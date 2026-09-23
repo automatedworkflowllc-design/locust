@@ -54,12 +54,12 @@ export interface SettingsPage {
 export const SETTINGS_PAGES: readonly SettingsPage[] = [
   {
     id: 'workspace',
-    label: 'Your workspace',
-    headings: ['Project folder', 'Teammates'],
+    label: 'Workspace',
+    headings: ['Project folder', 'Between teammates'],
     alsoKnownAs: {
       // Own branches are set here, under the folder they branch from.
       'Project folder': ['worktree', 'worktrees', 'branch', 'branches', 'folder', 'path', 'directory', 'project', 'repo'],
-      Teammates: ['role', 'roles', 'name', 'rename']
+      'Between teammates': ['relay', 'reply', 'replies', 'answer', 'message', 'messages', 'interrupt', 'role', 'roles', 'name', 'rename']
     }
   },
   {
@@ -77,7 +77,7 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
   },
   {
     id: 'teammates',
-    label: 'How teammates work',
+    label: 'Teammates',
     headings: ['Swarm', 'Auto mode', 'Plans', 'What your team remembers'],
     alsoKnownAs: {
       Swarm: ['parallel', 'at once', 'concurrent'],
@@ -90,21 +90,21 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
   {
     id: 'appearance',
     label: 'Appearance',
-    headings: ['Reply text size', 'Sidebar', 'The send button', 'The boot screen'],
+    headings: ['Reply text size', 'Sidebar', 'Send button', 'Boot screen'],
     alsoKnownAs: {
       // 'font' moved to Reply text size, which is the only setting in this
       // app that changes one. The sidebar has never had a font control.
       Sidebar: ['theme', 'dark', 'light', 'colour', 'color', 'width'],
       // The words a person reaches for when a reply is too big or too small:
       // Colin's own were 'text size', and nobody searches for 'prose'.
-      'The send button': ['metal', 'chromatic', 'silver', 'gold', 'shine', 'shimmer', 'hover', 'send', 'button', 'effect', 'bend', 'gooey', 'animation', 'motion'],
+      'Send button': ['metal', 'chromatic', 'silver', 'gold', 'shine', 'shimmer', 'hover', 'send', 'button', 'effect', 'bend', 'gooey', 'animation', 'motion'],
       'Reply text size': ['text', 'text size', 'font', 'font size', 'bigger', 'smaller', 'type', 'reading'],
-      'The boot screen': ['splash', 'startup', 'launch']
+      'Boot screen': ['splash', 'startup', 'launch']
     }
   },
   {
     id: 'app',
-    label: 'This app',
+    label: 'General',
     headings: ['Updates', 'Privacy & local data', 'Trash', 'Report a problem'],
     alsoKnownAs: {
       Updates: ['version', 'upgrade'],
@@ -121,10 +121,10 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
   {
     // The whole changelog, as Claude Code's What's new (Colin, 2026-09-23).
     id: 'whatsnew',
-    label: 'What’s new',
-    headings: ['What’s new'],
+    label: 'Changelog',
+    headings: ['Changelog'],
     alsoKnownAs: {
-      'What’s new': ['changelog', 'what changed', 'release notes', 'releases', 'history', 'versions', 'new']
+      Changelog: ['what’s new', "what's new", 'what changed', 'release notes', 'releases', 'history', 'versions', 'new']
     }
   }
 ]

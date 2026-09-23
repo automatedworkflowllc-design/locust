@@ -1478,7 +1478,7 @@ export function SettingsScreen({
           </div>
         </section>
         <section className="lc-settings__section">
-          <h2 className="lc-settings__heading">Teammates</h2>
+          <h2 className="lc-settings__heading">Between teammates</h2>
           <p className="lc-settings__lede">
             {/*
               * Says what is TRUE NOW. It stated the relay-on behaviour whatever
@@ -2053,7 +2053,7 @@ export function SettingsScreen({
           </div>
         </section>
         <section className="lc-settings__section">
-          <h2 className="lc-settings__heading">The send button</h2>
+          <h2 className="lc-settings__heading">Send button</h2>
           <p className="lc-settings__lede">
             {metal === 'off'
               ? 'Off. A plain button, and no shader running in the composer.'
@@ -2177,7 +2177,7 @@ export function SettingsScreen({
           </div>
         </section>
         <section className="lc-settings__section">
-          <h2 className="lc-settings__heading">The boot screen</h2>
+          <h2 className="lc-settings__heading">Boot screen</h2>
           <p className="lc-settings__lede">
             {tube === 'off'
               ? 'Off. Locust goes straight to the workspace while it finds your runtimes.'
@@ -2245,9 +2245,9 @@ export function SettingsScreen({
           </More>
           <UpdateControl update={update} onCheck={onCheckUpdate} onInstall={onInstallUpdate} />
           <p className="lc-settings__note">
-            This is {changelog?.version ?? 'this version'}. Every version, and what it changed, is in{' '}
+            This is {changelog?.version ?? 'this version'}. Every version, and what it changed, is in the{' '}
             <button type="button" className="lc-linkbutton" onClick={() => setPage('whatsnew')}>
-              What’s new
+              Changelog
             </button>
             .
           </p>
@@ -2302,7 +2302,7 @@ export function SettingsScreen({
         )}
         {shownPage === 'whatsnew' && (
         <section className="lc-settings__section">
-          <h2 className="lc-settings__heading">What’s new</h2>
+          <h2 className="lc-settings__heading">Changelog</h2>
           <p className="lc-settings__lede">Every version of Locust, newest first. This is {changelog?.version ?? 'the one running'}.</p>
           <WhatsNew changelog={changelog} />
         </section>

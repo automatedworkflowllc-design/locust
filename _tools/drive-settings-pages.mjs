@@ -32,7 +32,7 @@ const drive = await startDrive({
   }
 })
 
-const PAGES = ['Your workspace', 'Runtimes', 'How teammates work', 'Appearance', 'This app']
+const PAGES = ['Workspace', 'Runtimes', 'Teammates', 'Appearance', 'General']
 
 try {
   await drive.capture('launch', () => drive.ready())

@@ -170,7 +170,7 @@ try {
   say(`settings: ${await key('3')}`)
   await shoot(10, 'settings-top')
   // Settings is paged by category, not one long scroll.
-  say(await click('/^How teammates work$/'))
+  say(await click('/^Teammates$/'))
   await shoot(11, 'settings-how-teammates-work')
   say(await click('/^Appearance$/'))
   await shoot(12, 'settings-appearance')

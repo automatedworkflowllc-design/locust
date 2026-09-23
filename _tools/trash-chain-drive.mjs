@@ -254,7 +254,7 @@ try {
     const settings = [...document.querySelectorAll('button')].find(b => /^Settings/.test(b.getAttribute('aria-label') || b.getAttribute('title') || ''))
     if (settings) settings.click()
     await new Promise(r => setTimeout(r, 900))
-    const item = [...document.querySelectorAll('.lc-settings__navitem')].find(b => /This app/.test(b.innerText))
+    const item = [...document.querySelectorAll('.lc-settings__navitem')].find(b => /^General$/.test(b.innerText.trim()))
     if (item) item.click()
     await new Promise(r => setTimeout(r, 700))
     const back = [...document.querySelectorAll('button')].find(b => /Put back/.test(b.innerText))

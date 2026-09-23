@@ -51,7 +51,7 @@ try {
   say(`headings: ${JSON.stringify(headings)}`)
   const order = headings.headings ?? []
   check('Reply text size comes first', order[0] === 'Reply text size', order.join(' | '))
-  check('and ahead of the send button and the boot screen', order.indexOf('Reply text size') < order.indexOf('The send button') && order.indexOf('Reply text size') < order.indexOf('The boot screen'), order.join(' | '))
+  check('and ahead of the send button and the boot screen', order.indexOf('Reply text size') < order.indexOf('Send button') && order.indexOf('Reply text size') < order.indexOf('Boot screen'), order.join(' | '))
   say(failures === 0 ? '\nAPPEARANCE ORDER PASSED' : `\nAPPEARANCE ORDER: ${String(failures)} FAILED`)
 } catch (error) {
   say(`probe failed: ${error instanceof Error ? error.message : String(error)}`)

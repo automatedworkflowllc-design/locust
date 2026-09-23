@@ -95,14 +95,16 @@ try {
     await new Promise(r => setTimeout(r, 900))
     const nav = [...document.querySelectorAll('.lc-settings__navitem')].map(b => b.innerText.trim())
     const current = document.querySelector('.lc-settings__navitem.is-current')
-    const headings = [...document.querySelectorAll('.lc-settings__heading')].map(h => h.innerText.trim())
+    const headings = [...document.querySelectorAll('.lc-settings__heading')].map(h => h.textContent.trim())
     return JSON.stringify({ nav, current: current ? current.innerText.trim() : null, headings })
   })()`)
   const first = JSON.parse(opened)
   say(`   ${opened}`)
-  check('every page is listed', first.nav.length === 5, first.nav.join(' | '))
-  check('one of them is marked as where you are', first.current === 'Your workspace', String(first.current))
-  check('only that page is drawn', first.headings.join(',') === 'Project folder,Teammates', first.headings.join(','))
+  // Six since 0.281 added the changelog; the headings are read as TEXT --
+  // the CSS draws them in capitals, and innerText reports what is drawn.
+  check('every page is listed', first.nav.length === 6, first.nav.join(' | '))
+  check('one of them is marked as where you are', first.current === 'Workspace', String(first.current))
+  check('only that page is drawn', first.headings.join(',') === 'Project folder,Between teammates', first.headings.join(','))
 
   // Asked because the first after-frame LOOKED as though one heading were
   // tinted. Same class, same markup, so either the screenshot was lying or
@@ -116,11 +118,11 @@ try {
 
   say('2. another page is one press away')
   const switched = await cdp.eval(`(async () => {
-    const item = [...document.querySelectorAll('.lc-settings__navitem')].find(b => /This app/.test(b.innerText))
+    const item = [...document.querySelectorAll('.lc-settings__navitem')].find(b => /^General$/.test(b.innerText.trim()))
     if (!item) return JSON.stringify({ found: false })
     item.click()
     await new Promise(r => setTimeout(r, 500))
-    const headings = [...document.querySelectorAll('.lc-settings__heading')].map(h => h.innerText.trim())
+    const headings = [...document.querySelectorAll('.lc-settings__heading')].map(h => h.textContent.trim())
     const scrolled = document.querySelector('.lc-settings__pane')
     return JSON.stringify({ found: true, headings, scrollTop: scrolled ? scrolled.scrollTop : -1 })
   })()`)
@@ -139,7 +141,7 @@ try {
     box.dispatchEvent(new Event('input', { bubbles: true }))
     await new Promise(r => setTimeout(r, 500))
     const nav = [...document.querySelectorAll('.lc-settings__navitem')].map(b => b.innerText.replace(new RegExp('[' + String.fromCharCode(32, 9, 13, 10) + ']+', 'g'), ' ').trim())
-    const headings = [...document.querySelectorAll('.lc-settings__heading')].map(h => h.innerText.trim())
+    const headings = [...document.querySelectorAll('.lc-settings__heading')].map(h => h.textContent.trim())
     return JSON.stringify({ box: true, nav, headings })
   })()`)
   const three = JSON.parse(searched)
@@ -162,11 +164,11 @@ try {
    */
   say('3b. the words a person types, not the words we chose')
   for (const [typed, page, heading] of [
-    ['memory', 'How teammates work', 'What your team remembers'],
-    ['worktree', 'Your workspace', 'Project folder'],
+    ['memory', 'Teammates', 'What your team remembers'],
+    ['worktree', 'Workspace', 'Project folder'],
     ['node', 'Runtimes', 'Runtimes & accounts'],
-    ['ledger', 'This app', 'Privacy & local data'],
-    ['recycle bin', 'This app', 'Trash']
+    ['ledger', 'General', 'Privacy & local data'],
+    ['recycle bin', 'General', 'Trash']
   ]) {
     const found = await cdp.eval(`(async () => {
       const box = document.querySelector('.lc-settings__search')
@@ -189,12 +191,12 @@ try {
       // person can act on, and the thing that was missing.
       const box2 = pane ? pane.getBoundingClientRect() : null
       const wanted = box2 ? [...pane.querySelectorAll('.lc-settings__heading')]
-        .find(h => h.innerText.trim() === ${JSON.stringify(heading)}) : null
+        .find(h => h.textContent.trim() === ${JSON.stringify(heading)}) : null
       const seenNow = wanted && box2
         ? wanted.getBoundingClientRect().top >= box2.top - 1 && wanted.getBoundingClientRect().top < box2.bottom
         : false
       const atTop = box2 ? [...pane.querySelectorAll('.lc-settings__heading')]
-        .map(h => ({ text: h.innerText.trim(), d: Math.abs(h.getBoundingClientRect().top - box2.top) }))
+        .map(h => ({ text: h.textContent.trim(), d: Math.abs(h.getBoundingClientRect().top - box2.top) }))
         .sort((a, b) => a.d - b.d)[0] : null
       return JSON.stringify({
         nothingMatched: note ? note.innerText.slice(0, 40) : null,
@@ -224,7 +226,7 @@ try {
     await new Promise(r => setTimeout(r, 400))
     return JSON.stringify({ nav: [...document.querySelectorAll('.lc-settings__navitem')].length })
   })()`)
-  check('every page is back', JSON.parse(cleared).nav === 5, cleared)
+  check('every page is back', JSON.parse(cleared).nav === 6, cleared)
 
   const shot2 = await cdp.send('Page.captureScreenshot', { format: 'png' })
   const out = new URL('../docs/chain-measure/settings-2026-09-17.png', import.meta.url)
