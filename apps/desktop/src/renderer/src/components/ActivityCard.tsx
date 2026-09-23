@@ -133,6 +133,9 @@ function ShellOutputFoot({ output, total }: { readonly output: string; readonly 
   )
 }
 
+/** How many rows a finished fold shows before "Show N more". */
+export const FOLD_ROWS_SHOWN = 10
+
 export function ActivityCard({
   summary,
   details,
@@ -258,6 +261,21 @@ export function ActivityCard({
     next.set(entry.key, !isOpen(entry))
     setToggled(next)
   }
+  /*
+   * A LONG FINISHED FOLD SHOWS ITS FIRST ROWS, AND SAYS HOW MANY MORE.
+   *
+   * Folds stay open when a turn finishes -- Colin, 2026-09-08: "we want that
+   * to stay so they can see after the fact". But a twelve-file turn opened a
+   * twenty-five-row fold 969px tall in an 800px window, and the answer it
+   * led to was off the screen (Yurt's beta report, #2 / B3; the 0.271 design
+   * recheck's "make the final answer the focal point", 9a). So a finished
+   * fold keeps its first rows and one press shows the rest: open, as he
+   * asked, and the answer within reach. A run still going shows every row --
+   * that is the work happening.
+   */
+  const [showAll, setShowAll] = useState(false)
+  const capped = finished && !showAll && entries.length > FOLD_ROWS_SHOWN + 2
+  const shown = capped ? entries.slice(0, FOLD_ROWS_SHOWN) : entries
 
   return (
     <div className="lc-card">
@@ -295,7 +313,7 @@ export function ActivityCard({
               <PlanSteps steps={plan.steps} doneCount={plan.doneCount} outcomes underway={planUnderway} />
             </div>
           )}
-          {entries.map((entry) => (
+          {shown.map((entry) => (
             <Fragment key={entry.key}>
               {entry.kind === 'file' ? (
                 <>
@@ -593,6 +611,11 @@ export function ActivityCard({
               )}
             </Fragment>
           ))}
+          {capped && (
+            <button type="button" className="lc-activity__more" onClick={() => setShowAll(true)}>
+              Show {entries.length - FOLD_ROWS_SHOWN} more
+            </button>
+          )}
           {revealNotice !== undefined && <p className="lc-filerow__notice">{revealNotice}</p>}
           {/*
             * What the runtime said about this turn, in the fold's FOOTER --

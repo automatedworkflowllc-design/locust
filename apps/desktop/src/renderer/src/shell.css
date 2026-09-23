@@ -7808,6 +7808,26 @@ textarea {
  * ranked it above the tone (RULINGS 2026-09-10). The fold's own hairline
  * separates the two, and each notice carries who said it.
  */
+/* The rest of a long finished fold, one press away (ActivityCard, FOLD_ROWS_SHOWN). */
+.lc-activity__more {
+  display: block;
+  width: 100%;
+  padding: var(--lc-space-3) var(--lc-space-5);
+  border: 0;
+  border-top: 1px solid var(--lc-border-hairline);
+  background: transparent;
+  color: var(--lc-text-muted);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  text-align: left;
+  cursor: pointer;
+}
+
+.lc-activity__more:hover {
+  background: var(--lc-hover-surface);
+  color: var(--lc-text-secondary);
+}
+
 .lc-activity__foot {
   border-top: 1px solid var(--lc-border-hairline);
   padding: var(--lc-space-3) var(--lc-space-5);
