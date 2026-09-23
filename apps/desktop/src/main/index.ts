@@ -125,6 +125,7 @@ import {
   RUNTIME_INSTALL_CHANNEL,
   RUNTIME_UPDATES_CHANNEL,
   RUNTIME_UPDATES_EVENT_CHANNEL,
+  RUNTIME_UPDATES_NOW_CHANNEL,
   RUNTIME_UPDATES_SET_CHANNEL,
   RUNTIME_INSTALL_PROGRESS_CHANNEL,
   RUNTIME_SIGN_IN_CHANNEL,
@@ -1650,10 +1651,15 @@ if (!ownsSingleInstanceLock) {
       }
     })
     ipcMain.handle(RUNTIME_UPDATES_CHANNEL, (event) =>
-      fromOwnWindow(event) ? runtimeUpdates.state() : { enabled: false, checkedAt: undefined, agents: [] }
+      fromOwnWindow(event) ? runtimeUpdates.state() : { automatic: false, checkedAt: undefined, agents: [] }
     )
-    ipcMain.handle(RUNTIME_UPDATES_SET_CHANNEL, (event, enabled: unknown) =>
-      fromOwnWindow(event) && typeof enabled === 'boolean' ? runtimeUpdates.setEnabled(enabled) : runtimeUpdates.state()
+    ipcMain.handle(RUNTIME_UPDATES_SET_CHANNEL, (event, automatic: unknown) =>
+      fromOwnWindow(event) && typeof automatic === 'boolean' ? runtimeUpdates.setAutomatic(automatic) : runtimeUpdates.state()
+    )
+    // Update pressed on a runtime's row. Only an id crosses the bridge, and
+    // only one of the agents kept current is ever updated for it.
+    ipcMain.handle(RUNTIME_UPDATES_NOW_CHANNEL, (event, runtime: unknown) =>
+      fromOwnWindow(event) && typeof runtime === 'string' ? runtimeUpdates.updateNow(runtime) : runtimeUpdates.state()
     )
     if (mayUpdateAgents(process.argv, process.env)) {
       setTimeout(() => void runtimeUpdates.tick(), FIRST_LOOK_AFTER_MS)

@@ -439,13 +439,19 @@ export interface RuntimeInstallProgress {
  */
 export const RUNTIME_UPDATES_CHANNEL = 'runtime-updates:read'
 export const RUNTIME_UPDATES_SET_CHANNEL = 'runtime-updates:set'
+/** The person pressed Update on a runtime's row. */
+export const RUNTIME_UPDATES_NOW_CHANNEL = 'runtime-updates:now'
 /** Pushed when an update starts, lands or fails. */
 export const RUNTIME_UPDATES_EVENT_CHANNEL = 'runtime-updates:changed'
 
 export type RuntimeUpdateStatus =
   | { readonly kind: 'current' }
-  /** Newer is out and waits: something is using it, it is too new to trust yet, or keeping current is off. */
-  | { readonly kind: 'waiting'; readonly version: string; readonly why: 'in use' | 'too new' | 'off' }
+  /**
+   * Newer is out and waits: for the person to press Update (updating on its
+   * own is off), for nothing to be using it, or -- updating on its own -- for
+   * it to have been out long enough to trust.
+   */
+  | { readonly kind: 'waiting'; readonly version: string; readonly why: 'ask' | 'in use' | 'too new' }
   | { readonly kind: 'updating'; readonly version: string }
   | { readonly kind: 'updated'; readonly from: string; readonly to: string; readonly at: string }
   | { readonly kind: 'failed'; readonly version: string; readonly what: string; readonly at: string }
@@ -458,7 +464,8 @@ export interface RuntimeUpdateView {
 }
 
 export interface RuntimeUpdatesState {
-  readonly enabled: boolean
+  /** Updates without being asked: off unless the person turned it on. */
+  readonly automatic: boolean
   /** When npm was last asked; undefined before the first look. */
   readonly checkedAt: string | undefined
   readonly agents: readonly RuntimeUpdateView[]
@@ -2092,8 +2099,10 @@ export interface DesktopApi {
   onRuntimeInstallProgress(listener: (progress: RuntimeInstallProgress) => void): () => void
   /** The coding agents Locust keeps current, and what it has done about them. */
   readRuntimeUpdates(): Promise<RuntimeUpdatesState>
-  /** Keep them current, or not. */
-  setRuntimeUpdates(enabled: boolean): Promise<RuntimeUpdatesState>
+  /** Update them without being asked, or not. */
+  setRuntimeUpdates(automatic: boolean): Promise<RuntimeUpdatesState>
+  /** Update this one now: the person pressed Update on its row. */
+  updateRuntimeNow(runtime: string): Promise<RuntimeUpdatesState>
   /** An update started, landed or failed. Returns the unsubscribe. */
   onRuntimeUpdates(listener: (state: RuntimeUpdatesState) => void): () => void
   /** Open the runtime's sign-in in its own window. */

@@ -28,6 +28,7 @@ import {
   RUNTIME_INSTALL_PROGRESS_CHANNEL,
   RUNTIME_UPDATES_CHANNEL,
   RUNTIME_UPDATES_EVENT_CHANNEL,
+  RUNTIME_UPDATES_NOW_CHANNEL,
   RUNTIME_UPDATES_SET_CHANNEL,
   RUNTIME_DISCOVERY_CHANNEL,
   RUNTIME_DISCOVERY_EVENT_CHANNEL,
@@ -268,8 +269,10 @@ const desktopApi: DesktopApi = {
     }
   },
   readRuntimeUpdates: () => ipcRenderer.invoke(RUNTIME_UPDATES_CHANNEL) as Promise<RuntimeUpdatesState>,
-  setRuntimeUpdates: (enabled: boolean) =>
-    ipcRenderer.invoke(RUNTIME_UPDATES_SET_CHANNEL, enabled === true) as Promise<RuntimeUpdatesState>,
+  setRuntimeUpdates: (automatic: boolean) =>
+    ipcRenderer.invoke(RUNTIME_UPDATES_SET_CHANNEL, automatic === true) as Promise<RuntimeUpdatesState>,
+  updateRuntimeNow: (runtime: string) =>
+    ipcRenderer.invoke(RUNTIME_UPDATES_NOW_CHANNEL, runtime) as Promise<RuntimeUpdatesState>,
   onRuntimeUpdates: (listener: (state: RuntimeUpdatesState) => void) => {
     const handler = (_event: unknown, state: RuntimeUpdatesState): void => listener(state)
     ipcRenderer.on(RUNTIME_UPDATES_EVENT_CHANNEL, handler)

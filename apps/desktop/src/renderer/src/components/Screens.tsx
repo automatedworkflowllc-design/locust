@@ -41,7 +41,7 @@ import {
 } from '../status.js'
 import { CliArtifacts } from './CliArtifacts.js'
 import { TeammateBot } from './TeammateBot.js'
-import { keepCurrentNote, updateLine } from '../agentUpdates.js'
+import { keepCurrentNote, offersUpdate, updateLine } from '../agentUpdates.js'
 import { Icon } from './Icon.js'
 import { costCell, costLabel, costLineOrWhyNot, costTotal, runCostOf } from '../cost.js'
 import { agoLabel, teammateWork } from '../teammateWork.js'
@@ -1138,6 +1138,7 @@ export function SettingsScreen({
   usageWindows,
   runtimeUpdates,
   onKeepAgentsCurrent,
+  onUpdateAgent,
   runtimeSetup,
   cliArtifacts,
   workspaceBrief,
@@ -1198,7 +1199,10 @@ export function SettingsScreen({
   readonly usageWindows?: ReadonlyMap<string, string>
   /** What keeping the coding agents current has done (runtime-updates.ts); undefined until read. */
   readonly runtimeUpdates?: RuntimeUpdatesState
-  readonly onKeepAgentsCurrent?: (enabled: boolean) => void
+  /** Update the agents without being asked, or not. */
+  readonly onKeepAgentsCurrent?: (automatic: boolean) => void
+  /** Update pressed on a runtime's row. */
+  readonly onUpdateAgent?: (runtime: string) => void
   /** Each runtime's own MCP servers and hooks, by runtime id; undefined until read. */
   readonly runtimeSetup: Readonly<Record<string, PublicRuntimeSetup>> | undefined
   /**
@@ -1711,6 +1715,12 @@ export function SettingsScreen({
                     * there (Grok's audit, 2026-09-13).
                     */}
                   {status.tag === 'SIGN IN' && <SignInButton runtime={runtime.id} />}
+                  {/* A newer version is out: the download is the person's to start (0.303). */}
+                  {offersUpdate(runtimeUpdates?.agents.find((agent) => agent.runtime === runtime.id)) && onUpdateAgent !== undefined && (
+                    <button type="button" className="lc-runtimecell__install" onClick={() => onUpdateAgent(runtime.id)}>
+                      Update
+                    </button>
+                  )}
                 </div>
               )
             })}
@@ -1724,14 +1734,14 @@ export function SettingsScreen({
           {runtimeUpdates !== undefined && onKeepAgentsCurrent !== undefined && (
             <div className="lc-settingrows">
               <div className="lc-settingrow">
-                <span className="lc-settings__note">{keepCurrentNote(runtimeUpdates.enabled)}</span>
+                <span className="lc-settings__note">{keepCurrentNote(runtimeUpdates.automatic)}</span>
                 <button
                   type="button"
-                  className={`lc-switch${runtimeUpdates.enabled ? ' is-on' : ''}`}
+                  className={`lc-switch${runtimeUpdates.automatic ? ' is-on' : ''}`}
                   role="switch"
-                  aria-checked={runtimeUpdates.enabled}
-                  aria-label="Keep Codex CLI and Copilot CLI up to date"
-                  onClick={() => onKeepAgentsCurrent(!runtimeUpdates.enabled)}
+                  aria-checked={runtimeUpdates.automatic}
+                  aria-label="Update Codex CLI and Copilot CLI on their own"
+                  onClick={() => onKeepAgentsCurrent(!runtimeUpdates.automatic)}
                 >
                   <span className="lc-switch__knob" />
                 </button>

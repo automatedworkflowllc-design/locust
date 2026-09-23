@@ -36,6 +36,19 @@ import { runtimeInstallFacts } from '../shared/runtime-install.js'
  *   are in the picker without a restart.
  *
  * A switch in Settings turns it off; off, a newer version is still reported.
+ *
+ * AND IT ASKS FIRST (0.303). A beta tester, the evening 0.302 went out: "when
+ * I sent the prompt everything on the computer disconnected from internet ...
+ * I stopped it and closed locust and everything went back to normal", in the
+ * middle of a Google Meet, with Locust saying "reconnecting". Codex CLI's
+ * update is one npm package of 159 MB (0.156.1's win32 tarball, measured), and
+ * 0.302 started it by itself 45 s after launch: on an ordinary home line that
+ * is a minute or two of the whole connection. Nothing on this machine can
+ * know that someone is on a call, or on a slow line. So the LOOK stays
+ * automatic -- a few kilobytes -- and the DOWNLOAD is the person's: the row
+ * says a newer version is out and offers Update. Updating on its own is a
+ * switch they turn on, and it starts OFF -- a new saved key, so every 0.302
+ * install that had it on by default starts off again.
  */
 
 /**
@@ -79,7 +92,8 @@ export function savedUpdatesFrom(value: unknown): SavedUpdates | undefined {
     }
   }
   return {
-    enabled: record.enabled !== false,
+    // `automatic`, not 0.302's `enabled`: that was on for everyone by default.
+    automatic: record.automatic === true,
     checkedAt: typeof record.checkedAt === 'number' && Number.isFinite(record.checkedAt) ? record.checkedAt : undefined,
     latest,
     last
@@ -101,7 +115,8 @@ export interface Release {
 
 /** What is kept on disk between launches. */
 export interface SavedUpdates {
-  readonly enabled: boolean
+  /** Updates without being asked. Off unless the person turned it on. */
+  readonly automatic: boolean
   readonly checkedAt: number | undefined
   /** The newest release seen, by package. */
   readonly latest: Readonly<Record<string, Release>>
@@ -109,7 +124,7 @@ export interface SavedUpdates {
   readonly last: Readonly<Record<string, RuntimeUpdateStatus>>
 }
 
-export const NOTHING_SAVED: SavedUpdates = { enabled: true, checkedAt: undefined, latest: {}, last: {} }
+export const NOTHING_SAVED: SavedUpdates = { automatic: false, checkedAt: undefined, latest: {}, last: {} }
 
 /**
  * Newer, older or the same: dotted numbers compared as numbers, and a
@@ -139,13 +154,14 @@ export function compareVersions(left: string, right: string): number {
 export function decide(input: {
   readonly installed: string | undefined
   readonly latest: Release | undefined
-  readonly enabled: boolean
+  readonly automatic: boolean
   readonly inUse: boolean
   readonly now: number
 }): RuntimeUpdateStatus | { readonly kind: 'update'; readonly version: string } {
   const { installed, latest } = input
   if (installed === undefined || latest === undefined || compareVersions(latest.version, installed) <= 0) return { kind: 'current' }
-  if (!input.enabled) return { kind: 'waiting', version: latest.version, why: 'off' }
+  // Not automatic: it waits for the person to press Update.
+  if (!input.automatic) return { kind: 'waiting', version: latest.version, why: 'ask' }
   const published = latest.publishedAt === undefined ? Number.NaN : Date.parse(latest.publishedAt)
   // A release npm gives no date for is treated as brand new: it waits.
   if (!Number.isFinite(published) || input.now - published < RELEASE_AGE_MS) return { kind: 'waiting', version: latest.version, why: 'too new' }
@@ -186,7 +202,9 @@ export interface RuntimeUpdatesOptions {
 
 export interface RuntimeUpdates {
   state(): Promise<RuntimeUpdatesState>
-  setEnabled(enabled: boolean): Promise<RuntimeUpdatesState>
+  setAutomatic(automatic: boolean): Promise<RuntimeUpdatesState>
+  /** The person pressed Update: this agent, now, unless something is using it. */
+  updateNow(runtime: string): Promise<RuntimeUpdatesState>
   /** Look, if a look is due; then update whatever is behind and not in use. */
   tick(): Promise<void>
   /** The agent being updated right now, if one is: a mission must not start on it. */
@@ -209,12 +227,17 @@ export function createRuntimeUpdates(options: RuntimeUpdatesOptions): RuntimeUpd
     await options.save(next).catch(() => undefined)
   }
 
-  const run = async (): Promise<void> => {
-    let state = await held()
+  interface Agent {
+    readonly id: string
+    readonly installed: string
+    readonly dir: string
+    readonly packageName: string
+  }
+  const agentsNow = async (): Promise<readonly Agent[] | undefined> => {
     const runtimes = await options.discover()
     const root = await options.npmRoot().catch(() => undefined)
-    if (root === undefined) return
-    const agents = KEPT_CURRENT.flatMap((id) => {
+    if (root === undefined) return undefined
+    return KEPT_CURRENT.flatMap((id) => {
       const discovery = runtimes.find((entry) => entry.id === id)
       const dir = discovery === undefined ? undefined : npmPackageDir(discovery, root)
       const packageName = runtimeInstallFacts(id)?.install
@@ -222,6 +245,28 @@ export function createRuntimeUpdates(options: RuntimeUpdatesOptions): RuntimeUpd
         ? [{ id, installed: discovery.version.version, dir, packageName: packageName.packageName }]
         : []
     })
+  }
+  /** One update, reported as it starts and as it ends; the view it leaves. */
+  const updateOne = async (agent: Agent, version: string, others: readonly RuntimeUpdateView[]): Promise<RuntimeUpdateView> => {
+    current = agent.id
+    views = [...others, { runtime: agent.id, installed: agent.installed, latest: version, status: { kind: 'updating', version } }]
+    options.changed()
+    const outcome = await options.install(agent.id, version).catch((error: unknown) => ({ ok: false as const, what: error instanceof Error ? error.message : String(error) }))
+    current = undefined
+    const at = new Date(now()).toISOString()
+    const status: RuntimeUpdateStatus = outcome.ok
+      ? { kind: 'updated', from: agent.installed, to: version, at }
+      : { kind: 'failed', version, what: outcome.what, at }
+    const state = await held()
+    await keep({ ...state, last: { ...state.last, [agent.id]: status } })
+    if (outcome.ok) options.updated(agent.id)
+    return { runtime: agent.id, installed: outcome.ok ? version : agent.installed, latest: version, status }
+  }
+
+  const run = async (): Promise<void> => {
+    let state = await held()
+    const agents = await agentsNow()
+    if (agents === undefined) return
     // Look, if due.
     if (state.checkedAt === undefined || now() - state.checkedAt >= CHECK_EVERY_MS) {
       const latest: Record<string, Release> = { ...state.latest }
@@ -236,7 +281,7 @@ export function createRuntimeUpdates(options: RuntimeUpdatesOptions): RuntimeUpd
     for (const agent of agents) {
       const release = state.latest[agent.packageName]
       const ask = (inUse: boolean): ReturnType<typeof decide> =>
-        decide({ installed: agent.installed, latest: release, enabled: state.enabled, inUse, now: now() })
+        decide({ installed: agent.installed, latest: release, automatic: state.automatic, inUse, now: now() })
       // The machine's process table is read only when it is the last question:
       // an update would go ahead if nothing were using the agent.
       const provisional = ask(false)
@@ -247,20 +292,8 @@ export function createRuntimeUpdates(options: RuntimeUpdatesOptions): RuntimeUpd
         next.push({ runtime: agent.id, installed: agent.installed, latest: release?.version, status: verdict.kind === 'current' && last !== undefined ? last : verdict })
         continue
       }
-      current = agent.id
-      next.push({ runtime: agent.id, installed: agent.installed, latest: verdict.version, status: { kind: 'updating', version: verdict.version } })
-      views = [...next]
-      options.changed()
-      const outcome = await options.install(agent.id, verdict.version).catch((error: unknown) => ({ ok: false as const, what: error instanceof Error ? error.message : String(error) }))
-      current = undefined
-      const at = new Date(now()).toISOString()
-      const status: RuntimeUpdateStatus = outcome.ok
-        ? { kind: 'updated', from: agent.installed, to: verdict.version, at }
-        : { kind: 'failed', version: verdict.version, what: outcome.what, at }
-      state = { ...state, last: { ...state.last, [agent.id]: status } }
-      await keep(state)
-      next[next.length - 1] = { runtime: agent.id, installed: outcome.ok ? verdict.version : agent.installed, latest: verdict.version, status }
-      if (outcome.ok) options.updated(agent.id)
+      next.push(await updateOne(agent, verdict.version, next))
+      state = await held()
     }
     views = next
     options.changed()
@@ -269,12 +302,29 @@ export function createRuntimeUpdates(options: RuntimeUpdatesOptions): RuntimeUpd
   return {
     async state() {
       const state = await held()
-      return { enabled: state.enabled, checkedAt: state.checkedAt === undefined ? undefined : new Date(state.checkedAt).toISOString(), agents: views }
+      return { automatic: state.automatic, checkedAt: state.checkedAt === undefined ? undefined : new Date(state.checkedAt).toISOString(), agents: views }
     },
-    async setEnabled(enabled) {
-      await keep({ ...(await held()), enabled })
+    async setAutomatic(automatic) {
+      await keep({ ...(await held()), automatic })
       // Turned on, whatever was waiting on it goes now, not at the next look.
-      if (enabled) void this.tick()
+      if (automatic) void this.tick()
+      return this.state()
+    },
+    async updateNow(runtime) {
+      if (ticking !== undefined) await ticking.catch(() => undefined)
+      const agent = (await agentsNow())?.find((entry) => entry.id === runtime)
+      const state = await held()
+      const release = agent === undefined ? undefined : state.latest[agent.packageName]
+      if (agent === undefined || release === undefined || compareVersions(release.version, agent.installed) <= 0 || current !== undefined) return this.state()
+      const others = views.filter((view) => view.runtime !== runtime)
+      if (await options.inUse(agent.dir).catch(() => true)) {
+        views = [...others, { runtime, installed: agent.installed, latest: release.version, status: { kind: 'waiting', version: release.version, why: 'in use' } }]
+        options.changed()
+        return this.state()
+      }
+      const view = await updateOne(agent, release.version, others)
+      views = [...others, view]
+      options.changed()
       return this.state()
     },
     tick() {

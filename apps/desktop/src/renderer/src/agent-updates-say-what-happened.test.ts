@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { keepCurrentNote, updateLine } from './agentUpdates.js'
+import { keepCurrentNote, offersUpdate, updateLine } from './agentUpdates.js'
 import type { RuntimeUpdateView } from '../../shared/ipc.js'
 
 /**
@@ -17,9 +17,17 @@ describe("a runtime's row", () => {
   })
 
   it('says a newer version is out, and what it is waiting for', () => {
-    expect(updateLine(view({ kind: 'waiting', version: '0.156.1', why: 'in use' }), NOW)).toBe('0.156.1 is out. It updates once nothing is using it.')
+    expect(updateLine(view({ kind: 'waiting', version: '0.156.1', why: 'ask' }), NOW)).toBe('0.156.1 is out.')
+    expect(updateLine(view({ kind: 'waiting', version: '0.156.1', why: 'in use' }), NOW)).toBe('0.156.1 is out. It can update once nothing is using it.')
     expect(updateLine(view({ kind: 'waiting', version: '0.156.1', why: 'too new' }), NOW)).toBe('0.156.1 is out. It updates once it has been out 12 hours.')
-    expect(updateLine(view({ kind: 'waiting', version: '0.156.1', why: 'off' }), NOW)).toBe('0.156.1 is out. Keeping it current is off.')
+  })
+
+  it('offers Update when the download is the person\'s to start -- not for a release too new to update on its own', () => {
+    expect(offersUpdate(view({ kind: 'waiting', version: '0.156.1', why: 'ask' }))).toBe(true)
+    expect(offersUpdate(view({ kind: 'waiting', version: '0.156.1', why: 'in use' }))).toBe(true)
+    expect(offersUpdate(view({ kind: 'waiting', version: '0.156.1', why: 'too new' }))).toBe(false)
+    expect(offersUpdate(view({ kind: 'updating', version: '0.156.1' }))).toBe(false)
+    expect(offersUpdate(view({ kind: 'current' }))).toBe(false)
   })
 
   it('says an update is under way, landed, or failed -- and when', () => {
@@ -30,7 +38,8 @@ describe("a runtime's row", () => {
   })
 })
 
-it('the switch says what it does either way', () => {
-  expect(keepCurrentNote(true)).toMatch(/^On\. Codex CLI and Copilot CLI are updated/)
-  expect(keepCurrentNote(false)).toMatch(/^Off\./)
+it('the switch says what it does either way, and that the download is big', () => {
+  expect(keepCurrentNote(true)).toMatch(/^Updating on their own\./)
+  expect(keepCurrentNote(false)).toMatch(/^Updating when you press Update\./)
+  expect(keepCurrentNote(false)).toMatch(/160 MB/)
 })

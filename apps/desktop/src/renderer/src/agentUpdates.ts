@@ -12,11 +12,11 @@ export function updateLine(view: RuntimeUpdateView | undefined, now: Date = new 
     case 'current':
       return undefined
     case 'waiting':
-      return status.why === 'in use'
-        ? `${status.version} is out. It updates once nothing is using it.`
-        : status.why === 'too new'
-          ? `${status.version} is out. It updates once it has been out 12 hours.`
-          : `${status.version} is out. Keeping it current is off.`
+      return status.why === 'ask'
+        ? `${status.version} is out.`
+        : status.why === 'in use'
+          ? `${status.version} is out. It can update once nothing is using it.`
+          : `${status.version} is out. It updates once it has been out 12 hours.`
     case 'updating':
       return `Updating to ${status.version}…`
     case 'updated':
@@ -35,9 +35,18 @@ function when(at: string, now: Date): string {
     : `on ${then.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
 }
 
-/** The switch's own sentence. */
-export function keepCurrentNote(enabled: boolean): string {
-  return enabled
-    ? 'On. Codex CLI and Copilot CLI are updated when a newer version is out and nothing is using them. Claude Code, OpenCode and Cursor Agent keep themselves current.'
-    : 'Off. A newer Codex CLI or Copilot CLI is shown here, not installed.'
+/** Whether a row offers Update: a newer version is out and waiting on the person, or on nothing using it. */
+export function offersUpdate(view: RuntimeUpdateView | undefined): boolean {
+  return view !== undefined && view.status.kind === 'waiting' && view.status.why !== 'too new'
+}
+
+/**
+ * The switch's own sentence. Off by default since 0.303: an update is a big
+ * download (Codex CLI's was 159 MB), and one started by itself took a beta
+ * tester's whole connection in the middle of a call.
+ */
+export function keepCurrentNote(automatic: boolean): string {
+  return automatic
+    ? 'Updating on their own. A newer Codex CLI or Copilot CLI is downloaded when it is out and nothing is using it — a big download, which slows the connection while it runs.'
+    : 'Updating when you press Update. A newer Codex CLI or Copilot CLI is shown on its row, and the download — Codex CLI\'s is about 160 MB — starts only when you ask.'
 }

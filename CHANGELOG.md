@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.303.0 - 2026-09-23
+
+### Fixed
+
+- **Codex and Copilot update only when you ask.** 0.302 downloaded a newer
+  Codex CLI by itself a minute after Locust opened -- about 160 MB, which
+  can take over an ordinary internet connection for a minute or two, along
+  with whatever else was using it. Locust still checks for new versions,
+  quietly; a newer one is shown on its row in Settings › Runtimes with an
+  Update button, and the download starts only when you press it. Updating
+  on their own is a switch, off unless you turn it on.
+
 ## 0.302.0 - 2026-09-23
 
 ### New

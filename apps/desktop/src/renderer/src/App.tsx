@@ -4968,9 +4968,15 @@ export default function App(): ReactElement {
               limitedRuntimes={limitedRuntimes}
               usageWindows={usageWindows}
               {...(runtimeUpdates === undefined ? {} : { runtimeUpdates })}
-              onKeepAgentsCurrent={(enabled) => {
+              onKeepAgentsCurrent={(automatic) => {
                 void window.desktop
-                  ?.setRuntimeUpdates(enabled)
+                  ?.setRuntimeUpdates(automatic)
+                  .then(setRuntimeUpdates)
+                  .catch(() => undefined)
+              }}
+              onUpdateAgent={(runtime) => {
+                void window.desktop
+                  ?.updateRuntimeNow(runtime)
                   .then(setRuntimeUpdates)
                   .catch(() => undefined)
               }}
