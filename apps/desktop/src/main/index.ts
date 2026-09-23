@@ -758,6 +758,22 @@ const showAppWindow = (): void => {
   waiting.focus()
 }
 
+/**
+ * SAY WHY A PRELOAD FAILED, not only that it did.
+ *
+ * Drive records since 2026-09-20 carry "Electron sandboxed_renderer.bundle.js
+ * script failed to run" on their first step -- counted 2026-09-23: 4 of 31
+ * packaged launches, 0 of 23 from the development build, every one of those
+ * runs passing (the bridge was there). The console line has no stack, so
+ * nothing says which window or what threw. Electron hands the exception to
+ * `preload-error`; it goes to the log with the window it came from.
+ */
+const reportPreloadErrors = (window: BrowserWindow, which: string): void => {
+  window.webContents.on('preload-error', (_event, preloadPath, error) => {
+    console.error(`[preload] the ${which} window's preload threw (${preloadPath}):`, error)
+  })
+}
+
 /** How long the loading window may hold the app before it is opened anyway. */
 const SPLASH_CAP_MS = 12_000
 const SPLASH_WIDTH = 788
@@ -796,6 +812,7 @@ const createSplashWindow = (): BrowserWindow => {
       nodeIntegration: false
     }
   })
+  reportPreloadErrors(splash, 'loading')
   splash.once('ready-to-show', () => {
     // Shown AND raised. A loading screen that opens behind the window that
     // had focus is a loading screen nobody sees.
@@ -856,6 +873,7 @@ const createWindow = (
     }
   })
 
+  reportPreloadErrors(window, 'main')
   onWindow(window)
 
   window.once('ready-to-show', () => {
