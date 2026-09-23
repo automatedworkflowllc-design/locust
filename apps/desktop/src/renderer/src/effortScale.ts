@@ -106,3 +106,18 @@ export function joinEffort(base: string, fast: boolean, supported: readonly stri
   if (supported.includes(base)) return base
   return undefined
 }
+
+/**
+ * A model's levels in words, for the one line a picker row has: "Low, High",
+ * "Low to Max · Fast". The raw list -- `low, low-fast, medium, ...` -- is the
+ * hover's; ten ids on a line read as a config file, which is what every
+ * Cursor row did beside "Listed by cursor-agent --list-models" (2026-09-23).
+ * Undefined for a model with no levels at all.
+ */
+export function levelsLine(supported: readonly string[], name: (level: string) => string): string | undefined {
+  const { bases, hasFast } = effortScale(supported)
+  if (bases.length === 0) return undefined
+  const words = bases.map(name)
+  const span = words.length <= 3 ? words.join(', ') : `${words[0] ?? ''} to ${words[words.length - 1] ?? ''}`
+  return hasFast ? `${span} · Fast` : span
+}

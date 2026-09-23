@@ -386,7 +386,9 @@ export function cursorModelsFrom(runtimes: readonly RuntimeDiscovery[]): readonl
       id: named?.[1] ?? held.defaultId,
       runtime: 'cursor' as const,
       displayName: held.plainName ?? shared ?? family,
-      description: 'Listed by cursor-agent --list-models',
+      // Nothing to say beyond the name: "Listed by cursor-agent --list-models"
+      // stood on every one of 49 rows. The picker says the levels instead.
+      description: '',
       supportedEfforts: held.efforts,
       ...(Object.keys(held.variants).length === 0 ? {} : { variants: held.variants }),
       ...(named === undefined ? {} : { defaultEffort: named[0] })

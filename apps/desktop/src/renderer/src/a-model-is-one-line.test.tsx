@@ -70,8 +70,12 @@ describe('a model is one line in the picker', () => {
     expect(html).toContain('title="Fable 5.1 · Always the newest Fable · 5 effort levels · low, medium, high, xhigh, max"')
   })
 
-  it('a model the catalogue says nothing about keeps its levels as its line', () => {
-    expect(detailOf(draw([bare]), 'Sonnet 5')).toBe('2 effort levels · low, high')
+  it('a model the catalogue says nothing about keeps its levels as its line, in words', () => {
+    expect(detailOf(draw([bare]), 'Sonnet 5')).toBe('Low, High')
+    // Many levels read as a range, and a fast variant is said once.
+    const cursorish = { ...bare, id: 'opus', displayName: 'Claude Opus 5.5 1M', supportedEfforts: ['low', 'low-fast', 'medium', 'high', 'xhigh', 'max', 'max-fast'] }
+    // A Claude row is named from Claude Code's alias table: `opus` reads Opus 5.5.
+    expect(detailOf(draw([cursorish]), 'Opus 5.5')).toBe('Low to Max · Fast')
   })
 
   // The layout half -- that the line is DRAWN to stay one line -- is checked

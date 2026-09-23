@@ -6,6 +6,8 @@ import type { PublicModel, PublicRuntimeStatus } from '../../../shared/ipc.js'
 import { ROUTE_GROUP_LIMIT, capRouteRows, integrationOf, modelFamily, orderRouteRows, recentRouteRows, routeRowStatus, routeRowTag, routeSearchText } from '../status.js'
 import type { RouteTag } from '../status.js'
 import { modelDisplayName, routeModelName } from '../routeName.js'
+import { levelsLine } from '../effortScale.js'
+import { effortName } from '../effortLevels.js'
 import { FREE_START_RUNTIME } from '../../../shared/runtime-install.js'
 
 export interface RouteChoice {
@@ -130,7 +132,10 @@ function buildRows(
                * moves to the row's hover. A model the catalogue says nothing
                * about keeps its effort levels as its line, rather than none.
                */
-              detail: [described, name].filter((part): part is string => part !== undefined && part.length > 0).join(' · ') || efforts,
+              detail:
+                [described, name].filter((part): part is string => part !== undefined && part.length > 0).join(' · ')
+                || levelsLine(model.supportedEfforts, effortName)
+                || efforts,
               fullDetail: described === undefined || described.length === 0 ? measured : `${described} · ${measured}`,
               older: model.older === true
             }
