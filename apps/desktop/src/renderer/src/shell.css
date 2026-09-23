@@ -3660,6 +3660,25 @@ textarea {
   line-height: 0;
 }
 
+/* A small bot drawn at twice its size, shrunk to its box by exactly half
+   (Bot.tsx, SUPERSAMPLE_AT_OR_BELOW): the box keeps its size for layout, and
+   the drawing inside it is scaled from its top-left corner. */
+.lc-bot__supersample {
+  position: relative;
+  display: block;
+  flex: none;
+  line-height: 0;
+}
+
+.lc-bot__supersample-inner {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  transform: scale(0.5);
+  transform-origin: 0 0;
+}
+
 .lc-bot__ring {
   position: absolute;
   inset: 6%;

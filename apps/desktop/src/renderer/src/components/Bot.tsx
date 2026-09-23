@@ -50,7 +50,35 @@ export interface BotProps {
   readonly jumpEvery?: number
 }
 
-export function Bot({ type, size, color, state = 'default', paused = false, face, seed, interactive = false, jumpEvery }: BotProps): ReactElement {
+/**
+ * SMALL BOTS ARE DRAWN AT TWICE THEIR SIZE AND SHRUNK.
+ *
+ * Colin, 2026-09-23: *"the smaller renditions of the teammates have very
+ * jagged edges from downscaling"*. Enlarged from a packaged frame, a 16px
+ * sidebar bot's outline and antennae were hard stair-steps beside
+ * anti-aliased text: the plastic is shaded pixel by pixel at the canvas's
+ * own resolution, so at 14-26px an edge pixel is body or background and
+ * never between. Drawn at 2x and scaled to half by the compositor, each
+ * pixel on screen is the average of four, and the edge is smooth again. An
+ * exact half, because a 2:1 bilinear shrink averages four texels evenly
+ * where another ratio would skip some. A canvas four times the pixels at
+ * this size is still a few thousand of them; above it the canvas already
+ * has pixels to spare.
+ */
+export const SUPERSAMPLE_AT_OR_BELOW = 32
+
+export function Bot(props: BotProps): ReactElement {
+  if (props.size > SUPERSAMPLE_AT_OR_BELOW) return <DrawnBot {...props} />
+  return (
+    <span className="lc-bot__supersample" style={{ width: props.size, height: props.size }}>
+      <span className="lc-bot__supersample-inner" style={{ width: props.size * 2, height: props.size * 2 }}>
+        <DrawnBot {...props} size={props.size * 2} />
+      </span>
+    </span>
+  )
+}
+
+function DrawnBot({ type, size, color, state = 'default', paused = false, face, seed, interactive = false, jumpEvery }: BotProps): ReactElement {
   if (isLocustBot(type)) {
     return (
       <LocustBot
