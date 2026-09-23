@@ -121,7 +121,7 @@ try {
   await shoot('03-new-teammate.png')
   // Pick the Swarm, and see the preview take it.
   const picked = await drive.evaluate(`(async () => {
-    document.querySelector('.lc-look[aria-label="Swarm, a Locust"]')?.click()
+    document.querySelector('.lc-look[data-shape="swarm"]')?.click()
     await new Promise((r) => setTimeout(r, 500))
     return document.querySelector('.lc-dialog__identity .lc-bot')?.getAttribute('data-bot') ?? ''
   })()`)

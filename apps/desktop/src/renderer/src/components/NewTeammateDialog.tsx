@@ -224,6 +224,7 @@ export function NewTeammateDialog({
                   aria-checked={look.shape === shape}
                   aria-label={SHAPE_NAMES[shape]}
                   title={SHAPE_NAMES[shape]}
+                  data-shape={shape}
                   className={`lc-look${look.shape === shape ? ' is-selected' : ''}`}
                   onClick={() => setAvatar((current) => ({ ...current, bot: { shape, face: botFor(current).face } }))}
                 >
