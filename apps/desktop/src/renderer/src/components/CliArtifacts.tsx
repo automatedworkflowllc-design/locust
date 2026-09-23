@@ -26,8 +26,19 @@ export function CliArtifacts({
 }): ReactElement | null {
   if (artifacts.length === 0) return null
   return (
-    <div className="lc-cliartifacts">
-      <div className="lc-cliartifacts__note lc-mono">Set up in this CLI · Locust lists these, it does not run them</div>
+    /*
+     * FOLDED, with what is inside counted on the fold.
+     *
+     * Every runtime's inventory stood open, so the page was a scroll of other
+     * programs' config files -- Claude Code's six rows and Codex's three
+     * before the next runtime's name (the review, P3: "compact rows, CLI
+     * inventories folded"). The runtime's own line above already names them
+     * in short; the list is one press away for anyone looking for where a
+     * thing lives.
+     */
+    <details className="lc-cliartifacts">
+      <summary className="lc-cliartifacts__summary lc-mono">{inventorySummary(artifacts)} set up in this CLI</summary>
+      <div className="lc-cliartifacts__note lc-mono">Locust lists these, it does not run them</div>
       {artifacts.map((entry) => (
         <div className="lc-cliartifacts__row" key={`${entry.runtime}/${entry.kind}/${entry.path}`}>
           <span className="lc-cliartifacts__kind lc-mono">{entry.kind}</span>
@@ -44,6 +55,13 @@ export function CliArtifacts({
           </span>
         </div>
       ))}
-    </div>
+    </details>
   )
+}
+
+/** `3 agents · 3 commands`, in the order the kinds first appear. */
+export function inventorySummary(artifacts: readonly PublicRuntimeArtifact[]): string {
+  const counts = new Map<string, number>()
+  for (const entry of artifacts) counts.set(entry.kind, (counts.get(entry.kind) ?? 0) + 1)
+  return [...counts.entries()].map(([kind, count]) => `${String(count)} ${count === 1 ? kind : `${kind}s`}`).join(' · ')
 }

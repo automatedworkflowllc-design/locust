@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { AutomationsScreen } from './components/AutomationsScreen.js'
-import { CliArtifacts } from './components/CliArtifacts.js'
+import { CliArtifacts, inventorySummary } from './components/CliArtifacts.js'
 import { seedAvatar } from '../../shared/avatar.js'
 import type { PublicRuntimeArtifact, PublicTeammate } from '../../shared/ipc.js'
 
@@ -105,8 +105,11 @@ describe('what was configured inside a CLI', () => {
   it('is listed as a fact about that runtime, with no apology needed', () => {
     const html = renderToStaticMarkup(<CliArtifacts artifacts={[ARTIFACT]} />)
     expect(html).toContain('gig-scout')
-    expect(html).toContain('Set up in this CLI')
+    expect(html).toContain('1 agent set up in this CLI')
     expect(html).toContain('it does not run them')
+    // Folded, with the count on the fold (the review, P3): a closed details.
+    expect(html).toMatch(/^<details class="lc-cliartifacts"><summary/)
+    expect(inventorySummary([ARTIFACT, ARTIFACT, { ...ARTIFACT, kind: 'command' }])).toBe('2 agents · 1 command')
     // The runtime is not named again: it is the row directly above.
     expect(html).not.toContain('Codex CLI')
     // The tail of the path answers "where do I change it" without running off

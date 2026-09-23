@@ -1898,6 +1898,39 @@ textarea {
   margin-top: var(--lc-space-4);
 }
 
+/* The fold's own line: the Settings disclosure's chevron and voice. */
+.lc-cliartifacts__summary {
+  cursor: pointer;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--lc-text-mono-label);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lc-text-muted);
+  user-select: none;
+}
+
+.lc-cliartifacts__summary::-webkit-details-marker {
+  display: none;
+}
+
+.lc-cliartifacts__summary::before {
+  content: '\203A';
+  display: inline-block;
+  width: 10px;
+  transition: transform 120ms ease;
+}
+
+.lc-cliartifacts[open] > .lc-cliartifacts__summary::before {
+  transform: rotate(90deg);
+}
+
+.lc-cliartifacts__summary:hover {
+  color: var(--lc-text-secondary);
+}
+
 .lc-cliartifacts__note {
   color: var(--lc-text-muted);
   font-size: var(--lc-text-mono-caption);
