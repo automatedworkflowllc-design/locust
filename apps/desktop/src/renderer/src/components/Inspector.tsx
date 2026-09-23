@@ -6,7 +6,9 @@ import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import type { MissionRouteSummary, PublicRecoveredMission } from '../../../shared/ipc.js'
 import { costLabel, costLineOrWhyNot, runCostOf } from '../cost.js'
 import { buildSignalRail, buildThread, producedFiles } from '../missionView.js'
-import { checkpointLabel, ledgerVerificationLabel, sandboxPhrase, shortMissionId } from '../status.js'
+import { accountPhrase, checkpointLabel, ledgerVerificationLabel, sandboxPhrase, shortMissionId } from '../status.js'
+import { modelDisplayName } from '../routeName.js'
+import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { Icon } from './Icon.js'
 
 const TABS = ['Activity', 'Details', 'Artifacts', 'Receipt'] as const
@@ -174,20 +176,30 @@ export function Inspector({
           </>
         )}
 
+        {/*
+          * IN WORDS, WITH THE EXACT STRINGS ONE HOVER AWAY.
+          *
+          * These were the record's own spellings -- "codex 0.153.0",
+          * "account-default", "codex-account:default" -- beside a composer
+          * that says "Codex / Account Default" for the same run (the design
+          * review, "Details in plain words"). The names are the chip's; the
+          * identifiers stay in each value's title, which is where a person
+          * goes to find the string to type somewhere else.
+          */}
         {tab === 'Details' && (
           <dl className="lc-receipt lc-receipt--flush">
             <dt>Runtime</dt>
-            <dd className="lc-mono">
-              {route?.runtime ?? 'unknown'} {route?.cliVersion ?? ''}
+            <dd title={route === undefined ? undefined : `${route.runtime} ${route.cliVersion ?? ''}`.trim()}>
+              {route === undefined ? 'unknown' : `${runtimeDisplayName(route.runtime)} ${route.cliVersion ?? ''}`.trim()}
             </dd>
             <dt>Model</dt>
-            <dd className="lc-mono">{route?.model ?? 'unknown'}</dd>
-            <dt>Route</dt>
-            <dd className="lc-mono">{route?.resolvedRouteId ?? 'unknown'}</dd>
+            <dd title={route?.model}>{route === undefined ? 'unknown' : modelDisplayName(route.runtime, route.model)}</dd>
+            <dt>Account</dt>
+            <dd title={route?.resolvedRouteId}>{route === undefined ? 'unknown' : accountPhrase(route)}</dd>
             <dt>Mission</dt>
-            <dd className="lc-mono">{route === undefined ? 'unknown' : shortMissionId(route.missionId)}</dd>
+            <dd className="lc-mono" title={route?.missionId}>{route === undefined ? 'unknown' : shortMissionId(route.missionId)}</dd>
             <dt>Sandbox</dt>
-            <dd>{route?.sandbox ?? 'unknown'}</dd>
+            <dd>{route?.sandbox === undefined ? 'unknown' : sandboxPhrase(route.sandbox)}</dd>
             <dt>Events</dt>
             <dd>{events.length} recorded in this view</dd>
             {/* The Team card's rule: Cost for a priced run, Usage for tokens --

@@ -395,6 +395,11 @@ export function memorySection(input: {
       : `Your team keeps a shared memory. What is remembered for the folder "${input.workspaceName}" and everywhere:`,
     listed,
     "These are notes your team wrote earlier, each with when it was written. Use them as you would a colleague's notes: when one answers what the person asks, answer from it and say it came from memory; do not demand that the workspace confirm it. When two of them disagree, the newer one is usually the correction, and it is worth saying which you went with. Do not bring up a memory that has nothing to do with what was asked, and never report another teammate's work as something you are confirming: a person who asked you to change one file did not ask what anyone else did to another one.",
+    // The one exception to "answer from it". A memory that names a file as
+    // its source is a copy of that file as it read then (the 0.271 design
+    // recheck found "Colour: amber, Status: beta-candidate from README.md"
+    // kept from a room read) -- and the file can change under it.
+    'A note that says it came from a file in this folder is that file as it read when the note was written. When that file bears on the task, read the file: the file wins, and an old note that disagrees with it is worth a `forget`.',
     `If this work taught you something the next conversation in this folder would need -- a convention, a correction the person gave, where something lives that the code does not say -- use exactly this block and ${BLOCK_PLACEMENT}, one line per memory, at most ${String(MAX_MEMORY_OPS_PER_REPLY)}:`,
     `<${MEMORY_TAG}>`,
     'remember :: one sentence, specific enough to act on',
@@ -402,7 +407,7 @@ export function memorySection(input: {
     'remember everywhere :: only for something true in every project, like how the person likes to work',
     'forget :: quote a remembered line that is now wrong',
     `</${MEMORY_TAG}>`,
-    'Never remember file contents, secrets, credentials, or anything you can re-read from the workspace. Do not remember what CLAUDE.md, AGENTS.md or a rules file already says.',
+    'Never remember file contents, secrets, credentials, or anything you can re-read from the workspace -- a value a file holds (a status, a colour, a version in README.md) is the file\'s to say. Do not remember what CLAUDE.md, AGENTS.md or a rules file already says.',
     // The instruction that stops the store filling with near-copies. Measured
     // 2026-09-21: 26 of 89 memories were in a near-duplicate pair, and most
     // of them were one teammate restating "orb round N, tests X/X" after

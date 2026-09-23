@@ -917,6 +917,21 @@ export function sandboxPhrase(sandbox: 'read-only' | 'workspace-write' | 'full-a
 }
 
 /**
+ * Which sign-in a run went through, in words.
+ *
+ * The record's route id is `<runtime>-account:default` for every runtime but
+ * Antigravity (`antigravity:hub`): it names the account the runtime was
+ * signed into, never a plan or a price. OpenCode's free models need no
+ * account at all, and saying "your account" over one would be the opposite
+ * of the promise the welcome screen makes.
+ */
+export function accountPhrase(route: { readonly runtime: MissionRuntimeId; readonly model: string; readonly resolvedRouteId: string }): string {
+  if (route.resolvedRouteId === 'antigravity:hub') return 'through the Antigravity app'
+  if (/-free$/i.test(route.model)) return 'none -- a free model'
+  return `your ${runtimeDisplayName(route.runtime)} sign-in`
+}
+
+/**
  * Who the composer should address once a conversation is opened.
  *
  * Opening a mission used to change the thread and leave the selection alone,

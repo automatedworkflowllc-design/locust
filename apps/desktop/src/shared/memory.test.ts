@@ -107,6 +107,14 @@ describe('a memory is a colleague’s note, not a report on them', () => {
   it('still tells it to answer from a memory that does fit', () => {
     expect(brief()).toContain('answer from it and say it came from memory')
   })
+
+  it('puts a file ahead of a note copied from it', () => {
+    // The 0.271 design recheck: "Colour: amber, Status: beta-candidate from
+    // README.md" was kept from a room read, and "answer from it" would have
+    // kept answering amber after README changed.
+    expect(brief()).toContain('the file wins')
+    expect(brief()).toContain("a value a file holds (a status, a colour, a version in README.md) is the file's to say")
+  })
 })
 
 describe('how much of a brief the memory may take', () => {

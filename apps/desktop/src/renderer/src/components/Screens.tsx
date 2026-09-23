@@ -1962,6 +1962,59 @@ export function SettingsScreen({
         )}
         {shownPage === 'appearance' && (
           <>
+        {/*
+          * READING COMFORT FIRST. The one setting here that changes how a
+          * reply reads sat under the sidebar and the send button's metal
+          * effects -- a hundred and twenty lines of ornament above it (the
+          * design review: "Appearance: reading comfort before ornament").
+          */}
+        <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">Reply text size</h2>
+          <p className="lc-settings__lede">
+            {replySize === 'largest'
+              ? 'Largest. For reading at a distance, or a long reply you want to sit with.'
+              : replySize === 'large'
+                ? 'Large. A step up without turning the thread into a slide.'
+                : 'Standard. The size a reply has always been set at.'}
+          </p>
+          <More>
+            <p>
+              A teammate's reply is the one thing on this screen you read rather than scan, so it is set
+              in a serif and sized on its own -- the app's own chrome stays where it is whatever you pick
+              here.
+            </p>
+            <p>
+              The line length follows the size rather than staying put, so a bigger reply gets a wider
+              paragraph and about the same number of words to a line. Measured, not assumed: roughly 74
+              characters at Standard and 72 at Large.
+            </p>
+          </More>
+          <div className="lc-settingrows">
+            <div className="lc-settingrow">
+              <span className="lc-settings__note">How big to set it.</span>
+              <div className="lc-segmented" role="radiogroup" aria-label="How big to set a reply">
+                {(
+                  [
+                    ['standard', 'Standard'],
+                    ['large', 'Large'],
+                    ['largest', 'Largest']
+                  ] as const
+                ).map(([option, label]) => (
+                  <button
+                    key={option}
+                    type="button"
+                    role="radio"
+                    aria-checked={replySize === option}
+                    className={`lc-button${replySize === option ? ' is-active' : ''}`}
+                    onClick={() => onReplySizeChange(option)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Sidebar</h2>
           <div className="lc-settingrows">
@@ -2115,53 +2168,6 @@ export function SettingsScreen({
                     disabled={metal === 'off'}
                     className={`lc-button${metalBend === option ? ' is-active' : ''}`}
                     onClick={() => onMetalChange({ metalBend: option })}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-        <section className="lc-settings__section">
-          <h2 className="lc-settings__heading">Reply text size</h2>
-          <p className="lc-settings__lede">
-            {replySize === 'largest'
-              ? 'Largest. For reading at a distance, or a long reply you want to sit with.'
-              : replySize === 'large'
-                ? 'Large. A step up without turning the thread into a slide.'
-                : 'Standard. The size a reply has always been set at.'}
-          </p>
-          <More>
-            <p>
-              A teammate's reply is the one thing on this screen you read rather than scan, so it is set
-              in a serif and sized on its own -- the app's own chrome stays where it is whatever you pick
-              here.
-            </p>
-            <p>
-              The line length follows the size rather than staying put, so a bigger reply gets a wider
-              paragraph and about the same number of words to a line. Measured, not assumed: roughly 74
-              characters at Standard and 72 at Large.
-            </p>
-          </More>
-          <div className="lc-settingrows">
-            <div className="lc-settingrow">
-              <span className="lc-settings__note">How big to set it.</span>
-              <div className="lc-segmented" role="radiogroup" aria-label="How big to set a reply">
-                {(
-                  [
-                    ['standard', 'Standard'],
-                    ['large', 'Large'],
-                    ['largest', 'Largest']
-                  ] as const
-                ).map(([option, label]) => (
-                  <button
-                    key={option}
-                    type="button"
-                    role="radio"
-                    aria-checked={replySize === option}
-                    className={`lc-button${replySize === option ? ' is-active' : ''}`}
-                    onClick={() => onReplySizeChange(option)}
                   >
                     {label}
                   </button>

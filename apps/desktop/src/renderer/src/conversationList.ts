@@ -159,6 +159,14 @@ export function unreadableSentence(stores: readonly string[]): { readonly happen
     : { happened: `${subject} could not be read.`, safe: 'Nothing is saved over them until they read again.' }
 }
 
+/**
+ * The routine that started a run, when a routine did -- from a live run's
+ * starter or a recorded mission's, which name it the same way.
+ */
+export function routineOf(startedBy: { readonly kind: string; readonly routineId?: string } | undefined): string | undefined {
+  return startedBy?.kind === 'routine' ? startedBy.routineId : undefined
+}
+
 /** The first value stored against any id this conversation has worn. */
 export function heldFor<T>(mission: SidebarMission, byKey: Readonly<Record<string, T>>): T | undefined {
   for (const key of conversationKeys(mission)) {

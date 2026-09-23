@@ -10,6 +10,7 @@ import type { PublicPeerMessage, PublicRecoveredMission } from '../../shared/ipc
 import { splitAttachments } from '../../shared/attachments.js'
 import { stripShareBlocks } from '../../shared/peer-share.js'
 import { unwrapProtocolTags } from '../../shared/protocolTags.js'
+import { runtimeDisplayName } from '../../shared/runtimes.js'
 import { stripTaskBlocks } from '../../shared/room-task.js'
 import { stripMemoryBlocks } from '../../shared/memory.js'
 import { parseDecision, stripDecisionBlocks } from '../../shared/decision.js'
@@ -3044,6 +3045,25 @@ export interface SignalRow {
  * absolute interpreter path), and pasting it whole turns one row into four and
  * pushes everything else off screen.
  */
+/**
+ * THE RAIL IN WORDS.
+ *
+ * Each row was the event's own name -- `runtime.started · claude`,
+ * `tool.completed · Bash`, `step.started · reasoning`, `run.completed` --
+ * which is the ledger's vocabulary, not a person's (the design review, #10:
+ * "Inspector labels in words, not step.started"). The rows now say what
+ * happened; the kinds a runtime reports (`temporary-rate-limit`) are spelled
+ * with spaces, and a runtime is named the way Settings names it.
+ */
+function railWords(kind: string): string {
+  return kind.replace(/[-_]+/g, ' ').trim()
+}
+
+function railRuntimeName(adapter: string): string {
+  const named = runtimeDisplayName(adapter as MissionRuntimeId) as string | undefined
+  return named ?? adapter
+}
+
 export function railLabel(value: string, limit = 72): string {
   const single = value.replace(/\s+/g, ' ').trim()
   return single.length <= limit ? single : `${single.slice(0, limit - 1)}…`
@@ -3086,8 +3106,8 @@ export function buildSignalRail(
       case 'run.started':
         rows.push({
           key: event.id,
-          name: `runtime.started · ${event.sourceAdapter}`,
-          meta: `${clock} · handshake verified`,
+          name: `Started on ${railRuntimeName(event.sourceAdapter)}`,
+          meta: `${clock} · connected`,
           tone: 'muted',
           live: false
         })
@@ -3096,7 +3116,7 @@ export function buildSignalRail(
         const open = !settled.has(event.payload.itemId)
         rows.push({
           key: event.id,
-          name: railLabel(`tool.${event.payload.name} · ${event.payload.command ?? event.payload.toolKind}`),
+          name: railLabel(event.payload.command === undefined ? event.payload.name : `${event.payload.name} · ${event.payload.command}`),
           meta: `${clock} · ${open ? 'running' : 'started'}`,
           tone: open && options.running ? 'lime' : 'muted',
           live: open && options.running
@@ -3106,8 +3126,8 @@ export function buildSignalRail(
       case 'tool.completed':
         rows.push({
           key: event.id,
-          name: `tool.completed · ${event.payload.name}`,
-          meta: `${clock}${event.payload.exitCode === undefined ? '' : ` · exit ${event.payload.exitCode}`}`,
+          name: `${event.payload.name} finished`,
+          meta: `${clock}${event.payload.exitCode === undefined ? '' : ` · exit code ${event.payload.exitCode}`}`,
           tone: 'muted',
           live: false
         })
@@ -3115,8 +3135,8 @@ export function buildSignalRail(
       case 'tool.failed':
         rows.push({
           key: event.id,
-          name: `tool.failed · ${event.payload.name}`,
-          meta: `${clock} · ${event.payload.status ?? 'failed'}`,
+          name: `${event.payload.name} ${event.payload.status === 'refused' ? 'refused' : 'failed'}`,
+          meta: event.payload.status === undefined || event.payload.status === 'failed' || event.payload.status === 'refused' ? clock : `${clock} · ${event.payload.status}`,
           tone: 'red',
           live: false
         })
@@ -3126,7 +3146,7 @@ export function buildSignalRail(
       case 'step.failed':
         rows.push({
           key: event.id,
-          name: `${event.type} · ${event.payload.stepKind}`,
+          name: `Step ${event.type === 'step.started' ? 'started' : event.type === 'step.completed' ? 'finished' : 'failed'} · ${railWords(event.payload.stepKind)}`,
           meta: clock,
           tone: event.type === 'step.failed' ? 'red' : 'muted',
           live: false
@@ -3135,7 +3155,7 @@ export function buildSignalRail(
       case 'plan.updated':
         rows.push({
           key: event.id,
-          name: `plan.updated${event.payload.final ? ' · final' : ''}`,
+          name: `Plan updated${event.payload.final ? ' · final' : ''}`,
           meta: clock,
           tone: 'violet',
           live: false
@@ -3144,7 +3164,7 @@ export function buildSignalRail(
       case 'route.limit_detected':
         rows.push({
           key: event.id,
-          name: `route.limit_detected · ${event.payload.kind}`,
+          name: `Usage limit · ${railWords(event.payload.kind)}`,
           meta: railLabel(`${clock} · ${event.payload.message}`, 96),
           tone: 'amber',
           live: false
@@ -3153,22 +3173,22 @@ export function buildSignalRail(
       case 'adapter.diagnostic':
         rows.push({
           key: event.id,
-          name: `adapter.diagnostic · ${event.payload.code}`,
+          name: `Runtime note · ${event.payload.code}`,
           meta: `${clock} · ${event.payload.level}`,
           tone: event.payload.level === 'error' ? 'red' : 'amber',
           live: false
         })
         break
       case 'run.completed':
-        rows.push({ key: event.id, name: 'run.completed', meta: `${clock} · receipt written`, tone: 'blue', live: false })
+        rows.push({ key: event.id, name: 'Finished', meta: `${clock} · receipt written`, tone: 'blue', live: false })
         break
       case 'run.cancelled':
-        rows.push({ key: event.id, name: 'run.cancelled', meta: `${clock} · stopped by you`, tone: 'amber', live: false })
+        rows.push({ key: event.id, name: 'Stopped', meta: `${clock} · by you`, tone: 'amber', live: false })
         break
       case 'run.failed':
         rows.push({
           key: event.id,
-          name: `run.failed · ${event.payload.kind}`,
+          name: `Failed · ${railWords(event.payload.kind)}`,
           meta: railLabel(`${clock} · ${event.payload.message}`, 96),
           tone: 'red',
           live: false

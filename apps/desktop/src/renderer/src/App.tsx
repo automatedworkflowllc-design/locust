@@ -127,7 +127,7 @@ import { installCommand } from '../../shared/runtime-install.js'
 import { splitAttachments } from '../../shared/attachments.js'
 // Only `heldFor`: this file has its own `ownerOf` for live runs, which is a
 // different question from who owns a recorded mission.
-import { heldFor } from './conversationList.js'
+import { heldFor, routineOf } from './conversationList.js'
 import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
 import { modelDisplayName } from './routeName.js'
 import { withMessageDelta } from '../../shared/messageFragments.js'
@@ -4214,10 +4214,14 @@ export default function App(): ReactElement {
       const parentId = recorded === undefined
         ? earlier.at(-1)?.missionId ?? handoffFrom
         : recorded.continuesFrom?.missionId
+      // A routine's own step says so; a person's reply inside a routine's
+      // conversation is known by the conversation's first turn.
+      const routineId = routineOf(run.startedBy) ?? routineOf(rootId === undefined ? undefined : historyById.get(rootId)?.startedBy)
       rows.push({
         missionId,
         ...(rootId === undefined ? {} : { rootId }),
         ...(parentId === undefined ? {} : { parentId }),
+        ...(routineId === undefined ? {} : { routineId }),
         ...(run.teammateId === undefined ? {} : { ownerId: run.teammateId }),
         /*
          * When this run started, or when the mission it restored last moved.
@@ -4259,6 +4263,9 @@ export default function App(): ReactElement {
         ),
         rootId: rootMission(mission, historyById).missionId,
         ...(mission.continuesFrom === undefined ? {} : { parentId: mission.continuesFrom.missionId }),
+        ...(routineOf(rootMission(mission, historyById).startedBy) === undefined
+          ? {}
+          : { routineId: routineOf(rootMission(mission, historyById).startedBy)! }),
         phase: mission.phase,
         runtime: mission.runtime,
         integrityIssueCount: mission.integrityIssueCount,

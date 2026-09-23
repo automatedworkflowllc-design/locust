@@ -25,6 +25,7 @@ import {
   modesFor,
   ownerToSelect,
   sandboxPhrase,
+  accountPhrase,
   modeUnavailableReason,
   flagshipRank,
   missionsMatching,
@@ -924,6 +925,15 @@ describe('the Auto mode, which has to be switched on before it is offered', () =
     expect(sandboxPhrase('workspace-write')).toBe('may edit the workspace')
     expect(sandboxPhrase('read-only')).toBe('read-only')
     expect(sandboxPhrase(undefined)).toBe('read-only')
+  })
+
+  it('names the sign-in a run used in words, not by its route id', () => {
+    // The inspector's Details said "codex-account:default" (the design
+    // review: "Details in plain words").
+    expect(accountPhrase({ runtime: 'codex', model: 'account-default', resolvedRouteId: 'codex-account:default' })).toBe('your Codex CLI sign-in')
+    expect(accountPhrase({ runtime: 'antigravity', model: 'flash', resolvedRouteId: 'antigravity:hub' })).toBe('through the Antigravity app')
+    // A free model needs no account; "your OpenCode sign-in" would say it did.
+    expect(accountPhrase({ runtime: 'opencode', model: 'opencode/ling-3.0-flash-fin-free', resolvedRouteId: 'opencode-account:default' })).toBe('none -- a free model')
   })
 
   it('says what it allowed, not what it was called', () => {

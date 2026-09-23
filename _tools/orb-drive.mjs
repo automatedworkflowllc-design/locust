@@ -136,7 +136,12 @@ try {
     const read = JSON.parse(String(seen))
     check('the running conversation row carries an orb', read.sidebar !== 'none', seen)
     check('and it does not widen the row', read.sidebarWell === 6, `well ${String(read.sidebarWell)}px`)
-    check('it is drawn smaller than the face beside it', read.sidebarDrawn !== null && read.sidebarDrawn < 16, `drawn ${String(read.sidebarDrawn)}px`)
+    // At the library's own 20px, never shrunk: Colin, 2026-09-21, found the
+    // scaled-down morph orb dense and smudged, and shell.css (.lc-row__orb)
+    // records the measurement that keeps it at full size. This asserted
+    // "under 16px" -- the design before that -- and failed on every run
+    // since (0.271 design recheck, 9g).
+    check('it is drawn at its own size, where the morph stays a clean circle', read.sidebarDrawn === 20, `drawn ${String(read.sidebarDrawn)}px`)
     return seen
   })
 

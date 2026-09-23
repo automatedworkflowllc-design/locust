@@ -358,7 +358,14 @@ textarea {
   text-overflow: ellipsis;
 }
 
-/* A new version is ready. One line above the composer; the install is a click. */
+/*
+ * A new version is ready. One line above the composer; the install is a click.
+ *
+ * A card, and the install is the app's one offer colour -- the lime the
+ * follow-through ("Run again with edits allowed") wears. It was a navy tint
+ * with a blue border, the only navy surface on a neutral screen (the sweep,
+ * D5), which read as another app's notification rather than this one's.
+ */
 .lc-updatebanner {
   display: flex;
   align-items: center;
@@ -367,15 +374,27 @@ textarea {
   margin: 0 auto var(--lc-space-4);
   max-width: var(--lc-thread-max-width);
   padding: var(--lc-space-4) var(--lc-space-5);
-  border: 1px solid var(--lc-blue-border);
+  border: 1px solid var(--lc-border-card);
   border-radius: var(--lc-radius-card);
-  background: var(--lc-blue-tint);
+  background: var(--lc-bg-raised);
   font-size: var(--lc-text-description);
   color: var(--lc-text-secondary);
 }
 
 .lc-updatebanner__text {
   min-width: 0;
+}
+
+.lc-updatebanner .lc-button {
+  flex: none;
+  border-color: var(--lc-lime-border);
+  background: var(--lc-lime-tint);
+  color: var(--lc-lime-text);
+}
+
+.lc-updatebanner .lc-button:hover:not(:disabled) {
+  background: var(--lc-lime-tint-strong);
+  border-color: var(--lc-lime-border-strong);
 }
 
 .lc-dot {
@@ -12098,6 +12117,18 @@ textarea {
   place-items: center;
   width: 16px;
   height: 16px;
+  color: var(--lc-text-muted);
+}
+
+/* A routine's run: the Routines clock before the title, so the replay is not
+   read as the conversation it was saved from. Muted, like the age. */
+.lc-conv__routine {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 12px;
+  height: 12px;
+  margin-right: calc(-1 * var(--lc-space-1));
   color: var(--lc-text-muted);
 }
 

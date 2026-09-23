@@ -934,19 +934,19 @@ describe('signal rail', () => {
       [event('run.started', { runtimeThreadId: 't' }), toolStart('t1', 'shell', 'pnpm test')],
       { running: true }
     )
-    expect(rows[0]?.name).toMatch(/^tool\./)
-    expect(rows[1]?.name).toMatch(/^runtime\.started/)
+    expect(rows[0]?.name).toBe('shell · pnpm test')
+    expect(rows[1]?.name).toMatch(/^Started on /)
   })
 
   it('marks a tool live only while it is open AND the run is going', () => {
     const open = [toolStart('t1', 'shell', 'pnpm test')]
     const closed = [toolStart('t1', 'shell', 'pnpm test'), toolDone('t1')]
-    expect(buildSignalRail(open, { running: true }).find((r) => r.name.startsWith('tool.'))?.live).toBe(true)
+    expect(buildSignalRail(open, { running: true }).find((r) => r.name.includes('pnpm test'))?.live).toBe(true)
     // The same open tool in a run that has stopped is not live -- a pulsing dot
     // on a dead run is the shell asserting something is happening when nothing
     // is.
     expect(buildSignalRail(open, { running: false })[0]?.live).toBe(false)
-    expect(buildSignalRail(closed, { running: true }).find((r) => r.name.includes('completed'))?.live).toBe(false)
+    expect(buildSignalRail(closed, { running: true }).find((r) => r.name.endsWith('finished'))?.live).toBe(false)
   })
 
   it('colours by meaning, not decoration', () => {
@@ -958,9 +958,26 @@ describe('signal rail', () => {
       ],
       { running: false }
     )
-    expect(rows.find((r) => r.name.includes('limit_detected'))?.tone).toBe('amber')
-    expect(rows.find((r) => r.name.includes('run.failed'))?.tone).toBe('red')
-    expect(rows.find((r) => r.name === 'run.completed')?.tone).toBe('blue')
+    expect(rows.find((r) => r.name.startsWith('Usage limit'))?.tone).toBe('amber')
+    expect(rows.find((r) => r.name.startsWith('Failed'))?.tone).toBe('red')
+    expect(rows.find((r) => r.name === 'Finished')?.tone).toBe('blue')
+  })
+
+  it('says what happened in words, not the ledger\'s event names', () => {
+    // The design review (#10): "Inspector labels in words, not step.started".
+    const rows = buildSignalRail(
+      [
+        event('run.started', { runtimeThreadId: 't' }),
+        event('step.started', { stepKind: 'agent_reasoning' }),
+        event('plan.updated', { final: true, steps: [] }),
+        event('route.limit_detected', { kind: 'temporary-rate-limit', message: 'slow down' }),
+        event('run.cancelled', { process: {} })
+      ],
+      { running: false }
+    )
+    const names = rows.map((row) => row.name)
+    expect(names).toEqual(['Stopped', 'Usage limit · temporary rate limit', 'Plan updated · final', 'Step started · agent reasoning', expect.stringMatching(/^Started on /)])
+    for (const name of names) expect(name).not.toMatch(/\b(run|tool|step|route|plan|runtime|adapter)\.[a-z_]+/)
   })
 
   it('says nothing about events it does not understand', () => {

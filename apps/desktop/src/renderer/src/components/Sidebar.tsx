@@ -70,6 +70,13 @@ export interface SidebarMission {
   readonly turns?: number
   /** When this conversation last moved, for the rail flyout's age column. */
   readonly lastAt?: string
+  /**
+   * The routine whose replay began this conversation, when one did. A
+   * routine replays a conversation's words, so its run wore the same title
+   * as the conversation it was saved from, and the two rows could only be
+   * told apart by opening them (0.271 design recheck, finding 2).
+   */
+  readonly routineId?: string
 }
 
 /** Whether a row is the conversation the workroom is showing. */
@@ -571,6 +578,26 @@ export function Sidebar({
               const owner = ownerOf(mission, missionOwners)
               const by = owner === undefined ? undefined : teammates.find((entry) => entry.teammateId === owner)
               const age = shortAgo(mission.lastAt, now)
+              /*
+               * WHOSE, AND WHETHER A ROUTINE STARTED IT.
+               *
+               * Two rows with one title are one question asked twice -- by
+               * two teammates, or by a person and then by the routine they
+               * saved from it. The face says whose at a glance, and now says
+               * it to a screen reader and on hover too; a routine's run
+               * carries the Routines clock, so the replay is not mistaken for
+               * the conversation it came from (0.271 design recheck, finding
+               * 2). The routine's name is in the hover; a deleted routine is
+               * still "a routine".
+               */
+              const routineName = routines.find((entry) => entry.routineId === mission.routineId)?.name
+              const fromRoutine =
+                mission.routineId === undefined
+                  ? undefined
+                  : routineName === undefined
+                    ? 'from a routine'
+                    : `from the routine ${routineName}`
+              const hover = [mission.title, ...(by === undefined ? [] : [by.name]), ...(fromRoutine === undefined ? [] : [fromRoutine])].join(' · ')
               return (
                 <div className="lc-convrow" key={mission.missionId}>
                   {/*
@@ -610,7 +637,7 @@ export function Sidebar({
                   <button
                     type="button"
                     className={`lc-conv${isShown(mission, selectedMissionId) ? ' is-active' : ''}`}
-                    title={mission.title}
+                    title={hover}
                     aria-current={isShown(mission, selectedMissionId) ? 'true' : undefined}
                     onContextMenu={(event) => {
                       event.preventDefault()
@@ -695,7 +722,12 @@ export function Sidebar({
                     {by === undefined ? (
                       <span className="lc-conv__nobody" aria-hidden="true" />
                     ) : (
-                      <TeammateBot hue={by.hue} avatar={by.avatar} size={16} teammateId={by.teammateId} />
+                      <TeammateBot hue={by.hue} avatar={by.avatar} size={16} teammateId={by.teammateId} name={by.name} />
+                    )}
+                    {fromRoutine !== undefined && (
+                      <span className="lc-conv__routine" role="img" aria-label={`${fromRoutine.charAt(0).toUpperCase()}${fromRoutine.slice(1)}`}>
+                        <Icon name="clock" size={11} />
+                      </span>
                     )}
                     <span className="lc-conv__title">{mission.title}</span>
                     {age !== undefined && <span className="lc-conv__age lc-mono">{age}</span>}
