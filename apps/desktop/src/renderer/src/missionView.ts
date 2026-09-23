@@ -1046,11 +1046,31 @@ export function noticeKey(message: string): string {
   return message.trim().replace(/\s+/g, ' ').toLowerCase()
 }
 
-/** The notices a turn's fold carries, keyed for `saidBefore`. */
+/**
+ * A usage-window warning: "You've used 56% of your 7-day window", "Your
+ * 5-hour window is running low". Not a limit reached and not a retry -- a
+ * reading, which is why it is said once a conversation.
+ */
+export function isUsageWarning(message: string): boolean {
+  return /^You've used \d{1,3}% of your .+ window|^Your .+ window is running low/.test(message.trim())
+}
+
+/**
+ * The key a turn's usage warning is remembered by: one for every reading.
+ *
+ * Colin, 2026-09-23, asked whether the warning belongs on every turn or once
+ * a conversation: "Once per convo". A later turn's reading -- 56%, then 58%
+ * -- is the same news again; a limit actually REACHED is not a warning and
+ * still shows every time.
+ */
+export const USAGE_WARNING_KEY = 'usage-window-warning'
+
+/** What a turn said that a later turn must not say again, keyed for `saidBefore`. */
 export function foldNoticeKeys(items: readonly ThreadItem[]): readonly string[] {
   const activity = items.find((item) => item.type === 'activity')
   const notices = activity?.type === 'activity' ? activity.notices ?? [] : []
-  return notices.map((notice) => noticeKey(notice.message))
+  const warned = items.some((item) => item.type === 'limit' && item.kind === 'temporary-rate-limit' && isUsageWarning(item.message))
+  return [...notices.map((notice) => noticeKey(notice.message)), ...(warned ? [USAGE_WARNING_KEY] : [])]
 }
 
 function planKey(text: string): string {
@@ -2581,6 +2601,14 @@ export function buildThread(
          * under it -- four amber lines over two answers in a room (drive,
          * 2026-09-23). Updated in place, so the line does not jump.
          */
+        // Once a conversation: an earlier turn already gave the reading.
+        if (
+          event.payload.kind === 'temporary-rate-limit'
+          && isUsageWarning(event.payload.message)
+          && options.saidBefore?.has(USAGE_WARNING_KEY) === true
+        ) {
+          break
+        }
         if (event.payload.kind === 'temporary-rate-limit') {
           const earlier = items.findIndex((held) => held.type === 'limit' && held.kind === 'temporary-rate-limit')
           const held = items[earlier]

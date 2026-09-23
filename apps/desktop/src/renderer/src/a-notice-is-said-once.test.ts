@@ -67,4 +67,32 @@ describe('a usage warning', () => {
     expect(limits).toHaveLength(1)
     expect(limits[0]?.type === 'limit' ? limits[0].message : '').toMatch(/56%/)
   })
+
+  it('is said once a conversation -- Colin: "Once per convo"', () => {
+    const warn = (percent: number) =>
+      event('route.limit_detected', { kind: 'temporary-rate-limit', message: `You've used ${String(percent)}% of your 7-day window · resets 2026-09-28T07:00:00.000Z`, evidence: { redacted: false } })
+    const answer = (percent: number) => [
+      event('run.started', {}),
+      warn(percent),
+      event('message.delta', { itemId: 'm', operation: 'replace', text: 'Done.', final: true }),
+      event('run.completed', {})
+    ]
+    const limitsOf = (items: ReturnType<typeof buildThread>) => items.filter((item) => item.type === 'limit')
+    const first = buildThread(answer(56), { running: false })
+    expect(limitsOf(first)).toHaveLength(1)
+    const second = buildThread(answer(58), { running: false, saidBefore: new Set(foldNoticeKeys(first)) })
+    expect(limitsOf(second)).toHaveLength(0)
+  })
+
+  it('never hides a limit actually reached', () => {
+    const first = buildThread(
+      [event('run.started', {}), event('route.limit_detected', { kind: 'temporary-rate-limit', message: "You've used 90% of your 5-hour window", evidence: { redacted: false } }), event('run.completed', {})],
+      { running: false }
+    )
+    const reached = buildThread(
+      [event('run.started', {}), event('route.limit_detected', { kind: 'quota-exhausted', message: '5-hour window 100% used · resets 2026-09-23T20:00:00.000Z', evidence: { redacted: false } }), event('run.completed', {})],
+      { running: false, saidBefore: new Set(foldNoticeKeys(first)) }
+    )
+    expect(reached.filter((item) => item.type === 'limit')).toHaveLength(1)
+  })
 })
