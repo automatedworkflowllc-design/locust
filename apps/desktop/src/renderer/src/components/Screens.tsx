@@ -42,7 +42,7 @@ import {
 import { CliArtifacts } from './CliArtifacts.js'
 import { TeammateBot } from './TeammateBot.js'
 import { Icon } from './Icon.js'
-import { COST_NOT_REPORTED_SHORT, costLabel, costLine, costLineOrWhyNot, costTotal, runCostOf } from '../cost.js'
+import { costCell, costLabel, costLineOrWhyNot, costTotal, runCostOf } from '../cost.js'
 import { agoLabel, teammateWork } from '../teammateWork.js'
 import { routineRunSummary, routineScheduleSummary, routineStepLabel } from '../routines.js'
 import { RoutineRecovery } from './RoutineRecovery.js'
@@ -451,7 +451,7 @@ export function MissionsScreen({
                       : `${String(mission.checkpoints.length)} checkpoint${mission.checkpoints.length === 1 ? '' : 's'} · ${elapsed}`}
                   </span>
                   <span className="lc-missionrow__cost lc-mono" title="What the runtime reported this run cost">
-                    {costLine(runCostOf(mission.events)) ?? COST_NOT_REPORTED_SHORT}
+                    {costCell(runCostOf(mission.events), mission.model)}
                   </span>
                   <span className={`lc-missionrow__tag lc-mono lc-tone-${view.tone}`}>{view.tag}</span>
                 </button>

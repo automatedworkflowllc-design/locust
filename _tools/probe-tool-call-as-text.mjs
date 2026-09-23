@@ -82,11 +82,16 @@ try {
       row = [...document.querySelectorAll('.lc-missionrow')].find((n) => /ship it/i.test(n.innerText))
     }
     if (!row) return 'no row for the seeded mission'
+    // While the row is in view: its cost cell (Yurt's #14 -- a bare dash read
+    // as an empty column). The free model reported no number.
+    window.__costCell = row.querySelector('.lc-missionrow__cost')?.innerText.trim() ?? ''
     row.click()
     await new Promise((r) => setTimeout(r, 1500))
     return 'opened'
   })()`)
   check('the seeded mission opens', opened === 'opened', opened)
+  const cell = await drive.evaluate('window.__costCell')
+  check("its Missions row says the free model's run was free, not a bare dash", cell === 'free', cell)
   const seen = JSON.parse(await drive.capture('the reply, as the thread draws it', () => drive.evaluate(`(() => {
     const body = document.querySelector('.lc-thread .lc-agentline__body')
     if (!body) return JSON.stringify({ error: 'no reply in the thread' })

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { durationText } from './missionView.js'
 import { missionPhaseView } from './status.js'
-import { COST_NOT_REPORTED_SHORT, costLineOrWhyNot } from './cost.js'
+import { COST_NOT_REPORTED_SHORT, costCell, costLineOrWhyNot } from './cost.js'
 
 /*
  * Grok's 2026-09-13 audit, findings 2 and 4. Every one of that report is the
@@ -58,5 +58,18 @@ describe('one missing cost, one sentence', () => {
     // said to be anything.
     expect(COST_NOT_REPORTED_SHORT).not.toContain('0')
     expect(COST_NOT_REPORTED_SHORT).not.toContain('$')
+  })
+
+  it('the short form is words, not a bare dash', () => {
+    // Yurt's beta report (#14): a bare "—" read as an empty column.
+    expect(COST_NOT_REPORTED_SHORT).toBe('not reported')
+    expect(costCell(undefined, 'account-default')).toBe('not reported')
+    expect(costCell({ usd: 0.42 }, 'account-default')).toBe('$0.42')
+  })
+
+  it('a model whose own id says it is free reads free', () => {
+    expect(costCell(undefined, 'opencode/ling-3.0-flash-fin-free')).toBe('free')
+    // A reported number still wins over the name.
+    expect(costCell({ usd: 0.01 }, 'opencode/ling-3.0-flash-fin-free')).toBe('$0.01')
   })
 })

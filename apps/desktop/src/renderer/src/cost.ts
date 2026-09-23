@@ -274,10 +274,26 @@ export function costLineOrWhyNot(cost: RunCost | undefined, running = false): st
 
 /**
  * The same fact where only a few characters fit -- a table cell, a row's
- * trailing column. An em dash on its own says "nothing here" without
- * claiming the run was free, which is the thing a `$0.00` would claim.
+ * trailing column. It claims nothing about the price, which is the thing a
+ * `$0.00` would claim.
+ *
+ * It was an em dash, and a dash on its own read as a column nobody filled
+ * in (Yurt's beta report, 2026-09-23, #14: 'a bare "—" column'). Two words
+ * say what the dash meant, in the width "in your plan" already takes.
  */
-export const COST_NOT_REPORTED_SHORT = '—'
+export const COST_NOT_REPORTED_SHORT = 'not reported'
+
+/**
+ * A row's cost cell: what the run reported, else why there is nothing.
+ *
+ * A model whose own id says it is free (OpenCode's `...-free` models, the
+ * ones the route chip tags Free) reads "free" rather than "not reported":
+ * the price is known, it is nothing, and the runtime simply does not send a
+ * number for it.
+ */
+export function costCell(cost: RunCost | undefined, model: string): string {
+  return costLine(cost) ?? (/-free$/i.test(model) ? 'free' : COST_NOT_REPORTED_SHORT)
+}
 
 /**
  * The cost part of the mission header line.
