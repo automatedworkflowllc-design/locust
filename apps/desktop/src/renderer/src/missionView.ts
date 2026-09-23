@@ -156,6 +156,15 @@ export function foldedToolsText(names: readonly string[], verb: string | undefin
 
 export type ActivityEntry =
   | {
+      /**
+       * What the teammate SAID between its steps, put back where it said it
+       * (`narrationOf`). Never a tool, and never folded into a run of them.
+       */
+      readonly kind: 'said'
+      readonly key: string
+      readonly text: string
+    }
+  | {
       /** What a model thought, when its runtime reported it. Never a tool. */
       readonly kind: 'thought'
       readonly key: string
@@ -319,6 +328,10 @@ export function activityEntries(
      * Thinking sits between tool calls constantly, so left foldable it would
      * also BREAK those runs in two and stop them collapsing at all.
      */
+    if (detail.kind === 'said') {
+      entries.push({ kind: 'said', key: `said_${String(index)}`, text: detail.output ?? '' })
+      return
+    }
     if (detail.kind === 'reasoning') {
       entries.push({
         kind: 'thought',
@@ -1366,7 +1379,8 @@ export function activityTrace(
   // a thought said `3 tool calls`; a run that only thought said `1 tool
   // call`. Two functions, one fact, and the visible one was the unfixed
   // one; the summary's green test is how a one-hour regression came back.
-  const calls = details.filter((detail) => detail.kind !== 'helper' && detail.kind !== 'edit' && detail.kind !== 'shell' && detail.kind !== 'reasoning').length
+  // Nor is what the teammate said between its steps (`narrationOf`).
+  const calls = details.filter((detail) => detail.kind !== 'helper' && detail.kind !== 'edit' && detail.kind !== 'shell' && detail.kind !== 'reasoning' && detail.kind !== 'said').length
     + details.filter((detail) => detail.kind === 'edit' && detail.failed === true).length
   const diagnostics = events.filter(
     (event): event is Extract<NormalizedRuntimeEvent, { type: 'adapter.diagnostic' }> => event.type === 'adapter.diagnostic' && !/\.usage_window$/.test(event.payload.code)
@@ -1546,7 +1560,9 @@ export function activitySummary(details: readonly ActivityDetail[]): string {
    * once too often.
    */
   const thinking = details.filter((detail) => detail.kind === 'reasoning').length
-  const other = details.length - edits - commands - helpers - thinking
+  // What the teammate said between its steps is not a tool call either.
+  const said = details.filter((detail) => detail.kind === 'said').length
+  const other = details.length - edits - commands - helpers - thinking - said
   const parts: string[] = []
   if (edits > 0) parts.push(`Edited ${pluralize(edits, 'file')}`)
   if (commands > 0) parts.push(`ran ${pluralize(commands, 'command')}`)
@@ -2181,6 +2197,65 @@ export function turnText(events: readonly NormalizedRuntimeEvent[]): string {
 /** A blank line between two things that were said separately. */
 const PARAGRAPH_GAP = String.fromCharCode(10, 10)
 
+/** A message the thread moves into the fold, and the row it goes before. */
+export interface Narration {
+  readonly itemId: string
+  /** An index into the fold's rows; the row count when it goes last. */
+  readonly beforeRow: number
+}
+
+/**
+ * WHAT A TEAMMATE SAID WHILE IT WORKED goes where it said it.
+ *
+ * Yurt's beta report (#15): a free model's finished answer read "Creating
+ * your HELLO file and lining up verification. File write is underway -- then
+ * I'll print it back to confirm. DONE", under a fold that already showed the
+ * file written and printed. The model said those lines BEFORE its tool calls,
+ * as messages of their own (Muse Spark, walkthrough 06), and the thread drew
+ * every message after the fold -- so narration of work still to come read as
+ * if it came after the work. Claude Code keeps them in the order they
+ * happened, between the tool calls.
+ *
+ * So a message said entirely before the last row the runtime drew goes into
+ * the fold, before the first row that came after it began; what follows the
+ * last row is the reply. Nothing said is lost -- Colin's rule since
+ * 2026-09-13, "a turn is what was said, all of it, in order" -- it is put back
+ * in its order. The reply is never taken: when nothing was said after the
+ * last row, the last thing said stays below the fold. Rows the host adds after
+ * the run has ended (its look at the disk) do not count as the runtime's.
+ *
+ * `born` is the event each fold row came from, in row order; `candidates` the
+ * messages that may move, in the order they were said.
+ */
+export function narrationOf(
+  events: readonly NormalizedRuntimeEvent[],
+  born: readonly number[],
+  candidates: readonly string[]
+): readonly Narration[] {
+  const terminal = events.findIndex(
+    (event) => event.type === 'run.completed' || event.type === 'run.failed' || event.type === 'run.cancelled'
+  )
+  const end = terminal === -1 ? events.length : terminal
+  const lastRow = born.reduce((latest, at) => (at < end && at > latest ? at : latest), -1)
+  if (lastRow === -1) return []
+  const first = new Map<string, number>()
+  const last = new Map<string, number>()
+  events.forEach((event, index) => {
+    if (event.type !== 'message.delta') return
+    const itemId = event.payload.itemId
+    if (!first.has(itemId)) first.set(itemId, index)
+    last.set(itemId, index)
+  })
+  const said = candidates.filter((itemId) => (last.get(itemId) ?? Number.POSITIVE_INFINITY) < lastRow)
+  const reply = candidates.at(-1)
+  const moving = said.length === candidates.length && reply !== undefined ? said.filter((itemId) => itemId !== reply) : said
+  return moving.map((itemId) => {
+    const began = first.get(itemId) ?? 0
+    const row = born.findIndex((at) => at > began)
+    return { itemId, beforeRow: row === -1 ? born.length : row }
+  })
+}
+
 export interface MissionThreadOptions {
   /** While a run is live the last message shows a streaming caret. */
   readonly running: boolean
@@ -2284,6 +2359,13 @@ export function buildThread(
   /** The file's own name, however the runtime spelt the path to it. */
   const nameTail = (name: string): string => name.toLowerCase().replace(/\\/g, '/').split('/').at(-1) ?? name
   const activity: ActivityDetail[] = []
+  /**
+   * The event each row of `activity` came from, kept in step with it, so
+   * what the teammate SAID between its steps can be put back among them
+   * (see `narrationOf`). A row replaced in place keeps its origin; a row
+   * removed takes its entry with it.
+   */
+  const activityBorn: number[] = []
   let runningStep:
     | {
         label: string
@@ -2304,7 +2386,7 @@ export function buildThread(
   /** Diagnostics the thread gate drops, drawn at the foot of the fold instead. */
   const foldNotices: { readonly level: 'info' | 'warning' | 'error'; readonly message: string; readonly source: MissionRuntimeId }[] = []
 
-  for (const event of events) {
+  for (const [eventIndex, event] of events.entries()) {
     switch (event.type) {
       case 'tool.started': {
         workBegan = true
@@ -2376,6 +2458,7 @@ export function buildThread(
           viaConnector: mcp !== undefined || isBareConnectorTool(event.payload.name)
         })
         activity.push(detail)
+        activityBorn.push(eventIndex)
         break
       }
       case 'tool.completed':
@@ -2441,7 +2524,10 @@ export function buildThread(
               const keep = activity[index]
               for (let at = activity.length - 1; at >= 0; at -= 1) {
                 const other = activity[at]
-                if (other !== keep && other.kind === 'edit' && nameTail(other.name) === tail) activity.splice(at, 1)
+                if (other !== keep && other.kind === 'edit' && nameTail(other.name) === tail) {
+                  activity.splice(at, 1)
+                  activityBorn.splice(at, 1)
+                }
               }
             }
           }
@@ -2543,6 +2629,7 @@ export function buildThread(
             const ended = Date.parse(event.occurredAt)
             const durationMs = Number.isNaN(began) || Number.isNaN(ended) ? undefined : Math.max(0, ended - began)
             activity.push({ kind: 'reasoning', name: 'thought', settled: true, output: said, ...(durationMs === undefined ? {} : { durationMs }) })
+            activityBorn.push(eventIndex)
           }
         }
         runningStep = undefined
@@ -2734,13 +2821,46 @@ export function buildThread(
     })
   }
 
+  // What each message reads as on screen: every block the thread draws on
+  // its own taken out, as the reply below the fold does.
+  const shownText = (text: string): string =>
+    unwrapProtocolTags(stripFileBlocks(stripMemoryBlocks(stripTaskBlocks(stripDecisionBlocks(stripShareBlocks(text))))))
+  const messages = assistantMessages(events)
+  // Only a finished turn: see `narrationOf`. A message that handed over
+  // files keeps its place, with the files drawn under it.
+  const narration = options.running || activity.length === 0
+    ? []
+    : narrationOf(
+        events,
+        activityBorn,
+        messages
+          .filter((message) => shownText(message.text).length > 0 && parseFileBlocks(message.text).length === 0)
+          .map((message) => message.itemId)
+      )
+  const narrated = new Set(narration.map((said) => said.itemId))
+  const saidRow = (itemId: string): ActivityDetail => ({
+    kind: 'said',
+    name: 'said',
+    settled: true,
+    output: shownText(messages.find((message) => message.itemId === itemId)?.text ?? '')
+  })
+  const fold: readonly ActivityDetail[] = narration.length === 0
+    ? activity
+    : [
+        ...activity.flatMap((row, index) => [
+          ...narration.filter((said) => said.beforeRow === index).map((said) => saidRow(said.itemId)),
+          row
+        ]),
+        ...narration.filter((said) => said.beforeRow >= activity.length).map((said) => saidRow(said.itemId))
+      ]
+
   if (activity.length > 0) {
     items.push({
       key: 'activity',
       type: 'activity',
-      summary: activitySummary(activity),
+      summary: activitySummary(fold),
       trace: activityTrace(
-        activity,
+        fold,
         events,
         traceOutcome(events, options.running),
         planSteps,
@@ -2770,13 +2890,15 @@ export function buildThread(
        * default is not.
        */
       ...(options.running ? {} : { openByDefault: true }),
-      details: activity,
+      details: fold,
       ...(foldNotices.length === 0 ? {} : { notices: foldNotices }),
       reportedBy: events.find((event) => event.type.startsWith('tool.'))?.sourceAdapter
     })
   }
 
-  for (const message of assistantMessages(events)) {
+  for (const message of messages) {
+    // Said while the work went on: it is in the fold, where it was said.
+    if (narrated.has(message.itemId)) continue
     // A share block is shown in the peer card, attributed and labelled; left
     // in the bubble it would present the same claim twice, once unlabelled.
     //
@@ -2786,9 +2908,7 @@ export function buildThread(
     // a block too malformed to have been acted on, or a turn cut off
     // mid-block. It keeps the body, because for those the body never reached
     // anywhere else.
-    const text = unwrapProtocolTags(
-      stripFileBlocks(stripMemoryBlocks(stripTaskBlocks(stripDecisionBlocks(stripShareBlocks(message.text)))))
-    )
+    const text = shownText(message.text)
     /*
      * The files the teammate handed over, drawn UNDER the message it came
      * with rather than folded into the work.

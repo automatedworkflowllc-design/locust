@@ -10,6 +10,7 @@ import type { ReactElement } from 'react'
 import { activityCounts, activityEntries, boundedShellOutput, defaultOpenEntry, foldedToolsText, relativePath, durationText } from '../missionView.js'
 import type { TraceSegment, ActivityDetail, ActivityEntry, PlanStep } from '../missionView.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
+import { splitInlineCode } from '../agentText.js'
 import { DiffView } from './DiffView.js'
 import { Icon } from './Icon.js'
 import { PlanSteps } from './ThreadItems.js'
@@ -513,6 +514,25 @@ export function ActivityCard({
                     )}
                   </>
                 )
+              ) : entry.kind === 'said' ? (
+                /*
+                 * What the teammate said between its steps, where it said
+                 * it (missionView's `narrationOf`, Yurt's #15): "File write
+                 * is underway" read as stale under the finished work. In
+                 * the teammate's own voice, the reply's face, and quieter
+                 * than the reply -- it is the running commentary, not the
+                 * answer. Not a tool: no verb, no outcome.
+                 */
+                <div className="lc-filerow is-static lc-filerow--said">
+                  <Icon name="message" size={14} />
+                  <span className="lc-filerow__said">
+                    {splitInlineCode(entry.text).map((span, index) =>
+                      span.kind === 'code'
+                        ? <code className="lc-code--inline" key={index}>{span.text}</code>
+                        : <Fragment key={index}>{span.text}</Fragment>
+                    )}
+                  </span>
+                </div>
               ) : entry.kind === 'thought' ? (
                 /*
                  * What the model thought, in the fold with the rest of the

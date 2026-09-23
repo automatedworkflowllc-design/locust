@@ -12792,6 +12792,28 @@ textarea {
   align-items: center;
 }
 
+/* What the teammate said between its steps (Yurt's #15): its own voice, the
+   reply's face, one step quieter than the reply and allowed to wrap. */
+.lc-filerow--said {
+  align-items: flex-start;
+}
+
+.lc-filerow--said > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--lc-text-muted);
+}
+
+.lc-filerow__said {
+  min-width: 0;
+  font-family: var(--lc-font-prose);
+  font-size: var(--lc-text-description);
+  line-height: 1.5;
+  color: var(--lc-text-secondary);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
 /* The words, under the line that says how long: quoted, muted, and only when asked for. */
 .lc-filerow__thought {
   display: block;
