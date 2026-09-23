@@ -36,6 +36,9 @@ const RENDERER = fileURLToPath(new URL('../renderer/src/', import.meta.url))
 const REACHED_NOT_STYLED: ReadonlySet<string> = new Set([
   // A drive's selector for the Automations screen body.
   'lc-automations',
+  // A room's row in the conversation list (withRoomsFolded): drawn as any
+  // `lc-conv`, marked so drive-room can find the room it stands for.
+  'lc-conv--room',
   // The row wrapping one file's diff; `lc-filerow` and `DiffView` draw it.
   'lc-approval__file',
   // The composer's form is drawn by `command-dock`, which it also carries.

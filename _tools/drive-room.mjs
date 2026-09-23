@@ -25,7 +25,7 @@ const drive = await startDrive({
 })
 
 const roomState = `JSON.stringify({
-  title: document.querySelector('.lc-screen__title')?.innerText ?? '',
+  title: document.querySelector('.lc-room__name, .lc-screen__title')?.innerText ?? '',
   posts: document.querySelectorAll('.lc-roompost').length,
   cards: [...document.querySelectorAll('.lc-roomanswer')].map(c => (c.querySelector('.lc-face')?.getAttribute('aria-label')?.trim() ?? '') + ' · ' + (c.querySelector('.lc-roomanswer__phase')?.textContent.trim() ?? '') + ' · ' + (c.querySelector('.lc-roomanswer__text')?.textContent.replace(/\\s+/g, ' ').trim().slice(0, 60) ?? ''))
 })`
@@ -52,7 +52,7 @@ try {
     if (!create || create.disabled) return 'Create room disabled'
     create.click()
     await new Promise(r => setTimeout(r, 900))
-    return (document.querySelector('.lc-screen__title')?.innerText ?? '') + ' || sidebar rooms: ' + [...document.querySelectorAll('.lc-roomrow .lc-row__name')].map(el => el.textContent.trim()).join(', ')
+    return (document.querySelector('.lc-screen__title')?.innerText ?? '') + ' || sidebar rooms: ' + [...document.querySelectorAll('.lc-roomrow .lc-row__name, .lc-conv--room .lc-conv__title')].map(el => el.textContent.trim()).join(', ')
   })()`))
   await drive.capture('post a question to the room', () => drive.evaluate(`(async () => {
     const box = document.querySelector('.lc-roomcompose__box')
@@ -130,11 +130,11 @@ try {
    * the newest conversation, not the one you meant.
    */
   await drive.capture('back to the room from the sidebar', () => drive.evaluate(`(async () => {
-    const row = [...document.querySelectorAll('.lc-roomrow')].find(r => /Release/.test(r.innerText))
+    const row = [...document.querySelectorAll('.lc-roomrow, .lc-conv--room')].find(r => /Release/.test(r.innerText))
     if (!row) return 'NO ROOM ROW named Release in the sidebar -- did not navigate, so nothing below is about the room'
     row.click()
     await new Promise(r => setTimeout(r, 700))
-    const title = document.querySelector('.lc-screen__title')?.innerText ?? ''
+    const title = document.querySelector('.lc-room__name, .lc-screen__title')?.innerText ?? ''
     if (!/Release/.test(title)) return 'CLICKED the room row and landed on ' + JSON.stringify(title) + ' instead'
     return ${roomState}
   })()`))

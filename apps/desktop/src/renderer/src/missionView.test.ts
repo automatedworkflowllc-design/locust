@@ -2110,6 +2110,32 @@ describe('the trace line for a finished turn (SURFACES-0.22)', () => {
     expect(segments.find((seg) => seg.key === 'subagents')?.tone).toBeUndefined()
   })
 
+  it('counts the commands first, and calls the rest other tool calls', () => {
+    // Yurt's fat turn (beta report, #6): "3 tool calls · ran mkdir, printf and
+    // 10 more" over twelve command rows read as three calls in all. The three
+    // were reads; the commands were twelve.
+    const shell = (at: number, id: string, command: string) => [
+      ev(at, 'tool.started', { itemId: id, toolKind: 'command_execution', name: 'bash', command, phase: 'started' }, at),
+      ev(at + 1, 'tool.completed', { itemId: id, toolKind: 'command_execution', name: 'bash', command, phase: 'completed', exitCode: 0 }, at + 1)
+    ]
+    const read = (at: number, id: string, path: string) => [
+      ev(at, 'tool.started', { itemId: id, toolKind: 'read', name: 'read', command: path, phase: 'started' }, at),
+      ev(at + 1, 'tool.completed', { itemId: id, toolKind: 'read', name: 'read', command: path, phase: 'completed' }, at + 1)
+    ]
+    const events = [
+      ev(1, 'run.started', { runtimeThreadId: 't' }, 0),
+      ...read(2, 'r1', 'LOCUST.md'), ...read(4, 'r2', 'README.md'), ...read(6, 'r3', 'batch'),
+      ...shell(8, 's1', "mkdir -p batch && printf 'a' > batch/a.txt"),
+      ...shell(10, 's2', "printf 'b' > batch/b.txt"),
+      ...shell(12, 's3', "printf 'c' > batch/c.txt"),
+      ev(14, 'run.completed', { runtimeThreadId: 't', process: {} }, 14)
+    ]
+    const thread = buildThread(events, { running: false })
+    const activity = thread.find((item) => item.type === 'activity')
+    const details = activity?.type === 'activity' ? activity.details : []
+    expect(joined(activityTrace(details, events, traceOutcome(events, false)))).toBe('14s · ran 3 commands: mkdir and printf · 3 other tool calls')
+  })
+
   it('does not count thinking as a tool call, on the line a person reads', () => {
     // Grok, pass 5 on 0.154.0: `activitySummary` had stopped counting
     // reasoning in 0.153.0 and this line had not. Two reads plus a thought
@@ -2748,9 +2774,27 @@ describe('what a turn ran, and what came back', () => {
   })
 
   it('names two and counts the rest, because four command lines do not fit', () => {
+    // The count is the COMMANDS and "more" is the other KINDS: this read
+    // "ran pnpm, tsc and 2 more" with the commands and the kinds mixed in
+    // one number (Yurt's beta report, #6).
     const four = [detail(), detail(), detail(), detail()]
     expect(commandsRunText(commandsRun(four, true), ['pnpm check', 'tsc', 'node x.mjs', 'git status'])?.text)
-      .toBe('ran pnpm, tsc and 2 more')
+      .toBe('ran 4 commands: pnpm, tsc and 2 more')
+  })
+
+  it('names each kind once, so twelve commands of two kinds read as twelve', () => {
+    // Yurt's fat turn: one `mkdir && printf`, eleven `printf`, under the line
+    // "ran mkdir, printf and 10 more".
+    const twelve = Array.from({ length: 12 }, () => detail())
+    const names = ["mkdir -p batch && printf 'a' > batch/a.txt", ...'bcdefghijkl'.split('').map((c) => `printf '${c}' > batch/${c}.txt`)]
+    expect(commandsRunText(commandsRun(twelve, true), names)?.text).toBe('ran 12 commands: mkdir and printf')
+  })
+
+  it("reads past Claude Code's cd in front of a command", () => {
+    // Colin's frame of a long run, 2026-09-23: "ran cd, cd and 8 more".
+    const three = [detail(), detail(), detail()]
+    const names = ['cd C:\\work\\app && npm test', 'cd "C:\\work\\my app" && git status', 'cd /work/app; npm run build']
+    expect(commandsRunText(commandsRun(three, true), names)?.text).toBe('ran 3 commands: npm and git')
   })
 
   it('falls back to a count when no command name was recorded', () => {

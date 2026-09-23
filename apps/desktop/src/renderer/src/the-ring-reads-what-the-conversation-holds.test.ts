@@ -1,7 +1,7 @@
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { describe, expect, it } from 'vitest'
 
-import { ringSentence } from './components/ContextRing.js'
+import { pieSlicePath, ringSentence } from './components/ContextRing.js'
 import {
   contextReading,
   contextSentence,
@@ -112,5 +112,19 @@ describe('a list of runs, added up', () => {
   it('counts as priced only the runs that were', () => {
     expect(costTotal([priced, free, plan])).toEqual({ line: '$0.05', runs: 1, word: 'priced' })
     expect(costTotal([free, free])).toEqual({ line: '2.4k in · 600 out', runs: 2, word: 'measured' })
+  })
+})
+
+describe('the ring, drawn', () => {
+  // Yurt's beta report (#8): the arc read as a spinner still going after the
+  // run had finished. It is a slice of a disc now: nothing loads in a pie.
+  it('fills a slice from twelve o’clock, the size of the share used', () => {
+    expect(pieSlicePath(0, 7, 4.5)).toBeUndefined()
+    // A quarter ends at three o'clock, on the short way round.
+    expect(pieSlicePath(25, 7, 4.5)).toBe('M 7 7 L 7 2.5 A 4.5 4.5 0 0 1 11.5 7 Z')
+    // Past half, the long way round.
+    expect(pieSlicePath(75, 7, 4.5)).toContain(' 0 1 1 ')
+    // A full window is the whole disc, not a slice that closes on itself.
+    expect(pieSlicePath(100, 7, 4.5)).toMatch(/^M 2.5 7 a 4.5 4.5 0 1 0 9 0/)
   })
 })

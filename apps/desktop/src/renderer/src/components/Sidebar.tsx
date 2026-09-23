@@ -25,7 +25,7 @@ import { ThinkingOrb } from 'thinking-orbs'
 import { Icon } from './Icon.js'
 import { teammateTooltip } from '../teammateTooltip.js'
 import { railCountBadge, shortAgo } from '../railFlyout.js'
-import { conversationRows, heldFor, narrowingLine, ownerOf, unreadableSentence } from '../conversationList.js'
+import { conversationRows, heldFor, narrowingLine, ownerOf, unreadableSentence, withRoomsFolded } from '../conversationList.js'
 import { RailFlyout } from './RailFlyout.js'
 import { routineStepLabel } from '../routines.js'
 
@@ -515,6 +515,8 @@ export function Sidebar({
   const ungroupedConversations = shownConversations.filter(
     (mission) => heldFor(mission, groupMembers) === undefined
   )
+  // A room's answers, drawn as the room. See `withRoomsFolded`.
+  const ungroupedEntries = withRoomsFolded(ungroupedConversations, rooms)
   const unowned = missions.filter((mission) => (mission.ownerId ?? missionOwners[mission.missionId]) === undefined)
   const shownUnowned = missionsMatching(unowned, query)
   /*
@@ -525,6 +527,46 @@ export function Sidebar({
    * a conversation used to read one way nested under a teammate and another
    * way in the Missions section.
    */
+  /**
+   * A room, standing in the list for the conversations its posts started
+   * (`withRoomsFolded`): its name, where its newest answer was, and a press
+   * opens the room. The people mark keeps the face's footprint, so the title
+   * starts on the same x as every other row.
+   */
+  const roomRow = (room: PublicRoom, answers: readonly SidebarMission[]): ReactElement => {
+    const running = answers.some((mission) => mission.phase === 'running')
+    const newest = answers.map((mission) => mission.lastAt).filter((at): at is string => at !== undefined).sort().at(-1)
+    const age = shortAgo(newest, now)
+    const members = room.teammateIds
+      .map((id) => teammates.find((entry) => entry.teammateId === id)?.name)
+      .filter((name): name is string => name !== undefined)
+    const here = currentRoomId === room.roomId
+    return (
+      <div className="lc-convrow" key={`room:${room.roomId}`}>
+        <button
+          type="button"
+          className={`lc-conv lc-conv--room${here ? ' is-active' : ''}`}
+          title={`${room.name}: a room with ${members.join(' and ')}`}
+          aria-current={here ? 'true' : undefined}
+          onClick={() => onOpenRoom(room.roomId)}
+        >
+          {running ? (
+            <span className="lc-row__orb" aria-hidden="true" data-orb="shaping">
+              <ThinkingOrb state="shaping" size={20} theme="dark" />
+            </span>
+          ) : (
+            <span className="lc-dot lc-tone-blue is-quiet" />
+          )}
+          <span className="lc-conv__room" aria-hidden="true">
+            <Icon name="users" size={13} />
+          </span>
+          <span className="lc-conv__title">{room.name}</span>
+          {age !== undefined && <span className="lc-conv__age lc-mono">{age}</span>}
+        </button>
+      </div>
+    )
+  }
+
   const conversationRow = (mission: SidebarMission): ReactElement => {
               const owner = ownerOf(mission, missionOwners)
               const by = owner === undefined ? undefined : teammates.find((entry) => entry.teammateId === owner)
@@ -1531,13 +1573,13 @@ export function Sidebar({
               * ungrouped FROM. With no groups at all this is the whole
               * sidebar and a label over it would name the only thing there.
               */}
-            {groups.length > 0 && ungroupedConversations.length > 0 && (
+            {groups.length > 0 && ungroupedEntries.length > 0 && (
               <div className="lc-sectionlabel lc-sectionlabel--plain">
                 <span>Ungrouped</span>
-                <span className="lc-sectionlabel__count">{String(ungroupedConversations.length)}</span>
+                <span className="lc-sectionlabel__count">{String(ungroupedEntries.length)}</span>
               </div>
             )}
-            {ungroupedConversations.map(conversationRow)}
+            {ungroupedEntries.map((entry) => (entry.kind === 'room' ? roomRow(entry.room, entry.missions) : conversationRow(entry.mission)))}
           </div>
         )}
 

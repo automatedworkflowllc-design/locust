@@ -10,7 +10,7 @@ import type {
   PublicRecoveredMission,
   PublicTeammate
 } from '../../../shared/ipc.js'
-import { buildThread, cancellationSummary, decisionStanding, errorAlreadyShown, lastPlanOf, modeRefusedATool, readPlan, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
+import { buildThread, cancellationSummary, decisionStanding, errorAlreadyShown, foldNoticeKeys, lastPlanOf, modeRefusedATool, readPlan, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
 import type { GroupBoundary, GroupLeaving, LiveStarter } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
 import { folderName, ranOnLine } from '../ranOn.js'
@@ -711,11 +711,54 @@ export function Thread({
   // the newest. `no files changed` existed only on the last turn, so scrolling
   // up in a conversation showed the silence the line exists to break.
   const mayEdit = sandbox !== undefined && sandbox !== 'read-only'
+  /*
+   * AN EARLIER TURN'S WORK IS BUILT ONCE, not on every render.
+   *
+   * It depends on that turn's events, whether this run may edit, the folder
+   * and the teammate -- none of which move while somebody reads, or while a
+   * teammate streams anywhere in the app. Rebuilding it anyway re-derived
+   * every fold, diff and file row of the whole conversation on every commit:
+   * measured on Colin's largest conversation (30 turns, 11.7k nodes) at 34 ms
+   * a re-render with nothing changed, more than two frames (2026-09-22).
+   *
+   * The SAME element object comes back while its inputs hold, and React skips
+   * a subtree whose element has not changed -- the folds keep their state,
+   * because nothing about them was touched.
+   *
+   * In order, because each turn is told what the ones before it said: the
+   * plan it started from (`carriedPlan`) and the notices already carried
+   * (`saidBefore`).
+   */
+  const earlier = useMemo(() => {
+    const said = new Set<string>()
+    const elements = earlierTurns.map((turn, index) => {
+      const built = buildThread(turn.events, {
+        running: false,
+        mayEdit,
+        carriedPlan: index === 0 ? [] : lastPlanOf(earlierTurns[index - 1]!.events),
+        saidBefore: new Set(said),
+        ...(workspacePath === undefined ? {} : { workspacePath })
+      })
+      for (const key of foldNoticeKeys(built)) said.add(key)
+      return (
+        <ThreadItems
+          items={built}
+          owner={peers.self}
+          activity="idle"
+          workspacePath={workspacePath}
+          decision={undefined}
+        />
+      )
+    })
+    return { elements, said }
+  }, [earlierTurns, mayEdit, workspacePath, peers.self])
+  const earlierWork = earlier.elements
   const items = buildThread(events, {
     running,
     latestTurn: true,
     // What the turn before left the plan at: see `carriedPlan`.
     carriedPlan: lastPlanOf(earlierTurns.at(-1)?.events ?? []),
+    saidBefore: earlier.said,
     awaitingDecision: approvals.length > 0,
     spokeToPeers: peers.messages.length > 0,
     mayEdit,
@@ -755,38 +798,6 @@ export function Thread({
   // The current turn is the last in the sequence, so its own marker is the
   // one whose index is past every earlier turn.
   const markers = threadMarkers([...earlierTurns.map((turn) => turn.events), events])
-  /*
-   * AN EARLIER TURN'S WORK IS BUILT ONCE, not on every render.
-   *
-   * It depends on that turn's events, whether this run may edit, the folder
-   * and the teammate -- none of which move while somebody reads, or while a
-   * teammate streams anywhere in the app. Rebuilding it anyway re-derived
-   * every fold, diff and file row of the whole conversation on every commit:
-   * measured on Colin's largest conversation (30 turns, 11.7k nodes) at 34 ms
-   * a re-render with nothing changed, more than two frames (2026-09-22).
-   *
-   * The SAME element object comes back while its inputs hold, and React skips
-   * a subtree whose element has not changed -- the folds keep their state,
-   * because nothing about them was touched.
-   */
-  const earlierWork = useMemo(
-    () =>
-      earlierTurns.map((turn, index) => (
-        <ThreadItems
-          items={buildThread(turn.events, {
-            running: false,
-            mayEdit,
-            carriedPlan: index === 0 ? [] : lastPlanOf(earlierTurns[index - 1]!.events),
-            ...(workspacePath === undefined ? {} : { workspacePath })
-          })}
-          owner={peers.self}
-          activity="idle"
-          workspacePath={workspacePath}
-          decision={undefined}
-        />
-      )),
-    [earlierTurns, mayEdit, workspacePath, peers.self]
-  )
   /*
    * The group's line, and its instructions on request -- shown AS THE
    * GROUP'S: read-only here, with the way to edit going to the group's own

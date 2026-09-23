@@ -12074,6 +12074,16 @@ textarea {
   border: 1px dashed var(--lc-border-hairline);
 }
 
+/* A room's row: the people mark in the face's footprint (withRoomsFolded). */
+.lc-conv__room {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  color: var(--lc-text-muted);
+}
+
 .lc-conv__title {
   flex: 1;
   min-width: 0;

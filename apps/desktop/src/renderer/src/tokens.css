@@ -611,6 +611,12 @@
   --lc-plusmenu-fill: #202020;
   /* The effort control, Claude Code's on the gooey slider: its track, the
      part up to the level, the stops, and the white pill thumb's liquid. */
+  /* The context ring's circle and its filled part. The circle was the card
+     border colour, 7% white, so the ring read as a bare arc -- a spinner
+     beside the model chip after the run had finished (Yurt's beta report,
+     #8). Drawn whole, it reads as a gauge. */
+  --lc-contextring-track: rgba(255, 255, 255, 0.22);
+  --lc-contextring-fill: rgba(255, 255, 255, 0.68);
   --lc-effort-track: rgba(255, 255, 255, 0.07);
   --lc-effort-fill: rgba(255, 255, 255, 0.11);
   --lc-effort-dot: rgba(255, 255, 255, 0.26);

@@ -1028,6 +1028,18 @@ export function readPlan(value: unknown): readonly PlanStep[] {
   return steps
 }
 
+/** A notice's words, however its spacing and case came out. */
+export function noticeKey(message: string): string {
+  return message.trim().replace(/\s+/g, ' ').toLowerCase()
+}
+
+/** The notices a turn's fold carries, keyed for `saidBefore`. */
+export function foldNoticeKeys(items: readonly ThreadItem[]): readonly string[] {
+  const activity = items.find((item) => item.type === 'activity')
+  const notices = activity?.type === 'activity' ? activity.notices ?? [] : []
+  return notices.map((notice) => noticeKey(notice.message))
+}
+
 function planKey(text: string): string {
   return text.trim().replace(/\s+/g, ' ').toLowerCase()
 }
@@ -1397,7 +1409,6 @@ export function activityTrace(
     shellCommands.length === 1
       ? shellCommandText(shellCommands[0]?.name ?? '').split('\n')[0]?.trim()
       : undefined
-  if (calls > 0) segments.push({ key: 'calls', text: pluralize(calls, 'tool call') })
   /*
    * What it RAN, and what came back.
    *
@@ -1425,6 +1436,14 @@ export function activityTrace(
       segments.push({ key: 'commands', text: many.text, ...(many.amber ? { tone: 'amber' as const } : {}) })
     }
   }
+  /*
+   * The other calls, AFTER the commands and called other.
+   *
+   * Before them, "3 tool calls" read as the whole of it: Yurt counted twelve
+   * command rows under "3 tool calls · ran mkdir, printf and 10 more" and
+   * filed it as an undercount (beta report, #6). The three were the reads.
+   */
+  if (calls > 0) segments.push({ key: 'calls', text: pluralize(calls, shellCommands.length > 0 ? 'other tool call' : 'tool call') })
   if (files > 0 && !(outcome === 'cancelled' && files === 0)) segments.push({ key: 'files', text: pluralize(files, 'file') })
   else if (files === 0 && outcome === 'completed' && mayEdit === true && !cannotAttribute) {
     segments.push({ key: 'files', text: 'no files changed' })
@@ -1574,17 +1593,41 @@ export function commandsRunText(
  * not a verdict, it is just less useful.
  */
 export function commandList(names: readonly string[], ran: number): string | undefined {
-  const heads = names
-    .map((name) => shellCommandText(name).split('\n')[0]?.trim() ?? '')
-    .map((line) => line.split(/\s+/)[0] ?? '')
-    .filter((head) => head.length > 0 && head.length <= 24)
+  /*
+   * Each KIND of command once, and the count said as a count.
+   *
+   * It named the first word of the first two commands and counted every
+   * other COMMAND as "more", so twelve commands -- one `mkdir && printf`
+   * and eleven `printf` -- read "ran mkdir, printf and 10 more" over twelve
+   * rows, and Claude Code, which opens most commands with `cd <folder> &&`,
+   * read "ran cd, cd and 8 more" (Yurt's beta report, #6; Colin's frame of a
+   * long run, 2026-09-23). The count is the commands; the names are what kind.
+   */
+  const heads = [...new Set(names.map(commandHead).filter((head) => head.length > 0 && head.length <= 24))]
   if (heads.length === 0) return undefined
-  // Two named, then a count. Three names is already longer than the rest of
-  // the line put together.
+  // Two named, then how many other kinds. Three names is already longer than
+  // the rest of the line put together.
   const shown = heads.slice(0, 2)
-  const rest = ran - shown.length
-  if (rest <= 0) return `ran ${shown.join(' and ')}`
-  return `ran ${shown.join(', ')} and ${String(rest)} more`
+  const kinds = heads.length > shown.length
+    ? `${shown.join(', ')} and ${String(heads.length - shown.length)} more`
+    : shown.join(' and ')
+  // Every command a different one, and all of them named: the names are the count.
+  if (ran === heads.length && heads.length <= 2) return `ran ${kinds}`
+  return `ran ${pluralize(ran, 'command')}: ${kinds}`
+}
+
+/**
+ * The word that says what a command is: its first, past any `cd <folder> &&`
+ * in front of it -- that part says where it ran, not what ran.
+ */
+export function commandHead(name: string): string {
+  let line = shellCommandText(name).split('\n')[0]?.trim() ?? ''
+  for (;;) {
+    const hop = /^(?:cd|pushd|chdir|set-location|sl)\s+(?:"[^"]*"|'[^']*'|\S+)\s*(?:&&|;)\s*/i.exec(line)
+    if (hop === null) break
+    line = line.slice(hop[0].length)
+  }
+  return line.split(/\s+/)[0] ?? ''
 }
 
 /**
@@ -2128,6 +2171,14 @@ export interface MissionThreadOptions {
    */
   readonly carriedPlan?: readonly PlanStep[]
   /**
+   * Notices an earlier turn's fold already carried (`noticeKey`).
+   *
+   * Codex remarks on its own setup as every turn opens -- "Skill descriptions
+   * were shortened to fit the skills context budget" -- and each turn's fold
+   * said it again (Yurt's beta report, #10). A conversation hears it once.
+   */
+  readonly saidBefore?: ReadonlySet<string>
+  /**
    * Whether this turn wrote to a teammate. Those messages are drawn beside
    * the thread rather than inside it, so a turn whose whole output was a
    * message to a colleague looked, from in here, like a turn that said
@@ -2474,6 +2525,22 @@ export function buildThread(
         break
       }
       case 'route.limit_detected': {
+        /*
+         * One usage warning a run: the newest, where the first one stood.
+         *
+         * Claude Code restates the window each time its figure moves, so an
+         * answer wore "You've used 55% of your 7-day window" and then "...56%"
+         * under it -- four amber lines over two answers in a room (drive,
+         * 2026-09-23). Updated in place, so the line does not jump.
+         */
+        if (event.payload.kind === 'temporary-rate-limit') {
+          const earlier = items.findIndex((held) => held.type === 'limit' && held.kind === 'temporary-rate-limit')
+          const held = items[earlier]
+          if (held?.type === 'limit') {
+            items[earlier] = { ...held, message: event.payload.message }
+            break
+          }
+        }
         items.push({
           key: event.id,
           type: 'limit',
@@ -2524,6 +2591,7 @@ export function buildThread(
            */
           // With its source: the fold names who said it, so a runtime's
           // remark about itself is never read as a command's output.
+          if (options.saidBefore?.has(noticeKey(event.payload.message)) === true) break
           foldNotices.push({ level: event.payload.level, message: event.payload.message, source: event.sourceAdapter })
           break
         }

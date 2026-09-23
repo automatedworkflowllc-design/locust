@@ -11,6 +11,26 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.288.0 - 2026-09-23
+
+### Fixed
+
+- **A room stays in the sidebar.** A post to a room left one row per teammate,
+  each titled with the post, and no row for the room itself. The room now has
+  one row, by name, where its newest answer is; pressing it opens the room.
+
+- **The context gauge no longer looks like it is loading.** It is a small pie,
+  filled as far as the conversation's context is. The arc it replaces read as
+  a spinner still going after a run had finished.
+
+- **A turn's line counts what it shows.** "3 tool calls · ran mkdir, printf and
+  10 more" over twelve commands now reads "ran 12 commands: mkdir and printf ·
+  3 other tool calls", and a command is named past the `cd` in front of it.
+
+- **Said once.** Codex's note about its skills budget shows on the first turn
+  that hears it, not on every turn, and a run shows one usage warning, its
+  latest, instead of one each time the figure moves.
+
 ## 0.287.0 - 2026-09-23
 
 ### Fixed

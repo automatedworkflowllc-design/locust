@@ -27,6 +27,7 @@
  * is migrated.
  */
 
+import type { PublicRoom } from '../../shared/ipc.js'
 import type { SidebarMission } from './components/Sidebar.js'
 
 /**
@@ -165,4 +166,48 @@ export function heldFor<T>(mission: SidebarMission, byKey: Readonly<Record<strin
     if (held !== undefined) return held
   }
   return undefined
+}
+
+/** A row of the list: a conversation, or a room standing for its answers. */
+export type ListEntry =
+  | { readonly kind: 'conversation'; readonly mission: SidebarMission }
+  | { readonly kind: 'room'; readonly room: PublicRoom; readonly missions: readonly SidebarMission[] }
+
+/**
+ * The list with each room drawn as the room: one row, where its newest answer
+ * was, in place of the answers themselves.
+ *
+ * A post to a room starts one conversation per teammate, each titled with the
+ * post, and the ordinary sidebar has no Rooms section -- that is the compact
+ * one's. So after leaving a room called "Release" the sidebar had no row for
+ * it, and two identical rows reading "In one sentence each: what d..." stood
+ * in for it; the only way back was the Rooms screen (Yurt's beta report,
+ * 2026-09-23, #7). The answers are still one press away, in the room.
+ */
+export function withRoomsFolded(
+  conversations: readonly SidebarMission[],
+  rooms: readonly PublicRoom[]
+): readonly ListEntry[] {
+  const roomOf = new Map<string, PublicRoom>()
+  for (const room of rooms) {
+    for (const post of room.posts) for (const missionId of Object.values(post.missions)) roomOf.set(missionId, room)
+  }
+  const entries: ListEntry[] = []
+  const placed = new Map<string, number>()
+  for (const mission of conversations) {
+    const room = (mission.memberIds ?? [mission.missionId]).map((id) => roomOf.get(id)).find((found) => found !== undefined)
+    if (room === undefined) {
+      entries.push({ kind: 'conversation', mission })
+      continue
+    }
+    const at = placed.get(room.roomId)
+    if (at === undefined) {
+      placed.set(room.roomId, entries.length)
+      entries.push({ kind: 'room', room, missions: [mission] })
+      continue
+    }
+    const held = entries[at]
+    if (held?.kind === 'room') entries[at] = { ...held, missions: [...held.missions, mission] }
+  }
+  return entries
 }
