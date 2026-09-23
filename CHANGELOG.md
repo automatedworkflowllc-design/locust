@@ -6,6 +6,21 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.279.0 - 2026-09-23
+
+- **Calmer bots, except the one you are talking to.** The bot beside a
+  conversation's live line keeps all its moves: it hops while it works and
+  flips now and then. Its copies in the sidebar and the top bar no longer
+  mirror every hop. There, a working teammate looks around and gives a
+  small bounce, so you can still tell who is busy without the whole window
+  moving at once.
+
+- **The title beam means loading.** The grey beam round the home screen's
+  title box now runs only while Locust is finding your coding agents, and
+  goes out as the logo lights and the bots wake. It no longer circles
+  forever beside them, which made the home screen look like it was still
+  loading when it was not, and the home screen does a little less work.
+
 ## 0.278.0 - 2026-09-23
 
 - **A quiet beam of light.** While a run is going, a soft grey light now
