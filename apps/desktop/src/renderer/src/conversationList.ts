@@ -217,5 +217,30 @@ export function withRoomsFolded(
     const held = entries[at]
     if (held?.kind === 'room') entries[at] = { ...held, missions: [...held.missions, mission] }
   }
+  /*
+   * A ROOM NOBODY HAS POSTED TO YET is a row too, where its making would put it.
+   *
+   * It had none: a row stood for a room's answers, and an empty room has
+   * none, so a room made and left could only be found again on the Rooms
+   * screen. Colin, asked whether that was right: "I'll let you choose design
+   * choice" -- and a thing you just made should be where you left it. Placed
+   * by when it was made among the newest-first rows, never above one that is
+   * running. A room with posts whose answers are all in another folder stays
+   * that folder's.
+   */
+  const timeOf = (entry: ListEntry): number =>
+    entry.kind === 'conversation'
+      ? Date.parse(entry.mission.lastAt ?? '') || 0
+      : Math.max(0, ...entry.missions.map((mission) => Date.parse(mission.lastAt ?? '') || 0))
+  const running = (entry: ListEntry): boolean =>
+    entry.kind === 'conversation' ? entry.mission.phase === 'running' : entry.missions.some((mission) => mission.phase === 'running')
+  const empty = rooms.filter((room) => room.posts.length === 0).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+  for (const room of empty) {
+    const made = Date.parse(room.createdAt) || 0
+    const at = entries.findIndex((entry) => !running(entry) && timeOf(entry) < made)
+    const row: ListEntry = { kind: 'room', room, missions: [] }
+    if (at < 0) entries.push(row)
+    else entries.splice(at, 0, row)
+  }
   return entries
 }

@@ -542,7 +542,8 @@ export function Sidebar({
    */
   const roomRow = (room: PublicRoom, answers: readonly SidebarMission[]): ReactElement => {
     const running = answers.some((mission) => mission.phase === 'running')
-    const newest = answers.map((mission) => mission.lastAt).filter((at): at is string => at !== undefined).sort().at(-1)
+    // A room with no answers yet is as old as its making.
+    const newest = answers.map((mission) => mission.lastAt).filter((at): at is string => at !== undefined).sort().at(-1) ?? room.createdAt
     const age = shortAgo(newest, now)
     const members = room.teammateIds
       .map((id) => teammates.find((entry) => entry.teammateId === id)?.name)

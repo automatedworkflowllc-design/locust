@@ -62,6 +62,24 @@ describe('a room in the sidebar', () => {
     expect(entries[0]?.kind).toBe('room')
   })
 
+  it('keeps a room nobody has posted to yet, placed by when it was made', () => {
+    const fresh = { ...release, roomId: 'room_fresh', name: 'Fresh', createdAt: '2026-09-23T04:45:00.000Z', posts: [] } as unknown as PublicRoom
+    const list = [
+      conversation('mission_running', '2026-09-23T04:00:00.000Z', { title: 'Still going', phase: 'running' }),
+      conversation('mission_new', '2026-09-23T05:00:00.000Z', { title: 'Newer' }),
+      conversation('mission_old', '2026-09-23T04:10:00.000Z', { title: 'Older' })
+    ]
+    const entries = withRoomsFolded(list, [fresh])
+    expect(entries.map((entry) => (entry.kind === 'room' ? `room:${entry.room.name}` : entry.mission.title))).toEqual([
+      'Still going',
+      'Newer',
+      'room:Fresh',
+      'Older'
+    ])
+    const room = entries[2]
+    expect(room?.kind === 'room' ? room.missions : ['x']).toEqual([])
+  })
+
   it('leaves every other conversation as it was', () => {
     const list = [conversation('a', '2026-09-23T05:00:00.000Z'), conversation('b', '2026-09-23T04:00:00.000Z')]
     expect(withRoomsFolded(list, []).every((entry) => entry.kind === 'conversation')).toBe(true)
