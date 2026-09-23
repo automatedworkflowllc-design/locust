@@ -6,6 +6,18 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.271.0 - 2026-09-22
+
+- **The working orbs are sharper.** The six busy orbs beside a working
+  teammate (the ribbon, the web, the braid, the globe, the wave and the cube)
+  were drawn at 64 pixels and squeezed into their 26-pixel spot by the
+  browser on every frame, which striped some of them and made their dots
+  flicker as they moved. They are now drawn four times larger by the same
+  library and shrunk with a high-quality filter: the same designs, drawn
+  true, and steady from one frame to the next. They look a little dimmer,
+  about 15%, because the old extra brightness was dots doubling up. The ring
+  and the square were already sharp and are unchanged.
+
 ## 0.270.0 - 2026-09-22
 
 - **The logo on the home screen powers on.** Once your coding agents have
