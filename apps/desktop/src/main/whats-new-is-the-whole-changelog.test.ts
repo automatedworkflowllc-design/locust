@@ -92,10 +92,12 @@ describe('the changelog that ships', () => {
     expect(all.every((entry) => entry.groups.length > 0)).toBe(true)
   })
 
-  it('gives someone arriving from 0.276 the bots, and someone arriving from 0.280 nothing', () => {
+  it('gives someone arriving from 0.276 the bots and the machine, from 0.280 the machine, and from 0.295 nothing', () => {
+    // 0.295.0 is big too: the title screen became a machine (A2).
     const newest = all[0]!.version
-    expect(splashEntries(all, '0.276.0', newest).map((entry) => entry.version)).toEqual(['0.277.0'])
-    expect(splashEntries(all, '0.280.0', newest)).toEqual([])
+    expect(splashEntries(all, '0.276.0', newest).map((entry) => entry.version)).toEqual(['0.295.0', '0.277.0'])
+    expect(splashEntries(all, '0.280.0', newest).map((entry) => entry.version)).toEqual(['0.295.0'])
+    expect(splashEntries(all, '0.295.0', newest)).toEqual([])
   })
 })
 
