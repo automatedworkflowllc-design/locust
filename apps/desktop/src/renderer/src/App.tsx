@@ -4967,6 +4967,7 @@ export default function App(): ReactElement {
                 freeStart={freeStartStillFree(runtimes, models)}
                 limitedRuntimes={limitedRuntimes}
                 discoveryPhase={runtimeState.phase}
+                tube={tube}
                 workspacePath={workspacePath}
                 workspaceMade={workspaceMade}
                 teammateCount={teammates.length}

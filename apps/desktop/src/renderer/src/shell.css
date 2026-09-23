@@ -3620,16 +3620,181 @@ textarea {
   gap: 14px;
 }
 
-.lc-markcard__mark {
-  width: 112px;
-  max-width: 60%;
+/*
+ * THE LOCKUP, POWERING ON -- see PoweredLockup.tsx.
+ *
+ * Mark beside wordmark, the design system cover's composition, and the boot
+ * screen's tube laid over it for the moment it lights: scanlines, one sweep
+ * down the glass, the lime cooling to the app's ink. The still lockup is the
+ * finished state, so reduced motion loses nothing but the lighting.
+ */
+.lc-lockup {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  color: var(--lc-text-primary);
+}
+
+.lc-lockup__mark {
+  display: block;
+  width: 108px;
+  max-width: 34%;
   height: auto;
 }
 
-.lc-markcard__wordmark {
-  width: 168px;
-  max-width: 80%;
+.lc-lockup__word {
+  display: block;
+  width: 196px;
+  max-width: 56%;
   height: auto;
+}
+
+.lc-lockup path {
+  fill: currentColor;
+}
+
+.lc-lockup__tube {
+  position: absolute;
+  inset: -12px -20px;
+  border-radius: var(--lc-radius-card);
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.lc-lockup__scan {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--lc-boot-scan) 0px,
+    var(--lc-boot-scan) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+.lc-lockup__sweep {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 46%;
+  background: linear-gradient(to bottom, transparent, var(--lc-boot-glow-soft), transparent);
+  transform: translateY(-110%);
+}
+
+.lc-lockup.is-powering {
+  animation: lcLockupPower 2.6s ease-out both;
+}
+
+.lc-lockup.is-relighting {
+  animation: lcLockupRelight 2.2s ease-out both;
+}
+
+.lc-lockup.is-powering .lc-lockup__tube,
+.lc-lockup.is-relighting .lc-lockup__tube {
+  animation: lcLockupTube 2.4s ease-out both;
+}
+
+.lc-lockup.is-powering .lc-lockup__sweep,
+.lc-lockup.is-relighting .lc-lockup__sweep {
+  animation: lcLockupSweep 1.2s linear 0.25s both;
+}
+
+/* From dark: it catches with a flicker, lit in the tube's lime. */
+@keyframes lcLockupPower {
+  0% {
+    opacity: 0;
+    color: var(--lc-lime);
+    filter: drop-shadow(0 0 0 transparent);
+  }
+  5% {
+    opacity: 1;
+  }
+  8% {
+    opacity: 0.3;
+  }
+  11% {
+    opacity: 1;
+  }
+  16% {
+    opacity: 0.72;
+  }
+  19% {
+    opacity: 1;
+    color: var(--lc-lime);
+    filter: drop-shadow(0 0 12px var(--lc-boot-glow-soft));
+  }
+  55% {
+    color: var(--lc-lime);
+    filter: drop-shadow(0 0 10px var(--lc-boot-glow-soft));
+  }
+  100% {
+    opacity: 1;
+    color: var(--lc-text-primary);
+    filter: drop-shadow(0 0 0 transparent);
+  }
+}
+
+/* Again, from lit: it never goes dark, it only catches the lime once more. */
+@keyframes lcLockupRelight {
+  0% {
+    color: var(--lc-text-primary);
+    filter: drop-shadow(0 0 0 transparent);
+  }
+  10% {
+    opacity: 0.8;
+  }
+  14% {
+    opacity: 1;
+    color: var(--lc-lime);
+    filter: drop-shadow(0 0 12px var(--lc-boot-glow-soft));
+  }
+  50% {
+    color: var(--lc-lime);
+    filter: drop-shadow(0 0 10px var(--lc-boot-glow-soft));
+  }
+  100% {
+    opacity: 1;
+    color: var(--lc-text-primary);
+    filter: drop-shadow(0 0 0 transparent);
+  }
+}
+
+@keyframes lcLockupTube {
+  0% {
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  58% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes lcLockupSweep {
+  0% {
+    transform: translateY(-110%);
+  }
+  100% {
+    transform: translateY(240%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-lockup.is-powering,
+  .lc-lockup.is-relighting,
+  .lc-lockup .lc-lockup__tube,
+  .lc-lockup .lc-lockup__sweep {
+    animation: none;
+  }
 }
 
 /* The two claim lines. Mono reads as machine output rather than marketing. */

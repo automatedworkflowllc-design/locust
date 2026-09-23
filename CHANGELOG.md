@@ -6,6 +6,22 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.270.0 - 2026-09-22
+
+- **The logo on the home screen powers on.** Once your coding agents have
+  been found and the app opens, the Locust mark and wordmark light up like
+  the loading screen's tube: a flicker of phosphor lime, one sweep down the
+  glass, then they cool to white. It lights again every 7 to 10 seconds, in
+  case you missed it. Settings › Appearance › **The boot screen** decides it
+  too: Full lights it and relights it, Subtle lights it once, Off keeps it
+  still. It never moves if your system asks for reduced motion.
+
+- **The Receipt tab has the receipt as soon as a run finishes.** It used to
+  say the receipt would appear "once this mission has been recovered from
+  the ledger", with nothing to press, right after a run whose record was
+  already saved. It now shows the run's phase, checkpoints, event count and
+  whether its record verifies.
+
 ## 0.269.0 - 2026-09-22
 
 - **The right-click menu stays in the window, and reads like Claude's.**

@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 
-import type { PublicRuntimeStatus } from '../../../shared/ipc.js'
-import mark from '../assets/locust-mark.svg'
-import wordmark from '../assets/locust-wordmark.svg'
+import type { PublicRuntimeStatus, TubePreference } from '../../../shared/ipc.js'
 import { connectedRuntimeCount, deferredOthersSentence, integrationOf, routeRowStatus, runtimeIsUsable } from '../status.js'
 import { FREE_START_RUNTIME, installCommand, installSentence, runtimeInstallFacts, signInCommand } from '../../../shared/runtime-install.js'
+import { PoweredLockup } from './PoweredLockup.js'
 import { SignInButton } from './SignInButton.js'
 
 /**
@@ -60,6 +59,7 @@ export function FirstLaunch({
   runtimes,
   limitedRuntimes,
   discoveryPhase,
+  tube,
   freeStart = 'unknown',
   workspacePath,
   teammateCount,
@@ -86,6 +86,8 @@ export function FirstLaunch({
    */
   readonly freeStart?: 'yes' | 'no' | 'unknown'
   readonly discoveryPhase: 'loading' | 'ready' | 'error'
+  /** The boot screen's preference; the lockup's lighting follows it. Absent reads as full. */
+  readonly tube?: TubePreference
   /** The folder the teammates work in; undefined when none is chosen. */
   readonly workspacePath: string | undefined
   readonly teammateCount: number
@@ -221,10 +223,9 @@ export function FirstLaunch({
   return (
     <div className="lc-empty" ref={pane}>
       <div className="lc-empty__inner">
-        {/* The mark in its own card, at the reference's sizes. */}
+        {/* The lockup in its own card, powering on once the runtimes have answered. */}
         <div className="lc-markcard">
-          <img className="lc-markcard__mark" src={mark} alt="" />
-          <img className="lc-markcard__wordmark" src={wordmark} alt="Locust" />
+          <PoweredLockup ready={discoveryPhase === 'ready'} tube={tube ?? 'full'} />
         </div>
 
         {/*
