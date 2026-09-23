@@ -8,3 +8,6 @@ allowBuilds:
   # refused rather than run: nothing here needs it.
   electron-winstaller: false
   esbuild: true
+
+minimumReleaseAgeExclude:
+  - bot-avatars@0.1.1

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactElement } from 'react'
 
-import type { AvatarSpec } from '../../../shared/avatar.js'
-import type { TubePreference } from '../../../shared/ipc.js'
-import { PixelFace } from './PixelFace.js'
-import type { FaceActivity, FacePresence, PixelFaceHue } from './PixelFace.js'
+import type { BotAvatarState } from 'bot-avatars'
+
+import type { TeammateHue, TubePreference } from '../../../shared/ipc.js'
+import { Bot } from './Bot.js'
+import type { BotType } from './Bot.js'
 import { PoweredLockup } from './PoweredLockup.js'
 
 /**
@@ -14,16 +15,22 @@ import { PoweredLockup } from './PoweredLockup.js'
  * be a 1:1 once you fix the text description under locust tbh ... cause right
  * now it just looks like the locust logo and crt shipped"*. So this is the
  * whole cover: the lockup lighting up with the claim centred under it, and
- * three teammates on their plate, each in a real state -- Wren working, Atlas
- * waiting on you, Sable idle.
+ * three teammates on their plate, each in a real state.
+ *
+ * THE TEAMMATES ARE BOTS (0.274). Colin, on libraries.dev/bots: *"this is
+ * actually fucking perfect brother"*, then *"we will unfortunately have to
+ * update the title screen as well, lets definitely include ghost in there"*.
+ * Wren is a ghost, working; Atlas a droid, waiting on you (Locust's amber
+ * ring and dot); Sable a Locust of our own, the Hopper, asleep. They follow a
+ * pointer that comes near, and hop when clicked.
  *
  * ONE DRAWING, TO SCALE. Every number below is the cover's own, on its own
  * 960x288 canvas, and the card draws it at the column's width: the column is
  * 760 to 980px wide, so the card is the cover at 0.79 to 1.02 of its size
- * rather than a rearrangement of it. Faces are sized in whole pixels at that
- * scale, so the pixel art stays on its grid instead of being resampled.
+ * rather than a rearrangement of it. Bots are sized in whole pixels at that
+ * scale.
  *
- * The faces wake with the lockup: still, with no presence dot, until the
+ * The bots wake with the lockup: still, with no presence dot, until the
  * runtimes have answered -- the moment the loading screen's work is done and
  * the cover comes on.
  */
@@ -41,23 +48,36 @@ export function coverScale(width: number): number {
   return Math.round((width / COVER_WIDTH) * 1000) / 1000
 }
 
-interface CoverFace {
+interface CoverBot {
   readonly key: string
-  readonly hue: PixelFaceHue
-  readonly avatar: AvatarSpec
-  readonly activity: FaceActivity
-  readonly presence: FacePresence
-  /** Top-left on the cover's canvas, where the face is 120 across. */
+  readonly type: BotType
+  readonly hue: TeammateHue
+  readonly state: BotAvatarState
+  /** Locust's own marks: the presence dot, and the ring of a teammate waiting on you. */
+  readonly dot?: 'lime' | 'amber'
+  readonly waiting?: boolean
+  /** Top-left on the cover's canvas, where a bot is 120 across. */
   readonly x: number
   readonly y: number
 }
 
-/** The cover's cast, exactly as the design system draws them. */
-export const COVER_CAST: readonly CoverFace[] = [
-  { key: 'wren', hue: 'lime', avatar: { headwear: 1, accessory: 0, mouth: 0 }, activity: 'working', presence: 'working', x: 536, y: 76 },
-  { key: 'atlas', hue: 'blue', avatar: { headwear: 2, accessory: 1, mouth: 0 }, activity: 'waiting', presence: 'approval', x: 680, y: 100 },
-  { key: 'sable', hue: 'clay', avatar: { headwear: 4, accessory: 2, mouth: 3 }, activity: 'idle', presence: 'none', x: 824, y: 64 }
+/** The cover's cast. */
+export const COVER_CAST: readonly CoverBot[] = [
+  { key: 'wren', type: 'ghost', hue: 'lime', state: 'working', dot: 'lime', x: 536, y: 76 },
+  { key: 'atlas', type: 'droid', hue: 'blue', state: 'default', dot: 'amber', waiting: true, x: 680, y: 100 },
+  { key: 'sable', type: 'hopper', hue: 'clay', state: 'sleeping', x: 824, y: 64 }
 ]
+
+/**
+ * A teammate hue as a colour a canvas can take: the token's own value, read
+ * off the page, so the palette still has one definition (tokens.css). Nothing
+ * to read before there is a page; the bot then wears its own colour.
+ */
+function hueColor(hue: TeammateHue): string | undefined {
+  if (typeof document === 'undefined') return undefined
+  const value = getComputedStyle(document.documentElement).getPropertyValue(`--lc-hue-${hue}`).trim()
+  return value.length === 0 ? undefined : value
+}
 
 const FACE = 120
 
@@ -87,17 +107,29 @@ export function HomeCover({
   return (
     <div className="lc-cover" ref={card} style={{ '--lc-cover-k': String(scale) } as CSSProperties}>
       <div className="lc-cover__plate" aria-hidden="true" />
-      {COVER_CAST.map((face) => (
-        <span key={face.key} className="lc-cover__face" style={{ left: at(face.x), top: at(face.y) }}>
-          <PixelFace
-            hue={face.hue}
-            avatar={face.avatar}
-            size={at(FACE)}
-            activity={ready ? face.activity : 'idle'}
-            presence={ready ? face.presence : 'none'}
-          />
-        </span>
-      ))}
+      {COVER_CAST.map((mate, index) => {
+        const size = at(FACE)
+        const color = hueColor(mate.hue)
+        return (
+          <span key={mate.key} className="lc-cover__face" style={{ left: at(mate.x), top: at(mate.y) }}>
+            <span className="lc-bot" data-bot={mate.type} data-state={ready ? mate.state : 'still'} style={{ width: size, height: size }}>
+              {ready && mate.waiting === true && <span className="lc-bot__ring" />}
+              <Bot
+                type={mate.type}
+                size={size}
+                state={ready ? mate.state : 'default'}
+                paused={!ready}
+                interactive
+                seed={0.2 + index * 0.3}
+                {...(color === undefined ? {} : { color })}
+              />
+              {ready && mate.dot !== undefined && (
+                <span className={`lc-presence lc-presence--${mate.dot}`} style={{ width: Math.max(8, Math.round(size * 0.08)), height: Math.max(8, Math.round(size * 0.08)) }} />
+              )}
+            </span>
+          </span>
+        )
+      })}
       <div className="lc-cover__brand">
         <PoweredLockup ready={ready} tube={tube} />
         <p className="lc-cover__claim">Autonomous teammates on your own machine</p>

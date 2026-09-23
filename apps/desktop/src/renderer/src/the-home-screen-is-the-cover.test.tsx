@@ -13,7 +13,8 @@ import { COVER_CAST, COVER_WIDTH, HomeCover, coverScale } from './components/Hom
  * it, and the three teammates on their plate -- drawn to the column's width.
  */
 
-const activities = (html: string): string[] => [...html.matchAll(/data-activity="([a-z]+)"/g)].map((match) => match[1] ?? '')
+const botAttr = (html: string, name: string): string[] =>
+  [...html.matchAll(new RegExp(`class="lc-bot"[^>]*${name}="([a-z]+)"`, 'g'))].map((match) => match[1] ?? '')
 
 describe('the cover, drawn to the column', () => {
   it('is the cover at the column width: 960 is its own size, 760 is 0.79 of it', () => {
@@ -40,30 +41,34 @@ describe('what the home screen draws', () => {
     expect(brand.indexOf('lc-lockup')).toBeLessThan(brand.indexOf('lc-cover__claim'))
   })
 
-  it('has the three teammates on their plate, in the cover order', () => {
+  it('has the three teammates on their plate, in the cover order: a ghost, a droid, a Locust', () => {
     expect(after).toContain('class="lc-cover__plate" aria-hidden="true"')
-    expect(COVER_CAST.map((face) => face.key)).toEqual(['wren', 'atlas', 'sable'])
-    expect(activities(after)).toEqual(['working', 'waiting', 'idle'])
+    expect(COVER_CAST.map((mate) => mate.key)).toEqual(['wren', 'atlas', 'sable'])
+    // Colin: "lets definitely include ghost in there".
+    expect(botAttr(after, 'data-bot')).toEqual(['ghost', 'droid', 'hopper'])
+    expect(botAttr(after, 'data-state')).toEqual(['working', 'default', 'sleeping'])
   })
 
-  it('wakes the teammates with the lockup: still and dotless until the runtimes answer', () => {
-    expect(activities(before)).toEqual(['idle', 'idle', 'idle'])
+  it('wakes the teammates with the lockup: still and unmarked until the runtimes answer', () => {
+    expect(botAttr(before, 'data-state')).toEqual(['still', 'still', 'still'])
     expect(before).not.toContain('lc-presence')
-    expect(before).not.toContain('lc-face__ring')
-    // Then Wren works, Atlas waits on you, and Sable stays idle.
+    expect(before).not.toContain('lc-bot__ring')
+    // Then Wren works, Atlas waits on you -- Locust's amber ring and dot --
+    // and Sable sleeps, unmarked.
     expect(after).toContain('lc-presence--lime')
     expect(after).toContain('lc-presence--amber')
-    expect(after).toContain('lc-face__ring')
+    expect(after.match(/lc-bot__ring/g) ?? []).toHaveLength(1)
   })
 
-  it('places each face on the cover grid at the starting scale, in whole pixels', () => {
+  it('places each bot on the cover grid at the starting scale, in whole pixels', () => {
     // Wren is 120 across at (536, 76) on the cover; at 0.792 that is 95 at (425, 60).
     expect(after).toMatch(/<span class="lc-cover__face" style="left:425px;top:60px">/)
-    expect(after).toMatch(/width:95px;height:95px/)
+    expect(after).toMatch(/class="lc-bot" data-bot="ghost" data-state="working" style="width:95px;height:95px"/)
   })
 
-  it('is decorative apart from its words: no face answers to a name', () => {
-    expect(after).not.toMatch(/lc-face[^"]*" [^>]*role="img"/)
-    expect(after.match(/class="lc-face"[^>]*aria-hidden="true"/g) ?? []).toHaveLength(3)
+  it('is decorative apart from its words: no bot answers to a name', () => {
+    const canvases = after.match(/<canvas[^>]*>/g) ?? []
+    expect(canvases).toHaveLength(3)
+    expect(canvases.every((canvas) => canvas.includes('aria-hidden="true"'))).toBe(true)
   })
 })

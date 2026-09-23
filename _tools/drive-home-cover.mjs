@@ -21,7 +21,8 @@ import { say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tube = arg('--tube') ?? 'full'
-const OUT = join(new URL('../docs/home-cover-2026-09-22/', import.meta.url).pathname.slice(1), (packaged === undefined ? 'local' : 'packaged') + (tube === 'full' ? '' : '-tube-' + tube))
+// Bots since 0.274; the pixel-face cover's frames stay in docs/home-cover-2026-09-22.
+const OUT = join(new URL('../docs/home-cover-bots-2026-09-22/', import.meta.url).pathname.slice(1), (packaged === undefined ? 'local' : 'packaged') + (tube === 'full' ? '' : '-tube-' + tube))
 await mkdir(OUT, { recursive: true })
 
 const workspace = await scratchRepository('locust-drive-cover-ws-')
@@ -72,7 +73,7 @@ const MEASURE = `(async () => {
   }
   const letters = ink(claim)
   const nameLetters = ink(name)
-  const faces = [...card.querySelectorAll('.lc-cover__face .lc-face')].map((face) => ({ activity: face.getAttribute('data-activity'), width: Math.round(face.getBoundingClientRect().width), left: Math.round(face.getBoundingClientRect().left - card.getBoundingClientRect().left) }))
+  const faces = [...card.querySelectorAll('.lc-cover__face .lc-bot')].map((bot) => ({ bot: bot.getAttribute('data-bot'), state: bot.getAttribute('data-state'), width: Math.round(bot.getBoundingClientRect().width), canvas: bot.querySelector('canvas')?.width ?? 0 }))
   return JSON.stringify({
     k: card.style.getPropertyValue('--lc-cover-k'),
     card: box(card), pane: box(pane), lockup: box(lockup), mark: box(mark), plate: box(plate),
@@ -94,7 +95,7 @@ try {
     let last = ''
     const tick = () => {
       const lockup = document.querySelector('.lc-lockup')
-      const faces = [...document.querySelectorAll('.lc-cover__face .lc-face')].map((f) => f.getAttribute('data-activity')).join(',') || 'nofaces'
+      const faces = [...document.querySelectorAll('.lc-cover__face .lc-bot')].map((b) => b.getAttribute('data-state')).join(',') || 'nofaces'
       const dots = document.querySelectorAll('.lc-cover .lc-presence').length
       const state = [
         document.hasFocus() ? 'focus' : 'nofocus',
@@ -145,9 +146,9 @@ try {
 
   const probingLines = log.filter((line) => line.includes('| probing |'))
   const readyLines = log.filter((line) => line.includes('| ready |'))
-  if (probingLines.length > 0) check('while probing, the teammates are still and dotless', probingLines.every((line) => /idle,idle,idle dots=0/.test(line) || /nofaces/.test(line)), probingLines.join(' / '))
+  if (probingLines.length > 0) check('while probing, the teammates are still and dotless', probingLines.every((line) => /still,still,still dots=0/.test(line) || /nofaces/.test(line)), probingLines.join(' / '))
   else say('  note  probing finished before the watch began; the before-state was not seen on screen')
-  check('once ready, Wren works, Atlas waits on you, Sable is idle', readyLines.some((line) => /working,waiting,idle dots=2/.test(line)), readyLines.slice(-1)[0])
+  check('once ready, Wren (a ghost) works, Atlas waits on you, Sable sleeps', readyLines.some((line) => /working,default,sleeping dots=2/.test(line)), readyLines.slice(-1)[0])
   if (tube === 'full') check('the lockup lit, and lit again', shotPower && shotRelight)
   else check(`tube ${tube}: the lockup never lit`, !shotPower && !shotRelight)
 
@@ -166,7 +167,7 @@ try {
     measured[label] = m
     await shoot(`size-${label}.png`)
     if (m.missing) { check(`${label}: the cover is on the home screen`, false); continue }
-    say(`${label}: card ${Math.round(m.card.width)}x${Math.round(m.card.height)} at k=${m.k}; faces ${m.faces.map((f) => f.width).join('/')}px; claim ${m.claimFont.size} ${m.claimFont.family} ${m.claimFont.tracking}; name ${m.nameFont.size} ${m.nameFont.family} ${m.nameFont.weight}; pane overflow ${Math.round(m.scrolled.overflow)}px, scrolled ${Math.round(m.scrolled.top)}px`)
+    say(`${label}: card ${Math.round(m.card.width)}x${Math.round(m.card.height)} at k=${m.k}; bots ${m.faces.map((f) => `${f.bot} ${f.width}px (canvas ${f.canvas})`).join(', ')}; claim ${m.claimFont.size} ${m.claimFont.family} ${m.claimFont.tracking}; name ${m.nameFont.size} ${m.nameFont.family} ${m.nameFont.weight}; pane overflow ${Math.round(m.scrolled.overflow)}px, scrolled ${Math.round(m.scrolled.top)}px`)
     check(`${label}: k is the card's width over the cover's 960`, Math.abs(Number(m.k) - (m.card.width - 2) / 960) < 0.002, `${m.k} vs ${((m.card.width - 2) / 960).toFixed(3)}`)
     check(`${label}: the claim is centred under the lockup (letters to letters)`, Math.abs(m.claimLetters.mid - m.lockupInk.mid) <= 1.5, `claim centre ${m.claimLetters.mid.toFixed(1)}, lockup centre ${m.lockupInk.mid.toFixed(1)}`)
     check(`${label}: the lockup is centred in the space left of the plate`, Math.abs((m.lockupInk.left - m.card.left) - (m.plate.left - m.lockupInk.right)) <= 3, `left air ${(m.lockupInk.left - m.card.left).toFixed(1)}, right air ${(m.plate.left - m.lockupInk.right).toFixed(1)}`)

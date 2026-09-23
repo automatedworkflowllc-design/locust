@@ -3628,6 +3628,45 @@ textarea {
   line-height: 0;
 }
 
+/*
+ * A BOT, AND LOCUST'S OWN MARKS ON IT -- see Bot.tsx.
+ *
+ * A bot's body fills about nine tenths of its box, so the waiting ring and
+ * the presence dot sit on the body the way they sat on a pixel face's chip,
+ * not on the box's corner.
+ */
+.lc-bot {
+  position: relative;
+  display: block;
+  line-height: 0;
+}
+
+.lc-bot__ring {
+  position: absolute;
+  inset: 6%;
+  border: 1.5px solid var(--lc-amber);
+  border-radius: 34%;
+  animation: lcRingWait 1.8s ease-out infinite;
+  pointer-events: none;
+}
+
+.lc-bot .lc-presence {
+  right: 6%;
+  bottom: 6%;
+  z-index: 1;
+}
+
+/* On the cover the dot is ringed in the plate it stands on. */
+.lc-cover .lc-bot .lc-presence {
+  border-color: var(--lc-bg-window);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-bot__ring {
+    animation: none;
+  }
+}
+
 /* The lockup and the claim, centred in the space left of the plate: the
    same air on either side, and the claim's centre is the lockup's. */
 .lc-cover__brand {

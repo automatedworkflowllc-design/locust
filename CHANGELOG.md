@@ -6,6 +6,16 @@ carries what you would notice.
 
 Dates are when the build was cut. Versions are the number Settings shows.
 
+## 0.274.0 - 2026-09-22
+
+- **Bots on the home screen.** The three teammates on the home screen are
+  now bots: a ghost hard at work, a droid waiting on you (in Locust's amber
+  ring), and a Locust of our own, the Hopper, with big folded grasshopper
+  legs, fast asleep. They follow your pointer when it comes near and hop
+  when you click them, and like before they stay still until your coding
+  agents have been found. Teammates everywhere else keep their pixel faces
+  for now.
+
 ## 0.273.0 - 2026-09-22
 
 - **Claude's models say which version they are.** The picker listed Claude
