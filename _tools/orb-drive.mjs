@@ -14,8 +14,18 @@
 // next to a shell command, this is where it would show.
 //
 // Live and free: one turn on the free OpenCode model.
+//
+//   node _tools/orb-drive.mjs [--model <words>] [--packaged <exe>] [--out <dir>]
+//
+// --model picks the free row by name (default "muse"); on 2026-09-23 Muse
+// Spark hung and Nemotron 3.5 Lightning answered.
 
 import { FREE_ROUTE, pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace } from './drive-lib.mjs'
+
+const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
+const MODEL = arg('--model') ?? 'muse'
+const packaged = arg('--packaged')
+const out = arg('--out')
 
 const workspace = await scratchRepository('locust-drive-orb-ws-')
 const T0 = '2026-09-20T05:00:00.000Z'
@@ -31,6 +41,8 @@ const drive = await startDrive({
   name: 'orb',
   port: 9519,
   workspace,
+  ...(packaged === undefined ? {} : { packaged }),
+  ...(out === undefined ? {} : { outPath: out }),
   spends: false,
   seed: {
     schemaVersion: 1,
@@ -74,7 +86,7 @@ try {
 
   await drive.capture('start a turn that reads and then runs a command', async () => {
     await drive.evaluate(`${teammateFace('Wren')}?.click()`)
-    const route = await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'muse', row: '/free/i' }))
+    const route = await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: MODEL, row: '/free/i' }))
     check('the turn runs on a free route', /opencode/i.test(String(route)) && /\bfree\b/i.test(String(route)), route)
     await drive.evaluate(WATCH)
     /*
