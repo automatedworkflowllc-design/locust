@@ -111,6 +111,52 @@ function DrawnBot({ type, size, color, state = 'default', paused = false, face, 
   )
 }
 
+/** What a bot's clock runs on: the window's own, unless a test hands it another. */
+export interface BotFrames {
+  readonly requestAnimationFrame: (callback: (now: number) => void) => number
+  readonly cancelAnimationFrame: (handle: number) => void
+  readonly now: () => number
+}
+
+/**
+ * A MOVING BOT'S CLOCK: its first frame now, then one per animation frame
+ * while it is showing. Returns the way to stop it.
+ *
+ * The first frame is drawn at once, as bot-avatars draws its own shapes. A
+ * page that is not being painted runs no animation frames -- a tab in the
+ * background, a window not shown yet -- and a Locust bot that waited for one
+ * stayed blank there while the library's shapes beside it were drawn: the
+ * design system's cover, opened in a background tab, had the ghost and the
+ * droid on the machine and no Hopper (2026-09-23). Setting the canvas's size
+ * clears it, too, so a bot whose state changed while nothing was painting
+ * went blank the same way.
+ */
+export function startBotClock(
+  draw: () => void,
+  step: (seconds: number) => void,
+  showing: () => boolean,
+  frames: BotFrames = {
+    requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
+    cancelAnimationFrame: (handle) => window.cancelAnimationFrame(handle),
+    now: () => performance.now()
+  }
+): () => void {
+  draw()
+  let last = frames.now()
+  let handle = 0
+  const tick = (now: number): void => {
+    const seconds = Math.min(0.05, (now - last) / 1000)
+    last = now
+    if (showing()) {
+      step(seconds)
+      draw()
+    }
+    handle = frames.requestAnimationFrame(tick)
+  }
+  handle = frames.requestAnimationFrame(tick)
+  return () => frames.cancelAnimationFrame(handle)
+}
+
 function LocustBot({
   type,
   size,
@@ -182,19 +228,12 @@ function LocustBot({
       draw()
       return undefined
     }
-    let handle = 0
-    let last = performance.now()
     let onScreen = true
-    const tick = (now: number): void => {
-      const dt = Math.min(0.05, (now - last) / 1000)
-      last = now
-      if (onScreen && document.visibilityState !== 'hidden') {
-        sim.update(dt)
-        draw()
-      }
-      handle = requestAnimationFrame(tick)
-    }
-    handle = requestAnimationFrame(tick)
+    const stop = startBotClock(
+      draw,
+      (seconds) => sim.update(seconds),
+      () => onScreen && document.visibilityState !== 'hidden'
+    )
     const watch =
       typeof IntersectionObserver === 'undefined'
         ? undefined
@@ -203,7 +242,7 @@ function LocustBot({
           })
     watch?.observe(canvas)
     return () => {
-      cancelAnimationFrame(handle)
+      stop()
       watch?.disconnect()
       rig.current = null
     }
