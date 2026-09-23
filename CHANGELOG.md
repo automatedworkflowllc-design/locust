@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.301.0 - 2026-09-23
+
+### Improved
+
+- **The effort slider moves with you.** Drag it and the thumb stays under
+  your pointer with the filled part beside it, the level changing as you
+  pass each stop; let go and it settles on the nearest one. It used to jump
+  from stop to stop behind the pointer, with the fill catching up on its
+  own. And the liquid look it was built with now shows: the thumb stretches
+  into a drop as it moves and pours onto its stop.
+
 ## 0.300.0 - 2026-09-23
 
 ### New

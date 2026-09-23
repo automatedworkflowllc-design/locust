@@ -10818,6 +10818,15 @@ textarea {
   position: relative;
   display: block;
   height: 22px;
+  /* The pointer holds the thumb here (EffortSlider): no page scroll or
+     text selection is started by a drag along it. */
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+
+.lc-effortpanel__scale.is-held {
+  cursor: grabbing;
 }
 
 .lc-effortpanel__track,
@@ -10838,6 +10847,12 @@ textarea {
 .lc-effortpanel__fill {
   background: var(--lc-effort-fill);
   transition: width 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Held, the fill is where the thumb is, not on its way there: its own ease
+   put it up to 38px from the thumb mid-drag (probe-effort-slider, 0.300). */
+.lc-effortpanel__scale.is-held .lc-effortpanel__fill {
+  transition: none;
 }
 
 .lc-effortpanel__notches {
@@ -10886,7 +10901,10 @@ textarea {
   border-radius: 6px;
 }
 
-/* The control itself: the whole track, invisible, above everything drawn. */
+/* The control for the keyboard and the screen reader: the whole track,
+   invisible. The pointer goes to the track it lies on, which holds the thumb
+   the way the gooey page's slider does; a stepped input under the pointer
+   was what made the thumb jump. */
 .lc-effortpanel__slider {
   position: absolute;
   inset: 0;
@@ -10896,10 +10914,10 @@ textarea {
   margin: 0;
   opacity: 0;
   appearance: none;
-  cursor: pointer;
+  pointer-events: none;
 }
 
-.lc-effortpanel__slider:disabled {
+.lc-effortpanel__scale:has(.lc-effortpanel__slider:disabled) {
   cursor: default;
 }
 
