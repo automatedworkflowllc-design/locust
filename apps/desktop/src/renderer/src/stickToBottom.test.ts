@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { AT_BOTTOM_SLACK, atBottom, shouldFollow } from './stickToBottom.js'
+import { AT_BOTTOM_SLACK, atBottom, scrollVerdict, shouldFollow } from './stickToBottom.js'
 
 /**
  * The rule these pin: follow the newest line only while the person is already
@@ -45,5 +45,30 @@ describe('whether to pull the view back down', () => {
     // fights the person during a drag of the scrollbar itself.
     expect(shouldFollow(true, false)).toBe(false)
     expect(shouldFollow(false, false)).toBe(false)
+  })
+})
+
+describe('a scroll the app did not make', () => {
+  // MEASURED 2026-09-23 (Yurt's beta report, #3): three turns logged event by
+  // event -- the walk reached the bottom, the content grew 136px, and a scroll
+  // event came with the position UNCHANGED and no input anywhere. Read as the
+  // person scrolling up, it stopped the follow and raised the jump arrow, and
+  // every later turn landed short of its answer.
+  it('keeps following when the view did not go up: the content grew under it', () => {
+    expect(scrollVerdict({ atBottom: false, movedUp: false, following: true })).toBe('catch-up')
+  })
+
+  it('stops when the view went up, however it went -- wheel, drag, keys, focus, a script', () => {
+    // The first repair asked whether a PERSON scrolled, and walked the drive's
+    // own jump to the top straight back down -- as it would a keyboard user
+    // tabbing to an older message.
+    expect(scrollVerdict({ atBottom: false, movedUp: true, following: true })).toBe('leave')
+    // And once it has left, nothing but coming back resumes it.
+    expect(scrollVerdict({ atBottom: false, movedUp: false, following: false })).toBe('stay')
+  })
+
+  it('follows again from the bottom, whichever way it got there', () => {
+    expect(scrollVerdict({ atBottom: true, movedUp: true, following: false })).toBe('follow')
+    expect(scrollVerdict({ atBottom: true, movedUp: false, following: false })).toBe('follow')
   })
 })

@@ -47,7 +47,25 @@ const SCREENS = readFileSync(fileURLToPath(new URL('../renderer/src/components/S
  * match find nothing at all, silently, and every assertion pass against an
  * empty string. Second time the checker has been the broken thing here.
  */
-const BARE = CSS.replace(/\/\*[\s\S]*?\*\//g, '')
+/**
+ * And without the High Contrast block: its rules win only in Windows forced
+ * colors, so "the last block wins" was reading the forced-colors override of
+ * `.lc-settings__navitem.is-current` as the ordinary one (0.287.0).
+ */
+function withoutForcedColors(css: string): string {
+  const start = css.indexOf('@media (forced-colors: active)')
+  if (start === -1) return css
+  let depth = 0
+  for (let at = css.indexOf('{', start); at !== -1 && at < css.length; at += 1) {
+    if (css[at] === '{') depth += 1
+    if (css[at] === '}') {
+      depth -= 1
+      if (depth === 0) return css.slice(0, start) + withoutForcedColors(css.slice(at + 1))
+    }
+  }
+  return css.slice(0, start)
+}
+const BARE = withoutForcedColors(CSS.replace(/\/\*[\s\S]*?\*\//g, ''))
 
 function bodyOf(selector: string): string {
   let held = ''

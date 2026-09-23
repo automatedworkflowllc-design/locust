@@ -1028,6 +1028,33 @@ export function readPlan(value: unknown): readonly PlanStep[] {
   return steps
 }
 
+function planKey(text: string): string {
+  return text.trim().replace(/\s+/g, ' ').toLowerCase()
+}
+
+/** The plan a turn ended with, or none. What the next turn's card starts from. */
+export function lastPlanOf(events: readonly NormalizedRuntimeEvent[]): readonly PlanStep[] {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index]!
+    if (event.type === 'plan.updated') return readPlan(event.payload.plan)
+  }
+  return []
+}
+
+/**
+ * The steps that belong to this turn: all of them, less those the turn
+ * before had already finished and this one did not touch again.
+ */
+export function thisTurnsSteps(
+  plan: readonly PlanStep[],
+  carried: readonly PlanStep[],
+  worked: ReadonlySet<string>
+): readonly PlanStep[] {
+  const finishedBefore = new Set(carried.filter((step) => step.state === 'done').map((step) => planKey(step.text)))
+  if (finishedBefore.size === 0) return plan
+  return plan.filter((step) => !finishedBefore.has(planKey(step.text)) || worked.has(planKey(step.text)))
+}
+
 /** Shell verbs that read as file edits rather than as commands. */
 const EDIT_COMMANDS = /^(?:apply_patch|patch|edit|write|sed|tee)\b/
 
@@ -2090,6 +2117,17 @@ export interface MissionThreadOptions {
    */
   readonly workspacePath?: string
   /**
+   * The plan as the turn before this one left it (`lastPlanOf`).
+   *
+   * OpenCode keeps ONE to-do list for the whole session and sends all of it
+   * on every turn, so turn eight's card read "8 of 8 done" over the seven
+   * steps turns one to seven had already finished (Yurt's beta report, #5;
+   * the same frames show it making every turn taller). A step that was done
+   * before this turn began, and was not worked on again in it, is the
+   * earlier turn's -- and its card already shows it.
+   */
+  readonly carriedPlan?: readonly PlanStep[]
+  /**
    * Whether this turn wrote to a teammate. Those messages are drawn beside
    * the thread rather than inside it, so a turn whose whole output was a
    * message to a colleague looked, from in here, like a turn that said
@@ -2152,6 +2190,8 @@ export function buildThread(
       }
     | undefined
   let plan: readonly PlanStep[] = []
+  /** Every step this turn's plans showed unfinished at some point. */
+  const workedSteps = new Set<string>()
   // Notices that arrive before the run has done anything are the runtime
   // talking about its own setup (a skills budget, a config warning), not
   // about the mission. They stay in the Signal Rail; the thread keeps only
@@ -2428,6 +2468,9 @@ export function buildThread(
       case 'plan.updated': {
         workBegan = true
         plan = readPlan(event.payload.plan)
+        // A step seen unfinished in this turn was worked on in this turn,
+        // however it ends.
+        for (const step of plan) if (step.state !== 'done') workedSteps.add(planKey(step.text))
         break
       }
       case 'route.limit_detected': {
@@ -2510,8 +2553,10 @@ export function buildThread(
   // saying the same kind of thing the fold below it says (design review,
   // 2026-09-06).
   //
-  const planSteps = plan.length > 0
-    ? { steps: plan, doneCount: plan.filter((step) => step.state === 'done').length }
+  // Only this turn's steps: see `carriedPlan`.
+  const ownPlan = thisTurnsSteps(plan, options.carriedPlan ?? [], workedSteps)
+  const planSteps = ownPlan.length > 0
+    ? { steps: ownPlan, doneCount: ownPlan.filter((step) => step.state === 'done').length }
     : undefined
 
   /*

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import type { RefObject, UIEvent } from 'react'
 
 import { FOLLOW_TOLERANCE, nextScrollTop } from './followBottom.js'
-import { atBottom } from './stickToBottom.js'
+import { atBottom, scrollVerdict } from './stickToBottom.js'
 
 /**
  * The one scroll behaviour, for every chat surface.
@@ -52,6 +52,8 @@ export function useFollowBottom(): FollowBottom {
   const walking = useRef(0)
   /** True for exactly the scroll event our own assignment is about to cause. */
   const ourOwnScroll = useRef(false)
+  /** Where the view was at the last scroll event, ours or not: which way it went. */
+  const lastTop = useRef(0)
   const [away, setAway] = useState(false)
 
   const stepToBottom = useCallback((): void => {
@@ -107,6 +109,44 @@ export function useFollowBottom(): FollowBottom {
     []
   )
 
+  /*
+   * Growth nobody rendered.
+   *
+   * The layout effect above sees growth only when THIS component renders, and
+   * a fold opening or a diff laying itself out grows the thread from inside a
+   * child that renders alone -- so the content is watched for size directly.
+   * Re-attached whenever the content element changes, so a surface that draws
+   * its scroller after mounting is watched too.
+   */
+  const watched = useRef<{ readonly node: Element; readonly observer: ResizeObserver } | undefined>(undefined)
+  useLayoutEffect(() => {
+    const box = ref.current
+    const content = box?.firstElementChild ?? null
+    if (watched.current?.node === content) return
+    watched.current?.observer.disconnect()
+    watched.current = undefined
+    if (box === null || content === null || typeof ResizeObserver === 'undefined') return
+    // Where the view starts, so the first scroll a person makes is measured
+    // from where it really was -- from 0, a first move up reads as a move down.
+    lastTop.current = box.scrollTop
+    const observer = new ResizeObserver(() => {
+      const grew = box.scrollHeight > lastHeight.current
+      lastHeight.current = box.scrollHeight
+      if (following.current && grew && walking.current === 0) {
+        walking.current = requestAnimationFrame(stepToBottom)
+      }
+    })
+    observer.observe(content)
+    watched.current = { node: content, observer }
+  })
+
+  useEffect(
+    () => () => {
+      watched.current?.observer.disconnect()
+    },
+    []
+  )
+
   const onScroll = useCallback((event: UIEvent<HTMLElement>): void => {
     /*
      * Our own step is not the person scrolling away.
@@ -116,18 +156,37 @@ export function useFollowBottom(): FollowBottom {
      * the first frame of every batch -- the animation would cancel itself and
      * the following would do nothing at all.
      */
+    const top = event.currentTarget.scrollTop
+    const movedUp = top < lastTop.current - 1
+    lastTop.current = top
     if (ourOwnScroll.current) {
       ourOwnScroll.current = false
       return
     }
-    const at = atBottom(event.currentTarget, FOLLOW_TOLERANCE)
-    following.current = at
-    setAway(!at)
-    if (!at && walking.current !== 0) {
-      cancelAnimationFrame(walking.current)
-      walking.current = 0
+    const verdict = scrollVerdict({
+      atBottom: atBottom(event.currentTarget, FOLLOW_TOLERANCE),
+      movedUp,
+      following: following.current
+    })
+    if (verdict === 'follow') {
+      following.current = true
+      setAway(false)
+      return
     }
-  }, [])
+    if (verdict === 'leave') {
+      following.current = false
+      setAway(true)
+      if (walking.current !== 0) {
+        cancelAnimationFrame(walking.current)
+        walking.current = 0
+      }
+      return
+    }
+    // Short of the bottom and nobody moved it there: keep following.
+    if (verdict === 'catch-up' && walking.current === 0) {
+      walking.current = requestAnimationFrame(stepToBottom)
+    }
+  }, [stepToBottom])
 
   return { ref, onScroll, away, toBottom, jumpNow }
 }

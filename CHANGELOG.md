@@ -11,6 +11,23 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.287.0 - 2026-09-23
+
+### Fixed
+
+- **A long conversation keeps up with its newest reply.** From the second or
+  third turn, a reply could end below the bottom of the window with the
+  "newest message" arrow up, though nobody had scrolled. It stays with the
+  answer now; scrolling up still stops it.
+
+- **A turn's plan shows that turn's steps.** OpenCode keeps one to-do list for
+  a whole conversation, so every turn's plan listed the steps of every turn
+  before it. Each turn shows its own.
+
+- **Windows High Contrast.** The Settings switches, the chosen reply cap, the
+  current Settings page, the status dots and the focus on the search box had
+  all disappeared in High Contrast. They show again, in the system's colours.
+
 ## 0.286.0 - 2026-09-23
 
 ### Fixed

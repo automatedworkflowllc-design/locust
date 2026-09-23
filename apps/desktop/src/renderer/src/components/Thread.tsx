@@ -10,7 +10,7 @@ import type {
   PublicRecoveredMission,
   PublicTeammate
 } from '../../../shared/ipc.js'
-import { buildThread, cancellationSummary, decisionStanding, errorAlreadyShown, modeRefusedATool, readPlan, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
+import { buildThread, cancellationSummary, decisionStanding, errorAlreadyShown, lastPlanOf, modeRefusedATool, readPlan, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
 import type { GroupBoundary, GroupLeaving, LiveStarter } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
 import { folderName, ranOnLine } from '../ranOn.js'
@@ -714,6 +714,8 @@ export function Thread({
   const items = buildThread(events, {
     running,
     latestTurn: true,
+    // What the turn before left the plan at: see `carriedPlan`.
+    carriedPlan: lastPlanOf(earlierTurns.at(-1)?.events ?? []),
     awaitingDecision: approvals.length > 0,
     spokeToPeers: peers.messages.length > 0,
     mayEdit,
@@ -769,9 +771,14 @@ export function Thread({
    */
   const earlierWork = useMemo(
     () =>
-      earlierTurns.map((turn) => (
+      earlierTurns.map((turn, index) => (
         <ThreadItems
-          items={buildThread(turn.events, { running: false, mayEdit, ...(workspacePath === undefined ? {} : { workspacePath }) })}
+          items={buildThread(turn.events, {
+            running: false,
+            mayEdit,
+            carriedPlan: index === 0 ? [] : lastPlanOf(earlierTurns[index - 1]!.events),
+            ...(workspacePath === undefined ? {} : { workspacePath })
+          })}
           owner={peers.self}
           activity="idle"
           workspacePath={workspacePath}

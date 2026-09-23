@@ -13159,3 +13159,74 @@ textarea {
   height: 14px;
   border-radius: 3px;
 }
+
+/* =========================================================================
+ * HIGH CONTRAST (Windows forced colors).
+ *
+ * Yurt's beta report, 2026-09-23 (#4, forced-colors emulation): both Settings
+ * switches drew as empty pills, the chosen "12" of the reply cap looked like
+ * every other segment, the status dots vanished, and focus on the search box
+ * was a colour change and nothing else. One cause under all four: forced
+ * colors replaces author backgrounds and drops box-shadows, and those were
+ * what carried the state. Borders and outlines survive, and the system's own
+ * colours are there to be named -- so in this mode the state is drawn with
+ * them: Highlight for what is chosen or on, ButtonText for a knob, CanvasText
+ * for a mark, an outline for focus.
+ * ========================================================================= */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  .lc-search:focus-within,
+  .lc-composer__box:focus-within {
+    outline: 2px solid Highlight;
+    outline-offset: 1px;
+  }
+
+  .lc-switch,
+  .lc-memory__switch {
+    border: 1px solid ButtonText;
+  }
+
+  .lc-switch__knob,
+  .lc-memory__knob {
+    forced-color-adjust: none;
+    background: ButtonText;
+  }
+
+  .lc-switch.is-on,
+  .is-on .lc-switch,
+  .lc-memory__switch.is-on {
+    forced-color-adjust: none;
+    background: Highlight;
+    border-color: Highlight;
+  }
+
+  .lc-switch.is-on .lc-switch__knob,
+  .is-on .lc-switch__knob,
+  .lc-memory__switch.is-on .lc-memory__knob {
+    background: HighlightText;
+  }
+
+  .lc-segmented > .lc-button.is-active,
+  .lc-settings__navitem.is-current {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .lc-dot,
+  .lc-connected__dot,
+  .lc-faces__pip {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+
+  /* None connected is an empty ring, not a dot. */
+  .lc-connected__dot.is-none {
+    background: transparent;
+    border: 1px solid CanvasText;
+  }
+}
