@@ -604,6 +604,17 @@ export function Sidebar({
                 mission.phase === 'running' && mission.routineId !== undefined && by !== undefined
                   ? routineStepByTeammate[by.teammateId]
                   : undefined
+              /*
+               * A SUBAGENT AT WORK, said on the conversation that sent it.
+               *
+               * Yurt's beta report (#17): in a Claude subagent run the sidebar
+               * never said a subagent was working -- only the fold, afterwards,
+               * said "asked 1 subagent". A subagent is part of its teammate's
+               * turn, not a conversation of its own, so it does not get a row;
+               * its parent's row says so while it works (Colin: "I'll let you
+               * choose design choice").
+               */
+              const delegating = mission.phase === 'running' && by !== undefined && liveActivity[by.teammateId] === 'delegating'
               return (
                 <div className="lc-convrow" key={mission.missionId}>
                   {/*
@@ -741,7 +752,9 @@ export function Sidebar({
                       * while one runs, where its age would be -- the clock
                       * before the title already says it is a routine.
                       */}
-                    {runningStep !== undefined ? (
+                    {delegating ? (
+                      <span className="lc-conv__age lc-mono">subagent working</span>
+                    ) : runningStep !== undefined ? (
                       <span className="lc-conv__age lc-mono" title={`${runningStep.name}: step ${String(runningStep.step)} of ${String(runningStep.of)}`}>
                         step {runningStep.step} of {runningStep.of}
                       </span>

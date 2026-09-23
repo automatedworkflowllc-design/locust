@@ -30,7 +30,8 @@ const noop = (): void => undefined
 function sidebar(
   missions: readonly SidebarMission[],
   routines: readonly PublicRoutine[],
-  steps: Readonly<Record<string, { readonly name: string; readonly step: number; readonly of: number }>> = {}
+  steps: Readonly<Record<string, { readonly name: string; readonly step: number; readonly of: number }>> = {},
+  live: Readonly<Record<string, 'thinking' | 'working' | 'delegating' | 'responding' | 'idle'>> = {}
 ): string {
   return renderToStaticMarkup(
     <Sidebar
@@ -46,7 +47,7 @@ function sidebar(
       onMissionMenu={noop}
       onTeammateMenu={noop}
       pendingApprovals={{}}
-      liveActivity={{}}
+      liveActivity={live}
       starting={[]}
       recentlyDone={[]}
       recentlyReceived={[]}
@@ -96,6 +97,12 @@ describe("a routine's run in the sidebar", () => {
     expect(html).toContain('title="Morning check: step 2 of 3">step 2 of 3</span>')
     // Finished, it is back to its age.
     expect(sidebar([row('mission_replay', { routineId: 'rt_morning' })], [routine], { tm_wren: { name: 'Morning check', step: 2, of: 3 } })).not.toContain('step 2 of 3')
+  })
+
+  it("says a subagent is working on the conversation that sent it (Yurt's #17)", () => {
+    const running = row('mission_person', { phase: 'running' })
+    expect(sidebar([running], [], {}, { tm_wren: 'delegating' })).toContain('>subagent working</span>')
+    expect(sidebar([running], [], {}, { tm_wren: 'working' })).not.toContain('subagent working')
   })
 
   it('names the step in the header, in place of "running"', () => {
