@@ -75,7 +75,10 @@ describe('the brief a resumed session is sent', () => {
       memory: memory(['The build is pnpm check.']),
       alreadyGiven: new Set(first.given)
     })
-    expect(second.prompt.startsWith(STILL_HOLDS)).toBe(true)
+    // Who it is and who else is here come first: the roster paragraph is
+    // what a later turn leaves out, and a Haiku Wren on the packaged drive
+    // named itself among its teammates without this.
+    expect(second.prompt.startsWith(`You are Wren; your teammates here are Atlas (Research & Briefs). ${STILL_HOLDS}`)).toBe(true)
     // The tags are named, so a runtime that quietly started fresh can still answer.
     for (const tag of ['<locust-share to="Name">', '<locust-ask>', '<locust-file>', '<locust-memory>']) {
       expect(second.prompt).toContain(tag)

@@ -146,7 +146,11 @@ try {
   }
   check('three turns, one session', turns.length === 3 && new Set(turns.map((entry) => entry.file)).size === 1, turns.map((entry) => entry.file).join(', '))
   check('turn two still sent Booty the message', two.peers.some((line) => /Booty/.test(line)), two.peers.join(' | '))
-  check('turn three still knows its role and its teammate', /code|migration/i.test(three.last) && /Booty/.test(three.last), three.last.slice(0, 200))
+  // And not itself among them: the first packaged run of this drive had
+  // Wren answer "my teammates are Wren (Code & Migrations) and Booty".
+  check('turn three still knows its role and its teammate, and that it is not its own teammate',
+    /code|migration/i.test(three.last) && /Booty/.test(three.last) && !/teammates?\b[^.]*\bWren\b/i.test(three.last),
+    three.last.slice(0, 200))
   const record = JSON.parse(await readFile(join(profilePath, 'brief-sessions.json'), 'utf8').catch(() => '{}'))
   const counts = Object.values(record.sessions ?? {}).map((entry) => entry.turns)
   check('the host recorded turns 0, 1 and 2 of one session', counts.join(',') === '0,1,2', counts.join(','))

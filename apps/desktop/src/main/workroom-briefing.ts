@@ -139,20 +139,37 @@ export function paragraphKey(paragraph: string): string {
  * lost the session (resumed one it could not find, and started fresh) still
  * has the tags to answer with -- the record cannot see that happen.
  */
-export function stillHoldsLine(standing: string): string {
+export function stillHoldsLine(standing: string, peer?: MissionPeerContext): string {
   const tags = [
     ...(standing.includes(`<${SHARE_TAG} `) ? [`<${SHARE_TAG} to="Name">`] : []),
     ...[ASK_TAG, FILE_TAG, MEMORY_TAG].filter((tag) => standing.includes(`<${tag}>`)).map((tag) => `<${tag}>`)
   ]
   const blocks = tags.length === 0 ? '' : ` and how to write the reply blocks (${tags.join(', ')})`
-  return `You were given standing instructions earlier in this conversation -- how to work here${blocks}. They still hold; only what changed since is repeated here.`
+  return `${identityOf(peer)}You were given standing instructions earlier in this conversation -- how to work here${blocks}. They still hold; only what changed since is repeated here.`
+}
+
+/**
+ * Who the teammate is and who is on the roster, in one short sentence.
+ *
+ * The roster paragraph is what a later turn leaves out, and it was the only
+ * place saying which name is the teammate's own. MEASURED on the packaged
+ * 0.321 drive (2026-09-24): asked on turn three to name its teammate, a
+ * Haiku Wren answered "my teammates are Wren (Code & Migrations) and Booty
+ * (Reviewer)" -- itself among them -- where every full-brief run and the
+ * earlier short-brief runs said Booty alone. About fifty characters keep
+ * that fact next to the question.
+ */
+function identityOf(peer: MissionPeerContext | undefined): string {
+  if (peer === undefined) return ''
+  const others = peer.others.map((entry) => `${entry.name} (${entry.role})`).join(', ')
+  return others.length === 0 ? `You are ${peer.self.name}. ` : `You are ${peer.self.name}; your teammates here are ${others}. `
 }
 
 /**
  * The standing brief for a turn: whole when the session has none of it, and
  * otherwise the paragraphs it does not have, after the line that says so.
  */
-function standingFor(standing: readonly string[], alreadyGiven: ReadonlySet<string> | undefined): {
+function standingFor(standing: readonly string[], alreadyGiven: ReadonlySet<string> | undefined, peer?: MissionPeerContext): {
   readonly sections: readonly string[]
   readonly given: readonly string[]
 } {
@@ -163,7 +180,7 @@ function standingFor(standing: readonly string[], alreadyGiven: ReadonlySet<stri
   // Nothing held yet is a first brief, said whole rather than behind a line
   // claiming an earlier one.
   if (fresh.length === paragraphs.length) return { sections: standing, given }
-  return { sections: [stillHoldsLine(standing.join(SECTION_GAP)), ...fresh], given }
+  return { sections: [stillHoldsLine(standing.join(SECTION_GAP), peer), ...fresh], given }
 }
 
 function quoted(message: WorkroomMessage, roster: readonly PeerRosterEntry[]): string {
@@ -587,7 +604,7 @@ export function composeRuntimePrompt(input: RuntimePromptInput): RuntimePrompt {
   standing.push(answerSection())
   // What arrived this turn and what the person said are never held back:
   // only the standing part is what a session can already have (A2.5).
-  const brief = standingFor(standing, input.alreadyGiven)
+  const brief = standingFor(standing, input.alreadyGiven, input.peer)
   const assemble = (): string => {
     const sections: string[] = [...brief.sections]
     if (delivered.length > 0) sections.push(inboundSection(delivered, remaining, roster))
