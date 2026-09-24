@@ -68,7 +68,8 @@ describe('composeHandoffPrompt', () => {
     const brief = composeHandoffPrompt(
       'Task.',
       checkpoint({
-        settledActions: ['read src/index.ts'],
+        settledActions: ['call_1'],
+        settledNames: ['read src/index.ts'],
         unsettledActions: [unsettled('write src/index.ts')]
       }),
       'Codex'
@@ -85,7 +86,8 @@ describe('composeHandoffPrompt', () => {
       'Task.',
       checkpoint({
         assistantSummary: 'x'.repeat(4_000),
-        settledActions: [`settled ${'y'.repeat(3_800)}`],
+        settledActions: ['call_1'],
+        settledNames: [`settled ${'y'.repeat(3_800)}`],
         unsettledActions: [unsettled('the dangerous one')]
       }),
       'Codex'
@@ -116,7 +118,8 @@ describe('composeHandoffPrompt', () => {
       'a'.repeat(MAX_HANDOFF_PROMPT_LENGTH - 400),
       checkpoint({
         assistantSummary: 'x'.repeat(3_000),
-        settledActions: [`settled ${'z'.repeat(300)}`],
+        settledActions: ['call_1'],
+        settledNames: [`settled ${'z'.repeat(300)}`],
         unsettledActions: [unsettled('unsettled thing')]
       }),
       'Codex'
