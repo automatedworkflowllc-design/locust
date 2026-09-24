@@ -11,6 +11,21 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.331.0 - 2026-09-24
+
+### Fixed
+
+- **Older conversations open with their replies.** A conversation from
+  before your last twenty or so missions opened showing only your own
+  messages; its replies are read in when you open it.
+- **Removing a teammate or a routine asks first.** The x on the Team screen
+  and the routine Remove buttons acted on the first click. They now say
+  what the second click will do ("Remove, with 2 routines?"), and a routine
+  waiting for your review cannot be removed until you have dealt with it.
+- **A program planted in a project folder is never run.** On Windows,
+  Locust could run a `git.exe` saved inside the project you opened instead
+  of the real git. It no longer looks in the project folder for programs.
+
 ## 0.330.0 - 2026-09-24
 
 ### Fixed
