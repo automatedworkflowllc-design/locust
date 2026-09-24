@@ -94,6 +94,14 @@ export interface RelayOrigin {
    * person-started mission is the first entry.
    */
   readonly lastMissionOf: Readonly<Record<string, string>>
+  /**
+   * The teammates this exchange has already briefed as a reply (A2.8): each
+   * was given the reply rules in full on its first REPLY turn -- the first
+   * hop is the work and is told none of them -- and its later turns continue
+   * that same conversation, so they are told once and then reminded. Absent
+   * on an origin made before this existed.
+   */
+  readonly relayedTo?: readonly string[]
 }
 
 export type RelayDecision =
@@ -222,12 +230,40 @@ export function relayPrompt(input: {
    * Absent, the chain depth, as before.
    */
   readonly replyNumber?: number
+  /**
+   * This teammate already had a reply turn in this exchange, so its own
+   * conversation holds the rules below (A2.8): they are reminded in a line
+   * instead of being told again. The count still goes every time, and the
+   * person's own teammate is still told what its reply is for.
+   */
+  readonly briefedBefore?: boolean
 }): string {
   const who = `${input.sender.name} (${input.sender.role})`
   const opening = input.hop <= 1
     ? `${who} sent you a message; it is quoted below with anything else waiting for you.`
     : `${who} replied to you; it is quoted below.`
   const readByPerson = input.readByPerson === true && input.hop > 1
+  /*
+   * WARNINGS ONCE (A2.8, ECC's rule): a teammate's second reply in one
+   * exchange was handed the same eight sentences as its first -- the cost,
+   * what a reply is worth, the share form, the rule for `when="now"`, who is
+   * and is not here -- into the conversation that already held them, each
+   * hop. One line carries what they come to, and the count carries where in
+   * the budget it is.
+   */
+  if (input.briefedBefore === true && input.hop > 1) {
+    return [
+      opening,
+      ...(readByPerson
+        ? [
+            `The person who started this conversation reads it: say in a line or two what ${input.sender.name}'s reply means for what they asked -- the answer, where it is, what is still open -- written to them, and then stop.`
+          ]
+        : []),
+      `The rules for replies from your earlier turn in this exchange still hold: ${input.sender.name} is a model, a reply costs a whole run, so write back in one <locust-share to="${input.sender.name}"> block only when it moves the work, and end with no share block when nothing more is needed.`,
+      budgetSentence(input.replyNumber ?? input.hop, input.cap),
+      'Stay on what was asked.'
+    ].join(' ')
+  }
   return [
     opening,
     // Said only to a REPLY, where the whole failure lives.
@@ -677,7 +713,8 @@ export function createRelay(options: RelayOptions): Relay {
     const origin: RelayOrigin = {
       hop: exchange.origin.hop + 1,
       rootMissionId: exchange.origin.rootMissionId ?? exchange.askerMissionId,
-      lastMissionOf: { ...exchange.origin.lastMissionOf, [ended.peer.self.teammateId]: ended.missionId }
+      lastMissionOf: { ...exchange.origin.lastMissionOf, [ended.peer.self.teammateId]: ended.missionId },
+      ...(exchange.origin.relayedTo === undefined ? {} : { relayedTo: exchange.origin.relayedTo })
     }
     const notice = (message: string): void => notify(exchange.askerRunId, exchange.askerMissionId, message)
     const prompt = returnedAnswerPrompt(ended.peer.self.name)
@@ -976,7 +1013,8 @@ export function createRelay(options: RelayOptions): Relay {
     const origin: RelayOrigin = {
       hop: meeting.origin.hop + 1,
       ...(meeting.origin.rootMissionId === undefined ? {} : { rootMissionId: meeting.origin.rootMissionId }),
-      lastMissionOf: { ...meeting.origin.lastMissionOf, [from.peer.self.teammateId]: from.missionId }
+      lastMissionOf: { ...meeting.origin.lastMissionOf, [from.peer.self.teammateId]: from.missionId },
+      ...(meeting.origin.relayedTo === undefined ? {} : { relayedTo: meeting.origin.relayedTo })
     }
     // The PERSON'S cap, and the exchange's actual spend -- this checked the
     // constant, so a workspace that lowered its budget still got six here.
@@ -1135,13 +1173,19 @@ export function createRelay(options: RelayOptions): Relay {
             notice(`${message.to.name} is no longer on the roster; nothing was started.`)
             continue
           }
+          // Only a REPLY turn is given the reply rules (the first hop is the
+          // work, and is told none of them), so only a reply turn counts as
+          // having been told.
+          const earlier = mission.relay?.relayedTo ?? []
+          const briefedBefore = earlier.includes(recipientId)
           const origin: RelayOrigin = {
             hop: decision.hop,
             rootMissionId: root,
-            lastMissionOf
+            lastMissionOf,
+            relayedTo: decision.hop > 1 && !briefedBefore ? [...earlier, recipientId] : earlier
           }
           const promptFor = (replyNumber: number): string =>
-            relayPrompt({ sender: mission.peer.self, recipient: recipient.self, hop: origin.hop, cap, readByPerson, replyNumber })
+            relayPrompt({ sender: mission.peer.self, recipient: recipient.self, hop: origin.hop, cap, readByPerson, replyNumber, briefedBefore })
           const prompt = promptFor(spent + 1)
           const result = await startFor({ recipient, prompt, from: mission, origin, notice })
           ran = result.kind === 'started'
@@ -1204,7 +1248,8 @@ export function createRelay(options: RelayOptions): Relay {
           origin: {
             hop,
             rootMissionId: root,
-            lastMissionOf: { ...(mission.relay?.lastMissionOf ?? {}), [mission.peer.self.teammateId]: mission.missionId }
+            lastMissionOf: { ...(mission.relay?.lastMissionOf ?? {}), [mission.peer.self.teammateId]: mission.missionId },
+            ...(mission.relay?.relayedTo === undefined ? {} : { relayedTo: mission.relay.relayedTo })
           },
           awaiting: new Map(started.map((entry) => [entry.teammateId, entry.name])),
           answered: [],

@@ -231,7 +231,8 @@ export function createPeerExchange(options: {
           ...(memory === undefined ? {} : { memory }),
           ...(connectors === undefined ? {} : { connectors }),
           keepATodoList: todos,
-          ...(conversation?.alreadyGiven === undefined ? {} : { alreadyGiven: conversation.alreadyGiven })
+          ...(conversation?.alreadyGiven === undefined ? {} : { alreadyGiven: conversation.alreadyGiven }),
+          now: new Date()
         })
         return { runtimePrompt: composed.prompt, delivered: composed.delivered, failed: false, given: composed.given }
       } catch {

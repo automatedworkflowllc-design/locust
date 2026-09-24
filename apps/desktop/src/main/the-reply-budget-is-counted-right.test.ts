@@ -223,3 +223,37 @@ describe('every run the relay starts is counted', () => {
     expect(notices.some((line) => line.startsWith('Stopped after 2 automatic replies'))).toBe(true)
   })
 })
+
+/*
+ * A2.8: the reply rules are said once per exchange to each teammate. Its
+ * later reply turns continue the conversation that already holds them, and
+ * get one line instead -- the count still goes, and the person's own
+ * teammate is still told what its reply is for.
+ */
+describe('the reply rules, said once to each teammate', () => {
+  it('is the full brief on a first reply, and a line on the next', async () => {
+    const { relay, starts } = harness({ cap: 12 })
+    await relay.onShared(sharing('mission_root', peers.tm_wren!), [message(WREN, BOOTY, 'Booty, what is the build command?')])
+    // Hop 2, into the person's conversation; hop 3, Booty's first reply turn.
+    await relay.onShared(sharing('mission_1', peers.tm_booty!, starts[0]!.relay), [message(BOOTY, WREN, 'Which package?')])
+    await relay.onShared(sharing('mission_2', peers.tm_wren!, starts[1]!.relay), [message(WREN, BOOTY, 'The desktop app.')])
+    // Hop 4, Wren again; hop 5, Booty again: both have been told.
+    await relay.onShared(sharing('mission_3', peers.tm_booty!, starts[2]!.relay), [message(BOOTY, WREN, 'Then which script?')])
+    await relay.onShared(sharing('mission_4', peers.tm_wren!, starts[3]!.relay), [message(WREN, BOOTY, 'The build script.')])
+    expect(starts.map((entry) => entry.peer.self.teammateId)).toEqual(['tm_booty', 'tm_wren', 'tm_booty', 'tm_wren', 'tm_booty'])
+    const FULL = 'reach nobody and cost a run each'
+    const LINE = 'The rules for replies from your earlier turn in this exchange still hold'
+    // First reply turns: the whole of it.
+    expect(starts[2]?.prompt).toContain(FULL)
+    expect(starts[2]?.prompt).not.toContain(LINE)
+    // Later ones: the line, the count, and for the person's teammate its job.
+    expect(starts[3]?.prompt).toContain(LINE)
+    expect(starts[3]?.prompt).not.toContain('is a MODEL, not a person')
+    expect(starts[3]?.prompt).toContain('The person who started this conversation reads it')
+    expect(starts[3]?.prompt).toContain('This is automatic reply 4 of 12.')
+    expect(starts[4]?.prompt).toContain(LINE)
+    expect(starts[4]?.prompt).not.toContain('reads it')
+    expect(starts[4]?.prompt).toContain('<locust-share to="Wren">')
+    expect(starts[4]?.prompt.length).toBeLessThan((starts[2]?.prompt.length ?? 0) / 2)
+  })
+})

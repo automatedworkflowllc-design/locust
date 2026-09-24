@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.323.0 - 2026-09-24
+
+### Improved
+
+- **An old message says it is old.** A teammate's message that waited half
+  an hour or more before being read now says how long ago it was sent, and
+  to check it still holds before acting on it.
+- **The rules for replying are said once.** A teammate's second reply in an
+  exchange gets one line reminding it of the rules instead of all of them
+  again -- about 900 characters instead of 2,200 -- while still being told
+  where it is in the limit.
+
 ## 0.322.0 - 2026-09-24
 
 ### Improved
