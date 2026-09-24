@@ -7,6 +7,7 @@ import type { PublicRoutine, TeammateRoute } from '../shared/ipc.js'
 import { validSchedule } from '../shared/routine-schedule.js'
 import { isTeammateRoute, safeId } from './teammate-store.js'
 import type { RoutineExecution } from '../shared/routine-recovery.js'
+import { routineAwaitsReview } from '../shared/routine-recovery.js'
 import { STEP_BUDGET } from '../shared/step-budget.js'
 
 /**
@@ -322,7 +323,11 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
       return serialize(async () => {
         if (!safeId(routineId)) throw new Error('Routine id is invalid')
         const file = await read()
-        if (!file.routines.some((routine) => routine.routineId === routineId)) return
+        const held = file.routines.find((routine) => routine.routineId === routineId)
+        if (held === undefined) return
+        if (routineAwaitsReview(held)) {
+          throw new Error('That routine is waiting for your review. Check what its last attempt did and abandon it first.')
+        }
         await write({ ...file, routines: file.routines.filter((routine) => routine.routineId !== routineId) })
       })
     },

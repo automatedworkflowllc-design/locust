@@ -53,6 +53,8 @@ import { SignInButton } from './SignInButton.js'
 import { FeedbackDialog } from './FeedbackDialog.js'
 import { WorktreeRow } from './WorktreeRow.js'
 import type { WorktreeRemoval } from './WorktreeRow.js'
+import { ArmedButton } from './ArmedButton.js'
+import { routineAwaitsReview } from '../../../shared/routine-recovery.js'
 
 export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings' | 'rooms' | 'memory' | 'automations'
 
@@ -575,15 +577,16 @@ export function TeammatesScreen({
                     >
                       <Icon name="pencil" size={14} />
                     </button>
-                    <button
-                      type="button"
+                    {/* H2: asks first, as the right-click Remove does. */}
+                    <ArmedButton
                       className="lc-ghostbutton lc-iconbutton lc-rostercard__remove"
                       title="Remove teammate"
-                      aria-label={`Remove ${teammate.name}`}
-                      onClick={() => onRemove(teammate.teammateId)}
+                      ariaLabel={`Remove ${teammate.name}`}
+                      armedLabel={theirRoutines.length === 0 ? `Remove ${teammate.name}?` : `Remove, with ${String(theirRoutines.length)} ${theirRoutines.length === 1 ? 'routine' : 'routines'}?`}
+                      onConfirm={() => onRemove(teammate.teammateId)}
                     >
                       <Icon name="close" size={14} />
-                    </button>
+                    </ArmedButton>
                   </div>
                 </div>
                 {/*
@@ -687,9 +690,15 @@ export function TeammatesScreen({
                           <button type="button" className="lc-ghostbutton" onClick={() => onEditRoutine(routine)}>
                             Edit
                           </button>
-                          <button type="button" className="lc-ghostbutton" onClick={() => onRemoveRoutine(routine.routineId)}>
+                          <ArmedButton
+                            className="lc-ghostbutton"
+                            ariaLabel={`Remove ${routine.name}`}
+                            armedLabel="Remove for good?"
+                            {...(routineAwaitsReview(routine) ? { disabled: true, title: 'Waiting for your review: check it and abandon it before removing it' } : {})}
+                            onConfirm={() => onRemoveRoutine(routine.routineId)}
+                          >
                             Remove
-                          </button>
+                          </ArmedButton>
                         </span>
                       </div>
                     ))}

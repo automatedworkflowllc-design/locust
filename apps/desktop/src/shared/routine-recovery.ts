@@ -1,6 +1,16 @@
 import type { TeammateRoute } from './ipc.js'
 
 /** A dispatch receipt, not a claim that the runtime did (or did not) do work. */
+/**
+ * H2: a routine whose last attempt is not settled -- dispatching, running,
+ * or held for the person's review -- is not removed out from under that
+ * review; the review card's Abandon, behind its checkbox, is the way out.
+ */
+export function routineAwaitsReview(routine: { readonly execution?: RoutineExecution }): boolean {
+  const status = routine.execution?.status
+  return status !== undefined && status !== 'abandoned'
+}
+
 export interface RoutineExecution {
   readonly attemptId: string
   readonly status: 'dispatching' | 'running' | 'held' | 'abandoned'

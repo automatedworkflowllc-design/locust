@@ -10,6 +10,8 @@ import { ScreenHeader } from './Screens.js'
 import { TeammateBot } from './TeammateBot.js'
 import { RoutineRecovery } from './RoutineRecovery.js'
 import type { RecoverRoutine } from './RoutineRecovery.js'
+import { ArmedButton } from './ArmedButton.js'
+import { routineAwaitsReview } from '../../../shared/routine-recovery.js'
 
 const STEP_GAP = '\n\n'
 
@@ -267,15 +269,17 @@ export function AutomationsScreen({
                   >
                     <Icon name="pencil" size={14} />
                   </button>
-                  <button
-                    type="button"
+                  {/* H2: asks first; and not while the routine waits for review. */}
+                  <ArmedButton
                     className="lc-ghostbutton lc-iconbutton lc-routinerow__remove"
-                    title="Remove routine"
-                    aria-label={`Remove ${routine.name}`}
-                    onClick={() => onRemoveRoutine(routine.routineId)}
+                    title={routineAwaitsReview(routine) ? 'Waiting for your review: check it and abandon it before removing it' : 'Remove routine'}
+                    ariaLabel={`Remove ${routine.name}`}
+                    armedLabel="Remove for good?"
+                    disabled={routineAwaitsReview(routine)}
+                    onConfirm={() => onRemoveRoutine(routine.routineId)}
                   >
                     <Icon name="close" size={14} />
-                  </button>
+                  </ArmedButton>
                 </span>
                 {/*
                   * A row of its own, across every column.
