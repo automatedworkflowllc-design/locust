@@ -339,11 +339,13 @@ export function MissionsScreen({
           <button
             type="button"
             className={`lc-pickbar__delete${armed ? ' is-armed' : ''}`}
-            onClick={() => {
+            onClick={(event) => {
               if (!armed) {
                 setArmed(true)
                 return
               }
+              // M34: the second click of a double-click is not a second decision.
+              if (event.detail > 1) return
               // Only what is still selectable: a mission that started running
               // between the click and the confirm must not go.
               const going = deletable
@@ -787,11 +789,13 @@ function TrashControl({
       .catch(() => setMessage('That conversation could not be put back.'))
   }
 
-  const empty = (): void => {
+  const empty = (event?: { readonly detail: number }): void => {
     if (!armed) {
       setArmed(true)
       return
     }
+    // M34: the second click of a double-click is not a second decision.
+    if ((event?.detail ?? 0) > 1) return
     setArmed(false)
     setMessage(undefined)
     void onEmpty()

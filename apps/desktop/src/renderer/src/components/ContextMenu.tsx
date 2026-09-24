@@ -244,13 +244,15 @@ export function ContextMenu({
   if (anchor.current !== null && !anchor.current.isConnected) anchor.current = null
   useDismissOnOutsidePress(true, onClose, ref, anchor)
 
-  const choose = (item: ContextMenuItem): void => {
+  const choose = (item: ContextMenuItem, clicks = 0): void => {
     if (item.disabledReason !== undefined || item.submenu !== undefined) return
     // A destructive item asks first, in place.
     if (item.confirmLabel !== undefined && armedLabel !== item.label) {
       onArm(item.label)
       return
     }
+    // M34: the second click of a double-click is not a second decision.
+    if (item.confirmLabel !== undefined && clicks > 1) return
     item.onSelect?.()
     onClose()
   }
@@ -385,7 +387,7 @@ export function ContextMenu({
             disabled={item.disabledReason !== undefined}
             title={item.disabledReason}
             aria-keyshortcuts={item.shortcut}
-            onClick={() => choose(item)}
+            onClick={(event) => choose(item, event.detail)}
           >
             <span className="lc-context__label">{armed ? item.confirmLabel : item.label}</span>
             {item.shortcut !== undefined && item.disabledReason === undefined && (

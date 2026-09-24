@@ -262,6 +262,22 @@ export interface ComposerProps {
  * opens the picker, and what it displays comes from the running mission or from
  * discovery, never from a constant.
  */
+/**
+ * The mode Shift+Tab moves to, or undefined when there is nowhere to go.
+ *
+ * M33 (the code review): Auto is in the cycle only when the workspace's Auto
+ * switch is already on. Landing on it used to turn that saved safety switch
+ * on, and nothing turned it off when the next press moved on -- so going
+ * from Accept edits round to Ask left Auto allowed for good. Turning it on is
+ * the menu's choice, with its warning, never a side effect of a key.
+ */
+export function shiftTabMode<M extends string>(current: M, usable: readonly M[], autoAllowed: boolean): M | undefined {
+  const cycle = usable.filter((mode) => mode !== 'auto' || autoAllowed)
+  if (cycle.length < 2) return undefined
+  const at = cycle.indexOf(current)
+  return cycle[(at + 1) % cycle.length]
+}
+
 export function Composer({
   hasConnectors = false,
   continuationNote,
@@ -735,15 +751,11 @@ export function Composer({
     if (keyEvent.key === 'Tab' && keyEvent.shiftKey) {
       const usable = MODES.filter(
         (option) => modeUnavailableReason(option.mode, route.runtime, platform) === undefined
-      )
-      if (usable.length > 1) {
+      ).map((option) => option.mode)
+      const next = shiftTabMode(mode, usable, autoMode === true)
+      if (next !== undefined) {
         keyEvent.preventDefault()
-        const at = usable.findIndex((option) => option.mode === mode)
-        const next = usable[(at + 1) % usable.length]
-        if (next !== undefined) {
-          if (next.mode === 'auto' && autoMode !== true) onEnableAutoMode?.()
-          onModeChange(next.mode)
-        }
+        onModeChange(next)
         return
       }
     }
