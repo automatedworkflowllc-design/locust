@@ -44,6 +44,8 @@ const EXE = INSTALLED
   : join(APP_DIR, 'release', 'win-unpacked', 'Locust.exe')
 const PORT = portFor(import.meta.url)
 let failures = 0
+/** The version the app said it is: its own release is the one whose block map is read. */
+let testedVersion
 function check(label, ok, detail) {
   if (!ok) failures += 1
   console.error(`  [${ok ? 'PASS' : 'FAIL'}] ${label}${detail === undefined ? '' : ` -- ${detail}`}`)
@@ -160,6 +162,7 @@ try {
     return JSON.stringify({ opened: true, section: true, before, button: true, buttonLabel: button.innerText.trim(), version, line })
   })()`)
   const state = JSON.parse(result)
+  testedVersion = state.version || undefined
   check('Settings opened to an Updates section', state.opened === true && state.section === true, result)
   say(`       build: ${state.version || '(not shown)'} · before: ${state.before} · after: ${state.line}`)
   check('the check settled on an answer', typeof state.line === 'string' && state.line.length > 0 && !/Checking/.test(state.line), state.line)
@@ -240,9 +243,13 @@ try {
  * the day a beta tester's connection kept dropping while Locust was open.
  * The map must be there, whole, and describe the installer that is there.
  */
-say('3. the newest release carries its block map')
+say('3. the build tested carries its block map')
 {
-  const channel = 'https://github.com/automatedworkflowllc-design/locust-releases/releases/latest/download'
+  // Its OWN release: since 0.307 most builds are prereleases, and latest is
+  // the one a day testers get (_tools/promote-release.mjs).
+  const channel = testedVersion === undefined
+    ? 'https://github.com/automatedworkflowllc-design/locust-releases/releases/latest/download'
+    : `https://github.com/automatedworkflowllc-design/locust-releases/releases/download/${testedVersion}`
   const latest = await (await fetch(`${channel}/latest.yml`)).text()
   const installer = (latest.match(/^path:\s*(\S+)/m) || [])[1]
   const size = Number((latest.match(/^\s+size:\s*(\d+)/m) || [])[1])

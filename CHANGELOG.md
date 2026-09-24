@@ -11,6 +11,20 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.307.0 - 2026-09-23
+
+### Improved
+
+- **A new profile starts on Claude Code or Codex when you have them.** It
+  picks Claude Code if it is signed in, then Codex, and OpenCode's free
+  models only when neither is. Any other is a pick in the model menu away.
+- **One new build a day, or every build.** Settings › Updates has a switch:
+  left off, Locust takes one new build a day, the one testers get; turned
+  on, it takes every build as soon as it is out.
+- **Settings says what Locust itself sends over the network.** Privacy &
+  local data now names it all: Locust's own updates and new Codex CLI and
+  Copilot CLI versions. The window makes no requests of its own.
+
 ## 0.306.0 - 2026-09-23
 
 ### New

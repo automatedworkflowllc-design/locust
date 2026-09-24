@@ -16,6 +16,7 @@ function fakeUpdater(overrides: Partial<UpdaterLike> = {}): UpdaterLike & {
     installs,
     quits,
     autoDownload: false,
+    allowPrerelease: false,
     autoInstallOnAppQuit: true,
     checkForUpdates: async () => null,
     downloadUpdate: async () => undefined,

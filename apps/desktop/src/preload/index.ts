@@ -13,6 +13,7 @@ import {
   APP_CHANGELOG_SEEN_CHANNEL,
   APP_UPDATE_CHECK_CHANNEL,
   APP_UPDATE_INSTALL_CHANNEL,
+  APP_UPDATE_LANE_CHANNEL,
   APP_UPDATE_STATE_CHANNEL,
   MISSION_PRUNE_CHANNEL,
   MISSION_STORAGE_CHANNEL,
@@ -196,6 +197,7 @@ const desktopApi: DesktopApi = {
   readStorageReport: () => ipcRenderer.invoke(MISSION_STORAGE_CHANNEL) as Promise<StorageReportResponse>,
   checkForUpdate: () => ipcRenderer.invoke(APP_UPDATE_CHECK_CHANNEL) as Promise<AppUpdateResponse>,
   installUpdate: () => ipcRenderer.invoke(APP_UPDATE_INSTALL_CHANNEL) as Promise<AppUpdateResponse>,
+  setUpdateLane: (everyBuild: boolean) => ipcRenderer.invoke(APP_UPDATE_LANE_CHANNEL, everyBuild) as Promise<AppUpdateResponse>,
   onUpdateState: (listener: (state: AppUpdateState) => void) => {
     const handler = (_event: unknown, state: AppUpdateState): void => {
       listener(state)

@@ -249,6 +249,8 @@ export type AppUpdatePhase =
 export interface AppUpdateState {
   readonly phase: AppUpdatePhase
   readonly currentVersion: string
+  /** Every build as it is published, or only the one a day testers get (main/update-lane.ts). */
+  readonly everyBuild?: boolean
   readonly availableVersion?: string
   readonly percent?: number
   /** Set only when the phase is `failed`; never the provider's own text. */
@@ -261,6 +263,8 @@ export type AppUpdateResponse =
       readonly ok: false
       readonly error: { readonly code: 'UPDATE_NOT_READY' | 'UPDATE_BUSY' | 'INTERNAL_ERROR'; readonly message: string }
     }
+/** Switch between every build and the one a day testers get; answers with the update state. */
+export const APP_UPDATE_LANE_CHANNEL = 'app-update:lane'
 export const MISSION_PRUNE_CHANNEL = 'mission:prune'
 export const MISSION_TRASH_LIST_CHANNEL = 'mission:trash:list'
 export const MISSION_RESTORE_CHANNEL = 'mission:restore'
@@ -2056,6 +2060,8 @@ export interface DesktopApi {
   readStorageReport(): Promise<StorageReportResponse>
   checkForUpdate(): Promise<AppUpdateResponse>
   installUpdate(): Promise<AppUpdateResponse>
+  /** Every build, or only the one a day testers get; checks again on the new lane. */
+  setUpdateLane(everyBuild: boolean): Promise<AppUpdateResponse>
   onUpdateState(listener: (state: AppUpdateState) => void): () => void
   pruneMissions(request: MissionPruneRequest): Promise<MissionPruneResponse>
   /**

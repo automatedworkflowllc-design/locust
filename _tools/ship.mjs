@@ -270,6 +270,12 @@ if (failed === 0 && !checkOnly) {
  * downloads only the blocks that changed (about 2 MB of 117 MB); without it,
  * the whole installer, every time. It went missing from this list for months.
  *
+ * A PRERELEASE, THEN ONE A DAY PROMOTED (0.307). The beta handover: testers
+ * get at most one new build a day. Every build goes out as a prerelease --
+ * taken only by a Locust whose "every build" switch is on -- and
+ * promote-release.mjs makes one a day the release GitHub calls latest, which
+ * the tester lane and the site both read.
+ *
  * DRAFT FIRST (0.304). An installed Locust reads latest.yml from the newest
  * PUBLISHED release. Published with only latest.yml on it, the release sends
  * every Locust that checks in that minute after an installer that is not
@@ -279,12 +285,13 @@ if (failed === 0 && !checkOnly) {
 console.log(
   failed === 0
     ? `\nReady to release ${version}.\n\n`
-      + `  gh release create ${version} --repo automatedworkflowllc-design/locust-releases --draft \\\n`
+      + `  gh release create ${version} --repo automatedworkflowllc-design/locust-releases --draft --prerelease \\\n`
       + `    --title ${version} --notes "..." Locust-${version}-setup.exe.blockmap\n`
       + `  gh release upload ${version} Locust-${version}-setup.exe --repo ... --clobber\n`
       + `  gh release upload ${version} Locust-Setup.exe --repo ... --clobber\n`
       + `  gh release upload ${version} latest.yml --repo ... --clobber\n`
-      + `  gh release edit ${version} --repo ... --draft=false --latest   # nothing sees it before this\n`
+      + `  gh release edit ${version} --repo ... --draft=false   # a PRERELEASE: only every-build copies take it\n`
+      + `  # once a day, the build testers get:  node _tools/promote-release.mjs <version>\n`
       + `  node _tools/publish-changelog.mjs      # the app and the site both read this\n`
       + `  node _smoke/update-smoke.mjs\n`
     : `\n${String(failed)} check(s) failed AFTER packaging. Do not publish this.\n`

@@ -1167,6 +1167,7 @@ export function SettingsScreen({
   update,
   onCheckUpdate,
   onInstallUpdate,
+  onUpdateLane,
   relay,
   onRelayChange,
   interrupt,
@@ -1242,6 +1243,8 @@ export function SettingsScreen({
   readonly update: AppUpdateState | undefined
   readonly onCheckUpdate: () => Promise<AppUpdateResponse>
   readonly onInstallUpdate: () => Promise<AppUpdateResponse>
+  /** Every build, or the one a day testers get (main/update-lane.ts). */
+  readonly onUpdateLane?: (everyBuild: boolean) => void
   /** Whether teammates start runs to answer each other. */
   readonly relay: boolean
   readonly onRelayChange: (relay: boolean) => void
@@ -2303,6 +2306,33 @@ export function SettingsScreen({
             </p>
           </More>
           <UpdateControl update={update} onCheck={onCheckUpdate} onInstall={onInstallUpdate} />
+          {/*
+            * WHICH BUILDS (0.307). Testers get one new build a day -- the
+            * beta handover: "the build they're reporting on is gone within
+            * the hour" -- and anyone testing Locust itself can take every
+            * build as it is published (main/update-lane.ts).
+            */}
+          {onUpdateLane !== undefined && update !== undefined && update.phase !== 'unsupported' && (
+            <div className="lc-settingrows">
+              <div className="lc-settingrow">
+                <span className="lc-settings__note">
+                  {update.everyBuild === true
+                    ? 'Every build, as soon as it is out — for testing Locust itself. Turn off for one new build a day.'
+                    : 'One new build a day, the one testers get. Turn on to take every build as soon as it is out.'}
+                </span>
+                <button
+                  type="button"
+                  className={`lc-switch${update.everyBuild === true ? ' is-on' : ''}`}
+                  role="switch"
+                  aria-checked={update.everyBuild === true}
+                  aria-label="Take every build as soon as it is out"
+                  onClick={() => onUpdateLane(update.everyBuild !== true)}
+                >
+                  <span className="lc-switch__knob" />
+                </button>
+              </div>
+            </div>
+          )}
           <p className="lc-settings__note">
             This is {changelog?.version ?? 'this version'}. Every version, and what it changed, is in the{' '}
             <button type="button" className="lc-linkbutton" onClick={() => setPage('whatsnew')}>
@@ -2330,7 +2360,15 @@ export function SettingsScreen({
                   }`}
             </dd>
             <dt>Network</dt>
-            <dd>The window itself makes no outbound requests; runtimes talk to their own providers.</dd>
+            {/*
+              * All of it (the beta handover's claims check, 2026-09-23): the
+              * window asks nothing, but the app does -- its own updates, and
+              * Codex's and Copilot's (Settings > Runtimes has that switch).
+              */}
+            <dd>
+              The window makes no requests of its own. Locust checks for and downloads its own updates, and
+              new Codex CLI and Copilot CLI versions; each coding agent talks to its own provider.
+            </dd>
           </dl>
           <More>
             <p>

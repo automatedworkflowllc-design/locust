@@ -71,9 +71,16 @@ export interface RouteRowStatus {
  *
  * 1. A runtime that can actually run right now. A default naming something
  *    absent is the whole defect.
- * 2. Among those, the one that needs no account -- OpenCode -- because on a
- *    fresh machine it is the only one that is a complete answer, and the
- *    first-run screen already recommends it by name.
+ * 2. Among those, Claude Code, then Codex, then OpenCode (0.307). Colin,
+ *    2026-09-23, with the beta's pitch -- "full model control in a great
+ *    UI, not free. Most users will be on Claude or Codex plans; OpenCode is
+ *    a bonus" -- and "don't start on OpenCode when Claude or Codex is signed
+ *    in": "will run with your default setup". Usable already means signed
+ *    in and answering, so a Claude Code that is installed and signed out is
+ *    passed over. OpenCode, which needs no account, is still the start for
+ *    anyone without either -- the first-run screen recommends it by name.
+ *    It used to come first for everyone, which put a plan user's first
+ *    message on a free model they had not chosen.
  * 3. Failing everything, still OpenCode -- the runtime the first-run screen
  *    is at that moment telling them to install. This used to fall back to
  *    Codex "as a stable answer for a machine mid-probe", and a first outside
@@ -88,6 +95,9 @@ export interface RouteRowStatus {
  * prefer is the catalogue's business, not discovery's, and the picker is what
  * knows a free one exists.
  */
+/** Who a fresh profile starts on, when each can run (see defaultRoute). */
+export const START_ORDER: readonly MissionRuntimeId[] = ['claude', 'codex', FREE_START_RUNTIME]
+
 export function defaultRoute(runtimes: readonly PublicRuntimeStatus[]): {
   readonly runtime: MissionRuntimeId
   readonly model: string
@@ -98,8 +108,7 @@ export function defaultRoute(runtimes: readonly PublicRuntimeStatus[]): {
   const usable = runtimes.filter(
     (runtime) => runtimeIsUsable(runtime) && isMissionRuntime(runtime.id) && hostCanRunMission(runtime.id)
   )
-  const free = usable.find((runtime) => runtime.id === FREE_START_RUNTIME)
-  const chosen = free ?? usable[0]
+  const chosen = START_ORDER.map((id) => usable.find((runtime) => runtime.id === id)).find((runtime) => runtime !== undefined) ?? usable[0]
   return {
     runtime: (chosen?.id as MissionRuntimeId | undefined) ?? FREE_START_RUNTIME,
     model: ACCOUNT_DEFAULT_MODEL

@@ -5016,6 +5016,14 @@ export default function App(): ReactElement {
               update={update}
               onCheckUpdate={checkUpdate}
               onInstallUpdate={installUpdate}
+              onUpdateLane={(everyBuild) => {
+                void window.desktop
+                  ?.setUpdateLane(everyBuild)
+                  .then((response) => {
+                    if (response.ok) setUpdate(response.data)
+                  })
+                  .catch(() => undefined)
+              }}
               relay={relay}
               swarm={swarm}
               tube={tube}

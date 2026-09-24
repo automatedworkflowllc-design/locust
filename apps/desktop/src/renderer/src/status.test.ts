@@ -1145,8 +1145,17 @@ describe('a machine with nothing installed', () => {
     expect(defaultRoute([runtime('codex', true), runtime('opencode', false)]).runtime).toBe('codex')
   })
 
-  it('and among those, still the one that needs no account', () => {
-    expect(defaultRoute([runtime('codex', true), runtime('opencode', true)]).runtime).toBe('opencode')
+  /*
+   * Colin, 2026-09-23: "the pitch is full model control in a great UI, not
+   * free. Most users will be on Claude or Codex plans; OpenCode is a bonus"
+   * -- don't start on OpenCode when Claude or Codex is signed in.
+   */
+  it('and among those, Claude Code first, then Codex, then OpenCode', () => {
+    expect(defaultRoute([runtime('opencode', true), runtime('codex', true), runtime('claude', true)]).runtime).toBe('claude')
+    expect(defaultRoute([runtime('opencode', true), runtime('codex', true), runtime('claude', false)]).runtime).toBe('codex')
+    expect(defaultRoute([runtime('codex', false), runtime('opencode', true), runtime('claude', false)]).runtime).toBe('opencode')
+    // Anything else that can run, when none of the three can.
+    expect(defaultRoute([runtime('cursor', true), runtime('opencode', false)]).runtime).toBe('cursor')
   })
 })
 

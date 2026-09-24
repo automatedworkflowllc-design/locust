@@ -25,6 +25,8 @@ import type { AppUpdateResponse, AppUpdateState } from '../shared/ipc.js'
 /** What an updater must provide. Electron's is injected so this is testable. */
 export interface UpdaterLike {
   autoDownload: boolean
+  /** Take prereleases too: the "every build" lane (update-lane.ts). */
+  allowPrerelease: boolean
   /**
    * Whether the updater runs the installer when the app quits by any route.
    * Kept ON: the app's own shutdown handler cancels the first quit to flush
@@ -58,24 +60,32 @@ export interface UpdateServiceOptions {
    */
   readonly requestQuit: (finalise?: () => void) => void
   readonly onStateChange?: (state: AppUpdateState) => void
+  /** Every build, or only the one a day testers get (update-lane.ts). */
+  readonly everyBuild?: boolean
 }
 
 export interface UpdateService {
   state(): AppUpdateState
   check(): Promise<AppUpdateResponse>
   install(): AppUpdateResponse
+  /** Change lanes; the next check takes the new one. */
+  setEveryBuild(everyBuild: boolean): AppUpdateState
 }
 
 export function createUpdateService(options: UpdateServiceOptions): UpdateService {
+  let everyBuild = options.everyBuild === true
+  options.updater.allowPrerelease = everyBuild
   let state: AppUpdateState = {
     phase: options.supported ? 'idle' : 'unsupported',
-    currentVersion: options.currentVersion
+    currentVersion: options.currentVersion,
+    everyBuild
   }
 
+  // Every state carries the lane, so no phase change can drop it.
   const publish = (next: AppUpdateState): AppUpdateState => {
-    state = next
-    options.onStateChange?.(next)
-    return next
+    state = { ...next, everyBuild }
+    options.onStateChange?.(state)
+    return state
   }
 
   if (options.supported) {
@@ -126,6 +136,12 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
 
   return {
     state: () => state,
+
+    setEveryBuild(next) {
+      everyBuild = next
+      options.updater.allowPrerelease = next
+      return publish(state)
+    },
 
     async check(): Promise<AppUpdateResponse> {
       if (!options.supported) {

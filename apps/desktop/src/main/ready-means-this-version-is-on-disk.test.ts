@@ -33,6 +33,7 @@ function fake(versions: readonly string[]): UpdaterLike & {
     listeners,
     installs,
     autoDownload: false,
+    allowPrerelease: false,
     autoInstallOnAppQuit: true,
     checkForUpdates: async () => {
       const version = versions[Math.min(at, versions.length - 1)] ?? versions[0] ?? '0.0.0'

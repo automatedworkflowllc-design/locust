@@ -112,6 +112,7 @@ import {
   APP_CHANGELOG_SEEN_CHANNEL,
   APP_UPDATE_CHECK_CHANNEL,
   APP_UPDATE_INSTALL_CHANNEL,
+  APP_UPDATE_LANE_CHANNEL,
   APP_UPDATE_STATE_CHANNEL,
   MISSION_DELETE_CHANNEL,
   MISSION_PRUNE_CHANNEL,
@@ -189,6 +190,7 @@ import { routeAtStart } from '../shared/route-at-start.js'
 import { roleLabelOf } from '../shared/ipc.js'
 import { isOutboundLink, isWebLink } from '../shared/outbound-links.js'
 import { feedbackUrl } from './report-problem.js'
+import { TESTER_LANE, updateLaneFrom } from './update-lane.js'
 import { allowCursorConnectors } from './cursor-connector-allow.js'
 import { cursorConfiguredConnectorNames, cursorReadyConnectors } from './cursor-connector-notice.js'
 import { pruneMissionRecords, readStorageReport } from './retention.js'
@@ -3626,8 +3628,19 @@ ${taskSection({
 
     // Updates. A packaged build can replace itself; a development build
     // cannot, and says so rather than reporting itself up to date.
+    // Which builds it takes: the tester lane unless the person chose every
+    // build (update-lane.ts). Its own small file, like the window's.
+    const laneFile = join(app.getPath('userData'), 'update-lane.json')
+    const lane = (() => {
+      try {
+        return updateLaneFrom(JSON.parse(readFileSync(laneFile, 'utf8')))
+      } catch {
+        return TESTER_LANE
+      }
+    })()
     const updates = createUpdateService({
       updater: autoUpdater,
+      everyBuild: lane.everyBuild,
       currentVersion: app.getVersion(),
       supported: app.isPackaged,
       liveMissionCount: () =>
@@ -3654,6 +3667,16 @@ ${taskSection({
       if (!fromOwnWindow(event)) {
         return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'The request was rejected.' } } as const
       }
+      return updates.check()
+    })
+
+    ipcMain.handle(APP_UPDATE_LANE_CHANNEL, async (event, everyBuild: unknown) => {
+      if (!fromOwnWindow(event) || typeof everyBuild !== 'boolean') {
+        return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'The request was rejected.' } } as const
+      }
+      await writeFile(laneFile, JSON.stringify({ everyBuild }), 'utf8').catch(() => undefined)
+      updates.setEveryBuild(everyBuild)
+      // Looked at again on the new lane at once, so the switch says what it did.
       return updates.check()
     })
 
