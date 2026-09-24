@@ -1516,10 +1516,18 @@ export default function App(): ReactElement {
   // Not only at launch: the focus re-probe is what finds a runtime installed
   // mid-session, and that is exactly when this matters -- the person has just
   // come back from installing it.
+  /*
+   * FOLLOWS THE START ORDER, not only when the placeholder cannot run (0.307).
+   * The route starts as `codex / account-default` -- a placeholder nobody
+   * chose -- and this used to replace it only when Codex could NOT run. So
+   * on any machine where Codex worked, defaultRoute was never asked: 0.303
+   * and the first 0.307 package both started a fresh profile on Codex with
+   * Claude Code signed in and ready (drive-start-and-lane), and the old
+   * "OpenCode first" had never applied there either. Until the person picks
+   * a route, it is whatever defaultRoute says now.
+   */
   useEffect(() => {
     if (runtimeState.phase !== 'ready' || routeChosen.current) return
-    const selected = runtimes.find((runtime) => runtime.id === route.runtime)
-    if (selected !== undefined && runtimeIsUsable(selected)) return
     const next = defaultRoute(runtimes)
     if (next.runtime === route.runtime) return
     setRoute(next)
