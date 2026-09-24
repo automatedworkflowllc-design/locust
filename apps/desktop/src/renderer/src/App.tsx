@@ -106,7 +106,7 @@ import type { ContextMenuItem, ContextMenuState } from './components/ContextMenu
 import { Thread } from './components/Thread.js'
 import { AgentAvatar, REGISTER_WORD } from './components/ThreadItems.js'
 import { TitleBar } from './components/TitleBar.js'
-import {
+import { cappedLiveEvents,
   conversationTurns,
   failureMessage,
   recentlyUsedRoutes,
@@ -326,7 +326,9 @@ function applyMissionUpdate(run: LiveRunState, update: CodexMissionUpdate): Live
    * because a finished run is re-read from the record, where the fragments
    * are joined. Now they are joined here too, as they arrive.
    */
-  const events = withMessageDelta(live.events, update.event).slice(-500)
+  // H4: the FIRST event is kept past the cap, as the history projection
+  // keeps it -- it is how a run is known to have started at all.
+  const events = cappedLiveEvents(withMessageDelta(live.events, update.event))
   if (update.event.type === 'run.completed') return { ...live, events, phase: 'completed' }
   if (update.event.type === 'run.cancelled') return { ...live, events, phase: 'cancelled' }
   if (update.event.type === 'run.failed') {

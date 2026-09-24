@@ -4345,8 +4345,33 @@ export function lastActivityAt(mission: {
  * message, which is a chore the app can spare him without guessing.
  */
 export function runtimeNeverStarted(events: readonly NormalizedRuntimeEvent[]): boolean {
-  return !events.some((event) => event.type === 'run.started')
+  /*
+   * H4 (the code review): ANY SIGN OF THE RUNTIME AT WORK MEANS IT STARTED.
+   * This asked only whether `run.started` was there -- and OpenCode, Muse and
+   * Antigravity never emit one, so a run of theirs that had edited files and
+   * then failed was offered "Run it again" under "Nothing had started, so
+   * running this again cannot repeat anything". Reproduced by the review on
+   * the real OpenCode normalizer: edit:notes.txt in the fold, true here.
+   * Now only a record of nothing but the failure and the host's own notes
+   * counts as never started.
+   */
+  return events.every((event) => NEVER_STARTED_SHAPES.has(event.type) && event.runtimeThreadId === undefined)
 }
+
+/** How many events a live run keeps in memory; the record keeps them all. */
+export const LIVE_EVENT_CAP = 500
+
+/**
+ * A live run's events, capped -- with the FIRST kept past the cap, as the
+ * history projection keeps it (H4): it says the run started, and dropping it
+ * from a long Claude or Codex run made a failed turn look as if nothing had.
+ */
+export function cappedLiveEvents<T>(events: readonly T[], cap = LIVE_EVENT_CAP): readonly T[] {
+  return events.length <= cap ? events : [events[0]!, ...events.slice(-(cap - 1))]
+}
+
+/** What a run that never reached its runtime can hold: its failure, and diagnostics. */
+const NEVER_STARTED_SHAPES: ReadonlySet<string> = new Set(['run.failed', 'adapter.diagnostic'])
 
 /**
  * Whether a run failed because the MODE refused a tool, rather than anything

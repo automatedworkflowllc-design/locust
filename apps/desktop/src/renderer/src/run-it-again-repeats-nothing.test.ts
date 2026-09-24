@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { runtimeNeverStarted } from './missionView.js'
+import { cappedLiveEvents, LIVE_EVENT_CAP, runtimeNeverStarted } from './missionView.js'
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
 /**
@@ -59,9 +59,38 @@ describe('whether a failed run may simply be run again', () => {
     expect(runtimeNeverStarted([event('run.started'), event('tool.started'), event('run.failed')])).toBe(false)
   })
 
-  it('does not mistake other events for a start', () => {
-    // Nothing but `run.started` may unlock the exclusion, so a run that only
-    // ever emitted noise is still safely re-runnable.
-    expect(runtimeNeverStarted([event('runtime.unknown_event'), event('run.failed')])).toBe(true)
+  /*
+   * H4 (the code review): the rule is the other way round now. Anything the
+   * runtime said -- even an event this build does not know -- is a sign it
+   * was running, and so of work that may be repeated. Only the failure and
+   * the host's own diagnostics mean it never started.
+   */
+  it('takes any event from the runtime, even one it does not know, as a start', () => {
+    expect(runtimeNeverStarted([event('runtime.unknown_event'), event('run.failed')])).toBe(false)
+  })
+
+  it('H4: a run that reached a tool without ever saying run.started DID start (OpenCode, Muse, Antigravity)', () => {
+    expect(runtimeNeverStarted([event('step.started'), event('message.delta'), event('tool.started'), event('tool.completed'), event('run.failed')])).toBe(false)
+    expect(runtimeNeverStarted([event('message.delta'), event('run.failed')])).toBe(false)
+  })
+
+  it('is still true for a run that never reached its runtime: its failure and the host’s notes', () => {
+    expect(runtimeNeverStarted([event('adapter.diagnostic'), event('run.failed')])).toBe(true)
+    expect(runtimeNeverStarted([event('run.failed')])).toBe(true)
+  })
+
+  it('counts a runtime thread on any event as a start', () => {
+    expect(runtimeNeverStarted([{ ...event('run.failed'), runtimeThreadId: 'thread_1' } as never])).toBe(false)
+  })
+})
+
+describe('a long live run', () => {
+  it('H4: keeps its first event past the cap, so a failed turn still reads as started', () => {
+    const long = [event('run.started'), ...Array.from({ length: 700 }, () => event('message.delta')), event('run.failed')]
+    const kept = cappedLiveEvents(long)
+    expect(kept).toHaveLength(LIVE_EVENT_CAP)
+    expect(kept[0]).toBe(long[0])
+    expect(kept.at(-1)).toBe(long.at(-1))
+    expect(cappedLiveEvents(long.slice(0, 10))).toEqual(long.slice(0, 10))
   })
 })
