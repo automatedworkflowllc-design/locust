@@ -29,12 +29,32 @@
 // the installed copy stayed at 0.9.1 and every 'Up to date' smoke ran the
 // packaged build from release/ rather than the installed one.
 
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { gunzipSync } from 'node:zlib'
 import { mkdtemp, mkdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { portFor } from './ports.mjs'
+
+/**
+ * End the app AND its helper processes.
+ *
+ * child.kill() ends only Electron's main process on Windows; the GPU,
+ * renderer and utility processes it started can outlive it, holding the
+ * build's files. Five of them, left by the update smoke of 0.309, made
+ * electron-builder fail to package 0.310 (2026-09-24). The tree is ended
+ * while its root is still there -- once the root is gone, taskkill cannot
+ * find the orphans by it.
+ */
+function endTree(child) {
+  if (process.platform === 'win32' && child.pid !== undefined && child.exitCode === null) {
+    try {
+      execFileSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true })
+      return
+    } catch { /* already gone */ }
+  }
+  try { child.kill() } catch { /* gone */ }
+}
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const INSTALLED = process.argv.includes('--installed')
@@ -110,6 +130,7 @@ try {
   check('the renderer is up', page !== undefined, child.exitCode === null ? undefined : `app exited ${child.exitCode}`)
   if (page === undefined) {
     say(appOutput.join('').slice(-2000))
+    endTree(child)
     process.exit(1)
   }
   const socket = new WebSocket(page.webSocketDebuggerUrl)
@@ -230,7 +251,7 @@ try {
     }
   }
 } finally {
-  child.kill()
+  endTree(child)
   await sleep(500)
   if (profile !== undefined) await rm(profile, { recursive: true, force: true }).catch(() => undefined)
 }

@@ -17,11 +17,31 @@
 // where `~/.cursorignore` makes every Cursor run blind. See the file.
 import './scratch-root.mjs'
 
-import { spawn, execFile } from 'node:child_process'
+import { spawn, execFile, execFileSync } from 'node:child_process'
 import { readFileSync, rmSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+
+/**
+ * End the app AND its helper processes.
+ *
+ * child.kill() ends only Electron's main process on Windows; the GPU,
+ * renderer and utility processes it started can outlive it, holding the
+ * build's files. Five of them, left by the update smoke of 0.309, made
+ * electron-builder fail to package 0.310 (2026-09-24). The tree is ended
+ * while its root is still there -- once the root is gone, taskkill cannot
+ * find the orphans by it.
+ */
+function endTree(child) {
+  if (process.platform === 'win32' && child.pid !== undefined && child.exitCode === null) {
+    try {
+      execFileSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true })
+      return
+    } catch { /* already gone */ }
+  }
+  try { child.kill() } catch { /* gone */ }
+}
 
 export const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
@@ -238,7 +258,7 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
     } catch { /* not up */ }
   }
   if (page === undefined) {
-    try { child.kill() } catch { /* gone */ }
+    endTree(child)
     await giveBackLaunchTurn()
     throw new Error('renderer never came up')
   }
@@ -500,7 +520,7 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
      */
     await writeFile(join(out, 'main.log'), appOutput.join(''), 'utf8').catch(() => undefined)
     try { socket.close() } catch { /* gone */ }
-    try { child.kill() } catch { /* gone */ }
+    endTree(child)
     await sleep(1500)
     if (!keep && last) await rm(profile, { recursive: true, force: true }).catch(() => undefined)
     if (last) say(`\nrecord: ${out}`)
