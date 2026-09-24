@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import { useState } from 'react'
 
 import type { MemoryMode, MemoryScope, MemoryUpdateRequest, PublicForgottenMemory, PublicMemory, PublicTeammate } from '../../../shared/ipc.js'
-import { lastWritten } from '../../../shared/memory.js'
+import { lastWritten, outOfDate } from '../../../shared/memory.js'
 import { TIDY_NUDGE_AT, readableReason } from '../../../shared/memory-tidy.js'
 import { TeammateBot } from './TeammateBot.js'
 
@@ -27,6 +27,7 @@ export function MemoryScreen({
   onRemove,
   onClear,
   forgotten = [],
+  changedSince = {},
   onRestore,
   onTidy,
   onOpenMission,
@@ -45,6 +46,8 @@ export function MemoryScreen({
   readonly onClear: (scope: 'workspace' | 'all') => Promise<string | undefined>
   /** Recently forgotten, newest first, and the way back (A1.8). */
   readonly forgotten?: readonly PublicForgottenMemory[]
+  /** By memory id: the files it names that changed after it was written (A1.3). */
+  readonly changedSince?: Readonly<Record<string, readonly string[]>>
   readonly onRestore?: (memoryId: string) => Promise<string | undefined>
   /** A tidy pass (A1.2): opens the choice of teammate under the button. */
   readonly onTidy?: (anchor: HTMLElement) => void
@@ -177,6 +180,10 @@ export function MemoryScreen({
             teammate could rewrite a memory and the person could not see
             what it had said (harness review, 2026-09-24).
           */}
+          {/* A1.3: a file it names changed after it was written. */}
+          {!isEditing && (changedSince[memory.memoryId] ?? []).length > 0 && (
+            <p className="lc-memory__was lc-memory__stale">May be out of date: {outOfDate(changedSince[memory.memoryId] ?? [])}.</p>
+          )}
           {!isEditing && memory.previousText !== undefined && memory.previousText !== memory.text && (
             <p className="lc-memory__was">
               Was: {memory.previousText}{' '}

@@ -154,6 +154,8 @@ export type MemoryListResponse =
         readonly memories: readonly PublicMemory[]
         /** Recently forgotten, newest first (A1.8). */
         readonly forgotten?: readonly PublicForgottenMemory[]
+        /** By memory id: the files it names that changed after it was written (A1.3). */
+        readonly changedSince?: Readonly<Record<string, readonly string[]>>
         readonly workspaceId: string
         readonly workspaceName: string
       }

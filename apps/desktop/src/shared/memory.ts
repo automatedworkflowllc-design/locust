@@ -234,6 +234,11 @@ export interface MemoryLine {
    * exactly (A1.2). Not pasted into the brief.
    */
   readonly id?: string
+  /**
+   * Files this memory names that changed after it was last written (A1.3):
+   * it may be out of date. Found at brief time, by the host.
+   */
+  readonly changedSince?: readonly string[]
   readonly scope: MemoryScope
   /** Who wrote it: a teammate's name, or "you". */
   readonly by: string
@@ -415,7 +420,9 @@ export function memorySection(input: {
             memory = memory.by === 'you' ? { ...memory, by: 'the person' } : memory
             const place = memory.scope === 'global' ? `everywhere, by ${memory.by}${memory.where === undefined ? '' : ` in ${memory.where}`}` : `this folder, by ${memory.by}`
             const age = memoryAge(memory.at, input.now ?? new Date())
-            const origin = age === undefined ? place : `${place}, ${age}`
+            const dated = age === undefined ? place : `${place}, ${age}`
+            // A1.3: said where the teammate will weigh it, not hidden.
+            const origin = (memory.changedSince ?? []).length === 0 ? dated : `${dated}; may be out of date: ${outOfDate(memory.changedSince ?? [])}`
             // Defanged: a memory is something a teammate SAID, and this line
             // is what every other teammate is TOLD. The two per-tag
             // sanitizers written for it were never called, so a memory
@@ -459,4 +466,38 @@ export function memorySection(input: {
         ? 'A memory is kept at once and shown to the person as you wrote it; write it as they will read it.'
         : `A memory is kept at once and shown to the person as written by ${input.selfName}; write it as they will read it.`
   ].join('\n')
+}
+
+/**
+ * The files a memory names, as written in it (A1.3): paths, or file names
+ * with an extension a project file has. Not URLs, not version numbers, not
+ * "e.g.". Only what it says -- whether a named file exists, and where, is
+ * the host's to check (main/memory-provenance.ts).
+ */
+const FILE_EXTENSIONS = new Set([
+  'ts', 'tsx', 'js', 'jsx', 'mjs', 'cjs', 'json', 'md', 'mdx', 'py', 'rb', 'go', 'rs', 'java', 'kt', 'swift', 'c', 'h', 'cpp',
+  'hpp', 'cs', 'css', 'scss', 'html', 'yml', 'yaml', 'toml', 'ini', 'env', 'lock', 'sh', 'ps1', 'bat', 'sql', 'txt', 'csv', 'xml',
+  'gradle', 'vue', 'svelte', 'php', 'lua', 'dart', 'ex', 'exs', 'tf', 'proto', 'graphql'
+])
+export function citedPaths(text: string): readonly string[] {
+  const found: string[] = []
+  for (const raw of text.split(/[\s,;()[\]{}<>"'`]+/)) {
+    // Only trailing punctuation: a leading dot is a dotfile's name (.env).
+    const token = raw.replace(/^[:!?]+/, '').replace(/[.:!?]+$/, '')
+    if (token.length === 0 || token.length > 200 || /:\/\//.test(token) || /^[a-z]+:/i.test(token)) continue
+    const extension = /\.([A-Za-z0-9]{1,10})$/.exec(token)?.[1]?.toLowerCase()
+    const pathLike = /[\\/]/.test(token) && /[A-Za-z]/.test(token)
+    const named = extension !== undefined && FILE_EXTENSIONS.has(extension) && /[A-Za-z_]/.test(token.slice(0, -(extension.length + 1)))
+    const dotfile = /^\.[A-Za-z][A-Za-z0-9._-]*$/.test(token)
+    if ((pathLike && !/^\/+$/.test(token)) || named || dotfile) {
+      if (!found.includes(token)) found.push(token)
+    }
+  }
+  return found
+}
+
+/** "src/net.ts changed since", "a.ts and b.ts changed since". */
+export function outOfDate(files: readonly string[]): string {
+  const named = files.length <= 1 ? (files[0] ?? '') : `${files.slice(0, -1).join(', ')} and ${files[files.length - 1]!}`
+  return `${named} changed since`
 }

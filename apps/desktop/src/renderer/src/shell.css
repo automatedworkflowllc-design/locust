@@ -2538,6 +2538,11 @@ textarea {
 }
 
 
+/* A memory whose named files changed after it was written (A1.3). */
+.lc-memory__stale {
+  color: var(--lc-amber-text);
+}
+
 /* What a proposal asks of a kept memory: change it, or forget it (0.315). */
 .lc-memory__change {
   color: var(--lc-text-muted);

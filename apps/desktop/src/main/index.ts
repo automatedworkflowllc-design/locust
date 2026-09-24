@@ -62,6 +62,7 @@ import type { MemoryReader } from './memory-reader.js'
 import type { MemoryBriefing } from './peer-exchange.js'
 import { byLastWritten, lastWritten, memorySection } from '../shared/memory.js'
 import { MEMORY_FILE, retireMemoryFile, writeMemoryFile } from './memory-file.js'
+import { changedSince } from './memory-provenance.js'
 
 /** Scheduled routines are checked once a minute; the first check waits for runtime discovery. */
 const ROUTINE_TICK_MS = 60_000
@@ -1268,8 +1269,13 @@ if (!ownsSingleInstanceLock) {
           note('memory', `the memory file could not be read for a brief: ${error instanceof Error ? error.message : String(error)}`)
           return 'TEAM MEMORY could not be read for this run. Nothing in it was changed; do not assume it is empty.'
         }
-        const lines = listed.map((memory) => ({
+        // A1.3: which named files moved on since each memory was written,
+        // checked in the folder the run stands in.
+        const standsIn = peer?.cwd ?? workspacePath
+        const changed = await Promise.all(listed.map((memory) => changedSince(standsIn, memory.text, lastWritten(memory)).catch(() => [])))
+        const lines = listed.map((memory, index) => ({
           id: memory.memoryId,
+          ...(changed[index]!.length === 0 ? {} : { changedSince: changed[index]! }),
           text: memory.text,
           scope: memory.scope,
           // Whoever wrote the words the teammate will read (A1.6).
@@ -1305,8 +1311,9 @@ if (!ownsSingleInstanceLock) {
           // from the other section and left here (QA, 2026-09-06). Memory is
           // the project's either way; only the pointer at a folder goes.
           workspaceName: peer?.cwd === undefined ? memoryWorkspaceName : undefined,
-          memories: listed.map((memory) => ({
+          memories: listed.map((memory, index) => ({
             text: memory.text,
+            ...(changed[index]!.length === 0 ? {} : { changedSince: changed[index]! }),
             scope: memory.scope,
             by: (memory.updatedBy ?? memory.by).name,
             where: memory.scope === 'global' && memory.workspaceId !== memoryWorkspaceId ? memory.workspaceName : undefined,
@@ -3465,7 +3472,21 @@ if (!ownsSingleInstanceLock) {
     const memoryList = async () => {
       // One read for both lists, so a memory is never shown in both or neither.
       const held = await memories.snapshot()
-      return { ok: true, data: { memories: held.memories, forgotten: held.forgotten, workspaceId: memoryWorkspaceId, workspaceName: memoryWorkspaceName } } as const
+      // A1.3: for the memories this folder reads, the named files that
+      // changed after they were written -- shown on the Memory screen.
+      const outOfDate: Record<string, readonly string[]> = {}
+      await Promise.all(
+        held.memories
+          .filter((memory) => memory.status === 'kept' && (memory.scope === 'global' || memory.workspaceId === memoryWorkspaceId))
+          .map(async (memory) => {
+            const files = await changedSince(workspacePath, memory.text, lastWritten(memory)).catch(() => [])
+            if (files.length > 0) outOfDate[memory.memoryId] = files
+          })
+      )
+      return {
+        ok: true,
+        data: { memories: held.memories, forgotten: held.forgotten, changedSince: outOfDate, workspaceId: memoryWorkspaceId, workspaceName: memoryWorkspaceName }
+      } as const
     }
     ipcMain.handle(MEMORY_LIST_CHANNEL, async (event) => {
       if (!fromOwnWindow(event)) return memoryRejected('Memory could not be read.')

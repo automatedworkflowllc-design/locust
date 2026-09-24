@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.318.0 - 2026-09-24
+
+### Improved
+
+- **A memory that names a file says when the file has changed.** "Retries
+  live in src/net.ts" is marked "may be out of date: src/net.ts changed
+  since" once that file changes after the memory was written -- on the
+  Memory screen and in what your teammates are told -- so they check before
+  relying on it. A tidy pass looks at those first.
+
 ## 0.317.0 - 2026-09-24
 
 ### New

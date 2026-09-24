@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { excludeWith } from './attach-outside.js'
-import { memoryAge } from '../shared/memory.js'
+import { memoryAge, outOfDate } from '../shared/memory.js'
 import { defangProtocolBlocks } from '../shared/protocolTags.js'
 import type { MemoryLine } from '../shared/memory.js'
 
@@ -37,7 +37,9 @@ export function memoryFileText(lines: readonly MemoryLine[], now: Date): string 
     const where = memory.where === undefined ? '' : ` in ${memory.where}`
     // Defanged: the teammate reads this file as part of what it is told.
     // The id, so a tidy pass can name a memory exactly (A1.2).
-    return `- ${defangProtocolBlocks(memory.text)} (by ${by}${where}${when})${memory.id === undefined ? '' : ` [${memory.id}]`}`
+    // A1.3: a memory whose named files changed after it was written.
+    const stale = (memory.changedSince ?? []).length === 0 ? '' : ` -- may be out of date: ${outOfDate(memory.changedSince ?? [])}`
+    return `- ${defangProtocolBlocks(memory.text)} (by ${by}${where}${when}${stale})${memory.id === undefined ? '' : ` [${memory.id}]`}`
   }
   const here = lines.filter((memory) => memory.scope !== 'global')
   const everywhere = lines.filter((memory) => memory.scope === 'global')
