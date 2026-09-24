@@ -1,6 +1,6 @@
 import type { PublicRecoveredMission, PublicRoutine } from '../../shared/ipc.js'
 import { nextRunAfter, scheduleLabel } from '../../shared/routine-schedule.js'
-import { conversationTurns } from './missionView.js'
+import { conversationTurns, typedPrompt } from './missionView.js'
 
 /**
  * Turning a finished conversation into a routine a teammate can replay.
@@ -51,7 +51,10 @@ export function routineDraft(
     const held = byId.get(turn.missionId)
     // Host-written turns carry a briefing, not a person's words.
     if (held?.startedBy !== undefined) continue
-    const prompt = (held?.prompt ?? turn.prompt).trim()
+    // A turn on another runtime was STARTED with the host's briefing; the
+    // person's words are the part of it they typed (`typedPrompt`). Read raw,
+    // the briefing itself was offered as a routine step.
+    const prompt = (held === undefined ? turn.prompt : typedPrompt(held, byId)).trim()
     if (prompt.length === 0) continue
     said.push({ missionId: turn.missionId, prompt, phase: held?.phase })
   }

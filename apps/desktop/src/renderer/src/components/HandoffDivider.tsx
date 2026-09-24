@@ -2,6 +2,8 @@ import type { ReactElement } from 'react'
 
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 
+import { runtimeDisplayName } from '../../../shared/runtimes.js'
+
 const RUNTIME_LABEL: Readonly<Record<string, string>> = {
   codex: 'Codex',
   claude: 'Claude Code',
@@ -33,8 +35,10 @@ export function HandoffDivider({
   readonly unsettledCount: number
   readonly omittedBriefing: readonly string[]
 }): ReactElement {
-  const fromLabel = RUNTIME_LABEL[from] ?? from
-  const toLabel = RUNTIME_LABEL[to] ?? to
+  // Every runtime by its name. Only three were listed, so a switch to
+  // OpenCode read "Codex -> opencode" (drive-runtime-switch, packaged 0.309).
+  const fromLabel = RUNTIME_LABEL[from] ?? runtimeDisplayName(from) ?? from
+  const toLabel = RUNTIME_LABEL[to] ?? runtimeDisplayName(to) ?? to
 
   return (
     <div className="lc-handoff" role="separator" aria-label={`Handed off from ${fromLabel} to ${toLabel}`}>

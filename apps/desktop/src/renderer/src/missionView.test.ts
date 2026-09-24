@@ -50,7 +50,7 @@ import {
   threadMarkers,
   threadPeerCards,
   typedPrompt
-, commandsRun, commandsRunText} from './missionView.js'
+, commandsRun, commandsRunText, HANDOFF_INSTRUCTION_MARKER, switchOf } from './missionView.js'
 
 const NOW = '2026-08-31T16:00:00.000Z'
 let sequence = 0
@@ -1467,6 +1467,52 @@ describe('a conversation across turns', () => {
 
   it('draws no handoff divider across an ordinary reply', () => {
     expect(stitchedHandoff(second, byId)).toBeUndefined()
+  })
+
+  /*
+   * A REPLY SENT TO ANOTHER RUNTIME (drive-runtime-switch, packaged 0.309,
+   * opened again): the conversation came back as the reply, then the earlier
+   * turn's work UNDER it, then the divider -- its first message gone.
+   */
+  const briefed = (words: string): string =>
+    `You are continuing a conversation another agent (Codex) started.\n\n${HANDOFF_INSTRUCTION_MARKER}\n\n${words}`
+  const onCodex = { ...turn('s1', 'Remember the word marigold. Reply with just OK.'), runtime: 'codex' as const }
+  const switched = {
+    ...turn('s2', briefed('What was the word?'), { missionId: 's1', reason: 'route-switch' }),
+    runtime: 'opencode' as const,
+    createdAt: '2026-09-24T04:13:00.000Z'
+  }
+  const after = { ...turn('s3', 'And spell it backwards.', { missionId: 's2', reason: 'follow-up' }), runtime: 'opencode' as const }
+  const switchedById = new Map([onCodex, switched, after].map((mission) => [mission.missionId, mission] as const))
+
+  it('walks a reply sent to another runtime back to the turns before it, and marks the seam', () => {
+    const turns = conversationTurns(switched, switchedById)
+    expect(turns.map((entry) => entry.missionId)).toEqual(['s1', 's2'])
+    expect(turns[0]?.switchedFrom).toBeUndefined()
+    expect(turns[1]?.switchedFrom).toMatchObject({ from: 'codex', to: 'opencode', unsettledCount: 0, omittedBriefing: [] })
+    expect(switchOf(switched, switchedById)).toMatchObject({ from: 'codex', to: 'opencode' })
+    // The reply's own words, not the host's briefing.
+    expect(typedPrompt(switched, switchedById)).toBe('What was the word?')
+    // Its seam is drawn before it, not stitched after it with the earlier
+    // turn's work under the reply.
+    expect(stitchedHandoff(switched, switchedById)).toBeUndefined()
+  })
+
+  it('keeps the seam on the switched turn once the conversation moves on', () => {
+    const turns = conversationTurns(after, switchedById)
+    expect(turns.map((entry) => entry.missionId)).toEqual(['s1', 's2', 's3'])
+    expect(turns.map((entry) => entry.switchedFrom?.to)).toEqual([undefined, 'opencode', undefined])
+  })
+
+  it('keeps the turns before a running mission that was handed over', () => {
+    // A running mission handed over is ONE turn: its work is stitched into
+    // the turn (`stitchedHandoff`). The walk used to stop at it, and the turns
+    // before it were lost from a reopened conversation.
+    const handedMidRun = turn('m5', 'briefing text', { missionId: 'm2', reason: 'route-switch' })
+    const withMidRun = new Map([...byId, ['m5', handedMidRun] as const])
+    expect(conversationTurns(handedMidRun, withMidRun).map((entry) => entry.missionId)).toEqual(['m1', 'm5'])
+    expect(stitchedHandoff(handedMidRun, withMidRun)).toBeDefined()
+    expect(switchOf(handedMidRun, withMidRun)).toBeUndefined()
   })
 })
 

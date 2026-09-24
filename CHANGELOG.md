@@ -11,6 +11,26 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.310.0 - 2026-09-24
+
+### Fixed
+
+- **A conversation moved to another coding agent shows where it moved.**
+  Pick a model on another agent partway through -- from Codex to OpenCode,
+  say -- and the thread now marks the switch above your next message, the
+  moment you send it. Opened again later, the conversation comes back whole
+  and in order; it had been losing its first messages and showing the
+  earlier answer under the later question.
+- **The switch line names every agent.** It read "opencode" and the like for
+  anything but Codex and Claude Code.
+- **Saving a moved conversation as a routine keeps your words.** A step came
+  out as the note Locust writes to brief the next agent.
+
+### Improved
+
+- **Settings › Updates says what its switch does.** Left off, Locust takes
+  new versions as they are released; turned on, test builds too.
+
 ## 0.309.0 - 2026-09-23
 
 ### Improved

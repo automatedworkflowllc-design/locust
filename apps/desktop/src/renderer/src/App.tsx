@@ -115,7 +115,7 @@ import {
   startedLabel,
   stitchedHandoff,
   runtimeNeverStarted, typedPrompt, buildThread, lastActivityAt, relativePath, fileTurns, shellCommandText, turnText, groupBoundary, groupJoins, groupLeavings, latestSetupNotes } from './missionView.js'
-import type { LiveStarter } from './missionView.js'
+import type { LiveStarter, TurnSwitch } from './missionView.js'
 import { folderName, ranOnLine } from './ranOn.js'
 import { reviewBrief } from './reviewBrief.js'
 import type { ReviewMaterial } from './reviewBrief.js'
@@ -199,7 +199,16 @@ interface LiveRunState {
     readonly events: readonly NormalizedRuntimeEvent[]
     /** That turn's own workroom exchange, so the thread can draw it in place. */
     readonly peerMessages?: readonly PublicPeerMessage[]
+    /** Set when that turn was a reply sent to another runtime: the seam before it. */
+    readonly switchedFrom?: TurnSwitch
   }[]
+  /**
+   * Set when THIS turn is a reply sent to another runtime than the turn
+   * before it: the divider drawn above the reply. From the start receipt,
+   * so the seam shows the moment it happens; a reopened conversation
+   * rebuilds the same one from the record (`switchOf`).
+   */
+  readonly switchedFrom?: TurnSwitch
   /**
    * What this run continues, when it was started by a route switch. Held in
    * renderer state rather than re-read from the ledger because the thread has
@@ -347,7 +356,8 @@ function earlierTurnsOf(
         prompt: live.prompt,
         events: live.events,
         ...(live.peerMessages === undefined ? {} : { peerMessages: live.peerMessages }),
-        ...(live.startedBy === undefined ? {} : { startedBy: live.startedBy })
+        ...(live.startedBy === undefined ? {} : { startedBy: live.startedBy }),
+        ...(live.switchedFrom === undefined ? {} : { switchedFrom: live.switchedFrom })
       }
     ]
   }
@@ -359,7 +369,8 @@ function earlierTurnsOf(
       missionId: turn.missionId,
       prompt: record === undefined ? turn.prompt : typedPrompt(record, byId),
       events: turn.events,
-      peerMessages: turn.peerMessages
+      peerMessages: turn.peerMessages,
+      ...(turn.switchedFrom === undefined ? {} : { switchedFrom: turn.switchedFrom })
     }
   })
 }
@@ -370,7 +381,9 @@ function reopenedRun(
 ): LiveRunState {
   const restored = restoredLiveRun(mission)
   const handoff = stitchedHandoff(mission, byId)
-  const earlier = conversationTurns(mission, byId).slice(0, -1)
+  const turns = conversationTurns(mission, byId)
+  const earlier = turns.slice(0, -1)
+  const switchedFrom = turns.at(-1)?.switchedFrom
   return {
     ...restored,
     // The words a PERSON typed for this turn: a route switch's own prompt is
@@ -385,11 +398,13 @@ function reopenedRun(
               missionId: turn.missionId,
               prompt: held === undefined ? turn.prompt : typedPrompt(held, byId),
               events: turn.events,
-              peerMessages: turn.peerMessages
+              peerMessages: turn.peerMessages,
+              ...(turn.switchedFrom === undefined ? {} : { switchedFrom: turn.switchedFrom })
             }
           })
         }),
-    ...(handoff === undefined ? {} : { handoff })
+    ...(handoff === undefined ? {} : { handoff }),
+    ...(switchedFrom === undefined ? {} : { switchedFrom })
   }
 }
 
@@ -3014,7 +3029,10 @@ export default function App(): ReactElement {
             // exchange even after the thread learned to draw earlier turns:
             // the message Booty sent Wren lived on the turn BEFORE the reply,
             // and this is where that turn was rebuilt without it.
-            ...(continuing.peerMessages === undefined ? {} : { peerMessages: continuing.peerMessages })
+            ...(continuing.peerMessages === undefined ? {} : { peerMessages: continuing.peerMessages }),
+            // And where that turn itself switched runtime, so its divider
+            // stays above it once the conversation moves on.
+            ...(continuing.switchedFrom === undefined ? {} : { switchedFrom: continuing.switchedFrom })
           }
         ]
     const starting: LiveRunState = {
@@ -3153,12 +3171,24 @@ export default function App(): ReactElement {
       const queued = pendingUpdatesRef.current.get(runId) ?? []
       pendingUpdatesRef.current.delete(runId)
       setRuns((current) => {
+        const switched = response.data.switchedFrom
         let next: LiveRunState = {
           ...starting,
           runtime: response.data.runtime,
           data: response.data,
           phase: 'running',
           peerMessages: response.data.peerMessages,
+          ...(switched === undefined
+            ? {}
+            : {
+                switchedFrom: {
+                  from: switched.runtime,
+                  to: response.data.runtime,
+                  at: new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
+                  unsettledCount: switched.unsettledCount,
+                  omittedBriefing: switched.omittedBriefing
+                }
+              }),
           ...(response.data.peerDeliveryFailed
             ? { peerNotices: ['Messages from teammates could not be read for this mission. Whatever was waiting is still waiting.'] }
             : {})
@@ -5565,6 +5595,7 @@ export default function App(): ReactElement {
                 decidingIds={decidingIds}
                 cancelled={liveRun.phase === 'cancelled'}
                 handoff={liveRun.handoff}
+                {...(liveRun.switchedFrom === undefined ? {} : { switchedFrom: liveRun.switchedFrom })}
                 peers={{
                   self: missionOwner,
                   teammates,

@@ -3613,6 +3613,11 @@ export function stitchedHandoff(
   // seam to draw, and a "Codex to Codex" divider across an ordinary reply
   // would invent an event that never happened.
   if (link === undefined || link.reason !== 'route-switch') return undefined
+  // A reply sent to another runtime is its own turn after the one it
+  // answers, and its seam is drawn before it (`switchOf`). Stitched here, the
+  // earlier turn's work was drawn UNDER the reply and its first message was
+  // lost (drive-runtime-switch, packaged 0.309, opened again).
+  if (isReplySwitch(mission)) return undefined
   const prior = byId.get(link.missionId)
   if (prior === undefined) return undefined
   const checkpoint = prior.checkpoints.find((entry) => entry.epoch === link.checkpointEpoch)
@@ -3681,22 +3686,71 @@ export function resolvedModelKey(runtime: MissionRuntimeId, model: string): stri
   return `${runtime}:${model}`
 }
 
+/**
+ * Where a conversation moved to another runtime between two turns: the reply
+ * was sent to a different runtime than the turn it answers, and the host
+ * briefed that runtime from the earlier turn's record. Drawn as the handoff
+ * divider BEFORE the reply -- everything above it was said on `from`,
+ * everything below on `to`.
+ */
+export interface TurnSwitch {
+  readonly from: MissionRuntimeId
+  readonly to: MissionRuntimeId
+  readonly at: string | undefined
+  readonly unsettledCount: number
+  readonly omittedBriefing: readonly string[]
+}
+
 export interface ConversationTurn {
   readonly missionId: string
   /** What the person typed for this turn. */
   readonly prompt: string
   readonly events: readonly NormalizedRuntimeEvent[]
   readonly peerMessages: PublicRecoveredMission['peerMessages']
+  /** Set when this turn was a reply sent to another runtime. */
+  readonly switchedFrom?: TurnSwitch
+}
+
+/**
+ * A route switch made BETWEEN turns -- a reply sent to another runtime --
+ * rather than a running mission handed over. Both are recorded as
+ * 'route-switch' continuations; only the reply's briefing carries the
+ * person's new words under the instruction marker (`handoffInstruction`),
+ * which is the same test `typedPrompt` reads the words back by.
+ */
+export function isReplySwitch(mission: PublicRecoveredMission): boolean {
+  return mission.continuesFrom?.reason === 'route-switch' && handoffInstruction(mission.prompt) !== undefined
+}
+
+/** The seam before a reply sent to another runtime, rebuilt from the record. */
+export function switchOf(
+  mission: PublicRecoveredMission,
+  byId: ReadonlyMap<string, PublicRecoveredMission>
+): TurnSwitch | undefined {
+  const link = mission.continuesFrom
+  if (link === undefined || !isReplySwitch(mission)) return undefined
+  const prior = byId.get(link.missionId)
+  if (prior === undefined) return undefined
+  const checkpoint = prior.checkpoints.find((entry) => entry.epoch === link.checkpointEpoch)
+  return {
+    from: prior.runtime,
+    to: mission.runtime,
+    at: new Date(mission.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
+    unsettledCount: checkpoint?.unsettledActions.length ?? 0,
+    // What the briefing left out was never recorded; nothing is guessed.
+    omittedBriefing: []
+  }
 }
 
 /**
  * A mission and every earlier turn of its conversation, oldest first.
  *
  * Each turn is its own mission -- one mission holds one run, and a second turn
- * is a second process -- so the thread has to walk the `follow-up` links back
- * to rebuild what a person experienced as one exchange. Only follow-ups are
- * walked: a route switch is a different kind of continuation and keeps its
- * divider. Bounded, so a hand-edited cycle cannot spin.
+ * is a second process -- so the thread has to walk the links back to rebuild
+ * what a person experienced as one exchange: follow-ups, and replies sent to
+ * another runtime (each such turn carries its seam, `switchedFrom`). A
+ * running mission handed over is one turn, not two. Bounded, so a
+ * hand-edited cycle cannot spin.
  */
 export function conversationTurns(
   mission: PublicRecoveredMission,
@@ -3704,26 +3758,44 @@ export function conversationTurns(
 ): readonly ConversationTurn[] {
   // Bounded by what it has already seen rather than by a count: the count
   // was cycle protection, and a 65-turn conversation would have lost its
-  // earliest turns the way `rootMission`'s 32 lost Colin's. The `chain.some`
-  // check below was already doing the real work.
-  const chain: PublicRecoveredMission[] = [mission]
-  let current = mission
+  // earliest turns the way `rootMission`'s 32 lost Colin's.
+  const seen = new Set<string>([mission.missionId])
+  const turns: ConversationTurn[] = []
+  let latest = mission
   for (;;) {
-    const link = current.continuesFrom
-    if (link === undefined || link.reason !== 'follow-up') break
+    // A RUNNING mission handed to another runtime is still one turn: the
+    // handed-off run's work is drawn inside it (`stitchedHandoff`), so the
+    // walk steps over it to the mission the turn began with. This used to
+    // stop there, and every turn before a handoff was lost from a reopened
+    // conversation.
+    let head = latest
+    for (;;) {
+      const link = head.continuesFrom
+      if (link === undefined || link.reason !== 'route-switch' || isReplySwitch(head)) break
+      const prior = byId.get(link.missionId)
+      if (prior === undefined || seen.has(prior.missionId)) break
+      seen.add(prior.missionId)
+      head = prior
+    }
+    const switchedFrom = switchOf(head, byId)
+    turns.push({
+      missionId: latest.missionId,
+      prompt: latest.prompt,
+      events: latest.events,
+      peerMessages: latest.peerMessages,
+      ...(switchedFrom === undefined ? {} : { switchedFrom })
+    })
+    // The turn before this one: a follow-up on the same runtime, or a reply
+    // sent to another runtime -- the conversation carried on either way, and
+    // stopping at the switch dropped everything said before it.
+    const link = head.continuesFrom
+    if (link === undefined || (link.reason !== 'follow-up' && !isReplySwitch(head))) break
     const prior = byId.get(link.missionId)
-    if (prior === undefined || chain.some((held) => held.missionId === prior.missionId)) break
-    chain.push(prior)
-    current = prior
+    if (prior === undefined || seen.has(prior.missionId)) break
+    seen.add(prior.missionId)
+    latest = prior
   }
-  return chain
-    .reverse()
-    .map((turn) => ({
-      missionId: turn.missionId,
-      prompt: turn.prompt,
-      events: turn.events,
-      peerMessages: turn.peerMessages
-    }))
+  return turns.reverse()
 }
 
 /**

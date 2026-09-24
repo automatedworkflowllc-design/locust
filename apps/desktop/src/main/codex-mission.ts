@@ -1013,7 +1013,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               starting.delete(owner)
               claimed = false
             }
-            return service.start(
+            const switched = await service.start(
               briefing.prompt,
               runtime,
               mode,
@@ -1025,6 +1025,23 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               relay,
               startedBy
             )
+            if (!switched.ok) return switched
+            // The receipt says it was a switch, so the window can draw the
+            // seam the moment it happens. It used to come back looking like
+            // any other reply, and the divider appeared only once the
+            // conversation was rebuilt from the record.
+            return {
+              ok: true,
+              data: {
+                ...switched.data,
+                switchedFrom: {
+                  missionId: prior.metadata.missionId,
+                  runtime: prior.metadata.runtime,
+                  unsettledCount: checkpoint.unsettledActions.length,
+                  omittedBriefing: briefing.omitted
+                }
+              }
+            }
           }
           // A prior turn that failed before its runtime started recorded no
           // session. That used to refuse the reply outright; now the turn is

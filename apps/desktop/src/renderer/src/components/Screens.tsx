@@ -2320,18 +2320,23 @@ export function SettingsScreen({
           </More>
           <UpdateControl update={update} onCheck={onCheckUpdate} onInstall={onInstallUpdate} />
           {/*
-            * WHICH BUILDS (0.307). Testers get one new build a day -- the
-            * beta handover: "the build they're reporting on is gone within
-            * the hour" -- and anyone testing Locust itself can take every
-            * build as it is published (main/update-lane.ts).
+            * WHICH BUILDS (0.307). Off: the releases -- GitHub's latest. On:
+            * test builds too, as they are published (main/update-lane.ts).
+            *
+            * It said "One new build a day, the one testers get" (0.307). Then
+            * Colin set the cadence: until there are real users, every verified
+            * build IS the release, and releases are batched once users arrive.
+            * Under that the sentence was false -- off took every build too.
+            * These words hold under either cadence (0.310); whether the switch
+            * stays at all is for the next outside review.
             */}
           {onUpdateLane !== undefined && update !== undefined && update.phase !== 'unsupported' && (
             <div className="lc-settingrows">
               <div className="lc-settingrow">
                 <span className="lc-settings__note">
                   {update.everyBuild === true
-                    ? 'Every build, as soon as it is out — for testing Locust itself. Turn off for one new build a day.'
-                    : 'One new build a day, the one testers get. Turn on to take every build as soon as it is out.'}
+                    ? 'Test builds too, as soon as they are out — for testing Locust itself. Turn off for releases only.'
+                    : 'New versions as they are released. Turn on to take test builds too, as soon as they are out.'}
                 </span>
                 <button
                   type="button"

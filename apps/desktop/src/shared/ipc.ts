@@ -1657,6 +1657,21 @@ export interface CodexMissionStartData extends MissionRouteSummary {
    * just does not carry it.
    */
   readonly followsUp?: { readonly missionId: string; readonly runtimeThreadId?: string }
+  /**
+   * Set when this reply went to ANOTHER runtime than the turn it answers: the
+   * host reconciled that turn and briefed this runtime from it (a
+   * 'route-switch' continuation). Without it the window could not tell a
+   * switch from an ordinary reply, and drew no seam until the conversation
+   * was rebuilt from the record (drive-runtime-switch, packaged 0.309).
+   */
+  readonly switchedFrom?: {
+    readonly missionId: string
+    readonly runtime: MissionRuntimeId
+    /** Actions that had started and never reported back when that turn ended. */
+    readonly unsettledCount: number
+    /** Sections of the briefing dropped to fit the prompt bound, if any. */
+    readonly omittedBriefing: readonly string[]
+  }
   /** Workroom messages quoted into this mission's prompt, oldest first. */
   readonly peerMessages: readonly PublicPeerMessage[]
   /**

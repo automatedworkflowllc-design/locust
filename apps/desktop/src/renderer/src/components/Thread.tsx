@@ -11,7 +11,7 @@ import type {
   PublicTeammate
 } from '../../../shared/ipc.js'
 import { buildThread, cancellationSummary, decisionStanding, errorAlreadyShown, foldNoticeKeys, lastPlanOf, modeRefusedATool, readPlan, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
-import type { GroupBoundary, GroupLeaving, LiveStarter } from '../missionView.js'
+import type { GroupBoundary, GroupLeaving, LiveStarter, TurnSwitch } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
 import { folderName, ranOnLine } from '../ranOn.js'
 import { useFollowBottom } from '../useFollowBottom.js'
@@ -601,6 +601,8 @@ export interface ThreadProps {
     readonly peerMessages?: readonly PublicPeerMessage[]
     /** Who started it. A host-briefed turn is not drawn as the person's words. */
     readonly startedBy?: LiveStarter
+    /** Set when that turn was a reply sent to another runtime: its divider goes above it. */
+    readonly switchedFrom?: TurnSwitch
   }[]
   /**
    * Where this conversation's group began briefing it, if it is in one with
@@ -645,6 +647,13 @@ export interface ThreadProps {
    * as one piece of work, while the divider keeps the two runtimes' authorship
    * distinguishable -- which the durable record insists on.
    */
+  /**
+   * Set when this turn is a reply sent to another runtime than the turn
+   * before it. The divider goes ABOVE the reply: the turns before it were
+   * said on one runtime, this one and what follows on the other. (A running
+   * mission handed over is `handoff`, drawn after the prompt instead.)
+   */
+  readonly switchedFrom?: TurnSwitch
   readonly handoff:
     | {
         readonly from: MissionRuntimeId
@@ -704,6 +713,7 @@ export function Thread({
   onAnswerQuestion,
   decidingIds,
   cancelled,
+  switchedFrom,
   handoff,
   peers
 }: ThreadProps): ReactElement {
@@ -980,6 +990,7 @@ export function Thread({
               )}
               {leavingNotes((beforeTurn) => beforeTurn === index)}
               {joinNotes((beforeTurn) => beforeTurn === index)}
+              {turn.switchedFrom !== undefined && <HandoffDivider {...turn.switchedFrom} />}
               {userTurn(turnPromptLine(turn), turnAttachments(turn))}
               {cardsFor(index, 'before-work').map(peerCard)}
               {earlierWork[index]}
@@ -1017,6 +1028,12 @@ export function Thread({
           </div>
         )}
 
+        {/*
+          The seam of a reply sent to another runtime, above the reply. The
+          window had no word of the switch until 0.310, so the thread ran on
+          as if one runtime had answered both turns.
+        */}
+        {switchedFrom !== undefined && <HandoffDivider {...switchedFrom} />}
         {userTurn(currentLine, turnAttachments({ prompt, ...(startedBy === undefined ? {} : { startedBy }) }))}
 
         {handoff !== undefined && (

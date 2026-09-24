@@ -2161,6 +2161,33 @@ describe('continuing a conversation', () => {
     // No `exec resume`: the other runtime's session is not this one's.
     const spec = start.mock.calls[0]?.[0] as { args: readonly string[] }
     expect(spec.args.includes('resume')).toBe(false)
+    // And the receipt SAYS it was a switch, so the window draws the seam at
+    // once. It came back like any other reply, and the thread showed no
+    // divider until the conversation was reopened (drive-runtime-switch,
+    // packaged 0.309).
+    expect(response.ok && response.data.switchedFrom).toEqual({
+      missionId: 'mission_prior',
+      runtime: 'claude',
+      unsettledCount: 0,
+      omittedBriefing: []
+    })
+  })
+
+  it('names no switch on an ordinary reply on the same runtime', async () => {
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([{ type: 'thread.started', thread_id: 'thread-new' }, { type: 'turn.completed' }]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const { service } = scheduledService({ start }, fakeLedger({
+      getMission: async () => finished({ runtime: 'codex' })
+    }))
+
+    const response = await service.start(
+      'now in euros', 'codex', 'ask', {}, () => undefined, undefined, undefined, 'mission_prior'
+    )
+
+    expect(response).toMatchObject({ ok: true })
+    expect(response.ok && response.data.switchedFrom).toBeUndefined()
   })
 
   it('refuses the cross-runtime continuation when the record cannot be trusted', async () => {
