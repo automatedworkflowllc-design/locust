@@ -126,6 +126,21 @@ export function MemoryScreen({
                 if (event.key === 'Escape') setEditing(undefined)
               }}
             />
+          ) : memory.forgets !== undefined ? (
+            // A proposal to FORGET a kept memory: its words, and what is asked (0.315).
+            <p className="lc-memory__text">
+              <span className="lc-memory__change">Wants to forget this: </span>
+              {memory.text}
+            </p>
+          ) : memory.replaces !== undefined ? (
+            // A proposal to CHANGE a kept memory: the new words, and the ones kept now.
+            <>
+              <p className="lc-memory__text">
+                <span className="lc-memory__change">Wants to change this to: </span>
+                {memory.text}
+              </p>
+              <p className="lc-memory__was">Now: {memories.find((kept) => kept.memoryId === memory.replaces)?.text ?? 'no longer kept'}</p>
+            </>
           ) : (
             <p className="lc-memory__text">{memory.text}</p>
           )}
@@ -173,11 +188,12 @@ export function MemoryScreen({
         <span className="lc-memory__actions">
           {memory.status === 'proposed' ? (
             <>
+              {/* Keep applies the proposal; the other button drops only the proposal. */}
               <button type="button" className="lc-button is-active" disabled={busy} onClick={() => void act(() => onUpdate({ memoryId: memory.memoryId, keep: true }))}>
-                Keep
+                {memory.forgets !== undefined ? 'Forget it' : memory.replaces !== undefined ? 'Keep the change' : 'Keep'}
               </button>
               <button type="button" className="lc-ghostbutton" disabled={busy} onClick={() => void act(() => onRemove(memory.memoryId))}>
-                Forget
+                {memory.forgets !== undefined ? 'Keep it' : memory.replaces !== undefined ? 'Keep the old one' : 'Forget'}
               </button>
             </>
           ) : isEditing ? (
@@ -251,7 +267,7 @@ export function MemoryScreen({
             {mode === 'auto'
               ? 'A memory a teammate writes is kept at once and said in the conversation; undo it here.'
               : mode === 'ask'
-                ? 'A memory a teammate writes waits below until you keep or forget it.'
+                ? 'A memory a teammate writes, changes or forgets waits below until you answer it.'
                 : 'Teammates are not told what is remembered and cannot write memory. What is kept stays here.'}
           </p>
         </section>

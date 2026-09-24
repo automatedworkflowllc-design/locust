@@ -109,12 +109,24 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
        * was told (harness review, 2026-09-24).
        */
       const refused: string[] = []
+      // Changes to kept memories that wait for the person, in ask mode (0.315).
+      const proposedChanges: string[] = []
+      const proposedForgets: string[] = []
       for (const op of ops) {
         try {
           if (op.kind === 'forget') {
-            const result = await options.memories.forget(op.text, recovered.metadata.workspaceId)
+            // In ask mode a forget is proposed, not applied (0.315).
+            const result = await options.memories.forget(
+              op.text,
+              recovered.metadata.workspaceId,
+              mode === 'ask' ? { by, missionId: mission.missionId } : undefined
+            )
+            const waiting = result.proposed ?? []
+            if (waiting.length > 0) proposedForgets.push(...waiting)
             if (result.removed.length > 0) {
               forgotten.push(...result.removed)
+            } else if (waiting.length > 0) {
+              // Proposed, not missed: it waits for the person.
             } else if (result.refusal === 'ambiguous') {
               missed.push(
                 `"${op.text}" matches more than one memory (${quoted(result.candidates)}), so none was forgotten. Quote one of them exactly.`
@@ -134,6 +146,11 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
             status: mode === 'ask' ? 'proposed' : 'kept',
             ...(op.name === undefined ? {} : { name: op.name })
           })
+          // A rewrite proposed in ask mode waits for the person like a new one.
+          if (result.proposedChange === true) {
+            if (!proposedChanges.includes(result.memory.text)) proposedChanges.push(result.memory.text)
+            continue
+          }
           if (result.rewritten === true) {
             rewritten.push(result.memory.text)
             continue
@@ -147,7 +164,18 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
           if (!refused.includes(reason)) refused.push(reason)
         }
       }
-      if (kept.length === 0 && proposed.length === 0 && forgotten.length === 0 && missed.length === 0 && rewritten.length === 0 && refused.length === 0) return
+      if (
+        kept.length === 0 &&
+        proposed.length === 0 &&
+        forgotten.length === 0 &&
+        missed.length === 0 &&
+        rewritten.length === 0 &&
+        refused.length === 0 &&
+        proposedChanges.length === 0 &&
+        proposedForgets.length === 0
+      ) {
+        return
+      }
 
       /*
        * Only what the memory card cannot say.
@@ -163,7 +191,16 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
        * because the card is read from the memories that exist and a memory
        * that was forgotten is exactly the one it cannot draw.
        */
-      options.notify({ kind: 'memory-changed', by: by.name, kept, proposed, forgotten, ...(rewritten.length === 0 ? {} : { rewritten }) })
+      options.notify({
+        kind: 'memory-changed',
+        by: by.name,
+        kept,
+        proposed,
+        forgotten,
+        ...(rewritten.length === 0 ? {} : { rewritten }),
+        ...(proposedChanges.length === 0 ? {} : { proposedChanges }),
+        ...(proposedForgets.length === 0 ? {} : { proposedForgets })
+      })
       if (refused.length > 0) {
         // Amber, like a forget that failed: the person may need to act --
         // make room on the Memory screen, or read what the store said.

@@ -48,7 +48,13 @@ export interface MemoryStore {
     readonly by: { readonly teammateId?: string; readonly name: string }
     readonly missionId?: string
     readonly status: 'kept' | 'proposed'
-  }): Promise<{ readonly memory: PublicMemory; readonly created: boolean; readonly rewritten?: boolean }>
+  }): Promise<{
+    readonly memory: PublicMemory
+    readonly created: boolean
+    readonly rewritten?: boolean
+    /** A named rewrite in ask mode: proposed beside the kept memory, not applied. */
+    readonly proposedChange?: boolean
+  }>
   /** Edit the text, switch it on or off, or keep a proposed one. */
   update(input: { readonly memoryId: unknown; readonly text?: unknown; readonly enabled?: unknown; readonly keep?: unknown }): Promise<PublicMemory>
   remove(memoryId: unknown): Promise<void>
@@ -60,7 +66,7 @@ export interface MemoryStore {
    * see `forgetMatch`. It used to return 0 for both, indistinguishable from
    * "there was nothing to do", and the caller only reported successes.
    */
-  forget(text: string, workspaceId: string): Promise<ForgetResult>
+  forget(text: string, workspaceId: string, ask?: { readonly by: { readonly teammateId?: string; readonly name: string }; readonly missionId?: string }): Promise<ForgetResult>
   /** Everything for one folder, or everything. */
   clear(input: { readonly workspaceId?: string }): Promise<number>
 }
@@ -74,6 +80,8 @@ export interface ForgetResult {
    */
   readonly refusal: 'nothing-matched' | 'ambiguous' | undefined
   readonly candidates: readonly string[]
+  /** In ask mode: the kept memories now waiting for the person to agree they go. */
+  readonly proposed?: readonly string[]
 }
 
 interface StoredFile {
@@ -133,9 +141,15 @@ export function parsedMemory(value: unknown): PublicMemory | undefined {
     // rather than filing it under something unmatchable.
     ...(typeof record.name === 'string' && memoryName(record.name) !== undefined ? { name: memoryName(record.name) } : {}),
     ...(typeof record.updatedAt === 'string' && !Number.isNaN(Date.parse(record.updatedAt)) ? { updatedAt: record.updatedAt } : {}),
-    ...(validMemoryText(record.previousText) ? { previousText: boundedMemoryText(record.previousText) } : {})
+    ...(validMemoryText(record.previousText) ? { previousText: boundedMemoryText(record.previousText) } : {}),
+    // A change waiting for the person. Only a proposal carries one.
+    ...(record.status === 'proposed' && safeId(record.replaces) ? { replaces: record.replaces } : {}),
+    ...(record.status === 'proposed' && safeId(record.forgets) ? { forgets: record.forgets } : {})
   }
 }
+
+/** A proposal that CHANGES a kept memory, rather than adding one. */
+const isChange = (memory: PublicMemory): boolean => memory.replaces !== undefined || memory.forgets !== undefined
 
 /**
  * A MEMORY that does not parse is dropped; a FILE that does not parse is
@@ -202,12 +216,24 @@ export function createMemoryStore(options: {
     return parsedFile(text)
   }
 
+  /*
+   * A proposed change whose memory is gone goes with it (0.315). A proposal
+   * to change or to forget something nobody keeps any more is moot, and it
+   * would sit on the Memory screen asking about nothing. Settled here, on
+   * the one way into the file, so no path that removes a memory -- a
+   * person's Remove, a forget, a kept forget, a clear -- can leave one.
+   */
+  const settled = (memories: readonly PublicMemory[]): readonly PublicMemory[] => {
+    const ids = new Set(memories.map((memory) => memory.memoryId))
+    return memories.filter((memory) => !isChange(memory) || ids.has(memory.forgets ?? memory.replaces ?? ''))
+  }
+
   const write = async (file: StoredFile): Promise<void> => {
     await mkdir(rootDirectory, { recursive: true, mode: 0o700 })
     const temporary = `${path}.${randomUUID()}.tmp`
     const handle = await open(temporary, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL, 0o600)
     try {
-      await handle.writeFile(`${JSON.stringify(file, null, 2)}\n`, 'utf8')
+      await handle.writeFile(`${JSON.stringify({ ...file, memories: settled(file.memories) }, null, 2)}\n`, 'utf8')
       await handle.sync()
     } finally {
       await handle.close()
@@ -233,7 +259,7 @@ export function createMemoryStore(options: {
       )
     },
 
-    add(input): Promise<{ readonly memory: PublicMemory; readonly created: boolean; readonly rewritten?: boolean }> {
+    add(input): Promise<{ readonly memory: PublicMemory; readonly created: boolean; readonly rewritten?: boolean; readonly proposedChange?: boolean }> {
       return serialize(async () => {
         if (!validMemoryText(input.text)) throw new Error('A memory is one line of text, up to 300 characters.')
         if (!validScope(input.scope)) throw new Error('A memory is for this folder or for everywhere.')
@@ -261,6 +287,47 @@ export function createMemoryStore(options: {
             // Nothing actually changed: do not churn the file or lose the
             // real `updatedAt` by writing the same words again.
             if (memoryKey(held.text) === memoryKey(text)) return { memory: held, created: false }
+            /*
+             * "ASK ME FIRST" COVERS A REWRITE (0.315). A kept memory stays as
+             * it is, and briefed; the new wording waits beside it as a
+             * proposal that REPLACES it once the person keeps it. In ask mode
+             * a named rewrite used to change a kept memory at once -- the one
+             * promise of that mode it did not keep (harness review,
+             * 2026-09-24, reported #3). A later rewrite before the person
+             * answers updates the same proposal.
+             */
+            if (held.status === 'kept' && input.status === 'proposed') {
+              const pending = file.memories.find((memory) => memory.status === 'proposed' && memory.replaces === held.memoryId)
+              if (pending !== undefined) {
+                if (memoryKey(pending.text) === memoryKey(text)) return { memory: pending, created: false }
+                const again: PublicMemory = {
+                  ...pending,
+                  text,
+                  updatedAt: now().toISOString(),
+                  ...(input.missionId === undefined ? {} : { missionId: input.missionId })
+                }
+                await write({ ...file, memories: file.memories.map((memory) => (memory.memoryId === pending.memoryId ? again : memory)) })
+                return { memory: again, created: false, proposedChange: true }
+              }
+              if (file.memories.length >= MAX_MEMORIES) {
+                throw new Error(`Locust keeps at most ${String(MAX_MEMORIES)} memories. Forget some first.`)
+              }
+              const proposal: PublicMemory = {
+                memoryId: `mem_${createId()}`,
+                text,
+                scope: held.scope,
+                workspaceId: held.workspaceId,
+                workspaceName: held.workspaceName,
+                by: { name: input.by.name, ...(input.by.teammateId === undefined ? {} : { teammateId: input.by.teammateId }) },
+                ...(input.missionId === undefined ? {} : { missionId: input.missionId }),
+                createdAt: now().toISOString(),
+                status: 'proposed',
+                enabled: true,
+                replaces: held.memoryId
+              }
+              await write({ ...file, memories: [...file.memories, proposal] })
+              return { memory: proposal, created: true, proposedChange: true }
+            }
             const rewritten: PublicMemory = {
               ...held,
               text,
@@ -319,6 +386,36 @@ export function createMemoryStore(options: {
           throw new Error('A memory is one line of text, up to 300 characters.')
         }
         if (input.enabled !== undefined && typeof input.enabled !== 'boolean') throw new Error('That change could not be read.')
+        /*
+         * KEEPING A PROPOSED CHANGE APPLIES IT (0.315): a rewrite replaces
+         * the kept memory's wording (one step back kept, as always), a
+         * forget removes it. Either way the proposal itself goes.
+         */
+        if (input.keep === true && held.status === 'proposed' && isChange(held)) {
+          const others = file.memories.filter((memory) => memory.memoryId !== held.memoryId)
+          if (held.forgets !== undefined) {
+            const gone = file.memories.find((memory) => memory.memoryId === held.forgets)
+            await write({ ...file, memories: others.filter((memory) => memory.memoryId !== held.forgets) })
+            return gone ?? held
+          }
+          const target = file.memories.find((memory) => memory.memoryId === held.replaces)
+          if (target === undefined) {
+            // What it would have replaced is gone: it becomes a memory of its own.
+            const own: { -readonly [K in keyof PublicMemory]: PublicMemory[K] } = { ...held, status: 'kept' }
+            delete own.replaces
+            await write({ ...file, memories: file.memories.map((memory) => (memory.memoryId === held.memoryId ? own : memory)) })
+            return own
+          }
+          const changed: PublicMemory = {
+            ...target,
+            text: held.text,
+            previousText: target.text,
+            updatedAt: now().toISOString(),
+            ...(held.missionId === undefined ? {} : { missionId: held.missionId })
+          }
+          await write({ ...file, memories: others.map((memory) => (memory.memoryId === target.memoryId ? changed : memory)) })
+          return changed
+        }
         const text = input.text === undefined ? held.text : boundedMemoryText(input.text)
         const next: PublicMemory = {
           ...held,
@@ -347,14 +444,15 @@ export function createMemoryStore(options: {
       })
     },
 
-    forget(text, workspaceId): Promise<ForgetResult> {
+    forget(text, workspaceId, ask): Promise<ForgetResult> {
       return serialize(async () => {
         const file = await read()
         // Only what this mission could be talking about: this folder's and
         // everywhere's. A memory in another project is not a candidate and
-        // must not make a quote look ambiguous.
+        // must not make a quote look ambiguous. Nor is a proposed CHANGE:
+        // it carries the words of the memory it points at, and is not one.
         const reachable = file.memories.filter(
-          (memory) => memory.scope === 'global' || memory.workspaceId === workspaceId
+          (memory) => (memory.scope === 'global' || memory.workspaceId === workspaceId) && !isChange(memory)
         )
         const match = forgetMatch(text, reachable.map((memory) => memoryKey(memory.text)))
         if (match.refusal !== undefined) {
@@ -374,7 +472,41 @@ export function createMemoryStore(options: {
         }
         const hit = new Set(match.matched)
         const goes = (memory: PublicMemory): boolean =>
-          (memory.scope === 'global' || memory.workspaceId === workspaceId) && hit.has(memoryKey(memory.text))
+          (memory.scope === 'global' || memory.workspaceId === workspaceId) && !isChange(memory) && hit.has(memoryKey(memory.text))
+        /*
+         * "ASK ME FIRST" COVERS A FORGET (0.315): a kept memory stays, and
+         * briefed, with a proposal beside it to remove it. It used to go at
+         * once in ask mode too (reported #3). A memory still only proposed
+         * -- nobody kept it -- can simply go.
+         */
+        if (ask !== undefined) {
+          const targets = file.memories.filter(goes)
+          const dropped = new Set(targets.filter((target) => target.status === 'proposed').map((target) => target.memoryId))
+          const proposals: PublicMemory[] = targets
+            .filter((target) => target.status === 'kept' && !file.memories.some((memory) => memory.forgets === target.memoryId))
+            .map((target) => ({
+              memoryId: `mem_${createId()}`,
+              text: target.text,
+              scope: target.scope,
+              workspaceId: target.workspaceId,
+              workspaceName: target.workspaceName,
+              by: { name: ask.by.name, ...(ask.by.teammateId === undefined ? {} : { teammateId: ask.by.teammateId }) },
+              ...(ask.missionId === undefined ? {} : { missionId: ask.missionId }),
+              createdAt: now().toISOString(),
+              status: 'proposed' as const,
+              enabled: true,
+              forgets: target.memoryId
+            }))
+          if (proposals.length > 0 || dropped.size > 0) {
+            await write({ ...file, memories: [...file.memories.filter((memory) => !dropped.has(memory.memoryId)), ...proposals] })
+          }
+          return {
+            removed: targets.filter((target) => dropped.has(target.memoryId)).map((target) => target.text),
+            refusal: undefined,
+            candidates: [],
+            proposed: targets.filter((target) => target.status === 'kept').map((target) => target.text)
+          }
+        }
         const removed = file.memories.filter(goes).map((memory) => memory.text)
         if (removed.length > 0) await write({ ...file, memories: file.memories.filter((memory) => !goes(memory)) })
         return { removed, refusal: undefined, candidates: [] }

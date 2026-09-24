@@ -2532,6 +2532,11 @@ textarea {
 }
 
 
+/* What a proposal asks of a kept memory: change it, or forget it (0.315). */
+.lc-memory__change {
+  color: var(--lc-text-muted);
+}
+
 /* A memory's previous wording, under it, with the way back (0.314). */
 .lc-memory__was {
   margin: 0;

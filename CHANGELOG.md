@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.315.0 - 2026-09-24
+
+### Improved
+
+- **"Ask me first" now covers changes too.** With memory set to Ask me first,
+  a teammate rewriting or forgetting something you kept no longer changes it
+  on the spot. The change waits on the Memory screen beside what it would
+  replace: Keep the change or Keep the old one, Forget it or Keep it. Until
+  you answer, your teammates keep reading the memory as you left it.
+
 ## 0.314.0 - 2026-09-24
 
 ### Improved

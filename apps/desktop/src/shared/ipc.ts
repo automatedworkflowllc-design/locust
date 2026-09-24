@@ -40,6 +40,13 @@ export interface PublicMemory {
   /** When a named memory was last rewritten. Absent if it never has been. */
   readonly updatedAt?: string
   /**
+   * On a PROPOSAL only: the kept memory this one would REPLACE, or REMOVE,
+   * once the person keeps it. "Ask me first" covers rewrites and forgets
+   * (0.315); the kept memory stays as it is, and briefed, until then.
+   */
+  readonly replaces?: string
+  readonly forgets?: string
+  /**
    * What this memory said before it was last rewritten.
    *
    * One step, not a chain: these are single lines of at most 300 characters,
@@ -1905,6 +1912,13 @@ export type CodexMissionUpdate =
        * them together lets a memory move under them without a word.
        */
       readonly rewritten?: readonly string[]
+      /**
+       * In ask mode, a CHANGE to a kept memory waiting for the person: the
+       * new wording of a rewrite, the words of a memory it wants forgotten
+       * (0.315). Not `proposed`: "wants to remember" would misname both.
+       */
+      readonly proposedChanges?: readonly string[]
+      readonly proposedForgets?: readonly string[]
     }
   /** Why a teammate did NOT reply on their own, said in the thread that shared. */
   | {

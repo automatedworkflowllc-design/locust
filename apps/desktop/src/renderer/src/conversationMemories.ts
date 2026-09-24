@@ -24,6 +24,9 @@ export interface ConversationMemory {
   readonly status: 'kept' | 'proposed'
   /** Present when this memory has been rewritten under its name; what it said before. */
   readonly previousText?: string
+  /** A proposal to change, or to forget, a kept memory (0.315). */
+  readonly replaces?: string
+  readonly forgets?: string
 }
 
 export interface MemoryLine {
@@ -47,6 +50,8 @@ export interface MemoryLine {
    * had just done.
    */
   readonly missionId: string
+  /** A proposal to change or to forget a kept memory, not a new one (0.315). */
+  readonly change?: 'rewrite' | 'forget'
 }
 
 /**
@@ -92,6 +97,43 @@ export function memoriesOfConversation(
       text: memory.text,
       status: memory.status,
       missionId: memory.missionId!,
-      ...(memory.previousText === undefined ? {} : { updated: true })
+      ...(memory.previousText === undefined ? {} : { updated: true }),
+      ...(memory.forgets !== undefined ? { change: 'forget' as const } : memory.replaces !== undefined ? { change: 'rewrite' as const } : {})
     }))
+}
+
+/**
+ * What the Memory screen's notice says about one reply's memory changes, or
+ * nothing when nothing happened worth reporting.
+ *
+ * Every list empty is `undefined`, not '': `[].join()` is '', which passes
+ * `!== undefined` downstream and drew an empty paragraph that then also could
+ * not be dismissed.
+ *
+ * Sentences, not a join: a memory is usually a sentence, and '. ' after its
+ * closing quote printed `...Thursdays.". Booty wants...` (seen on the 0.315
+ * drive). A clause already ended inside its quote is left as it is.
+ */
+export function memoryChangedNotice(update: {
+  readonly by: string
+  readonly kept: readonly string[]
+  readonly proposed: readonly string[]
+  readonly forgotten: readonly string[]
+  readonly rewritten?: readonly string[]
+  readonly proposedChanges?: readonly string[]
+  readonly proposedForgets?: readonly string[]
+}): string | undefined {
+  const quoted = (texts: readonly string[]): string => texts.map((text) => `"${text}"`).join('; ')
+  const said: string[] = []
+  if (update.kept.length > 0) said.push(`${update.by} remembered ${quoted(update.kept)}`)
+  if (update.proposed.length > 0) said.push(`${update.by} wants to remember ${quoted(update.proposed)}`)
+  if (update.forgotten.length > 0) said.push(`${update.by} forgot ${quoted(update.forgotten)}`)
+  // A memory that CHANGED, named as a change. It replaced something the
+  // person may already have read, which is worth more than a new one.
+  if ((update.rewritten ?? []).length > 0) said.push(`${update.by} updated ${quoted(update.rewritten ?? [])}`)
+  // "Ask me first" changes, waiting on this screen (0.315).
+  if ((update.proposedChanges ?? []).length > 0) said.push(`${update.by} wants to change a memory to ${quoted(update.proposedChanges ?? [])}`)
+  if ((update.proposedForgets ?? []).length > 0) said.push(`${update.by} wants to forget ${quoted(update.proposedForgets ?? [])}`)
+  if (said.length === 0) return undefined
+  return said.map((clause) => (/[.!?]"$/.test(clause) ? clause : `${clause}.`)).join(' ')
 }
