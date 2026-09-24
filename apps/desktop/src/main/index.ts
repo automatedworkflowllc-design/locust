@@ -60,7 +60,7 @@ import { createTranscriptTracker } from './peer-exchange.js'
 import type { AttentionReader } from './attention-reader.js'
 import type { MemoryReader } from './memory-reader.js'
 import type { MemoryBriefing } from './peer-exchange.js'
-import { byLastWritten, lastWritten, memorySection } from '../shared/memory.js'
+import { briefedMemories, byLastWritten, daysUnused, lastWritten, memorySection } from '../shared/memory.js'
 import { MEMORY_FILE, retireMemoryFile, writeMemoryFile } from './memory-file.js'
 import { changedSince } from './memory-provenance.js'
 
@@ -1273,9 +1273,13 @@ if (!ownsSingleInstanceLock) {
         // checked in the folder the run stands in.
         const standsIn = peer?.cwd ?? workspacePath
         const changed = await Promise.all(listed.map((memory) => changedSince(standsIn, memory.text, lastWritten(memory)).catch(() => [])))
+        // A1.4: which have gone a month without being given to anyone.
+        const trackingSince = await memories.briefTrackingSince().catch(() => undefined)
+        const briefedAt = new Date()
         const lines = listed.map((memory, index) => ({
           id: memory.memoryId,
           ...(changed[index]!.length === 0 ? {} : { changedSince: changed[index]! }),
+          ...(daysUnused(memory, trackingSince, briefedAt) === undefined ? {} : { unusedDays: daysUnused(memory, trackingSince, briefedAt)! }),
           text: memory.text,
           scope: memory.scope,
           // Whoever wrote the words the teammate will read (A1.6).
@@ -1300,7 +1304,7 @@ if (!ownsSingleInstanceLock) {
         if (file === undefined) {
           note('memory-file', `could not write ${MEMORY_FILE} under ${peer?.cwd ?? workspacePath}: the write did not complete (see memory-file.ts)`)
         }
-        return memorySection({
+        const sectionInput = {
           ...(file === undefined ? {} : { file }),
           ...(query === undefined ? {} : { query }),
           ...(peer === undefined ? {} : { selfName: peer.self.name }),
@@ -1312,6 +1316,7 @@ if (!ownsSingleInstanceLock) {
           // the project's either way; only the pointer at a folder goes.
           workspaceName: peer?.cwd === undefined ? memoryWorkspaceName : undefined,
           memories: listed.map((memory, index) => ({
+            id: memory.memoryId,
             text: memory.text,
             ...(changed[index]!.length === 0 ? {} : { changedSince: changed[index]! }),
             scope: memory.scope,
@@ -1322,7 +1327,17 @@ if (!ownsSingleInstanceLock) {
             at: lastWritten(memory)
           })),
           askFirst: settings.memoryMode === 'ask'
+        }
+        /*
+         * A1.4: what this teammate is GIVEN is exactly what the section
+         * pastes -- the same choice, made by the same function -- and that
+         * is what is noted, at most once a day per memory.
+         */
+        const given = briefedMemories(sectionInput).flatMap((line) => (line.id === undefined ? [] : [line.id]))
+        void memories.noteBriefed(given).catch((error: unknown) => {
+          note('memory', `could not note which memories were briefed: ${error instanceof Error ? error.message : String(error)}`)
         })
+        return memorySection(sectionInput)
     }
     const workroom = createFileWorkroom({
       rootDirectory: join(app.getPath('userData'), 'workroom')
@@ -3485,7 +3500,14 @@ if (!ownsSingleInstanceLock) {
       )
       return {
         ok: true,
-        data: { memories: held.memories, forgotten: held.forgotten, changedSince: outOfDate, workspaceId: memoryWorkspaceId, workspaceName: memoryWorkspaceName }
+        data: {
+          memories: held.memories,
+          forgotten: held.forgotten,
+          changedSince: outOfDate,
+          ...(held.briefTrackingSince === undefined ? {} : { briefTrackingSince: held.briefTrackingSince }),
+          workspaceId: memoryWorkspaceId,
+          workspaceName: memoryWorkspaceName
+        }
       } as const
     }
     ipcMain.handle(MEMORY_LIST_CHANNEL, async (event) => {

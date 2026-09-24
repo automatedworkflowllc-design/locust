@@ -239,6 +239,8 @@ export interface MemoryLine {
    * it may be out of date. Found at brief time, by the host.
    */
   readonly changedSince?: readonly string[]
+  /** Days since a teammate was last given it, past UNUSED_AFTER_DAYS (A1.4). */
+  readonly unusedDays?: number
   readonly scope: MemoryScope
   /** Who wrote it: a teammate's name, or "you". */
   readonly by: string
@@ -395,21 +397,7 @@ export function memorySection(input: {
    * shortened list cannot tell that it was shortened, and neither can the
    * person reading the answer.
    */
-  const maxLines = input.file === undefined ? MEMORY_BRIEF_LINES : MEMORY_BRIEF_LINES_WITH_FILE
-  const budget = input.file === undefined ? MEMORY_BRIEF_BUDGET : MEMORY_BRIEF_BUDGET_WITH_FILE
-  // Folder-first and newest-within-group, with the ones that bear on what
-  // was asked moved to the front (see `memoriesForBrief`).
-  const candidates = memoriesForBrief(input.memories, input.query, maxLines)
-  const briefed: MemoryLine[] = []
-  let spent = 0
-  // From the FRONT: `candidates` is already folder-first, newest-within-group,
-  // so taking the tail would drop exactly the folder memories the order
-  // exists to prefer. Its own test caught that.
-  for (const memory of candidates.slice(0, maxLines)) {
-    spent += memory.text.length + 40
-    if (spent > budget && briefed.length > 0) break
-    briefed.push(memory)
-  }
+  const briefed = briefedMemories(input)
   const dropped = input.memories.length - briefed.length
   const listed =
     input.memories.length === 0
@@ -500,4 +488,55 @@ export function citedPaths(text: string): readonly string[] {
 export function outOfDate(files: readonly string[]): string {
   const named = files.length <= 1 ? (files[0] ?? '') : `${files.slice(0, -1).join(', ')} and ${files[files.length - 1]!}`
   return `${named} changed since`
+}
+
+/**
+ * Which memories a brief pastes, in order (A1.4 reads the same answer to
+ * know what a teammate was actually given).
+ *
+ * Folder-first and newest-within-group, with the ones that bear on what was
+ * asked moved to the front (see `memoriesForBrief`), bounded by lines and
+ * characters.
+ */
+export function briefedMemories(input: { readonly memories: readonly MemoryLine[]; readonly query?: string; readonly file?: string }): readonly MemoryLine[] {
+  const maxLines = input.file === undefined ? MEMORY_BRIEF_LINES : MEMORY_BRIEF_LINES_WITH_FILE
+  const budget = input.file === undefined ? MEMORY_BRIEF_BUDGET : MEMORY_BRIEF_BUDGET_WITH_FILE
+  const candidates = memoriesForBrief(input.memories, input.query, maxLines)
+  const briefed: MemoryLine[] = []
+  let spent = 0
+  // From the FRONT: `candidates` is already folder-first, newest-within-group,
+  // so taking the tail would drop exactly the folder memories the order
+  // exists to prefer. Its own test caught that.
+  for (const memory of candidates.slice(0, maxLines)) {
+    spent += memory.text.length + 40
+    if (spent > budget && briefed.length > 0) break
+    briefed.push(memory)
+  }
+  return briefed
+}
+
+/**
+ * A MEMORY NO TEAMMATE HAS BEEN GIVEN IN A MONTH (A1.4).
+ *
+ * The brief pastes the folder's newest and most relevant memories; the rest
+ * sit in the file. One that has not been in any teammate's brief for a
+ * month, and was not written or changed in that time either, is probably
+ * not doing anything -- worth a look, never deleted for it (Copilot deletes
+ * after 28 days; Locust asks). Counted from when the memory was last given,
+ * last written, or when this counting began (`trackingSince`), whichever is
+ * latest -- so the first month after an update marks nothing it could not
+ * have seen.
+ */
+export const UNUSED_AFTER_DAYS = 30
+
+export function daysUnused(
+  memory: { readonly createdAt: string; readonly updatedAt?: string; readonly lastBriefedAt?: string },
+  trackingSince: string | undefined,
+  now: Date
+): number | undefined {
+  if (trackingSince === undefined) return undefined
+  const since = Math.max(Date.parse(lastWritten(memory)), Date.parse(memory.lastBriefedAt ?? trackingSince), Date.parse(trackingSince))
+  if (Number.isNaN(since)) return undefined
+  const days = Math.floor((now.getTime() - since) / (24 * 60 * 60 * 1000))
+  return days > UNUSED_AFTER_DAYS ? days : undefined
 }

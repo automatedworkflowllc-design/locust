@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import { useState } from 'react'
 
 import type { MemoryMode, MemoryScope, MemoryUpdateRequest, PublicForgottenMemory, PublicMemory, PublicTeammate } from '../../../shared/ipc.js'
-import { lastWritten, outOfDate } from '../../../shared/memory.js'
+import { daysUnused, lastWritten, outOfDate } from '../../../shared/memory.js'
 import { TIDY_NUDGE_AT, readableReason } from '../../../shared/memory-tidy.js'
 import { TeammateBot } from './TeammateBot.js'
 
@@ -28,6 +28,7 @@ export function MemoryScreen({
   onClear,
   forgotten = [],
   changedSince = {},
+  briefTrackingSince,
   onRestore,
   onTidy,
   onOpenMission,
@@ -48,6 +49,8 @@ export function MemoryScreen({
   readonly forgotten?: readonly PublicForgottenMemory[]
   /** By memory id: the files it names that changed after it was written (A1.3). */
   readonly changedSince?: Readonly<Record<string, readonly string[]>>
+  /** When counting began which memories teammates are given (A1.4). */
+  readonly briefTrackingSince?: string
   readonly onRestore?: (memoryId: string) => Promise<string | undefined>
   /** A tidy pass (A1.2): opens the choice of teammate under the button. */
   readonly onTidy?: (anchor: HTMLElement) => void
@@ -180,6 +183,10 @@ export function MemoryScreen({
             teammate could rewrite a memory and the person could not see
             what it had said (harness review, 2026-09-24).
           */}
+          {/* A1.4: a month without being given to anyone -- worth a look, not a deletion. */}
+          {!isEditing && memory.status === 'kept' && daysUnused(memory, briefTrackingSince, new Date()) !== undefined && (
+            <p className="lc-memory__was">No teammate has been given this in {String(daysUnused(memory, briefTrackingSince, new Date()))} days.</p>
+          )}
           {/* A1.3: a file it names changed after it was written. */}
           {!isEditing && (changedSince[memory.memoryId] ?? []).length > 0 && (
             <p className="lc-memory__was lc-memory__stale">May be out of date: {outOfDate(changedSince[memory.memoryId] ?? [])}.</p>

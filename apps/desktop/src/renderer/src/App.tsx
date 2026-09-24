@@ -1204,6 +1204,7 @@ export default function App(): ReactElement {
   const [memories, setMemories] = useState<readonly PublicMemory[]>([])
   const [forgottenMemories, setForgottenMemories] = useState<readonly PublicForgottenMemory[]>([])
   const [memoriesOutOfDate, setMemoriesOutOfDate] = useState<Readonly<Record<string, readonly string[]>>>({})
+  const [briefTrackingSince, setBriefTrackingSince] = useState<string>()
   const [memoryWorkspace, setMemoryWorkspace] = useState<{ readonly id: string; readonly name: string }>({ id: '', name: '' })
   const [memoryMode, setMemoryMode] = useState<MemoryMode>(DEFAULT_MEMORY_MODE)
   /**
@@ -2850,6 +2851,7 @@ export default function App(): ReactElement {
     setMemories(response.data.memories)
     setForgottenMemories(response.data.forgotten ?? [])
     setMemoriesOutOfDate(response.data.changedSince ?? {})
+    setBriefTrackingSince(response.data.briefTrackingSince)
     setMemoryWorkspace({ id: response.data.workspaceId, name: response.data.workspaceName })
     return undefined
   }
@@ -5060,6 +5062,7 @@ export default function App(): ReactElement {
               onClear={clearMemories}
               forgotten={forgottenMemories}
               changedSince={memoriesOutOfDate}
+              {...(briefTrackingSince === undefined ? {} : { briefTrackingSince })}
               onRestore={restoreMemory}
               onTidy={openTidyMenu}
               // `openMission`, like every other opener. This had its own two

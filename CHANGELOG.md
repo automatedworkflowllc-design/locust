@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.319.0 - 2026-09-24
+
+### Improved
+
+- **See which memories nobody uses.** A memory no teammate has been given
+  in a month -- and that nobody has changed -- is marked on the Memory
+  screen, so you can tidy it or let it be. Nothing is deleted for it. The
+  count starts with this version, so nothing is marked for the first month.
+
 ## 0.318.0 - 2026-09-24
 
 ### Improved

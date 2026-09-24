@@ -88,9 +88,20 @@ export interface MemoryStore {
   /** Everything for one folder, or everything. */
   clear(input: { readonly workspaceId?: string }): Promise<number>
   /** What the Memory screen shows, from ONE read: the memories, and Recently forgotten, newest first. */
-  snapshot(): Promise<{ readonly memories: readonly PublicMemory[]; readonly forgotten: readonly PublicForgottenMemory[] }>
+  snapshot(): Promise<{
+    readonly memories: readonly PublicMemory[]
+    readonly forgotten: readonly PublicForgottenMemory[]
+    readonly briefTrackingSince?: string
+  }>
   /** Put a recently forgotten memory back, as it was (A1.8). */
   restore(memoryId: unknown): Promise<PublicMemory>
+  /**
+   * These kept memories were just given to a teammate in a brief (A1.4).
+   * Written at most once a day per memory, so a day of runs is one write.
+   */
+  noteBriefed(memoryIds: readonly string[]): Promise<void>
+  /** When the counting behind `noteBriefed` began; absent until the first brief. */
+  briefTrackingSince(): Promise<string | undefined>
   /**
    * A tidy pass's suggestions (A1.2), each made a proposal for the person.
    * One that names a memory this folder does not keep is refused, with why.
@@ -128,6 +139,8 @@ interface StoredFile {
    * build that writes the file drops them, which loses only the undo.
    */
   readonly forgotten?: readonly PublicForgottenMemory[]
+  /** When Locust began noting which memories teammates are given (A1.4). */
+  readonly briefTrackingSince?: string
 }
 
 const EMPTY: StoredFile = { schemaVersion: SCHEMA_VERSION, memories: [] }
@@ -184,6 +197,7 @@ export function parsedMemory(value: unknown): PublicMemory | undefined {
     ...(typeof record.updatedAt === 'string' && !Number.isNaN(Date.parse(record.updatedAt)) ? { updatedAt: record.updatedAt } : {}),
     ...(validMemoryText(record.previousText) ? { previousText: boundedMemoryText(record.previousText) } : {}),
     ...(parsedActor(record.updatedBy) === undefined ? {} : { updatedBy: parsedActor(record.updatedBy)! }),
+    ...(typeof record.lastBriefedAt === 'string' && !Number.isNaN(Date.parse(record.lastBriefedAt)) ? { lastBriefedAt: record.lastBriefedAt } : {}),
     // A change waiting for the person. Only a proposal carries one.
     ...(record.status === 'proposed' && safeId(record.replaces) ? { replaces: record.replaces } : {}),
     ...(record.status === 'proposed' && safeId(record.forgets) ? { forgets: record.forgets } : {}),
@@ -260,7 +274,13 @@ export function parsedFile(text: string): StoredFile {
     const held = parsedForgotten(entry)
     if (held !== undefined) forgotten.push(held)
   }
-  return { schemaVersion: SCHEMA_VERSION, memories, ...(forgotten.length === 0 ? {} : { forgotten: forgotten.slice(-MAX_FORGOTTEN) }) }
+  const tracking = typeof record.briefTrackingSince === 'string' && !Number.isNaN(Date.parse(record.briefTrackingSince)) ? record.briefTrackingSince : undefined
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    memories,
+    ...(forgotten.length === 0 ? {} : { forgotten: forgotten.slice(-MAX_FORGOTTEN) }),
+    ...(tracking === undefined ? {} : { briefTrackingSince: tracking })
+  }
 }
 
 /** The place a memory lives, for matching: a global one is everywhere, a folder one is its folder. */
@@ -692,7 +712,11 @@ export function createMemoryStore(options: {
     snapshot() {
       return serialize(async () => {
         const file = await read()
-        return { memories: file.memories, forgotten: [...recentlyForgotten(file.forgotten)].reverse() }
+        return {
+          memories: file.memories,
+          forgotten: [...recentlyForgotten(file.forgotten)].reverse(),
+          ...(file.briefTrackingSince === undefined ? {} : { briefTrackingSince: file.briefTrackingSince })
+        }
       })
     },
 
@@ -721,6 +745,28 @@ export function createMemoryStore(options: {
         await write({ ...file, memories: [...file.memories, back], forgotten: rest })
         return back
       })
+    },
+
+    noteBriefed(memoryIds) {
+      return serialize(async () => {
+        const file = await read()
+        const at = now()
+        const given = new Set(memoryIds)
+        const dayAgo = at.getTime() - 24 * 60 * 60 * 1000
+        let changed = file.briefTrackingSince === undefined
+        const memories = file.memories.map((memory) => {
+          if (!given.has(memory.memoryId) || memory.status !== 'kept') return memory
+          if (memory.lastBriefedAt !== undefined && Date.parse(memory.lastBriefedAt) > dayAgo) return memory
+          changed = true
+          return { ...memory, lastBriefedAt: at.toISOString() }
+        })
+        if (!changed) return
+        await write({ ...file, memories, briefTrackingSince: file.briefTrackingSince ?? at.toISOString() })
+      })
+    },
+
+    briefTrackingSince() {
+      return serialize(async () => (await read()).briefTrackingSince)
     },
 
     proposeTidy(input) {

@@ -77,7 +77,7 @@ export const TIDY_PROMPT = [
   "Tidy this folder's team memory. Read .locust/memory.md -- every memory is listed there, with its id in square brackets at the end of its line.",
   'Suggest at most 10 changes, and only ones you are sure of:',
   '- merge two or more memories that say the same thing, as one sentence;',
-  '- retire a memory that is stale, superseded by another, or no longer true, and say why in plain words -- one marked "may be out of date" names a file that changed after it was written, so check that file;',
+  '- retire a memory that is stale, superseded by another, or no longer true, and say why in plain words -- one marked "may be out of date" names a file that changed after it was written, so check that file, and one marked "not given to a teammate in N days" may no longer matter;',
   '- rewrite a memory that is unclear or contradicts another, as the corrected sentence.',
   'Change nothing yourself: every suggestion waits for the person, who keeps it or not. The ids are for the block only; the person reads your reasons, so write them without ids.',
   'Say in a sentence or two what you found, then end your reply with a block in this form, one suggestion per line, each id exactly as the file shows it:',

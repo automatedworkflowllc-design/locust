@@ -53,6 +53,8 @@ export interface PublicMemory {
    */
   readonly replaces?: string
   readonly forgets?: string
+  /** When a teammate was last given it in a brief (A1.4); written at most once a day. */
+  readonly lastBriefedAt?: string
   /** On a PROPOSAL only: the kept memories this one would MERGE into one, the first keeping its place (A1.2). */
   readonly merges?: readonly string[]
   /** Why a proposal asks what it asks, when its writer said -- a tidy pass's reason to retire (A1.2). */
@@ -156,6 +158,8 @@ export type MemoryListResponse =
         readonly forgotten?: readonly PublicForgottenMemory[]
         /** By memory id: the files it names that changed after it was written (A1.3). */
         readonly changedSince?: Readonly<Record<string, readonly string[]>>
+        /** When Locust began counting which memories teammates are given (A1.4). */
+        readonly briefTrackingSince?: string
         readonly workspaceId: string
         readonly workspaceName: string
       }

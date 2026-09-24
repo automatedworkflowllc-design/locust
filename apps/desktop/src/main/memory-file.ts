@@ -39,7 +39,9 @@ export function memoryFileText(lines: readonly MemoryLine[], now: Date): string 
     // The id, so a tidy pass can name a memory exactly (A1.2).
     // A1.3: a memory whose named files changed after it was written.
     const stale = (memory.changedSince ?? []).length === 0 ? '' : ` -- may be out of date: ${outOfDate(memory.changedSince ?? [])}`
-    return `- ${defangProtocolBlocks(memory.text)} (by ${by}${where}${when}${stale})${memory.id === undefined ? '' : ` [${memory.id}]`}`
+    // A1.4: a month without being given to anyone.
+    const unused = memory.unusedDays === undefined ? '' : ` -- not given to a teammate in ${String(memory.unusedDays)} days`
+    return `- ${defangProtocolBlocks(memory.text)} (by ${by}${where}${when}${stale}${unused})${memory.id === undefined ? '' : ` [${memory.id}]`}`
   }
   const here = lines.filter((memory) => memory.scope !== 'global')
   const everywhere = lines.filter((memory) => memory.scope === 'global')
