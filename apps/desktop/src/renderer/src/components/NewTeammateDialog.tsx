@@ -5,7 +5,10 @@ import { useModal } from '../useModal.js'
 import { BOT_SHAPES, botFor, seedAvatar, shuffledAvatar } from '../../../shared/avatar.js'
 import type { AvatarSpec, BotShape } from '../../../shared/avatar.js'
 import type { MissionMode, PublicTeammate, TeammateHue, TeammateRole, PublicConnector, PublicModel, PublicRuntimeStatus, TeammateRoute } from '../../../shared/ipc.js'
-import { modeRunsOn, modesFor, modeSummary } from '../status.js'
+import { defaultEffort, modelFamily, modeRunsOn, modesFor, modeSummary } from '../status.js'
+import { effortFooter } from '../effortLevels.js'
+import { effortScale, joinEffort, splitEffort } from '../effortScale.js'
+import { EffortSlider } from './EffortSlider.js'
 import { routeLabel } from './GroupSettingsDialog.js'
 import { RoutePicker } from './RoutePicker.js'
 import type { RouteChoice } from './RoutePicker.js'
@@ -186,6 +189,23 @@ export function NewTeammateDialog({
     const effort = was !== undefined && was.runtime === choice.runtime && was.model === choice.model ? was.effort : undefined
     setPicked({ runtime: choice.runtime, model: choice.model, mode: kept, ...(effort === undefined ? {} : { effort }) })
     setPicking(false)
+  }
+  /*
+   * THE TEAMMATE'S OWN EFFORT, beside their model. Colin, 2026-09-24: "for
+   * model picker in edit teammate we need to be able to choose effort too".
+   * The route always carried a level, but the dialog never showed it: a new
+   * model silently started on its default, and the only way to change it was
+   * a chat with them. The same control as the composer's, on the levels THIS
+   * model reports; a level set here is saved like a picked model.
+   */
+  const family = shownRoute === undefined || picker === undefined ? undefined : modelFamily(picker.models, shownRoute.runtime, shownRoute.model)
+  const supportedEfforts = family?.supportedEfforts ?? []
+  const effortOfId = Object.entries(family?.variants ?? {}).find(([, id]) => id === shownRoute?.model)?.[0]
+  const shownEffort = shownRoute?.effort ?? effortOfId ?? defaultEffort(supportedEfforts, family?.defaultEffort)
+  const { bases: effortBases, hasFast: effortHasFast } = effortScale(supportedEfforts)
+  const { base: effortBase, fast: effortIsFast } = splitEffort(shownEffort ?? effortBases[0] ?? '')
+  const chooseEffort = (level: string | undefined): void => {
+    if (level !== undefined && shownRoute !== undefined) setPicked({ ...shownRoute, effort: level })
   }
   const nameRef = useRef<HTMLInputElement>(null)
 
@@ -501,6 +521,19 @@ export function NewTeammateDialog({
                   active={shownRoute === undefined ? { runtime: 'claude', model: 'account-default' } : { runtime: shownRoute.runtime, model: shownRoute.model }}
                   onSelect={pick}
                   onClose={() => setPicking(false)}
+                />
+              </div>
+            )}
+            {!picking && shownRoute !== undefined && effortBases.length > 0 && (
+              <div className="lc-effortpanel lc-teammatemodel__effort" role="group" aria-label="Reasoning effort">
+                <EffortSlider
+                  bases={effortBases}
+                  index={Math.max(0, effortBases.indexOf(effortBase))}
+                  fast={effortIsFast}
+                  hasFast={effortHasFast}
+                  footer={effortFooter(shownRoute.runtime)}
+                  onPick={(base) => chooseEffort(joinEffort(base, effortIsFast, supportedEfforts))}
+                  onFast={(next) => chooseEffort(joinEffort(effortBase, next, supportedEfforts))}
                 />
               </div>
             )}

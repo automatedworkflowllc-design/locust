@@ -11,6 +11,22 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.327.0 - 2026-09-24
+
+### New
+
+- **Set a teammate's effort from their Edit dialog.** Under their model,
+  the same effort slider as the chat box, with that model's own levels.
+  It used to change only in a chat with them.
+
+### Improved
+
+- **The effort slider's thumb is Claude Code's.** It was a small, soft
+  white ball; it is now a crisp white rounded rectangle the height of the
+  track, with the filled part easier to see.
+- **The line under the Locust screen on the home page is centred** under
+  it, instead of starting at the column's edge.
+
 ## 0.326.0 - 2026-09-24
 
 ### Fixed

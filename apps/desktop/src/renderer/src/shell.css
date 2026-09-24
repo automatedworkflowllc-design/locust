@@ -6728,6 +6728,13 @@ textarea {
   box-shadow: none;
 }
 
+/* The teammate's own effort (Colin, 2026-09-24): the composer's panel, in
+   the dialog's flow and boxed like the picker above it. */
+.lc-teammatemodel__effort {
+  border: 1px solid var(--lc-border-control);
+  border-radius: var(--lc-radius-control);
+}
+
 .lc-teammatemodel__hint {
   color: var(--lc-text-muted);
   font-size: var(--lc-text-description);
