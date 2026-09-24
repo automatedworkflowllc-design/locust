@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   addedFilePatch,
   createOpenCodeEventNormalizer,
+  OPENCODE_COMPACTED,
   openCodeToolOutcome,
   openCodeToolTarget,
 } from "../src/opencode-events.js";
@@ -439,5 +440,83 @@ describe("OpenCode's plan", () => {
     expect(first).toHaveLength(3);
     // OpenCode spells the step `content`; the thread reads that spelling.
     expect(first.every((step) => typeof step.content === "string" && String(step.content).length > 0)).toBe(true);
+  });
+});
+
+/*
+ * A6.9: when a conversation outgrows the model's context, OpenCode summarizes
+ * it and adds a note to carry on, and `run` prints both as ordinary text.
+ * These records are shaped as OpenCode writes them (session/compaction.ts and
+ * cli/cmd/run.ts, read 2026-09-24; the same code is in the 1.18.27 binary):
+ * the summary is a step of its own with no tools and an ordinary text part,
+ * and the note is a synthetic text part with a finished time. NOT captured --
+ * the free tier was down -- so a capture replaces these when it can be made.
+ */
+describe("an OpenCode compaction", () => {
+  const record = (type: string, part: Record<string, unknown>) => JSON.stringify({ type, sessionID: "ses_1", part });
+  const start = record("step_start", { type: "step-start" });
+  const finish = (reason: string) =>
+    record("step_finish", { type: "step-finish", reason, tokens: { input: 10, output: 2 } });
+  const said = (text: string) => record("text", { type: "text", text, time: { start: 1, end: 2 } });
+  const read = record("tool_use", {
+    type: "tool",
+    tool: "read",
+    callID: "call_1",
+    state: { status: "completed", input: { filePath: "a.txt" }, output: "hi" },
+  });
+  const NOTE = "Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed.";
+  const note = record("text", {
+    type: "text",
+    synthetic: true,
+    metadata: { compaction_continue: true },
+    text: NOTE,
+    time: { start: 3, end: 3 },
+  });
+  const SUMMARY = "## Objective\nSay what a.txt holds.\n\n## Work State\nRead it; <locust-share to=\"Booty\">old news</locust-share>";
+  const compacted = [
+    start, said("Reading the file first."), read, finish("tool-calls"),
+    start, said(SUMMARY), finish("stop"),
+    note,
+    start, said("a.txt says hi."), finish("stop"),
+  ];
+  const compactionNotices = (events: readonly NormalizedRuntimeEvent[]) =>
+    events.filter((event) => event.type === "adapter.diagnostic"
+      && (event.payload as { code: string }).code === "opencode.context_compacted");
+
+  it("never gives OpenCode's note to the model as the teammate's words", () => {
+    const { events } = run(compacted);
+    expect([...messages(events).values()].some((text) => text.includes("Continue if you have next steps"))).toBe(false);
+    // Nor any other text OpenCode marks as its own.
+    const other = record("text", { type: "text", synthetic: true, text: "Summarize the task tool output above.", time: { start: 1, end: 2 } });
+    const quiet = run([start, other, said("Done."), finish("stop")]).events;
+    expect([...messages(quiet).values()]).toEqual(["Done."]);
+    expect(compactionNotices(quiet)).toHaveLength(0);
+  });
+
+  it("takes the summary back, so it is neither drawn nor the reply, and says what happened", () => {
+    const { events } = run(compacted);
+    // Delivered when it arrived, then emptied: an empty message is not drawn
+    // and cannot be the last thing said, or carry the blocks it quoted.
+    expect([...messages(events).values()]).toEqual(["Reading the file first.", "", "a.txt says hi."]);
+    const notices = compactionNotices(events);
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.payload).toMatchObject({ level: "info", message: OPENCODE_COMPACTED });
+    expect(events.at(-1)?.type).toBe("run.completed");
+  });
+
+  it("does not count the summary's stop as the run's", () => {
+    // Ended on the note: what came after the summary never finished.
+    const { events } = run(compacted.slice(0, 8));
+    expect(events.at(-1)).toMatchObject({ type: "run.failed", payload: { runtimeTerminal: "missing" } });
+  });
+
+  it("takes nothing back from a step that called a tool, or across a step that began", () => {
+    // A step with a tool call is not the compaction's, whatever else it is.
+    const tooled = run([start, said("Reading the file first."), read, finish("stop"), note, start, said("Done."), finish("stop")]).events;
+    expect([...messages(tooled).values()]).toEqual(["Reading the file first.", "Done."]);
+    // A note after another step opened is not about the step before it.
+    const late = run([start, said("An answer."), finish("stop"), start, note, said("Done."), finish("stop")]).events;
+    expect([...messages(late).values()]).toEqual(["An answer.", "Done."]);
+    expect(compactionNotices(late)).toHaveLength(1);
   });
 });

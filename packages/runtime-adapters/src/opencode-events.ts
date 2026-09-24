@@ -157,6 +157,39 @@ export function openCodeToolTitle(tool: string, input: JsonObject): string | und
  */
 const OPENCODE_PLAN_TOOL = /^todo_?write$/i;
 
+/**
+ * Words OpenCode wrote to the MODEL, which `run` prints as if the model had
+ * said them (A6.9).
+ *
+ * `run --format json` prints every finished text part in the session, and
+ * OpenCode writes some text parts itself: when a conversation outgrows the
+ * model's context it summarizes it, then adds "Continue if you have next
+ * steps, or stop and ask for clarification if you are unsure how to proceed."
+ * as a user message to carry on. That part is `synthetic` and carries
+ * `metadata.compaction_continue`, and it has a finished time, so `run` prints
+ * it -- read in OpenCode's session/compaction.ts and cli/cmd/run.ts
+ * (2026-09-24), and the same code is in the installed 1.18.27 binary. Locust
+ * took it as the teammate's message, and as the last one it would have been
+ * the reply.
+ *
+ * `synthetic` is OpenCode's own mark for text it wrote, so no synthetic part
+ * is a teammate's words. Returns `compaction` for the one that says the
+ * conversation was just summarized, `other` for any other, and undefined for
+ * text the model wrote.
+ */
+export function openCodeOwnText(part: JsonObject): "compaction" | "other" | undefined {
+  if (part.synthetic !== true) return undefined;
+  const metadata = isObject(part.metadata) ? part.metadata : {};
+  return metadata.compaction_continue === true ? "compaction" : "other";
+}
+
+/**
+ * What the person is told when OpenCode summarizes the conversation. Claude
+ * Code shows a line when it compacts, not the summary, and this does the same.
+ */
+export const OPENCODE_COMPACTED =
+  "The conversation outgrew the model's context, so OpenCode summarized it and carried on from the summary.";
+
 /** What a tool acted on, in the order OpenCode reports it. */
 export function openCodeToolTarget(input: JsonObject, metadata: JsonObject): string | undefined {
   return stringValue(input.filePath)
@@ -190,6 +223,14 @@ export function createOpenCodeEventNormalizer(
   // The last provider error the runtime reported, kept so the run that follows
   // it can say what happened instead of shrugging.
   let providerError: OpenCodeErrorFacts | undefined;
+  // The messages of the step now open and whether it called a tool, and the
+  // same for the step that last finished. A compaction's summary is the text
+  // of the step just before OpenCode's continue note, and that step has no
+  // tools (compaction.ts gives it none), so this is how the summary is found
+  // once the note says what it was.
+  let stepMessages: string[] = [];
+  let stepUsedTools = false;
+  let finishedStep: { readonly messages: readonly string[]; readonly usedTools: boolean } | undefined;
 
   const emit = <TType extends NormalizedRuntimeEventType>(
     type: TType,
@@ -233,6 +274,11 @@ export function createOpenCodeEventNormalizer(
     const evidence = evidenceFor(record, parsed, type);
 
     if (type === "step_start") {
+      stepMessages = [];
+      stepUsedTools = false;
+      // A note that arrives after another step began is not taken as
+      // describing the step before it: nothing is taken back on a guess.
+      finishedStep = undefined;
       // A second start without a finish would leave the first step open
       // forever, so only the first one opens anything.
       if (stepOpen) return [];
@@ -253,6 +299,9 @@ export function createOpenCodeEventNormalizer(
       // Each step reports its own counts, so a run's cost is their sum. Taking
       // the last step's numbers would report the cheapest step as the total.
       if (stringValue(part.reason) === "stop") sawStop = true;
+      finishedStep = { messages: stepMessages, usedTools: stepUsedTools };
+      stepMessages = [];
+      stepUsedTools = false;
       if (!stepOpen) return [];
       stepOpen = false;
       return [emit("step.completed", { stepKind: "turn", evidence })];
@@ -261,8 +310,27 @@ export function createOpenCodeEventNormalizer(
     if (type === "text") {
       const text = stringValue(part.text);
       if (text === undefined) return [];
+      const own = openCodeOwnText(part);
+      if (own === "other") return [];
+      if (own === "compaction") {
+        // The summary goes (Claude Code shows that it compacted, not what it
+        // kept), only when the step before the note is one that called no
+        // tool, as the compaction step never does. An empty message is one
+        // the thread does not draw and a reply that says nothing, so a
+        // summary cannot become the answer or carry blocks it quoted.
+        const summary = finishedStep !== undefined && !finishedStep.usedTools ? finishedStep.messages : [];
+        finishedStep = undefined;
+        // The summary step's own stop is not the run's: what OpenCode does
+        // after it has to finish too before the run counts as done.
+        sawStop = false;
+        return [
+          ...summary.map((itemId) => emit("message.delta", { itemId, operation: "replace", text: "", final: true, evidence })),
+          diagnostic("info", "opencode.context_compacted", OPENCODE_COMPACTED, evidence),
+        ];
+      }
       const itemId = `msg_${String(messageIndex)}`;
       messageIndex += 1;
+      stepMessages.push(itemId);
       // Complete on arrival: there is no partial output mode to reconcile
       // with, so the message replaces its item and closes it in one event.
       return [
@@ -277,6 +345,7 @@ export function createOpenCodeEventNormalizer(
     }
 
     if (type === "tool_use") {
+      stepUsedTools = true;
       const state = isObject(part.state) ? part.state : {};
       const input = isObject(state.input) ? state.input : {};
       const metadata = isObject(state.metadata) ? state.metadata : {};

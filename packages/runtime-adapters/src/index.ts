@@ -153,6 +153,8 @@ export {
 export {
   addedFilePatch,
   createOpenCodeEventNormalizer,
+  OPENCODE_COMPACTED,
+  openCodeOwnText,
   openCodeToolOutcome,
   openCodeToolTarget,
   openCodeToolTitle,
