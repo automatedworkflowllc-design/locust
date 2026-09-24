@@ -60,7 +60,7 @@ import { createTranscriptTracker } from './peer-exchange.js'
 import type { AttentionReader } from './attention-reader.js'
 import type { MemoryReader } from './memory-reader.js'
 import type { MemoryBriefing } from './peer-exchange.js'
-import { memorySection } from '../shared/memory.js'
+import { byLastWritten, lastWritten, memorySection } from '../shared/memory.js'
 import { MEMORY_FILE, writeMemoryFile } from './memory-file.js'
 
 /** Scheduled routines are checked once a minute; the first check waits for runtime discovery. */
@@ -1253,7 +1253,8 @@ if (!ownsSingleInstanceLock) {
         // plainly, and the file is left exactly as it was.
         let listed: Awaited<ReturnType<typeof memories.briefed>>
         try {
-          listed = await memories.briefed(memoryWorkspaceId)
+          // Ordered and dated by the last write: a rewritten named memory is today's (shared/memory.ts lastWritten).
+          listed = byLastWritten(await memories.briefed(memoryWorkspaceId))
         } catch (error) {
           note('memory', `the memory file could not be read for a brief: ${error instanceof Error ? error.message : String(error)}`)
           return 'TEAM MEMORY could not be read for this run. Nothing in it was changed; do not assume it is empty.'
@@ -1263,7 +1264,7 @@ if (!ownsSingleInstanceLock) {
           scope: memory.scope,
           by: memory.by.name,
           where: memory.scope === 'global' && memory.workspaceId !== memoryWorkspaceId ? memory.workspaceName : undefined,
-          at: memory.createdAt
+          at: lastWritten(memory)
         }))
         // The whole list as a file where the run stands, so the brief can
         // paste the newest few and the teammate can read the rest itself.
@@ -1300,7 +1301,7 @@ if (!ownsSingleInstanceLock) {
             where: memory.scope === 'global' && memory.workspaceId !== memoryWorkspaceId ? memory.workspaceName : undefined,
             // So a teammate can tell a note from this morning from one that
             // has been sitting there since August.
-            at: memory.createdAt
+            at: lastWritten(memory)
           })),
           askFirst: settings.memoryMode === 'ask'
         })

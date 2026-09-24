@@ -296,6 +296,25 @@ function topicWords(text: string): ReadonlySet<string> {
  * prompt that matches nothing, this is exactly the list it always was. No
  * index: a linear scan of a few hundred one-line notes is microseconds.
  */
+/**
+ * When a memory was last WRITTEN.
+ *
+ * A named memory is rewritten in place -- `orb-suite-status` today replaces
+ * `orb-suite-status` from August -- and it was dated, and ranked, by when it
+ * was first kept: the brief called today's status two weeks old, and "the
+ * newer one is usually the correction" could side with a genuinely older note
+ * (harness review, 2026-09-24; `updatedAt` was written and never read).
+ */
+export function lastWritten(memory: { readonly createdAt: string; readonly updatedAt?: string }): string {
+  return memory.updatedAt ?? memory.createdAt
+}
+
+/** Oldest first by last write, so "the end of the list is the newest" holds for a rewritten memory too. */
+export function byLastWritten<T extends { readonly createdAt: string; readonly updatedAt?: string }>(memories: readonly T[]): T[] {
+  // Array.prototype.sort is stable: equal dates keep the store's own order.
+  return [...memories].sort((left, right) => Date.parse(lastWritten(left)) - Date.parse(lastWritten(right)))
+}
+
 export function memoriesForBrief(memories: readonly MemoryLine[], query: string | undefined, maxLines: number): readonly MemoryLine[] {
   const here = memories.filter((memory) => memory.scope !== 'global')
   const everywhere = memories.filter((memory) => memory.scope === 'global')

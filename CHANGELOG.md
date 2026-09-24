@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.314.0 - 2026-09-24
+
+### Improved
+
+- **See what a memory said before, and put it back.** On the Memory screen, a
+  memory a teammate -- or you -- rewrote shows its previous wording, with Put
+  it back; pressing it again undoes that too.
+- **A memory rewritten today is today's.** Teammates see a rewritten memory
+  as the newest, so the latest status wins over an older note, and the
+  Memory screen says when it changed.
+
 ## 0.313.0 - 2026-09-24
 
 ### Fixed

@@ -2,6 +2,7 @@ import type { ReactElement } from 'react'
 import { useState } from 'react'
 
 import type { MemoryMode, MemoryScope, MemoryUpdateRequest, PublicMemory, PublicTeammate } from '../../../shared/ipc.js'
+import { lastWritten } from '../../../shared/memory.js'
 import { TeammateBot } from './TeammateBot.js'
 
 /**
@@ -128,6 +129,25 @@ export function MemoryScreen({
           ) : (
             <p className="lc-memory__text">{memory.text}</p>
           )}
+          {/*
+            What it said before its last change, and the way back. The store
+            has kept this one step since 0.242 and nothing showed it: a
+            teammate could rewrite a memory and the person could not see
+            what it had said (harness review, 2026-09-24).
+          */}
+          {!isEditing && memory.previousText !== undefined && memory.previousText !== memory.text && (
+            <p className="lc-memory__was">
+              Was: {memory.previousText}{' '}
+              <button
+                type="button"
+                className="lc-linkbutton"
+                disabled={busy}
+                onClick={() => void act(() => onUpdate({ memoryId: memory.memoryId, text: memory.previousText! }))}
+              >
+                Put it back
+              </button>
+            </p>
+          )}
           <p className="lc-memory__meta lc-mono">
             {author === undefined ? (
               <span>{memory.by.name}</span>
@@ -138,7 +158,8 @@ export function MemoryScreen({
               </span>
             )}
             <span> · {memory.scope === 'global' ? `everywhere, from ${memory.workspaceName}` : memory.workspaceName}</span>
-            <span> · {when(memory.createdAt)}</span>
+            {/* When it last changed: a memory rewritten today is today's. */}
+            <span> · {memory.updatedAt === undefined ? when(memory.createdAt) : `changed ${when(lastWritten(memory))}`}</span>
             {memory.missionId !== undefined && (
               <>
                 <span> · </span>

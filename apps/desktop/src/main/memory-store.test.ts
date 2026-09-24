@@ -22,6 +22,28 @@ const WREN = { teammateId: 'tm_wren', name: 'Wren' }
 const SHOP = { workspaceId: 'ws_shop', workspaceName: 'shop' }
 const LEDGER = { workspaceId: 'ws_ledger', workspaceName: 'ledger' }
 
+describe('a person’s edit', () => {
+  it('keeps one step back and says when, so Put it back is a swap and can be undone', async () => {
+    const memories = await store()
+    const { memory } = await memories.add({ text: 'Orb suite: 29/31, two flaky.', scope: 'workspace', ...SHOP, by: WREN, status: 'kept' })
+    const edited = await memories.update({ memoryId: memory.memoryId, text: 'Orb suite: 31/31 passing.' })
+    expect(edited.previousText).toBe('Orb suite: 29/31, two flaky.')
+    expect(edited.updatedAt).toBe(NOW)
+    // Put it back: the same update with the previous text -- and the edit is now the step back.
+    const back = await memories.update({ memoryId: memory.memoryId, text: edited.previousText! })
+    expect(back.text).toBe('Orb suite: 29/31, two flaky.')
+    expect(back.previousText).toBe('Orb suite: 31/31 passing.')
+  })
+
+  it('changes nothing of the kind when only the switch moves', async () => {
+    const memories = await store()
+    const { memory } = await memories.add({ text: 'Tests run with pnpm test.', scope: 'workspace', ...SHOP, by: WREN, status: 'kept' })
+    const off = await memories.update({ memoryId: memory.memoryId, enabled: false })
+    expect(off.previousText).toBeUndefined()
+    expect(off.updatedAt).toBeUndefined()
+  })
+})
+
 describe('a memory file it cannot read', () => {
   /*
    * Read as EMPTY, the next memory kept was written over it: every memory

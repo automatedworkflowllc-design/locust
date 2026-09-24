@@ -319,11 +319,20 @@ export function createMemoryStore(options: {
           throw new Error('A memory is one line of text, up to 300 characters.')
         }
         if (input.enabled !== undefined && typeof input.enabled !== 'boolean') throw new Error('That change could not be read.')
+        const text = input.text === undefined ? held.text : boundedMemoryText(input.text)
         const next: PublicMemory = {
           ...held,
-          text: input.text === undefined ? held.text : boundedMemoryText(input.text),
+          text,
           enabled: input.enabled === undefined ? held.enabled : input.enabled,
-          status: input.keep === true ? 'kept' : held.status
+          status: input.keep === true ? 'kept' : held.status,
+          /*
+           * A person's edit keeps one step back too, as a teammate's rewrite
+           * does. It did not, so "Put it back" on the Memory screen would
+           * have thrown the teammate's version away for good; now it is a
+           * swap, and pressing it again undoes it (harness review,
+           * 2026-09-24 -- Rakazo keeps every revision; one step is ours).
+           */
+          ...(text === held.text ? {} : { previousText: held.text, updatedAt: now().toISOString() })
         }
         await write({ ...file, memories: file.memories.map((memory) => (memory.memoryId === next.memoryId ? next : memory)) })
         return next
