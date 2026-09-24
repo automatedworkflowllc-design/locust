@@ -1,3 +1,5 @@
+// H1: first, before any import can spawn -- no bare name is found in its working folder.
+import './no-planted-executables.js'
 import { MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH } from './window-size.js'
 import { startAppServerProcess } from './app-server-process.js'
 import { APP_USER_MODEL_ID, DEVELOPMENT_APP_USER_MODEL_ID, mayShowToasts, sweepStaleElectronShortcuts } from './stale-shortcut.js'

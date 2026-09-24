@@ -169,6 +169,8 @@ export const RUNTIME_ENVIRONMENT_ALLOWLIST = [
   "LOGNAME",
   "NODE_EXTRA_CA_CERTS",
   "NO_COLOR",
+  // H1: no bare name is found in a run's working folder (no-planted-executables.ts).
+  "NODEFAULTCURRENTDIRECTORYINEXEPATH",
   "NO_PROXY",
   "PATH",
   "PATHEXT",
