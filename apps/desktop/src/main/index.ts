@@ -1958,6 +1958,15 @@ if (!ownsSingleInstanceLock) {
       enabled: async () => (await teammates.readSettings()).relay === true,
       hopCap: async () => (await teammates.readSettings()).relayHopCap,
       peerContextFor,
+      // A2.1: an answer not written back is brought to the teammate who asked.
+      finalReplyOf: async (missionId) => {
+        const recovered = await missionLedger.getMission(missionId)
+        if (recovered === undefined) return undefined
+        const tracker = createTranscriptTracker()
+        tracker.track(recovered.events)
+        return tracker.latestFinal
+      },
+      post: (input) => workroom.post(input),
       cursorHoldsReadOnly: () => cursorCanEnforceReadOnly(process.platform),
       start: async (input) => {
         if (input.runtime === 'antigravity') {

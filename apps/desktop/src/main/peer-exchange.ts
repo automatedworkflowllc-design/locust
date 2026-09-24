@@ -346,6 +346,10 @@ export function createPeerExchange(options: {
           failed(`A message from ${peer.self.name} to ${target.name} could not be written to the workroom. Nothing was sent.`)
           continue
         }
+        // The same block twice in one reply is one message (A2.2): the
+        // workroom answers the repeat with the first, and it is recorded,
+        // shown and relayed once.
+        if (posted.some((held) => held.messageId === message.messageId)) continue
         try {
           await options.ledger.appendPeerLinks(input.missionId, [{
             direction: 'posted',
@@ -365,7 +369,12 @@ export function createPeerExchange(options: {
           missionId: input.missionId,
           message: publicPeerMessage(message, 'posted')
         })
-        posted.push({ ...message, urgent: block.urgent, ...(block.defer === true ? { defer: true } : {}) })
+        posted.push({
+          ...message,
+          urgent: block.urgent,
+          ...(block.defer === true ? { defer: true } : {}),
+          ...(block.wantsAnswer === true ? { wantsAnswer: true } : {})
+        })
       }
       return posted
     }

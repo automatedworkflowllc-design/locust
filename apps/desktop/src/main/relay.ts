@@ -4,6 +4,12 @@ import type { MissionRuntimeId, MissionSandbox } from '@teammate/runtime-adapter
 import type { CodexMissionStartResponse, CodexMissionUpdate, MissionMode } from '../shared/ipc.js'
 import type { MissionPeerContext, PeerRosterEntry } from './workroom-briefing.js'
 import { runtimeDisplayName } from '../shared/runtimes.js'
+import { stripDecisionBlocks } from '../shared/decision.js'
+import { stripFileBlocks } from '../shared/handover.js'
+import { stripMemoryBlocks } from '../shared/memory.js'
+import { boundedShareText, stripShareBlocks } from '../shared/peer-share.js'
+import { defangProtocolBlocks } from '../shared/protocolTags.js'
+import { stripTaskBlocks } from '../shared/room-task.js'
 
 /**
  * Teammates replying to each other without a person in the loop.
@@ -304,6 +310,14 @@ export interface RelayOptions {
   /** The autonomy budget for one exchange, read when a share is decided. Absent means the default. */
   readonly hopCap?: () => Promise<number>
   readonly peerContextFor: (teammateId: string) => Promise<MissionPeerContext | undefined>
+  /** A finished run's final message, for bringing back an answer it did not write back (A2.1). */
+  readonly finalReplyOf?: (missionId: string) => Promise<string | undefined>
+  /** Posts a returned answer to the asker's messages, as the answerer's (A2.1). */
+  readonly post?: (input: {
+    readonly from: { readonly teammateId: string; readonly name: string; readonly missionId: string }
+    readonly to: { readonly teammateId: string; readonly name: string }
+    readonly text: string
+  }) => Promise<unknown>
   /**
    * Whether Cursor Agent can be held read-only on this machine. Absent
    * reads as yes. On Windows it cannot (its sandbox needs macOS or Linux),
@@ -387,7 +401,7 @@ export interface EndedMission {
 }
 
 /** A message as the relay receives it: the record, plus what its sender asked for. */
-export type RelayedMessage = WorkroomMessage & { readonly urgent?: boolean; readonly defer?: boolean }
+export type RelayedMessage = WorkroomMessage & { readonly urgent?: boolean; readonly defer?: boolean; readonly wantsAnswer?: boolean }
 
 export interface Relay {
   onShared(mission: SharingMission, posted: readonly RelayedMessage[]): Promise<void>
@@ -407,6 +421,12 @@ interface OpenExchange {
   readonly askerMissionId: string
   readonly askerId: string
   readonly recipientName: string
+  /** The asker wants an answer (A2.1): one not written back is brought to them. */
+  readonly wantsAnswer?: boolean
+  /** The asker's mission, whose route a returned answer starts on. */
+  readonly asker?: SharingMission
+  /** The exchange the recipient's run belongs to, which a returned answer continues. */
+  readonly origin?: RelayOrigin
 }
 
 /** A reply that could not start because its recipient was already running. */
@@ -449,6 +469,23 @@ export function meetingPrompt(input: { readonly repliers: readonly string[]; rea
     'If nothing more is needed, end with no share block -- that is how an exchange finishes.',
     'Do not start unrelated work.'
   ].join(' ')
+}
+
+/** How a returned answer is labelled in the asker's messages (A2.1). */
+export const RETURNED_ANSWER = '(Returned by Locust: this is how they answered in their own conversation; they did not write back.)'
+
+/** The asker's turn when an answer is brought back to them (A2.1). */
+export function returnedAnswerPrompt(recipientName: string): string {
+  return [
+    `${recipientName} answered your message in their own conversation and did not write back, so Locust brought their answer to you: it is quoted below as a message from them.`,
+    'Take it into account and carry on. Write back only if that moves the work; if nothing more is needed, end with no share block.',
+    'Do not start unrelated work.'
+  ].join(' ')
+}
+
+/** A final reply, as another teammate may be shown it: every protocol block out, whatever is left defanged. */
+function withoutProtocolBlocks(text: string): string {
+  return defangProtocolBlocks(stripFileBlocks(stripMemoryBlocks(stripTaskBlocks(stripDecisionBlocks(stripShareBlocks(text))))))
 }
 
 export function createRelay(options: RelayOptions): Relay {
@@ -518,6 +555,58 @@ export function createRelay(options: RelayOptions): Relay {
 
   const notify = (runId: string, missionId: string, message: string): void => {
     options.notify({ kind: 'relay-notice', runId, missionId, message })
+  }
+
+  /*
+   * AN ANSWER NOT WRITTEN BACK IS BROUGHT BACK (A2.1).
+   *
+   * Colin, 2026-09-05: "wren answered it but only in his own chat, we never
+   * got the reply in booty's chat". A question went out, the answer was
+   * written -- in prose, in the recipient's own conversation, with no reply
+   * block -- and the teammate who asked never had it. In Colin's ledger 3
+   * of 12 relayed runs ended that way. The notice said where the answer was;
+   * the asker still worked without it.
+   *
+   * When the sender WANTED an answer (wants="answer", or a message ending in
+   * a question), the host brings it: the recipient's final reply, without
+   * its protocol blocks and bounded like any message, is posted to the asker
+   * as theirs -- labelled as returned -- and the asker's turn starts to take
+   * it, through the same start and hold as every reply. Exactly once: the
+   * exchange is gone the moment its run ends. It is the exchange CLOSING, so
+   * it is not refused by the hop budget (it still counts against it); what
+   * the asker does next is budgeted as always. An FYI ends silently, as it
+   * should.
+   */
+  const returnAnswer = async (exchange: OpenExchange, ended: EndedMission): Promise<boolean> => {
+    if (options.finalReplyOf === undefined || options.post === undefined || exchange.asker === undefined || exchange.origin === undefined) return false
+    if (ended.peer === undefined) return false
+    const said = await options.finalReplyOf(ended.missionId)
+    const words = said === undefined ? '' : withoutProtocolBlocks(said).trim()
+    if (words.length === 0) return false
+    const asker = await options.peerContextFor(exchange.askerId)
+    if (asker === undefined) return false
+    await options.post({
+      from: { teammateId: ended.peer.self.teammateId, name: ended.peer.self.name, missionId: ended.missionId },
+      to: { teammateId: asker.self.teammateId, name: asker.self.name },
+      text: boundedShareText(`${RETURNED_ANSWER} ${words}`)
+    })
+    const origin: RelayOrigin = {
+      hop: exchange.origin.hop + 1,
+      rootMissionId: exchange.origin.rootMissionId ?? exchange.askerMissionId,
+      lastMissionOf: { ...exchange.origin.lastMissionOf, [ended.peer.self.teammateId]: ended.missionId }
+    }
+    const notice = (message: string): void => notify(exchange.askerRunId, exchange.askerMissionId, message)
+    const prompt = returnedAnswerPrompt(ended.peer.self.name)
+    const result = await startFor({ recipient: asker, prompt, from: exchange.asker, origin, notice })
+    if (result.kind === 'busy') defer({ recipient: asker, prompt, from: exchange.asker, origin, notice, exchange: undefined }, result.pool === true)
+    notifyAndKeep(
+      exchange.askerRunId,
+      exchange.askerMissionId,
+      result.kind === 'refused'
+        ? `${exchange.recipientName} answered in their own conversation without writing back. The answer was brought to ${asker.self.name}'s messages, to read on their next run.`
+        : `${exchange.recipientName} answered in their own conversation without writing back, so the answer was brought back to ${asker.self.name}.`
+    )
+    return true
   }
 
   /**
@@ -891,7 +980,13 @@ export function createRelay(options: RelayOptions): Relay {
       }
 
       const seen = new Set<string>()
-      const started: { readonly teammateId: string; readonly name: string; readonly missionId: string }[] = []
+      const started: {
+        readonly teammateId: string
+        readonly name: string
+        readonly missionId: string
+        readonly wantsAnswer: boolean
+        readonly origin: RelayOrigin
+      }[] = []
       for (const message of posted) {
         const recipientId = message.to.teammateId
         if (seen.has(recipientId) || held.has(recipientId)) continue
@@ -946,7 +1041,10 @@ export function createRelay(options: RelayOptions): Relay {
                   askerRunId: mission.runId,
                   askerMissionId: mission.missionId,
                   askerId: mission.peer.self.teammateId,
-                  recipientName: recipient.self.name
+                  recipientName: recipient.self.name,
+                  wantsAnswer: message.wantsAnswer === true,
+                  asker: mission,
+                  origin
                 }
               },
               result.pool === true
@@ -964,7 +1062,9 @@ export function createRelay(options: RelayOptions): Relay {
             if (message.urgent === true) await interruptFor(recipient, notice)
             continue
           }
-          if (result.kind === 'started') started.push({ teammateId: recipientId, name: recipient.self.name, missionId: result.missionId })
+          if (result.kind === 'started') {
+            started.push({ teammateId: recipientId, name: recipient.self.name, missionId: result.missionId, wantsAnswer: message.wantsAnswer === true, origin })
+          }
         } catch (error) {
           // Whatever failed between the decision and the start, the thread
           // says so. The service that called us swallows anything thrown
@@ -1000,7 +1100,10 @@ export function createRelay(options: RelayOptions): Relay {
             askerRunId: mission.runId,
             askerMissionId: mission.missionId,
             askerId: mission.peer.self.teammateId,
-            recipientName: entry.name
+            recipientName: entry.name,
+            wantsAnswer: entry.wantsAnswer,
+            asker: mission,
+            origin: entry.origin
           })
         }
       }
@@ -1014,11 +1117,14 @@ export function createRelay(options: RelayOptions): Relay {
       const exchange = exchanges.get(mission.missionId)
       exchanges.delete(mission.missionId)
       if (exchange !== undefined) {
-        notifyAndKeep(
-          exchange.askerRunId,
-          exchange.askerMissionId,
-          `${exchange.recipientName} finished without writing back. Anything they said is in their own conversation.`
-        )
+        const returned = exchange.wantsAnswer === true && (await returnAnswer(exchange, mission).catch(() => false))
+        if (!returned) {
+          notifyAndKeep(
+            exchange.askerRunId,
+            exchange.askerMissionId,
+            `${exchange.recipientName} finished without writing back. Anything they said is in their own conversation.`
+          )
+        }
       }
       const meeting = answering.get(mission.missionId)
       answering.delete(mission.missionId)

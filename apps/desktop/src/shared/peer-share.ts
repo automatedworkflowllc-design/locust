@@ -97,6 +97,12 @@ export interface ShareBlock {
    * delivering it after the conflicting work is done delivers it too late.
    */
   readonly urgent: boolean
+  /**
+   * The sender wants an answer back (A2.1): `wants="answer"`, or a message
+   * that ends by asking. If the recipient answers in their own conversation
+   * and does not write back, the host brings the answer to the sender.
+   */
+  readonly wantsAnswer?: boolean
 }
 
 /** Complete, well-formed blocks in transcript order. Empty bodies are dropped. */
@@ -114,7 +120,14 @@ export function parseShareBlocks(text: string): readonly ShareBlock[] {
     // Exactly one word means it, in both directions: a model reaching for
     // emphasis with `when="soon"` gets the ordinary treatment rather than an
     // interruption, and one reaching for `when="whenever"` still pages.
-    blocks.push({ to, text: body, urgent: when === 'now', ...(when === 'later' ? { defer: true } : {}) })
+    const wantsAnswer = (attributes.wants ?? '').trim().toLowerCase() === 'answer' || /\?\s*$/.test(body)
+    blocks.push({
+      to,
+      text: body,
+      urgent: when === 'now',
+      ...(when === 'later' ? { defer: true } : {}),
+      ...(wantsAnswer ? { wantsAnswer: true } : {})
+    })
   }
   return blocks
 }

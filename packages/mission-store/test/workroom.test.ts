@@ -91,6 +91,23 @@ describe('the workroom channel', () => {
     await expect(workroom.markDelivered(['wm_nope'], 'mission_w2')).rejects.toThrow('Unknown workroom message')
   })
 
+  it('posts the same words from the same run to the same teammate once (A2.2)', async () => {
+    // A re-read, a retry, a restart part-way through posting, or a model
+    // that wrote one block twice must not deliver twice: each delivery can
+    // start a run.
+    const root = await temporaryRoot()
+    const workroom = workroomAt(root)
+    const first = await postFromAtlas(workroom, 'The build runs through pnpm check.')
+    const again = await postFromAtlas(workroom, 'The build runs through pnpm check.')
+    expect(again).toEqual(first)
+    expect((await workroom.read()).messages).toEqual([first])
+    // Different words, or the same words from a later run, are new messages.
+    await postFromAtlas(workroom, 'Also: pnpm lint.')
+    await postFromAtlas(workroom, 'The build runs through pnpm check.', 'mission_a2')
+    expect((await workroom.read()).messages).toHaveLength(3)
+    expect((await workroomAt(root).unread('tm_wren', 10)).messages).toHaveLength(3)
+  })
+
   it('refuses a self-addressed message, an oversized one, and control characters', async () => {
     const root = await temporaryRoot()
     const workroom = workroomAt(root)

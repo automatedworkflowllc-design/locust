@@ -394,7 +394,20 @@ export function createFileWorkroom(options: FileWorkroomOptions): Workroom {
           postedAt
         }
         let sequence = 0
+        let already: WorkroomMessage | undefined
         await appendRecords((parsed) => {
+          /*
+           * KEYED DELIVERY (A2.2). The same words, from the same run, to the
+           * same teammate, are one message: a re-read of a finished reply, a
+           * retry, a restart part-way through posting, or a model that wrote
+           * the same block twice must not deliver it twice -- each delivery
+           * can start a run. Rakazo and agent-native both key deliveries
+           * this way. The second post answers with the first message.
+           */
+          already = parsed.messages.find(
+            (held) => held.from.missionId === message.from.missionId && held.to.teammateId === message.to.teammateId && held.text === message.text
+          )
+          if (already !== undefined) return []
           sequence = parsed.nextSequence
           // Same rule as the ledger: the reader defines what is writable.
           if (parsedMessage(message, sequence) === undefined) {
@@ -408,7 +421,7 @@ export function createFileWorkroom(options: FileWorkroomOptions): Workroom {
             message
           }]
         })
-        return { ...message, sequence }
+        return already ?? { ...message, sequence }
       })
     },
 

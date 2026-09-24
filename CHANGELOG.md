@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.320.0 - 2026-09-24
+
+### Improved
+
+- **An answer comes back to the teammate who asked.** When one teammate
+  asks another a question and the answer is written in the other's own
+  conversation without a reply, Locust now brings that answer back to the
+  one who asked -- as a message from them -- and lets them carry on with it.
+- **A message is delivered once.** The same message from the same turn can
+  no longer reach a teammate twice.
+
 ## 0.319.0 - 2026-09-24
 
 ### Improved
