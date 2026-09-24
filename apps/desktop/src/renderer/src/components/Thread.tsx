@@ -747,6 +747,12 @@ export function Thread({
         mayEdit,
         carriedPlan: index === 0 ? [] : lastPlanOf(earlierTurns[index - 1]!.events),
         saidBefore: new Set(said),
+        // Said for the latest turn and never for these, so a turn whose whole
+        // reply was a message to a teammate read "ended without a reply ...
+        // Sending it again usually works" the moment another turn followed
+        // it -- over the message it had sent, inviting a second copy
+        // (drive-brief-once, 2026-09-24, the same on 0.320).
+        spokeToPeers: (turn.peerMessages ?? []).length > 0,
         ...(workspacePath === undefined ? {} : { workspacePath })
       })
       for (const key of foldNoticeKeys(built)) said.add(key)

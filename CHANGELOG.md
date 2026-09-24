@@ -11,6 +11,35 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.321.0 - 2026-09-24
+
+### Improved
+
+- **A conversation is briefed once.** A teammate's standing instructions --
+  its role, the team, the memory rules and the reply formats -- now go to
+  the coding agent on the first turn of a conversation. Later turns carry
+  one line saying they still hold, plus anything that changed. Measured on
+  Claude Code and Codex: each later turn went from about 6,000 characters of
+  instructions to about 350, so a long conversation lasts longer before the
+  agent has to summarize it. The whole brief goes again after an agent
+  summarizes its conversation, and every eighth turn regardless.
+- **A summarized conversation says so.** When Claude Code, Codex or OpenCode
+  summarizes a long conversation to fit the model, the thread shows one line
+  saying so. OpenCode's summary, and its note to the model to carry on, no
+  longer appear as the teammate's reply.
+- **OpenCode in Ask and Plan mode keeps going when a shell command is
+  refused**, instead of stopping there. A read-only OpenCode run no longer
+  loads the project's own OpenCode plugins, and a new OpenCode conversation
+  no longer spends a model call naming itself.
+
+### Fixed
+
+- **A turn that only messaged a teammate** no longer says "This turn ended
+  without a reply" once a later turn follows it.
+- **Claude Code runs no longer copy your command list.** Claude Code 2.1.281
+  sends the list of your slash commands and skills at the start of every
+  run; it is no longer saved into each mission's record.
+
 ## 0.320.0 - 2026-09-24
 
 ### Improved

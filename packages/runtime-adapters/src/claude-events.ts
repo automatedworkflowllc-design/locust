@@ -360,6 +360,13 @@ export function brieflyPut(detail: string): string {
 /** Long enough for an ordinary command, short enough to stay one line. */
 export const REFUSAL_DETAIL_LIMIT = 96;
 
+/** Said when Claude Code compacts on its own, as its context fills (A2.5). */
+export const CLAUDE_COMPACTED =
+  "The conversation outgrew the model's context, so Claude Code summarized it and carried on from the summary.";
+/** And when it was asked to, by a `/compact` sent as the prompt. */
+export const CLAUDE_COMPACTED_ON_REQUEST =
+  "Claude Code summarized the conversation so far, as asked, and carries on from the summary.";
+
 export function namedTool(name: string): string {
   const match = /^mcp__([A-Za-z0-9_]+?)__(.+)$/.exec(name);
   if (match === null) return name;
@@ -693,6 +700,32 @@ export function createClaudeEventNormalizer(
       // nothing in it, and in the 2026-09-22 capture one of those came after
       // the run's answer.
       if (subtype === "background_tasks_changed") return [];
+      // The person's slash commands and skills, each with its description --
+      // MEASURED 2026-09-24 on Claude Code 2.1.281: sent twice at the start of
+      // every run, 44 KB each, and read as a turn opening it became two empty
+      // steps whose evidence carried the whole list into every mission's
+      // record. It is the CLI's setup, not the run's news, and not something
+      // the ledger should hold a copy of per run.
+      if (subtype === "commands_changed") return [];
+      // The session compacted (A2.5): measured the same day with `/compact`
+      // on a two-turn Haiku session -- `status` "compacting", then this
+      // record with `compact_metadata.trigger` ("manual" there, "auto" when
+      // the context fills), then the summary as a USER message, which this
+      // adapter does not draw. Said once, as a line, the way Claude Code's own
+      // transcript says it; the host reads the code to brief the next turn in
+      // full.
+      if (subtype === "compact_boundary") {
+        const metadata = isObject(parsed.compact_metadata) ? parsed.compact_metadata : {};
+        return [
+          emit("adapter.diagnostic", {
+            code: "claude.context_compacted",
+            level: "info",
+            terminal: false,
+            message: stringValue(metadata.trigger) === "manual" ? CLAUDE_COMPACTED_ON_REQUEST : CLAUDE_COMPACTED,
+            evidence,
+          }),
+        ];
+      }
       return [
         emit("step.started", {
           stepKind: "turn",

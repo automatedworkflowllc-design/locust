@@ -34,6 +34,7 @@ import { bundledNpmBinDirectory, bundledNpmPrefix, findBundledNpm } from './bund
 import { createModelCatalog } from './model-catalog.js'
 import { describeGone, diagnosticLine, shouldRoll, startupDetail } from './diagnostics.js'
 import { createGroupStore } from './group-store.js'
+import { createBriefSessions } from './brief-sessions.js'
 import { readRuntimeArtifacts } from './runtime-artifacts.js'
 import { relative } from 'node:path'
 import { decideReveal } from './reveal-file.js'
@@ -1460,6 +1461,8 @@ if (!ownsSingleInstanceLock) {
       ledger: missionLedger,
       workroom,
       memory: memoryBriefing,
+      // A2.5: a resumed session is told only what changed in its brief.
+      briefSessions: createBriefSessions({ rootDirectory: app.getPath('userData') }),
       onShared: async (mission, posted) => {
         await relay?.onShared(mission, posted)
       },

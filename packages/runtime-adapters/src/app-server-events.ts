@@ -165,6 +165,10 @@ export function limitFromSnapshot(
   return undefined;
 }
 
+/** Said when the runtime summarizes its conversation to fit its context (A2.5). */
+export const APP_SERVER_COMPACTED =
+  "The conversation outgrew the model's context, so Codex summarized it and carried on from the summary.";
+
 export function createAppServerEventNormalizer(
   context: AppServerInvocationContext,
 ): AppServerEventNormalizer {
@@ -189,6 +193,29 @@ export function createAppServerEventNormalizer(
   let normalizedSequence = 0;
   let finalized = false;
   let announcedLimit = false;
+  /*
+   * A compaction, said once however it is reported (A2.5). Codex 0.156.1
+   * has both a `contextCompaction` item and a `thread/compacted` notification
+   * (read in the binary, 2026-09-24; not yet captured), and whether one
+   * compaction sends one or both is not known -- so each kind is counted, and
+   * a line is said only when a count passes the lines already said.
+   */
+  let compactionItems = 0;
+  let compactionNotices = 0;
+  let compactionsSaid = 0;
+  const compacted = (notification: AppServerNotification, seen: number): readonly NormalizedRuntimeEvent[] => {
+    if (seen <= compactionsSaid) return [];
+    compactionsSaid = seen;
+    return [
+      emit("adapter.diagnostic", {
+        level: "info",
+        code: `${runtime}.context_compacted`,
+        message: APP_SERVER_COMPACTED,
+        terminal: false,
+        evidence: evidence(notification),
+      }),
+    ];
+  };
 
   const emit = <TType extends NormalizedRuntimeEventType>(
     type: TType,
@@ -242,6 +269,12 @@ export function createAppServerEventNormalizer(
 
     if (itemType === "plan") {
       return [];
+    }
+
+    if (itemType === "contextCompaction") {
+      if (!completed) return [];
+      compactionItems += 1;
+      return compacted(notification, compactionItems);
     }
 
     if (!TOOL_ITEM_TYPES.has(itemType)) {
@@ -455,6 +488,10 @@ export function createAppServerEventNormalizer(
             }),
           ];
         }
+
+        case "thread/compacted":
+          compactionNotices += 1;
+          return compacted(notification, compactionNotices);
 
         case "warning":
         case "guardianWarning":

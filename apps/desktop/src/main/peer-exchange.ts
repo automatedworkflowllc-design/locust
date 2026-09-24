@@ -31,6 +31,14 @@ export interface PreparedPeerPrompt {
   readonly delivered: readonly WorkroomMessage[]
   /** True when the channel could not be read; the run proceeds without it. */
   readonly failed: boolean
+  /** What the session has been told once this is sent, with `alreadyGiven` (A2.5). */
+  readonly given: readonly string[]
+}
+
+/** A run with no teammate's brief, and what its session has been told (A2.5). */
+export interface PreparedSoloPrompt {
+  readonly runtimePrompt: string
+  readonly given: readonly string[]
 }
 
 export interface TranscriptTracker {
@@ -53,7 +61,7 @@ export interface PeerExchange {
    * memory, and none of what needs a roster. Never throws -- a memory that
    * cannot be read is left out, the same as everywhere else.
    */
-  briefSolo(prompt: string, runtime?: string, conversation?: ConversationHint): Promise<string>
+  briefSolo(prompt: string, runtime?: string, conversation?: ConversationHint): Promise<PreparedSoloPrompt>
   /** Throws when the ledger refuses: a mission must not run on messages it cannot record. */
   recordReceived(missionId: string, delivered: readonly WorkroomMessage[], occurredAt: string): Promise<void>
   /** Never throws: a delivery that cannot be marked is shown again next time, which is the safe direction. */
@@ -127,6 +135,11 @@ export function createTranscriptTracker(): TranscriptTracker {
  */
 export interface ConversationHint {
   readonly previousMissionId?: string
+  /**
+   * The paragraphs of the brief the resumed CLI session already holds, by
+   * key (A2.5). Absent for a turn that must be briefed in full.
+   */
+  readonly alreadyGiven?: ReadonlySet<string>
 }
 
 /** What the team remembers, worded for a runtime; undefined when memory is off. */
@@ -217,9 +230,10 @@ export function createPeerExchange(options: {
           remaining: unread.remaining,
           ...(memory === undefined ? {} : { memory }),
           ...(connectors === undefined ? {} : { connectors }),
-          keepATodoList: todos
+          keepATodoList: todos,
+          ...(conversation?.alreadyGiven === undefined ? {} : { alreadyGiven: conversation.alreadyGiven })
         })
-        return { runtimePrompt: composed.prompt, delivered: composed.delivered, failed: false }
+        return { runtimePrompt: composed.prompt, delivered: composed.delivered, failed: false, given: composed.given }
       } catch {
         // The roster trailer still goes: the run can share even when it could
         // not be shown what was waiting.
@@ -230,9 +244,10 @@ export function createPeerExchange(options: {
           remaining: 0,
           ...(memory === undefined ? {} : { memory }),
           ...(connectors === undefined ? {} : { connectors }),
-          keepATodoList: todos
+          keepATodoList: todos,
+          ...(conversation?.alreadyGiven === undefined ? {} : { alreadyGiven: conversation.alreadyGiven })
         })
-        return { runtimePrompt: composed.prompt, delivered: [], failed: true }
+        return { runtimePrompt: composed.prompt, delivered: [], failed: true, given: composed.given }
       }
     },
 
@@ -244,12 +259,14 @@ export function createPeerExchange(options: {
         (await options.keepATodoList?.().catch(() => false)) === true
       const connectors =
         runtime === 'cursor' ? await options.readyConnectors?.().catch(() => undefined) : undefined
-      return composeSoloPrompt({
+      const composed = composeSoloPrompt({
         prompt,
         ...(memory === undefined ? {} : { memory }),
         ...(connectors === undefined ? {} : { connectors }),
-        keepATodoList: todos
+        keepATodoList: todos,
+        ...(conversation?.alreadyGiven === undefined ? {} : { alreadyGiven: conversation.alreadyGiven })
       })
+      return { runtimePrompt: composed.prompt, given: composed.given }
     },
 
     async recordReceived(missionId, delivered, occurredAt) {

@@ -54,6 +54,8 @@ import type { MemoryBriefing } from './peer-exchange.js'
 import type { PeerExchange, TranscriptTracker } from './peer-exchange.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 import { openCodeReadOnlySection, planSection } from './workroom-briefing.js'
+import { briefHeld, briefPlan, compactedDuring } from './brief-sessions.js'
+import type { BriefSessions } from './brief-sessions.js'
 import type { EndedMission, RelayOrigin, SharingMission } from './relay.js'
 import type { MissionStarter } from '@teammate/mission-store'
 import { recordableCommand } from './command-record.js'
@@ -259,6 +261,11 @@ interface CodexMissionServiceOptions {
   readonly workroom?: Workroom
   /** What the team remembers, briefed to every teammate mission. */
   readonly memory?: MemoryBriefing
+  /**
+   * What each CLI session has already been told (A2.5). Absent, every turn
+   * is briefed in full, as before.
+   */
+  readonly briefSessions?: BriefSessions
   /**
    * Called after a completed run posted messages to teammates, with what it
    * posted. Whatever this does -- a relay starting the recipient's run --
@@ -961,6 +968,9 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // the renderer names a mission, and the host decides what that means.
         let resumeThreadId: string | undefined
         let resumedMissionId: string | undefined
+        // Whether the session being resumed compacted during that turn: then
+        // it holds a summary, not the brief, and this turn is briefed in full.
+        let resumedCompacted = false
         if (followUpOf !== undefined) {
           const prior = await options.ledger.getMission(followUpOf).catch(() => undefined)
           const priorThread = prior === undefined ? undefined : runtimeThreadIdOf(prior)
@@ -1064,6 +1074,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           const modeChanged = priorMode !== undefined && priorMode !== mode
           resumeThreadId = modeChanged ? undefined : priorThread
           resumedMissionId = prior.metadata.missionId
+          resumedCompacted = compactedDuring(prior.events)
         }
 
         const runId = `run_${createId()}`
@@ -1324,18 +1335,32 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         let runtimePrompt = prompt
         let delivered: readonly WorkroomMessage[] = []
         let peerDeliveryFailed = false
+        /*
+         * A2.5: what the session this turn resumes was already told. Only a
+         * turn that RESUMES one -- a cold start, a changed mode or another
+         * runtime starts a session that holds nothing -- and never one that
+         * compacted, whose record says more than the session now holds.
+         */
+        const earlierBrief =
+          resumeThreadId !== undefined && resumedMissionId !== undefined && !resumedCompacted
+            ? await options.briefSessions?.after(resumedMissionId).catch(() => undefined)
+            : undefined
+        const plan = briefPlan({ resumes: resumeThreadId !== undefined, compacted: resumedCompacted, earlier: earlierBrief })
+        let briefGiven: readonly string[] | undefined
         if (peer !== undefined && peerExchange !== undefined) {
           // The turn this one continues, so the brief can find the
           // conversation's group. A route switch names it in `continuation`;
           // a follow-up in `resumedMissionId`; a first turn has none.
           const prepared = await peerExchange.prepare(prompt, peer, runtime, {
-            ...(continuation?.missionId ?? resumedMissionId ?? followUpOf) === undefined
+            ...((continuation?.missionId ?? resumedMissionId ?? followUpOf) === undefined
               ? {}
-              : { previousMissionId: continuation?.missionId ?? resumedMissionId ?? followUpOf }
+              : { previousMissionId: continuation?.missionId ?? resumedMissionId ?? followUpOf }),
+            ...(plan.alreadyGiven === undefined ? {} : { alreadyGiven: plan.alreadyGiven })
           })
           runtimePrompt = prepared.runtimePrompt
           delivered = prepared.delivered
           peerDeliveryFailed = prepared.failed
+          briefGiven = prepared.given
         } else if (peerExchange !== undefined) {
           /*
            * A run that belongs to nobody still stands in the project folder
@@ -1344,11 +1369,14 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
            * pass 14, ranked second: the secret word answered NONE and no
            * memory file anywhere). Nothing here needs a roster.
            */
-          runtimePrompt = await peerExchange.briefSolo(prompt, runtime, {
-            ...(continuation?.missionId ?? resumedMissionId ?? followUpOf) === undefined
+          const solo = await peerExchange.briefSolo(prompt, runtime, {
+            ...((continuation?.missionId ?? resumedMissionId ?? followUpOf) === undefined
               ? {}
-              : { previousMissionId: continuation?.missionId ?? resumedMissionId ?? followUpOf }
+              : { previousMissionId: continuation?.missionId ?? resumedMissionId ?? followUpOf }),
+            ...(plan.alreadyGiven === undefined ? {} : { alreadyGiven: plan.alreadyGiven })
           })
+          runtimePrompt = solo.runtimePrompt
+          briefGiven = solo.given
         }
         // Plan first, for a teammate's mission or a plain one. Appended last
         // so it is the instruction closest to the model's answer.
@@ -1432,6 +1460,17 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             'PERSISTENCE_FAILED',
             'The mission could not be created in the durable local ledger.'
           ) as CodexMissionStartResponse
+        }
+
+        // What this mission's session now holds, for the turn that resumes
+        // it (A2.5). Best effort: a record that is not written costs the next
+        // turn a full brief, and nothing else.
+        if (options.briefSessions !== undefined && briefGiven !== undefined) {
+          await options.briefSessions
+            .record(missionId, { given: briefHeld(plan.alreadyGiven, briefGiven), turns: plan.turns })
+            .catch((cause: unknown) => {
+              options.note?.('brief-record-failed', `${missionId}: ${cause instanceof Error ? cause.message : String(cause)}`)
+            })
         }
 
         // Recorded BEFORE the process starts: a mission must not run on

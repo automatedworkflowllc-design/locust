@@ -424,11 +424,15 @@ export function memorySection(input: {
             ? `${NEWLINE}(${String(dropped)} older ${dropped === 1 ? 'memory is' : 'memories are'} kept but not in this brief. Ask the person if you need one.)`
             : `${NEWLINE}(${String(dropped)} older ${dropped === 1 ? 'memory is' : 'memories are'} in ${input.file}, with these, newest last. Read that file when the task touches something remembered; never edit it -- the block below is how memory changes.)`
           : '')
-  return [
-    input.workspaceName === undefined
-      ? 'Your team keeps a shared memory. What is remembered for this project and everywhere:'
-      : `Your team keeps a shared memory. What is remembered for the folder "${input.workspaceName}" and everywhere:`,
-    listed,
+  // Two paragraphs: what is remembered, which moves whenever a memory does,
+  // and how to use and write memory, which does not. A resumed turn is sent
+  // only the paragraphs its session was not given (A2.5,
+  // workroom-briefing.ts), and this gap is what lets it keep the rules while
+  // the list moves.
+  const heading = input.workspaceName === undefined
+    ? 'Your team keeps a shared memory. What is remembered for this project and everywhere:'
+    : `Your team keeps a shared memory. What is remembered for the folder "${input.workspaceName}" and everywhere:`
+  return [heading, listed].join(NEWLINE) + NEWLINE + NEWLINE + [
     "These are notes your team wrote earlier, each with when it was written. Use them as you would a colleague's notes: when one answers what the person asks, answer from it and say it came from memory; do not demand that the workspace confirm it. When two of them disagree, the newer one is usually the correction, and it is worth saying which you went with. Do not bring up a memory that has nothing to do with what was asked, and never report another teammate's work as something you are confirming: a person who asked you to change one file did not ask what anyone else did to another one.",
     // The one exception to "answer from it". A memory that names a file as
     // its source is a copy of that file as it read then (the 0.271 design

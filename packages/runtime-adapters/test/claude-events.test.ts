@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  CLAUDE_COMPACTED,
+  CLAUDE_COMPACTED_ON_REQUEST,
   createClaudeEventNormalizer,
   claudeToolTarget,
   limitKindFor,
@@ -821,5 +823,42 @@ describe("a call Claude Code refused", () => {
     n.accept(record({ type: "stream_event", event: { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "toolu_x", name: "Bash" } } }));
     const [done] = n.accept(record({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "toolu_x", is_error: true, content: "exit code 1" }] } }));
     expect(done).toMatchObject({ type: "tool.failed", payload: { status: "error" } });
+  });
+});
+
+/*
+ * A2.5: a compaction, and the command list. Shaped as MEASURED 2026-09-24 on
+ * Claude Code 2.1.281 (a two-turn Haiku session, then `/compact`); the
+ * capture itself stays out of the repo, since its init and command records
+ * describe the machine it ran on.
+ */
+describe("Claude Code compacting its conversation", () => {
+  const boundary = (trigger: string) => ({
+    type: "system",
+    subtype: "compact_boundary",
+    session_id: "ses_1",
+    uuid: "u1",
+    compact_metadata: { trigger, pre_tokens: 35420, post_tokens: 7635 },
+  });
+
+  it("says so once, as a line the host can read, and not as an empty step", () => {
+    const events = normalizer().accept(record(boundary("auto")));
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      type: "adapter.diagnostic",
+      payload: { code: "claude.context_compacted", level: "info", message: CLAUDE_COMPACTED },
+    });
+    expect(normalizer().accept(record(boundary("manual")))[0]?.payload).toMatchObject({ message: CLAUDE_COMPACTED_ON_REQUEST });
+  });
+
+  it("keeps the person's command list out of the run's record", () => {
+    // Twice a run, 44 KB each, measured: every slash command and skill with
+    // its description.
+    const listed = {
+      type: "system",
+      subtype: "commands_changed",
+      commands: [{ name: "deliver", description: "a person's own skill", argumentHint: "" }],
+    };
+    expect(normalizer().accept(record(listed))).toEqual([]);
   });
 });

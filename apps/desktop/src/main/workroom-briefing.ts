@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+
 import type { WorkroomMessage } from '@teammate/mission-store'
 
 import type { TeammateRoute } from '../shared/ipc.js'
@@ -7,6 +9,7 @@ import { ASK_TAG } from '../shared/decision.js'
 import type { TeammateRole } from '../shared/ipc.js'
 import { BLOCK_PLACEMENT } from '../shared/trailer.js'
 import { FILE_TAG } from '../shared/handover.js'
+import { MEMORY_TAG } from '../shared/memory.js'
 
 /**
  * What a teammate's runtime is told about its colleagues.
@@ -20,8 +23,9 @@ import { FILE_TAG } from '../shared/handover.js'
  *
  * Neither addition is recorded as the person's prompt. The ledger keeps what
  * the person typed, plus the ids of the messages delivered; this function is
- * deterministic over those, so what the runtime was actually sent can always
- * be reconstructed.
+ * deterministic over those and over what the session was already told
+ * (`alreadyGiven`, kept by main/brief-sessions.ts), so what the runtime was
+ * actually sent can be reconstructed.
  */
 
 export const MAX_INBOUND_MESSAGES = 5
@@ -86,12 +90,80 @@ export interface RuntimePromptInput {
   readonly keepATodoList?: boolean
   /** Connectors this teammate can call, by name. Standing, so it caches. */
   readonly connectors?: string
+  /**
+   * What this turn's CLI session was already told, by `paragraphKey` (A2.5).
+   * Absent means a full brief: a new session, one that compacted, or one
+   * whose record is gone.
+   */
+  readonly alreadyGiven?: ReadonlySet<string>
 }
 
 export interface RuntimePrompt {
   readonly prompt: string
   /** The messages the prompt actually quotes; anything else stays undelivered. */
   readonly delivered: readonly WorkroomMessage[]
+  /**
+   * The key of every standing paragraph this brief stands on, sent now or
+   * earlier in the session: what the session has been told once this turn is
+   * sent. Empty when the standing brief was dropped for length.
+   */
+  readonly given: readonly string[]
+}
+
+/**
+ * A2.5: A CLI SESSION IS BRIEFED ONCE, THEN TOLD WHAT CHANGED.
+ *
+ * Every turn used to carry the whole standing brief -- role, roster and share
+ * form, the folder's LOCUST.md, the team memory, the reply formats -- up to
+ * about 12,000 characters, into a session that already held a copy from every
+ * turn before it (harness review, 2026-09-24, defect 5). A resumed runtime
+ * keeps the whole conversation, so the copies only filled its context: a
+ * long conversation reached the point where the runtime compacts it sooner,
+ * and paid for the same words each turn.
+ *
+ * So the brief is kept by paragraph. A resumed turn sends the paragraphs its
+ * session has not been given -- a memory listing that moved, a teammate who
+ * joined, an edited LOCUST.md -- and one line saying the rest still holds.
+ * What the session holds is the host's record (main/brief-sessions.ts), and
+ * it is dropped whenever the session may have lost it: a compaction, a cold
+ * start, or every few turns regardless.
+ */
+export function paragraphKey(paragraph: string): string {
+  return createHash('sha256').update(paragraph).digest('hex').slice(0, 16)
+}
+
+/**
+ * The line a resumed turn gets in place of what its session already holds.
+ *
+ * It names the block tags the brief teaches, because a runtime that quietly
+ * lost the session (resumed one it could not find, and started fresh) still
+ * has the tags to answer with -- the record cannot see that happen.
+ */
+export function stillHoldsLine(standing: string): string {
+  const tags = [
+    ...(standing.includes(`<${SHARE_TAG} `) ? [`<${SHARE_TAG} to="Name">`] : []),
+    ...[ASK_TAG, FILE_TAG, MEMORY_TAG].filter((tag) => standing.includes(`<${tag}>`)).map((tag) => `<${tag}>`)
+  ]
+  const blocks = tags.length === 0 ? '' : ` and how to write the reply blocks (${tags.join(', ')})`
+  return `You were given standing instructions earlier in this conversation -- how to work here${blocks}. They still hold; only what changed since is repeated here.`
+}
+
+/**
+ * The standing brief for a turn: whole when the session has none of it, and
+ * otherwise the paragraphs it does not have, after the line that says so.
+ */
+function standingFor(standing: readonly string[], alreadyGiven: ReadonlySet<string> | undefined): {
+  readonly sections: readonly string[]
+  readonly given: readonly string[]
+} {
+  const paragraphs = standing.join(SECTION_GAP).split(SECTION_GAP).filter((paragraph) => paragraph.trim().length > 0)
+  const given = paragraphs.map(paragraphKey)
+  if (alreadyGiven === undefined) return { sections: standing, given }
+  const fresh = paragraphs.filter((_, index) => !alreadyGiven.has(given[index]!))
+  // Nothing held yet is a first brief, said whole rather than behind a line
+  // claiming an earlier one.
+  if (fresh.length === paragraphs.length) return { sections: standing, given }
+  return { sections: [stillHoldsLine(standing.join(SECTION_GAP)), ...fresh], given }
 }
 
 function quoted(message: WorkroomMessage, roster: readonly PeerRosterEntry[]): string {
@@ -446,20 +518,25 @@ export function composeSoloPrompt(input: {
   readonly memory?: string
   readonly connectors?: string
   readonly keepATodoList: boolean
-}): string {
-  const sections: string[] = []
-  if (input.memory !== undefined) sections.push(input.memory)
-  if (input.connectors !== undefined) sections.push(input.connectors)
-  if (input.keepATodoList) sections.push(todoSection())
-  sections.push(askSection())
-  sections.push(filesSection())
-  sections.push(answerSection())
-  sections.push(input.prompt)
-  const composed = sections.join(SECTION_GAP)
+  /** A2.5, as for `composeRuntimePrompt`. */
+  readonly alreadyGiven?: ReadonlySet<string>
+}): { readonly prompt: string; readonly given: readonly string[] } {
+  const standing: string[] = []
+  if (input.memory !== undefined) standing.push(input.memory)
+  if (input.connectors !== undefined) standing.push(input.connectors)
+  if (input.keepATodoList) standing.push(todoSection())
+  standing.push(askSection())
+  standing.push(filesSection())
+  standing.push(answerSection())
+  const brief = standingFor(standing, input.alreadyGiven)
+  const composed = [...brief.sections, input.prompt].join(SECTION_GAP)
   // Nothing here can be shed -- there are no inbound messages to drop, and
   // the memory section is bounded where it is built -- so an over-long
-  // briefing loses the briefing rather than the person's words.
-  return composed.length > MAX_RUNTIME_PROMPT_LENGTH ? input.prompt : composed
+  // briefing loses the briefing rather than the person's words. The session
+  // was then told none of it, and is recorded that way.
+  return composed.length > MAX_RUNTIME_PROMPT_LENGTH
+    ? { prompt: input.prompt, given: [] }
+    : { prompt: composed, given: brief.given }
 }
 
 export function composeRuntimePrompt(input: RuntimePromptInput): RuntimePrompt {
@@ -493,22 +570,26 @@ export function composeRuntimePrompt(input: RuntimePromptInput): RuntimePrompt {
    * works unchanged.
    */
   const role = roleSection(input.peer.self)
+  const standing: string[] = []
+  // The role first: it is the most stable thing about a teammate, and it
+  // is what the roster line right after it refers to.
+  if (role !== undefined) standing.push(role)
+  if (trailer !== undefined) standing.push(trailer)
+  if (input.memory !== undefined) standing.push(input.memory)
+  // Standing, like the ask format beside it: the same sentence every turn,
+  // so it sits in the cached prefix rather than ahead of the person's words.
+  // Standing, beside memory: what this machine has does not change turn to
+  // turn, so it belongs in the cached prefix rather than ahead of the ask.
+  if (input.connectors !== undefined) standing.push(input.connectors)
+  if (input.keepATodoList === true) standing.push(todoSection())
+  standing.push(askSection())
+  standing.push(filesSection())
+  standing.push(answerSection())
+  // What arrived this turn and what the person said are never held back:
+  // only the standing part is what a session can already have (A2.5).
+  const brief = standingFor(standing, input.alreadyGiven)
   const assemble = (): string => {
-    const sections: string[] = []
-    // The role first: it is the most stable thing about a teammate, and it
-    // is what the roster line right after it refers to.
-    if (role !== undefined) sections.push(role)
-    if (trailer !== undefined) sections.push(trailer)
-    if (input.memory !== undefined) sections.push(input.memory)
-    // Standing, like the ask format beside it: the same sentence every turn,
-    // so it sits in the cached prefix rather than ahead of the person's words.
-    // Standing, beside memory: what this machine has does not change turn to
-    // turn, so it belongs in the cached prefix rather than ahead of the ask.
-    if (input.connectors !== undefined) sections.push(input.connectors)
-    if (input.keepATodoList === true) sections.push(todoSection())
-    sections.push(askSection())
-    sections.push(filesSection())
-    sections.push(answerSection())
+    const sections: string[] = [...brief.sections]
     if (delivered.length > 0) sections.push(inboundSection(delivered, remaining, roster))
     sections.push(input.prompt)
     return sections.join(SECTION_GAP)
@@ -554,5 +635,6 @@ export function composeRuntimePrompt(input: RuntimePromptInput): RuntimePrompt {
       }
     }
   }
-  return { prompt, delivered }
+  // Over the cap or not, the standing brief went out with it.
+  return { prompt, delivered, given: brief.given }
 }

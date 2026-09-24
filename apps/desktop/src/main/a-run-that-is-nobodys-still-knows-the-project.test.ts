@@ -45,7 +45,7 @@ describe('a run that belongs to nobody', () => {
     }
     const exchange = createPeerExchange({ workroom, ledger, memory })
 
-    const briefed = await exchange.briefSolo('What is the secret word?', 'opencode', { previousMissionId: 'mission_prev' })
+    const briefed = (await exchange.briefSolo('What is the secret word?', 'opencode', { previousMissionId: 'mission_prev' })).runtimePrompt
 
     // The memory slot is asked, and told there is no teammate rather than
     // being handed a made-up one.
@@ -67,7 +67,7 @@ describe('a run that belongs to nobody', () => {
     }
     const exchange = createPeerExchange({ workroom, ledger, memory })
 
-    const briefed = await exchange.briefSolo('Read the README.', 'opencode')
+    const briefed = (await exchange.briefSolo('Read the README.', 'opencode')).runtimePrompt
 
     // A briefing that cannot be read is never a refusal to run.
     expect(briefed).toContain('Read the README.')
@@ -78,6 +78,6 @@ describe('a run that belongs to nobody', () => {
     // Nothing here can be shed -- no inbound messages to drop -- so an
     // over-long briefing loses the briefing, never the question.
     const huge = 'x'.repeat(13_000)
-    expect(composeSoloPrompt({ prompt: 'Two plus two?', memory: huge, keepATodoList: false })).toBe('Two plus two?')
+    expect(composeSoloPrompt({ prompt: 'Two plus two?', memory: huge, keepATodoList: false }).prompt).toBe('Two plus two?')
   })
 })

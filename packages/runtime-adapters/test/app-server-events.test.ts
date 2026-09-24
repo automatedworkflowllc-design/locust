@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  APP_SERVER_COMPACTED,
   createAppServerEventNormalizer,
   limitFromSnapshot,
   toolCommandOf,
@@ -279,3 +280,36 @@ describe("saying which limit, and when it lifts", () => {
     expect(limitFromSnapshot({ primary: { used_percent: 14, window_minutes: 10080 } })).toBeUndefined();
   });
 })
+
+/*
+ * A2.5: Codex 0.156.1 carries a `contextCompaction` item and a
+ * `thread/compacted` notification (read in the binary, 2026-09-24; not
+ * captured). One compaction is said once, whichever of them arrives, and
+ * whether it sends one or both.
+ */
+describe("Codex compacting its conversation", () => {
+  const item = note("item/completed", { item: { type: "contextCompaction", id: "c1" } });
+  const notice = note("thread/compacted", { threadId: "th_1" });
+  const lines = (events: readonly { type: string; payload: unknown }[]) =>
+    events.filter((event) => event.type === "adapter.diagnostic"
+      && (event.payload as { code: string }).code === "codex.context_compacted");
+
+  it("is one line for one compaction, however it is reported", () => {
+    for (const order of [[item, notice], [notice, item], [item], [notice]]) {
+      const app = normalizer();
+      const said = lines(order.flatMap((entry) => app.accept(entry)));
+      expect(said).toHaveLength(1);
+      expect(said[0]?.payload).toMatchObject({ level: "info", message: APP_SERVER_COMPACTED });
+    }
+  });
+
+  it("is a line for each compaction when there are two", () => {
+    const app = normalizer();
+    expect(lines([item, notice, item, notice].flatMap((entry) => app.accept(entry)))).toHaveLength(2);
+  });
+
+  it("opens no step for the compaction item", () => {
+    const app = normalizer();
+    expect(app.accept(note("item/started", { item: { type: "contextCompaction", id: "c1" } }))).toEqual([]);
+  });
+});
