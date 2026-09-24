@@ -19,11 +19,14 @@ import { Icon } from './Icon.js'
 export function ResumeCard({
   offer,
   onResume,
-  busy
+  busy,
+  refusal
 }: {
   readonly offer: ResumeOffer | undefined
   readonly onResume: (epoch: number) => void
   readonly busy: boolean
+  /** M28: why the last press did not resume it, in the host's words. */
+  readonly refusal?: string
 }): ReactElement | null {
   if (offer === undefined) return null
 
@@ -76,6 +79,11 @@ export function ResumeCard({
           </span>
         )}
       </div>
+      {refusal !== undefined && (
+        <p className="lc-resume__refusal" role="alert">
+          Not resumed: {refusal}
+        </p>
+      )}
     </div>
   )
 }

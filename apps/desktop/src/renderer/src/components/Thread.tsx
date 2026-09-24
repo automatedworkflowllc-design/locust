@@ -577,6 +577,8 @@ export interface ThreadProps {
    * way to accept it.
    */
   readonly onResume?: (epoch: number) => void
+  /** M28: why the last Resume from checkpoint did not start, shown on the card. */
+  readonly resumeRefusal?: string
   /**
    * What THIS run was permitted to do. Taken from the live run rather than
    * from `restoredMission`, which is set only for a mission recovered from
@@ -696,6 +698,7 @@ export function Thread({
   wasPlan,
   onAnswer,
   onResume,
+  resumeRefusal,
   sandbox,
   workspacePath,
   workspaceId,
@@ -1268,7 +1271,7 @@ export function Thread({
           is the record, this is the thing to do about it.
         */}
         {restoredMission !== undefined && onResume !== undefined && (
-          <ResumeCard offer={resumeOffer(restoredMission)} onResume={onResume} busy={running} />
+          <ResumeCard offer={resumeOffer(restoredMission)} onResume={onResume} busy={running} {...(resumeRefusal === undefined ? {} : { refusal: resumeRefusal })} />
         )}
         {restoredMission !== undefined && (
           <ReceiptCard

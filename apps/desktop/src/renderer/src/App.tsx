@@ -3024,6 +3024,8 @@ export default function App(): ReactElement {
    * runs, or every slot taken -- came back into the box with no reason.
    */
   const startRefusal = useRef<string | undefined>(undefined)
+  /** M28: why the last Resume from checkpoint did not start, for the card that was pressed. */
+  const [resumeRefusal, setResumeRefusal] = useState<{ readonly missionId: string; readonly message: string }>()
   const startFromComposer = async (prompt: string): Promise<boolean | string> => {
     startRefusal.current = undefined
     const started = await startMission(prompt)
@@ -3338,10 +3340,11 @@ export default function App(): ReactElement {
    * does, so the new run appears and follows exactly as any other; what is
    * different is only that the host wrote its prompt from the checkpoint.
    */
-  const resumeMission = async (missionId: string, epoch: number): Promise<void> => {
+  const resumeMission = async (missionId: string, _epoch: number): Promise<void> => {
     const route = composerRoute
     const bridge = window.desktop
     if (!bridge) return
+    setResumeRefusal(undefined)
     setHandingOff(true)
     try {
       // The same route the composer would start a fresh mission on, folded
@@ -3365,31 +3368,33 @@ export default function App(): ReactElement {
         ...(resumed.effort === undefined ? {} : { effort: resumed.effort })
       })
       if (!response.ok) {
-        // Said in the thread the person is looking at, not swallowed: they
-        // pressed a button and are owed the reason it did nothing.
-        setRuns((current) =>
-          withNewRun(current, `resume-failed:${String(epoch)}:${String(++pendingKeyCounter.current)}`, {
-            prompt: 'Resume from checkpoint',
-            phase: 'failed',
-            events: [],
-            error: response.error.message
-          })
-        )
+        // M28: said ON THE CARD that was pressed. It went into a run under a
+        // key nothing ever showed or listed, so the button just seemed dead.
+        setResumeRefusal({ missionId, message: response.error.message })
         return
       }
       const ownerId = missionOwners[missionId]
       if (ownerId !== undefined) {
         setMissionOwners((current) => ({ ...current, [response.data.missionId]: ownerId }))
       }
+      // M28: what the host sent before its answer, held for a run the window
+      // did not know yet, is this run's -- replayed as a start's is. It was
+      // dropped, and a run that finished that fast stayed "running" forever.
+      const early = pendingUpdatesRef.current.get(response.data.runId) ?? []
+      pendingUpdatesRef.current.delete(response.data.runId)
       setRuns((current) =>
-        withNewRun(current, response.data.runId, {
-          prompt: 'Resume from checkpoint',
-          data: response.data,
-          phase: 'running',
-          events: [],
-          startedAtIso: new Date().toISOString(),
-          ...(ownerId === undefined ? {} : { teammateId: ownerId })
-        })
+        withNewRun(
+          current,
+          response.data.runId,
+          early.reduce(applyMissionUpdate, {
+            prompt: 'Resume from checkpoint',
+            data: response.data,
+            phase: 'running',
+            events: [],
+            startedAtIso: new Date().toISOString(),
+            ...(ownerId === undefined ? {} : { teammateId: ownerId })
+          } as LiveRunState)
+        )
       )
       setShownKey(response.data.runId)
       await refreshHistory()
@@ -5702,12 +5707,13 @@ export default function App(): ReactElement {
                     ? () => void startMission(liveRun.prompt)
                     : undefined
                 }
+                resumeRefusal={resumeRefusal !== undefined && resumeRefusal.missionId === liveRun.restoredMission?.missionId ? resumeRefusal.message : undefined}
                 onResume={
                   // Offered only for a mission that is not running and whose
                   // record the app will vouch for -- ResumeCard decides that
                   // from the checkpoint, and the host checks it again rather
                   // than taking the renderer's word.
-                  !running && liveRun.restoredMission !== undefined
+                  !running && !handingOff && liveRun.restoredMission !== undefined
                     ? (epoch) => {
                         void resumeMission(liveRun.restoredMission!.missionId, epoch)
                       }

@@ -1168,6 +1168,13 @@ textarea {
   min-width: 0;
 }
 
+/* M28: why the last press did not resume it, on the card that was pressed. */
+.lc-resume__refusal {
+  margin: 0;
+  color: var(--lc-red-text);
+  font-size: var(--lc-text-description);
+}
+
 /*
   A teammate asking which way to go.
 
