@@ -125,6 +125,13 @@ export const WAKE_WITHIN = 1.6
 /** How long the pointer has to have been gone before it dozes off again. */
 export const DOZE_AFTER_MS = 4_000
 
+/**
+ * A home screen nobody has touched for this long rests, as it does behind
+ * other windows: its bots drawn still, the ghost's float and the waiting ring
+ * held. The next pointer, key or wheel wakes it.
+ */
+export const REST_AFTER_MS = 30_000
+
 export interface Wakefulness {
   readonly awake: boolean
   /** When the pointer went, while it is still awake; undefined while the pointer is near. */
@@ -316,21 +323,58 @@ export function HomeCover({
    * in the background and pick up again when it comes back; a hidden window
    * already stops them.
    */
-  const [awake, setAwake] = useState(() => typeof document === 'undefined' || document.hasFocus())
+  const [focused, setFocused] = useState(() => typeof document === 'undefined' || document.hasFocus())
   useEffect(() => {
-    const wake = (): void => setAwake(true)
-    const rest = (): void => setAwake(false)
+    const wake = (): void => setFocused(true)
+    const rest = (): void => setFocused(false)
     window.addEventListener('focus', wake)
     window.addEventListener('blur', rest)
     // The window is shown, and focused, as the app loads: a focus that lands
     // between the first render and these listeners is missed by both, and
     // the loading beam would wait for the next one. Read it now instead.
-    setAwake(document.hasFocus())
+    setFocused(document.hasFocus())
     return () => {
       window.removeEventListener('focus', wake)
       window.removeEventListener('blur', rest)
     }
   }, [])
+  /*
+   * ...AND WHILE NOBODY IS TOUCHING IT (0.305). A beta tester: "Lowkey my
+   * computer feels noticeably slower while running locust". Measured on
+   * 0.302, the home screen IN FRONT cost 39.6% of one core, for as long as it
+   * was up, whether anyone was there or not. So the cover also rests once no
+   * pointer, key or wheel has touched the window for REST_AFTER_MS. A move
+   * that lands while it is awake only notes the time: nothing re-renders.
+   */
+  const [touched, setTouched] = useState(true)
+  useEffect(() => {
+    let lastTouch = performance.now()
+    let timer: number | undefined
+    const check = (): void => {
+      const idle = performance.now() - lastTouch
+      if (idle >= REST_AFTER_MS) {
+        timer = undefined
+        setTouched(false)
+      } else {
+        timer = window.setTimeout(check, REST_AFTER_MS - idle + 50)
+      }
+    }
+    const touch = (): void => {
+      lastTouch = performance.now()
+      if (timer === undefined) {
+        setTouched(true)
+        timer = window.setTimeout(check, REST_AFTER_MS + 50)
+      }
+    }
+    timer = window.setTimeout(check, REST_AFTER_MS + 50)
+    const events = ['pointermove', 'pointerdown', 'keydown', 'wheel', 'focus'] as const
+    for (const name of events) window.addEventListener(name, touch, { passive: true })
+    return () => {
+      window.clearTimeout(timer)
+      for (const name of events) window.removeEventListener(name, touch)
+    }
+  }, [])
+  const awake = focused && touched
 
   /*
    * THE HOPPER WAKES FOR A POINTER. It sleeps on the machine until a pointer

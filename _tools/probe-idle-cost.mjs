@@ -12,7 +12,8 @@
 // much of each second went to script, style, layout and paint (CDP
 // Performance metrics), and how many animation frames it drew.
 //
-// States: the home screen in front; the home screen behind another window;
+// States: the home screen in front; the same, left alone for 35 s; the home
+// screen behind another window;
 // a teammate's empty conversation in front; Settings in front; the window
 // minimised. Sends nothing.
 
@@ -119,6 +120,11 @@ try {
   await drive.send('Emulation.setFocusEmulationEnabled', { enabled: true })
   await drive.evaluate(`window.dispatchEvent(new Event('focus'))`)
   results.push(await measure('home screen, in front'))
+
+  // Left alone: nothing touches the window for longer than the cover waits
+  // before it rests (HomeCover's REST_AFTER_MS, 30 s, from 0.305).
+  await sleep(35_000)
+  results.push(await measure('home screen, in front, left alone'))
 
   await drive.send('Emulation.setFocusEmulationEnabled', { enabled: false })
   await drive.evaluate(`window.dispatchEvent(new Event('blur'))`)

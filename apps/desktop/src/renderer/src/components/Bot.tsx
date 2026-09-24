@@ -15,6 +15,7 @@ import {
   warmBotAvatarPlastic
 } from 'bot-avatars'
 import type { BotAvatarFace, BotAvatarState, BotAvatarType } from 'bot-avatars'
+import { anchorsOf, anchorVariables, paintedBounds, type BodyBox } from '../botAnchors.js'
 
 import { LOCUST_BOTS, isLocustBot } from '../locustBots.js'
 import type { LocustBotType } from '../locustBots.js'
@@ -226,8 +227,21 @@ export interface BotFrames {
 }
 
 /**
+ * How often a moving bot is drawn, at most, a second.
+ *
+ * A beta tester, 2026-09-23: "Lowkey my computer feels noticeably slower
+ * while running locust". Measured on 0.302: the home screen in front cost
+ * 39.6% of one core, 28 of it the GPU process -- each bot's plastic lit per
+ * pixel and handed to the GPU on EVERY animation frame, which is 60 a second
+ * on most screens and 144 on a gaming laptop's. A look round, a bob and a hop
+ * read the same at 30.
+ */
+export const BOT_FRAMES_PER_SECOND = 30
+
+/**
  * A MOVING BOT'S CLOCK: its first frame now, then one per animation frame
- * while it is showing. Returns the way to stop it.
+ * while it is showing, at most BOT_FRAMES_PER_SECOND of them. Returns the way
+ * to stop it.
  *
  * The first frame is drawn at once, as bot-avatars draws its own shapes. A
  * page that is not being painted runs no animation frames -- a tab in the
@@ -251,17 +265,82 @@ export function startBotClock(
   draw()
   let last = frames.now()
   let handle = 0
+  // A millisecond of slack, so a 60 Hz screen's second frame (33.3 ms) is not
+  // turned away for arriving a hair early.
+  const every = 1000 / BOT_FRAMES_PER_SECOND - 1
   const tick = (now: number): void => {
-    const seconds = Math.min(0.05, (now - last) / 1000)
-    last = now
-    if (showing()) {
-      step(seconds)
-      draw()
+    // A frame too soon after the last is passed over, and its time goes to the next.
+    if (now - last >= every) {
+      const seconds = Math.min(0.05, (now - last) / 1000)
+      last = now
+      if (showing()) {
+        step(seconds)
+        draw()
+      }
     }
     handle = frames.requestAnimationFrame(tick)
   }
   handle = frames.requestAnimationFrame(tick)
   return () => frames.cancelAnimationFrame(handle)
+}
+
+/**
+ * Where each shape's paint falls on its OWN canvas, per the state it was
+ * drawn in, as fractions of the canvas -- read from the pixels once, the
+ * first time that shape is drawn, and the same for every bot of it after.
+ */
+const PAINT = new Map<string, BodyBox>()
+
+/**
+ * Puts the bot's waiting ring and presence dot ON the bot: the CSS variables
+ * they read (botAnchors.ts), on the `.lc-bot` that holds this canvas -- a
+ * TeammateBot, a cover face. Returns false when there is nothing laid out to
+ * measure yet, so the caller can try again once the bot is on screen.
+ *
+ * WHERE THE CANVAS IS, MEASURED, NOT ASSUMED. The first version worked out
+ * the canvas's place from its margins, and on the cover it was 27 px out: the
+ * cover's face is a plain block, the canvas's negative top margin collapses
+ * through it, and the BOX rises while the drawing stays -- which is the whole
+ * of what Colin saw (the dots and the droid's ring riding high). A sidebar
+ * face is a flex box, where nothing collapses. So only the paint's place on
+ * the canvas is kept; the canvas's place in its box is read each time.
+ */
+function anchorToBody(canvas: HTMLCanvasElement, context: CanvasRenderingContext2D, key: string): boolean {
+  const host = canvas.closest<HTMLElement>('.lc-bot')
+  if (host === null) return true
+  let paint = PAINT.get(key)
+  if (paint === undefined) {
+    let painted: ReturnType<typeof paintedBounds>
+    try {
+      painted = paintedBounds(context.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height)
+    } catch {
+      return true
+    }
+    if (painted === undefined) return false
+    paint = {
+      left: painted.left / canvas.width,
+      top: painted.top / canvas.height,
+      right: painted.right / canvas.width,
+      bottom: painted.bottom / canvas.height
+    }
+    PAINT.set(key, paint)
+  }
+  const drawn = canvas.getBoundingClientRect()
+  const box = host.getBoundingClientRect()
+  const width = host.offsetWidth
+  const height = host.offsetHeight
+  if (drawn.width === 0 || box.width === 0 || box.height === 0 || width === 0 || height === 0) return false
+  // Page pixels to the box's own (an ancestor may be scaled), then to fractions of it.
+  const across = (x: number): number => ((x - box.left) * (width / box.width)) / width
+  const down = (y: number): number => ((y - box.top) * (height / box.height)) / height
+  const body: BodyBox = {
+    left: across(drawn.left + paint.left * drawn.width),
+    top: down(drawn.top + paint.top * drawn.height),
+    right: across(drawn.left + paint.right * drawn.width),
+    bottom: down(drawn.top + paint.bottom * drawn.height)
+  }
+  for (const [name, value] of Object.entries(anchorVariables(anchorsOf(body)))) host.style.setProperty(name, value)
+  return true
 }
 
 function RiggedBot({
@@ -327,8 +406,13 @@ function RiggedBot({
         still
       })
     }
+    let anchored = false
+    const anchor = (): void => {
+      if (!anchored) anchored = anchorToBody(canvas, context, `${outline.key}|${state}`)
+    }
     if (still) {
       draw()
+      anchor()
       return undefined
     }
     watchPointer()
@@ -349,11 +433,15 @@ function RiggedBot({
       },
       () => onScreen && document.visibilityState !== 'hidden'
     )
+    // The clock drew the first frame already: the bot at rest, where its ring and dot belong.
+    anchor()
     const watch =
       typeof IntersectionObserver === 'undefined'
         ? undefined
         : new IntersectionObserver(([entry]) => {
             onScreen = entry?.isIntersecting ?? true
+            // A bot mounted out of sight is measured once it is in sight.
+            if (onScreen) anchor()
           })
     watch?.observe(canvas)
     return () => {

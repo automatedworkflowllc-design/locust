@@ -47,19 +47,40 @@ describe('a moving Locust bot', () => {
     expect(clock.pending()).toBe(1)
   })
 
-  it('then moves and draws on every frame while it is showing, and only then', () => {
+  it('then moves and draws while it is showing, and only then', () => {
     const clock = frames()
     let drawn = 0
     const steps: number[] = []
     let showing = true
     startBotClock(() => (drawn += 1), (seconds) => steps.push(seconds), () => showing, clock)
-    clock.fire(16)
+    clock.fire(34)
     expect(drawn).toBe(2)
-    expect(steps).toEqual([0.016])
+    expect(steps).toEqual([0.034])
     showing = false
-    clock.fire(32)
+    clock.fire(68)
     expect(drawn).toBe(2)
     expect(clock.pending()).toBe(1)
+  })
+
+  /*
+   * A beta tester, 2026-09-23: "Lowkey my computer feels noticeably slower
+   * while running locust" -- the home screen in front cost 39.6% of one core
+   * on 0.302, each bot lit and handed to the GPU on every frame the screen
+   * drew. At most BOT_FRAMES_PER_SECOND now, whatever the screen's rate.
+   */
+  it('draws at most 30 frames a second: every other frame at 60 Hz, every fifth at 144', () => {
+    for (const [hertz, most] of [[60, 30], [144, 30]] as const) {
+      const clock = frames()
+      let drawn = 0
+      let moved = 0
+      startBotClock(() => (drawn += 1), (seconds) => (moved += seconds), () => true, clock)
+      for (let frame = 1; frame <= hertz; frame += 1) clock.fire((frame * 1000) / hertz)
+      // One second of the screen's frames, after the first drawing.
+      expect(drawn - 1).toBeLessThanOrEqual(most)
+      expect(drawn - 1).toBeGreaterThanOrEqual(most - 2)
+      // And the bot still moves a whole second's worth: no time is lost to a skipped frame.
+      expect(moved).toBeGreaterThan(0.95)
+    }
   })
 
   it('stops when asked, cancelling the frame it was waiting on', () => {

@@ -3788,6 +3788,15 @@ textarea {
   position: relative;
   display: block;
   line-height: 0;
+  /* Where its waiting ring and presence dot go until the bot is drawn: the
+     box-relative places they always had. Bot.tsx then sets these on the
+     element from where the paint actually is (botAnchors.ts). */
+  --lc-bot-ring-left: 6%;
+  --lc-bot-ring-top: 6%;
+  --lc-bot-ring-side: 88%;
+  --lc-bot-dot-right: 6%;
+  --lc-bot-dot-bottom: 6%;
+  --lc-bot-dot-shift: 0%;
 }
 
 /* A small bot drawn at twice its size, shrunk to its box by exactly half
@@ -3809,9 +3818,13 @@ textarea {
   transform-origin: 0 0;
 }
 
+/* The ring and the dot are placed from the bot's BODY (see .lc-bot). */
 .lc-bot__ring {
   position: absolute;
-  inset: 6%;
+  left: var(--lc-bot-ring-left);
+  top: var(--lc-bot-ring-top);
+  width: var(--lc-bot-ring-side);
+  height: var(--lc-bot-ring-side);
   border: 1.5px solid var(--lc-amber);
   border-radius: 34%;
   animation: lcRingWait 1.8s ease-out infinite;
@@ -3819,8 +3832,10 @@ textarea {
 }
 
 .lc-bot .lc-presence {
-  right: 6%;
-  bottom: 6%;
+  right: var(--lc-bot-dot-right);
+  bottom: var(--lc-bot-dot-bottom);
+  /* Anchored, the dot's CENTRE is the point: pulled back half its own size. */
+  transform: translate(var(--lc-bot-dot-shift), var(--lc-bot-dot-shift));
   z-index: 1;
 }
 

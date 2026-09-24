@@ -266,21 +266,19 @@ export function FirstLaunch({
         {discoveryPhase === 'ready' && (
           <p className="lc-intro">
             {/*
-              * The second half of this sentence is a promise about SOMEBODY
-              * ELSE'S price list, so it is checked before it is made. It
-              * softens only on positive evidence that OpenCode has nothing
-              * free left -- never on "we have not looked", which is the
-              * ordinary state at first launch. See `freeStartStillFree`.
+              * One line (Colin, 2026-09-23: "lets make the text under the tv
+              * be a bit cleaner, maybe we can fix up the wordiness as well").
+              * It was two sentences, the second with a bold white phrase that
+              * broke across the line. What is left: whose agents and whose
+              * accounts, and the one way in that needs neither.
+              *
+              * The second sentence is a promise about SOMEBODY ELSE'S price
+              * list, so it is checked before it is made: it goes only on
+              * positive evidence that OpenCode has nothing free left -- never
+              * on "we have not looked", which is the ordinary state at first
+              * launch. See `freeStartStillFree`.
               */}
-            {freeStart === 'no' ? (
-              <>
-                Locust runs the coding agents you already have, on your own accounts. <strong>OpenCode needs no account</strong> — though it is not listing a free model right now, so this one needs a paid route too.
-              </>
-            ) : (
-              <>
-                Locust runs the coding agents you already have, on your own accounts. <strong>OpenCode needs no account</strong> — one install and you have a working teammate.
-              </>
-            )}
+            {freeStart === 'no' ? 'Your coding agents, on your own accounts.' : 'Your coding agents, on your own accounts. OpenCode works without one.'}
           </p>
         )}
 
