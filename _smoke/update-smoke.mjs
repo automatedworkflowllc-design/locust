@@ -59,9 +59,15 @@ function endTree(child) {
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const INSTALLED = process.argv.includes('--installed')
 const INSTALL = process.argv.includes('--install') && INSTALLED
-const EXE = INSTALLED
-  ? join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Locust', 'Locust.exe')
-  : join(APP_DIR, 'release', 'win-unpacked', 'Locust.exe')
+// `--exe <path>`: a packaged build somewhere else. 0.311 was packaged beside
+// release/win-unpacked because a Locust window running from there held its
+// files (2026-09-24), and the smoke has to test the build it is about.
+const EXE_ARG = process.argv.includes('--exe') ? process.argv[process.argv.indexOf('--exe') + 1] : undefined
+const EXE = EXE_ARG !== undefined
+  ? EXE_ARG
+  : INSTALLED
+    ? join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Locust', 'Locust.exe')
+    : join(APP_DIR, 'release', 'win-unpacked', 'Locust.exe')
 const PORT = portFor(import.meta.url)
 let failures = 0
 /** The version the app said it is: its own release is the one whose block map is read. */
