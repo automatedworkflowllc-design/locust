@@ -203,7 +203,14 @@ export interface CodexMissionService {
     runtime: MissionRuntimeId,
     mode: MissionMode,
     route: { readonly model?: string; readonly effort?: string },
-    emit: (update: CodexMissionUpdate) => void
+    emit: (update: CodexMissionUpdate) => void,
+    /**
+     * H6: the teammate the interrupted mission belonged to. A resume used to
+     * start as nobody's: in the project folder rather than their own branch
+     * or folder, with no roster brief, and outside the one-run-per-teammate
+     * guard, so a second run of theirs could start beside it.
+     */
+    peer?: MissionPeerContext
   ): Promise<MissionHandoffResponse>
   handOff(
     runId: unknown,
@@ -1858,7 +1865,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       runtime: MissionRuntimeId,
       mode: MissionMode,
       route: { readonly model?: string; readonly effort?: string },
-      emit: (update: CodexMissionUpdate) => void
+      emit: (update: CodexMissionUpdate) => void,
+      peer?: MissionPeerContext
     ): Promise<MissionHandoffResponse> {
       if (!validRunId(missionId)) {
         return error('RUN_NOT_ACTIVE', 'That mission id is not one this app wrote.') as MissionHandoffResponse
@@ -1886,9 +1894,12 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         ) as MissionHandoffResponse
       }
 
+      // H6: resumed on ANOTHER runtime, it is a route switch -- recorded as
+      // one, so the thread draws the seam -- not a follow-up.
+      const switching = runtime !== recovered.metadata.runtime
       let checkpoint
       try {
-        checkpoint = await options.ledger.createCheckpoint(missionId, 'manual')
+        checkpoint = await options.ledger.createCheckpoint(missionId, switching ? 'route-switch' : 'manual')
       } catch {
         return error(
           'HANDOFF_REFUSED',
@@ -1927,11 +1938,11 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         mode,
         route,
         emit,
-        // A resume continues the same conversation on the same runtime, so it
-        // is a follow-up rather than a route switch -- drawing a handoff
-        // divider here would claim a change of runtime that did not happen.
-        { missionId, checkpointEpoch: checkpoint.epoch, reason: 'follow-up' },
-        undefined,
+        // On the same runtime a resume is a follow-up -- a handoff divider
+        // would claim a change of runtime that did not happen. On another,
+        // it is exactly that change (H6).
+        { missionId, checkpointEpoch: checkpoint.epoch, reason: switching ? 'route-switch' : 'follow-up' },
+        peer,
         undefined,
         undefined,
         { kind: 'resume', epoch: checkpoint.epoch }

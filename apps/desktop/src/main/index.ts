@@ -4185,7 +4185,13 @@ if (!ownsSingleInstanceLock) {
       const model = typeof payload.model === 'string' ? payload.model : undefined
       const effort = typeof payload.effort === 'string' ? payload.effort : undefined
       try {
-        return await codexMissions.resume(
+        // H6: resumed as the teammate the interrupted mission belonged to --
+        // in their own branch or folder, briefed as them, under their guard --
+        // and the continuation is recorded as theirs, as a handoff's is.
+        const owners = await teammates.missionOwners().catch(() => ({}) as Readonly<Record<string, string>>)
+        const ownerId = typeof payload.missionId === 'string' ? owners[payload.missionId] : undefined
+        const peer = ownerId === undefined ? undefined : await peerContextFor(ownerId).catch(() => undefined)
+        const response = await codexMissions.resume(
           payload.missionId,
           runtime,
           mode,
@@ -4194,8 +4200,11 @@ if (!ownsSingleInstanceLock) {
             if (!owner.isDestroyed() && !owner.webContents.isDestroyed()) {
               owner.webContents.send(CODEX_MISSION_UPDATE_CHANNEL, update)
             }
-          }
+          },
+          peer
         )
+        if (response.ok && ownerId !== undefined) await assignOwner(ownerId, response.data.missionId)
+        return response
       } catch {
         return {
           ok: false,

@@ -2151,6 +2151,60 @@ describe('continuing a conversation', () => {
     expect(spec.args).not.toContain('resume')
   })
 
+  /*
+   * H6: Resume from checkpoint resumed as NOBODY -- in the project folder
+   * rather than the teammate's own branch, outside their one-run guard, and
+   * a runtime change recorded as a follow-up. Driven through the real
+   * service, as the review's verifier did.
+   */
+  describe('H6: resuming an interrupted mission', () => {
+    const resumed = async (runtime: 'codex' | 'claude') => {
+      const starts: { cwd?: string }[] = []
+      const created: Record<string, unknown>[] = []
+      const checkpoints: string[] = []
+      const start = vi.fn((spec: { cwd?: string }, _prompt, _options): RuntimeProcessRun => {
+        starts.push(spec)
+        // A run that stays live, so its owner can be asked about.
+        return { records: records([{ type: 'thread.started', thread_id: 'thread-resumed' }]), completion: new Promise(() => undefined) }
+      }) satisfies RuntimeProcessRunner['start']
+      const { service } = scheduledService({ start }, fakeLedger({
+        getMission: async () => finished({ runtime: 'codex' }),
+        createMission: async (metadata) => {
+          created.push(metadata as unknown as Record<string, unknown>)
+        },
+        createCheckpoint: async (missionId, reason) => {
+          checkpoints.push(reason)
+          return { missionId, epoch: 2, reason, resumeSafety: 'safe', safetyReason: 'settled', createdAt: NOW, unsettledActions: [], settledActions: [], assistantSummary: 'Half done.' } as never
+        }
+      }), {
+        discover: async () => [codexRuntime(), { ...codexRuntime(), id: 'claude' as const, displayName: 'Claude Code', executable: { ...codexRuntime().executable!, commandName: 'claude' } }]
+      })
+      const WREN_TREE = process.platform === 'win32' ? 'C:\\project\\.locust\\worktrees\\tm_wren' : '/project/.locust/worktrees/tm_wren'
+      const peer: MissionPeerContext = { self: { teammateId: 'tm_wren', name: 'Wren', role: 'Code & Migrations' }, others: [], cwd: WREN_TREE } as MissionPeerContext
+      const response = await service.resume('mission_prior', runtime, 'accept-edits', {}, () => undefined, peer)
+      return { service, response, starts, created, checkpoints, WREN_TREE }
+    }
+
+    it('runs in the teammate\u2019s own branch, as theirs, under their one-run guard', async () => {
+      const { service, response, starts, WREN_TREE } = await resumed('codex')
+      expect(response.ok).toBe(true)
+      expect(starts[0]?.cwd).toBe(WREN_TREE)
+      expect(service.runIdOwnedBy('tm_wren')).toBeDefined()
+    })
+
+    it('records a resume on another runtime as a route switch, not a follow-up', async () => {
+      const { created, checkpoints } = await resumed('claude')
+      expect(checkpoints).toEqual(['route-switch'])
+      expect(created.at(-1)?.continuesFrom).toMatchObject({ missionId: 'mission_prior', reason: 'route-switch' })
+    })
+
+    it('and on the same runtime, as a follow-up still', async () => {
+      const { created, checkpoints } = await resumed('codex')
+      expect(checkpoints).toEqual(['manual'])
+      expect(created.at(-1)?.continuesFrom).toMatchObject({ reason: 'follow-up' })
+    })
+  })
+
   it('A2.11: carries the conversation\u2019s earlier turns into the switch, oldest first, and stops at a loop', async () => {
     const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
       records: records([{ type: 'thread.started', thread_id: 'thread-new' }, { type: 'turn.completed' }]),
