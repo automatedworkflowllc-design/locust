@@ -37,7 +37,11 @@ export interface UpdaterLike {
    * and the installer runs after it.
    */
   autoInstallOnAppQuit: boolean
-  checkForUpdates(): Promise<{ readonly updateInfo: { readonly version: string } } | null>
+  checkForUpdates(): Promise<{
+    readonly updateInfo: { readonly version: string }
+    /** electron-updater's own answer: false for the same version, or an older one. */
+    readonly isUpdateAvailable?: boolean
+  } | null>
   downloadUpdate(): Promise<unknown>
   quitAndInstall(isSilent?: boolean, isForceRunAfter?: boolean): void
   on(event: string, listener: (payload?: unknown) => void): unknown
@@ -70,6 +74,21 @@ export interface UpdateService {
   install(): AppUpdateResponse
   /** Change lanes; the next check takes the new one. */
   setEveryBuild(everyBuild: boolean): AppUpdateState
+}
+
+/** `a` is a later version than `b`, by major.minor.patch; unreadable is never later. */
+export function isNewer(a: string, b: string): boolean {
+  const parse = (text: string): readonly number[] | undefined => {
+    const match = /^v?(\d+)\.(\d+)\.(\d+)/.exec(text.trim())
+    return match === null ? undefined : [Number(match[1]), Number(match[2]), Number(match[3])]
+  }
+  const x = parse(a)
+  const y = parse(b)
+  if (x === undefined || y === undefined) return a !== b
+  for (let index = 0; index < 3; index += 1) {
+    if (x[index]! !== y[index]!) return x[index]! > y[index]!
+  }
+  return false
 }
 
 export function createUpdateService(options: UpdateServiceOptions): UpdateService {
@@ -154,7 +173,17 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
       try {
         const result = await options.updater.checkForUpdates()
         const version = result?.updateInfo.version
-        if (version === undefined || version === options.currentVersion) {
+        /*
+         * ONLY A NEWER VERSION IS AN UPDATE (0.308). The tester lane takes
+         * `latest` -- the one build a day -- and a build AHEAD of it (a
+         * prerelease taken on "every build", with the switch turned off
+         * again; any build before its day's promotion) found latest, 0.307,
+         * from 0.308, and called that an update: 'available', a Download
+         * that electron-updater, refusing to go backwards, never starts. The
+         * update smoke hung on it (2026-09-23). Older or the same is up to
+         * date.
+         */
+        if (version === undefined || result?.isUpdateAvailable === false || !isNewer(version, options.currentVersion)) {
           // Only said after a check that actually finished.
           return { ok: true, data: publish({ phase: 'current', currentVersion: options.currentVersion }) }
         }

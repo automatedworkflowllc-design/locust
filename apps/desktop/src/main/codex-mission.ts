@@ -1087,7 +1087,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         ) {
           return error(
             'RUNTIME_START_FAILED',
-            'Cursor Agent cannot be held read-only on this system: its sandbox needs macOS or Linux, and plan mode alone does not stop it editing files. Choose "Accept edits" if it may change this workspace, or run this on Codex CLI or Claude Code.'
+            'Cursor Agent cannot be held read-only on this system: its sandbox needs macOS or Linux, and plan mode alone does not stop it editing files. Choose "Edit" if it may change this workspace, or run this on Codex CLI or Claude Code.'
           ) as CodexMissionStartResponse
         }
         const resolvedRouteId = `${routeId}-account:default`

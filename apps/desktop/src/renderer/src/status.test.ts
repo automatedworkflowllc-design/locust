@@ -122,7 +122,7 @@ describe('the mode a roster card shows', () => {
   it('names the mode the teammate actually last ran in', () => {
     // The card printed the literal string `read-only` for every teammate,
     // whatever they had run in -- false the moment a runtime could edit.
-    expect(modeLabel('accept-edits')).toBe('accept edits')
+    expect(modeLabel('accept-edits')).toBe('edit')
     expect(modeLabel('approve-each')).toBe('approve each action')
     expect(modeLabel('ask')).toContain('read-only')
   })

@@ -844,12 +844,16 @@ export const MODE_FACTS: readonly ModeFacts[] = [
   },
   {
     mode: 'accept-edits',
-    name: 'Accept edits',
+    // The chip's word, everywhere a person reads the mode (0.309). A practice
+    // tester on 0.306: "The compact mode control says Edit while its menu
+    // says Accept edits." It was "Accept edits" -- Claude Code's own term --
+    // in the menu and in every message, and "Edit" on the chip beside them.
+    name: 'Edit',
     chip: 'Edit',
     short: 'may change files in this workspace',
     consequence: 'May edit files inside this workspace folder, and nowhere else.',
     sentence:
-      'Accept edits is on, so it may change files here; switch to Ask below to keep it read-only.'
+      'Edit is on, so it may change files here; switch to Ask below to keep it read-only.'
   },
   {
     mode: 'plan',

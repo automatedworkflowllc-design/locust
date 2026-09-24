@@ -5188,6 +5188,10 @@ export default function App(): ReactElement {
                 workspaceMade={workspaceMade}
                 teammateCount={teammates.length}
                 onChooseFolder={chooseWorkspace}
+                onNewTeammate={() => {
+                  setTeammateError(undefined)
+                  setNewTeammateOpen(true)
+                }}
                 onInstall={installRuntime}
                 installing={installing}
                 installLog={installLog}

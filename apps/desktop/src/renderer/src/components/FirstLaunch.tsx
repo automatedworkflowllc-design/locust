@@ -5,6 +5,7 @@ import type { PublicRuntimeStatus, TubePreference } from '../../../shared/ipc.js
 import { connectedRuntimeCount, deferredOthersSentence, integrationOf, routeRowStatus, runtimeIsUsable } from '../status.js'
 import { FREE_START_RUNTIME, installCommand, installSentence, runtimeInstallFacts, signInCommand } from '../../../shared/runtime-install.js'
 import { HomeCover } from './HomeCover.js'
+import { Icon } from './Icon.js'
 import { SignInButton } from './SignInButton.js'
 
 /**
@@ -65,6 +66,7 @@ export function FirstLaunch({
   workspacePath,
   teammateCount,
   onChooseFolder,
+  onNewTeammate,
   onInstall,
   installing,
   installLine,
@@ -95,6 +97,8 @@ export function FirstLaunch({
   readonly workspacePath: string | undefined
   readonly teammateCount: number
   readonly onChooseFolder: () => void
+  /** Opens the New teammate form: the home screen's way to the product's core action. */
+  readonly onNewTeammate?: () => void
   /** Run the install for a runtime. Absent means the panel offers none. */
   readonly onInstall?: (runtime: string) => void
   /** The runtime being installed right now; every other button waits on it. */
@@ -188,7 +192,15 @@ export function FirstLaunch({
           left.runtime.id === FREE_START_RUNTIME ? -1 : right.runtime.id === FREE_START_RUNTIME ? 1 : 0
         )
       : shownAll
-  void teammateCount
+  /*
+   * THE FIRST TEAMMATE, ASKED FOR BY NAME (0.309). A practice tester on
+   * 0.306: "Claude looked for how to make a teammate and found it only under
+   * an unlabeled sidebar +; the three prominent mascot faces on Home looked
+   * like the entry point but were decorative." So while there is no
+   * teammate, the home screen offers one, with the sentence that says what it
+   * is -- which sat at the foot of the form, below the fold.
+   */
+  const offerFirstTeammate = teammateCount === 0 && onNewTeammate !== undefined && discoveryPhase === 'ready'
   // A build stamp with a commit hash is a fact for a changelog, not a
   // status panel: "2026.09.02-c22c1a3" reads as its date.
   const shortVersion = (version: string | null | undefined): string => (version === undefined || version === null ? '' : version.replace(/-[0-9a-f]{6,}$/i, ''))
@@ -280,6 +292,17 @@ export function FirstLaunch({
               */}
             {freeStart === 'no' ? 'Your coding agents, on your own accounts.' : 'Your coding agents, on your own accounts. OpenCode works without one.'}
           </p>
+        )}
+
+        {offerFirstTeammate && (
+          <div className="lc-firstteammate">
+            <button type="button" className="lc-button lc-firstteammate__button" onClick={onNewTeammate}>
+              <Icon name="plus" size={13} /> New teammate
+            </button>
+            <span className="lc-firstteammate__about">
+              A name, a face and a model of its own, and a place for its missions. It grants no new access.
+            </span>
+          </div>
         )}
 
         {/*

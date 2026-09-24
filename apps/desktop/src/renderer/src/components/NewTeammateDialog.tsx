@@ -165,6 +165,10 @@ export function NewTeammateDialog({
         </div>
 
         <div className="lc-dialog__body">
+          {/* First, not at the foot below the fold (a practice tester on 0.306 found it there). */}
+          <p className="lc-dialog__note lc-mono">
+            A teammate is a name, a face and a place to keep missions. It grants no new access.
+          </p>
           <div className="lc-dialog__identity">
             {/* The preview works, so the person sees the behaviour a live
                 teammate has -- all of it, as the face in a conversation does. */}
@@ -426,10 +430,6 @@ export function NewTeammateDialog({
               <span className="lc-summarycard__label lc-mono">APPROVALS</span>
             </div>
           </div>
-
-          <p className="lc-dialog__note lc-mono">
-            A teammate is a name, a face and a place to keep missions. It grants no new access.
-          </p>
 
           {error !== undefined && <p className="lc-dialog__error">{error}</p>}
         </div>

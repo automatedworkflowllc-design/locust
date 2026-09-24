@@ -591,7 +591,7 @@ export function createRelay(options: RelayOptions): Relay {
     const route = cursorWidened ? { ...lent, mode: 'accept-edits' as const } : lent
     if (cursorWidened) {
       input.notice(
-        `${recipient.self.name} replies in Accept edits rather than read-only: Cursor Agent cannot be held read-only on this system.`
+        `${recipient.self.name} replies in Edit mode rather than read-only: Cursor Agent cannot be held read-only on this system.`
       )
     }
     if (own === undefined) {

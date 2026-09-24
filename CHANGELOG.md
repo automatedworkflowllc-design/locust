@@ -11,6 +11,27 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.309.0 - 2026-09-23
+
+### Improved
+
+- **Your first teammate is one click from the home screen.** Until you have
+  one, the home screen offers New teammate, and says what a teammate is:
+  a name, a face and a model of its own. The New teammate form says it first
+  too, rather than at its foot.
+- **One word for each mode.** The mode menu now names Edit the way its
+  chip does -- it said Accept edits -- and so do the messages that mention
+  it.
+- **The + menu no longer sits on the box's words.** While it is open, the
+  box's placeholder steps aside.
+
+### Fixed
+
+- **A build newer than the day's no longer offers the older one.** With
+  every build turned off again, Locust found the day's build -- older than
+  the one running -- and offered it as an update that never came. Only a
+  newer version is an update now.
+
 ## 0.308.0 - 2026-09-23
 
 ### Improved

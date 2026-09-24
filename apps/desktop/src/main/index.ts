@@ -3946,7 +3946,7 @@ ${taskSection({
             ok: false,
             error: {
               code: 'RUNTIME_START_FAILED',
-              message: "Antigravity runs its own agent with its own permissions; Locust cannot hold it read-only. Choose Accept edits, or another route."
+              message: "Antigravity runs its own agent with its own permissions; Locust cannot hold it read-only. Choose Edit, or another route."
             }
           } as const
         }

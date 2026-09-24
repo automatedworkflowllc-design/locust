@@ -4788,6 +4788,30 @@ textarea {
   color: var(--lc-text-secondary);
 }
 
+/* The first teammate, offered on the home screen while there is none (FirstLaunch). */
+.lc-firstteammate {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lc-space-3);
+}
+
+.lc-firstteammate__button {
+  flex: none;
+}
+
+.lc-firstteammate__about {
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
+}
+
+/* While the + menu is open its satellites stand over the box's placeholder
+   ("Write a m[folder]ssage" -- a practice tester on 0.306): the words step
+   aside until it closes. */
+.lc-composer:has(.lc-plusmenu.is-open) textarea::placeholder {
+  color: transparent;
+}
+
 .lc-intro strong {
   font-weight: 500;
   color: var(--lc-text-name);

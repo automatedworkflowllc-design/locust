@@ -343,7 +343,7 @@ describe('relaying a share', () => {
     await relay.onShared(sharing({ sandbox: 'full-access' }), [message(BOOTY)])
     expect(starts[0]).toMatchObject({ runtime: 'cursor', mode: 'accept-edits' })
     const said = notices.filter((update) => update.kind === 'relay-notice').map((update) => (update.kind === 'relay-notice' ? update.message : ''))
-    expect(said.some((line) => line.includes('replies in Accept edits rather than read-only: Cursor Agent cannot be held read-only'))).toBe(true)
+    expect(said.some((line) => line.includes('replies in Edit mode rather than read-only: Cursor Agent cannot be held read-only'))).toBe(true)
     // A remembered Cursor route in ask is widened the same way; a Codex one is not.
     const remembered = harness({ booty: { ...newBootyPeer, self: { ...newBootyPeer.self, route: { runtime: 'cursor', model: 'composer-2.5', mode: 'ask' } } }, cursorHoldsReadOnly: false })
     await remembered.relay.onShared(sharing(), [message(BOOTY)])
