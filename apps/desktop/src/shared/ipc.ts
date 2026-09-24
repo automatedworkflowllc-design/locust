@@ -237,6 +237,8 @@ export const MISSION_HANDOFF_CHANNEL = 'mission:hand-off'
 export const MISSION_RESUME_CHANNEL = 'mission:resume'
 export const CODEX_MISSION_UPDATE_CHANNEL = 'codex-mission:update'
 export const MISSION_HISTORY_CHANNEL = 'mission-history:list'
+/** H3: one mission's record, whole -- for a conversation history listed as a row only. */
+export const MISSION_READ_CHANNEL = 'mission-history:read'
 export const MISSION_DELETE_CHANNEL = 'mission:delete'
 export const APP_INFO_CHANNEL = 'app:info'
 export const APP_CHANGELOG_CHANNEL = 'app:changelog'
@@ -2097,6 +2099,11 @@ export interface PublicRecoveredMission {
       }
 }
 
+/** H3: one mission, projected as history projects the newest ones. */
+export type MissionReadResponse =
+  | { readonly ok: true; readonly data: { readonly mission: PublicRecoveredMission } }
+  | { readonly ok: false; readonly error: { readonly code: 'MISSION_UNAVAILABLE'; readonly message: string } }
+
 export type MissionHistoryResponse =
   | {
       readonly ok: true
@@ -2294,6 +2301,12 @@ export interface DesktopApi {
    * exactly those (C1).
    */
   removeWorktree(teammateId: string, discard?: readonly string[]): Promise<WorktreeListResponse>
+  /**
+   * H3: one mission's record with its events. History sends the newest
+   * missions whole and every other one as a row; opening one of those reads
+   * it here.
+   */
+  readMission(missionId: string): Promise<MissionReadResponse>
   addMemory(request: MemoryAddRequest): Promise<MemoryListResponse>
   updateMemory(request: MemoryUpdateRequest): Promise<MemoryListResponse>
   removeMemory(memoryId: string): Promise<MemoryListResponse>

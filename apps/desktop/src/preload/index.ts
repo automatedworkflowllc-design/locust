@@ -22,6 +22,7 @@ import {
   MISSION_RESTORE_CHANNEL,
   MISSION_TRASH_EMPTY_CHANNEL,
   MISSION_HISTORY_CHANNEL,
+  MISSION_READ_CHANNEL,
   MODEL_CATALOG_CHANNEL,
   RUNTIME_ARTIFACTS_CHANNEL,
   RUNTIME_INSTALL_CHANNEL,
@@ -105,6 +106,7 @@ import type {
   AppUpdateState,
   MissionPruneRequest,
   MissionPruneResponse,
+  MissionReadResponse,
   TrashListResponse,
   TrashMutationResponse,
   StorageReportResponse,
@@ -315,6 +317,7 @@ const desktopApi: DesktopApi = {
   chooseTeammateFolder: (teammateId: string, clear?: boolean) =>
     ipcRenderer.invoke(TEAMMATE_FOLDER_CHANNEL, { teammateId, clear: clear === true }) as Promise<TeammateFolderResponse>,
   listWorktrees: () => ipcRenderer.invoke(WORKTREE_LIST_CHANNEL) as Promise<WorktreeListResponse>,
+  readMission: (missionId: string) => ipcRenderer.invoke(MISSION_READ_CHANNEL, missionId) as Promise<MissionReadResponse>,
   removeWorktree: (teammateId: string, discard?: readonly string[]) => ipcRenderer.invoke(WORKTREE_REMOVE_CHANNEL, teammateId, discard) as Promise<WorktreeListResponse>,
   addMemory: (request: MemoryAddRequest) => ipcRenderer.invoke(MEMORY_ADD_CHANNEL, request) as Promise<MemoryListResponse>,
   updateMemory: (request: MemoryUpdateRequest) => ipcRenderer.invoke(MEMORY_UPDATE_CHANNEL, request) as Promise<MemoryListResponse>,

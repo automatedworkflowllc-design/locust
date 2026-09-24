@@ -73,7 +73,7 @@ import { changedSince } from './memory-provenance.js'
 const ROUTINE_TICK_MS = 60_000
 const ROUTINE_FIRST_TICK_MS = 15_000
 import type { RoutineRunner } from './routine-runner.js'
-import { deleteMissionRecord, knownDigests, readMissionHistory } from './mission-history.js'
+import { readOneMission, deleteMissionRecord, knownDigests, readMissionHistory } from './mission-history.js'
 import { changelogPaths, entries as changelogEntries, readChangelog, splashEntries } from './changelog.js'
 import type { ChangelogEntry } from './changelog.js'
 import type { CodexMissionService } from './codex-mission.js'
@@ -127,6 +127,7 @@ import {
   MISSION_TRASH_EMPTY_CHANNEL,
   MISSION_STORAGE_CHANNEL,
   MISSION_HISTORY_CHANNEL,
+  MISSION_READ_CHANNEL,
   MODEL_CATALOG_CHANNEL,
   RUNTIME_ARTIFACTS_CHANNEL,
   RUNTIME_INSTALL_CHANNEL,
@@ -3593,6 +3594,14 @@ if (!ownsSingleInstanceLock) {
       } catch {
         return memoryRejected('Memory could not be cleared.')
       }
+    })
+
+    // H3: one mission whole, for a conversation history listed as a row.
+    ipcMain.handle(MISSION_READ_CHANNEL, async (event, missionId: unknown) => {
+      if (!fromOwnWindow(event)) {
+        return { ok: false, error: { code: 'MISSION_UNAVAILABLE', message: 'The request was rejected.' } } as const
+      }
+      return readOneMission(missionLedger, workroom, missionId)
     })
 
     ipcMain.handle(MISSION_HISTORY_CHANNEL, async (event, known: unknown) => {

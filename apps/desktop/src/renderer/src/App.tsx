@@ -62,7 +62,7 @@ import { AutomationsScreen } from './components/AutomationsScreen.js'
 import { TIDY_PROMPT } from '../../shared/memory-tidy.js'
 import { memoryChangedNotice, memoriesOfConversation, turnsOfConversation } from './conversationMemories.js'
 import { createFrameBatcher } from './streamFrames.js'
-import { heldDigests, mergeHistory } from './historyMerge.js'
+import { missingTranscripts, heldDigests, mergeHistory } from './historyMerge.js'
 import { savableMissionId } from './savableConversations.js'
 import { MemoryScreen } from './components/MemoryScreen.js'
 import { isMissionRuntime, runtimeDisplayName } from '../../shared/runtimes.js'
@@ -4081,6 +4081,33 @@ export default function App(): ReactElement {
     setRuns((current) => withNewRun(current, mission.runId, reopened))
     setShownKey(mission.runId)
     followRouteOf(reopened)
+    /*
+     * H3: AN OLDER CONVERSATION IS READ WHEN IT IS OPENED. History sends the
+     * newest missions whole and the rest as rows, and this is where the rows
+     * of THIS conversation -- every turn of it -- are fetched, then the
+     * thread is built again from the whole records. It used to open on the
+     * person's words and no replies, with "Events: 41 recorded" beside them.
+     */
+    const missing = missingTranscripts([mission.missionId, ...conversationTurns(mission, historyById).map((turn) => turn.missionId)], historyById)
+    const bridge = window.desktop
+    if (missing.length === 0 || bridge?.readMission === undefined) return
+    void Promise.all(missing.map((id) => bridge.readMission(id).catch(() => undefined))).then((answers) => {
+      const read = new Map(
+        answers.flatMap((answer) => (answer !== undefined && answer.ok ? [[answer.data.mission.missionId, answer.data.mission] as const] : []))
+      )
+      if (read.size === 0) return
+      setHistory((current) => current.map((entry) => read.get(entry.missionId) ?? entry))
+      const whole = new Map(historyById)
+      for (const [id, entry] of read) whole.set(id, entry)
+      const now = whole.get(mission.missionId)
+      if (now === undefined) return
+      // Only a thread that is still the reopened record is rebuilt: a turn
+      // started meanwhile is live, and its own events are the truth.
+      setRuns((current) => {
+        const shown = current.get(mission.runId)
+        return shown === undefined || !isTerminal(shown.phase) ? current : withNewRun(current, mission.runId, reopenedRun(now, whole))
+      })
+    })
   }
 
   /**

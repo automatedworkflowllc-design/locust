@@ -10,6 +10,17 @@ import type { PublicRecoveredMission } from '../../shared/ipc.js'
  * THE SAME OBJECT, so a turn memoised on its events is not built again.
  */
 
+/**
+ * H3: which turns of a conversation came as rows only -- no events, though
+ * the ledger holds some -- and so must be read before it is shown whole.
+ */
+export function missingTranscripts(missionIds: readonly string[], byId: ReadonlyMap<string, PublicRecoveredMission>): readonly string[] {
+  return [...new Set(missionIds)].filter((missionId) => {
+    const mission = byId.get(missionId)
+    return mission !== undefined && mission.events.length === 0 && mission.eventCount > 0
+  })
+}
+
 /** The records held whole, by the digest each was sent under. Undefined when there are none. */
 export function heldDigests(history: readonly PublicRecoveredMission[]): Readonly<Record<string, string>> | undefined {
   const held: Record<string, string> = {}
@@ -35,6 +46,18 @@ export function mergeHistory(
 ): readonly PublicRecoveredMission[] {
   const byId = new Map(held.map((mission) => [mission.missionId, mission]))
   return incoming.map((mission) => {
+    /*
+     * H3: a ROW for a record this window holds whole -- an older
+     * conversation it opened and read (`missingTranscripts`) -- keeps the
+     * whole one while the ledger still has as many events as it did. It
+     * used to be replaced by the row on the next read, and the replies went
+     * again.
+     */
+    if (mission.eventsKept !== true && mission.events.length === 0) {
+      const mine = byId.get(mission.missionId)
+      if (mine !== undefined && mine.events.length > 0 && mine.eventCount === mission.eventCount) return mine
+      return mission
+    }
     if (mission.eventsKept !== true) return mission
     const mine = byId.get(mission.missionId)
     if (mine !== undefined && mine.digest === mission.digest && mine.events.length > 0) return mine

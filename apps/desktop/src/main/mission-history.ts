@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { workspaceIdFor } from './workspace.js'
 import { joinMessageFragments } from '../shared/messageFragments.js'
 import type { MissionLedger, RecoveredMission, Workroom, WorkroomMessage } from '@teammate/mission-store'
-import type {
+import type { MissionReadResponse,
   MissionDeleteResponse,
   MissionHistoryResponse,
   PublicPeerMessage,
@@ -485,6 +485,34 @@ async function cachedHistoryPage(ledger: MissionLedger, limit: number): Promise<
     ),
     issueCount: listing.issues.length + entries.reduce((total, entry) => total + entry.issues, 0),
     unreadableCount: entries.filter((entry) => entry.light === undefined).length
+  }
+}
+
+/**
+ * H3: ONE MISSION, WHOLE. History sends the newest missions with their
+ * events and every other one as a row, promising that opening it fetches
+ * the rest (0.221.0) -- and nothing did, so an older conversation opened
+ * with the person's own words and no replies. This is that fetch: the same
+ * projection, the same workroom join, the same digest a history read gives.
+ */
+export async function readOneMission(ledger: MissionLedger, workroom: Workroom | undefined, missionId: unknown): Promise<MissionReadResponse> {
+  const unavailable = { ok: false, error: { code: 'MISSION_UNAVAILABLE', message: 'That conversation could not be read from the local ledger.' } } as const
+  if (typeof missionId !== 'string' || missionId.length === 0 || missionId.length > 200) return unavailable
+  try {
+    const recovered = await ledger.getMission(missionId)
+    if (recovered === undefined) return unavailable
+    const workroomMessages = new Map<string, WorkroomMessage>()
+    if (workroom !== undefined) {
+      try {
+        for (const message of (await workroom.read()).messages) workroomMessages.set(message.messageId, message)
+      } catch {
+        // Unreadable peer messages show as such; the mission still opens.
+      }
+    }
+    const mission = publicRecoveredMission(recovered, workroomMessages)
+    return { ok: true, data: { mission: { ...mission, digest: missionDigest(JSON.stringify(mission)) } } }
+  } catch {
+    return unavailable
   }
 }
 
