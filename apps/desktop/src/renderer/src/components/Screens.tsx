@@ -2329,21 +2329,22 @@ export function SettingsScreen({
             * Under that the sentence was false -- off took every build too.
             * These words hold under either cadence (0.310); whether the switch
             * stays at all is for the next outside review.
+            *
+            * Then two words (0.311). Colin, with a frame of the 0.310 row:
+            * "maybe switch this button to test build or beta build, this is
+            * wayyy too wordy". A switch's label names the setting; the switch
+            * says whether it is on.
             */}
           {onUpdateLane !== undefined && update !== undefined && update.phase !== 'unsupported' && (
             <div className="lc-settingrows">
               <div className="lc-settingrow">
-                <span className="lc-settings__note">
-                  {update.everyBuild === true
-                    ? 'Test builds too, as soon as they are out — for testing Locust itself. Turn off for releases only.'
-                    : 'New versions as they are released. Turn on to take test builds too, as soon as they are out.'}
-                </span>
+                <span className="lc-settings__note">Beta builds</span>
                 <button
                   type="button"
                   className={`lc-switch${update.everyBuild === true ? ' is-on' : ''}`}
                   role="switch"
                   aria-checked={update.everyBuild === true}
-                  aria-label="Take every build as soon as it is out"
+                  aria-label="Beta builds"
                   onClick={() => onUpdateLane(update.everyBuild !== true)}
                 >
                   <span className="lc-switch__knob" />

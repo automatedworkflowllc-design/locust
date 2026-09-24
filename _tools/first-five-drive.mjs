@@ -161,7 +161,7 @@ try {
   const menuState = async (step) => cdp.eval(`(async () => {
     ${step}
     await new Promise(r => setTimeout(r, 400))
-    return document.querySelector('.lc-sidebar__addmenu') === null ? 'closed' : 'open'
+    return document.querySelector('.lc-context[aria-label="Add"]') === null ? 'closed' : 'open'
   })()`)
   const openMenu = `[...document.querySelectorAll('button')].find(b => (b.getAttribute('aria-label') || '') === 'Add').click(); await new Promise(r => setTimeout(r, 300));`
 

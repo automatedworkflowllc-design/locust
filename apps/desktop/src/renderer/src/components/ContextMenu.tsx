@@ -61,6 +61,13 @@ export interface ContextMenuState {
   /** The menu's accessible name: what was right-clicked. Not drawn. */
   readonly title: string
   readonly items: readonly ContextMenuItem[]
+  /**
+   * The control it hangs from, when it opens from a button rather than a
+   * right-click: a press on that control is the control's own business --
+   * a second press closes the menu -- not a press somewhere else, which
+   * would close it and let the same click open it again.
+   */
+  readonly anchor?: HTMLElement
 }
 
 /** How close a menu may come to the window's edge. */
@@ -216,7 +223,9 @@ export function ContextMenu({
    * that press does its own work, or a right-click on a second row stacks
    * two menus.
    */
-  useDismissOnOutsidePress(true, onClose, ref)
+  const anchor = useRef<HTMLElement | null>(null)
+  anchor.current = state.anchor ?? null
+  useDismissOnOutsidePress(true, onClose, ref, anchor)
 
   const choose = (item: ContextMenuItem): void => {
     if (item.disabledReason !== undefined || item.submenu !== undefined) return

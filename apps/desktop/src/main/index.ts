@@ -41,7 +41,7 @@ import { MAX_ATTACHMENTS } from '../shared/attachments.js'
 import { ATTACHMENT_DIR, attachmentDestination, excludeWith } from './attach-outside.js'
 import { imageMediaType, MAX_PREVIEW_BYTES } from '../shared/image-files.js'
 import { isViewableText, MAX_TEXT_BYTES, viewerMode } from '../shared/text-files.js'
-import { createTeammateStore } from './teammate-store.js'
+import { createTeammateStore, isTeammateRoute } from './teammate-store.js'
 import { createRoutineStore } from './routine-store.js'
 import { createRoomStore } from './room-store.js'
 import { createRoomTasks } from './room-tasks.js'
@@ -2938,7 +2938,11 @@ if (!ownsSingleInstanceLock) {
         // roleTitle was dropped here since Custom teammates got titles: every
         // one read "Custom" on the sidebar and in the brief (found 2026-09-05).
         const teammate = await teammates.create({ name: input.name, hue: input.hue, role: input.role, roleTitle: input.roleTitle, worktree: input.worktree, avatar: input.avatar })
-        return { ok: true, data: { teammate } } as const
+        // The model picked on the dialog's Model row, kept exactly as a
+        // started mission keeps one (rememberRoute validates it).
+        if (!isTeammateRoute(input.route)) return { ok: true, data: { teammate } } as const
+        await teammates.rememberRoute(teammate.teammateId, input.route)
+        return { ok: true, data: { teammate: { ...teammate, route: input.route } } } as const
       } catch {
         // The store's own validation is the authority; the renderer is told
         // that it was refused, never why in terms it could probe.
@@ -2959,7 +2963,11 @@ if (!ownsSingleInstanceLock) {
           worktree: input.worktree,
           avatar: input.avatar
         })
-        return { ok: true, data: { teammate } } as const
+        // A model picked on the Model row (0.311): until then a teammate's
+        // model changed only when a message was sent to them on another.
+        if (!isTeammateRoute(input.route)) return { ok: true, data: { teammate } } as const
+        await teammates.rememberRoute(teammate.teammateId, input.route)
+        return { ok: true, data: { teammate: { ...teammate, route: input.route } } } as const
       } catch {
         return teammateRejected('That teammate could not be updated. Check the name, hue and role.')
       }

@@ -11,6 +11,22 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.311.0 - 2026-09-24
+
+### New
+
+- **Set a teammate's model from their Edit dialog.** Right-click a teammate
+  and choose Edit: the Model row names the model they run on, and Change
+  opens the same picker as the chat box. Their messages, rooms and routines
+  run on it. Picking another model in a chat with them still changes it
+  too.
+
+### Improved
+
+- **The + menu matches the right-click menus.** New teammate, New room and
+  New group, each with its key: T, R, G.
+- **Settings › Updates says it in two words:** Beta builds.
+
 ## 0.310.0 - 2026-09-24
 
 ### Fixed

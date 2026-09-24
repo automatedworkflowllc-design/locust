@@ -70,25 +70,26 @@ try {
     const page = [...document.querySelectorAll('button, a')].find((b) => /^General$/.test((b.textContent ?? '').trim()))
     page?.click()
     await new Promise((r) => setTimeout(r, 1000))
-    const toggle = document.querySelector('button[role="switch"][aria-label="Take every build as soon as it is out"]')
+    const toggle = document.querySelector('button[role="switch"][aria-label="Beta builds"]')
     const note = toggle?.closest('.lc-settingrow')?.querySelector('.lc-settings__note')?.textContent ?? null
     const network = [...document.querySelectorAll('dt')].find((dt) => dt.textContent.trim() === 'Network')?.nextElementSibling?.textContent?.replace(/\\s+/g, ' ').trim() ?? null
     return JSON.stringify({ switch: toggle === null ? null : toggle.getAttribute('aria-checked'), note, network })
   })()`))
   const before = JSON.parse(String(settings))
-  // Its words since 0.310: "New versions as they are released" (0.307-0.309
-  // said "One new build a day", untrue once every verified build was the release).
-  check('Settings > Updates has the lane switch, off: releases', before.switch === 'false' && /^(New versions as they are released|One new build a day)/.test(before.note ?? ''), String(settings))
+  // Its words: "Beta builds" since 0.311 (Colin: "wayyy too wordy"); 0.310 said
+  // "New versions as they are released"; 0.307-0.309 "One new build a day",
+  // untrue once every verified build was the release.
+  check('Settings > Updates has the lane switch, off: releases', before.switch === 'false' && /^(Beta builds|New versions as they are released|One new build a day)/.test(before.note ?? ''), String(settings))
   check('the Network line names what Locust itself fetches', /checks for and downloads its own updates, and new Codex CLI and Copilot CLI versions/.test(before.network ?? ''), JSON.stringify(before.network))
 
   const flipped = await drive.capture('the switch turned on: every build', () => drive.evaluate(`(async () => {
-    document.querySelector('button[role="switch"][aria-label="Take every build as soon as it is out"]')?.click()
+    document.querySelector('button[role="switch"][aria-label="Beta builds"]')?.click()
     await new Promise((r) => setTimeout(r, 4000))
-    const toggle = document.querySelector('button[role="switch"][aria-label="Take every build as soon as it is out"]')
+    const toggle = document.querySelector('button[role="switch"][aria-label="Beta builds"]')
     return JSON.stringify({ switch: toggle?.getAttribute('aria-checked') ?? null, note: toggle?.closest('.lc-settingrow')?.querySelector('.lc-settings__note')?.textContent ?? null })
   })()`))
   const after = JSON.parse(String(flipped))
-  check('turned on, it says test builds too', after.switch === 'true' && /^(Test builds too, as soon as they are out|Every build, as soon as it is out)/.test(after.note ?? ''), String(flipped))
+  check('turned on, it says test builds too', after.switch === 'true' && /^(Beta builds|Test builds too, as soon as they are out|Every build, as soon as it is out)/.test(after.note ?? ''), String(flipped))
   const saved = join(profilePath, 'update-lane.json')
   const lane = existsSync(saved) ? readFileSync(saved, 'utf8') : '(no file)'
   check('and the choice is saved in the profile', /"everyBuild":true/.test(lane), lane)

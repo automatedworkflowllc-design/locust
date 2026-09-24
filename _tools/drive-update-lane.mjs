@@ -87,7 +87,7 @@ try {
 
   // Every build: the switch re-checks at once, and finds the newest prerelease.
   const every = await drive.capture('every build: the newest prerelease', () => drive.evaluate(`(async () => {
-    document.querySelector('button[role="switch"][aria-label="Take every build as soon as it is out"]')?.click()
+    document.querySelector('button[role="switch"][aria-label="Beta builds"]')?.click()
     await new Promise((r) => setTimeout(r, 1500))
     return ${LINE}
   })()`))

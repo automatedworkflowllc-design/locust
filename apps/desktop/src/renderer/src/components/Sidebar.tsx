@@ -181,7 +181,8 @@ export function Sidebar({
   onNewGroup,
   namingGroup = false,
   onNamingGroupDone,
-  onStartNamingGroup,
+  onAddMenu,
+  addMenuOpen = false,
   onTeammateMenu,
   pendingApprovals,
   liveActivity,
@@ -192,7 +193,6 @@ export function Sidebar({
   onSelectTeammate,
   onOpenHub,
   onNewConversationWith,
-  onNewTeammate,
   composerShown,
   onOpenSettings,
   onOpenMissions,
@@ -260,8 +260,13 @@ export function Sidebar({
       the conversation menu can start it too. */
   readonly namingGroup?: boolean
   readonly onNamingGroupDone?: () => void
-  /** Ask for the name box; the `+` menu and the conversation menu both do. */
-  readonly onStartNamingGroup?: () => void
+  /**
+   * The `+`: New teammate, New room, New group, drawn as the right-click
+   * menus are and hung from the button that asked for it.
+   */
+  readonly onAddMenu: (anchor: HTMLElement) => void
+  /** Whether that menu is open, for the button to say so. */
+  readonly addMenuOpen?: boolean
   /** Right-click on a teammate. Same menu shape as a mission row, on the row above them. */
   readonly onTeammateMenu: (teammateId: string, at: { readonly x: number; readonly y: number }) => void
   /** Approvals waiting on each teammate's live run, by teammate id. */
@@ -284,7 +289,6 @@ export function Sidebar({
   readonly onOpenHub: (teammateId: string) => void
   /** A blank page with that teammate on it, not their newest conversation. */
   readonly onNewConversationWith: (teammateId: string) => void
-  readonly onNewTeammate: () => void
   /** Whether the composer is on screen; the empty state says "below" only then. */
   readonly composerShown: boolean
   readonly onOpenSettings: () => void
@@ -415,42 +419,6 @@ export function Sidebar({
   }, [])
   const railOpenFor = railPinned ?? railHovered
 
-  /** The rail's single `+`, which has to say what it would add. */
-  const [addOpen, setAddOpen] = useState(false)
-  /*
-   * A menu closes the way every other menu closes.
-   *
-   * MEASURED by an outside tester on 0.164.0, and it is the first thing a new
-   * user does: press +, then try to get out. Escape did nothing, clicking the
-   * main column did nothing, pressing Home did nothing, and opening Missions,
-   * Rooms, Routines or Settings left the three items sitting over the empty
-   * copy of whatever screen they had reached. The only ways out were choosing
-   * a row or pressing + again. There was a toggle and an onClick per item,
-   * and no handler for any of the three ways a person expects to leave.
-   *
-   * Pointer-down rather than click, so it closes on the press that begins a
-   * click elsewhere, and matched by class rather than a ref because the
-   * anchor is rendered by two branches (rail and full sidebar) and only one
-   * is mounted. The + button is inside the anchor, so its own toggle still
-   * closes the menu rather than fighting this.
-   */
-  useEffect(() => {
-    if (!addOpen) return undefined
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setAddOpen(false)
-    }
-    const onPointerDown = (event: PointerEvent): void => {
-      const target = event.target
-      if (target instanceof Element && target.closest('.lc-sidebar__add') !== null) return
-      setAddOpen(false)
-    }
-    window.addEventListener('keydown', onKey)
-    window.addEventListener('pointerdown', onPointerDown)
-    return () => {
-      window.removeEventListener('keydown', onKey)
-      window.removeEventListener('pointerdown', onPointerDown)
-    }
-  }, [addOpen])
   // Which groups are open. All three start open, which is how the sidebar
   // has always read; folding is for making room, not a new default.
   const [openSections, setOpenSections] = useState({ rooms: true, teammates: true, missions: true, automations: true })
@@ -799,130 +767,31 @@ export function Sidebar({
           <img className="lc-brand__wordmark" src={wordmark} alt="Locust" />
         </button>
         {/*
-          * ONE `+` in the rail, and it says what it would add.
+          * ONE `+`, and it says what it would add: New teammate, New room,
+          * New group (Colin, 2026-09-14: "consolidate room and teammate add
+          * into one +, looks clunky").
           *
-          * At 64px the header's plus (new teammate) and the Rooms section's
-          * plus (new room) both collapse to a bare icon, stacked, with
-          * nothing to tell them apart -- Colin, 2026-09-14: "consolidate
-          * room and teammate add into one +, looks clunky". Widened out,
-          * both rows carry their own words and neither needs a menu, so the
-          * menu exists only where the words do not.
+          * DRAWN AS THE RIGHT-CLICK MENUS ARE (0.311). Colin, 2026-09-24:
+          * "make the + button for new teammate and group the same style as
+          * our right click dropdowns, those are way cleaner". It was its own
+          * `lc-menu` dropdown, with its own ways of closing and its own fixes
+          * for hanging out of the 64px rail; now it is the one menu the rows
+          * use (ContextMenu, drawn at the window, kept inside it, with keys),
+          * opened from here and hung from this button.
           */}
-        {compact ? (
-          <span className="lc-control__anchor lc-sidebar__add">
-            <button
-              type="button"
-              className="lc-iconbutton"
-              aria-label="Add"
-              title="Add"
-              aria-haspopup="menu"
-              aria-expanded={addOpen}
-              onClick={() => setAddOpen((open) => !open)}
-            >
-              <Icon name="plus" size={14} />
-            </button>
-            {addOpen && (
-              <div className="lc-menu lc-sidebar__addmenu" role="menu">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="lc-menu__item"
-                  onClick={() => {
-                    setAddOpen(false)
-                    onNewTeammate()
-                  }}
-                >
-                  New teammate
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="lc-menu__item"
-                  onClick={() => {
-                    setAddOpen(false)
-                    onOpenRooms()
-                  }}
-                >
-                  New room
-                </button>
-                {onNewGroup !== undefined && (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="lc-menu__item"
-                    onClick={() => {
-                      setAddOpen(false)
-                      onStartNamingGroup?.()
-                    }}
-                  >
-                    New group
-                  </button>
-                )}
-              </div>
-            )}
-          </span>
-        ) : (
-          /*
-            * The wide `+` offers the same three things the rail's does.
-            *
-            * It used to make a teammate and nothing else, which was fine
-            * while a teammate was the only thing you could add. With groups
-            * there are three, and one `+` that says what it adds beats a
-            * button whose meaning depends on which layout you are in.
-            */
-          <span className="lc-control__anchor lc-sidebar__add">
-            <button
-              type="button"
-              className="lc-iconbutton"
-              aria-label="Add"
-              title="Add"
-              aria-haspopup="menu"
-              aria-expanded={addOpen}
-              onClick={() => setAddOpen((open) => !open)}
-            >
-              <Icon name="plus" size={14} />
-            </button>
-            {addOpen && (
-              <div className="lc-menu lc-sidebar__addmenu" role="menu">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="lc-menu__item"
-                  onClick={() => {
-                    setAddOpen(false)
-                    onNewTeammate()
-                  }}
-                >
-                  New teammate
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="lc-menu__item"
-                  onClick={() => {
-                    setAddOpen(false)
-                    onOpenRooms()
-                  }}
-                >
-                  New room
-                </button>
-                {onNewGroup !== undefined && (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="lc-menu__item"
-                    onClick={() => {
-                      setAddOpen(false)
-                      onStartNamingGroup?.()
-                    }}
-                  >
-                    New group
-                  </button>
-                )}
-              </div>
-            )}
-          </span>
-        )}
+        <span className="lc-control__anchor lc-sidebar__add">
+          <button
+            type="button"
+            className="lc-iconbutton"
+            aria-label="Add"
+            title="Add"
+            aria-haspopup="menu"
+            aria-expanded={addMenuOpen}
+            onClick={(event) => onAddMenu(event.currentTarget)}
+          >
+            <Icon name="plus" size={14} />
+          </button>
+        </span>
       </div>
 
       <div className="lc-search">

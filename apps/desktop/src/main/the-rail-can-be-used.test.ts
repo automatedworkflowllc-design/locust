@@ -28,6 +28,8 @@ import { describe, expect, it } from 'vitest'
 
 const CSS = readFileSync(fileURLToPath(new URL('../renderer/src/shell.css', import.meta.url)), 'utf8')
 const SIDEBAR = readFileSync(fileURLToPath(new URL('../renderer/src/components/Sidebar.tsx', import.meta.url)), 'utf8')
+const APP = readFileSync(fileURLToPath(new URL('../renderer/src/App.tsx', import.meta.url)), 'utf8')
+const CONTEXT_MENU = readFileSync(fileURLToPath(new URL('../renderer/src/components/ContextMenu.tsx', import.meta.url)), 'utf8')
 
 const rule = (selector: string): string => {
   const at = CSS.indexOf(selector)
@@ -35,71 +37,48 @@ const rule = (selector: string): string => {
   return CSS.slice(at, CSS.indexOf('}', at))
 }
 
-describe('the add menu in the rail', () => {
-  it('outranks .lc-menu on its own, rather than by sitting below it', () => {
+describe('the add menu', () => {
+  it('is the right-click menu, hung from the +', () => {
     /*
-     * `.lc-menu` opens UPWARD off the composer (`bottom: calc(100% + ...)`)
-     * and is a fixed 306px. This menu hangs off a button at the TOP of the
-     * rail, so it has to undo both.
-     *
-     * Written first as a single-class `.lc-sidebar__addmenu` block, which
-     * changed nothing: one class against one class, and `.lc-menu` is
-     * declared further down the file, so it won every property they share.
-     * `bottom` stayed pinned while `top` was added, the box stretched
-     * between both edges, and the menu opened two pixels tall.
+     * Colin, 2026-09-24: "make the + button for new teammate and group the
+     * same style as our right click dropdowns, those are way cleaner". It
+     * was its own `lc-menu` dropdown, which needed three cascade fixes to
+     * open downward, at its own width and above the workroom from a 64px
+     * rail -- all of which the right-click menu never needed: it is drawn at
+     * the window and kept inside it (0.311).
      */
-    expect(CSS).toContain('.lc-menu.lc-sidebar__addmenu {')
-    const menu = rule('.lc-menu.lc-sidebar__addmenu {')
-    expect(menu, 'a box pinned top AND bottom is as tall as the gap').toContain('bottom: auto')
-    expect(menu).toContain('top:')
+    expect(SIDEBAR).not.toContain('lc-sidebar__addmenu')
+    expect(CSS).not.toContain('lc-sidebar__addmenu')
+    expect(SIDEBAR).toContain('onAddMenu(event.currentTarget)')
+    expect(rule('.lc-context {')).toContain('position: fixed')
   })
 
-  it('is not left to the base width, which is wider than the rail', () => {
-    expect(rule('.lc-menu.lc-sidebar__addmenu {')).toContain('width: max-content')
+  it('offers the three things the + adds, each with its key', () => {
+    const menu = APP.slice(APP.indexOf('const openAddMenu'), APP.indexOf('const assignMissionTo'))
+    expect(menu).toContain("{ label: 'New teammate', shortcut: 't'")
+    expect(menu).toContain("{ label: 'New room', shortcut: 'r'")
+    expect(menu).toContain("label: 'New group',")
   })
 
-  it('may hang out of the rail, which is 64px and cannot contain it', () => {
+  it('leaves its own button alone, so a second press closes it instead of reopening it', () => {
+    // An outside press closes a menu before the press does its own work; the
+    // + is outside the menu, so without this a second press would close it
+    // and the same click would open it again.
+    expect(CONTEXT_MENU).toContain('useDismissOnOutsidePress(true, onClose, ref, anchor)')
+    expect(APP).toContain('if (rowMenu?.anchor === anchor) {')
+  })
+
+  it('may still hang out of the rail, as the rail\u2019s flyouts do', () => {
     /*
      * `.lc-sidebar` carries a belt-and-braces `overflow: hidden` so no row
      * that miscalculates its width paints outside a fixed-width column. It
-     * caught the one thing that is SUPPOSED to hang out: the menu's own box
-     * measured 168x84 while everything past x=63 was clipped away, so half
-     * of each item was unpressable.
-     *
-     * Lifting it is safe because `.lc-sidebar__scroll` is the scrolling
-     * child -- the nav itself never scrolled, so nothing depended on the
-     * clip.
-     */
-    /*
-     * AT EVERY WIDTH, and that is the whole correction.
-     *
-     * This asserted `overflow: visible` on `.lc-shell.is-compact
-     * .lc-sidebar` -- the rail only -- because the rail was the only place
-     * the menu existed. When the wide `+` learned to offer the same three
-     * things in 0.147.0, the same brace clipped the same menu again: 168x125
-     * running to x=393 against a column ending at 268, with all three items
-     * reporting `reachable: false`. Colin's screenshot, "minor issue".
-     *
-     * So the guard is on the base rule now. A fix scoped to one width is a
-     * fix that waits for the other width to arrive.
+     * caught the add menu once (168x84 with everything past x=63 clipped),
+     * then again at full width in 0.147.0. The add menu no longer lives in
+     * the sidebar, but the rail's flyouts do, so the guard stays on the base
+     * rule: a fix scoped to one width is a fix that waits for the other.
      */
     expect(rule(String.fromCharCode(10) + '.lc-sidebar {')).toContain('overflow: visible')
     expect(CSS, 'the brand must not clip it either').toContain('.lc-shell.is-compact .lc-sidebar__brand {')
-  })
-
-  it('beats the workroom, which comes after the sidebar in the document', () => {
-    expect(rule('.lc-menu.lc-sidebar__addmenu {')).toContain('z-index:')
-  })
-
-  it('exists only where the words do not', () => {
-    // Widened out, both rows carry their own label and neither needs a menu.
-    expect(SIDEBAR).toContain('compact ? (')
-    expect(SIDEBAR).toContain('lc-sidebar__addmenu')
-  })
-
-  it('offers both things the two separate pluses used to', () => {
-    expect(SIDEBAR).toContain('New teammate')
-    expect(SIDEBAR).toContain('New room')
   })
 })
 

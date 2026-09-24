@@ -4,8 +4,11 @@ import { useModal } from '../useModal.js'
 
 import { BOT_SHAPES, botFor, seedAvatar, shuffledAvatar } from '../../../shared/avatar.js'
 import type { AvatarSpec, BotShape } from '../../../shared/avatar.js'
-import type { MissionMode, PublicTeammate, TeammateHue, TeammateRole, PublicConnector} from '../../../shared/ipc.js'
-import { modeSummary } from '../status.js'
+import type { MissionMode, PublicTeammate, TeammateHue, TeammateRole, PublicConnector, PublicModel, PublicRuntimeStatus, TeammateRoute } from '../../../shared/ipc.js'
+import { modeRunsOn, modesFor, modeSummary } from '../status.js'
+import { routeLabel } from './GroupSettingsDialog.js'
+import { RoutePicker } from './RoutePicker.js'
+import type { RouteChoice } from './RoutePicker.js'
 import { TeammateBot } from './TeammateBot.js'
 import { branchNameFor } from '../../../shared/worktree-name.js'
 
@@ -99,10 +102,13 @@ export function NewTeammateDialog({
   onChooseFolder,
   folderNotice,
   connectors,
-  onSetConnectors
+  onSetConnectors,
+  composerRoute,
+  picker,
+  platform
 }: {
   readonly onCancel: () => void
-  readonly onCreate: (input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; worktree?: boolean; avatar: AvatarSpec }) => void
+  readonly onCreate: (input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; worktree?: boolean; avatar: AvatarSpec; route?: TeammateRoute }) => void
   readonly error: string | undefined
   /** Set to edit an existing teammate: the same dialog, filled in, saving instead of creating. */
   readonly initial?: PublicTeammate
@@ -128,6 +134,24 @@ export function NewTeammateDialog({
   readonly connectors?: readonly PublicConnector[]
   /** The whole list of ticked names; empty means every connector. Takes effect at once. */
   readonly onSetConnectors?: (names: readonly string[]) => void
+  /**
+   * What the chat box is set to: the model a teammate with none of its own
+   * runs on, and so what the Model row says until one is picked.
+   */
+  readonly composerRoute?: TeammateRoute
+  /**
+   * What the chat's own model picker lists, so the Model row can offer the
+   * same picker. Absent, the row states the model and offers nothing.
+   */
+  readonly picker?: {
+    readonly runtimes: readonly PublicRuntimeStatus[]
+    readonly models: readonly PublicModel[]
+    readonly resolvedModels: ReadonlyMap<string, string>
+    readonly recentRoutes: readonly string[]
+    readonly limitedRuntimes: ReadonlyMap<string, string>
+  }
+  /** Which modes a runtime can run turns on it (Cursor cannot be held read-only on Windows). */
+  readonly platform?: string
 }): ReactElement {
   const editing = initial !== undefined
   const [name, setName] = useState(initial?.name ?? '')
@@ -138,6 +162,28 @@ export function NewTeammateDialog({
   const [role, setRole] = useState<TeammateRole>(initial?.role ?? 'Code & Migrations')
   const [roleTitle, setRoleTitle] = useState(initial?.roleTitle ?? '')
   const [worktree, setWorktree] = useState(initial?.worktree === true)
+  /*
+   * THE TEAMMATE'S OWN MODEL, chosen here (0.311). Colin, 2026-09-24: "do we
+   * have the ability to switch a teammates model? like not when youre in the
+   * chat but the actual designated teammate". It could only change by
+   * sending them a message on another model; rooms and routines use it, so
+   * to move a teammate in a room you had to talk to them alone first. Only a
+   * model actually picked is saved -- opening the dialog changes nothing.
+   */
+  const [picked, setPicked] = useState<TeammateRoute>()
+  const [picking, setPicking] = useState(false)
+  const ownRoute = initial?.route
+  const shownRoute = picked ?? ownRoute ?? composerRoute
+  const pick = (choice: RouteChoice): void => {
+    const was = ownRoute ?? composerRoute
+    const wanted = was?.mode ?? mode
+    // A mode the new runtime cannot run is not one it can be kept in.
+    const kept = modeRunsOn(wanted, choice.runtime, platform) ? wanted : modesFor(choice.runtime, platform)[0] ?? 'accept-edits'
+    // The level goes with the model that reported it; another model starts on its own default.
+    const effort = was !== undefined && was.runtime === choice.runtime && was.model === choice.model ? was.effort : undefined
+    setPicked({ runtime: choice.runtime, model: choice.model, mode: kept, ...(effort === undefined ? {} : { effort }) })
+    setPicking(false)
+  }
   const nameRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -151,7 +197,14 @@ export function NewTeammateDialog({
   // Focus in (the name field, above), Tab held inside, Escape closes -- from
   // anywhere now, not only while focus happened to be in the dialog.
   const box = useRef<HTMLDivElement>(null)
-  useModal(box, onCancel)
+  // Escape closes the model picker first, then the dialog.
+  useModal(box, () => {
+    if (picking) {
+      setPicking(false)
+      return
+    }
+    onCancel()
+  })
 
   return (
     <div className="lc-scrim">
@@ -411,12 +464,41 @@ export function NewTeammateDialog({
             can change: route selection lands with the route layer, and approval
             modes need a write-capable sandbox to mean anything.
           */}
-          <div className="lc-dialog__summary">
-            <div className="lc-summarycard">
-              <span className="lc-dot lc-tone-lime" />
-              <span className="lc-summarycard__text">Whichever route is active when a mission starts</span>
-              <span className="lc-summarycard__label lc-mono">DEFAULT ROUTE</span>
+          <div className="lc-teammatemodel">
+            <span className="lc-fieldlabel lc-mono">Model</span>
+            <div className="lc-teammatemodel__row">
+              <span className="lc-teammatemodel__name">
+                {shownRoute === undefined ? 'The chat box\u2019s, when they start' : routeLabel(shownRoute)}
+                {picked === undefined && ownRoute === undefined && shownRoute !== undefined && (
+                  <span className="lc-teammatemodel__whose"> · the chat box&apos;s, until you pick one</span>
+                )}
+              </span>
+              {picker !== undefined && (
+                <button type="button" className="lc-button" aria-expanded={picking} onClick={() => setPicking((open) => !open)}>
+                  {picking ? 'Cancel' : 'Change'}
+                </button>
+              )}
             </div>
+            {picking && picker !== undefined && (
+              <div className="lc-teammatemodel__picker">
+                <RoutePicker
+                  runtimes={picker.runtimes}
+                  limitedRuntimes={picker.limitedRuntimes}
+                  models={picker.models}
+                  resolvedModels={picker.resolvedModels}
+                  recentRoutes={picker.recentRoutes}
+                  active={shownRoute === undefined ? { runtime: 'claude', model: 'account-default' } : { runtime: shownRoute.runtime, model: shownRoute.model }}
+                  onSelect={pick}
+                  onClose={() => setPicking(false)}
+                />
+              </div>
+            )}
+            <span className="lc-teammatemodel__hint">
+              Their messages, rooms and routines run on it. Picking another model in a chat with them changes it too.
+            </span>
+          </div>
+
+          <div className="lc-dialog__summary">
             {/*
               * The mode the next mission will ACTUALLY run in. This said
               * "Read-only · nothing outside the workspace" as fixed copy,
@@ -449,7 +531,8 @@ export function NewTeammateDialog({
                 role,
                 ...(role === 'Custom' && roleTitle.trim().length > 0 ? { roleTitle: roleTitle.trim() } : {}),
                 ...(worktree ? { worktree: true } : {}),
-                avatar
+                avatar,
+                ...(picked === undefined ? {} : { route: picked })
               })
             }
           >

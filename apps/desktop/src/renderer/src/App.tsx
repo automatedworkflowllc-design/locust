@@ -660,6 +660,50 @@ export default function App(): ReactElement {
     })
   }
 
+  const startNewTeammate = (): void => {
+    setTeammateError(undefined)
+    setNewTeammateOpen(true)
+  }
+  const openRoomsScreen = (): void => {
+    setRoomNotice(undefined)
+    setCurrentRoomId(undefined)
+    setScreen('rooms')
+  }
+
+  /*
+   * THE SIDEBAR'S `+`, drawn as the right-click menus are. Colin,
+   * 2026-09-24: "make the + button for new teammate and group the same style
+   * as our right click dropdowns, those are way cleaner". It hangs from the
+   * button; pressing the button again closes it.
+   */
+  const openAddMenu = (anchor: HTMLElement): void => {
+    if (rowMenu?.anchor === anchor) {
+      setRowMenu(undefined)
+      return
+    }
+    const box = anchor.getBoundingClientRect()
+    setRowMenuArmed(undefined)
+    setRowMenu({
+      x: box.left,
+      y: box.bottom + 4,
+      title: 'Add',
+      anchor,
+      items: [
+        { label: 'New teammate', shortcut: 't', onSelect: startNewTeammate },
+        { label: 'New room', shortcut: 'r', onSelect: openRoomsScreen },
+        {
+          label: 'New group',
+          shortcut: 'g',
+          onSelect: () => {
+            // From the `+`, the new group takes no conversation with it.
+            setNewGroupFor(undefined)
+            setNamingGroup(true)
+          }
+        }
+      ]
+    })
+  }
+
   const assignMissionTo = (missionId: string, teammateId: string): void => {
     const bridge = window.desktop
     if (bridge === undefined) return
@@ -3432,7 +3476,7 @@ export default function App(): ReactElement {
       })
   }
 
-  const createTeammate = (input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; worktree?: boolean; avatar: AvatarSpec }): void => {
+  const createTeammate = (input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; worktree?: boolean; avatar: AvatarSpec; route?: TeammateRoute }): void => {
     const bridge = window.desktop
     if (!bridge) return
     void bridge
@@ -3456,7 +3500,7 @@ export default function App(): ReactElement {
 
   const updateTeammate = (
     teammateId: string,
-    input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; worktree?: boolean; avatar: AvatarSpec }
+    input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; worktree?: boolean; avatar: AvatarSpec; route?: TeammateRoute }
   ): void => {
     const bridge = window.desktop
     if (!bridge) return
@@ -4829,11 +4873,8 @@ export default function App(): ReactElement {
           }}
           onGroupRenameDone={() => setRenamingGroupId(undefined)}
           namingGroup={namingGroup}
-          onStartNamingGroup={() => {
-            // From the `+`, the new group takes no conversation with it.
-            setNewGroupFor(undefined)
-            setNamingGroup(true)
-          }}
+          onAddMenu={openAddMenu}
+          addMenuOpen={rowMenu?.anchor !== undefined}
           onNamingGroupDone={() => {
             setNamingGroup(false)
             setNewGroupFor(undefined)
@@ -4872,11 +4913,7 @@ export default function App(): ReactElement {
             setCurrentRoomId(roomId)
             setScreen('rooms')
           }}
-          onOpenRooms={() => {
-            setRoomNotice(undefined)
-            setCurrentRoomId(undefined)
-            setScreen('rooms')
-          }}
+          onOpenRooms={openRoomsScreen}
           onHome={() => {
             setSelectedTeammateId(undefined)
             setShownKey(undefined)
@@ -4893,10 +4930,6 @@ export default function App(): ReactElement {
           onSelectTeammate={selectTeammate}
           onNewConversationWith={newConversationWith}
           onOpenHub={openHub}
-          onNewTeammate={() => {
-            setTeammateError(undefined)
-            setNewTeammateOpen(true)
-          }}
           composerShown={screen === 'workroom'}
           onOpenSettings={() => {
             refreshWorktrees()
@@ -6033,6 +6066,9 @@ export default function App(): ReactElement {
           takenHues={teammates.map((teammate) => teammate.hue)}
           onCancel={() => setNewTeammateOpen(false)}
           onCreate={createTeammate}
+          composerRoute={{ runtime: route.runtime, model: route.model, mode, ...(effort === undefined ? {} : { effort }) }}
+          picker={{ runtimes, models, resolvedModels, recentRoutes, limitedRuntimes }}
+          {...(build?.platform === undefined ? {} : { platform: build.platform })}
         />
       )}
       {editingTeammate !== undefined && (
@@ -6046,6 +6082,9 @@ export default function App(): ReactElement {
             setEditingTeammate(undefined)
           }}
           onCreate={(input) => updateTeammate(editingTeammate.teammateId, input)}
+          composerRoute={{ runtime: route.runtime, model: route.model, mode, ...(effort === undefined ? {} : { effort }) }}
+          picker={{ runtimes, models, resolvedModels, recentRoutes, limitedRuntimes }}
+          {...(build?.platform === undefined ? {} : { platform: build.platform })}
           onChooseFolder={(clear) => chooseTeammateFolder(editingTeammate.teammateId, clear)}
           {...(connectorList === undefined ? {} : { connectors: connectorList })}
           onSetConnectors={(names) => setTeammateConnectors(editingTeammate.teammateId, names)}

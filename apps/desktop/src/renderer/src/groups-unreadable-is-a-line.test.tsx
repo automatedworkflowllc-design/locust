@@ -52,7 +52,7 @@ function sidebar(props: { readonly groups?: readonly PublicGroup[]; readonly unr
       onSelectTeammate={noop}
       onNewConversationWith={noop}
       onOpenHub={noop}
-      onNewTeammate={noop}
+      onAddMenu={noop}
       composerShown={false}
       onOpenSettings={noop}
       onOpenMissions={noop}

@@ -824,6 +824,8 @@ export interface TeammateCreateRequest {
   readonly worktree?: boolean
   /** The look chosen in the dialog; omitted, the store seeds one from the new id. */
   readonly avatar?: AvatarSpec
+  /** The model picked on the dialog's Model row; omitted, their first mission's is kept. */
+  readonly route?: TeammateRoute
 }
 
 /**
@@ -838,6 +840,13 @@ export interface TeammateUpdateRequest {
   readonly roleTitle?: string
   readonly worktree?: boolean
   readonly avatar: AvatarSpec
+  /**
+   * The model picked on the dialog's Model row (0.311). Colin, 2026-09-24:
+   * "do we have the ability to switch a teammates model? like not when
+   * youre in the chat but the actual designated teammate". Omitted, the
+   * route stays what it was.
+   */
+  readonly route?: TeammateRoute
 }
 
 export type TeammateListResponse =

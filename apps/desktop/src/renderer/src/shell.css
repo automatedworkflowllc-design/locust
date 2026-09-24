@@ -5846,38 +5846,9 @@ textarea {
     display: none;
   }
 
-/* The menu hangs OUT of a 64px rail, so it cannot be clipped by it. */
+/* The `+`'s anchor. Its menu is the right-click one, drawn at the window. */
 .lc-sidebar__add {
   position: relative;
-}
-
-/*
- * Opens DOWNWARD, and says so at a specificity that survives source order.
- *
- * `.lc-menu` is the composer's menu: it opens UPWARD off a control at the
- * foot of the window (`bottom: calc(100% + ...)`) and is a fixed 306px wide.
- * This menu hangs off a button at the TOP of the rail, so both have to go.
- *
- * Written first as a plain `.lc-sidebar__addmenu` block, which did nothing
- * at all -- one class against one class, and `.lc-menu` is declared 1,300
- * lines further down, so it won every property they share. `bottom` stayed
- * pinned while `top` was added, the box stretched between both edges, and
- * the menu opened `306x2` -- present, and to a person indistinguishable
- * from a button that does nothing, which is exactly what Colin reported:
- * "the + doesnt even function".
- *
- * Two classes rather than moving the block, because a rule whose
- * correctness depends on staying below another rule in an 8,700-line file
- * is a rule that breaks the next time someone tidies.
- */
-.lc-menu.lc-sidebar__addmenu {
-  position: absolute;
-  top: calc(100% + var(--lc-space-2));
-  bottom: auto;
-  left: 0;
-  z-index: 40;
-  width: max-content;
-  min-width: 168px;
 }
 
 .lc-shell.is-compact .lc-sidebar__brand {
@@ -6689,6 +6660,44 @@ textarea {
   color: var(--lc-text-muted);
   margin-top: 3px;
   line-height: 1.4;
+}
+
+/*
+ * A teammate's own model, in their dialog (0.311): the name, Change, and the
+ * chat's own picker opened in place -- in the dialog's flow rather than
+ * floating, because the body scrolls and would clip a floating panel.
+ */
+.lc-teammatemodel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+}
+
+.lc-teammatemodel__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lc-space-3);
+}
+
+.lc-teammatemodel__name {
+  min-width: 0;
+  color: var(--lc-text-primary);
+}
+
+.lc-teammatemodel__whose {
+  color: var(--lc-text-muted);
+}
+
+.lc-teammatemodel__picker .lc-picker {
+  position: static;
+  width: auto;
+  box-shadow: none;
+}
+
+.lc-teammatemodel__hint {
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
 }
 
 .lc-dialog__summary {

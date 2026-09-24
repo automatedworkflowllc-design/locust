@@ -54,7 +54,7 @@ function sidebar(
       onSelectTeammate={noop}
       onNewConversationWith={noop}
       onOpenHub={noop}
-      onNewTeammate={noop}
+      onAddMenu={noop}
       composerShown={false}
       onOpenSettings={noop}
       onOpenMissions={noop}
