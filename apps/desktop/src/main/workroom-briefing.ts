@@ -213,7 +213,25 @@ function quoted(message: WorkroomMessage, roster: readonly PeerRosterEntry[], no
   const body = sanitizeInbound(message.text).replace(/\n/g, '\n  ')
   const age = now === undefined ? undefined : messageAge(message.postedAt, now)
   const stale = age === undefined ? '' : ` (sent ${age}: check it still holds before acting on it)`
-  return `- ${who}, ${message.postedAt}${stale}:\n  ${body}`
+  return `- ${who}, ${message.postedAt}${stale}:\n  ${body}${hostSaw(message)}`
+}
+
+/**
+ * A2.17: PROOF FROM THE HOST. Beside a teammate's claim, what Locust itself
+ * saw their run change -- read off the folder before and after, and carried
+ * on the message by the host, so the sender's words cannot supply it. Said
+ * only when the host looked: a message with no reading gets no line.
+ */
+export function hostSaw(message: Pick<WorkroomMessage, 'observed'>): string {
+  if (message.observed === undefined) return ''
+  if (message.observed.length === 0) return '\n  (Locust saw their run change no files.)'
+  // The store keeps 40 and counts the rest as "+N more"; a path is file-system
+  // text, so it is defanged like any other text in a brief.
+  const counted = /^\+(\d+) more$/.exec(message.observed.at(-1) ?? '')
+  const paths = counted === null ? message.observed : message.observed.slice(0, -1)
+  const shown = paths.slice(0, 12)
+  const more = paths.length - shown.length + (counted === null ? 0 : Number(counted[1]))
+  return `\n  (Locust saw their run change: ${sanitizeInbound(shown.join(', '))}${more > 0 ? `, and ${String(more)} more` : ''}.)`
 }
 
 function inboundSection(messages: readonly WorkroomMessage[], remaining: number, roster: readonly PeerRosterEntry[], now: Date | undefined): string {

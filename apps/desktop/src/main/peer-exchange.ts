@@ -72,6 +72,8 @@ export interface PeerExchange {
     readonly missionId: string
     readonly peer: MissionPeerContext
     readonly text: string
+    /** What the host saw this run change (A2.17), attached to every message it sends. */
+    readonly observed?: readonly string[]
   }, report: (update: CodexMissionUpdate) => void): Promise<readonly PostedShare[]>
 }
 
@@ -363,7 +365,8 @@ export function createPeerExchange(options: {
           message = await options.workroom.post({
             from: { teammateId: peer.self.teammateId, name: peer.self.name, missionId: input.missionId },
             to: { teammateId: target.teammateId, name: target.name },
-            text
+            text,
+            ...(input.observed === undefined ? {} : { observed: input.observed })
           })
         } catch {
           failed(`A message from ${peer.self.name} to ${target.name} could not be written to the workroom. Nothing was sent.`)

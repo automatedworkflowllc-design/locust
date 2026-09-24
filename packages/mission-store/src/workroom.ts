@@ -54,6 +54,33 @@ export interface WorkroomMessage {
   readonly to: WorkroomParty
   readonly text: string
   readonly postedAt: string
+  /**
+   * A2.17: WHAT THE HOST SAW, not what the sender says. The paths Locust
+   * itself saw change in the folder during the run that sent this -- its
+   * own before-and-after reading, attached by the host, never by the
+   * sender's words -- so "I fixed app.ts" arrives beside whether app.ts
+   * changed. Absent when the host did not look (a read-only run, a folder
+   * another run was writing in at the same time); empty when it looked and
+   * nothing changed.
+   */
+  readonly observed?: readonly string[]
+}
+
+/** At most this many observed paths are kept on a message; the rest are counted, not listed. */
+export const MAX_OBSERVED_PATHS = 40
+
+/** A path as the host reports it: short, printable, one line. */
+export function isObservedPath(value: unknown): value is string {
+  return typeof value === 'string'
+    && value.length > 0
+    && value.length <= 300
+    && !/[\u0000-\u001f\u007f]/.test(value)
+}
+
+/** The observed paths a record may carry, or undefined when it carries none that are valid. */
+function parsedObserved(value: unknown): readonly string[] | undefined {
+  if (!Array.isArray(value) || value.length > MAX_OBSERVED_PATHS + 1) return undefined
+  return value.every((entry) => isObservedPath(entry) || /^\+\d+ more$/.test(String(entry))) ? (value as string[]) : undefined
 }
 
 /**
@@ -100,6 +127,8 @@ export interface Workroom {
     readonly from: WorkroomSender
     readonly to: WorkroomParty
     readonly text: string
+    /** What the host saw the sending run change (A2.17); the host's reading, never the sender's. */
+    readonly observed?: readonly string[]
   }): Promise<WorkroomMessage>
   /**
    * `include`: messages the run is being started FOR (A2.12). A run the host
@@ -207,7 +236,8 @@ function parsedMessage(value: unknown, sequence: number): WorkroomMessage | unde
     from: { ...from, missionId: value.from.missionId },
     to,
     text: value.text,
-    postedAt: value.postedAt
+    postedAt: value.postedAt,
+    ...(parsedObserved(value.observed) === undefined ? {} : { observed: parsedObserved(value.observed)! })
   }
 }
 
@@ -401,7 +431,15 @@ export function createFileWorkroom(options: FileWorkroomOptions): Workroom {
           from: { teammateId: input.from.teammateId, name: input.from.name, missionId: input.from.missionId },
           to: { teammateId: input.to.teammateId, name: input.to.name },
           text: input.text,
-          postedAt
+          postedAt,
+          ...(input.observed === undefined
+            ? {}
+            : {
+                observed: [
+                  ...input.observed.filter(isObservedPath).slice(0, MAX_OBSERVED_PATHS),
+                  ...(input.observed.length > MAX_OBSERVED_PATHS ? [`+${String(input.observed.length - MAX_OBSERVED_PATHS)} more`] : [])
+                ]
+              })
         }
         let sequence = 0
         let already: WorkroomMessage | undefined

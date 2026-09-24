@@ -2163,7 +2163,9 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
 export {
   createFileWorkroom,
   isWorkroomName,
+  isObservedPath,
   isWorkroomText,
+  MAX_OBSERVED_PATHS,
   MAX_WORKROOM_MESSAGE_LENGTH,
   MAX_WORKROOM_NAME_LENGTH,
   WORKROOM_SCHEMA_VERSION

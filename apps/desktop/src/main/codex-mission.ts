@@ -725,6 +725,13 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
     // What follows is the HOST's reading of the folder, and when another run
     // was writing in it the reading names nobody: it is reported as the
     // folder's change rather than attached to this teammate as files.
+    /*
+     * A2.17: what the host itself saw this run change, for the messages it
+     * sends. Only from a folder this run had to itself -- in a shared one the
+     * reading names nobody, so it proves nothing about this teammate -- and
+     * only when the host looked at all.
+     */
+    let observed: readonly string[] | undefined
     if (mission.diskBefore !== undefined) {
       try {
         const diskAfter = await (options.observeDisk ?? snapshotWorkspace)(mission.cwd)
@@ -751,6 +758,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           // path the runtime named keeps its own row and gets the patch
           // attached; one it never named gets a row of its own.
           const changed = changedPaths(mission.diskBefore, diskAfter)
+          observed = changed
           const unreported = new Set(unreportedPaths(changed, mission.persisted))
           const patches = changed.length === 0
             ? new Map<string, ToolPatch>()
@@ -785,7 +793,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       const text = mission.transcript.latestFinal
       if (text !== undefined) {
         const posted = await peerExchange.share(
-          { runId: mission.runId, missionId: mission.missionId, peer: mission.peer, text },
+          { runId: mission.runId, missionId: mission.missionId, peer: mission.peer, text, ...(observed === undefined ? {} : { observed }) },
           (update) => safelyEmit(mission, update)
         )
         if (posted.length > 0 && options.onShared !== undefined) {

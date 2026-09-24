@@ -2340,6 +2340,75 @@ describe('what a completed share hands to the relay', () => {
     ])
   })
 
+  /*
+   * A2.17: PROOF FROM THE HOST. A message a writing run sends carries the
+   * paths the host itself saw that run change -- its own before-and-after
+   * reading of the folder -- so the recipient reads the claim beside the
+   * fact. A read-only run was never looked at, and claims nothing.
+   */
+  describe('what the host saw, on the messages a run sends', () => {
+    const NUL = String.fromCharCode(0)
+    const run = async (mode: 'accept-edits' | 'ask') => {
+      const posts: { observed?: readonly string[] }[] = []
+      const scheduled: Array<() => void> = []
+      let looks = 0
+      let ids = 0
+      const service = createCodexMissionService({
+        workspacePath: WORKSPACE,
+        discover: async () => [codexRuntime()],
+        runner: {
+          start: () => ({
+            records: records([
+              { type: 'thread.started', thread_id: 'thread-live' },
+              { type: 'turn.started' },
+              { type: 'item.completed', item: { id: 'answer', type: 'agent_message', text: 'Done.\n<locust-share to="Atlas">I fixed app.ts.</locust-share>' } },
+              { type: 'turn.completed', usage: { output_tokens: 2 } }
+            ]),
+            completion: Promise.resolve(completion())
+          })
+        },
+        ledger: fakeLedger(),
+        observeDisk: async () => {
+          looks += 1
+          const map = new Map<string, string>()
+          if (looks > 1) for (const entry of ` M src/app.ts${NUL}?? src/new.ts${NUL}`.split(NUL)) if (entry.length >= 4) map.set(entry.slice(3), entry.slice(0, 2))
+          return map
+        },
+        observePatches: async () => new Map(),
+        workroom: {
+          post: async (input) => {
+            posts.push(input)
+            return { messageId: `wm_${String(posts.length)}`, sequence: posts.length, from: input.from, to: input.to, text: input.text, postedAt: NOW }
+          },
+          unread: async () => ({ messages: [], remaining: 0 }),
+          markDelivered: async () => undefined,
+          read: async () => ({ messages: [], deliveries: [], issues: [] }),
+          flush: async () => undefined
+        },
+        createId: () => String(++ids),
+        now: () => new Date(NOW),
+        schedule: (task) => scheduled.push(task)
+      })
+      const response = await service.start('Fix app.ts and tell Atlas.', 'codex', mode, {}, () => undefined, undefined, PEER)
+      expect(response.ok).toBe(true)
+      while (scheduled.length > 0) scheduled.shift()!()
+      for (let i = 0; i < 20; i += 1) await new Promise((resolve) => setImmediate(resolve))
+      return posts
+    }
+
+    it('attaches the paths the host saw a writing run change', async () => {
+      const posts = await run('accept-edits')
+      expect(posts).toHaveLength(1)
+      expect([...(posts[0]!.observed ?? [])].sort()).toEqual(['src/app.ts', 'src/new.ts'])
+    })
+
+    it('attaches nothing from a read-only run, which the host never looked at', async () => {
+      const posts = await run('ask')
+      expect(posts).toHaveLength(1)
+      expect(posts[0]!.observed).toBeUndefined()
+    })
+  })
+
   it('a relayed run carries its hop through to what it shares', async () => {
     const scheduled: Array<() => void> = []
     const shared: { mission: { relay?: unknown } }[] = []
