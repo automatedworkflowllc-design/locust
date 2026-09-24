@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { combineQueued, QUEUE_SEPARATOR, queuedIn, takeNext, withoutQueueOf } from './steering.js'
+import { queueHome, queuedVerdict, combineQueued, QUEUE_SEPARATOR, queuedIn, takeNext, withoutQueueOf } from './steering.js'
 import type { QueuedRow } from './steering.js'
+import APP from './App.tsx?raw'
 
 /**
  * A QUEUED MESSAGE STAYS IN THE CONVERSATION IT WAS TYPED IN.
@@ -124,3 +125,39 @@ describe('Edit while the run finishes', () => {
     expect(queuedIn(gemEnds.rest, 'pip').map((entry) => entry.text)).toEqual(['PIP_QUEUED'])
   })
 })
+
+/*
+ * M32: a follow-up typed into one of a busy teammate's own conversations
+ * stays in THAT conversation, waiting for their other run; it used to be
+ * keyed to the other run, vanish from where it was typed, and send there.
+ */
+describe('a message typed while its teammate is busy elsewhere', () => {
+  it('waits in the conversation it was typed in, for the busy run', () => {
+    expect(queueHome({ liveOnScreen: undefined, busyKey: 'run_h', shownKey: 'run_x', shownIsTheirs: true })).toEqual({ queueKey: 'run_x', waitForKey: 'run_h' })
+  })
+
+  it('goes to their busy run when the thread on screen is not theirs, or there is none', () => {
+    expect(queueHome({ liveOnScreen: undefined, busyKey: 'run_h', shownKey: 'run_gem', shownIsTheirs: false })).toEqual({ queueKey: 'run_h', waitForKey: undefined })
+    expect(queueHome({ liveOnScreen: undefined, busyKey: 'run_h', shownKey: undefined, shownIsTheirs: false })).toEqual({ queueKey: 'run_h', waitForKey: undefined })
+  })
+
+  it('replies into the live run on screen, whoever else is busy', () => {
+    expect(queueHome({ liveOnScreen: 'run_x', busyKey: 'run_h', shownKey: 'run_x', shownIsTheirs: true })).toEqual({ queueKey: 'run_x', waitForKey: undefined })
+  })
+
+  it('is judged by the run it waits for: held while that runs, sent when it ends', () => {
+    const row = { id: 'q1', key: 'run_x', text: 'now add tests', origin: 'person' as const, waitFor: 'run_h' }
+    expect(queuedIn([row], 'run_x')).toEqual([row])
+    expect(queuedVerdict({ running: true, phase: 'running', onScreen: true }).kind).toBe('waiting')
+    expect(queuedVerdict({ running: false, phase: 'completed', onScreen: true }).kind).toBe('send')
+  })
+})
+
+describe('the window', () => {
+  it('judges and shows a waiting row by the run it waits for (M32)', () => {
+    expect(APP).toContain('runs.get(front.waitFor ?? front.key)')
+    expect(APP).toContain('const waitingRunKey = waitingHere[0]?.waitFor ?? queueKey')
+    expect(APP).toContain('queueHome({ liveOnScreen, busyKey, shownKey, shownIsTheirs })')
+  })
+})
+

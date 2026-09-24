@@ -54,7 +54,7 @@ import type {
 } from '../../shared/ipc.js'
 import { roleLabelOf } from '../../shared/ipc.js'
 import { routineDraft, routineStepPhrase } from './routines.js'
-import { combineQueued, queuedIn, queuedVerdict, requeuedRows, retriedAfterBusy, takeNext, withoutQueueOf } from './steering.js'
+import { queueHome, combineQueued, queuedIn, queuedVerdict, requeuedRows, retriedAfterBusy, takeNext, withoutQueueOf } from './steering.js'
 import type { QueuedRow } from './steering.js'
 import type { RoutineDraft } from './routines.js'
 import { RoutineDialog } from './components/RoutineDialog.js'
@@ -3978,7 +3978,8 @@ export default function App(): ReactElement {
   // every conversation made a line for Gem wait on Pip's run and then ride
   // along with Pip's (outside beta recheck of 0.299, P1).
   const front = queuedIn(queued, shownKey)[0]
-  const queuedRun = front === undefined ? undefined : runs.get(front.key)
+  // M32: judged by the run it waits behind, when that is another conversation's.
+  const queuedRun = front === undefined ? undefined : runs.get(front.waitFor ?? front.key)
   const verdict =
     front === undefined
       ? undefined
@@ -4031,9 +4032,19 @@ export default function App(): ReactElement {
    */
   const liveOnScreen = shownKey !== undefined && liveRunIsActive(runs.get(shownKey)) ? shownKey : undefined
   const busyKey = busyRun === undefined ? undefined : [...runs.entries()].find(([, run]) => run === busyRun)?.[0]
-  const queueKey = liveOnScreen ?? busyKey ?? shownKey
+  /*
+   * M32: a message typed into one of the addressed teammate's OWN
+   * conversations while they are busy in another stays in the one it was
+   * typed in, waiting for the other run: shown and sent there. Only a thread
+   * that is not theirs -- someone else's, or none -- queues into their busy
+   * run, as before.
+   */
+  const shownRun = shownKey === undefined ? undefined : runs.get(shownKey)
+  const shownIsTheirs = shownRun !== undefined && pickedTeammate !== undefined && ownerOf(shownRun) === pickedTeammate.teammateId
+  const { queueKey, waitForKey } = queueHome({ liveOnScreen, busyKey, shownKey, shownIsTheirs })
   const waitingHere = queuedIn(queued, queueKey)
-  const waitingRun = queueKey === undefined ? undefined : runs.get(queueKey)
+  const waitingRunKey = waitingHere[0]?.waitFor ?? queueKey
+  const waitingRun = waitingRunKey === undefined ? undefined : runs.get(waitingRunKey)
   const waitingVerdict =
     waitingHere[0] === undefined
       ? undefined
@@ -5983,11 +5994,11 @@ export default function App(): ReactElement {
             onQueue={(text) => {
               // Into the conversation the box shows the queue of (queueKey):
               // the live run on screen, else the addressed teammate's busy run.
-              const key = liveOnScreen ?? busyKey
+              const key = queueKey
               if (key !== undefined) {
                 setQueued((rows) => [
                   ...rows,
-                  { id: `q_${String(rows.length)}_${key}`, key, text, origin: 'person' as const }
+                  { id: `q_${String(rows.length)}_${key}`, key, text, origin: 'person' as const, ...(waitForKey === undefined ? {} : { waitFor: waitForKey }) }
                 ])
               }
             }}

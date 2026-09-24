@@ -98,6 +98,14 @@ export interface QueuedRow {
   readonly retryAt?: number
   /** How many times the host has refused it as busy. */
   readonly tries?: number
+  /**
+   * M32: the run it waits behind, when that is not the conversation it was
+   * typed in -- the teammate busy in ANOTHER conversation of theirs. The row
+   * stays, shows and sends in `key`, its own conversation, once this run
+   * has ended. It used to be keyed to that other run, vanished from where it
+   * was typed when the run ended, and later sent into the wrong conversation.
+   */
+  readonly waitFor?: string
 }
 
 /**
@@ -185,6 +193,25 @@ export function combineQueued(rows: readonly QueuedRow[]): readonly QueuedRow[] 
  * sat under Gem's thread reading "sends when Gem finishes", and Edit there
  * rewrote Pip's (outside beta recheck of 0.299, P1).
  */
+/**
+ * M32: WHERE A MESSAGE TYPED NOW WAITS, AND WHAT IT WAITS FOR. The live run
+ * on screen is the conversation replied into. Otherwise, with the addressed
+ * teammate busy elsewhere: in the conversation on screen if it is theirs,
+ * waiting for the busy run; into the busy run if the thread on screen is not
+ * theirs (or there is none). With nobody busy, the conversation on screen.
+ */
+export function queueHome(input: {
+  readonly liveOnScreen: string | undefined
+  readonly busyKey: string | undefined
+  readonly shownKey: string | undefined
+  readonly shownIsTheirs: boolean
+}): { readonly queueKey: string | undefined; readonly waitForKey: string | undefined } {
+  const { liveOnScreen, busyKey, shownKey, shownIsTheirs } = input
+  const queueKey = liveOnScreen ?? (busyKey !== undefined && !shownIsTheirs ? busyKey : shownKey ?? busyKey)
+  const waitForKey = liveOnScreen === undefined && busyKey !== undefined && queueKey !== busyKey ? busyKey : undefined
+  return { queueKey, waitForKey }
+}
+
 export function queuedIn(rows: readonly QueuedRow[], key: string | undefined): readonly QueuedRow[] {
   return key === undefined ? [] : rows.filter((row) => row.key === key)
 }
