@@ -3017,6 +3017,18 @@ export default function App(): ReactElement {
     ).finally(() => setStoppingExchange(false))
   }
 
+  /**
+   * M27: why the last start went back to the box, in the host's words, for
+   * the composer to say. A send refused as busy with nothing of the
+   * teammate's to wait behind -- a conversation of nobody's while another
+   * runs, or every slot taken -- came back into the box with no reason.
+   */
+  const startRefusal = useRef<string | undefined>(undefined)
+  const startFromComposer = async (prompt: string): Promise<boolean | string> => {
+    startRefusal.current = undefined
+    const started = await startMission(prompt)
+    return started ? true : (startRefusal.current ?? false)
+  }
   const startMission = async (
     prompt: string,
     modeOverride?: MissionMode,
@@ -3198,6 +3210,7 @@ export default function App(): ReactElement {
             setQueued((rows) => [back, ...rows])
             return true
           }
+          startRefusal.current = `Not sent: ${response.error.message} Your message is back in the box.`
           return false
         }
         // A ledger that cannot be written is the same failure whether it hits
@@ -5924,7 +5937,7 @@ export default function App(): ReactElement {
                 ? 'No runtime can run a mission yet. Locust runs the coding-agent CLIs on this machine — Settings shows what to install, and OpenCode needs no account.'
                 : undefined
             }
-            onStart={startMission}
+            onStart={startFromComposer}
             onCancel={cancelMission}
             onOpenRoutePicker={() => {
               // Opening the picker is the moment the list matters most, and

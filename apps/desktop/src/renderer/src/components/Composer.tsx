@@ -200,7 +200,8 @@ export interface ComposerProps {
   readonly onEffortChange: (effort: string | undefined) => void
   readonly swarm: boolean
   readonly onSwarmChange: (swarm: boolean) => void
-  readonly onStart: (prompt: string) => Promise<boolean>
+  /** True when it started; false, or the words saying why not (M27), when it did not. */
+  readonly onStart: (prompt: string) => Promise<boolean | string>
   readonly onCancel: () => void
   readonly onOpenRoutePicker: () => void
   /**
@@ -611,9 +612,11 @@ export function Composer({
     const sending = attached
     setAttached([])
     void onStart(withAttachments(prompt, sending)).then((started) => {
-      if (!started) {
+      if (started !== true) {
         setValue(prompt)
         setAttached(sending)
+        // M27: and say why, when the host said.
+        if (typeof started === 'string') setNote(started)
       }
     })
   }

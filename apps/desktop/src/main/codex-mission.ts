@@ -969,7 +969,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           return error(
             'RUN_ALREADY_ACTIVE',
             peer === undefined
-              ? 'Wait for the active Codex mission to finish or cancel it first.'
+              // M27: said to the person now, so it names the real rule, not "Codex".
+              ? 'Another conversation without a teammate is running, and those run one at a time. Wait for it to finish or stop it first.'
               : `${peer.self.name} already has a mission running. Wait for it to finish or stop it first.`
           ) as CodexMissionStartResponse
         }
