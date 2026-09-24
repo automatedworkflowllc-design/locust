@@ -16,10 +16,18 @@
 // was already gone from its brief for exactly that reason.
 
 import { createHash } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { FREE_ROUTE, pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace } from './drive-lib.mjs'
+
+// `--packaged <exe> --tag <name>`: the same drive on an installer's build,
+// recorded beside the other fixes, as drive-relay does.
+const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
+const packaged = arg('--packaged')
+const tag = arg('--tag')
+const outPath = tag === undefined ? undefined : join(new URL('../docs/beta-fixes-2026-09-24/', import.meta.url).pathname.slice(1), `ask-changes-${tag}`)
+if (outPath !== undefined) await mkdir(outPath, { recursive: true })
 
 const workspace = await scratchRepository('locust-drive-askchanges-ws-')
 const workspaceId = `ws_${createHash('sha256').update(workspace, 'utf8').digest('hex').slice(0, 32)}`
@@ -40,6 +48,8 @@ const drive = await startDrive({
   name: 'ask-changes',
   port: 9528,
   workspace,
+  ...(packaged === undefined ? {} : { packaged }),
+  ...(outPath === undefined ? {} : { outPath }),
   seed: {
     schemaVersion: 1,
     teammates: [
@@ -133,5 +143,5 @@ try {
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
-  await drive.finish({ intro: 'Build: whatever `pnpm build` last wrote to out/. Booty proposes; Wren, Ash and Moth quote, each in their first conversation; all on the free OpenCode model; memory mode Ask me first, two memories already kept.' })
+  await drive.finish({ intro: `Build: ${packaged ?? 'whatever `pnpm build` last wrote to out/'}. Booty proposes; Wren, Ash and Moth quote, each in their first conversation; all on the free OpenCode model; memory mode Ask me first, two memories already kept.` })
 }
