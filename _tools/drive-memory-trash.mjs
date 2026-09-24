@@ -17,6 +17,15 @@ import { join } from 'node:path'
 
 import { FREE_ROUTE, openTeammateScript, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
 
+/*
+ * Free by default. LOCUST_DRIVE_CLAUDE=1 runs the teammates on Claude Haiku
+ * instead -- for when the OpenCode free tier is down (2026-09-24: both free
+ * models hung on a one-word prompt) -- and says the drive spends, so it also
+ * needs LOCUST_SPEND=1.
+ */
+const ON_CLAUDE = process.env.LOCUST_DRIVE_CLAUDE === '1'
+const ROUTE = ON_CLAUDE ? { runtime: 'claude', model: 'haiku', mode: 'accept-edits' } : FREE_ROUTE
+
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tag = arg('--tag')
@@ -27,7 +36,7 @@ const workspace = await scratchRepository('locust-drive-trash-ws-')
 const workspaceId = `ws_${createHash('sha256').update(workspace, 'utf8').digest('hex').slice(0, 32)}`
 const T0 = '2026-09-05T05:00:00.000Z'
 const kept = (memoryId, text) => ({ memoryId, text, scope: 'workspace', workspaceId, workspaceName: 'scratch', by: { name: 'you' }, createdAt: T0, status: 'kept', enabled: true })
-const teammate = (name, hue) => ({ teammateId: `tm_${name.toLowerCase()}`, name, hue, role: 'Custom', roleTitle: 'Helper', createdAt: T0, route: FREE_ROUTE })
+const teammate = (name, hue) => ({ teammateId: `tm_${name.toLowerCase()}`, name, hue, role: 'Custom', roleTitle: 'Helper', createdAt: T0, route: ROUTE })
 const common = {
   name: 'memory-trash',
   port: 9530,
@@ -35,6 +44,7 @@ const common = {
   ...(packaged === undefined ? {} : { packaged })
 }
 let drive = await startDrive({
+  spends: ON_CLAUDE,
   ...common,
   ...(outPath === undefined ? {} : { outPath }),
   keep: true,
@@ -109,14 +119,14 @@ try {
     return said + ' || ' + ${sections}
   })()`))
   await drive.capture('Restore the secret word', () => drive.evaluate(click('/PELICAN/', 'Restore', '.lc-memory.is-forgotten')))
-  handoff = await drive.finish({ intro: `Build: ${packaged ?? 'whatever pnpm build last wrote to out/'}. Booty, Ash, Moth and Fern on the free OpenCode model; memory Keep and tell me; three memories kept; closed and opened again at the end.`, last: false })
+  handoff = await drive.finish({ intro: `Build: ${packaged ?? 'whatever pnpm build last wrote to out/'}. Booty, Ash, Moth and Fern on ${ON_CLAUDE ? 'Claude Haiku' : 'the free OpenCode model'}; memory Keep and tell me; three memories kept; closed and opened again at the end.`, last: false })
 } catch (error) {
   say(`first half failed: ${error instanceof Error ? error.message : String(error)}`)
 }
 
 try {
   // The same profile, opened again.
-  drive = await startDrive({ ...common, profilePath: handoff.profile, outPath: handoff.out, stepFrom: handoff.step })
+  drive = await startDrive({ ...common, spends: ON_CLAUDE, profilePath: handoff.profile, outPath: handoff.out, stepFrom: handoff.step })
   await drive.capture('opened again: Recently forgotten outlived the restart', async () => {
     await drive.ready()
     return drive.evaluate(`(async () => { ${memoryScreen}; return ${sections} })()`)

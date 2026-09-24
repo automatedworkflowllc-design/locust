@@ -118,5 +118,12 @@ describe('running one saved before', () => {
     expect(execution?.status === 'held' && execution.reason).toContain('Step 2 is too long to send')
     expect(execution?.status === 'held' && execution.reason).not.toContain('Dispatch not confirmed')
     expect(h.notices.at(-1)).toContain('stopped before step 2 of 2: Step 2 is too long to send')
+    // And it STAYS said: a reconcile -- the Routines screen runs one -- must
+    // not trade the reason for "The saved step completed" and a Continue
+    // that would run into the same refusal (caught by the 0.316 drive).
+    await h.runner.reconcile()
+    const after = h.map.get('rt_1')?.execution
+    expect(after?.status === 'held' && after.reason).toContain('Step 2 is too long to send')
+    expect(after?.status === 'held' && after.canContinue).toBe(false)
   })
 })

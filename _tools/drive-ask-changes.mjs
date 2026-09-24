@@ -21,6 +21,15 @@ import { join } from 'node:path'
 
 import { FREE_ROUTE, pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace } from './drive-lib.mjs'
 
+/*
+ * Free by default. LOCUST_DRIVE_CLAUDE=1 runs the teammates on Claude Haiku
+ * instead -- for when the OpenCode free tier is down (2026-09-24: both free
+ * models hung on a one-word prompt) -- and says the drive spends, so it also
+ * needs LOCUST_SPEND=1.
+ */
+const ON_CLAUDE = process.env.LOCUST_DRIVE_CLAUDE === '1'
+const ROUTE = ON_CLAUDE ? { runtime: 'claude', model: 'haiku', mode: 'accept-edits' } : FREE_ROUTE
+
 // `--packaged <exe> --tag <name>`: the same drive on an installer's build,
 // recorded beside the other fixes, as drive-relay does.
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
@@ -45,6 +54,7 @@ const kept = (memoryId, text, name) => ({
   ...(name === undefined ? {} : { name })
 })
 const drive = await startDrive({
+  spends: ON_CLAUDE,
   name: 'ask-changes',
   port: 9528,
   workspace,
@@ -60,10 +70,10 @@ const drive = await startDrive({
        * reach for `cat` first -- the first two runs of this drive lost three
        * of their turns to exactly that, the second one its only proposal.
        */
-      { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: T0, route: FREE_ROUTE },
-      { teammateId: 'tm_booty', name: 'Booty', hue: 'blue', role: 'Custom', roleTitle: 'Reviewer', createdAt: T0, route: FREE_ROUTE },
-      { teammateId: 'tm_ash', name: 'Ash', hue: 'clay', role: 'Custom', roleTitle: 'Quoter', createdAt: T0, route: FREE_ROUTE },
-      { teammateId: 'tm_moth', name: 'Moth', hue: 'teal', role: 'Custom', roleTitle: 'Quoter', createdAt: T0, route: FREE_ROUTE }
+      { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: T0, route: ROUTE },
+      { teammateId: 'tm_booty', name: 'Booty', hue: 'blue', role: 'Custom', roleTitle: 'Reviewer', createdAt: T0, route: ROUTE },
+      { teammateId: 'tm_ash', name: 'Ash', hue: 'clay', role: 'Custom', roleTitle: 'Quoter', createdAt: T0, route: ROUTE },
+      { teammateId: 'tm_moth', name: 'Moth', hue: 'teal', role: 'Custom', roleTitle: 'Quoter', createdAt: T0, route: ROUTE }
     ],
     missionOwners: {},
     settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'ask' }
@@ -143,5 +153,5 @@ try {
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
-  await drive.finish({ intro: `Build: ${packaged ?? 'whatever `pnpm build` last wrote to out/'}. Booty proposes; Wren, Ash and Moth quote, each in their first conversation; all on the free OpenCode model; memory mode Ask me first, two memories already kept.` })
+  await drive.finish({ intro: `Build: ${packaged ?? 'whatever `pnpm build` last wrote to out/'}. Booty proposes; Wren, Ash and Moth quote, each in their first conversation; all on ${ON_CLAUDE ? 'Claude Haiku' : 'the free OpenCode model'}; memory mode Ask me first, two memories already kept.` })
 }

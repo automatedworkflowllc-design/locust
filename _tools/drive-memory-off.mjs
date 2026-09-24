@@ -15,6 +15,15 @@ import { join } from 'node:path'
 
 import { FREE_ROUTE, openTeammateScript, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
 
+/*
+ * Free by default. LOCUST_DRIVE_CLAUDE=1 runs the teammates on Claude Haiku
+ * instead -- for when the OpenCode free tier is down (2026-09-24: both free
+ * models hung on a one-word prompt) -- and says the drive spends, so it also
+ * needs LOCUST_SPEND=1.
+ */
+const ON_CLAUDE = process.env.LOCUST_DRIVE_CLAUDE === '1'
+const ROUTE = ON_CLAUDE ? { runtime: 'claude', model: 'haiku', mode: 'accept-edits' } : FREE_ROUTE
+
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tag = arg('--tag')
@@ -24,8 +33,9 @@ if (outPath !== undefined) await mkdir(outPath, { recursive: true })
 const workspace = await scratchRepository('locust-drive-memoff-ws-')
 const workspaceId = `ws_${createHash('sha256').update(workspace, 'utf8').digest('hex').slice(0, 32)}`
 const T0 = '2026-09-05T05:00:00.000Z'
-const teammate = (name, hue) => ({ teammateId: `tm_${name.toLowerCase()}`, name, hue, role: 'Custom', roleTitle: 'Helper', createdAt: T0, route: FREE_ROUTE })
+const teammate = (name, hue) => ({ teammateId: `tm_${name.toLowerCase()}`, name, hue, role: 'Custom', roleTitle: 'Helper', createdAt: T0, route: ROUTE })
 const drive = await startDrive({
+  spends: ON_CLAUDE,
   name: 'memory-off',
   port: 9531,
   workspace,
@@ -76,5 +86,5 @@ try {
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
-  await drive.finish({ intro: `Build: ${packaged ?? 'whatever pnpm build last wrote to out/'}. Ash and Moth on the free OpenCode model; one memory kept; memory switched Off on the Memory screen between them.` })
+  await drive.finish({ intro: `Build: ${packaged ?? 'whatever pnpm build last wrote to out/'}. Ash and Moth on ${ON_CLAUDE ? 'Claude Haiku' : 'the free OpenCode model'}; one memory kept; memory switched Off on the Memory screen between them.` })
 }

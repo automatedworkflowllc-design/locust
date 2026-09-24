@@ -255,7 +255,10 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
     if (tooLong !== undefined) {
       const message = `Step ${String(step)} is too long to send: ${tooLong} Shorten it in Edit, then run the routine again. Nothing was started.`
       const prior = routine.execution
-      if (step > 1 && prior !== undefined && prior.status !== 'abandoned') await hold(routine, prior, message)
+      // Settled at dispatch: the reason is exact, and a later reconcile must
+      // not trade it for "The saved step completed ... Continue", which would
+      // only run into the same refusal (the 0.316 drive caught exactly that).
+      if (step > 1 && prior !== undefined && prior.status !== 'abandoned') await hold(routine, prior, message, false, true)
       return { ok: false, error: { code: 'INVALID_PROMPT', message } }
     }
     /*
