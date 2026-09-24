@@ -1053,6 +1053,12 @@ export interface RoomTask {
   readonly state: 'open' | 'in-hand' | 'done'
   /** The mission whose reply last moved this task, when a teammate did. */
   readonly missionId: string | undefined
+  /**
+   * The teammate who last handed it to its owner (A2.15): a handoff straight
+   * back to them is refused, so a stage is never bounced between two members.
+   * Cleared when someone claims it or a person reassigns it.
+   */
+  readonly handedBy?: string | undefined
   readonly at: string
 }
 

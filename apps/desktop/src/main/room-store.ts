@@ -153,6 +153,7 @@ function parsedTask(value: unknown): RoomTask | undefined {
   if (record.state !== 'open' && record.state !== 'in-hand' && record.state !== 'done') return undefined
   if (record.ownerId !== undefined && !safeId(record.ownerId)) return undefined
   if (record.missionId !== undefined && !safeId(record.missionId)) return undefined
+  if (record.handedBy !== undefined && !safeId(record.handedBy)) return undefined
   if (typeof record.at !== 'string' || Number.isNaN(Date.parse(record.at))) return undefined
   return {
     taskId: record.taskId,
@@ -160,6 +161,7 @@ function parsedTask(value: unknown): RoomTask | undefined {
     ownerId: record.ownerId,
     state: record.state,
     missionId: record.missionId,
+    ...(record.handedBy === undefined ? {} : { handedBy: record.handedBy }),
     at: record.at
   }
 }
@@ -527,7 +529,7 @@ export function createRoomStore(options: {
               refused.push(`${actor.name} tried to claim "${task.text}", which is done.`)
               continue
             }
-            tasks[index] = { ...task, ownerId: actor.teammateId, state: 'in-hand', missionId: actor.missionId, at }
+            tasks[index] = { ...task, ownerId: actor.teammateId, state: 'in-hand', missionId: actor.missionId, handedBy: undefined, at }
             changed.push(`${actor.name} took on "${task.text}".`)
             continue
           }
@@ -549,15 +551,31 @@ export function createRoomStore(options: {
             refused.push(`${actor.name} handed "${op.text}" to "${op.to}", who is not in this room.`)
             continue
           }
+          if (target.teammateId === actor.teammateId) {
+            refused.push(`${actor.name} handed "${op.text}" to themselves; to take it on, claim it.`)
+            continue
+          }
+          /*
+           * A2.15: NEVER BOUNCE A STAGE BETWEEN MEMBERS (Rakazo's rules for a
+           * room). A handoff straight back to whoever handed it over is two
+           * teammates passing one task between them, each run a hop, until
+           * the relay's budget runs out with the work undone. It stays with
+           * its owner, who can say in the room what is stopping it; a person
+           * can still move it anywhere.
+           */
+          if (index >= 0 && tasks[index]!.ownerId === actor.teammateId && tasks[index]!.handedBy === target.teammateId) {
+            refused.push(`${actor.name} tried to hand "${tasks[index]!.text}" back to ${target.name}, who handed it over. It stays with ${actor.name}.`)
+            continue
+          }
           if (index < 0) {
             if (tasks.length >= MAX_ROOM_TASKS) {
               refused.push(`The board is full (${String(MAX_ROOM_TASKS)} tasks).`)
               continue
             }
-            tasks.push({ taskId: `task_${createId()}`, text: op.text, ownerId: target.teammateId, state: 'open', missionId: actor.missionId, at })
+            tasks.push({ taskId: `task_${createId()}`, text: op.text, ownerId: target.teammateId, state: 'open', missionId: actor.missionId, handedBy: actor.teammateId, at })
           } else {
             const task = tasks[index]!
-            tasks[index] = { ...task, ownerId: target.teammateId, state: 'open', missionId: actor.missionId, at }
+            tasks[index] = { ...task, ownerId: target.teammateId, state: 'open', missionId: actor.missionId, handedBy: actor.teammateId, at }
           }
           changed.push(`${actor.name} handed "${op.text}" to ${target.name}.`)
         }
@@ -589,7 +607,7 @@ export function createRoomStore(options: {
           if (request.op === 'assign') {
             const ownerId = typeof request.ownerId === 'string' ? request.ownerId : undefined
             if (ownerId !== undefined && !room.teammateIds.includes(ownerId)) throw new Error('Only a teammate in the room can own its task.')
-            tasks[index] = { ...task, ownerId, state: task.state === 'done' ? 'done' : ownerId === undefined ? 'open' : 'in-hand', at }
+            tasks[index] = { ...task, ownerId, state: task.state === 'done' ? 'done' : ownerId === undefined ? 'open' : 'in-hand', handedBy: undefined, at }
           } else if (request.op === 'done') {
             tasks[index] = { ...task, state: 'done', at }
           } else if (request.op === 'reopen') {

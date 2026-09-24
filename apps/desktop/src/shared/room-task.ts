@@ -248,6 +248,8 @@ export function taskSection(input: {
      * teammates receive the task only assigned to one things can get messy").
      */
     'If you begin work that a row on that board describes -- because the person asked you to, or because you picked it up -- claim it in the same reply. An unassigned row and a row you are working look the same to everyone else, and the rule above sends them at unassigned rows.',
+    // A2.15: the host refuses the bounce too (room-store `applyTaskOps`).
+    'Never hand a task back to the teammate who handed it to you: if you cannot finish it, say in your reply what is stopping you, and keep it.',
     'Claim only what you are actually doing, mark done only what is finished, and if you touched no task, end with no block.'
   ].join('\n')
 }

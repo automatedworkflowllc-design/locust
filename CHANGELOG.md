@@ -19,6 +19,13 @@ heading: the home screen then shows it once, as a splash.
   the same effort slider as the chat box, with that model's own levels.
   It used to change only in a chat with them.
 
+### Fixed
+
+- **Two teammates can no longer pass a room task back and forth.** A task
+  handed to a teammate cannot be handed straight back to whoever handed it
+  over; it stays with them, and the room says so. You can still move it
+  anywhere yourself.
+
 ### Improved
 
 - **The effort slider's thumb is Claude Code's.** It was a small, soft
