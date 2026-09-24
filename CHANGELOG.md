@@ -11,6 +11,28 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.306.0 - 2026-09-23
+
+### New
+
+- **Send feedback, the way Claude Code asks for it.** Settings › Report a
+  problem, and every conversation's ⋯ menu, open a Send feedback box: say
+  what happened, and Locust opens the report on GitHub with your Locust
+  version and Windows build written in -- and, from a conversation, that
+  conversation. You send it there (it needs a GitHub account). Nothing is
+  attached for you: the log stays on your machine unless you add it.
+
+### Improved
+
+- **The folder is back on the composer.** The chip naming the folder your
+  teammates work in is on the row again; click it to pick another.
+- **Editing a queued message says what happens.** Edit takes the message
+  off the queue and back into the box, and a line now says so -- and what
+  Enter will do: queue it again while the run is going, or send it once the
+  run is over.
+- **The update banner waits for the run to end** instead of sitting between
+  a live run and the box.
+
 ## 0.305.0 - 2026-09-23
 
 ### Improved

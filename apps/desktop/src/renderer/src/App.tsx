@@ -132,6 +132,8 @@ import { splitAttachments } from '../../shared/attachments.js'
 import { heldFor, routineOf } from './conversationList.js'
 import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
 import { modelDisplayName } from './routeName.js'
+import { FeedbackDialog } from './components/FeedbackDialog.js'
+import { conversationText } from './feedback.js'
 import { withMessageDelta } from '../../shared/messageFragments.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
 import type { Handoff } from './glances.js'
@@ -672,6 +674,8 @@ export default function App(): ReactElement {
 
   /** Which conversation is being renamed in place, if any. */
   const [renamingMissionId, setRenamingMissionId] = useState<string>()
+  /** The Send feedback box, and the conversation it was opened from. */
+  const [feedbackFor, setFeedbackFor] = useState<{ readonly conversation: string }>()
 
   /**
    * Name a conversation, or clear the name with an empty one.
@@ -4447,6 +4451,27 @@ export default function App(): ReactElement {
   if (saveAsRoutineId !== undefined) {
     headerActions.push({ label: 'Save conversation as routine', onSelect: () => openSaveRoutine(saveAsRoutineId) })
   }
+  /*
+   * SEND FEEDBACK about this conversation -- Claude Code's box (Colin: "for
+   * bug reporting we can use what claude code does"), carrying what was said
+   * here, which is what a report about it needs. Words only (feedback.ts).
+   */
+  if (liveRun !== undefined) {
+    const shown = liveRun
+    headerActions.push({
+      label: 'Send feedback',
+      onSelect: () => {
+        const turns = [
+          ...(shown.earlierTurns ?? []).map((turn) => ({ prompt: turn.prompt, events: turn.events })),
+          { prompt: shown.prompt, events: shown.events }
+        ]
+        const runtime = shown.data?.runtime ?? shown.runtime ?? 'codex'
+        const model = shown.data?.model
+        const speaker = `${missionOwner?.name ?? 'The teammate'} (${runtimeDisplayName(runtime)}${model === undefined || model.length === 0 ? '' : `, ${modelDisplayName(runtime, model)}`})`
+        setFeedbackFor({ conversation: conversationText(turns, speaker) })
+      }
+    })
+  }
   if (!running && liveRun?.data?.missionId !== undefined) {
     const shownId = liveRun.data.missionId
     headerActions.push({
@@ -5583,7 +5608,13 @@ export default function App(): ReactElement {
           )}
           {/* What changed lives in Settings > What's new now, and a big build
               gets the splash (see `splashOpen`); the banner that sat here is gone. */}
-          {screen === 'workroom' && <UpdateBanner update={update} onInstall={installUpdate} />}
+          {/*
+            * Not while this conversation's run is going: the outside recheck
+            * of 0.303 found the banner "understandable, but competed for
+            * attention during a live mission" -- and installing is refused
+            * mid-run anyway. It is there again the moment the run ends.
+            */}
+          {screen === 'workroom' && !running && <UpdateBanner update={update} onInstall={installUpdate} />}
           {screen === 'workroom' && (
           <Composer
             metal={metal}
@@ -5966,6 +5997,9 @@ export default function App(): ReactElement {
           onSetConnectors={(names) => setTeammateConnectors(editingTeammate.teammateId, names)}
           {...(folderNotice === undefined ? {} : { folderNotice })}
         />
+      )}
+      {feedbackFor !== undefined && (
+        <FeedbackDialog conversation={feedbackFor.conversation} onClose={() => setFeedbackFor(undefined)} />
       )}
       {routineDialog !== undefined && (
         <RoutineDialog

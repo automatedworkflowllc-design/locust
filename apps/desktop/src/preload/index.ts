@@ -44,6 +44,7 @@ import {
   WORKSPACE_SAVE_COPY_CHANNEL,
   WORKSPACE_TEXT_CHANNEL,
   DIAGNOSTICS_REVEAL_CHANNEL,
+  FEEDBACK_CHANNEL,
   DIAGNOSTICS_REPORT_CHANNEL,
   OPEN_LINK_CHANNEL,
   ROOM_LIST_CHANNEL,
@@ -114,6 +115,7 @@ import type {
   WorkspaceChooseResponse,
   AttachFilesResponse,
   OpenLinkResponse,
+  FeedbackReport,
   RevealFileResponse,
   WorkspaceTextResponse,
   DiagnosticsReport,
@@ -287,6 +289,7 @@ const desktopApi: DesktopApi = {
   saveCopy: (path: string) => ipcRenderer.invoke(WORKSPACE_SAVE_COPY_CHANNEL, path) as Promise<RevealFileResponse>,
   readTextFile: (path: string) => ipcRenderer.invoke(WORKSPACE_TEXT_CHANNEL, path) as Promise<WorkspaceTextResponse>,
   revealDiagnostics: () => ipcRenderer.invoke(DIAGNOSTICS_REVEAL_CHANNEL) as Promise<void>,
+  sendFeedback: (report: FeedbackReport) => ipcRenderer.invoke(FEEDBACK_CHANNEL, report) as Promise<OpenLinkResponse>,
   diagnosticsReport: () => ipcRenderer.invoke(DIAGNOSTICS_REPORT_CHANNEL) as Promise<DiagnosticsReport>,
   openLink: (url: string) => ipcRenderer.invoke(OPEN_LINK_CHANNEL, url) as Promise<OpenLinkResponse>,
   readWorkspaceImage: (path: string) =>

@@ -164,6 +164,7 @@ import {
   WORKSPACE_SAVE_COPY_CHANNEL,
   WORKSPACE_TEXT_CHANNEL,
   DIAGNOSTICS_REVEAL_CHANNEL,
+  FEEDBACK_CHANNEL,
   DIAGNOSTICS_REPORT_CHANNEL,
   OPEN_LINK_CHANNEL,
   DEFAULT_RELAY_HOP_CAP,
@@ -187,6 +188,7 @@ import { isMissionRuntime, runtimeDisplayName } from '../shared/runtimes.js'
 import { routeAtStart } from '../shared/route-at-start.js'
 import { roleLabelOf } from '../shared/ipc.js'
 import { isOutboundLink, isWebLink } from '../shared/outbound-links.js'
+import { feedbackUrl } from './report-problem.js'
 import { allowCursorConnectors } from './cursor-connector-allow.js'
 import { cursorConfiguredConnectorNames, cursorReadyConnectors } from './cursor-connector-notice.js'
 import { pruneMissionRecords, readStorageReport } from './retention.js'
@@ -2496,6 +2498,31 @@ if (!ownsSingleInstanceLock) {
      * The file is guaranteed to exist by the time anyone can press this,
      * because every run writes its opening line before a window is shown.
      */
+    /*
+     * Send feedback, in the person's browser: the one address in
+     * report-problem.ts, filled in with their words, the version, the Windows
+     * build and the conversation they sent it from. The renderer hands over
+     * words only; anything that is not a string is dropped.
+     */
+    ipcMain.handle(FEEDBACK_CHANNEL, async (event, report: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      const record = (typeof report === 'object' && report !== null ? report : {}) as Record<string, unknown>
+      const description = typeof record.description === 'string' ? record.description : ''
+      if (description.trim().length === 0) return { ok: false, message: 'Say what happened first.' } as const
+      const conversation = typeof record.conversation === 'string' ? record.conversation : undefined
+      try {
+        await shell.openExternal(
+          feedbackUrl(
+            { version: app.getVersion(), release: release(), arch: process.arch },
+            { description, ...(conversation === undefined ? {} : { conversation }) }
+          )
+        )
+        return { ok: true } as const
+      } catch {
+        return { ok: false, message: 'Your browser could not be opened. What you wrote is still here.' } as const
+      }
+    })
+
     ipcMain.handle(DIAGNOSTICS_REVEAL_CHANNEL, () => {
       shell.showItemInFolder(errorLog())
     })

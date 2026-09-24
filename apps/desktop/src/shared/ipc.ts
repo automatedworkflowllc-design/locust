@@ -540,6 +540,22 @@ export const WORKSPACE_SAVE_COPY_CHANNEL = 'workspace:save-copy'
  */
 export const DIAGNOSTICS_REVEAL_CHANNEL = 'diagnostics:reveal'
 
+/**
+ * Send feedback: the words from the Send feedback box, and the conversation
+ * it was sent from when there was one (main/report-problem.ts). The renderer
+ * hands over WORDS; the host builds the one address itself, so nothing here
+ * can name a destination.
+ */
+export const FEEDBACK_CHANNEL = 'diagnostics:feedback'
+
+/** What the Send feedback box hands the host. */
+export interface FeedbackReport {
+  /** What the person wrote. */
+  readonly description: string
+  /** The conversation it was sent from, as plain text, when it was sent from one. */
+  readonly conversation?: string
+}
+
 /** Where the log is and whether anything has been written to it yet. */
 export interface DiagnosticsReport {
   readonly path: string
@@ -2121,6 +2137,8 @@ export interface DesktopApi {
   readTextFile(path: string): Promise<WorkspaceTextResponse>
   /** Show the diagnostics log in the file manager. Names no path. */
   revealDiagnostics(): Promise<void>
+  /** Open the feedback report, filled in, in the person's browser. Names no address. */
+  sendFeedback(report: FeedbackReport): Promise<OpenLinkResponse>
   /** Where the log is, for the sentence that tells a person what to send. */
   diagnosticsReport(): Promise<DiagnosticsReport>
   /** Open one of the addresses the host allows, in the person's browser. */

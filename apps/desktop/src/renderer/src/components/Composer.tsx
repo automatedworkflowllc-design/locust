@@ -313,6 +313,16 @@ export function Composer({
   queuedElsewhere
 }: ComposerProps): ReactElement {
   const [value, setValue] = useState('')
+  /*
+   * The box's words came off the queue by Edit. Claude Code does the same --
+   * a queued message pulled back into the box is no longer queued -- but it
+   * said nothing, and the outside recheck of 0.303 read Edit as "keep it
+   * queued until I save": a run that finished mid-edit sent nothing, and the
+   * words sat in the box. Said now, where the queued card was.
+   */
+  const [offTheQueue, setOffTheQueue] = useState(false)
+  // Emptied -- sent, or cleared -- it is just the box again.
+  if (offTheQueue && value.trim().length === 0) setOffTheQueue(false)
   /** Why the last press of Enter did nothing. Cleared as soon as one lands. */
   /**
    * What the box has to say about the last press, and in which register.
@@ -972,6 +982,18 @@ export function Composer({
           * what you will see in the thread once it goes -- and one quiet line
           * under it: when it goes, or why it is held, and what can be done.
           */}
+        {queued === undefined && offTheQueue && (
+          <div className="lc-queued is-editing" role="status" aria-live="polite">
+            <div className="lc-queued__meta">
+              <Icon name="clock" size={12} />
+              <span className="lc-queued__note">
+                {workingNow
+                  ? `Off the queue while you edit — Enter queues it again for when ${workingName} finishes`
+                  : 'Off the queue — Enter sends it'}
+              </span>
+            </div>
+          </div>
+        )}
         {queued !== undefined && (
           <div className="lc-queued" role="status" aria-live="polite">
             <div className="lc-queued__bubble">
@@ -1013,6 +1035,7 @@ export function Composer({
                 className="lc-queued__action"
                 onClick={() => {
                   setValue(queued)
+                  setOffTheQueue(true)
                   onUnqueue()
                 }}
               >
@@ -1265,29 +1288,28 @@ export function Composer({
                 * launched from the Start menu had no folder at all and no
                 * surface said so (Colin, 2026-09-05).
                 *
-                * ON THE ROW ONLY WHEN THERE IS NONE, since the metal composer
-                * (2026-09-23): the chosen folder's name is in the title bar,
-                * and choosing another is on the + menu. A missing folder is
-                * still said here, where the message it blocks is written.
+                * The metal composer (2026-09-23) kept it on the row only when
+                * there was none -- the chosen folder's name in the title bar,
+                * choosing another on the + menu. BACK ON THE ROW (0.306),
+                * Colin: "our workspace folder asset is gone ... we just can
+                * use what we used to have until we find a better idea".
                 */}
-              {workspacePath === undefined && (
-                <button
-                  type="button"
-                  className={`lc-control lc-control--folder${workspacePath === undefined ? ' is-missing' : ''}`}
-                  disabled={running}
-                  title={
-                    workspacePath === undefined
-                      ? 'No folder chosen. Every teammate works inside one project folder.'
-                      : workspaceMade
-                        ? `Teammates work in ${workspacePath}. Locust made this folder; pick any other to work there instead.`
-                        : `Teammates work in ${workspacePath}`
-                  }
-                  onClick={onChooseFolder}
-                >
-                  <Icon name="folder" size={13} />
-                  <span className="lc-control__folder">{workspaceName ?? 'No folder'}</span>
-                </button>
-              )}
+              <button
+                type="button"
+                className={`lc-control lc-control--folder${workspacePath === undefined ? ' is-missing' : ''}`}
+                disabled={running}
+                title={
+                  workspacePath === undefined
+                    ? 'No folder chosen. Every teammate works inside one project folder.'
+                    : workspaceMade
+                      ? `Teammates work in ${workspacePath}. Locust made this folder; pick any other to work there instead.`
+                      : `Teammates work in ${workspacePath}`
+                }
+                onClick={onChooseFolder}
+              >
+                <Icon name="folder" size={13} />
+                <span className="lc-control__folder">{workspaceName ?? 'No folder'}</span>
+              </button>
             </div>
             <div className="lc-composer__group">
               {context !== undefined ? (

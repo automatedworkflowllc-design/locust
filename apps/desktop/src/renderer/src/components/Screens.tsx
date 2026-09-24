@@ -50,6 +50,7 @@ import { RoutineRecovery } from './RoutineRecovery.js'
 import type { RecoverRoutine } from './RoutineRecovery.js'
 import { FREE_START_RUNTIME, installCommand } from '../../../shared/runtime-install.js'
 import { SignInButton } from './SignInButton.js'
+import { FeedbackDialog } from './FeedbackDialog.js'
 
 export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings' | 'rooms' | 'memory' | 'automations'
 
@@ -1096,6 +1097,7 @@ function RuntimeSetupLine({ setup }: { readonly setup: PublicRuntimeSetup }): Re
  */
 function ProblemReport(): ReactElement {
   const [report, setReport] = useState<DiagnosticsReport>()
+  const [asking, setAsking] = useState(false)
   useEffect(() => {
     const bridge = window.desktop
     if (bridge === undefined) return
@@ -1119,15 +1121,27 @@ function ProblemReport(): ReactElement {
         </p>
         <p>It is capped, and rolls over once. Nothing in it leaves this machine unless you send it.</p>
       </More>
-      <button
-        type="button"
-        className="lc-button"
-        onClick={() => {
-          void window.desktop?.revealDiagnostics()
-        }}
-      >
-        Show the log
-      </button>
+      {/*
+        * Somewhere to send it (the beta handover, 2026-09-23: nothing said
+        * where), in Claude Code's own shape (Colin: "for bug reporting we can
+        * use what claude code does"): the Send feedback box. From here it
+        * carries no conversation; a conversation's own menu sends that one.
+        */}
+      <div className="lc-feedbackactions">
+        <button type="button" className="lc-button" onClick={() => setAsking(true)}>
+          Send feedback
+        </button>
+        <button
+          type="button"
+          className="lc-button"
+          onClick={() => {
+            void window.desktop?.revealDiagnostics()
+          }}
+        >
+          Show the log
+        </button>
+      </div>
+      {asking && <FeedbackDialog onClose={() => setAsking(false)} />}
     </>
   )
 }
@@ -2338,7 +2352,7 @@ export function SettingsScreen({
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Report a problem</h2>
           <p className="lc-settings__lede">
-            If Locust crashes or behaves oddly, this is the file to send.
+            If Locust crashes or behaves oddly, send feedback and say what happened. The log below helps.
           </p>
           <ProblemReport />
         </section>

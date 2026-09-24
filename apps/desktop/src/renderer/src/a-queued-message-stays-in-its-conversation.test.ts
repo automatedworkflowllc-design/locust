@@ -90,3 +90,37 @@ describe("Edit and Discard in one conversation's box", () => {
     expect(gem.rest).toEqual([])
   })
 })
+
+/*
+ * The outside recheck of 0.303 (2026-09-23), its two asks: two queues pending
+ * AT ONCE, and Edit racing the run's end.
+ */
+describe('two conversations, each with a message pending at once', () => {
+  it("sends each its own as each run ends, in either order, the other's staying pending", () => {
+    const rows = [row('p1', 'pip', { text: 'PIP_1' }), row('g1', 'gem', { text: 'GEM_1' }), row('p2', 'pip', { text: 'PIP_2' })]
+    const gemFirst = takeNext(rows, 'gem')
+    expect(gemFirst.going?.text).toBe('GEM_1')
+    expect(queuedIn(gemFirst.rest, 'pip').map((entry) => entry.text)).toEqual(['PIP_1', 'PIP_2'])
+    const thenPip = takeNext(gemFirst.rest, 'pip')
+    expect(thenPip.going?.text).toBe(['PIP_1', 'PIP_2'].join(QUEUE_SEPARATOR))
+    expect(thenPip.rest).toEqual([])
+
+    const pipFirst = takeNext(rows, 'pip')
+    expect(pipFirst.going?.text).toBe(['PIP_1', 'PIP_2'].join(QUEUE_SEPARATOR))
+    expect(queuedIn(pipFirst.rest, 'gem').map((entry) => entry.text)).toEqual(['GEM_1'])
+  })
+})
+
+describe('Edit while the run finishes', () => {
+  it('sends nothing -- the words are back in the box, not the queue -- and leaves the other conversation queued', () => {
+    const rows = [row('g', 'gem', { text: 'GEM_QUEUED' }), row('p', 'pip', { text: 'PIP_QUEUED' })]
+    // Edit in Gem's box takes Gem's words out of the queue and into the box
+    // (the box then says "Off the queue", Composer's offTheQueue)...
+    const editing = withoutQueueOf(rows, 'gem')
+    // ...and Gem's run ends before Enter: there is nothing of Gem's to send.
+    const gemEnds = takeNext(editing, 'gem')
+    expect(gemEnds.going).toBeUndefined()
+    expect(gemEnds.rest).toEqual(editing)
+    expect(queuedIn(gemEnds.rest, 'pip').map((entry) => entry.text)).toEqual(['PIP_QUEUED'])
+  })
+})

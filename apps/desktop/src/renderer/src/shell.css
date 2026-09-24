@@ -12716,6 +12716,41 @@ textarea {
   width: min(560px, calc(100vw - 32px));
 }
 
+/* Send feedback (FeedbackDialog): Claude Code's box -- the text, one line on
+   what goes with it, Cancel and Send. The group-settings dialog's measures. */
+.lc-feedback {
+  width: min(560px, calc(100vw - 32px));
+}
+
+/* Settings' Report a problem: Send feedback beside Show the log. */
+.lc-feedbackactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lc-space-2);
+}
+
+.lc-feedback__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-3);
+}
+
+.lc-feedback__text {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.6;
+}
+
+.lc-feedback__claim {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
+  text-wrap: pretty;
+}
+
 .lc-groupsettings__body {
   display: flex;
   flex-direction: column;
