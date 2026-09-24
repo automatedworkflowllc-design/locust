@@ -11,6 +11,30 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.332.0 - 2026-09-24
+
+### Fixed
+
+- **Menus stay open while a reply streams in.** Right-click menus and the
+  chat box's model, effort and mode menus closed by themselves whenever the
+  conversation scrolled to follow a reply.
+- **Resuming an interrupted mission resumes it as its teammate** -- in their
+  own branch or folder, and still theirs afterwards. It used to run in the
+  main project folder, as nobody's.
+- **Muse and Cursor work when your Windows user folder has a space in its
+  name**, and arguments with characters like `&` reach them intact.
+- **Two changed files with the same name are two files.** Changing
+  `packages/a/package.json` and `packages/b/package.json` in one turn showed
+  as one file, with one of the changes missing.
+- **"Run it again" is offered only when nothing had started.** It could
+  appear on a failed OpenCode, Muse or Antigravity turn that had already
+  changed files, and pressing it would have done that work again.
+- **Coding agents installed without Node.js now start.** On a machine
+  without Node.js, an agent Locust installed could open a second copy of
+  Locust instead of running.
+- **A teammate who finishes while others wait for a turn keeps their board
+  update.** Their task changes were dropped when every run slot was full.
+
 ## 0.331.0 - 2026-09-24
 
 ### Fixed
