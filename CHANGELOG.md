@@ -11,6 +11,30 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.333.0 - 2026-09-24
+
+### Fixed
+
+- **A message that could not be sent says why.** Sending while another
+  conversation without a teammate was running, or with every run slot
+  taken, put your words back in the box with no reason; the reason is
+  shown beside them now.
+- **Resume from checkpoint says why it did not resume**, on the card you
+  pressed, instead of seeming to do nothing.
+- **A routine's Run says why it did not start**, on the Team and Routines
+  screens, and a routine that does start opens its conversation.
+- **Approval and question cards go away when their run ends.** A card left
+  over from a stopped run kept its buttons and kept the teammate reading
+  "waiting on you".
+- **A follow-up typed while a teammate is busy elsewhere stays in the
+  conversation you typed it in**, and is sent there when they are free. It
+  could vanish, and later be sent into their other conversation.
+- **Shift+Tab never turns Auto on.** Cycling through the modes could switch
+  the workspace's Auto setting on as it passed.
+- **A double-click never confirms a delete.** Deleting a conversation, or
+  emptying the trash, asks first; a quick double-click used to answer for
+  you.
+
 ## 0.332.0 - 2026-09-24
 
 ### Fixed
