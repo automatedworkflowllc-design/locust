@@ -3798,6 +3798,19 @@ export default function App(): ReactElement {
     })
   }
 
+  /** M30: a routine run to show once it is in the window. */
+  const followRunRef = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    const want = followRunRef.current
+    if (want === undefined) return
+    const key = runs.has(want) ? want : [...runs.entries()].find(([, run]) => run.data?.runId === want)?.[0]
+    if (key === undefined) return
+    followRunRef.current = undefined
+    setShownKey(key)
+    const owner = runs.get(key)?.teammateId
+    if (owner !== undefined) setSelectedTeammateId(owner)
+  }, [runs])
+  const [routineNotice, setRoutineNotice] = useState<string>()
   const runRoutine = (routineId: string): void => {
     const bridge = window.desktop
     if (!bridge) return
@@ -3805,17 +3818,21 @@ export default function App(): ReactElement {
       .runRoutine(routineId)
       .then(async (response) => {
         if (!response.ok) {
-          setTeammateError(response.error.message)
+          // M30: said on the screen the Run was pressed on. It went into the
+          // teammate dialog's error, which only that dialog shows.
+          setRoutineNotice(`Not run: ${response.error.message}`)
           return
         }
-        setTeammateError(undefined)
+        setRoutineNotice(undefined)
         // Follow the routine into the thread it is running in, the way the
-        // view follows a teammate's reply.
+        // view follows a teammate's reply. M30: once the run is in the
+        // window -- openMission here read the runs from before the press,
+        // which cannot hold it, and left the old conversation on screen.
+        followRunRef.current = response.data.runId
         setScreen('workroom')
-        openMission(response.data.missionId)
         await reloadRoutines()
       })
-      .catch(() => setTeammateError('That routine could not be started. None of its steps ran.'))
+      .catch(() => setRoutineNotice('Not run: that routine could not be started. None of its steps ran.'))
   }
 
   const recoverRoutine: import('./components/RoutineRecovery.js').RecoverRoutine = async (request) => {
@@ -5084,6 +5101,8 @@ export default function App(): ReactElement {
             />
           ) : screen === 'teammates' ? (
             <TeammatesScreen
+              {...(routineNotice === undefined ? {} : { routineNotice })}
+              onDismissRoutineNotice={() => setRoutineNotice(undefined)}
               teammates={teammates}
               missions={history}
               missionOwners={missionOwners}
@@ -5143,8 +5162,8 @@ export default function App(): ReactElement {
               onRecoverRoutine={recoverRoutine}
               onEditRoutine={editRoutine}
               onRemoveRoutine={removeRoutine}
-              notice={automationNotice}
-              onDismissNotice={() => setAutomationNotice(undefined)}
+              notice={routineNotice ?? automationNotice}
+              onDismissNotice={() => { setRoutineNotice(undefined); setAutomationNotice(undefined) }}
               // The same rows the sidebar draws. An empty screen offers the
               // finished ones rather than describing how to save one.
               missions={sidebarMissions}

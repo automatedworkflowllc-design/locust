@@ -487,8 +487,13 @@ export function TeammatesScreen({
   onRunRoutine,
   onRecoverRoutine,
   onEditRoutine,
-  onRemoveRoutine
+  onRemoveRoutine,
+  routineNotice,
+  onDismissRoutineNotice
 }: {
+  /** M30: why a routine's Run did not start, said where it was pressed. */
+  readonly routineNotice?: string
+  readonly onDismissRoutineNotice?: () => void
   readonly teammates: readonly PublicTeammate[]
   /** Every recovered mission, so a card can say what its teammate has done. */
   readonly missions: readonly PublicRecoveredMission[]
@@ -518,6 +523,14 @@ export function TeammatesScreen({
         title="Team"
         meta={`${teammates.length} teammate${teammates.length === 1 ? '' : 's'} · avatars and roles are yours to set`}
       />
+      {routineNotice !== undefined && (
+        <p className="lc-claim lc-claim--hint lc-tone-amber" role="alert">
+          {routineNotice}{' '}
+          <button type="button" className="lc-ghostbutton" onClick={onDismissRoutineNotice}>
+            Dismiss
+          </button>
+        </p>
+      )}
       <div className="lc-screen__scroll">
         <div className="lc-rostergrid">
           {teammates.map((teammate) => {
