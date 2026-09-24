@@ -45,8 +45,37 @@ export interface WorktreeManager {
   ensure(teammate: { readonly teammateId: string; readonly name: string }): Promise<string>
   /** Every Locust-made worktree git still knows about. */
   list(): Promise<readonly WorktreeInfo[]>
-  /** Remove a teammate's worktree. The branch stays: the work is theirs to merge or drop. */
-  remove(teammateId: string): Promise<void>
+  /**
+   * Remove a teammate's worktree. The branch stays: the work is theirs to
+   * merge or drop.
+   *
+   * C1 (the code review's one critical): this ran `git worktree remove
+   * --force`, which deletes every uncommitted and untracked file in the
+   * teammate's copy -- and nothing in Locust commits, so that was all of
+   * their work -- on one click, under "Removing one keeps its branch". Now a
+   * copy with changes is refused with a `WorktreeHasChangesError` naming
+   * them, and is deleted only when `discard` lists exactly the changes that
+   * are there now: what the person was shown and agreed to lose. A change
+   * made after they were shown the list is refused again.
+   */
+  remove(teammateId: string, options?: { readonly discard?: readonly string[] }): Promise<void>
+}
+
+/** A teammate's copy still has uncommitted changes, so removing it would delete them. */
+export class WorktreeHasChangesError extends Error {
+  constructor(readonly changes: readonly string[]) {
+    super(`It has ${String(changes.length)} uncommitted ${changes.length === 1 ? 'change' : 'changes'}, and removing it would delete ${changes.length === 1 ? 'it' : 'them'}.`)
+    this.name = 'WorktreeHasChangesError'
+  }
+}
+
+/** The paths `git status --porcelain` names, as the person will be shown them. */
+export function changedPathsOf(porcelain: string): readonly string[] {
+  return porcelain
+    .split('\n')
+    .map((line) => line.replace(/\r$/, ''))
+    .filter((line) => line.length > 3)
+    .map((line) => line.slice(3).replace(/^"(.*)"$/, '$1'))
 }
 
 export interface WorktreeManagerOptions {
@@ -190,9 +219,19 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
       }
     },
 
-    async remove(teammateId) {
+    async remove(teammateId, options = {}) {
       const directory = safeTeammateDirectory(teammateId)
       const path = join(root, WORKTREE_DIR, directory)
+      const changes = changedPathsOf(await runGit(['status', '--porcelain', '--untracked-files=all'], path))
+      if (changes.length === 0) {
+        // Clean: git's own remove, which refuses anything it would lose.
+        await runGit(['worktree', 'remove', path], root)
+        return
+      }
+      const agreed = new Set(options.discard ?? [])
+      if (options.discard === undefined || changes.length !== agreed.size || changes.some((change) => !agreed.has(change))) {
+        throw new WorktreeHasChangesError(changes)
+      }
       await runGit(['worktree', 'remove', '--force', path], root)
     }
   }

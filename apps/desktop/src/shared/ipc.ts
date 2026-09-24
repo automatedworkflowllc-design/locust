@@ -141,6 +141,8 @@ export interface PublicWorktree {
 export type WorktreeListResponse =
   | { readonly ok: true; readonly data: { readonly worktrees: readonly PublicWorktree[]; readonly reason: string | undefined } }
   | { readonly ok: false; readonly error: { readonly code: 'WORKTREES_UNAVAILABLE'; readonly message: string } }
+  /** C1: the copy has uncommitted changes; removing it would delete these. */
+  | { readonly ok: false; readonly error: { readonly code: 'WORKTREE_HAS_CHANGES'; readonly message: string; readonly changes: readonly string[] } }
 
 export type RuntimeSetupResponse =
   | {
@@ -2286,8 +2288,12 @@ export interface DesktopApi {
   setTeammateConnectors(teammateId: string, names: readonly string[]): Promise<TeammateFolderResponse>
   /** The teammates' own worktrees under the folder, and whether the folder can have them. */
   listWorktrees(): Promise<WorktreeListResponse>
-  /** Remove a teammate's worktree. The branch stays. Refused while a run is live in it. */
-  removeWorktree(teammateId: string): Promise<WorktreeListResponse>
+  /**
+   * Remove a teammate's worktree. The branch stays. Refused while a run is
+   * live in it, and while it has uncommitted changes unless `discard` names
+   * exactly those (C1).
+   */
+  removeWorktree(teammateId: string, discard?: readonly string[]): Promise<WorktreeListResponse>
   addMemory(request: MemoryAddRequest): Promise<MemoryListResponse>
   updateMemory(request: MemoryUpdateRequest): Promise<MemoryListResponse>
   removeMemory(memoryId: string): Promise<MemoryListResponse>

@@ -52,7 +52,7 @@ import type { RoomTasks } from './room-tasks.js'
 import { boardLines, fittedTaskSection, rowToClaimAtStart } from '../shared/room-task.js'
 import { createRoutineRunner } from './routine-runner.js'
 import { createMemoryStore } from './memory-store.js'
-import { createWorktreeManager } from './worktrees.js'
+import { WorktreeHasChangesError, createWorktreeManager } from './worktrees.js'
 import { readRuntimeSetup } from './runtime-setup.js'
 import { briefSection, readWorkspaceBrief, whereSection, worktreeSection, groupSection } from './workspace-brief.js'
 import { createConversationChain, groupBriefFor } from './conversation-chain.js'
@@ -3824,7 +3824,7 @@ if (!ownsSingleInstanceLock) {
         return worktreesRejected('The worktrees could not be listed.')
       }
     })
-    ipcMain.handle(WORKTREE_REMOVE_CHANNEL, async (event, teammateId: unknown) => {
+    ipcMain.handle(WORKTREE_REMOVE_CHANNEL, async (event, teammateId: unknown, discard: unknown) => {
       if (!fromOwnWindow(event)) return worktreesRejected('The request was rejected.')
       if (typeof teammateId !== 'string' || worktrees === undefined) return worktreesRejected('That worktree could not be removed.')
       try {
@@ -3832,9 +3832,13 @@ if (!ownsSingleInstanceLock) {
         if (current.ok && current.data.worktrees.some((tree) => tree.teammateId === teammateId && tree.busy)) {
           return worktreesRejected('A run is live in that worktree. Stop it first.')
         }
-        await worktrees.remove(teammateId)
+        const agreed = Array.isArray(discard) && discard.every((entry) => typeof entry === 'string') ? (discard as string[]) : undefined
+        await worktrees.remove(teammateId, agreed === undefined ? {} : { discard: agreed })
         return await worktreeList()
       } catch (error) {
+        if (error instanceof WorktreeHasChangesError) {
+          return { ok: false, error: { code: 'WORKTREE_HAS_CHANGES', message: error.message, changes: error.changes } } as const
+        }
         return worktreesRejected(error instanceof Error ? error.message : 'That worktree could not be removed.')
       }
     })

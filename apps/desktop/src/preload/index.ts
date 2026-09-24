@@ -315,7 +315,7 @@ const desktopApi: DesktopApi = {
   chooseTeammateFolder: (teammateId: string, clear?: boolean) =>
     ipcRenderer.invoke(TEAMMATE_FOLDER_CHANNEL, { teammateId, clear: clear === true }) as Promise<TeammateFolderResponse>,
   listWorktrees: () => ipcRenderer.invoke(WORKTREE_LIST_CHANNEL) as Promise<WorktreeListResponse>,
-  removeWorktree: (teammateId: string) => ipcRenderer.invoke(WORKTREE_REMOVE_CHANNEL, teammateId) as Promise<WorktreeListResponse>,
+  removeWorktree: (teammateId: string, discard?: readonly string[]) => ipcRenderer.invoke(WORKTREE_REMOVE_CHANNEL, teammateId, discard) as Promise<WorktreeListResponse>,
   addMemory: (request: MemoryAddRequest) => ipcRenderer.invoke(MEMORY_ADD_CHANNEL, request) as Promise<MemoryListResponse>,
   updateMemory: (request: MemoryUpdateRequest) => ipcRenderer.invoke(MEMORY_UPDATE_CHANNEL, request) as Promise<MemoryListResponse>,
   removeMemory: (memoryId: string) => ipcRenderer.invoke(MEMORY_REMOVE_CHANNEL, memoryId) as Promise<MemoryListResponse>,

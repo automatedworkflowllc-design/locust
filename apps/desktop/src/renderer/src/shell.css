@@ -2803,6 +2803,23 @@ textarea {
   white-space: nowrap;
 }
 
+/* C1: the two answers to "it has uncommitted changes", and what it says. */
+.lc-worktreerow__confirm {
+  display: flex;
+  gap: var(--lc-space-2);
+}
+
+.lc-worktreerow__note {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--lc-text-secondary);
+  font-size: var(--lc-text-description);
+}
+
+.lc-ghostbutton.lc-ghostbutton--danger {
+  color: var(--lc-red-text);
+}
+
 .lc-linkbutton {
   background: none;
   border: 0;

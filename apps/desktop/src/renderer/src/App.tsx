@@ -142,6 +142,7 @@ import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
 import type { Handoff } from './glances.js'
 import type { LiveActivity } from './faceState.js'
 import type { TeammateStatusView } from './status.js'
+import type { WorktreeRemoval } from './components/WorktreeRow.js'
 
 /**
  * The Locust shell.
@@ -1855,16 +1856,22 @@ export default function App(): ReactElement {
       })
       .catch(() => undefined)
   }
-  const removeWorktree = async (teammateId: string): Promise<string | undefined> => {
+  // C1: the host's answer comes back whole -- a copy with uncommitted changes
+  // names them, and the row asks before sending them back as the agreement.
+  const removeWorktree = async (teammateId: string, discard?: readonly string[]): Promise<WorktreeRemoval | undefined> => {
     const bridge = window.desktop
-    if (bridge === undefined) return 'Worktrees are not available here.'
+    if (bridge === undefined) return { message: 'Worktrees are not available here.' }
     try {
-      const response = await bridge.removeWorktree(teammateId)
-      if (!response.ok) return response.error.message
+      const response = await bridge.removeWorktree(teammateId, discard)
+      if (!response.ok) {
+        return response.error.code === 'WORKTREE_HAS_CHANGES'
+          ? { message: response.error.message, changes: response.error.changes }
+          : { message: response.error.message }
+      }
       setWorktrees({ list: response.data.worktrees, reason: response.data.reason })
       return undefined
     } catch {
-      return 'That worktree could not be removed. It is still on disk with its files intact.'
+      return { message: 'That worktree could not be removed. It is still on disk with its files intact.' }
     }
   }
 

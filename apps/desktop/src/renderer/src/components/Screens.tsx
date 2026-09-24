@@ -51,6 +51,8 @@ import type { RecoverRoutine } from './RoutineRecovery.js'
 import { FREE_START_RUNTIME, installCommand } from '../../../shared/runtime-install.js'
 import { SignInButton } from './SignInButton.js'
 import { FeedbackDialog } from './FeedbackDialog.js'
+import { WorktreeRow } from './WorktreeRow.js'
+import type { WorktreeRemoval } from './WorktreeRow.js'
 
 export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings' | 'rooms' | 'memory' | 'automations'
 
@@ -1232,7 +1234,7 @@ export function SettingsScreen({
   readonly workspaceBrief: PublicWorkspaceBrief | null | undefined
   /** The teammates' own worktrees under the folder, and why there can be none; undefined until read. */
   readonly worktrees: { readonly list: readonly PublicWorktree[]; readonly reason: string | undefined } | undefined
-  readonly onRemoveWorktree: (teammateId: string) => Promise<string | undefined>
+  readonly onRemoveWorktree: (teammateId: string, discard?: readonly string[]) => Promise<WorktreeRemoval | undefined>
   /** The folder every teammate works in; undefined when none is chosen. */
   readonly workspacePath: string | undefined
   readonly workspaceMade?: boolean
@@ -1482,24 +1484,12 @@ export function SettingsScreen({
                   ? `${worktrees.reason} A teammate with Own branch on cannot start until this is fixed.`
                   : worktrees.list.length === 0
                     ? 'None yet. Turn Own branch on in a teammate\'s card and its next run makes one.'
-                    : 'Removing one keeps its branch.'}
+                    : 'Removing one keeps its branch, with what was committed on it; uncommitted changes are named before anything is deleted.'}
               </span>
               {worktrees.list.length > 0 && (
                 <div className="lc-worktreelist">
                   {worktrees.list.map((tree) => (
-                    <div className="lc-worktreerow" key={tree.teammateId}>
-                      <span className="lc-worktreerow__who">{tree.teammateName ?? tree.teammateId}</span>
-                      <span className="lc-worktreerow__branch lc-mono" title={tree.path}>{tree.branch}</span>
-                      <button
-                        type="button"
-                        className="lc-ghostbutton"
-                        disabled={tree.busy}
-                        title={tree.busy ? 'A run is live in this worktree' : `Remove the worktree; the branch ${tree.branch} stays`}
-                        onClick={() => void onRemoveWorktree(tree.teammateId)}
-                      >
-                        {tree.busy ? 'In use' : 'Remove'}
-                      </button>
-                    </div>
+                    <WorktreeRow key={tree.teammateId} tree={tree} onRemove={onRemoveWorktree} />
                   ))}
                 </div>
               )}

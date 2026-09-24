@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { branchNameFor, createWorktreeManager, gitVersionSupportsWorktrees, parseGitVersion, parseWorktreeList } from './worktrees.js'
+import { branchNameFor, changedPathsOf, createWorktreeManager, gitVersionSupportsWorktrees, parseGitVersion, parseWorktreeList, WorktreeHasChangesError } from './worktrees.js'
 
 /*
  * These tests drive REAL git against REAL directories, and that is the point
@@ -122,13 +122,69 @@ describe('a worktree per teammate, on a real repository', () => {
     expect(await readFile(join(wren, 'NOTES.md'), 'utf8')).toContain('wren')
     expect(await readFile(join(booty, 'NOTES.md'), 'utf8')).not.toContain('wren')
     expect((await manager.list()).map((entry) => entry.branch).sort()).toEqual(['locust/booty', 'locust/wren'])
-    await manager.remove('tm_booty')
+    // Booty's edit is uncommitted: removing the tree deletes it, so it goes only when agreed to (C1).
+    await manager.remove('tm_booty', { discard: ['NOTES.md'] })
     expect((await manager.list()).map((entry) => entry.teammateId)).toEqual(['tm_wren'])
     // The branch outlives the tree: the work is the person's to merge or drop.
     expect((await git(['branch', '--list', 'locust/booty'], root)).trim()).toContain('locust/booty')
     // A tree removed and asked for again comes back on the same branch.
     const again = await manager.ensure({ teammateId: 'tm_booty', name: 'Booty' })
     expect((await git(['rev-parse', '--abbrev-ref', 'HEAD'], again)).trim()).toBe('locust/booty')
+  })
+
+  /*
+   * C1, the code review's one critical: Remove ran `git worktree remove
+   * --force`, deleting a teammate's uncommitted and untracked work on one
+   * click, under "Removing one keeps its branch" -- and nothing in Locust
+   * commits, so that was all of it. Real git, a real tree.
+   */
+  it('C1: refuses to remove a copy with uncommitted work, naming it, and keeps every file', { timeout: REAL_GIT_TIMEOUT_MS }, async () => {
+    const root = await repository()
+    const manager = createWorktreeManager({ workspacePath: root })
+    const wren = await manager.ensure({ teammateId: 'tm_wren', name: 'Wren' })
+    await writeFile(join(wren, 'NOTES.md'), '# notes\nwren was here\n', 'utf8')
+    await writeFile(join(wren, 'REPORT.md'), 'the findings\n', 'utf8')
+    const refused = await manager.remove('tm_wren').then(() => undefined, (error: unknown) => error)
+    expect(refused).toBeInstanceOf(WorktreeHasChangesError)
+    expect([...(refused as WorktreeHasChangesError).changes].sort()).toEqual(['NOTES.md', 'REPORT.md'])
+    expect(await readFile(join(wren, 'REPORT.md'), 'utf8')).toBe('the findings\n')
+    expect((await manager.list()).map((entry) => entry.teammateId)).toEqual(['tm_wren'])
+  })
+
+  it('C1: removes it only for the exact changes agreed to -- one made since is refused again', { timeout: REAL_GIT_TIMEOUT_MS }, async () => {
+    const root = await repository()
+    const manager = createWorktreeManager({ workspacePath: root })
+    const wren = await manager.ensure({ teammateId: 'tm_wren', name: 'Wren' })
+    await writeFile(join(wren, 'REPORT.md'), 'the findings\n', 'utf8')
+    // Shown REPORT.md; a second file appeared before the person agreed.
+    await writeFile(join(wren, 'LATER.md'), 'written after\n', 'utf8')
+    await expect(manager.remove('tm_wren', { discard: ['REPORT.md'] })).rejects.toBeInstanceOf(WorktreeHasChangesError)
+    expect(await readFile(join(wren, 'LATER.md'), 'utf8')).toBe('written after\n')
+    await manager.remove('tm_wren', { discard: ['LATER.md', 'REPORT.md'] })
+    expect(await manager.list()).toEqual([])
+    expect((await git(['branch', '--list', 'locust/wren'], root)).trim()).toContain('locust/wren')
+  })
+
+  it('C1: removes a clean copy at once, with git’s own unforced remove', { timeout: REAL_GIT_TIMEOUT_MS }, async () => {
+    const root = await repository()
+    const calls: string[][] = []
+    const manager = createWorktreeManager({
+      workspacePath: root,
+      runGit: (args, cwd) => {
+        calls.push([...args])
+        return git(args, cwd)
+      }
+    })
+    await manager.ensure({ teammateId: 'tm_wren', name: 'Wren' })
+    await manager.remove('tm_wren')
+    expect(await manager.list()).toEqual([])
+    const removal = calls.find((args) => args[0] === 'worktree' && args[1] === 'remove')
+    expect(removal).not.toContain('--force')
+  })
+
+  it('names changes the way git status does, a quoted path unquoted', () => {
+    expect(changedPathsOf(' M NOTES.md\n?? REPORT.md\r\n?? "with space.md"\n')).toEqual(['NOTES.md', 'REPORT.md', 'with space.md'])
+    expect(changedPathsOf('')).toEqual([])
   })
 
   it('refuses an id that could name a path outside the folder', { timeout: REAL_GIT_TIMEOUT_MS }, async () => {
