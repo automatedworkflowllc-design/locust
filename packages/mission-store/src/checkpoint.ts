@@ -18,6 +18,8 @@ import type { MissionLedgerIssue, MissionLedgerMetadata } from './index.js'
 export const CHECKPOINT_SCHEMA_VERSION = 1 as const
 
 export const MAX_CHECKPOINT_SUMMARY_LENGTH = 4_000
+/** Settled actions named in a checkpoint; the most recent are kept. */
+export const MAX_SETTLED_NAMES = 40
 export const MAX_UNSETTLED_ACTIONS = 64
 
 export type CheckpointReason = 'route-limit' | 'route-switch' | 'manual' | 'shutdown'
@@ -55,6 +57,13 @@ export interface ReconciledCheckpoint {
   readonly reconciledThroughSequence: number
   /** Item ids of tool calls that reached a terminal event. */
   readonly settledActions: readonly string[]
+  /**
+   * The same actions named by what they did -- `command: npm test` -- for
+   * those whose start was recorded, in order, at most MAX_SETTLED_NAMES
+   * (A2.11: a handoff brief listed the ids, `call_8f2...`, which tell the next
+   * runtime nothing). Absent on a checkpoint written before it existed.
+   */
+  readonly settledNames?: readonly string[]
   /** Tool calls that started and never reported an outcome. */
   readonly unsettledActions: readonly UnsettledAction[]
   readonly resumeSafety: CheckpointResumeSafety
@@ -160,9 +169,11 @@ export function reconcileMission(
   // that. Retrying it elsewhere is how a mission sends an email twice.
   const open = new Map<string, UnsettledAction>()
   const settled = new Set<string>()
+  const started = new Map<string, string>()
   for (const event of events) {
     if (event.type === 'tool.started') {
       const { itemId, toolKind, name } = event.payload
+      started.set(itemId, `${toolKind}: ${name}`.slice(0, 300))
       open.set(itemId, {
         itemId,
         toolKind,
@@ -212,6 +223,7 @@ export function reconcileMission(
     reason: options.reason,
     reconciledThroughSequence: events.at(-1)?.sequence ?? 0,
     settledActions: [...settled],
+    settledNames: [...settled].flatMap((id) => (started.has(id) ? [started.get(id)!] : [])).slice(-MAX_SETTLED_NAMES),
     unsettledActions,
     resumeSafety,
     safetyReason,
@@ -284,6 +296,12 @@ export function parsedCheckpoint(
     || (value.runtimeThreadId !== undefined && !isBoundedText(value.runtimeThreadId, 2_048))
   ) return undefined
   if (!value.settledActions.every((entry) => isNonemptyBoundedText(entry, 512))) return undefined
+  if (
+    value.settledNames !== undefined
+    && (!Array.isArray(value.settledNames)
+      || value.settledNames.length > MAX_SETTLED_NAMES
+      || !value.settledNames.every((entry) => isNonemptyBoundedText(entry, 512)))
+  ) return undefined
   if (!value.unsettledActions.every((entry) => parsedUnsettledAction(entry) !== undefined)) {
     return undefined
   }

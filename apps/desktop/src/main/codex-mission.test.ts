@@ -2151,6 +2151,30 @@ describe('continuing a conversation', () => {
     expect(spec.args).not.toContain('resume')
   })
 
+  it('A2.11: carries the conversation\u2019s earlier turns into the switch, oldest first, and stops at a loop', async () => {
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([{ type: 'thread.started', thread_id: 'thread-new' }, { type: 'turn.completed' }]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const byId: Record<string, unknown> = {
+      mission_prior: finished({ runtime: 'claude', continuesFrom: { missionId: 'mission_middle', checkpointEpoch: 1, reason: 'follow-up' } }),
+      mission_middle: { ...(finished({ missionId: 'mission_middle', prompt: 'then make it weekly', continuesFrom: { missionId: 'mission_first', checkpointEpoch: 1, reason: 'follow-up' } }) as Record<string, unknown>), events: [] },
+      // A record that points back at itself must not walk forever.
+      mission_first: { ...(finished({ missionId: 'mission_first', prompt: 'build a price report', continuesFrom: { missionId: 'mission_first', checkpointEpoch: 1, reason: 'follow-up' } }) as Record<string, unknown>), events: [] }
+    }
+    const { service } = scheduledService({ start }, fakeLedger({
+      getMission: async (id) => byId[id as string] as never,
+      createCheckpoint: async (missionId, reason) => ({
+        missionId, epoch: 2, reason, resumeSafety: 'safe', safetyReason: 'settled', createdAt: NOW,
+        unsettledActions: [], settledActions: [], assistantSummary: 'The price was 181.'
+      }) as never
+    }))
+    const response = await service.start('now in euros', 'codex', 'ask', {}, () => undefined, undefined, undefined, 'mission_prior')
+    expect(response).toMatchObject({ ok: true })
+    const briefed = start.mock.calls[0]?.[1] as string
+    expect(briefed).toContain('Earlier in this conversation, oldest first:\n- Asked: "build a price report" -- no reply was recorded.\n- Asked: "then make it weekly" -- no reply was recorded.')
+  })
+
   it('continues another runtime\u2019s conversation from a checkpoint, with the reply as the latest word', async () => {
     // This used to be refused ("switch the route back"), and the person's
     // workaround was a fresh mission with the task retyped -- the 0.21.2 QA

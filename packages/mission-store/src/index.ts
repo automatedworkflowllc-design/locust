@@ -2185,6 +2185,7 @@ export type {
 export {
   CHECKPOINT_SCHEMA_VERSION,
   MAX_CHECKPOINT_SUMMARY_LENGTH,
+  MAX_SETTLED_NAMES,
   MAX_UNSETTLED_ACTIONS,
   parsedCheckpoint,
   reconcileMission

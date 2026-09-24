@@ -45,6 +45,7 @@ import type { ApprovalChannel } from './approval-channel.js'
 import { fileChangesOf, itemOf } from './approval-patch.js'
 import type { FileChangeRecord } from './approval-patch.js'
 import { composeHandoffPrompt } from './handoff.js'
+import type { EarlierTurn } from './handoff.js'
 import { changedPaths, observedEditEvents, observedPatches, sharedTreeNotice, snapshotWorkspace, unreportedPaths } from './disk-observation.js'
 import type { RecentEdits } from './recent-edits.js'
 import { cursorCannotSee, cursorIgnoreNotice } from './cursor-visibility.js'
@@ -497,6 +498,9 @@ function validRunId(value: unknown): value is string {
     && !value.includes('\0')
 }
 
+/** How many turns before the one handed over a switch brief recalls (A2.11). */
+const EARLIER_TURNS = 4
+
 export function createCodexMissionService(options: CodexMissionServiceOptions): CodexMissionService {
   // Resolved here, not inside `start`: that scope declares its own `process`
   // for the child, which shadows Node's global and is in its temporal dead
@@ -826,6 +830,27 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
     clearActive(mission)
   }
 
+  /**
+   * A2.11: the conversation's turns before `prior`, oldest first, walked back
+   * through each mission's `continuesFrom`. Best effort: a turn the ledger
+   * cannot read ends the walk, and the brief goes without what is past it.
+   */
+  const earlierTurnsOf = async (prior: { readonly metadata: { readonly continuesFrom?: { readonly missionId: string } } }): Promise<readonly EarlierTurn[]> => {
+    const turns: EarlierTurn[] = []
+    let from = prior.metadata.continuesFrom?.missionId
+    const seen = new Set<string>()
+    while (from !== undefined && turns.length < EARLIER_TURNS && !seen.has(from)) {
+      seen.add(from)
+      const earlier = await options.ledger.getMission(from).catch(() => undefined)
+      if (earlier === undefined) break
+      const transcript = createTranscriptTracker()
+      transcript.track(earlier.events)
+      turns.unshift({ asked: earlier.metadata.prompt, answered: transcript.latestFinal })
+      from = earlier.metadata.continuesFrom?.missionId
+    }
+    return turns
+  }
+
   const scheduleConsume = (mission: ActiveCodexMission): void => {
     let resolveOperation!: () => void
     const operation = new Promise<void>((resolve) => {
@@ -1029,7 +1054,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               prior.metadata.prompt,
               checkpoint,
               runtimeDisplayName(prior.metadata.runtime),
-              prompt
+              prompt,
+              await earlierTurnsOf(prior)
             )
             if (briefing === undefined) {
               return error(

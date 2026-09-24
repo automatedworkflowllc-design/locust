@@ -38,11 +38,27 @@ function bullets(lines: readonly string[]): string {
  * task the new run has nothing to do, so if it alone will not fit, the handoff
  * is refused upstream rather than started with an empty instruction.
  */
+/** One earlier turn of the conversation, oldest first (A2.11). */
+export interface EarlierTurn {
+  readonly asked: string
+  readonly answered: string | undefined
+}
+
+/** How much of each earlier turn is quoted: enough to say what it was, not to re-read it. */
+const ASKED_CHARS = 240
+const ANSWERED_CHARS = 360
+
+function clipped(text: string, limit: number): string {
+  const flat = text.replace(/\s+/g, ' ').trim()
+  return flat.length <= limit ? flat : `${flat.slice(0, limit - 1).trimEnd()}\u2026`
+}
+
 function sectionsFor(
   originalPrompt: string,
   checkpoint: ReconciledCheckpoint,
   fromRuntime: string,
-  next?: string
+  next?: string,
+  earlier: readonly EarlierTurn[] = []
 ): readonly { readonly name: string; readonly text: string }[] {
   const sections: { readonly name: string; readonly text: string }[] = [
     {
@@ -50,6 +66,22 @@ function sectionsFor(
       text: `You are continuing work that another agent (${fromRuntime}) started and stopped partway through. The original task was:\n\n${originalPrompt}`
     }
   ]
+
+  /*
+   * A2.11 (reported #13): the turns BEFORE the one handed over. A switch
+   * carried only the last turn, so a runtime taking over a long conversation
+   * knew the latest ask and nothing of how the work got there. Each is what
+   * was asked and the start of what came back -- enough to know what was
+   * already settled with the person, not a transcript.
+   */
+  if (earlier.length > 0) {
+    sections.push({
+      name: 'earlier',
+      text:
+        'Earlier in this conversation, oldest first:\n'
+        + bullets(earlier.map((turn) => `Asked: "${clipped(turn.asked, ASKED_CHARS)}"${turn.answered === undefined || turn.answered.trim().length === 0 ? ' -- no reply was recorded.' : ` -- answered: "${clipped(turn.answered, ANSWERED_CHARS)}"`}`))
+    })
+  }
 
   if (checkpoint.unsettledActions.length > 0) {
     sections.push({
@@ -61,12 +93,23 @@ function sectionsFor(
     })
   }
 
+  /*
+   * A2.11 (reported #13): named by what they did. This listed the item ids
+   * -- `call_8f2c...`, a provider's handle -- which told the next runtime
+   * nothing about the work. An action whose start the ledger did not keep is
+   * counted, never shown as an id.
+   */
   if (checkpoint.settledActions.length > 0) {
+    const names = checkpoint.settledNames ?? []
+    const unnamed = checkpoint.settledActions.length - names.length
     sections.push({
       name: 'settled',
       text:
         'These actions reported finishing before the stop:\n'
-        + bullets(checkpoint.settledActions)
+        + [
+          ...(names.length === 0 ? [] : [bullets(names)]),
+          ...(unnamed > 0 ? [`- ${String(unnamed)} ${names.length === 0 ? '' : 'other '}${unnamed === 1 ? 'action' : 'actions'} whose details were not recorded`] : [])
+        ].join('\n')
     })
   }
 
@@ -104,9 +147,11 @@ export function composeHandoffPrompt(
    * provider switch after a quota failure used to start a stranger with no
    * memory of the files or the task).
    */
-  next?: string
+  next?: string,
+  /** The conversation's turns before the one handed over, oldest first (A2.11). */
+  earlier: readonly EarlierTurn[] = []
 ): HandoffBriefing | undefined {
-  const sections = sectionsFor(originalPrompt, checkpoint, fromRuntime, next)
+  const sections = sectionsFor(originalPrompt, checkpoint, fromRuntime, next, earlier)
   // Reserve room for the omission notice UP FRONT whenever a section could be
   // dropped. Charging for it only at the first drop is too late: by then the
   // mandatory task section has already claimed the space, and it cannot be
@@ -114,25 +159,27 @@ export function composeHandoffPrompt(
   // handoff is refused. Under-using 120 characters when nothing is dropped is
   // the cheap side of that trade.
   const budget = MAX_HANDOFF_PROMPT_LENGTH - (sections.length > 1 ? NOTICE_BUDGET : 0)
-  const kept: string[] = []
+  // The task and the person's next words are charged FIRST: they are never
+  // optional, and a section added ahead of them in the reading order (the
+  // earlier turns) must never be what squeezes them out. Then the optional
+  // ones, most important first -- the earlier turns are the first to go.
+  const mandatory = sections.filter((section) => section.name === 'task' || section.name === 'next')
+  let used = mandatory.reduce((sum, section, index) => sum + section.text.length + (index === 0 ? 0 : 2), 0)
+  if (used > budget) return undefined
+  const keptNames = new Set(mandatory.map((section) => section.name))
   const omitted: string[] = []
-  let used = 0
-
-  for (const section of sections) {
-    // +2 for the blank line that will join this section to the previous one.
-    const cost = section.text.length + (kept.length === 0 ? 0 : 2)
+  for (const name of KEEP_ORDER) {
+    const section = sections.find((entry) => entry.name === name)
+    if (section === undefined) continue
+    const cost = section.text.length + 2
     if (used + cost > budget) {
-      omitted.push(section.name)
+      omitted.push(name)
       continue
     }
-    kept.push(section.text)
+    keptNames.add(name)
     used += cost
   }
-
-  // The task section is first and is never optional, and the person's own
-  // next instruction is never optional either. If either overflows, the
-  // caller gets nothing rather than a run pointed at a truncated instruction.
-  if (!omitted.every((name) => name !== 'task' && name !== 'next')) return undefined
+  const kept = sections.filter((section) => keptNames.has(section.name)).map((section) => section.text)
   if (kept.length === 0) return undefined
 
   const body = omitted.length === 0
@@ -161,7 +208,9 @@ export function composeHandoffPrompt(
 export const NOTICE_BUDGET = 120
 
 /** Every section that may be dropped. Exported so a test can price the worst case. */
-export const OPTIONAL_SECTION_NAMES = ['unsettled', 'settled', 'summary'] as const
+export const OPTIONAL_SECTION_NAMES = ['unsettled', 'settled', 'summary', 'earlier'] as const
+/** The optional sections in the order they are kept: the first one given up is the last here. */
+const KEEP_ORDER = OPTIONAL_SECTION_NAMES
 
 export function omissionNotice(omitted: readonly string[]): string {
   return `(Some handoff detail did not fit and was left out: ${omitted.join(', ')}.)`
