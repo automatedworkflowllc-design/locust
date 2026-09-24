@@ -175,3 +175,43 @@ describe('when a slot frees', () => {
     expect(recorded).toEqual([])
   })
 })
+
+/*
+ * H5 (the code review, second half): a full pool ended the WHOLE run end --
+ * `return` inside the drain -- so the member who just finished had their own
+ * task block (claim, done, handoff) silently dropped whenever someone else
+ * was still waiting for a slot.
+ */
+describe('when the pool is full and someone is waiting', () => {
+  it('still reads the finished member\u2019s own task block', async () => {
+    const NL = String.fromCharCode(10)
+    const reply = ['Done.', '<locust-task>', 'done :: Say your word', '</locust-task>'].join(NL)
+    const applied: unknown[] = []
+    const tasks = createRoomTasks({
+      rooms: {
+        list: async () => [room(['tm_booty'])],
+        applyTaskOps: async (_roomId, ops) => {
+          applied.push(ops)
+          return { changed: ['Wren finished "Say your word".'], refused: [] }
+        },
+        updateTask: async () => ({}) as never,
+        startQueued: async () => undefined,
+        refuseQueued: async () => undefined
+      },
+      ledger: {
+        getMission: async () => ({
+          metadata: { missionId: 'mission_w' },
+          events: [
+            { id: 'e1', runId: 'run_w', missionId: 'mission_w', sequence: 1, type: 'message.delta', occurredAt: NOW, sourceAdapter: 'codex', payload: { itemId: 'a', operation: 'append', text: reply, final: true, evidence: { redacted: true } } },
+            { id: 'e2', runId: 'run_w', missionId: 'mission_w', sequence: 2, type: 'run.completed', occurredAt: NOW, sourceAdapter: 'codex', payload: { process: {}, evidence: { redacted: true } } }
+          ]
+        }) as never
+      },
+      teammates: { list: async () => [WREN] },
+      notify: () => undefined,
+      startQueued: vi.fn(async () => 'no-slot' as const)
+    })
+    await tasks.onRunEnded({ missionId: 'mission_w' })
+    expect(applied).toHaveLength(1)
+  })
+})

@@ -94,7 +94,9 @@ export function createRoomTasks(options: RoomTasksOptions): RoomTasks {
        */
       if (options.startQueued !== undefined) {
         let started = 0
-        for (const room of rooms) {
+        // H5: a full pool ends the DRAIN, not this run end -- the finished
+        // member's own task block below still has to be read.
+        drain: for (const room of rooms) {
           for (const post of room.posts) {
             for (const teammateId of post.queued ?? []) {
               if (started >= MAX_DRAIN_PER_RUN) break
@@ -106,7 +108,7 @@ export function createRoomTasks(options: RoomTasksOptions): RoomTasks {
               }
               // Still full. Nothing else in any queue can start either, so
               // stop asking.
-              if (outcome === 'no-slot') return
+              if (outcome === 'no-slot') break drain
               // This one is mid-run; the members behind them may be free.
               if (outcome === 'busy' || outcome === 'refused') continue
               if ('refused' in outcome) {
