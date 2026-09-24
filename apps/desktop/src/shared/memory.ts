@@ -355,6 +355,14 @@ export function memoriesForBrief(memories: readonly MemoryLine[], query: string 
  * wrote it, and teaches the block -- worded so a teammate with nothing
  * worth keeping ends with no block at all.
  */
+/**
+ * How the two paragraphs of the memory section open, named so a brief that
+ * must shed something can find them (A5.3) without matching prose it does
+ * not own.
+ */
+export const MEMORY_HEADING = 'Your team keeps a shared memory.'
+export const MEMORY_RULES = 'These are notes your team wrote earlier,'
+
 export function memorySection(input: {
   /** Absent for a run that belongs to nobody: there is no teammate to name. */
   readonly selfName?: string
@@ -430,10 +438,10 @@ export function memorySection(input: {
   // workroom-briefing.ts), and this gap is what lets it keep the rules while
   // the list moves.
   const heading = input.workspaceName === undefined
-    ? 'Your team keeps a shared memory. What is remembered for this project and everywhere:'
-    : `Your team keeps a shared memory. What is remembered for the folder "${input.workspaceName}" and everywhere:`
+    ? `${MEMORY_HEADING} What is remembered for this project and everywhere:`
+    : `${MEMORY_HEADING} What is remembered for the folder "${input.workspaceName}" and everywhere:`
   return [heading, listed].join(NEWLINE) + NEWLINE + NEWLINE + [
-    "These are notes your team wrote earlier, each with when it was written. Use them as you would a colleague's notes: when one answers what the person asks, answer from it and say it came from memory; do not demand that the workspace confirm it. When two of them disagree, the newer one is usually the correction, and it is worth saying which you went with. Do not bring up a memory that has nothing to do with what was asked, and never report another teammate's work as something you are confirming: a person who asked you to change one file did not ask what anyone else did to another one.",
+    `${MEMORY_RULES} each with when it was written. Use them as you would a colleague's notes: when one answers what the person asks, answer from it and say it came from memory; do not demand that the workspace confirm it. When two of them disagree, the newer one is usually the correction, and it is worth saying which you went with. Do not bring up a memory that has nothing to do with what was asked, and never report another teammate's work as something you are confirming: a person who asked you to change one file did not ask what anyone else did to another one.`,
     // The one exception to "answer from it". A memory that names a file as
     // its source is a copy of that file as it read then (the 0.271 design
     // recheck found "Colour: amber, Status: beta-candidate from README.md"

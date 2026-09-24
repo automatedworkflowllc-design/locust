@@ -9,7 +9,7 @@ import { ASK_TAG } from '../shared/decision.js'
 import type { TeammateRole } from '../shared/ipc.js'
 import { BLOCK_PLACEMENT } from '../shared/trailer.js'
 import { FILE_TAG } from '../shared/handover.js'
-import { MEMORY_TAG } from '../shared/memory.js'
+import { MEMORY_HEADING, MEMORY_RULES, MEMORY_TAG } from '../shared/memory.js'
 
 /**
  * What a teammate's runtime is told about its colleagues.
@@ -573,13 +573,27 @@ export function composeSoloPrompt(input: {
   standing.push(answerSection())
   const brief = standingFor(standing, input.alreadyGiven)
   const composed = [...brief.sections, input.prompt].join(SECTION_GAP)
-  // Nothing here can be shed -- there are no inbound messages to drop, and
-  // the memory section is bounded where it is built -- so an over-long
-  // briefing loses the briefing rather than the person's words. The session
-  // was then told none of it, and is recorded that way.
-  return composed.length > MAX_RUNTIME_PROMPT_LENGTH
-    ? { prompt: input.prompt, given: [] }
-    : { prompt: composed, given: brief.given }
+  if (composed.length <= MAX_RUNTIME_PROMPT_LENGTH) return { prompt: composed, given: brief.given }
+  /*
+   * A5.3: OVER THE CAP, THE TEAM'S MEMORY GIVES WAY -- NOT THE PROJECT'S OWN
+   * INSTRUCTIONS.
+   *
+   * This dropped the whole brief, LOCUST.md with it (the code review's
+   * reported #11): a folder with a long LOCUST.md never had it read by a run
+   * that belonged to nobody. The memory is the bulk and the one part kept
+   * elsewhere too (the memory file), so it goes first; what is left goes
+   * whole, long or not -- as a teammate's brief already does -- because the
+   * folder's instructions and the reply formats are not the part to lose.
+   */
+  const paragraphs = brief.sections.join(SECTION_GAP).split(SECTION_GAP)
+  const kept = paragraphs.filter((paragraph) => !paragraph.trimStart().startsWith(MEMORY_HEADING) && !paragraph.trimStart().startsWith(MEMORY_RULES))
+  const shed = kept.length === paragraphs.length ? brief.sections : kept
+  const keptKeys = new Set(kept.map(paragraphKey))
+  return {
+    prompt: [...shed, input.prompt].join(SECTION_GAP),
+    // Recorded as told only what went.
+    given: shed === brief.sections ? brief.given : brief.given.filter((key) => keptKeys.has(key))
+  }
 }
 
 export function composeRuntimePrompt(input: RuntimePromptInput): RuntimePrompt {

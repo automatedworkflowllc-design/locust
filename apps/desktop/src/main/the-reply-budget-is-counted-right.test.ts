@@ -257,3 +257,34 @@ describe('the reply rules, said once to each teammate', () => {
     expect(starts[4]?.prompt.length).toBeLessThan((starts[2]?.prompt.length ?? 0) / 2)
   })
 })
+
+/*
+ * A2.13: the meeting's close and a returned answer tell the person's own
+ * teammate that the person is reading -- they said "There is no person in
+ * this exchange" to the one teammate the person was waiting on.
+ */
+describe('the turn that brings the result to the person', () => {
+  it('closes a meeting by writing to the person, not by saying nobody is there', async () => {
+    const { relay, starts } = harness({ cap: 12 })
+    await relay.onShared(sharing('mission_root', peers.tm_wren!), [message(WREN, BOOTY, 'Booty, the build command?'), message(WREN, NOVA, 'Nova, the lint step?')])
+    const branch = { hop: 1, rootMissionId: 'mission_root', lastMissionOf: { tm_wren: 'mission_root' } }
+    await relay.onShared(sharing('mission_1', peers.tm_booty!, branch), [message(BOOTY, WREN, 'pnpm check.')])
+    await relay.onShared(sharing('mission_2', peers.tm_nova!, branch), [message(NOVA, WREN, 'eslint.')])
+    const close = starts.find((entry) => entry.peer.self.teammateId === 'tm_wren')
+    expect(close?.prompt).toContain('The person who started this conversation reads it and is waiting on this')
+    expect(close?.prompt).not.toContain('There is no person in this exchange')
+  })
+
+  it('still says nobody is there to a teammate the person is not reading', async () => {
+    const { relay, starts } = harness({ cap: 12 })
+    // Booty, answering Wren's question, opens its own meeting with two others.
+    const branch = { hop: 1, rootMissionId: 'mission_root', lastMissionOf: { tm_wren: 'mission_root' } }
+    await relay.onShared(sharing('mission_b', peers.tm_booty!, branch), [message(BOOTY, WREN, 'Wren, which package?'), message(BOOTY, NOVA, 'Nova, which script?')])
+    const inner = { hop: 2, rootMissionId: 'mission_root', lastMissionOf: { tm_wren: 'mission_root', tm_booty: 'mission_b' } }
+    await relay.onShared(sharing('mission_1', peers.tm_wren!, inner), [message(WREN, BOOTY, 'The desktop app.')])
+    await relay.onShared(sharing('mission_2', peers.tm_nova!, inner), [message(NOVA, BOOTY, 'The build script.')])
+    const close = starts.filter((entry) => entry.peer.self.teammateId === 'tm_booty').at(-1)
+    expect(close?.prompt).toContain('There is no person in this exchange')
+  })
+})
+

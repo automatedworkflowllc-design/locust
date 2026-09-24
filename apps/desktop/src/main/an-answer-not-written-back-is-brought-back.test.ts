@@ -55,6 +55,7 @@ function harness(input: { readonly finalReply?: string; readonly cap?: number; r
     finalReplyOf: async () => input.finalReply,
     post: async (message) => {
       posts.push(message)
+      return { messageId: `wm_returned_${String(posts.length)}` }
     },
     start: async (request) => {
       starts.push(request)
@@ -96,7 +97,9 @@ describe('when the recipient answers without writing back', () => {
       }
     ])
     expect(h.starts.map((start) => start.peer.self.name)).toEqual(['Booty', 'Wren'])
-    expect(h.starts[1]?.prompt).toBe(returnedAnswerPrompt('Booty'))
+    // Wren started this conversation for the person, so Wren is told the
+    // person is reading (A2.13).
+    expect(h.starts[1]?.prompt).toBe(returnedAnswerPrompt('Booty', true))
     expect(h.starts[1]?.relay.hop).toBe(2)
     expect(h.said().at(-1)).toBe('Booty answered in their own conversation without writing back, so the answer was brought back to Wren.')
     expect(h.said()).not.toContain('Booty finished without writing back. Anything they said is in their own conversation.')
@@ -140,7 +143,7 @@ describe('when the recipient answers without writing back', () => {
     await h.relay.onRunEnded({ missionId: 'mission_wren_busy', peer: wrenPeer, relay: undefined })
     expect(h.starts.length).toBe(waiting + 1)
     expect(h.starts.at(-1)?.peer.self.name).toBe('Wren')
-    expect(h.starts.at(-1)?.prompt).toBe(returnedAnswerPrompt('Booty'))
+    expect(h.starts.at(-1)?.prompt).toBe(returnedAnswerPrompt('Booty', true))
   })
 
   it('nothing to bring back -- an empty reply -- is said as before', async () => {

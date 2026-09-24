@@ -102,6 +102,12 @@ export interface RelayOrigin {
    * on an origin made before this existed.
    */
   readonly relayedTo?: readonly string[]
+  /**
+   * The workroom messages this run is started to answer (A2.12), so its
+   * prompt quotes them whatever else is waiting for the recipient. Absent
+   * for a run no message started.
+   */
+  readonly answering?: readonly string[]
 }
 
 export type RelayDecision =
@@ -411,7 +417,7 @@ export interface RelayOptions {
     readonly from: { readonly teammateId: string; readonly name: string; readonly missionId: string }
     readonly to: { readonly teammateId: string; readonly name: string }
     readonly text: string
-  }) => Promise<unknown>
+  }) => Promise<{ readonly messageId: string }>
   /**
    * Whether Cursor Agent can be held read-only on this machine. Absent
    * reads as yes. On Windows it cannot (its sandbox needs macOS or Linux),
@@ -558,13 +564,27 @@ interface Meeting {
  * ordinary inbound section; this only says what the person's teammate is
  * looking at.
  */
-export function meetingPrompt(input: { readonly repliers: readonly string[]; readonly silent: readonly string[] }): string {
+/*
+ * A2.13: THE PERSON'S OWN TEAMMATE IS TOLD THE PERSON IS THERE.
+ *
+ * The meeting's close said "There is no person in this exchange" to every
+ * asker -- including the teammate whose conversation the person started and
+ * is reading, which is where the whole meeting's result is waited for (the
+ * code review's reported #7). `relayPrompt` has told that teammate the truth
+ * since 2026-09-16; the meeting's close and the returned answer now do too.
+ */
+const TO_THE_PERSON =
+  'The person who started this conversation reads it and is waiting on this: say in a line or two what came back and what it means for what they asked -- the answer, where it is, what is still open -- written to them. If you need their decision, a <locust-ask> block reaches them here.'
+
+export function meetingPrompt(input: { readonly repliers: readonly string[]; readonly silent: readonly string[]; readonly readByPerson?: boolean }): string {
   const who = input.repliers.length === 1 ? input.repliers[0] : `${input.repliers.slice(0, -1).join(', ')} and ${input.repliers[input.repliers.length - 1]}`
   return [
     `${who} replied to your message; the replies are quoted below.`,
     ...(input.silent.length === 0 ? [] : [`${input.silent.join(', ')} finished without replying.`]),
     'Take them together. Write back to anyone only if that helps finish the work: one <locust-share to="Name"> block per teammate.',
-    'There is no person in this exchange to answer you; a question for any of them goes in their share block, never in a <locust-ask> block, which reaches only a person.',
+    input.readByPerson === true
+      ? TO_THE_PERSON
+      : 'There is no person in this exchange to answer you; a question for any of them goes in their share block, never in a <locust-ask> block, which reaches only a person.',
     'If nothing more is needed, end with no share block -- that is how an exchange finishes.',
     'Do not start unrelated work.'
   ].join(' ')
@@ -574,9 +594,10 @@ export function meetingPrompt(input: { readonly repliers: readonly string[]; rea
 export const RETURNED_ANSWER = '(Returned by Locust: this is how they answered in their own conversation; they did not write back.)'
 
 /** The asker's turn when an answer is brought back to them (A2.1). */
-export function returnedAnswerPrompt(recipientName: string): string {
+export function returnedAnswerPrompt(recipientName: string, readByPerson = false): string {
   return [
     `${recipientName} answered your message in their own conversation and did not write back, so Locust brought their answer to you: it is quoted below as a message from them.`,
+    ...(readByPerson ? [TO_THE_PERSON] : []),
     'Take it into account and carry on. Write back only if that moves the work; if nothing more is needed, end with no share block.',
     'Do not start unrelated work.'
   ].join(' ')
@@ -705,7 +726,7 @@ export function createRelay(options: RelayOptions): Relay {
     if (words.length === 0) return false
     const asker = await options.peerContextFor(exchange.askerId)
     if (asker === undefined) return false
-    await options.post({
+    const returned = await options.post({
       from: { teammateId: ended.peer.self.teammateId, name: ended.peer.self.name, missionId: ended.missionId },
       to: { teammateId: asker.self.teammateId, name: asker.self.name },
       text: boundedShareText(`${RETURNED_ANSWER} ${words}`)
@@ -714,10 +735,12 @@ export function createRelay(options: RelayOptions): Relay {
       hop: exchange.origin.hop + 1,
       rootMissionId: exchange.origin.rootMissionId ?? exchange.askerMissionId,
       lastMissionOf: { ...exchange.origin.lastMissionOf, [ended.peer.self.teammateId]: ended.missionId },
-      ...(exchange.origin.relayedTo === undefined ? {} : { relayedTo: exchange.origin.relayedTo })
+      ...(exchange.origin.relayedTo === undefined ? {} : { relayedTo: exchange.origin.relayedTo }),
+      answering: [returned.messageId]
     }
     const notice = (message: string): void => notify(exchange.askerRunId, exchange.askerMissionId, message)
-    const prompt = returnedAnswerPrompt(ended.peer.self.name)
+    // The person-started mission is the first entry in `lastMissionOf`.
+    const prompt = returnedAnswerPrompt(ended.peer.self.name, Object.keys(origin.lastMissionOf)[0] === asker.self.teammateId)
     // Never refused by the budget, but spent against it (A2.4).
     reserve(origin.rootMissionId)
     const result = await startFor({ recipient: asker, prompt, from: exchange.asker, origin, notice })
@@ -1035,9 +1058,10 @@ export function createRelay(options: RelayOptions): Relay {
     }
     reserve(origin.rootMissionId)
     const notice = (message: string): void => notify(meeting.askerRunId, meeting.askerMissionId, message)
+    const readByPerson = Object.keys(origin.lastMissionOf)[0] === asker.self.teammateId
     const outcome = await startFor({
       recipient: asker,
-      prompt: meetingPrompt({ repliers: meeting.answered, silent }),
+      prompt: meetingPrompt({ repliers: meeting.answered, silent, readByPerson }),
       from,
       origin,
       notice
@@ -1049,7 +1073,7 @@ export function createRelay(options: RelayOptions): Relay {
       defer(
         {
           recipient: asker,
-          prompt: meetingPrompt({ repliers: meeting.answered, silent }),
+          prompt: meetingPrompt({ repliers: meeting.answered, silent, readByPerson }),
           from,
           origin,
           notice,
@@ -1182,7 +1206,9 @@ export function createRelay(options: RelayOptions): Relay {
             hop: decision.hop,
             rootMissionId: root,
             lastMissionOf,
-            relayedTo: decision.hop > 1 && !briefedBefore ? [...earlier, recipientId] : earlier
+            relayedTo: decision.hop > 1 && !briefedBefore ? [...earlier, recipientId] : earlier,
+            // Every message this share sent them: one run answers them all.
+            answering: posted.filter((entry) => entry.to.teammateId === recipientId).map((entry) => entry.messageId)
           }
           const promptFor = (replyNumber: number): string =>
             relayPrompt({ sender: mission.peer.self, recipient: recipient.self, hop: origin.hop, cap, readByPerson, replyNumber, briefedBefore })

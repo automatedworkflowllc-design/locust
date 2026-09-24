@@ -4,6 +4,7 @@ import { createPeerExchange } from './peer-exchange.js'
 import type { ConversationHint, MemoryBriefing } from './peer-exchange.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 import { composeSoloPrompt } from './workroom-briefing.js'
+import { MEMORY_HEADING, MEMORY_RULES } from '../shared/memory.js'
 
 /**
  * A run started from Home with nobody picked.
@@ -75,9 +76,27 @@ describe('a run that belongs to nobody', () => {
   })
 
   it('keeps the person\'s words when the briefing would not fit', () => {
-    // Nothing here can be shed -- no inbound messages to drop -- so an
-    // over-long briefing loses the briefing, never the question.
+    // The question is never what gives way, and it stays last.
     const huge = 'x'.repeat(13_000)
-    expect(composeSoloPrompt({ prompt: 'Two plus two?', memory: huge, keepATodoList: false }).prompt).toBe('Two plus two?')
+    const composed = composeSoloPrompt({ prompt: 'Two plus two?', memory: huge, keepATodoList: false }).prompt
+    expect(composed.endsWith('Two plus two?')).toBe(true)
+  })
+
+  it('sheds the team memory first when it would not fit, and keeps LOCUST.md and the formats', () => {
+    /*
+     * A5.3 (the code review's reported #11): over the cap this dropped the
+     * WHOLE brief -- LOCUST.md with it, so a folder with long instructions
+     * never had them read by a run that belonged to nobody.
+     */
+    const project = 'The folder "shop" has a LOCUST.md: always run pnpm check before you finish.'
+    const listing = `${MEMORY_HEADING} What is remembered for the folder "shop" and everywhere:\n${'- a long remembered note\n'.repeat(600)}`
+    const rules = `${MEMORY_RULES} each with when it was written. Use them as notes.`
+    const composed = composeSoloPrompt({ prompt: 'Fix the test.', memory: [project, listing, rules].join('\n\n'), keepATodoList: false })
+    expect(composed.prompt).toContain('always run pnpm check before you finish')
+    expect(composed.prompt).not.toContain(MEMORY_HEADING)
+    expect(composed.prompt).not.toContain(MEMORY_RULES)
+    expect(composed.prompt).toContain('<locust-ask>')
+    expect(composed.prompt.endsWith('Fix the test.')).toBe(true)
+    expect(composed.prompt.length).toBeLessThan(12_000)
   })
 })

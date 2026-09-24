@@ -140,6 +140,11 @@ export interface ConversationHint {
    * key (A2.5). Absent for a turn that must be briefed in full.
    */
   readonly alreadyGiven?: ReadonlySet<string>
+  /**
+   * The messages this run was started to answer (A2.12): shown first, and
+   * the last to give way when the prompt is long.
+   */
+  readonly startedFor?: readonly string[]
 }
 
 /** What the team remembers, worded for a runtime; undefined when memory is off. */
@@ -222,7 +227,7 @@ export function createPeerExchange(options: {
       const connectors =
         runtime === 'cursor' ? await options.readyConnectors?.().catch(() => undefined) : undefined
       try {
-        const unread = await options.workroom.unread(peer.self.teammateId, MAX_INBOUND_MESSAGES)
+        const unread = await options.workroom.unread(peer.self.teammateId, MAX_INBOUND_MESSAGES, conversation?.startedFor)
         const composed = composeRuntimePrompt({
           prompt,
           peer,

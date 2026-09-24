@@ -1355,7 +1355,9 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             ...((continuation?.missionId ?? resumedMissionId ?? followUpOf) === undefined
               ? {}
               : { previousMissionId: continuation?.missionId ?? resumedMissionId ?? followUpOf }),
-            ...(plan.alreadyGiven === undefined ? {} : { alreadyGiven: plan.alreadyGiven })
+            ...(plan.alreadyGiven === undefined ? {} : { alreadyGiven: plan.alreadyGiven }),
+            // A2.12: what the host started this run to answer is shown to it.
+            ...(relay?.answering === undefined ? {} : { startedFor: relay.answering })
           })
           runtimePrompt = prepared.runtimePrompt
           delivered = prepared.delivered

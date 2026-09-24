@@ -86,7 +86,10 @@ export interface WorkroomSnapshot {
 }
 
 export interface WorkroomUnread {
-  /** Oldest first, so nothing waits behind newer traffic forever. */
+  /**
+   * Oldest first, so nothing waits behind newer traffic forever -- after any
+   * message the caller asked for by id, which comes first whatever its age.
+   */
   readonly messages: readonly WorkroomMessage[]
   /** How many more are waiting beyond `messages`. Never silently dropped. */
   readonly remaining: number
@@ -98,7 +101,14 @@ export interface Workroom {
     readonly to: WorkroomParty
     readonly text: string
   }): Promise<WorkroomMessage>
-  unread(teammateId: string, limit: number): Promise<WorkroomUnread>
+  /**
+   * `include`: messages the run is being started FOR (A2.12). A run the host
+   * started to answer a message was shown the five OLDEST waiting, so behind
+   * five older ones -- a `when="later"` note, a message that needed nothing
+   * back -- the one it was started for was not in its prompt at all. They
+   * come first, still waiting or not at all, and count toward the limit.
+   */
+  unread(teammateId: string, limit: number, include?: readonly string[]): Promise<WorkroomUnread>
   markDelivered(messageIds: readonly string[], missionId: string): Promise<void>
   read(): Promise<WorkroomSnapshot>
   flush(): Promise<void>
@@ -425,7 +435,7 @@ export function createFileWorkroom(options: FileWorkroomOptions): Workroom {
       })
     },
 
-    unread(teammateId: string, limit: number): Promise<WorkroomUnread> {
+    unread(teammateId: string, limit: number, include?: readonly string[]): Promise<WorkroomUnread> {
       return serialize(async () => {
         if (!isSafeId(teammateId)) throw new Error('Teammate id is invalid')
         const bounded = Math.max(0, Math.trunc(limit))
@@ -435,9 +445,13 @@ export function createFileWorkroom(options: FileWorkroomOptions): Workroom {
         const waiting = parsed.messages.filter(
           (message) => message.to.teammateId === teammateId && !delivered.has(message.messageId)
         )
+        // Asked for first -- a run started to answer them must be shown them
+        // -- then the oldest of the rest.
+        const asked = include === undefined ? [] : waiting.filter((message) => include.includes(message.messageId))
+        const chosen = [...asked, ...waiting.filter((message) => !asked.includes(message))].slice(0, Math.max(bounded, asked.length))
         return {
-          messages: waiting.slice(0, bounded),
-          remaining: Math.max(0, waiting.length - bounded)
+          messages: chosen,
+          remaining: Math.max(0, waiting.length - chosen.length)
         }
       })
     },

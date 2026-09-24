@@ -11,6 +11,25 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.325.0 - 2026-09-24
+
+### Fixed
+
+- **A teammate started to answer a message is shown that message.** When
+  older messages were already waiting, a teammate started to answer a new
+  one could be shown only the older ones. The message it was started for
+  now comes first.
+- **The teammate you are waiting on is told you are there.** When a group
+  question closed, or an answer was brought back, the teammate whose
+  conversation you started was told nobody was in the exchange. It is now
+  asked to tell you what came back, and may ask you something.
+- **A run's memory is saved before the next teammate starts**, so they are
+  briefed with it; and one step failing at a run's end no longer skips the
+  steps after it.
+- **A long brief keeps your project's LOCUST.md.** A run that belongs to no
+  teammate dropped its whole brief when it ran long, instructions included;
+  now the team memory gives way instead.
+
 ## 0.324.0 - 2026-09-24
 
 ### Fixed

@@ -35,6 +35,7 @@ import { createModelCatalog } from './model-catalog.js'
 import { describeGone, diagnosticLine, shouldRoll, startupDetail } from './diagnostics.js'
 import { createGroupStore } from './group-store.js'
 import { createBriefSessions } from './brief-sessions.js'
+import { createRunEnd } from './run-end.js'
 import { readRuntimeArtifacts } from './runtime-artifacts.js'
 import { relative } from 'node:path'
 import { decideReveal } from './reveal-file.js'
@@ -1405,6 +1406,18 @@ if (!ownsSingleInstanceLock) {
       }
     })
 
+    // A2.14: a run's end, in order and each on its own -- its memory first,
+    // so a teammate started because of this run is briefed with it.
+    const runEnd = createRunEnd({
+      memory: () => memoryReader,
+      relay: () => relay,
+      after: [
+        { label: 'routine', step: () => routineRunner },
+        { label: 'room tasks', step: () => roomTasks },
+        { label: 'attention', step: () => attentionReader }
+      ],
+      note
+    })
     const codexMissions = createCodexMissionService({
       workspacePath,
       // A scripted launch spends nothing unless told to (free-routes.ts).
@@ -1463,16 +1476,8 @@ if (!ownsSingleInstanceLock) {
       memory: memoryBriefing,
       // A2.5: a resumed session is told only what changed in its brief.
       briefSessions: createBriefSessions({ rootDirectory: app.getPath('userData') }),
-      onShared: async (mission, posted) => {
-        await relay?.onShared(mission, posted)
-      },
-      onRunEnded: async (mission) => {
-        await relay?.onRunEnded(mission)
-        await routineRunner?.onRunEnded(mission)
-        await roomTasks?.onRunEnded(mission)
-        await memoryReader?.onRunEnded(mission)
-        await attentionReader?.onRunEnded(mission)
-      }
+      onShared: (mission, posted) => runEnd.onShared(mission, posted),
+      onRunEnded: (mission) => runEnd.onRunEnded(mission)
     })
     // The approval transport. It only runs for the mode that asked for it, so
     // an experimental protocol failing cannot take the ordinary paths with it.
@@ -1528,16 +1533,8 @@ if (!ownsSingleInstanceLock) {
           target.webContents.send(MISSION_APPROVAL_WITHDRAWN_CHANNEL, approvalId)
         }
       },
-      onShared: async (mission, posted) => {
-        await relay?.onShared(mission, posted)
-      },
-      onRunEnded: async (mission) => {
-        await relay?.onRunEnded(mission)
-        await routineRunner?.onRunEnded(mission)
-        await roomTasks?.onRunEnded(mission)
-        await memoryReader?.onRunEnded(mission)
-        await attentionReader?.onRunEnded(mission)
-      }
+      onShared: (mission, posted) => runEnd.onShared(mission, posted),
+      onRunEnded: (mission) => runEnd.onRunEnded(mission)
     })
     const sendToWindow = (update: CodexMissionUpdate): void => {
       const target = approvalWindow
