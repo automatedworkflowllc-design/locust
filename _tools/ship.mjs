@@ -269,15 +269,22 @@ if (failed === 0 && !checkOnly) {
  * The block map is what makes an update small: with it, an installed Locust
  * downloads only the blocks that changed (about 2 MB of 117 MB); without it,
  * the whole installer, every time. It went missing from this list for months.
+ *
+ * DRAFT FIRST (0.304). An installed Locust reads latest.yml from the newest
+ * PUBLISHED release. Published with only latest.yml on it, the release sends
+ * every Locust that checks in that minute after an installer that is not
+ * there yet, or one without its block map -- a full download. A draft is
+ * invisible to the channel until every file is on it.
  */
 console.log(
   failed === 0
     ? `\nReady to release ${version}.\n\n`
-      + `  gh release create ${version} --repo automatedworkflowllc-design/locust-releases \\\n`
-      + `    --title ${version} --notes "..." latest.yml\n`
+      + `  gh release create ${version} --repo automatedworkflowllc-design/locust-releases --draft \\\n`
+      + `    --title ${version} --notes "..." Locust-${version}-setup.exe.blockmap\n`
       + `  gh release upload ${version} Locust-${version}-setup.exe --repo ... --clobber\n`
-      + `  gh release upload ${version} Locust-${version}-setup.exe.blockmap --repo ... --clobber\n`
       + `  gh release upload ${version} Locust-Setup.exe --repo ... --clobber\n`
+      + `  gh release upload ${version} latest.yml --repo ... --clobber\n`
+      + `  gh release edit ${version} --repo ... --draft=false --latest   # nothing sees it before this\n`
       + `  node _tools/publish-changelog.mjs      # the app and the site both read this\n`
       + `  node _smoke/update-smoke.mjs\n`
     : `\n${String(failed)} check(s) failed AFTER packaging. Do not publish this.\n`

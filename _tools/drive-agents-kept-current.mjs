@@ -91,10 +91,21 @@ try {
   await drive.ready()
   await drive.resize(1215, 800)
 
-  const read = async () => JSON.parse(String(await drive.evaluate(`(async () => {
-    if (typeof window.desktop.readRuntimeUpdates !== 'function') return JSON.stringify({ missing: true })
-    return JSON.stringify(await window.desktop.readRuntimeUpdates())
-  })()`)))
+  // A read can come back empty while the main process is still busy on its
+  // first look (0.303's control, 2026-09-24: "undefined" after the route was
+  // read); retried, and said, rather than ending the drive.
+  const read = async () => {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const raw = await drive.evaluate(`(async () => {
+        if (typeof window.desktop.readRuntimeUpdates !== 'function') return JSON.stringify({ missing: true })
+        return JSON.stringify(await window.desktop.readRuntimeUpdates()) ?? 'null'
+      })()`)
+      if (typeof raw === 'string' && raw !== 'null') return JSON.parse(raw)
+      say(`  (the updates read came back ${JSON.stringify(raw)}; again)`)
+      await sleep(2000)
+    }
+    return { unreadable: true }
+  }
   const settle = async (limitMs) => {
     let settled
     for (let waited = 0; waited < limitMs; waited += 3000) {
@@ -169,7 +180,14 @@ try {
     return JSON.stringify([...document.querySelectorAll('.lc-picker__row')].map((r) => r.textContent.replace(/\\s+/g, ' ').trim()).filter((t) => /GPT/.test(t)))
   })()`))
   await shoot('03-the-picker.png')
-  const rows = JSON.parse(String(models))
+  // An empty answer (a read that timed out) is no rows, not the end of the drive.
+  const rows = (() => {
+    try {
+      return JSON.parse(String(models))
+    } catch {
+      return []
+    }
+  })()
   check('GPT-6-Sol and GPT-6-Luna are in the picker, without a restart', rows.some((t) => /GPT-6-Sol/.test(t)) && rows.some((t) => /GPT-6-Luna/.test(t)), JSON.stringify(rows))
 
   // The row, after.
@@ -192,7 +210,13 @@ try {
     const note = toggle?.closest('.lc-settingrow')?.querySelector('.lc-settings__note')?.textContent ?? ''
     return JSON.stringify({ checked: toggle?.getAttribute('aria-checked') ?? 'no switch', note })
   })()`)
-  const toggle = JSON.parse(String(onItsOwn))
+  const toggle = (() => {
+    try {
+      return JSON.parse(String(onItsOwn))
+    } catch {
+      return { checked: 'unreadable', note: '' }
+    }
+  })()
   check(ASK ? 'the switch reads off: updating when you press Update' : 'the switch reads on: updating on their own', ASK ? toggle.checked === 'false' && /^Updating when you press Update/.test(toggle.note) : toggle.checked === 'true' && /^Updating on their own/.test(toggle.note), String(onItsOwn))
 
   // The scratch CLI itself.
