@@ -13332,8 +13332,7 @@ textarea {
  */
 
 /* A chip: 36px, a pill, frosted -- a ring and a top highlight, no border. */
-.lc-composer__controls .lc-control--boxed,
-.lc-composer__controls .lc-control--folder {
+.lc-composer__controls .lc-control--boxed {
   height: 36px;
   padding: 0 10px 0 14px;
   gap: 4px;
@@ -13348,9 +13347,32 @@ textarea {
   line-height: 14px;
 }
 
-.lc-composer__controls .lc-control--boxed:hover:not(:disabled),
-.lc-composer__controls .lc-control--folder:hover:not(:disabled) {
+.lc-composer__controls .lc-control--boxed:hover:not(:disabled) {
   background: var(--lc-chip-bg-hover);
+}
+
+/*
+ * THE FOLDER SITS AS TEXT, not a chip (0.308). Colin, 2026-09-23, with a frame
+ * of the old composer: "lets go back to our old style folder button where it
+ * just sat with no button". Its name and its icon in the muted text of the
+ * row, no pill and no ring; it still opens the folder picker, and says so by
+ * brightening under the pointer.
+ */
+.lc-composer__controls .lc-control--folder {
+  height: 36px;
+  padding: 0 6px;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--lc-text-muted);
+  font-size: 12px;
+  line-height: 14px;
+}
+
+.lc-composer__controls .lc-control--folder:hover:not(:disabled) {
+  background: transparent;
+  color: var(--lc-text-secondary);
 }
 
 /* One face on the row, the chip's own: Colin, 2026-09-23, "Use the same font
