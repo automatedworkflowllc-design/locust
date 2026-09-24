@@ -2408,6 +2408,47 @@ export function buildThread(
   const backgroundRows = new Map<string, ActivityDetail>()
   /** The file's own name, however the runtime spelt the path to it. */
   const nameTail = (name: string): string => name.toLowerCase().replace(/\\/g, '/').split('/').at(-1) ?? name
+  /*
+   * H10: WHICH ROW A HOST OBSERVATION IS OF, by path, not by name. It was the
+   * file's basename, so packages/a/package.json and packages/b/package.json
+   * were one row, showing one diff, with one file counted and one in
+   * Artifacts. The observation names a workspace-relative path and a
+   * runtime's row may name it absolutely, relatively or bare: they are the
+   * same file when one ends with the other at a folder boundary. A bare name
+   * is trusted only when exactly one row has it.
+   */
+  const normalPath = (name: string): string => name.toLowerCase().replace(/\\/g, '/').replace(/\/+$/, '')
+  const workspace = options.workspacePath === undefined ? undefined : normalPath(options.workspacePath)
+  /** A path as the workspace knows it: its prefix stripped when it is inside. */
+  const relative = (name: string): string => {
+    const path = normalPath(name)
+    return workspace !== undefined && path.startsWith(`${workspace}/`) ? path.slice(workspace.length + 1) : path
+  }
+  const isAbsolutePath = (path: string): boolean => /^[a-z]:\//.test(path) || path.startsWith('/')
+  const samePath = (a: string, b: string): boolean => {
+    const ra = relative(a)
+    const rb = relative(b)
+    if (ra === rb) return true
+    // An absolute path outside a known workspace, beside a relative one:
+    // the same file when the absolute one ends with it at a folder boundary.
+    if (isAbsolutePath(ra) && !isAbsolutePath(rb)) return ra.endsWith(`/${rb}`)
+    if (isAbsolutePath(rb) && !isAbsolutePath(ra)) return rb.endsWith(`/${ra}`)
+    return false
+  }
+  const editRowOf = (observed: string): ActivityDetail | undefined => {
+    const edits = activity.filter((detail) => detail.kind === 'edit')
+    const exact = edits.filter((detail) => relative(detail.name) === relative(observed))
+    if (exact.length > 0) return exact[0]
+    // Anything looser is trusted only when it names exactly one row.
+    const byPath = edits.filter((detail) => samePath(detail.name, observed))
+    // Several rows of ONE file (two edits to it) are one candidate; rows of
+    // two different files that both end with the name are not a match.
+    if (new Set(byPath.map((detail) => relative(detail.name))).size === 1) return byPath[0]
+    if (byPath.length > 1) return undefined
+    const tail = nameTail(observed)
+    const named = edits.filter((detail) => !normalPath(detail.name).includes('/') && nameTail(detail.name) === tail)
+    return named.length === 1 ? named[0] : undefined
+  }
   const activity: ActivityDetail[] = []
   /**
    * The event each row of `activity` came from, kept in step with it, so
@@ -2453,13 +2494,12 @@ export function buildThread(
         // `1 file`. The stated intent above was always unconditional; the
         // condition was the accident.
         if (event.payload.toolKind === 'observed_edit' && /reported by the runtime/.test(event.payload.status ?? '')) {
-          const path = (event.payload.command ?? '').toLowerCase()
-          const tail = path.split('/').at(-1) ?? path
-          const own = activity.find((detail) => detail.kind === 'edit' && nameTail(detail.name) === tail)
+          const path = event.payload.command ?? ''
+          const own = editRowOf(path)
           if (own !== undefined) {
             openTools.set(event.payload.itemId, own)
             openToolAt.set(event.payload.itemId, { at: event.occurredAt, connector: undefined, viaConnector: false })
-            observedNet.set(event.payload.itemId, tail)
+            observedNet.set(event.payload.itemId, path)
             break
           }
         }
@@ -2569,12 +2609,13 @@ export function buildThread(
              * they counted the second line twice. The attach was written for
              * one edit per file and never said so.
              */
-            const tail = observedNet.get(event.payload.itemId)
-            if (tail !== undefined && patch !== undefined) {
+            const observedPath = observedNet.get(event.payload.itemId)
+            if (observedPath !== undefined && patch !== undefined) {
               const keep = activity[index]
               for (let at = activity.length - 1; at >= 0; at -= 1) {
                 const other = activity[at]
-                if (other !== keep && other.kind === 'edit' && nameTail(other.name) === tail) {
+                // H10: the same FILE's other rows, never another file's with its name.
+                if (other !== keep && other.kind === 'edit' && (samePath(other.name, observedPath) || (keep !== undefined && samePath(other.name, keep.name)))) {
                   activity.splice(at, 1)
                   activityBorn.splice(at, 1)
                 }
