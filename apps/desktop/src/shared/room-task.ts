@@ -125,6 +125,37 @@ export interface TaskBoardLine {
  * teaches the block -- worded so a teammate that did nothing to the board
  * ends with no block at all.
  */
+/**
+ * The board, fitted beside a post in the room's per-member prompt.
+ *
+ * A room post may be 8,000 characters and a mission prompt may be 8,000
+ * characters, and the board was appended to the post: a long post plus the
+ * board was over the limit, and EVERY member was refused (harness review,
+ * 2026-09-24). The post is the person's words and goes whole; the board
+ * gives way -- done rows first, then the last rows -- and says how many it
+ * left out. A post that leaves no room even for the board's instructions goes
+ * without it, and says that instead.
+ */
+export function fittedTaskSection(input: Parameters<typeof taskSection>[0] & { readonly budget: number }): string {
+  const { budget, ...section } = input
+  const full = taskSection(section)
+  if (full.length <= budget) return full
+  let tasks = section.tasks.filter((task) => task.state !== 'done')
+  const withNote = (kept: readonly TaskBoardLine[]): string => {
+    const left = section.tasks.length - kept.length
+    const text = taskSection({ ...section, tasks: kept })
+    return left === 0 ? text : `${text}\n(${String(left)} more row${left === 1 ? '' : 's'} on the board did not fit beside this post.)`
+  }
+  let text = withNote(tasks)
+  while (text.length > budget && tasks.length > 0) {
+    tasks = tasks.slice(0, -1)
+    text = withNote(tasks)
+  }
+  if (text.length <= budget) return text
+  const none = 'The room\u2019s task board did not fit beside this post.'
+  return none.length <= budget ? none : ''
+}
+
 export function taskSection(input: {
   readonly roomName: string
   readonly selfName: string

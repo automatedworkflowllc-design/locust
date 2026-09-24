@@ -102,6 +102,13 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
        * failure the `missed` list above exists to prevent.
        */
       const rewritten: string[] = []
+      /*
+       * Memories the store REFUSED, with its reason: full (400), a line too
+       * long, a file it could not read. They were dropped without a word --
+       * a teammate "remembered" something and nothing was kept, and nobody
+       * was told (harness review, 2026-09-24).
+       */
+      const refused: string[] = []
       for (const op of ops) {
         try {
           if (op.kind === 'forget') {
@@ -133,12 +140,14 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
           }
           if (!result.created) continue
           ;(result.memory.status === 'proposed' ? proposed : kept).push(result.memory.text)
-        } catch {
-          // A memory the store refuses (full, malformed) is dropped; the
-          // reply itself is untouched and the person can still read it.
+        } catch (error) {
+          // The reply itself is untouched and the person can still read it;
+          // what the store said is kept, once, for the notice below.
+          const reason = error instanceof Error ? error.message : 'It could not be kept.'
+          if (!refused.includes(reason)) refused.push(reason)
         }
       }
-      if (kept.length === 0 && proposed.length === 0 && forgotten.length === 0 && missed.length === 0 && rewritten.length === 0) return
+      if (kept.length === 0 && proposed.length === 0 && forgotten.length === 0 && missed.length === 0 && rewritten.length === 0 && refused.length === 0) return
 
       /*
        * Only what the memory card cannot say.
@@ -155,6 +164,16 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
        * that was forgotten is exactly the one it cannot draw.
        */
       options.notify({ kind: 'memory-changed', by: by.name, kept, proposed, forgotten, ...(rewritten.length === 0 ? {} : { rewritten }) })
+      if (refused.length > 0) {
+        // Amber, like a forget that failed: the person may need to act --
+        // make room on the Memory screen, or read what the store said.
+        options.notify({
+          kind: 'relay-notice',
+          runId: recovered.metadata.runId,
+          missionId: mission.missionId,
+          message: `${by.name} tried to remember something and it was not kept. ${refused.join(' ')}`
+        })
+      }
       if (missed.length > 0) {
         // Amber: a person may need to act. The memory that was meant to go is
         // still there, and only they can settle what it should say.

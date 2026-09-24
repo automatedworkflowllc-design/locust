@@ -49,10 +49,11 @@ function room(queued: readonly string[]): PublicRoom {
 /** The drain, with a host that answers however the test needs. */
 function harness(
   queued: readonly string[],
-  answer: (teammateId: string) => { readonly missionId: string } | 'no-slot' | 'refused'
+  answer: (teammateId: string) => { readonly missionId: string } | 'no-slot' | 'busy' | 'refused' | { readonly refused: string }
 ) {
   const started: string[] = []
   const recorded: { teammateId: string; missionId: string }[] = []
+  const refusals: { teammateId: string; message: string }[] = []
   const notices: CodexMissionUpdate[] = []
   const tasks = createRoomTasks({
     rooms: {
@@ -61,6 +62,9 @@ function harness(
       updateTask: async () => ({}) as never,
       startQueued: async (_roomId, _postId, teammateId, missionId) => {
         recorded.push({ teammateId, missionId })
+      },
+      refuseQueued: async (_roomId, _postId, teammateId, message) => {
+        refusals.push({ teammateId, message })
       }
     },
     // The ended mission has no reply, so nothing below the drain runs.
@@ -72,7 +76,7 @@ function harness(
       return answer(teammateId)
     }
   })
-  return { tasks, started, recorded, notices }
+  return { tasks, started, recorded, refusals, notices }
 }
 
 describe('when a slot frees', () => {
@@ -101,15 +105,29 @@ describe('when a slot frees', () => {
     expect(recorded).toEqual([])
   })
 
-  it('passes over someone waiting cannot help, and keeps going', async () => {
+  it('passes over someone waiting cannot help, records why on the post, and keeps going', async () => {
     // Gone from the roster, or a runtime a room cannot post to. Waiting will
-    // never fix it, so it must not block the person behind them.
-    const { tasks, started, recorded } = harness(['tm_booty', 'tm_gem'], (id) =>
-      id === 'tm_booty' ? 'refused' : { missionId: 'm_gem' }
+    // never fix it, so it must not block the person behind them -- and it
+    // leaves the queue, onto the post's refusals, rather than being asked
+    // again at every run end forever (harness review, 2026-09-24).
+    const { tasks, started, recorded, refusals } = harness(['tm_booty', 'tm_gem'], (id) =>
+      id === 'tm_booty' ? { refused: 'No longer on the roster.' } : { missionId: 'm_gem' }
     )
     await tasks.onRunEnded({ missionId: 'mission_w' })
     expect(started).toEqual(['tm_booty', 'tm_gem'])
     expect(recorded).toEqual([{ teammateId: 'tm_gem', missionId: 'm_gem' }])
+    expect(refusals).toEqual([{ teammateId: 'tm_booty', message: 'No longer on the roster.' }])
+  })
+
+  it('skips a member who is mid-run, still asks the ones behind them, and records nothing for them', async () => {
+    // A busy member is not a full pool: the others may well be free.
+    const { tasks, started, recorded, refusals } = harness(['tm_booty', 'tm_gem'], (id) =>
+      id === 'tm_booty' ? 'busy' : { missionId: 'm_gem' }
+    )
+    await tasks.onRunEnded({ missionId: 'mission_w' })
+    expect(started).toEqual(['tm_booty', 'tm_gem'])
+    expect(recorded).toEqual([{ teammateId: 'tm_gem', missionId: 'm_gem' }])
+    expect(refusals).toEqual([])
   })
 
   it('does nothing at all when nobody is waiting', async () => {
@@ -133,7 +151,8 @@ describe('when a slot frees', () => {
         list: async () => [room(['tm_booty', 'tm_gem'])],
         applyTaskOps: async () => ({ changed: [], refused: [] }),
         updateTask: async () => ({}) as never,
-        startQueued: failing
+        startQueued: failing,
+        refuseQueued: async () => undefined
       },
       ledger: { getMission: async () => undefined },
       teammates: { list: async () => [WREN] },

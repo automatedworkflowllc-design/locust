@@ -62,7 +62,7 @@ import { MAX_LIVE_MISSIONS } from '../shared/live-missions.js'
 import { hostReadsEventsOf, runtimeDisplayName } from '../shared/runtimes.js'
 import { FREE_ONLY_REFUSAL, isFreeRoute } from './free-routes.js'
 
-const MAX_PROMPT_LENGTH = 8_000
+export const MAX_PROMPT_LENGTH = 8_000
 /**
  * Missions run side by side now, one per teammate.
  *

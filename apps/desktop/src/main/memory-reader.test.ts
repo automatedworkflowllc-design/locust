@@ -129,7 +129,7 @@ describe('reading a reply for memory', () => {
     }
   })
 
-  it('a conversation nobody owns is attributed as one; a store that refuses is not a crash and not a notice', async () => {
+  it('a conversation nobody owns is attributed as one; a store that refuses is not a crash, and the person is told why', async () => {
     const nobody = harness({ reply: BLOCK })
     await nobody.reader.onRunEnded({ missionId: 'mission_1' })
     expect(nobody.added[0]?.by).toEqual({ name: 'a conversation' })
@@ -137,5 +137,10 @@ describe('reading a reply for memory', () => {
     await full.reader.onRunEnded({ missionId: 'mission_1' })
     // forget still ran and found one, so that alone is reported
     expect(full.updates.find((u) => u.kind === 'memory-changed')).toMatchObject({ kept: [], proposed: [], forgotten: ['The API is on port 3000'] })
+    // Refused memories were dropped without a word (harness review,
+    // 2026-09-24). Now the store's own reason reaches the thread, once.
+    const told = full.updates.filter((u) => u.kind === 'relay-notice' && u.message.includes('tried to remember something and it was not kept'))
+    expect(told).toHaveLength(1)
+    expect(told[0]?.kind === 'relay-notice' ? told[0].message : '').toContain('full')
   })
 })

@@ -26,7 +26,7 @@ import { basename, dirname, join } from 'node:path'
 import { release } from 'node:os'
 import { execFile } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
-import { createCodexMissionService } from './codex-mission.js'
+import { MAX_PROMPT_LENGTH, createCodexMissionService } from './codex-mission.js'
 import { approvalAnswerFrom, createApprovalChannel } from './approval-channel.js'
 import { PeerRecordError } from './peer-exchange.js'
 import { readNpmBinDirectory } from './npm-prefix.js'
@@ -46,7 +46,7 @@ import { createRoutineStore } from './routine-store.js'
 import { createRoomStore } from './room-store.js'
 import { createRoomTasks } from './room-tasks.js'
 import type { RoomTasks } from './room-tasks.js'
-import { rowToClaimAtStart, taskSection } from '../shared/room-task.js'
+import { fittedTaskSection, rowToClaimAtStart } from '../shared/room-task.js'
 import { createRoutineRunner } from './routine-runner.js'
 import { createMemoryStore } from './memory-store.js'
 import { createWorktreeManager } from './worktrees.js'
@@ -2172,15 +2172,16 @@ if (!ownsSingleInstanceLock) {
       startQueued: async (room, postId, teammateId) => {
         const post = room.posts.find((entry) => entry.postId === postId)
         if (post === undefined) return 'refused'
-        // A roster that cannot be read cannot say who this member is.
+        // A roster that cannot be read cannot say who this member is --
+        // this time. Asked again at the next run end, not refused for good.
         let roster: Awaited<ReturnType<typeof teammates.list>>
         try {
           roster = await teammates.list()
         } catch {
-          return 'refused'
+          return 'busy'
         }
         const attempt = await startRoomMember(room, teammateId, post.text, roster)
-        if (!attempt.ok) return attempt.retryable ? 'no-slot' : 'refused'
+        if (!attempt.ok) return attempt.retryable ? (attempt.pool === true ? 'no-slot' : 'busy') : { refused: attempt.message }
         sendToWindow({
           kind: 'mission-started',
           runId: attempt.data.runId,
@@ -3202,7 +3203,7 @@ if (!ownsSingleInstanceLock) {
       roster: readonly PublicTeammate[]
     ): Promise<
       | { readonly ok: true; readonly data: CodexMissionStartData }
-      | { readonly ok: false; readonly name: string; readonly message: string; readonly retryable: boolean }
+      | { readonly ok: false; readonly name: string; readonly message: string; readonly retryable: boolean; readonly pool?: boolean }
     > => {
       const teammate = roster.find((entry) => entry.teammateId === teammateId)
       const peer = await peerContextFor(teammateId)
@@ -3216,9 +3217,9 @@ if (!ownsSingleInstanceLock) {
       // the mission is briefed with. Read fresh, so a member started from
       // the queue is briefed with the board as it stands NOW.
       const memberNames = room.teammateIds.map((id: string) => roster.find((entry) => entry.teammateId === id)?.name ?? id)
-      const briefed = `${text}
-
-${taskSection({
+      // Fitted beside the post: the post goes whole and the board gives way,
+      // or a long post was refused for every member (room-task.ts).
+      const board = fittedTaskSection({
         roomName: room.name,
         selfName: teammate.name,
         memberNames,
@@ -3226,8 +3227,10 @@ ${taskSection({
           text: task.text,
           state: task.state,
           ownerName: task.ownerId === undefined ? undefined : roster.find((entry) => entry.teammateId === task.ownerId)?.name ?? task.ownerId
-        }))
-      })}`
+        })),
+        budget: MAX_PROMPT_LENGTH - text.length - 2
+      })
+      const briefed = board.length === 0 ? text : `${text}\n\n${board}`
       if (route.runtime === 'antigravity') {
         return { ok: false, name: teammate.name, message: 'Antigravity cannot be posted to from a room yet.', retryable: false }
       }
@@ -3248,7 +3251,9 @@ ${taskSection({
           ok: false,
           name: teammate.name,
           message: response.error.message,
-          retryable: response.error.code === 'RUN_ALREADY_ACTIVE'
+          retryable: response.error.code === 'RUN_ALREADY_ACTIVE',
+          // Every slot taken, as against this teammate being mid-run.
+          pool: response.error.code === 'RUN_ALREADY_ACTIVE' && response.error.busy === 'pool'
         }
       }
       await assignOwner(teammateId, response.data.missionId)

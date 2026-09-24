@@ -11,6 +11,22 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.313.0 - 2026-09-24
+
+### Fixed
+
+- **A long room post still reaches every teammate.** A post near the length
+  limit, plus the room's task board, used to be too long for any of them to
+  start. The post now goes whole, and the board makes room, saying how many
+  rows it left out.
+- **A memory that could not be kept says so.** When team memory is full, or
+  a line is too long, the teammate's thread now says it was not kept and
+  why, instead of dropping it silently.
+- **A room member who can never start leaves the queue.** Someone removed
+  from the team, or an agent a room cannot post to, is recorded on the post
+  with the reason instead of waiting there forever; a teammate who is only
+  busy no longer holds up the rest.
+
 ## 0.312.0 - 2026-09-24
 
 ### Fixed

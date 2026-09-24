@@ -17,7 +17,7 @@ import type { RoomStore } from './room-store.js'
  * the window in one line, so the room can show it.
  */
 export interface RoomTasksOptions {
-  readonly rooms: Pick<RoomStore, 'list' | 'applyTaskOps' | 'startQueued' | 'updateTask'>
+  readonly rooms: Pick<RoomStore, 'list' | 'applyTaskOps' | 'startQueued' | 'refuseQueued' | 'updateTask'>
   readonly ledger: Pick<MissionLedger, 'getMission'>
   readonly teammates: { list(): Promise<readonly PublicTeammate[]> }
   readonly notify: (update: CodexMissionUpdate) => void
@@ -25,15 +25,18 @@ export interface RoomTasksOptions {
    * Start one member who has been waiting for a slot.
    *
    * The host owns this: it knows the routes, the briefing and the three
-   * transports. Answers the mission id when the run started, `'no-slot'`
-   * when there is still no room for it -- which ends the drain rather than
-   * spinning -- and `'refused'` when waiting will never fix it.
+   * transports. Answers the mission id when the run started; `'no-slot'`
+   * when every run slot is taken -- which ends the drain rather than
+   * spinning; `'busy'` when THIS member is mid-run, so the members behind
+   * them still get asked; `{ refused }`, with the host's words, when waiting
+   * will never fix it; and `'refused'` when there is nothing left to record
+   * it on.
    */
   readonly startQueued?: (
     room: PublicRoom,
     postId: string,
     teammateId: string
-  ) => Promise<{ readonly missionId: string } | 'no-slot' | 'refused'>
+  ) => Promise<{ readonly missionId: string } | 'no-slot' | 'busy' | 'refused' | { readonly refused: string }>
 }
 
 export interface RoomTasks {
@@ -103,7 +106,19 @@ export function createRoomTasks(options: RoomTasksOptions): RoomTasks {
               // Still full. Nothing else in any queue can start either, so
               // stop asking.
               if (outcome === 'no-slot') return
-              if (outcome === 'refused') continue
+              // This one is mid-run; the members behind them may be free.
+              if (outcome === 'busy' || outcome === 'refused') continue
+              if ('refused' in outcome) {
+                /*
+                 * Waiting will never fix it: out of the queue and onto the
+                 * post's refusals, with the host's words. It stayed queued,
+                 * asked again at every run end, the post showing someone
+                 * "waiting" who never would start (harness review,
+                 * 2026-09-24).
+                 */
+                await options.rooms.refuseQueued(room.roomId, post.postId, teammateId, outcome.refused).catch(() => undefined)
+                continue
+              }
               started += 1
               try {
                 await options.rooms.startQueued(room.roomId, post.postId, teammateId, outcome.missionId)
