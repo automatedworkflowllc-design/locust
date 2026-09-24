@@ -33,6 +33,12 @@ export const MAX_MEMORY_OPS_PER_REPLY = 4
 
 const BLOCK = /<locust-memory\s*>([\s\S]*?)<\/locust-memory>/g
 /**
+ * A tidy pass's answer (A1.2): read by `parseTidyBlocks` in memory-tidy.ts,
+ * and taken out of a reply here with the memory block -- the Memory screen
+ * shows what it suggested.
+ */
+export const TIDY_BLOCK = /<locust-tidy\s*>([\s\S]*?)<\/locust-tidy>/g
+/**
  * `remember :: ...`, `remember everywhere :: ...`, `forget :: ...`, and the
  * named forms `remember as <slug> :: ...`.
  *
@@ -187,7 +193,7 @@ export function parseMemoryBlocks(text: string): readonly MemoryOp[] {
 
 /** The reply without its memory blocks; the Memory screen shows what they did. */
 export function stripMemoryBlocks(text: string): string {
-  return text.replace(BLOCK, '').replace(/\n{3,}/g, '\n\n').trimEnd()
+  return text.replace(BLOCK, '').replace(TIDY_BLOCK, '').replace(/\n{3,}/g, '\n\n').trimEnd()
 }
 
 /**
@@ -223,6 +229,11 @@ const NEWLINE = String.fromCharCode(10)
 
 export interface MemoryLine {
   readonly text: string
+  /**
+   * Its id, written into `.locust/memory.md` so a tidy pass can name it
+   * exactly (A1.2). Not pasted into the brief.
+   */
+  readonly id?: string
   readonly scope: MemoryScope
   /** Who wrote it: a teammate's name, or "you". */
   readonly by: string

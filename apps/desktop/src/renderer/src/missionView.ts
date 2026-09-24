@@ -17,6 +17,7 @@ import { parseDecision, stripDecisionBlocks } from '../../shared/decision.js'
 import { parseFileBlocks, stripFileBlocks } from '../../shared/handover.js'
 import type { HandedFile } from '../../shared/handover.js'
 import type { DecisionRequest } from '../../shared/decision.js'
+import { TIDY_PROMPT } from '../../shared/memory-tidy.js'
 
 /**
  * Turns the normalized event stream into the thread the workroom renders.
@@ -4096,6 +4097,23 @@ export type LiveStarter =
   | PublicRecoveredMission['startedBy']
   | { readonly kind: 'room'; readonly roomId: string; readonly postId: string }
 
+/**
+ * What the person ASKED FOR, when a button sent a brief in their name (A1.2).
+ *
+ * "Tidy up" and "Ask Wren for a review" each start an ordinary turn whose
+ * prompt is a page of instructions the host wrote for the runtime -- the
+ * example block, the rules, the whole review material -- and the bubble drew
+ * it as though the person had typed it (the 0.317 tidy drive's screenshot).
+ * The person pressed a button meaning one thing; that is what their bubble
+ * says, the way Claude Code shows `/review` rather than the prompt behind it.
+ * The runtime still gets every word.
+ */
+export function briefAskedFor(prompt: string): string | undefined {
+  if (prompt === TIDY_PROMPT) return "Tidy this folder's team memory."
+  const review = /^(.+?) finished a piece of work and you are reviewing it\. You did not do this work/.exec(prompt)
+  return review === null ? undefined : `Review ${review[1]!}'s work.`
+}
+
 export function turnPromptLine(turn: {
   readonly prompt: string
   readonly startedBy?: LiveStarter
@@ -4107,6 +4125,8 @@ export function turnPromptLine(turn: {
   // they never typed, in the style that says they said them. The files are
   // still shown, as rows under the bubble; this is only about whose voice
   // the sentence is in.
+  const asked = briefAskedFor(turn.prompt)
+  if (asked !== undefined) return asked
   if (turn.startedBy === undefined) return splitAttachments(turn.prompt).text
   // A routine step is the person's own words, saved from a conversation they
   // had; it is theirs to see, even though the host pressed go. A room post

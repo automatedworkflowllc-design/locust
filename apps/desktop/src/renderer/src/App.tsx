@@ -59,6 +59,7 @@ import type { QueuedRow } from './steering.js'
 import type { RoutineDraft } from './routines.js'
 import { RoutineDialog } from './components/RoutineDialog.js'
 import { AutomationsScreen } from './components/AutomationsScreen.js'
+import { TIDY_PROMPT } from '../../shared/memory-tidy.js'
 import { memoryChangedNotice, memoriesOfConversation, turnsOfConversation } from './conversationMemories.js'
 import { createFrameBatcher } from './streamFrames.js'
 import { heldDigests, mergeHistory } from './historyMerge.js'
@@ -91,7 +92,8 @@ import { MissionsScreen, SettingsScreen, TeammatesScreen, UpdateBanner } from '.
 import { WhatsNewSplash } from './components/WhatsNew.js'
 import type { SettingsPageId } from './settingsPages.js'
 import type { RouteChoice } from './components/RoutePicker.js'
-import { composerRouteFor } from '../../shared/route-at-start.js'
+import { composerRouteFor, startAs } from '../../shared/route-at-start.js'
+import type { StartAs } from '../../shared/route-at-start.js'
 import type { Screen } from './components/Screens.js'
 import { Icon } from './components/Icon.js'
 import { NewTeammateDialog } from './components/NewTeammateDialog.js'
@@ -2882,7 +2884,11 @@ export default function App(): ReactElement {
   const memoryCall = async (call: Promise<MemoryListResponse> | undefined): Promise<string | undefined> => {
     if (call === undefined) return 'Memory is not available here.'
     try {
-      return adoptMemories(await call)
+      const response = await call
+      // A refusal can still have changed the list -- a suggestion refused as
+      // out of date is dropped (A1.2) -- so the screen reads it again.
+      if (!response.ok) refreshMemories()
+      return adoptMemories(response)
     } catch {
       return 'Memory could not be changed. What was saved is still saved.'
     }
@@ -2997,13 +3003,24 @@ export default function App(): ReactElement {
     prompt: string,
     modeOverride?: MissionMode,
     /** Sent from the queue: refused as busy, it goes back in line (retriedAfterBusy). */
-    options?: { readonly requeue?: QueuedRow }
+    options?: {
+      readonly requeue?: QueuedRow
+      /**
+       * Started FOR a teammate who is not on screen yet -- a review, a tidy
+       * pass (H9). They are carried whole, and the run is a NEW conversation
+       * of theirs: whatever is on screen is not theirs to continue.
+       */
+      readonly as?: StartAs
+    }
   ): Promise<boolean> => {
-    const route = composerRoute
+    const as = options?.as
+    const route = as?.route ?? composerRoute
+    const runMode = as?.mode ?? mode
+    const runEffort = as === undefined ? effort : as.effort
     // What was on screen before this turn's own row took its place.
     const previousKey = shownKey
     const bridge = window.desktop
-    const teammateId = pickedTeammate?.teammateId
+    const teammateId = as?.teammateId ?? pickedTeammate?.teammateId
     // No folder, no run. The main process refuses this too; saying it here
     // keeps a refused start from being filed as a failed mission.
     if (workspacePath === undefined && build !== undefined) {
@@ -3050,7 +3067,7 @@ export default function App(): ReactElement {
      * in front of it ends. There is no window left in which this is wrong.
      */
     const continuing =
-      shown !== undefined && shown.data !== undefined && ownerOf(shown) === teammateId ? shown : undefined
+      as === undefined && shown !== undefined && shown.data !== undefined && ownerOf(shown) === teammateId ? shown : undefined
     const coldStart = continuing !== undefined && resumableSessionOf(continuing.events) === undefined
     const earlierTurns = continuing === undefined
       ? []
@@ -3082,7 +3099,7 @@ export default function App(): ReactElement {
       ...(coldStart ? { coldStart: true } : {}),
       // Plan is a mode now, so the run remembers what it was asked to be
       // rather than a switch that sat beside the mode and could disagree.
-      ...((modeOverride ?? mode) === 'plan' ? { plan: true } : {})
+      ...((modeOverride ?? runMode) === 'plan' ? { plan: true } : {})
     }
     setRuns((current) => withNewRun(current, key, starting))
     setShownKey(key)
@@ -3099,8 +3116,8 @@ export default function App(): ReactElement {
         // The mode the composer SHOWS, which is not always the mode last
         // chosen: a mode the route cannot run is not one a mission can start
         // in, and sending it anyway is how every message came back refused.
-        mode: modeRunsOn(modeOverride ?? mode, route.runtime, build?.platform)
-          ? modeOverride ?? mode
+        mode: modeRunsOn(modeOverride ?? runMode, route.runtime, build?.platform)
+          ? modeOverride ?? runMode
           : modesFor(route.runtime, build?.platform)[0] ?? 'accept-edits',
         runtime: route.runtime,
         // The concrete model. When a runtime encodes effort in the id, the
@@ -3112,7 +3129,7 @@ export default function App(): ReactElement {
         // composer shows that -- so what is sent must match what is shown.
         // Where the effort lives inside the model id, it is sent as the id
         // alone (startRoute).
-        ...startRoute(models, route.runtime, route.model, swarmEffortFor(models, route.model, swarm, effort, route.runtime)),
+        ...startRoute(models, route.runtime, route.model, swarmEffortFor(models, route.model, swarm, runEffort, route.runtime)),
         modelChoice: route.model,
         ...(teammateId !== undefined && pickerRoutes.has(teammateId) ? { routeOverrideFor: teammateId } : {}),
         ...(teammateId === undefined ? {} : { teammateId }),
@@ -3199,7 +3216,7 @@ export default function App(): ReactElement {
         // The host recorded this route as the teammate's own; mirror it so a
         // reply they make on their own, and the composer next time they are
         // picked, use it at once.
-        const kept = { runtime: response.data.runtime, model: response.data.model, mode: modeOverride ?? mode }
+        const kept = { runtime: response.data.runtime, model: response.data.model, mode: modeOverride ?? runMode }
         setTeammates((current) =>
           current.map((teammate) => (teammate.teammateId === teammateId ? { ...teammate, route: kept } : teammate))
         )
@@ -4176,14 +4193,52 @@ export default function App(): ReactElement {
   const reviewersFor = (run: LiveRunState | undefined): readonly PublicTeammate[] =>
     run === undefined ? [] : teammates.filter((entry) => entry.teammateId !== ownerOf(run))
 
+  /**
+   * A tidy pass (A1.2): one of the team reads the folder's memories and
+   * suggests merges, retirements and rewrites -- an ordinary run of theirs,
+   * in their own thread, as a review is. Its suggestions come back as
+   * proposals on the Memory screen; nothing changes until the person keeps
+   * one.
+   */
+  const tidyMemory = (teammateId: string): void => {
+    const teammate = teammates.find((one) => one.teammateId === teammateId)
+    if (teammate === undefined) return
+    selectTeammate(teammateId)
+    // As THEM, whole (H9): not the closure's idea of who is on screen.
+    void startMission(TIDY_PROMPT, undefined, { as: startAs(teammate, { route, mode, effort }, pickerRoutes) })
+  }
+  const openTidyMenu = (anchor: HTMLElement): void => {
+    if (rowMenu?.anchor === anchor) {
+      setRowMenu(undefined)
+      return
+    }
+    const box = anchor.getBoundingClientRect()
+    setRowMenuArmed(undefined)
+    setRowMenu({
+      x: box.left,
+      y: box.bottom + 4,
+      title: 'Tidy up with',
+      anchor,
+      items:
+        teammates.length === 0
+          ? [{ label: 'Add a teammate first', disabledReason: 'A tidy pass is a teammate reading the memories.' }]
+          : teammates.map((teammate) => ({ label: `Ask ${teammate.name}`, onSelect: () => tidyMemory(teammate.teammateId) }))
+    })
+  }
   const askForReview = (run: LiveRunState, reviewer: PublicTeammate): void => {
     const material = reviewMaterialFor(run)
     if (material === undefined) return
     selectTeammate(reviewer.teammateId)
-    // After the teammate is selected, so the run is started as theirs. The
-    // same path a person's own message takes -- a review is an ordinary
-    // mission of the reviewer's, on their own route, in their own thread.
-    setTimeout(() => void startMission(reviewBrief(material)), 0)
+    /*
+     * As the REVIEWER, whole (H9). This used to wait a tick "so the run is
+     * started as theirs" -- and then call the startMission of the render
+     * before the selection, which read the AUTHOR's teammate, route and
+     * mode: the author reviewed their own work and the reviewer never ran
+     * (code review H9, and the probe's own capture). A review is an
+     * ordinary mission of the reviewer's, on their own route, as a new
+     * conversation of theirs.
+     */
+    void startMission(reviewBrief(material), undefined, { as: startAs(reviewer, { route, mode, effort }, pickerRoutes) })
   }
   /**
    * What a row action just did, when it worked.
@@ -5003,6 +5058,7 @@ export default function App(): ReactElement {
               onClear={clearMemories}
               forgotten={forgottenMemories}
               onRestore={restoreMemory}
+              onTidy={openTidyMenu}
               // `openMission`, like every other opener. This had its own two
               // lines, and `setShownKey` wants a RUN key -- `runs` is keyed by
               // `run_...` -- so a `mission_...` id matched nothing and the

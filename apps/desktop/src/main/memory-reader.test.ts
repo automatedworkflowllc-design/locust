@@ -36,7 +36,8 @@ function harness(input: {
         return text.includes('port')
           ? { removed: [text], refusal: undefined, candidates: [] }
           : { removed: [], refusal: 'nothing-matched' as const, candidates: [] }
-      }
+      },
+      proposeTidy: async () => ({ proposed: 0, refused: [] })
     },
     ledger: {
       getMission: async () =>

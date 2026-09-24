@@ -36,14 +36,15 @@ export function memoryFileText(lines: readonly MemoryLine[], now: Date): string 
     const when = memory.at === undefined ? '' : ` -- ${memory.at.slice(0, 10)}${age === undefined ? '' : ` (${age})`}`
     const where = memory.where === undefined ? '' : ` in ${memory.where}`
     // Defanged: the teammate reads this file as part of what it is told.
-    return `- ${defangProtocolBlocks(memory.text)} (by ${by}${where}${when})`
+    // The id, so a tidy pass can name a memory exactly (A1.2).
+    return `- ${defangProtocolBlocks(memory.text)} (by ${by}${where}${when})${memory.id === undefined ? '' : ` [${memory.id}]`}`
   }
   const here = lines.filter((memory) => memory.scope !== 'global')
   const everywhere = lines.filter((memory) => memory.scope === 'global')
   return [
     '# Team memory',
     '',
-    'Written by Locust before each run, newest last. Read-only: to change memory, use the <locust-memory> block in your reply.',
+    'Written by Locust before each run, newest last. Read-only: to change memory, use the <locust-memory> block in your reply. The id in square brackets names each memory exactly.',
     '',
     `## This folder (${String(here.length)})`,
     '',

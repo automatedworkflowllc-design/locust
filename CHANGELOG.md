@@ -11,6 +11,23 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.317.0 - 2026-09-24
+
+### New
+
+- **Tidy up memory.** On the Memory screen, Tidy up asks a teammate to read
+  the folder's memories and suggest merging near-copies, retiring stale ones
+  and correcting contradictions. Each suggestion waits for you -- Merge them,
+  Forget it, Keep the change -- and nothing changes until you keep it. A
+  suggestion about a memory that changed since it was made is refused.
+
+### Fixed
+
+- **"Ask X for a review" asks X.** The review ran as the teammate whose work
+  it was, on their own route -- reviewing their own work. It now runs as the
+  reviewer, in a new conversation of theirs, and your side of it reads
+  "Review Wren's work." rather than the whole brief.
+
 ## 0.316.0 - 2026-09-24
 
 ### New

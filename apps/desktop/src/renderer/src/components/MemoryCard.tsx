@@ -23,8 +23,8 @@ export interface MemoryCardLine {
   readonly updated?: boolean
   /** The turn it was learned on: the card is drawn under that turn. */
   readonly missionId: string
-  /** A proposal to change or to forget a kept memory, not a new one (0.315). */
-  readonly change?: 'rewrite' | 'forget'
+  /** A proposal to change, forget or merge kept memories, not a new one (0.315, A1.2). */
+  readonly change?: 'rewrite' | 'forget' | 'merge'
 }
 
 export function memoryCardSummary(lines: readonly MemoryCardLine[]): string {
@@ -35,6 +35,7 @@ export function memoryCardSummary(lines: readonly MemoryCardLine[]): string {
   const proposedNew = proposed.filter((line) => line.change === undefined)
   const proposedChanges = proposed.filter((line) => line.change === 'rewrite')
   const proposedForgets = proposed.filter((line) => line.change === 'forget')
+  const proposedMerges = proposed.filter((line) => line.change === 'merge')
   const rewritten = lines.filter((line) => line.updated === true && line.status === 'kept')
   // Everyone whose lines these are, not the first line's writer for all of
   // them (A1.6, reported #21).
@@ -50,6 +51,7 @@ export function memoryCardSummary(lines: readonly MemoryCardLine[]): string {
   if (proposedNew.length > 0) parts.push(`wants to remember ${things(proposedNew.length)}`)
   if (proposedChanges.length > 0) parts.push(`wants to change ${things(proposedChanges.length)} it already knew`)
   if (proposedForgets.length > 0) parts.push(`wants to forget ${things(proposedForgets.length)}`)
+  if (proposedMerges.length > 0) parts.push(`wants to merge ${String(proposedMerges.length)} set${proposedMerges.length === 1 ? '' : 's'} of memories`)
   // A proposal needs a person, and until 2026-09-13 the sentence that said so
   // lived on a second notice above this card -- which is the redundancy that
   // notice was removed for. The card is the only surface for memory now, so
@@ -82,7 +84,15 @@ export function MemoryCard({ lines }: { readonly lines: readonly MemoryCardLine[
         <ul className="lc-memorycard__list">
           {lines.map((line, index) => (
             <li key={`${String(index)}-${line.text}`} className={`lc-memorycard__line${line.status === 'proposed' ? ' is-proposed' : ''}`}>
-              <span>{line.change === 'forget' ? `Forget: ${line.text}` : line.change === 'rewrite' ? `Change to: ${line.text}` : line.text}</span>
+              <span>
+                {line.change === 'forget'
+                  ? `Forget: ${line.text}`
+                  : line.change === 'rewrite'
+                    ? `Change to: ${line.text}`
+                    : line.change === 'merge'
+                      ? `Merge into: ${line.text}`
+                      : line.text}
+              </span>
               {line.status === 'proposed' && <span className="lc-rail__meta"> · waiting for you on the Memory screen</span>}
             </li>
           ))}

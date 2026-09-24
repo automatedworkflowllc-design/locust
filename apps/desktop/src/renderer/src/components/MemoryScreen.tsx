@@ -3,6 +3,7 @@ import { useState } from 'react'
 
 import type { MemoryMode, MemoryScope, MemoryUpdateRequest, PublicForgottenMemory, PublicMemory, PublicTeammate } from '../../../shared/ipc.js'
 import { lastWritten } from '../../../shared/memory.js'
+import { TIDY_NUDGE_AT, readableReason } from '../../../shared/memory-tidy.js'
 import { TeammateBot } from './TeammateBot.js'
 
 /**
@@ -27,6 +28,7 @@ export function MemoryScreen({
   onClear,
   forgotten = [],
   onRestore,
+  onTidy,
   onOpenMission,
   notice,
   onDismissNotice
@@ -44,6 +46,8 @@ export function MemoryScreen({
   /** Recently forgotten, newest first, and the way back (A1.8). */
   readonly forgotten?: readonly PublicForgottenMemory[]
   readonly onRestore?: (memoryId: string) => Promise<string | undefined>
+  /** A tidy pass (A1.2): opens the choice of teammate under the button. */
+  readonly onTidy?: (anchor: HTMLElement) => void
   readonly onOpenMission: (missionId: string) => void
   /** The host's last word about memory, when it had one. */
   readonly notice: string | undefined
@@ -133,12 +137,28 @@ export function MemoryScreen({
                 if (event.key === 'Escape') setEditing(undefined)
               }}
             />
+          ) : memory.merges !== undefined ? (
+            // A proposal to MERGE kept memories into one, and each as it is now (A1.2).
+            <>
+              <p className="lc-memory__text">
+                <span className="lc-memory__change">Wants to merge these into one: </span>
+                {memory.text}
+              </p>
+              {memory.merges.map((id) => (
+                <p key={id} className="lc-memory__was">
+                  Now: {memories.find((kept) => kept.memoryId === id)?.text ?? 'no longer kept'}
+                </p>
+              ))}
+            </>
           ) : memory.forgets !== undefined ? (
-            // A proposal to FORGET a kept memory: its words, and what is asked (0.315).
-            <p className="lc-memory__text">
-              <span className="lc-memory__change">Wants to forget this: </span>
-              {memory.text}
-            </p>
+            // A proposal to FORGET a kept memory: its words, what is asked, and why when it said (0.315, A1.2).
+            <>
+              <p className="lc-memory__text">
+                <span className="lc-memory__change">Wants to forget this: </span>
+                {memory.text}
+              </p>
+              {memory.reason !== undefined && <p className="lc-memory__was">Why: {readableReason(memory.reason, memories)}</p>}
+            </>
           ) : memory.replaces !== undefined ? (
             // A proposal to CHANGE a kept memory: the new words, and the ones kept now.
             <>
@@ -197,10 +217,10 @@ export function MemoryScreen({
             <>
               {/* Keep applies the proposal; the other button drops only the proposal. */}
               <button type="button" className="lc-button is-active" disabled={busy} onClick={() => void act(() => onUpdate({ memoryId: memory.memoryId, keep: true }))}>
-                {memory.forgets !== undefined ? 'Forget it' : memory.replaces !== undefined ? 'Keep the change' : 'Keep'}
+                {memory.merges !== undefined ? 'Merge them' : memory.forgets !== undefined ? 'Forget it' : memory.replaces !== undefined ? 'Keep the change' : 'Keep'}
               </button>
               <button type="button" className="lc-ghostbutton" disabled={busy} onClick={() => void act(() => onRemove(memory.memoryId))}>
-                {memory.forgets !== undefined ? 'Keep it' : memory.replaces !== undefined ? 'Keep the old one' : 'Forget'}
+                {memory.merges !== undefined ? 'Keep them apart' : memory.forgets !== undefined ? 'Keep it' : memory.replaces !== undefined ? 'Keep the old one' : 'Forget'}
               </button>
             </>
           ) : isEditing ? (
@@ -292,6 +312,20 @@ export function MemoryScreen({
           <h2 className="lc-settings__heading">
             This folder · <span className="lc-title__name">{workspaceName}</span>
           </h2>
+          {/* A tidy pass (A1.2): a teammate reads them and suggests; nothing changes until it is kept. */}
+          {onTidy !== undefined && mode !== 'off' && here.length >= 2 && (
+            // What it does, then the control -- the way a settings row reads.
+            // (A ghost button pushes itself right; first in the row, it sat
+            // indented under the heading.)
+            <div className="lc-memoryform__row">
+              <span className="lc-settings__note">
+                {here.length > TIDY_NUDGE_AT ? `${String(here.length)} memories here. ` : ''}A teammate reads them and suggests merges and retirements; nothing changes until you keep it.
+              </span>
+              <button type="button" className="lc-ghostbutton" disabled={busy} onClick={(event) => onTidy(event.currentTarget)}>
+                Tidy up…
+              </button>
+            </div>
+          )}
           {here.length === 0 ? <p className="lc-settings__note">Nothing remembered for this folder yet.</p> : <div className="lc-memorylist">{here.map(row)}</div>}
         </section>
 

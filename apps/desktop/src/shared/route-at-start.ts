@@ -1,5 +1,5 @@
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
-import type { TeammateRoute } from './ipc.js'
+import type { MissionMode, TeammateRoute } from './ipc.js'
 import { isMissionRuntime } from './runtimes.js'
 
 export interface StartRouteInput {
@@ -58,4 +58,41 @@ export function composerRouteFor(
 ): PickerRoute {
   if (teammate === undefined) return fallback
   return explicit.get(teammate.teammateId) ?? teammate.route ?? fallback
+}
+
+/**
+ * A run started FOR a teammate who is not the one on screen yet (H9).
+ *
+ * "Ask <reviewer> for a review" selected the reviewer and then started the
+ * run from a closure made before the selection -- so it went out as the
+ * AUTHOR, on the author's route and mode, in the author's conversation, and
+ * the reviewer never ran it (code review H9, reproduced from the probe's own
+ * capture). The tidy pass (A1.2) copied the pattern and went out as nobody's.
+ *
+ * So the teammate is carried whole, from their own record: their id, the
+ * route the composer would show for them (a picker choice made for them
+ * wins, as it does in the composer), their saved mode and effort. Nothing is
+ * read from state that has not caught up with selecting them.
+ */
+export interface StartAs {
+  readonly teammateId: string
+  readonly route: PickerRoute
+  readonly mode: MissionMode
+  readonly effort: string | undefined
+}
+
+export function startAs(
+  teammate: { readonly teammateId: string; readonly route?: TeammateRoute },
+  composer: { readonly route: PickerRoute; readonly mode: MissionMode; readonly effort: string | undefined },
+  explicit: ReadonlyMap<string, PickerRoute>
+): StartAs {
+  // Just the picker's two fields: a saved route also carries its mode and
+  // effort, which are said once, below, where they belong.
+  const route = composerRouteFor(composer.route, teammate, explicit)
+  return {
+    teammateId: teammate.teammateId,
+    route: { runtime: route.runtime, model: route.model },
+    mode: teammate.route?.mode ?? composer.mode,
+    effort: teammate.route === undefined ? composer.effort : teammate.route.effort
+  }
 }

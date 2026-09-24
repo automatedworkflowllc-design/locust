@@ -26,9 +26,10 @@ export interface ConversationMemory {
   readonly status: 'kept' | 'proposed'
   /** Present when this memory has been rewritten under its name; what it said before. */
   readonly previousText?: string
-  /** A proposal to change, or to forget, a kept memory (0.315). */
+  /** A proposal to change, or to forget, a kept memory (0.315), or to merge some (A1.2). */
   readonly replaces?: string
   readonly forgets?: string
+  readonly merges?: readonly string[]
 }
 
 export interface MemoryLine {
@@ -52,8 +53,8 @@ export interface MemoryLine {
    * had just done.
    */
   readonly missionId: string
-  /** A proposal to change or to forget a kept memory, not a new one (0.315). */
-  readonly change?: 'rewrite' | 'forget'
+  /** A proposal to change, forget or merge kept memories, not a new one (0.315, A1.2). */
+  readonly change?: 'rewrite' | 'forget' | 'merge'
 }
 
 /**
@@ -100,7 +101,13 @@ export function memoriesOfConversation(
       status: memory.status,
       missionId: memory.missionId!,
       ...(memory.previousText === undefined ? {} : { updated: true }),
-      ...(memory.forgets !== undefined ? { change: 'forget' as const } : memory.replaces !== undefined ? { change: 'rewrite' as const } : {})
+      ...(memory.merges !== undefined
+        ? { change: 'merge' as const }
+        : memory.forgets !== undefined
+          ? { change: 'forget' as const }
+          : memory.replaces !== undefined
+            ? { change: 'rewrite' as const }
+            : {})
     }))
 }
 
@@ -124,6 +131,8 @@ export function memoryChangedNotice(update: {
   readonly rewritten?: readonly string[]
   readonly proposedChanges?: readonly string[]
   readonly proposedForgets?: readonly string[]
+  readonly proposedTidy?: number
+  readonly tidyRefused?: readonly string[]
 }): string | undefined {
   const quoted = (texts: readonly string[]): string => texts.map((text) => `"${text}"`).join('; ')
   const said: string[] = []
@@ -136,6 +145,11 @@ export function memoryChangedNotice(update: {
   // "Ask me first" changes, waiting on this screen (0.315).
   if ((update.proposedChanges ?? []).length > 0) said.push(`${update.by} wants to change a memory to ${quoted(update.proposedChanges ?? [])}`)
   if ((update.proposedForgets ?? []).length > 0) said.push(`${update.by} wants to forget ${quoted(update.proposedForgets ?? [])}`)
+  // A tidy pass's suggestions, waiting on this screen, and any it could not make (A1.2).
+  const tidy = update.proposedTidy ?? 0
+  if (tidy > 0) said.push(`${update.by} suggested ${String(tidy)} change${tidy === 1 ? '' : 's'} to memory, waiting below`)
+  const refused = update.tidyRefused ?? []
+  if (refused.length > 0) said.push(`${String(refused.length)} could not be made: ${refused.join(' ')}`)
   if (said.length === 0) return undefined
-  return said.map((clause) => (/[.!?]"$/.test(clause) ? clause : `${clause}.`)).join(' ')
+  return said.map((clause) => (/[.!?]"?$/.test(clause) ? clause : `${clause}.`)).join(' ')
 }

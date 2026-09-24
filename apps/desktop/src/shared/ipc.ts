@@ -53,6 +53,17 @@ export interface PublicMemory {
    */
   readonly replaces?: string
   readonly forgets?: string
+  /** On a PROPOSAL only: the kept memories this one would MERGE into one, the first keeping its place (A1.2). */
+  readonly merges?: readonly string[]
+  /** Why a proposal asks what it asks, when its writer said -- a tidy pass's reason to retire (A1.2). */
+  readonly reason?: string
+  /**
+   * The words of what a proposal would change, as they were when it was
+   * made, as a fingerprint. Keeping it after any of them changed is refused
+   * (A1.2, agent-native's hash gate): the suggestion was about words that
+   * are no longer there.
+   */
+  readonly basis?: string
   /**
    * What this memory said before it was last rewritten.
    *
@@ -1945,6 +1956,9 @@ export type CodexMissionUpdate =
        */
       readonly proposedChanges?: readonly string[]
       readonly proposedForgets?: readonly string[]
+      /** A tidy pass's suggestions made proposals, and the ones refused with why (A1.2). */
+      readonly proposedTidy?: number
+      readonly tidyRefused?: readonly string[]
     }
   /** Why a teammate did NOT reply on their own, said in the thread that shared. */
   | {

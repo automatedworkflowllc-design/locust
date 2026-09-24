@@ -29,7 +29,7 @@
  * that IS the point of quoting it -- so the angle bracket becomes a visibly
  * different character and the words survive intact.
  */
-export const PROTOCOL_TAGS = ['locust-share', 'locust-memory', 'locust-ask', 'locust-task', 'locust-file'] as const
+export const PROTOCOL_TAGS = ['locust-share', 'locust-memory', 'locust-ask', 'locust-task', 'locust-file', 'locust-tidy'] as const
 
 /** The mark a defanged bracket leaves. Single-width, visibly not a bracket. */
 export const DEFANGED_BRACKET = '‹'

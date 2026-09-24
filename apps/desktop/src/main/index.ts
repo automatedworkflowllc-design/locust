@@ -1269,6 +1269,7 @@ if (!ownsSingleInstanceLock) {
           return 'TEAM MEMORY could not be read for this run. Nothing in it was changed; do not assume it is empty.'
         }
         const lines = listed.map((memory) => ({
+          id: memory.memoryId,
           text: memory.text,
           scope: memory.scope,
           // Whoever wrote the words the teammate will read (A1.6).

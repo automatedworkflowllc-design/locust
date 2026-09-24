@@ -4,6 +4,7 @@ import type { CodexMissionUpdate, PublicTeammate, WorkspaceSettings } from '../s
 import { parseMemoryBlocks } from '../shared/memory.js'
 import type { MemoryStore } from './memory-store.js'
 import { createTranscriptTracker } from './peer-exchange.js'
+import { parseTidyBlocks } from '../shared/memory-tidy.js'
 
 /**
  * When a run ends, read its reply for a memory block and move the team's
@@ -17,7 +18,7 @@ import { createTranscriptTracker } from './peer-exchange.js'
  * re-read the file.
  */
 export interface MemoryReaderOptions {
-  readonly memories: Pick<MemoryStore, 'add' | 'forget'>
+  readonly memories: Pick<MemoryStore, 'add' | 'forget' | 'proposeTidy'>
   readonly ledger: Pick<MissionLedger, 'getMission'>
   readonly teammates: {
     list(): Promise<readonly PublicTeammate[]>
@@ -58,7 +59,10 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
       const text = tracker.latestFinal
       if (text === undefined) return
       const ops = parseMemoryBlocks(text)
-      if (ops.length === 0) return
+      // A tidy pass's suggestions (A1.2): proposals whatever the mode, because
+      // the pass was asked to suggest, not to change.
+      const tidy = parseTidyBlocks(text)
+      if (ops.length === 0 && tidy.length === 0) return
 
       let by: { readonly teammateId?: string; readonly name: string } = { name: 'a conversation' }
       try {
@@ -165,7 +169,22 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
           if (!refused.includes(reason)) refused.push(reason)
         }
       }
+      let tidied: { readonly proposed: number; readonly refused: readonly string[] } | undefined
+      if (tidy.length > 0) {
+        try {
+          tidied = await options.memories.proposeTidy({
+            workspaceId: recovered.metadata.workspaceId,
+            by,
+            missionId: mission.missionId,
+            suggestions: tidy
+          })
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : 'Its suggestions could not be kept.'
+          if (!refused.includes(reason)) refused.push(reason)
+        }
+      }
       if (
+        (tidied === undefined || (tidied.proposed === 0 && tidied.refused.length === 0)) &&
         kept.length === 0 &&
         proposed.length === 0 &&
         forgotten.length === 0 &&
@@ -200,7 +219,9 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
         forgotten,
         ...(rewritten.length === 0 ? {} : { rewritten }),
         ...(proposedChanges.length === 0 ? {} : { proposedChanges }),
-        ...(proposedForgets.length === 0 ? {} : { proposedForgets })
+        ...(proposedForgets.length === 0 ? {} : { proposedForgets }),
+        ...(tidied === undefined || tidied.proposed === 0 ? {} : { proposedTidy: tidied.proposed }),
+        ...(tidied === undefined || tidied.refused.length === 0 ? {} : { tidyRefused: tidied.refused })
       })
       if (refused.length > 0) {
         // Amber, like a forget that failed: the person may need to act --

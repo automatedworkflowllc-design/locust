@@ -1,10 +1,12 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { constants as fsConstants } from 'node:fs'
 import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
 import type { MemoryScope, PublicForgottenMemory, PublicMemory } from '../shared/ipc.js'
 import { boundedMemoryText, forgetMatch, memoryKey, memoryName } from '../shared/memory.js'
+import { MAX_MERGED } from '../shared/memory-tidy.js'
+import type { TidySuggestion } from '../shared/memory-tidy.js'
 import { safeId } from './teammate-store.js'
 
 /**
@@ -89,7 +91,20 @@ export interface MemoryStore {
   snapshot(): Promise<{ readonly memories: readonly PublicMemory[]; readonly forgotten: readonly PublicForgottenMemory[] }>
   /** Put a recently forgotten memory back, as it was (A1.8). */
   restore(memoryId: unknown): Promise<PublicMemory>
+  /**
+   * A tidy pass's suggestions (A1.2), each made a proposal for the person.
+   * One that names a memory this folder does not keep is refused, with why.
+   */
+  proposeTidy(input: {
+    readonly workspaceId: string
+    readonly by: Actor
+    readonly missionId?: string
+    readonly suggestions: readonly TidySuggestion[]
+  }): Promise<{ readonly proposed: number; readonly refused: readonly string[] }>
 }
+
+/** Keeping a suggestion whose memories changed after it was made. */
+export const SUGGESTION_OUT_OF_DATE = 'What this suggestion would change has changed since it was made, so it was dropped. Everything is as it was.'
 
 export interface ForgetResult {
   /** The memories actually removed, in the store's own words. */
@@ -171,12 +186,28 @@ export function parsedMemory(value: unknown): PublicMemory | undefined {
     ...(parsedActor(record.updatedBy) === undefined ? {} : { updatedBy: parsedActor(record.updatedBy)! }),
     // A change waiting for the person. Only a proposal carries one.
     ...(record.status === 'proposed' && safeId(record.replaces) ? { replaces: record.replaces } : {}),
-    ...(record.status === 'proposed' && safeId(record.forgets) ? { forgets: record.forgets } : {})
+    ...(record.status === 'proposed' && safeId(record.forgets) ? { forgets: record.forgets } : {}),
+    ...(record.status === 'proposed' && validMerges(record.merges) ? { merges: [...record.merges] } : {}),
+    ...(record.status === 'proposed' && validMemoryText(record.reason) ? { reason: boundedMemoryText(record.reason) } : {}),
+    ...(record.status === 'proposed' && typeof record.basis === 'string' && /^[0-9a-f]{16}$/.test(record.basis) ? { basis: record.basis } : {})
   }
 }
 
+function validMerges(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && value.length >= 2 && value.length <= MAX_MERGED && value.every((id) => safeId(id)) && new Set(value).size === value.length
+}
+
 /** A proposal that CHANGES a kept memory, rather than adding one. */
-const isChange = (memory: PublicMemory): boolean => memory.replaces !== undefined || memory.forgets !== undefined
+const isChange = (memory: PublicMemory): boolean =>
+  memory.replaces !== undefined || memory.forgets !== undefined || memory.merges !== undefined
+
+/**
+ * The words of what a proposal would change, as a short fingerprint: the
+ * hash gate (A1.2). Exact text, not the matching key -- a suggestion made
+ * about one wording is not kept over a person's correction of it.
+ */
+const fingerprint = (memories: readonly PublicMemory[]): string =>
+  createHash('sha256').update(memories.map((memory) => memory.text).join('\n'), 'utf8').digest('hex').slice(0, 16)
 
 function parsedActor(value: unknown): Actor | undefined {
   if (typeof value !== 'object' || value === null) return undefined
@@ -280,7 +311,9 @@ export function createMemoryStore(options: {
    */
   const settled = (memories: readonly PublicMemory[]): readonly PublicMemory[] => {
     const ids = new Set(memories.map((memory) => memory.memoryId))
-    return memories.filter((memory) => !isChange(memory) || ids.has(memory.forgets ?? memory.replaces ?? ''))
+    return memories.filter((memory) =>
+      memory.merges !== undefined ? memory.merges.every((id) => ids.has(id)) : !isChange(memory) || ids.has(memory.forgets ?? memory.replaces ?? '')
+    )
   }
 
   /*
@@ -383,6 +416,7 @@ export function createMemoryStore(options: {
                 const again: PublicMemory = {
                   ...pending,
                   text,
+                  basis: fingerprint([held]),
                   updatedAt: now().toISOString(),
                   ...(input.missionId === undefined ? {} : { missionId: input.missionId })
                 }
@@ -403,7 +437,8 @@ export function createMemoryStore(options: {
                 createdAt: now().toISOString(),
                 status: 'proposed',
                 enabled: true,
-                replaces: held.memoryId
+                replaces: held.memoryId,
+                basis: fingerprint([held])
               }
               await write({ ...file, memories: [...file.memories, proposal] })
               return { memory: proposal, created: true, proposedChange: true }
@@ -475,6 +510,40 @@ export function createMemoryStore(options: {
          */
         if (input.keep === true && held.status === 'proposed' && isChange(held)) {
           const others = file.memories.filter((memory) => memory.memoryId !== held.memoryId)
+          const sources = (held.merges ?? [held.forgets ?? held.replaces ?? '']).map((id) => file.memories.find((memory) => memory.memoryId === id))
+          /*
+           * THE HASH GATE (A1.2). A suggestion is about the words it saw.
+           * Kept after they changed -- the person edited one, a teammate
+           * rewrote it, it was forgotten -- it would overwrite or remove
+           * something it never read. Refused, and the suggestion goes.
+           * A proposal made before 0.317 has no basis and is not gated.
+           */
+          const present = sources.filter((source): source is PublicMemory => source !== undefined)
+          const stale = held.basis !== undefined && (present.length !== sources.length || fingerprint(present) !== held.basis)
+          if (stale || (held.merges !== undefined && present.length < 2)) {
+            await write({ ...file, memories: others })
+            throw new Error(SUGGESTION_OUT_OF_DATE)
+          }
+          if (held.merges !== undefined) {
+            // The first keeps its place, its name and its one step back;
+            // the rest go to Recently forgotten, by whoever suggested it.
+            const [first, ...rest] = present as [PublicMemory, ...PublicMemory[]]
+            const merged: PublicMemory = {
+              ...first,
+              text: held.text,
+              previousText: first.text,
+              updatedAt: now().toISOString(),
+              updatedBy: held.by,
+              ...(held.missionId === undefined ? {} : { missionId: held.missionId })
+            }
+            const going = new Set(rest.map((memory) => memory.memoryId))
+            await write({
+              ...file,
+              memories: others.filter((memory) => !going.has(memory.memoryId)).map((memory) => (memory.memoryId === first.memoryId ? merged : memory)),
+              forgotten: bin(file, rest, held.by)
+            })
+            return merged
+          }
           if (held.forgets !== undefined) {
             const gone = file.memories.find((memory) => memory.memoryId === held.forgets)
             await write({
@@ -585,7 +654,8 @@ export function createMemoryStore(options: {
               createdAt: now().toISOString(),
               status: 'proposed' as const,
               enabled: true,
-              forgets: target.memoryId
+              forgets: target.memoryId,
+              basis: fingerprint([target])
             }))
           if (proposals.length > 0 || dropped.size > 0) {
             await write({ ...file, memories: [...file.memories.filter((memory) => !dropped.has(memory.memoryId)), ...proposals] })
@@ -650,6 +720,87 @@ export function createMemoryStore(options: {
         if (file.memories.some((memory) => memory.memoryId === back.memoryId)) back.memoryId = `mem_${createId()}`
         await write({ ...file, memories: [...file.memories, back], forgotten: rest })
         return back
+      })
+    },
+
+    proposeTidy(input) {
+      return serialize(async () => {
+        const file = await read()
+        const reachable = (id: string): PublicMemory | undefined =>
+          file.memories.find(
+            (memory) => memory.memoryId === id && memory.status === 'kept' && (memory.scope === 'global' || memory.workspaceId === input.workspaceId)
+          )
+        const added: PublicMemory[] = []
+        const rewritten = new Map<string, PublicMemory>()
+        const refused: string[] = []
+        const pending = (test: (memory: PublicMemory) => boolean): PublicMemory | undefined =>
+          [...file.memories, ...added].find((memory) => memory.status === 'proposed' && test(memory))
+        const proposal = (sources: readonly PublicMemory[], text: string, what: Partial<PublicMemory>): PublicMemory => ({
+          memoryId: `mem_${createId()}`,
+          text,
+          scope: sources[0]!.scope,
+          workspaceId: sources[0]!.workspaceId,
+          workspaceName: sources[0]!.workspaceName,
+          by: { name: input.by.name, ...(input.by.teammateId === undefined ? {} : { teammateId: input.by.teammateId }) },
+          ...(input.missionId === undefined ? {} : { missionId: input.missionId }),
+          createdAt: now().toISOString(),
+          status: 'proposed',
+          enabled: true,
+          basis: fingerprint(sources),
+          ...what
+        })
+        for (const suggestion of input.suggestions) {
+          if (file.memories.length + added.length >= MAX_MEMORIES) {
+            refused.push(`Locust keeps at most ${String(MAX_MEMORIES)} memories, so the rest were not kept. Forget some first.`)
+            break
+          }
+          if (suggestion.kind === 'merge') {
+            const found = suggestion.ids.map(reachable)
+            if (found.some((memory) => memory === undefined)) {
+              refused.push('A suggested merge named a memory this folder does not keep.')
+              continue
+            }
+            const sources = found as PublicMemory[]
+            if (new Set(sources.map(placeOf)).size > 1) {
+              refused.push('A suggested merge joined memories kept in different places -- this folder and everywhere.')
+              continue
+            }
+            const same = new Set(suggestion.ids)
+            if (pending((memory) => memory.merges !== undefined && memory.merges.length === same.size && memory.merges.every((id) => same.has(id)))) continue
+            added.push(proposal(sources, suggestion.text, { merges: [...suggestion.ids] }))
+            continue
+          }
+          const target = reachable(suggestion.id)
+          if (target === undefined) {
+            refused.push(`A suggestion to ${suggestion.kind === 'retire' ? 'forget' : 'change'} a memory named one this folder does not keep.`)
+            continue
+          }
+          if (suggestion.kind === 'retire') {
+            if (pending((memory) => memory.forgets === target.memoryId)) continue
+            added.push(proposal([target], target.text, { forgets: target.memoryId, reason: suggestion.reason }))
+            continue
+          }
+          if (suggestion.text === target.text) continue
+          const waiting = pending((memory) => memory.replaces === target.memoryId)
+          if (waiting !== undefined) {
+            // Its own earlier rewrite, still unanswered: the newer words win.
+            if (!added.includes(waiting)) {
+              rewritten.set(waiting.memoryId, {
+                ...waiting,
+                text: suggestion.text,
+                basis: fingerprint([target]),
+                updatedAt: now().toISOString(),
+                ...(input.missionId === undefined ? {} : { missionId: input.missionId })
+              })
+            }
+            continue
+          }
+          added.push(proposal([target], suggestion.text, { replaces: target.memoryId }))
+        }
+        if (added.length > 0 || rewritten.size > 0) {
+          await write({ ...file, memories: [...file.memories.map((memory) => rewritten.get(memory.memoryId) ?? memory), ...added] })
+        }
+        return { proposed: added.length + rewritten.size, refused }
       })
     }
   }
