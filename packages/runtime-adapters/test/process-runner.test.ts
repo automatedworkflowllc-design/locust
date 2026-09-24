@@ -535,3 +535,26 @@ describe("controlled runtime JSONL process runner", () => {
     });
   });
 });
+
+// H8: a mission started through a .cmd launcher is spawned with the command
+// line cmd.exe reads correctly -- one verbatim argument, not Node's quoting.
+describe("a mission started through a .cmd launcher", () => {
+  it("gets one verbatim command line, launcher and every argument quoted", () => {
+    const child = fakeChild();
+    let launched: { readonly args: readonly string[]; readonly options: RuntimeSpawnOptions } | undefined;
+    const runner = createNodeRuntimeProcessRunner({
+      environment: { PATH: "C:\\tools" },
+      spawnProcess: (_executablePath, args, options) => {
+        launched = { args, options };
+        return child.process;
+      },
+    });
+    const muse = "C:\\Users\\Jane Doe\\AppData\\Local\\Programs\\muse\\muse.cmd";
+    runner.start({ ...spec, executablePath: "C:\\Windows\\System32\\cmd.exe", args: ["/d", "/s", "/c", muse, "exec", "--json", "R&D"] }, "go");
+    expect(launched?.args).toHaveLength(1);
+    expect(launched?.args[0]?.startsWith('/d /s /c "')).toBe(true);
+    expect(launched?.args[0]).toContain("Jane^ Doe");
+    expect(launched?.args[0]).toContain('^"R^&D^"');
+    expect((launched?.options as { windowsVerbatimArguments?: boolean } | undefined)?.windowsVerbatimArguments).toBe(true);
+  });
+});

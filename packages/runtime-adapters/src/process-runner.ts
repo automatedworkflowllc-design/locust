@@ -1,3 +1,4 @@
+import { spawnShape } from "./cmd-line.js";
 import { execFile, execFileSync, spawn } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -508,9 +509,18 @@ export function createNodeRuntimeProcessRunner(
       }
 
       let child: SpawnedRuntimeProcess;
+      // H8: a .cmd launcher gets the command line cmd.exe reads correctly.
+      let shape: ReturnType<typeof spawnShape>;
       try {
-        child = spawnProcess(spec.executablePath, args, {
+        shape = spawnShape(spec.executablePath, args);
+      } catch (error) {
+        discardPromptFile(promptDirectory);
+        throw safeTransportError(error instanceof Error ? error.message : "Runtime process failed to start");
+      }
+      try {
+        child = spawnProcess(spec.executablePath, shape.args, {
           cwd: spec.cwd,
+          ...(shape.windowsVerbatimArguments === true ? { windowsVerbatimArguments: true } : {}),
           // The spec's own variables sit ON TOP of the allowlist, not beside
           // it: OpenCode's read-only permission config is the only thing
           // holding that runtime back, and a machine that happened to export

@@ -1,3 +1,4 @@
+import { spawnShape } from '@teammate/runtime-adapters'
 import { spawn } from 'node:child_process'
 
 import { releaseProcessTree } from '@teammate/runtime-adapters'
@@ -49,8 +50,15 @@ export interface AppServerChild {
 const MACHINE: AppServerProcessDeps = {
   // H7: the launch's own environment over the host's -- a CLI under the
   // app's own Node needs ELECTRON_RUN_AS_NODE, or this opens another Locust.
-  spawn: (executablePath, args, env) =>
-    spawn(executablePath, [...args], { stdio: ['pipe', 'pipe', 'pipe'], ...(env === undefined ? {} : { env: { ...process.env, ...env } }) }),
+  // H8: and a .cmd launcher gets the command line cmd.exe reads correctly.
+  spawn: (executablePath, args, env) => {
+    const shape = spawnShape(executablePath, args)
+    return spawn(executablePath, [...shape.args], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      ...(shape.windowsVerbatimArguments === true ? { windowsVerbatimArguments: true } : {}),
+      ...(env === undefined ? {} : { env: { ...process.env, ...env } })
+    })
+  },
   releaseTree: releaseProcessTree,
   platform: process.platform
 }

@@ -1,3 +1,4 @@
+import { spawnShape } from "./cmd-line.js";
 import { spawn, spawnSync } from "node:child_process";
 import { isAbsolute } from "node:path";
 import type { CommandResult, CommandRunner, ProbeCommand } from "./types.js";
@@ -190,7 +191,16 @@ export function createNodeProbeRunner(options: NodeProbeRunnerOptions = {}): Pro
         let settled = false;
         let forceTimer: ReturnType<typeof setTimeout> | undefined;
 
-        const child = spawnProcess(command.executablePath, command.args, {
+        // H8: a .cmd launcher gets the command line cmd.exe reads correctly.
+        let shape: ReturnType<typeof spawnShape>;
+        try {
+          shape = spawnShape(command.executablePath, command.args);
+        } catch (error) {
+          reject(error instanceof Error ? error : new Error(String(error)));
+          return;
+        }
+        const child = spawnProcess(command.executablePath, shape.args, {
+          ...(shape.windowsVerbatimArguments === true ? { windowsVerbatimArguments: true } : {}),
           shell: false,
           windowsHide: true,
           stdio: ["ignore", "pipe", "pipe"],
