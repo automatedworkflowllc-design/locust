@@ -69,13 +69,22 @@ const LIGHTINGS = new Set(['lcLockupPower', 'lcLockupRelight'])
 export function PoweredLockup({
   ready,
   tube,
-  replay = 0
+  replay = 0,
+  resting = false
 }: {
   /** The runtimes have answered: the loading screen's work is done. */
   readonly ready: boolean
   readonly tube: TubePreference
   /** Counts up for each time someone asks to see it power on again: a click on the glass. */
   readonly replay?: number
+  /**
+   * The cover is resting -- behind other windows, or left alone (HomeCover's
+   * REST_AFTER_MS): no relight is started until it wakes. Measured on 0.305
+   * before this: the cover's bots still and its float held, and the relight
+   * every 7-10 s still cost 10.4% of one core on a home screen nobody had
+   * touched for 35 s.
+   */
+  readonly resting?: boolean
 }): ReactElement {
   const [inFront, setInFront] = useState(() => typeof document !== 'undefined' && document.hasFocus())
   const [lighting, setLighting] = useState<'power' | 'relight'>()
@@ -104,9 +113,10 @@ export function PoweredLockup({
     setLighting('power')
   }, [ready, inFront, plan])
 
-  // Again, 7 to 10 seconds after each one ends -- only while the window is visible.
+  // Again, 7 to 10 seconds after each one ends -- only while the window is
+  // visible, and not while the cover rests.
   useEffect(() => {
-    if (lighting !== undefined || lit.current === 0 || plan !== 'repeat') return undefined
+    if (lighting !== undefined || lit.current === 0 || plan !== 'repeat' || resting) return undefined
     const timer = window.setTimeout(() => {
       if (document.hidden) {
         setWaitRound((round) => round + 1)
@@ -116,7 +126,7 @@ export function PoweredLockup({
       setLighting('relight')
     }, nextLightingDelay())
     return () => window.clearTimeout(timer)
-  }, [lighting, plan, waitRound])
+  }, [lighting, plan, waitRound, resting])
 
   /*
    * ASKED FOR AGAIN. A click on the glass powers it on again (Colin's "have

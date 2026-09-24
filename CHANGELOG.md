@@ -15,12 +15,14 @@ heading: the home screen then shows it once, as a splash.
 
 ### Improved
 
-- **The home screen goes still when you leave it.** Its bots moved and were
-  redrawn on every frame the screen drew, for as long as it was open -- about
-  40% of one processor core with the window in front. Now they rest once
-  nothing has touched the window for 30 seconds, as they already did behind
-  other windows, and wake when you move the mouse or press a key. Every
-  moving bot is also drawn at most 30 times a second.
+- **The home screen goes still when you leave it.** Its bots, the logo's
+  flicker and the little loops around them ran for as long as it was open --
+  roughly half of one processor core with the window in front, even with
+  nobody there. Now all of it rests once nothing has touched the window for
+  30 seconds, as the bots already did behind other windows, and wakes when
+  you move the mouse or press a key. While it moves, each bot and each loop
+  changes about 30 times a second rather than on every frame the screen
+  draws.
 - **Cleaner words under the machine:** one line where there were two
   sentences.
 

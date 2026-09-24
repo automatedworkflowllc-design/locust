@@ -3827,7 +3827,7 @@ textarea {
   height: var(--lc-bot-ring-side);
   border: 1.5px solid var(--lc-amber);
   border-radius: 34%;
-  animation: lcRingWait 1.8s ease-out infinite;
+  animation: lcRingWait 1.8s steps(14) infinite;
   pointer-events: none;
 }
 
@@ -3839,18 +3839,54 @@ textarea {
   z-index: 1;
 }
 
+/*
+ * THE SMALL LOOPS CHANGE ABOUT 30 TIMES A SECOND, NOT ON EVERY FRAME (0.305).
+ * A beta tester: "Lowkey my computer feels noticeably slower while running
+ * locust". Measured on the packaged app, the home screen in front, alternated
+ * in one run: the ghost's float and the waiting ring as they were, 64.7% and
+ * 53.2% of one core; stepped, 50.1% and 44.4%. Each loop's curve is written
+ * into its keyframes, and steps() moves between them in even ticks -- a bob
+ * of a few pixels reads the same at 30.
+ */
 /* A ghost floats rather than hops: a slow bob, the dot riding with it. */
 .lc-bot.is-floating {
-  animation: lcBotFloat 3.8s ease-in-out infinite;
+  /* Stepped, the curve in the keyframes (see lcBotFloat). */
+  animation: lcBotFloat 3.8s steps(11) infinite;
 }
 
 @keyframes lcBotFloat {
-  0%,
-  100% {
+  0% {
     transform: translateY(0);
+  }
+  10% {
+    transform: translateY(-0.57%);
+  }
+  20% {
+    transform: translateY(-2.07%);
+  }
+  30% {
+    transform: translateY(-3.93%);
+  }
+  40% {
+    transform: translateY(-5.43%);
   }
   50% {
     transform: translateY(-6%);
+  }
+  60% {
+    transform: translateY(-5.43%);
+  }
+  70% {
+    transform: translateY(-3.93%);
+  }
+  80% {
+    transform: translateY(-2.07%);
+  }
+  90% {
+    transform: translateY(-0.57%);
+  }
+  100% {
+    transform: translateY(0);
   }
 }
 
@@ -3882,17 +3918,39 @@ textarea {
    hops (TeammateBot's motion levels): a short lift and a longer rest, the
    dot and the ring riding with it. */
 .lc-bot.is-bouncing {
-  animation: lcBotBounce 1.5s ease-in-out infinite;
+  animation: lcBotBounce 1.5s steps(3) infinite;
 }
 
 @keyframes lcBotBounce {
-  0%,
-  46%,
-  100% {
+  0% {
     transform: translateY(0);
+  }
+  5.75% {
+    transform: translateY(-1.03%);
+  }
+  11.5% {
+    transform: translateY(-3.5%);
+  }
+  17.25% {
+    transform: translateY(-5.97%);
   }
   23% {
     transform: translateY(-7%);
+  }
+  28.75% {
+    transform: translateY(-5.97%);
+  }
+  34.5% {
+    transform: translateY(-3.5%);
+  }
+  40.25% {
+    transform: translateY(-1.03%);
+  }
+  46% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(0);
   }
 }
 
@@ -8878,15 +8936,18 @@ textarea {
 /* Waiting on you: a slow amber ring outside the chip. The one state whose
    whole job is to get attention must never look abandoned. */
 @keyframes lcRingWait {
-  0% { transform: scale(0.92); opacity: 0.7; }
-  100% { transform: scale(1.32); opacity: 0; }
+  0% { transform: scale(0.9200); opacity: 0.7000; }
+  25% { transform: scale(1.1513); opacity: 0.2953; }
+  50% { transform: scale(1.2700); opacity: 0.0875; }
+  75% { transform: scale(1.3138); opacity: 0.0109; }
+  100% { transform: scale(1.3200); opacity: 0.0000; }
 }
 
 .lc-face__ring {
   position: absolute;
   inset: 0;
   border: 1.5px solid var(--lc-amber);
-  animation: lcRingWait 1.8s ease-out infinite;
+  animation: lcRingWait 1.8s steps(14) infinite;
   pointer-events: none;
 }
 

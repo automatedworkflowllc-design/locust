@@ -446,7 +446,7 @@ export function HomeCover({
               <div className="lc-cover__glass" onClick={ready ? () => setRelights((count) => count + 1) : undefined}>
                 <span className="lc-cover__scan" aria-hidden="true" />
                 <div className="lc-cover__screen">
-                  <PoweredLockup ready={ready} tube={tube} replay={relights} />
+                  <PoweredLockup ready={ready} tube={tube} replay={relights} resting={!awake} />
                   <p className="lc-cover__claim">Autonomous teammates on your own machine</p>
                 </div>
               </div>
