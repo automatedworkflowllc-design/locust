@@ -198,6 +198,18 @@ async function cursor(options: RuntimeSetupOptions, home: string, ws: string | u
     const hooks = await readJson(join(dir, 'hooks.json'), options, found)
     addNames(found.hooks, hookLabels(hooks?.hooks))
   }
+  /*
+   * A4.1: Cursor's skills, READ FROM ITS CODE (cursor-agent
+   * 2026.09.23-86fc751, index.js): its skill roots are `.cursor/skills` and
+   * `.agents/skills`, and it also knows `.claude`, `.codex` and `.grok` skill
+   * folders but marks them `thirdParty` -- read behind a setting this cannot
+   * see, so they are not listed rather than guessed at. Its own
+   * `skills-cursor` folder is its built-ins, left out as Codex's are.
+   */
+  for (const root of [home, ...(ws === undefined ? [] : [ws])]) {
+    addNames(found.skills, await names(join(root, '.cursor', 'skills'), options, found, 'folders'))
+    addNames(found.skills, await names(join(root, '.agents', 'skills'), options, found, 'folders'))
+  }
   return found
 }
 
@@ -228,10 +240,24 @@ async function opencode(options: RuntimeSetupOptions, home: string, ws: string |
   return found
 }
 
-async function copilot(options: RuntimeSetupOptions, home: string): Promise<Found> {
+async function copilot(options: RuntimeSetupOptions, home: string, ws: string | undefined): Promise<Found> {
   const found = fresh()
   const config = await readJson(join(home, '.copilot', 'mcp-config.json'), options, found)
   addNames(found.mcpServers, keysOf(config?.mcpServers))
+  /*
+   * A4.1: Copilot's skills, from where Copilot itself says it looks.
+   * MEASURED 2026-09-24 off `copilot skill --help` (1.0.88): personal
+   * ~/.copilot/skills or ~/.agents/skills; in the project .github/skills,
+   * .agents/skills or .claude/skills. `copilot skill list` on this machine
+   * named the two in ~/.agents/skills as its own. Plugin and `skill add`
+   * directories are not read here.
+   */
+  const skillFolders = [
+    join(home, '.copilot', 'skills'),
+    join(home, '.agents', 'skills'),
+    ...(ws === undefined ? [] : [join(ws, '.github', 'skills'), join(ws, '.agents', 'skills'), join(ws, '.claude', 'skills')])
+  ]
+  for (const folder of skillFolders) addNames(found.skills, await names(folder, options, found, 'folders'))
   return found
 }
 
@@ -244,7 +270,7 @@ export async function readRuntimeSetup(options: RuntimeSetupOptions): Promise<Re
     ['codex', await codex(options, home, ws)],
     ['cursor', await cursor(options, home, ws)],
     ['opencode', await opencode(options, home, ws)],
-    ['copilot', await copilot(options, home)]
+    ['copilot', await copilot(options, home, ws)]
   ]
   return Object.fromEntries(
     entries.map(([id, found]) => [id, { mcpServers: found.mcpServers, hooks: found.hooks, skills: found.skills, agents: found.agents, sources: found.sources, unreadable: found.unreadable }])

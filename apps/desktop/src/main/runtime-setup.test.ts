@@ -128,7 +128,11 @@ describe('the skills each runtime finds', () => {
     'C:/Users/colin/.agents/skills': ['shared-one/'],
     'C:/Users/colin/.codex/skills': ['.system/', 'codex-own/'],
     'C:/Users/colin/shop/.agents/skills': ['project-agents/'],
-    'C:/Users/colin/shop/.opencode/skills': ['opencode-own/']
+    'C:/Users/colin/shop/.opencode/skills': ['opencode-own/'],
+    'C:/Users/colin/.copilot/skills': ['copilot-own/'],
+    'C:/Users/colin/shop/.github/skills': ['github-project/'],
+    'C:/Users/colin/.cursor/skills': ['cursor-own/'],
+    'C:/Users/colin/.cursor/skills-cursor': ['canvas/']
   }
 
   it('lists Codex skills from ~/.codex/skills and the .agents folders, never the Claude folder or its built-ins', async () => {
@@ -141,5 +145,15 @@ describe('the skills each runtime finds', () => {
     expect(setup.opencode?.skills).toEqual(['reskin', 'new-lead', 'shared-one', 'project-agents', 'opencode-own'])
     // Claude Code's own list is unchanged: its two folders.
     expect(setup.claude?.skills).toEqual(['reskin', 'new-lead'])
+  })
+
+  it('lists Cursor skills from its own two roots, never its built-ins or the third-party folders', async () => {
+    const setup = await readRuntimeSetup({ workspacePath: WS, homeDirectory: HOME, read: disk({}), list: folders(tree) })
+    expect(setup.cursor?.skills).toEqual(['cursor-own', 'shared-one', 'project-agents'])
+  })
+
+  it('lists Copilot skills from where `copilot skill --help` says it looks, the Claude folder only in the project', async () => {
+    const setup = await readRuntimeSetup({ workspacePath: WS, homeDirectory: HOME, read: disk({}), list: folders(tree) })
+    expect(setup.copilot?.skills).toEqual(['copilot-own', 'shared-one', 'github-project', 'project-agents'])
   })
 })
