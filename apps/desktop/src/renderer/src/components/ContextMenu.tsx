@@ -3,6 +3,18 @@ import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useDismissOnOutsidePress } from '../useDismissOnOutsidePress.js'
 import type { KeyboardEvent as ReactKeyboardEvent, ReactElement } from 'react'
 
+/** The element the most recent right-click landed on (H11). */
+let lastRightClicked: HTMLElement | null = null
+if (typeof window !== 'undefined') {
+  window.addEventListener(
+    'contextmenu',
+    (event) => {
+      lastRightClicked = event.target instanceof HTMLElement ? event.target : null
+    },
+    true
+  )
+}
+
 /**
  * A right-click menu for a row.
  *
@@ -224,7 +236,12 @@ export function ContextMenu({
    * two menus.
    */
   const anchor = useRef<HTMLElement | null>(null)
-  anchor.current = state.anchor ?? null
+  // H11: a right-click menu has no anchor of its own, so the element that
+  // was right-clicked stands in -- scrolling the list it is in still closes
+  // the menu, and a scroll anywhere else (the thread following a reply) no
+  // longer does.
+  anchor.current = state.anchor ?? lastRightClicked
+  if (anchor.current !== null && !anchor.current.isConnected) anchor.current = null
   useDismissOnOutsidePress(true, onClose, ref, anchor)
 
   const choose = (item: ContextMenuItem): void => {

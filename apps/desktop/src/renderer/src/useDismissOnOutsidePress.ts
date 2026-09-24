@@ -23,8 +23,8 @@ import type { RefObject } from 'react'
  * trigger is passed in too: a press on it is left alone, so the button keeps
  * toggling the way it always did.
  *
- * Scroll closes it for the same reason a context menu does: the panel is
- * positioned against something that just moved out from under it.
+ * A scroll closes it when the panel moved with it -- see `onScroll`: a
+ * scroll of some other part of the window leaves it where it is.
  */
 export function useDismissOnOutsidePress(
   open: boolean,
@@ -43,13 +43,33 @@ export function useDismissOnOutsidePress(
       if (target instanceof Node && ignore.some((ref) => ref.current?.contains(target) === true)) return
       onClose()
     }
+    /*
+     * H11 (the code review): a scroll closes it only when what scrolled
+     * CARRIES the panel -- the page, or an element the panel sits inside --
+     * because only then has the panel moved out from under what it points
+     * at. It closed on every scroll anywhere, and the thread scrolls itself
+     * each frame while it follows a streaming reply: the route picker opened
+     * mid-run to hand off, the effort panel, and every right-click menu
+     * closed on their own while a teammate answered.
+     */
+    const onScroll = (event: Event): void => {
+      const target = event.target
+      if (target === document || target === document.documentElement || target === document.body) {
+        onClose()
+        return
+      }
+      if (!(target instanceof Node)) return
+      // Scrolling inside the panel itself is the panel's business.
+      if (ignore.some((ref) => ref.current?.contains(target) === true)) return
+      if (ignore.some((ref) => ref.current !== null && ref.current !== undefined && target.contains(ref.current))) onClose()
+    }
     window.addEventListener('keydown', onKey)
     window.addEventListener('mousedown', onPress, true)
-    window.addEventListener('scroll', onPress as EventListener, true)
+    window.addEventListener('scroll', onScroll, true)
     return () => {
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('mousedown', onPress, true)
-      window.removeEventListener('scroll', onPress as EventListener, true)
+      window.removeEventListener('scroll', onScroll, true)
     }
     // `ignore` is a fresh array each render; its refs are stable, and the
     // effect only reads `.current`, so the refs themselves are the dependency
