@@ -117,6 +117,25 @@ export interface TaskBoardLine {
   readonly text: string
   readonly state: 'open' | 'in-hand' | 'done'
   readonly ownerName: string | undefined
+  /** Who handed it to its owner (A2.15), by name. */
+  readonly handedByName?: string
+  /** A2.6: handed over with no message to its owner. */
+  readonly handedWithoutNote?: boolean
+}
+
+/** The board's rows as a member is briefed with them: names, not ids (A2.6, A2.15). */
+export function boardLines(
+  tasks: readonly { readonly text: string; readonly state: TaskBoardLine['state']; readonly ownerId: string | undefined; readonly handedBy?: string | undefined; readonly handedWithoutNote?: boolean }[],
+  roster: readonly { readonly teammateId: string; readonly name: string }[]
+): readonly TaskBoardLine[] {
+  const nameOf = (id: string): string => roster.find((entry) => entry.teammateId === id)?.name ?? id
+  return tasks.map((task) => ({
+    text: task.text,
+    state: task.state,
+    ownerName: task.ownerId === undefined ? undefined : nameOf(task.ownerId),
+    ...(task.handedBy === undefined ? {} : { handedByName: nameOf(task.handedBy) }),
+    ...(task.handedWithoutNote === true ? { handedWithoutNote: true } : {})
+  }))
 }
 
 /**
@@ -188,7 +207,12 @@ export function taskSection(input: {
               task.ownerName === undefined
                 ? ' (unassigned)'
                 : task.ownerName === input.selfName
-                  ? ' (yours)'
+                  ? task.handedByName === undefined
+                    ? ' (yours)'
+                    : task.handedWithoutNote === true
+                      // A2.6: the gap, said to the one it leaves with nothing to go on.
+                      ? ` (yours, handed over by ${task.handedByName} with no note: ask them what is done and what is left before you start)`
+                      : ` (yours, handed over by ${task.handedByName})`
                   : ` (${task.ownerName}'s)`
             // Defanged: a task on the board is text a teammate wrote, briefed to every member.
             return `- [${task.state}] ${defangProtocolBlocks(task.text)}${owner}`
@@ -248,6 +272,8 @@ export function taskSection(input: {
      * teammates receive the task only assigned to one things can get messy").
      */
     'If you begin work that a row on that board describes -- because the person asked you to, or because you picked it up -- claim it in the same reply. An unassigned row and a row you are working look the same to everyone else, and the rule above sends them at unassigned rows.',
+    // A2.6: the handover in the teammate's own words, not a form to fill.
+    'When you hand a task over, send that teammate a message in the same reply: what you did, how you checked it, and what is left.',
     // A2.15: the host refuses the bounce too (room-store `applyTaskOps`).
     'Never hand a task back to the teammate who handed it to you: if you cannot finish it, say in your reply what is stopping you, and keep it.',
     'Claim only what you are actually doing, mark done only what is finished, and if you touched no task, end with no block.'

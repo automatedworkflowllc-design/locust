@@ -85,7 +85,13 @@ export interface RoomStore {
   applyTaskOps(
     roomId: unknown,
     ops: readonly TaskOp[],
-    actor: { readonly teammateId: string; readonly name: string; readonly missionId: string },
+    actor: {
+      readonly teammateId: string
+      readonly name: string
+      readonly missionId: string
+      /** A2.6: who the same reply sent a message to; absent when that is not known. */
+      readonly notedTo?: readonly string[]
+    },
     roster: readonly { readonly teammateId: string; readonly name: string }[]
   ): Promise<{ readonly changed: readonly string[]; readonly refused: readonly string[] }>
   /** A person moving the board from the room screen. */
@@ -162,6 +168,7 @@ function parsedTask(value: unknown): RoomTask | undefined {
     state: record.state,
     missionId: record.missionId,
     ...(record.handedBy === undefined ? {} : { handedBy: record.handedBy }),
+    ...(record.handedWithoutNote === true ? { handedWithoutNote: true } : {}),
     at: record.at
   }
 }
@@ -529,7 +536,7 @@ export function createRoomStore(options: {
               refused.push(`${actor.name} tried to claim "${task.text}", which is done.`)
               continue
             }
-            tasks[index] = { ...task, ownerId: actor.teammateId, state: 'in-hand', missionId: actor.missionId, handedBy: undefined, at }
+            tasks[index] = { ...task, ownerId: actor.teammateId, state: 'in-hand', missionId: actor.missionId, handedBy: undefined, handedWithoutNote: undefined, at }
             changed.push(`${actor.name} took on "${task.text}".`)
             continue
           }
@@ -567,15 +574,17 @@ export function createRoomStore(options: {
             refused.push(`${actor.name} tried to hand "${tasks[index]!.text}" back to ${target.name}, who handed it over. It stays with ${actor.name}.`)
             continue
           }
+          // A2.6: said on the new owner's row when the reply that handed it wrote them nothing.
+          const unnoted = actor.notedTo !== undefined && !actor.notedTo.includes(target.teammateId) ? { handedWithoutNote: true } : { handedWithoutNote: undefined }
           if (index < 0) {
             if (tasks.length >= MAX_ROOM_TASKS) {
               refused.push(`The board is full (${String(MAX_ROOM_TASKS)} tasks).`)
               continue
             }
-            tasks.push({ taskId: `task_${createId()}`, text: op.text, ownerId: target.teammateId, state: 'open', missionId: actor.missionId, handedBy: actor.teammateId, at })
+            tasks.push({ taskId: `task_${createId()}`, text: op.text, ownerId: target.teammateId, state: 'open', missionId: actor.missionId, handedBy: actor.teammateId, ...unnoted, at })
           } else {
             const task = tasks[index]!
-            tasks[index] = { ...task, ownerId: target.teammateId, state: 'open', missionId: actor.missionId, handedBy: actor.teammateId, at }
+            tasks[index] = { ...task, ownerId: target.teammateId, state: 'open', missionId: actor.missionId, handedBy: actor.teammateId, ...unnoted, at }
           }
           changed.push(`${actor.name} handed "${op.text}" to ${target.name}.`)
         }
@@ -607,7 +616,7 @@ export function createRoomStore(options: {
           if (request.op === 'assign') {
             const ownerId = typeof request.ownerId === 'string' ? request.ownerId : undefined
             if (ownerId !== undefined && !room.teammateIds.includes(ownerId)) throw new Error('Only a teammate in the room can own its task.')
-            tasks[index] = { ...task, ownerId, state: task.state === 'done' ? 'done' : ownerId === undefined ? 'open' : 'in-hand', handedBy: undefined, at }
+            tasks[index] = { ...task, ownerId, state: task.state === 'done' ? 'done' : ownerId === undefined ? 'open' : 'in-hand', handedBy: undefined, handedWithoutNote: undefined, at }
           } else if (request.op === 'done') {
             tasks[index] = { ...task, state: 'done', at }
           } else if (request.op === 'reopen') {

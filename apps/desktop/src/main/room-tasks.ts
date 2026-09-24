@@ -1,6 +1,7 @@
 import type { MissionLedger } from '@teammate/mission-store'
 
 import type { CodexMissionUpdate, PublicRoom, PublicTeammate } from '../shared/ipc.js'
+import { parseShareBlocks } from '../shared/peer-share.js'
 import { parseTaskBlocks, rowToClaimAtStart } from '../shared/room-task.js'
 import { createTranscriptTracker } from './peer-exchange.js'
 import type { RoomStore } from './room-store.js'
@@ -251,10 +252,14 @@ export function createRoomTasks(options: RoomTasksOptions): RoomTasks {
         // the store refuses it by name, which is the truthful outcome.
       }
       const actor = roster.find((entry) => entry.teammateId === found.teammateId)
+      // A2.6: whom the same reply wrote to, so a handoff with no note says so on the board.
+      const notedTo = parseShareBlocks(text)
+        .map((block) => roster.find((entry) => entry.name.toLowerCase() === block.to.trim().toLowerCase())?.teammateId)
+        .filter((id): id is string => id !== undefined)
       const result = await options.rooms.applyTaskOps(
         found.room.roomId,
         ops,
-        { teammateId: found.teammateId, name: actor?.name ?? found.teammateId, missionId: mission.missionId },
+        { teammateId: found.teammateId, name: actor?.name ?? found.teammateId, missionId: mission.missionId, notedTo },
         roster.map((entry) => ({ teammateId: entry.teammateId, name: entry.name }))
       )
       if (result.changed.length === 0 && result.refused.length === 0) return

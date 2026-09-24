@@ -49,7 +49,7 @@ import { createRoutineStore } from './routine-store.js'
 import { createRoomStore, exchangeOfRoomPost } from './room-store.js'
 import { createRoomTasks } from './room-tasks.js'
 import type { RoomTasks } from './room-tasks.js'
-import { fittedTaskSection, rowToClaimAtStart } from '../shared/room-task.js'
+import { boardLines, fittedTaskSection, rowToClaimAtStart } from '../shared/room-task.js'
 import { createRoutineRunner } from './routine-runner.js'
 import { createMemoryStore } from './memory-store.js'
 import { createWorktreeManager } from './worktrees.js'
@@ -3280,11 +3280,7 @@ if (!ownsSingleInstanceLock) {
         roomName: room.name,
         selfName: teammate.name,
         memberNames,
-        tasks: room.tasks.map((task: PublicRoom['tasks'][number]) => ({
-          text: task.text,
-          state: task.state,
-          ownerName: task.ownerId === undefined ? undefined : roster.find((entry) => entry.teammateId === task.ownerId)?.name ?? task.ownerId
-        })),
+        tasks: boardLines(room.tasks, roster),
         budget: MAX_PROMPT_LENGTH - text.length - 2
       })
       const briefed = board.length === 0 ? text : `${text}\n\n${board}`

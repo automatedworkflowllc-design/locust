@@ -1059,6 +1059,12 @@ export interface RoomTask {
    * Cleared when someone claims it or a person reassigns it.
    */
   readonly handedBy?: string | undefined
+  /**
+   * A2.6: handed over with no message to its new owner in the same reply --
+   * so the board tells them there is nothing to go on but the row itself.
+   * Cleared with `handedBy`.
+   */
+  readonly handedWithoutNote?: boolean
   readonly at: string
 }
 
