@@ -36,3 +36,15 @@ describe('who may answer an approval', () => {
     expect(index[handler + 1]).toContain('fromOwnWindow(event)')
   })
 })
+
+/*
+ * M31: the window drops an approval card when its run ends. Pinned here,
+ * beside the rule for who may answer one, because the card and the answer are
+ * one contract: a card no run can take must not be offered.
+ */
+describe('an approval card in the window', () => {
+  it('is dropped when its run ends: App applies approvalsOfLiveRuns on every change of runs', () => {
+    const app = readFileSync(join(MAIN, '..', 'renderer', 'src', 'App.tsx'), 'utf8')
+    expect(app).toMatch(/useEffect\(\(\) => \{\s*setApprovals\(\(current\) => approvalsOfLiveRuns\(current, runs\)\)\s*\}, \[runs\]\)/)
+  })
+})

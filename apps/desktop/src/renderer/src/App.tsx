@@ -143,6 +143,7 @@ import type { Handoff } from './glances.js'
 import type { LiveActivity } from './faceState.js'
 import type { TeammateStatusView } from './status.js'
 import type { WorktreeRemoval } from './components/WorktreeRow.js'
+import { approvalsOfLiveRuns } from './approvalsOfLiveRuns.js'
 
 /**
  * The Locust shell.
@@ -1619,6 +1620,10 @@ export default function App(): ReactElement {
       .catch(() => setCliArtifacts([]))
   }, [runtimeState.phase, usableKey])
   const [approvals, setApprovals] = useState<readonly MissionApprovalRequest[]>([])
+  // M31: a card goes with its run -- one whose run ended is not left behind.
+  useEffect(() => {
+    setApprovals((current) => approvalsOfLiveRuns(current, runs))
+  }, [runs])
   const [decidingIds, setDecidingIds] = useState<readonly string[]>([])
   const [models, setModels] = useState<readonly PublicModel[]>([])
   /*
