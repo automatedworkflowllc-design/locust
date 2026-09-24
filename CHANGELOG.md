@@ -11,6 +11,21 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.330.0 - 2026-09-24
+
+### Fixed
+
+- **Removing a teammate's own branch no longer deletes their unsaved
+  work.** Settings > Own branches > Remove used to delete every change a
+  teammate had not committed, in one click and without a word. Now a copy
+  with changes says which files would be lost and asks: Keep it, or Delete
+  the changes and remove.
+
+### Improved
+
+- **Copilot's and Cursor's skills are listed** from the folders each of
+  them reads.
+
 ## 0.329.0 - 2026-09-24
 
 ### Improved
