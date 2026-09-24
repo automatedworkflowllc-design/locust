@@ -426,6 +426,43 @@ describe('relaying a share', () => {
    * called that a failed start and gave up, and nothing ever started the
    * "next run" its own notice promised. The argument died at hop zero.
    */
+  /*
+   * EVERY SLOT TAKEN, THE RECIPIENT IDLE (harness review, 2026-09-24). The
+   * pool cap answers with the same code as a busy teammate, so the reply was
+   * held until the RECIPIENT's run ended -- which, for an idle one, never
+   * came -- and the thread said they were "part-way through another mission".
+   */
+  describe('a reply held because every run slot was taken', () => {
+    const POOL_FULL: CodexMissionStartResponse = {
+      ok: false,
+      error: { code: 'RUN_ALREADY_ACTIVE', message: 'Up to 6 missions can run at once. Wait for one to finish or stop it first.', busy: 'pool' }
+    }
+
+    it('says so, not that the recipient is mid-run', async () => {
+      const { relay, notices } = harness({ startResults: [POOL_FULL] })
+      await relay.onShared(sharing(), [message(BOOTY)])
+      expect(said(notices)[0]).toContain('Every run slot is in use')
+      expect(said(notices)[0]).not.toContain('part-way')
+    })
+
+    it('starts when ANY run ends, not only the recipient’s own', async () => {
+      const { relay, starts, owners } = harness({ startResults: [POOL_FULL] })
+      await relay.onShared(sharing(), [message(BOOTY)])
+      // Someone else's run ends -- Juno's, a stranger to this exchange -- and a slot frees.
+      await relay.onRunEnded(ended('mission_juno', { self: { teammateId: 'tm_juno', name: 'Juno', role: 'Custom' }, others: [] }))
+      expect(starts).toHaveLength(2)
+      expect(owners).toEqual([['tm_booty', 'mission_2']])
+    })
+
+    it('is held again, quietly, while every slot is still taken', async () => {
+      const { relay, starts, notices } = harness({ startResults: [POOL_FULL, POOL_FULL] })
+      await relay.onShared(sharing(), [message(BOOTY)])
+      await relay.onRunEnded(ended('mission_juno', { self: { teammateId: 'tm_juno', name: 'Juno', role: 'Custom' }, others: [] }))
+      expect(starts).toHaveLength(2)
+      expect(said(notices).filter((line) => line.includes('Every run slot'))).toHaveLength(1)
+    })
+  })
+
   describe('a reply whose recipient is mid-run', () => {
     it('is held rather than dropped, and the thread that shared is told', async () => {
       const { relay, owners, notices } = harness({ startResults: [BUSY] })

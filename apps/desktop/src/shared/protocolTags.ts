@@ -90,6 +90,30 @@ const TORN_TAG = new RegExp(
 const CODE = /```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`/g
 
 /**
+ * The blocks a host may ACT on: every match of `block` whose opening tag is
+ * not inside code.
+ *
+ * The display has always left code alone ("CODE IS LEFT ALONE", below): a
+ * teammate explaining the protocol writes these tags on purpose, in a fence,
+ * and that is the answer, not plumbing. The parsers read the raw text, so the
+ * same example could send a message, keep a memory, move a task, ask the
+ * person, or hand a file (harness review, 2026-09-24).
+ *
+ * Only the OPENING TAG is tested, never the body: a real block often quotes
+ * code -- "Tests run with `pnpm test`" -- and blanking code out of the text
+ * would have cut the command out of the memory. Measured on Colin's ledger
+ * that day: 27 share blocks and 68 memory blocks outside code, and the 3
+ * inside code all describing the protocol; no real block was ever fenced.
+ */
+export function blocksOutsideCode(text: string, block: RegExp): RegExpMatchArray[] {
+  const spans = [...text.matchAll(CODE)].map((span) => [span.index ?? 0, (span.index ?? 0) + span[0].length] as const)
+  return [...text.matchAll(block)].filter((match) => {
+    const at = match.index ?? 0
+    return !spans.some(([from, to]) => at >= from && at < to)
+  })
+}
+
+/**
  * The last thing done to a reply before a person reads it: take the tags off
  * anything still wearing them.
  *

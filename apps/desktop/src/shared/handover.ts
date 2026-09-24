@@ -1,3 +1,5 @@
+import { blocksOutsideCode } from './protocolTags.js'
+
 /**
  * The file block: how a teammate hands a file to the person.
  *
@@ -90,7 +92,7 @@ function normalize(path: string): string {
 export function parseFileBlocks(text: string): readonly HandedFile[] {
   const files: HandedFile[] = []
   const seen = new Set<string>()
-  for (const match of text.matchAll(BLOCK)) {
+  for (const match of blocksOutsideCode(text, BLOCK)) {
     for (const line of (match[1] ?? '').split('\n')) {
       if (files.length >= MAX_FILES_PER_REPLY) return files
       const trimmed = line.trim().replace(/^[-*]\s+/, '')

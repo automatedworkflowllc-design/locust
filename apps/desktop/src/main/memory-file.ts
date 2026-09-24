@@ -3,6 +3,7 @@ import { join } from 'node:path'
 
 import { excludeWith } from './attach-outside.js'
 import { memoryAge } from '../shared/memory.js'
+import { defangProtocolBlocks } from '../shared/protocolTags.js'
 import type { MemoryLine } from '../shared/memory.js'
 
 /**
@@ -34,7 +35,8 @@ export function memoryFileText(lines: readonly MemoryLine[], now: Date): string 
     const age = memoryAge(memory.at, now)
     const when = memory.at === undefined ? '' : ` -- ${memory.at.slice(0, 10)}${age === undefined ? '' : ` (${age})`}`
     const where = memory.where === undefined ? '' : ` in ${memory.where}`
-    return `- ${memory.text} (by ${by}${where}${when})`
+    // Defanged: the teammate reads this file as part of what it is told.
+    return `- ${defangProtocolBlocks(memory.text)} (by ${by}${where}${when})`
   }
   const here = lines.filter((memory) => memory.scope !== 'global')
   const everywhere = lines.filter((memory) => memory.scope === 'global')

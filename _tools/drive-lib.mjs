@@ -46,7 +46,9 @@ function endTree(child) {
 export const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
 const NPM_DIR = 'C:\\Users\\<home>\\AppData\\Roaming\\npm'
-export const FREE_ROUTE = { runtime: 'opencode', model: 'opencode/muse-spark-1.3-contributor-free', mode: 'accept-edits' }
+// LOCUST_FREE_MODEL picks another of OpenCode's free models when this one is
+// down (Muse Spark was, 9/22-9/24); `opencode models | grep free` lists them.
+export const FREE_ROUTE = { runtime: 'opencode', model: process.env.LOCUST_FREE_MODEL ?? 'opencode/muse-spark-1.3-contributor-free', mode: 'accept-edits' }
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 export const say = (line) => console.error(line)
 export const git = (args, cwd) => new Promise((resolve, reject) => {

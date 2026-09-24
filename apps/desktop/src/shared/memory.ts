@@ -1,4 +1,5 @@
 import { BLOCK_PLACEMENT } from './trailer.js'
+import { blocksOutsideCode, defangProtocolBlocks } from './protocolTags.js'
 /**
  * Team memory: what every teammate remembers, shared across the team and
  * kept per project folder, with a smaller set that goes everywhere.
@@ -158,7 +159,7 @@ export function boundedMemoryText(text: string): string {
 /** Every well-formed operation in every block, in transcript order, capped. */
 export function parseMemoryBlocks(text: string): readonly MemoryOp[] {
   const ops: MemoryOp[] = []
-  for (const match of text.matchAll(BLOCK)) {
+  for (const match of blocksOutsideCode(text, BLOCK)) {
     for (const rawLine of (match[1] ?? '').split(/\r?\n/)) {
       const line = LINE.exec(rawLine)
       if (line === null) continue
@@ -189,9 +190,13 @@ export function stripMemoryBlocks(text: string): string {
   return text.replace(BLOCK, '').replace(/\n{3,}/g, '\n\n').trimEnd()
 }
 
-/** Defang the tag in text quoted into another runtime's prompt. */
+/**
+ * Defang the tags in text quoted into another runtime's prompt. Every
+ * protocol tag, not only this one: a memory holding a share tag is as live
+ * in a brief as one holding a memory tag.
+ */
 export function sanitizeMemoryTags(text: string): string {
-  return text.replace(/<(\/?)locust-memory/gi, '‹$1locust-memory')
+  return defangProtocolBlocks(text)
 }
 
 /**
@@ -381,7 +386,12 @@ export function memorySection(input: {
             const place = memory.scope === 'global' ? `everywhere, by ${memory.by}${memory.where === undefined ? '' : ` in ${memory.where}`}` : `this folder, by ${memory.by}`
             const age = memoryAge(memory.at, input.now ?? new Date())
             const origin = age === undefined ? place : `${place}, ${age}`
-            return `- ${memory.text} (${origin})`
+            // Defanged: a memory is something a teammate SAID, and this line
+            // is what every other teammate is TOLD. The two per-tag
+            // sanitizers written for it were never called, so a memory
+            // holding a protocol tag reached every brief live (harness
+            // review, 2026-09-24).
+            return `- ${defangProtocolBlocks(memory.text)} (${origin})`
           })
           .join(NEWLINE)
         + (dropped > 0

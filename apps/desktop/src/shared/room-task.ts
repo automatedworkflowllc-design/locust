@@ -1,4 +1,5 @@
 import { BLOCK_PLACEMENT } from './trailer.js'
+import { blocksOutsideCode, defangProtocolBlocks } from './protocolTags.js'
 /**
  * The task block: how a teammate claims, finishes, hands off or adds a task
  * on a room's board, the same way a share block reaches a teammate.
@@ -80,7 +81,7 @@ const isExample = (text: string): boolean =>
 
 export function parseTaskBlocks(text: string): readonly TaskOp[] {
   const ops: TaskOp[] = []
-  for (const match of text.matchAll(BLOCK)) {
+  for (const match of blocksOutsideCode(text, BLOCK)) {
     for (const rawLine of (match[1] ?? '').split(/\r?\n/)) {
       const line = LINE.exec(rawLine)
       if (line === null) continue
@@ -107,9 +108,9 @@ export function stripTaskBlocks(text: string): string {
   return text.replace(BLOCK, '').replace(/\n{3,}/g, '\n\n').trimEnd()
 }
 
-/** Defang the tag in text quoted into another runtime's prompt. */
+/** Defang the tags in text quoted into another runtime's prompt -- every protocol tag. */
 export function sanitizeTaskTags(text: string): string {
-  return text.replace(/<(\/?)locust-task/gi, '‹$1locust-task')
+  return defangProtocolBlocks(text)
 }
 
 export interface TaskBoardLine {
@@ -158,7 +159,8 @@ export function taskSection(input: {
                 : task.ownerName === input.selfName
                   ? ' (yours)'
                   : ` (${task.ownerName}'s)`
-            return `- [${task.state}] ${task.text}${owner}`
+            // Defanged: a task on the board is text a teammate wrote, briefed to every member.
+            return `- [${task.state}] ${defangProtocolBlocks(task.text)}${owner}`
           })
           .join('\n')
   const handoffExample = others[0] ?? 'Name'

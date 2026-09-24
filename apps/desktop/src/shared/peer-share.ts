@@ -1,4 +1,4 @@
-import { defangProtocolBlocks } from './protocolTags.js'
+import { blocksOutsideCode, defangProtocolBlocks } from './protocolTags.js'
 
 /**
  * The share block: how a teammate's runtime says "another teammate needs this".
@@ -102,7 +102,7 @@ export interface ShareBlock {
 /** Complete, well-formed blocks in transcript order. Empty bodies are dropped. */
 export function parseShareBlocks(text: string): readonly ShareBlock[] {
   const blocks: ShareBlock[] = []
-  for (const match of text.matchAll(BLOCK)) {
+  for (const match of blocksOutsideCode(text, BLOCK)) {
     const attributes = attributesOf(match[1] ?? '')
     const to = withoutRole(attributes.to ?? '')
     const body = (match[2] ?? '').trim()

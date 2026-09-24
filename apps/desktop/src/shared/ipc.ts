@@ -1227,6 +1227,14 @@ export type CodexMissionErrorCode =
 export interface CodexMissionError {
   readonly code: CodexMissionErrorCode
   readonly message: string
+  /**
+   * On RUN_ALREADY_ACTIVE only: `pool` when every run slot is taken rather
+   * than this teammate being mid-run. Same code, because a person's message
+   * waits either way; the relay has to know which, because a reply held for
+   * an IDLE teammate never sees that teammate's run end (harness review,
+   * 2026-09-24).
+   */
+  readonly busy?: 'pool'
 }
 
 /**

@@ -357,9 +357,10 @@ interface CodexMissionServiceOptions {
 
 function error(
   code: 'INVALID_PROMPT' | 'RUN_ALREADY_ACTIVE' | 'CODEX_UNAVAILABLE' | 'RUNTIME_START_FAILED' | 'PERSISTENCE_FAILED' | 'RUN_NOT_ACTIVE' | 'HANDOFF_REFUSED',
-  message: string
+  message: string,
+  busy?: 'pool'
 ): CodexMissionStartResponse | CodexMissionCancelResponse | MissionHandoffResponse {
-  return { ok: false, error: { code, message } }
+  return { ok: false, error: { code, message, ...(busy === undefined ? {} : { busy }) } }
 }
 
 /** What went wrong, in the error's own words, bounded so a card stays a card. */
@@ -912,7 +913,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         if (starting.size + live.length + (options.liveElsewhere ?? (() => 0))() >= MAX_LIVE_MISSIONS) {
           return error(
             'RUN_ALREADY_ACTIVE',
-            `Up to ${MAX_LIVE_MISSIONS} missions can run at once. Wait for one to finish or stop it first.`
+            `Up to ${MAX_LIVE_MISSIONS} missions can run at once. Wait for one to finish or stop it first.`,
+            'pool'
           ) as CodexMissionStartResponse
         }
 

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { MAX_MEMORIES, createMemoryStore, parsedFile } from './memory-store.js'
+import { MAX_MEMORIES, MEMORY_UNREADABLE, createMemoryStore, parsedFile } from './memory-store.js'
 
 const NOW = '2026-09-05T12:00:00.000Z'
 let root: string
@@ -21,6 +21,37 @@ async function store() {
 const WREN = { teammateId: 'tm_wren', name: 'Wren' }
 const SHOP = { workspaceId: 'ws_shop', workspaceName: 'shop' }
 const LEDGER = { workspaceId: 'ws_ledger', workspaceName: 'ledger' }
+
+describe('a memory file it cannot read', () => {
+  /*
+   * Read as EMPTY, the next memory kept was written over it: every memory
+   * gone for one new one. The rooms and groups stores were fixed for exactly
+   * this on 2026-09-16; memories were not (harness review, 2026-09-24).
+   */
+  it('is refused, not written over, when it is torn', async () => {
+    const memories = await store()
+    const torn = '{"schemaVersion":1,"memories":[{"memoryId":"mem_a","text":"Tests run'
+    await writeFile(join(root, 'memories.json'), torn, 'utf8')
+    await expect(memories.list()).rejects.toThrow(MEMORY_UNREADABLE)
+    await expect(memories.add({ text: 'A new one.', scope: 'workspace', ...SHOP, by: WREN, status: 'kept' })).rejects.toThrow(MEMORY_UNREADABLE)
+    expect(await readFile(join(root, 'memories.json'), 'utf8')).toBe(torn)
+  })
+
+  it('is refused when it is a schema this build does not know, which a later build may have written', async () => {
+    const memories = await store()
+    const newer = JSON.stringify({ schemaVersion: 99, memories: [{ memoryId: 'mem_a', text: 'kept by a newer build' }] })
+    await writeFile(join(root, 'memories.json'), newer, 'utf8')
+    await expect(memories.add({ text: 'A new one.', scope: 'workspace', ...SHOP, by: WREN, status: 'kept' })).rejects.toThrow(MEMORY_UNREADABLE)
+    expect(await readFile(join(root, 'memories.json'), 'utf8')).toBe(newer)
+  })
+
+  it('is genuinely empty when there is simply no file yet', async () => {
+    const memories = await store()
+    expect(await memories.list()).toEqual([])
+    const { created } = await memories.add({ text: 'The first one.', scope: 'workspace', ...SHOP, by: WREN, status: 'kept' })
+    expect(created).toBe(true)
+  })
+})
 
 describe('what the team remembers', () => {
   it('keeps a memory with who wrote it, where, and from which conversation, on disk', async () => {
@@ -98,14 +129,19 @@ describe('what the team remembers', () => {
     expect(await memories.list()).toEqual([])
   })
 
-  it('refuses what it cannot keep, and a malformed file reads as empty rather than throwing', async () => {
+  it('refuses what it cannot keep, and a malformed file is unreadable rather than empty', async () => {
     const memories = await store()
     await expect(memories.add({ text: '', scope: 'workspace', ...SHOP, by: WREN, status: 'kept' })).rejects.toThrow(/one line/)
     await expect(memories.add({ text: 'x', scope: 'team', ...SHOP, by: WREN, status: 'kept' })).rejects.toThrow(/folder or for everywhere/)
-    expect(parsedFile('{{{')).toEqual({ schemaVersion: 1, memories: [] })
+    // A torn FILE is unreadable, never empty: read as empty, the next memory
+    // kept was written over it (harness review, 2026-09-24).
+    expect(() => parsedFile('{{{')).toThrow(MEMORY_UNREADABLE)
+    // A bad MEMORY inside a good file is still just dropped.
     expect(parsedFile(JSON.stringify({ schemaVersion: 1, memories: [{ memoryId: 'mem_1', text: 'no scope' }] }))).toEqual({ schemaVersion: 1, memories: [] })
+    // This asserted the bug: "not json" read as an empty list, which the
+    // next memory kept then replaced (harness review, 2026-09-24).
     await writeFile(join(root, 'memories.json'), 'not json', 'utf8')
-    expect(await memories.list()).toEqual([])
+    await expect(memories.list()).rejects.toThrow(MEMORY_UNREADABLE)
   })
 
   it('is bounded', async () => {

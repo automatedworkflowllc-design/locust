@@ -542,7 +542,8 @@ export function createRelay(options: RelayOptions): Relay {
    */
   type StartOutcome =
     | { readonly kind: 'started'; readonly missionId: string }
-    | { readonly kind: 'busy' }
+    /** `pool`: every run slot was taken; the recipient may be idle. */
+    | { readonly kind: 'busy'; readonly pool?: true }
     | { readonly kind: 'refused' }
 
   const startFor = async (input: {
@@ -638,7 +639,7 @@ export function createRelay(options: RelayOptions): Relay {
       // Mid-run is not a refusal. A teammate runs one mission at a time, so
       // answering while they work is impossible and answering when they
       // finish is ordinary; the caller holds the reply until then.
-      if (response.error.code === 'RUN_ALREADY_ACTIVE') return { kind: 'busy' }
+      if (response.error.code === 'RUN_ALREADY_ACTIVE') return response.error.busy === 'pool' ? { kind: 'busy', pool: true } : { kind: 'busy' }
       input.notice(`${recipient.self.name} could not reply on their own: ${response.error.message} The message waits for their next run.`)
       return { kind: 'refused' }
     }
@@ -697,12 +698,23 @@ export function createRelay(options: RelayOptions): Relay {
     }
   }
 
-  /** Hold a reply for a teammate who is mid-run. The first one held wins. */
-  const defer = (entry: DeferredReply): void => {
+  /**
+   * Hold a reply for a teammate who cannot start yet. The first one held wins.
+   *
+   * `pool`: every run slot was taken, and the recipient may be idle. It used
+   * to say they were "part-way through another mission" either way -- untrue
+   * for an idle one -- and to wait for THEIR run to end, which for an idle
+   * teammate never came (harness review, 2026-09-24).
+   */
+  const defer = (entry: DeferredReply, pool = false): void => {
     const teammateId = entry.recipient.self.teammateId
     if (deferred.has(teammateId)) return
     deferred.set(teammateId, entry)
-    entry.notice(`${entry.recipient.self.name} is part-way through another mission. Their reply starts when it ends.`)
+    entry.notice(
+      pool
+        ? `Every run slot is in use, so ${entry.recipient.self.name}'s reply starts when one frees up.`
+        : `${entry.recipient.self.name} is part-way through another mission. Their reply starts when it ends.`
+    )
   }
 
   /**
@@ -812,14 +824,17 @@ export function createRelay(options: RelayOptions): Relay {
     // The asker picked up another mission while the meeting ran. The minutes
     // keep until they are free rather than being dropped on the floor.
     if (outcome.kind === 'busy') {
-      defer({
-        recipient: asker,
-        prompt: meetingPrompt({ repliers: meeting.answered, silent }),
-        from,
-        origin,
-        notice,
-        exchange: undefined
-      })
+      defer(
+        {
+          recipient: asker,
+          prompt: meetingPrompt({ repliers: meeting.answered, silent }),
+          from,
+          origin,
+          notice,
+          exchange: undefined
+        },
+        outcome.pool === true
+      )
     }
   }
 
@@ -920,19 +935,22 @@ export function createRelay(options: RelayOptions): Relay {
           const prompt = relayPrompt({ sender: mission.peer.self, recipient: recipient.self, hop: origin.hop, cap, readByPerson })
           const result = await startFor({ recipient, prompt, from: mission, origin, notice })
           if (result.kind === 'busy') {
-            defer({
-              recipient,
-              prompt,
-              from: mission,
-              origin,
-              notice,
-              exchange: {
-                askerRunId: mission.runId,
-                askerMissionId: mission.missionId,
-                askerId: mission.peer.self.teammateId,
-                recipientName: recipient.self.name
-              }
-            })
+            defer(
+              {
+                recipient,
+                prompt,
+                from: mission,
+                origin,
+                notice,
+                exchange: {
+                  askerRunId: mission.runId,
+                  askerMissionId: mission.missionId,
+                  askerId: mission.peer.self.teammateId,
+                  recipientName: recipient.self.name
+                }
+              },
+              result.pool === true
+            )
             /*
              * Asked to be taken now, and allowed to be.
              *
@@ -1031,6 +1049,13 @@ export function createRelay(options: RelayOptions): Relay {
       // This is the line that makes an argument alternate: the reply that
       // arrived mid-run starts here instead of waiting for a person.
       if (teammateId !== undefined) await deliverDeferred(teammateId)
+      // And a run ending frees a slot for everyone: a reply held because
+      // every slot was taken, for a teammate idle all along, starts now. It
+      // waited for that teammate's own run to end, which never came (harness
+      // review, 2026-09-24). One still mid-run is simply held again.
+      for (const other of [...deferred.keys()]) {
+        if (other !== teammateId) await deliverDeferred(other)
+      }
     }
   }
 }

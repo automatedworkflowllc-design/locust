@@ -11,6 +11,24 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.312.0 - 2026-09-24
+
+### Fixed
+
+- **Team memory can no longer wipe itself.** If the memory file cannot be
+  read -- damaged, locked for a moment, or written by a newer Locust --
+  nothing is saved over it, and teammates are told memory could not be read
+  this time. It used to be treated as empty, and the next thing remembered
+  replaced everything.
+- **An example is just an example.** When a teammate shows how a message,
+  memory, task, question or file hand-off is written, inside a code block,
+  Locust no longer acts on it.
+- **What a teammate wrote is quoted, never obeyed.** Memories and the tasks
+  on a room's board reach other teammates with their tags disarmed.
+- **A reply no longer waits forever when every run slot is taken.** It
+  starts as soon as any run ends, and the thread says that is what it is
+  waiting for.
+
 ## 0.311.0 - 2026-09-24
 
 ### New

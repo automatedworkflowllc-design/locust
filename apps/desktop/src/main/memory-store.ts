@@ -83,6 +83,18 @@ interface StoredFile {
 
 const EMPTY: StoredFile = { schemaVersion: SCHEMA_VERSION, memories: [] }
 
+/**
+ * What a write says when the file it would change cannot be read.
+ *
+ * An unreadable memory file (torn, a schema this build does not know, over
+ * the size cap, locked for a moment) was read as EMPTY -- and since every
+ * change here reads first, the next memory kept was written over it: every
+ * memory gone, for one new one. The rooms and groups stores were fixed for
+ * exactly this on 2026-09-16 and memories never were (harness review,
+ * 2026-09-24). Now it fails closed, as they do.
+ */
+export const MEMORY_UNREADABLE = 'The memory file could not be read, so nothing was changed. Every memory is as it was.'
+
 export function validMemoryText(value: unknown): value is string {
   return typeof value === 'string' && boundedMemoryText(value).length > 0
 }
@@ -125,16 +137,20 @@ export function parsedMemory(value: unknown): PublicMemory | undefined {
   }
 }
 
+/**
+ * A MEMORY that does not parse is dropped; a FILE that does not parse is
+ * unreadable, and says so (MEMORY_UNREADABLE) rather than passing for empty.
+ */
 export function parsedFile(text: string): StoredFile {
   let value: unknown
   try {
     value = JSON.parse(text)
   } catch {
-    return EMPTY
+    throw new Error(MEMORY_UNREADABLE)
   }
-  if (typeof value !== 'object' || value === null) return EMPTY
+  if (typeof value !== 'object' || value === null) throw new Error(MEMORY_UNREADABLE)
   const record = value as Record<string, unknown>
-  if (record.schemaVersion !== SCHEMA_VERSION || !Array.isArray(record.memories)) return EMPTY
+  if (record.schemaVersion !== SCHEMA_VERSION || !Array.isArray(record.memories)) throw new Error(MEMORY_UNREADABLE)
   const memories: PublicMemory[] = []
   const seen = new Set<string>()
   for (const entry of record.memories) {
@@ -173,13 +189,17 @@ export function createMemoryStore(options: {
   }
 
   const read = async (): Promise<StoredFile> => {
+    let text: string
     try {
-      const text = await readFile(path, 'utf8')
-      if (Buffer.byteLength(text, 'utf8') > MAX_FILE_BYTES) return EMPTY
-      return parsedFile(text)
-    } catch {
-      return EMPTY
+      text = await readFile(path, 'utf8')
+    } catch (error) {
+      // No file yet is the empty store; anything else is a file that could
+      // not be read, and must not be written over as if it were empty.
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return EMPTY
+      throw new Error(MEMORY_UNREADABLE)
     }
+    if (Buffer.byteLength(text, 'utf8') > MAX_FILE_BYTES) throw new Error(MEMORY_UNREADABLE)
+    return parsedFile(text)
   }
 
   const write = async (file: StoredFile): Promise<void> => {

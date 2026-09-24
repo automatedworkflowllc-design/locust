@@ -12,7 +12,18 @@
 // click path in this drive already uses. Counting the dead one made
 // "underlined links: 0" true by construction.
 
+import { mkdir } from 'node:fs/promises'
+import { join } from 'node:path'
+
 import { FREE_ROUTE, say, scratchRepository, startDrive, teammateFace, teammateRows } from './drive-lib.mjs'
+
+// `--packaged <exe> --tag <name>`: the same exchange on an installer's build,
+// recorded beside the other fixes (0.312, the harness hardening pass).
+const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
+const packaged = arg('--packaged')
+const tag = arg('--tag')
+const outPath = tag === undefined ? undefined : join(new URL('../docs/beta-fixes-2026-09-24/', import.meta.url).pathname.slice(1), `relay-${tag}`)
+if (outPath !== undefined) await mkdir(outPath, { recursive: true })
 
 const CODE = 'TANGERINE'
 const workspace = await scratchRepository('locust-drive-relay-ws-')
@@ -20,6 +31,8 @@ const drive = await startDrive({
   name: 'relay',
   port: 9295,
   workspace,
+  ...(packaged === undefined ? {} : { packaged }),
+  ...(outPath === undefined ? {} : { outPath }),
   seed: {
     schemaVersion: 1,
     teammates: [

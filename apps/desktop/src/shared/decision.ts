@@ -1,3 +1,5 @@
+import { blocksOutsideCode } from './protocolTags.js'
+
 /**
  * The ask block: how a runtime says "I need you to choose" instead of guessing.
  *
@@ -139,7 +141,7 @@ const bounded = (value: string, limit: number): string =>
  * rest stay visible in the reply, which is where a reader can see them.
  */
 export function parseDecision(text: string): DecisionRequest | undefined {
-  for (const match of text.matchAll(BLOCK)) {
+  for (const match of blocksOutsideCode(text, BLOCK)) {
     const parsed = readBlock(match[1] ?? '')
     if (parsed !== undefined) return parsed
   }

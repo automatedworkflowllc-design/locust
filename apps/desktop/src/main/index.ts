@@ -1248,7 +1248,16 @@ if (!ownsSingleInstanceLock) {
     }
     async function memoryPart(peer: MissionPeerContext | undefined, query: string | undefined): Promise<string> {
         const settings = await teammates.readSettings()
-        const listed = await memories.briefed(memoryWorkspaceId)
+        // An unreadable memory file refuses to be read now rather than
+        // passing for empty (memory-store.ts); the run still starts, told
+        // plainly, and the file is left exactly as it was.
+        let listed: Awaited<ReturnType<typeof memories.briefed>>
+        try {
+          listed = await memories.briefed(memoryWorkspaceId)
+        } catch (error) {
+          note('memory', `the memory file could not be read for a brief: ${error instanceof Error ? error.message : String(error)}`)
+          return 'TEAM MEMORY could not be read for this run. Nothing in it was changed; do not assume it is empty.'
+        }
         const lines = listed.map((memory) => ({
           text: memory.text,
           scope: memory.scope,
