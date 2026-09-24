@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { AgentApi, AntigravityHost } from './antigravity-host.js'
 import { antigravityExecutableCandidates, createAntigravityHostProbe, parseServerCommandLine, transcriptPathFor } from './antigravity-host.js'
-import { antigravityTier, createAntigravityMissionService } from './antigravity-mission.js'
+import { AntigravityStartError, MAX_LIVE_ANTIGRAVITY_MISSIONS, antigravityStartRefusal, antigravityTier, createAntigravityMissionService } from './antigravity-mission.js'
 import type { AntigravityMissionService } from './antigravity-mission.js'
 
 const NOW = '2026-09-03T09:00:00.000Z'
@@ -315,6 +315,29 @@ describe('a mission through Antigravity', () => {
     const peer = { self: { teammateId: 'tm_w', name: 'Wren', role: 'Code & Migrations' }, others: [] }
     await h.service.start('one', peer, {})
     await expect(h.service.start('two', peer, {})).rejects.toThrow(/already has a mission running/)
+  })
+
+  it('says a busy teammate is busy, so a relayed reply is held and not dropped (A2.19)', async () => {
+    const h = harness({ lines: [] })
+    const peer = { self: { teammateId: 'tm_w', name: 'Wren', role: 'Code & Migrations' }, others: [] }
+    await h.service.start('one', peer, {})
+    const refused = await h.service.start('two', peer, {}).then(() => undefined, (error: unknown) => error)
+    expect(antigravityStartRefusal(refused)).toEqual({
+      ok: false,
+      error: { code: 'RUN_ALREADY_ACTIVE', message: 'Wren already has a mission running. Wait for it to finish or stop it first.' }
+    })
+    // Anything else is a start that failed.
+    expect(antigravityStartRefusal(new AntigravityStartError('Antigravity is not open.')).error.code).toBe('RUNTIME_START_FAILED')
+  })
+
+  it('says every slot being taken is busy too, and which kind', async () => {
+    const h = harness({ lines: [] })
+    for (let index = 0; index < MAX_LIVE_ANTIGRAVITY_MISSIONS; index += 1) {
+      await h.service.start(`run ${String(index)}`, { self: { teammateId: `tm_${String(index)}`, name: `Mate${String(index)}`, role: 'Code & Migrations' }, others: [] }, {})
+    }
+    const extra = { self: { teammateId: 'tm_extra', name: 'Extra', role: 'Code & Migrations' }, others: [] }
+    const refused = await h.service.start('one more', extra, {}).then(() => undefined, (error: unknown) => error)
+    expect(antigravityStartRefusal(refused).error).toMatchObject({ code: 'RUN_ALREADY_ACTIVE', busy: 'pool' })
   })
 })
 

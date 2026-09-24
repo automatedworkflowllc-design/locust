@@ -41,6 +41,11 @@ export interface UpdaterLike {
     readonly updateInfo: { readonly version: string }
     /** electron-updater's own answer: false for the same version, or an older one. */
     readonly isUpdateAvailable?: boolean
+    /**
+     * The download `autoDownload` started. It REJECTS when the download
+     * fails, after the updater has already said so with its 'error' event.
+     */
+    readonly downloadPromise?: Promise<unknown> | null
   } | null>
   downloadUpdate(): Promise<unknown>
   quitAndInstall(isSilent?: boolean, isForceRunAfter?: boolean): void
@@ -141,11 +146,16 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
     })
     options.updater.on('error', () => {
       // Deliberately not the provider's message: it can carry URLs and paths,
-      // and this string is shown in the window.
+      // and this string is shown in the window. Which step failed IS said:
+      // a download that failed after the check found a version is not a
+      // check that could not complete.
+      const downloading = state.phase === 'available' || state.phase === 'downloading'
       publish({
         phase: 'failed',
         currentVersion: options.currentVersion,
-        message: 'The update check could not complete.'
+        message: downloading
+          ? 'The update could not be downloaded. Locust will try again at its next check.'
+          : 'The update check could not complete.'
       })
     })
   }
@@ -172,6 +182,19 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
       publish({ phase: 'checking', currentVersion: options.currentVersion })
       try {
         const result = await options.updater.checkForUpdates()
+        /*
+         * THE DOWNLOAD'S FAILURE IS ANSWERED HERE, NOT BY THE CRASH DIALOG.
+         *
+         * With `autoDownload` on, the check starts the download and hands
+         * back its promise; when the download fails the updater emits
+         * 'error' (handled above) and the promise rejects too. Nothing held
+         * that promise, so the rejection went to `unhandledRejection` -- and
+         * a published release whose installer was not up yet put "Locust hit
+         * a problem ... Something went wrong inside Locust" in front of Colin
+         * (2026-09-24, a 404 for 0.325.0; the same on 2026-09-23 for 0.269.0).
+         * A download that did not work is a line in Settings, not a crash.
+         */
+        void result?.downloadPromise?.catch(() => undefined)
         const version = result?.updateInfo.version
         /*
          * ONLY A NEWER VERSION IS AN UPDATE (0.308). The tester lane takes

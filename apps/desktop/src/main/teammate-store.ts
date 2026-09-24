@@ -260,6 +260,26 @@ function roleTitleFor(role: TeammateRole, value: unknown): string | undefined {
   return value.trim()
 }
 
+/**
+ * A2.18: TWO TEAMMATES MAY NOT SHARE A NAME.
+ *
+ * A teammate is reached by the name a model writes in `to=`, and a name two
+ * teammates answer to is refused as ambiguous (peer-exchange.ts
+ * `recipientOf`): with two Wrens, a message could reach neither. Refused at
+ * the only two places a name is given -- creating and editing -- ignoring
+ * case and the spaces around it, the way the name is matched.
+ */
+export class TeammateNameTakenError extends Error {
+  constructor(readonly taken: string) {
+    super(`Another teammate is already called ${taken}. Pick another name.`)
+  }
+}
+
+function nameTaken(teammates: readonly PublicTeammate[], name: string, except?: string): string | undefined {
+  const wanted = name.trim().toLowerCase()
+  return teammates.find((teammate) => teammate.teammateId !== except && teammate.name.trim().toLowerCase() === wanted)?.name
+}
+
 export function validName(value: unknown): value is string {
   if (typeof value !== 'string') return false
   const trimmed = value.trim()
@@ -547,6 +567,8 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
         if (!isRole(input.role)) throw new Error('Teammate role is invalid')
         const file = await read()
         if (file.teammates.length >= MAX_TEAMMATES) throw new Error('Too many teammates')
+        const clash = nameTaken(file.teammates, input.name)
+        if (clash !== undefined) throw new TeammateNameTakenError(clash)
         if (input.avatar !== undefined && !isAvatarSpec(input.avatar)) throw new Error('Teammate avatar is invalid')
         const teammateId = `tm_${randomUUID().replace(/-/g, '').slice(0, 24)}`
         const teammate: PublicTeammate = {
@@ -574,6 +596,8 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
         const file = await read()
         const existing = file.teammates.find((teammate) => teammate.teammateId === input.teammateId)
         if (existing === undefined) throw new Error('Unknown teammate')
+        const clash = nameTaken(file.teammates, input.name, existing.teammateId)
+        if (clash !== undefined) throw new TeammateNameTakenError(clash)
         // Identity is the id and the creation time; everything else is theirs
         // to change. Mission ownership is keyed by id, so it follows for free.
         const updated: PublicTeammate = {

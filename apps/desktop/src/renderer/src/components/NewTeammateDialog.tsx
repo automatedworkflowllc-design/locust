@@ -99,6 +99,7 @@ export function NewTeammateDialog({
   initial,
   mode,
   takenHues = [],
+  takenNames = [],
   onChooseFolder,
   folderNotice,
   connectors,
@@ -116,6 +117,8 @@ export function NewTeammateDialog({
   readonly mode: MissionMode
   /** The colours the team already wears, so a new teammate starts on one it does not. */
   readonly takenHues?: readonly TeammateHue[]
+  /** The other teammates' names, so a name already taken is said before Save (A2.18). */
+  readonly takenNames?: readonly string[]
   /**
    * Ask the host for this teammate's own folder, or clear it.
    *
@@ -191,7 +194,9 @@ export function NewTeammateDialog({
   }, [])
 
   const trimmed = name.trim()
-  const canCreate = trimmed.length > 0
+  // A2.18: a name another teammate has would make both unreachable by name.
+  const taken = takenNames.find((other) => other.trim().toLowerCase() === trimmed.toLowerCase())
+  const canCreate = trimmed.length > 0 && taken === undefined
   const look = botFor(avatar)
 
   // Focus in (the name field, above), Tab held inside, Escape closes -- from
@@ -239,7 +244,13 @@ export function NewTeammateDialog({
                 onChange={(event) => setName(event.target.value)}
                 placeholder="Wren"
                 autoComplete="off"
+                {...(taken === undefined ? {} : { 'aria-invalid': true, 'aria-describedby': 'lc-teammate-name-taken' })}
               />
+              {taken !== undefined && (
+                <p id="lc-teammate-name-taken" className="lc-dialog__error">
+                  Another teammate is already called {taken}.
+                </p>
+              )}
               <div className="lc-hues" role="radiogroup" aria-label="Avatar colour">
                 {HUES.map((option) => (
                   <button

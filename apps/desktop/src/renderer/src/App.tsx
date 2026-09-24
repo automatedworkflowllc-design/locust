@@ -6120,6 +6120,7 @@ export default function App(): ReactElement {
           error={teammateError}
           mode={mode}
           takenHues={teammates.map((teammate) => teammate.hue)}
+          takenNames={teammates.map((teammate) => teammate.name)}
           onCancel={() => setNewTeammateOpen(false)}
           onCreate={createTeammate}
           composerRoute={{ runtime: route.runtime, model: route.model, mode, ...(effort === undefined ? {} : { effort }) }}
@@ -6133,6 +6134,7 @@ export default function App(): ReactElement {
           initial={editingTeammate}
           error={teammateError}
           mode={mode}
+          takenNames={teammates.filter((teammate) => teammate.teammateId !== editingTeammate.teammateId).map((teammate) => teammate.name)}
           onCancel={() => {
             setFolderNotice(undefined)
             setEditingTeammate(undefined)

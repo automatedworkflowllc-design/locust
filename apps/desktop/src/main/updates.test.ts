@@ -207,3 +207,32 @@ describe('what the app does about a new version', () => {
     expect(seen.join(' ')).not.toContain('secret')
   })
 })
+
+/*
+ * A download that fails is a line in Settings, never the crash dialog
+ * (2026-09-24: a release published before its installer was up gave Colin
+ * "Locust hit a problem" for a 404). Vitest fails a test on an unhandled
+ * rejection, so this test failing is the dialog.
+ */
+describe('a download that fails', () => {
+  it('is said as a download that failed, and nothing is left unhandled', async () => {
+    const failed = Promise.reject(new Error('Cannot download ... status 404'))
+    const updater = fakeUpdater({
+      checkForUpdates: async () => ({ updateInfo: { version: '0.6.0' }, isUpdateAvailable: true, downloadPromise: failed })
+    })
+    const service = createUpdateService({ updater, currentVersion: '0.5.0', supported: true, liveMissionCount: () => 0, requestQuit: () => undefined })
+    await service.check()
+    // The updater's own report of the failure, as electron-updater sends it.
+    updater.listeners.get('error')?.(new Error('Cannot download ... status 404'))
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(service.state()).toMatchObject({ phase: 'failed', message: 'The update could not be downloaded. Locust will try again at its next check.' })
+  })
+
+  it('keeps the check\'s own sentence for a check that failed', async () => {
+    const updater = fakeUpdater()
+    const service = createUpdateService({ updater, currentVersion: '0.5.0', supported: true, liveMissionCount: () => 0, requestQuit: () => undefined })
+    updater.listeners.get('error')?.(new Error('offline'))
+    expect(service.state()).toMatchObject({ phase: 'failed', message: 'The update check could not complete.' })
+  })
+})
+

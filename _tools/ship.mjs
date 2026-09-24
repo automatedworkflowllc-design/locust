@@ -282,18 +282,21 @@ if (failed === 0 && !checkOnly) {
  * there yet, or one without its block map -- a full download. A draft is
  * invisible to the channel until every file is on it.
  */
+/*
+ * ONE COMMAND TO PUBLISH, AND IT CHECKS (2026-09-24). The steps below used
+ * to be typed as a chain of gh calls, each piped to `tail`, and a stalled
+ * installer upload that was stopped let the chain publish 0.325.0 with no
+ * installer: every checking Locust got a 404. publish-release.mjs uploads one
+ * file per call with its own exit code, reads the draft back, and publishes
+ * only when every file is on it whole -- then checks the installer answers.
+ */
 console.log(
   failed === 0
     ? `\nReady to release ${version}.\n\n`
-      + `  gh release create ${version} --repo automatedworkflowllc-design/locust-releases --draft --prerelease \\\n`
-      + `    --title ${version} --notes "..." Locust-${version}-setup.exe.blockmap\n`
-      + `  gh release upload ${version} Locust-${version}-setup.exe --repo ... --clobber\n`
-      + `  gh release upload ${version} Locust-Setup.exe --repo ... --clobber\n`
-      + `  gh release upload ${version} latest.yml --repo ... --clobber\n`
-      + `  gh release edit ${version} --repo ... --draft=false   # a PRERELEASE: only every-build copies take it\n`
-      + `  # once a day, the build testers get:  node _tools/promote-release.mjs <version>\n`
+      + `  node _tools/publish-release.mjs ${version} --notes "..."   # uploads, reads back, publishes, checks\n`
       + `  node _tools/publish-changelog.mjs      # the app and the site both read this\n`
       + `  node _smoke/update-smoke.mjs\n`
+      + `  Never chain gh through a pipe: a pipe reports the last command's exit, not gh's.\n`
     : `\n${String(failed)} check(s) failed AFTER packaging. Do not publish this.\n`
 )
 process.exit(failed === 0 ? 0 : 1)

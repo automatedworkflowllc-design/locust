@@ -11,6 +11,20 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.326.0 - 2026-09-24
+
+### Fixed
+
+- **A failed update download is no longer "Locust hit a problem".** When
+  an update could not be downloaded, Locust showed its crash message. It
+  now says so quietly in Settings -- "The update could not be downloaded" --
+  and tries again at its next check.
+- **Two teammates can no longer share a name.** A message addressed to a
+  name two teammates had reached neither; the New teammate and Edit
+  dialogs now say the name is taken before you save.
+- **A reply to a busy Antigravity teammate waits for them** instead of
+  being dropped, as it already did for every other agent.
+
 ## 0.325.0 - 2026-09-24
 
 ### Fixed

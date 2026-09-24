@@ -43,7 +43,7 @@ import { MAX_ATTACHMENTS } from '../shared/attachments.js'
 import { ATTACHMENT_DIR, attachmentDestination, excludeWith } from './attach-outside.js'
 import { imageMediaType, MAX_PREVIEW_BYTES } from '../shared/image-files.js'
 import { isViewableText, MAX_TEXT_BYTES, viewerMode } from '../shared/text-files.js'
-import { createTeammateStore, isTeammateRoute } from './teammate-store.js'
+import { createTeammateStore, TeammateNameTakenError, isTeammateRoute } from './teammate-store.js'
 import { createRoutineStore } from './routine-store.js'
 import { createRoomStore, exchangeOfRoomPost } from './room-store.js'
 import { createRoomTasks } from './room-tasks.js'
@@ -82,7 +82,7 @@ import { boundedShutdown } from './bounded-shutdown.js'
 import { createPermissionHost } from './permission-host.js'
 import { isInsideDirectory, readRememberedWorkspace, resolveWorkspacePath, WORKSPACE_ARGUMENT, writeRememberedWorkspace, workspaceIdFor } from './workspace.js'
 import { createAntigravityHostProbe } from './antigravity-host.js'
-import { AntigravityStartError, createAntigravityMissionService } from './antigravity-mission.js'
+import { AntigravityStartError, antigravityStartRefusal, createAntigravityMissionService } from './antigravity-mission.js'
 import type { Relay } from './relay.js'
 import { createRuntimeDiscoveryService, RUNTIME_DISCOVERY_CHANNEL } from './runtime-discovery.js'
 import { bootOutcome, createDiscoveryLog } from './discovery-log.js'
@@ -1981,10 +1981,9 @@ if (!ownsSingleInstanceLock) {
             })
             return { ok: true, data: antigravityStartData(mission) } as const
           } catch (error) {
-            return {
-              ok: false,
-              error: { code: 'RUNTIME_START_FAILED', message: error instanceof Error ? error.message : 'Antigravity could not start the mission.' }
-            } as const
+            // A2.19: busy is BUSY on Antigravity too, so the relay holds the
+            // reply instead of dropping it (antigravityStartRefusal).
+            return antigravityStartRefusal(error)
           }
         }
         return codexMissions.start(
@@ -2999,9 +2998,12 @@ if (!ownsSingleInstanceLock) {
         if (!isTeammateRoute(input.route)) return { ok: true, data: { teammate } } as const
         await teammates.rememberRoute(teammate.teammateId, input.route)
         return { ok: true, data: { teammate: { ...teammate, route: input.route } } } as const
-      } catch {
+      } catch (error) {
         // The store's own validation is the authority; the renderer is told
-        // that it was refused, never why in terms it could probe.
+        // that it was refused, never why in terms it could probe -- except a
+        // name another teammate has (A2.18), which the window already knows
+        // and which is the one refusal a person can fix from the sentence.
+        if (error instanceof TeammateNameTakenError) return teammateRejected(error.message)
         return teammateRejected('That teammate could not be created. Check the name, hue and role.')
       }
     })
@@ -3024,7 +3026,8 @@ if (!ownsSingleInstanceLock) {
         if (!isTeammateRoute(input.route)) return { ok: true, data: { teammate } } as const
         await teammates.rememberRoute(teammate.teammateId, input.route)
         return { ok: true, data: { teammate: { ...teammate, route: input.route } } } as const
-      } catch {
+      } catch (error) {
+        if (error instanceof TeammateNameTakenError) return teammateRejected(error.message)
         return teammateRejected('That teammate could not be updated. Check the name, hue and role.')
       }
     })

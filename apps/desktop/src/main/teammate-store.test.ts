@@ -413,6 +413,9 @@ describe('teammate faces', () => {
   it('seeds a face from the id, never the name', async () => {
     const { store: teammates } = await store()
     const first = await teammates.create({ name: 'Wren', hue: 'lime', role: 'Code & Migrations' })
+    // Two teammates may not share a name at once (A2.18), so the same name
+    // comes back as a new teammate: removed, then made again.
+    await teammates.remove(first.teammateId)
     const second = await teammates.create({ name: 'Wren', hue: 'lime', role: 'Code & Migrations' })
     expect(first.avatar).toEqual(seedAvatar(first.teammateId))
     expect(second.avatar).toEqual(seedAvatar(second.teammateId))

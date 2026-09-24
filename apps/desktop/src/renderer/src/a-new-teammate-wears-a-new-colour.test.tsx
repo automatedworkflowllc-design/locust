@@ -31,3 +31,24 @@ describe("a new teammate's colour", () => {
     expect(edit).toMatch(/aria-checked="true"[^>]*aria-label="Rose"|aria-label="Rose"[^>]*aria-checked="true"/)
   })
 })
+
+/*
+ * A2.18: a name another teammate has is said in the dialog, and Save waits
+ * for another -- two teammates sharing a name cannot be told apart by the
+ * name a message is addressed to.
+ */
+describe("a new teammate's name", () => {
+  const noop = (): void => undefined
+  const wren = { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: '2026-09-23T05:00:00.000Z', avatar: { headwear: 0, accessory: 0, mouth: 0 } } as never
+
+  it('says when it is taken, and will not save it', () => {
+    const clash = renderToStaticMarkup(<NewTeammateDialog error={undefined} mode="accept-edits" initial={wren} takenNames={['wren']} onCancel={noop} onCreate={noop} />)
+    expect(clash).toContain('Another teammate is already called wren.')
+    expect(clash).toMatch(/<button[^>]*class="lc-primarybutton"[^>]*disabled=""|<button[^>]*disabled=""[^>]*class="lc-primarybutton"/)
+  })
+
+  it('says nothing about a name nobody else has', () => {
+    const free = renderToStaticMarkup(<NewTeammateDialog error={undefined} mode="accept-edits" initial={wren} takenNames={['Booty']} onCancel={noop} onCreate={noop} />)
+    expect(free).not.toContain('already called')
+  })
+})

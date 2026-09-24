@@ -144,7 +144,38 @@ export interface AntigravityMissionService {
   dispose(): Promise<void>
 }
 
-export class AntigravityStartError extends Error {}
+/**
+ * Why an Antigravity mission did not start.
+ *
+ * `busy` marks the two refusals that waiting fixes (A2.19): this teammate is
+ * mid-run, or every Antigravity slot is taken (`pool`). The relay HOLDS a
+ * reply for a busy recipient and starts it when a run ends; told only the
+ * sentence, it refused the reply as if Antigravity could not take it.
+ */
+export class AntigravityStartError extends Error {
+  constructor(message: string, readonly busy?: 'teammate' | 'pool') {
+    super(message)
+  }
+}
+
+/**
+ * A failed Antigravity start, as the relay reads a start (A2.19): busy is
+ * RUN_ALREADY_ACTIVE -- `pool` when every slot is taken -- so the reply is
+ * held and started when a run ends, the same as for every other runtime;
+ * anything else is a start that failed.
+ */
+export function antigravityStartRefusal(error: unknown): {
+  readonly ok: false
+  readonly error: { readonly code: 'RUN_ALREADY_ACTIVE' | 'RUNTIME_START_FAILED'; readonly message: string; readonly busy?: 'pool' }
+} {
+  if (error instanceof AntigravityStartError && error.busy !== undefined) {
+    return { ok: false, error: { code: 'RUN_ALREADY_ACTIVE', message: error.message, ...(error.busy === 'pool' ? { busy: 'pool' as const } : {}) } }
+  }
+  return {
+    ok: false,
+    error: { code: 'RUNTIME_START_FAILED', message: error instanceof Error ? error.message : 'Antigravity could not start the mission.' }
+  }
+}
 
 /** The tier a chosen model maps to. `account-default` and anything unknown is flash. */
 export function antigravityTier(model: string | undefined): AntigravityTier {
@@ -581,11 +612,12 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
       const owner = ownerKeyOf(peer)
       if (starting.has(owner) || [...runs.values()].some((run) => ownerKeyOf(run.peer) === owner)) {
         throw new AntigravityStartError(
-          peer === undefined ? 'A mission is already running.' : `${peer.self.name} already has a mission running. Wait for it to finish or stop it first.`
+          peer === undefined ? 'A mission is already running.' : `${peer.self.name} already has a mission running. Wait for it to finish or stop it first.`,
+          'teammate'
         )
       }
       if (starting.size + runs.size + (options.liveElsewhere ?? (() => 0))() >= MAX_LIVE_ANTIGRAVITY_MISSIONS) {
-        throw new AntigravityStartError(`Up to ${String(MAX_LIVE_ANTIGRAVITY_MISSIONS)} Antigravity missions can run at once.`)
+        throw new AntigravityStartError(`Up to ${String(MAX_LIVE_ANTIGRAVITY_MISSIONS)} Antigravity missions can run at once.`, 'pool')
       }
       starting.add(owner)
       try {
