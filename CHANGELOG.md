@@ -11,6 +11,19 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.329.0 - 2026-09-24
+
+### Improved
+
+- **Switching a conversation to another coding agent carries more of it.**
+  The new agent is told the conversation's earlier turns, not only the
+  last, and what the previous one did in plain words ("command: npm test")
+  instead of internal ids.
+- **A handed-over room task comes with a handover.** A teammate handing a
+  task over is asked to tell the new owner what was done, how it was
+  checked and what is left; if they say nothing, the new owner's board row
+  says so.
+
 ## 0.328.0 - 2026-09-24
 
 ### Improved
