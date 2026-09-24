@@ -589,12 +589,65 @@ export function codexAppServerPolicy(
  */
 export function createCodexAppServerCommand(
   executable: ExecutableLaunch,
-  options: { readonly workspacePath: string; readonly sandbox?: MissionSandbox },
+  options: {
+    readonly workspacePath: string;
+    readonly sandbox?: MissionSandbox;
+    /** The CLI's own version, as discovered; decides whether the plan tool is switched on. */
+    readonly cliVersion?: string;
+  },
 ): RuntimeCommandSpec {
-  return baseSpec("codex", executable, options.workspacePath, ["app-server"], {
-    sandbox: sandboxArgument(options.sandbox),
-    stdin: "protocol",
-  });
+  return baseSpec(
+    "codex",
+    executable,
+    options.workspacePath,
+    ["app-server", ...codexPlanToolArguments(options.cliVersion)],
+    {
+      sandbox: sandboxArgument(options.sandbox),
+      stdin: "protocol",
+    },
+  );
+}
+
+/**
+ * THE PLAN TOOL, SWITCHED ON (0.304).
+ *
+ * Colin, 2026-09-23, on a Codex reply that opened with a typed "TODO" list of
+ * "In progress: ..." and "Pending: ..." lines: "planui looks like its failing
+ * in here in a codex chart". Codex 0.153 offers its `update_plan` tool only
+ * when its config says `tools.update_plan.enabled`, and nothing said so. The
+ * model, briefed to keep a todo list with its own tool, had no such tool and
+ * typed the list into its reply instead -- no `turn/plan/updated` ever came,
+ * so the plan panel had nothing to draw. The session's own log (GPT-5.6-Sol,
+ * code mode) never once mentions update_plan.
+ *
+ * MEASURED 2026-09-24 (_tools/probe-codex-plan-tool.mjs, one GPT-5.6-Luna
+ * turn each way, Locust's own todo sentence): on 0.153.0 and 0.156.1 alike,
+ * no plan update without the setting; with it, three, every step with its
+ * status, and no list typed into the reply. Only from 0.153.0 up: older
+ * builds were never measured with it, and one that read `tools.update_plan`
+ * as something else could refuse its own configuration.
+ */
+export const CODEX_PLAN_TOOL_FROM = "0.153.0";
+
+export function codexPlanToolArguments(cliVersion: string | undefined): readonly string[] {
+  return cliVersion !== undefined && versionAtLeast(cliVersion, CODEX_PLAN_TOOL_FROM)
+    ? ["-c", "tools.update_plan.enabled=true"]
+    : [];
+}
+
+/** `major.minor.patch` compared as numbers; anything unreadable is not at least anything. */
+function versionAtLeast(version: string, floor: string): boolean {
+  const parse = (text: string): readonly number[] | undefined => {
+    const match = /^v?(\d+)\.(\d+)\.(\d+)/.exec(text.trim());
+    return match === null ? undefined : [Number(match[1]), Number(match[2]), Number(match[3])];
+  };
+  const have = parse(version);
+  const need = parse(floor);
+  if (have === undefined || need === undefined) return false;
+  for (let index = 0; index < 3; index += 1) {
+    if (have[index]! !== need[index]!) return have[index]! > need[index]!;
+  }
+  return true;
 }
 
 export function createCodexExecCommand(

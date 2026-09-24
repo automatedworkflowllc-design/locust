@@ -1263,7 +1263,10 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               : codexStreams
               ? createCodexAppServerCommand(executable, {
                   workspacePath: runCwd,
-                  sandbox: effectiveSandbox
+                  sandbox: effectiveSandbox,
+                  // Switches Codex's plan tool on, so its plan reaches the
+                  // panel rather than being typed into the reply (0.304).
+                  ...(chosen?.version?.version === undefined ? {} : { cliVersion: chosen.version.version })
                 })
               : createCodexExecCommand(executable, {
                   workspacePath: runCwd,

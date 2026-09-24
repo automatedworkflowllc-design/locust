@@ -23,10 +23,10 @@ import type { Release, SavedUpdates } from './runtime-updates.js'
  * agent's models live; Codex CLI 0.153.0 listed GPT-6-Astra and 0.156.1 adds
  * GPT-6-Sol and GPT-6-Luna -- and Codex, from npm, never updates itself.
  *
- * And it ASKS FIRST (0.303): Codex's update is a 159 MB download, and 0.302
- * started it by itself -- a beta tester's whole connection went, mid-call,
- * "when I sent the prompt". The look stays automatic; the download is the
- * person's, unless they turn updating on its own on.
+ * 0.303 made it ask first, suspecting the 159 MB download for a beta
+ * tester's dropped connection; the drops went on, only on Codex runs, and
+ * Colin: "automatic updating for the models should be fine". So 0.304 updates
+ * on its own again by default, and asks only when the person turned that off.
  */
 
 const ROOT = 'C:\\Users\\me\\AppData\\Roaming\\npm\\node_modules'
@@ -123,7 +123,8 @@ describe('a scripted launch', () => {
 describe('what is kept on disk', () => {
   it('reads back what was written, and nothing else', () => {
     const saved: SavedUpdates = {
-      automatic: true,
+      automatic: false,
+      chosen: true,
       checkedAt: NOW,
       latest: { '@openai/codex': released('0.156.1', 14) },
       last: { codex: { kind: 'updated', from: '0.153.0', to: '0.156.1', at: '2026-09-24T11:00:00.000Z' } }
@@ -133,14 +134,17 @@ describe('what is kept on disk', () => {
     expect(savedUpdatesFrom('nonsense')).toBeUndefined()
   })
 
-  it("starts off again for a 0.302 install, whose 'on' was a default nobody chose", () => {
-    expect(NOTHING_SAVED.automatic).toBe(false)
-    expect(savedUpdatesFrom({ enabled: true, checkedAt: NOW })?.automatic).toBe(false)
+  it('updates on its own unless the person turned that off -- a default 0.303 saved is not a choice', () => {
+    expect(NOTHING_SAVED.automatic).toBe(true)
+    expect(savedUpdatesFrom({ automatic: false, checkedAt: NOW })?.automatic).toBe(true)
+    expect(savedUpdatesFrom({ enabled: false, checkedAt: NOW })?.automatic).toBe(true)
+    expect(savedUpdatesFrom({ automatic: false, chosen: true, checkedAt: NOW })?.automatic).toBe(false)
   })
 })
 
 describe('keeping current, end to end on fakes', () => {
-  const AUTOMATIC: SavedUpdates = { ...NOTHING_SAVED, automatic: true }
+  const AUTOMATIC: SavedUpdates = NOTHING_SAVED
+  const ASKS: SavedUpdates = { ...NOTHING_SAVED, automatic: false, chosen: true }
   const run = (setup: { saved?: SavedUpdates; inUse?: boolean; latest?: Release; installOk?: boolean; discovered?: RuntimeDiscovery }) => {
     const calls = { latest: 0, installs: [] as string[], updated: 0, inUse: 0 }
     let saved = setup.saved
@@ -172,8 +176,8 @@ describe('keeping current, end to end on fakes', () => {
     return { updates, calls, saved: () => saved }
   }
 
-  it('by default only looks: 0.156.1 is out, and nothing is downloaded until the person asks', async () => {
-    const { updates, calls } = run({})
+  it('turned off, only looks: 0.156.1 is out, and nothing is downloaded until the person asks', async () => {
+    const { updates, calls } = run({ saved: ASKS })
     await updates.tick()
     expect(calls.latest).toBe(1)
     expect(calls.inUse).toBe(0)
@@ -182,7 +186,7 @@ describe('keeping current, end to end on fakes', () => {
   })
 
   it('updates when the person presses Update, and asks for the models again', async () => {
-    const { updates, calls } = run({})
+    const { updates, calls } = run({ saved: ASKS })
     await updates.tick()
     await updates.updateNow('codex')
     expect(calls.installs).toEqual(['codex@0.156.1'])
@@ -191,15 +195,15 @@ describe('keeping current, end to end on fakes', () => {
   })
 
   it('does not update on the press while something is using it, and says why', async () => {
-    const { updates, calls } = run({ inUse: true })
+    const { updates, calls } = run({ saved: ASKS, inUse: true })
     await updates.tick()
     await updates.updateNow('codex')
     expect(calls.installs).toEqual([])
     expect((await updates.state()).agents[0]?.status).toEqual({ kind: 'waiting', version: '0.156.1', why: 'in use' })
   })
 
-  it('turned on, looks, finds 0.156.1, updates Codex, and asks for the models again', async () => {
-    const { updates, calls, saved } = run({ saved: AUTOMATIC })
+  it('by default looks, finds 0.156.1, updates Codex, and asks for the models again', async () => {
+    const { updates, calls, saved } = run({})
     await updates.tick()
     expect(calls.installs).toEqual(['codex@0.156.1'])
     expect(calls.updated).toBe(1)

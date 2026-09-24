@@ -41,9 +41,10 @@ export function offersUpdate(view: RuntimeUpdateView | undefined): boolean {
 }
 
 /**
- * The switch's own sentence. Off by default since 0.303: an update is a big
- * download (Codex CLI's was 159 MB), and one started by itself took a beta
- * tester's whole connection in the middle of a call.
+ * The switch's own sentence, saying what an update costs either way: Codex
+ * CLI's was 159 MB. On by default (0.304; 0.303 had it off, suspecting the
+ * download for a beta tester's dropped connection -- the drops went on, only
+ * on Codex runs).
  */
 export function keepCurrentNote(automatic: boolean): string {
   return automatic

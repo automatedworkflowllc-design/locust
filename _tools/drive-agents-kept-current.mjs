@@ -1,6 +1,6 @@
 // Does Locust keep Codex current by itself -- and do the new models show up?
 //
-//   node _tools/drive-agents-kept-current.mjs [--packaged <exe>] [--tag <name>]
+//   node _tools/drive-agents-kept-current.mjs [--packaged <exe>] [--tag <name>] [--ask]
 //
 // Colin, 2026-09-23: "new gpt-6 models released we need those added", then
 // "is there a way to make it so the models will automatically update without
@@ -14,12 +14,12 @@
 // never updates an agent (mayUpdateAgents); LOCUST_UPDATE_AGENTS=1 lets this
 // one. Nothing is sent; nothing is spent.
 //
-// ASK FIRST (0.303): Codex's update is a 159 MB download, and 0.302 started it
-// by itself -- a beta tester's whole connection went, mid-call. So first the
-// drive waits past the first look and checks NOTHING was downloaded: the row
-// says a newer version is out and offers Update. Then it presses Update, the
-// way a person would, and reads the result where a person would: the row, the
-// scratch CLI's own version, and the model picker.
+// By default it updates on its own (0.304, as 0.302 did): the drive waits for
+// the update to land by itself. With --ask, updating on its own is switched
+// off first (0.303's ask-first, now a choice): the drive waits past the first
+// look, checks NOTHING was downloaded and that the row offers Update, and
+// presses it. Either way it then reads the result where a person would: the
+// row, the scratch CLI's own version, and the model picker.
 
 import { execFile } from 'node:child_process'
 import { mkdir, mkdtemp } from 'node:fs/promises'
@@ -30,7 +30,8 @@ import { say, sleep, scratchRepository, startDrive } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
-const tag = arg('--tag') ?? (packaged === undefined ? 'local' : 'packaged')
+const ASK = process.argv.includes('--ask')
+const tag = arg('--tag') ?? `${packaged === undefined ? 'local' : 'packaged'}${ASK ? '-ask' : ''}`
 const OUT = join(new URL('../docs/beta-fixes-2026-09-23/', import.meta.url).pathname.slice(1), `agents-kept-current-${tag}`)
 await mkdir(OUT, { recursive: true })
 
@@ -90,55 +91,68 @@ try {
   await drive.ready()
   await drive.resize(1215, 800)
 
-  // Past the first look (45 s after launch): it has looked, and downloaded nothing.
   const read = async () => JSON.parse(String(await drive.evaluate(`(async () => {
     if (typeof window.desktop.readRuntimeUpdates !== 'function') return JSON.stringify({ missing: true })
     return JSON.stringify(await window.desktop.readRuntimeUpdates())
   })()`)))
-  let looked
-  for (let waited = 0; waited < 120_000; waited += 3000) {
-    await sleep(3000)
+  const settle = async (limitMs) => {
+    let settled
+    for (let waited = 0; waited < limitMs; waited += 3000) {
+      await sleep(3000)
+      settled = await read()
+      if (settled.missing) break
+      const codex = (settled.agents ?? []).find((agent) => agent.runtime === 'codex')
+      if (codex !== undefined && (codex.status.kind === 'updated' || codex.status.kind === 'failed')) break
+    }
+    return settled
+  }
+  if (!ASK) {
+    // It updates on its own: the first look is 45 s after launch.
+    const settled = await settle(360_000)
+    const codex = (settled?.agents ?? []).find((agent) => agent.runtime === 'codex')
+    check('Locust updated Codex by itself', codex?.status.kind === 'updated' && codex.status.to === '0.156.1', JSON.stringify(codex?.status ?? settled))
+  } else {
+    await drive.evaluate(`window.desktop.setRuntimeUpdates(false)`)
+    // Past the first look (45 s after launch): it has looked, and downloaded nothing.
+    let looked
+    for (let waited = 0; waited < 120_000; waited += 3000) {
+      await sleep(3000)
+      looked = await read()
+      if (looked.missing || (looked.agents ?? []).some((agent) => agent.runtime === 'codex')) break
+    }
+    await sleep(15_000)
     looked = await read()
-    if (looked.missing || (looked.agents ?? []).some((agent) => agent.runtime === 'codex')) break
-  }
-  await sleep(15_000)
-  looked = await read()
-  say(`after the first look: ${JSON.stringify(looked)}`)
-  const waiting = (looked.agents ?? []).find((agent) => agent.runtime === 'codex')
-  check('it looked, found 0.156.1, and is waiting for the person', waiting?.status.kind === 'waiting' && waiting.status.why === 'ask' && waiting.status.version === '0.156.1', JSON.stringify(waiting?.status ?? looked))
-  const untouched = await scratchVersion()
-  check('and downloaded nothing by itself', /0\.153\.0/.test(untouched), untouched)
+    say(`after the first look: ${JSON.stringify(looked)}`)
+    const waiting = (looked.agents ?? []).find((agent) => agent.runtime === 'codex')
+    check('it looked, found 0.156.1, and is waiting for the person', waiting?.status.kind === 'waiting' && waiting.status.why === 'ask' && waiting.status.version === '0.156.1', JSON.stringify(waiting?.status ?? looked))
+    const untouched = await scratchVersion()
+    check('and downloaded nothing by itself', /0\.153\.0/.test(untouched), untouched)
 
-  // Where a person would see it: the Codex row, with Update on it. Pressed.
-  const offered = await drive.capture('Settings, the Codex row offering Update', () => drive.evaluate(`(async () => {
-    const tab = [...document.querySelectorAll('button')].find((b) => (b.getAttribute('title') ?? '').startsWith('Settings'))
-    tab?.click()
-    await new Promise((r) => setTimeout(r, 1200))
-    const page = [...document.querySelectorAll('button, a')].find((b) => /^Runtimes$/.test((b.textContent ?? '').trim()))
-    page?.click()
-    await new Promise((r) => setTimeout(r, 1200))
-    const codexRow = [...document.querySelectorAll('.lc-runtimerow')].find((r) => /Codex/.test(r.textContent ?? ''))
-    return codexRow ? codexRow.innerText.replace(/\\s+/g, ' ').trim() : 'no Codex row'
-  })()`))
-  await shoot('01-update-offered.png')
-  check('the Codex row says 0.156.1 is out and offers Update', /0\.156\.1 is out\./.test(String(offered)) && /Update/.test(String(offered)), String(offered))
-  const pressed = await drive.evaluate(`(() => {
-    const codexRow = [...document.querySelectorAll('.lc-runtimerow')].find((r) => /Codex/.test(r.textContent ?? ''))
-    const button = [...(codexRow?.querySelectorAll('button') ?? [])].find((b) => (b.textContent ?? '').trim() === 'Update')
-    button?.click()
-    return button ? 'pressed' : 'no Update button'
-  })()`)
-  say(`Update: ${String(pressed)}`)
+    // Where a person would see it: the Codex row, with Update on it. Pressed.
+    const offered = await drive.capture('Settings, the Codex row offering Update', () => drive.evaluate(`(async () => {
+      const tab = [...document.querySelectorAll('button')].find((b) => (b.getAttribute('title') ?? '').startsWith('Settings'))
+      tab?.click()
+      await new Promise((r) => setTimeout(r, 1200))
+      const page = [...document.querySelectorAll('button, a')].find((b) => /^Runtimes$/.test((b.textContent ?? '').trim()))
+      page?.click()
+      await new Promise((r) => setTimeout(r, 1200))
+      const codexRow = [...document.querySelectorAll('.lc-runtimerow')].find((r) => /Codex/.test(r.textContent ?? ''))
+      return codexRow ? codexRow.innerText.replace(/\\s+/g, ' ').trim() : 'no Codex row'
+    })()`))
+    await shoot('01-update-offered.png')
+    check('the Codex row says 0.156.1 is out and offers Update', /0\.156\.1 is out\./.test(String(offered)) && /Update/.test(String(offered)), String(offered))
+    const pressed = await drive.evaluate(`(() => {
+      const codexRow = [...document.querySelectorAll('.lc-runtimerow')].find((r) => /Codex/.test(r.textContent ?? ''))
+      const button = [...(codexRow?.querySelectorAll('button') ?? [])].find((b) => (b.textContent ?? '').trim() === 'Update')
+      button?.click()
+      return button ? 'pressed' : 'no Update button'
+    })()`)
+    say(`Update: ${String(pressed)}`)
 
-  let settled
-  for (let waited = 0; waited < 300_000; waited += 3000) {
-    await sleep(3000)
-    settled = await read()
-    const codex = (settled.agents ?? []).find((agent) => agent.runtime === 'codex')
-    if (codex !== undefined && (codex.status.kind === 'updated' || codex.status.kind === 'failed')) break
+    const settled = await settle(300_000)
+    const codex = (settled?.agents ?? []).find((agent) => agent.runtime === 'codex')
+    check('pressed, it updated Codex', codex?.status.kind === 'updated' && codex.status.to === '0.156.1', JSON.stringify(codex?.status ?? settled))
   }
-  const codex = (settled?.agents ?? []).find((agent) => agent.runtime === 'codex')
-  check('pressed, it updated Codex', codex?.status.kind === 'updated' && codex.status.to === '0.156.1', JSON.stringify(codex?.status ?? settled))
 
   // The new models, in the picker.
   const models = await drive.capture('the model picker', () => drive.evaluate(`(async () => {
@@ -172,6 +186,14 @@ try {
   })()`))
   await shoot('02-the-codex-row.png')
   check("the Codex row says it was updated, and shows the new version", /Updated from 0\.153\.0 to 0\.156\.1/.test(String(row)) && /0\.156\.1/.test(String(row)), String(row))
+  // The switch, as a person sees it: on unless they turned it off.
+  const onItsOwn = await drive.evaluate(`(() => {
+    const toggle = document.querySelector('button[role="switch"][aria-label="Update Codex CLI and Copilot CLI on their own"]')
+    const note = toggle?.closest('.lc-settingrow')?.querySelector('.lc-settings__note')?.textContent ?? ''
+    return JSON.stringify({ checked: toggle?.getAttribute('aria-checked') ?? 'no switch', note })
+  })()`)
+  const toggle = JSON.parse(String(onItsOwn))
+  check(ASK ? 'the switch reads off: updating when you press Update' : 'the switch reads on: updating on their own', ASK ? toggle.checked === 'false' && /^Updating when you press Update/.test(toggle.note) : toggle.checked === 'true' && /^Updating on their own/.test(toggle.note), String(onItsOwn))
 
   // The scratch CLI itself.
   const after = await scratchVersion()

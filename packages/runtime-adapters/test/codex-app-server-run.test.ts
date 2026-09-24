@@ -5,7 +5,12 @@ import {
   startCodexAppServerRun,
 } from "../src/codex-app-server-run.js";
 import type { AppServerRunProcess } from "../src/codex-app-server-run.js";
-import { codexAppServerPolicy, createCodexAppServerCommand } from "../src/commands.js";
+import {
+  assertSafeRuntimeCommand,
+  codexAppServerPolicy,
+  codexPlanToolArguments,
+  createCodexAppServerCommand,
+} from "../src/commands.js";
 import { createAppServerEventNormalizer } from "../src/app-server-events.js";
 import type { RuntimeJsonlRecord } from "../src/process-runner.js";
 
@@ -120,6 +125,24 @@ describe("the command that launches it", () => {
     expect(command.stdin).toBe("protocol");
     expect(command.sandbox).toBe("workspace-write");
     expect(command.cwd).toBe("/work");
+  });
+
+  // Codex 0.153 offers update_plan only when its config says so; without it
+  // a model briefed to keep a todo list typed one into its reply (2026-09-23).
+  it("switches the plan tool on from 0.153.0, where it was measured, and not below", () => {
+    const ON = ["-c", "tools.update_plan.enabled=true"];
+    expect(codexPlanToolArguments("0.153.0")).toEqual(ON);
+    expect(codexPlanToolArguments("0.156.1")).toEqual(ON);
+    expect(codexPlanToolArguments("1.0.0")).toEqual(ON);
+    expect(codexPlanToolArguments("0.152.9")).toEqual([]);
+    expect(codexPlanToolArguments("0.151.0-alpha.7.2")).toEqual([]);
+    expect(codexPlanToolArguments("not a version")).toEqual([]);
+    expect(codexPlanToolArguments(undefined)).toEqual([]);
+    for (const sandbox of ["read-only", "workspace-write", "full-access"] as const) {
+      const command = createCodexAppServerCommand(EXECUTABLE, { workspacePath: "/work", sandbox, cliVersion: "0.156.1" });
+      expect(command.args).toEqual(["app-server", ...ON]);
+      expect(() => assertSafeRuntimeCommand(command, sandbox)).not.toThrow();
+    }
   });
 });
 

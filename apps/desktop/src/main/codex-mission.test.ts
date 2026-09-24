@@ -2533,6 +2533,32 @@ describe('Codex over app-server', () => {
     ['turn/completed', { threadId: 'thread-live' }]
   ] as const
 
+  /*
+   * Colin, 2026-09-23: "planui looks like its failing in here in a codex
+   * chart" -- a Codex reply that typed its TODO list, because Codex 0.153
+   * offers its plan tool only when told to and Locust never told it. From
+   * 0.153 the server is started with the tool on; the fake runtime below the
+   * other tests is 0.151.0-alpha, which keeps plain `app-server`.
+   */
+  it("switches Codex's plan tool on from 0.153, so its plan reaches the panel rather than the reply", async () => {
+    const { spawn } = fakeAppServer(REPLY)
+    const start = vi.fn() satisfies RuntimeProcessRunner['start']
+    const createMission = vi.fn<MissionLedger['createMission']>(async () => undefined)
+    const older = codexRuntime()
+    const { service } = scheduledService({ start }, fakeLedger({ createMission }), {
+      appServerSpawn: spawn,
+      discover: async () => [{ ...older, version: { ...older.version!, raw: 'codex-cli 0.153.0', version: '0.153.0', minor: 153 } }]
+    })
+
+    const response = await service.start('How many files?', 'codex', 'accept-edits', {}, () => undefined)
+    expect(response.ok).toBe(true)
+    const withPlanTool = ['app-server', '-c', 'tools.update_plan.enabled=true']
+    expect(spawn.mock.calls[0]?.[1]).toEqual(withPlanTool)
+    expect(createMission).toHaveBeenCalledWith(expect.objectContaining({
+      command: expect.objectContaining({ args: withPlanTool })
+    }))
+  })
+
   it('launches a server rather than an exec, and turns its deltas into message events', async () => {
     const { spawn, written } = fakeAppServer(REPLY)
     const start = vi.fn() satisfies RuntimeProcessRunner['start']

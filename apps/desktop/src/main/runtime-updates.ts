@@ -49,6 +49,14 @@ import { runtimeInstallFacts } from '../shared/runtime-install.js'
  * says a newer version is out and offers Update. Updating on its own is a
  * switch they turn on, and it starts OFF -- a new saved key, so every 0.302
  * install that had it on by default starts off again.
+ *
+ * ON AGAIN BY DEFAULT (0.304). Colin: "automatic updating for the models
+ * should be fine, i dont think thats what knocked out his internet" -- and
+ * the tester's connection went again, and again only on Codex runs, which
+ * one download cannot explain. So it updates on its own unless the person
+ * turned that off; the Update button stays for anyone who does. Only a
+ * choice the person made is kept (`chosen`): 0.303 saved OFF for everyone
+ * who never touched the switch, and that is not a choice.
  */
 
 /**
@@ -91,9 +99,12 @@ export function savedUpdatesFrom(value: unknown): SavedUpdates | undefined {
       }
     }
   }
+  // What the person chose, when they chose; the default otherwise -- 0.303
+  // wrote `automatic: false` for everyone, and 0.302 its own `enabled`.
+  const chosen = record.chosen === true && typeof record.automatic === 'boolean'
   return {
-    // `automatic`, not 0.302's `enabled`: that was on for everyone by default.
-    automatic: record.automatic === true,
+    automatic: chosen ? record.automatic === true : NOTHING_SAVED.automatic,
+    chosen,
     checkedAt: typeof record.checkedAt === 'number' && Number.isFinite(record.checkedAt) ? record.checkedAt : undefined,
     latest,
     last
@@ -115,8 +126,10 @@ export interface Release {
 
 /** What is kept on disk between launches. */
 export interface SavedUpdates {
-  /** Updates without being asked. Off unless the person turned it on. */
+  /** Updates without being asked. On unless the person turned it off. */
   readonly automatic: boolean
+  /** Whether `automatic` is the person's own choice rather than the default. */
+  readonly chosen: boolean
   readonly checkedAt: number | undefined
   /** The newest release seen, by package. */
   readonly latest: Readonly<Record<string, Release>>
@@ -124,7 +137,7 @@ export interface SavedUpdates {
   readonly last: Readonly<Record<string, RuntimeUpdateStatus>>
 }
 
-export const NOTHING_SAVED: SavedUpdates = { automatic: false, checkedAt: undefined, latest: {}, last: {} }
+export const NOTHING_SAVED: SavedUpdates = { automatic: true, chosen: false, checkedAt: undefined, latest: {}, last: {} }
 
 /**
  * Newer, older or the same: dotted numbers compared as numbers, and a
@@ -305,7 +318,7 @@ export function createRuntimeUpdates(options: RuntimeUpdatesOptions): RuntimeUpd
       return { automatic: state.automatic, checkedAt: state.checkedAt === undefined ? undefined : new Date(state.checkedAt).toISOString(), agents: views }
     },
     async setAutomatic(automatic) {
-      await keep({ ...(await held()), automatic })
+      await keep({ ...(await held()), automatic, chosen: true })
       // Turned on, whatever was waiting on it goes now, not at the next look.
       if (automatic) void this.tick()
       return this.state()

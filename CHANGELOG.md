@@ -11,6 +11,28 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.304.0 - 2026-09-23
+
+### Improved
+
+- **Codex and Copilot update on their own again.** As in 0.302, Locust
+  keeps them current by itself: it looks for a newer version a while after
+  it opens, updates them when nothing is using them, and reads their models
+  again. Settings › Runtimes still has the Update button, and its switch
+  turns updating on their own off -- a choice Locust keeps.
+- **Updates to Locust are small now.** Every new version used to download
+  the whole installer, 117 MB, in the background. From the next update on,
+  Locust downloads only the parts that changed -- about 2 MB for a typical
+  release.
+
+### Fixed
+
+- **A Codex teammate's plan shows in the plan card.** Codex offers its
+  planning tool only when it is asked to, and Locust never asked -- so a
+  Codex teammate typed its to-do list into its reply instead, a "TODO" with
+  "In progress:" and "Pending:" lines. Now its steps appear in the plan card
+  and are ticked off as it works.
+
 ## 0.303.0 - 2026-09-23
 
 ### Fixed

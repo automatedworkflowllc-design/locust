@@ -30,6 +30,7 @@
 // packaged build from release/ rather than the installed one.
 
 import { spawn } from 'node:child_process'
+import { gunzipSync } from 'node:zlib'
 import { mkdtemp, mkdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -229,6 +230,35 @@ try {
   child.kill()
   await sleep(500)
   if (profile !== undefined) await rm(profile, { recursive: true, force: true }).catch(() => undefined)
+}
+
+/*
+ * THE BLOCK MAP (2026-09-23). An update downloads only the blocks that
+ * changed when the new release carries <installer>.blockmap -- about 2 MB
+ * of a 117 MB installer. Every release from at least v0.134 to 0.303 went
+ * out without it, so every update was the whole installer: eight in one day,
+ * the day a beta tester's connection kept dropping while Locust was open.
+ * The map must be there, whole, and describe the installer that is there.
+ */
+say('3. the newest release carries its block map')
+{
+  const channel = 'https://github.com/automatedworkflowllc-design/locust-releases/releases/latest/download'
+  const latest = await (await fetch(`${channel}/latest.yml`)).text()
+  const installer = (latest.match(/^path:\s*(\S+)/m) || [])[1]
+  const size = Number((latest.match(/^\s+size:\s*(\d+)/m) || [])[1])
+  const response = installer === undefined ? undefined : await fetch(`${channel}/${installer}.blockmap`)
+  let described
+  try {
+    const map = JSON.parse(gunzipSync(Buffer.from(await response.arrayBuffer())).toString())
+    described = map.files[0].sizes.reduce((sum, n) => sum + n, 0)
+  } catch {
+    described = undefined
+  }
+  check(
+    'the block map is published and describes the published installer',
+    response?.status === 200 && described === size,
+    `${installer ?? '(no installer in latest.yml)'}.blockmap: HTTP ${String(response?.status)}, describes ${String(described)} bytes of ${String(size)}`
+  )
 }
 
 console.error(failures === 0 ? '\nUPDATE SMOKE PASSED' : `\n${failures} UPDATE SMOKE FAILURE(S)`)
