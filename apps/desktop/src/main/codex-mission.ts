@@ -86,6 +86,8 @@ interface ActiveCodexMission {
   readonly controller: AbortController
   readonly normalizer: CodexEventNormalizer | ClaudeEventNormalizer
   readonly process: RuntimeProcessRun
+  /** Adds a message to the running turn without stopping it (A2.10); only an app-server run can. */
+  readonly steer: ((text: string) => Promise<boolean>) | undefined
   readonly emit: (update: CodexMissionUpdate) => void
   /**
    * Kept so a handoff can brief the next runtime. The ledger holds this too,
@@ -220,6 +222,12 @@ export interface CodexMissionService {
    * mission id would make the caller look the run back up.
    */
   runIdOwnedBy(teammateId: string): string | undefined
+  /**
+   * Show a running mission a message at its next step, without stopping it
+   * (A2.10). True when the runtime took it; false for a run that cannot be
+   * steered (every transport but Codex's app-server) or is no longer running.
+   */
+  steer(runId: string, text: string): Promise<boolean>
   interrupt(): void
   dispose(): Promise<void>
 }
@@ -1514,6 +1522,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
 
         let diskBefore: WorkspaceSnapshot | undefined
         let process: RuntimeProcessRun
+        let steer: ((text: string) => Promise<boolean>) | undefined
         try {
           // The prompt the runtime is sent is the person's words plus their
           // teammates' messages; a runtime that takes it on the argv gets the
@@ -1542,7 +1551,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               mode === 'approve-each' && options.approvals !== undefined
                 ? options.approvals.requestHandlerFor({ runId, missionId, cwd: runCwd, changesByItem })
                 : undefined
-            process = startCodexAppServerRun({
+            const streamed = startCodexAppServerRun({
               spawn: options.appServerSpawn!,
               command,
               prompt: runtimePrompt,
@@ -1555,6 +1564,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               signal: controller.signal,
               now
             })
+            process = streamed
+            steer = streamed.steer
           } else {
             process = options.runner.start(command, runtimePrompt, { signal: controller.signal })
           }
@@ -1590,6 +1601,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           controller,
           normalizer,
           process,
+          steer,
           emit,
           prompt,
           runtime,
@@ -1903,6 +1915,16 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
 
     hasMission(missionId: string): boolean {
       return [...active.values()].some((mission) => mission.missionId === missionId)
+    },
+
+    async steer(runId: string, text: string): Promise<boolean> {
+      const mission = active.get(runId)
+      if (mission?.steer === undefined) return false
+      try {
+        return await mission.steer(text)
+      } catch {
+        return false
+      }
     },
 
     runIdOwnedBy(teammateId: string): string | undefined {

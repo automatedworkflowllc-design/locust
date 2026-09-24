@@ -2773,6 +2773,68 @@ describe('stopping a Codex run over app-server', () => {
   })
 })
 
+/*
+ * A2.10: a running Codex turn is shown a message at its next step, not
+ * stopped. The service steers the run it holds, on that run's own thread and
+ * turn; a run on any other transport cannot be steered and says so.
+ */
+describe('steering a Codex run over app-server', () => {
+  it('sends the message into the running turn, and the run keeps going', async () => {
+    let emit: (chunk: string) => void = () => undefined
+    const written: Record<string, unknown>[] = []
+    const spawn = vi.fn(() => ({
+      write: (line: string) => {
+        for (const part of line.split('\n')) {
+          if (part.trim().length === 0) continue
+          const message = JSON.parse(part) as Record<string, unknown>
+          written.push(message)
+          if (typeof message.id !== 'number') continue
+          const answer = message.method === 'thread/start'
+            ? { thread: { id: 'thread-live' } }
+            : message.method === 'turn/start'
+              ? { turn: { id: 'turn-1' } }
+              : message.method === 'turn/steer'
+                ? { turnId: 'turn-1' }
+                : { userAgent: 'codex' }
+          queueMicrotask(() => {
+            emit(`${JSON.stringify({ jsonrpc: '2.0', id: message.id, result: answer })}\n`)
+            if (message.method !== 'turn/start') return
+            queueMicrotask(() => {
+              emit(`${JSON.stringify({ jsonrpc: '2.0', method: 'item/agentMessage/delta', params: { itemId: 'm1', delta: '1. ' } })}\n`)
+            })
+          })
+        }
+      },
+      kill: () => undefined,
+      onData: (listener: (chunk: string) => void) => {
+        emit = listener
+      },
+      onExit: () => undefined
+    }))
+    const { service, scheduled } = scheduledService({ start: vi.fn() }, fakeLedger(), { appServerSpawn: spawn })
+    const updates: CodexMissionUpdate[] = []
+    const response = await service.start('Count to 200.', 'codex', 'accept-edits', {}, (update) => {
+      updates.push(update)
+    })
+    scheduled[0]?.()
+    await vi.waitFor(() => {
+      expect(updates.some((update) => update.kind === 'event' && update.event.type === 'message.delta')).toBe(true)
+    })
+    const runId = response.ok ? response.data.runId : ''
+
+    expect(await service.steer(runId, 'Stop editing app.ts.')).toBe(true)
+    expect(written.find((message) => message.method === 'turn/steer')?.params).toEqual({
+      threadId: 'thread-live',
+      expectedTurnId: 'turn-1',
+      input: [{ type: 'text', text: 'Stop editing app.ts.' }]
+    })
+    // Not stopped: still live, nothing cancelled.
+    expect(service.liveMissionIds()).toHaveLength(1)
+    expect(updates.some((update) => update.kind === 'event' && update.event.type === 'run.cancelled')).toBe(false)
+    expect(await service.steer('run_nobody', 'anyone?')).toBe(false)
+  })
+})
+
 /**
  * Approve-each, on the same loop as every other mode.
  *

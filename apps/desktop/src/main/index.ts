@@ -2089,6 +2089,11 @@ if (!ownsSingleInstanceLock) {
         if (antigravityRun !== undefined) return antigravityMissions.cancel(antigravityRun)
         return false
       },
+      // A2.10: a running Codex (app-server) turn is shown the message at its next step instead.
+      steerWorkOf: async (teammateId, text) => {
+        const codexRun = codexMissions.runIdOwnedBy(teammateId)
+        return codexRun === undefined ? false : codexMissions.steer(codexRun, text)
+      },
       notify: sendToWindow
     })
 

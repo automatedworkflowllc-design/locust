@@ -79,7 +79,15 @@ export interface CodexAppServerRunOptions {
  * back. A JSON round-trip per notification costs nothing beside the fsync the
  * ledger pays for the same batch.
  */
-export type CodexAppServerRun = RuntimeProcessRun;
+export type CodexAppServerRun = RuntimeProcessRun & {
+  /**
+   * Add a message to the turn that is running, WITHOUT stopping it (A2.10):
+   * `turn/steer`, which Codex's app-server takes at the turn's next step.
+   * True once the server accepted it; false when there is no turn to steer
+   * (not started yet, or ended) or the server refused.
+   */
+  steer(text: string): Promise<boolean>;
+};
 
 const DEFAULT_HANDSHAKE_TIMEOUT_MS = 60_000;
 const DEFAULT_MAX_QUEUED_RECORDS = 4096;
@@ -175,6 +183,14 @@ export function startCodexAppServerRun(
     settleCompletion = resolve;
   });
   let settled = false;
+  /** The thread and the turn running on it, once the server has said them. */
+  let threadId: string | undefined;
+  let turnId: string | undefined;
+  const turnIdOf = (value: unknown): string | undefined => {
+    const turn = typeof value === "object" && value !== null ? (value as Record<string, unknown>).turn : undefined;
+    const id = typeof turn === "object" && turn !== null ? (turn as Record<string, unknown>).id : undefined;
+    return typeof id === "string" && id.length > 0 ? id : undefined;
+  };
 
   const child = options.spawn(options.command.executablePath, options.command.args);
 
@@ -225,6 +241,7 @@ export function startCodexAppServerRun(
         sequence: recordCount,
         raw: JSON.stringify({ method: notification.method, params: notification.params ?? null }),
       });
+      if (notification.method === "turn/started") turnId = turnIdOf(notification.params) ?? turnId;
       if (ENDING_METHODS.has(notification.method)) finish();
     },
     // The approval channel, when the mode has one. Under `never` nothing
@@ -285,8 +302,9 @@ export function startCodexAppServerRun(
     const inner = (typeof record.thread === "object" && record.thread !== null
       ? record.thread
       : {}) as Record<string, unknown>;
-    const threadId = typeof inner.id === "string" ? inner.id : undefined;
-    if (threadId === undefined) throw new Error("The runtime did not start a thread.");
+    const startedThread = typeof inner.id === "string" ? inner.id : undefined;
+    if (startedThread === undefined) throw new Error("The runtime did not start a thread.");
+    threadId = startedThread;
     // Route and effort are per-TURN parameters here rather than flags. Only a
     // plain word is passed as either: a malformed one is refused by the server
     // and takes the whole turn with it, which the person would read as the
@@ -299,13 +317,14 @@ export function startCodexAppServerRun(
       typeof options.effort === "string" && /^[a-z]{1,16}$/.test(options.effort)
         ? options.effort
         : undefined;
-    await client.request("turn/start", {
-      threadId,
+    const started = await client.request("turn/start", {
+      threadId: startedThread,
       approvalPolicy: options.approvalPolicy,
       input: [{ type: "text", text: options.prompt }],
       ...(model === undefined ? {} : { model }),
       ...(effort === undefined ? {} : { effort }),
     });
+    turnId = turnIdOf(started) ?? turnId;
   };
 
   const timeout = setTimeout(() => {
@@ -329,7 +348,21 @@ export function startCodexAppServerRun(
     client.dispose("The turn ended.");
   });
 
-  return { records, completion };
+  const steer = async (text: string): Promise<boolean> => {
+    if (settled || threadId === undefined || turnId === undefined || text.trim().length === 0) return false;
+    try {
+      await client.request("turn/steer", {
+        threadId,
+        expectedTurnId: turnId,
+        input: [{ type: "text", text }],
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  return { records, completion, steer };
 }
 
 /**

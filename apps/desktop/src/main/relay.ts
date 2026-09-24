@@ -470,6 +470,12 @@ export interface RelayOptions {
    * "make the wait short", never a second way to start a mission.
    */
   readonly stopWorkOf?: (teammateId: string) => Promise<boolean>
+  /**
+   * Show this teammate's running turn a message at its next step, WITHOUT
+   * stopping it (A2.10), and say whether the runtime took it. Only Codex's
+   * app-server can (`turn/steer`); every other runtime answers false.
+   */
+  readonly steerWorkOf?: (teammateId: string, text: string) => Promise<boolean>
   /** Reaches the window, addressed to the SENDER's run, so notices land in the thread that shared. */
   readonly notify: (update: CodexMissionUpdate) => void
   /**
@@ -908,6 +914,33 @@ export function createRelay(options: RelayOptions): Relay {
    * for and refused by a switch is exactly the case where silence reads as
    * the message never arriving.
    */
+  /**
+   * A2.10: SAFE-POINT DELIVERY. A message asked to be taken now is first
+   * offered to the recipient's running turn, at its next step -- which loses
+   * nothing, so it needs no switch -- and only a runtime that cannot take it
+   * that way falls back to being stopped, under the switch, as before. The
+   * message is still their next turn either way (the held reply is already
+   * queued): steering is a heads-up that arrives in time, not a second way to
+   * answer, so the hop cap and the answer's return are untouched.
+   */
+  const takeNowFor = async (recipient: MissionPeerContext, from: string, text: string, notice: (message: string) => void): Promise<void> => {
+    const shown = withoutProtocolBlocks(text).trim().slice(0, 2000)
+    let steered = false
+    try {
+      steered = shown.length > 0 && (await options.steerWorkOf?.(recipient.self.teammateId, [
+        `${from} sent you this while you were working, asking for it to be taken now: "${shown}"`,
+        'If it changes what you are doing, act on it before you go on. You will also get it as your next turn, to answer.'
+      ].join(' '))) === true
+    } catch {
+      steered = false
+    }
+    if (steered) {
+      notice(`${recipient.self.name} was shown this part-way through their run, without stopping it. It is also their next turn.`)
+      return
+    }
+    await interruptFor(recipient, notice)
+  }
+
   const interruptFor = async (recipient: MissionPeerContext, notice: (message: string) => void): Promise<void> => {
     let allowed = false
     try {
@@ -1246,7 +1279,7 @@ export function createRelay(options: RelayOptions): Relay {
              * and it cannot outrun the hop cap or the relay switch because it
              * does not go near either.
              */
-            if (message.urgent === true) await interruptFor(recipient, notice)
+            if (message.urgent === true) await takeNowFor(recipient, mission.peer.self.name, message.text, notice)
             continue
           }
           if (result.kind === 'started') {
