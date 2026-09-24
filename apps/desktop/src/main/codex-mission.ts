@@ -46,6 +46,7 @@ import { fileChangesOf, itemOf } from './approval-patch.js'
 import type { FileChangeRecord } from './approval-patch.js'
 import { composeHandoffPrompt } from './handoff.js'
 import { changedPaths, observedEditEvents, observedPatches, sharedTreeNotice, snapshotWorkspace, unreportedPaths } from './disk-observation.js'
+import type { RecentEdits } from './recent-edits.js'
 import { cursorCannotSee, cursorIgnoreNotice } from './cursor-visibility.js'
 import type { WorkspaceSnapshot } from './disk-observation.js'
 import type { ToolPatch } from '@teammate/runtime-adapters'
@@ -284,6 +285,8 @@ interface CodexMissionServiceOptions {
   readonly onRunEnded?: (mission: EndedMission) => Promise<void>
   /** Test seam: how the working tree is looked at before and after a write-capable run. Defaults to `git status`. */
   readonly observeDisk?: (workspacePath: string) => Promise<WorkspaceSnapshot | undefined>
+  /** A2.9: what each teammate's writing runs changed lately, per folder, for the overlap note. */
+  readonly recentEdits?: RecentEdits
   /** Test seam: what `.cursorignore` says, if anything. See cursor-visibility.ts. */
   /** Test seam: what the Cursor CLI says about its connectors. */
   readonly readCursorIgnore?: (path: string) => Promise<string | undefined>
@@ -759,6 +762,9 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           // attached; one it never named gets a row of its own.
           const changed = changedPaths(mission.diskBefore, diskAfter)
           observed = changed
+          if (mission.peer !== undefined) {
+            options.recentEdits?.record({ folder: mission.cwd, teammateId: mission.peer.self.teammateId, name: mission.peer.self.name, paths: changed, at: now() })
+          }
           const unreported = new Set(unreportedPaths(changed, mission.persisted))
           const patches = changed.length === 0
             ? new Map<string, ToolPatch>()
@@ -1373,7 +1379,12 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               : { previousMissionId: continuation?.missionId ?? resumedMissionId ?? followUpOf }),
             ...(plan.alreadyGiven === undefined ? {} : { alreadyGiven: plan.alreadyGiven }),
             // A2.12: what the host started this run to answer is shown to it.
-            ...(relay?.answering === undefined ? {} : { startedFor: relay.answering })
+            ...(relay?.answering === undefined ? {} : { startedFor: relay.answering }),
+            // A2.9: files another teammate changed that this one changed too.
+            ...((() => {
+              const overlap = options.recentEdits?.overlapFor({ folder: runCwd, teammateId: peer.self.teammateId, now: now() })
+              return overlap === undefined ? {} : { overlap }
+            })())
           })
           runtimePrompt = prepared.runtimePrompt
           delivered = prepared.delivered

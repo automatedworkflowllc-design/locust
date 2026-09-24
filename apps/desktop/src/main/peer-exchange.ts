@@ -147,6 +147,8 @@ export interface ConversationHint {
    * the last to give way when the prompt is long.
    */
   readonly startedFor?: readonly string[]
+  /** A2.9: the overlap note for this teammate in this folder, when there is one. */
+  readonly overlap?: string
 }
 
 /** What the team remembers, worded for a runtime; undefined when memory is off. */
@@ -239,6 +241,7 @@ export function createPeerExchange(options: {
           ...(connectors === undefined ? {} : { connectors }),
           keepATodoList: todos,
           ...(conversation?.alreadyGiven === undefined ? {} : { alreadyGiven: conversation.alreadyGiven }),
+          ...(conversation?.overlap === undefined ? {} : { overlap: conversation.overlap }),
           now: new Date()
         })
         return { runtimePrompt: composed.prompt, delivered: composed.delivered, failed: false, given: composed.given }
@@ -253,7 +256,8 @@ export function createPeerExchange(options: {
           ...(memory === undefined ? {} : { memory }),
           ...(connectors === undefined ? {} : { connectors }),
           keepATodoList: todos,
-          ...(conversation?.alreadyGiven === undefined ? {} : { alreadyGiven: conversation.alreadyGiven })
+          ...(conversation?.alreadyGiven === undefined ? {} : { alreadyGiven: conversation.alreadyGiven }),
+          ...(conversation?.overlap === undefined ? {} : { overlap: conversation.overlap })
         })
         return { runtimePrompt: composed.prompt, delivered: [], failed: true, given: composed.given }
       }

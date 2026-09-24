@@ -98,6 +98,12 @@ export interface RuntimePromptInput {
   readonly alreadyGiven?: ReadonlySet<string>
   /** The time now, so a message that waited long is said to have (A2.7). Absent: no ages. */
   readonly now?: Date
+  /**
+   * A2.9: the files another teammate changed that this one changed too,
+   * recently, in this folder (`RecentEdits.overlapFor`). Volatile, so it sits
+   * with what arrived this turn, not in the cached prefix.
+   */
+  readonly overlap?: string
 }
 
 export interface RuntimePrompt {
@@ -666,6 +672,7 @@ export function composeRuntimePrompt(input: RuntimePromptInput): RuntimePrompt {
   const assemble = (): string => {
     const sections: string[] = [...brief.sections]
     if (delivered.length > 0) sections.push(inboundSection(delivered, remaining, roster, input.now))
+    if (input.overlap !== undefined) sections.push(input.overlap)
     sections.push(input.prompt)
     return sections.join(SECTION_GAP)
   }

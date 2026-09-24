@@ -36,6 +36,7 @@ import { describeGone, diagnosticLine, shouldRoll, startupDetail } from './diagn
 import { createGroupStore } from './group-store.js'
 import { createBriefSessions } from './brief-sessions.js'
 import { createRunEnd } from './run-end.js'
+import { createRecentEdits } from './recent-edits.js'
 import { readRuntimeArtifacts } from './runtime-artifacts.js'
 import { relative } from 'node:path'
 import { decideReveal } from './reveal-file.js'
@@ -1420,6 +1421,8 @@ if (!ownsSingleInstanceLock) {
     })
     const codexMissions = createCodexMissionService({
       workspacePath,
+      // A2.9: the overlap note -- who else changed the files a teammate did, lately.
+      recentEdits: createRecentEdits(),
       // A scripted launch spends nothing unless told to (free-routes.ts).
       freeRoutesOnly: freeRoutesOnly(process.argv, process.env),
       permissionHost,

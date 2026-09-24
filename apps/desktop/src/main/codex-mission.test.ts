@@ -13,6 +13,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { openCodeReadOnlySection, planSection } from './workroom-briefing.js'
 import type { CodexMissionUpdate, MissionApprovalRequest } from '../shared/ipc.js'
 import { MAX_LIVE_MISSIONS } from '../shared/live-missions.js'
+import { createRecentEdits } from './recent-edits.js'
 import { createCodexMissionService } from './codex-mission.js'
 import { FREE_ONLY_REFUSAL } from './free-routes.js'
 import { createApprovalChannel } from './approval-channel.js'
@@ -2400,6 +2401,60 @@ describe('what a completed share hands to the relay', () => {
       const posts = await run('accept-edits')
       expect(posts).toHaveLength(1)
       expect([...(posts[0]!.observed ?? [])].sort()).toEqual(['src/app.ts', 'src/new.ts'])
+    })
+
+    it('A2.9: tells a teammate, in their next brief, that another changed a file they changed too', async () => {
+      const prompts: string[] = []
+      const scheduled: Array<() => void> = []
+      let looks = 0
+      let ids = 0
+      const service = createCodexMissionService({
+        workspacePath: WORKSPACE,
+        discover: async () => [codexRuntime()],
+        runner: {
+          start: (_spec, prompt) => {
+            prompts.push(prompt)
+            return {
+              records: records([
+                { type: 'thread.started', thread_id: `thread-${String(prompts.length)}` },
+                { type: 'turn.started' },
+                { type: 'item.completed', item: { id: 'answer', type: 'agent_message', text: 'Done.' } },
+                { type: 'turn.completed', usage: { output_tokens: 2 } }
+              ]),
+              completion: Promise.resolve(completion())
+            }
+          }
+        },
+        ledger: fakeLedger(),
+        // Every run finds src/app.ts changed by the time it ends.
+        observeDisk: async () => {
+          looks += 1
+          return looks % 2 === 0 ? new Map([['src/app.ts', ' M']]) : new Map<string, string>()
+        },
+        observePatches: async () => new Map(),
+        recentEdits: createRecentEdits(),
+        workroom: {
+          post: async (input) => ({ messageId: 'wm_1', sequence: 1, from: input.from, to: input.to, text: input.text, postedAt: NOW }),
+          unread: async () => ({ messages: [], remaining: 0 }),
+          markDelivered: async () => undefined,
+          read: async () => ({ messages: [], deliveries: [], issues: [] }),
+          flush: async () => undefined
+        },
+        createId: () => String(++ids),
+        now: () => new Date(NOW),
+        schedule: (task) => scheduled.push(task)
+      })
+      const runAs = async (peer: MissionPeerContext) => {
+        const response = await service.start('Tidy app.ts.', 'codex', 'accept-edits', {}, () => undefined, undefined, peer)
+        expect(response.ok).toBe(true)
+        while (scheduled.length > 0) scheduled.shift()!()
+        for (let i = 0; i < 20; i += 1) await new Promise((resolve) => setImmediate(resolve))
+      }
+      await runAs(PEER)
+      await runAs({ self: ATLAS, others: [WREN] })
+      await runAs(PEER)
+      expect(prompts[0]).not.toContain('also changed by another teammate')
+      expect(prompts[2]).toContain('- Atlas changed src/app.ts')
     })
 
     it('attaches nothing from a read-only run, which the host never looked at', async () => {
