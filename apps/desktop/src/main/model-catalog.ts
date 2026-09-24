@@ -33,7 +33,7 @@ const ACCOUNT_DEFAULT_MODEL = 'account-default'
 
 export interface ModelCatalogOptions {
   readonly discover: () => Promise<readonly RuntimeDiscovery[]>
-  readonly spawn: (executablePath: string, args: readonly string[]) => AppServerProcess
+  readonly spawn: (executablePath: string, args: readonly string[], env?: Readonly<Record<string, string>>) => AppServerProcess
   readonly now?: () => number
 }
 
@@ -482,7 +482,7 @@ export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {
     const child = options.spawn(codex.executable.executablePath, [
       ...codex.executable.prefixArgs,
       'app-server'
-    ])
+    ], codex.executable.env)
     const client = createAppServerClient({
       transport: { send: (line) => child.write(line), close: () => child.kill() },
       onNotification: () => undefined,

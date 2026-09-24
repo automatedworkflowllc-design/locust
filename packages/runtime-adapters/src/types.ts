@@ -147,6 +147,12 @@ export interface ProbeCommand {
   readonly executablePath: string;
   readonly args: readonly string[];
   readonly timeoutMs: number;
+  /**
+   * The launch's own environment, merged over the host's (H7). A CLI run
+   * under the app's own Node needs ELECTRON_RUN_AS_NODE, and a probe that
+   * dropped it opened another copy of Locust instead of the CLI.
+   */
+  readonly env?: Readonly<Record<string, string>>;
 }
 
 export interface CommandResult {

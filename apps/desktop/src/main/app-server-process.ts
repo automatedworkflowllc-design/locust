@@ -32,7 +32,7 @@ export interface AppServerProcess {
 
 /** What the process needs from the machine, so a test can stand in for it. */
 export interface AppServerProcessDeps {
-  readonly spawn: (executablePath: string, args: readonly string[]) => AppServerChild
+  readonly spawn: (executablePath: string, args: readonly string[], env?: Readonly<Record<string, string>>) => AppServerChild
   readonly releaseTree: (pid: number) => Promise<boolean>
   readonly platform: NodeJS.Platform
 }
@@ -47,7 +47,10 @@ export interface AppServerChild {
 }
 
 const MACHINE: AppServerProcessDeps = {
-  spawn: (executablePath, args) => spawn(executablePath, [...args], { stdio: ['pipe', 'pipe', 'pipe'] }),
+  // H7: the launch's own environment over the host's -- a CLI under the
+  // app's own Node needs ELECTRON_RUN_AS_NODE, or this opens another Locust.
+  spawn: (executablePath, args, env) =>
+    spawn(executablePath, [...args], { stdio: ['pipe', 'pipe', 'pipe'], ...(env === undefined ? {} : { env: { ...process.env, ...env } }) }),
   releaseTree: releaseProcessTree,
   platform: process.platform
 }
@@ -55,9 +58,10 @@ const MACHINE: AppServerProcessDeps = {
 export function startAppServerProcess(
   executablePath: string,
   args: readonly string[],
-  deps: AppServerProcessDeps = MACHINE
+  deps: AppServerProcessDeps = MACHINE,
+  env?: Readonly<Record<string, string>>
 ): AppServerProcess {
-  const child = deps.spawn(executablePath, args)
+  const child = deps.spawn(executablePath, args, env)
   let stopping = false
   const killChild = (): void => {
     try {

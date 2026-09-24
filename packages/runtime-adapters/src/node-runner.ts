@@ -194,6 +194,8 @@ export function createNodeProbeRunner(options: NodeProbeRunnerOptions = {}): Pro
           shell: false,
           windowsHide: true,
           stdio: ["ignore", "pipe", "pipe"],
+          // H7: the launch's own environment over the host's, when it has one.
+          ...(command.env === undefined ? {} : { env: { ...process.env, ...command.env } }),
           // A group of its own off Windows: kill(-pid) then ends the shim
           // and whatever it started. On Windows a detached child gets its
           // own console, which is not wanted; taskkill /T walks the tree.

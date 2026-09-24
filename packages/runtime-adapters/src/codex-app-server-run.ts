@@ -47,6 +47,8 @@ export interface CodexAppServerRunOptions {
   readonly spawn: (
     executablePath: string,
     args: readonly string[],
+    /** H7: the launch's own environment, to merge over the host's. */
+    env?: Readonly<Record<string, string>>,
   ) => AppServerRunProcess;
   readonly command: RuntimeCommandSpec;
   readonly prompt: string;
@@ -192,7 +194,7 @@ export function startCodexAppServerRun(
     return typeof id === "string" && id.length > 0 ? id : undefined;
   };
 
-  const child = options.spawn(options.command.executablePath, options.command.args);
+  const child = options.spawn(options.command.executablePath, options.command.args, options.command.env);
 
   const finish = (): void => {
     if (settled) return;

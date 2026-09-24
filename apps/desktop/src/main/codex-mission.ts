@@ -262,7 +262,9 @@ interface CodexMissionServiceOptions {
    */
   readonly appServerSpawn?: (
     executablePath: string,
-    args: readonly string[]
+    args: readonly string[],
+    /** H7: the launch's own environment, merged over the host's. */
+    env?: Readonly<Record<string, string>>
   ) => AppServerRunProcess
   readonly ledger: MissionLedger
   /**

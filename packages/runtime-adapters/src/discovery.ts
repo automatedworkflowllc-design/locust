@@ -354,6 +354,8 @@ async function runProbe(
         executablePath: executable.executablePath,
         args: [...executable.prefixArgs, ...args],
         timeoutMs: PROBE_TIMEOUT_MS,
+        // H7: the launch travels whole, its environment with it.
+        ...(executable.env === undefined ? {} : { env: executable.env }),
       }),
     };
   } catch (error) {

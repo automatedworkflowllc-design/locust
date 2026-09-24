@@ -345,6 +345,24 @@ describe("runtime version and executable discovery", () => {
 });
 
 describe("installed runtime discovery", () => {
+  // H7: a CLI under the app's own Node is probed WITH its launch's environment.
+  it("probes a CLI launched through the app binary with the launch's environment", async () => {
+    const underOwnNode: ExecutableLaunch = {
+      ...nativeExecutable,
+      executablePath: "C:\Program Files\Locust\Locust.exe",
+      prefixArgs: ["C:\npm\node_modules\@openai\codex\bin\codex.js"],
+      kind: "node-shim",
+      env: { ELECTRON_RUN_AS_NODE: "1" },
+    };
+    const seen: (Readonly<Record<string, string>> | undefined)[] = [];
+    await discoverInstalledRuntimes({
+      locator: { find: async (name) => (name === "codex" ? underOwnNode : undefined) },
+      runner: { run: async (command) => { seen.push(command.env); return fakeProbe(command); } },
+    });
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every((env) => env?.ELECTRON_RUN_AS_NODE === "1")).toBe(true);
+  });
+
   it("separates installation, safe capability support, and authentication", async () => {
     const launches = new Map<string, ExecutableLaunch>([
       ["codex", nativeExecutable],

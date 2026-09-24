@@ -440,7 +440,9 @@ const connectorReader = createConnectorReader({
       purpose: 'capabilities',
       executablePath: claude.executablePath,
       args: [...claude.prefixArgs, 'mcp', 'list'],
-      timeoutMs
+      timeoutMs,
+      // H7: under the app's own Node the launch needs its environment.
+      ...(claude.env === undefined ? {} : { env: claude.env })
     })
     // The listing prints on stdout; a machine with none says so there too.
     // Both streams are joined because a warning on stderr has never been a
@@ -1437,7 +1439,7 @@ if (!ownsSingleInstanceLock) {
       // arrives as one `item.completed`. Called lazily for the same reason
       // `liveElsewhere` is: the spawner is defined further down this same
       // setup, and nothing starts a mission until all of it has run.
-      appServerSpawn: (executablePath, args) => spawnAppServer(executablePath, args),
+      appServerSpawn: (executablePath, args, env) => spawnAppServer(executablePath, args, env),
       /*
        * Asked at the start of every run, never captured: a connector signed
        * into after launch reaches the next mission without a restart.
@@ -1645,8 +1647,8 @@ if (!ownsSingleInstanceLock) {
 
     // Started and stopped in one place for the mission transport and the model
     // probe -- stopped once, without holding the app; see app-server-process.ts.
-    const spawnAppServer = (executablePath: string, args: readonly string[]) =>
-      startAppServerProcess(executablePath, args)
+    const spawnAppServer = (executablePath: string, args: readonly string[], env?: Readonly<Record<string, string>>) =>
+      startAppServerProcess(executablePath, args, undefined, env)
 
     // Installing is its own service: one at a time, and it asks discovery
     // again after a clean exit rather than trusting npm's exit code alone.

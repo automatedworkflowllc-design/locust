@@ -71,13 +71,23 @@ export async function openSignIn(runtime: string, options: RuntimeSignInOptions)
   if (path === undefined) {
     return { ok: false, what: 'Locust could not find this runtime on the machine.', next: 'Install it first, then sign in.' }
   }
+  /*
+   * H7: a CLI npm installed on a machine without Node runs under the app's
+   * own Node -- the launch is the app binary plus the script, with
+   * ELECTRON_RUN_AS_NODE. Its .cmd shim would look for a `node` there is not
+   * ("'node' is not recognized"), so the console runs the launch itself.
+   */
+  const launch = found?.executable
+  const underOwnNode = launch?.env !== undefined
+  const command = underOwnNode ? consoleCommandLine(launch.executablePath, [...launch.prefixArgs.map((part) => `"${part}"`), ...args]) : consoleCommandLine(path, args)
   try {
-    const child = spawn('cmd.exe', [consoleCommandLine(path, args)], {
+    const child = spawn('cmd.exe', [command], {
       // Detached on Windows means a console of its own -- the visible window.
       detached: true,
       stdio: 'ignore',
       windowsHide: false,
-      windowsVerbatimArguments: true
+      windowsVerbatimArguments: true,
+      ...(underOwnNode ? { env: { ...process.env, ...launch.env } } : {})
     })
     child.once('exit', () => options.closed())
     child.once('error', () => options.closed())
