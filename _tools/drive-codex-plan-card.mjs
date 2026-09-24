@@ -104,6 +104,25 @@ try {
   check('a plan card is drawn, with the steps in it', view.card === true && view.steps.length >= 2, `${String(view.steps.length)} steps: ${JSON.stringify(view.steps)}`)
   const typed = /^\s*TODO\b/m.test(view.prose) || /^\s*[-*•]?\s*(In progress|Pending)\s*:/m.test(view.prose)
   check('and the reply does not type the list out', !typed, typed ? JSON.stringify(view.prose.slice(0, 300)) : undefined)
+  // 0.308: Codex's remarks about its own setup stay out of the conversation...
+  const fold = String(await drive.evaluate(`(() => [...document.querySelectorAll('.lc-activity, .lc-fold, .lc-thread')].map((el) => el.innerText ?? '').join(' '))()`))
+  const setupSaid = /Skill descriptions were shortened|unrecognized configuration setting/i.exec(fold)
+  check("the run carries none of Codex's remarks about its own setup", setupSaid === null, setupSaid === null ? undefined : setupSaid[0])
+  // ...and the folder sits as text, not a chip.
+  const folder = JSON.parse(String(await drive.evaluate(`(() => { const el = document.querySelector('.lc-composer__controls .lc-control--folder'); if (!el) return JSON.stringify(null); const style = getComputedStyle(el); return JSON.stringify({ background: style.backgroundColor, shadow: style.boxShadow }) })()`)))
+  check('the folder sits as text on the composer row (no pill, no ring)', folder !== null && (folder.background === 'rgba(0, 0, 0, 0)' || folder.background === 'transparent') && folder.shadow === 'none', JSON.stringify(folder))
+  const notes = await drive.capture("Settings, Runtimes: Codex's setup notes on its row", () => drive.evaluate(`(async () => {
+    const tab = [...document.querySelectorAll('button')].find((b) => (b.getAttribute('title') ?? '').startsWith('Settings'))
+    tab?.click()
+    await new Promise((r) => setTimeout(r, 1200))
+    const page = [...document.querySelectorAll('button, a')].find((b) => /^Runtimes$/.test((b.textContent ?? '').trim()))
+    page?.click()
+    await new Promise((r) => setTimeout(r, 1200))
+    const row = [...document.querySelectorAll('.lc-runtimerow')].find((r) => /Codex/.test(r.textContent ?? ''))
+    return JSON.stringify([...(row?.querySelectorAll('.lc-runtimerow__setupnote') ?? [])].map((n) => (n.textContent ?? '').trim()))
+  })()`))
+  const said = JSON.parse(String(notes))
+  check("Codex's row in Settings says them instead", said.length > 0 && said.every((line) => line.startsWith('Codex CLI says: ')), JSON.stringify(said))
   say(failures === 0 ? '\nCODEX PLAN CARD PASSED' : `\nCODEX PLAN CARD: ${String(failures)} FAILED`)
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

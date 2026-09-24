@@ -1150,6 +1150,7 @@ export function SettingsScreen({
   runtimes,
   limitedRuntimes,
   usageWindows,
+  setupNotes,
   runtimeUpdates,
   onKeepAgentsCurrent,
   onUpdateAgent,
@@ -1212,6 +1213,8 @@ export function SettingsScreen({
   readonly limitedRuntimes: ReadonlyMap<string, string>
   /** The latest still-allowed rate-limit reading per runtime, in words. */
   readonly usageWindows?: ReadonlyMap<string, string>
+  /** What each CLI said about its own setup on its newest run (missionView's setupNotesOf). */
+  readonly setupNotes?: ReadonlyMap<string, readonly string[]>
   /** What keeping the coding agents current has done (runtime-updates.ts); undefined until read. */
   readonly runtimeUpdates?: RuntimeUpdatesState
   /** Update the agents without being asked, or not. */
@@ -1692,6 +1695,16 @@ export function SettingsScreen({
                         {usageWindowSentence(usageWindows.get(runtime.id)!)}
                       </div>
                     )}
+                    {/*
+                      * What the CLI said about its own setup on its last run
+                      * -- a key its config has that it does not know -- kept
+                      * out of the conversations (0.308) and said here, once.
+                      */}
+                    {(setupNotes?.get(runtime.id) ?? []).slice(0, 3).map((note) => (
+                      <div key={note} className="lc-runtimerow__detail lc-runtimerow__setupnote">
+                        {runtime.displayName} says: {note}
+                      </div>
+                    ))}
                     {status.tag === 'NOT INSTALLED' && installCommand(runtime.id) !== undefined && (
                       <InstallCommand command={installCommand(runtime.id)!} />
                     )}

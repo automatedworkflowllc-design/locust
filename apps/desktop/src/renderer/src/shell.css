@@ -5002,6 +5002,14 @@ textarea {
 
 /* What keeping the agent current has done (runtime-updates.ts): a version
    number in a sentence, so its figures line up with the row's own. */
+/* What a CLI said about its own setup on its last run (missionView's
+   setupNotesOf): kept out of the conversations, muted here, and a long
+   config path wraps rather than running off the row. */
+.lc-runtimerow__setupnote {
+  color: var(--lc-text-muted);
+  overflow-wrap: anywhere;
+}
+
 .lc-runtimerow__update {
   font-variant-numeric: tabular-nums;
 }

@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.308.0 - 2026-09-23
+
+### Improved
+
+- **The folder sits quietly on the composer again.** Its name shows as plain
+  text beside the mode, the way it used to, rather than as a button; click
+  it, or the + menu, to pick another.
+- **Codex's notes about its own setup stay out of your conversations.** Its
+  remarks on how it is configured -- a setting it does not recognise, skill
+  descriptions it shortened -- came at the foot of every Codex turn. They
+  are on Codex's row in Settings › Runtimes now, once.
+
 ## 0.307.0 - 2026-09-23
 
 ### Improved

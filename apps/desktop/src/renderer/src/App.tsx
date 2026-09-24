@@ -114,7 +114,7 @@ import {
   rootMission,
   startedLabel,
   stitchedHandoff,
-  runtimeNeverStarted, typedPrompt, buildThread, lastActivityAt, relativePath, fileTurns, shellCommandText, turnText, groupBoundary, groupJoins, groupLeavings } from './missionView.js'
+  runtimeNeverStarted, typedPrompt, buildThread, lastActivityAt, relativePath, fileTurns, shellCommandText, turnText, groupBoundary, groupJoins, groupLeavings, latestSetupNotes } from './missionView.js'
 import type { LiveStarter } from './missionView.js'
 import { folderName, ranOnLine } from './ranOn.js'
 import { reviewBrief } from './reviewBrief.js'
@@ -1024,6 +1024,8 @@ export default function App(): ReactElement {
   /** Which run's thread is on screen; undefined shows the addressed teammate's idle state. */
   const [shownKey, setShownKey] = useState<string>()
   const [history, setHistory] = useState<readonly PublicRecoveredMission[]>([])
+  /** What each CLI last said about its own setup, for its row in Settings (not the conversations). */
+  const setupNotes = useMemo(() => latestSetupNotes(history), [history])
   /** The history as last committed, for a read to say what it already holds (historyMerge.ts). */
   const historyRef = useRef<readonly PublicRecoveredMission[]>([])
   useEffect(() => {
@@ -5000,6 +5002,7 @@ export default function App(): ReactElement {
               runtimes={runtimes}
               limitedRuntimes={limitedRuntimes}
               usageWindows={usageWindows}
+              setupNotes={setupNotes}
               {...(runtimeUpdates === undefined ? {} : { runtimeUpdates })}
               onKeepAgentsCurrent={(automatic) => {
                 void window.desktop

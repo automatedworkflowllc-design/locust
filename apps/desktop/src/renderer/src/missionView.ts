@@ -1054,6 +1054,55 @@ export function readPlan(value: unknown): readonly PlanStep[] {
   return steps
 }
 
+/**
+ * WHAT A CLI SAYS ABOUT ITS OWN SETUP, NOT ABOUT THE WORK (0.308).
+ *
+ * Codex opens every turn with remarks on how it is configured -- "Skill
+ * descriptions were shortened to fit the skills context budget", "Codex is
+ * ignoring 1 unrecognized configuration setting ... user (<the path to
+ * your config.toml>)" -- and they reached the foot of every Codex turn's fold,
+ * the person's own path with them: in a room of two, on the site's
+ * screenshot (drive-room-two-agents, 2026-09-23). They are true and worth
+ * reading once, and they are about the CLI, so they live on its row in
+ * Settings > Runtimes (setupNotesOf) and nowhere in a conversation.
+ */
+const SETUP_NOTES: readonly RegExp[] = [
+  /^Codex is ignoring \d+ unrecognized configuration settings?\b/i,
+  /^Skill descriptions were shortened to fit\b/i
+]
+
+export function isSetupNote(message: string): boolean {
+  return SETUP_NOTES.some((pattern) => pattern.test(message.trim()))
+}
+
+/** A run's setup notes, each once, in the order said -- for its runtime's row in Settings. */
+export function setupNotesOf(events: readonly NormalizedRuntimeEvent[]): readonly string[] {
+  const notes: string[] = []
+  for (const event of events) {
+    if (event.type !== 'adapter.diagnostic') continue
+    const message = event.payload.message.trim()
+    if (isSetupNote(message) && !notes.includes(message)) notes.push(message)
+  }
+  return notes
+}
+
+/**
+ * Each runtime's setup notes from its newest run that said any: what its row
+ * in Settings > Runtimes shows (0.308).
+ */
+export function latestSetupNotes(
+  missions: readonly { readonly runtime: string; readonly createdAt: string; readonly events: readonly NormalizedRuntimeEvent[] }[]
+): ReadonlyMap<string, readonly string[]> {
+  const newest = new Map<string, { readonly at: string; readonly notes: readonly string[] }>()
+  for (const mission of missions) {
+    const notes = setupNotesOf(mission.events)
+    if (notes.length === 0) continue
+    const held = newest.get(mission.runtime)
+    if (held === undefined || mission.createdAt > held.at) newest.set(mission.runtime, { at: mission.createdAt, notes })
+  }
+  return new Map([...newest].map(([runtime, entry]) => [runtime, entry.notes]))
+}
+
 /** A notice's words, however its spacing and case came out. */
 export function noticeKey(message: string): string {
   return message.trim().replace(/\s+/g, ' ').toLowerCase()
@@ -2713,6 +2762,8 @@ export function buildThread(
         break
       }
       case 'adapter.diagnostic': {
+        // About the CLI's own setup: its row in Settings, not the conversation.
+        if (isSetupNote(event.payload.message)) break
         // Before any tool runs, only trouble with the RUN ITSELF gets through.
         //
         // The gate exists because Codex comments on its own setup the moment a

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildThread, foldNoticeKeys } from './missionView.js'
+import { buildThread, foldNoticeKeys, isSetupNote, latestSetupNotes } from './missionView.js'
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
 /**
@@ -26,9 +26,11 @@ function event(type: string, payload: unknown): NormalizedRuntimeEvent {
 }
 
 const SKILLS = 'Skill descriptions were shortened to fit the skills context budget.'
+const REMARK = 'The model is answering from a fallback region.'
 const turn = (extra: string | undefined) => [
   event('run.started', {}),
   event('adapter.diagnostic', { code: 'codex.item_notice', level: 'warning', terminal: false, message: SKILLS }),
+  event('adapter.diagnostic', { code: 'codex.item_notice', level: 'warning', terminal: false, message: REMARK }),
   ...(extra === undefined ? [] : [event('adapter.diagnostic', { code: 'codex.item_notice', level: 'warning', terminal: false, message: extra })]),
   event('tool.started', { itemId: 'a', toolKind: 'read', name: 'read', command: 'README.md', phase: 'started' }),
   event('tool.completed', { itemId: 'a', toolKind: 'read', name: 'read', command: 'README.md', phase: 'completed' }),
@@ -42,7 +44,7 @@ const noticesOf = (items: ReturnType<typeof buildThread>): readonly string[] => 
 
 describe("a runtime's remark about itself", () => {
   it('is carried by the first turn that heard it', () => {
-    expect(noticesOf(buildThread(turn(undefined), { running: false }))).toEqual([SKILLS])
+    expect(noticesOf(buildThread(turn(undefined), { running: false }))).toEqual([REMARK])
   })
 
   it('is not said again by a later turn, while a new remark still is', () => {
@@ -94,5 +96,42 @@ describe('a usage warning', () => {
       { running: false, saidBefore: new Set(foldNoticeKeys(first)) }
     )
     expect(reached.filter((item) => item.type === 'limit')).toHaveLength(1)
+  })
+})
+
+/*
+ * A CLI'S REMARK ABOUT ITS OWN SETUP IS NOT IN THE CONVERSATION AT ALL (0.308).
+ *
+ * "Skill descriptions were shortened..." and "Codex is ignoring 1
+ * unrecognized configuration setting ... (the path to your config.toml)"
+ * sat at the foot of every Codex turn's fold, the person's path with them,
+ * on a room of two captured for the site (2026-09-23). They are about the
+ * CLI: its row in Settings > Runtimes says them.
+ */
+describe("a CLI's remark about its own setup", () => {
+  const IGNORING = 'Codex is ignoring 1 unrecognized configuration setting. Check for typos or deprecated settings. user (config.toml): `computer_use.windows.always_allowed_app_ids` is ignored.'
+
+  it('is known for what it is, and nothing else is', () => {
+    expect(isSetupNote(SKILLS)).toBe(true)
+    expect(isSetupNote(IGNORING)).toBe(true)
+    expect(isSetupNote('Codex is ignoring 2 unrecognized configuration settings.')).toBe(true)
+    expect(isSetupNote('Reconnecting... 2/5')).toBe(false)
+    expect(isSetupNote(REMARK)).toBe(false)
+  })
+
+  it('never reaches a turn, not even the first', () => {
+    const notices = noticesOf(buildThread(turn(undefined), { running: false }))
+    expect(notices.some((notice) => isSetupNote(notice))).toBe(false)
+  })
+
+  it("is what its runtime's row in Settings shows, from its newest run", () => {
+    const run = (at: string, messages: readonly string[]) => ({
+      runtime: 'codex',
+      createdAt: at,
+      events: messages.map((message) => event('adapter.diagnostic', { code: 'codex.item_notice', level: 'warning', terminal: false, message }))
+    })
+    const notes = latestSetupNotes([run('2026-09-23T10:00:00.000Z', [SKILLS]), run('2026-09-23T12:00:00.000Z', [IGNORING, SKILLS, IGNORING]), run('2026-09-23T11:00:00.000Z', [REMARK])])
+    expect(notes.get('codex')).toEqual([IGNORING, SKILLS])
+    expect(notes.has('claude')).toBe(false)
   })
 })
