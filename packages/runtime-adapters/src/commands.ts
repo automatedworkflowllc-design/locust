@@ -1029,6 +1029,21 @@ export const COPILOT_MODEL_HINTS: RuntimeModelHints = {
  * HTTP 403 `FreeTierError`, `ask` answers. Spreading one object means the
  * next correction cannot land on one of them.
  */
+/**
+ * A refused shell call must not END a read-only run (A6.1).
+ *
+ * `opencode run` answers every "ask" with a bare reject, and a bare reject
+ * stops OpenCode's loop unless this is set (oc/session/processor.ts:200-202 in
+ * OpenCode's own source, read 2026-09-24). So a teammate in Ask mode whose
+ * model tried `git status` first simply stopped -- 3 of 4 such turns on the
+ * 0.315 drive. MEASURED with it set, same config otherwise: `git status` was
+ * refused, the model read the file instead, and the run finished with its
+ * own stop step, exit 0. "Experimental", and gone in OpenCode's v2 -- so the
+ * brief still tells the model the shell is off (A2.20); this is the net
+ * under that line, not a replacement for it.
+ */
+const OPENCODE_KEEP_GOING = { continue_loop_on_deny: true } as const
+
 const OPENCODE_READ_ONLY_PERMISSIONS = {
   edit: "deny",
   write: "deny",
@@ -1068,6 +1083,7 @@ export const OPENCODE_READ_ONLY_CONFIG = JSON.stringify({
    * being refused.
    */
   permission: { ...OPENCODE_READ_ONLY_PERMISSIONS, external_directory: "deny" },
+  experimental: OPENCODE_KEEP_GOING,
 });
 
 /**
@@ -1097,6 +1113,7 @@ export function opencodeWorktreeConfig(repositoryRoot: string, readOnly: boolean
       ...(readOnly ? OPENCODE_READ_ONLY_PERMISSIONS : {}),
       external_directory: { [`${repositoryRoot}\\.git\\*`]: "allow", "*": "deny" },
     },
+    ...(readOnly ? { experimental: OPENCODE_KEEP_GOING } : {}),
   });
 }
 
@@ -1261,6 +1278,12 @@ export function createOpenCodeRunCommand(
   }
   if (options.resumeThreadId !== undefined) {
     args.push("-s", requireText(options.resumeThreadId, "Session id"));
+  } else {
+    // A6.3: a new session names itself with a second model call -- the
+    // `title` agent, on the same model -- unless it is given a title (read
+    // in OpenCode's session/prompt.ts, 2026-09-24). Locust names missions
+    // itself, so that call is pure cost against a free model's rate limit.
+    args.push("--title", "Locust");
   }
   if (sandboxArgument(options.sandbox) === "full-access") {
     // "auto-approve permissions that are not explicitly denied" -- opencode
@@ -1278,10 +1301,20 @@ export function createOpenCodeRunCommand(
     : readOnly
       ? OPENCODE_READ_ONLY_CONFIG
       : OPENCODE_CONFINED_CONFIG;
+  // A6.2: a read-only run loads no plugins. A repo's .opencode/plugin/*.ts
+  // runs in OpenCode's own process, which would put code the repository
+  // chose outside everything the permission config holds back
+  // (OPENCODE_PURE, "run without external plugins"; plugin/index.ts:181).
+  // Only for read-only runs: a run that may edit is already trusted with
+  // the folder, and the person's own plugins are theirs to have there.
+  const env = {
+    ...(config === undefined ? {} : { OPENCODE_CONFIG_CONTENT: config }),
+    ...(readOnly ? { OPENCODE_PURE: "1" } : {}),
+  };
   return baseSpec("opencode", executable, options.workspacePath, args, {
     stdin: "prompt",
     sandbox: sandboxArgument(options.sandbox),
-    ...(config === undefined ? {} : { env: { OPENCODE_CONFIG_CONTENT: config } }),
+    ...(Object.keys(env).length === 0 ? {} : { env }),
   });
 }
 

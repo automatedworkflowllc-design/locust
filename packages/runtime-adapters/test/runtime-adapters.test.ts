@@ -1030,12 +1030,15 @@ describe("OpenCode and Copilot CLI commands", () => {
     // of the first Chief of Staff exchange and the person never got the
     // report. Measured: with no positional, `opencode run` reads stdin.
     expect(spec.stdin).toBe("prompt");
-    expect(spec.args).toEqual(["run", "--format", "json"]);
+    // A new session is titled, so OpenCode does not spend a second model
+    // call naming it (A6.3).
+    expect(spec.args).toEqual(["run", "--format", "json", "--title", "Locust"]);
     expect(spec.args).not.toContain(PROMPT);
     // There is no read-only FLAG. Measured, this environment value is the
     // only thing that stops a run editing files -- with it, the write tool is
-    // not offered at all.
-    expect(spec.env).toEqual({ OPENCODE_CONFIG_CONTENT: OPENCODE_READ_ONLY_CONFIG });
+    // not offered at all. And a read-only run loads no plugins, so a repo's
+    // own .opencode/plugin code cannot run outside that config (A6.2).
+    expect(spec.env).toEqual({ OPENCODE_CONFIG_CONTENT: OPENCODE_READ_ONLY_CONFIG, OPENCODE_PURE: "1" });
     expect(JSON.parse(OPENCODE_READ_ONLY_CONFIG)).toEqual({
       permission: {
         edit: "deny",
@@ -1052,7 +1055,17 @@ describe("OpenCode and Copilot CLI commands", () => {
         // Stated, not left to the default: an unstated refusal ends the run.
         external_directory: "deny",
       },
+      // A refused call is answered to the model, not the end of the run
+      // (A6.1): measured, `git status` refused, the file read instead, exit 0.
+      experimental: { continue_loop_on_deny: true },
     });
+  });
+
+  it("titles only a NEW OpenCode session, and keeps plugins for a run that may edit", () => {
+    const resumed = createOpenCodeRunCommand(openCode, { workspacePath, prompt: PROMPT, resumeThreadId: "ses_abc" });
+    expect(resumed.args).toEqual(["run", "--format", "json", "-s", "ses_abc"]);
+    const editing = createOpenCodeRunCommand(openCode, { workspacePath, prompt: PROMPT, sandbox: "workspace-write" });
+    expect(editing.env?.OPENCODE_PURE).toBeUndefined();
   });
 
   it("lets a worktree run reach the repository it belongs to, and only that", () => {
@@ -1121,6 +1134,8 @@ describe("OpenCode and Copilot CLI commands", () => {
         patch: "deny",
         external_directory: { "C:\\work\\shop\\.git\\*": "allow", "*": "deny" },
       },
+      // Read-only, so a refused call does not end it either (A6.1).
+      experimental: { continue_loop_on_deny: true },
     });
 
     /*
