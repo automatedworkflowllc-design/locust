@@ -113,6 +113,12 @@ export function decideRelay(input: {
    * start a run should not spend an exchange's allowance on deciding not to.
    */
   readonly defer?: boolean
+  /**
+   * The message says its recipient needs to do nothing (A2.3,
+   * `saysNothingIsNeeded`): delivered, and read on their next run, rather
+   * than starting one to read it. Checked beside `defer`, for its reason.
+   */
+  readonly closes?: boolean
   readonly hop: number
   readonly recipientName: string
   /** The person's own budget for one exchange; the constant is only the default. */
@@ -133,6 +139,12 @@ export function decideRelay(input: {
       reason: `Sent to ${input.recipientName} to read on their next run, rather than starting one.`
     }
   }
+  if (input.closes === true) {
+    return {
+      start: false,
+      reason: `Sent to ${input.recipientName} to read on their next run: the message says nothing more is needed from them.`
+    }
+  }
   if (!input.enabled) {
     return { start: false, reason: 'Teammate replies are switched off in Settings; the message waits for their next run.' }
   }
@@ -144,6 +156,37 @@ export function decideRelay(input: {
     }
   }
   return { start: true, hop: input.hop + 1 }
+}
+
+/**
+ * A MESSAGE THAT SAYS ITS RECIPIENT NEED DO NOTHING STARTS NOTHING (A2.3).
+ *
+ * The plan's "visited path" idea, read against what actually happens here.
+ * Refusing every A-to-B-to-A would end every question and answer; what burns
+ * the budget is the bounce with nothing in it. MEASURED in the packaged 0.312
+ * relay drive (docs/beta-fixes-2026-09-24/relay-packaged-0.312): Booty gave
+ * the word Wren asked for, and Wren's reply to it was a recap ending "No
+ * further action is needed from you" -- a whole run of Booty's to be told to
+ * do nothing, stopped there only because that drive's budget was 2.
+ *
+ * So a message that says, in so many words, that nothing is needed FROM THE
+ * RECIPIENT, and asks nothing, is delivered without starting their run. The
+ * words must name the recipient ("from you", "on your part"): Booty's own
+ * "Nothing further is needed from me" was the answer, and it went back. And a
+ * message that also asks for something -- a question, "please", "can you" --
+ * is a request whatever else it says. Wrong in the safe direction: a message
+ * held this way is read on their next run, never lost.
+ */
+const NOTHING_NEEDED = [
+  /\bno (?:further |more |other )?(?:action|work) (?:is |will be )?(?:needed|required|necessary) (?:from you|on your (?:part|end|side))\b/i,
+  /\bnothing (?:further|more|else) is (?:needed|required) (?:from you|on your (?:part|end|side))\b/i,
+  /\byou (?:don't|do not|needn't|need not) (?:need to )?(?:do anything|take any action|act on this)\b/i,
+  /\bno need for you to (?:do anything|take any action|act on this)\b/i
+]
+const ASKS_FOR_SOMETHING = /\?|\b(?:please|could you|can you|would you|will you|need you to|i need|make sure|go ahead)\b/i
+
+export function saysNothingIsNeeded(text: string): boolean {
+  return NOTHING_NEEDED.some((pattern) => pattern.test(text)) && !ASKS_FOR_SOMETHING.test(text)
 }
 
 /**
@@ -171,6 +214,14 @@ export function relayPrompt(input: {
    * nothing.
    */
   readonly readByPerson?: boolean
+  /**
+   * Which automatic reply of the exchange this run is (A2.4): what it has
+   * spent, plus this one. `hop` is the depth of one chain, and a held reply
+   * or a second branch sits deeper in the exchange than its chain says --
+   * the brief told a reply "3 of 12" in an exchange that had spent seven.
+   * Absent, the chain depth, as before.
+   */
+  readonly replyNumber?: number
 }): string {
   const who = `${input.sender.name} (${input.sender.role})`
   const opening = input.hop <= 1
@@ -235,7 +286,7 @@ export function relayPrompt(input: {
       ? `If you need the person's decision, a <locust-ask> block reaches them here; anything for ${input.sender.name} goes in the share block.`
       : noPersonHere(input.sender.name),
     'If nothing more is needed, end with no share block -- that is how an exchange finishes.',
-    budgetSentence(input.hop, input.cap),
+    budgetSentence(input.replyNumber ?? input.hop, input.cap),
     'Stay on what was asked.'
   ].join(' ')
 }
@@ -309,6 +360,13 @@ export interface RelayOptions {
   readonly enabled: () => Promise<boolean>
   /** The autonomy budget for one exchange, read when a share is decided. Absent means the default. */
   readonly hopCap?: () => Promise<number>
+  /**
+   * The exchange a mission a PERSON started belongs to, when it is not its
+   * own (A2.4): every run a room post started shares one, so the budget
+   * bounds the post rather than each member's corner of it. Absent, or
+   * undefined, the mission is its own exchange.
+   */
+  readonly exchangeOf?: (missionId: string) => Promise<string | undefined>
   readonly peerContextFor: (teammateId: string) => Promise<MissionPeerContext | undefined>
   /** A finished run's final message, for bringing back an answer it did not write back (A2.1). */
   readonly finalReplyOf?: (missionId: string) => Promise<string | undefined>
@@ -433,6 +491,11 @@ interface OpenExchange {
 interface DeferredReply {
   readonly recipient: MissionPeerContext
   readonly prompt: string
+  /**
+   * The same brief for the reply number it will actually be, which is only
+   * known when it starts (A2.4). Absent for a brief with no budget line.
+   */
+  readonly promptFor?: (replyNumber: number) => string
   readonly from: SharingMission
   readonly origin: RelayOrigin
   /** Addressed to the thread that shared, so the wait is visible where it was caused. */
@@ -530,6 +593,27 @@ export function createRelay(options: RelayOptions): Relay {
    */
   const spendOf = (root: string | undefined, hop: number): number =>
     Math.max(hop, root === undefined ? 0 : spentByExchange.get(root) ?? 0)
+  /*
+   * SPENT AT THE DECISION (A2.4).
+   *
+   * This was counted in `startFor`, after the start returned -- and a start
+   * takes seconds. Two replies decided in that window both read the same
+   * count, both passed, and both ran: the budget let one through per
+   * overlap. Now the count is taken in the same synchronous step as the
+   * decision, before anything awaits, and given back if no run came of it
+   * (refused, held for later, the recipient gone). A held reply is decided,
+   * and counted, again when it starts.
+   */
+  const reserve = (root: string | undefined): void => {
+    if (root !== undefined) recordSpend(root)
+  }
+  const release = (root: string | undefined): void => {
+    if (root === undefined) return
+    const held = spentByExchange.get(root)
+    if (held === undefined) return
+    if (held <= 1) spentByExchange.delete(root)
+    else spentByExchange.set(root, held - 1)
+  }
   const recordSpend = (root: string): void => {
     // Read BEFORE deleting. The delete-then-set is only to move the key to
     // the end of the insertion order so the eviction below drops the least
@@ -597,7 +681,10 @@ export function createRelay(options: RelayOptions): Relay {
     }
     const notice = (message: string): void => notify(exchange.askerRunId, exchange.askerMissionId, message)
     const prompt = returnedAnswerPrompt(ended.peer.self.name)
+    // Never refused by the budget, but spent against it (A2.4).
+    reserve(origin.rootMissionId)
     const result = await startFor({ recipient: asker, prompt, from: exchange.asker, origin, notice })
+    if (result.kind !== 'started') release(origin.rootMissionId)
     if (result.kind === 'busy') defer({ recipient: asker, prompt, from: exchange.asker, origin, notice, exchange: undefined }, result.pool === true)
     notifyAndKeep(
       exchange.askerRunId,
@@ -732,10 +819,8 @@ export function createRelay(options: RelayOptions): Relay {
       input.notice(`${recipient.self.name} could not reply on their own: ${response.error.message} The message waits for their next run.`)
       return { kind: 'refused' }
     }
-    // Counted HERE, not at the decision: a decision that never became a run
-    // spends nothing, and a held reply that starts minutes later spends then.
-    // This is the one place every relayed run passes through.
-    if (input.origin.rootMissionId !== undefined) recordSpend(input.origin.rootMissionId)
+    // Counted by the caller, at its decision, and given back there when no
+    // run came of it (A2.4, `reserve`).
     await options.assignOwner(recipient.self.teammateId, response.data.missionId).catch(() => undefined)
     // A run that continued the hub, or began one, is the hub's newest turn
     // now. Recorded before the window is told, so a face clicked on the
@@ -829,6 +914,8 @@ export function createRelay(options: RelayOptions): Relay {
     } catch {
       cap = MAX_RELAY_HOPS
     }
+    const root = entry.origin.rootMissionId
+    const spent = spendOf(root, entry.origin.hop - 1)
     const decision = decideRelay({
       enabled,
       hop: entry.origin.hop - 1,
@@ -837,12 +924,13 @@ export function createRelay(options: RelayOptions): Relay {
       // Against what the exchange has spent NOW, not when this was held. That
       // gap is the leak: every decision was inside the cap and the total was
       // not, because a held reply carried a hop the exchange had moved past.
-      spent: spendOf(entry.origin.rootMissionId, entry.origin.hop - 1)
+      spent
     })
     if (!decision.start) {
       entry.notice(decision.reason)
       return
     }
+    reserve(root)
     if (options.stillWaiting !== undefined) {
       let waiting = true
       try {
@@ -852,15 +940,20 @@ export function createRelay(options: RelayOptions): Relay {
         // shown is the bug this whole path exists to fix.
         waiting = true
       }
-      if (!waiting) return
+      if (!waiting) {
+        release(root)
+        return
+      }
     }
     const outcome = await startFor({
       recipient: entry.recipient,
-      prompt: entry.prompt,
+      // The number it is NOW, not the one it would have been when it was held.
+      prompt: entry.promptFor?.(spent + 1) ?? entry.prompt,
       from: entry.from,
       origin: entry.origin,
       notice: entry.notice
     })
+    if (outcome.kind !== 'started') release(root)
     // Free for a moment and taken again -- by a person, or by another
     // teammate's reply that landed first. Wait for the next ending.
     if (outcome.kind === 'busy') {
@@ -902,6 +995,7 @@ export function createRelay(options: RelayOptions): Relay {
       )
       return
     }
+    reserve(origin.rootMissionId)
     const notice = (message: string): void => notify(meeting.askerRunId, meeting.askerMissionId, message)
     const outcome = await startFor({
       recipient: asker,
@@ -910,6 +1004,7 @@ export function createRelay(options: RelayOptions): Relay {
       origin,
       notice
     })
+    if (outcome.kind !== 'started') release(origin.rootMissionId)
     // The asker picked up another mission while the meeting ran. The minutes
     // keep until they are free rather than being dropped on the floor.
     if (outcome.kind === 'busy') {
@@ -944,8 +1039,17 @@ export function createRelay(options: RelayOptions): Relay {
       }
       const hop = mission.relay?.hop ?? 0
       // The exchange this belongs to. A mission a PERSON started is its own
-      // root; every relayed one carries the root it was started under.
-      const root = mission.relay?.rootMissionId ?? mission.missionId
+      // root -- unless it is one of a room post's, which share the post's
+      // (A2.4) -- and every relayed one carries the root it was started under.
+      let shared: string | undefined
+      if (mission.relay?.rootMissionId === undefined && options.exchangeOf !== undefined) {
+        try {
+          shared = await options.exchangeOf(mission.missionId)
+        } catch {
+          shared = undefined
+        }
+      }
+      const root = mission.relay?.rootMissionId ?? shared ?? mission.missionId
       const notice = (message: string): void => notify(mission.runId, mission.missionId, message)
 
       // A reply into an open meeting is held, not relayed: the asker's turn
@@ -992,13 +1096,22 @@ export function createRelay(options: RelayOptions): Relay {
         if (seen.has(recipientId) || held.has(recipientId)) continue
         seen.add(recipientId)
 
+        const lastMissionOf = { ...(mission.relay?.lastMissionOf ?? {}), [mission.peer.self.teammateId]: mission.missionId }
+        // The person-started mission is the first entry in `lastMissionOf`
+        // (documented on RelayOrigin), so its teammate is the one whose
+        // conversation the person is reading.
+        const readByPerson = Object.keys(lastMissionOf)[0] === recipientId
+        const spent = spendOf(root, hop)
         const decision = decideRelay({
           enabled,
           hop,
           recipientName: message.to.name,
           cap,
-          spent: spendOf(root, hop),
-          ...(message.defer === true ? { defer: true } : {})
+          spent,
+          ...(message.defer === true ? { defer: true } : {}),
+          // Never for the person's own teammate: that run is how the person
+          // hears what came of it, whatever the message says (A2.3).
+          ...(!readByPerson && message.wantsAnswer !== true && saysNothingIsNeeded(message.text) ? { closes: true } : {})
         })
         if (!decision.start) {
           // Kept: this is the sentence that explains why a conversation the
@@ -1012,6 +1125,10 @@ export function createRelay(options: RelayOptions): Relay {
           continue
         }
 
+        // Spent in the same step as the decision, before anything awaits
+        // (A2.4); given back below unless a run starts.
+        reserve(root)
+        let ran = false
         try {
           const recipient = await options.peerContextFor(recipientId)
           if (recipient === undefined) {
@@ -1021,19 +1138,19 @@ export function createRelay(options: RelayOptions): Relay {
           const origin: RelayOrigin = {
             hop: decision.hop,
             rootMissionId: root,
-            lastMissionOf: { ...(mission.relay?.lastMissionOf ?? {}), [mission.peer.self.teammateId]: mission.missionId }
+            lastMissionOf
           }
-          // The person-started mission is the first entry in `lastMissionOf`
-          // (documented on RelayOrigin), so its teammate is the one whose
-          // conversation the person is reading.
-          const readByPerson = Object.keys(origin.lastMissionOf)[0] === recipientId
-          const prompt = relayPrompt({ sender: mission.peer.self, recipient: recipient.self, hop: origin.hop, cap, readByPerson })
+          const promptFor = (replyNumber: number): string =>
+            relayPrompt({ sender: mission.peer.self, recipient: recipient.self, hop: origin.hop, cap, readByPerson, replyNumber })
+          const prompt = promptFor(spent + 1)
           const result = await startFor({ recipient, prompt, from: mission, origin, notice })
+          ran = result.kind === 'started'
           if (result.kind === 'busy') {
             defer(
               {
                 recipient,
                 prompt,
+                promptFor,
                 from: mission,
                 origin,
                 notice,
@@ -1070,6 +1187,8 @@ export function createRelay(options: RelayOptions): Relay {
           // says so. The service that called us swallows anything thrown
           // here, which is how a failure became silence.
           notice(`${message.to.name} could not reply on their own: ${error instanceof Error ? error.message : String(error)} The message waits for their next run.`)
+        } finally {
+          if (!ran) release(root)
         }
       }
 

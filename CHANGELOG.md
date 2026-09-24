@@ -11,6 +11,20 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.322.0 - 2026-09-24
+
+### Improved
+
+- **A message that needs nothing back starts nothing.** When one teammate
+  tells another that no further action is needed from them, and asks
+  nothing, the message is waiting for them on their next run instead of
+  starting a run just to read it. A message to the teammate whose
+  conversation you are reading still starts their turn, as before.
+- **The automatic-reply limit is counted right.** Two replies starting at
+  the same moment can no longer both slip under the limit; a teammate is
+  told its real place in the exchange ("automatic reply 5 of 12"); and all
+  the runs one room post starts share a single limit, instead of one each.
+
 ## 0.321.0 - 2026-09-24
 
 ### Improved

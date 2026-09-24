@@ -44,7 +44,7 @@ import { imageMediaType, MAX_PREVIEW_BYTES } from '../shared/image-files.js'
 import { isViewableText, MAX_TEXT_BYTES, viewerMode } from '../shared/text-files.js'
 import { createTeammateStore, isTeammateRoute } from './teammate-store.js'
 import { createRoutineStore } from './routine-store.js'
-import { createRoomStore } from './room-store.js'
+import { createRoomStore, exchangeOfRoomPost } from './room-store.js'
 import { createRoomTasks } from './room-tasks.js'
 import type { RoomTasks } from './room-tasks.js'
 import { fittedTaskSection, rowToClaimAtStart } from '../shared/room-task.js'
@@ -1960,6 +1960,9 @@ if (!ownsSingleInstanceLock) {
     relay = createRelay({
       enabled: async () => (await teammates.readSettings()).relay === true,
       hopCap: async () => (await teammates.readSettings()).relayHopCap,
+      // A2.4: every run a room post started is one exchange, so the budget
+      // bounds the post -- not each member's own corner of it.
+      exchangeOf: async (missionId) => exchangeOfRoomPost(await rooms.list(), missionId),
       peerContextFor,
       // A2.1: an answer not written back is brought to the teammate who asked.
       finalReplyOf: async (missionId) => {

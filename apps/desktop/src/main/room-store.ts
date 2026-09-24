@@ -105,6 +105,20 @@ const UNREADABLE = 'The rooms file could not be read, so nothing was changed. Ev
 
 const EMPTY: StoredFile = { schemaVersion: SCHEMA_VERSION, rooms: [] }
 
+/**
+ * The exchange a room post's runs share, for the relay's budget (A2.4):
+ * every mission the post started answers to one key, so the automatic
+ * replies they set off are bounded per post, not per member. Undefined for
+ * a mission no post started.
+ */
+export function exchangeOfRoomPost(rooms: readonly PublicRoom[], missionId: string): string | undefined {
+  for (const room of rooms) {
+    const post = room.posts.find((entry) => Object.values(entry.missions).includes(missionId))
+    if (post !== undefined) return `room:${room.roomId}:${post.postId}`
+  }
+  return undefined
+}
+
 export function validRoomName(value: unknown): value is string {
   if (typeof value !== 'string') return false
   const trimmed = value.trim()
