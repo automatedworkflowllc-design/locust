@@ -279,7 +279,9 @@ export function FirstLaunch({
           <p className="lc-intro">
             {/*
               * One line (Colin, 2026-09-23: "lets make the text under the tv
-              * be a bit cleaner, maybe we can fix up the wordiness as well").
+              * be a bit cleaner, maybe we can fix up the wordiness as well"),
+              * centred under the machine it captions (2026-09-24: "text is way
+              * off center" -- it began at the column's edge; shell.css).
               * It was two sentences, the second with a bold white phrase that
               * broke across the line. What is left: whose agents and whose
               * accounts, and the one way in that needs neither.

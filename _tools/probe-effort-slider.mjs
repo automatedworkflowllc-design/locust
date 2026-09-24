@@ -21,7 +21,7 @@ import { say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tag = arg('--tag') ?? (packaged === undefined ? 'local' : 'packaged')
-const OUT = join(new URL('../docs/beta-fixes-2026-09-23/', import.meta.url).pathname.slice(1), `effort-slider-${tag}`)
+const OUT = join(new URL('../docs/beta-fixes-2026-09-24/', import.meta.url).pathname.slice(1), `effort-slider-${tag}`)
 await mkdir(OUT, { recursive: true })
 
 const workspace = await scratchRepository('locust-effort-slider-ws-')
@@ -125,21 +125,49 @@ try {
     const shot = await drive.send('Page.captureScreenshot', { format: 'png', clip: { x: first.track.left - 16, y: first.track.top - 14, width: first.track.width + 32, height: first.track.height + 28, scale: 4 } })
     if (shot?.result?.data) await writeFile(join(OUT, file), Buffer.from(shot.result.data, 'base64'))
   }
+  // Pressed twice, as the slow drag is: the first press alone did not start
+  // a hold, so the "quick drag" frames showed a thumb standing still at Max,
+  // and the keys below then had nowhere to step (2026-09-24, both builds).
   await mouse('mousePressed', end, y, 1)
-  let frame = 0
+  await sleep(120)
+  await mouse('mousePressed', end, y, 1)
+  // No screenshots during it: a clipped capture mid-drag made the page lose
+  // the pointer, so the old frames here showed a drag that had already ended
+  // (2026-09-24: "a quick drag lands there" failed on 0.326 as well).
   for (let x = end; x >= start; x -= 24) {
     await mouse('mouseMoved', x, y, 1)
     await sleep(16)
-    if (x < end && frame < 3) {
-      frame += 1
-      await zoom(`03-quick-drag-${String(frame)}.png`)
-    }
   }
+  await mouse('mouseMoved', start, y, 1)
   await mouse('mouseReleased', start, y)
-  await sleep(40)
-  await zoom('04-let-go.png')
+  await sleep(700)
+  const back = await panel()
+  check('a quick drag back to the first dot lands there', Number(back.value) === 0, `value ${String(back.value)}`)
+
+  // The liquid, close up: a click on the last dot from the first jumps the
+  // thumb, and the drop under it pours after on its spring. Frames as it goes.
+  await mouse('mousePressed', end, y, 1)
+  await mouse('mouseReleased', end, y)
+  for (const [n, wait] of [[1, 10], [2, 40], [3, 60]]) {
+    await sleep(wait)
+    await zoom(`03-liquid-after-a-jump-${String(n)}.png`)
+  }
   await sleep(700)
   await zoom('05-settled.png')
+
+  // The thumb at rest, close up, where Colin's frames were taken: Medium, and
+  // the last level (Claude Code's frame was at Max).
+  await mouse('mousePressed', first.dots[1], y, 1)
+  await mouse('mouseReleased', first.dots[1], y)
+  await sleep(700)
+  await zoom('06-rest-medium.png')
+  await mouse('mousePressed', end, y, 1)
+  await mouse('mouseReleased', end, y)
+  await sleep(700)
+  await zoom('07-rest-last.png')
+  await mouse('mousePressed', start, y, 1)
+  await mouse('mouseReleased', start, y)
+  await sleep(700)
 
   // The keyboard still moves it: the range input is the control for keys.
   const key = async (name, code) => {

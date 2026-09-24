@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
-import { EFFORT_TRACK_WIDTH, EffortSlider, stopPosition } from './components/EffortSlider.js'
+import { DROP_WIDTH, EFFORT_TRACK_WIDTH, EffortSlider, stopPosition, THUMB_WIDTH } from './components/EffortSlider.js'
 import { effortName } from './effortLevels.js'
 
 /**
@@ -64,7 +64,15 @@ describe('the control', () => {
     expect(stopPosition(4, 5)).toBeLessThan(EFFORT_TRACK_WIDTH)
     expect(stopPosition(0, 5) + stopPosition(4, 5)).toBeCloseTo(EFFORT_TRACK_WIDTH)
     expect(stopPosition(0, 1)).toBe(EFFORT_TRACK_WIDTH / 2)
-    expect(draw({ index: 2 })).toContain(`translateX(${String(stopPosition(2, 5) - 6)}px)`)
+    // The thumb, and the drop the liquid is made from, both centred on the level.
+    expect(draw({ index: 2 })).toContain(`translateX(${String(stopPosition(2, 5) - THUMB_WIDTH / 2)}px)`)
+    expect(draw({ index: 2 })).toContain(`translateX(${String(stopPosition(2, 5) - DROP_WIDTH / 2)}px)`)
+  })
+
+  it("draws the thumb over the liquid, not as it (Colin, 2026-09-24: \"our white ball/square is off\")", () => {
+    // The drop is inside the liquid; the thumb is the next thing after the
+    // liquid closes -- a crisp element, so the goo's blur cannot round it.
+    expect(draw()).toMatch(/lc-effortpanel__liquid[\s\S]*lc-effortpanel__drop[\s\S]*<\/div><span class="lc-effortpanel__thumb"/)
   })
 
   it('is a real range input over the track: the browser keeps its keys, its snapping and its name', () => {

@@ -617,11 +617,17 @@
      #8). Drawn whole, it reads as a gauge. */
   --lc-contextring-track: rgba(255, 255, 255, 0.22);
   --lc-contextring-fill: rgba(255, 255, 255, 0.68);
-  --lc-effort-track: rgba(255, 255, 255, 0.07);
-  --lc-effort-fill: rgba(255, 255, 255, 0.11);
-  --lc-effort-dot: rgba(255, 255, 255, 0.26);
-  --lc-effort-dot-passed: rgba(255, 255, 255, 0.5);
-  --lc-effort-thumb: #f2f2f2;
+  /* Claude Code's, read off Colin's frame of it (2026-09-24): a track at
+     luminance 52 and a fill at 125 on its panel -- ours was 45 and 68, so the
+     part up to the level barely showed -- 2px dots a quarter white on both,
+     and a pure white thumb whose shadow darkens the fill by about a tenth at
+     its edge, gone 10px out. */
+  --lc-effort-track: rgba(255, 255, 255, 0.1);
+  --lc-effort-fill: rgba(255, 255, 255, 0.36);
+  --lc-effort-dot: rgba(255, 255, 255, 0.25);
+  --lc-effort-dot-passed: rgba(255, 255, 255, 0.25);
+  --lc-effort-thumb: #ffffff;
+  --lc-effort-thumb-lift: 0 0 11px 0 rgba(0, 0, 0, 0.19);
   --lc-effort-thumb-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.45);
   --lc-plusmenu-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04) inset, 0 1px 0 0 rgba(255, 255, 255, 0.03) inset, 0 0 0 1px rgba(0, 0, 0, 0.06), 0 2px 6px 0 rgba(0, 0, 0, 0.05), 0 4px 42px 0 rgba(0, 0, 0, 0.24);
   --lc-hover-surface-strong: rgba(255, 255, 255, 0.07);

@@ -18,9 +18,9 @@ import { effortDescription, effortName } from '../effortLevels.js'
  * So, top to bottom, as Claude Code draws it: the word Effort and the level's
  * name, a ? that says what the level costs; Faster and Smarter at the ends;
  * a rounded track with a dot at every stop and the part up to the level
- * filled; a white pill thumb. The thumb is the page's liquid slider (the Move
- * demo): its surface is a liquid blob that chases it on a spring and leaves a
- * droplet tail.
+ * filled; a white thumb, Claude Code's rounded rectangle. Under the thumb is
+ * the page's liquid slider (the Move demo): a liquid drop that chases it on a
+ * spring and leaves a droplet tail.
  *
  * THE POINTER HOLDS THE THUMB (0.301). Colin, 2026-09-23, with frames of ours,
  * Claude's and the gooey page's slider: "our effort slide is a little wonky
@@ -37,6 +37,18 @@ import { effortDescription, effortName } from '../effortLevels.js'
  * thumb follows the pointer along the track with the fill under it, the level
  * names the nearest stop and is picked as it changes, and on letting go it
  * settles on that stop -- the liquid pouring the last of the way.
+ *
+ * THE THUMB IS DRAWN, NOT MELTED (2026-09-24). Colin, with frames of ours at
+ * Medium and Claude Code's at Max: "our white ball/square is off and not
+ * quite right, cc for reference". Measured off the two frames, which are at
+ * one scale ("Faster" is 8 x 32px in both): Claude Code's thumb is a white
+ * rounded rectangle, 16 x 20 with 4px corners, the full height of a 20px
+ * track; ours was a ball about 10px across. The blob WAS the thumb, and a
+ * 6px goo blur on a 12px-wide shape can only ever come out round. So the
+ * thumb is its own crisp element, Claude Code's shape, over the liquid; the
+ * liquid's source is a smaller drop hidden under it, so at rest nothing of
+ * it shows, and when the thumb moves, the drop lagging on its spring pours
+ * out behind it -- the gooey page's tail, without the ball.
  *
  * The stops are the model's own (effortScale.ts), named in words
  * (`effortName`), and a model with fast variants gets the switch below.
@@ -59,7 +71,10 @@ const MOVE = { springiness: 0.5, wobble: 0.25, stretch: 0.85, trail: 0.6 }
 const GOO = { blur: 6, contrast: 18, waviness: 0 }
 /** The track's inner width, and the thumb's: stops sit this far in from each end. */
 export const EFFORT_TRACK_WIDTH = 216
-const THUMB_WIDTH = 12
+/** Claude Code's thumb is 16px wide (and 20 tall, the track's height: shell.css). */
+export const THUMB_WIDTH = 16
+/** The liquid's source: smaller than the thumb, so the goo it makes stays under it at rest. */
+export const DROP_WIDTH = 12
 const INSET = THUMB_WIDTH / 2 + 5
 
 /** Where stop `index` of `count` sits, along the track, in px from its left edge. */
@@ -115,6 +130,14 @@ export function EffortSlider({
   const control = useRef<HTMLInputElement>(null)
   /** Where the thumb is while a pointer holds it; undefined when it rests on its stop. */
   const [held, setHeld] = useState<number>()
+  /**
+   * A press far from the thumb JUMPS it; the drop under it is started again
+   * there rather than left to chase it. Chasing across the track, it showed
+   * as a lone white ball crossing after the thumb (probe-effort-slider,
+   * 2026-09-24, frame 03) -- the ball Colin had just asked to be rid of. Held
+   * and moved, the drop stays close enough to read as the thumb's tail.
+   */
+  const [pour, setPour] = useState(0)
   const x = held ?? stopPosition(index, count)
   const shown = held === undefined ? index : nearestStop(held, count)
   const level = bases[shown] ?? bases[0] ?? ''
@@ -164,6 +187,7 @@ export function EffortSlider({
             // A synthetic event has no pointer to capture; the move still reads.
           }
           control.current?.focus({ preventScroll: true })
+          if (Math.abs(heldAt(event.clientX, event.currentTarget.getBoundingClientRect().left) - x) > THUMB_WIDTH) setPour((n) => n + 1)
           hold(event)
         }}
         onPointerMove={(event) => {
@@ -192,10 +216,15 @@ export function EffortSlider({
           waviness={GOO.waviness}
           className="lc-effortpanel__liquid"
         >
-          <Liquid.Item effect="move" move={MOVE}>
-            <span className="lc-effortpanel__thumb" style={{ transform: `translateX(${String(x - THUMB_WIDTH / 2)}px)` }} />
+          <Liquid.Item key={pour} effect="move" move={MOVE}>
+            <span className="lc-effortpanel__drop" style={{ transform: `translateX(${String(x - DROP_WIDTH / 2)}px)` }} />
           </Liquid.Item>
         </Liquid>
+        <span
+          className="lc-effortpanel__thumb"
+          style={{ transform: `translateX(${String(x - THUMB_WIDTH / 2)}px)` }}
+          aria-hidden="true"
+        />
         <input
           ref={control}
           className="lc-effortpanel__slider"

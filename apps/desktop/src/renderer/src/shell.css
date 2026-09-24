@@ -4803,9 +4803,18 @@ textarea {
 }
 
 /* The first screen, redrawn (design agent, 2026-09-19): one left edge shared
-   with the composer, and rows that say what they cost. */
+   with the composer, and rows that say what they cost.
+
+   Except this line, which is the machine's caption: CENTRED UNDER IT. Colin,
+   2026-09-24, with a frame of it: "text is way off center". At the column's
+   left edge under a centred machine, its middle was 182px left of the
+   machine's at 1215 wide and 243px at 1920 (probe-first-screen-centre); the
+   list and the composer below keep the shared edge. */
 .lc-intro {
   margin: 0;
+  align-self: center;
+  text-align: center;
+  text-wrap: balance;
   max-width: 66ch;
   font-size: var(--lc-text-body);
   line-height: 1.7;
@@ -10964,7 +10973,8 @@ textarea {
 .lc-effortpanel__scale {
   position: relative;
   display: block;
-  height: 22px;
+  /* 20: Claude Code's track, measured off Colin's frame of it (2026-09-24). */
+  height: 20px;
   /* The pointer holds the thumb here (EffortSlider): no page scroll or
      text selection is started by a drag along it. */
   cursor: pointer;
@@ -10981,8 +10991,8 @@ textarea {
   position: absolute;
   left: 0;
   top: 0;
-  height: 22px;
-  border-radius: 11px;
+  height: 20px;
+  border-radius: 10px;
   pointer-events: none;
 }
 
@@ -11008,12 +11018,13 @@ textarea {
   pointer-events: none;
 }
 
+/* Claude Code's dots: 2px, and as faint on the fill as on the track. */
 .lc-effortpanel__notch {
   position: absolute;
   top: 50%;
-  width: 4px;
-  height: 4px;
-  margin: -2px 0 0 -2px;
+  width: 2px;
+  height: 2px;
+  margin: -1px 0 0 -1px;
   border-radius: 50%;
   background: var(--lc-effort-dot);
 }
@@ -11033,19 +11044,51 @@ textarea {
 .lc-effortpanel__liquid {
   display: block;
   width: 100%;
-  height: 22px;
+  height: 20px;
   pointer-events: none;
 }
 
-/* The thumb element is unstyled on purpose: its surface and shadow are the
-   liquid's blob (the page's `.sl-thumb`). A white pill, as Claude Code's. */
-.lc-effortpanel__thumb {
+/*
+ * The liquid's source: unstyled, its surface and shadow are the blob the
+ * library draws from its box (the page's `.sl-thumb`). Smaller than the thumb
+ * on purpose -- the blob of a 12 x 16 box under a 6px goo blur comes out about
+ * 10 x 12, so at rest it and its shadow are covered by the thumb, and only
+ * the part that lags behind a moving thumb shows.
+ */
+.lc-effortpanel__drop {
   position: absolute;
   left: 0;
   top: 2px;
   width: 12px;
-  height: 18px;
+  height: 16px;
   border-radius: 6px;
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/*
+ * THE THUMB: Claude Code's, measured off Colin's frame of it (2026-09-24) --
+ * white, a rounded rectangle 16 x 20 with 4px corners, the track's full
+ * height, and a soft shadow that darkens the fill for about 10px either side.
+ * Drawn, not melted: it lies over the liquid, which only shows as the tail it
+ * leaves (EffortSlider). It glides with the fill on a key or a let-go, and
+ * is under the pointer, with no ease, while held.
+ */
+.lc-effortpanel__thumb {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 16px;
+  height: 20px;
+  border-radius: 4px;
+  background: var(--lc-effort-thumb);
+  box-shadow: var(--lc-effort-thumb-lift);
+  pointer-events: none;
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lc-effortpanel__scale.is-held .lc-effortpanel__thumb,
+.lc-effortpanel__scale.is-held .lc-effortpanel__drop {
+  transition: none;
 }
 
 /* The control for the keyboard and the screen reader: the whole track,
@@ -11057,7 +11100,7 @@ textarea {
   inset: 0;
   z-index: 1;
   width: 100%;
-  height: 22px;
+  height: 20px;
   margin: 0;
   opacity: 0;
   appearance: none;
