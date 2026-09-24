@@ -11,6 +11,21 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.328.0 - 2026-09-24
+
+### Improved
+
+- **A teammate's "I fixed it" comes with what Locust saw.** When a
+  teammate messages another after changing files, the message now carries
+  the files Locust itself saw that run change, so the one reading it can
+  tell a claim from a fact.
+- **Teammates hear about each other's edits.** When two teammates have
+  both changed the same file in the last few hours, each one's next task
+  starts with a note saying who changed it, so neither undoes the other.
+- **An urgent message reaches a busy Codex teammate without stopping
+  them.** A message marked to be taken now is shown to a Codex teammate at
+  their next step, instead of waiting for their run to end or stopping it.
+
 ## 0.327.0 - 2026-09-24
 
 ### New
