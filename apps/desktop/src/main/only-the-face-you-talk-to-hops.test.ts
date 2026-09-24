@@ -60,8 +60,12 @@ describe('the slight bounce', () => {
 
   it('is a small lift and a longer rest', () => {
     expect(rule('.lc-bot.is-bouncing')).toContain('animation: lcBotBounce')
-    const frames = shell.slice(shell.indexOf('@keyframes lcBotBounce'), shell.indexOf('@keyframes lcBotBounce') + 200)
+    // The whole block: since 0.305 its curve is written out in keyframes and stepped.
+    const start = shell.indexOf('@keyframes lcBotBounce')
+    const frames = shell.slice(start, shell.indexOf('\n}', start))
     expect(frames).toContain('translateY(-7%)')
+    // Down again by 46%, and still from there: the rest is the longer part.
+    expect(frames).toMatch(/46% \{\s*transform: translateY\(0\)/)
   })
 
   it('stops for a person who asked for less motion', () => {
