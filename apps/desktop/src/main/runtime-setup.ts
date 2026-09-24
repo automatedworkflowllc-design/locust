@@ -175,6 +175,18 @@ async function codex(options: RuntimeSetupOptions, home: string, ws: string | un
     addNames(found.mcpServers, [...text.matchAll(/^\s*\[mcp_servers\.([^\]\s.]+)\]/gm)].map((match) => match[1] ?? ''))
     if (/^\s*notify\s*=/m.test(text)) addNames(found.hooks, ['notify (1)'])
   }
+  /*
+   * A4.1: Codex's skills, from where Codex itself finds them. MEASURED
+   * 2026-09-24 with its app-server's `skills/list` (starts no turn): the
+   * user's ~/.agents/skills, and its own ~/.codex/skills -- whose `.system`
+   * folder of built-ins is left out, as every dot-name is. The project's
+   * `.agents/skills` is named beside them in the 0.156.1 binary. Skills a
+   * Codex PLUGIN brings (~/.codex/plugins/cache) are the plugin's, not listed.
+   * Not ~/.claude/skills: Codex does not read it.
+   */
+  addNames(found.skills, await names(join(home, '.codex', 'skills'), options, found, 'folders'))
+  addNames(found.skills, await names(join(home, '.agents', 'skills'), options, found, 'folders'))
+  if (ws !== undefined) addNames(found.skills, await names(join(ws, '.agents', 'skills'), options, found, 'folders'))
   return found
 }
 
@@ -196,6 +208,23 @@ async function opencode(options: RuntimeSetupOptions, home: string, ws: string |
     const config = await readJson(path, options, found)
     addNames(found.mcpServers, keysOf(config?.mcp))
   }
+  /*
+   * A4.1: OpenCode's skills, READ FROM ITS SOURCE (skill/index.ts,
+   * 2026-09-24): Claude Code's and the shared `.agents` folders at home and
+   * in the project -- so an OpenCode teammate carries the person's Claude
+   * skills too, which the research found (18 of them) and nothing showed --
+   * and its own `skill` or `skills` folder beside its config.
+   */
+  const skillFolders = [
+    join(home, '.claude', 'skills'),
+    join(home, '.agents', 'skills'),
+    join(home, '.config', 'opencode', 'skill'),
+    join(home, '.config', 'opencode', 'skills'),
+    ...(ws === undefined
+      ? []
+      : [join(ws, '.claude', 'skills'), join(ws, '.agents', 'skills'), join(ws, '.opencode', 'skill'), join(ws, '.opencode', 'skills')])
+  ]
+  for (const folder of skillFolders) addNames(found.skills, await names(folder, options, found, 'folders'))
   return found
 }
 

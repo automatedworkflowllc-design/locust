@@ -11,6 +11,26 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.324.0 - 2026-09-24
+
+### Fixed
+
+- **A review of a long answer starts.** Asking a teammate to review a long
+  piece of work was refused with "Enter a mission between 1 and 8,000
+  characters". The review now fits: a long reply keeps its opening and its
+  ending, and says how much of the middle was left out.
+
+### Improved
+
+- **A review opens with its verdict.** The reviewer starts with Ready,
+  Needs changes or Start over, edits nothing, and checks the author's own
+  claims ("the tests pass") rather than repeating them.
+- **Settings shows the skills Codex and OpenCode actually load**, from
+  their own folders -- including, for OpenCode, the Claude Code skills it
+  picks up.
+- **OpenCode's usage is complete.** Its reasoning tokens are counted in
+  "out", its cached reads are kept, and a paid model's cost is shown.
+
 ## 0.323.0 - 2026-09-24
 
 ### Improved

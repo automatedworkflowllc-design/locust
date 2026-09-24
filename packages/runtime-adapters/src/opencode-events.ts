@@ -219,6 +219,21 @@ export function createOpenCodeEventNormalizer(
   let messageIndex = 0;
   let inputTokens = 0;
   let outputTokens = 0;
+  /*
+   * A6.4: the rest of what a step reports. MEASURED in the captured streams
+   * (test/fixtures/opencode): reasoning is often larger than the visible
+   * output -- 420 against 78 on one step -- and a later step reads nearly
+   * its whole prompt from cache (15,217 cached against 261 new). Reasoning
+   * is generated and is counted as output, the way Claude Code's
+   * `output_tokens` already includes its thinking; the cache is carried as
+   * its own counts, as Claude Code's receipt does; the cost only when there
+   * is one -- a free model's explicit 0 would read as "$0.00 ... priced",
+   * which is the wording the free routes were rid of (Sol, 0.225.0).
+   */
+  let reasoningTokens = 0;
+  let cacheReadTokens = 0;
+  let cacheWriteTokens = 0;
+  let costUsd = 0;
   let sawTokens = false;
   // The last provider error the runtime reported, kept so the run that follows
   // it can say what happened instead of shrugging.
@@ -288,14 +303,21 @@ export function createOpenCodeEventNormalizer(
 
     if (type === "step_finish") {
       const tokens = isObject(part.tokens) ? part.tokens : {};
-      if (typeof tokens.input === "number" && Number.isFinite(tokens.input)) {
-        inputTokens += tokens.input;
+      const cache = isObject(tokens.cache) ? tokens.cache : {};
+      const counted = (value: unknown): number | undefined =>
+        typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
+      if (counted(tokens.input) !== undefined) {
+        inputTokens += counted(tokens.input)!;
         sawTokens = true;
       }
-      if (typeof tokens.output === "number" && Number.isFinite(tokens.output)) {
-        outputTokens += tokens.output;
+      if (counted(tokens.output) !== undefined) {
+        outputTokens += counted(tokens.output)!;
         sawTokens = true;
       }
+      reasoningTokens += counted(tokens.reasoning) ?? 0;
+      cacheReadTokens += counted(cache.read) ?? 0;
+      cacheWriteTokens += counted(cache.write) ?? 0;
+      costUsd += counted(part.cost) ?? 0;
       // Each step reports its own counts, so a run's cost is their sum. Taking
       // the last step's numbers would report the cheapest step as the total.
       if (stringValue(part.reason) === "stop") sawStop = true;
@@ -514,7 +536,13 @@ export function createOpenCodeEventNormalizer(
       const process = processEvidence(completion);
       const thread = runtimeThreadId === undefined ? {} : { runtimeThreadId };
       const usage: RedactedJsonValue | undefined = sawTokens
-        ? { inputTokens, outputTokens }
+        ? {
+            inputTokens,
+            outputTokens: outputTokens + reasoningTokens,
+            ...(cacheReadTokens > 0 ? { cacheReadTokens } : {}),
+            ...(cacheWriteTokens > 0 ? { cacheWriteTokens } : {}),
+            ...(costUsd > 0 ? { usd: costUsd } : {}),
+          }
         : undefined;
       if (completion.cancelled) {
         return [emit("run.cancelled", { ...thread, process })];

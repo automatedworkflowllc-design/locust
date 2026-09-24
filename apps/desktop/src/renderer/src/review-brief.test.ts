@@ -59,7 +59,8 @@ describe('the brief a reviewer is handed', () => {
   it('tells it to report rather than fix', () => {
     // A reviewer that redoes the work is a second builder.
     expect(reviewBrief(MATERIAL)).toContain('Do not redo the work')
-    expect(reviewBrief(MATERIAL)).toContain('Report; do not fix.')
+    // And, since A3.2, edits nothing at all.
+    expect(reviewBrief(MATERIAL)).toContain('edit no file: report; do not fix.')
   })
 
   it('says a short answer is right when the work is fine', () => {
@@ -139,8 +140,14 @@ describe('the brief a reviewer is handed', () => {
   })
 
   it('says out loud when the reply was cut, rather than ending mid-sentence', () => {
-    const brief = reviewBrief({ ...MATERIAL, said: 'y'.repeat(20_000) })
-    expect(brief).toContain('the rest is in their thread')
+    // A5.2: cut from the MIDDLE, so the ending -- where the answer is -- stays,
+    // and the whole brief still fits the 8,000 a mission prompt may be.
+    const said = `It opened like this. ${'y'.repeat(20_000)} And it ended with the answer: 42.`
+    const brief = reviewBrief({ ...MATERIAL, said })
+    expect(brief).toContain('It opened like this.')
+    expect(brief).toContain('And it ended with the answer: 42.')
+    expect(brief).toMatch(/\[\.\.\. [\d,]+ characters from the middle of the reply left out; the whole reply is in their thread \.\.\.\]/)
+    expect(brief.length).toBeLessThanOrEqual(8_000)
   })
 
   it('bounds a very long request, with a mark', () => {

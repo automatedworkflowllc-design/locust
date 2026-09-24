@@ -122,11 +122,24 @@ describe("a write-mode OpenCode run that read and then wrote, as captured", () =
   });
 
   it("adds up what every step cost, rather than reporting the last step as the total", () => {
-    // The three steps reported 8673 + 1041 + 389 in and 113 + 136 + 11 out.
+    // The three steps reported 8673 + 1041 + 389 in and 113 + 136 + 11 out --
+    // and, read in full since A6.4, 853 reasoning tokens (counted as output,
+    // as Claude Code's output already counts its thinking) and 18,835 read
+    // from cache. The cost was an explicit 0 on a free model, and is left
+    // off rather than shown as "$0.00".
     const completed = events.at(-1);
     expect(completed?.type).toBe("run.completed");
     expect((completed?.payload as { usage?: Record<string, number> }).usage)
-      .toEqual({ inputTokens: 10_103, outputTokens: 260 });
+      .toEqual({ inputTokens: 10_103, outputTokens: 1_113, cacheReadTokens: 18_835 });
+  });
+
+  it("carries a real cost when a model has one", () => {
+    const priced = run([
+      JSON.stringify({ type: "step_start", sessionID: "ses_1", part: { type: "step-start" } }),
+      JSON.stringify({ type: "step_finish", sessionID: "ses_1", part: { type: "step-finish", reason: "stop", cost: 0.0123, tokens: { input: 900, output: 40, reasoning: 10, cache: { read: 100, write: 50 } } } }),
+    ]).events;
+    expect((priced.at(-1)?.payload as { usage?: Record<string, number> }).usage)
+      .toEqual({ inputTokens: 900, outputTokens: 50, cacheReadTokens: 100, cacheWriteTokens: 50, usd: 0.0123 });
   });
 });
 

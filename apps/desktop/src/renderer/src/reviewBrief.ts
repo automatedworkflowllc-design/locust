@@ -1,4 +1,5 @@
 import { defangProtocolBlocks } from '../../shared/protocolTags.js'
+import { STEP_BUDGET } from '../../shared/step-budget.js'
 
 /**
  * Handing a finished mission to another teammate to be challenged.
@@ -98,18 +99,40 @@ export interface ReviewMaterial {
 /** Long enough to carry a real request, short enough not to be the whole turn. */
 const MAX_REQUEST = 1_200
 /**
- * The reply gets the largest budget of anything here, because for most turns
- * it IS the work. It is still bounded: a brief that carries a whole long
- * session would cost more to read than the review is worth, and the truncation
- * is said out loud rather than left as a silent cut.
+ * THE WHOLE BRIEF FITS WHERE IT IS SENT (A5.2).
+ *
+ * The brief is the reviewer's mission prompt, and a mission prompt is at
+ * most `STEP_BUDGET` -- 8,000 characters. The reply alone was allowed 8,000,
+ * on top of the request, the paths, the commands and the job, so reviewing a
+ * long turn built a prompt the mission service refused ("Enter a mission
+ * between 1 and 8,000 characters") and the review never started (the code
+ * review's reported item). Everything else is bounded first; the reply gets
+ * what is left, because for most turns it IS the work.
  */
-const MAX_SAID = 8_000
+const MAX_BRIEF = STEP_BUDGET - 200
 const MAX_PATHS = 20
 const MAX_COMMANDS = 12
+/** Where the reply's middle was, said where it was. */
+const TRIMMED = (count: number): string =>
+  `[... ${count.toLocaleString('en-US')} characters from the middle of the reply left out; the whole reply is in their thread ...]`
 
 function bounded(text: string, limit: number): string {
   const clean = text.replace(/\r\n?/g, '\n').trim()
   return clean.length <= limit ? clean : `${clean.slice(0, limit - 1)}…`
+}
+
+/**
+ * The reply cut to `limit`, from the MIDDLE: how it opened and how it ended
+ * both stay -- the end is where a turn puts its answer and what is left
+ * open, which a cut from the end took first -- and the gap says how much.
+ */
+export function trimmedFromTheMiddle(text: string, limit: number): string {
+  const clean = text.replace(/\r\n?/g, '\n').trim()
+  if (clean.length <= limit) return clean
+  const room = Math.max(0, limit - TRIMMED(clean.length).length - 2)
+  const head = Math.floor(room * 0.4)
+  const tail = room - head
+  return `${clean.slice(0, head).trimEnd()}\n${TRIMMED(clean.length - head - tail)}\n${clean.slice(clean.length - tail).trimStart()}`
 }
 
 /**
@@ -121,6 +144,14 @@ function bounded(text: string, limit: number): string {
  * thing it is in a position to know.
  */
 export function reviewBrief(material: ReviewMaterial): string {
+  const SAID = '\u0000SAID\u0000'
+  const brief = reviewBriefAround(material, SAID)
+  if (!brief.includes(SAID)) return brief
+  const room = Math.max(400, MAX_BRIEF - (brief.length - SAID.length))
+  return brief.replace(SAID, trimmedFromTheMiddle(defangProtocolBlocks(material.said), room))
+}
+
+function reviewBriefAround(material: ReviewMaterial, saidSlot: string): string {
   const lines: string[] = []
   lines.push(
     `${material.author} finished a piece of work and you are reviewing it. You did not do this work and you cannot see their conversation; everything known about it is below.`
@@ -157,11 +188,9 @@ export function reviewBrief(material: ReviewMaterial): string {
      * that block parsed out of ITS reply and written to the team's memory,
      * under its name, with nobody having asked.
      */
-    const said = bounded(defangProtocolBlocks(material.said), MAX_SAID)
-    lines.push(said)
-    if (said !== material.said.replace(/\r\n?/g, '\n').trim()) {
-      lines.push('(The reply was longer than this; the rest is in their thread.)')
-    }
+    // Filled in by `reviewBrief` once everything else is known, so the whole
+    // brief fits; a long reply loses its middle, and says so.
+    lines.push(saidSlot)
   }
   lines.push('')
 
@@ -248,7 +277,16 @@ function jobLines(): readonly string[] {
     // The two failure modes of a reviewer, said as rules. Both were watched for
     // in the proposal: a reviewer that redoes the work is a second builder, and
     // a reviewer that approves everything is worse than none.
-    'Do not redo the work or make the change yourself. Report; do not fix.',
+    'Do not redo the work or make the change yourself, and edit no file: report; do not fix.',
+    /*
+     * A3.2 (impeccable's reviewer contract). What the author says it did is
+     * the thing under review, not evidence for it: "fixed the null check,
+     * tests pass" is a claim, and a reviewer that repeats it has reviewed
+     * nothing.
+     */
+    'What they said about their own work is their account, not evidence: check a claim such as "the tests pass" or "this fixes it" against the files, or by running it.',
+    // And a verdict first, so the person can read the outcome in one line.
+    'Start your answer with a one-line verdict -- Ready, Needs changes, or Start over -- then the reasons.',
     'If it does what was asked, say so plainly and stop — a short answer is the right answer for work that is fine. If something is wrong, name the file and what is wrong with it.',
     // The exact claim this whole feature exists to stop being made by accident.
     'The commands above are what was run, not proof that the work is correct: a command exiting 0 says only that it exited 0. Decide for yourself what it does and does not show.'

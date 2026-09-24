@@ -103,3 +103,43 @@ describe("what each runtime has set up for itself", () => {
     expect(setup.codex).toEqual({ mcpServers: [], hooks: [], skills: [], agents: [], sources: [], unreadable: [] })
   })
 })
+
+/*
+ * A4.1: skills from every runtime's own folders, as each finds them -- Codex
+ * measured through its app-server's skills/list, OpenCode read from its
+ * source. Cursor and Copilot are not guessed at.
+ */
+describe('the skills each runtime finds', () => {
+  const folders = (tree: Readonly<Record<string, readonly string[]>>) => {
+    const normal = (p: string) => p.replace(/\\/g, '/').toLowerCase()
+    const held = new Map(Object.entries(tree).map(([path, entries]) => [normal(path), entries]))
+    return async (directory: string): Promise<readonly string[]> => {
+      const entries = held.get(normal(directory))
+      if (entries === undefined) {
+        const error = new Error('not found') as NodeJS.ErrnoException
+        error.code = 'ENOENT'
+        throw error
+      }
+      return entries
+    }
+  }
+  const tree = {
+    'C:/Users/colin/.claude/skills': ['reskin/', 'new-lead/'],
+    'C:/Users/colin/.agents/skills': ['shared-one/'],
+    'C:/Users/colin/.codex/skills': ['.system/', 'codex-own/'],
+    'C:/Users/colin/shop/.agents/skills': ['project-agents/'],
+    'C:/Users/colin/shop/.opencode/skills': ['opencode-own/']
+  }
+
+  it('lists Codex skills from ~/.codex/skills and the .agents folders, never the Claude folder or its built-ins', async () => {
+    const setup = await readRuntimeSetup({ workspacePath: WS, homeDirectory: HOME, read: disk({}), list: folders(tree) })
+    expect(setup.codex?.skills).toEqual(['codex-own', 'shared-one', 'project-agents'])
+  })
+
+  it('lists OpenCode skills from the Claude and .agents folders and its own', async () => {
+    const setup = await readRuntimeSetup({ workspacePath: WS, homeDirectory: HOME, read: disk({}), list: folders(tree) })
+    expect(setup.opencode?.skills).toEqual(['reskin', 'new-lead', 'shared-one', 'project-agents', 'opencode-own'])
+    // Claude Code's own list is unchanged: its two folders.
+    expect(setup.claude?.skills).toEqual(['reskin', 'new-lead'])
+  })
+})
