@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto'
 import type { RoutineExecution, RoutineRecoveryRequest, RoutineRecoveryResponse } from '../shared/routine-recovery.js'
 import type { RoutineStore } from './routine-store.js'
 import { hostReadsEventsOf } from '../shared/runtimes.js'
+import { stepTooLongNotice } from '../shared/step-budget.js'
 
 /**
  * Replays a routine: step 1 starts as a new mission for the teammate, and each
@@ -237,6 +238,25 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
     const prompt = routine.steps[step - 1]
     if (prompt === undefined) {
       return { ok: false, error: { code: 'RUNTIME_START_FAILED', message: `Routine has no step ${String(step)}.` } }
+    }
+    /*
+     * A STEP TOO LONG TO SEND IS REFUSED HERE, BEFORE ANYTHING IS RECORDED
+     * (A5.1).
+     *
+     * It used to be written down as dispatching, handed to the mission
+     * service, refused there ("Enter a mission between 1 and 8,000
+     * characters."), and -- from step 2 on -- held as "Dispatch not confirmed
+     * ... Review external work before proceeding": a person sent to check
+     * for side effects of a step that provably never started. A routine
+     * saved before 0.316 can still hold one (the store reads 20,000 and
+     * saves 8,000), so the check stays here too.
+     */
+    const tooLong = stepTooLongNotice(prompt)
+    if (tooLong !== undefined) {
+      const message = `Step ${String(step)} is too long to send: ${tooLong} Shorten it in Edit, then run the routine again. Nothing was started.`
+      const prior = routine.execution
+      if (step > 1 && prior !== undefined && prior.status !== 'abandoned') await hold(routine, prior, message)
+      return { ok: false, error: { code: 'INVALID_PROMPT', message } }
     }
     /*
      * Approve-each replays now, and draws its cards.

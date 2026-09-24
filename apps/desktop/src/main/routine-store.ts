@@ -7,6 +7,7 @@ import type { PublicRoutine, TeammateRoute } from '../shared/ipc.js'
 import { validSchedule } from '../shared/routine-schedule.js'
 import { isTeammateRoute, safeId } from './teammate-store.js'
 import type { RoutineExecution } from '../shared/routine-recovery.js'
+import { STEP_BUDGET } from '../shared/step-budget.js'
 
 /**
  * Routines: conversations a person saved as steps a teammate can replay.
@@ -25,7 +26,20 @@ const MAX_FILE_BYTES = 4 * 1024 * 1024
 export const ROUTINES_UNREADABLE = 'ROUTINES_UNREADABLE'
 export const MAX_ROUTINES = 64
 export const MAX_STEPS = 12
+/**
+ * What a stored routine may hold when it is READ -- 20,000, as it always was,
+ * so a routine saved before 0.316 stays readable. A step is SAVED only up to
+ * STEP_BUDGET (A5.1): the message a step becomes can carry about 8,000, and
+ * one saved longer never started.
+ */
 export const MAX_STEP_LENGTH = 20_000
+
+/** Why these steps cannot be saved, or undefined when they can. */
+export function stepsTooLongToSave(steps: readonly string[]): string | undefined {
+  const index = steps.findIndex((step) => step.length > STEP_BUDGET)
+  if (index < 0) return undefined
+  return `Step ${String(index + 1)} is ${steps[index]!.length.toLocaleString('en-US')} characters; a step can be at most ${STEP_BUDGET.toLocaleString('en-US')}. Shorten it and save again.`
+}
 export const MAX_ROUTINE_NAME_LENGTH = 80
 export const MAX_LEARNED_FROM = 64
 
@@ -243,6 +257,8 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
         if (!safeId(input.teammateId)) throw new Error('Teammate id is invalid')
         if (!isTeammateRoute(input.route)) throw new Error('Routine route is invalid')
         if (!validSteps(input.steps)) throw new Error(`Routine steps are invalid: 1 to ${String(MAX_STEPS)} non-empty steps`)
+        const tooLongToSave = stepsTooLongToSave(input.steps)
+        if (tooLongToSave !== undefined) throw new Error(tooLongToSave)
         if (!validLearnedFrom(input.learnedFrom)) throw new Error('Routine provenance is invalid')
         if (input.schedule !== undefined && !validSchedule(input.schedule)) {
           throw new Error('The schedule is not one Locust can keep: every 1 to 168 hours, or daily at HH:MM.')
@@ -275,6 +291,8 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
         if (!safeId(input.routineId)) throw new Error('Routine id is invalid')
         if (!validRoutineName(input.name)) throw new Error('Routine name is invalid')
         if (!validSteps(input.steps)) throw new Error(`Routine steps are invalid: 1 to ${String(MAX_STEPS)} non-empty steps`)
+        const tooLongToSave = stepsTooLongToSave(input.steps)
+        if (tooLongToSave !== undefined) throw new Error(tooLongToSave)
         const file = await read()
         const held = file.routines.find((routine) => routine.routineId === input.routineId)
         if (held === undefined) throw new Error('Routine not found')

@@ -10,7 +10,7 @@ import type {
 import type { MissionLedger, MissionPeerLink, Workroom, WorkroomMessage } from '@teammate/mission-store'
 import { describe, expect, it, vi } from 'vitest'
 
-import { planSection } from './workroom-briefing.js'
+import { openCodeReadOnlySection, planSection } from './workroom-briefing.js'
 import type { CodexMissionUpdate, MissionApprovalRequest } from '../shared/ipc.js'
 import { MAX_LIVE_MISSIONS } from '../shared/live-missions.js'
 import { createCodexMissionService } from './codex-mission.js'
@@ -1509,6 +1509,7 @@ describe('the workroom around a mission', () => {
     readonly run: RuntimeProcessRun
     readonly workroom: Workroom
     readonly ledger?: Partial<MissionLedger>
+    readonly runtime?: RuntimeDiscovery
   }) {
     const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => input.run)
     const links: { missionId: string; links: readonly MissionPeerLink[] }[] = []
@@ -1522,7 +1523,7 @@ describe('the workroom around a mission', () => {
     let nextId = 0
     const service = createCodexMissionService({
       workspacePath: WORKSPACE,
-      discover: async () => [codexRuntime()],
+      discover: async () => [input.runtime ?? codexRuntime()],
       runner: { start },
       ledger,
       workroom: input.workroom,
@@ -1635,6 +1636,46 @@ describe('the workroom around a mission', () => {
     const plain = peerService({ run: transcript('Done.'), workroom })
     await plain.service.start('Add retries to the fetch helper.', 'codex', 'ask', {}, () => undefined, undefined, PEER)
     expect(plain.start.mock.calls[0]?.[1] as string).not.toContain('PLAN FIRST')
+  })
+
+  it('tells a read-only OpenCode run it has no shell, and no other run (A2.20)', async () => {
+    /*
+     * In Ask or Plan mode OpenCode rejects every shell call and the run ENDS
+     * there; the free models reach for `cat` first. The run is read-only
+     * either way -- the line is what lets it finish (workroom-briefing.ts).
+     */
+    const { workroom } = fakeWorkroom()
+    const codex = codexRuntime()
+    const opencode: RuntimeDiscovery = {
+      ...codex,
+      id: 'opencode',
+      displayName: 'OpenCode',
+      executable: { ...codex.executable!, commandName: 'opencode' }
+    }
+    const sent = async (runtime: RuntimeDiscovery, mode: 'ask' | 'plan' | 'accept-edits'): Promise<string> => {
+      const one = peerService({ run: transcript('Done.'), workroom, runtime })
+      const started = await one.service.start(
+        'What does LOCUST.md say?',
+        runtime.id as 'codex' | 'opencode',
+        mode,
+        runtime.id === 'opencode' ? { model: 'opencode/muse-spark-1.3-contributor-free' } : {},
+        () => undefined,
+        undefined,
+        PEER
+      )
+      expect(started.ok).toBe(true)
+      return one.start.mock.calls[0]?.[1] as string
+    }
+
+    expect(await sent(opencode, 'ask')).toContain(openCodeReadOnlySection())
+    // Plan mode too -- and the plan instruction still comes last.
+    const planned = await sent(opencode, 'plan')
+    expect(planned).toContain(openCodeReadOnlySection())
+    expect(planned.endsWith(planSection())).toBe(true)
+    // A run that may edit has its shell; a read-only Codex run can run
+    // read-only commands in its sandbox, so neither is told otherwise.
+    expect(await sent(opencode, 'accept-edits')).not.toContain(openCodeReadOnlySection())
+    expect(await sent(codex, 'ask')).not.toContain(openCodeReadOnlySection())
   })
 
   it('keeps the person\'s own words as the recorded prompt, not the briefing', async () => {

@@ -323,6 +323,30 @@ function answerSection(): string {
 }
 
 /**
+ * A read-only OpenCode run has no shell -- and was never told so (A2.20).
+ *
+ * OpenCode's read-only config keeps `bash` on its tool list as "ask",
+ * because `deny` takes the tool away and the free tier then answers 403
+ * (commands.ts, OPENCODE_READ_ONLY_CONFIG). `opencode run` is
+ * non-interactive, so it rejects every shell call -- and the run ENDS there.
+ * The free models reach for `cat` before anything else: on the 0.315 drive
+ * of "Ask me first", 3 of 4 turns in Ask mode ended on their first shell
+ * command, one of them before it wrote the memory block it was asked for.
+ *
+ * A model cannot keep a rule nobody told it. The run is still read-only
+ * without this line; the line is what lets it finish.
+ *
+ * It names git because git is what they reach for: measured before this
+ * line, 3 of 9 "what is this project and what state is it in" runs ended on
+ * `git status && git log`, and none of 9 "quote what your team remembers"
+ * (drive-ask-mode-reads, three runs). "Read files instead" alone offers
+ * nothing in place of `git log`, so the line says what to answer from.
+ */
+export function openCodeReadOnlySection(): string {
+  return 'You have NO shell in this mode -- not git, not cat, not ls: any shell command ends this run at once, with nothing done. Use your read, grep, glob and list tools, and answer from what the files show.'
+}
+
+/**
  * Plan first: work the problem out and write down what you WOULD do, without
  * doing any of it.
  *

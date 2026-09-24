@@ -40,6 +40,13 @@ export interface PublicMemory {
   /** When a named memory was last rewritten. Absent if it never has been. */
   readonly updatedAt?: string
   /**
+   * Who wrote its CURRENT wording, when it has been rewritten (A1.6). `by`
+   * is who first kept it. A rewrite used to leave only `by`, so Booty's
+   * "Deploys go out on Thursdays" was credited to the person who had
+   * written "Fridays" -- on the Memory screen, on the card, in every brief.
+   */
+  readonly updatedBy?: { readonly teammateId?: string; readonly name: string }
+  /**
    * On a PROPOSAL only: the kept memory this one would REPLACE, or REMOVE,
    * once the person keeps it. "Ask me first" covers rewrites and forgets
    * (0.315); the kept memory stays as it is, and briefed, until then.
@@ -55,6 +62,18 @@ export interface PublicMemory {
    * person actually does with a note.
    */
   readonly previousText?: string
+}
+
+/**
+ * A kept memory that was forgotten, held for a Restore (A1.8): 7 days, then
+ * gone for good. Wrapped rather than flattened, so nothing that takes a live
+ * memory can be handed a forgotten one by accident.
+ */
+export interface PublicForgottenMemory {
+  readonly memory: PublicMemory
+  readonly forgottenAt: string
+  /** "you", or the teammate who forgot it -- or asked to, and was agreed with. */
+  readonly forgottenBy: { readonly teammateId?: string; readonly name: string }
 }
 
 export interface MemoryAddRequest {
@@ -120,7 +139,13 @@ export type RuntimeSetupResponse =
 export type MemoryListResponse =
   | {
       readonly ok: true
-      readonly data: { readonly memories: readonly PublicMemory[]; readonly workspaceId: string; readonly workspaceName: string }
+      readonly data: {
+        readonly memories: readonly PublicMemory[]
+        /** Recently forgotten, newest first (A1.8). */
+        readonly forgotten?: readonly PublicForgottenMemory[]
+        readonly workspaceId: string
+        readonly workspaceName: string
+      }
     }
   | { readonly ok: false; readonly error: { readonly code: 'MEMORY_REJECTED'; readonly message: string } }
 
@@ -669,6 +694,7 @@ export const MEMORY_ADD_CHANNEL = 'memory:add'
 export const MEMORY_UPDATE_CHANNEL = 'memory:update'
 export const MEMORY_REMOVE_CHANNEL = 'memory:remove'
 export const MEMORY_CLEAR_CHANNEL = 'memory:clear'
+export const MEMORY_RESTORE_CHANNEL = 'memory:restore'
 export const RUNTIME_SETUP_CHANNEL = 'runtime:setup'
 /** Every connector the person's Claude Code reports, and which each teammate may use. */
 export const CONNECTOR_LIST_CHANNEL = 'connectors:list'
@@ -2234,6 +2260,8 @@ export interface DesktopApi {
   updateMemory(request: MemoryUpdateRequest): Promise<MemoryListResponse>
   removeMemory(memoryId: string): Promise<MemoryListResponse>
   clearMemories(request: MemoryClearRequest): Promise<MemoryListResponse>
+  /** Put a recently forgotten memory back, as it was. */
+  restoreMemory(memoryId: string): Promise<MemoryListResponse>
   writeWorkspaceSettings(settings: WorkspaceSettings): Promise<WorkspaceSettings>
   decideMissionApproval(answer: MissionApprovalAnswer): Promise<{ readonly ok: boolean }>
   onMissionApproval(listener: (request: MissionApprovalRequest) => void): () => void

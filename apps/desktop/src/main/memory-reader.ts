@@ -116,11 +116,12 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
         try {
           if (op.kind === 'forget') {
             // In ask mode a forget is proposed, not applied (0.315).
-            const result = await options.memories.forget(
-              op.text,
-              recovered.metadata.workspaceId,
-              mode === 'ask' ? { by, missionId: mission.missionId } : undefined
-            )
+            // Who forgot it goes with it into Recently forgotten (A1.8).
+            const result = await options.memories.forget(op.text, recovered.metadata.workspaceId, {
+              by,
+              missionId: mission.missionId,
+              ask: mode === 'ask'
+            })
             const waiting = result.proposed ?? []
             if (waiting.length > 0) proposedForgets.push(...waiting)
             if (result.removed.length > 0) {

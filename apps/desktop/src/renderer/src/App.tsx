@@ -45,6 +45,7 @@ import type {
   MemoryMode,
   MemoryScope,
   MemoryUpdateRequest,
+  PublicForgottenMemory,
   PublicMemory,
   PublicRuntimeSetup,
   PublicWorkspaceBrief,
@@ -1199,6 +1200,7 @@ export default function App(): ReactElement {
   const [roomNotice, setRoomNotice] = useState<string>()
   /** What the team remembers, as the host last listed it. */
   const [memories, setMemories] = useState<readonly PublicMemory[]>([])
+  const [forgottenMemories, setForgottenMemories] = useState<readonly PublicForgottenMemory[]>([])
   const [memoryWorkspace, setMemoryWorkspace] = useState<{ readonly id: string; readonly name: string }>({ id: '', name: '' })
   const [memoryMode, setMemoryMode] = useState<MemoryMode>(DEFAULT_MEMORY_MODE)
   /**
@@ -2843,6 +2845,7 @@ export default function App(): ReactElement {
   const adoptMemories = (response: MemoryListResponse): string | undefined => {
     if (!response.ok) return response.error.message
     setMemories(response.data.memories)
+    setForgottenMemories(response.data.forgotten ?? [])
     setMemoryWorkspace({ id: response.data.workspaceId, name: response.data.workspaceName })
     return undefined
   }
@@ -2888,6 +2891,7 @@ export default function App(): ReactElement {
   const updateMemory = (request: MemoryUpdateRequest): Promise<string | undefined> => memoryCall(window.desktop?.updateMemory(request))
   const removeMemory = (memoryId: string): Promise<string | undefined> => memoryCall(window.desktop?.removeMemory(memoryId))
   const clearMemories = (scope: 'workspace' | 'all'): Promise<string | undefined> => memoryCall(window.desktop?.clearMemories({ scope }))
+  const restoreMemory = (memoryId: string): Promise<string | undefined> => memoryCall(window.desktop?.restoreMemory(memoryId))
   const changeMemoryMode = (next: MemoryMode): void => {
     const before = memoryMode
     setMemoryMode(next)
@@ -4997,6 +5001,8 @@ export default function App(): ReactElement {
               onUpdate={updateMemory}
               onRemove={removeMemory}
               onClear={clearMemories}
+              forgotten={forgottenMemories}
+              onRestore={restoreMemory}
               // `openMission`, like every other opener. This had its own two
               // lines, and `setShownKey` wants a RUN key -- `runs` is keyed by
               // `run_...` -- so a `mission_...` id matched nothing and the

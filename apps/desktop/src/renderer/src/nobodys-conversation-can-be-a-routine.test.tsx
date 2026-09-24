@@ -83,3 +83,11 @@ describe('saving a conversation nobody owns', () => {
     expect(html).toContain('runs it')
   })
 })
+
+describe('a step too long to send (A5.1)', () => {
+  it('will not save, and says which step to shorten', () => {
+    const html = drawn({ teammate: WREN, initialSteps: ['Fine.', 'x'.repeat(8_001)] })
+    expect(html).toContain('Shorten step 2 to save this routine.')
+    expect(html).toMatch(/<button type="button" class="lc-primarybutton" disabled="">/)
+  })
+})

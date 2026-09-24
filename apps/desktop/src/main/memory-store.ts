@@ -3,7 +3,7 @@ import { constants as fsConstants } from 'node:fs'
 import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
-import type { MemoryScope, PublicMemory } from '../shared/ipc.js'
+import type { MemoryScope, PublicForgottenMemory, PublicMemory } from '../shared/ipc.js'
 import { boundedMemoryText, forgetMatch, memoryKey, memoryName } from '../shared/memory.js'
 import { safeId } from './teammate-store.js'
 
@@ -23,6 +23,12 @@ const SCHEMA_VERSION = 1 as const
 const MAX_FILE_BYTES = 2 * 1024 * 1024
 export const MAX_MEMORIES = 400
 export const MAX_WORKSPACE_NAME_LENGTH = 120
+/** How long a forgotten memory can be put back (A1.8), and how many are held. */
+export const FORGOTTEN_DAYS = 7
+export const MAX_FORGOTTEN = 400
+
+type Actor = { readonly teammateId?: string; readonly name: string }
+const YOU: Actor = { name: 'you' }
 
 export interface MemoryStore {
   list(): Promise<readonly PublicMemory[]>
@@ -57,7 +63,8 @@ export interface MemoryStore {
   }>
   /** Edit the text, switch it on or off, or keep a proposed one. */
   update(input: { readonly memoryId: unknown; readonly text?: unknown; readonly enabled?: unknown; readonly keep?: unknown }): Promise<PublicMemory>
-  remove(memoryId: unknown): Promise<void>
+  /** A person's Remove, or `by` whoever else removed it. A kept memory goes to Recently forgotten. */
+  remove(memoryId: unknown, by?: Actor): Promise<void>
   /**
    * Forget by quote, in this folder and everywhere.
    *
@@ -66,9 +73,22 @@ export interface MemoryStore {
    * see `forgetMatch`. It used to return 0 for both, indistinguishable from
    * "there was nothing to do", and the caller only reported successes.
    */
-  forget(text: string, workspaceId: string, ask?: { readonly by: { readonly teammateId?: string; readonly name: string }; readonly missionId?: string }): Promise<ForgetResult>
+  forget(
+    text: string,
+    workspaceId: string,
+    context?: {
+      readonly by: Actor
+      readonly missionId?: string
+      /** "Ask me first": propose the forget rather than apply it (0.315). */
+      readonly ask?: boolean
+    }
+  ): Promise<ForgetResult>
   /** Everything for one folder, or everything. */
   clear(input: { readonly workspaceId?: string }): Promise<number>
+  /** What the Memory screen shows, from ONE read: the memories, and Recently forgotten, newest first. */
+  snapshot(): Promise<{ readonly memories: readonly PublicMemory[]; readonly forgotten: readonly PublicForgottenMemory[] }>
+  /** Put a recently forgotten memory back, as it was (A1.8). */
+  restore(memoryId: unknown): Promise<PublicMemory>
 }
 
 export interface ForgetResult {
@@ -87,6 +107,12 @@ export interface ForgetResult {
 interface StoredFile {
   readonly schemaVersion: typeof SCHEMA_VERSION
   readonly memories: readonly PublicMemory[]
+  /**
+   * Kept memories that were forgotten, oldest first, for a Restore (A1.8).
+   * Optional, so a file from before 0.316 reads as having none; an older
+   * build that writes the file drops them, which loses only the undo.
+   */
+  readonly forgotten?: readonly PublicForgottenMemory[]
 }
 
 const EMPTY: StoredFile = { schemaVersion: SCHEMA_VERSION, memories: [] }
@@ -142,6 +168,7 @@ export function parsedMemory(value: unknown): PublicMemory | undefined {
     ...(typeof record.name === 'string' && memoryName(record.name) !== undefined ? { name: memoryName(record.name) } : {}),
     ...(typeof record.updatedAt === 'string' && !Number.isNaN(Date.parse(record.updatedAt)) ? { updatedAt: record.updatedAt } : {}),
     ...(validMemoryText(record.previousText) ? { previousText: boundedMemoryText(record.previousText) } : {}),
+    ...(parsedActor(record.updatedBy) === undefined ? {} : { updatedBy: parsedActor(record.updatedBy)! }),
     // A change waiting for the person. Only a proposal carries one.
     ...(record.status === 'proposed' && safeId(record.replaces) ? { replaces: record.replaces } : {}),
     ...(record.status === 'proposed' && safeId(record.forgets) ? { forgets: record.forgets } : {})
@@ -150,6 +177,26 @@ export function parsedMemory(value: unknown): PublicMemory | undefined {
 
 /** A proposal that CHANGES a kept memory, rather than adding one. */
 const isChange = (memory: PublicMemory): boolean => memory.replaces !== undefined || memory.forgets !== undefined
+
+function parsedActor(value: unknown): Actor | undefined {
+  if (typeof value !== 'object' || value === null) return undefined
+  const record = value as Record<string, unknown>
+  if (typeof record.name !== 'string' || record.name.trim().length === 0 || record.name.length > 80) return undefined
+  if (record.teammateId !== undefined && !safeId(record.teammateId)) return undefined
+  return { name: record.name, ...(record.teammateId === undefined ? {} : { teammateId: record.teammateId }) }
+}
+
+/** One Recently-forgotten entry, as untrusted as any memory. Only a kept memory is ever held. */
+export function parsedForgotten(value: unknown): PublicForgottenMemory | undefined {
+  if (typeof value !== 'object' || value === null) return undefined
+  const record = value as Record<string, unknown>
+  const memory = parsedMemory(record.memory)
+  if (memory === undefined || memory.status !== 'kept') return undefined
+  if (typeof record.forgottenAt !== 'string' || Number.isNaN(Date.parse(record.forgottenAt))) return undefined
+  const by = parsedActor(record.forgottenBy)
+  if (by === undefined) return undefined
+  return { memory, forgottenAt: record.forgottenAt, forgottenBy: by }
+}
 
 /**
  * A MEMORY that does not parse is dropped; a FILE that does not parse is
@@ -174,7 +221,15 @@ export function parsedFile(text: string): StoredFile {
     memories.push(memory)
     if (memories.length >= MAX_MEMORIES) break
   }
-  return { schemaVersion: SCHEMA_VERSION, memories }
+  // Recently forgotten is optional; present but not a list is a file this
+  // build does not understand, and says so like any other.
+  if (record.forgotten !== undefined && !Array.isArray(record.forgotten)) throw new Error(MEMORY_UNREADABLE)
+  const forgotten: PublicForgottenMemory[] = []
+  for (const entry of Array.isArray(record.forgotten) ? (record.forgotten as unknown[]) : []) {
+    const held = parsedForgotten(entry)
+    if (held !== undefined) forgotten.push(held)
+  }
+  return { schemaVersion: SCHEMA_VERSION, memories, ...(forgotten.length === 0 ? {} : { forgotten: forgotten.slice(-MAX_FORGOTTEN) }) }
 }
 
 /** The place a memory lives, for matching: a global one is everywhere, a folder one is its folder. */
@@ -228,12 +283,37 @@ export function createMemoryStore(options: {
     return memories.filter((memory) => !isChange(memory) || ids.has(memory.forgets ?? memory.replaces ?? ''))
   }
 
+  /*
+   * RECENTLY FORGOTTEN (A1.8): a kept memory that leaves the store -- a
+   * person's Remove, a teammate's forget, a forget the person agreed to,
+   * Forget everything -- is held FORGOTTEN_DAYS for a Restore, then gone.
+   * A forget used to be final the moment it landed, including a teammate's
+   * in "Keep and tell me", where nobody is asked; the harness review found
+   * the undo missing (Rakazo keeps every revision; we keep one step back and
+   * this). A proposal nobody kept is not held: it was never the person's.
+   */
+  const recentlyForgotten = (entries: readonly PublicForgottenMemory[] | undefined): readonly PublicForgottenMemory[] => {
+    const since = now().getTime() - FORGOTTEN_DAYS * 24 * 60 * 60 * 1000
+    return (entries ?? []).filter((entry) => Date.parse(entry.forgottenAt) >= since).slice(-MAX_FORGOTTEN)
+  }
+  const bin = (file: StoredFile, gone: readonly PublicMemory[], by: Actor): readonly PublicForgottenMemory[] => [
+    ...(file.forgotten ?? []),
+    ...gone
+      .filter((memory) => memory.status === 'kept')
+      .map((memory) => ({
+        memory,
+        forgottenAt: now().toISOString(),
+        forgottenBy: { name: by.name, ...(by.teammateId === undefined ? {} : { teammateId: by.teammateId }) }
+      }))
+  ]
+
   const write = async (file: StoredFile): Promise<void> => {
     await mkdir(rootDirectory, { recursive: true, mode: 0o700 })
     const temporary = `${path}.${randomUUID()}.tmp`
     const handle = await open(temporary, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL, 0o600)
+    const settledFile: StoredFile = { ...file, memories: settled(file.memories), forgotten: recentlyForgotten(file.forgotten) }
     try {
-      await handle.writeFile(`${JSON.stringify({ ...file, memories: settled(file.memories) }, null, 2)}\n`, 'utf8')
+      await handle.writeFile(`${JSON.stringify(settledFile, null, 2)}\n`, 'utf8')
       await handle.sync()
     } finally {
       await handle.close()
@@ -333,6 +413,8 @@ export function createMemoryStore(options: {
               text,
               previousText: held.text,
               updatedAt: now().toISOString(),
+              // Credit where the words came from (A1.6); `by` stays who first kept it.
+              updatedBy: { name: input.by.name, ...(input.by.teammateId === undefined ? {} : { teammateId: input.by.teammateId }) },
               // The turn that CHANGED it, not the turn that first wrote it.
               // The thread draws a memory card under the turn it belongs to,
               // and as this memory now reads, it belongs to this one.
@@ -395,7 +477,11 @@ export function createMemoryStore(options: {
           const others = file.memories.filter((memory) => memory.memoryId !== held.memoryId)
           if (held.forgets !== undefined) {
             const gone = file.memories.find((memory) => memory.memoryId === held.forgets)
-            await write({ ...file, memories: others.filter((memory) => memory.memoryId !== held.forgets) })
+            await write({
+              ...file,
+              memories: others.filter((memory) => memory.memoryId !== held.forgets),
+              forgotten: bin(file, gone === undefined ? [] : [gone], held.by)
+            })
             return gone ?? held
           }
           const target = file.memories.find((memory) => memory.memoryId === held.replaces)
@@ -411,6 +497,7 @@ export function createMemoryStore(options: {
             text: held.text,
             previousText: target.text,
             updatedAt: now().toISOString(),
+            updatedBy: held.by,
             ...(held.missionId === undefined ? {} : { missionId: held.missionId })
           }
           await write({ ...file, memories: others.map((memory) => (memory.memoryId === target.memoryId ? changed : memory)) })
@@ -429,22 +516,24 @@ export function createMemoryStore(options: {
            * swap, and pressing it again undoes it (harness review,
            * 2026-09-24 -- Rakazo keeps every revision; one step is ours).
            */
-          ...(text === held.text ? {} : { previousText: held.text, updatedAt: now().toISOString() })
+          ...(text === held.text ? {} : { previousText: held.text, updatedAt: now().toISOString(), updatedBy: YOU })
         }
         await write({ ...file, memories: file.memories.map((memory) => (memory.memoryId === next.memoryId ? next : memory)) })
         return next
       })
     },
 
-    remove(memoryId): Promise<void> {
+    remove(memoryId, by): Promise<void> {
       return serialize(async () => {
         if (!safeId(memoryId)) return
         const file = await read()
-        await write({ ...file, memories: file.memories.filter((memory) => memory.memoryId !== memoryId) })
+        const gone = file.memories.filter((memory) => memory.memoryId === memoryId)
+        if (gone.length === 0) return
+        await write({ ...file, memories: file.memories.filter((memory) => memory.memoryId !== memoryId), forgotten: bin(file, gone, by ?? YOU) })
       })
     },
 
-    forget(text, workspaceId, ask): Promise<ForgetResult> {
+    forget(text, workspaceId, context): Promise<ForgetResult> {
       return serialize(async () => {
         const file = await read()
         // Only what this mission could be talking about: this folder's and
@@ -479,7 +568,8 @@ export function createMemoryStore(options: {
          * once in ask mode too (reported #3). A memory still only proposed
          * -- nobody kept it -- can simply go.
          */
-        if (ask !== undefined) {
+        if (context?.ask === true) {
+          const ask = context
           const targets = file.memories.filter(goes)
           const dropped = new Set(targets.filter((target) => target.status === 'proposed').map((target) => target.memoryId))
           const proposals: PublicMemory[] = targets
@@ -507,8 +597,11 @@ export function createMemoryStore(options: {
             proposed: targets.filter((target) => target.status === 'kept').map((target) => target.text)
           }
         }
-        const removed = file.memories.filter(goes).map((memory) => memory.text)
-        if (removed.length > 0) await write({ ...file, memories: file.memories.filter((memory) => !goes(memory)) })
+        const gone = file.memories.filter(goes)
+        const removed = gone.map((memory) => memory.text)
+        if (removed.length > 0) {
+          await write({ ...file, memories: file.memories.filter((memory) => !goes(memory)), forgotten: bin(file, gone, context?.by ?? { name: 'a teammate' }) })
+        }
         return { removed, refusal: undefined, candidates: [] }
       })
     },
@@ -518,8 +611,45 @@ export function createMemoryStore(options: {
         const file = await read()
         const kept = input.workspaceId === undefined ? [] : file.memories.filter((memory) => memory.scope === 'global' || memory.workspaceId !== input.workspaceId)
         const removed = file.memories.length - kept.length
-        if (removed > 0) await write({ ...file, memories: kept })
+        if (removed > 0) {
+          const staying = new Set(kept)
+          await write({ ...file, memories: kept, forgotten: bin(file, file.memories.filter((memory) => !staying.has(memory)), YOU) })
+        }
         return removed
+      })
+    },
+
+    snapshot() {
+      return serialize(async () => {
+        const file = await read()
+        return { memories: file.memories, forgotten: [...recentlyForgotten(file.forgotten)].reverse() }
+      })
+    },
+
+    restore(memoryId): Promise<PublicMemory> {
+      return serialize(async () => {
+        const file = await read()
+        const entry = safeId(memoryId) ? recentlyForgotten(file.forgotten).find((one) => one.memory.memoryId === memoryId) : undefined
+        if (entry === undefined) throw new Error('That memory is no longer in Recently forgotten.')
+        const rest = (file.forgotten ?? []).filter((one) => one !== entry)
+        const place = placeOf(entry.memory)
+        // Already remembered in the same words, in the same place: nothing to
+        // put back, and a second copy would be briefed twice.
+        const same = file.memories.find((memory) => placeOf(memory) === place && memoryKey(memory.text) === memoryKey(entry.memory.text))
+        if (same !== undefined) {
+          await write({ ...file, forgotten: rest })
+          return same
+        }
+        if (file.memories.length >= MAX_MEMORIES) {
+          throw new Error(`Locust keeps at most ${String(MAX_MEMORIES)} memories. Forget some first.`)
+        }
+        const back: { -readonly [K in keyof PublicMemory]: PublicMemory[K] } = { ...entry.memory, status: 'kept' }
+        // Its name was given to a newer memory meanwhile: it comes back
+        // without one, rather than as a second memory under the same name.
+        if (back.name !== undefined && file.memories.some((memory) => placeOf(memory) === place && memory.name === back.name)) delete back.name
+        if (file.memories.some((memory) => memory.memoryId === back.memoryId)) back.memoryId = `mem_${createId()}`
+        await write({ ...file, memories: [...file.memories, back], forgotten: rest })
+        return back
       })
     }
   }

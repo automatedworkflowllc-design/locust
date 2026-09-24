@@ -85,7 +85,7 @@ describe('a named rewrite in ask mode', () => {
 })
 
 describe('a forget in ask mode', () => {
-  const ASK = { by: YURT, missionId: 'mission_3' }
+  const ASK = { by: YURT, missionId: 'mission_3', ask: true }
 
   it('waits beside the kept memory, which stays briefed', async () => {
     const { memories, kept } = await withKept('The API is on port 3000.')
@@ -140,7 +140,7 @@ describe('a proposal whose memory is gone', () => {
   it('goes with it, whichever way the memory went', async () => {
     const { memories, kept } = await withKept('Deploys go out on Fridays.', 'deploy-day')
     await memories.add({ text: 'Deploys go out on Thursdays.', scope: 'workspace', ...SHOP, by: YURT, status: 'proposed', name: 'deploy-day' })
-    await memories.forget('Deploys go out on Fridays', 'ws_shop', { by: YURT })
+    await memories.forget('Deploys go out on Fridays', 'ws_shop', { by: YURT, ask: true })
     expect((await memories.list()).filter((memory) => memory.status === 'proposed')).toHaveLength(2)
     // The person removes the memory itself: both questions about it are moot.
     await memories.remove(kept.memoryId)

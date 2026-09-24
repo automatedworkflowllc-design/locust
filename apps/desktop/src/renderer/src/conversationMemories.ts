@@ -20,6 +20,8 @@
 export interface ConversationMemory {
   readonly missionId?: string
   readonly by: { readonly name: string }
+  /** Who wrote its current wording, when it was rewritten (A1.6). */
+  readonly updatedBy?: { readonly name: string }
   readonly text: string
   readonly status: 'kept' | 'proposed'
   /** Present when this memory has been rewritten under its name; what it said before. */
@@ -93,7 +95,7 @@ export function memoriesOfConversation(
   return memories
     .filter((memory) => memory.missionId !== undefined && turns.has(memory.missionId))
     .map((memory) => ({
-      by: memory.by.name,
+      by: (memory.updatedBy ?? memory.by).name,
       text: memory.text,
       status: memory.status,
       missionId: memory.missionId!,

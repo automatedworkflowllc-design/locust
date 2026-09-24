@@ -71,7 +71,9 @@ export function RoutineDialog({
   const scheduleKind = schedule?.kind ?? 'off'
 
   const kept = steps.filter((step) => step.trim().length > 0)
-  const canSave = name.trim().length > 0 && kept.length > 0 && !busy && (!mustPick || runner.length > 0)
+  // The first step too long to send, by its number on screen (A5.1).
+  const tooLongAt = steps.findIndex((step) => stepTooLongNotice(step.trim()) !== undefined)
+  const canSave = name.trim().length > 0 && kept.length > 0 && tooLongAt < 0 && !busy && (!mustPick || runner.length > 0)
   // Focus in, Tab held inside, Escape closes, focus back to the opener.
   const box = useRef<HTMLDivElement>(null)
   useModal(box, onCancel)
@@ -170,9 +172,11 @@ export function RoutineDialog({
                * half is fixed in the host; this is the half that stops it
                * being saved in the first place.
                *
-               * A warning, not a block: the cap is not lowered, because
-               * `parsedRoutine` validates length on READ and a smaller one
-               * would make routines people already saved unreadable.
+               * A block now, on SAVE (A5.1): Save stays off until every step
+               * fits, and says which one does not. The cap on READ is not
+               * lowered -- `parsedRoutine` validates length there, and a
+               * smaller one would make routines people already saved
+               * unreadable -- so this costs nobody a saved routine.
                */
               const tooLong = stepTooLongNotice(step)
               return (
@@ -303,6 +307,7 @@ export function RoutineDialog({
             Each step runs only after the one before it finishes. A step that fails ends the routine there.
           </p>
           {error !== undefined && <p className="lc-dialog__error">{error}</p>}
+          {tooLongAt >= 0 && <p className="lc-dialog__error">Shorten step {tooLongAt + 1} to save this routine.</p>}
         </div>
 
         <div className="lc-dialog__foot">

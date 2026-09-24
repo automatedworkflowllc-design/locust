@@ -69,6 +69,30 @@ const nodeIo: MemoryFileIo = {
 }
 
 /**
+ * What the file says while memory is switched off (A1.7).
+ *
+ * Switching memory off stopped the brief and the writes, and left the last
+ * file where it was -- every memory it held, still readable by any teammate
+ * that looks around the folder, under a heading that says it is the team's
+ * memory. The Off setting says teammates are not told what is remembered;
+ * the file said otherwise.
+ */
+export const MEMORY_OFF_TEXT = '# Team memory\n\nTeam memory is switched off in Locust for this folder. Nothing here is current, and nothing is remembered for this run.\n'
+
+/**
+ * Memory switched off: a file written while it was on is rewritten to say
+ * so. Only one that exists -- a folder that never had the file gets none.
+ * Answers whether it changed anything.
+ */
+export async function retireMemoryFile(folder: string, io: MemoryFileIo = nodeIo): Promise<boolean> {
+  const path = join(folder, MEMORY_FILE)
+  const current = await io.readFile(path).catch(() => undefined)
+  if (current === undefined || current === MEMORY_OFF_TEXT) return false
+  await io.writeFile(path, MEMORY_OFF_TEXT)
+  return true
+}
+
+/**
  * Write the file under `folder`, and keep `.locust/` out of git there.
  * Returns the workspace-relative path the brief should name, or undefined
  * when the folder could not be written -- the brief then pastes as before.

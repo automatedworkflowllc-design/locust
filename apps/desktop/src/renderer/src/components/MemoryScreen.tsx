@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import { useState } from 'react'
 
-import type { MemoryMode, MemoryScope, MemoryUpdateRequest, PublicMemory, PublicTeammate } from '../../../shared/ipc.js'
+import type { MemoryMode, MemoryScope, MemoryUpdateRequest, PublicForgottenMemory, PublicMemory, PublicTeammate } from '../../../shared/ipc.js'
 import { lastWritten } from '../../../shared/memory.js'
 import { TeammateBot } from './TeammateBot.js'
 
@@ -25,6 +25,8 @@ export function MemoryScreen({
   onUpdate,
   onRemove,
   onClear,
+  forgotten = [],
+  onRestore,
   onOpenMission,
   notice,
   onDismissNotice
@@ -39,6 +41,9 @@ export function MemoryScreen({
   readonly onUpdate: (request: MemoryUpdateRequest) => Promise<string | undefined>
   readonly onRemove: (memoryId: string) => Promise<string | undefined>
   readonly onClear: (scope: 'workspace' | 'all') => Promise<string | undefined>
+  /** Recently forgotten, newest first, and the way back (A1.8). */
+  readonly forgotten?: readonly PublicForgottenMemory[]
+  readonly onRestore?: (memoryId: string) => Promise<string | undefined>
   readonly onOpenMission: (missionId: string) => void
   /** The host's last word about memory, when it had one. */
   readonly notice: string | undefined
@@ -93,7 +98,9 @@ export function MemoryScreen({
   }
 
   const row = (memory: PublicMemory): ReactElement => {
-    const author = memory.by.teammateId === undefined ? undefined : teammates.find((entry) => entry.teammateId === memory.by.teammateId)
+    // Whoever wrote the words shown: a rewrite is credited to its writer (A1.6).
+    const writer = memory.updatedBy ?? memory.by
+    const author = writer.teammateId === undefined ? undefined : teammates.find((entry) => entry.teammateId === writer.teammateId)
     const isEditing = editing?.memoryId === memory.memoryId
     return (
       <div key={memory.memoryId} className={`lc-memory${memory.enabled ? '' : ' is-off'}${memory.status === 'proposed' ? ' is-proposed' : ''}`}>
@@ -165,7 +172,7 @@ export function MemoryScreen({
           )}
           <p className="lc-memory__meta lc-mono">
             {author === undefined ? (
-              <span>{memory.by.name}</span>
+              <span>{writer.name}</span>
             ) : (
               <span className="lc-memory__author">
                 <TeammateBot hue={author.hue} avatar={author.avatar} size={14} activity="idle" presence="none" />
@@ -301,6 +308,37 @@ export function MemoryScreen({
           </section>
         )}
 
+        {/*
+          Recently forgotten (A1.8). A forget -- the person's, a teammate's,
+          Forget everything -- used to be final the moment it landed; every
+          kept memory that goes is held here for 7 days with the way back.
+        */}
+        {forgotten.length > 0 && onRestore !== undefined && (
+          <section className="lc-settings__section">
+            <h2 className="lc-settings__heading">Recently forgotten</h2>
+            <p className="lc-settings__note">Kept for 7 days, then gone for good. Teammates do not read these.</p>
+            <div className="lc-memorylist">
+              {forgotten.map((entry) => (
+                <div key={`${entry.memory.memoryId}-${entry.forgottenAt}`} className="lc-memory is-forgotten">
+                  <div className="lc-memory__body">
+                    <p className="lc-memory__text">{entry.memory.text}</p>
+                    <p className="lc-memory__meta lc-mono">
+                      <span>forgotten by {entry.forgottenBy.name}</span>
+                      <span> · {when(entry.forgottenAt)}</span>
+                      <span> · {entry.memory.scope === 'global' ? 'everywhere' : entry.memory.workspaceName}</span>
+                    </p>
+                  </div>
+                  <span className="lc-memory__actions">
+                    <button type="button" className="lc-ghostbutton" disabled={busy} onClick={() => void act(() => onRestore(entry.memory.memoryId))}>
+                      Restore
+                    </button>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Remember something</h2>
           <div className="lc-memoryform">
@@ -348,8 +386,9 @@ export function MemoryScreen({
             ) : (
               <div className="lc-memoryform__row">
                 <span className="lc-settings__note">
-                  {confirmClear === 'all' ? 'Every memory, every folder, gone. ' : `Everything remembered for ${workspaceName}, gone. `}
-                  This cannot be undone.
+                  {confirmClear === 'all' ? 'Every memory, every folder, forgotten. ' : `Everything remembered for ${workspaceName}, forgotten. `}
+                  {/* Honest since A1.8: they are held, not gone. */}
+                  You can restore them from Recently forgotten for 7 days.
                 </span>
                 <button
                   type="button"

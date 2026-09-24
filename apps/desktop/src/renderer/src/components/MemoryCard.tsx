@@ -36,7 +36,10 @@ export function memoryCardSummary(lines: readonly MemoryCardLine[]): string {
   const proposedChanges = proposed.filter((line) => line.change === 'rewrite')
   const proposedForgets = proposed.filter((line) => line.change === 'forget')
   const rewritten = lines.filter((line) => line.updated === true && line.status === 'kept')
-  const by = lines[0]?.by ?? 'A teammate'
+  // Everyone whose lines these are, not the first line's writer for all of
+  // them (A1.6, reported #21).
+  const names = [...new Set(lines.map((line) => line.by))]
+  const by = names.length === 0 ? 'A teammate' : names.length === 1 ? names[0]! : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]!}`
   const things = (n: number): string => `${String(n)} thing${n === 1 ? '' : 's'}`
   const parts: string[] = []
   if (kept.length > 0) parts.push(`remembered ${things(kept.length)}`)

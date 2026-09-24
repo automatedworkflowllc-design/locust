@@ -11,6 +11,32 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.316.0 - 2026-09-24
+
+### New
+
+- **Recently forgotten.** Anything forgotten -- by you, by a teammate, or
+  with Forget everything -- now waits under Recently forgotten on the Memory
+  screen for 7 days, with Restore. A forget is no longer final the moment
+  it happens.
+
+### Fixed
+
+- **A teammate in Ask mode on OpenCode finishes what it was asked.** Asked
+  to look around a project, it would often try a shell command such as
+  `git log`, which Ask mode does not allow, and the whole run stopped there.
+  It is now told the shell is off and to read the files instead.
+- **A changed memory names who changed it.** A memory a teammate rewrote --
+  or that you edited -- was still credited to whoever first wrote it, on
+  the Memory screen, in the conversation and in what teammates are told.
+- **Memory switched off leaves nothing behind to read.** The memory file in
+  your project folder kept listing everything remembered after you switched
+  memory off; it now says memory is off.
+- **A routine step too long to send says so.** A routine can no longer be
+  saved with a step longer than a run can carry, and one saved by an older
+  build stops before that step with the reason, instead of asking you to
+  check for work that never started.
+
 ## 0.315.0 - 2026-09-24
 
 ### Improved

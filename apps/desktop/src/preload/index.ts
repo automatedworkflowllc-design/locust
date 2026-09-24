@@ -77,6 +77,7 @@ import {
   MEMORY_UPDATE_CHANNEL,
   MEMORY_REMOVE_CHANNEL,
   MEMORY_CLEAR_CHANNEL,
+  MEMORY_RESTORE_CHANNEL,
   RUNTIME_SETUP_CHANNEL,
   CONNECTOR_LIST_CHANNEL,
   TEAMMATE_CONNECTORS_CHANNEL,
@@ -319,6 +320,7 @@ const desktopApi: DesktopApi = {
   updateMemory: (request: MemoryUpdateRequest) => ipcRenderer.invoke(MEMORY_UPDATE_CHANNEL, request) as Promise<MemoryListResponse>,
   removeMemory: (memoryId: string) => ipcRenderer.invoke(MEMORY_REMOVE_CHANNEL, memoryId) as Promise<MemoryListResponse>,
   clearMemories: (request: MemoryClearRequest) => ipcRenderer.invoke(MEMORY_CLEAR_CHANNEL, request) as Promise<MemoryListResponse>,
+  restoreMemory: (memoryId: string) => ipcRenderer.invoke(MEMORY_RESTORE_CHANNEL, memoryId) as Promise<MemoryListResponse>,
   writeWorkspaceSettings: (settings: WorkspaceSettings) =>
     ipcRenderer.invoke(WORKSPACE_SETTINGS_WRITE_CHANNEL, settings) as Promise<WorkspaceSettings>,
   decideMissionApproval: (answer: MissionApprovalAnswer) =>

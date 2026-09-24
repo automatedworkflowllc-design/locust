@@ -53,7 +53,7 @@ import { createPeerExchange, createTranscriptTracker, publicPeerMessage } from '
 import type { MemoryBriefing } from './peer-exchange.js'
 import type { PeerExchange, TranscriptTracker } from './peer-exchange.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
-import { planSection } from './workroom-briefing.js'
+import { openCodeReadOnlySection, planSection } from './workroom-briefing.js'
 import type { EndedMission, RelayOrigin, SharingMission } from './relay.js'
 import type { MissionStarter } from '@teammate/mission-store'
 import { recordableCommand } from './command-record.js'
@@ -1359,6 +1359,11 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // true -- which is exactly why the guard targets the mapping instead
         // of this line. A "plan" that could edit the workspace is a promise
         // the app cannot keep, whichever of the two ever changes.
+        // A read-only OpenCode run is told it has no shell, before the plan
+        // instruction so that one stays last (A2.20, workroom-briefing.ts).
+        if (runtime === 'opencode' && sandbox === 'read-only') {
+          runtimePrompt = [runtimePrompt, openCodeReadOnlySection()].join('\n\n')
+        }
         if (mode === 'plan' && sandbox === 'read-only') {
           runtimePrompt = [runtimePrompt, planSection()].join('\n\n')
         }

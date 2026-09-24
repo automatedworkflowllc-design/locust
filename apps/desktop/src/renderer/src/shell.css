@@ -2523,6 +2523,12 @@ textarea {
   border-style: dashed;
 }
 
+/* Recently forgotten (A1.8): quieter than a live memory, not struck out --
+   struck out means switched off, which is a different thing. */
+.lc-memory.is-forgotten .lc-memory__text {
+  color: var(--lc-text-muted);
+}
+
 .lc-memory__body {
   flex: 1 1 auto;
   min-width: 0;

@@ -61,7 +61,7 @@ import type { AttentionReader } from './attention-reader.js'
 import type { MemoryReader } from './memory-reader.js'
 import type { MemoryBriefing } from './peer-exchange.js'
 import { byLastWritten, lastWritten, memorySection } from '../shared/memory.js'
-import { MEMORY_FILE, writeMemoryFile } from './memory-file.js'
+import { MEMORY_FILE, retireMemoryFile, writeMemoryFile } from './memory-file.js'
 
 /** Scheduled routines are checked once a minute; the first check waits for runtime discovery. */
 const ROUTINE_TICK_MS = 60_000
@@ -149,6 +149,7 @@ import {
   MEMORY_UPDATE_CHANNEL,
   MEMORY_REMOVE_CHANNEL,
   MEMORY_CLEAR_CHANNEL,
+  MEMORY_RESTORE_CHANNEL,
   RUNTIME_SETUP_CHANNEL,
   WORKTREE_LIST_CHANNEL,
   WORKTREE_REMOVE_CHANNEL,
@@ -1242,7 +1243,15 @@ if (!ownsSingleInstanceLock) {
           if (inGroup !== undefined) sections.push(groupSection(inGroup.name, inGroup.instructions))
         }
         const settings = await teammates.readSettings()
-        if (settings.memoryMode !== 'off') sections.push(await memoryPart(peer, query))
+        if (settings.memoryMode !== 'off') {
+          sections.push(await memoryPart(peer, query))
+        } else {
+          // Off: the file a run could still read says so, rather than
+          // holding the last memories (A1.7).
+          await retireMemoryFile(peer?.cwd ?? workspacePath).catch((error: unknown) => {
+            note('memory-file', `could not retire ${MEMORY_FILE} under ${peer?.cwd ?? workspacePath}: ${error instanceof Error ? error.message : String(error)}`)
+          })
+        }
         return sections.length === 0 ? undefined : sections.join('\n\n')
       }
     }
@@ -1262,7 +1271,8 @@ if (!ownsSingleInstanceLock) {
         const lines = listed.map((memory) => ({
           text: memory.text,
           scope: memory.scope,
-          by: memory.by.name,
+          // Whoever wrote the words the teammate will read (A1.6).
+          by: (memory.updatedBy ?? memory.by).name,
           where: memory.scope === 'global' && memory.workspaceId !== memoryWorkspaceId ? memory.workspaceName : undefined,
           at: lastWritten(memory)
         }))
@@ -1297,7 +1307,7 @@ if (!ownsSingleInstanceLock) {
           memories: listed.map((memory) => ({
             text: memory.text,
             scope: memory.scope,
-            by: memory.by.name,
+            by: (memory.updatedBy ?? memory.by).name,
             where: memory.scope === 'global' && memory.workspaceId !== memoryWorkspaceId ? memory.workspaceName : undefined,
             // So a teammate can tell a note from this morning from one that
             // has been sitting there since August.
@@ -3451,8 +3461,11 @@ if (!ownsSingleInstanceLock) {
     // Memory. Every answer carries the whole list so the screen never
     // shows a state the file does not hold.
     const memoryRejected = (message: string) => ({ ok: false, error: { code: 'MEMORY_REJECTED', message } }) as const
-    const memoryList = async () =>
-      ({ ok: true, data: { memories: await memories.list(), workspaceId: memoryWorkspaceId, workspaceName: memoryWorkspaceName } }) as const
+    const memoryList = async () => {
+      // One read for both lists, so a memory is never shown in both or neither.
+      const held = await memories.snapshot()
+      return { ok: true, data: { memories: held.memories, forgotten: held.forgotten, workspaceId: memoryWorkspaceId, workspaceName: memoryWorkspaceName } } as const
+    }
     ipcMain.handle(MEMORY_LIST_CHANNEL, async (event) => {
       if (!fromOwnWindow(event)) return memoryRejected('Memory could not be read.')
       try {
@@ -3491,10 +3504,19 @@ if (!ownsSingleInstanceLock) {
     ipcMain.handle(MEMORY_REMOVE_CHANNEL, async (event, memoryId: unknown) => {
       if (!fromOwnWindow(event)) return memoryRejected('The memory could not be removed.')
       try {
-        await memories.remove(memoryId)
+        await memories.remove(memoryId, { name: 'you' })
         return await memoryList()
       } catch {
         return memoryRejected('The memory could not be removed.')
+      }
+    })
+    ipcMain.handle(MEMORY_RESTORE_CHANNEL, async (event, memoryId: unknown) => {
+      if (!fromOwnWindow(event)) return memoryRejected('The memory could not be put back.')
+      try {
+        await memories.restore(memoryId)
+        return await memoryList()
+      } catch (error) {
+        return memoryRejected(error instanceof Error ? error.message : 'The memory could not be put back.')
       }
     })
     ipcMain.handle(MEMORY_CLEAR_CHANNEL, async (event, request: unknown) => {
