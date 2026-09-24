@@ -99,7 +99,7 @@ try {
   await drive.evaluate(scrollOf('.lc-thread'))
   await sleep(300)
   const afterThread = String(await drive.evaluate(`document.querySelector('.lc-context') ? 'open' : 'closed'`))
-  await drive.capture('the thread scrolled itself: the menu', () => drive.evaluate(`document.querySelector('.lc-context')?.innerText.replace(/\s+/g, ' ') ?? 'closed'`))
+  await drive.capture('the thread scrolled itself: the menu', () => drive.evaluate(`document.querySelector('.lc-context')?.innerText.replace(/\\s+/g, ' ') ?? 'closed'`))
   check('the thread scrolling itself leaves the menu open', afterThread === 'open', afterThread)
   const listSel = String(await drive.evaluate(`(() => { const row = [...document.querySelectorAll('li, button')].find((el) => /Question number 21/.test(el.textContent ?? '')); let el = row?.parentElement; while (el && getComputedStyle(el).overflowY !== 'auto' && getComputedStyle(el).overflowY !== 'scroll') el = el.parentElement; if (!el) return 'none'; el.setAttribute('data-drive-list', '1'); return '[data-drive-list]' })()`))
   await drive.evaluate(scrollOf(listSel))
