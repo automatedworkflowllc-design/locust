@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.344.0 - 2026-09-25
+
+### New
+
+- **Ask two teammates on different coding agents for a review, at once.**
+  When your team has reviewers on two different agents, a conversation's
+  More actions menu offers both together, for example "Ask Booty (Claude
+  Code) and Vale (Codex CLI) for a review". Each reviews in their own
+  conversation, changes nothing, and opens with a verdict.
+
 ## 0.343.0 - 2026-09-25
 
 ### Fixed
