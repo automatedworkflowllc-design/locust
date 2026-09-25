@@ -11,6 +11,23 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.339.0 - 2026-09-25
+
+### New
+
+- **OpenCode models offer their effort levels.** Models that list levels,
+  such as Ling 3.0 Flash Fin, Muse Spark and Space Bunny, now let you choose
+  one where the composer used to say Fixed.
+
+### Fixed
+
+- **Auto mode on OpenCode can work outside the project folder**, which is
+  what Auto is for. It was still being kept inside.
+- **Antigravity shows each tool's result against the right call** when one
+  step runs several at once. The first one used to read "did not report".
+- **An OpenCode run that outgrew the model's context and recovered is shown
+  as finished**, not as failed over the answer it gave.
+
 ## 0.338.0 - 2026-09-25
 
 ### Fixed
