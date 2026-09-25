@@ -564,7 +564,7 @@ export function createOpenCodeEventNormalizer(
               : blockedTool !== undefined
                 ? `The mode this run is in does not allow ${blockedTool}, so OpenCode stopped when it tried to use it. Nothing was changed.`
                 : completion.outputLimitExceeded
-                ? "OpenCode sent a single piece of output larger than Locust accepts, so the run was stopped. Asking for a narrower slice -- one file, or a summary rather than the whole contents -- usually avoids it."
+                ? "OpenCode sent output faster than Locust could record it, so the run was stopped rather than leave a gap in its record. Sending it again usually works."
                 // The runtime's own account of why, when it gave one. Sits
                 // below the two cases above because those describe something
                 // the HOST did, which the runtime could not know about, and

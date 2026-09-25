@@ -285,7 +285,7 @@ describe("Codex JSONL event normalizer", () => {
     }));
     const failed = ofType(terminal, "run.failed")[0]?.payload;
     expect(failed).toMatchObject({ kind: "process-failed", runtimeTerminal: "missing" });
-    expect(failed?.message).toContain("larger than Locust accepts");
+    expect(failed?.message).toContain("faster than Locust could record it");
     expect(failed?.message).not.toContain("did not complete successfully");
   });
 

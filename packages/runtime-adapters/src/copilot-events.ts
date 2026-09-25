@@ -640,7 +640,7 @@ export function createCopilotEventNormalizer(
             // performed is the vaguest possible account of the one thing we
             // know for certain.
             message: completion.outputLimitExceeded
-              ? "Copilot CLI sent a single piece of output larger than Locust accepts, so the run was stopped. Asking for a narrower slice -- one file, or a summary rather than the whole contents -- usually avoids it."
+              ? "Copilot CLI sent output faster than Locust could record it, so the run was stopped rather than leave a gap in its record. Sending it again usually works."
               : sawResult
               ? `Copilot CLI exited with code ${String(completion.exitCode)}.`
               : "Copilot CLI ended without a terminal result record.",

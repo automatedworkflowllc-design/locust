@@ -226,6 +226,22 @@ describe("limits and sign-in on the app-server transport", () => {
     expect(events[0]?.type === "run.failed" && events[0].payload.kind).toBe("authentication-failed");
   });
 
+  it("classifies the schema's other named errors", () => {
+    const kindOf = (info: string) => {
+      const events = failure({ message: "x", codexErrorInfo: info });
+      const failed = events.at(-1);
+      return failed?.type === "run.failed" ? failed.payload.kind : undefined;
+    };
+    expect(kindOf("rateLimitExceeded")).toBe("temporary-rate-limit");
+    expect(kindOf("cyberPolicy")).toBe("safety-blocked");
+    expect(kindOf("misalignmentPolicyViolation")).toBe("safety-blocked");
+  });
+
+  it("names a window by the v2 field, windowDurationMins (read from the generated schema)", () => {
+    expect(limitFromSnapshot({ primary: { usedPercent: 93, windowDurationMins: 300 } })?.message).not.toMatch(/primary/);
+    expect(limitFromSnapshot({ secondary: { usedPercent: 99, windowDurationMins: 10080 } })?.message).not.toMatch(/secondary/);
+  });
+
   it("falls back to the message when there is no error info", () => {
     const events = failure({ message: "You've hit your usage limit. Try again later." });
     expect(events.at(-1)?.type === "run.failed" && events.at(-1)?.payload).toMatchObject({ kind: expect.stringMatching(/quota-exhausted|temporary-rate-limit/) });

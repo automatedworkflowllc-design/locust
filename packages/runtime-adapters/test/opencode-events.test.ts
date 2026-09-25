@@ -316,7 +316,7 @@ describe("a run the host stopped for output volume", () => {
 
   it("says so instead of blaming a missing stop step", () => {
     const message = failure({ exitCode: null, signal: "SIGINT", outputLimitExceeded: true });
-    expect(message).toContain("larger than Locust accepts");
+    expect(message).toContain("faster than Locust could record it");
     expect(message).not.toContain("without a step that reported it had stopped");
   });
 
@@ -334,10 +334,10 @@ describe("a run the host stopped for output volume", () => {
     const failed = events.find((event) => event.type === "run.failed");
     const message = failed === undefined ? "" : (failed.payload as { readonly message: string }).message;
     if (message.includes("outside the folder")) {
-      expect(message).not.toContain("larger than Locust accepts");
+      expect(message).not.toContain("faster than Locust could record it");
     } else {
       // The fixture did not produce a refusal; the cap message is then correct.
-      expect(message).toContain("larger than Locust accepts");
+      expect(message).toContain("faster than Locust could record it");
     }
   });
 

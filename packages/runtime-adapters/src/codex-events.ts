@@ -1132,7 +1132,7 @@ export function createCodexEventNormalizer(
       // person retrying the same prompt forever and narrowing it once.
       kind = "process-failed";
       message =
-        "Codex sent a single piece of output larger than Locust accepts, so the run was stopped. Asking for a narrower slice -- one file, or a summary rather than the whole contents -- usually avoids it.";
+        "Codex sent output faster than Locust could record it, so the run was stopped rather than leave a gap in its record. Sending it again usually works.";
     } else if (sawTurnCompleted && !cleanExit) {
       kind = "protocol-mismatch";
       message = "Codex reported turn completion but the host process did not exit cleanly";

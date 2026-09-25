@@ -243,6 +243,13 @@ export function startCodexAppServerRun(
         sequence: recordCount,
         raw: JSON.stringify({ method: notification.method, params: notification.params ?? null }),
       });
+      // A queue that backed up has lost records nobody can name, and a run
+      // that then ended "completed" had an unknown hole in its record. The
+      // exec transport stops for this; so does this one (a B4 lead).
+      if (records.droppedForOverflow) {
+        lose("Codex sent output faster than Locust could record it, so the run was stopped rather than leave a gap in its record. Sending it again usually works.");
+        return;
+      }
       if (notification.method === "turn/started") turnId = turnIdOf(notification.params) ?? turnId;
       if (ENDING_METHODS.has(notification.method)) finish();
     },

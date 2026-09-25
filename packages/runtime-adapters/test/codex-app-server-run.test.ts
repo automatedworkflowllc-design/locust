@@ -325,3 +325,20 @@ describe("what a run over this transport cost", () => {
     expect((completed?.payload as { usage?: unknown }).usage).toBeUndefined();
   });
 });
+
+/*
+ * A B4 lead from the code review, settled: a full notification queue dropped
+ * records and said nothing, and the run could still end "completed" with an
+ * unknown hole in its record. The exec transport treats a backed-up queue as
+ * fatal for exactly that reason; so does this.
+ */
+describe("a notification queue that backs up", () => {
+  it("stops the run and says why, instead of dropping records quietly", async () => {
+    const { server, run } = await handshaken({ maxQueuedRecords: 3 });
+    for (let n = 0; n < 5; n += 1) server.notify("item/agentMessage/delta", { threadId: "thread_9", turnId: "turn_1", itemId: "m", delta: "x" });
+    const completion = await run.completion;
+    expect(completion.outputLimitExceeded).toBe(true);
+    expect(completion.stderr).toMatch(/faster than Locust could record it/i);
+    expect(server.killed).toBe(true);
+  });
+});

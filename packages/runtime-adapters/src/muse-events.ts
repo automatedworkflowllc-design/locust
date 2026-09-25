@@ -396,7 +396,7 @@ export function createMuseEventNormalizer(
             // which names what it thought happened. An exit code is last,
             // because a number is not a reason.
             message: completion.outputLimitExceeded
-              ? "Muse Code sent a single piece of output larger than Locust accepts, so the run was stopped. Asking for a narrower slice -- one file, or a summary rather than the whole contents -- usually avoids it."
+              ? "Muse Code sent output faster than Locust could record it, so the run was stopped rather than leave a gap in its record. Sending it again usually works."
               : terminal === undefined
                 ? "Muse Code ended without a record saying the run had finished."
                 : !finished

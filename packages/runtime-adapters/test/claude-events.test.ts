@@ -781,7 +781,7 @@ describe("a run the host stopped for output volume", () => {
     const failed = events.find((entry) => entry.type === "run.failed")?.payload as
       | { readonly message: string }
       | undefined;
-    expect(failed?.message).toContain("larger than Locust accepts");
+    expect(failed?.message).toContain("faster than Locust could record it");
     expect(failed?.message).not.toContain("without a terminal result record");
   });
 });

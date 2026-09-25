@@ -146,7 +146,9 @@ export function limitFromSnapshot(
       ?? (number(value.utilization) === undefined ? undefined : (value.utilization as number) * 100);
     if (used === undefined) continue;
     windows.push({
-      name: windowName(number(value.windowMinutes) ?? number(value.window_minutes), label),
+      // `windowDurationMins` is the v2 protocol's own name (read from `codex
+      // app-server generate-json-schema`, 0.156.1); the others are older.
+      name: windowName(number(value.windowDurationMins) ?? number(value.windowMinutes) ?? number(value.window_minutes), label),
       used,
       resets: value.resetsAt ?? value.resets_at ?? value.resetsInSeconds,
     });
@@ -483,11 +485,16 @@ export function createAppServerEventNormalizer(
           const info = isObject(error.codexErrorInfo)
             ? Object.keys(error.codexErrorInfo)[0]
             : stringValue(error.codexErrorInfo);
+          // Names from the v2 schema's CodexErrorInfo (0.156.1).
           const kind: CodexRunFailureKind = info === "usageLimitExceeded"
             ? "quota-exhausted"
-            : info === "unauthorized"
-              ? "authentication-failed"
-              : failureKind(message);
+            : info === "rateLimitExceeded"
+              ? "temporary-rate-limit"
+              : info === "unauthorized"
+                ? "authentication-failed"
+                : info === "cyberPolicy" || info === "misalignmentPolicyViolation"
+                  ? "safety-blocked"
+                  : failureKind(message);
           const limitSaid = (kind === "quota-exhausted" || kind === "temporary-rate-limit") && !announcedLimits.has(kind);
           if (limitSaid) announcedLimits.add(kind);
           return [

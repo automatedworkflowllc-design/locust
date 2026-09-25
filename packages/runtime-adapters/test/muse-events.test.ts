@@ -246,7 +246,7 @@ describe("a Muse run that did not finish", () => {
       exitCode: 1,
     });
     expect((events.find((event) => event.type === "run.failed")!.payload as { message: string }).message).toContain(
-      "larger than Locust accepts",
+      "faster than Locust could record it",
     );
   });
 

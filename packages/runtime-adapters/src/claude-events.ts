@@ -1110,7 +1110,7 @@ export function createClaudeEventNormalizer(
             // performed is the vaguest possible account of the one thing we
             // know for certain.
             message: completion.outputLimitExceeded
-              ? "Claude Code sent a single piece of output larger than Locust accepts, so the run was stopped. Asking for a narrower slice -- one file, or a summary rather than the whole contents -- usually avoids it."
+              ? "Claude Code sent output faster than Locust could record it, so the run was stopped rather than leave a gap in its record. Sending it again usually works."
               : sawResult
                 ? `Claude Code exited with code ${String(completion.exitCode)}.`
                 : "Claude Code ended without a terminal result record.",
