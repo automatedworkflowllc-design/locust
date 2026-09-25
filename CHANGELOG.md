@@ -11,6 +11,27 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.347.0 - 2026-09-25
+
+### New
+
+- **Check after edits.** In Settings, give a folder a command that checks
+  it (your tests, a type check, a linter). After a teammate's turn changes
+  files there, Locust runs it and shows what is newly failing, or that it
+  still fails the same way, or that it passed. Send to the teammate hands
+  the failure back as their next turn; nothing is sent unless you press
+  it. The command is kept by Locust for that folder, never read from the
+  project.
+
+### Fixed
+
+- **A second edit to a file that was already changed is noticed.** Until
+  now a teammate changing the same file twice in a row could look, to
+  Locust, like no change at all.
+- **Claude Code asking to run a command says so.** Its card spoke of "the
+  service the connector reaches", as though the command were a
+  connector's; it now names the command, and an edit names the file.
+
 ## 0.346.0 - 2026-09-25
 
 ### Fixed
