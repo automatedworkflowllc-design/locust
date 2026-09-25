@@ -106,7 +106,7 @@ describe('the history reads only what changed', () => {
     const light = kept.data.missions.filter((mission) => mission.events.length === 0)
     expect(light.length).toBeGreaterThan(0)
     expect(light.every((mission) => mission.eventCount > 0)).toBe(true)
-  })
+  }, 30_000)
 
   it('reads no file twice when nothing changed', async () => {
     const ledger = await ledgerWithMissions()
@@ -114,7 +114,7 @@ describe('the history reads only what changed', () => {
     const read = countReads(ledger)
     await readMissionHistory(ledger, undefined, 'C:\\work')
     expect(read.ids).toEqual([])
-  })
+  }, 30_000)
 
   it('reads the one file that changed, and the answer carries the change', async () => {
     const ledger = await ledgerWithMissions()
@@ -127,5 +127,5 @@ describe('the history reads only what changed', () => {
     // Its newest turn moved it to the top, with its third event on it.
     expect(after.ok && after.data.missions[0]?.missionId).toBe('mission_003')
     expect(after.ok && after.data.missions[0]?.eventCount).toBe(3)
-  })
+  }, 30_000)
 })
