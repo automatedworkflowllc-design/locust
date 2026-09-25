@@ -80,3 +80,47 @@ export function sweepStaleElectronShortcuts(options: StaleShortcutSweepOptions):
 export function mayShowToasts(argv: readonly string[]): boolean {
   return !argv.some((argument) => argument.startsWith('--remote-debugging-port'))
 }
+
+export interface StartMenuRepairOptions {
+  /** The Start menu's "Locust.lnk". */
+  readonly path: string
+  /** This process's executable. */
+  readonly execPath: string
+  /** Whether this copy is the INSTALLED one: the installer puts its uninstaller beside it. */
+  readonly installed: boolean
+  readonly readShortcut: (path: string) => ShortcutFacts | undefined
+  readonly writeShortcut: (path: string, target: string) => void
+}
+
+const samePathText = (a: string, b: string): boolean =>
+  a.trim().replace(/\//g, '\\').toLowerCase() === b.trim().replace(/\//g, '\\').toLowerCase()
+
+/**
+ * The installed copy takes the Start-menu shortcut back when anything else
+ * holds it, and returns whether it did.
+ *
+ * The shortcut is what the taskbar pin resolves through and what the
+ * updater's installer relaunches through, so whoever it points at is the
+ * Locust that opens. Colin, 2026-09-24, after a worktree's build had opened
+ * from his taskbar yet again: "ive never once opened a locust from anywhere
+ * but my taskbar, and weve supposedly fixed it numerous times." Guards
+ * against a drive rewriting it (see `mayShowToasts`) are one half; this is
+ * the half that undoes it if anything ever does, the next time he opens the
+ * real app. Only the installed copy may claim it -- a build folder never.
+ */
+export function repairStartMenuShortcut(options: StartMenuRepairOptions): boolean {
+  if (!options.installed) return false
+  let facts: ShortcutFacts | undefined
+  try {
+    facts = options.readShortcut(options.path)
+  } catch {
+    return false
+  }
+  if (facts === undefined || samePathText(facts.target, options.execPath)) return false
+  try {
+    options.writeShortcut(options.path, options.execPath)
+    return true
+  } catch {
+    return false
+  }
+}

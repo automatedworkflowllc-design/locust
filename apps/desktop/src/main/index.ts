@@ -1,7 +1,7 @@
 // H1: first, before any import can spawn -- no bare name is found in its working folder.
 import './no-planted-executables.js'
 import { startAppServerProcess } from './app-server-process.js'
-import { APP_USER_MODEL_ID, DEVELOPMENT_APP_USER_MODEL_ID, mayShowToasts, sweepStaleElectronShortcuts } from './stale-shortcut.js'
+import { APP_USER_MODEL_ID, DEVELOPMENT_APP_USER_MODEL_ID, mayShowToasts, repairStartMenuShortcut, sweepStaleElectronShortcuts } from './stale-shortcut.js'
 import { openingPlacement, readSavedWindow } from './window-bounds.js'
 import type { SavedWindow } from './window-bounds.js'
 import { app, BrowserWindow, crashReporter, dialog, ipcMain, nativeTheme, Notification, screen, session, shell } from 'electron'
@@ -1101,6 +1101,23 @@ if (!ownsSingleInstanceLock) {
     if (process.platform === 'win32') {
       app.setAppUserModelId(app.isPackaged ? APP_USER_MODEL_ID : DEVELOPMENT_APP_USER_MODEL_ID)
       if (app.isPackaged) {
+        // The installed copy takes the Start-menu shortcut back from any
+        // other copy that took it (stale-shortcut.ts, 2026-09-24).
+        const startMenuLink = join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Locust.lnk')
+        const repaired = repairStartMenuShortcut({
+          path: startMenuLink,
+          execPath: process.execPath,
+          installed: existsSync(join(dirname(process.execPath), 'Uninstall Locust.exe')),
+          readShortcut: (path) => {
+            if (!existsSync(path)) return undefined
+            const link = shell.readShortcutLink(path)
+            return { target: link.target, ...(link.appUserModelId === undefined ? {} : { appUserModelId: link.appUserModelId }) }
+          },
+          writeShortcut: (path, target) => {
+            shell.writeShortcutLink(path, 'replace', { target, cwd: dirname(target), appUserModelId: APP_USER_MODEL_ID, icon: target, iconIndex: 0 })
+          }
+        })
+        if (repaired) note('start-menu-repaired', startMenuLink)
         const removed = sweepStaleElectronShortcuts({
           candidates: [join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Electron.lnk')],
           appId: APP_USER_MODEL_ID,
@@ -1497,8 +1514,13 @@ if (!ownsSingleInstanceLock) {
         return target !== undefined && !target.isDestroyed() && target.isFocused() && !target.isMinimized()
       },
       // Not from a drive: a toast from any copy points the Start-menu
-      // shortcut at that copy (stale-shortcut.ts).
-      supported: () => Notification.isSupported() && mayShowToasts(process.argv),
+      // shortcut at that copy (stale-shortcut.ts). The drive check comes
+      // FIRST. MEASURED 2026-09-24: `Notification.isSupported()` alone, with
+      // no toast shown, rewrites the Start-menu shortcut to the calling copy
+      // -- so with the order the other way round every drive that raised an
+      // approval re-pointed Colin's Locust.lnk (and the taskbar pin that
+      // resolves through it) at a worktree's release folder.
+      supported: () => mayShowToasts(process.argv) && Notification.isSupported(),
       notify: ({ title, body, onClick }) => {
         const toast = new Notification({ title, body })
         toast.on('click', onClick)

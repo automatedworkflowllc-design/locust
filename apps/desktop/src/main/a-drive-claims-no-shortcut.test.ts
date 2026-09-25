@@ -27,6 +27,9 @@ describe('a scripted launch', () => {
 
   it('is what the attention surface asks before it shows one', () => {
     const source = readFileSync(fileURLToPath(new URL('./index.ts', import.meta.url)), 'utf8')
-    expect(source).toContain('supported: () => Notification.isSupported() && mayShowToasts(process.argv)')
+    // The drive check FIRST: `Notification.isSupported()` alone rewrites the
+    // Start-menu shortcut (measured 2026-09-24), and this line pinned the
+    // order that let it -- the guard was here, and asked too late.
+    expect(source).toContain('supported: () => mayShowToasts(process.argv) && Notification.isSupported()')
   })
 })
