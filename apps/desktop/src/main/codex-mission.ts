@@ -939,6 +939,14 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       if (options.freeRoutesOnly === true && !isFreeRoute(runtime, chosenModel)) {
         return error('RUNTIME_START_FAILED', FREE_ONLY_REFUSAL) as CodexMissionStartResponse
       }
+      // M11: Own branch on and the branch could not be made. Refused HERE,
+      // on the path every start shares -- a direct message, a room post, a
+      // relayed share, a routine step, a resume -- because the context falls
+      // back to the shared folder, and every caller but the direct start used
+      // to run there in the teammate's write mode.
+      if (peer?.worktreeRefused !== undefined) {
+        return error('RUNTIME_START_FAILED', peer.worktreeRefused) as CodexMissionStartResponse
+      }
       // Read-only unless the renderer explicitly asked for edits. The host
       // decides the sandbox from this one value; the renderer never passes a
       // sandbox string of its own.

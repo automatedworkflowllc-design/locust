@@ -1873,7 +1873,9 @@ if (!ownsSingleInstanceLock) {
             cwd = await manager.ensure(self)
             repositoryRoot = home ?? workspacePath
           } catch (error) {
-            worktreeRefused = `${self.name} is set to work on its own branch, but ${error instanceof Error ? error.message : 'the worktree could not be made.'}`
+            // Joined mid-sentence: "but the project folder is not...", not "but The".
+            const why = error instanceof Error ? error.message : 'the worktree could not be made.'
+            worktreeRefused = `${self.name} is set to work on its own branch, but ${why.charAt(0).toLowerCase()}${why.slice(1)}`
           }
         }
       }

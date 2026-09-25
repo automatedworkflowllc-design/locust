@@ -903,6 +903,28 @@ describe('mission sandbox', () => {
     return { start, service: scheduledService({ start }).service }
   }
 
+  /*
+   * M11 (the code review): a teammate set to work on its own branch, whose
+   * branch could not be made, is refused on EVERY start -- not only a direct
+   * message. A room post, a relayed share, a routine step or a resume passed
+   * the same context here, and ran in the shared folder, in the teammate's
+   * write mode, which is exactly what Own branch was turned on to prevent.
+   */
+  it('refuses a teammate whose own branch could not be made, whoever started it', async () => {
+    const { start, service } = specFor('accept-edits')
+    const peer: MissionPeerContext = {
+      self: { teammateId: 'tm_wren', name: 'Wren', role: 'Code & Migrations' },
+      others: [],
+      worktreeRefused: 'Wren is set to work on its own branch, but this folder is not a git repository.'
+    }
+    const response = await service.start('Fix the typo.', 'codex', 'accept-edits', {}, () => undefined, undefined, peer)
+    expect(response).toMatchObject({
+      ok: false,
+      error: { code: 'RUNTIME_START_FAILED', message: 'Wren is set to work on its own branch, but this folder is not a git repository.' }
+    })
+    expect(start).not.toHaveBeenCalled()
+  })
+
   it('runs read-only when the mode is ask', async () => {
     const { start, service } = specFor('ask')
     await service.start('Look around.', 'codex', 'ask', {}, () => undefined)
