@@ -162,6 +162,7 @@ export function Sidebar({
   teammates,
   viewByTeammate,
   routineStepByTeammate,
+  branchByTeammate = {},
   missionOwners,
   selectedMissionId,
   selectedTeammateId,
@@ -217,6 +218,8 @@ export function Sidebar({
   readonly viewByTeammate: Readonly<Record<string, TeammateStatusView>>
   /** Which routine each teammate is replaying right now, if any. */
   readonly routineStepByTeammate: Readonly<Record<string, { readonly name: string; readonly step: number; readonly of: number }>>
+  /** The branch each teammate's own tree is on, as git reports it; the name's branch until one is made (M17). */
+  readonly branchByTeammate?: Readonly<Record<string, string>>
   readonly missionOwners: Readonly<Record<string, string>>
   readonly selectedMissionId: string | undefined
   /** Who the composer is addressing. Selecting a teammate makes them the next mission's owner. */
@@ -1215,7 +1218,7 @@ export function Sidebar({
                     ) : (
                       teammate.worktree === true && (
                         <span className="lc-row__route lc-mono" title="Works on its own branch, in its own worktree of the folder">
-                          on {branchNameFor(teammate.name)}
+                          on {branchByTeammate[teammate.teammateId] ?? branchNameFor(teammate.name, teammate.teammateId)}
                         </span>
                       )
                     )}

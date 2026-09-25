@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process'
 import { appendFile, mkdir, readFile, stat } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 
-import { branchNameFor } from '../shared/worktree-name.js'
+import { branchNameFor, distinctBranchNameFor } from '../shared/worktree-name.js'
 
 /**
  * A worktree per teammate (docs/WORKTREES-DESIGN-2026-09-05.md).
@@ -24,7 +24,7 @@ import { branchNameFor } from '../shared/worktree-name.js'
 
 const GIT_TIMEOUT_MS = 20_000
 export const WORKTREE_DIR = join('.locust', 'worktrees')
-export { BRANCH_PREFIX, branchNameFor } from '../shared/worktree-name.js'
+export { BRANCH_PREFIX, branchNameFor, distinctBranchNameFor } from '../shared/worktree-name.js'
 
 export interface WorktreeInfo {
   readonly teammateId: string
@@ -196,7 +196,13 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
       if (!ready.repository) throw new Error(ready.reason ?? 'Own branches are not available in this folder.')
       await mkdir(join(root, WORKTREE_DIR), { recursive: true })
       await excludeLocustDirectory()
-      const branch = branchNameFor(teammate.name)
+      // M17: a name another teammate's tree already has checked out gets
+      // this teammate's id on the end, rather than git's refusal.
+      const named = branchNameFor(teammate.name, teammate.teammateId)
+      const checkedOut = await runGit(['worktree', 'list', '--porcelain'], root)
+        .then((listing) => listing.split(/\r?\n/).filter((line) => line.startsWith('branch ')).map((line) => line.slice('branch '.length).trim().replace(/^refs\/heads\//, '')))
+        .catch(() => [] as string[])
+      const branch = checkedOut.includes(named) ? distinctBranchNameFor(teammate.name, teammate.teammateId) : named
       let branchExists = false
       try {
         await runGit(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], root)

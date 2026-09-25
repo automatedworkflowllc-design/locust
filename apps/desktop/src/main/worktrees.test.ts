@@ -56,6 +56,11 @@ describe('the pure parts', () => {
     expect(branchNameFor('Wren')).toBe('locust/wren')
     expect(branchNameFor('  Booty Call! ')).toBe('locust/booty-call')
     expect(branchNameFor('...')).toBe('locust/teammate')
+    // M17: a name that folds to nothing is named by the teammate instead, so
+    // two such teammates never share a branch.
+    expect(branchNameFor('小明', 'tm_1a2b3c4d')).toBe('locust/tm_1a2b3c4d')
+    expect(branchNameFor('小红', 'tm_9f8e7d6c')).toBe('locust/tm_9f8e7d6c')
+    expect(branchNameFor('Wren', 'tm_1a2b3c4d')).toBe('locust/wren')
     expect(branchNameFor('x'.repeat(80)).length).toBeLessThanOrEqual('locust/'.length + 40)
   })
 
@@ -109,6 +114,23 @@ describe('a worktree per teammate, on a real repository', () => {
     expect((await git(['status', '--porcelain'], root)).trim()).toBe('')
     expect(await manager.ensure({ teammateId: 'tm_wren', name: 'Wren' })).toBe(path)
     expect((await manager.list()).map((entry) => [entry.teammateId, entry.branch])).toEqual([['tm_wren', 'locust/wren']])
+  })
+
+  /*
+   * M17 (the code review): two names that fold to the same branch -- "Dev 1"
+   * and "Dev-1", "Wren" and "wren", or any two non-Latin names -- and git
+   * refuses the second tree: the branch is already checked out. That
+   * teammate's start was refused with raw git text.
+   */
+  it('two teammates whose names fold to one branch each get a tree', { timeout: REAL_GIT_TIMEOUT_MS }, async () => {
+    const root = await repository()
+    const manager = createWorktreeManager({ workspacePath: root })
+    await manager.ensure({ teammateId: 'tm_dev_one_a1', name: 'Dev 1' })
+    const second = await manager.ensure({ teammateId: 'tm_dev_one_b2', name: 'Dev-1' })
+    expect((await git(['rev-parse', '--abbrev-ref', 'HEAD'], second)).trim()).toBe('locust/dev-1-dev_one_b2')
+    await manager.ensure({ teammateId: 'tm_ming_c3', name: '小明' })
+    await manager.ensure({ teammateId: 'tm_hong_d4', name: '小红' })
+    expect((await manager.list()).map((entry) => entry.branch).sort()).toEqual(['locust/dev-1', 'locust/dev-1-dev_one_b2', 'locust/tm_hong_d4', 'locust/tm_ming_c3'])
   })
 
   it('two teammates get two trees that do not see each other, and the main checkout stays untouched', { timeout: REAL_GIT_TIMEOUT_MS }, async () => {

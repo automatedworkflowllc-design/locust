@@ -5010,6 +5010,7 @@ export default function App(): ReactElement {
           compact={layoutMode === 'compact'}
           teammates={teammates}
           routineStepByTeammate={routineStepByTeammate}
+          branchByTeammate={Object.fromEntries((worktrees?.list ?? []).filter((tree) => tree.branch.length > 0).map((tree) => [tree.teammateId, tree.branch]))}
           missionOwners={missionOwners}
           selectedMissionId={liveRun?.data?.missionId ?? shownKey}
           // Highlight the pick, not the fallback: with nobody picked the
