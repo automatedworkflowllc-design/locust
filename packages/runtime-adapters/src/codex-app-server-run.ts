@@ -1,5 +1,6 @@
 import { createAppServerClient } from "./app-server.js";
 import type { AppServerNotification, AppServerRequest, JsonValue } from "./app-server.js";
+import { notificationThreadId } from "./app-server-events.js";
 import type { AppServerEventNormalizer } from "./app-server-events.js";
 import type { CodexEventNormalizer, NormalizedRuntimeEvent } from "./codex-events.js";
 import type { RuntimeCommandSpec } from "./types.js";
@@ -250,8 +251,16 @@ export function startCodexAppServerRun(
         lose("Codex sent output faster than Locust could record it, so the run was stopped rather than leave a gap in its record. Sending it again usually works.");
         return;
       }
-      if (notification.method === "turn/started") turnId = turnIdOf(notification.params) ?? turnId;
-      if (ENDING_METHODS.has(notification.method)) finish();
+      // Only this run's own thread starts or ends it. A sub-agent's turn runs
+      // on the same connection under its own thread id and ends FIRST
+      // (measured 2026-09-25); taken as ours, it ended the run -- killing the
+      // server mid-turn -- and made the steer aim at the sub-agent's turn.
+      const from = typeof notification.params === "object" && notification.params !== null
+        ? notificationThreadId(notification.params as Record<string, unknown>)
+        : undefined;
+      const ours = threadId === undefined || from === undefined || from === threadId;
+      if (ours && notification.method === "turn/started") turnId = turnIdOf(notification.params) ?? turnId;
+      if (ours && ENDING_METHODS.has(notification.method)) finish();
     },
     // The approval channel, when the mode has one. Under `never` nothing
     // asks -- measured to raise no request at all -- and a server that asks

@@ -280,38 +280,89 @@ describe("the app-server normalizer, worn as a process normalizer", () => {
 });
 
 describe("what a run over this transport cost", () => {
+  /*
+   * The shapes below are codex 0.156.1's own, captured 2026-09-25 by
+   * probe-codex-resume-and-subagent: a first turn's `total` equals its `last`;
+   * a RESUMED thread replays the earlier total before its turn starts; a
+   * sub-agent's turn runs on the same connection under its own thread id.
+   */
+  const line = (method: string, params: unknown): RuntimeJsonlRecord => ({
+    sequence: 1,
+    raw: JSON.stringify({ method, params }),
+  });
+  const counted = (threadId: string, total: number, last: number, cached = 0) =>
+    line("thread/tokenUsage/updated", {
+      threadId,
+      tokenUsage: {
+        total: { totalTokens: total, inputTokens: total - 5, cachedInputTokens: cached, cacheWriteInputTokens: 0, outputTokens: 5, reasoningOutputTokens: 0 },
+        last: { totalTokens: last, inputTokens: last - 5, cachedInputTokens: cached, cacheWriteInputTokens: 0, outputTokens: 5, reasoningOutputTokens: 0 },
+      },
+    });
+  const fresh = () =>
+    asProcessNormalizer(createAppServerEventNormalizer({ runId: "run_1", missionId: "mission_1", runtime: "codex" }));
+  const usageOf = (events: readonly { type: string; payload: unknown }[]) =>
+    (events.find((event) => event.type === "run.completed")?.payload as { usage?: Record<string, number> } | undefined)?.usage;
+
   it("reports the tokens the thread counted, in the vocabulary every receipt uses", () => {
-    const normalizer = asProcessNormalizer(
-      createAppServerEventNormalizer({ runId: "run_1", missionId: "mission_1", runtime: "codex" }),
-    );
-    const line = (method: string, params: unknown): RuntimeJsonlRecord => ({
-      sequence: 1,
-      raw: JSON.stringify({ method, params }),
-    });
-    normalizer.accept(
-      line("thread/tokenUsage/updated", {
-        threadId: "t1",
-        tokenUsage: {
-          // `last` is one turn; `total` is the run, and the run is what the
-          // receipt is for.
-          last: { inputTokens: 5, outputTokens: 1 },
-          total: {
-            totalTokens: 19_394,
-            inputTokens: 19_389,
-            cachedInputTokens: 11_008,
-            cacheWriteInputTokens: 0,
-            outputTokens: 5,
-          },
-        },
-      }),
-    );
-    const [completed] = normalizer.accept(line("turn/completed", { threadId: "t1" }));
-    expect(completed?.type).toBe("run.completed");
-    expect((completed?.payload as { usage?: unknown }).usage).toMatchObject({
-      inputTokens: 19_389,
-      outputTokens: 5,
-      cacheReadTokens: 11_008,
-    });
+    const normalizer = fresh();
+    normalizer.accept(line("thread/started", { thread: { id: "t1" } }));
+    normalizer.accept(line("turn/started", { threadId: "t1", turn: { id: "turn_1" } }));
+    normalizer.accept(counted("t1", 18_375, 18_375, 11_008));
+    const events = normalizer.accept(line("turn/completed", { threadId: "t1", turn: { id: "turn_1" } }));
+    expect(usageOf(events)).toMatchObject({ inputTokens: 18_370, outputTokens: 5, cacheReadTokens: 11_008 });
+  });
+
+  it("bills a resumed turn for itself, not the whole conversation", () => {
+    // Measured: the replay said 18,375 before the turn; the turn's own read
+    // 36,767 total, 18,392 last. The receipt used to say 36,767.
+    const normalizer = fresh();
+    normalizer.accept(counted("t1", 18_375, 18_375));
+    normalizer.accept(line("turn/started", { threadId: "t1", turn: { id: "turn_2" } }));
+    normalizer.accept(counted("t1", 36_767, 18_392));
+    const events = normalizer.accept(line("turn/completed", { threadId: "t1", turn: { id: "turn_2" } }));
+    expect(usageOf(events)).toMatchObject({ inputTokens: 18_392, outputTokens: 0 });
+  });
+
+  it("is not ended by a sub-agent's turn, and counts what the sub-agent spent", () => {
+    const normalizer = fresh();
+    normalizer.accept(line("thread/started", { thread: { id: "parent" } }));
+    normalizer.accept(line("turn/started", { threadId: "parent", turn: { id: "p1" } }));
+    normalizer.accept(counted("parent", 18_548, 18_548));
+    normalizer.accept(line("item/started", { threadId: "parent", item: { id: "c1", type: "collabAgentToolCall", tool: "spawnAgent", status: "inProgress" } }));
+    // The sub-agent, on the same connection, ending FIRST -- as measured.
+    const sub = [
+      ...normalizer.accept(line("turn/started", { threadId: "child", turn: { id: "k1" } })),
+      ...normalizer.accept(line("item/agentMessage/delta", { threadId: "child", itemId: "km", delta: "PING" })),
+      ...normalizer.accept(counted("child", 18_379, 18_379)),
+      ...normalizer.accept(line("turn/completed", { threadId: "child", turn: { id: "k1" } })),
+    ];
+    expect(sub).toEqual([]);
+    expect(normalizer.finalized).toBe(false);
+    expect(normalizer.runtimeThreadId).toBe("parent");
+    const closed = normalizer.accept(line("item/completed", { threadId: "parent", item: { id: "c1", type: "collabAgentToolCall", tool: "spawnAgent", status: "completed" } }));
+    expect(closed[0]).toMatchObject({ type: "tool.completed", payload: { name: "subagent:spawnAgent" } });
+    normalizer.accept(counted("parent", 46_273, 27_725));
+    normalizer.accept(line("item/agentMessage/delta", { threadId: "parent", itemId: "pm", delta: "It said PING." }));
+    const events = normalizer.accept(line("turn/completed", { threadId: "parent", turn: { id: "p1" } }));
+    expect(events[0]?.type).toBe("run.completed");
+    // The parent's 46,273 and the sub-agent's 18,379 -- the run caused both.
+    expect(usageOf(events)?.inputTokens).toBe(46_268 + 18_374);
+  });
+
+  it("keeps the transport running through a sub-agent's turn ending", async () => {
+    const { server, run } = await handshaken();
+    server.notify("turn/started", { threadId: "thread_9", turn: { id: "turn_1" } });
+    server.notify("turn/started", { threadId: "sub_1", turn: { id: "sub_turn" } });
+    server.notify("turn/completed", { threadId: "sub_1", turn: { id: "sub_turn" } });
+    await settle();
+    expect(server.killed).toBe(false);
+    // The steer still aims at the parent's turn.
+    void run.steer("heads up");
+    await settle();
+    expect(server.paramsOf("turn/steer")).toMatchObject({ threadId: "thread_9", expectedTurnId: "turn_1" });
+    server.notify("turn/completed", { threadId: "thread_9", turn: { id: "turn_1" } });
+    await settle();
+    expect(server.killed).toBe(true);
   });
 
   it("says nothing about cost when the thread never counted, rather than claiming zero", () => {

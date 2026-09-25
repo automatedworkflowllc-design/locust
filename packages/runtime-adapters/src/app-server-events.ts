@@ -36,7 +36,43 @@ const TOOL_ITEM_TYPES = new Set([
   "dynamicToolCall",
   "webSearch",
   "imageGeneration",
+  // Codex's sub-agent calls (`spawnAgent`, `wait`). As a step each opened
+  // and never closed; as a tool it closes with its status (a B4 lead).
+  "collabAgentToolCall",
 ]);
+
+/**
+ * The thread a notification is about, when it names one.
+ *
+ * MEASURED 2026-09-25 on codex 0.156.1 (probe-codex-resume-and-subagent): a
+ * sub-agent's own turn -- its `turn/started`, messages, token usage and
+ * `turn/completed` -- arrives on the SAME connection as the parent's, under
+ * the sub-agent's thread id, and its `turn/completed` comes BEFORE the
+ * parent's. Every notification that names a thread names it here.
+ */
+export function notificationThreadId(params: Record<string, unknown>): string | undefined {
+  const thread = isObject(params.thread) ? params.thread : undefined;
+  const turn = isObject(params.turn) ? params.turn : undefined;
+  return identityValue(params.threadId) ?? identityValue(thread?.id) ?? identityValue(turn?.threadId);
+}
+
+/** The counts a receipt carries, from one of Codex's token breakdowns. */
+const USAGE_FIELDS: readonly (readonly [string, string])[] = [
+  ["inputTokens", "inputTokens"],
+  ["outputTokens", "outputTokens"],
+  ["cachedInputTokens", "cacheReadTokens"],
+  ["cacheWriteInputTokens", "cacheWriteTokens"],
+];
+
+function breakdown(value: unknown): Record<string, number> | undefined {
+  if (!isObject(value)) return undefined;
+  const held: Record<string, number> = {};
+  for (const [from] of USAGE_FIELDS) {
+    const count = value[from];
+    if (typeof count === "number" && Number.isFinite(count) && count >= 0) held[from] = count;
+  }
+  return Object.keys(held).length === 0 ? undefined : held;
+}
 
 export interface AppServerInvocationContext {
   readonly runId: string;
@@ -74,6 +110,9 @@ export function toolNameOf(item: Record<string, unknown>): string {
   if (type === "commandExecution") return "shell";
   if (type === "fileChange") return "apply_patch";
   if (type === "webSearch") return "web_search";
+  // Named as the exec transport names them, so the thread folds them as
+  // sub-agent rows either way.
+  if (type === "collabAgentToolCall") return `subagent:${identityValue(item.tool) ?? "spawnAgent"}`;
   const server = identityValue(item.server);
   const tool = identityValue(item.tool);
   if (server !== undefined && tool !== undefined) return identityValue(`${server}.${tool}`) ?? tool;
@@ -195,6 +234,18 @@ export function createAppServerEventNormalizer(
    * uses, because the cost line reads one vocabulary.
    */
   let latestUsage: Record<string, number> | undefined;
+  /**
+   * What each thread has spent, as its running `total` against where this
+   * run found it. MEASURED 2026-09-25: a RESUMED thread's first
+   * `thread/tokenUsage/updated` replays the earlier turns' total before the
+   * turn starts (18,375), and the turn's own then reads 36,767 with `last`
+   * 18,392 -- so taking `total` billed a one-line turn for the whole
+   * conversation (a B4 lead). And `total` always equals the previous total
+   * plus `last`, so where there was no replay, `total - last` of the first
+   * one is the same starting point.
+   */
+  const spentByThread = new Map<string, { before?: Record<string, number>; from?: Record<string, number>; now?: Record<string, number> }>();
+  let ownTurnStarted = false;
   const messageBuffers = new Map<string, string>();
   let runtimeThreadId: string | undefined;
   let normalizedSequence = 0;
@@ -347,38 +398,58 @@ export function createAppServerEventNormalizer(
     accept(notification: AppServerNotification): readonly NormalizedRuntimeEvent[] {
       if (finalized) return [];
       const params = isObject(notification.params) ? (notification.params as Record<string, unknown>) : {};
+      const from = notificationThreadId(params);
 
-      switch (notification.method) {
-        case "thread/tokenUsage/updated": {
-          const usage = isObject(params.tokenUsage) ? params.tokenUsage : undefined;
-          // `total` is the thread's running count and `last` only the most
-          // recent turn; the receipt is for the run, so the total is the one
-          // that answers "what did this cost".
-          const total = isObject(usage?.total) ? usage.total : undefined;
-          if (total === undefined) return [];
-          const held: Record<string, number> = {};
-          const carry = (from: string, to: string): void => {
-            const value = total[from];
-            if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
-              held[to] = value;
-            }
-          };
-          carry("inputTokens", "inputTokens");
-          carry("outputTokens", "outputTokens");
-          carry("cachedInputTokens", "cacheReadTokens");
-          carry("cacheWriteInputTokens", "cacheWriteTokens");
-          if (Object.keys(held).length > 0) latestUsage = held;
+      if (notification.method === "thread/tokenUsage/updated") {
+        // The run's cost is what every thread it ran spent during it: its own
+        // and any sub-agent's, each from where this run found it.
+        const usage = isObject(params.tokenUsage) ? params.tokenUsage : undefined;
+        const total = breakdown(usage?.total);
+        if (total === undefined) return [];
+        const key = from ?? runtimeThreadId ?? "";
+        const spent = spentByThread.get(key) ?? {};
+        spentByThread.set(key, spent);
+        if (!ownTurnStarted) {
+          // Before this run's turn: a replay of what came before it.
+          spent.before = total;
           return [];
         }
+        if (spent.from === undefined) {
+          const last = breakdown(usage?.last) ?? {};
+          spent.from = spent.before ?? Object.fromEntries(
+            Object.entries(total).map(([field, count]) => [field, Math.max(0, count - (last[field] ?? 0))]),
+          );
+        }
+        spent.now = total;
+        const held: Record<string, number> = {};
+        for (const entry of spentByThread.values()) {
+          if (entry.now === undefined || entry.from === undefined) continue;
+          for (const [field, to] of USAGE_FIELDS) {
+            const count = entry.now[field];
+            if (count === undefined) continue;
+            held[to] = (held[to] ?? 0) + Math.max(0, count - (entry.from[field] ?? 0));
+          }
+        }
+        if (Object.keys(held).length > 0) latestUsage = held;
+        return [];
+      }
 
+      // Another thread's own events -- a sub-agent's turn -- neither start,
+      // end nor speak for this run. Its work shows as the parent's
+      // spawnAgent / wait calls; its turn ending first used to END the run,
+      // before the parent had answered (a B4 lead, measured).
+      if (from !== undefined && runtimeThreadId !== undefined && from !== runtimeThreadId) return [];
+
+      switch (notification.method) {
         case "thread/started": {
           const thread = isObject(params.thread) ? params.thread : undefined;
-          runtimeThreadId = identityValue(thread?.id) ?? identityValue(params.threadId);
+          runtimeThreadId = runtimeThreadId ?? identityValue(thread?.id) ?? identityValue(params.threadId);
           return [];
         }
 
         case "turn/started":
           runtimeThreadId = runtimeThreadId ?? identityValue(params.threadId);
+          ownTurnStarted = true;
           return [
             emit("run.started", {
               runtimeThreadId: runtimeThreadId ?? "",
