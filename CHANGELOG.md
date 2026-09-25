@@ -11,6 +11,25 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.342.0 - 2026-09-25
+
+### New
+
+- **LOCUST.md can speak to one coding agent.** Lines between `<claude>` and
+  `</claude>` (or `<codex>`, `<opencode>`, `<cursor>`, `<copilot>`, `<muse>`,
+  `<antigravity>`), each tag on its own line, go only to teammates on that
+  agent. Everything else still goes to everyone.
+
+### Improved
+
+- **Muse Code's billing refusal says what it is.** When Meta wants the
+  account's payment method verified, the card says so, and that it is
+  settled in your Meta account, instead of an error code that looked like
+  Locust breaking.
+- **A LOCUST.md over the 200-line limit** now suggests moving long
+  checklists into their own files and naming them; a teammate reads one
+  when it applies.
+
 ## 0.341.0 - 2026-09-25
 
 ### Fixed
