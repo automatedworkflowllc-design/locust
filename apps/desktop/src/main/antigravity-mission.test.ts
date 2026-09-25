@@ -70,7 +70,7 @@ interface Harness {
   readonly notices: { message: string }[]
 }
 
-function harness(options: { host?: AntigravityHost | undefined; lines?: string[]; idleTimeoutMs?: number; askingNoticeMs?: number; refuseAppend?: boolean } = {}): Harness {
+function harness(options: { host?: AntigravityHost | undefined; lines?: string[]; idleTimeoutMs?: number; askingNoticeMs?: number; refuseAppend?: boolean; ended?: string[] } = {}): Harness {
   const { ledger, created, appended } = fakeLedger(options.refuseAppend === true)
   const api = { calls: [] as { kind: string; input: unknown }[] }
   const transcript = { lines: options.lines ?? [] }
@@ -99,6 +99,7 @@ function harness(options: { host?: AntigravityHost | undefined; lines?: string[]
     now: () => new Date(NOW),
     pollMs: 5,
     notify: ({ message }) => notices.push({ message }),
+    ...(options.ended === undefined ? {} : { onRunEnded: async ({ missionId }) => { options.ended!.push(missionId) } }),
     ...(options.idleTimeoutMs === undefined ? {} : { idleTimeoutMs: options.idleTimeoutMs }),
     ...(options.askingNoticeMs === undefined ? {} : { askingNoticeMs: options.askingNoticeMs })
   })
@@ -378,6 +379,17 @@ describe('when the ledger refuses a receipt', () => {
     await test.service.start('Write hello.txt', undefined, {})
     await settle()
     expect(test.updates.some((update) => update.kind === 'persistence-error')).toBe(true)
+  })
+
+  // A B4 lead from the code review, settled: a run ended this way never said
+  // it had ended, so a relay reply held behind it, a room drain and memory
+  // reading all waited on a run that was over.
+  it('says the run ended, as every other end does', async () => {
+    const ended: string[] = []
+    const test = harness({ lines: WRITE_LINES, refuseAppend: true, ended })
+    const mission = await test.service.start('Write hello.txt', undefined, {})
+    await settle()
+    expect(ended).toEqual([mission.missionId])
   })
 
   it('does NOT advance past events it failed to write', async () => {

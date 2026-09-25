@@ -33,3 +33,12 @@ describe('runtime discovery', () => {
     expect(body.indexOf('event.senderFrame.parent !== null')).toBeLessThan(body.indexOf('discoveryCache = undefined'))
   })
 })
+
+describe('closing the app', () => {
+  it('stops the Antigravity watches before the ledger is flushed, as it stops Codex runs', () => {
+    const work = INDEX.slice(INDEX.indexOf('work: async () => {'), INDEX.indexOf('leave: (reason) => {'))
+    expect(work).toContain('await antigravityServiceForShutdown?.dispose()')
+    expect(work.indexOf('antigravityServiceForShutdown?.dispose()')).toBeLessThan(work.indexOf('ledgerForShutdown?.flush()'))
+    expect(INDEX).toContain('antigravityServiceForShutdown = antigravityMissions')
+  })
+})

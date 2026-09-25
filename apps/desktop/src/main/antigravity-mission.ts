@@ -304,6 +304,11 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
         message: 'The mission could not be written to the durable local ledger.'
       }
     })
+    // And that it ended, as every other end says: a relay reply held behind
+    // this run, a room drain and memory reading all waited on it (B4 lead).
+    if (options.onRunEnded !== undefined) {
+      void options.onRunEnded({ missionId: run.missionId, peer: run.peer, relay: run.relay }).catch(() => undefined)
+    }
     await Promise.resolve()
   }
 

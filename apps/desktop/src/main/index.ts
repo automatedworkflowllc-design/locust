@@ -675,6 +675,8 @@ const runtimeDiscovery = createRuntimeDiscoveryService({
 })
 const ownsSingleInstanceLock = app.requestSingleInstanceLock()
 let missionServiceForShutdown: CodexMissionService | undefined
+/** Antigravity's watches too: never disposed, they polled and wrote on through the flush (B4 lead). */
+let antigravityServiceForShutdown: { dispose(): Promise<void> } | undefined
 let ledgerForShutdown: MissionLedger | undefined
 let workroomForShutdown: Workroom | undefined
 let permissionHostForShutdown: { dispose(): Promise<void> } | undefined
@@ -1840,6 +1842,7 @@ if (!ownsSingleInstanceLock) {
 
     const teammates = createTeammateStore({ rootDirectory: app.getPath('userData') })
     missionServiceForShutdown = codexMissions
+    antigravityServiceForShutdown = antigravityMissions
     ledgerForShutdown = missionLedger
     workroomForShutdown = workroom
 
@@ -4424,6 +4427,7 @@ if (ownsSingleInstanceLock) {
       deadlineMs: SHUTDOWN_DEADLINE_MS,
       work: async () => {
         await missionServiceForShutdown?.dispose()
+        await antigravityServiceForShutdown?.dispose()
         await ledgerForShutdown?.flush()
         await workroomForShutdown?.flush()
         // Refuses whatever a run was still asking, and closes the loopback door.
