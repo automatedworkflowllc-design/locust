@@ -126,6 +126,21 @@ export function museSessionIdOf(parsed: JsonObject): string | undefined {
   return identityValue(stream.id);
 }
 
+/**
+ * Meta refusing to answer until the account's payment method is verified.
+ *
+ * MEASURED 2026-09-25, muse 1.4.0: every run, whatever its flags, ended
+ * `run.terminal.failed` with the reason "API error 402 [request_id=...]:
+ * Billing verification failed. Please check your payment method.
+ * (billing_error)", and the person was shown that line after "Muse Code ended
+ * failed:" -- which reads as the app breaking, over something only their Meta
+ * account can settle.
+ */
+const MUSE_BILLING_REFUSAL = /\bbilling_error\b|\bAPI error 402\b|billing verification failed/i;
+
+export const MUSE_BILLING_SENTENCE =
+  "Meta will not run Muse Code until the account's payment method is verified (API error 402, billing_error), so nothing in this run happened. That is settled in your Meta account, not in Locust.";
+
 export function createMuseEventNormalizer(
   context: MuseInvocationContext,
 ): MuseEventNormalizer {
@@ -402,7 +417,9 @@ export function createMuseEventNormalizer(
                 : !finished
                   ? terminalReason === undefined
                     ? `Muse Code ended ${terminal}.`
-                    : `Muse Code ended ${terminal}: ${terminalReason}`
+                    : MUSE_BILLING_REFUSAL.test(terminalReason)
+                      ? MUSE_BILLING_SENTENCE
+                      : `Muse Code ended ${terminal}: ${terminalReason}`
                   : `Muse Code exited with code ${String(completion.exitCode)}.`,
             ...thread,
             runtimeTerminal: terminal === undefined ? "missing" : finished ? "completed" : "failed",

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-import { createMuseEventNormalizer, museSessionIdOf, museTaskIsInternal } from "../src/muse-events.js";
+import { createMuseEventNormalizer, MUSE_BILLING_SENTENCE, museSessionIdOf, museTaskIsInternal } from "../src/muse-events.js";
 import type { NormalizedRuntimeEvent } from "../src/codex-events.js";
 import type { RuntimeProcessCompletion } from "../src/process-runner.js";
 
@@ -238,6 +238,18 @@ describe("a Muse run that did not finish", () => {
     const payload = failed!.payload as { message: string; runtimeTerminal: string };
     expect(payload.message).toBe("Muse Code ended cancelled: interrupted by user");
     expect(payload.runtimeTerminal).toBe("failed");
+  });
+
+  it("says a billing refusal is the account's, not the app breaking", () => {
+    // The reason as muse 1.4.0 wrote it on 2026-09-25, on every run.
+    const reason = "API error 402 [request_id=db5edbb9-ecbe-4f80-be1d-108647c7586c]: Billing verification failed. Please check your payment method. (billing_error)";
+    const { events } = run([
+      record("run.lifecycle.started", { prompt: "hello" }, 1).raw,
+      record("run.terminal.failed", { kind: "run_terminal", terminal: "failed", text: "", reason }, 2).raw,
+    ], { exitCode: 1 });
+    const payload = events.find((event) => event.type === "run.failed")!.payload as { message: string };
+    expect(payload.message).toBe(MUSE_BILLING_SENTENCE);
+    expect(payload.message).not.toContain("request_id");
   });
 
   it("says so when Locust was the one that stopped it", () => {
