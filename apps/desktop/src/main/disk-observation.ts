@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { readFile } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { toolPatchFrom } from '@teammate/runtime-adapters'
@@ -39,10 +39,27 @@ export interface DiskObservationOptions {
   readonly runGit?: (args: readonly string[], cwd: string) => Promise<string>
   /** Test seam: read a file's text; undefined when it cannot be read as text. */
   readonly readText?: (absolutePath: string) => Promise<string | undefined>
+  /** Test seam: a file's size and modification time; undefined when it cannot be read. */
+  readonly statOf?: (absolutePath: string) => Promise<{ readonly size: number; readonly mtimeMs: number } | undefined>
 }
 
 /** The most of a file the host will turn into a diff on the runtime's behalf. */
 export const MAX_OBSERVED_FILE_BYTES = 64 * 1024
+/*
+ * M18 (the code review): bounds on what one snapshot reads. Every untracked
+ * file was read whole, before the run and again after, with the 64 KB cap
+ * checked only once the bytes were in memory -- a repo with node_modules
+ * outside .gitignore made each Edit run wait seconds and hold tens of MB,
+ * and an untracked dataset was read in full to be thrown away. Past these,
+ * a file is looked at by size and time only: an edit to it is still seen,
+ * without its text.
+ */
+/** Untracked files that carry their text. */
+export const MAX_UNTRACKED_TEXTS = 400
+/** The text those may carry between them. */
+export const MAX_UNTRACKED_TEXT_BYTES = 4 * 1024 * 1024
+/** Untracked files looked at at all; the rest are status only. */
+export const MAX_UNTRACKED_LOOKED_AT = 5_000
 
 function defaultRunGit(args: readonly string[], cwd: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -71,15 +88,33 @@ export async function snapshotWorkspace(
   } catch {
     return undefined
   }
+  const statOf = options.statOf ?? defaultStatOf
   const snapshot = new Map(parsePorcelain(output))
   // An untracked file's status never changes while it stays untracked, so
   // an edit to one between two snapshots was invisible: the second turn of
   // a Codex CLI session appended to the file it made in the first and the
-  // fold showed nothing (2026-09-05). Its text rides on the status, bounded.
+  // fold showed nothing (2026-09-05). Its text rides on the status, bounded
+  // -- and past the bounds its size and time do, so the edit is still seen.
+  let lookedAt = 0
+  let texts = 0
+  let textBytes = 0
   for (const [path, status] of snapshot) {
     if (status !== UNTRACKED) continue
-    const text = await readText(join(workspacePath, path))
-    if (text !== undefined) snapshot.set(path, UNTRACKED + TEXT_MARK + text)
+    if (lookedAt >= MAX_UNTRACKED_LOOKED_AT) break
+    lookedAt += 1
+    const absolute = join(workspacePath, path)
+    const seen = await statOf(absolute)
+    const size = seen?.size ?? 0
+    if (size <= MAX_OBSERVED_FILE_BYTES && texts < MAX_UNTRACKED_TEXTS && textBytes + size <= MAX_UNTRACKED_TEXT_BYTES) {
+      const text = await readText(absolute)
+      if (text !== undefined) {
+        snapshot.set(path, UNTRACKED + TEXT_MARK + text)
+        texts += 1
+        textBytes += text.length
+        continue
+      }
+    }
+    if (seen !== undefined) snapshot.set(path, UNTRACKED + STAMP_MARK + `${String(seen.size)}:${String(Math.round(seen.mtimeMs))}`)
   }
   return snapshot
 }
@@ -87,6 +122,8 @@ export async function snapshotWorkspace(
 const UNTRACKED = '??'
 /** Separates an untracked entry's status from the text it carried; never a byte git prints. */
 const TEXT_MARK = String.fromCharCode(1)
+/** Separates it from the size and time it carried instead, past the bounds (M18). */
+const STAMP_MARK = String.fromCharCode(2)
 
 /** The two-letter status of a snapshot entry, whatever else it carries. */
 export function statusOf(entry: string | undefined): string | undefined {
@@ -160,8 +197,19 @@ export function unreportedPaths(
  * -- and `observed on disk` as the status so nobody reads them as the
  * runtime's own account.
  */
+async function defaultStatOf(absolutePath: string): Promise<{ readonly size: number; readonly mtimeMs: number } | undefined> {
+  try {
+    const seen = await stat(absolutePath)
+    return seen.isFile() ? { size: seen.size, mtimeMs: seen.mtimeMs } : undefined
+  } catch {
+    return undefined
+  }
+}
+
 async function defaultReadText(absolutePath: string): Promise<string | undefined> {
   try {
+    // Sized first: a file past the cap is never read into memory (M18).
+    if ((await stat(absolutePath)).size > MAX_OBSERVED_FILE_BYTES) return undefined
     const bytes = await readFile(absolutePath)
     if (bytes.length > MAX_OBSERVED_FILE_BYTES) return undefined
     // A NUL byte is the cheap sign of a file that is not text.
@@ -201,6 +249,9 @@ export async function observedPatches(
         const text = textOf(entry) ?? (await readText(join(workspacePath, path)))
         if (text === undefined || text.length === 0) continue
         const earlier = textOf(before?.get(path))
+        // There before too, but without its text (past the bounds): what
+        // changed in it is unknown, and it is not an add. The row keeps its path.
+        if (earlier === undefined && statusOf(before?.get(path)) === UNTRACKED) continue
         // Untracked before and after: the file was there and was changed.
         // Git will diff two texts it does not track; the header names temp
         // files, so it is rewritten to the path a person knows.

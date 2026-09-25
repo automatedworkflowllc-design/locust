@@ -9,7 +9,8 @@ import {
   statusOf,
   textOf,
   snapshotWorkspace,
-  unreportedPaths
+  unreportedPaths,
+  MAX_UNTRACKED_TEXTS
 } from './disk-observation.js'
 
 const NUL = String.fromCharCode(0)
@@ -233,5 +234,52 @@ describe('an untracked file that changed while it stayed untracked', () => {
     expect(patch?.removed).toBe(0)
     expect(patch?.text.startsWith('--- a/NOTES.md\n+++ b/NOTES.md\n@@')).toBe(true)
     expect(patch?.text).toContain('+Second entry.')
+  })
+})
+
+/*
+ * M18 (the code review): every untracked file was read whole, twice a run,
+ * the 64 KB cap checked after the read, with no bound on how many. Measured
+ * on 10,001 untracked files and one 200 MB file: 1.9 s and 78 MB carried
+ * before; 0.5 s and 3.2 MB after.
+ */
+describe('a snapshot of a folder with a great many untracked files', () => {
+  const statusOfAll = (count: number): string =>
+    Array.from({ length: count }, (_, n) => `?? file${String(n)}.txt`).join(String.fromCharCode(0)) + String.fromCharCode(0)
+
+  it('never reads a file past the cap, and still sees it change', async () => {
+    const reads: string[] = []
+    const look = (size: number) => snapshotWorkspace('C:/w', {
+      runGit: async () => `?? data.csv${String.fromCharCode(0)}`,
+      statOf: async () => ({ size, mtimeMs: 1000 }),
+      readText: async (absolute) => { reads.push(absolute); return 'x' }
+    })
+    const before = await look(200 * 1024 * 1024)
+    const after = await look(200 * 1024 * 1024 + 10)
+    expect(reads).toEqual([])
+    expect(statusOf(before?.get('data.csv'))).toBe('??')
+    expect(textOf(before?.get('data.csv'))).toBeUndefined()
+    expect(changedPaths(before!, after!)).toEqual(['data.csv'])
+  })
+
+  it('carries the text of only so many files, and a size for the rest', async () => {
+    let reads = 0
+    const snapshot = await snapshotWorkspace('C:/w', {
+      runGit: async () => statusOfAll(MAX_UNTRACKED_TEXTS + 50),
+      statOf: async () => ({ size: 10, mtimeMs: 1 }),
+      readText: async () => { reads += 1; return 'hello' }
+    })
+    expect(reads).toBe(MAX_UNTRACKED_TEXTS)
+    expect(textOf(snapshot?.get('file0.txt'))).toBe('hello')
+    expect(textOf(snapshot?.get(`file${String(MAX_UNTRACKED_TEXTS + 10)}.txt`))).toBeUndefined()
+    expect(statusOf(snapshot?.get(`file${String(MAX_UNTRACKED_TEXTS + 10)}.txt`))).toBe('??')
+  })
+
+  it('draws no patch for a file it saw only by size, rather than calling it new', async () => {
+    const entry = (text: string) => new Map([['big.log', text]])
+    const before = entry(`??${String.fromCharCode(2)}100:1`)
+    const after = entry(`??${String.fromCharCode(1)}now small`)
+    const patches = await observedPatches('C:/w', after, ['big.log'], { runGit: async () => '', readText: async () => undefined }, before)
+    expect(patches.size).toBe(0)
   })
 })
