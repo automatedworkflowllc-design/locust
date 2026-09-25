@@ -100,7 +100,7 @@ const DEFAULT_MAX_QUEUED_RECORDS = 4096;
  * runner's is: a server that floods faster than the ledger can write must end
  * the run rather than grow without limit.
  */
-class NotificationQueue implements RuntimeProcessRecordStream {
+export class NotificationQueue implements RuntimeProcessRecordStream {
   private readonly queued: RuntimeJsonlRecord[] = [];
   private readonly waiting: Array<
     (result: IteratorResult<RuntimeJsonlRecord>) => void

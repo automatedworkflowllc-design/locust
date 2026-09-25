@@ -29,6 +29,8 @@ export {
 } from "./app-server-events.js";
 export { createCodexEventNormalizer } from "./codex-events.js";
 export { asProcessNormalizer, notificationOfRecord, startCodexAppServerRun } from "./codex-app-server-run.js";
+export { runRecordFor, startOpenCodeServeRun } from "./opencode-serve-run.js";
+export type { OpenCodePermission, OpenCodePermissionReply, OpenCodeServeRunOptions } from "./opencode-serve-run.js";
 export type {
   AppServerRunProcess,
   CodexAppServerRun,
@@ -146,6 +148,7 @@ export {
   createMuseExecCommand,
   PROMPT_FILE_PLACEHOLDER,
   createOpenCodeRunCommand,
+  createOpenCodeServeCommand,
   OPENCODE_READ_ONLY_CONFIG,
   MUSE_REQUIRED_FEATURES,
   OPENCODE_REQUIRED_FEATURES,

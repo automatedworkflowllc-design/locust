@@ -144,6 +144,8 @@ const FORBIDDEN_ARGUMENTS = new Set([
   "--remote",
   "--remote-export",
   "--enable-memory",
+  // OpenCode serve: announces the server on the local network (0.0.0.0).
+  "--mdns",
 ]);
 
 function requireText(value: string, label: string): string {
@@ -1403,6 +1405,41 @@ export function createOpenCodeRunCommand(
     stdin: "prompt",
     sandbox: sandboxArgument(options.sandbox),
     ...(Object.keys(env).length === 0 ? {} : { env }),
+  });
+}
+
+/**
+ * OpenCode's own server, for a run that stops and asks (A6.7): Approve-each.
+ *
+ * Fixed arguments only -- an ephemeral port on 127.0.0.1, never `--mdns`,
+ * which would announce it on the network. The password is not here: the
+ * transport makes one per server and passes it in the child's environment,
+ * so no spec, argv or record ever carries it.
+ *
+ * The permission config asks for everything that acts: an edit, a shell
+ * command, a fetch, a folder outside the run's own. Measured 2026-09-25:
+ * under "ask" the server raises `permission.asked` and waits for the answer,
+ * where `run` could only reject. A worktree still reaches its own `.git`
+ * without asking, as every OpenCode worktree run does.
+ */
+export function createOpenCodeServeCommand(
+  executable: ExecutableLaunch,
+  options: { readonly workspacePath: string; readonly repositoryRoot?: string },
+): RuntimeCommandSpec {
+  const config = JSON.stringify({
+    permission: {
+      edit: "ask",
+      bash: "ask",
+      webfetch: "ask",
+      external_directory: options.repositoryRoot === undefined
+        ? "ask"
+        : { [`${options.repositoryRoot}\\.git\\*`]: "allow", "*": "ask" },
+    },
+  });
+  return baseSpec("opencode", executable, options.workspacePath, ["serve", "--port", "0", "--hostname", "127.0.0.1"], {
+    stdin: "protocol",
+    sandbox: "workspace-write",
+    env: { OPENCODE_CONFIG_CONTENT: config },
   });
 }
 

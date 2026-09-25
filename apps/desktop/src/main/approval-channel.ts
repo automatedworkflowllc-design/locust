@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
-import type { AppServerRequest, JsonValue, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
+import type { AppServerRequest, JsonValue, MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
 import type {
   CodexMissionUpdate,
@@ -193,6 +193,48 @@ export function approvalAnswerFrom(raw: unknown): MissionApprovalAnswer | undefi
   return { approvalId: payload.approvalId, decision: decision === 'approve-once' || decision === 'approve-always' ? decision : 'deny' }
 }
 
+/**
+ * An OpenCode server's permission request, as the request this channel
+ * already knows how to put to a person (A6.7).
+ *
+ * A shell call is a command card; an edit is a file-change card naming the
+ * file; anything else OpenCode asks about -- a folder outside the run's own,
+ * a web fetch -- is a command card that says what it is, because a card that
+ * cannot say what would happen is not an approval.
+ */
+export function openCodePermissionRequest(
+  permission: { readonly permission: string; readonly patterns: readonly string[]; readonly metadata: Readonly<Record<string, unknown>> },
+  cwd: string
+): AppServerRequest {
+  const said = (key: string): string | undefined => {
+    const value = permission.metadata[key]
+    return typeof value === 'string' && value.length > 0 ? value : undefined
+  }
+  if (permission.permission === 'bash') {
+    return { id: 0, method: 'item/commandExecution/requestApproval', params: { command: said('command') ?? permission.patterns.join(' '), cwd } }
+  }
+  if (permission.permission === 'edit') {
+    const file = said('filepath') ?? said('filePath') ?? permission.patterns.join(', ')
+    return { id: 0, method: 'item/fileChange/requestApproval', params: { summary: file, cwd } }
+  }
+  const what = permission.permission === 'external_directory' ? 'Reach outside its folder' : `Use ${permission.permission}`
+  return {
+    id: 0,
+    method: 'item/commandExecution/requestApproval',
+    params: { command: `${what}: ${permission.patterns.join(', ')}`, cwd }
+  }
+}
+
+/** This channel's answer, as the reply an OpenCode server takes. Anything unclear is a refusal. */
+export function openCodeReplyFor(result: JsonValue): 'once' | 'always' | 'reject' {
+  const decision = typeof result === 'object' && result !== null && !Array.isArray(result) ? (result as { decision?: unknown }).decision : undefined
+  if (decision === 'accept') return 'once'
+  // Session-scoped on Codex; the server here lives for one run, so "always"
+  // lasts exactly as long.
+  if (decision === 'acceptForSession') return 'always'
+  return 'reject'
+}
+
 /** The protocol decision for each of the product's three authorization answers. */
 export function protocolDecisionFor(decision: MissionApprovalDecision): string {
   if (decision === 'approve-once') return 'accept'
@@ -282,6 +324,8 @@ export interface ApprovalRun {
    * can carry the diff Codex attached to the item the approval is about.
    */
   readonly changesByItem: ReadonlyMap<string, readonly FileChangeRecord[]>
+  /** Who is asking, so the card names them. Absent: Codex, as before. */
+  readonly runtime?: MissionRuntimeId
 }
 
 export interface ApprovalChannel {
@@ -360,7 +404,7 @@ export function createApprovalChannel(options: ApprovalChannelOptions): Approval
             approvalId,
             runId,
             missionId,
-            runtime: 'codex',
+            runtime: run.runtime ?? 'codex',
             kind: described.kind,
             ...(described.questions === undefined || described.questions.length === 0
               ? {}

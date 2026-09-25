@@ -61,7 +61,12 @@ describe('a runtime declares what it can do', () => {
     // It claimed three modes purely through the old fall-through, was
     // flagged when the table was written, and this is the commit it was
     // flagged for.
-    gemini: []
+    gemini: [],
+    // OpenCode gained Approve-each on 2026-09-25 (A6.7): it rides
+    // `opencode serve`, which stops and asks -- measured, and driven
+    // (drive-opencode-approve-each: an approved command ran, a declined one
+    // did not). `run` could only reject, which is why it was not offered.
+    opencode: ['ask', 'accept-edits', 'approve-each', 'plan', 'auto']
   }
 
   it('answers exactly as the if-chain did, except where a claim was corrected on purpose', () => {
@@ -146,9 +151,9 @@ describe('a runtime declares what it can do', () => {
       for (const mode of MODES) {
         const reason = modeUnavailableReason(mode, runtime as never, 'win32')
         if (reason === undefined || runtime === 'codex') continue
-        // Approve-each names Codex on purpose -- it says which runtime DOES
-        // have it -- so only the second half of that sentence is checked.
-        const aboutThisRuntime = mode === 'approve-each' ? reason.replace('Codex CLI only.', '') : reason
+        // Approve-each names Codex and OpenCode on purpose -- it says which
+        // runtimes DO have it -- so only the second half is checked.
+        const aboutThisRuntime = mode === 'approve-each' ? reason.replace('Codex CLI and OpenCode only.', '') : reason
         expect(aboutThisRuntime, `${runtime} / ${mode}: ${reason}`).not.toContain('Codex CLI')
       }
     }

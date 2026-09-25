@@ -15,9 +15,11 @@ import {
   createMuseExecCommand,
   createOpenCodeEventNormalizer,
   createOpenCodeRunCommand,
+  createOpenCodeServeCommand,
   cursorCanEnforceReadOnly,
   notificationOfRecord,
-  startCodexAppServerRun
+  startCodexAppServerRun,
+  startOpenCodeServeRun
 } from '@teammate/runtime-adapters'
 import type {
   AppServerRunProcess,
@@ -40,7 +42,7 @@ import type {
   MissionHandoffResponse,
   MissionMode
 } from '../shared/ipc.js'
-import { withFileChanges } from './approval-channel.js'
+import { openCodePermissionRequest, openCodeReplyFor, withFileChanges } from './approval-channel.js'
 import type { ApprovalChannel } from './approval-channel.js'
 import { fileChangesOf, itemOf } from './approval-patch.js'
 import type { FileChangeRecord } from './approval-patch.js'
@@ -265,6 +267,15 @@ interface CodexMissionServiceOptions {
     executablePath: string,
     args: readonly string[],
     /** H7: the launch's own environment, merged over the host's. */
+    env?: Readonly<Record<string, string>>
+  ) => AppServerRunProcess
+  /**
+   * How to start `opencode serve`, which an OpenCode run in Approve-each rides
+   * so it can stop and ask (A6.7). Absent: OpenCode has no Approve-each.
+   */
+  readonly opencodeServeSpawn?: (
+    executablePath: string,
+    args: readonly string[],
     env?: Readonly<Record<string, string>>
   ) => AppServerRunProcess
   readonly ledger: MissionLedger
@@ -1249,6 +1260,9 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // command built below are the same decision and are made from the
         // same value.
         const codexStreams = runtime === 'codex' && options.appServerSpawn !== undefined
+        // OpenCode asks only through its server; every other OpenCode mode
+        // stays on `run`, which is what they were measured on.
+        const opencodeServes = runtime === 'opencode' && mode === 'approve-each' && options.opencodeServeSpawn !== undefined
         // What the run has announced it will change, by item id. Read off the
         // stream so a file-change tool row can carry its diff, and so an
         // approval card for that item can show what it is about.
@@ -1330,6 +1344,12 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             ...(chosenModel === undefined ? {} : { model: chosenModel }),
             ...(chosenEffort === undefined ? {} : { effort: chosenEffort }),
             ...(resumeThreadId === undefined ? {} : { resumeThreadId })
+          }
+          if (runtime === 'opencode' && opencodeServes) {
+            return createOpenCodeServeCommand(executable, {
+              workspacePath: runCwd,
+              ...(repositoryRoot === undefined ? {} : { repositoryRoot })
+            })
           }
           if (runtime === 'opencode') {
             return createOpenCodeRunCommand(executable, {
@@ -1680,6 +1700,23 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             })
             process = streamed
             steer = streamed.steer
+          } else if (opencodeServes) {
+            // Each thing OpenCode asks becomes the same card Codex's do, and
+            // the person's answer goes back as the server's own reply.
+            const handler = options.approvals?.requestHandlerFor({ runId, missionId, cwd: runCwd, changesByItem, runtime: 'opencode' })
+            process = startOpenCodeServeRun({
+              spawn: options.opencodeServeSpawn!,
+              command,
+              prompt: runtimePrompt,
+              ...(chosenModel === undefined ? {} : { model: chosenModel }),
+              ...(route.effort === undefined ? {} : { variant: route.effort }),
+              ...(resumeThreadId === undefined ? {} : { resumeSessionId: resumeThreadId }),
+              ...(handler === undefined
+                ? {}
+                : { onPermission: async (asked) => openCodeReplyFor(await handler(openCodePermissionRequest(asked, runCwd))) }),
+              signal: controller.signal,
+              now
+            })
           } else {
             process = options.runner.start(command, runtimePrompt, { signal: controller.signal })
             // A2.10: Claude Code's input stays open while its turn runs, so a

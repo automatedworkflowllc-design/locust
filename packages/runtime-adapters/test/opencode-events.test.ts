@@ -206,6 +206,9 @@ describe("what a tool call's status means", () => {
   it("treats anything but `completed` as a failure, including nothing at all", () => {
     expect(openCodeToolOutcome({ status: "completed" })).toEqual({ failed: false });
     expect(openCodeToolOutcome({ status: "error" })).toEqual({ failed: true, status: "error" });
+    // A declined or mode-refused call never ran, and says so (A6.7's drive).
+    expect(openCodeToolOutcome({ status: "error", error: "The user rejected permission to use this specific tool call." }))
+      .toEqual({ failed: true, status: "refused" });
     for (const shape of [{ status: "pending" }, { status: "" }, {}]) {
       expect(openCodeToolOutcome(shape).failed).toBe(true);
     }

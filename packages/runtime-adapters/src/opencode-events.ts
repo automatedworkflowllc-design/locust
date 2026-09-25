@@ -124,6 +124,13 @@ export function openCodeToolOutcome(state: JsonObject): {
 } {
   const status = stringValue(state.status);
   if (status === "completed") return { failed: false };
+  // A call the person declined, or a mode refused, never ran: OpenCode fails
+  // it with "The user rejected permission to use this specific tool call"
+  // (measured, `run` and `serve` alike). As a plain error the fold said it
+  // "ran ... exited non-zero" (drive opencode-approve-each, 2026-09-25).
+  if (status === "error" && /rejected permission/i.test(stringValue(state.error) ?? "")) {
+    return { failed: true, status: "refused" };
+  }
   return { failed: true, status: status ?? "unknown" };
 }
 

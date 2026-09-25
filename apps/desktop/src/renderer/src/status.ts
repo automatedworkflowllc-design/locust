@@ -749,7 +749,9 @@ export const RUNTIME_CAPABILITIES: Readonly<Record<MissionRuntimeId, RuntimeCapa
    * is claimed when a run has proved it and not before.
    */
   gemini: { modes: [], evidence: 'unproven' },
-  opencode: { modes: [...EVERY_ORDINARY_MODE], evidence: 'measured' },
+  // Approve-each through `opencode serve`, which stops and asks (A6.7,
+  // measured 2026-09-25): `run` could only reject what it would have asked.
+  opencode: { modes: [...EVERY_ORDINARY_MODE, 'approve-each'], evidence: 'measured' },
   copilot: { modes: [...EVERY_ORDINARY_MODE], evidence: 'measured' },
   /*
    * Antigravity runs its agent under its own policy and Locust holds nothing
@@ -1018,7 +1020,7 @@ export function modeUnavailableReason(
   platform?: string
 ): string | undefined {
   if (modeRunsOn(mode, runtime, platform)) return undefined
-  if (mode === 'approve-each') return `Codex CLI only. ${runtimeLabel(runtime)} cannot stop and ask yet.`
+  if (mode === 'approve-each') return `Codex CLI and OpenCode only. ${runtimeLabel(runtime)} cannot stop and ask yet.`
   if (mode === 'auto') return `${runtimeLabel(runtime)} runs its own agent under its own permissions; Locust has no handle to widen.`
   if (runtime === 'antigravity') return "Antigravity runs its own agent with its own permissions; Locust cannot hold it read-only."
   return 'Cursor Agent cannot be held read-only on Windows: its sandbox needs macOS or Linux, and plan mode alone does not stop it editing files.'

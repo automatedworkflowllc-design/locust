@@ -1467,6 +1467,8 @@ if (!ownsSingleInstanceLock) {
       // `liveElsewhere` is: the spawner is defined further down this same
       // setup, and nothing starts a mission until all of it has run.
       appServerSpawn: (executablePath, args, env) => spawnAppServer(executablePath, args, env),
+      // A6.7: OpenCode's own server, for Approve-each; the same launcher (tree kill on Windows).
+      opencodeServeSpawn: (executablePath, args, env) => spawnAppServer(executablePath, args, env),
       /*
        * Asked at the start of every run, never captured: a connector signed
        * into after launch reaches the next mission without a restart.
@@ -4142,12 +4144,13 @@ if (!ownsSingleInstanceLock) {
           } as const
         }
       }
-      if (mode === 'approve-each' && runtime !== 'codex') {
+      // Codex asks through its app-server, OpenCode through its own server (A6.7).
+      if (mode === 'approve-each' && runtime !== 'codex' && runtime !== 'opencode') {
         return {
           ok: false,
           error: {
             code: 'RUNTIME_START_FAILED',
-            message: `Per-action approvals run on Codex CLI only. Pick another mode for ${runtimeDisplayName(runtime)}, or switch the route.`
+            message: `Per-action approvals run on Codex CLI and OpenCode only. Pick another mode for ${runtimeDisplayName(runtime)}, or switch the route.`
           }
         } as const
       }
