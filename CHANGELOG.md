@@ -11,6 +11,20 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.348.0 - 2026-09-25
+
+### Improved
+
+- **A busy free model says so.** When the model's provider turns an
+  OpenCode request away (a rate limit, most often on free models), the
+  conversation now says what the provider answered and that OpenCode is
+  trying again, instead of reading "Starting" until it gives up.
+
+### Fixed
+
+- **The check after a turn is still there when you reopen the
+  conversation**, with its Send button.
+
 ## 0.347.0 - 2026-09-25
 
 ### New
