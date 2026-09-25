@@ -11,6 +11,31 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.335.0 - 2026-09-24
+
+### Fixed
+
+- **Choosing another folder never closes Locust for good.** With an update
+  downloaded, switching folders quit into a silent install that also shut
+  the reopened app. The update now waits for your next quit, or Install.
+- **The window fits a small screen.** On a 1080p laptop at 150% the window
+  opened taller than the space above the taskbar, and could not be made
+  smaller; the bottom of the chat box sat behind the taskbar.
+- **After a handoff, the chat box stays on the runtime you handed to.** It
+  went back to the one you had just left, and so did your next message.
+- **Room posts and relayed replies run at the teammate's effort level.**
+  They ran at the runtime's default whatever the teammate was set to.
+- **Teammates whose names make the same branch name each get their own.**
+  "Dev 1" and "Dev-1", or two names in a non-Latin script, collided, and
+  the second could not start.
+- **Edit runs start faster in folders with many untracked files**, and no
+  longer read large untracked files into memory.
+- **An attached file reaches a teammate on its own branch or in its own
+  folder.** The message pointed at a path that did not exist where the
+  teammate worked.
+- **A scheduled routine runs only in the folder it was made in.** It used
+  to run in whichever folder was open. Run still works anywhere.
+
 ## 0.334.0 - 2026-09-24
 
 ### Fixed
