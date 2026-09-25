@@ -1649,6 +1649,10 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           // a read-only run has nothing to observe, and asking git for every
           // question would be paying for an answer nobody reads.
           diskBefore = effectiveSandbox === 'read-only' ? undefined : await (options.observeDisk ?? snapshotWorkspace)(runCwd)
+          // Asked again once that look returns: git can take a while, and a
+          // window closed or an app quit meanwhile must not get a run spawned
+          // behind it (L5). The catch below records this as the reason.
+          if (disposed || startLifecycleVersion !== lifecycleVersion) throw new Error('The Codex mission was stopped before launch.')
           if (codexStreams) {
             // The policy is chosen here, not carried in the argv, because on
             // this transport it is JSON on a socket -- so the rule that only

@@ -238,6 +238,30 @@ function scheduledService(
 }
 
 describe('Codex mission service', () => {
+  // L5 (the code review): a start still in its pre-spawn look at the tree
+  // spawned anyway after the window closed or the app quit -- nothing checked
+  // again once that await returned.
+  it('does not spawn a run the app stopped while it looked at the tree', async () => {
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([{ type: 'turn.completed' }]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    let release!: () => void
+    const looking = new Promise<void>((resolve) => { release = resolve })
+    const { service } = scheduledService({ start }, fakeLedger(), {
+      observeDisk: async () => {
+        await looking
+        return new Map()
+      }
+    })
+    const response = service.start('Fix the typo.', 'codex', 'accept-edits', {}, () => undefined)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    service.interrupt()
+    release()
+    await expect(response).resolves.toMatchObject({ ok: false, error: { code: 'RUNTIME_START_FAILED', message: expect.stringMatching(/stopped before launch/) } })
+    expect(start).not.toHaveBeenCalled()
+  })
+
   it('runs one fixed read-only Codex route and streams normalized events', async () => {
     const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
       records: records([

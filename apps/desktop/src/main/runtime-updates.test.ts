@@ -237,3 +237,45 @@ describe('keeping current, end to end on fakes', () => {
 
 
 })
+
+/*
+ * L12 (the code review): a tick that came while a manual Update was
+ * installing ran the same install again beside it -- npm fighting itself --
+ * recorded the refused second one as a failed update, and cleared
+ * "updating" while the first was still running.
+ */
+describe('a tick during a manual Update', () => {
+  it('waits for it, and installs once', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const installs: string[] = []
+    const updates = createRuntimeUpdates({
+      discover: async () => [codex()],
+      npmRoot: async () => ROOT,
+      latest: async () => released('0.156.1', 14),
+      inUse: async () => false,
+      install: async (runtime, version) => {
+        installs.push(`${runtime}@${version}`)
+        await gate
+        return { ok: true }
+      },
+      load: async () => ({ ...NOTHING_SAVED, checkedAt: NOW, latest: { '@openai/codex': released('0.156.1', 14) } }),
+      save: async () => undefined,
+      updated: () => undefined,
+      changed: () => undefined,
+      now: () => NOW
+    })
+    const pressed = updates.updateNow('codex')
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(updates.updating()).toBe('codex')
+    const ticked = updates.tick()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    // Still the one install, and still updating.
+    expect(installs).toEqual(['codex@0.156.1'])
+    expect(updates.updating()).toBe('codex')
+    release()
+    await pressed
+    await ticked
+    expect(installs).toEqual(['codex@0.156.1'])
+  })
+})

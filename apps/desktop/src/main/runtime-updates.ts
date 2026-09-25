@@ -312,7 +312,7 @@ export function createRuntimeUpdates(options: RuntimeUpdatesOptions): RuntimeUpd
     options.changed()
   }
 
-  return {
+  const service: RuntimeUpdates = {
     async state() {
       const state = await held()
       return { automatic: state.automatic, checkedAt: state.checkedAt === undefined ? undefined : new Date(state.checkedAt).toISOString(), agents: views }
@@ -324,21 +324,20 @@ export function createRuntimeUpdates(options: RuntimeUpdatesOptions): RuntimeUpd
       return this.state()
     },
     async updateNow(runtime) {
-      if (ticking !== undefined) await ticking.catch(() => undefined)
-      const agent = (await agentsNow())?.find((entry) => entry.id === runtime)
-      const state = await held()
-      const release = agent === undefined ? undefined : state.latest[agent.packageName]
-      if (agent === undefined || release === undefined || compareVersions(release.version, agent.installed) <= 0 || current !== undefined) return this.state()
-      const others = views.filter((view) => view.runtime !== runtime)
-      if (await options.inUse(agent.dir).catch(() => true)) {
-        views = [...others, { runtime, installed: agent.installed, latest: release.version, status: { kind: 'waiting', version: release.version, why: 'in use' } }]
-        options.changed()
-        return this.state()
+      // One lock for both (L12): a tick that came while this installed ran the
+      // same install beside it. This waits for a tick, then holds the lock
+      // itself, so a tick meanwhile waits for it.
+      while (ticking !== undefined) await ticking.catch(() => undefined)
+      let unlock!: () => void
+      ticking = new Promise<void>((resolve) => {
+        unlock = resolve
+      })
+      try {
+        return await pressUpdate(runtime)
+      } finally {
+        ticking = undefined
+        unlock()
       }
-      const view = await updateOne(agent, release.version, others)
-      views = [...others, view]
-      options.changed()
-      return this.state()
     },
     tick() {
       if (ticking !== undefined) return ticking
@@ -349,6 +348,24 @@ export function createRuntimeUpdates(options: RuntimeUpdatesOptions): RuntimeUpd
     },
     updating: () => current
   }
+
+  async function pressUpdate(runtime: string): Promise<RuntimeUpdatesState> {
+    const agent = (await agentsNow())?.find((entry) => entry.id === runtime)
+    const state = await held()
+    const release = agent === undefined ? undefined : state.latest[agent.packageName]
+    if (agent === undefined || release === undefined || compareVersions(release.version, agent.installed) <= 0 || current !== undefined) return service.state()
+    const others = views.filter((view) => view.runtime !== runtime)
+    if (await options.inUse(agent.dir).catch(() => true)) {
+      views = [...others, { runtime, installed: agent.installed, latest: release.version, status: { kind: 'waiting', version: release.version, why: 'in use' } }]
+      options.changed()
+      return service.state()
+    }
+    const view = await updateOne(agent, release.version, others)
+    views = [...others, view]
+    options.changed()
+    return service.state()
+  }
+  return service
 }
 
 /** One command, no shell, its output, and a time limit. */
@@ -418,7 +435,9 @@ export async function processesUsing(dir: string): Promise<boolean> {
   }
   const text = await capture(
     'powershell.exe',
-    ['-NoProfile', '-NonInteractive', '-Command', 'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ExecutablePath)|$($_.CommandLine)" }'],
+    // UTF-8 out: in the console's OEM code page a folder with any non-ASCII
+    // letter never matched, so an agent in use read as free (L13).
+    ['-NoProfile', '-NonInteractive', '-Command', '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-CimInstance Win32_Process | ForEach-Object { "$($_.ExecutablePath)|$($_.CommandLine)" }'],
     30_000
   )
   return text.toLowerCase().replace(/[\\/]+/g, '\\').includes(needle)

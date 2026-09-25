@@ -42,9 +42,9 @@ export interface AppServerProcessDeps {
 /** The slice of a child process this module touches. */
 export interface AppServerChild {
   readonly pid?: number
-  readonly stdin: { write(line: string): unknown }
+  readonly stdin: { write(line: string): unknown; on?(event: 'error', listener: () => void): unknown }
   readonly stdout: { on(event: 'data', listener: (chunk: Buffer | string) => void): unknown }
-  on(event: 'exit', listener: () => void): unknown
+  on(event: 'exit' | 'error', listener: () => void): unknown
   kill(): unknown
 }
 
@@ -55,7 +55,9 @@ const MACHINE: AppServerProcessDeps = {
   spawn: (executablePath, args, env) => {
     const shape = spawnShape(executablePath, args)
     return spawn(executablePath, [...shape.args], {
-      stdio: ['pipe', 'pipe', 'pipe'],
+      // Stderr is never read, so it is not piped: a full pipe nobody drains
+      // stalls a chatty CLI (L4).
+      stdio: ['pipe', 'pipe', 'ignore'],
       ...(shape.windowsVerbatimArguments === true ? { windowsVerbatimArguments: true } : {}),
       ...(env === undefined ? {} : { env: { ...process.env, ...env } })
     })
@@ -71,6 +73,11 @@ export function startAppServerProcess(
   env?: Readonly<Record<string, string>>
 ): AppServerProcess {
   const child = deps.spawn(executablePath, args, env)
+  // A write to a child that is gone is an 'error' on stdin; it is the exit's
+  // business, not an exception (L4).
+  child.stdin.on?.('error', () => undefined)
+  // And the spawn's own failure is handled even before anyone asks onExit.
+  child.on('error', () => undefined)
   let stopping = false
   const killChild = (): void => {
     try {
@@ -105,7 +112,17 @@ export function startAppServerProcess(
       })
     },
     onExit: (listener) => {
-      child.on('exit', () => listener())
+      // A spawn that fails emits 'error' and never 'exit': it had no listener,
+      // so it was an uncaught exception, and the turn waited out its timeout
+      // for an exit nothing reported (L4). Either one is the end, said once.
+      let ended = false
+      const end = (): void => {
+        if (ended) return
+        ended = true
+        listener()
+      }
+      child.on('exit', end)
+      child.on('error', end)
     }
   }
 }
