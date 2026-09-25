@@ -497,15 +497,20 @@ describe("installed runtime discovery", () => {
     expect(JSON.stringify(muse)).not.toContain("readiness-unverifiable");
   });
 
-  it("takes an API key as a credential, with no file at all", async () => {
-    // `META_API_KEY always takes priority over the account login` -- muse
-    // login --help. A machine set up that way has no auth.json and is signed
-    // in, so a file-only check would report SIGN IN over a working runtime.
+  it("does not take an API key as a credential, because no run is given one", async () => {
+    /*
+     * M6 (the code review): this counted META_API_KEY as signed in -- muse
+     * login --help: "META_API_KEY always takes priority over the account
+     * login" -- but a run's environment is an allowlist that deliberately
+     * carries no provider key (process-runner.ts), so Muse showed ready and
+     * every run failed for missing credentials. What a run can use is the
+     * login, so the login is what is checked.
+     */
     const muse = await museWith(
       { homeDirectory: "C:\Users\dev", variables: { META_API_KEY: "sk-not-a-real-key" } },
       false,
     );
-    expect(muse?.readiness).toBe("ready");
+    expect(muse?.readiness).toBe("authentication-required");
   });
 
   it("looks where Muse looks when XDG_CONFIG_HOME is set", async () => {

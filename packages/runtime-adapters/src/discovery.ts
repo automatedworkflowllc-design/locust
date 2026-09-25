@@ -295,7 +295,10 @@ const DEFINITIONS: readonly IntegrationDefinition[] = [
      * folder.
      */
     credentials: {
-      environment: ["META_API_KEY"],
+      // Not META_API_KEY, though Muse itself prefers it: a run's environment
+      // is an allowlist that carries no provider key, so a key-only machine
+      // showed ready and every run failed (M6, the code review).
+      environment: [],
       homePath: [".config", "muse", "auth.json"],
       xdgConfigPath: ["muse", "auth.json"],
     },
