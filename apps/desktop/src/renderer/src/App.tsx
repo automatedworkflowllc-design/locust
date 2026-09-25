@@ -743,6 +743,8 @@ export default function App(): ReactElement {
 
   /** Which conversation is being renamed in place, if any. */
   const [renamingMissionId, setRenamingMissionId] = useState<string>()
+  // Missions shown for one teammate only, from their card (L23).
+  const [missionsOwner, setMissionsOwner] = useState<string>()
   /** The Send feedback box, and the conversation it was opened from. */
   const [feedbackFor, setFeedbackFor] = useState<{ readonly conversation: string }>()
 
@@ -5103,7 +5105,13 @@ export default function App(): ReactElement {
             if (next === 'settings') refreshStorage()
             setScreen(next)
           }}
-          onOpenMissions={() => setScreen(screen === 'missions' ? 'workroom' : 'missions')}
+          onOpenMissions={(teammateId) => {
+            // A teammate's card asks for THEIR missions, and opens them even
+            // when Missions is already open (L23); Ctrl 1 still toggles.
+            setMissionsOwner(teammateId)
+            if (teammateId !== undefined) setScreen('missions')
+            else setScreen(screen === 'missions' ? 'workroom' : 'missions')
+          }}
           onOpenTeammates={() => setScreen(screen === 'teammates' ? 'workroom' : 'teammates')}
         />
         <main className="lc-workroom">
@@ -5133,6 +5141,8 @@ export default function App(): ReactElement {
               }}
               teammates={teammates}
               missionOwners={missionOwners}
+              {...(missionsOwner === undefined ? {} : { ownerId: missionsOwner })}
+              onShowEveryone={() => setMissionsOwner(undefined)}
               onOpen={openMission}
             />
           ) : screen === 'teammates' ? (
@@ -6066,6 +6076,9 @@ export default function App(): ReactElement {
         )}
         {viewingFile !== undefined && screen === 'workroom' ? (
           <FileViewer
+            // Keyed by the file, so a new file opens on itself and not on the
+            // version the last one was showing (L21).
+            key={viewingFile.path}
             path={viewingFile.path}
             text={viewingFile.text}
             mode={viewingFile.mode}

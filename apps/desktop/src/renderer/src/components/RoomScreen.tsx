@@ -494,10 +494,12 @@ export function RoomScreen({
     setDraftMembers([])
   }
 
-  const move = async (request: RoomTaskRequest): Promise<void> => {
+  /** The refusal, if any: an add keeps its words when it was refused (L24). */
+  const move = async (request: RoomTaskRequest): Promise<string | undefined> => {
     setBoardError(undefined)
     const error = await onTask(request)
     if (error !== undefined) setBoardError(error)
+    return error
   }
 
   const post = async (): Promise<void> => {
@@ -1305,13 +1307,18 @@ export function RoomScreen({
             * until it is asked for, and what is left is one quiet line at the
             * END of the list, where a new step belongs.
             */}
+          {/* Outside the add form, so a refused move, done or assign is said too (L24). */}
+          {boardError !== undefined && <p className="lc-settings__note lc-tone-red" role="status">{boardError}</p>}
           {adding ? (
             <form
               className="lc-board__add"
               onSubmit={(event) => {
                 event.preventDefault()
                 if (draftTask.trim().length === 0) return
-                void move({ roomId: room.roomId, op: 'add', text: draftTask }).then(() => {
+                void move({ roomId: room.roomId, op: 'add', text: draftTask }).then((refused) => {
+                  // L24 (the code review): cleared and closed whatever the
+                  // answer, so a refused task was thrown away with its reason.
+                  if (refused !== undefined) return
                   setDraftTask('')
                   setAdding(false)
                 })
@@ -1336,7 +1343,6 @@ export function RoomScreen({
               <button type="submit" className="lc-button" disabled={draftTask.trim().length === 0}>
                 Add
               </button>
-              {boardError !== undefined && <span className="lc-settings__note lc-tone-red">{boardError}</span>}
             </form>
           ) : (
             <button type="button" className="lc-board__addlink" onClick={() => setAdding(true)}>

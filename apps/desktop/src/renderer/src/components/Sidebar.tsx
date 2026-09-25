@@ -295,7 +295,8 @@ export function Sidebar({
   /** Whether the composer is on screen; the empty state says "below" only then. */
   readonly composerShown: boolean
   readonly onOpenSettings: () => void
-  readonly onOpenMissions: () => void
+  /** With a teammate: their missions only, and never a toggle closed (L23). */
+  readonly onOpenMissions: (teammateId?: string) => void
   readonly onOpenTeammates: () => void
   /** Rooms a person can write to at once; the one open now is highlighted. */
   readonly rooms: readonly PublicRoom[]
@@ -1613,7 +1614,7 @@ export function Sidebar({
               {...(onRenameMission === undefined ? {} : { onRename: onRenameMission })}
               {...(onRenameDone === undefined ? {} : { onRenameDone })}
               onOpenMissions={() => {
-                onOpenMissions()
+                onOpenMissions(open.teammateId)
                 railClose()
               }}
               onNewConversation={() => {

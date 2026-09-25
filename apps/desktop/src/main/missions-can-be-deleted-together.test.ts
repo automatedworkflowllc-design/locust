@@ -49,13 +49,13 @@ describe('what may be selected', () => {
 
 describe('the bar', () => {
   it('appears only once something is selected', () => {
-    expect(SCREENS).toContain('picked.size > 0 && (')
+    expect(SCREENS).toContain('pickedHere.length > 0 && (')
   })
 
   it('is absent entirely when the screen has no way to delete', () => {
     // A list with checkboxes and nowhere to take them is worse than a list
     // without: the prop is what turns selection on at all.
-    expect(SCREENS).toContain('onDeleteMissions !== undefined && picked.size > 0')
+    expect(SCREENS).toContain('onDeleteMissions !== undefined && pickedHere.length > 0')
     expect(SCREENS).toContain('{onDeleteMissions !== undefined && (')
   })
 
@@ -63,7 +63,7 @@ describe('the bar', () => {
     // This removes records that cannot be recovered. One click is not enough
     // between a person and that; a modal is heavier than the act deserves,
     // and the menu settled that question already.
-    expect(SCREENS).toContain('Delete ${picked.size} for good?')
+    expect(SCREENS).toContain('Delete ${pickedHere.length} for good?')
   })
 
   it('offers select-all over what is actually deletable, not what is listed', () => {

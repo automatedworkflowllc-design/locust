@@ -159,7 +159,9 @@ export function MissionsScreen({
   onOpen,
   unreadableLedgers = 0,
   ledgerUnreadable = false,
-  onDeleteMissions
+  onDeleteMissions,
+  ownerId,
+  onShowEveryone
 }: {
   readonly missions: readonly PublicRecoveredMission[]
   /** The folder this window is open on, so the header can say how many are its own. */
@@ -210,11 +212,20 @@ export function MissionsScreen({
    * worse than a list without.
    */
   readonly onDeleteMissions?: (missionIds: readonly string[]) => void
+  /**
+   * Only this teammate's missions, as a teammate's card asks for (L23): its
+   * "All of Wren's conversations" opened everyone's, or closed this screen.
+   */
+  readonly ownerId?: string
+  /** Back to everyone's. */
+  readonly onShowEveryone?: () => void
 }): ReactElement {
   const [filter, setFilter] = useState<Filter>('All')
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set())
   const [armed, setArmed] = useState(false)
-  const shown = missions.filter((mission) => matchesFilter(mission, filter, runningMissionIds))
+  const owner = ownerId === undefined ? undefined : teammates.find((teammate) => teammate.teammateId === ownerId)
+  const shown = missions.filter((mission) =>
+    matchesFilter(mission, filter, runningMissionIds) && (ownerId === undefined || missionOwners[mission.missionId] === ownerId))
   const withIssues = missions.filter((mission) => mission.integrityIssueCount > 0).length
   /*
    * "ledger verified" is a claim, and it must cover the files that are NOT here.
@@ -283,6 +294,13 @@ export function MissionsScreen({
               : ledgerDamageWords(withIssues, unreadableLedgers)
         }${total === undefined ? '' : ` · ${total.line} across ${String(total.runs)} ${total.word}`}`}
       />
+      {owner !== undefined && (
+        <div className="lc-filters" role="status">
+          <button type="button" className="lc-filter is-active" aria-pressed="true" onClick={onShowEveryone}>
+            Only {owner.name}’s · Show everyone’s
+          </button>
+        </div>
+      )}
       {/*
         * Filters over an empty archive are four controls that can only ever
         * return nothing -- the same reason the approval filter is withheld
@@ -318,10 +336,15 @@ export function MissionsScreen({
         * enough -- but a modal for it would be heavier than the act
         * deserves, and the menu settled that question already.
         */}
-      {onDeleteMissions !== undefined && picked.size > 0 && (
+      {/*
+        * L25 (the code review): the bar counted every pick, and Delete took
+        * only the ones this filter shows -- "Delete 5" deleted 2, and the
+        * other three were forgotten. It counts, and deletes, what is shown.
+        */}
+      {onDeleteMissions !== undefined && pickedHere.length > 0 && (
         <div className="lc-pickbar" role="status">
           <span className="lc-pickbar__count">
-            {picked.size} selected
+            {pickedHere.length} selected
           </span>
           <button type="button" className="lc-pickbar__link" onClick={clear}>
             Clear
@@ -352,10 +375,12 @@ export function MissionsScreen({
                 .map((mission) => mission.missionId)
                 .filter((missionId) => picked.has(missionId))
               onDeleteMissions(going)
-              clear()
+              // Only the ones that went; a pick this filter hides stays picked.
+              setPicked((current) => new Set([...current].filter((missionId) => !going.includes(missionId))))
+              setArmed(false)
             }}
           >
-            {armed ? `Delete ${picked.size} for good?` : `Delete ${picked.size}`}
+            {armed ? `Delete ${pickedHere.length} for good?` : `Delete ${pickedHere.length}`}
           </button>
         </div>
       )}

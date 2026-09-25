@@ -127,7 +127,7 @@ export function FileViewer({
           <p className="lc-viewer__versionnote">
             What turn {String((showing ?? 0) + 1)} changed. The file itself is under <strong>Now</strong>.
           </p>
-          <DiffView file={version.file} truncated={version.truncated} reported={version.reported} />
+          <DiffView key={showing} file={version.file} truncated={version.truncated} reported={version.reported} />
         </div>
       ) : (
       <div className="lc-viewer__scroll">
