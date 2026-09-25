@@ -1523,7 +1523,7 @@ export function SettingsScreen({
               <span className="lc-settings__note">
                 {workspaceBrief === null
                   ? 'None in this folder. Add a LOCUST.md at its root and every teammate, on every runtime, is given it before each mission.'
-                  : `${String(workspaceBrief.lines)} line${workspaceBrief.lines === 1 ? '' : 's'} briefed to every teammate before each mission${workspaceBrief.truncated ? ' -- longer than 200 lines, so the rest is not loaded' : ''}.`}
+                  : `${String(workspaceBrief.lines)} line${workspaceBrief.lines === 1 ? '' : 's'} briefed to every teammate before each mission${workspaceBrief.truncated ? ' -- longer than 200 lines, so the rest is not loaded. Put long checklists in files of their own and name them in LOCUST.md; a teammate reads one when it applies' : ''}.`}
               </span>
             </div>
           )}
