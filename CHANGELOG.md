@@ -11,6 +11,29 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.337.0 - 2026-09-24
+
+### Fixed
+
+- **A message queued with a file keeps its file**, and the file leaves the
+  chat box with it instead of riding along on your next message.
+- **Changing one setting no longer resets others.** Turning Auto on reset
+  the layout, and other switches reset the send button's finish.
+- **"All of Wren's conversations" shows Wren's**, from a teammate's card.
+- **The Missions selection bar counts what Delete will delete.**
+- **A refused room task keeps what you typed**, and says why.
+- **A new file in the viewer opens on itself**, not on the last file's
+  version.
+- **A runtime that has not answered yet says so**, instead of asking you
+  to sign in.
+- **Headings like "Why C#" keep their last character.**
+- **Rooms nobody has posted to are listed newest first.**
+- **A routine saved from a message with a file is named after your
+  words**, not the attachment line.
+- **Replies cut off mid-word no longer lose their trailing s's.**
+- **Non-English text in connector approvals stays intact.**
+- **Stopping a run no longer flashes a console window** on Windows.
+
 ## 0.336.0 - 2026-09-24
 
 ### Fixed
