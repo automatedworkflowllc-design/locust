@@ -140,6 +140,11 @@ const bounded = (value: string, limit: number): string =>
  * resolved, and answering the second would be answering out of order. The
  * rest stay visible in the reply, which is where a reader can see them.
  */
+/** An option named by its position or by the template's placeholder, not by what it is. */
+export function isPlaceholderLabel(label: string): boolean {
+  return /^(?:<[^>]*>|(?:the )?(?:first|second|third|fourth|1st|2nd|3rd|4th) option|option (?:[1-4]|one|two|three|four|[a-d]))$/i.test(label.trim())
+}
+
 export function parseDecision(text: string): DecisionRequest | undefined {
   for (const match of blocksOutsideCode(text, BLOCK)) {
     const parsed = readBlock(match[1] ?? '')
@@ -165,9 +170,18 @@ function readBlock(body: string): DecisionRequest | undefined {
       continue
     }
     const [label, ...rest] = (option[1] ?? '').split('::')
-    const text = clean(label ?? '')
+    let text = clean(label ?? '')
     if (text.length === 0) continue
-    const note = clean(rest.join('::'))
+    let note = clean(rest.join('::'))
+    // The brief's own placeholder copied as the option's name -- Colin's
+    // screenshot, 2026-09-25, a free Mimo run on 0.345: two buttons titled
+    // "The first option" and "The second option". The model's real words
+    // are the note, so they become the name, and the answer sent back names
+    // what was chosen rather than a position.
+    if (isPlaceholderLabel(text) && note.length > 0) {
+      text = note
+      note = ''
+    }
     options.push({
       label: bounded(text, MAX_OPTION_LABEL_LENGTH),
       note: note.length === 0 ? undefined : bounded(note, MAX_OPTION_NOTE_LENGTH)

@@ -40,3 +40,27 @@ describe('reading the options out of an ask', () => {
     expect(parseDecision(ask('I found 2 files.\nThere were 3 problems.'))).toBeUndefined()
   })
 })
+
+describe('an option named after the template, not after itself', () => {
+  // Colin's screenshot, 2026-09-25: a free Mimo run on 0.345 copied the
+  // brief's example words, and the card showed two buttons titled "The
+  // first option" and "The second option".
+  it('is named by what it says instead', () => {
+    const asked = parseDecision([
+      '<locust-ask>',
+      'How do you want the file creation handled, given write tools are disabled in this mode?',
+      '- The first option :: Re-run with write/shell enabled, and I create forbidden-ask.txt',
+      '- The second option :: Leave it undone; I only report the README values',
+      '</locust-ask>'
+    ].join('\n'))
+    expect(asked?.options).toEqual([
+      { label: 'Re-run with write/shell enabled, and I create forbidden-ask.txt', note: undefined },
+      { label: 'Leave it undone; I only report the README values', note: undefined }
+    ])
+  })
+
+  it('keeps a real name that happens to mention an option', () => {
+    const asked = parseDecision('<locust-ask>\nWhich?\n- Keep the old option :: safer\n- Drop it :: simpler\n</locust-ask>')
+    expect(asked?.options.map((one) => one.label)).toEqual(['Keep the old option', 'Drop it'])
+  })
+})

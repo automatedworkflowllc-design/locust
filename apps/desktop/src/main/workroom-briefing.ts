@@ -336,8 +336,10 @@ function askSection(): string {
     `To ask, use exactly this block and ${BLOCK_PLACEMENT}:`,
     `<${ASK_TAG}>`,
     'The question, in one or two sentences.',
-    '- The first option :: what it costs or implies',
-    '- The second option :: what it costs or implies',
+    // Placeholders, not example words: free models copied "The first option"
+    // as the option's name (Colin's screenshot, 2026-09-25).
+    '- <option name> :: <what it costs or implies>',
+    '- <option name> :: <what it costs or implies>',
     `</${ASK_TAG}>`,
     'Two to four options, each one you would actually be willing to do. The person sees them as buttons and their answer starts your next turn.'
   ].join('\n')

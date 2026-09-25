@@ -86,7 +86,9 @@ describe('what a teammate is told about reaching another', () => {
     for (const others of [[], undefined]) {
       const text = brief('Review the tests.', others)
       expect(text).toContain('<locust-ask>')
-      expect(text).toContain(':: what it costs or implies')
+      expect(text).toContain(':: <what it costs or implies>')
+      // Placeholders, never example words a model can copy as a name.
+      expect(text).not.toContain('The first option')
     }
   })
 
