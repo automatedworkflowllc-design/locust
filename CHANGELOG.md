@@ -11,6 +11,22 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.346.0 - 2026-09-25
+
+### Fixed
+
+- **An OpenCode edit waiting for your approval shows the change.** The
+  card now shows the lines it would add and remove, and names the file
+  within your folder, before you decide.
+- **A declined action says "declined"**, not "failed" or "refused". A
+  mode's refusal still says "refused".
+- **OpenCode is no longer shown as "not signed in"** while it is still
+  starting up; it needs no account. A coding agent that has not answered
+  yet is checked again instead of being marked as signed out.
+- **A teammate's question names its choices.** Some free models copied the
+  instructions' example and titled their options "The first option" and
+  "The second option".
+
 ## 0.345.0 - 2026-09-25
 
 ### New
