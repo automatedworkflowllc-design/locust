@@ -33,6 +33,20 @@ heading: the home screen then shows it once, as a splash.
 - **Replies cut off mid-word no longer lose their trailing s's.**
 - **Non-English text in connector approvals stays intact.**
 - **Stopping a run no longer flashes a console window** on Windows.
+- **A Codex run that fails before it starts says why**, instead of "the
+  runtime connection ended before the turn completed".
+- **A Codex CLI that cannot start is reported at once**, instead of after
+  a minute's wait.
+- **Closing the window while a run is starting stops it from starting.**
+- **Pruning old conversations deletes only what the preview listed**, and
+  a restored one comes back to its teammate.
+- **A crash while a teammate was sending a message no longer stops
+  teammates messaging each other** until a file is fixed by hand.
+- **An Update pressed while an automatic update runs installs once.**
+- **Coding agents installed under a folder with accented letters** are
+  recognised as in use, so they are not updated while running.
+- **If Antigravity starts but Locust cannot record it**, you are told it
+  is already working, so it is not started twice.
 
 ## 0.336.0 - 2026-09-24
 
