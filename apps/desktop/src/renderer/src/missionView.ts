@@ -1164,7 +1164,24 @@ export function thisTurnsSteps(
 }
 
 /** Shell verbs that read as file edits rather than as commands. */
-const EDIT_COMMANDS = /^(?:apply_patch|patch|edit|write|sed|tee)\b/
+const EDIT_COMMANDS = /^(?:apply_patch|patch|edit|write)\b/
+
+/**
+ * Whether a shell command edits a file, as far as its own words say.
+ *
+ * M24 (the code review): every `sed` counted, so a read-only
+ * `sed -n '1,40p' src/app.ts` became an edited file named after the
+ * command -- "Edited 1 file" on an Ask run, the command listed as a
+ * produced file, and its output never shown. `sed` edits only in place,
+ * and `tee` only when it is given a file to write.
+ */
+export function isEditCommand(command: string): boolean {
+  const text = command.trim()
+  if (EDIT_COMMANDS.test(text)) return true
+  if (/^sed\b/.test(text)) return /\s(?:-[a-zA-Z]*i[a-zA-Z.]*|--in-place\b)/.test(text)
+  if (/^tee\b/.test(text)) return /^tee(?:\s+-[a-zA-Z-]+)*\s+[^-\s|]/.test(text)
+  return false
+}
 
 function pluralize(count: number, singular: string): string {
   return `${count} ${singular}${count === 1 ? '' : 's'}`
@@ -2127,7 +2144,7 @@ function toolKindOf(event: Extract<NormalizedRuntimeEvent, { type: 'tool.started
   const name = event.payload.name
   const command = event.payload.command
   if (isShellTool(name, event.payload.toolKind)) {
-    return command !== undefined && EDIT_COMMANDS.test(command.trim()) ? 'edit' : 'shell'
+    return command !== undefined && isEditCommand(command) ? 'edit' : 'shell'
   }
   // A runtime's own sub-agent: Claude Code's `Task`, OpenCode's `task`.
   if (SUBAGENT_TOOL.test(name)) return 'helper'
@@ -3195,9 +3212,15 @@ export function buildThread(
   // read -- a turn that did work says so through its activity card, and a
   // failure has its own card already.
   if (!options.running && events.some((event) => event.type === 'run.completed')) {
+    // M25: a plan, a file handed over or a question asked is a reply too,
+    // and so is any text the runtime wrote -- a reply that was only a block
+    // is stripped to nothing before it is drawn, and on an earlier turn the
+    // question itself is no longer shown. Not a share block, though: one
+    // that reached nobody is still a turn that told nobody anything.
     const saidSomething =
       options.spokeToPeers === true
-      || items.some((item) => item.type === 'agent-message' || item.type === 'activity')
+      || items.some((item) => item.type === 'agent-message' || item.type === 'activity' || item.type === 'plan' || item.type === 'files' || item.type === 'decision')
+      || events.some((event) => event.type === 'message.delta' && event.payload.text.replace(/<locust-share[^>]*>[^]*?<\/locust-share>/g, '').trim().length > 0)
     if (!saidSomething) {
       items.push({
         key: 'silent_turn',

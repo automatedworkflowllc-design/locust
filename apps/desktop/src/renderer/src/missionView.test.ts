@@ -50,7 +50,7 @@ import {
   threadMarkers,
   threadPeerCards,
   typedPrompt
-, commandsRun, commandsRunText, HANDOFF_INSTRUCTION_MARKER, switchOf } from './missionView.js'
+, commandsRun, commandsRunText, HANDOFF_INSTRUCTION_MARKER, isEditCommand, switchOf } from './missionView.js'
 
 const NOW = '2026-08-31T16:00:00.000Z'
 let sequence = 0
@@ -630,6 +630,21 @@ describe('collapsed activity', () => {
     expect(activitySummary([{ kind: 'edit', name: 'x', settled: true }])).toBe('Edited 1 file')
     // A refused write edited nothing; it is a call, and its row says failed.
     expect(activitySummary([{ kind: 'edit', name: 'C:/Users/x/.claude/plans/p.md', settled: true, failed: true }])).toBe('1 tool call')
+  })
+
+  // M24 (the code review): every sed counted as an edit, so a read-only
+  // `sed -n` was "Edited 1 file", named after the command.
+  it('counts sed as an edit only in place, and tee only with a file', () => {
+    const read = buildThread([toolStart('t1', 'shell', "sed -n '1,40p' src/app.ts")], { running: true })
+    expect(read.find((item) => item.type === 'activity')).toMatchObject({ summary: 'ran 1 command' })
+    const inPlace = buildThread([toolStart('t1', 'shell', "sed -i 's/a/b/' src/app.ts")], { running: true })
+    expect(inPlace.find((item) => item.type === 'activity')).toMatchObject({ summary: 'Edited 1 file' })
+    expect(isEditCommand("sed -i.bak 's/a/b/' x")).toBe(true)
+    expect(isEditCommand("sed --in-place 's/a/b/' x")).toBe(true)
+    expect(isEditCommand("sed -E 's/a/b/g' x")).toBe(false)
+    expect(isEditCommand('tee out.log')).toBe(true)
+    expect(isEditCommand('tee -a out.log')).toBe(true)
+    expect(isEditCommand('tee')).toBe(false)
   })
 
   it('says so when there was no tool activity', () => {
