@@ -11,6 +11,37 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.336.0 - 2026-09-24
+
+### Fixed
+
+- **A change you decline is shown as declined.** In Approve each action, a
+  refused change was listed as a changed file, with the lines it would
+  have written.
+- **Diffs of files with `--` comments draw correctly.** Removing a SQL or
+  Lua comment line split the file into a phantom second one, and an added
+  line starting `++` renamed the file -- on approval cards too.
+- **A teammate stops reading "working" when Claude Code's tools finish.**
+  After a subagent or any tool, the face and sidebar stayed on "working"
+  or "subagent working" for the rest of the run.
+- **A read-only `sed` is a command, not an edited file.**
+- **A reply that was only a file, a plan or a question is a reply.** It
+  was told "This turn ended without a reply".
+- **Rename works in the narrow sidebar**, from a teammate's card; New group
+  is no longer offered there, where it named nothing.
+- **Codex usage limits and sign-in problems are recognised** on the
+  Approve-each transport, so another route is offered.
+- **Long Antigravity answers keep their end**, where shares and notes are.
+- **Connector permissions match local MCP servers with hyphens** in their
+  names, so their tools stop asking every time.
+- **Copilot replies that quote a key still finish**, so their shares and
+  replies go through.
+- **Muse no longer shows ready on an API key** that its runs are never
+  given; sign in with `muse login`.
+- **After OpenCode could not continue a session, the next message really
+  starts a fresh one**, as the card says.
+- **Accented and emoji text from Codex stays intact** in the record.
+
 ## 0.335.0 - 2026-09-24
 
 ### Fixed
