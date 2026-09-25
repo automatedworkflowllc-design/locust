@@ -15,6 +15,10 @@ heading: the home screen then shows it once, as a splash.
 
 ### Fixed
 
+- **Locust opens from your taskbar as your installed copy, every time.**
+  A development test could re-point the Start menu's Locust shortcut, which
+  the taskbar goes through, at a build folder. That can no longer happen,
+  and your installed copy puts the shortcut back if anything ever moves it.
 - **A message queued with a file keeps its file**, and the file leaves the
   chat box with it instead of riding along on your next message.
 - **Changing one setting no longer resets others.** Turning Auto on reset
