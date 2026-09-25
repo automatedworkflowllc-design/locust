@@ -3,6 +3,7 @@ import { appendFile, mkdir, readFile, stat } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 
 import { branchNameFor, distinctBranchNameFor } from '../shared/worktree-name.js'
+import { ownGitArgs } from './git-guard.js'
 
 /**
  * A worktree per teammate (docs/WORKTREES-DESIGN-2026-09-05.md).
@@ -86,7 +87,7 @@ export interface WorktreeManagerOptions {
 
 function defaultRunGit(args: readonly string[], cwd: string): Promise<string> {
   return new Promise((resolvePromise, reject) => {
-    execFile('git', [...args], { cwd, timeout: GIT_TIMEOUT_MS, windowsHide: true, maxBuffer: 4 * 1024 * 1024 }, (error, stdout, stderr) => {
+    execFile('git', ownGitArgs(args), { cwd, timeout: GIT_TIMEOUT_MS, windowsHide: true, maxBuffer: 4 * 1024 * 1024 }, (error, stdout, stderr) => {
       if (error) reject(new Error(`git ${args[0] ?? ''}: ${String(stderr || error.message).trim().slice(0, 300)}`))
       else resolvePromise(stdout)
     })

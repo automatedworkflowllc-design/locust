@@ -1,6 +1,7 @@
 // H1: first, before any import can spawn -- no bare name is found in its working folder.
 import './no-planted-executables.js'
 import { startAppServerProcess } from './app-server-process.js'
+import { ownGitArgs } from './git-guard.js'
 import { APP_USER_MODEL_ID, DEVELOPMENT_APP_USER_MODEL_ID, mayShowToasts, repairStartMenuShortcut, sweepStaleElectronShortcuts } from './stale-shortcut.js'
 import { openingPlacement, readSavedWindow } from './window-bounds.js'
 import type { SavedWindow } from './window-bounds.js'
@@ -1648,7 +1649,7 @@ if (!ownsSingleInstanceLock) {
     void (async () => {
       const readGit = (args: readonly string[]): Promise<string | undefined> =>
         new Promise((resolve) => {
-          execFile('git', [...args], { cwd: workspacePath, windowsHide: true }, (error, stdout) => {
+          execFile('git', ownGitArgs(args), { cwd: workspacePath, windowsHide: true }, (error, stdout) => {
             resolve(error === null ? stdout.trim() : undefined)
           })
         })

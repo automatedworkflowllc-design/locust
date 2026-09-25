@@ -6,6 +6,7 @@ import { toolPatchFrom } from '@teammate/runtime-adapters'
 import type { NormalizedRuntimeEvent, ToolPatch } from '@teammate/runtime-adapters'
 
 import { unifiedPatchText } from '../shared/approval-patch.js'
+import { ownGitArgs } from './git-guard.js'
 
 /**
  * What a run changed on disk, observed rather than reported.
@@ -65,7 +66,7 @@ function defaultRunGit(args: readonly string[], cwd: string): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(
       'git',
-      [...args],
+      ownGitArgs(args),
       { cwd, timeout: GIT_TIMEOUT_MS, windowsHide: true, maxBuffer: 8 * 1024 * 1024 },
       (error, stdout) => {
         if (error) reject(Object.assign(error, { stdout: String(stdout ?? '') }))
@@ -263,8 +264,8 @@ export async function observedPatches(
       }
       // Tracked: the working tree against the index, then the index against
       // HEAD, so a change a runtime staged still shows.
-      let unified = await runGit(['diff', '--no-color', '--no-ext-diff', '--', path], workspacePath)
-      if (unified.trim().length === 0) unified = await runGit(['diff', '--no-color', '--no-ext-diff', '--cached', '--', path], workspacePath)
+      let unified = await runGit(['diff', '--no-color', '--no-ext-diff', '--no-textconv', '--', path], workspacePath)
+      if (unified.trim().length === 0) unified = await runGit(['diff', '--no-color', '--no-ext-diff', '--no-textconv', '--cached', '--', path], workspacePath)
       const patch = toolPatchFrom(unified)
       if (patch !== undefined) patches.set(path, patch)
     } catch {
@@ -296,7 +297,7 @@ async function diffTexts(
     await writeFile(b, later, 'utf8')
     let out = ''
     try {
-      out = await runGit(['diff', '--no-color', '--no-ext-diff', '--no-index', '--', a, b], workspacePath)
+      out = await runGit(['diff', '--no-color', '--no-ext-diff', '--no-textconv', '--no-index', '--', a, b], workspacePath)
     } catch (error) {
       const stdout = (error as { stdout?: unknown }).stdout
       if (typeof stdout !== 'string' || stdout.length === 0) return ''
