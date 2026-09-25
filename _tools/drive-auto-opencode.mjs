@@ -1,6 +1,6 @@
 // Auto mode on OpenCode: whether it really reaches outside the folder.
 //
-//   node _tools/drive-auto-opencode.mjs [--exe <packaged Locust.exe>] [--tag <label>]
+//   node _tools/drive-auto-opencode.mjs [--packaged <exe>] [--tag <label>]
 //
 // A B4 lead from the code review: OpenCode's Auto run carried
 // `external_directory: "deny"` beside `--auto`, and `--auto` approves only
@@ -16,11 +16,18 @@
 //
 // Free model only: `ling-3.0-flash-fin-free` on OpenCode.
 
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace } from './drive-lib.mjs'
+
+const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
+const packaged = arg('--packaged')
+const tag = arg('--tag')
+const outPath = tag === undefined ? undefined : join(new URL('../docs/beta-fixes-2026-09-24/', import.meta.url).pathname.slice(1), `auto-opencode-${tag}`)
+if (outPath !== undefined) await mkdir(outPath, { recursive: true })
+
 
 const workspace = await scratchRepository('locust-drive-auto-oc-ws-')
 const outside = await mkdtemp(join(tmpdir(), 'locust-drive-auto-oc-outside-'))
@@ -29,6 +36,8 @@ await writeFile(join(outside, 'secret.txt'), `${MARKER}\n`, 'utf8')
 const target = join(outside, 'secret.txt')
 
 const drive = await startDrive({
+  ...(packaged === undefined ? {} : { packaged }),
+  ...(outPath === undefined ? {} : { outPath }),
   name: 'auto-opencode',
   port: 9312,
   workspace,
@@ -77,7 +86,7 @@ try {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
   await drive.finish({
-    intro: `Wren runs the control under Edit and Vale runs Auto, both on OpenCode's free ling model, so the two never share a session. The marker ${MARKER} sits in ${outside.replace(/\\/g, '/')}, a directory the mission was never given; it reaches the thread only if the run left its folder.`
+    intro: `Build: ${packaged ?? 'whatever pnpm build last wrote to out/'}. Wren runs the control under Edit and Vale runs Auto, both on OpenCode's free ling model, so the two never share a session. The marker ${MARKER} sits in ${outside.replace(/\\/g, '/')}, a directory the mission was never given; it reaches the thread only if the run left its folder.`
   })
   await rm(outside, { recursive: true, force: true })
 }

@@ -878,6 +878,18 @@ describe('the route a mission starts on', () => {
     })
   })
 
+  it('sends an OpenCode model only an effort it lists', () => {
+    // OpenCode takes any variant name and silently ignores one the model does
+    // not list (measured 2026-09-25), so a leftover would be shown as applied
+    // and never be (A6.5).
+    const ling: readonly PublicModel[] = [
+      ...models,
+      { id: 'opencode/ling', runtime: 'opencode', displayName: 'Ling', description: '', supportedEfforts: ['low', 'medium', 'high'] }
+    ]
+    expect(startRoute(ling, 'opencode', 'opencode/ling', 'high')).toEqual({ model: 'opencode/ling', effort: 'high' })
+    expect(startRoute(ling, 'opencode', 'opencode/ling', 'xhigh')).toEqual({ model: 'opencode/ling' })
+  })
+
   it('still sends an effort for a model the catalogue has never heard of', () => {
     // The control, and the reason the guard checks for a KNOWN empty list. An
     // account default, or a probe that has not answered yet, says nothing about

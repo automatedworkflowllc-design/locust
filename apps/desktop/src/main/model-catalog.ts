@@ -414,7 +414,8 @@ export function opencodeModelsFrom(runtimes: readonly RuntimeDiscovery[]): reado
       runtime: 'opencode' as const,
       displayName: model.displayName,
       description: free ? 'Free · no sign-in · listed by opencode models' : 'Listed by opencode models',
-      supportedEfforts: []
+      // Its variants, which `run --variant` takes (A6.5); none listed, none offered.
+      supportedEfforts: [...(model.efforts ?? [])]
     }
   })
 }

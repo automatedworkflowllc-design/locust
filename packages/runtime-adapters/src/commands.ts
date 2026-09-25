@@ -968,20 +968,65 @@ export function createGeminiPrintCommand(
  */
 export function parseOpenCodeModelList(text: string): RuntimeModelHints | undefined {
   const models: RuntimeModelName[] = [];
-  for (const line of text.split(/\r?\n/)) {
-    const match = /^([a-z0-9][a-z0-9._-]{0,60})\/([A-Za-z0-9][A-Za-z0-9._-]{0,80})$/.exec(line.trim());
+  const lines = text.split(/\r?\n/);
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = /^([a-z0-9][a-z0-9._-]{0,60})\/([A-Za-z0-9][A-Za-z0-9._-]{0,80})$/.exec(lines[index]!.trim());
     if (match === null) continue;
     const id = `${match[1]!}/${match[2]!}`;
     if (models.some((model) => model.id === id)) continue;
     const displayName = match[2]!;
-    models.push(
-      displayName.endsWith("-free")
-        ? { id, displayName, description: "free" }
-        : { id, displayName },
-    );
+    const efforts = openCodeVariantsAfter(lines, index);
+    models.push({
+      id,
+      displayName,
+      ...(displayName.endsWith("-free") ? { description: "free" } : {}),
+      ...(efforts.length === 0 ? {} : { efforts }),
+    });
   }
   if (models.length === 0) return undefined;
   return { aliases: models.map((model) => model.id), efforts: [], models };
+}
+
+/**
+ * The effort words a variant may be offered as: the effort control's own
+ * scale. A variant named anything else is a provider's private option, not a
+ * reasoning effort, and is not offered.
+ */
+const OPENCODE_EFFORT_VARIANTS: readonly string[] = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
+
+/**
+ * A model's reasoning efforts, from `opencode models --verbose` (A6.5).
+ *
+ * That form prints each id followed by the model as a JSON object, and its
+ * `variants` are what `run --variant` takes -- "provider-specific reasoning
+ * effort, e.g., high, max, minimal" (`run --help`, 1.18.27). MEASURED
+ * 2026-09-25 on the free models: Ling 3.0 Flash Fin lists low/medium/high,
+ * Muse Spark minimal..xhigh, Space Bunny low..max, the rest none; and the
+ * variant reaches the provider -- Ling at `high` reasoned more than at `low`
+ * in four runs of four (median ~2,040 tokens against ~730). A variant the
+ * model does not list is accepted and silently ignored, so only the listed
+ * ones are ever offered. The plain form has no object after the id, and a
+ * model read from it simply offers no effort, as before.
+ */
+function openCodeVariantsAfter(lines: readonly string[], idLine: number): readonly string[] {
+  if (lines[idLine + 1]?.trim() !== "{") return [];
+  const body: string[] = [];
+  for (let index = idLine + 1; index < lines.length; index += 1) {
+    body.push(lines[index]!);
+    if (lines[index] === "}") break;
+  }
+  let model: unknown;
+  try {
+    model = JSON.parse(body.join("\n"));
+  } catch {
+    return [];
+  }
+  const variants = typeof model === "object" && model !== null
+    ? (model as { variants?: unknown }).variants
+    : undefined;
+  if (typeof variants !== "object" || variants === null || Array.isArray(variants)) return [];
+  // In the scale's order, whatever order the runtime printed them in.
+  return OPENCODE_EFFORT_VARIANTS.filter((effort) => Object.hasOwn(variants, effort));
 }
 
 /**
@@ -1297,9 +1342,14 @@ export function createOpenCodeRunCommand(
     args.push("-m", requireText(options.model, "Model"));
   }
   if (options.effort !== undefined) {
-    // Its `run` names no effort flag. Dropping one silently would leave a
-    // caller believing a setting they were shown had been applied.
-    throw new Error("OpenCode takes no effort level");
+    // A model's effort is its variant (A6.5). Only an effort word: the
+    // runtime accepts any name and silently ignores one it does not know, so
+    // anything else would be a setting shown as applied and never applied.
+    const effort = requireText(options.effort, "Effort");
+    if (!OPENCODE_EFFORT_VARIANTS.includes(effort)) {
+      throw new Error(`OpenCode takes no effort level called "${effort}"`);
+    }
+    args.push("--variant", effort);
   }
   if (options.resumeThreadId !== undefined) {
     args.push("-s", requireText(options.resumeThreadId, "Session id"));

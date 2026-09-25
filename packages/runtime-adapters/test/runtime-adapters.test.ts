@@ -1263,11 +1263,45 @@ describe("OpenCode and Copilot CLI commands", () => {
     expect(spec.args).not.toContain("--session-id");
   });
 
-  it("refuses an effort for OpenCode, whose run names no effort flag", () => {
-    // OpenCode has `--variant` ("provider-specific reasoning effort"), NOT
-    // `--effort`, and which models accept which variants has not been
-    // measured -- so an effort is still refused here rather than guessed at.
-    expect(() => createOpenCodeRunCommand(openCode, { workspacePath, prompt: PROMPT, effort: "high" })).toThrow(/effort/);
+  it("passes an OpenCode effort as its variant, and only an effort word", () => {
+    // This refused every effort until A6.5 measured it (2026-09-25): each
+    // model lists its variants in `models --verbose`, and `--variant high`
+    // reasoned more than `--variant low` in four runs of four on the free Ling.
+    const spec = createOpenCodeRunCommand(openCode, { workspacePath, prompt: PROMPT, model: "opencode/ling-3.0-flash-fin-free", effort: "high" });
+    expect(spec.args).toEqual(["run", "--format", "json", "-m", "opencode/ling-3.0-flash-fin-free", "--variant", "high", "--title", "Locust"]);
+    // OpenCode accepts ANY name and ignores one it does not know, so a word
+    // that is not an effort is refused here rather than shown as applied.
+    expect(() => createOpenCodeRunCommand(openCode, { workspacePath, prompt: PROMPT, effort: "bogus" })).toThrow(/effort level called "bogus"/);
+  });
+
+  it("reads each OpenCode model's variants as its efforts, in the scale's order", () => {
+    // The verbose listing's own shape: an id line, then the model as JSON.
+    const verbose = [
+      "opencode/big-pickle",
+      "{",
+      '  "id": "big-pickle",',
+      '  "variants": {}',
+      "}",
+      "opencode/space-bunny-free",
+      "{",
+      '  "id": "space-bunny-free",',
+      '  "variants": {',
+      '    "max": { "reasoningEffort": "max" },',
+      '    "low": { "reasoningEffort": "low" },',
+      '    "turbo": { "speed": "fast" }',
+      "  }",
+      "}",
+    ].join("\n");
+    expect(parseOpenCodeModelList(verbose)?.models).toEqual([
+      { id: "opencode/big-pickle", displayName: "big-pickle" },
+      // A variant that is not an effort word is a provider's option, not offered.
+      { id: "opencode/space-bunny-free", displayName: "space-bunny-free", description: "free", efforts: ["low", "max"] },
+    ]);
+    // The plain listing still reads, with no efforts, as before.
+    expect(parseOpenCodeModelList("opencode/big-pickle\nopencode/space-bunny-free\n")?.models).toEqual([
+      { id: "opencode/big-pickle", displayName: "big-pickle" },
+      { id: "opencode/space-bunny-free", displayName: "space-bunny-free", description: "free" },
+    ]);
   });
 
   it("PASSES an effort to Copilot, which does take one", () => {
@@ -1333,7 +1367,7 @@ describe("OpenCode and Copilot CLI discovery", () => {
           expect(command.args).toEqual(["run", "--help"]);
           return { exitCode: 0, stdout: OPENCODE_HELP, stderr: "" };
         }
-        expect(command.args).toEqual(["models"]);
+        expect([["models"], ["models", "--verbose"]]).toContainEqual(command.args);
         return { exitCode: 0, stdout: OPENCODE_MODELS, stderr: "" };
       },
     };
@@ -1345,6 +1379,28 @@ describe("OpenCode and Copilot CLI discovery", () => {
     expect(opencode?.supportedFeatures).toEqual(expect.arrayContaining([...OPENCODE_REQUIRED_FEATURES]));
     expect(opencode?.modelHints?.models?.map((model) => model.id))
       .toEqual(["opencode/muse-spark-1.3-contributor-free", "opencode/big-pickle"]);
+  });
+
+  it("reads each model's efforts from the verbose list, and keeps the plain list when an older CLI refuses it", async () => {
+    const verbose = 'opencode/ling-3.0-flash-fin-free\n{\n  "variants": { "low": {}, "high": {} }\n}\n';
+    const discover = async (verboseAnswer: { exitCode: number; stdout: string; stderr: string }) => {
+      const runner: CommandRunner = {
+        run: async (command) => {
+          if (command.purpose === "version") return { exitCode: 0, stdout: "1.18.27", stderr: "" };
+          if (command.purpose === "capabilities") return { exitCode: 0, stdout: OPENCODE_HELP, stderr: "" };
+          if (command.args.includes("--verbose")) return verboseAnswer;
+          return { exitCode: 0, stdout: "opencode/ling-3.0-flash-fin-free\n", stderr: "" };
+        },
+      };
+      const [opencode] = (await discoverInstalledRuntimes({ runner, locator: newcomerLocator("opencode") }))
+        .filter((entry) => entry.id === "opencode");
+      return opencode;
+    };
+    expect((await discover({ exitCode: 0, stdout: verbose, stderr: "" }))?.modelHints?.models)
+      .toEqual([{ id: "opencode/ling-3.0-flash-fin-free", displayName: "ling-3.0-flash-fin-free", description: "free", efforts: ["low", "high"] }]);
+    const older = await discover({ exitCode: 1, stdout: "", stderr: "Unknown argument: verbose" });
+    expect(older?.modelHints?.models).toEqual([{ id: "opencode/ling-3.0-flash-fin-free", displayName: "ling-3.0-flash-fin-free", description: "free" }]);
+    expect(older?.diagnostics.some((issue) => issue.code === "capability-probe-failed")).toBe(false);
   });
 
   it("does not report an OpenCode that cannot list a single model as ready to run one", async () => {

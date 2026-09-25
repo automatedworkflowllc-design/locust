@@ -193,6 +193,11 @@ export interface RuntimeModelName {
    * description this package invented about a model it cannot see.
    */
   readonly description?: string;
+  /**
+   * The reasoning efforts the runtime listed for THIS model, when it lists
+   * them per model (OpenCode's variants). Absent means none were listed.
+   */
+  readonly efforts?: readonly string[];
 }
 
 export interface RuntimeDiscovery {

@@ -1542,6 +1542,13 @@ export function startRoute(
   // says nothing about efforts, and dropping one there would quietly downgrade
   // a Claude run that asked for `high`.
   if (model !== undefined && model.supportedEfforts.length === 0) return { model: modelId }
+  // OpenCode takes ANY variant name and silently ignores one the model does
+  // not list (measured 2026-09-25), so a leftover effort from another model
+  // would be shown as applied and never be. Its lists are per model and
+  // complete, so an effort outside one is dropped here (A6.5).
+  if (runtime === 'opencode' && model !== undefined && !model.supportedEfforts.includes(effort)) {
+    return { model: modelId }
+  }
   const variant = model?.variants?.[effort]
   if (variant !== undefined) return { model: variant }
   // A model with variants and no variant for this effort: the effort names

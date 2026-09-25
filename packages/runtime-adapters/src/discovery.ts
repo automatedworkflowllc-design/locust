@@ -171,7 +171,9 @@ const DEFINITIONS: readonly IntegrationDefinition[] = [
     // available -- it is local, it costs nothing, and a CLI that can list the
     // models it will run is a CLI that can run one.
     readinessArgs: ["models"],
-    modelsArgs: ["models"],
+    // The verbose form carries each model's variants, its reasoning efforts
+    // (A6.5). The plain listing above still stands in if it cannot be read.
+    modelsArgs: ["models", "--verbose"],
     parseModels: parseOpenCodeModelList,
     requiredFeatures: OPENCODE_REQUIRED_FEATURES,
     readyWhen: (result) =>
@@ -746,25 +748,30 @@ async function discoverOne(
     // Spawned above with the rest; the readiness answer itself when the list
     // command is the readiness command.
     const modelsOutcome = sameCommand ? readinessOutcome : listedOutcome;
-    if (modelsOutcome !== undefined && succeeded(modelsOutcome)) {
-      // Both streams, like every other probe in this file: the one model
-      // listing this repo has actually captured arrived on stderr.
-      modelHints = definition.parseModels?.(
-        `${modelsOutcome.result.stdout}\n${modelsOutcome.result.stderr}`,
+    // Both streams, like every other probe in this file: the one model
+    // listing this repo has actually captured arrived on stderr.
+    const read = (outcome: typeof modelsOutcome) =>
+      outcome !== undefined && succeeded(outcome)
+        ? definition.parseModels?.(`${outcome.result.stdout}\n${outcome.result.stderr}`)
+        : undefined;
+    // A richer list command that fails (an older CLI without the flag) falls
+    // back to the readiness answer, when that answer is itself a list.
+    const listed = read(modelsOutcome) ?? (sameCommand ? undefined : read(readinessOutcome));
+    if (listed !== undefined) {
+      modelHints = listed;
+    } else if (modelsOutcome !== undefined && succeeded(modelsOutcome)) {
+      modelHints = undefined;
+      // A list that could not be read is not an empty list. Saying nothing
+      // here would leave the picker offering one runtime no models with no
+      // hint that anything went wrong.
+      diagnostics.push(
+        diagnostic({
+          code: "capability-probe-failed",
+          severity: "warning",
+          message: `${definition.displayName} listed its models in a form this build does not recognise.`,
+          resolution: "Its account default is still offered; update Locust if the list stays empty.",
+        }),
       );
-      if (modelHints === undefined) {
-        // A list that could not be read is not an empty list. Saying nothing
-        // here would leave the picker offering one runtime no models with no
-        // hint that anything went wrong.
-        diagnostics.push(
-          diagnostic({
-            code: "capability-probe-failed",
-            severity: "warning",
-            message: `${definition.displayName} listed its models in a form this build does not recognise.`,
-            resolution: "Its account default is still offered; update Locust if the list stays empty.",
-          }),
-        );
-      }
     }
   }
 

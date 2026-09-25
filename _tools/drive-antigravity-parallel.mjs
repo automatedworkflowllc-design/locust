@@ -1,6 +1,6 @@
 // When one Antigravity step opens several tool calls, which result is whose?
 //
-//   node _tools/drive-antigravity-parallel.mjs [--exe <packaged Locust.exe>] [--tag <label>]
+//   node _tools/drive-antigravity-parallel.mjs [--packaged <exe>] [--tag <label>]
 //
 // A B4 lead from the code review: a transcript's `GENERIC` result line names
 // no tool and carries no id, and the normalizer attaches each result to the
@@ -14,11 +14,18 @@
 // the raw transcript's shape for that turn (this drive's own files, nothing
 // of Colin's), and which marker Locust attached to which call.
 
-import { readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 import { pickRouteScript, say, sendAndWaitScript, startDrive, teammateFace } from './drive-lib.mjs'
+
+const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
+const packaged = arg('--packaged')
+const tag = arg('--tag')
+const outPath = tag === undefined ? undefined : join(new URL('../docs/beta-fixes-2026-09-24/', import.meta.url).pathname.slice(1), `antigravity-parallel-${tag}`)
+if (outPath !== undefined) await mkdir(outPath, { recursive: true })
+
 
 // Antigravity runs only in a folder it has opened itself; this is the one the
 // smoke uses. The two files are removed again at the end.
@@ -31,6 +38,8 @@ for (const file of FILES) await writeFile(join(workspace, file.name), `${file.ma
 const startedAt = Date.now()
 
 const drive = await startDrive({
+  ...(packaged === undefined ? {} : { packaged }),
+  ...(outPath === undefined ? {} : { outPath }),
   name: 'antigravity-parallel',
   port: 9357,
   workspace,
@@ -90,7 +99,7 @@ try {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
   await drive.finish({
-    intro: `One Antigravity step asked to open two file reads at once, in ${workspace}. ${FILES.map((f) => `${f.name} holds ${f.marker}`).join('; ')}; each marker exists nowhere else, so a result's marker says which call it answers.`
+    intro: `Build: ${packaged ?? 'whatever pnpm build last wrote to out/'}. One Antigravity step asked to open two file reads at once, in ${workspace}. ${FILES.map((f) => `${f.name} holds ${f.marker}`).join('; ')}; each marker exists nowhere else, so a result's marker says which call it answers.`
   })
   for (const file of FILES) await rm(join(workspace, file.name), { force: true })
 }
