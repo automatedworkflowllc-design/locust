@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.340.0 - 2026-09-25
+
+### Improved
+
+- **A teammate on Claude takes an urgent message without being stopped.**
+  When a teammate sends a Claude teammate something marked to take now, it
+  reaches their run while it is going, and the work they were doing is not
+  thrown away. It is still their next turn as well. Codex teammates already
+  worked this way.
+
 ## 0.339.0 - 2026-09-25
 
 ### New
