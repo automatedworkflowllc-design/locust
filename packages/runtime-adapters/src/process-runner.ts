@@ -325,7 +325,7 @@ const defaultSpawn: RuntimeSpawn = (executablePath, args, options) =>
  * searched for in the application directory and the working directory first,
  * so a planted `taskkill.exe` would run in this process's own context.
  */
-function windowsTaskkillPath(): string {
+export function windowsTaskkillPath(): string {
   const root = process.env.SystemRoot ?? process.env.SYSTEMROOT ?? "C:\\Windows";
   return `${root}\\System32\\taskkill.exe`;
 }

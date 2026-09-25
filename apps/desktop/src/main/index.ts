@@ -232,6 +232,11 @@ import { parsedMissionMode } from './mission-mode.js'
 const MAX_PASTED_BYTES = 24 * 1024 * 1024
 
 const probeRunner = createNodeProbeRunner()
+// `claude mcp list` health-checks every connector and asks for 20 s; the
+// ordinary runner caps any probe at 10 s, so on a slower machine the list
+// was never read and connector allow rules were never made. Its own ceiling,
+// so no other probe's default grows with it.
+const connectorProbeRunner = createNodeProbeRunner({ maximumTimeoutMs: 30_000 })
 // `LOCUST_HIDE_RUNTIMES=1` is a test seam: the first-run drive needs a
 // machine with nothing installed, and this one has everything.
 /*
@@ -436,7 +441,7 @@ const connectorReader = createConnectorReader({
   read: async (timeoutMs) => {
     const claude = await executableLocator.find('claude').catch(() => undefined)
     if (claude === undefined) return undefined
-    const result = await probeRunner.run({
+    const result = await connectorProbeRunner.run({
       purpose: 'capabilities',
       executablePath: claude.executablePath,
       args: [...claude.prefixArgs, 'mcp', 'list'],
@@ -2295,6 +2300,18 @@ if (!ownsSingleInstanceLock) {
     })
 
     ipcMain.handle(RUNTIME_DISCOVERY_CHANNEL, async (event, fresh: unknown, only: unknown) => {
+      // Who is asking, FIRST: this used to drop every cached answer before
+      // it checked, so a frame it then refused had still cleared them.
+      const owner = BrowserWindow.fromWebContents(event.sender)
+      if (!owner || !event.senderFrame || event.senderFrame.parent !== null) {
+        return {
+          ok: false,
+          error: {
+            code: 'DISCOVERY_FAILED',
+            message: 'Local runtime discovery could not complete.'
+          }
+        } as const
+      }
       /*
        * `fresh` DROPS EVERY CACHED ANSWER, INCLUDING THE ONE ABOUT npm.
        *
@@ -2326,16 +2343,6 @@ if (!ownsSingleInstanceLock) {
         // that sweep back without asking anything (main-process audit,
         // 2026-09-22).
         runtimeDiscovery.invalidate()
-      }
-      const owner = BrowserWindow.fromWebContents(event.sender)
-      if (!owner || !event.senderFrame || event.senderFrame.parent !== null) {
-        return {
-          ok: false,
-          error: {
-            code: 'DISCOVERY_FAILED',
-            message: 'Local runtime discovery could not complete.'
-          }
-        } as const
       }
       /*
        * ASK AGAIN ABOUT THE ONES THAT ARE NOT READY, NOT ABOUT EVERYTHING.

@@ -1,4 +1,5 @@
 import { spawnShape } from "./cmd-line.js";
+import { windowsTaskkillPath } from "./process-runner.js";
 import { spawn, spawnSync } from "node:child_process";
 import { isAbsolute } from "node:path";
 import type { CommandResult, CommandRunner, ProbeCommand } from "./types.js";
@@ -78,7 +79,9 @@ const defaultKillTree = (pid: number, platform: NodeJS.Platform): void => {
     // with the runner alone: "after 1", and the calling process then hung on
     // the orphan's open pipe. The walk takes tens of milliseconds on a path
     // that has already waited five seconds.
-    spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
+    // By absolute path, as the process runner does: a bare name is looked
+    // up in the working folder first, where a planted taskkill.exe would run.
+    spawnSync(windowsTaskkillPath(), ["/PID", String(pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
   } catch {
     // The process itself still gets the signals below.
   }
