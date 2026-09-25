@@ -66,6 +66,7 @@ import { missingTranscripts, heldDigests, mergeHistory } from './historyMerge.js
 import { savableMissionId } from './savableConversations.js'
 import { MemoryScreen } from './components/MemoryScreen.js'
 import { isMissionRuntime, runtimeDisplayName } from '../../shared/runtimes.js'
+import { reviewPairOf } from './review-pair.js'
 import { imageMediaType } from '../../shared/image-files.js'
 import { signInCommand } from '../../shared/runtime-install.js'
 import { SIGN_IN_OPENED_EVENT } from './signInEvents.js'
@@ -4371,6 +4372,28 @@ export default function App(): ReactElement {
     void startMission(reviewBrief(material), undefined, { as: startAs(reviewer, { route, mode, effort }, pickerRoutes) })
   }
   /**
+   * A3.1: the same review from two teammates on DIFFERENT coding agents, at
+   * once -- each an ordinary review of theirs, in their own conversation,
+   * with the reviewer contract (edit nothing; a verdict line first). Two
+   * readings by two models is the thing a one-model tool cannot offer.
+   */
+  const reviewPairFor = (run: LiveRunState) =>
+    reviewPairOf(
+      reviewersFor(run).map((one) => ({ ...one, runtime: startAs(one, { route, mode, effort }, pickerRoutes).route.runtime })),
+      run.data?.runtime ?? run.runtime
+    )
+  const askTwoForReview = (run: LiveRunState, pair: readonly [PublicTeammate, PublicTeammate]): void => {
+    const material = reviewMaterialFor(run)
+    if (material === undefined) return
+    const brief = reviewBrief(material)
+    selectTeammate(pair[0].teammateId)
+    void (async () => {
+      for (const reviewer of pair) {
+        await startMission(brief, undefined, { as: startAs(reviewer, { route, mode, effort }, pickerRoutes) })
+      }
+    })()
+  }
+  /**
    * What a row action just did, when it worked.
    *
    * A refusal has had somewhere to appear since 2026-09-05. Success had
@@ -4706,6 +4729,13 @@ export default function App(): ReactElement {
       headerActions.push({
         label: `Ask ${reviewer.name} for a review`,
         onSelect: () => askForReview(liveRun, reviewer)
+      })
+    }
+    const pair = reviewPairFor(liveRun)
+    if (pair !== undefined) {
+      headerActions.push({
+        label: `Ask ${pair[0].name} (${runtimeDisplayName(pair[0].runtime as MissionRuntimeId)}) and ${pair[1].name} (${runtimeDisplayName(pair[1].runtime as MissionRuntimeId)}) for a review`,
+        onSelect: () => askTwoForReview(liveRun, pair)
       })
     }
   }
