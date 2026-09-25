@@ -142,6 +142,7 @@ export function createPermissionHost(options: {
   const byRun = new Map<string, string>()
   const pending = new Map<string, Pending>()
   let server: Server | undefined
+  let starting: Promise<void> | undefined
   let port = 0
 
   const answerRequest = async (body: unknown): Promise<BridgeAnswer> => {
@@ -181,6 +182,10 @@ export function createPermissionHost(options: {
 
     async start() {
       if (server !== undefined) return
+      // One start, however many ask: two runs registering at once each
+      // started a listener, and the first was never closed (a B4 lead).
+      if (starting !== undefined) return starting
+      starting = (async (): Promise<void> => {
       const listener = createServer((req, res) => {
         if (req.method !== 'POST' || req.url !== '/approve') {
           res.writeHead(404).end()
@@ -214,6 +219,10 @@ export function createPermissionHost(options: {
       const address = listener.address()
       port = typeof address === 'object' && address !== null ? address.port : 0
       server = listener
+      })().finally(() => {
+        starting = undefined
+      })
+      return starting
     },
 
     async register(run) {

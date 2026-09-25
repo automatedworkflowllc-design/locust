@@ -187,3 +187,33 @@ describe('what the CLI is handed', () => {
     expect(serverPrefixOf('Bash')).toBe('Bash')
   })
 })
+
+/*
+ * A B4 lead from the code review, settled: two Claude runs registering at
+ * once both found no server and each started one; the first listener stayed
+ * open on loopback, and dispose closed only the second.
+ */
+describe('two runs registering at once', () => {
+  it('share one listener, and both are answered on it', async () => {
+    let n = 0
+    const host = createPermissionHost({
+      bridgePath: 'C:/locust/resources/locust-permission-bridge.mjs',
+      node: 'node',
+      emitApproval: () => undefined,
+      createId: () => `id_${String(++n)}`
+    })
+    hosts.push(host)
+    const [a, b] = await Promise.all([
+      host.register({ runId: 'run_a', missionId: 'm_a', cwd: null }),
+      host.register({ runId: 'run_b', missionId: 'm_b', cwd: null })
+    ])
+    const urlOf = (configPath: string) =>
+      (JSON.parse(readFileSync(configPath, 'utf8')) as { mcpServers: { locust: { env: { LOCUST_PERMISSION_URL: string } } } }).mcpServers.locust.env.LOCUST_PERMISSION_URL
+    expect(urlOf(a.configPath)).toBe(urlOf(b.configPath))
+    // And nothing is left listening once it is closed.
+    const listening = () => process.getActiveResourcesInfo().filter((kind) => kind === 'TCPServerWrap').length
+    await host.dispose()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(listening()).toBe(0)
+  })
+})

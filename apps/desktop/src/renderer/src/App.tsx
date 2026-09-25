@@ -106,7 +106,7 @@ import type { ContextMenuItem, ContextMenuState } from './components/ContextMenu
 import { Thread } from './components/Thread.js'
 import { AgentAvatar, REGISTER_WORD } from './components/ThreadItems.js'
 import { TitleBar } from './components/TitleBar.js'
-import { cappedLiveEvents,
+import { cappedLiveEvents, LIVE_EVENT_CAP,
   conversationTurns,
   failureMessage,
   recentlyUsedRoutes,
@@ -1965,8 +1965,11 @@ export default function App(): ReactElement {
           }
           // A run whose start receipt has not come back yet: hold its updates
           // until the receipt names its runId, then replay them in order.
+          // A side effect inside an updater, which React may run twice (it
+          // does under StrictMode in a dev build): the same update is held
+          // once, not replayed twice (a B4 lead).
           const queued = pendingUpdatesRef.current.get(update.runId) ?? []
-          pendingUpdatesRef.current.set(update.runId, [...queued, update].slice(-500))
+          if (!queued.includes(update)) pendingUpdatesRef.current.set(update.runId, [...queued, update].slice(-500))
         }
         return next
       })
@@ -4240,7 +4243,10 @@ export default function App(): ReactElement {
       ...new Set(
         details
           .filter((detail) => detail.kind === 'edit' && detail.failed !== true)
-          .map((detail) => relativePath(detail.name, workspacePath))
+          // A Codex change of several files names them one per line; each is
+          // its own entry, not one joined path (a B4 lead).
+          .flatMap((detail) => detail.name.split('\n').map((name) => name.trim()).filter((name) => name.length > 0))
+          .map((name) => relativePath(name, workspacePath))
       )
     ]
     // A run the host started carries an assembled briefing as its prompt, so
@@ -4879,7 +4885,10 @@ export default function App(): ReactElement {
         phase: 'interrupted',
         events: run.events,
         eventCount: run.events.length,
-        eventsTruncated: false,
+        // At the cap, the live run holds a window of its events, and what is
+        // counted from them is the window's; it says so, as the history does
+        // (a B4 lead: this said nothing was cut).
+        eventsTruncated: run.events.length >= LIVE_EVENT_CAP,
         integrityIssueCount: 0,
         sandbox: data.sandbox,
         checkpoints: [],
