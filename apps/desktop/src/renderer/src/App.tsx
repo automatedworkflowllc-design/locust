@@ -3404,33 +3404,43 @@ export default function App(): ReactElement {
     }
   }
 
-  const handOffMission = async (choice: RouteChoice): Promise<void> => {
+  /** Hand the running mission over; the reason, when it was refused with nothing stopped (M9). */
+  const handOffMission = async (choice: RouteChoice): Promise<string | undefined> => {
     const bridge = window.desktop
     const current = liveRunRef.current
     const runId = current?.data?.runId
-    if (!bridge || current === undefined || runId === undefined || !liveRunIsActive(current)) return
+    if (!bridge || current === undefined || runId === undefined || !liveRunIsActive(current)) return undefined
 
     const from = current.data?.runtime ?? route.runtime
     const priorEvents = current.events
     setHandingOff(true)
+    const phaseBefore = current.phase
     setRuns((all) => withRun(all, runId, (run) => ({ ...run, phase: 'cancelling', error: undefined })))
-    // The new run cannot inherit questions asked of the old one.
-    setApprovals((all) => all.filter((entry) => entry.runId !== runId))
 
     try {
       const response = await bridge.handOffMission({
         runId,
         runtime: choice.runtime,
-        // M26: the mode the NEW runtime can run, as a start sends it.
-        mode: modeRunsOn(mode, choice.runtime, build?.platform) ? mode : modesFor(choice.runtime, build?.platform)[0] ?? 'accept-edits',
+        // M26: the mode as chosen. Never widened to one the new runtime can
+        // run: Ask onto Cursor on Windows would have become Edit unasked. A
+        // mode the runtime cannot run is refused with nothing stopped (M9).
+        mode,
         ...startRoute(models, choice.runtime, choice.model, swarmEffortFor(models, choice.model, swarm, effort, choice.runtime))
       })
 
+      if (!response.ok && response.error.untouched === true) {
+        // M9: refused before anything was stopped. The run goes on as it
+        // was, its questions still asked, and the reason goes to the chat box.
+        setRuns((all) => withRun(all, runId, (run) => (run.phase === 'cancelling' ? { ...run, phase: phaseBefore } : run)))
+        return response.error.message
+      }
+      // The new run cannot inherit questions asked of the old one.
+      setApprovals((all) => all.filter((entry) => entry.runId !== runId))
       if (!response.ok) {
         // Failed, not cancelled: the mission is over and the reason has to be
         // the thing on screen.
         setRuns((all) => withRun(all, runId, (run) => ({ ...run, phase: 'failed', error: response.error.message })))
-        return
+        return undefined
       }
 
       const newRunId = response.data.runId
@@ -3477,6 +3487,7 @@ export default function App(): ReactElement {
       // the next thing the person said belongs to it and not to the run that
       // was handed off.
       setQueued((current) => requeuedRows(current, runId, newRunId))
+      return undefined
     } catch {
       setRuns((all) =>
         withRun(all, runId, (run) => ({ ...run, phase: 'failed', error: 'The handoff request could not be delivered. The mission stayed on the runtime it was on.' }))
@@ -3484,6 +3495,7 @@ export default function App(): ReactElement {
     } finally {
       setHandingOff(false)
     }
+    return undefined
   }
 
   const cancelMission = (): void => {
@@ -5982,7 +5994,7 @@ export default function App(): ReactElement {
               // the cheapest moment to be sure it is current.
               readModels()
             }}
-            onHandOff={(choice) => { void handOffMission(choice) }}
+            onHandOff={handOffMission}
             handingOff={handingOff}
             teammateName={pickedTeammate?.name}
             busyWith={busyRun === undefined ? undefined : (pickedTeammate?.name ?? 'This teammate')}

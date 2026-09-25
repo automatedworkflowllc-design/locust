@@ -211,7 +211,8 @@ export interface ComposerProps {
    * different consequences, so they are two different callbacks rather than one
    * that quietly means something else while a run is live.
    */
-  readonly onHandOff: (route: RouteChoice) => void
+  /** Resolves to the reason when the handoff was refused with nothing stopped (M9). */
+  readonly onHandOff: (route: RouteChoice) => void | Promise<string | undefined>
   readonly handingOff: boolean
   /** The folder the next mission runs in, by its last segment; undefined when none is chosen. */
   readonly workspaceName: string | undefined
@@ -1350,7 +1351,9 @@ export function Composer({
                       // Picking the route the run is already on would stop it
                       // and buy nothing, so it is not an action here.
                       if (choice.runtime === activeChoice.runtime) return
-                      onHandOff(choice)
+                      void Promise.resolve(onHandOff(choice)).then((why) => {
+                        if (typeof why === 'string') setNote(why)
+                      })
                     }}
                     onClose={() => setPickerOpen(false)}
                     {...(handoff === 'available'

@@ -1301,6 +1301,12 @@ export interface CodexMissionError {
    * 2026-09-24).
    */
   readonly busy?: 'pool'
+  /**
+   * On HANDOFF_REFUSED only: the refusal came before anything was stopped,
+   * so the mission is still running where it was (M9). Without it the window
+   * could not tell "nothing happened" from "stopped, and nothing replaced it".
+   */
+  readonly untouched?: true
 }
 
 /**

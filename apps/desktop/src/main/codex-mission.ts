@@ -510,6 +510,13 @@ function validRunId(value: unknown): value is string {
 /** How many turns before the one handed over a switch brief recalls (A2.11). */
 const EARLIER_TURNS = 4
 
+const CURSOR_READ_ONLY_REFUSAL = 'Cursor Agent cannot be held read-only on this system: its sandbox needs macOS or Linux, and plan mode alone does not stop it editing files. Choose "Edit" if it may change this workspace, or run this on Codex CLI or Claude Code.'
+const AUTO_OFF_REFUSAL = 'Auto mode is switched off for this workspace. Turn it on in Settings to let a run work outside the workspace folder. Nothing was recorded.'
+const unreadableRuntimeRefusal = (runtime: MissionRuntimeId): string =>
+  `${runtimeDisplayName(runtime)} is installed and signed in, but Locust cannot read its event stream yet. Choose Codex CLI or Claude Code for this mission.`
+const notReadyRefusal = (runtime: MissionRuntimeId): string =>
+  `${runtimeDisplayName(runtime)} is not ready. Install or sign in to it, then retry discovery.`
+
 export function createCodexMissionService(options: CodexMissionServiceOptions): CodexMissionService {
   // Resolved here, not inside `start`: that scope declares its own `process`
   // for the child, which shadows Node's global and is in its temporal dead
@@ -876,6 +883,39 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
     })
   }
 
+  /**
+   * M9 (the code review): why `runtime` would refuse this run whatever the
+   * run did -- asked before a handoff stops anything. These are start()'s own
+   * checks that do not depend on the run: a paid route in a free window, Auto
+   * switched off, Cursor read-only where its sandbox cannot hold, a runtime
+   * that is not ready, one whose events Locust cannot read. The handoff used
+   * to learn them from the new start, after the run was already stopped, so
+   * the work in flight was lost and nothing ran on either side.
+   */
+  async function targetRefusal(
+    runtime: MissionRuntimeId,
+    mode: MissionMode,
+    route: { readonly model?: string }
+  ): Promise<string | undefined> {
+    const chosenModel = route.model === undefined || route.model === 'account-default' ? undefined : route.model
+    if (options.freeRoutesOnly === true && !isFreeRoute(runtime, chosenModel)) return FREE_ONLY_REFUSAL
+    if (mode === 'auto' && !(await (options.autoModeAllowed ?? (async () => false))())) return AUTO_OFF_REFUSAL
+    const readOnly = mode !== 'auto' && mode !== 'accept-edits' && mode !== 'approve-each'
+    if (runtime === 'cursor' && readOnly && !cursorCanEnforceReadOnly(hostPlatform)) return CURSOR_READ_ONLY_REFUSAL
+    let runtimes: readonly RuntimeDiscovery[]
+    try {
+      runtimes = await options.discover(runtime)
+    } catch {
+      return `${runtimeDisplayName(runtime)} readiness could not be verified. Check the local runtime and try again.`
+    }
+    const chosen = runtimes.find((entry) => entry.id === runtime)
+    if (chosen?.availability !== 'available' || chosen.readiness !== 'ready' || chosen.executable === undefined) {
+      return notReadyRefusal(runtime)
+    }
+    if (!hostReadsEventsOf(runtime)) return unreadableRuntimeRefusal(runtime)
+    return undefined
+  }
+
   const service: CodexMissionService = {
     async start(
       prompt: unknown,
@@ -912,7 +952,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       if (mode === 'auto' && !(await (options.autoModeAllowed ?? (async () => false))())) {
         return error(
           'RUNTIME_START_FAILED',
-          'Auto mode is switched off for this workspace. Turn it on in Settings to let a run work outside the workspace folder. Nothing was recorded.'
+          AUTO_OFF_REFUSAL
         ) as CodexMissionStartResponse
       }
       // Approve-each is workspace-write: approvals only mean something when
@@ -1010,13 +1050,13 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         ) {
           return error(
             'CODEX_UNAVAILABLE',
-            `${runtimeDisplayName(runtime)} is not ready. Install or sign in to it, then retry discovery.`
+            notReadyRefusal(runtime)
           ) as CodexMissionStartResponse
         }
         if (!hostReadsEventsOf(runtime)) {
           return error(
             'RUNTIME_START_FAILED',
-            `${runtimeDisplayName(runtime)} is installed and signed in, but Locust cannot read its event stream yet. Choose Codex CLI or Claude Code for this mission.`
+            unreadableRuntimeRefusal(runtime)
           ) as CodexMissionStartResponse
         }
 
@@ -1173,10 +1213,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           && effectiveSandbox === 'read-only'
           && !cursorCanEnforceReadOnly(hostPlatform)
         ) {
-          return error(
-            'RUNTIME_START_FAILED',
-            'Cursor Agent cannot be held read-only on this system: its sandbox needs macOS or Linux, and plan mode alone does not stop it editing files. Choose "Edit" if it may change this workspace, or run this on Codex CLI or Claude Code.'
-          ) as CodexMissionStartResponse
+          return error('RUNTIME_START_FAILED', CURSOR_READ_ONLY_REFUSAL) as CodexMissionStartResponse
         }
         const resolvedRouteId = `${routeId}-account:default`
         const normalizerContext = {
@@ -1784,15 +1821,25 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       // restart it on the same route would cost the user their progress and
       // buy nothing, and it is much more likely to be a misclick than a wish.
       if (previous.runtime === runtime) {
-        return error(
-          'HANDOFF_REFUSED',
-          'That mission is already on this runtime. Nothing was changed.'
-        ) as MissionHandoffResponse
+        return {
+          ok: false,
+          error: { code: 'HANDOFF_REFUSED', message: 'That mission is already on this runtime. Nothing was changed.', untouched: true }
+        }
       }
 
       const fromMissionId = previous.missionId
       const fromRuntime = runtimeDisplayName(previous.runtime)
       const originalPrompt = previous.prompt
+
+      // Asked before the run is stopped, so a refusal known in advance
+      // costs nothing (M9).
+      const refused = await targetRefusal(runtime, mode, route)
+      if (refused !== undefined) {
+        return {
+          ok: false,
+          error: { code: 'HANDOFF_REFUSED', message: `${refused} Nothing was stopped: the mission is still running on ${fromRuntime}.`, untouched: true }
+        }
+      }
 
       // Stop the run, then WAIT for its own records to settle before
       // reconciling. Checkpointing a still-draining mission would race the

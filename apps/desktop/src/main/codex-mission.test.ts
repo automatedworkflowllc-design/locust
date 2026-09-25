@@ -1330,7 +1330,8 @@ describe('mid-mission handoff', () => {
 
   function liveService(
     ledger: MissionLedger,
-    runtimes: RuntimeDiscovery[] = [codexRuntime(), handoffClaudeRuntime()]
+    runtimes: RuntimeDiscovery[] = [codexRuntime(), handoffClaudeRuntime()],
+    extra: Partial<Parameters<typeof createCodexMissionService>[0]> = {}
   ) {
     const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
       records: records([{ type: 'turn.completed', usage: { output_tokens: 1 } }]),
@@ -1343,7 +1344,8 @@ describe('mid-mission handoff', () => {
       ledger,
       createId: (() => { let n = 0; return () => String(++n) })(),
       now: () => new Date(NOW),
-      schedule: (task) => { setImmediate(task) }
+      schedule: (task) => { setImmediate(task) },
+      ...extra
     })
     return { start, service }
   }
@@ -1430,16 +1432,92 @@ describe('mid-mission handoff', () => {
 
   it('says both things when the stop worked and the new run did not start', async () => {
     const createCheckpoint = vi.fn<MissionLedger['createCheckpoint']>(async () => checkpoint())
-    // Claude is discovered but signed out, so the continuation cannot launch.
-    const notReady: RuntimeDiscovery = { ...handoffClaudeRuntime(), readiness: 'authentication-required' }
-    const { service } = liveService(fakeLedger({ createCheckpoint }), [codexRuntime(), notReady])
+    // The continuation's record cannot be written -- a failure nothing could
+    // know before the run was stopped (a signed-out target is refused first).
+    let missions = 0
+    const createMission = vi.fn<MissionLedger['createMission']>(async () => {
+      missions += 1
+      if (missions > 1) throw new Error('disk full')
+    })
+    const { service } = liveService(fakeLedger({ createCheckpoint, createMission }))
 
     await service.start('Refactor the parser.', 'codex', 'ask', {}, () => undefined)
     const response = await service.handOff('run_1', 'claude', 'ask', {}, () => undefined)
 
     expect(response.ok).toBe(false)
     expect(response.ok === false && response.error.message).toContain('was stopped for the handoff')
-    expect(response.ok === false && response.error.message).toContain('not ready')
+    expect(createCheckpoint).toHaveBeenCalledTimes(1)
+  })
+
+  /*
+   * M9 (the code review): a refusal the target runtime would give no matter
+   * what the run did is asked BEFORE the run is stopped. It used to be asked
+   * after, by the new start, so a handoff to Cursor read-only on Windows, to
+   * a runtime Locust cannot read, or to one that is signed out stopped the
+   * run and started nothing: the work in flight was lost for a refusal that
+   * was known before anything was touched.
+   */
+  function handoffRuntime(id: 'cursor' | 'antigravity', displayName: string): RuntimeDiscovery {
+    return {
+      ...codexRuntime(),
+      id,
+      displayName,
+      executable: {
+        commandName: id,
+        discoveredPath: process.platform === 'win32' ? `C:${String.fromCharCode(92)}tools${String.fromCharCode(92)}${id}.exe` : `/tools/${id}`,
+        executablePath: process.platform === 'win32' ? `C:${String.fromCharCode(92)}tools${String.fromCharCode(92)}${id}.exe` : `/tools/${id}`,
+        prefixArgs: [],
+        kind: 'native'
+      }
+    }
+  }
+
+  it.each([
+    ['Cursor read-only on Windows', 'cursor', 'ask', /cannot be held read-only/],
+    ['Cursor in Plan on Windows', 'cursor', 'plan', /cannot be held read-only/],
+    ['a runtime whose events Locust cannot read', 'antigravity', 'accept-edits', /cannot read its event stream/],
+    ['a runtime that is signed out', 'claude', 'ask', /not ready/]
+  ] as const)('refuses a handoff to %s before stopping anything', async (_what, runtime, mode, reason) => {
+    const createCheckpoint = vi.fn<MissionLedger['createCheckpoint']>(async () => checkpoint())
+    const runtimes = [
+      codexRuntime(),
+      { ...handoffClaudeRuntime(), readiness: 'authentication-required' as const },
+      handoffRuntime('cursor', 'Cursor Agent'),
+      handoffRuntime('antigravity', 'Antigravity')
+    ]
+    let release!: () => void
+    const held = new Promise<void>((resolve) => { release = resolve })
+    // A run still working: it ends when released or when it is stopped.
+    const start = vi.fn((_spec, _prompt, options): RuntimeProcessRun => {
+      options?.signal?.addEventListener('abort', () => { release() })
+      return {
+        records: { async *[Symbol.asyncIterator]() { await held }, drainAvailable: () => [] },
+        completion: held.then(() => completion())
+      }
+    }) satisfies RuntimeProcessRunner['start']
+    const { service } = liveService(fakeLedger({ createCheckpoint }), runtimes, { platform: 'win32', runner: { start } })
+
+    await service.start('Refactor the parser.', 'codex', 'ask', {}, () => undefined)
+    const response = await service.handOff('run_1', runtime, mode, {}, () => undefined)
+
+    expect(response).toMatchObject({ ok: false, error: { code: 'HANDOFF_REFUSED' } })
+    expect(response.ok === false && response.error.message).toMatch(reason)
+    expect(response.ok === false && response.error.message).toContain('Nothing was stopped')
+    expect(response.ok === false && response.error.untouched).toBe(true)
+    expect(createCheckpoint).not.toHaveBeenCalled()
+    expect(service.liveMissionIds()).toEqual(['mission_2'])
+    release()
+  })
+
+  it('still hands off to Cursor on Windows when the run may edit', async () => {
+    const createCheckpoint = vi.fn<MissionLedger['createCheckpoint']>(async () => checkpoint())
+    const { service } = liveService(fakeLedger({ createCheckpoint }), [codexRuntime(), handoffRuntime('cursor', 'Cursor Agent')], { platform: 'win32' })
+
+    await service.start('Refactor the parser.', 'codex', 'ask', {}, () => undefined)
+    const response = await service.handOff('run_1', 'cursor', 'accept-edits', {}, () => undefined)
+
+    expect(response).toMatchObject({ ok: true, data: { runtime: 'cursor' } })
+    expect(createCheckpoint).toHaveBeenCalledTimes(1)
   })
 
   it('refuses when there is no active run to hand off', async () => {
