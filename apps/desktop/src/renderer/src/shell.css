@@ -11271,6 +11271,19 @@ textarea {
   overflow-y: auto;
 }
 
+/* The row as a rename field (M35): the row's own height and inset, so the
+   list does not jump when it becomes one. */
+.lc-railflyout__list > .lc-railflyout__rename {
+  /* Over `.lc-conv__rename`, which is later in this file and sized for the
+     wide list: its right margin clears a row menu the card does not have,
+     and its `flex: 1` would stretch the field DOWN in this column. */
+  flex: none;
+  height: 30px;
+  margin: 0;
+  padding: 0 8px;
+  font-size: var(--lc-text-description);
+}
+
 .lc-railflyout__row {
   display: flex;
   align-items: center;

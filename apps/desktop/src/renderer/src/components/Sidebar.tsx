@@ -421,6 +421,33 @@ export function Sidebar({
     return () => window.clearInterval(tick)
   }, [])
   const railOpenFor = railPinned ?? railHovered
+  /*
+   * M35 (the code review): in the rail, Rename and New group did nothing --
+   * their fields live in the wide list -- and the state they left behind
+   * surfaced later as an autofocused field when the window widened. Rename
+   * in the rail pins its teammate's card open, where the row becomes the
+   * field. The rail draws no groups, so its menus offer no New group, and a
+   * naming left over from the wide list is cleared.
+   */
+  useEffect(() => {
+    if (!compact) return
+    if (namingGroup === true) onNamingGroupDone?.()
+    if (renamingMissionId === undefined) return
+    const renamed = missions.find((mission) => (mission.memberIds ?? [mission.missionId]).includes(renamingMissionId))
+    const owner = renamed === undefined ? undefined : ownerOf(renamed, missionOwners)
+    if (owner === undefined) {
+      onRenameDone?.()
+      return
+    }
+    if (railPinned !== owner) {
+      measureRail(owner)
+      setRailPinned(owner)
+      setRailHovered(owner)
+    }
+    // Only when the layout or the rename changes: re-pinning on every render
+    // would undo a person closing the card.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compact, renamingMissionId, namingGroup])
 
   // Which groups are open. All three start open, which is how the sidebar
   // has always read; folding is for making room, not a new default.
@@ -1582,6 +1609,9 @@ export function Sidebar({
                 railClose()
               }}
               onMissionMenu={onMissionMenu}
+              {...(renamingMissionId === undefined ? {} : { renamingMissionId })}
+              {...(onRenameMission === undefined ? {} : { onRename: onRenameMission })}
+              {...(onRenameDone === undefined ? {} : { onRenameDone })}
               onOpenMissions={() => {
                 onOpenMissions()
                 railClose()

@@ -698,15 +698,18 @@ export default function App(): ReactElement {
       items: [
         { label: 'New teammate', shortcut: 't', onSelect: startNewTeammate },
         { label: 'New room', shortcut: 'r', onSelect: openRoomsScreen },
-        {
-          label: 'New group',
-          shortcut: 'g',
-          onSelect: () => {
-            // From the `+`, the new group takes no conversation with it.
-            setNewGroupFor(undefined)
-            setNamingGroup(true)
-          }
-        }
+        // Not in the rail, which draws no groups: it named nothing there (M35).
+        ...(layoutMode === 'compact'
+          ? []
+          : [{
+              label: 'New group',
+              shortcut: 'g',
+              onSelect: () => {
+                // From the `+`, the new group takes no conversation with it.
+                setNewGroupFor(undefined)
+                setNamingGroup(true)
+              }
+            }])
       ]
     })
   }
@@ -908,7 +911,8 @@ export default function App(): ReactElement {
                       void window.desktop?.assignGroup(conversationKeyOf(missionId), undefined).then(refreshGroups)
                     }
                   },
-                  {
+                  // Not in the rail, which draws no groups to name one in (M35).
+                  ...(layoutMode === 'compact' ? [] : [{
                     /*
                      * Makes the group AND puts this conversation in it,
                      * which is the only reading of choosing it from here.
@@ -921,7 +925,7 @@ export default function App(): ReactElement {
                       setNewGroupFor(conversationKeyOf(missionId))
                       setNamingGroup(true)
                     }
-                  }
+                  }])
                 ]
               }
             ],

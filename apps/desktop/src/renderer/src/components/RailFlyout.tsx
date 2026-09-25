@@ -38,6 +38,9 @@ export function RailFlyout({
   pinned,
   onSelectMission,
   onMissionMenu,
+  renamingMissionId,
+  onRename,
+  onRenameDone,
   onOpenMissions,
   onNewConversation,
   filtered = false,
@@ -58,6 +61,14 @@ export function RailFlyout({
   readonly pinned: boolean
   readonly onSelectMission: (missionId: string) => void
   readonly onMissionMenu: (missionId: string, at: { readonly x: number; readonly y: number }) => void
+  /**
+   * M35 (the code review): Rename, chosen in the rail, renamed nothing -- the
+   * field lived only in the wide list. Here the row becomes the field, with
+   * the wide row's rules: Enter commits, Escape abandons, losing focus commits.
+   */
+  readonly renamingMissionId?: string
+  readonly onRename?: (missionId: string, name: string) => void
+  readonly onRenameDone?: () => void
   readonly onOpenMissions: () => void
   readonly onNewConversation: () => void
   /**
@@ -133,6 +144,27 @@ export function RailFlyout({
               const live = mission.phase === 'running'
               const active = selectedMissionId !== undefined && (mission.memberIds ?? [mission.missionId]).includes(selectedMissionId)
               const age = shortAgo(mission.lastAt)
+              if (renamingMissionId !== undefined && (mission.memberIds ?? [mission.missionId]).includes(renamingMissionId)) {
+                const commit = (next: string): void => {
+                  onRenameDone?.()
+                  if (next.trim() !== mission.title) onRename?.(mission.missionId, next)
+                }
+                return (
+                  <input
+                    key={mission.missionId}
+                    className="lc-input lc-conv__rename lc-railflyout__rename"
+                    defaultValue={mission.title}
+                    maxLength={120}
+                    aria-label="Name this conversation"
+                    autoFocus
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape') onRenameDone?.()
+                      if (event.key === 'Enter') commit(event.currentTarget.value)
+                    }}
+                    onBlur={(event) => commit(event.currentTarget.value)}
+                  />
+                )
+              }
               return (
                 <button
                   key={mission.missionId}
