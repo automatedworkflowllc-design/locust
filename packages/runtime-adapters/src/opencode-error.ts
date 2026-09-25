@@ -44,6 +44,12 @@ export interface OpenCodeErrorFacts {
   readonly kind: string | undefined;
   /** Whether OpenCode said trying again could work. */
   readonly retryable: boolean | undefined;
+  /**
+   * OpenCode's own name for the error, e.g. `ContextOverflowError`. Kept
+   * apart from `kind`, which the provider's body overrides with its own type
+   * (`invalid_request_error`) and so loses it.
+   */
+  readonly name?: string;
 }
 
 const numberValue = (value: unknown): number | undefined =>
@@ -81,8 +87,26 @@ export function openCodeErrorFacts(parsed: JsonObject): OpenCodeErrorFacts | und
     statusCode: numberValue(data.statusCode),
     kind,
     retryable: typeof data.isRetryable === "boolean" ? data.isRetryable : undefined,
+    ...(stringValue(error.name) === undefined ? {} : { name: stringValue(error.name)! }),
   };
 }
+
+/**
+ * The request was longer than the model takes, which OpenCode RECOVERS from.
+ *
+ * MEASURED 2026-09-25 (A6.10), opencode 1.18.27 against a local endpoint that
+ * refused the first request as too long: the stream carries this error, then
+ * the compaction's summary step and its synthetic continue note, then the
+ * real answer and a clean stop -- and the process still exits 1, because
+ * `run` sets the exit code on any session error it saw.
+ */
+export function isContextOverflow(facts: OpenCodeErrorFacts): boolean {
+  return facts.name === "ContextOverflowError";
+}
+
+/** Said when it happens, before anyone knows whether it recovers. */
+export const OPENCODE_OVERFLOW_RECOVERING =
+  "The request was longer than the model accepts, so OpenCode is summarizing the conversation to try again.";
 
 /**
  * The sentence a person reads when a run ends on one of these.

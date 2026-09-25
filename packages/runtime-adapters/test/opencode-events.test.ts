@@ -462,8 +462,9 @@ describe("OpenCode's plan", () => {
  * These records are shaped as OpenCode writes them (session/compaction.ts and
  * cli/cmd/run.ts, read 2026-09-24; the same code is in the 1.18.27 binary):
  * the summary is a step of its own with no tools and an ordinary text part,
- * and the note is a synthetic text part with a finished time. NOT captured --
- * the free tier was down -- so a capture replaces these when it can be made.
+ * and the note is a synthetic text part with a finished time. Shaped from the
+ * source while the free tier was down; the capture that confirms the shape is
+ * the next describe.
  */
 describe("an OpenCode compaction", () => {
   const record = (type: string, part: Record<string, unknown>) => JSON.stringify({ type, sessionID: "ses_1", part });
@@ -531,5 +532,68 @@ describe("an OpenCode compaction", () => {
     const late = run([start, said("An answer."), finish("stop"), start, note, said("Done."), finish("stop")]).events;
     expect([...messages(late).values()]).toEqual(["An answer.", "Done."]);
     expect(compactionNotices(late)).toHaveLength(1);
+  });
+});
+
+/*
+ * The same, CAPTURED 2026-09-25: opencode 1.18.27 on the free Ling 3.0 Flash
+ * Fin, its context cut to 24,000 tokens in a scratch config, asked to read six
+ * 38 KB files one at a time. After two reads OpenCode summarized ("## Objective
+ * ..."), printed its synthetic compaction_continue note, and carried on --
+ * with `tail -1` this time -- to the real answer. The shape the tests above
+ * were built from is the shape it wrote.
+ */
+describe("an OpenCode compaction, as captured", () => {
+  const { events } = run(fixture("compaction-small-context.jsonl"));
+  const said = [...messages(events).values()].filter((text) => text.length > 0);
+
+  it("keeps OpenCode's summary and note out of the teammate's words, and ends on the real answer", () => {
+    expect(said.some((text) => text.includes("Continue if you have next steps"))).toBe(false);
+    expect(said.some((text) => text.includes("## Objective"))).toBe(false);
+    expect(said.at(-1)).toMatch(/^Here are the last lines of all six files/);
+    expect(events.at(-1)?.type).toBe("run.completed");
+  });
+
+  it("says once that the conversation was summarized", () => {
+    expect(events.filter((event) => event.type === "adapter.diagnostic"
+      && (event.payload as { code: string }).code === "opencode.context_compacted")).toHaveLength(1);
+  });
+});
+
+/*
+ * A6.10, CAPTURED 2026-09-25: opencode 1.18.27 against a local endpoint that
+ * refused the first request as too long ("maximum context length"). OpenCode
+ * wrote a ContextOverflowError, summarized, printed its continue note, and
+ * answered -- then exited 1, because `run` sets the exit code on any session
+ * error it saw. Locust called that a failure: "OpenCode stopped: This model's
+ * maximum context length ..." over the answer it had just delivered.
+ */
+describe("an OpenCode run the provider refused as too long, which recovered", () => {
+  const lines = fixture("context-overflow-recovered.jsonl");
+  const codes = (events: readonly NormalizedRuntimeEvent[]) =>
+    events.filter((event) => event.type === "adapter.diagnostic")
+      .map((event) => (event.payload as { code: string; level: string }))
+      .map((payload) => `${payload.level} ${payload.code}`);
+
+  it("ends completed on the answer, though the process exits 1", () => {
+    const { events } = run(lines, { exitCode: 1 });
+    expect([...messages(events).values()].filter((text) => text.length > 0)).toEqual(["RECOVERED-ANSWER"]);
+    expect(events.at(-1)?.type).toBe("run.completed");
+    // Said as what it is, not as OpenCode stopping.
+    expect(codes(events)).toEqual(["info opencode.context_overflow", "info opencode.context_compacted"]);
+  });
+
+  it("still fails when the retry never reached its own stop", () => {
+    // Cut after the continue note: summarized, never answered.
+    const { events } = run(lines.slice(0, 5), { exitCode: 1 });
+    expect(events.at(-1)).toMatchObject({ type: "run.failed", payload: { runtimeTerminal: "missing" } });
+    expect((events.at(-1)?.payload as { message: string }).message).toMatch(/maximum context length/);
+  });
+
+  it("still fails when a different error follows the recovery", () => {
+    const later = JSON.stringify({ type: "error", sessionID: "ses_1", error: { name: "APIError", data: { message: "Upstream went away" } } });
+    const { events } = run([...lines, later], { exitCode: 1 });
+    expect(events.at(-1)).toMatchObject({ type: "run.failed" });
+    expect((events.at(-1)?.payload as { message: string }).message).toMatch(/Upstream went away/);
   });
 });

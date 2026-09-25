@@ -22,7 +22,13 @@ import type {
   RuntimeJsonlRecord,
   RuntimeProcessCompletion,
 } from "./process-runner.js";
-import { openCodeErrorFacts, openCodeErrorSentence, sessionCannotContinue } from "./opencode-error.js";
+import {
+  isContextOverflow,
+  OPENCODE_OVERFLOW_RECOVERING,
+  openCodeErrorFacts,
+  openCodeErrorSentence,
+  sessionCannotContinue,
+} from "./opencode-error.js";
 import type { OpenCodeErrorFacts } from "./opencode-error.js";
 
 /**
@@ -238,6 +244,10 @@ export function createOpenCodeEventNormalizer(
   // The last provider error the runtime reported, kept so the run that follows
   // it can say what happened instead of shrugging.
   let providerError: OpenCodeErrorFacts | undefined;
+  // A context overflow is followed by a compaction and a retry (A6.10). It is
+  // recovered once a compaction came after it AND the run then stopped on its
+  // own; the exit code, which says 1 for any error seen, cannot tell.
+  let overflow: "none" | "waiting" | "compacted" | "recovered" = "none";
   // The messages of the step now open and whether it called a tool, and the
   // same for the step that last finished. A compaction's summary is the text
   // of the step just before OpenCode's continue note, and that step has no
@@ -320,7 +330,10 @@ export function createOpenCodeEventNormalizer(
       costUsd += counted(part.cost) ?? 0;
       // Each step reports its own counts, so a run's cost is their sum. Taking
       // the last step's numbers would report the cheapest step as the total.
-      if (stringValue(part.reason) === "stop") sawStop = true;
+      if (stringValue(part.reason) === "stop") {
+        sawStop = true;
+        if (overflow === "compacted") overflow = "recovered";
+      }
       finishedStep = { messages: stepMessages, usedTools: stepUsedTools };
       stepMessages = [];
       stepUsedTools = false;
@@ -345,6 +358,7 @@ export function createOpenCodeEventNormalizer(
         // The summary step's own stop is not the run's: what OpenCode does
         // after it has to finish too before the run counts as done.
         sawStop = false;
+        if (overflow === "waiting") overflow = "compacted";
         return [
           ...summary.map((itemId) => emit("message.delta", { itemId, operation: "replace", text: "", final: true, evidence })),
           diagnostic("info", "opencode.context_compacted", OPENCODE_COMPACTED, evidence),
@@ -450,6 +464,12 @@ export function createOpenCodeEventNormalizer(
         // reported. Emitting `run.failed` from here would race the process
         // exit and could finalize a run the runtime has not finished writing.
         providerError = facts;
+        if (isContextOverflow(facts)) {
+          // Not "OpenCode stopped": it summarizes and tries again (A6.10).
+          overflow = "waiting";
+          return [diagnostic("info", "opencode.context_overflow", OPENCODE_OVERFLOW_RECOVERING, evidence)];
+        }
+        overflow = "none";
         return [diagnostic("error", "opencode.provider_error", openCodeErrorSentence(facts), evidence)];
       }
     }
@@ -547,7 +567,11 @@ export function createOpenCodeEventNormalizer(
       if (completion.cancelled) {
         return [emit("run.cancelled", { ...thread, process })];
       }
-      if (!sawStop || completion.exitCode !== 0) {
+      // A run that overflowed, compacted and then stopped on its own exits 1
+      // all the same; that exit is the error it recovered from, not a failure.
+      const recoveredExit = overflow === "recovered" && completion.exitCode === 1
+        && refusedPath === undefined && blockedTool === undefined && !completion.outputLimitExceeded;
+      if (!sawStop || (completion.exitCode !== 0 && !recoveredExit)) {
         return [
           emit("run.failed", {
             kind: "process-failed",
