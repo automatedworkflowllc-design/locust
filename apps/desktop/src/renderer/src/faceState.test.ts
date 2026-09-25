@@ -156,3 +156,27 @@ describe('a run waiting on its own subagent', () => {
     expect(liveActivityOf([started('task', 't1')], true)).toBe('delegating')
   })
 })
+
+/*
+ * M23 (the code review): Claude Code restates a tool's start once its input
+ * arrives -- a second tool.started for the same item -- and every start was
+ * counted. A finished Agent call left the face on "subagent working" for the
+ * rest of the run, beside a live line that had already closed it.
+ */
+describe('a tool whose start is said twice', () => {
+  const started = (itemId: string, name: string, command?: string) =>
+    event('tool.started', { itemId, toolKind: 'tool', name, ...(command === undefined ? {} : { command }) })
+  const completed = (itemId: string, name: string) => event('tool.completed', { itemId, toolKind: 'tool', name })
+
+  it('is closed by its one completion', () => {
+    const agent = [started('toolu_1', 'Agent'), started('toolu_1', 'Agent', 'Survey the tests'), completed('toolu_1', 'Agent')]
+    expect(liveActivityOf(agent, true)).toBe('thinking')
+    const read = [started('toolu_2', 'Read'), started('toolu_2', 'Read', 'src/app.ts'), completed('toolu_2', 'Read')]
+    expect(liveActivityOf(read, true)).toBe('thinking')
+  })
+
+  it('is still open until then', () => {
+    expect(liveActivityOf([started('toolu_1', 'Agent'), started('toolu_1', 'Agent', 'Survey the tests')], true)).toBe('delegating')
+    expect(liveActivityOf([started('toolu_2', 'Bash'), started('toolu_2', 'Bash', 'ls')], true)).toBe('working')
+  })
+})

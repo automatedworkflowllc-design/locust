@@ -108,8 +108,10 @@ export function liveActivityOf(events: readonly NormalizedRuntimeEvent[], runnin
   if (!running) return 'idle'
   let streaming = false
   let reasoning = false
-  let openTools = 0
-  let openSubagents = 0
+  // By item, not by count: Claude Code restates a tool's start once its
+  // input arrives, and counting both left every finished call open (M23).
+  const openTools = new Set<string>()
+  const openSubagents = new Set<string>()
   let turnOpen = false
   for (const event of events) {
     switch (event.type) {
@@ -126,14 +128,14 @@ export function liveActivityOf(events: readonly NormalizedRuntimeEvent[], runnin
         else if (event.payload.stepKind === 'turn') turnOpen = false
         break
       case 'tool.started':
-        openTools += 1
-        if (SUBAGENT_TOOL.test(event.payload.name)) openSubagents += 1
+        openTools.add(event.payload.itemId)
+        if (SUBAGENT_TOOL.test(event.payload.name)) openSubagents.add(event.payload.itemId)
         reasoning = false
         break
       case 'tool.completed':
       case 'tool.failed':
-        openTools = Math.max(0, openTools - 1)
-        if (SUBAGENT_TOOL.test(event.payload.name)) openSubagents = Math.max(0, openSubagents - 1)
+        openTools.delete(event.payload.itemId)
+        openSubagents.delete(event.payload.itemId)
         break
       default:
         break
@@ -141,8 +143,8 @@ export function liveActivityOf(events: readonly NormalizedRuntimeEvent[], runnin
   }
   if (streaming) return 'responding'
   if (reasoning) return 'thinking'
-  if (openSubagents > 0) return 'delegating'
-  if (openTools > 0) return 'working'
+  if (openSubagents.size > 0) return 'delegating'
+  if (openTools.size > 0) return 'working'
   // An open TURN step is the runtime naming something it is doing, and the
   // thread draws that as a named live line with no dots. It has to resolve to
   // `working` for the same reason the gap below resolves to `thinking`: the
