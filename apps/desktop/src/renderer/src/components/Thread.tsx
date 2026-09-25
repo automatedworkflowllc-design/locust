@@ -1,3 +1,5 @@
+import { EditCheckCard } from './EditCheckCard.js'
+import type { EditCheckShown } from './EditCheckCard.js'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
 
@@ -671,6 +673,9 @@ export interface ThreadProps {
    * mission belongs to; `notices` are shares the host could not honour, said
    * in the thread rather than dropped.
    */
+  /** A3.3: the person's check after this turn, and sending its findings back. */
+  readonly editCheck?: EditCheckShown
+  readonly onSendEditCheck?: (text: string) => void
   readonly peers: {
     readonly self: PublicTeammate | undefined
     readonly teammates: readonly PublicTeammate[]
@@ -683,6 +688,8 @@ export interface ThreadProps {
 
 export function Thread({
   prompt,
+  editCheck,
+  onSendEditCheck,
   startedBy,
   onOpenFile,
   onOpenPeerRun,
@@ -1082,6 +1089,9 @@ export function Thread({
         {peers.notices.map((notice, index) => (
           <DiagnosticLine key={`peer_notice_${index}`} level="warning" message={notice} />
         ))}
+        {editCheck !== undefined && (
+          <EditCheckCard check={editCheck} teammateName={peers.self?.name} {...(onSendEditCheck === undefined ? {} : { onSend: onSendEditCheck })} />
+        )}
         {/*
           * The CURRENT turn's memories, under the current turn -- and the
           * card is per turn now, not one at the foot of the conversation.

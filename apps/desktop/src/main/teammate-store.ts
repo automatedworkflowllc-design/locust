@@ -187,6 +187,28 @@ function parsedMetal(raw: unknown): Pick<WorkspaceSettings, 'metal' | 'metalStre
   }
 }
 
+/**
+ * A3.3: one check command, as the person wrote it -- one line, bounded, or
+ * nothing. It is run through the shell, so it is kept exactly as typed; what
+ * is refused is what could not have been typed into one line.
+ */
+export function parsedCheckCommand(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const command = value.trim()
+  if (command.length === 0 || command.length > 500 || /[\r\n\0]/.test(command)) return undefined
+  return command
+}
+
+function parsedCheckCommands(value: unknown): Readonly<Record<string, string>> | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+  const kept: Record<string, string> = {}
+  for (const [folder, command] of Object.entries(value as Record<string, unknown>).slice(0, 200)) {
+    const parsed = parsedCheckCommand(command)
+    if (folder.length > 0 && folder.length <= 200 && parsed !== undefined) kept[folder] = parsed
+  }
+  return Object.keys(kept).length === 0 ? undefined : kept
+}
+
 function parsedReplySize(value: unknown): ReplyTextSize {
   return value === 'standard' || value === 'large' || value === 'largest' ? value : 'standard'
 }
@@ -498,7 +520,13 @@ function parsedFile(text: string): StoredFile {
     ...parsedMetal(rawSettings),
     replySize: typeof rawSettings === 'object' && rawSettings !== null
       ? parsedReplySize((rawSettings as Record<string, unknown>).replySize)
-      : 'standard'
+      : 'standard',
+    ...(() => {
+      const checkCommands = typeof rawSettings === 'object' && rawSettings !== null
+        ? parsedCheckCommands((rawSettings as Record<string, unknown>).checkCommands)
+        : undefined
+      return checkCommands === undefined ? {} : { checkCommands }
+    })()
   }
 
   return { schemaVersion: SCHEMA_VERSION, teammates, missionOwners: owners, missionTitles: titles, settings }
@@ -856,7 +884,11 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           ...parsedMetal(settings),
           replySize: typeof settings === 'object' && settings !== null
             ? parsedReplySize((settings as Record<string, unknown>).replySize)
-            : 'standard'
+            : 'standard',
+          ...(() => {
+            const checkCommands = parsedCheckCommands((settings as Record<string, unknown>).checkCommands)
+            return checkCommands === undefined ? {} : { checkCommands }
+          })()
         }
         await write({ ...stored, settings: next })
         return next

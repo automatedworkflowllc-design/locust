@@ -6448,6 +6448,40 @@ textarea {
  * logs never dump into the thread, and a full-width red card for a routine
  * runtime message reads as a failure and buries the real work.
  */
+/* A3.3: the person's check after a turn. The notice line's own rule and
+   indent; only the lines it found and the Send button are added. */
+.lc-checkrow {
+  display: flex;
+  gap: var(--lc-space-3);
+  align-items: center;
+}
+
+.lc-checkrow .lc-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.lc-editcheck__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-3);
+  min-width: 0;
+}
+
+.lc-editcheck__lines {
+  margin: 0;
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-secondary);
+}
+
+.lc-editcheck .lc-button {
+  align-self: flex-start;
+}
+
 .lc-diagnostic {
   display: flex;
   align-items: flex-start;

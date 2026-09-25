@@ -43,6 +43,7 @@ import type {
   MissionMode
 } from '../shared/ipc.js'
 import { openCodePermissionRequest, openCodeReplyFor, withFileChanges } from './approval-channel.js'
+import type { EditCheckResult } from './edit-check.js'
 import type { ApprovalChannel } from './approval-channel.js'
 import { fileChangesOf, itemOf } from './approval-patch.js'
 import type { FileChangeRecord } from './approval-patch.js'
@@ -279,6 +280,12 @@ interface CodexMissionServiceOptions {
     env?: Readonly<Record<string, string>>
   ) => AppServerRunProcess
   readonly ledger: MissionLedger
+  /**
+   * A3.3: the person's check, after a turn that changed files -- in the
+   * folder the run changed. Its answer goes to that run's thread; nothing
+   * is sent to the teammate from here.
+   */
+  readonly afterEdits?: (cwd: string) => Promise<EditCheckResult | undefined>
   /**
    * Where the host writes a line nobody sees on screen. A ledger write
    * that fails mid-run used to be reported as a card that named no cause
@@ -860,6 +867,18 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           }
         }
       }
+    }
+    // A3.3: the person's check, only after a turn that may write and did.
+    // Not awaited: a check can take minutes, and the slot is not its to hold.
+    if (observed !== undefined && observed.length > 0 && mission.sandbox !== 'read-only' && options.afterEdits !== undefined) {
+      void options.afterEdits(mission.cwd)
+        .then((result) => {
+          // One line in the host's log per check run: how the edits the host could not
+          // see were found (disk-observation.ts, snapshotWorkspace).
+          if (result !== undefined) console.log(`[edit-check] ${mission.runId}: ${result.outcome}, ${String(result.newLines.length)} new line(s)`)
+          if (result !== undefined) safelyEmit(mission, { kind: 'edit-check', runId: mission.runId, missionId: mission.missionId, ...result })
+        })
+        .catch(() => undefined)
     }
     clearActive(mission)
   }

@@ -18,7 +18,7 @@ import {
   killSpawnedTree
 } from '@teammate/runtime-adapters'
 import { createFileMissionLedger, createFileWorkroom } from '@teammate/mission-store'
-import type { AppChangelog, AppChangelogEntry } from '../shared/ipc.js'
+import type { AppChangelog, AppChangelogEntry, WorkspaceSettings } from '../shared/ipc.js'
 import type { MissionLedger, Workroom } from '@teammate/mission-store'
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 import { spawn } from 'node:child_process'
@@ -46,7 +46,8 @@ import { MAX_ATTACHMENTS } from '../shared/attachments.js'
 import { ATTACHMENT_DIR, attachmentDestination, excludeWith } from './attach-outside.js'
 import { imageMediaType, MAX_PREVIEW_BYTES } from '../shared/image-files.js'
 import { isViewableText, MAX_TEXT_BYTES, viewerMode } from '../shared/text-files.js'
-import { createTeammateStore, TeammateNameTakenError, isTeammateRoute } from './teammate-store.js'
+import { createEditCheck } from './edit-check.js'
+import { createTeammateStore, parsedCheckCommand, TeammateNameTakenError, isTeammateRoute } from './teammate-store.js'
 import { createRoutineStore } from './routine-store.js'
 import { createRoomStore, exchangeOfRoomPost } from './room-store.js'
 import { createRoomTasks } from './room-tasks.js'
@@ -1451,6 +1452,11 @@ if (!ownsSingleInstanceLock) {
       ],
       note
     })
+    // A3.3: read fresh at every check, so a command set in Settings applies
+    // to the next turn. The folder's own id: the command is per project.
+    const editCheck = createEditCheck({
+      commandFor: async () => (workspaceChosen ? (await teammates.readSettings()).checkCommands?.[workspaceIdFor(workspacePath)] : undefined)
+    })
     const codexMissions = createCodexMissionService({
       workspacePath,
       // A2.9: the overlap note -- who else changed the files a teammate did, lately.
@@ -1469,6 +1475,8 @@ if (!ownsSingleInstanceLock) {
       appServerSpawn: (executablePath, args, env) => spawnAppServer(executablePath, args, env),
       // A6.7: OpenCode's own server, for Approve-each; the same launcher (tree kill on Windows).
       opencodeServeSpawn: (executablePath, args, env) => spawnAppServer(executablePath, args, env),
+      // A3.3: the person's check for THIS folder, after a turn that changed files.
+      afterEdits: (cwd) => editCheck.after(cwd),
       /*
        * Asked at the start of every run, never captured: a connector signed
        * into after launch reaches the next mission without a restart.
@@ -2408,10 +2416,31 @@ if (!ownsSingleInstanceLock) {
     const teammateRejected = (message: string) =>
       ({ ok: false, error: { code: 'TEAMMATE_REJECTED', message } }) as const
 
+    /*
+     * A3.3: the check command is kept PER FOLDER (the settings are the app's),
+     * and the window only ever sees and sets this folder's. No folder, no
+     * command: a check runs in a project, and there is none open.
+     */
+    const checkFolderId = workspaceChosen ? workspaceIdFor(workspacePath) : undefined
+    const forThisFolder = (settings: WorkspaceSettings): WorkspaceSettings => {
+      const { checkCommands, ...rest } = settings
+      const command = checkFolderId === undefined ? undefined : checkCommands?.[checkFolderId]
+      return command === undefined ? rest : { ...rest, checkCommand: command }
+    }
+    const withThisFolder = async (requested: unknown): Promise<unknown> => {
+      if (typeof requested !== 'object' || requested === null || !('checkCommand' in requested)) return requested
+      const { checkCommand, ...rest } = requested as Record<string, unknown>
+      if (checkFolderId === undefined) return rest
+      const stored = { ...((await teammates.readSettings()).checkCommands ?? {}) }
+      const command = parsedCheckCommand(checkCommand)
+      if (command === undefined) delete stored[checkFolderId]
+      else stored[checkFolderId] = command
+      return { ...rest, checkCommands: stored }
+    }
     ipcMain.handle(WORKSPACE_SETTINGS_READ_CHANNEL, async (event) => {
       if (!fromOwnWindow(event)) return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, keepATodoList: false, layout: 'auto', tube: 'full', replySize: 'standard' } as const
       try {
-        return await teammates.readSettings()
+        return forThisFolder(await teammates.readSettings())
       } catch {
         // An unreadable switch reads as its default: swarm off, replies on.
         return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, keepATodoList: false, layout: 'auto', tube: 'full', replySize: 'standard' } as const
@@ -3008,7 +3037,7 @@ if (!ownsSingleInstanceLock) {
     ipcMain.handle(WORKSPACE_SETTINGS_WRITE_CHANNEL, async (event, settings: unknown) => {
       if (!fromOwnWindow(event)) return { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, keepATodoList: false, layout: 'auto', tube: 'full', replySize: 'standard' } as const
       try {
-        return await teammates.writeSettings(settings)
+        return forThisFolder(await teammates.writeSettings(await withThisFolder(settings)))
       } catch {
         /*
          * The write failed, so answer with what is ACTUALLY STORED.

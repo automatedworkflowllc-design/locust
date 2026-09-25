@@ -1545,6 +1545,15 @@ export interface WorkspaceSettings {
    * setting at all.
    */
   readonly replySize: ReplyTextSize
+  /**
+   * A3.3: the command Locust runs in a teammate's folder after a turn that
+   * changed files -- THIS folder's, as the window sees it. The person's
+   * own words in Settings, never read from the project: running a command
+   * the repository names after every turn is the hole 0.341 closed.
+   */
+  readonly checkCommand?: string
+  /** Every folder's check command, by workspace id. Kept by the host. */
+  readonly checkCommands?: Readonly<Record<string, string>>
 }
 
 /*
@@ -1894,6 +1903,20 @@ export type CodexMissionUpdate =
       readonly runId: string
       readonly missionId: string
       readonly message: string
+    }
+  /**
+   * A3.3: the person's check, run after this turn changed files. Only what
+   * is new since the last check in that folder is carried.
+   */
+  | {
+      readonly kind: 'edit-check'
+      readonly runId: string
+      readonly missionId: string
+      readonly command: string
+      readonly outcome: 'passed' | 'failed' | 'timed-out' | 'could-not-run'
+      readonly newLines: readonly string[]
+      readonly unchanged: boolean
+      readonly first: boolean
     }
   /**
    * The host has decided on a reply and is starting it.

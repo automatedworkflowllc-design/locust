@@ -1199,6 +1199,47 @@ function ProblemReport(): ReactElement {
   )
 }
 
+/**
+ * A3.3: the person's check after a teammate's edits, for THIS folder. Set
+ * here and only here -- a project never names a command Locust runs.
+ */
+function CheckAfterEditsRow({ saved, onSave }: { readonly saved: string; readonly onSave: (command: string) => void }): ReactElement {
+  const [draft, setDraft] = useState(saved)
+  useEffect(() => setDraft(saved), [saved])
+  const changed = draft.trim() !== saved
+  return (
+    <div className="lc-policyrow lc-policyrow--stack">
+      <span className="lc-tag">CHECK AFTER EDITS</span>
+      <span className="lc-settings__note">
+        A command Locust runs in a teammate&apos;s folder after a turn that changed files, such as npm test. Only failures
+        that were not there at the last check are shown, with a button to send them to the teammate. Set here only: a
+        project never chooses its own.
+      </span>
+      <form
+        className="lc-checkrow"
+        onSubmit={(event) => {
+          event.preventDefault()
+          onSave(draft.trim())
+        }}
+      >
+        <input
+          className="lc-input lc-mono"
+          aria-label="Check after edits"
+          value={draft}
+          maxLength={500}
+          placeholder="npm test"
+          autoComplete="off"
+          spellCheck={false}
+          onChange={(event) => setDraft(event.target.value)}
+        />
+        <button type="submit" className="lc-button" disabled={!changed}>
+          {draft.trim().length === 0 && saved.length > 0 ? 'Turn off' : 'Save'}
+        </button>
+      </form>
+    </div>
+  )
+}
+
 export function SettingsScreen({
   runtimes,
   limitedRuntimes,
@@ -1234,6 +1275,8 @@ export function SettingsScreen({
   swarm,
   tube,
   replySize,
+  checkCommand,
+  onCheckCommandSave,
   metal,
   metalStrength,
   metalMotion,
@@ -1316,6 +1359,9 @@ export function SettingsScreen({
   readonly onTubeChange: (tube: TubePreference) => void
   /** How big a reply is set. The person's, not the app's -- see ReplyTextSize. */
   readonly replySize: ReplyTextSize
+  /** A3.3: this folder's check after edits; empty for none. */
+  readonly checkCommand?: string
+  readonly onCheckCommandSave?: (command: string) => void
   /** The send button's metal; every option the design pass offered. */
   readonly metal: MetalPreset
   readonly metalStrength: MetalStrength
@@ -1526,6 +1572,9 @@ export function SettingsScreen({
                   : `${String(workspaceBrief.lines)} line${workspaceBrief.lines === 1 ? '' : 's'} briefed to every teammate before each mission${workspaceBrief.truncated ? ' -- longer than 200 lines, so the rest is not loaded. Put long checklists in files of their own and name them in LOCUST.md; a teammate reads one when it applies' : ''}.`}
               </span>
             </div>
+          )}
+          {workspacePath !== undefined && onCheckCommandSave !== undefined && (
+            <CheckAfterEditsRow saved={checkCommand ?? ''} onSave={onCheckCommandSave} />
           )}
           {workspacePath !== undefined && worktrees !== undefined && (
             <div className="lc-policyrow lc-policyrow--stack">

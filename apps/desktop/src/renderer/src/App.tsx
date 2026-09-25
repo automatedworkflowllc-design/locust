@@ -67,6 +67,7 @@ import { savableMissionId } from './savableConversations.js'
 import { MemoryScreen } from './components/MemoryScreen.js'
 import { isMissionRuntime, runtimeDisplayName } from '../../shared/runtimes.js'
 import { reviewPairOf } from './review-pair.js'
+import type { EditCheckShown } from './components/EditCheckCard.js'
 import { imageMediaType } from '../../shared/image-files.js'
 import { signInCommand } from '../../shared/runtime-install.js'
 import { SIGN_IN_OPENED_EVENT } from './signInEvents.js'
@@ -247,6 +248,8 @@ interface LiveRunState {
   readonly peerMessages?: readonly PublicPeerMessage[]
   /** Shares the host could not honour, in the host's words. */
   readonly peerNotices?: readonly string[]
+  /** A3.3: the person's check after this turn changed files. */
+  readonly editCheck?: EditCheckShown
 }
 
 type RuntimeDiscoveryState =
@@ -302,6 +305,10 @@ function applyMissionUpdate(run: LiveRunState, update: CodexMissionUpdate): Live
   }
   if (update.kind === 'peer-share-failed' || update.kind === 'relay-notice') {
     return { ...live, peerNotices: [...(live.peerNotices ?? []), update.message] }
+  }
+  if (update.kind === 'edit-check') {
+    const { kind: _kind, runId: _runId, missionId: _missionId, ...shown } = update
+    return { ...live, editCheck: shown }
   }
   // A host-started run is adopted by the listener, never applied to a run.
   if (update.kind === 'mission-started') return live
@@ -1284,6 +1291,15 @@ export default function App(): ReactElement {
         setMetalBend(before.metalBend)
       })
   }
+  // A3.3: this folder's check after edits, as the host last said it.
+  const [checkCommand, setCheckCommand] = useState('')
+  const [editChecks, setEditChecks] = useState<ReadonlyMap<string, EditCheckShown>>(new Map())
+  const saveCheckCommand = (next: string): void => {
+    void window.desktop
+      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, replySize, layout, tube, checkCommand: next })
+      .then((settings) => setCheckCommand(settings.checkCommand ?? ''))
+      .catch(() => undefined)
+  }
   const chooseReplySize = (next: ReplyTextSize): void => {
     const before = replySize
     setReplySize(next)
@@ -2001,6 +2017,13 @@ export default function App(): ReactElement {
     })
 
     const removeMissionListener = bridge.onCodexMissionUpdate((update) => {
+      // A3.3: kept by mission, apart from the run state -- a finished run is
+      // rebuilt from its record, which holds no check, and a result that
+      // landed first was wiped by that rebuild (drive, 2026-09-25).
+      if (update.kind === 'edit-check') {
+        const { kind: _kind, runId: _runId, missionId, ...shown } = update
+        setEditChecks((current) => new Map(current).set(missionId, shown))
+      }
       // A finished mission hops once; a message that just arrived earns a
       // glance. Both are moments, so both clear themselves.
       if (update.kind === 'event') {
@@ -2364,6 +2387,7 @@ export default function App(): ReactElement {
           setAutoModeKnown(true)
           setAskConnectors(settings.askConnectors === true)
           setKeepATodoList(settings.keepATodoList === true)
+          setCheckCommand(settings.checkCommand ?? '')
           setRelayHopCap(settings.relayHopCap)
           setInterrupt(settings.interrupt)
           setMemoryMode(settings.memoryMode)
@@ -5330,6 +5354,8 @@ export default function App(): ReactElement {
             onTubeChange={chooseTube}
               replySize={replySize}
               onReplySizeChange={chooseReplySize}
+              checkCommand={checkCommand}
+              onCheckCommandSave={saveCheckCommand}
               metal={metal}
               metalStrength={metalStrength}
               metalMotion={metalMotion}
@@ -5856,6 +5882,11 @@ export default function App(): ReactElement {
                 cancelled={liveRun.phase === 'cancelled'}
                 handoff={liveRun.handoff}
                 {...(liveRun.switchedFrom === undefined ? {} : { switchedFrom: liveRun.switchedFrom })}
+                {...((() => {
+                  const check = (liveRun.data?.missionId === undefined ? undefined : editChecks.get(liveRun.data.missionId)) ?? liveRun.editCheck
+                  return check === undefined ? {} : { editCheck: check }
+                })())}
+                {...(running ? {} : { onSendEditCheck: (text: string) => { void startMission(text) } })}
                 peers={{
                   self: missionOwner,
                   teammates,
