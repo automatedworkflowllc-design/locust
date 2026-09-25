@@ -90,7 +90,7 @@ describe("the connectors a person has", () => {
     // after a literal mcp__<server>__ prefix" -- and this shape is accepted.
     expect(allowRuleFor("claude.ai Robinhood")).toBe("mcp__claude_ai_Robinhood__*");
     for (const rule of parseClaudeConnectors(REAL_OUTPUT).map((entry) => allowRuleFor(entry.name))) {
-      expect(rule).toMatch(/^mcp__[A-Za-z0-9_]+__\*$/);
+      expect(rule).toMatch(/^mcp__[A-Za-z0-9_-]+__\*$/);
       expect(rule).not.toBe("mcp__*");
     }
     expect(parseClaudeConnectors(REAL_OUTPUT).every((entry) => allowRuleFor(entry.name) !== undefined)).toBe(true);
@@ -100,9 +100,26 @@ describe("the connectors a person has", () => {
     // `mcp____*` would be accepted by the CLI -- it is not the bare `mcp__*`
     // that gets refused -- so it would widen something nobody chose, with
     // nothing anywhere to notice. Fail closed: no rule, and the call prompts.
-    for (const hostile of ["", "   ", "...", "___", "!!!", "•"]) {
-      expect(toolPrefixFor(hostile)).toBe("mcp____");
+    for (const hostile of ["", "   ", "...", "___", "!!!", "•", "--"]) {
       expect(allowRuleFor(hostile), hostile).toBeUndefined();
     }
+  });
+
+  /*
+   * M4 (the code review): every run of characters that was not a letter or a
+   * digit became one underscore, so a local server "robinhood-trading" got
+   * the rule mcp__robinhood_trading__* -- and its tools are
+   * mcp__robinhood-trading__..., which the rule never matched, so every call
+   * prompted. READ from Claude Code 2.1.281's own code: anything outside
+   * [A-Za-z0-9_-] becomes "_", and runs are collapsed and trimmed only for a
+   * name beginning "claude.ai ".
+   */
+  it("keep a local server's hyphens and underscores, as Claude Code does", () => {
+    expect(toolPrefixFor("robinhood-trading")).toBe("mcp__robinhood-trading__");
+    expect(toolPrefixFor("my_server")).toBe("mcp__my_server__");
+    expect(toolPrefixFor("my server.v2")).toBe("mcp__my_server_v2__");
+    expect(toolPrefixFor("a  b")).toBe("mcp__a__b__");
+    expect(toolPrefixFor("claude.ai Google  Drive")).toBe("mcp__claude_ai_Google_Drive__");
+    expect(allowRuleFor("robinhood-trading")).toBe("mcp__robinhood-trading__*");
   });
 });

@@ -1,4 +1,5 @@
 import {
+  boundedMessageText,
   evidenceFor,
   identityValue,
   isObject,
@@ -322,7 +323,8 @@ export function createAntigravityEventNormalizer(
         emit("message.delta", {
           itemId: `msg_${String(stepIndex)}`,
           operation: "replace",
-          text: redactText(content),
+          // Both ends: the blocks the host acts on are at the end (M1).
+          text: boundedMessageText(content),
           final: true,
           evidence,
         }),
@@ -399,7 +401,8 @@ export function createAntigravityEventNormalizer(
         emit("message.delta", {
           itemId: `msg_${String(stepIndex)}`,
           operation: "replace",
-          text: redactText(content),
+          // Both ends: the blocks the host acts on are at the end (M1).
+          text: boundedMessageText(content),
           final: false,
           evidence,
         }),

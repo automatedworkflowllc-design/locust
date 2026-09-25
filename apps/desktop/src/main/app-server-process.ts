@@ -1,5 +1,6 @@
 import { spawnShape } from '@teammate/runtime-adapters'
 import { spawn } from 'node:child_process'
+import { StringDecoder } from 'node:string_decoder'
 
 import { releaseProcessTree } from '@teammate/runtime-adapters'
 
@@ -94,7 +95,14 @@ export function startAppServerProcess(
       killChild()
     },
     onData: (listener) => {
-      child.stdout.on('data', (chunk) => listener(String(chunk)))
+      // One decoder across reads (M8): a character split between two pipe
+      // reads was decoded half at a time, into replacement characters that
+      // still parsed as JSON and went into the ledger.
+      const decoder = new StringDecoder('utf8')
+      child.stdout.on('data', (chunk) => {
+        const text = typeof chunk === 'string' ? chunk : decoder.write(chunk)
+        if (text.length > 0) listener(text)
+      })
     },
     onExit: (listener) => {
       child.on('exit', () => listener())

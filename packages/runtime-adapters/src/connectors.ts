@@ -40,17 +40,24 @@ export interface ClaudeConnector {
 /**
  * The tool-name prefix a connector's tools carry.
  *
- * Every run of characters that is not a letter or a digit becomes one
- * underscore, so `claude.ai Anthropic Economic Index` becomes
- * `claude_ai_Anthropic_Economic_Index`. Case is kept: the tool names are
- * case-sensitive and the CLI's own are mixed.
+ * Claude Code's own rule, read from 2.1.281: every character outside
+ * `[A-Za-z0-9_-]` becomes an underscore, and only for a name beginning
+ * `claude.ai ` are runs of underscores then collapsed and the ends trimmed --
+ * so `claude.ai Anthropic Economic Index` becomes
+ * `claude_ai_Anthropic_Economic_Index`, and a local `robinhood-trading` keeps
+ * its hyphen. It used to collapse every run for every name, which gave a
+ * hyphenated local server a rule its tools never matched (M4, the code
+ * review). Case is kept: the tool names are case-sensitive.
  *
  * This is a DERIVATION and derivations drift, so `connectors.test.ts` checks
  * it against ten real tool names taken from a live session rather than
  * against itself.
  */
 export function toolPrefixFor(name: string): string {
-  return `mcp__${name.trim().replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "")}__`;
+  const trimmed = name.trim();
+  let server = trimmed.replace(/[^A-Za-z0-9_-]/g, "_");
+  if (trimmed.startsWith("claude.ai ")) server = server.replace(/_+/g, "_").replace(/^_|_$/g, "");
+  return `mcp__${server}__`;
 }
 
 /**
@@ -64,7 +71,9 @@ export function toolPrefixFor(name: string): string {
  */
 export function allowRuleFor(name: string): string | undefined {
   const prefix = toolPrefixFor(name);
-  return prefix === "mcp____" ? undefined : `${prefix}*`;
+  // No letter or digit in the server part: `mcp____*`, `mcp_____*` and the
+  // like would all be accepted and would widen nothing anyone chose.
+  return /[A-Za-z0-9]/.test(prefix.slice("mcp__".length, -"__".length)) ? `${prefix}*` : undefined;
 }
 
 /**

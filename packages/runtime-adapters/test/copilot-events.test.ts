@@ -442,3 +442,26 @@ describe("Copilot CLI 1.0.83's stream, measured 2026-09-06", () => {
     expect(glob[0]).toMatchObject({ payload: { command: "**/*.md" } })
   })
 })
+
+/*
+ * M5 (the code review): the complete message was dropped, with no final
+ * event, whenever its redacted text was shorter than the raw deltas -- which
+ * is every reply that quotes a key. Nothing closed the reply, so its share
+ * and relay were never acted on.
+ */
+describe("a reply whose deltas carried a key", () => {
+  it("is still closed by its complete message, and the key stays redacted", () => {
+    const key = `sk-${"a".repeat(40)}`;
+    const rec = (value: unknown, sequence: number) => ({ sequence, raw: JSON.stringify(value) });
+    const copilot = normalizer();
+    const events = [
+      ...copilot.accept(rec({ type: "assistant.message_delta", data: { messageId: "m1", deltaContent: `The key is ${key}. ` } }, 1)),
+      ...copilot.accept(rec({ type: "assistant.message_delta", data: { messageId: "m1", deltaContent: "Done." } }, 2)),
+      ...copilot.accept(rec({ type: "assistant.message", data: { messageId: "m1", content: `The key is ${key}. Done.` } }, 3)),
+    ];
+    const deltas = events.filter((event) => event.type === "message.delta").map((event) => event.payload as { final: boolean; text: string });
+    expect(deltas.some((delta) => delta.final)).toBe(true);
+    expect(deltas.every((delta) => !delta.text.includes(key))).toBe(true);
+    expect(messages(events).get("msg_m1")).toBe("The key is [redacted]. Done.");
+  });
+});

@@ -444,12 +444,14 @@ export function createCopilotEventNormalizer(
       const messageId = identityValue(data.messageId);
       if (text === undefined || messageId === undefined) return [];
       const itemId = `msg_${messageId}`;
-      deliveredLength.set(itemId, (deliveredLength.get(itemId) ?? 0) + text.length);
+      const delivered = boundedMessageText(text);
+      // What was DELIVERED, redacted, not the raw fragment (M5).
+      deliveredLength.set(itemId, (deliveredLength.get(itemId) ?? 0) + delivered.length);
       return [
         emit("message.delta", {
           itemId,
           operation: "append",
-          text: boundedMessageText(text),
+          text: delivered,
           final: false,
           evidence,
         }),
@@ -467,7 +469,14 @@ export function createCopilotEventNormalizer(
       // A REPLACE shorter than what the fragments already delivered would take
       // text back out of the ledger. Fragments are bounded individually and so
       // are never truncated; the whole message can be.
-      if (bounded.length < (deliveredLength.get(itemId) ?? 0)) return [];
+      //
+      // But the reply still has to be CLOSED. M5 (the code review): this
+      // returned nothing, so a reply the fragments had outrun never became
+      // final and its share and relay were never acted on. Measured against
+      // raw fragment lengths, that was every reply that quoted a key.
+      if (bounded.length < (deliveredLength.get(itemId) ?? 0)) {
+        return [emit("message.delta", { itemId, operation: "append", text: "", final: true, evidence })];
+      }
       return [
         emit("message.delta", {
           itemId,

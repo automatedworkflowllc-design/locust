@@ -561,3 +561,22 @@ describe("the row an ask_question draws", () => {
     expect(command).toContain("notes.md");
   })
 })
+
+/*
+ * M1 (the code review): the planner's final answer was bounded with the
+ * evidence limit, which keeps only the head -- so on a long answer the share,
+ * memory and room-task blocks at the end were cut off and never acted on.
+ */
+describe("a long planner answer", () => {
+  it("keeps the end, where the blocks the host acts on are", () => {
+    const share = '<locust-share to="Booty">The build is green.</locust-share>';
+    const content = `${"Findings. ".repeat(2_000)}${share}`;
+    const events = normalizer().accept({
+      sequence: 1,
+      raw: JSON.stringify({ step_index: 9, source: "MODEL", type: "PLANNER_RESPONSE", status: "DONE", created_at: "2026-09-06T03:02:28Z", content }),
+    });
+    const text = payload<{ text: string }>(events.find((event) => event.type === "message.delta")).text;
+    expect(text.startsWith("Findings.")).toBe(true);
+    expect(text.endsWith(share)).toBe(true);
+  });
+});
