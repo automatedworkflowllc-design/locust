@@ -234,6 +234,11 @@ interface RunFailedPayload {
   readonly kind: CodexRunFailureKind;
   readonly message: string;
   readonly runtimeThreadId?: string;
+  /**
+   * The runtime's session cannot be continued: the next turn must start a
+   * fresh one rather than resume `runtimeThreadId` (M7, the code review).
+   */
+  readonly sessionEnded?: true;
   readonly runtimeTerminal: "completed" | "failed" | "missing";
   readonly process: ProcessEvidence;
 }

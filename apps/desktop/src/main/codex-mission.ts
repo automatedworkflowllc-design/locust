@@ -493,7 +493,13 @@ function validPrompt(value: unknown): value is string {
 export function runtimeThreadIdOf(mission: RecoveredMission): string | undefined {
   let held: string | undefined
   for (const event of mission.events) {
-    const payload = event.payload as { readonly runtimeThreadId?: unknown }
+    const payload = event.payload as { readonly runtimeThreadId?: unknown; readonly sessionEnded?: unknown }
+    // M7: a failure that ended the session leaves nothing to resume -- the
+    // next turn starts fresh, as its card told the person it would.
+    if (event.type === 'run.failed' && payload.sessionEnded === true) {
+      held = undefined
+      continue
+    }
     if (typeof payload.runtimeThreadId === 'string' && payload.runtimeThreadId.length > 0) {
       held = payload.runtimeThreadId
     }

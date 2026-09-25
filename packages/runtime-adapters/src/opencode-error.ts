@@ -92,6 +92,15 @@ export function openCodeErrorFacts(parsed: JsonObject): OpenCodeErrorFacts | und
  * limit has a real answer ("wait, or pick another model"), and a generic 500
  * does not, so it gets none rather than a guess.
  */
+/**
+ * The provider refused to resume this session -- its reasoning was "not
+ * issued to this caller" -- so the session is over and the next turn has to
+ * start a fresh one. The sentence below promises exactly that (M7).
+ */
+export function sessionCannotContinue(facts: OpenCodeErrorFacts): boolean {
+  return facts.message !== undefined && /encrypted_content/i.test(facts.message);
+}
+
 export function openCodeErrorSentence(facts: OpenCodeErrorFacts): string {
   const quoted = facts.message === undefined ? undefined : facts.message.trim();
   // The one worth naming precisely, because it is the one a person meets on

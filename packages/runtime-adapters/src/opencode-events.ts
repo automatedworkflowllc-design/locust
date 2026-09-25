@@ -22,7 +22,7 @@ import type {
   RuntimeJsonlRecord,
   RuntimeProcessCompletion,
 } from "./process-runner.js";
-import { openCodeErrorFacts, openCodeErrorSentence } from "./opencode-error.js";
+import { openCodeErrorFacts, openCodeErrorSentence, sessionCannotContinue } from "./opencode-error.js";
 import type { OpenCodeErrorFacts } from "./opencode-error.js";
 
 /**
@@ -575,6 +575,8 @@ export function createOpenCodeEventNormalizer(
                     ? `OpenCode exited with code ${String(completion.exitCode)}.`
                     : "OpenCode ended without a step that reported it had stopped.",
             ...thread,
+            // M7: and the next turn starts a fresh session, as the card says.
+            ...(providerError !== undefined && sessionCannotContinue(providerError) ? { sessionEnded: true as const } : {}),
             runtimeTerminal: sawStop ? "completed" : "missing",
             process,
           }),

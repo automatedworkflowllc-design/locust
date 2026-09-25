@@ -1004,6 +1004,7 @@ function isEventPayload(type: NormalizedRuntimeEventType, value: JsonObject): bo
       || value.kind === 'unknown')
     && isNonemptyText(value.message)
     && isOptionalText(value.runtimeThreadId, 2_048)
+    && (value.sessionEnded === undefined || value.sessionEnded === true)
     && (value.runtimeTerminal === 'completed' || value.runtimeTerminal === 'failed' || value.runtimeTerminal === 'missing')
     && isProcessEvidence(value.process)
 }
