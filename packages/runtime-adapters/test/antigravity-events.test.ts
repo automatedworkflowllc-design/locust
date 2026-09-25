@@ -332,12 +332,66 @@ describe("a tool result with nothing open to attach it to", () => {
   });
 
   it("says so, rather than inventing a tool call to hang it on", () => {
+    // Held while a planner line might still claim it (the file can write a
+    // result before its call), and said once nothing can.
     const antigravity = normalizer();
-    const events = antigravity.accept({ sequence: 1, raw: orphan });
-    expect(events.map((event) => event.type)).toEqual(["adapter.diagnostic"]);
+    expect(antigravity.accept({ sequence: 1, raw: orphan })).toEqual([]);
+    const events = antigravity.finish(completion());
+    expect(events.map((event) => event.type)).toEqual(["adapter.diagnostic", "run.failed"]);
     expect(payload<{ code: string; level: string }>(events[0])).toMatchObject({
       code: "antigravity.unattached_result",
       level: "info",
+    });
+  });
+});
+
+describe("one planner step that opens two calls", () => {
+  // The shape measured 2026-09-25 by drive-antigravity-parallel: a planner
+  // line at step 1 opening two reads, answered at steps 2 and 3 in call
+  // order -- and the file wrote step 2 BEFORE step 1, all in one second.
+  const at = (fields: Record<string, unknown>) =>
+    JSON.stringify({ source: "MODEL", status: "DONE", created_at: "2026-09-25T04:33:59Z", ...fields });
+  const user = JSON.stringify({ step_index: 0, source: "USER_EXPLICIT", type: "USER_INPUT", status: "DONE", created_at: "2026-09-25T04:33:55Z", content: "read both" });
+  const planner = at({
+    step_index: 1,
+    type: "PLANNER_RESPONSE",
+    thinking: "both at once",
+    tool_calls: [
+      { name: "view_file", args: { AbsolutePath: JSON.stringify("c:/work/agy-alpha.txt") } },
+      { name: "view_file", args: { AbsolutePath: JSON.stringify("c:/work/agy-bravo.txt") } },
+    ],
+  });
+  const alpha = at({ step_index: 2, type: "GENERIC", content: "ALPHA-MARKER-5170" });
+  const bravo = at({ step_index: 3, type: "GENERIC", content: "BRAVO-MARKER-8823" });
+  const answer = at({ step_index: 4, type: "PLANNER_RESPONSE", content: "Both read." });
+
+  const answered = (lines: readonly string[]) => {
+    const { events } = run(lines);
+    return {
+      pairs: events
+        .filter((event) => event.type === "tool.completed")
+        .map((event) => payload<{ itemId: string; output?: string }>(event))
+        .map((done) => [done.itemId, done.output]),
+      stray: events.filter((event) => event.type === "adapter.diagnostic").length,
+      ended: events.at(-1)?.type,
+    };
+  };
+
+  it("gives each call its own result in the order the file really wrote them", () => {
+    // Last-opened took step 2 as nobody's (the first read said "did not
+    // report") and gave step 3 to the second read by luck.
+    expect(answered([user, alpha, planner, bravo, answer])).toEqual({
+      pairs: [["tool_1_0", "ALPHA-MARKER-5170"], ["tool_1_1", "BRAVO-MARKER-8823"]],
+      stray: 0,
+      ended: "run.completed",
+    });
+  });
+
+  it("and in step order, where last-opened swapped them", () => {
+    expect(answered([user, planner, alpha, bravo, answer])).toEqual({
+      pairs: [["tool_1_0", "ALPHA-MARKER-5170"], ["tool_1_1", "BRAVO-MARKER-8823"]],
+      stray: 0,
+      ended: "run.completed",
     });
   });
 });

@@ -55,9 +55,10 @@ import type {
  *   is rebuilt without the field before evidence is taken, exactly as Cursor's
  *   thinking deltas and Codex's reasoning items are handled.
  * - `GENERIC` (source `MODEL`) carries a tool's result text. It does not name
- *   the tool it belongs to, so it is attached to the most recently opened call.
- *   With nothing open there is no honest attachment to make, and a diagnostic
- *   says so rather than a tool call being invented to hang it on.
+ *   the tool it belongs to; its STEP does -- a planner line at step p with n
+ *   calls is answered at p+1 .. p+n, in call order (measured 2026-09-25, see
+ *   `awaiting`). A result no call claims gets a diagnostic rather than a tool
+ *   call invented to hang it on.
  * - A `PLANNER_RESPONSE` with `content` and no `tool_calls` is the final answer,
  *   whether or not it also carries `thinking` -- a model that reasons and
  *   answers in one step is still answering (measured 2026-09-06; requiring no
@@ -250,6 +251,45 @@ export function createAntigravityEventNormalizer(
   const seen = new Set<number>();
   /** Calls opened by a planner line and not yet closed by a `GENERIC` result. */
   const openTools: OpenTool[] = [];
+  /**
+   * Each open call, by the step its result will carry.
+   *
+   * A result names no tool and carries no id, and this used to go to the call
+   * opened LAST. MEASURED 2026-09-25 (drive-antigravity-parallel, and every
+   * transcript on this machine: 1,026 of 1,027 results): a planner line at
+   * step p with n calls is answered at steps p+1 .. p+n, in call order. So the
+   * step index is the attribution, and last-opened swapped the two answers of
+   * a two-call step -- or, since the file wrote the first result BEFORE its
+   * planner line, dropped one as "no tool call open" and left its call saying
+   * "did not report" beside an answer that quoted it.
+   */
+  const awaiting = new Map<number, OpenTool>();
+  /**
+   * Results read before the planner line that opened their call. Held for that
+   * line rather than reported as unattached, because the file's order is not
+   * the conversation's: both halves share a second and the result came first.
+   */
+  const early = new Map<number, { readonly parsed: JsonObject; readonly evidence: CodexEventEvidence }>();
+
+  const unattached = (evidence: CodexEventEvidence): NormalizedRuntimeEvent =>
+    diagnostic(
+      "info",
+      "antigravity.unattached_result",
+      "An Antigravity tool result arrived with no tool call open to attach it to.",
+      evidence,
+    );
+
+  const closeTool = (open: OpenTool, parsed: JsonObject, evidence: CodexEventEvidence): NormalizedRuntimeEvent => {
+    const at = openTools.indexOf(open);
+    if (at >= 0) openTools.splice(at, 1);
+    const content = stringValue(parsed.content);
+    return emit("tool.completed", {
+      ...open,
+      ...(content === undefined ? {} : { output: redactText(content) }),
+      phase: "completed",
+      evidence,
+    });
+  };
 
   const emit = <TType extends NormalizedRuntimeEventType>(
     type: TType,
@@ -383,6 +423,7 @@ export function createAntigravityEventNormalizer(
         ...(command === undefined ? {} : { command }),
       };
       openTools.push(open);
+      awaiting.set(stepIndex + 1 + index, open);
       const patch = name === "write_to_file" ? antigravityWritePatch(args) : undefined;
       events.push(
         emit("tool.started", {
@@ -394,6 +435,19 @@ export function createAntigravityEventNormalizer(
         }),
       );
     });
+    // A result the file wrote before this line is this line's, if its step
+    // says so; one from before this step that nothing claimed never will be.
+    for (const [resultStep, held] of [...early].sort(([a], [b]) => a - b)) {
+      const open = awaiting.get(resultStep);
+      if (open !== undefined) {
+        early.delete(resultStep);
+        awaiting.delete(resultStep);
+        events.push(closeTool(open, held.parsed, held.evidence));
+      } else if (resultStep < stepIndex) {
+        early.delete(resultStep);
+        events.push(unattached(held.evidence));
+      }
+    }
     if (content !== undefined) {
       // Content beside tool calls was never captured. It is delivered, but not
       // as a final answer: the turn plainly is not over if a tool just started.
@@ -445,26 +499,14 @@ export function createAntigravityEventNormalizer(
     if (type === "GENERIC" && stringValue(parsed.source) === "MODEL") {
       latestFinal = false;
       const evidence = evidenceFor(record, parsed, type);
-      const open = openTools.pop();
+      const open = awaiting.get(stepIndex);
       if (open === undefined) {
-        return [
-          diagnostic(
-            "info",
-            "antigravity.unattached_result",
-            "An Antigravity tool result arrived with no tool call open to attach it to.",
-            evidence,
-          ),
-        ];
+        // Its planner line may not be read yet; that line settles it.
+        early.set(stepIndex, { parsed, evidence });
+        return [];
       }
-      const content = stringValue(parsed.content);
-      return [
-        emit("tool.completed", {
-          ...open,
-          ...(content === undefined ? {} : { output: redactText(content) }),
-          phase: "completed",
-          evidence,
-        }),
-      ];
+      awaiting.delete(stepIndex);
+      return [closeTool(open, parsed, evidence)];
     }
 
     latestFinal = false;
@@ -515,14 +557,19 @@ export function createAntigravityEventNormalizer(
       finalized = true;
       const process = processEvidence(completion);
       const thread = runtimeThreadId === undefined ? {} : { runtimeThreadId };
+      // Results no planner line ever claimed are said, as they were said when
+      // they arrived before this held them.
+      const orphans = [...early.values()].map((held) => unattached(held.evidence));
+      early.clear();
       if (completion.cancelled) {
-        return [emit("run.cancelled", { ...thread, process })];
+        return [...orphans, emit("run.cancelled", { ...thread, process })];
       }
       // A host that only tails the file owns no process and reports no exit
       // code; a number that is not zero is the host saying its own driver died,
       // and that outranks whatever the transcript got to.
       if (typeof completion.exitCode === "number" && completion.exitCode !== 0) {
         return [
+          ...orphans,
           emit("run.failed", {
             kind: "process-failed",
             message: `The Antigravity language server exited with code ${String(completion.exitCode)}.`,
@@ -534,6 +581,7 @@ export function createAntigravityEventNormalizer(
       }
       if (!latestFinal) {
         return [
+          ...orphans,
           emit("run.failed", {
             kind: "process-failed",
             message: "The Antigravity transcript never ended on a planner answer with no tool calls, so the host stopped waiting for one.",
@@ -543,7 +591,7 @@ export function createAntigravityEventNormalizer(
           }),
         ];
       }
-      return [emit("run.completed", { ...thread, process })];
+      return [...orphans, emit("run.completed", { ...thread, process })];
     },
   };
 }
