@@ -11,6 +11,31 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.338.0 - 2026-09-25
+
+### Fixed
+
+- **Connector permissions work on slower machines.** Locust gave up reading
+  your connectors after 10 seconds, and on some machines listing them takes
+  longer, so every connector call asked for permission.
+- **Copilot's effort levels can be chosen.** The composer said Copilot's
+  effort was fixed; its seven levels are offered now.
+- **A tool call with an unusually long field name no longer stops the run.**
+- **A downloaded update stays installable** after a later check fails.
+- **A Windows "file in use" error during an install says so**, instead of
+  suggesting you reconfigure npm.
+- **Codex usage-limit warnings name their window**, such as "5-hour limit".
+- **A run that could not keep up with its runtime's output says so**
+  plainly, instead of blaming a large piece of output.
+- **Antigravity runs are stopped cleanly when Locust closes**, and report
+  their end when saving fails.
+- **A connector check that failed is asked again next time**, rather than
+  remembered as "no connectors" for five minutes.
+- **Coding agents that update themselves are re-checked**, so Locust does
+  not keep describing the old version.
+- Smaller fixes to messages between teammates, permission handling and the
+  release tooling.
+
 ## 0.337.0 - 2026-09-24
 
 ### Fixed
