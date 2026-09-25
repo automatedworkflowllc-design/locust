@@ -37,10 +37,12 @@ describe('a run that belongs to nobody', () => {
   it('is briefed with the folder and the project memory, and with no roster', async () => {
     const asked: (MissionPeerContext | undefined)[] = []
     const seen: (ConversationHint | undefined)[] = []
+    const runtimes: (string | undefined)[] = []
     const memory: MemoryBriefing = {
-      async section(peer, conversation) {
+      async section(peer, conversation, _prompt, runtime) {
         asked.push(peer)
         seen.push(conversation)
+        runtimes.push(runtime)
         return 'What is remembered for the folder "locust": the secret word is PELICAN.'
       }
     }
@@ -52,6 +54,8 @@ describe('a run that belongs to nobody', () => {
     // being handed a made-up one.
     expect(asked).toEqual([undefined])
     expect(seen).toEqual([{ previousMissionId: 'mission_prev' }])
+    // And which runtime is asking, so LOCUST.md's sections for others stay out (A4.2).
+    expect(runtimes).toEqual(['opencode'])
     expect(briefed).toContain('the secret word is PELICAN')
     // The person's words are last, where every other briefing puts them.
     expect(briefed.endsWith('What is the secret word?')).toBe(true)

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { MAX_BRIEF_BYTES, MAX_BRIEF_LINES, boundedBrief, briefSection, readWorkspaceBrief } from './workspace-brief.js'
+import { MAX_BRIEF_BYTES, MAX_BRIEF_LINES, boundedBrief, briefForRuntime, briefSection, readWorkspaceBrief } from './workspace-brief.js'
 
 const enoent = async (): Promise<string> => {
   const error = new Error('not found') as NodeJS.ErrnoException
@@ -39,5 +39,49 @@ describe("the folder's own instructions", () => {
     expect(byBytes.truncated).toBe(true)
     expect(Buffer.byteLength(byBytes.text, 'utf8')).toBeLessThanOrEqual(MAX_BRIEF_BYTES)
     expect(byBytes.lines).toBeLessThan(50)
+  })
+})
+
+/*
+ * A4.2: a LOCUST.md section can be addressed to one runtime's teammates.
+ * Everything outside a section still goes to everyone.
+ */
+describe("LOCUST.md sections for one runtime", () => {
+  const FILE = [
+    '# Project',
+    'Run the tests with npm test.',
+    '<claude>',
+    'Use the Task tool for long searches.',
+    '</claude>',
+    '<codex>',
+    'Prefer apply_patch for edits.',
+    '</codex>',
+    'Never push to main.'
+  ].join('\n')
+
+  it('gives each runtime its own section and everyone the rest', () => {
+    expect(briefForRuntime(FILE, 'claude')).toBe('# Project\nRun the tests with npm test.\nUse the Task tool for long searches.\nNever push to main.')
+    expect(briefForRuntime(FILE, 'codex')).toBe('# Project\nRun the tests with npm test.\nPrefer apply_patch for edits.\nNever push to main.')
+    expect(briefForRuntime(FILE, 'opencode')).toBe('# Project\nRun the tests with npm test.\nNever push to main.')
+  })
+
+  it('leaves alone a tag that names no runtime, a tag inside a code fence, and a tag never closed', () => {
+    const other = '<details>\nmore\n</details>'
+    expect(briefForRuntime(other, 'claude')).toBe(other)
+    const fenced = 'Example:\n```\n<codex>\nsample\n</codex>\n```\nEnd.'
+    expect(briefForRuntime(fenced, 'claude')).toBe(fenced)
+    // An unclosed tag hides nothing: the rest of the file still arrives.
+    const unclosed = 'Top.\n<claude>\nFor Claude.\nEveryone again.'
+    expect(briefForRuntime(unclosed, 'codex')).toBe(unclosed)
+  })
+
+  it('is what a run on that runtime is given, bounded after the other sections are gone', async () => {
+    const read = async () => FILE
+    expect((await readWorkspaceBrief('/work', read, 'codex'))?.text).toContain('Prefer apply_patch')
+    expect((await readWorkspaceBrief('/work', read, 'codex'))?.text).not.toContain('Task tool')
+    // With no runtime named, the file as written (the Settings count reads it so).
+    expect((await readWorkspaceBrief('/work', read))?.text).toContain('<claude>')
+    // A file that is only another runtime's section is no brief for this one.
+    expect(await readWorkspaceBrief('/work', async () => '<claude>\nOnly Claude.\n</claude>', 'codex')).toBeUndefined()
   })
 })

@@ -156,9 +156,10 @@ export interface MemoryBriefing {
   /**
    * `peer` is absent for a run that belongs to nobody; the folder and the
    * memory are still the project's. `prompt` is what was asked, so the
-   * memories that bear on it are the ones pasted.
+   * memories that bear on it are the ones pasted. `runtime` is the run's,
+   * so LOCUST.md's sections for other runtimes are left out (A4.2).
    */
-  section(peer: MissionPeerContext | undefined, conversation?: ConversationHint, prompt?: string): Promise<string | undefined>
+  section(peer: MissionPeerContext | undefined, conversation?: ConversationHint, prompt?: string, runtime?: string): Promise<string | undefined>
 }
 
 /**
@@ -208,7 +209,7 @@ export function createPeerExchange(options: {
   return {
     async prepare(prompt, peer, runtime, conversation) {
       // Memory that cannot be read is left out, never a refusal to run.
-      const memory = options.memory === undefined ? undefined : await options.memory.section(peer, conversation, prompt).catch(() => undefined)
+      const memory = options.memory === undefined ? undefined : await options.memory.section(peer, conversation, prompt, runtime).catch(() => undefined)
       /*
        * Both halves must be true, and the runtime half is not negotiable.
        * A setting that is on does not make Claude Code able to keep a list;
@@ -264,7 +265,7 @@ export function createPeerExchange(options: {
     },
 
     async briefSolo(prompt, runtime, conversation) {
-      const memory = options.memory === undefined ? undefined : await options.memory.section(undefined, conversation, prompt).catch(() => undefined)
+      const memory = options.memory === undefined ? undefined : await options.memory.section(undefined, conversation, prompt, runtime).catch(() => undefined)
       const todos =
         runtime !== undefined &&
         runtimeKeepsATodoList(runtime) &&

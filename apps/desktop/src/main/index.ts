@@ -1225,10 +1225,10 @@ if (!ownsSingleInstanceLock) {
     // The folder's own LOCUST.md rides in the same slot, first: read fresh at
     // every start so an edit lands on the next mission (parity row 45).
     const memoryBriefing: MemoryBriefing = {
-      section: async (peer, conversation, query) => {
+      section: async (peer, conversation, query, runtime) => {
         if (!workspaceChosen) return undefined
         const sections: string[] = []
-        const brief = await readWorkspaceBrief(workspacePath).catch(() => undefined)
+        const brief = await readWorkspaceBrief(workspacePath, undefined, runtime).catch(() => undefined)
         // A teammate with a worktree is not standing in the folder that
         // name belongs to, and saying otherwise sends it looking.
         // `peer` is absent for a run that belongs to nobody. It stands in the

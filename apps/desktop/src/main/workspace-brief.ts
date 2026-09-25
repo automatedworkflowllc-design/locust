@@ -49,10 +49,77 @@ export function boundedBrief(raw: string): WorkspaceBrief {
   return { text: text.trimEnd(), lines: kept.length, truncated }
 }
 
-/** The folder's LOCUST.md, or undefined when there is none. Unreadable reads as none. */
+/**
+ * The runtimes a LOCUST.md section can be addressed to (A4.2). A tag that is
+ * not one of these -- `<details>`, say -- is ordinary text and left alone.
+ */
+const RUNTIME_TAGS: ReadonlySet<string> = new Set([
+  'codex', 'claude', 'cursor', 'gemini', 'opencode', 'copilot', 'muse', 'antigravity'
+])
+
+/**
+ * LOCUST.md as one runtime's teammates are given it (A4.2).
+ *
+ * A section between `<claude>` and `</claude>`, each alone on its line, goes
+ * only to teammates on Claude Code; the same for every runtime; everything
+ * outside a section goes to all. So a project can say "run the tests with
+ * npm test" to everyone and something only one CLI needs to that CLI alone.
+ *
+ * Nothing is lost by accident: a tag inside a code fence is text, a tag that
+ * names no runtime is text, and an opening tag with no closing one is left
+ * in, content and all, rather than hiding the rest of the file.
+ */
+export function briefForRuntime(raw: string, runtime: string): string {
+  const lines = raw.replace(/\r\n?/g, '\n').split('\n')
+  const tagOf = (line: string): { readonly name: string; readonly closing: boolean } | undefined => {
+    const match = /^\s*<(\/?)([a-z]+)>\s*$/i.exec(line)
+    if (match === null) return undefined
+    const name = match[2]!.toLowerCase()
+    return RUNTIME_TAGS.has(name) ? { name, closing: match[1] === '/' } : undefined
+  }
+  const kept: string[] = []
+  let fenced = false
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]!
+    if (/^\s*(```|~~~)/.test(line)) fenced = !fenced
+    const tag = fenced ? undefined : tagOf(line)
+    if (tag === undefined || tag.closing) {
+      // A closing tag with nothing open is text, like any other stray line.
+      kept.push(line)
+      continue
+    }
+    // An opening tag: find its close, outside fences.
+    let close = -1
+    let inner = false
+    for (let ahead = index + 1; ahead < lines.length; ahead += 1) {
+      if (/^\s*(```|~~~)/.test(lines[ahead]!)) inner = !inner
+      const next = inner ? undefined : tagOf(lines[ahead]!)
+      if (next?.closing === true && next.name === tag.name) {
+        close = ahead
+        break
+      }
+    }
+    if (close < 0) {
+      kept.push(line)
+      continue
+    }
+    const section = lines.slice(index + 1, close)
+    if (tag.name === runtime) kept.push(...section)
+    // Fences inside the section count toward what follows it, kept or not.
+    for (const inside of section) if (/^\s*(```|~~~)/.test(inside)) fenced = !fenced
+    index = close
+  }
+  return kept.join('\n')
+}
+
+/**
+ * The folder's LOCUST.md, or undefined when there is none. Unreadable reads as
+ * none. Given a runtime, the sections addressed to other runtimes are left out.
+ */
 export async function readWorkspaceBrief(
   workspacePath: string | undefined,
-  read: (path: string) => Promise<string> = (path) => readFile(path, 'utf8')
+  read: (path: string) => Promise<string> = (path) => readFile(path, 'utf8'),
+  runtime?: string
 ): Promise<WorkspaceBrief | undefined> {
   if (workspacePath === undefined || workspacePath.length === 0) return undefined
   let raw: string
@@ -61,8 +128,9 @@ export async function readWorkspaceBrief(
   } catch {
     return undefined
   }
-  if (raw.trim().length === 0) return undefined
-  return boundedBrief(raw)
+  const text = runtime === undefined ? raw : briefForRuntime(raw, runtime)
+  if (text.trim().length === 0) return undefined
+  return boundedBrief(text)
 }
 
 /**
