@@ -3363,7 +3363,8 @@ export default function App(): ReactElement {
       const response = await bridge.resumeMission({
         missionId,
         runtime: route.runtime,
-        mode,
+        // M26: the mode this runtime can run, as a start sends it.
+        mode: modeRunsOn(mode, route.runtime, build?.platform) ? mode : modesFor(route.runtime, build?.platform)[0] ?? 'accept-edits',
         ...(resumed.model === 'account-default' ? {} : { model: resumed.model }),
         ...(resumed.effort === undefined ? {} : { effort: resumed.effort })
       })
@@ -3420,7 +3421,8 @@ export default function App(): ReactElement {
       const response = await bridge.handOffMission({
         runId,
         runtime: choice.runtime,
-        mode,
+        // M26: the mode the NEW runtime can run, as a start sends it.
+        mode: modeRunsOn(mode, choice.runtime, build?.platform) ? mode : modesFor(choice.runtime, build?.platform)[0] ?? 'accept-edits',
         ...startRoute(models, choice.runtime, choice.model, swarmEffortFor(models, choice.model, swarm, effort, choice.runtime))
       })
 

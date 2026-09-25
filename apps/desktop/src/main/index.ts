@@ -219,6 +219,7 @@ import type {
 } from '../shared/ipc.js'
 import { ROUTINE_RECOVERY_CHANNEL } from '../shared/routine-recovery.js'
 import { decideRoutineRecovery } from './routine-recovery-ipc.js'
+import { parsedMissionMode } from './mission-mode.js'
 
 /**
  * How large a single paste may be.
@@ -4029,13 +4030,7 @@ if (!ownsSingleInstanceLock) {
       // enough on its own: the word was already gone by the time anything
       // wrote it down, which is what a live drive found and the unit tests
       // could not.
-      const mode =
-        payload.mode === 'accept-edits'
-        || payload.mode === 'approve-each'
-        || payload.mode === 'auto'
-        || payload.mode === 'plan'
-          ? payload.mode
-          : 'ask'
+      const mode = parsedMissionMode(payload.mode)
       /*
        * Validated BEFORE the peer context is built, because building it has
        * a side effect: a teammate set to work on its own branch gets its
@@ -4182,7 +4177,8 @@ if (!ownsSingleInstanceLock) {
       // Same widening as a start and a handoff: an unrecognized mode is
       // read-only and an unrecognized runtime is Codex, so a malformed
       // request cannot buy itself write access by being wrong.
-      const mode = payload.mode === 'accept-edits' ? 'accept-edits' : 'ask'
+      // M26: the same reading as a start -- Auto, Approve-each and Plan are not Ask.
+      const mode = parsedMissionMode(payload.mode)
       const runtime = isMissionRuntime(payload.runtime) ? payload.runtime : 'codex'
       const model = typeof payload.model === 'string' ? payload.model : undefined
       const effort = typeof payload.effort === 'string' ? payload.effort : undefined
@@ -4229,7 +4225,8 @@ if (!ownsSingleInstanceLock) {
       // Same widening rules as a start: an unrecognized mode is read-only and
       // an unrecognized runtime is Codex. A handoff must not become the way a
       // malformed request buys itself write access.
-      const mode = payload.mode === 'accept-edits' ? 'accept-edits' : 'ask'
+      // M26: the same reading as a start -- Auto, Approve-each and Plan are not Ask.
+      const mode = parsedMissionMode(payload.mode)
       const runtime = isMissionRuntime(payload.runtime) ? payload.runtime : 'codex'
       const model = typeof payload.model === 'string' ? payload.model : undefined
       const effort = typeof payload.effort === 'string' ? payload.effort : undefined
