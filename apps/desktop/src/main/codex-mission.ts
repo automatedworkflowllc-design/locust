@@ -65,6 +65,7 @@ import { commandTooLong } from './command-length.js'
 import { MAX_LIVE_MISSIONS } from '../shared/live-missions.js'
 import { hostReadsEventsOf, runtimeDisplayName } from '../shared/runtimes.js'
 import { FREE_ONLY_REFUSAL, isFreeRoute } from './free-routes.js'
+import { attachmentsForRun } from './attachments-for-run.js'
 
 export const MAX_PROMPT_LENGTH = 8_000
 /**
@@ -1435,7 +1436,10 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // waiting messages and the share form. The ledger keeps the person's
         // words as the prompt and the delivered messages by id; the rest is
         // deterministic over those.
-        let runtimePrompt = prompt
+        // M16: attached files placed where this run reads, when it runs
+        // anywhere but the project folder. Only what is sent changes.
+        const sentPrompt = await attachmentsForRun(prompt, options.workspacePath, runCwd).catch(() => prompt)
+        let runtimePrompt = sentPrompt
         let delivered: readonly WorkroomMessage[] = []
         let peerDeliveryFailed = false
         /*
@@ -1454,7 +1458,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           // The turn this one continues, so the brief can find the
           // conversation's group. A route switch names it in `continuation`;
           // a follow-up in `resumedMissionId`; a first turn has none.
-          const prepared = await peerExchange.prepare(prompt, peer, runtime, {
+          const prepared = await peerExchange.prepare(sentPrompt, peer, runtime, {
             ...((continuation?.missionId ?? resumedMissionId ?? followUpOf) === undefined
               ? {}
               : { previousMissionId: continuation?.missionId ?? resumedMissionId ?? followUpOf }),
@@ -1479,7 +1483,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
            * pass 14, ranked second: the secret word answered NONE and no
            * memory file anywhere). Nothing here needs a roster.
            */
-          const solo = await peerExchange.briefSolo(prompt, runtime, {
+          const solo = await peerExchange.briefSolo(sentPrompt, runtime, {
             ...((continuation?.missionId ?? resumedMissionId ?? followUpOf) === undefined
               ? {}
               : { previousMissionId: continuation?.missionId ?? resumedMissionId ?? followUpOf }),
