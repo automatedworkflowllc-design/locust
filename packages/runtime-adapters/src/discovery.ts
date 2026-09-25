@@ -1,6 +1,6 @@
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { sep } from "node:path";
+import { dirname, join, sep } from "node:path";
 
 import {
   CLAUDE_REQUIRED_FEATURES,
@@ -419,10 +419,24 @@ export type StatFile = (path: string) => Promise<{ readonly size: number; readon
  */
 function fingerprintPaths(executable: ExecutableLaunch): readonly string[] {
   const paths = [executable.discoveredPath, executable.executablePath, ...executable.prefixArgs];
+  /*
+   * A SCRIPT launcher stays put while the CLI behind it updates itself, so
+   * its own size and time said nothing had changed and the cached version
+   * and help went stale (a B4 lead). Seen on this machine: Cursor's
+   * `versions` folder moved at 23:09 while cursor-agent.cmd/.ps1 kept 19:25;
+   * Muse writes `.muse-version` and a new muse-bin-<version>.exe beside an
+   * unchanged muse.cmd. The launcher's folder, a `versions` folder in it and
+   * Muse's version file are part of the fingerprint too; one that is not
+   * there is skipped like any missing path.
+   */
+  if (/\.(?:cmd|bat|ps1)$/i.test(executable.discoveredPath)) {
+    const folder = dirname(executable.discoveredPath);
+    paths.push(folder, join(folder, "versions"), join(folder, ".muse-version"));
+  }
   return [...new Set(paths.filter((path) => path.length > 0))];
 }
 
-async function fingerprintOf(executable: ExecutableLaunch, statFile: StatFile): Promise<string | undefined> {
+export async function fingerprintOf(executable: ExecutableLaunch, statFile: StatFile): Promise<string | undefined> {
   const parts: string[] = [];
   for (const path of fingerprintPaths(executable)) {
     let stats;
