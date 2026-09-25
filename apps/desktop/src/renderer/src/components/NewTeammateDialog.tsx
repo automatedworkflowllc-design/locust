@@ -112,7 +112,8 @@ export function NewTeammateDialog({
   platform
 }: {
   readonly onCancel: () => void
-  readonly onCreate: (input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; worktree?: boolean; avatar: AvatarSpec; route?: TeammateRoute }) => void
+  /** Resolves when the save has landed; the button is held until then (L22). */
+  readonly onCreate: (input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; worktree?: boolean; avatar: AvatarSpec; route?: TeammateRoute }) => void | Promise<unknown>
   readonly error: string | undefined
   /** Set to edit an existing teammate: the same dialog, filled in, saving instead of creating. */
   readonly initial?: PublicTeammate
@@ -161,6 +162,9 @@ export function NewTeammateDialog({
 }): ReactElement {
   const editing = initial !== undefined
   const [name, setName] = useState(initial?.name ?? '')
+  // A save in flight (L22): the button is held until it lands.
+  const [saving, setSaving] = useState(false)
+  const pressed = useRef(false)
   const [hue, setHue] = useState<TeammateHue>(initial?.hue ?? freshHue(takenHues))
   const [avatar, setAvatar] = useState<AvatarSpec>(
     () => initial?.avatar ?? seedAvatar(`draft_${Date.now()}_${Math.random()}`)
@@ -567,18 +571,29 @@ export function NewTeammateDialog({
           <button
             type="button"
             className="lc-primarybutton"
-            disabled={!canCreate}
-            onClick={() =>
-              onCreate({
-                name: trimmed,
-                hue,
-                role,
-                ...(role === 'Custom' && roleTitle.trim().length > 0 ? { roleTitle: roleTitle.trim() } : {}),
-                ...(worktree ? { worktree: true } : {}),
-                avatar,
-                ...(picked === undefined ? {} : { route: picked })
+            disabled={!canCreate || saving}
+            onClick={() => {
+              // L22 (the code review): a double click created the teammate
+              // twice. A ref, because the second click lands before the
+              // re-render that would disable the button.
+              if (pressed.current) return
+              pressed.current = true
+              setSaving(true)
+              void Promise.resolve(
+                onCreate({
+                  name: trimmed,
+                  hue,
+                  role,
+                  ...(role === 'Custom' && roleTitle.trim().length > 0 ? { roleTitle: roleTitle.trim() } : {}),
+                  ...(worktree ? { worktree: true } : {}),
+                  avatar,
+                  ...(picked === undefined ? {} : { route: picked })
+                })
+              ).finally(() => {
+                pressed.current = false
+                setSaving(false)
               })
-            }
+            }}
           >
             {editing ? 'Save changes' : 'Create teammate'}
           </button>

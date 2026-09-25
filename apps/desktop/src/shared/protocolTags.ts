@@ -82,7 +82,10 @@ const LOOSE_TAG = new RegExp(`</?(?:${PROTOCOL_TAGS.join('|')})\\b[^<>]{0,400}>`
  * it, and prose is the thing this function exists to protect.
  */
 const TORN_TAG = new RegExp(
-  `\n?\s*</?(?:${PROTOCOL_TAGS.map((tag) => tag.slice(0, 4)).join('|')})[a-z-]*$`,
+  // Escaped for the TEMPLATE, then for the regex: a lone backslash-s in a
+  // template literal is just `s`, so this stripped trailing s's -- "yes"
+  // before a torn tag came back "ye" (L7, the code review).
+  `\\n?\\s*</?(?:${PROTOCOL_TAGS.map((tag) => tag.slice(0, 4)).join('|')})[a-z-]*$`,
   'i'
 )
 

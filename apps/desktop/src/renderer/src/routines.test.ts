@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { withAttachments } from '../../shared/attachments.js'
 import type { PublicRecoveredMission } from '../../shared/ipc.js'
 import { MAX_ROUTINE_STEPS, draftName, routineDraft, routineRunSummary, routineStepLabel, routineScheduleSummary } from './routines.js'
 
@@ -43,6 +44,16 @@ const index = (missions: readonly PublicRecoveredMission[]): ReadonlyMap<string,
   new Map(missions.map((mission) => [mission.missionId, mission]))
 
 describe('saving a conversation as a routine', () => {
+  // L17 (the code review): a first turn with a file attached named the
+  // routine "Read this file in the workspace before you answer: - notes.md".
+  it('is named after what the person typed, not the attachment line', () => {
+    const missions = [turn('m1', withAttachments('Summarise the notes.', ['notes.md']))]
+    const draft = routineDraft(missions[0]!, index(missions))
+    expect(draft?.name).toBe('Summarise the notes.')
+    // The step keeps its file, so a replay reads it again.
+    expect(draft?.steps[0]).toContain('notes.md')
+  })
+
   it('takes the words a person typed on each turn, in order, with where each came from', () => {
     const missions = [
       turn('m1', 'Read status.ts and summarise it.'),

@@ -228,10 +228,14 @@ export function withRoomsFolded(
    * running. A room with posts whose answers are all in another folder stays
    * that folder's.
    */
+  // An empty room times by its making: timed as 0 it sat below every row,
+  // so each older empty room went above it -- oldest first (L16).
   const timeOf = (entry: ListEntry): number =>
     entry.kind === 'conversation'
       ? Date.parse(entry.mission.lastAt ?? '') || 0
-      : Math.max(0, ...entry.missions.map((mission) => Date.parse(mission.lastAt ?? '') || 0))
+      : entry.missions.length === 0
+        ? Date.parse(entry.room.createdAt) || 0
+        : Math.max(0, ...entry.missions.map((mission) => Date.parse(mission.lastAt ?? '') || 0))
   const running = (entry: ListEntry): boolean =>
     entry.kind === 'conversation' ? entry.mission.phase === 'running' : entry.missions.some((mission) => mission.phase === 'running')
   const empty = rooms.filter((room) => room.posts.length === 0).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))

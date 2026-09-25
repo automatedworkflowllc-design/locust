@@ -67,13 +67,24 @@ const version = JSON.parse(readFileSync(join(DESKTOP, 'package.json'), 'utf8')).
 // Releases go to a DIFFERENT repository, so a local tag proves nothing: this
 // repo never sees them. Ask the releases repo itself.
 const RELEASES_REPO = 'automatedworkflowllc-design/locust-releases'
-const published = spawnSync('gh', ['release', 'view', `v${version}`, '--repo', RELEASES_REPO, '--json', 'tagName'], {
+//
+// Both spellings, because releases are tagged `0.333.0` and this asked for
+// `v0.333.0` -- a tag that never exists, so the gate could not fail
+// (L10, the code review). It did not, on 2026-09-24: 0.333.0 was rebuilt
+// and passed as "not published yet" a day after it shipped. And a gh that
+// cannot answer FAILS the gate: "could not ask" is not "not released".
+const releaseTagged = (tag) => spawnSync('gh', ['release', 'view', tag, '--repo', RELEASES_REPO, '--json', 'tagName'], {
   cwd: ROOT,
   shell: true,
   encoding: 'utf8'
 })
-if (published.status === 0) {
-  bad(`version ${version} is not already released`, `v${version} is already published to ${RELEASES_REPO}`)
+const answers = [version, `v${version}`].map((tag) => ({ tag, answer: releaseTagged(tag) }))
+const found = answers.find(({ answer }) => answer.status === 0)
+const unanswered = answers.find(({ answer }) => answer.status !== 0 && !/not found/i.test(`${answer.stderr ?? ''}${answer.stdout ?? ''}`))
+if (found !== undefined) {
+  bad(`version ${version} is not already released`, `${found.tag} is already published to ${RELEASES_REPO}`)
+} else if (unanswered !== undefined) {
+  bad(`version ${version} is not already released`, `gh could not say: ${String(unanswered.answer.stderr ?? '').trim().slice(0, 200)}`)
 } else {
   ok(`version ${version} is not published yet`)
 }

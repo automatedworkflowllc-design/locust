@@ -3543,10 +3543,11 @@ export default function App(): ReactElement {
       })
   }
 
-  const createTeammate = (input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; worktree?: boolean; avatar: AvatarSpec; route?: TeammateRoute }): void => {
+  // Returns the save, so the dialog can hold its button until it lands (L22).
+  const createTeammate = (input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; worktree?: boolean; avatar: AvatarSpec; route?: TeammateRoute }): Promise<void> => {
     const bridge = window.desktop
-    if (!bridge) return
-    void bridge
+    if (!bridge) return Promise.resolve()
+    return bridge
       .createTeammate(input)
       .then((response) => {
         if (!response.ok) {
@@ -3568,10 +3569,10 @@ export default function App(): ReactElement {
   const updateTeammate = (
     teammateId: string,
     input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; worktree?: boolean; avatar: AvatarSpec; route?: TeammateRoute }
-  ): void => {
+  ): Promise<void> => {
     const bridge = window.desktop
-    if (!bridge) return
-    void bridge
+    if (!bridge) return Promise.resolve()
+    return bridge
       .updateTeammate({ teammateId, ...input })
       .then((response) => {
         if (!response.ok) {

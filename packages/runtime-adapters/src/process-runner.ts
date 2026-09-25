@@ -334,7 +334,8 @@ function windowsTaskkillPath(): string {
 export function killProcessTree(pid: number | undefined): void {
   if (process.platform !== "win32" || pid === undefined) return;
   try {
-    execFileSync(windowsTaskkillPath(), ["/F", "/T", "/PID", String(pid)], { stdio: "ignore" });
+    // Hidden, or a console window flashes on every Stop (L2).
+    execFileSync(windowsTaskkillPath(), ["/F", "/T", "/PID", String(pid)], { stdio: "ignore", windowsHide: true });
   } catch {
     // Best effort. `child.kill` still runs, and the completion path does not
     // depend on either of them succeeding.

@@ -86,3 +86,20 @@ describe('a room in the sidebar', () => {
     expect(withRoomsFolded(list, [release]).every((entry) => entry.kind === 'conversation')).toBe(true)
   })
 })
+
+/*
+ * L16 (the code review): two rooms nobody has posted to came out oldest
+ * first. An empty room already placed timed as 0 -- it has no answers -- so
+ * every older empty room was put above it.
+ */
+describe('rooms nobody has posted to', () => {
+  it('are newest first, like every other row', () => {
+    const empty = (roomId: string, name: string, createdAt: string): PublicRoom =>
+      ({ roomId, name, teammateIds: [], createdAt, posts: [], tasks: [] }) as unknown as PublicRoom
+    const entries = withRoomsFolded(
+      [conversation('mission_old', '2026-09-20T00:00:00.000Z', { title: 'Old work' })],
+      [empty('room_a', 'Made first', '2026-09-23T01:00:00.000Z'), empty('room_b', 'Made second', '2026-09-23T02:00:00.000Z'), empty('room_c', 'Made third', '2026-09-23T03:00:00.000Z')]
+    )
+    expect(entries.map((entry) => (entry.kind === 'room' ? entry.room.name : entry.mission.title))).toEqual(['Made third', 'Made second', 'Made first', 'Old work'])
+  })
+})

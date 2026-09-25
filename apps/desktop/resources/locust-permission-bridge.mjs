@@ -92,6 +92,9 @@ const askLocust = (params) =>
   })
 
 let buffer = ''
+// Decoded across reads, not chunk by chunk: a character split between two
+// reads became two replacement characters on the card (L11).
+process.stdin.setEncoding('utf8')
 process.stdin.on('data', (chunk) => {
   buffer += String(chunk)
   let cut

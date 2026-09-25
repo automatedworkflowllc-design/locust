@@ -192,6 +192,9 @@ describe('headings and emphasis', () => {
     ])
     expect(parseAgentText('# Title')).toEqual([{ kind: 'heading', level: 1, text: 'Title' }])
     expect(parseAgentText('## Title ##')).toEqual([{ kind: 'heading', level: 2, text: 'Title' }])
+    // L15: a hash that is part of the words stays ("Why C#" read "Why C").
+    expect(parseAgentText('## Why C#')).toEqual([{ kind: 'heading', level: 2, text: 'Why C#' }])
+    expect(parseAgentText('### F# and C# ##')).toEqual([{ kind: 'heading', level: 3, text: 'F# and C#' }])
     // Deeper than three is drawn as the third: the thread has three sizes.
     expect(parseAgentText('##### Deep')).toEqual([{ kind: 'heading', level: 3, text: 'Deep' }])
   })

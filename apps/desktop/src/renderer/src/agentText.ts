@@ -122,7 +122,9 @@ const FENCE = /^[ \t]*(`{3,})[ \t]*(.*)$/
  * is about that", and drawing the hashes throws the structure away while
  * keeping the punctuation.
  */
-const HEADING = /^[ \t]{0,3}(#{1,6})[ \t]+(.+?)[ \t]*#*[ \t]*$/
+// A closing run of hashes only after whitespace, as CommonMark has it: the
+// old pattern ate any trailing `#`, so "## Why C#" read "Why C" (L15).
+const HEADING = /^[ \t]{0,3}(#{1,6})[ \t]+(.+?)(?:[ \t]+#+)?[ \t]*$/
 
 /**
  * A table row: a line carrying a pipe with content either side. Leading and

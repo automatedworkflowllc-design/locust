@@ -1,4 +1,5 @@
 import type { PublicRecoveredMission, PublicRoutine } from '../../shared/ipc.js'
+import { splitAttachments } from '../../shared/attachments.js'
 import { nextRunAfter, scheduleLabel } from '../../shared/routine-schedule.js'
 import { conversationTurns, typedPrompt } from './missionView.js'
 
@@ -73,7 +74,8 @@ export function routineDraft(
   if (first === undefined) return undefined
   const kept = typed.slice(0, MAX_ROUTINE_STEPS)
   return {
-    name: draftName(first.prompt),
+    // Named by what the person typed, not by the host's attachment line (L17).
+    name: draftName(splitAttachments(first.prompt).text),
     steps: kept.map((turn) => turn.prompt),
     learnedFrom: kept.map((turn) => turn.missionId),
     truncated: typed.length > kept.length
