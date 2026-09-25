@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import type { MissionApprovalAnswer, MissionApprovalRequest } from '../shared/ipc.js'
+import { relativeToFolder } from '../shared/approval-patch.js'
 
 /**
  * Locust as Claude Code's permission host.
@@ -124,6 +125,39 @@ export function bridgeConfig(options: {
 
 const deny = (message: string): BridgeAnswer => ({ behavior: 'deny', message })
 
+/**
+ * What a bridged request is, in the card's words.
+ *
+ * The bridge was built for connectors, and every request through it was
+ * drawn as one. But in Edit mode Claude Code routes its OWN tools here too:
+ * a drive of the check-after-edits feature (2026-09-25) had Bash asking to
+ * run `node check.js`, and the card said the input went "to the service the
+ * connector reaches" and that Locust "cannot undo what happens there" -- about
+ * a command on this machine. A built-in tool is now the card it is.
+ */
+export function builtInOrConnector(
+  toolName: string,
+  input: unknown,
+  cwd: string
+): { readonly kind: 'command' | 'file-change' | 'connector'; readonly summary: string; readonly detail: string } {
+  const fields = typeof input === 'object' && input !== null ? (input as Record<string, unknown>) : {}
+  const text = (value: unknown): string => (typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, 600) : '')
+  if (toolName === 'Bash') {
+    const command = text(fields.command)
+    return { kind: 'command', summary: command.length > 0 ? 'Run a command' : 'Run a command it did not describe', detail: command }
+  }
+  if (toolName === 'Edit' || toolName === 'Write' || toolName === 'MultiEdit' || toolName === 'NotebookEdit') {
+    const file = text(fields.file_path) || text(fields.notebook_path)
+    return { kind: 'file-change', summary: 'Change 1 file', detail: file.length > 0 ? relativeToFolder(file, cwd) : '' }
+  }
+  if (!toolName.startsWith('mcp__')) {
+    return { kind: 'command', summary: `Use ${toolName}`, detail: JSON.stringify(input).slice(0, 600) }
+  }
+  // The input the connector would be called with, bounded. It is the one
+  // thing a person can judge a connector call by.
+  return { kind: 'connector', summary: connectorSummary(toolName), detail: JSON.stringify(input).slice(0, 600) }
+}
+
 export function createPermissionHost(options: {
   /** Absolute path of the bridge script the CLI will spawn. */
   readonly bridgePath: string
@@ -163,12 +197,8 @@ export function createPermissionHost(options: {
       approvalId,
       runId: registered.runId,
       missionId: registered.missionId,
-      kind: 'connector',
+      ...builtInOrConnector(toolName, input, registered.cwd ?? ''),
       runtime: 'claude',
-      summary: connectorSummary(toolName),
-      // The input the connector would be called with, bounded. It is the
-      // one thing a person can judge a connector call by.
-      detail: JSON.stringify(input).slice(0, 600),
       cwd: registered.cwd,
       requestedAt: now().toISOString()
     })

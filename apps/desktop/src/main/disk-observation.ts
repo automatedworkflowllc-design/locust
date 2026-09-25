@@ -117,6 +117,24 @@ export async function snapshotWorkspace(
     }
     if (seen !== undefined) snapshot.set(path, UNTRACKED + STAMP_MARK + `${String(seen.size)}:${String(Math.round(seen.mtimeMs))}`)
   }
+  /*
+   * A TRACKED file that was already modified, and was modified again, kept
+   * the same status -- ` M` before and after -- so the second edit was
+   * invisible: no host record, no diff on its row ("did not report the
+   * change"), and no check after it. Found driving the check-after-edits
+   * feature (2026-09-25): a teammate's fix rewrote notes.txt, still
+   * differing from HEAD by a newline, and the host logged "nothing changed
+   * on disk". The same size-and-time stamp the untracked files carry past
+   * their text bounds, so any write is seen.
+   */
+  let stamped = 0
+  for (const [path, status] of snapshot) {
+    if (status === UNTRACKED || status.startsWith(UNTRACKED) || /D/.test(status.slice(0, 2))) continue
+    if (stamped >= MAX_UNTRACKED_LOOKED_AT) break
+    stamped += 1
+    const seen = await statOf(join(workspacePath, path))
+    if (seen !== undefined) snapshot.set(path, status + STAMP_MARK + `${String(seen.size)}:${String(Math.round(seen.mtimeMs))}`)
+  }
   return snapshot
 }
 
