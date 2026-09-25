@@ -284,6 +284,19 @@ describe('a fileChange item carries its change into the activity row', () => {
     expect(payload.patch?.text).toContain('+hello from wren')
   })
 
+  // M2 (the code review): a change the person declined was drawn with its
+  // diff, as though it had been written. It names its files; it has no patch.
+  it('gives a declined fileChange its paths but no patch', () => {
+    const [out] = withFileChanges(
+      [{ ...base, type: 'tool.failed', payload: { itemId: 'item_fc', toolKind: 'fileChange', name: 'apply_patch', status: 'declined', phase: 'completed', evidence: { runtimeEventType: 'item/completed', redacted: true } } } as never],
+      byItem,
+      'C:' + String.fromCharCode(92) + 'work' + String.fromCharCode(92) + 'pebble'
+    )
+    const payload = out!.payload as { command?: string; patch?: unknown }
+    expect(payload.command).toBe('HELLO.txt')
+    expect(payload.patch).toBeUndefined()
+  })
+
   it('leaves every other event, and a fileChange it never saw, exactly as it was', () => {
     const shell = { ...base, type: 'tool.completed', payload: { itemId: 'item_sh', toolKind: 'commandExecution', name: 'shell', command: 'ls', phase: 'completed', evidence: { runtimeEventType: 'item/completed', redacted: true } } } as never
     const unknown = { ...base, type: 'tool.started', payload: { itemId: 'item_other', toolKind: 'fileChange', name: 'apply_patch', phase: 'started', evidence: { runtimeEventType: 'item/started', redacted: true } } } as never

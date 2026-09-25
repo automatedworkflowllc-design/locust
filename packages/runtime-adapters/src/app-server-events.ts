@@ -1,11 +1,14 @@
 import {
   boundedMessageText,
+  failureKind,
   identityValue,
   isObject,
   stringValue,
 } from "./codex-events.js";
 import type {
   CodexEventEvidence,
+  CodexLimitKind,
+  CodexRunFailureKind,
   NormalizedRuntimeEvent,
   NormalizedRuntimeEventType,
   NormalizedRuntimePayloadMap,
@@ -192,7 +195,9 @@ export function createAppServerEventNormalizer(
   let runtimeThreadId: string | undefined;
   let normalizedSequence = 0;
   let finalized = false;
-  let announcedLimit = false;
+  // Per kind, as the exec transport keeps them: one flag for every limit
+  // meant an exhausted quota was never said once a warning had been (M3).
+  const announcedLimits = new Set<CodexLimitKind>();
   /*
    * A compaction, said once however it is reported (A2.5). Codex 0.156.1
    * has both a `contextCompaction` item and a `thread/compacted` notification
@@ -309,7 +314,10 @@ export function createAppServerEventNormalizer(
     openTools.delete(itemId);
     const status = stringValue(item.status);
     const exitCode = typeof item.exitCode === "number" ? item.exitCode : undefined;
-    const failed = status === "failed" || status === "error" || (exitCode !== undefined && exitCode !== 0);
+    // Any terminal status but "completed" is not a success -- in particular
+    // "declined", what Codex reports for a call the person refused in
+    // Approve-each. It was recorded as completed, as though it had run (M2).
+    const failed = (status !== undefined && status !== "completed") || (exitCode !== undefined && exitCode !== 0);
     return [
       emit(failed ? "tool.failed" : "tool.completed", {
         itemId,
@@ -435,8 +443,8 @@ export function createAppServerEventNormalizer(
           const limit = limitFromSnapshot(params.rateLimits);
           // Say it once. The server pushes this repeatedly, and a transcript
           // that repeats the same warning is a transcript nobody reads.
-          if (limit === undefined || announcedLimit) return [];
-          announcedLimit = true;
+          if (limit === undefined || announcedLimits.has(limit.kind)) return [];
+          announcedLimits.add(limit.kind);
           return [
             emit("route.limit_detected", {
               kind: limit.kind,
@@ -465,9 +473,27 @@ export function createAppServerEventNormalizer(
             ];
           }
           finalized = true;
+          // M3: classified, from Codex's own error info when it gives one --
+          // a string, or an object keyed by the variant -- and from the
+          // message when not. An exhausted quota or a signed-out account used
+          // to end as "unknown", with no limit said, so no other route was
+          // offered.
+          const info = isObject(error.codexErrorInfo)
+            ? Object.keys(error.codexErrorInfo)[0]
+            : stringValue(error.codexErrorInfo);
+          const kind: CodexRunFailureKind = info === "usageLimitExceeded"
+            ? "quota-exhausted"
+            : info === "unauthorized"
+              ? "authentication-failed"
+              : failureKind(message);
+          const limitSaid = (kind === "quota-exhausted" || kind === "temporary-rate-limit") && !announcedLimits.has(kind);
+          if (limitSaid) announcedLimits.add(kind);
           return [
+            ...(limitSaid
+              ? [emit("route.limit_detected", { kind, message, evidence: evidence(notification) })]
+              : []),
             emit("run.failed", {
-              kind: "unknown",
+              kind,
               message,
               ...(runtimeThreadId === undefined ? {} : { runtimeThreadId }),
               runtimeTerminal: "failed",

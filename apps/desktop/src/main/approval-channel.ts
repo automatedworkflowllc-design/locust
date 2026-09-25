@@ -256,7 +256,9 @@ export function withFileChanges(
     if (payload.toolKind !== 'fileChange' || payload.itemId === undefined) return event
     const changes = changesByItem.get(payload.itemId)
     if (changes === undefined || changes.length === 0) return event
-    const patch = approvalPatchFrom(changes, workspacePath)
+    // A change that failed or was declined wrote nothing: it names its
+    // files, and carries no diff that would read as written (M2).
+    const patch = event.type === 'tool.failed' ? undefined : approvalPatchFrom(changes, workspacePath)
     const paths = changes.map((change) => relativeToFolder(change.path, workspacePath)).join('\n')
     return {
       ...event,

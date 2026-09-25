@@ -119,6 +119,19 @@ describe("tools", () => {
     expect(done?.type).toBe("tool.completed");
   });
 
+  // M2 (the code review): a command or patch the person DENIED in
+  // Approve-each ends with Codex's status "declined" and was recorded as
+  // completed -- with its diff attached -- as though it had run.
+  it("records a declined command or patch as failed, not completed", () => {
+    for (const type of ["commandExecution", "fileChange"]) {
+      const app = normalizer();
+      app.accept(startItem({ id: "item_1", type, command: "rm -rf build" }));
+      const [done] = app.accept(completeItem({ id: "item_1", type, status: "declined" }));
+      expect(done?.type, type).toBe("tool.failed");
+      expect(done?.type === "tool.failed" && done.payload.status).toBe("declined");
+    }
+  });
+
   it("treats a non-zero exit as a failure even when the status says otherwise", () => {
     const app = normalizer();
     app.accept(startItem({ id: "exec_1", type: "commandExecution", command: "false" }));
@@ -175,6 +188,47 @@ describe("rate limits", () => {
     expect(first.map((event) => event.type)).toEqual(["route.limit_detected"]);
     // A transcript that repeats the same warning is one nobody reads.
     expect(second).toEqual([]);
+  });
+});
+
+/*
+ * M3 (the code review): on the app-server transport an exhausted quota or a
+ * signed-out account ended the run as kind "unknown" with no limit event, so
+ * nothing offered another route; and one flag for every limit meant an
+ * exhausted snapshot was never said once a 90% warning had been.
+ */
+describe("limits and sign-in on the app-server transport", () => {
+  const failure = (error: Record<string, unknown>) => {
+    const app = normalizer();
+    return app.accept(note("error", { threadId: "t", turnId: "u", willRetry: false, error }));
+  };
+
+  it("says an exhausted quota after a warning was already said", () => {
+    const app = normalizer();
+    const warned = app.accept(note("account/rateLimits/updated", { rateLimits: { weekly: { usedPercent: 95 } } }));
+    const spent = app.accept(note("account/rateLimits/updated", { rateLimits: { weekly: { usedPercent: 100 } } }));
+    expect(warned.map((event) => event.type === "route.limit_detected" && event.payload.kind)).toEqual(["temporary-rate-limit"]);
+    expect(spent.map((event) => event.type === "route.limit_detected" && event.payload.kind)).toEqual(["quota-exhausted"]);
+  });
+
+  it("classifies a usage-limit error from Codex's own error info, and names the limit", () => {
+    for (const info of ["usageLimitExceeded", { usageLimitExceeded: {} }]) {
+      const events = failure({ message: "You have hit your limit.", codexErrorInfo: info });
+      expect(events.map((event) => event.type)).toEqual(["route.limit_detected", "run.failed"]);
+      expect(events[0]?.type === "route.limit_detected" && events[0].payload.kind).toBe("quota-exhausted");
+      expect(events[1]?.type === "run.failed" && events[1].payload.kind).toBe("quota-exhausted");
+    }
+  });
+
+  it("classifies a signed-out account from Codex's own error info", () => {
+    const events = failure({ message: "401", codexErrorInfo: "unauthorized" });
+    expect(events.map((event) => event.type)).toEqual(["run.failed"]);
+    expect(events[0]?.type === "run.failed" && events[0].payload.kind).toBe("authentication-failed");
+  });
+
+  it("falls back to the message when there is no error info", () => {
+    const events = failure({ message: "You've hit your usage limit. Try again later." });
+    expect(events.at(-1)?.type === "run.failed" && events.at(-1)?.payload).toMatchObject({ kind: expect.stringMatching(/quota-exhausted|temporary-rate-limit/) });
   });
 });
 

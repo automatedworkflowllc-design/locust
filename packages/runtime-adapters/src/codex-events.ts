@@ -545,7 +545,8 @@ function limitKind(message: string): CodexLimitKind | undefined {
   return undefined;
 }
 
-function failureKind(message: string | undefined): CodexRunFailureKind {
+/** What a failure message says went wrong; shared with the app-server transport (M3). */
+export function failureKind(message: string | undefined): CodexRunFailureKind {
   if (message === undefined) return "unknown";
   const routeLimit = limitKind(message);
   if (routeLimit !== undefined) return routeLimit;
