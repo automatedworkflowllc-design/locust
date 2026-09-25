@@ -3447,6 +3447,10 @@ export default function App(): ReactElement {
       setRoute(choice)
       const ownerId = ownerOf(current)
       if (ownerId !== undefined) {
+        // M29: and the teammate's own pick, which the chat box prefers over
+        // the bare route. Left alone, it still held the route handed AWAY
+        // from, so the chip -- and the next follow-up -- went back there.
+        setPickerRoutes((routes) => new Map(routes).set(ownerId, choice))
         const missionId = response.data.missionId
         setMissionOwners((owners) => ({ ...owners, [missionId]: ownerId }))
         // The host now remembers a handed-off route as the teammate's own;
