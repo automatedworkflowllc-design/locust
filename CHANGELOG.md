@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.341.0 - 2026-09-25
+
+### Fixed
+
+- **Opening a folder no longer runs a program its Git settings name.** A
+  project's own Git configuration can name a program for Git to run while
+  checking the folder, and Locust's own checks of your folder ran it. They
+  no longer do.
+
 ## 0.340.0 - 2026-09-25
 
 ### Improved
