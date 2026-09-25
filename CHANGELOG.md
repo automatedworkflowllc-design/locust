@@ -11,6 +11,22 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.334.0 - 2026-09-24
+
+### Fixed
+
+- **Handing a mission to another runtime keeps its mode.** A handoff or a
+  resume in Plan, Auto or Approve-each ran as read-only Ask; a resumed plan
+  lost its plan.
+- **A handoff the other runtime would refuse stops nothing.** Picking Cursor
+  for a read-only run on Windows, or a runtime that is signed out, stopped
+  the running mission and then started nothing. The mission keeps running
+  now, and the reason is shown above the chat box.
+- **A teammate set to work on its own branch never runs in the shared
+  folder.** When the branch could not be made, only a direct message was
+  refused; a room post, a relayed reply, a routine or a resume ran in the
+  main folder instead. They all refuse and say why now.
+
 ## 0.333.0 - 2026-09-24
 
 ### Fixed
