@@ -201,6 +201,7 @@ import { TESTER_LANE, updateLaneFrom } from './update-lane.js'
 import { allowCursorConnectors } from './cursor-connector-allow.js'
 import { cursorConfiguredConnectorNames, cursorReadyConnectors } from './cursor-connector-notice.js'
 import { pruneMissionRecords, readStorageReport } from './retention.js'
+import { oneAtATime } from './one-at-a-time.js'
 import { createUpdateService } from './updates.js'
 import type {
   CodexMissionCancelRequest,
@@ -2093,7 +2094,10 @@ if (!ownsSingleInstanceLock) {
        * backwards for any terminal event, so a completed mission stays
        * completed. Checked before this was written rather than after.
        */
-      note: async ({ missionId, message }) => {
+      // One at a time: each reads the tail it appends after, and the relay
+      // fires several without waiting -- two at once read the same tail and
+      // the second ending note was refused and lost (B4 lead).
+      note: oneAtATime(async ({ missionId, message }: { readonly missionId: string; readonly message: string }) => {
         const mission = await missionLedger.getMission(missionId).catch(() => undefined)
         if (mission === undefined) return
         const last = mission.events.at(-1)
@@ -2120,7 +2124,7 @@ if (!ownsSingleInstanceLock) {
             } as NormalizedRuntimeEvent
           ])
           .catch(() => undefined)
-      },
+      }),
       stopWorkOf: async (teammateId) => {
         const codexRun = codexMissions.runIdOwnedBy(teammateId)
         if (codexRun !== undefined) return codexMissions.cancel(codexRun).ok

@@ -35,7 +35,8 @@ const TIMEOUT_MS = 8_000
 
 let held: { readonly at: number; readonly text: string } | undefined
 
-export type McpLister = () => Promise<string>
+/** The listing, or undefined when Cursor could not be asked -- which is not "none". */
+export type McpLister = () => Promise<string | undefined>
 
 const runCursorMcpList: McpLister = async () => {
   /*
@@ -56,12 +57,20 @@ const runCursorMcpList: McpLister = async () => {
    */
   const launch = await createPathExecutableLocator({}).find('cursor-agent')
   if (launch === undefined) return ''
-  return await new Promise((resolve) => {
+  return await new Promise<string | undefined>((resolve) => {
     execFile(
       launch.executablePath,
       [...launch.prefixArgs, 'mcp', 'list'],
       { timeout: TIMEOUT_MS, windowsHide: true },
-      (_error, stdout) => resolve(typeof stdout === 'string' ? stdout : '')
+      // A failure or a timeout is NOT an empty listing: an empty one was kept
+      // for five minutes, so a connector needing login went unsaid (B4 lead).
+      // What it printed is kept even on a non-zero exit (a server needing
+      // login may be exactly why); only an error with nothing printed is
+      // "could not ask".
+      (error, stdout) => {
+        const text = typeof stdout === 'string' ? stdout : ''
+        resolve(text.trim().length > 0 || error === null ? text : undefined)
+      }
     )
   })
 }
@@ -79,6 +88,8 @@ async function cachedList(lister: McpLister, now: () => number): Promise<string>
   const at = now()
   if (held !== undefined && at - held.at < TTL_MS) return held.text
   const text = await lister()
+  // Only an answer is held; the callers read a throw as "say nothing".
+  if (text === undefined) throw new Error('Cursor could not be asked about its connectors')
   held = { at, text }
   return text
 }
