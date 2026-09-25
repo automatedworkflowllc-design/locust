@@ -1408,6 +1408,18 @@ describe("OpenCode and Copilot CLI discovery", () => {
     expect(older?.diagnostics.some((issue) => issue.code === "capability-probe-failed")).toBe(false);
   });
 
+  it("still says signed out when a CLI says so in its own words", async () => {
+    const runner: CommandRunner = {
+      run: async (command) => {
+        if (command.purpose === "capabilities") return { exitCode: 0, stdout: COPILOT_HELP, stderr: "" };
+        return { exitCode: 1, stdout: "", stderr: "Error: not logged in. Run copilot login." };
+      },
+    };
+    const [copilot] = (await discoverInstalledRuntimes({ runner, locator: newcomerLocator("copilot") }))
+      .filter((entry) => entry.id === "copilot");
+    expect(copilot?.readiness).toBe("authentication-required");
+  });
+
   it("does not report an OpenCode that cannot list a single model as ready to run one", async () => {
     const runner: CommandRunner = {
       run: async (command) => {
@@ -1418,7 +1430,11 @@ describe("OpenCode and Copilot CLI discovery", () => {
     };
     const [opencode] = (await discoverInstalledRuntimes({ runner, locator: newcomerLocator("opencode") }))
       .filter((entry) => entry.id === "opencode");
-    expect(opencode?.readiness).toBe("authentication-required");
+    // Not ready -- and not "signed out" either: OpenCode has no sign-in, and
+    // this asserted "authentication-required" until a fresh-profile beta
+    // report of 0.345 saw that word stick while the window never re-checked.
+    // Not answering is checked again.
+    expect(opencode?.readiness).toBe("unhealthy");
   });
 
   it("reports Copilot CLI ready on its version alone, and says on the record why that is a guess", async () => {
@@ -1471,7 +1487,9 @@ describe("OpenCode and Copilot CLI discovery", () => {
     };
     const [copilot] = (await discoverInstalledRuntimes({ runner, locator: newcomerLocator("copilot") }))
       .filter((entry) => entry.id === "copilot");
-    expect(copilot?.readiness).toBe("authentication-required");
+    // A version command saying something else is not a sign-in statement (the
+    // same 0.345 correction): not ready, and checked again.
+    expect(copilot?.readiness).toBe("unhealthy");
     expect(copilot?.modelHints).toBeUndefined();
   });
 });

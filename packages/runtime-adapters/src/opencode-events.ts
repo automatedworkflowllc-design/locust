@@ -129,7 +129,9 @@ export function openCodeToolOutcome(state: JsonObject): {
   // (measured, `run` and `serve` alike). As a plain error the fold said it
   // "ran ... exited non-zero" (drive opencode-approve-each, 2026-09-25).
   if (status === "error" && /rejected permission/i.test(stringValue(state.error) ?? "")) {
-    return { failed: true, status: "refused" };
+    // The person said no on a card: Locust's own reply says so, and it is
+    // not the mode refusing (the beta report asked for the two to differ).
+    return { failed: true, status: /declined this in Locust/i.test(stringValue(state.error) ?? "") ? "declined" : "refused" };
   }
   return { failed: true, status: status ?? "unknown" };
 }

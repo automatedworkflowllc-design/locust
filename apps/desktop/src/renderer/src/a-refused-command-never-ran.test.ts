@@ -54,3 +54,30 @@ describe('a refused command', () => {
     expect(shell[1]?.kind === 'shell' ? shell[1].refused : 'x').toBeUndefined()
   })
 })
+
+/*
+ * A fresh-profile beta report of 0.345: an edit the person DECLINED on its
+ * approval card read "edit failed" in its row and "1 refused" in the summary.
+ * Declined is the person's no; refused is the mode's; neither is a failure.
+ */
+describe('a declined edit', () => {
+  const declined = [
+    event('run.started', {}),
+    event('tool.started', { itemId: 'e', toolKind: 'tool_use', name: 'db/query.sql', tool: 'edit', phase: 'started' }),
+    event('tool.failed', { itemId: 'e', toolKind: 'tool_use', name: 'db/query.sql', tool: 'edit', phase: 'completed', status: 'declined', output: 'The person declined this in Locust.' }),
+    event('run.completed', {})
+  ]
+  const shown = (() => {
+    const activity = buildThread(declined, { running: false }).find((item) => item.type === 'activity')
+    return activity?.type === 'activity' ? activity.details : []
+  })()
+
+  it('says declined in its row and in the summary, never failed or refused', () => {
+    const rows = activityEntries(shown).filter((entry) => entry.kind === 'tool' || entry.kind === 'unreported')
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.kind === 'tool' || rows[0]?.kind === 'unreported' ? rows[0].neverRan : undefined).toBe('declined')
+    const line = activityTrace(shown, declined, traceOutcome(declined, false)).map((segment) => segment.text).join(' · ')
+    expect(line).toContain('1 declined')
+    expect(line).not.toContain('refused')
+  })
+})

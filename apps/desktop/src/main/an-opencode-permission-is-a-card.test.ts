@@ -18,9 +18,32 @@ describe("an OpenCode server's permission request", () => {
     expect(openCodeReplyFor(await reply)).toBe('once')
   })
 
+  it('shows the edit it proposes, by its file relative to the folder (the 0.345 beta report)', () => {
+    // OpenCode's own request shape, measured: metadata { filepath, diff }.
+    const raised: MissionApprovalRequest[] = []
+    const channel = createApprovalChannel({ emitApproval: (request) => raised.push(request), createId: () => '2' })
+    const handler = channel.requestHandlerFor({ runId: 'run_2', missionId: 'm_2', cwd: 'C:/work', changesByItem: new Map(), runtime: 'opencode' })
+    const diff = [
+      'Index: C:/work/notes.txt',
+      '='.repeat(67),
+      '--- C:/work/notes.txt',
+      '+++ C:/work/notes.txt',
+      '@@ -1,1 +1,1 @@',
+      '-Status: draft',
+      '+Status: ready',
+      ''
+    ].join('\n')
+    void handler(openCodePermissionRequest({ permission: 'edit', patterns: ['notes.txt'], metadata: { filepath: 'C:/work/notes.txt', diff } }, 'C:/work'))
+    expect(raised[0]).toMatchObject({ kind: 'file-change', summary: 'Change 1 file', detail: 'notes.txt' })
+    expect(raised[0]?.patch?.text).toContain('+Status: ready')
+    expect(raised[0]?.patch?.text).toContain('-Status: draft')
+    expect(raised[0]?.patch?.text).not.toContain('Index:')
+    expect(raised[0]?.patch).toMatchObject({ added: 1, removed: 1 })
+  })
+
   it('names an edit by its file, and anything else by what it is', () => {
     expect(openCodePermissionRequest({ permission: 'edit', patterns: ['a.txt'], metadata: { filepath: 'C:/work/a.txt' } }, 'C:/work'))
-      .toMatchObject({ method: 'item/fileChange/requestApproval', params: { summary: 'C:/work/a.txt' } })
+      .toMatchObject({ method: 'item/fileChange/requestApproval', params: { summary: 'a.txt' } })
     expect(openCodePermissionRequest({ permission: 'external_directory', patterns: ['C:/other/*'], metadata: {} }, 'C:/work'))
       .toMatchObject({ method: 'item/commandExecution/requestApproval', params: { command: 'Reach outside its folder: C:/other/*' } })
   })

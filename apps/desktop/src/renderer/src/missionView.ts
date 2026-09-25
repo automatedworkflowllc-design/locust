@@ -223,6 +223,8 @@ export type ActivityEntry =
        * none). Not a failure: nothing ran (see `refusedCalls` in the Claude
        * adapter).
        */
+      /** Declined by the person on a card, not refused by the mode. */
+      readonly declined?: true
       readonly refused?: string
       /**
        * What the command printed, where the runtime reported it.
@@ -286,6 +288,13 @@ export type ActivityEntry =
       readonly tool: string | undefined
       readonly settled: boolean
       readonly failed: boolean
+      /**
+       * It never ran: the person declined it on a card, or the mode refused
+       * it. Said as that word, not "failed" -- a fresh-profile beta report of
+       * 0.345 found a declined edit's row reading "edit failed" beside a
+       * summary that said "1 refused".
+       */
+      readonly neverRan?: 'declined' | 'refused'
     }
 
 /**
@@ -353,7 +362,8 @@ export function activityEntries(
         settled: detail.settled,
         failed,
         exitCode: detail.exitCode,
-        ...(detail.status === 'refused' ? { refused: detail.output ?? '' } : {}),
+        ...(detail.status === 'refused' || detail.status === 'declined' ? { refused: detail.output ?? '' } : {}),
+        ...(detail.status === 'declined' ? { declined: true } : {}),
         /*
          * Carried whenever the runtime SAID something about output, including
          * when what it said was "none".
@@ -430,7 +440,8 @@ export function activityEntries(
         name: relativePath(detail.name, workspacePath),
         tool: detail.tool === detail.name ? undefined : detail.tool,
         settled: detail.settled,
-        failed
+        failed,
+        ...(detail.status === 'declined' || detail.status === 'refused' ? { neverRan: detail.status } : {})
       })
       return
     }
@@ -1474,6 +1485,8 @@ export function activityTrace(
   // runtime's notices otherwise. One notice named two refused calls in the
   // replay of 2026-09-23 and the line said "1 refused".
   const refusedRows = details.filter((detail) => detail.status === 'refused').length
+  // Declined by the person on a card: counted as its own word, never "refused".
+  const declined = details.filter((detail) => detail.status === 'declined').length
   const refused = refusedRows > 0
     ? refusedRows
     : diagnostics.filter((event) => /denied|refus|permission/i.test(event.payload.code) || /not permitted|refused/i.test(event.payload.message)).length
@@ -1532,7 +1545,7 @@ export function activityTrace(
    * shares its row with the duration, the file count and the cost.
    */
   // What RAN: a command the runtime refused is counted as refused, below.
-  const shellCommands = details.filter((detail) => detail.kind === 'shell' && detail.status !== 'refused')
+  const shellCommands = details.filter((detail) => detail.kind === 'shell' && detail.status !== 'refused' && detail.status !== 'declined')
   // Through `shellCommandText`, the same unwrapping the command ROW uses. A
   // raw name on Windows begins with the whole
   // `"C:\Windows\...\powershell.exe" -NoProfile -Command` preamble, so a
@@ -1582,6 +1595,7 @@ export function activityTrace(
     segments.push({ key: 'files', text: 'no files changed' })
   }
   if (refused > 0) segments.push({ key: 'refused', text: `${String(refused)} refused`, tone: 'amber' })
+  if (declined > 0) segments.push({ key: 'declined', text: `${String(declined)} declined`, tone: 'amber' })
   /*
    * No `1 notice` chip. The notices themselves are drawn at the foot of the
    * fold instead -- see `activityNotices` and ActivityCard.
@@ -1665,7 +1679,7 @@ export interface CommandsRun {
 
 export function commandsRun(details: readonly ActivityDetail[], finished: boolean): CommandsRun {
   // A command the runtime refused never ran, so it is none of these.
-  const shell = details.filter((detail) => detail.kind === 'shell' && detail.status !== 'refused')
+  const shell = details.filter((detail) => detail.kind === 'shell' && detail.status !== 'refused' && detail.status !== 'declined')
   return {
     ran: shell.length,
     nonZero: shell.filter((detail) => detail.failed === true || (detail.exitCode !== undefined && detail.exitCode !== 0)).length,

@@ -618,10 +618,12 @@ export function ActivityCard({
                     * that failed, and the difference matters — the command may
                     * well have run.
                     */}
-                  <span className={`lc-filerow__result ${entry.settled ? (entry.failed ? 'is-failed' : 'is-muted') : finished ? 'is-stalled' : 'is-running'}`}>
+                  <span className={`lc-filerow__result ${entry.settled ? (entry.neverRan !== undefined ? 'is-stalled' : entry.failed ? 'is-failed' : 'is-muted') : finished ? 'is-stalled' : 'is-running'}`}>
                     {!entry.settled
                       ? finished ? 'did not report' : 'still running'
-                      : entry.failed
+                      : entry.neverRan !== undefined
+                        ? entry.neverRan
+                        : entry.failed
                         ? 'failed'
                         : entry.kind === 'tool'
                           ? 'done'
@@ -683,7 +685,7 @@ function shellResult(entry: Extract<ActivityEntry, { kind: 'shell' }>, finished 
   // report, and saying `running` about it contradicts the header beside it.
   if (!entry.settled) return finished ? 'did not report' : 'running'
   // Refused is not failed: the command never ran.
-  if (entry.refused !== undefined) return 'refused'
+  if (entry.refused !== undefined) return entry.declined === true ? 'declined' : 'refused'
   if (entry.failed) return entry.exitCode === undefined ? 'failed' : `failed · exit ${String(entry.exitCode)}`
   /*
    * A call sent to the background returns at once, so `done` on it was a

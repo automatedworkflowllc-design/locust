@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
+import { toolPatchFrom } from '@teammate/runtime-adapters'
 import type { AppServerRequest, JsonValue, MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
 import type {
@@ -215,7 +216,16 @@ export function openCodePermissionRequest(
   }
   if (permission.permission === 'edit') {
     const file = said('filepath') ?? said('filePath') ?? permission.patterns.join(', ')
-    return { id: 0, method: 'item/fileChange/requestApproval', params: { summary: file, cwd } }
+    const diff = said('diff')
+    // The file relative to the folder, and the change itself: a fresh-profile
+    // beta report of 0.345 found the card naming a long absolute path and
+    // "Change files" with nothing to judge -- while OpenCode's request
+    // carries the diff (measured: metadata { filepath, diff }).
+    return {
+      id: 0,
+      method: 'item/fileChange/requestApproval',
+      params: { summary: relativeToFolder(file, cwd), cwd, ...(diff === undefined ? {} : { unifiedDiff: diff }) }
+    }
   }
   const what = permission.permission === 'external_directory' ? 'Reach outside its folder' : `Use ${permission.permission}`
   return {
@@ -223,6 +233,22 @@ export function openCodePermissionRequest(
     method: 'item/commandExecution/requestApproval',
     params: { command: `${what}: ${permission.patterns.join(', ')}`, cwd }
   }
+}
+
+/**
+ * A runtime's own unified diff, as the card's patch: its `Index:` and `====`
+ * banner dropped and its paths made relative, so the change is what the card
+ * shows rather than the folder it lives in.
+ */
+export function diffPatchFrom(diff: string, cwd: string): ReturnType<typeof toolPatchFrom> | undefined {
+  const lines = diff.split(/\r?\n/)
+    .filter((line) => !/^Index: /.test(line) && !/^={10,}$/.test(line))
+    .map((line) => {
+      const header = /^(---|\+\+\+) (.+)$/.exec(line)
+      return header === null ? line : `${header[1]!} ${relativeToFolder(header[2]!.trim(), cwd)}`
+    })
+  const text = lines.join('\n').trim()
+  return text.includes('@@') ? toolPatchFrom(text) : undefined
 }
 
 /** This channel's answer, as the reply an OpenCode server takes. Anything unclear is a refusal. */
@@ -397,7 +423,8 @@ export function createApprovalChannel(options: ApprovalChannelOptions): Approval
         const requestParams = (typeof request.params === 'object' && request.params !== null ? request.params : {}) as Record<string, unknown>
         const itemId = typeof requestParams.itemId === 'string' ? requestParams.itemId : undefined
         const changes = described.kind === 'file-change' && itemId !== undefined ? run.changesByItem.get(itemId) : undefined
-        const patch = approvalPatchFrom(changes, run.cwd)
+        const offered = typeof requestParams.unifiedDiff === 'string' ? diffPatchFrom(requestParams.unifiedDiff, run.cwd) : undefined
+        const patch = approvalPatchFrom(changes, run.cwd) ?? offered
         return await new Promise<JsonValue>((resolve) => {
           approvals.set(approvalId, { runId, missionId, kind: described.kind, resolve })
           options.emitApproval({
@@ -410,7 +437,9 @@ export function createApprovalChannel(options: ApprovalChannelOptions): Approval
               ? {}
               : { questions: described.questions }),
             ...(requestParams.isBlocking === false ? { blocking: false } : {}),
-            summary: changes !== undefined && changes.length > 0 ? `Change ${String(changes.length)} file${changes.length === 1 ? '' : 's'}` : described.summary,
+            summary: changes !== undefined && changes.length > 0
+              ? `Change ${String(changes.length)} file${changes.length === 1 ? '' : 's'}`
+              : offered !== undefined ? 'Change 1 file' : described.summary,
             detail: described.detail,
             cwd: described.cwd,
             requestedAt: now().toISOString(),

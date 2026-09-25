@@ -341,6 +341,32 @@ const DEFINITIONS: readonly IntegrationDefinition[] = [
  */
 const PROBE_TIMEOUT_MS = 10_000;
 
+/**
+ * Whether a readiness check that did not pass said the person is SIGNED OUT,
+ * rather than simply not answering right.
+ *
+ * Any check that failed without timing out used to read as "not signed in".
+ * A fresh-profile beta report of 0.345 met it on OpenCode -- which has no
+ * sign-in at all -- and on Muse, both "not signed in" on the first sweep and
+ * ready on a later one. And the window never asks again about a runtime it
+ * was told needs a sign-in (it re-checks only the ones not answering), so the
+ * wrong word stuck: the model menu offered only the account default for about
+ * two minutes. So "signed out" now needs the CLI's own words about signing
+ * in, and OpenCode, with no account to be out of, is never said to be.
+ * Anything else is a runtime not answering yet, which is checked again.
+ */
+const SIGN_IN_CHECKS: ReadonlySet<string> = new Set(["codex", "claude", "cursor", "gemini"]);
+
+function saysSignedOut(definition: IntegrationDefinition, result: CommandResult): boolean {
+  if (definition.id === "opencode") return false;
+  // Where the readiness command IS a sign-in check -- `codex login status`,
+  // `claude auth status`, `cursor-agent status`, gemini's session list --
+  // its failing is the statement, with or without words.
+  if (SIGN_IN_CHECKS.has(definition.id)) return true;
+  return /sign(?:ed)?[ -]?(?:in|out)|log(?:ged)?[ -]?(?:in|out)|login|auth|credential|api[ _-]?key|unauthori[sz]ed|subscription|not entitled|account|ineligible/i
+    .test(`${result.stdout}\n${result.stderr}`);
+}
+
 interface ProbeOutcome {
   readonly result?: CommandResult;
   readonly error?: string;
@@ -719,7 +745,8 @@ async function discoverOne(
     } else if (
       definition.id !== "omniroute" &&
       readinessOutcome.result !== undefined &&
-      readinessOutcome.result.timedOut !== true
+      readinessOutcome.result.timedOut !== true &&
+      saysSignedOut(definition, readinessOutcome.result)
     ) {
       readiness = "authentication-required";
       diagnostics.push(
