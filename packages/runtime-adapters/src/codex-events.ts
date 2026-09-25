@@ -447,6 +447,9 @@ export function redactText(value: string): string {
     );
 }
 
+/** The longest key the ledger reads (mission-store `isRedactedJson`). */
+const MAX_EVIDENCE_KEY_LENGTH = 512;
+
 export function sanitizeJson(
   value: unknown,
   state: { redacted: boolean },
@@ -490,7 +493,13 @@ export function sanitizeJson(
     const entries = Object.entries(value);
     if (entries.length > MAX_EVIDENCE_OBJECT_KEYS) state.redacted = true;
     for (const [entryKey, entryValue] of entries.slice(0, MAX_EVIDENCE_OBJECT_KEYS)) {
-      result[entryKey] = sanitizeJson(entryValue, state, depth + 1, entryKey);
+      // The ledger reads no key over 512 characters or with a NUL in it, and
+      // one such key made the write throw and stopped the run (a B4 lead).
+      const safeKey = entryKey.includes("\u0000") || entryKey.length > MAX_EVIDENCE_KEY_LENGTH
+        ? `${entryKey.replace(/\u0000/g, "").slice(0, MAX_EVIDENCE_KEY_LENGTH - 12)}[truncated]`
+        : entryKey;
+      if (safeKey !== entryKey) state.redacted = true;
+      result[safeKey] = sanitizeJson(entryValue, state, depth + 1, entryKey);
     }
     return result;
   }
