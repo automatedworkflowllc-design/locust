@@ -109,6 +109,32 @@ const settle = async (ticks = 12): Promise<void> => {
   for (let i = 0; i < ticks; i += 1) await new Promise((resolve) => setTimeout(resolve, 10))
 }
 
+/*
+ * L3 (the code review): the conversation is opened in Antigravity before the
+ * mission is recorded -- deliberately, so a refusal leaves nothing behind --
+ * but when the RECORD then failed, the person was told only that the start
+ * failed, while Antigravity's agent was already working. A retry started it
+ * twice.
+ */
+describe('a mission Antigravity started and Locust could not record', () => {
+  it('says the agent may already be working, and not to send it again', async () => {
+    const failing = { createMission: async () => { throw new Error('no space left on device') } }
+    const service = createAntigravityMissionService({
+      workspacePath: WORKSPACE,
+      ledger: { ...fakeLedger().ledger, ...failing } as unknown as MissionLedger,
+      probe: async () => host(),
+      emitEvent: () => undefined,
+      agentApi: (): AgentApi => ({ newConversation: async () => CONVERSATION, sendMessage: async () => undefined }),
+      readTranscript: async () => undefined,
+      home: HOME,
+      createId: () => 'x',
+      now: () => new Date(NOW),
+      pollMs: 5
+    })
+    await expect(service.start('Fix the build.', undefined, {})).rejects.toThrow(/already started on this.*do not send it again/i)
+  })
+})
+
 describe('finding the running Antigravity', () => {
   it("reads the token and version off the server's own command line, and only Antigravity's", () => {
     expect(parseServerCommandLine(SERVER_CMD)).toEqual({ csrfToken: '60843f52-6d41-4d97-9b31-53157a780b5e', version: '2.11.0' })

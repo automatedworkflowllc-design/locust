@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
 import { describe, expect, it, vi } from 'vitest'
 
 import type { MissionLedger, MissionPruneOptions } from '@teammate/mission-store'
@@ -87,6 +90,22 @@ describe('pruning, as the host offers it', () => {
     const done = await pruneMissionRecords(ledger, { olderThanDays: 30, dryRun: false }, () => [], () => NOW)
     expect(pruneMissions.mock.calls[0]?.[0]?.dryRun).toBe(false)
     expect(done).toMatchObject({ ok: true, data: { previewed: false, deleted: ['mission_1'] } })
+  })
+
+  // L8 (the code review): the confirm recomputed the cutoff and never passed
+  // the previewed ids, so a panel left open deleted more than it showed; and
+  // the handler dropped the owners of missions only moved to the trash.
+  it('deletes only what the preview showed, and leaves the owners for the trash', async () => {
+    const pruneMissions = vi.fn(async (_options: MissionPruneOptions) => ({ deleted: ['mission_1'], failed: [], unreadable: [], keptForContinuity: [], keptAsRunning: [] }))
+    await pruneMissionRecords(ledgerWith({ pruneMissions }), { olderThanDays: 30, dryRun: false, only: ['mission_1'] }, () => [], () => NOW)
+    expect(pruneMissions.mock.calls[0]?.[0]?.only).toEqual(['mission_1'])
+    // A preview is never bounded -- it is what finds the list.
+    pruneMissions.mockClear()
+    await pruneMissionRecords(ledgerWith({ pruneMissions }), { olderThanDays: 30, dryRun: true, only: ['mission_1'] }, () => [], () => NOW)
+    expect(pruneMissions.mock.calls[0]?.[0]?.only).toBeUndefined()
+    const index = readFileSync(fileURLToPath(new URL('./index.ts', import.meta.url)), 'utf8')
+    const handler = index.slice(index.indexOf('ipcMain.handle(MISSION_PRUNE_CHANNEL'), index.indexOf('const deletedThisSession'))
+    expect(handler).not.toContain('unassignMission')
   })
 
   it('tells the ledger which missions are running, from the transports', async () => {

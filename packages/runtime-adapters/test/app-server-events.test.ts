@@ -232,6 +232,26 @@ describe("limits and sign-in on the app-server transport", () => {
   });
 });
 
+/*
+ * L1 (the code review): a run that failed before or outside its turn -- a
+ * refused handshake, a server that exited, a timeout -- lost its reason: the
+ * run knew it and every one read "The runtime connection ended before the
+ * turn completed."
+ */
+describe("a run that ends without the server saying so", () => {
+  it("says the reason the run knew, and classifies it", () => {
+    const app = normalizer();
+    const [failed] = app.finish("transport-lost", "Authentication required: run codex login.");
+    expect(failed?.type === "run.failed" && failed.payload.message).toBe("Authentication required: run codex login.");
+    expect(failed?.type === "run.failed" && failed.payload.kind).toBe("authentication-failed");
+  });
+
+  it("still says something when it knew nothing", () => {
+    const [failed] = normalizer().finish("transport-lost");
+    expect(failed?.type === "run.failed" && failed.payload.message).toMatch(/ended before the turn completed/);
+  });
+});
+
 describe("errors and noise", () => {
   it("does not end the run on an error the provider intends to retry", () => {
     const app = normalizer();

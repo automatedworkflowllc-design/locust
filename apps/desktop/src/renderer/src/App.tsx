@@ -1041,13 +1041,17 @@ export default function App(): ReactElement {
     return bridge.installUpdate()
   }
 
+  const lastPrunePreview = useRef<{ readonly days: number; readonly missionIds: readonly string[] } | undefined>(undefined)
   /** Ask the host what a prune would do. Nothing is deleted by this. */
   const previewPrune = async (days: number): Promise<MissionPruneResponse> => {
     const bridge = window.desktop
     if (!bridge) {
       return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'The host is not available.' } }
     }
-    return bridge.pruneMissions({ olderThanDays: days, dryRun: true })
+    const response = await bridge.pruneMissions({ olderThanDays: days, dryRun: true })
+    // Remembered, so the confirm deletes what this showed and nothing else (L8).
+    lastPrunePreview.current = response.ok ? { days, missionIds: response.data.deleted } : undefined
+    return response
   }
 
   const prune = async (days: number): Promise<MissionPruneResponse> => {
@@ -1055,7 +1059,10 @@ export default function App(): ReactElement {
     if (!bridge) {
       return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'The host is not available.' } }
     }
-    const response = await bridge.pruneMissions({ olderThanDays: days, dryRun: false })
+    // Only what the preview showed: a panel left open while missions crossed
+    // the cutoff, or finished, deleted those too (L8). No preview, nothing.
+    const previewed = lastPrunePreview.current?.days === days ? lastPrunePreview.current.missionIds : []
+    const response = await bridge.pruneMissions({ olderThanDays: days, dryRun: false, only: previewed })
     if (response.ok) {
       // A deleted mission has to leave the SCREEN as well as the disk. One
       // left open kept showing a durable receipt for a record that no longer

@@ -364,6 +364,12 @@ export interface MissionPruneRequest {
   readonly olderThanDays: number
   /** Ask what would happen. The preview and the deletion are one code path. */
   readonly dryRun: boolean
+  /**
+   * On a confirm: the missions its preview showed, and no others (L8). A
+   * preview left open while missions crossed the cutoff, or finished, used
+   * to delete those too.
+   */
+  readonly only?: readonly string[]
 }
 
 export interface MissionPruneData {

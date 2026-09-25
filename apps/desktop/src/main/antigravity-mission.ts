@@ -681,32 +681,42 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
           await api.sendMessage({ projectId, conversationId, content: runtimePrompt })
         }
 
-        await options.ledger.createMission({
-          missionId,
-          runId,
-          prompt,
-          runtime: 'antigravity',
-          model,
-          requestedRouteId: 'antigravity',
-          resolvedRouteId: 'antigravity:hub',
-          cliVersion: host.version ?? null,
-          // The FOLDER, not a fresh id: a random one can never be matched
-          // back to where the mission ran.
-          workspaceId: workspaceIdFor(options.workspacePath),
-          sandbox: 'workspace-write',
-          executionPolicyVersion: 1,
-          createdAt,
-          ...(priorConversation === undefined
-            ? {}
-            : {
-                continuesFrom: {
-                  missionId: priorConversation.missionId,
-                  checkpointEpoch: 1,
-                  reason: 'follow-up' as const,
-                  runtimeThreadId: conversationId
-                }
-              })
-        })
+        // L3 (the code review): Antigravity has the conversation by now, so a
+        // record that fails here leaves its agent working with nothing in
+        // Locust to show it -- and a plain "could not start" invited a retry
+        // that started it twice. Said as what it is.
+        try {
+          await options.ledger.createMission({
+            missionId,
+            runId,
+            prompt,
+            runtime: 'antigravity',
+            model,
+            requestedRouteId: 'antigravity',
+            resolvedRouteId: 'antigravity:hub',
+            cliVersion: host.version ?? null,
+            // The FOLDER, not a fresh id: a random one can never be matched
+            // back to where the mission ran.
+            workspaceId: workspaceIdFor(options.workspacePath),
+            sandbox: 'workspace-write',
+            executionPolicyVersion: 1,
+            createdAt,
+            ...(priorConversation === undefined
+              ? {}
+              : {
+                  continuesFrom: {
+                    missionId: priorConversation.missionId,
+                    checkpointEpoch: 1,
+                    reason: 'follow-up' as const,
+                    runtimeThreadId: conversationId
+                  }
+                })
+          })
+        } catch {
+          throw new AntigravityStartError(
+            'Antigravity has already started on this, but Locust could not record the mission, so it will not appear here. Open Antigravity to follow it, and do not send it again.'
+          )
+        }
         if (peerExchange !== undefined && delivered.length > 0) {
           try {
             await peerExchange.recordReceived(missionId, delivered, createdAt)

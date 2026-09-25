@@ -422,7 +422,8 @@ export function asProcessNormalizer(
       return notification === undefined ? [] : normalizer.accept(notification);
     },
     finish(completion: RuntimeProcessCompletion): readonly NormalizedRuntimeEvent[] {
-      return normalizer.finish(completion.cancelled ? "cancelled" : "transport-lost");
+      // With the reason the run recorded for the failure, when it has one (L1).
+      return normalizer.finish(completion.cancelled ? "cancelled" : "transport-lost", completion.stderr);
     },
   };
 }

@@ -135,6 +135,27 @@ describe('the workroom channel', () => {
     expect(snapshot.issues.map((entry) => entry.code)).toEqual(['truncated-tail'])
   })
 
+  /*
+   * L9 (the code review): a torn last line -- a crash or a power cut in the
+   * middle of an append -- disabled the workroom for good: every post and
+   * every read of what is waiting threw, in every folder, until someone
+   * hand-edited a file in AppData. A torn TAIL is repaired: the file goes
+   * back to its last complete record. A record that breaks the sequence is
+   * still refused (below): that is not a crash, and nothing guesses past it.
+   */
+  it('repairs a torn tail and carries on', async () => {
+    const root = await temporaryRoot()
+    const workroom = workroomAt(root)
+    const kept = await postFromAtlas(workroom, 'kept')
+    await appendFile(join(root, 'workroom.jsonl'), '{"schemaVersion":1,"recordType":"workroom.message","sequ')
+    const next = await postFromAtlas(workroom, 'after the crash', 'mission_a2')
+    const unread = await workroom.unread(WREN.teammateId, 10)
+    expect(unread.messages.map((message) => message.text)).toEqual(['kept', 'after the crash'])
+    const snapshot = await workroom.read()
+    expect(snapshot.issues).toEqual([])
+    expect(snapshot.messages).toEqual([kept, next])
+  })
+
   it('stops at a record that breaks the sequence, and refuses to append past the break', async () => {
     const root = await temporaryRoot()
     const workroom = workroomAt(root)

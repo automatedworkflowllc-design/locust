@@ -170,6 +170,8 @@ type WorkroomRecord = MessageRecord | DeliveryRecord
 interface ParsedWorkroom extends WorkroomSnapshot {
   readonly nextSequence: number
   readonly byteLength: number
+  /** The bytes up to the end of the last record read whole (L9). */
+  readonly validByteLength: number
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -261,7 +263,7 @@ function recordLine(record: WorkroomRecord): string {
 }
 
 async function readWorkroomFile(path: string): Promise<ParsedWorkroom> {
-  const empty: ParsedWorkroom = { messages: [], deliveries: [], issues: [], nextSequence: 1, byteLength: 0 }
+  const empty: ParsedWorkroom = { messages: [], deliveries: [], issues: [], nextSequence: 1, byteLength: 0, validByteLength: 0 }
   let handle: FileHandle
   try {
     handle = await open(path, READ_FLAGS)
@@ -300,6 +302,7 @@ async function readWorkroomFile(path: string): Promise<ParsedWorkroom> {
   const seen = new Set<string>()
   const delivered = new Set<string>()
   let expectedSequence = 1
+  let validByteLength = 0
   for (const line of lines) {
     if (Buffer.byteLength(line, 'utf8') > MAX_RECORD_BYTES) {
       issues.push(issue('invalid-record', 'An oversized workroom record and its tail were ignored.'))
@@ -352,6 +355,7 @@ async function readWorkroomFile(path: string): Promise<ParsedWorkroom> {
       break
     }
     expectedSequence += 1
+    validByteLength += Buffer.byteLength(line, 'utf8') + 1
   }
 
   return {
@@ -359,7 +363,8 @@ async function readWorkroomFile(path: string): Promise<ParsedWorkroom> {
     deliveries,
     issues,
     nextSequence: expectedSequence,
-    byteLength: Buffer.byteLength(text, 'utf8')
+    byteLength: Buffer.byteLength(text, 'utf8'),
+    validByteLength
   }
 }
 
@@ -380,6 +385,28 @@ export function createFileWorkroom(options: FileWorkroomOptions): Workroom {
   }
 
   /**
+   * The file as the writer may use it. L9 (the code review): a torn last
+   * line -- a crash or a power cut mid-append -- made every post and every
+   * read of waiting messages throw from then on, in every folder. A torn TAIL
+   * and nothing else is a crash's shape, so the file is cut back to its last
+   * complete record. Anything else -- a record that breaks the sequence, a
+   * schema this build does not know -- is still refused: it is not a crash,
+   * and nothing guesses past it.
+   */
+  const readForWriting = async (): Promise<ParsedWorkroom> => {
+    const parsed = await readWorkroomFile(path)
+    if (parsed.issues.length === 0 || !parsed.issues.every((entry) => entry.code === 'truncated-tail')) return parsed
+    const handle = await open(path, fsConstants.O_RDWR)
+    try {
+      await handle.truncate(parsed.validByteLength)
+      await handle.sync()
+    } finally {
+      await handle.close()
+    }
+    return readWorkroomFile(path)
+  }
+
+  /**
    * Every append re-reads the file first. The channel is small and appends are
    * rare, and reading first is what makes the writer exactly as strict as the
    * reader: an append lands only on a file the reader can walk end to end, at
@@ -389,7 +416,7 @@ export function createFileWorkroom(options: FileWorkroomOptions): Workroom {
     build: (parsed: ParsedWorkroom) => readonly WorkroomRecord[]
   ): Promise<readonly WorkroomRecord[]> => {
     await mkdir(rootDirectory, { recursive: true, mode: 0o700 })
-    const parsed = await readWorkroomFile(path)
+    const parsed = await readForWriting()
     if (parsed.issues.length > 0) throw new Error('Workroom is unavailable')
     const records = build(parsed)
     if (records.length === 0) return records
@@ -477,7 +504,7 @@ export function createFileWorkroom(options: FileWorkroomOptions): Workroom {
       return serialize(async () => {
         if (!isSafeId(teammateId)) throw new Error('Teammate id is invalid')
         const bounded = Math.max(0, Math.trunc(limit))
-        const parsed = await readWorkroomFile(path)
+        const parsed = await readForWriting()
         if (parsed.issues.length > 0) throw new Error('Workroom is unavailable')
         const delivered = new Set(parsed.deliveries.map((delivery) => delivery.messageId))
         const waiting = parsed.messages.filter(

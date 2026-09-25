@@ -65,10 +65,15 @@ export async function pruneMissionRecords(
   // never be the thing that deletes a person's history.
   const dryRun = payload.dryRun !== false
   try {
+    // A confirm is bounded by what its preview showed (L8).
+    const only = Array.isArray(payload.only) && payload.only.every((id) => typeof id === 'string') && payload.only.length <= 10_000
+      ? payload.only
+      : undefined
     const result = await ledger.pruneMissions({
       before,
       dryRun,
-      protectMissionIds: liveMissionIds()
+      protectMissionIds: liveMissionIds(),
+      ...(dryRun || only === undefined ? {} : { only })
     })
     return {
       ok: true,

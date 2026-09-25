@@ -1,6 +1,7 @@
 import {
   boundedMessageText,
   failureKind,
+  redactText,
   identityValue,
   isObject,
   stringValue,
@@ -52,7 +53,8 @@ export interface AppServerEventNormalizer {
   readonly finalized: boolean;
   accept(notification: AppServerNotification): readonly NormalizedRuntimeEvent[];
   /** Terminal event for a run that ended without the server saying so. */
-  finish(reason: "cancelled" | "transport-lost"): readonly NormalizedRuntimeEvent[];
+  /** `detail`: why the run ended, when the run knows (L1). */
+  finish(reason: "cancelled" | "transport-lost", detail?: string): readonly NormalizedRuntimeEvent[];
 }
 
 function evidence(notification: AppServerNotification): CodexEventEvidence {
@@ -543,13 +545,16 @@ export function createAppServerEventNormalizer(
       }
     },
 
-    finish(reason): readonly NormalizedRuntimeEvent[] {
+    finish(reason, detail): readonly NormalizedRuntimeEvent[] {
       if (finalized) return [];
       finalized = true;
+      // What the run knew about why it ended: a refused handshake, a server
+      // that exited, a timeout. Every one used to read the same sentence (L1).
+      const said = detail === undefined || detail.trim().length === 0 ? undefined : boundedMessageText(detail.trim());
       const process = {
         exitCode: null,
         signal: null,
-        stderr: "",
+        stderr: said === undefined ? "" : redactText(said),
         stderrTruncated: false,
         recordCount: normalizedSequence,
         inputDeliveryFailed: false,
@@ -570,8 +575,11 @@ export function createAppServerEventNormalizer(
       }
       return [
         emit("run.failed", {
-          kind: "process-failed",
-          message: "The runtime connection ended before the turn completed.",
+          kind: said === undefined ? "process-failed" : (() => {
+            const kind = failureKind(said);
+            return kind === "unknown" ? "process-failed" : kind;
+          })(),
+          message: said ?? "The runtime connection ended before the turn completed.",
           ...(runtimeThreadId === undefined ? {} : { runtimeThreadId }),
           runtimeTerminal: "missing",
           process,

@@ -3913,13 +3913,9 @@ if (!ownsSingleInstanceLock) {
         () => [...codexMissions.liveMissionIds(), ...antigravityMissions.liveMissionIds()],
         () => new Date()
       )
-      // Ownership follows the records out, exactly as it does for a single
-      // deletion, so the roster never lists a mission that no longer exists.
-      if (response.ok && !response.data.previewed) {
-        for (const missionId of response.data.deleted) {
-          await teammates.unassignMission(missionId).catch(() => undefined)
-        }
-      }
+      // Ownership is NOT dropped here: pruned missions go to the trash, and a
+      // restore must bring each back to its teammate -- it came back owned by
+      // nobody (L8). Emptying the trash drops the owners, as a single delete's.
       return response
     })
 
