@@ -154,6 +154,13 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
       })
     })
     options.updater.on('error', () => {
+      // An update already on disk stays installable: a check that failed
+      // after the download hid Install and restart with the installer still
+      // there (a B4 lead).
+      if (downloadedVersion !== undefined) {
+        publish({ phase: 'ready', currentVersion: options.currentVersion, availableVersion: downloadedVersion })
+        return
+      }
       // Deliberately not the provider's message: it can carry URLs and paths,
       // and this string is shown in the window. Which step failed IS said:
       // a download that failed after the check found a version is not a
@@ -264,6 +271,10 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
           })
         }
       } catch {
+        // The same rule: what is downloaded can still be installed.
+        if (downloadedVersion !== undefined) {
+          return { ok: true, data: publish({ phase: 'ready', currentVersion: options.currentVersion, availableVersion: downloadedVersion }) }
+        }
         return {
           ok: true,
           data: publish({

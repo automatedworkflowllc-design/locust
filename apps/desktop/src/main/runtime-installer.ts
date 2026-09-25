@@ -115,6 +115,8 @@ export const MAX_OUTPUT_BYTES = 64 * 1024
 const NETWORK = /ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT|network|getaddrinfo/i
 const PROXY = /407|proxy|tunneling socket|ERR_PROXY/i
 const PERMISSION = /EACCES|EPERM|permission denied|operation not permitted/i
+/** On Windows: a file npm must replace is held open by a running program. */
+const IN_USE = /EBUSY|EPERM[^\n]{0,80}\b(?:rename|unlink|rmdir|scandir|open|copyfile)\b/i
 const PACKAGE = /E404|ETARGET|notarget|is not in this registry|No matching version/i
 
 /**
@@ -145,6 +147,16 @@ export function classifyInstallFailure(input: {
       ok: false,
       what: 'npm could not reach the registry.',
       next: "Check this machine's connection and try again."
+    }
+  }
+  // A B4 lead: on Windows this is nearly always a LOCK -- the CLI being
+  // replaced is running -- and the advice below (move npm's prefix) sends a
+  // person to reconfigure npm for nothing.
+  if ((input.platform ?? process.platform) === 'win32' && IN_USE.test(output)) {
+    return {
+      ok: false,
+      what: `A running program is holding ${input.displayName}'s files, so npm could not replace them.`,
+      next: `Close anything using ${input.displayName} -- a terminal running it, or a Locust mission on it -- and try again.`
     }
   }
   if (PERMISSION.test(output)) {

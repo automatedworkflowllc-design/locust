@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import { dirname, sep } from 'node:path'
 
+import { releaseProcessTree } from '@teammate/runtime-adapters'
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 
 import type { RuntimeUpdateStatus, RuntimeUpdateView, RuntimeUpdatesState } from '../shared/ipc.js'
@@ -374,7 +375,14 @@ function capture(command: string, args: readonly string[], timeoutMs: number): P
     const child = spawn(command, [...args], { windowsHide: true, shell: false })
     let out = ''
     const timer = setTimeout(() => {
-      child.kill()
+      // The whole tree on Windows: npm is a .cmd, so the child is cmd.exe,
+      // and killing it alone left a hung `npm view` running (a B4 lead).
+      // Root last: once it is gone, taskkill cannot find the tree by it.
+      if (process.platform === 'win32' && child.pid !== undefined) {
+        void releaseProcessTree(child.pid).catch(() => false).finally(() => child.kill())
+      } else {
+        child.kill()
+      }
       reject(new Error(`${command} took longer than ${String(timeoutMs / 1000)} s`))
     }, timeoutMs)
     child.stdout?.on('data', (chunk: Buffer) => {

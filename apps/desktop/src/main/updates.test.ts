@@ -53,6 +53,23 @@ describe('what the app does about a new version', () => {
     expect(updater.autoInstallOnAppQuit).toBe(true)
   })
 
+  // A B4 lead from the code review, settled: a check that failed AFTER a
+  // download hid Install and restart, with the installer still on disk.
+  it('keeps a downloaded update installable when a later check fails', async () => {
+    let fail = false
+    const updater = fakeUpdater({ checkForUpdates: vi.fn(async () => { if (fail) throw new Error('offline'); return { updateInfo: { version: '0.6.0' }, isUpdateAvailable: true } as never }) })
+    const service = createUpdateService({ updater, currentVersion: '0.5.0', supported: true, liveMissionCount: () => 0, requestQuit: () => undefined })
+    await service.check()
+    updater.listeners.get('update-downloaded')?.({ version: '0.6.0' })
+    expect(service.state().phase).toBe('ready')
+    fail = true
+    await service.check()
+    expect(service.state()).toMatchObject({ phase: 'ready', availableVersion: '0.6.0' })
+    updater.listeners.get('error')?.()
+    expect(service.state().phase).toBe('ready')
+    expect(service.install().ok).toBe(true)
+  })
+
   it('does not install on a quit that is a relaunch (M19)', () => {
     const updater = fakeUpdater()
     const service = createUpdateService({ updater, currentVersion: '0.5.0', supported: true, liveMissionCount: () => 0, requestQuit: () => undefined })
