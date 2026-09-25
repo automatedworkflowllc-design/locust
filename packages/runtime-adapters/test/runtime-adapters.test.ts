@@ -219,7 +219,7 @@ describe("the Auto mode a person switches on", () => {
     expect(copilot.args.join(" ")).not.toContain("--deny-tool");
   });
 
-  it("gives OpenCode --auto, and drops the read-only denials while still stating confinement", () => {
+  it("gives OpenCode --auto, drops the read-only denials, and says it may leave the folder", () => {
     const opencode = createOpenCodeRunCommand(nativeExecutable, {
       workspacePath,
       sandbox: "full-access",
@@ -231,11 +231,22 @@ describe("the Auto mode a person switches on", () => {
     const config = JSON.parse(opencode.env?.OPENCODE_CONFIG_CONTENT ?? "{}");
     expect(config.permission?.edit).toBeUndefined();
     expect(config.permission?.write).toBeUndefined();
-    // What remains is not a restriction on where an Auto run may go -- Auto
-    // has already answered that -- it is the difference between a refusal the
-    // run survives and one that ends it. Left unstated, OpenCode's default
-    // auto-rejects and the process ends without saying it stopped.
-    expect(config.permission?.external_directory).toBe("deny");
+    // And it may leave the folder, stated. This asserted "deny" until
+    // 2026-09-25, on the reading that `--auto` would approve past it; it
+    // approves only what is NOT explicitly denied, so Auto stayed in the
+    // folder. Measured the same day on the free model: "deny" refused an
+    // outside read, "allow" returned the file.
+    expect(config.permission?.external_directory).toBe("allow");
+    // In a worktree too: Auto is the person's answer to where it may go.
+    const inWorktree = createOpenCodeRunCommand(nativeExecutable, {
+      workspacePath,
+      sandbox: "full-access",
+      prompt: "go",
+      repositoryRoot: "C:\\work\\shop",
+    });
+    expect(JSON.parse(inWorktree.env?.OPENCODE_CONFIG_CONTENT ?? "{}")).toEqual({
+      permission: { external_directory: "allow" },
+    });
   });
 
   it("unlocks those two arguments only for a full-access run", () => {

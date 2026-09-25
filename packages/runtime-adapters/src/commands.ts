@@ -1147,6 +1147,28 @@ export const OPENCODE_CONFINED_CONFIG = JSON.stringify({
 });
 
 /**
+ * What an Auto run is told: it may leave the folder, which is what Auto is for.
+ *
+ * Auto used to carry OPENCODE_CONFINED_CONFIG, on the reading that `--auto`
+ * would approve the rest. It does not override an explicit deny -- "auto-
+ * approve permissions that are not explicitly denied" -- so Auto stayed in the
+ * folder (a B4 lead). MEASURED 2026-09-25, opencode `run --auto` on the free
+ * `ling-3.0-flash-fin-free`, asked to read a file outside its folder:
+ *
+ *   external_directory: "deny"   -> "prevents you from using this specific
+ *                                    tool call", the file never read
+ *   external_directory: "allow"  -> the file's contents, verbatim
+ *
+ * Stated rather than left to `--auto`'s default for the same reason the
+ * denial is stated: nothing about where a run may go is left implicit. It
+ * applies in a worktree as well, as danger-full-access does for Codex there --
+ * the person chose Auto for that teammate knowing it may leave its folder.
+ */
+export const OPENCODE_AUTO_CONFIG = JSON.stringify({
+  permission: { external_directory: "allow" },
+});
+
+/**
  * OpenCode in its non-interactive `run` mode.
  *
  * The prompt goes on STDIN. It went in argv until 2026-09-17, on the
@@ -1288,7 +1310,8 @@ export function createOpenCodeRunCommand(
     // itself, so that call is pure cost against a free model's rate limit.
     args.push("--title", "Locust");
   }
-  if (sandboxArgument(options.sandbox) === "full-access") {
+  const auto = sandboxArgument(options.sandbox) === "full-access";
+  if (auto) {
     // "auto-approve permissions that are not explicitly denied" -- opencode
     // run --help, measured 2026-09-06.
     args.push("--auto");
@@ -1298,12 +1321,14 @@ export function createOpenCodeRunCommand(
   // A worktree run needs its parent repository; a read-only one still needs
   // the denials. When both apply the config carries both, because the two
   // used to be written into the same environment variable and the second
-  // would simply have replaced the first.
-  const config = options.repositoryRoot !== undefined
-    ? opencodeWorktreeConfig(options.repositoryRoot, readOnly)
-    : readOnly
-      ? OPENCODE_READ_ONLY_CONFIG
-      : OPENCODE_CONFINED_CONFIG;
+  // would simply have replaced the first. Auto reaches past both.
+  const config = auto
+    ? OPENCODE_AUTO_CONFIG
+    : options.repositoryRoot !== undefined
+      ? opencodeWorktreeConfig(options.repositoryRoot, readOnly)
+      : readOnly
+        ? OPENCODE_READ_ONLY_CONFIG
+        : OPENCODE_CONFINED_CONFIG;
   // A6.2: a read-only run loads no plugins. A repo's .opencode/plugin/*.ts
   // runs in OpenCode's own process, which would put code the repository
   // chose outside everything the permission config holds back

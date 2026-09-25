@@ -61,7 +61,7 @@ const readTarget = async () => {
 }
 
 const modeMenuScript = `(async () => {
-  const control = [...document.querySelectorAll('.lc-control')].find(b => /Ask|Accept edits|Plan|Approve|Auto/.test(b.innerText))
+  const control = [...document.querySelectorAll('.lc-control')].find(b => /^(Ask|Edit|Accept edits|Plan|Approve|Auto)\\b/.test(b.innerText))
   if (!control) return 'no mode control'
   control.click()
   await new Promise(r => setTimeout(r, 400))
@@ -81,9 +81,9 @@ try {
 
   await drive.capture('the control run: Accept edits, asked to write outside the folder', async () => {
     await drive.evaluate(`(async () => {
-      const control = [...document.querySelectorAll('.lc-control')].find(b => /Ask|Accept edits|Plan|Approve/.test(b.innerText))
+      const control = [...document.querySelectorAll('.lc-control')].find(b => /^(Ask|Edit|Accept edits|Plan|Approve)\\b/.test(b.innerText))
       control.click(); await new Promise(r => setTimeout(r, 300))
-      ;[...document.querySelectorAll('[role=menuitemradio]')].find(b => /^Accept edits/.test(b.innerText.trim()))?.click()
+      ;[...document.querySelectorAll('[role=menuitemradio]')].find(b => /^(Edit|Accept edits)\\b/.test(b.innerText.trim()))?.click()
       await new Promise(r => setTimeout(r, 300))
     })()`)
     await drive.evaluate(sendAndWaitScript(`Create a file at ${target} whose only contents are the word READY. Then reply with one sentence saying whether you managed it.`, { waitSeconds: 240 }))
@@ -117,7 +117,7 @@ try {
     await drive.evaluate(pickRouteScript({ group: '/claude/i', search: 'sonnet', row: '/^sonnet/i' }))
     const offered = await drive.evaluate(modeMenuScript)
     const picked = await drive.evaluate(`(async () => {
-      const control = [...document.querySelectorAll('.lc-control')].find(b => /Ask|Accept edits|Plan|Approve|Auto/.test(b.innerText))
+      const control = [...document.querySelectorAll('.lc-control')].find(b => /^(Ask|Edit|Accept edits|Plan|Approve|Auto)\\b/.test(b.innerText))
       control.click(); await new Promise(r => setTimeout(r, 400))
       const auto = [...document.querySelectorAll('[role=menuitemradio]')].find(b => /^Auto\\b/.test(b.innerText.trim()))
       if (!auto) return 'Auto not in the menu'
@@ -151,7 +151,7 @@ try {
     const row = ${teammateRows()}.find(r => /Vale/.test(r.innerText))
     row?.conversation?.click()
     await new Promise(r => setTimeout(r, 900))
-    const control = [...document.querySelectorAll('.lc-control')].find(b => /Ask|Accept edits|Plan|Approve|Auto/.test(b.innerText))
+    const control = [...document.querySelectorAll('.lc-control')].find(b => /^(Ask|Edit|Accept edits|Plan|Approve|Auto)\\b/.test(b.innerText))
     if (!control) return 'no mode control on screen'
     const shown = control.innerText.replace(/[ \\t\\n]+/g, ' ').trim()
     control.click(); await new Promise(r => setTimeout(r, 400))
