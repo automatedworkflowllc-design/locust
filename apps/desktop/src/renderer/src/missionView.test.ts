@@ -1346,6 +1346,30 @@ describe('runtime notices in the thread', () => {
     expect(items.some((item) => item.type === 'diagnostic' && /Reconnecting/.test(item.message))).toBe(true)
   })
 
+  it('shows a rate-limited OpenCode run retrying, before anything has run', () => {
+    // MEASURED 2026-09-25: `opencode run` retrying a 429 said nothing until it
+    // gave up; its log line now arrives as this diagnostic (opencode-events).
+    // Not a timer -- Colin had the timed quiet line removed on 2026-09-13.
+    const retrying = {
+      id: 'd10',
+      runId: 'run_1',
+      missionId: 'mission_1',
+      sequence: 1,
+      type: 'adapter.diagnostic',
+      occurredAt: at,
+      sourceAdapter: 'opencode',
+      payload: {
+        level: 'warning',
+        code: 'opencode.runtime_error',
+        message: `The model's provider answered "Rate limit exceeded", and OpenCode is trying again on its own.`,
+        terminal: false,
+        evidence: { redacted: true }
+      }
+    } as unknown as NormalizedRuntimeEvent
+    const items = buildThread([retrying], { running: true })
+    expect(items.some((item) => item.type === 'diagnostic' && /trying again on its own/.test(item.message))).toBe(true)
+  })
+
   it('shows a notice raised while the work was under way', () => {
     const items = buildThread([step, toolStart('t1', 'shell', 'pnpm test'), notice('d2', 4)], { running: false })
     expect(items.some((item) => item.type === 'diagnostic')).toBe(true)

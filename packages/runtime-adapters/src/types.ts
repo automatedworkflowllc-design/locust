@@ -275,4 +275,13 @@ export interface RuntimeCommandSpec {
    * caller to remember.
    */
   readonly env?: Readonly<Record<string, string>>;
+  /**
+   * Each line the process writes to stderr also joins its records, in order,
+   * as `{"type":"locust.stderr","line":...}`. For a runtime whose only word
+   * about a retry is a log line (OpenCode: MEASURED 2026-09-25, `opencode run`
+   * retrying a rate-limited provider prints nothing on stdout until it gives
+   * up). Lines are bounded and the prompt is redacted from them, as it is
+   * from the stderr kept for the completion.
+   */
+  readonly stderrRecords?: boolean;
 }

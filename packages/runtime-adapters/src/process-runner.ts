@@ -300,6 +300,9 @@ function positiveInteger(value: number | undefined, fallback: number, label: str
   return resolved;
 }
 
+/** One forwarded stderr line, at most. A log line is a sentence, not a payload. */
+const MAX_STDERR_RECORD_CHARS = 2_000;
+
 function appendBounded(
   output: BoundedStderr,
   chunk: Uint8Array | string,
@@ -481,8 +484,10 @@ export function createNodeRuntimeProcessRunner(
       const records = new AsyncRecordQueue(maxQueuedRecords);
       const stderr: BoundedStderr = { chunks: [], keptBytes: 0, totalBytes: 0 };
       const stdoutDecoder = new StringDecoder("utf8");
+      const stderrDecoder = new StringDecoder("utf8");
       const startedAt = now().toISOString();
       let stdoutRemainder = "";
+      let stderrRemainder = "";
       let recordCount = 0;
       let settled = false;
       let cancelled = false;
@@ -796,7 +801,22 @@ export function createNodeRuntimeProcessRunner(
         if (!settled) acceptStdout(stdoutDecoder.write(Buffer.from(chunk)));
       });
       child.stderr.on("data", (chunk) => {
-        if (!settled) appendBounded(stderr, chunk, maxStderrBytes);
+        if (settled) return;
+        appendBounded(stderr, chunk, maxStderrBytes);
+        if (spec.stderrRecords !== true) return;
+        // Whole lines only, each bounded; a line with no end yet waits for
+        // one, and a runaway one is cut rather than held.
+        stderrRemainder += stderrDecoder.write(Buffer.from(chunk));
+        let lineEnd = stderrRemainder.indexOf("\n");
+        while (lineEnd !== -1) {
+          const line = stderrRemainder.slice(0, lineEnd).replace(/\r$/, "");
+          stderrRemainder = stderrRemainder.slice(lineEnd + 1);
+          if (line.trim().length > 0) {
+            emitRecord(JSON.stringify({ type: "locust.stderr", line: redactPrompt(line, prompt).slice(0, MAX_STDERR_RECORD_CHARS) }));
+          }
+          lineEnd = stderrRemainder.indexOf("\n");
+        }
+        if (stderrRemainder.length > MAX_STDERR_RECORD_CHARS) stderrRemainder = "";
       });
       child.once("error", () => fail("Runtime process failed to start"));
       child.once("close", finish);

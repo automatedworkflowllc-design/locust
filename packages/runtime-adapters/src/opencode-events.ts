@@ -257,6 +257,8 @@ export function createOpenCodeEventNormalizer(
   // recovered once a compaction came after it AND the run then stopped on its
   // own; the exit code, which says 1 for any error seen, cannot tell.
   let overflow: "none" | "waiting" | "compacted" | "recovered" = "none";
+  /** The retry errors already said, so a run retrying one rate limit says it once. */
+  const retriesSaid = new Set<string>();
   // The messages of the step now open and whether it called a tool, and the
   // same for the step that last finished. A compaction's summary is the text
   // of the step just before OpenCode's continue note, and that step has no
@@ -459,6 +461,27 @@ export function createOpenCodeEventNormalizer(
           evidence,
         }),
       ];
+    }
+
+    // OpenCode's own log, forwarded from stderr (commands.ts, `--print-logs`).
+    // Only one line in it is news: a request to the model that failed and is
+    // being tried again. Said once per distinct error, so nine retries of the
+    // same rate limit are one line; everything else in the log is ignored.
+    if (type === "locust.stderr") {
+      const line = stringValue(parsed.line) ?? "";
+      if (!/message="stream error"/.test(line) || !/(?:^|\s)agent=build(?:\s|$)/.test(line)) return [];
+      const said = /error\.error="([^"]{1,300})"/.exec(line)?.[1]?.replace(/^AI_[A-Za-z]+Error:\s*/, "").trim();
+      const key = said ?? "";
+      if (retriesSaid.has(key)) return [];
+      retriesSaid.add(key);
+      return [diagnostic(
+        "warning",
+        "opencode.runtime_error",
+        said === undefined || said.length === 0
+          ? "OpenCode's request to the model failed, and OpenCode is trying again on its own."
+          : `The model's provider answered "${said}", and OpenCode is trying again on its own.`,
+        evidence,
+      )];
     }
 
     // OpenCode says why it is about to die. Until 2026-09-07 this fell through

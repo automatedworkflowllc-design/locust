@@ -1071,7 +1071,7 @@ describe("OpenCode and Copilot CLI commands", () => {
     expect(spec.stdin).toBe("prompt");
     // A new session is titled, so OpenCode does not spend a second model
     // call naming it (A6.3).
-    expect(spec.args).toEqual(["run", "--format", "json", "--title", "Locust"]);
+    expect(spec.args).toEqual(["run", "--format", "json", "--print-logs", "--log-level", "ERROR", "--title", "Locust"]);
     expect(spec.args).not.toContain(PROMPT);
     // There is no read-only FLAG. Measured, this environment value is the
     // only thing that stops a run editing files -- with it, the write tool is
@@ -1102,7 +1102,7 @@ describe("OpenCode and Copilot CLI commands", () => {
 
   it("titles only a NEW OpenCode session, and keeps plugins for a run that may edit", () => {
     const resumed = createOpenCodeRunCommand(openCode, { workspacePath, prompt: PROMPT, resumeThreadId: "ses_abc" });
-    expect(resumed.args).toEqual(["run", "--format", "json", "-s", "ses_abc"]);
+    expect(resumed.args).toEqual(["run", "--format", "json", "--print-logs", "--log-level", "ERROR", "-s", "ses_abc"]);
     const editing = createOpenCodeRunCommand(openCode, { workspacePath, prompt: PROMPT, sandbox: "workspace-write" });
     expect(editing.env?.OPENCODE_PURE).toBeUndefined();
   });
@@ -1236,7 +1236,7 @@ describe("OpenCode and Copilot CLI commands", () => {
       permission: { external_directory: "deny" },
     });
     // Confinement is stated; nothing about editing inside the folder changed.
-    expect(spec.args).toEqual(["run", "--format", "json", "-m", "opencode/big-pickle", "-s", "ses_1"]);
+    expect(spec.args).toEqual(["run", "--format", "json", "--print-logs", "--log-level", "ERROR", "-m", "opencode/big-pickle", "-s", "ses_1"]);
     // `--auto` buys nothing: measured, `run` edits files without it.
     expect(spec.args).not.toContain("--auto");
     // Plan mode is narration, not enforcement, so it is never the read-only
@@ -1273,7 +1273,7 @@ describe("OpenCode and Copilot CLI commands", () => {
     // model lists its variants in `models --verbose`, and `--variant high`
     // reasoned more than `--variant low` in four runs of four on the free Ling.
     const spec = createOpenCodeRunCommand(openCode, { workspacePath, prompt: PROMPT, model: "opencode/ling-3.0-flash-fin-free", effort: "high" });
-    expect(spec.args).toEqual(["run", "--format", "json", "-m", "opencode/ling-3.0-flash-fin-free", "--variant", "high", "--title", "Locust"]);
+    expect(spec.args).toEqual(["run", "--format", "json", "--print-logs", "--log-level", "ERROR", "-m", "opencode/ling-3.0-flash-fin-free", "--variant", "high", "--title", "Locust"]);
     // OpenCode accepts ANY name and ignores one it does not know, so a word
     // that is not an effort is refused here rather than shown as applied.
     expect(() => createOpenCodeRunCommand(openCode, { workspacePath, prompt: PROMPT, effort: "bogus" })).toThrow(/effort level called "bogus"/);

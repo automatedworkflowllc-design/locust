@@ -312,6 +312,7 @@ interface SpecTransport {
   /** What the mission was allowed, so the guard can judge the argv it is given. */
   readonly sandbox?: MissionSandbox;
   readonly env?: Readonly<Record<string, string>>;
+  readonly stderrRecords?: boolean;
 }
 
 function baseSpec(
@@ -335,6 +336,7 @@ function baseSpec(
     ...(executable.env === undefined && transport.env === undefined
       ? {}
       : { env: { ...executable.env, ...transport.env } }),
+    ...(transport.stderrRecords === true ? { stderrRecords: true } : {}),
   };
   assertSafeRuntimeCommand(spec, transport.sandbox);
   return spec;
@@ -1349,7 +1351,16 @@ export function createOpenCodeRunCommand(
   executable: ExecutableLaunch,
   options: RuntimeCommandOptions,
 ): RuntimeCommandSpec {
-  const args = ["run", "--format", "json"];
+  // `--print-logs --log-level ERROR`: the one place OpenCode says it is
+  // retrying. MEASURED 2026-09-25 against a local provider answering 429:
+  // `run` retried nine times over twelve seconds with nothing on stdout or
+  // stderr, then printed an `error` record and exited 1 -- and a real free
+  // model's longer retry-after is a run that reads "Starting" for minutes.
+  // At ERROR each attempt is one stderr line, `message="stream error" ...
+  // agent=build ... error.error="AI_APICallError: Rate limit exceeded"`, which
+  // the spec forwards as records (stderrRecords). ERROR only: WARN names
+  // every duplicate skill on the machine.
+  const args = ["run", "--format", "json", "--print-logs", "--log-level", "ERROR"];
   if (options.model !== undefined) {
     args.push("-m", requireText(options.model, "Model"));
   }
@@ -1405,6 +1416,7 @@ export function createOpenCodeRunCommand(
     stdin: "prompt",
     sandbox: sandboxArgument(options.sandbox),
     ...(Object.keys(env).length === 0 ? {} : { env }),
+    stderrRecords: true,
   });
 }
 
