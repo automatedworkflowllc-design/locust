@@ -79,6 +79,15 @@ export interface UpdateService {
   install(): AppUpdateResponse
   /** Change lanes; the next check takes the new one. */
   setEveryBuild(everyBuild: boolean): AppUpdateState
+  /**
+   * M19 (the code review): the next quit is a RELAUNCH, so it must not
+   * install. A downloaded update installs on quit, silently -- and a silent
+   * install starts nothing and stops every Locust running from the install
+   * folder, including the one the relaunch has just started. Switching
+   * folders then closed the app for good. The update stays downloaded; the
+   * relaunched app installs it on its own next quit, or on Install.
+   */
+  holdInstallForRelaunch(): void
 }
 
 /** `a` is a later version than `b`, by major.minor.patch; unreadable is never later. */
@@ -264,6 +273,12 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
           })
         }
       }
+    },
+
+    holdInstallForRelaunch(): void {
+      // Read by electron-updater at the quit itself, not when the handler
+      // was added, so turning it off here is enough (BaseUpdater.addQuitHandler).
+      options.updater.autoInstallOnAppQuit = false
     },
 
     install(): AppUpdateResponse {

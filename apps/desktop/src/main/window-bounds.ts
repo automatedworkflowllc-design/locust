@@ -1,4 +1,4 @@
-import { MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH, openingSize } from './window-size.js'
+import { minimumSize, openingSize } from './window-size.js'
 
 /**
  * Where the window opens, remembered between launches.
@@ -33,6 +33,9 @@ export interface OpeningPlacement {
   readonly x: number | undefined
   readonly y: number | undefined
   readonly maximized: boolean
+  /** The window's own minimum, for the work area it opens on (M21). */
+  readonly minWidth: number
+  readonly minHeight: number
 }
 
 /**
@@ -88,20 +91,23 @@ export function openingPlacement(
 ): OpeningPlacement {
   const fallback = openingSize(primaryWork)
   if (!saved) {
-    return { width: fallback.width, height: fallback.height, x: undefined, y: undefined, maximized: false }
+    const floor = minimumSize(primaryWork)
+    return { width: fallback.width, height: fallback.height, x: undefined, y: undefined, maximized: false, minWidth: floor.width, minHeight: floor.height }
   }
 
   const home = displays.find((display) => overlaps(saved, display))
   const bound = home ?? { x: 0, y: 0, width: primaryWork.width, height: primaryWork.height }
-  const width = Math.max(MIN_WINDOW_WIDTH, Math.min(saved.width, bound.width))
-  const height = Math.max(MIN_WINDOW_HEIGHT, Math.min(saved.height, bound.height))
+  // The layout's minimum, unless the work area is smaller than it (M21).
+  const floor = minimumSize(bound)
+  const width = Math.max(floor.width, Math.min(saved.width, bound.width))
+  const height = Math.max(floor.height, Math.min(saved.height, bound.height))
 
   // No display owns the saved position: the monitor it was on is gone. Keep
   // the size the person chose and let the caller center it, rather than
   // opening off the edge of every screen.
   if (!home) {
-    return { width, height, x: undefined, y: undefined, maximized: saved.maximized }
+    return { width, height, x: undefined, y: undefined, maximized: saved.maximized, minWidth: floor.width, minHeight: floor.height }
   }
 
-  return { width, height, x: saved.x, y: saved.y, maximized: saved.maximized }
+  return { width, height, x: saved.x, y: saved.y, maximized: saved.maximized, minWidth: floor.width, minHeight: floor.height }
 }

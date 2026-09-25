@@ -53,6 +53,18 @@ describe('what the app does about a new version', () => {
     expect(updater.autoInstallOnAppQuit).toBe(true)
   })
 
+  it('does not install on a quit that is a relaunch (M19)', () => {
+    const updater = fakeUpdater()
+    const service = createUpdateService({ updater, currentVersion: '0.5.0', supported: true, liveMissionCount: () => 0, requestQuit: () => undefined })
+    updater.listeners.get('update-downloaded')?.({ version: '0.6.0' })
+    service.holdInstallForRelaunch()
+    // electron-updater reads this when the app quits; off, the silent install
+    // that would stop the relaunched app never starts.
+    expect(updater.autoInstallOnAppQuit).toBe(false)
+    expect(updater.installs).toEqual([])
+    expect(service.state().phase).toBe('ready')
+  })
+
   it('refuses to install while a mission is running, and says why', () => {
     const updater = fakeUpdater({
       checkForUpdates: async () => ({ updateInfo: { version: '0.6.0' } })

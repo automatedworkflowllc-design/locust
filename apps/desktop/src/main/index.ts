@@ -1,6 +1,5 @@
 // H1: first, before any import can spawn -- no bare name is found in its working folder.
 import './no-planted-executables.js'
-import { MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH } from './window-size.js'
 import { startAppServerProcess } from './app-server-process.js'
 import { APP_USER_MODEL_ID, DEVELOPMENT_APP_USER_MODEL_ID, mayShowToasts, sweepStaleElectronShortcuts } from './stale-shortcut.js'
 import { openingPlacement, readSavedWindow } from './window-bounds.js'
@@ -868,8 +867,9 @@ const createWindow = (
     width: opening.width,
     height: opening.height,
     ...(opening.x === undefined || opening.y === undefined ? {} : { x: opening.x, y: opening.y }),
-    minWidth: MIN_WINDOW_WIDTH,
-    minHeight: MIN_WINDOW_HEIGHT,
+    // The layout's minimum, or the work area when that is smaller (M21).
+    minWidth: opening.minWidth,
+    minHeight: opening.minHeight,
     center: opening.x === undefined,
     show: false,
     frame: false,
@@ -2510,7 +2510,10 @@ if (!ownsSingleInstanceLock) {
       // Reopen there. Every service bound its folder at start-up and the
       // mission list is scoped by it, so the honest switch is a fresh start;
       // before-quit still runs, so live runs are stopped and the ledger is
-      // flushed on the way out.
+      // flushed on the way out. And a downloaded update is NOT installed on
+      // this quit: that install is silent, starts nothing, and stops the
+      // relaunched app with the rest (M19).
+      updates.holdInstallForRelaunch()
       app.relaunch({
         args: [...process.argv.slice(1).filter((entry) => !entry.startsWith(WORKSPACE_ARGUMENT)), `${WORKSPACE_ARGUMENT}${next}`]
       })

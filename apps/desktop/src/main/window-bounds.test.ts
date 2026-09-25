@@ -18,7 +18,7 @@ describe('what the window opens with', () => {
   it('reopens where and how the person left it', () => {
     const saved = { x: 220, y: 90, width: 1500, height: 900, maximized: false }
     const placement = openingPlacement(saved, [LAPTOP], WORK)
-    expect(placement).toEqual({ x: 220, y: 90, width: 1500, height: 900, maximized: false })
+    expect(placement).toEqual({ x: 220, y: 90, width: 1500, height: 900, maximized: false, minWidth: 1120, minHeight: 720 })
   })
 
   it('keeps a saved size larger than the default opening size', () => {
@@ -63,6 +63,14 @@ describe('what the window opens with', () => {
     const placement = openingPlacement(saved, [LAPTOP], WORK)
     expect(placement.width).toBe(1120)
     expect(placement.height).toBe(720)
+  })
+
+  it('never restores taller than a work area smaller than the minimum (M21)', () => {
+    const small = { x: 0, y: 0, width: 1280, height: 672 }
+    const saved = { x: 0, y: 0, width: 1120, height: 650, maximized: false }
+    const placement = openingPlacement(saved, [small], { width: 1280, height: 672 })
+    expect(placement.height).toBe(672)
+    expect(placement.minHeight).toBe(672)
   })
 
   it('never restores taller than the display it lands on', () => {
