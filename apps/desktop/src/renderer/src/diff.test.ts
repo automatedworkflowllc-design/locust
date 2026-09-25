@@ -164,3 +164,50 @@ describe('marking only what changed on a line', () => {
     expect(unpaired.every((row) => !spans.has(row))).toBe(true)
   })
 })
+
+/*
+ * M22 (the code review): a content line beginning `--- ` or `+++ ` inside a
+ * hunk was read as a new file's header. Deleting a SQL comment split the file
+ * and made a phantom one; adding `++ world` renamed the file. The approval
+ * card draws this parser, so a person was asked to approve a change whose
+ * diff showed nothing changing.
+ */
+describe('a line inside a hunk that looks like a header', () => {
+  const NL = String.fromCharCode(10)
+  it('keeps a removed SQL comment as a removed line', () => {
+    const text = [
+      '--- a/db/schema.sql',
+      '+++ b/db/schema.sql',
+      '@@ -1,3 +1,3 @@',
+      ' CREATE TABLE t (',
+      '--- legacy column, remove me',
+      '+  id INTEGER',
+      ' );'
+    ].join(NL)
+    const files = parseUnifiedDiff(text)
+    expect(files).toHaveLength(1)
+    expect(files[0]?.path).toBe('db/schema.sql')
+    expect(files[0]?.status).toBe('MODIFIED')
+    expect(fileCounts(files[0]!)).toEqual({ added: 1, removed: 1 })
+    expect(files[0]?.hunks[0]?.rows.map((row) => row.kind)).toEqual(['context', 'del', 'add', 'context'])
+    expect(files[0]?.hunks[0]?.rows[1]?.text).toBe('-- legacy column, remove me')
+  })
+
+  it('keeps an added line beginning ++ as an added line, not a rename', () => {
+    const text = ['--- a/notes.txt', '+++ b/notes.txt', '@@ -1 +1,2 @@', ' hello', '+++ world'].join(NL)
+    const files = parseUnifiedDiff(text)
+    expect(files).toEqual([expect.objectContaining({ path: 'notes.txt', status: 'MODIFIED' })])
+    expect(fileCounts(files[0]!)).toEqual({ added: 1, removed: 0 })
+  })
+
+  it('still starts the next file once a hunk is used up', () => {
+    const text = [
+      '--- a/one.sql', '+++ b/one.sql', '@@ -1 +1 @@', '--- old', '+-- new',
+      '--- a/two.txt', '+++ b/two.txt', '@@ -1 +1 @@', '-a', '+b'
+    ].join(NL)
+    expect(parseUnifiedDiff(text).map((file) => [file.path, fileCounts(file)])).toEqual([
+      ['one.sql', { added: 1, removed: 1 }],
+      ['two.txt', { added: 1, removed: 1 }]
+    ])
+  })
+})

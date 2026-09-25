@@ -58,7 +58,8 @@ export function parseUnifiedDiff(text: string): readonly DiffFile[] {
   let oldPath: string | undefined
   let newPath: string | undefined
   let hunks: DiffHunk[] = []
-  let current: { header: DiffHunk; rows: DiffRow[]; oldNo: number; newNo: number } | undefined
+  // `oldLeft` / `newLeft`: the lines the hunk's header says are still to come.
+  let current: { header: DiffHunk; rows: DiffRow[]; oldNo: number; newNo: number; oldLeft: number; newLeft: number } | undefined
 
   const closeHunk = (): void => {
     if (current === undefined) return
@@ -84,6 +85,35 @@ export function parseUnifiedDiff(text: string): readonly DiffFile[] {
   }
 
   for (const line of text.split('\n')) {
+    /*
+     * Inside a hunk that still expects lines, a line is a ROW, whatever it
+     * begins with. M22 (the code review): `--- legacy column` -- a removed
+     * SQL comment -- was read as the next file's header, which split the
+     * file and made a phantom one, and an added `++ world` renamed it. The
+     * header's counts say where the hunk ends, so they decide.
+     */
+    if (current !== undefined && (current.oldLeft > 0 || current.newLeft > 0)) {
+      if (line.startsWith('+') && current.newLeft > 0) {
+        current.rows.push({ kind: 'add', newNo: current.newNo, text: line.slice(1) })
+        current.newNo += 1
+        current.newLeft -= 1
+        continue
+      }
+      if (line.startsWith('-') && current.oldLeft > 0) {
+        current.rows.push({ kind: 'del', oldNo: current.oldNo, text: line.slice(1) })
+        current.oldNo += 1
+        current.oldLeft -= 1
+        continue
+      }
+      if (line.startsWith(' ') && current.oldLeft > 0 && current.newLeft > 0) {
+        current.rows.push({ kind: 'context', oldNo: current.oldNo, newNo: current.newNo, text: line.slice(1) })
+        current.oldNo += 1
+        current.newNo += 1
+        current.oldLeft -= 1
+        current.newLeft -= 1
+        continue
+      }
+    }
     if (line.startsWith('--- ')) {
       // A new file starts at its `---` header, unless this is the first.
       if (oldPath !== undefined || hunks.length > 0) closeFile()
@@ -114,7 +144,9 @@ export function parseUnifiedDiff(text: string): readonly DiffFile[] {
         },
         rows: [],
         oldNo: oldStart,
-        newNo: newStart
+        newNo: newStart,
+        oldLeft: match[2] === undefined ? 1 : Number(match[2]),
+        newLeft: match[4] === undefined ? 1 : Number(match[4])
       }
       continue
     }
