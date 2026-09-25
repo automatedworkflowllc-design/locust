@@ -246,7 +246,8 @@ export interface ComposerProps {
   readonly queuedCount?: number
   /** Why a queued message has not gone yet, when it is not simply still running. */
   readonly queuedNote: string | undefined
-  readonly onQueue: (text: string) => void
+  /** With the files attached to it, which ride on the row and go when it goes (L20). */
+  readonly onQueue: (text: string, attachments: readonly string[]) => void
   readonly onUnqueue: () => void
   readonly onSendQueued: () => void
   /** The queued message belongs to a conversation that is NOT the one on screen. */
@@ -597,8 +598,12 @@ export function Composer({
     const prompt = value.trim()
     if (prompt.length === 0) return
     if (canQueue) {
-      onQueue(prompt)
+      // With its files, and the tiles cleared, as a send does. L20 (the code
+      // review): the queued row dropped them, and the tiles then rode along
+      // on the next, unrelated message.
+      onQueue(prompt, attached)
       setValue('')
+      setAttached([])
       return
     }
     if (!canStart) {

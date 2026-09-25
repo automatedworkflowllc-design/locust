@@ -798,8 +798,23 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
       return serialize(async () => (await read()).settings)
     },
 
-    writeSettings(settings: unknown): Promise<WorkspaceSettings> {
+    writeSettings(requested: unknown): Promise<WorkspaceSettings> {
       return serialize(async () => {
+        /*
+         * A write is a CHANGE, laid over what is stored. L19 (the code
+         * review): it replaced the whole object, so every caller had to send
+         * every field -- and the ones that did not reset the rest: choosing
+         * Auto reset the layout and the boot screen, and every other switch
+         * reset the send button's metal. A field the request leaves out is
+         * kept. Only what it sends is read, by the same rules as before, so a
+         * malformed message still cannot turn anything on.
+         */
+        const stored = await read()
+        const incoming = typeof requested === 'object' && requested !== null ? (requested as Record<string, unknown>) : {}
+        const settings: Record<string, unknown> = {
+          ...((stored.settings ?? {}) as unknown as Record<string, unknown>),
+          ...Object.fromEntries(Object.entries(incoming).filter(([, value]) => value !== undefined))
+        }
         // Only a literal true turns it on. Anything else -- absent, a string,
         // a truthy object -- is off, so a malformed message cannot enable a
         // workspace-wide setting.
@@ -843,8 +858,7 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
             ? parsedReplySize((settings as Record<string, unknown>).replySize)
             : 'standard'
         }
-        const file = await read()
-        await write({ ...file, settings: next })
+        await write({ ...stored, settings: next })
         return next
       })
     }

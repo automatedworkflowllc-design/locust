@@ -412,11 +412,19 @@ export function teammateStatusView(input: {
     // Same distinction, for the teammate's OWN runtime: absent is not
     // unsigned. `installed` is the runtime's own answer, so this needs
     // nothing passed in.
+    // And not answering is not signed out (L18): an installed runtime whose
+    // probe timed out or could not be reached is asked again, as Settings
+    // says -- telling the person to sign in sends them to fix nothing.
+    const notAnswering = input.runtime.installed && (input.runtime.status === 'probe-failed' || input.runtime.status === 'offline')
     return {
       status: 'blocked',
       activity,
-      label: input.runtime.installed ? 'Runtime sign-in required' : 'Runtime not installed',
-      tone: 'red',
+      label: !input.runtime.installed
+        ? 'Runtime not installed'
+        : notAnswering
+          ? 'Runtime not answering — checking again'
+          : 'Runtime sign-in required',
+      tone: notAnswering ? 'amber' : 'red',
       pulse: false
     }
   }

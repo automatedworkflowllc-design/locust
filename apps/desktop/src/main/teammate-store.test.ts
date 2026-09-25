@@ -370,6 +370,19 @@ describe('workspace settings', () => {
     expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full', replySize: 'standard', metal: 'silver', metalStrength: 'standard', metalMotion: 'hover', metalBend: false })
   })
 
+  // L19 (the code review): a write replaced the whole settings object, so a
+  // caller that left fields out reset them -- choosing Auto reset the layout
+  // and every switch reset the send button's metal.
+  it('keeps what a write leaves out', async () => {
+    const { store: teammates } = await store()
+    await teammates.writeSettings({ layout: 'wide', tube: 'subtle', metal: 'gold', metalStrength: 'strong' })
+    await teammates.writeSettings({ autoMode: true })
+    expect(await teammates.readSettings()).toMatchObject({ autoMode: true, layout: 'wide', tube: 'subtle', metal: 'gold', metalStrength: 'strong' })
+    // And a malformed field is still read as the old rules read it.
+    await teammates.writeSettings({ autoMode: 'yes' })
+    expect((await teammates.readSettings()).autoMode).toBe(false)
+  })
+
   it('defaults swarm off and persists a change', async () => {
     const { root, store: teammates } = await store()
     expect(await teammates.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full', replySize: 'standard', metal: 'silver', metalStrength: 'standard', metalMotion: 'hover', metalBend: false })

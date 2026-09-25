@@ -129,7 +129,7 @@ import { isStoppable, stopPress } from './stopPress.js'
 import { isLayoutPreference, resolveLayout } from './layout.js'
 import { decisionReply } from '../../shared/decision.js'
 import { installCommand } from '../../shared/runtime-install.js'
-import { splitAttachments } from '../../shared/attachments.js'
+import { splitAttachments, withAttachments } from '../../shared/attachments.js'
 // Only `heldFor`: this file has its own `ownerOf` for live runs, which is a
 // different question from who owns a recorded mission.
 import { heldFor, routineOf } from './conversationList.js'
@@ -4031,7 +4031,8 @@ export default function App(): ReactElement {
     // merge stays queued and takes its own turn, and every other
     // conversation's rows stay where they are.
     setQueued(rest)
-    void startMission(going.text, undefined, { requeue: going })
+    // With its files (L20): the row carried them; nothing put them back.
+    void startMission(withAttachments(going.text, going.attachments ?? []), undefined, { requeue: going })
     return undefined
   }, [queued, front, shownKey, verdict?.kind, queueClock])
 
@@ -5916,7 +5917,7 @@ export default function App(): ReactElement {
               // same answer the composer just showed.
               setAutoMode(true)
               void window.desktop
-                ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode: true, askConnectors, keepATodoList, replySize, layout: 'auto', tube: 'full' })
+                ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode: true, askConnectors, keepATodoList, replySize, layout, tube })
                 .then((settings) => setAutoMode(settings.autoMode === true))
                 .catch(() => setAutoMode(false))
             }}
@@ -6015,14 +6016,14 @@ export default function App(): ReactElement {
             queuedCount={waitingHere.length}
             queuedNote={queuedNote}
             queuedElsewhere={queueKey !== shownKey}
-            onQueue={(text) => {
+            onQueue={(text, attachments) => {
               // Into the conversation the box shows the queue of (queueKey):
               // the live run on screen, else the addressed teammate's busy run.
               const key = queueKey
               if (key !== undefined) {
                 setQueued((rows) => [
                   ...rows,
-                  { id: `q_${String(rows.length)}_${key}`, key, text, origin: 'person' as const, ...(waitForKey === undefined ? {} : { waitFor: waitForKey }) }
+                  { id: `q_${String(rows.length)}_${key}`, key, text, origin: 'person' as const, ...(attachments.length === 0 ? {} : { attachments }), ...(waitForKey === undefined ? {} : { waitFor: waitForKey }) }
                 ])
               }
             }}
@@ -6031,7 +6032,7 @@ export default function App(): ReactElement {
               if (queueKey === undefined) return
               const { going, rest } = takeNext(queued, queueKey)
               setQueued(rest)
-              if (going !== undefined) void startMission(going.text, undefined, { requeue: going })
+              if (going !== undefined) void startMission(withAttachments(going.text, going.attachments ?? []), undefined, { requeue: going })
             }}
           />
           )}

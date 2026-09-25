@@ -122,3 +122,26 @@ describe('a teammate that has never run', () => {
     expect(view.status).toBe('blocked')
   })
 })
+
+/*
+ * L18 (the code review): an installed runtime that had not answered its
+ * probe yet -- Claude Code's first version probe can outlast the window on a
+ * cold start -- was labelled "Runtime sign-in required", an instruction to
+ * do something nobody needed to do. Settings already says CHECKING.
+ */
+describe('a teammate whose runtime has not answered yet', () => {
+  const base = { hasRunningMission: false, pendingApprovals: 0, roleLabel: 'Code & Migrations', anyRuntimeUsable: true, anyRuntimeInstalled: true }
+  it('is not told to sign in', () => {
+    for (const status of ['probe-failed', 'offline']) {
+      const runtime = { id: 'claude', ready: false, installed: true, auth: 'unknown', status } as unknown as Parameters<typeof teammateStatusView>[0]['runtime']
+      const view = teammateStatusView({ ...base, runtime })
+      expect(view.label, status).not.toMatch(/sign-in/i)
+      expect(view.label, status).toMatch(/not answering/i)
+    }
+  })
+
+  it('still is, when the runtime says it is signed out', () => {
+    const runtime = { id: 'claude', ready: false, installed: true, auth: 'unauthenticated', status: 'auth-required' } as unknown as Parameters<typeof teammateStatusView>[0]['runtime']
+    expect(teammateStatusView({ ...base, runtime }).label).toBe('Runtime sign-in required')
+  })
+})
