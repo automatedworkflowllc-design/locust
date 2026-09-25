@@ -2001,7 +2001,8 @@ if (!ownsSingleInstanceLock) {
           input.prompt,
           input.runtime,
           input.mode,
-          input.model === undefined ? {} : { model: input.model },
+          // M10: the effort as well as the model, which this used to drop.
+          { ...(input.model === undefined ? {} : { model: input.model }), ...(input.effort === undefined ? {} : { effort: input.effort }) },
           sendToWindow,
           undefined,
           input.peer,
@@ -3302,7 +3303,8 @@ if (!ownsSingleInstanceLock) {
         briefed,
         route.runtime,
         route.mode,
-        route.model === 'account-default' ? {} : { model: route.model },
+        // M10: the teammate's saved effort too, as a direct message runs them.
+        { ...(route.model === 'account-default' ? {} : { model: route.model }), ...(route.effort === undefined ? {} : { effort: route.effort }) },
         sendToWindow,
         undefined,
         peer,

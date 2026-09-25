@@ -432,6 +432,8 @@ export interface RelayOptions {
     readonly runtime: MissionRuntimeId
     readonly mode: MissionMode
     readonly model: string | undefined
+    /** The recipient's own saved effort; a borrowed route borrows none (M10). */
+    readonly effort?: string
     readonly peer: MissionPeerContext
     readonly followUpOf: string | undefined
     readonly relay: RelayOrigin
@@ -867,6 +869,8 @@ export function createRelay(options: RelayOptions): Relay {
         runtime: route.runtime,
         mode: route.mode,
         model: route.model === 'account-default' ? undefined : route.model,
+        // M10: the effort they were saved at, as a direct message runs them.
+        ...(own?.effort === undefined ? {} : { effort: own.effort }),
         peer: recipient,
         followUpOf,
         relay: input.origin

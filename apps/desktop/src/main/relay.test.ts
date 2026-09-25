@@ -377,6 +377,21 @@ describe('relaying a share', () => {
     expect(starts[0]).toMatchObject({ runtime: 'codex', model: undefined })
   })
 
+  // M10 (the code review): a relayed reply ran at the runtime's default
+  // effort, whatever the teammate was saved at -- the model was passed and
+  // the effort was not.
+  it("a reply runs at the recipient's own saved effort", async () => {
+    const { relay, starts } = harness({ booty: { self: { ...BOOTY, route: { runtime: 'codex', model: 'gpt-5.5', mode: 'ask', effort: 'high' } }, others: [WREN] } })
+    await relay.onShared(sharing(), [message(BOOTY)])
+    expect(starts[0]).toMatchObject({ runtime: 'codex', model: 'gpt-5.5', effort: 'high' })
+  })
+
+  it("a borrowed route borrows no effort", async () => {
+    const { relay, starts } = harness({ booty: { self: { ...BOOTY }, others: [WREN] } })
+    await relay.onShared(sharing(), [message(BOOTY)])
+    expect(starts[0]?.effort).toBeUndefined()
+  })
+
   it("the reply back follows up the mission that asked, so it lands in that thread", async () => {
     const { relay, starts } = harness()
     const bootyRun = sharing({
