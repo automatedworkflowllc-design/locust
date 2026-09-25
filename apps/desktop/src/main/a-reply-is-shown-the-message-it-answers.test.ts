@@ -91,7 +91,7 @@ describe('the waiting messages a run is shown', () => {
     const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({ records: stream, completion: Promise.resolve(completion) }))
     const ledger = {
       createMission: async () => undefined, appendEvents: async () => undefined, appendHostFailure: async () => undefined,
-      createCheckpoint: async () => { throw new Error('not used') }, appendPeerLinks: async () => undefined,
+      createCheckpoint: async () => { throw new Error('not used') }, appendPeerLinks: async () => undefined, appendEditCheck: async () => undefined,
       deleteMission: async () => true, listTrashedMissions: async () => [], restoreMission: async () => true, emptyTrash: async () => 0,
       storageReport: async () => ({ missionCount: 0, byteTotal: 0, unreadableCount: 0 }),
       pruneMissions: async () => ({ deleted: [], failed: [], unreadable: [], keptForContinuity: [], keptAsRunning: [] }),

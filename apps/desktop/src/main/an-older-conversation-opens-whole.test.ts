@@ -26,6 +26,7 @@ function recovered(missionId: string): RecoveredMission {
     hostFailures: [],
     checkpoints: [],
     peerLinks: [],
+    editChecks: [],
     phase: 'completed',
     lastUpdatedAt: NOW
   } as unknown as RecoveredMission

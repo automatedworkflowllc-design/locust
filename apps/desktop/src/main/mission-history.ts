@@ -185,6 +185,18 @@ export function publicRecoveredMission(
       }))
     })),
     peerMessages: publicPeerMessages(mission, workroomMessages),
+    // Copied field by field, like everything else that leaves for the window.
+    ...(mission.editChecks.at(-1) === undefined
+      ? {}
+      : {
+          editCheck: {
+            command: mission.editChecks.at(-1)!.command,
+            outcome: mission.editChecks.at(-1)!.outcome,
+            newLines: mission.editChecks.at(-1)!.newLines,
+            unchanged: mission.editChecks.at(-1)!.unchanged,
+            first: mission.editChecks.at(-1)!.first
+          }
+        }),
     ...(mission.metadata.continuesFrom === undefined
       ? {}
       : {

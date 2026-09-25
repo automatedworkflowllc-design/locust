@@ -2104,6 +2104,17 @@ export interface PublicRecoveredMission {
   /** Workroom messages this mission received or posted, in ledger order. */
   readonly peerMessages: readonly PublicPeerMessage[]
   /**
+   * A3.3: what the person's check said after this turn, the newest one. Absent
+   * when no check ran, or on a mission recorded before schema 17.
+   */
+  readonly editCheck?: {
+    readonly command: string
+    readonly outcome: 'passed' | 'failed' | 'timed-out' | 'could-not-run'
+    readonly newLines: readonly string[]
+    readonly unchanged: boolean
+    readonly first: boolean
+  }
+  /**
    * Set when this mission continued another after a route switch. The
    * renderer uses it to draw the pair as one thread under a divider -- and to
    * show the ROOT mission's prompt, because this mission's own recorded prompt

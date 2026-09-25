@@ -123,10 +123,10 @@ describe('ledger schema versions', () => {
 
     const header = JSON.parse((await readFile(join(root, 'mission_1.jsonl'), 'utf8')).split('\n')[0] ?? '{}')
 
-    // v16 added Muse Code to the runtimes a mission may record.
-    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(16)
-    expect(header.schemaVersion).toBe(16)
-    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
+    // v17 added the person's check result after a turn (mission.edit_check).
+    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(17)
+    expect(header.schemaVersion).toBe(17)
+    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17])
     /*
      * THE PAIR THAT DRIFTED, checked as a pair.
      *
@@ -735,7 +735,7 @@ describe('ledger schema versions', () => {
       join(root, 'mission_1.jsonl'),
       `${JSON.stringify({
         // One past the newest this reader knows. Bump when the schema does.
-        schemaVersion: 17,
+        schemaVersion: 18,
         recordType: 'mission.created',
         ledgerSequence: 1,
         occurredAt: metadata.createdAt,

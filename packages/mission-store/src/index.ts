@@ -26,7 +26,7 @@ import type { CheckpointReason, ReconciledCheckpoint } from './checkpoint.js'
  */
 export type MissionRecordedMode = "ask" | "plan" | "accept-edits" | "approve-each" | "auto";
 
-export const MISSION_LEDGER_SCHEMA_VERSION = 16 as const
+export const MISSION_LEDGER_SCHEMA_VERSION = 17 as const
 
 /**
  * Versions this reader accepts, each a strict subset of the next, so all are
@@ -117,8 +117,15 @@ export const MISSION_LEDGER_SCHEMA_VERSION = 16 as const
  * older number) would be worse, because that reader would draw a run that
  * could touch the whole machine as one confined to a folder. The permission a
  * run had is the last thing a record may be vague about.
+ *
+ * v16 -> v17 adds `mission.edit_check` records: what the person's own check
+ * command said after a turn that changed files (A3.3). The host runs it after
+ * the turn has ended, so it cannot be a runtime event -- nothing a runtime
+ * said -- and without a record a reopened conversation lost the card and its
+ * Send button. A v16 reader stops at the first record it cannot name, so the
+ * number moves for the reason it moved at v5.
  */
-export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] as const
+export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17] as const
 
 export type MissionLedgerSchemaVersion =
   (typeof SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS)[number]
@@ -281,6 +288,24 @@ export interface MissionPeerLink {
   readonly occurredAt: string
 }
 
+/**
+ * What the person's check command said after a turn that changed files. Only
+ * the lines new since the folder's previous check are kept, bounded, never
+ * the whole output: the output of a person's test suite is theirs, and
+ * enormous, and the card only ever shows what is new.
+ */
+export interface MissionEditCheck {
+  readonly command: string
+  readonly outcome: 'passed' | 'failed' | 'timed-out' | 'could-not-run'
+  readonly newLines: readonly string[]
+  readonly unchanged: boolean
+  readonly first: boolean
+  readonly occurredAt: string
+}
+
+const MAX_EDIT_CHECK_LINES = 60
+const MAX_EDIT_CHECK_LINE_LENGTH = 500
+
 export interface MissionHostFailure {
   readonly code: MissionHostFailureCode
   readonly message: string
@@ -311,6 +336,8 @@ export interface RecoveredMission {
   readonly checkpoints: readonly ReconciledCheckpoint[]
   /** Workroom messages this mission received or posted, in ledger order. */
   readonly peerLinks: readonly MissionPeerLink[]
+  /** What the person's check said after this turn, in ledger order (A3.3). */
+  readonly editChecks: readonly MissionEditCheck[]
   readonly phase: RecoveredMissionPhase
   readonly lastUpdatedAt: string
   readonly ledgerSequence: number
@@ -357,6 +384,8 @@ export interface MissionLedger {
   createCheckpoint(missionId: string, reason: CheckpointReason): Promise<ReconciledCheckpoint>
   /** Record which workroom messages this mission was shown, or produced. */
   appendPeerLinks(missionId: string, links: readonly MissionPeerLink[]): Promise<void>
+  /** Record what the person's check said after this turn (A3.3). */
+  appendEditCheck(missionId: string, check: MissionEditCheck): Promise<void>
   /**
    * Move a mission's record to the trash. Returns false when there was none.
    *
@@ -569,7 +598,15 @@ interface PeerRecord {
   readonly link: MissionPeerLink
 }
 
-type LedgerRecord = CreatedRecord | EventRecord | HostFailureRecord | CheckpointRecord | PeerRecord
+interface EditCheckRecord {
+  readonly schemaVersion: MissionLedgerSchemaVersion
+  readonly recordType: 'mission.edit_check'
+  readonly ledgerSequence: number
+  readonly occurredAt: string
+  readonly check: MissionEditCheck
+}
+
+type LedgerRecord = CreatedRecord | EventRecord | HostFailureRecord | CheckpointRecord | PeerRecord | EditCheckRecord
 type JsonObject = Record<string, unknown>
 
 interface ParsedLedger {
@@ -731,6 +768,58 @@ function validatePeerLink(link: MissionPeerLink): MissionPeerLink {
   requireSafeId(link.peerTeammateId, 'peerTeammateId')
   requireTimestamp(link.occurredAt, 'Peer link timestamp')
   return link
+}
+
+function validateEditCheck(check: MissionEditCheck): MissionEditCheck {
+  if (!['passed', 'failed', 'timed-out', 'could-not-run'].includes(check.outcome)) {
+    throw new Error('Edit check outcome is invalid')
+  }
+  requireText(check.command, 'Edit check command', 500)
+  if (!Array.isArray(check.newLines) || check.newLines.length > MAX_EDIT_CHECK_LINES) {
+    throw new Error('Edit check lines are invalid')
+  }
+  for (const line of check.newLines) {
+    if (typeof line !== 'string' || line.length > MAX_EDIT_CHECK_LINE_LENGTH) throw new Error('Edit check line is invalid')
+  }
+  if (typeof check.unchanged !== 'boolean' || typeof check.first !== 'boolean') {
+    throw new Error('Edit check flags are invalid')
+  }
+  requireTimestamp(check.occurredAt, 'Edit check timestamp')
+  return check
+}
+
+/**
+ * The host's own check result, cut to what the record can hold: the first
+ * lines, each at most a line's worth. Exported so the host bounds it exactly
+ * the way the reader will accept it.
+ */
+export function boundedEditCheck(check: MissionEditCheck): MissionEditCheck {
+  return {
+    command: check.command.slice(0, 500),
+    outcome: check.outcome,
+    newLines: check.newLines.slice(0, MAX_EDIT_CHECK_LINES).map((line) => line.slice(0, MAX_EDIT_CHECK_LINE_LENGTH)),
+    unchanged: check.unchanged,
+    first: check.first,
+    occurredAt: check.occurredAt
+  }
+}
+
+function parsedEditCheck(value: unknown): MissionEditCheck | undefined {
+  if (!isObject(value)) return undefined
+  try {
+    const candidate = value as unknown as MissionEditCheck
+    validateEditCheck(candidate)
+    return {
+      command: candidate.command,
+      outcome: candidate.outcome,
+      newLines: [...candidate.newLines],
+      unchanged: candidate.unchanged,
+      first: candidate.first,
+      occurredAt: candidate.occurredAt
+    }
+  } catch {
+    return undefined
+  }
 }
 
 function parsedPeerLink(value: unknown): MissionPeerLink | undefined {
@@ -1135,6 +1224,7 @@ async function readLedgerFile(path: string, missionId: string): Promise<ParsedLe
   const hostFailures: MissionHostFailure[] = []
   const checkpoints: ReconciledCheckpoint[] = []
   const peerLinks: MissionPeerLink[] = []
+  const editChecks: MissionEditCheck[] = []
   let expectedSequence = 2
   let expectedEventSequence = 1
   let lastUpdatedAt = metadata.createdAt
@@ -1205,6 +1295,14 @@ async function readLedgerFile(path: string, missionId: string): Promise<ParsedLe
       }
       peerLinks.push(link)
       lastUpdatedAt = link.occurredAt
+    } else if (value.recordType === 'mission.edit_check') {
+      const check = parsedEditCheck(value.check)
+      if (schemaVersion < 17 || check === undefined || value.occurredAt !== check.occurredAt) {
+        issues.push(publicIssue('invalid-record', 'An invalid check result and its tail were ignored.', missionId))
+        break
+      }
+      editChecks.push(check)
+      lastUpdatedAt = check.occurredAt
     } else {
       issues.push(publicIssue('invalid-record', 'An unknown mission record and its tail were ignored.', missionId))
       break
@@ -1219,6 +1317,7 @@ async function readLedgerFile(path: string, missionId: string): Promise<ParsedLe
       hostFailures,
       checkpoints,
       peerLinks,
+      editChecks,
       phase: phaseFor(events, hostFailures),
       lastUpdatedAt,
       ledgerSequence: expectedSequence - 1,
@@ -1791,6 +1890,30 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
         })
         await appendRecords(missionId, records)
         nextSequences.set(missionId, sequence)
+      })
+    },
+
+    appendEditCheck(missionId: string, check: MissionEditCheck): Promise<void> {
+      return serialize(async () => {
+        requireSafeId(missionId, 'missionId')
+        validateEditCheck(check)
+        const hydrated = await hydrateForAppend(missionId)
+        if (hydrated.schemaVersion < 17) {
+          // Same rule as a peer link on a pre-v5 file: an older mission cannot
+          // take a record its own readers would stop at. Its card is simply
+          // not kept.
+          throw new Error('Mission ledger version cannot hold check results')
+        }
+        const sequence = hydrated.nextSequence
+        const record: EditCheckRecord = {
+          schemaVersion: hydrated.schemaVersion,
+          recordType: 'mission.edit_check',
+          ledgerSequence: sequence,
+          occurredAt: check.occurredAt,
+          check
+        }
+        await appendRecords(missionId, [record])
+        nextSequences.set(missionId, sequence + 1)
       })
     },
 

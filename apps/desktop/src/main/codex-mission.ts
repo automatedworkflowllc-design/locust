@@ -63,6 +63,7 @@ import { briefHeld, briefPlan, compactedDuring } from './brief-sessions.js'
 import type { BriefSessions } from './brief-sessions.js'
 import type { EndedMission, RelayOrigin, SharingMission } from './relay.js'
 import type { MissionStarter } from '@teammate/mission-store'
+import { boundedEditCheck } from '@teammate/mission-store'
 import { recordableCommand } from './command-record.js'
 import { commandTooLong } from './command-length.js'
 import { MAX_LIVE_MISSIONS } from '../shared/live-missions.js'
@@ -872,11 +873,14 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
     // Not awaited: a check can take minutes, and the slot is not its to hold.
     if (observed !== undefined && observed.length > 0 && mission.sandbox !== 'read-only' && options.afterEdits !== undefined) {
       void options.afterEdits(mission.cwd)
-        .then((result) => {
-          // One line in the host's log per check run: how the edits the host could not
-          // see were found (disk-observation.ts, snapshotWorkspace).
-          if (result !== undefined) console.log(`[edit-check] ${mission.runId}: ${result.outcome}, ${String(result.newLines.length)} new line(s)`)
-          if (result !== undefined) safelyEmit(mission, { kind: 'edit-check', runId: mission.runId, missionId: mission.missionId, ...result })
+        .then(async (result) => {
+          if (result === undefined) return
+          safelyEmit(mission, { kind: 'edit-check', runId: mission.runId, missionId: mission.missionId, ...result })
+          // Onto the mission it ran after, so a reopened conversation still
+          // has the card and its Send button. A failed write loses only that.
+          await options.ledger
+            .appendEditCheck(mission.missionId, boundedEditCheck({ ...result, occurredAt: now().toISOString() }))
+            .catch((error: unknown) => options.note?.('edit-check-write-failed', `${mission.missionId}: ${error instanceof Error ? error.message : 'no message'}`))
         })
         .catch(() => undefined)
     }

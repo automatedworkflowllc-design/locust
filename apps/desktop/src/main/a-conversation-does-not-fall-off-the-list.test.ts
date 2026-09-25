@@ -46,6 +46,7 @@ function mission(missionId: string, prompt: string, at: string, parent?: string)
     hostFailures: [],
     checkpoints: [],
     peerLinks: [],
+    editChecks: [],
     phase: 'completed',
     lastUpdatedAt: at,
     ledgerSequence: 1,

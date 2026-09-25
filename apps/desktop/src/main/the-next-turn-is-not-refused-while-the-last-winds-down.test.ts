@@ -102,7 +102,7 @@ function harness() {
     createCheckpoint: async () => {
       throw new Error('not used here')
     },
-    appendPeerLinks: async () => undefined,
+    appendPeerLinks: async () => undefined, appendEditCheck: async () => undefined,
     deleteMission: async () => true,
     listTrashedMissions: async () => [],
     restoreMission: async () => true,

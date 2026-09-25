@@ -39,6 +39,7 @@ function mission(missionId: string, events: readonly unknown[]): RecoveredMissio
     hostFailures: [],
     checkpoints: [],
     peerLinks: [],
+    editChecks: [],
     phase: 'completed',
     lastUpdatedAt: AT,
     ledgerSequence: 1,

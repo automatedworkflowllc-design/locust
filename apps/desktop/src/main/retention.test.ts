@@ -23,7 +23,7 @@ function ledgerWith(overrides: Partial<MissionLedger> = {}): MissionLedger {
     createCheckpoint: async () => {
       throw new Error('not used in this test')
     },
-    appendPeerLinks: async () => undefined,
+    appendPeerLinks: async () => undefined, appendEditCheck: async () => undefined,
     deleteMission: async () => true,
     listTrashedMissions: async () => [],
     restoreMission: async () => true,

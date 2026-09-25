@@ -448,6 +448,9 @@ function restoredLiveRun(mission: PublicRecoveredMission): LiveRunState {
     restored: true,
     restoredMission: mission,
     peerMessages: mission.peerMessages,
+    // A3.3: the check after this turn, kept on the record so a reopened
+    // conversation still offers to send it.
+    ...(mission.editCheck === undefined ? {} : { editCheck: mission.editCheck }),
     // A plan is a plan after a restart too. The ledger records what a run was
     // ALLOWED, and `ask` and `plan` are both read-only -- so until the mode
     // was recorded (schema 15) a reopened plan lost its "Build this plan"

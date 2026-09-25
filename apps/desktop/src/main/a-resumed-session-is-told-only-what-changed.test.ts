@@ -269,6 +269,7 @@ describe('a conversation with a teammate, through the mission service', () => {
     hostFailures: [],
     checkpoints: [],
     peerLinks: [],
+    editChecks: [],
     phase: 'completed',
     lastUpdatedAt: NOW,
     ledgerSequence: 2,
@@ -284,7 +285,7 @@ describe('a conversation with a teammate, through the mission service', () => {
       createCheckpoint: async () => {
         throw new Error('not used')
       },
-      appendPeerLinks: async () => undefined,
+      appendPeerLinks: async () => undefined, appendEditCheck: async () => undefined,
       deleteMission: async () => true,
       listTrashedMissions: async () => [],
       restoreMission: async () => true,

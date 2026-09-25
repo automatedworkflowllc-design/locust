@@ -44,7 +44,7 @@ function fakeLedger(refuseAppend = false): { ledger: MissionLedger; created: unk
     },
     appendHostFailure: async () => undefined,
     getMission: async () => undefined,
-    appendPeerLinks: async () => undefined
+    appendPeerLinks: async () => undefined, appendEditCheck: async () => undefined
   } as unknown as MissionLedger
   return { ledger, created, appended }
 }
