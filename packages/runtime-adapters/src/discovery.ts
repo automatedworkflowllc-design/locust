@@ -757,7 +757,11 @@ async function discoverOne(
   // A runtime with no list command to ask offers what it can honestly offer:
   // the route where the CLI chooses the model for itself.
   if (definition.fixedModelHints !== undefined && readiness === "ready") {
-    modelHints = definition.fixedModelHints;
+    // The fixed MODELS, and the efforts the help really named: the fixed
+    // hints carry none, and replacing wholesale threw Copilot's seven away,
+    // so the composer said its effort was fixed (a B4 lead).
+    const read = modelHints?.efforts ?? [];
+    modelHints = read.length === 0 ? definition.fixedModelHints : { ...definition.fixedModelHints, efforts: read };
   }
 
   const base: RuntimeDiscovery = {

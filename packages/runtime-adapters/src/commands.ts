@@ -464,10 +464,13 @@ function requireEffort(value: string): string {
  * Nothing is guessed: a CLI that names no choices yields none.
  */
 export function parseEffortChoices(helpText: string): readonly string[] {
-  const clause = /--(?:reasoning-)?effort\b[\s\S]{0,240}?\(\s*(?:choices:)?\s*([^)]*)\)/i.exec(helpText);
+  // And a third, copilot 1.0.88 (read 2026-09-24): `--reasoning-effort
+  // <level>  ... [possible values: none, minimal, low, ...]` -- square
+  // brackets, which the parenthesised pattern never matched.
+  const clause = /--(?:reasoning-)?effort\b[\s\S]{0,240}?(?:\(\s*(?:choices:)?\s*([^)]*)\)|\[\s*possible values:\s*([^\]]*)\])/i.exec(helpText);
   if (clause === null) return [];
   return [...new Set(
-    clause[1]!
+    (clause[1] ?? clause[2] ?? '')
       .split(",")
       .map((entry) => entry.trim().replace(/^["']|["']$/g, "").trim())
       .filter((entry) => EFFORT.test(entry))
