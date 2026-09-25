@@ -11,6 +11,20 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.345.0 - 2026-09-25
+
+### New
+
+- **Approve each action works on OpenCode.** Choose it and an OpenCode
+  teammate stops before each command, edit or reach outside its folder,
+  and shows you exactly what it wants to do. Approve it once, for the rest
+  of the run, or decline it. Until now this mode was Codex only.
+
+### Fixed
+
+- **A command OpenCode was not allowed to run says it was refused**, instead
+  of saying it ran and failed.
+
 ## 0.344.0 - 2026-09-25
 
 ### New
