@@ -2116,6 +2116,13 @@ if (!ownsSingleInstanceLock) {
     const rooms = createRoomStore({ rootDirectory: app.getPath('userData') })
     routineRunner = createRoutineRunner({
       workspaceId: memoryWorkspaceId,
+      // M15: where a routine was made; for an older one, where it was learned.
+      homeOf: async (routine) => {
+        if (routine.workspaceId !== undefined) return routine.workspaceId
+        const first = routine.learnedFrom[0]
+        if (first === undefined) return undefined
+        return (await missionLedger.getMission(first).catch(() => undefined))?.metadata.workspaceId
+      },
       routines,
       peerContextFor,
       start: (input) =>
@@ -3469,7 +3476,9 @@ if (!ownsSingleInstanceLock) {
           route: input.route,
           steps: input.steps,
           learnedFrom: input.learnedFrom,
-          ...(input.schedule === undefined ? {} : { schedule: input.schedule })
+          ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
+          // M15: the folder it is made in, so a schedule runs it only there.
+          ...(workspaceChosen ? { workspaceId: memoryWorkspaceId } : {})
         })
         return { ok: true, data: { routine } } as const
       } catch (error) {

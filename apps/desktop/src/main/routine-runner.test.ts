@@ -227,7 +227,7 @@ describe('a routine that runs on its own', () => {
   const NOON = new Date('2026-09-05T12:00:00.000Z')
 
   /** A harness whose store keeps lastRunAt, so a second tick sees the first. */
-  function scheduled(input: { readonly routines: readonly PublicRoutine[]; readonly busy?: readonly string[]; readonly startFails?: boolean }) {
+  function scheduled(input: { readonly routines: readonly PublicRoutine[]; readonly busy?: readonly string[]; readonly startFails?: boolean; readonly homeOf?: RoutineRunnerOptions['homeOf'] }) {
     const base = harness({ routines: input.routines, ...(input.startFails === true ? { startFails: true } : {}) })
     const held = new Map(input.routines.map((entry) => [entry.routineId, entry]))
     let clock = NOON
@@ -253,7 +253,8 @@ describe('a routine that runs on its own', () => {
       },
       // The real peer context is the routine's own teammate; the base stub answers Wren for everyone.
       peerContextFor: async (teammateId) => ({ self: { teammateId, name: 'Wren', role: 'Code & Migrations' }, others: [] }),
-      teammateBusy: async (teammateId) => (input.busy ?? []).includes(teammateId)
+      teammateBusy: async (teammateId) => (input.busy ?? []).includes(teammateId),
+      ...(input.homeOf === undefined ? {} : { homeOf: input.homeOf })
     }
     const runner = createRoutineRunner(options)
     return {
@@ -285,6 +286,26 @@ describe('a routine that runs on its own', () => {
     // still replaying step 1 so it waits.
     expect(await h.tick(new Date('2026-09-05T14:00:00.000Z'))).toEqual(['rt_soon'])
     expect(h.starts).toHaveLength(2)
+  })
+
+  /*
+   * M15 (the code review): routines are global and a tick started a due one
+   * in whichever folder was open -- a routine made to fix tests in project A
+   * replayed its steps, in its write mode, in project B, with nobody there.
+   */
+  it('runs on its own only in the folder it was made in', async () => {
+    const at = '2026-09-05T09:00:00.000Z'
+    const h = scheduled({
+      routines: [
+        routine({ routineId: 'rt_here', teammateId: 'tm_a', schedule: { kind: 'every', hours: 1 }, createdAt: at, workspaceId: 'ws_test' }),
+        routine({ routineId: 'rt_there', teammateId: 'tm_b', schedule: { kind: 'every', hours: 1 }, createdAt: at, workspaceId: 'ws_other' }),
+        // Saved before the folder was recorded: found from the mission it was learned from.
+        routine({ routineId: 'rt_old_there', teammateId: 'tm_c', schedule: { kind: 'every', hours: 1 }, createdAt: at, learnedFrom: ['mission_in_other'] }),
+        routine({ routineId: 'rt_old_unknown', teammateId: 'tm_d', schedule: { kind: 'every', hours: 1 }, createdAt: at, learnedFrom: ['mission_gone'] })
+      ],
+      homeOf: async (entry) => entry.workspaceId ?? (entry.learnedFrom[0] === 'mission_in_other' ? 'ws_other' : undefined)
+    })
+    expect(await h.tick(NOON)).toEqual(['rt_here', 'rt_old_unknown'])
   })
 
   it("a teammate busy with a person's run is skipped and tried next tick, not queued and not held off", async () => {

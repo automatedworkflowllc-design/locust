@@ -975,6 +975,12 @@ export interface PublicRoutine {
    */
   readonly schedule?: RoutineSchedule
   readonly execution?: import('./routine-recovery.js').RoutineExecution
+  /**
+   * The folder it was made in, as a workspace id. A schedule runs it only
+   * there (M15); Run still runs it wherever a person presses it. Absent on a
+   * routine saved before this was recorded.
+   */
+  readonly workspaceId?: string
 }
 
 export interface RoutineCreateRequest {

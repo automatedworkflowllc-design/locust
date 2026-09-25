@@ -33,6 +33,12 @@ import { stepTooLongNotice } from '../shared/step-budget.js'
 
 export interface RoutineRunnerOptions {
   readonly workspaceId: string
+  /**
+   * The folder a routine was made in: its own record, or for one saved
+   * before that was recorded, the folder of the mission it was learned
+   * from. Undefined when neither says; such a routine runs as before (M15).
+   */
+  readonly homeOf?: (routine: PublicRoutine) => Promise<string | undefined>
   readonly routines: Pick<RoutineStore, 'get' | 'list' | 'recordRun' | 'saveProgress' | 'clearProgress' | 'abandon'>
   /** Whether the teammate has a live run of anyone's. A scheduled routine waits for it to end. */
   readonly teammateBusy?: (teammateId: string) => Promise<boolean>
@@ -511,6 +517,10 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
         if (routine.execution !== undefined && routine.execution.status !== 'abandoned') continue
         if (routine.schedule === undefined) continue
         if (!isDue(routine.schedule, routine.lastRunAt ?? routine.createdAt, now)) continue
+        // M15: on its own, only in the folder it was made in. A routine made
+        // for project A replayed its steps, in its write mode, in project B.
+        const home = await (options.homeOf ?? (async (entry: PublicRoutine) => entry.workspaceId))(routine).catch(() => undefined)
+        if (home !== undefined && home !== options.workspaceId) continue
         const until = heldOff.get(routine.routineId)
         if (until !== undefined && until > now.getTime()) continue
         heldOff.delete(routine.routineId)

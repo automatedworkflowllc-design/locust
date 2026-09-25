@@ -47,6 +47,14 @@ describe('what a routine may hold', () => {
 })
 
 describe('the routine store', () => {
+  it('keeps the folder a routine was made in, and drops one that is not a workspace id (M15)', async () => {
+    const store = createRoutineStore({ rootDirectory: await root() })
+    const here = await store.create({ ...fresh(), workspaceId: 'ws_0123456789abcdef0123456789abcdef' })
+    const junk = await store.create({ ...fresh({ teammateId: 'tm_booty' }), workspaceId: '../elsewhere' })
+    expect((await store.get(here.routineId))?.workspaceId).toBe('ws_0123456789abcdef0123456789abcdef')
+    expect((await store.get(junk.routineId))?.workspaceId).toBeUndefined()
+  })
+
   it('creates, lists, gets, corrects, counts runs and removes', async () => {
     const store = createRoutineStore({ rootDirectory: await root() })
     const routine = await store.create(fresh())

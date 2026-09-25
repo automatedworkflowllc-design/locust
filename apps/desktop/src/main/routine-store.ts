@@ -54,6 +54,8 @@ export interface RoutineStore {
     readonly steps: unknown
     readonly learnedFrom: unknown
     readonly schedule?: unknown
+    /** The folder it is made in (M15). */
+    readonly workspaceId?: unknown
   }): Promise<PublicRoutine>
   /** Corrections: the name, the steps, and the schedule (`null` clears it). The teammate, route and provenance stay. */
   update(input: { readonly routineId: unknown; readonly name: unknown; readonly steps: unknown; readonly schedule?: unknown }): Promise<PublicRoutine>
@@ -100,6 +102,8 @@ export function validSteps(value: unknown): value is readonly string[] {
   )
 }
 
+const validWorkspaceId = (value: unknown): value is string => typeof value === 'string' && /^ws_[a-z0-9]{1,64}$/.test(value)
+
 function validLearnedFrom(value: unknown): value is readonly string[] {
   return Array.isArray(value) && value.length <= MAX_LEARNED_FROM && value.every((id) => safeId(id))
 }
@@ -139,7 +143,9 @@ export function parsedRoutine(value: unknown): PublicRoutine | undefined {
     runs: record.runs,
     ...(record.lastRunAt === undefined ? {} : { lastRunAt: record.lastRunAt }),
     ...(schedule === undefined ? {} : { schedule }),
-    ...(record.execution === undefined ? {} : { execution: parsedExecution(record.execution, record.steps, route) })
+    ...(record.execution === undefined ? {} : { execution: parsedExecution(record.execution, record.steps, route) }),
+    // Named, like every field here: this object is rebuilt field by field (M15).
+    ...(validWorkspaceId(record.workspaceId) ? { workspaceId: record.workspaceId } : {})
   }
 }
 
@@ -280,7 +286,8 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
           learnedFrom: [...input.learnedFrom],
           createdAt: new Date().toISOString(),
           runs: 0,
-          ...(input.schedule === undefined ? {} : { schedule: input.schedule })
+          ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
+          ...(validWorkspaceId(input.workspaceId) ? { workspaceId: input.workspaceId } : {})
         }
         await write({ ...file, routines: [...file.routines, routine] })
         return routine
