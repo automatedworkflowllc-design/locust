@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.343.0 - 2026-09-25
+
+### Fixed
+
+- **A Codex teammate that starts a helper finishes its own answer.** The
+  helper finishing used to end the teammate's run, with the helper's reply
+  shown as the teammate's. Helpers now show as their own rows, and the
+  teammate answers after them.
+- **A continued Codex conversation shows what each message cost.** The
+  count used to include every earlier message in the conversation.
+
 ## 0.342.0 - 2026-09-25
 
 ### New
