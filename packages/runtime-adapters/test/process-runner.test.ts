@@ -558,3 +558,55 @@ describe("a mission started through a .cmd launcher", () => {
     expect((launched?.options as { windowsVerbatimArguments?: boolean } | undefined)?.windowsVerbatimArguments).toBe(true);
   });
 });
+
+/*
+ * A2.10, the Claude half. `--input-format stream-json` takes the prompt as a
+ * user turn and reads more while the turn runs -- MEASURED 2026-09-25 on
+ * claude 2.1.282: a message written after the first tool call was taken into
+ * the same turn. And it does NOT exit after its result while input is open,
+ * so the runner must close input on that record or the run never ends.
+ */
+describe("a stream-json run", () => {
+  const streamSpec = { ...spec, runtime: "claude", args: ["--print"], stdin: "stream-json" } as const;
+  const userTurn = (text: string) => `${JSON.stringify({ type: "user", message: { role: "user", content: text } })}\n`;
+
+  it("sends the prompt as a user turn and keeps input open for the running turn", async () => {
+    const child = fakeChild();
+    const run = createNodeRuntimeProcessRunner({ spawnProcess: () => child.process }).start(streamSpec, prompt);
+    expect(child.stdin.writes).toEqual([userTurn(prompt)]);
+    expect(child.stdin.ended).toBe(false);
+    child.stdout.emit("data", '{"type":"assistant","message":{"content":[]}}\n');
+    expect(run.send?.("take this too")).toBe(true);
+    expect(child.stdin.writes.at(-1)).toBe(userTurn("take this too"));
+    expect(child.stdin.ended).toBe(false);
+    child.close(0);
+    await run.completion;
+  });
+
+  it("closes input on the turn's result, after which nothing more is sent", async () => {
+    const child = fakeChild();
+    const run = createNodeRuntimeProcessRunner({ spawnProcess: () => child.process }).start(streamSpec, prompt);
+    child.stdout.emit("data", '{"type":"result","subtype":"success","result":"done"}\n');
+    expect(child.stdin.ended).toBe(true);
+    expect(run.send?.("too late")).toBe(false);
+    expect(child.stdin.writes).toHaveLength(1);
+    child.close(0);
+    await run.completion;
+  });
+
+  it("does not take text that merely mentions a result for the result", async () => {
+    const child = fakeChild();
+    const run = createNodeRuntimeProcessRunner({ spawnProcess: () => child.process }).start(streamSpec, prompt);
+    child.stdout.emit("data", '{"type":"assistant","message":{"content":[{"type":"text","text":"the \\"result\\" is 4"}]}}\n');
+    expect(child.stdin.ended).toBe(false);
+    child.close(0);
+    await run.completion;
+  });
+
+  it("offers no send on any other transport", () => {
+    const child = fakeChild();
+    const run = createNodeRuntimeProcessRunner({ spawnProcess: () => child.process }).start(spec, prompt);
+    expect(run.send).toBeUndefined();
+    expect(child.stdin.ended).toBe(true);
+  });
+});

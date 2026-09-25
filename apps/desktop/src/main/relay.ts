@@ -474,8 +474,9 @@ export interface RelayOptions {
   readonly stopWorkOf?: (teammateId: string) => Promise<boolean>
   /**
    * Show this teammate's running turn a message at its next step, WITHOUT
-   * stopping it (A2.10), and say whether the runtime took it. Only Codex's
-   * app-server can (`turn/steer`); every other runtime answers false.
+   * stopping it (A2.10), and say whether the runtime took it. Codex's
+   * app-server can (`turn/steer`), and Claude Code can (its stream-json input
+   * stays open while the turn runs); every other runtime answers false.
    */
   readonly steerWorkOf?: (teammateId: string, text: string) => Promise<boolean>
   /** Reaches the window, addressed to the SENDER's run, so notices land in the thread that shared. */

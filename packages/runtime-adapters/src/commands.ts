@@ -737,6 +737,13 @@ export function createClaudePrintCommand(
     // asking, anywhere. Every other mode keeps it.
     ...(auto ? [] : ["--restricted"]),
     "--print",
+    // A2.10: the prompt goes as a stream-json user turn and input stays open,
+    // so a teammate's message can be handed to the running turn. MEASURED
+    // 2026-09-25 on claude 2.1.282 with exactly these flags: a message written
+    // after the first tool call was taken into the SAME turn -- one result,
+    // and the answer did what it asked.
+    "--input-format",
+    "stream-json",
     "--output-format",
     "stream-json",
     "--verbose",
@@ -838,7 +845,10 @@ export function createClaudePrintCommand(
   if (options.resumeThreadId !== undefined) {
     args.push("--resume", requireText(options.resumeThreadId, "Session id"));
   }
-  return baseSpec("claude", executable, options.workspacePath, args, { sandbox: sandboxArgument(options.sandbox) });
+  return baseSpec("claude", executable, options.workspacePath, args, {
+    stdin: "stream-json",
+    sandbox: sandboxArgument(options.sandbox),
+  });
 }
 
 /**

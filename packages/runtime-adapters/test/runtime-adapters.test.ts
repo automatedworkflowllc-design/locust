@@ -70,6 +70,11 @@ describe("runtime command specifications", () => {
     expect(claude.args).toContain("stream-json");
     expect(claude.args).toContain("default");
     expect(claude.args).not.toContain("--dangerously-skip-permissions");
+    // A2.10: the prompt goes as a stream-json user turn, input open while the
+    // turn runs, so a teammate's message can reach it (measured 2026-09-25).
+    expect(claude.args.slice(claude.args.indexOf("--input-format"), claude.args.indexOf("--input-format") + 2))
+      .toEqual(["--input-format", "stream-json"]);
+    expect(claude.stdin).toBe("stream-json");
   });
 
   it("holds a read-only Claude mission in default mode with a reading tool list plus Task, never plan mode", () => {

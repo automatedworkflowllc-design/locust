@@ -1032,6 +1032,37 @@ describe('runtime selection', () => {
     return { start, service }
   }
 
+  it('hands a running Claude turn a message through its open input (A2.10)', async () => {
+    const sent: string[] = []
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([]),
+      // Still running: the turn has not reached its result.
+      completion: new Promise<RuntimeProcessCompletion>(() => undefined),
+      send: (text: string) => {
+        sent.push(text)
+        return true
+      }
+    })) satisfies RuntimeProcessRunner['start']
+    const service = createCodexMissionService({
+      workspacePath: WORKSPACE,
+      discover: async () => [codexRuntime(), claudeRuntime()],
+      runner: { start },
+      ledger: fakeLedger(),
+      createId: (() => { let n = 0; return () => String(++n) })(),
+      now: () => new Date(NOW),
+      schedule: () => undefined
+    })
+    const response = await service.start('Count to 200.', 'claude', 'accept-edits', {}, () => undefined)
+    const runId = response.ok ? response.data.runId : ''
+    expect(start.mock.calls[0]?.[0]?.stdin).toBe('stream-json')
+    expect(await service.steer(runId, 'Stop at 100.')).toBe(true)
+    expect(sent).toEqual(['Stop at 100.'])
+    // A run whose transport cannot take one says so.
+    const { service: plain } = serviceWith([codexRuntime(), claudeRuntime()])
+    const other = await plain.start('Count to 200.', 'claude', 'accept-edits', {}, () => undefined)
+    expect(await plain.steer(other.ok ? other.data.runId : '', 'Stop at 100.')).toBe(false)
+  }, 15_000)
+
   it('launches Claude with its own restricted argv when Claude is chosen', async () => {
     const { start, service } = serviceWith([codexRuntime(), claudeRuntime()])
 

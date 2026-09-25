@@ -1682,6 +1682,10 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             steer = streamed.steer
           } else {
             process = options.runner.start(command, runtimePrompt, { signal: controller.signal })
+            // A2.10: Claude Code's input stays open while its turn runs, so a
+            // message can be handed to it there too.
+            const send = process.send
+            if (send !== undefined) steer = async (text) => send(text)
           }
         } catch (startError) {
           // A refusal this file raised knows WHY; anything else does not, and

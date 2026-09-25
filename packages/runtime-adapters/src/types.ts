@@ -256,8 +256,12 @@ export interface RuntimeCommandSpec {
    * their report (2026-09-17). OpenCode escaped it through stdin. Muse cannot,
    * so the prompt goes in a file instead of argv, and `commandTooLong` --
    * which only limits `stdin: "none"` -- correctly stops applying.
+   *
+   * `stream-json` is Claude Code's `--input-format stream-json`: the prompt
+   * goes as the first user turn and input stays open until the turn's result,
+   * so a message can be handed to the running turn (A2.10).
    */
-  readonly stdin: "prompt" | "none" | "protocol" | "prompt-file";
+  readonly stdin: "prompt" | "none" | "protocol" | "prompt-file" | "stream-json";
   readonly stdout: "jsonl";
   /**
    * What this mission was allowed. Absent reads as `read-only` everywhere it

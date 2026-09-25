@@ -11,7 +11,30 @@ import { assertSafeRuntimeCommand, PROMPT_FILE_PLACEHOLDER } from "./commands.js
  * purpose: that spec is a server to be spoken to, and running it as an
  * ordinary process would start something nobody is listening to.
  */
-const ACCEPTED_TRANSPORTS: ReadonlySet<string> = new Set(["prompt", "none", "prompt-file"]);
+const ACCEPTED_TRANSPORTS: ReadonlySet<string> = new Set(["prompt", "none", "prompt-file", "stream-json"]);
+
+/** One user turn in Claude Code's `--input-format stream-json`. */
+function streamJsonUserLine(text: string): string {
+  return `${JSON.stringify({ type: "user", message: { role: "user", content: text } })}\n`;
+}
+
+/**
+ * Whether a stdout record is the one that ends a stream-json turn.
+ *
+ * MEASURED 2026-09-25, claude 2.1.282: with `--input-format stream-json` the
+ * process does NOT exit after its `result` while stdin is open -- it waits for
+ * another turn -- so the runner closes stdin on this record, or the run would
+ * never end.
+ */
+function isTurnResult(raw: string): boolean {
+  if (!raw.includes('"result"')) return false;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return typeof parsed === "object" && parsed !== null && (parsed as { type?: unknown }).type === "result";
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Remove the prompt file, whatever happened to the run.
@@ -119,6 +142,11 @@ export interface RuntimeProcessRun {
   readonly records: RuntimeProcessRecordStream;
   /** Settles on confirmed close or with `terminationUnconfirmed` after the watchdog. */
   readonly completion: Promise<RuntimeProcessCompletion>;
+  /**
+   * A `stream-json` run only: hand the running turn another user message.
+   * True when it was written; false once the turn's result has closed input.
+   */
+  readonly send?: (text: string) => boolean;
 }
 
 export interface RuntimeProcessStartOptions {
@@ -535,6 +563,32 @@ export function createNodeRuntimeProcessRunner(
         throw safeTransportError("Runtime process failed to start");
       }
 
+      // A stream-json run's input, open until its turn's result (A2.10).
+      let inputOpen = false;
+      const closeInput = (): void => {
+        if (!inputOpen) return;
+        inputOpen = false;
+        try {
+          child.stdin.end();
+        } catch {
+          // Already gone with the process; nothing is left to close.
+        }
+      };
+      const writeInput = (line: string): boolean => {
+        try {
+          child.stdin.write(line, (error) => {
+            if (error === undefined || error === null || settled) return;
+            inputDeliveryFailed = true;
+            requestTermination(false);
+          });
+          return true;
+        } catch {
+          inputDeliveryFailed = true;
+          requestTermination(false);
+          return false;
+        }
+      };
+
       const emitRecord = (raw: string): void => {
         if (!raw || outputLimitExceeded) return;
         if (Buffer.byteLength(raw, "utf8") > maxRecordBytes) {
@@ -547,6 +601,7 @@ export function createNodeRuntimeProcessRunner(
           return;
         }
         recordCount = nextSequence;
+        if (inputOpen && isTurnResult(raw)) closeInput();
       };
 
       const acceptStdout = (text: string): void => {
@@ -764,6 +819,12 @@ export function createNodeRuntimeProcessRunner(
       // reading, and some CLIs treat anything on stdin as extra input.
       if (terminationRequested || spec.stdin === "none" || spec.stdin === "prompt-file") {
         child.stdin.end();
+      } else if (spec.stdin === "stream-json") {
+        // The prompt as the first user turn, and input left OPEN: a message
+        // written while the turn runs is taken into it (A2.10, measured
+        // 2026-09-25). It closes on the turn's result -- see isTurnResult.
+        inputOpen = true;
+        if (!writeInput(streamJsonUserLine(prompt))) closeInput();
       } else {
         try {
           child.stdin.write(prompt, (error) => {
@@ -778,7 +839,13 @@ export function createNodeRuntimeProcessRunner(
         }
       }
 
-      return { records, completion };
+      if (spec.stdin !== "stream-json") return { records, completion };
+      return {
+        records,
+        completion,
+        send: (text: string): boolean => inputOpen && !settled && !terminationRequested
+          && writeInput(streamJsonUserLine(text)),
+      };
     },
   };
 }
