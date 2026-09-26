@@ -4,6 +4,8 @@ import type { ReactElement } from 'react'
 import { moneyLine } from '../cost.js'
 import type { ExchangeOverview } from '../exchange.js'
 import { Icon } from './Icon.js'
+import { modelDisplayName, routeChrome } from '../routeName.js'
+import { isMissionRuntime } from '../../../shared/runtimes.js'
 
 /**
  * One line above a conversation that is part of an exchange: who is in it
@@ -88,8 +90,16 @@ export function ExchangeStrip({
             {index > 0 && <span className="lc-separator">·</span>}
             <span className={`lc-dot ${participant.live ? 'lc-tone-lime is-pulsing' : 'lc-tone-muted'}`} />
             <span className="lc-exchange__name">{participant.name}</span>
-            <span className="lc-exchange__route lc-mono">
-              {runtimeNameOf(participant.runtime)} / {participant.model === 'account-default' ? 'default' : participant.model}
+            <span className="lc-exchange__route lc-mono" title={`${runtimeNameOf(participant.runtime)} / ${participant.model}`}>
+              {/* The chat bar's own spelling (routeChrome, 0.366): this printed
+                  "OpenCode / opencode/muse-spark-1.3-contributor-free" three
+                  times over a first delegation (Rook, packaged 0.366). The
+                  exact id stays one hover away. */}
+              {participant.model === 'account-default'
+                ? `${runtimeNameOf(participant.runtime)} / default`
+                : isMissionRuntime(participant.runtime)
+                  ? routeChrome(participant.runtime, participant.model, modelDisplayName(participant.runtime, participant.model))
+                  : `${runtimeNameOf(participant.runtime)} / ${participant.model}`}
             </span>
           </span>
         ))}

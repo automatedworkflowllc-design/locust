@@ -43,7 +43,12 @@ textarea {
   flex-direction: column;
   height: 100%;
   background: var(--lc-bg-window);
-  overflow: hidden;
+  /* `clip`, not `hidden` (0.366): a hidden-overflow box is still a scroll
+     container, and the chat box's metal glow canvas reaches 11px past the
+     window's bottom edge -- so anything scrolled into view moved the WHOLE
+     window up 11px, title bar and all (probe-shell-shift, packaged 0.366).
+     Clipped, it cuts the same and can never be scrolled. */
+  overflow: clip;
 }
 
 .lc-mono {

@@ -21,12 +21,15 @@ heading: the home screen then shows it once, as a splash.
   kept for something that did not happen or needs you.
 - A teammate answering on someone else's model now says so in plain words,
   without a model's internal name, and tells you where to give them their
-  own.
+  own. The strip above a conversation between teammates names models the
+  way the chat bar does.
 
 ### Fixed
 
 - A teammate's question could show its choices with stray brackets, such as
   "<option name>I'll supply my numbers". The choices now read as written.
+- The whole window could slide up a few pixels, title bar and all, when
+  something scrolled into view. It stays put now.
 
 ## 0.365.0 - 2026-09-26
 

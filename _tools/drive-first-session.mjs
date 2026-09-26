@@ -117,6 +117,27 @@ try {
           return ${text('.lc-thread')}
         })()`)
   )
+  // The notes an exchange leaves belong to the turn that asked, and that
+  // turn's view gives way to the next -- so they are photographed while the
+  // team is still working, if any appear (0.366).
+  await drive.capture('while the team works: the exchange notes', () => drive.evaluate(`(async () => {
+    for (let i = 0; i < 480; i += 1) {
+      const notes = [...document.querySelectorAll('.lc-diagnostic')]
+      if (notes.length > 0) {
+        await new Promise((r) => setTimeout(r, 1500))
+        const now = [...document.querySelectorAll('.lc-diagnostic')]
+        now.at(-1)?.scrollIntoView({ block: 'center' })
+        document.scrollingElement.scrollTop = 0
+        await new Promise((r) => setTimeout(r, 400))
+        return now.map((note) => (note.className.includes('amber') ? 'AMBER ' : note.className.includes('muted') ? 'quiet ' : '') + note.textContent.trim()).join(' | ').slice(0, 700)
+      }
+      const busy = document.querySelector('button[aria-label^="Stop the running"]') !== null
+        || ${teammateRows()}.some((row) => /working|running|starting|replying|listening|thinking|waiting/i.test(row.innerText))
+      if (i > 20 && !busy) return 'no notes while it worked'
+      await new Promise((r) => setTimeout(r, 500))
+    }
+    return 'no notes in time'
+  })()`))
   const quiet = await drive.capture('the whole team, once quiet', () => drive.evaluate(quietScript(480)))
   say(quiet.slice(0, 200))
   await drive.capture(`${mate}'s conversation, at its end`, () => drive.evaluate(`(async () => {
@@ -127,6 +148,17 @@ try {
     scroller?.scrollTo?.({ top: 1e9 })
     await new Promise((r) => setTimeout(r, 600))
     return (document.querySelector('.lc-thread')?.innerText ?? '').replace(/\\s+/g, ' ').slice(-400)
+  })()`))
+  // What the exchange said on the way (0.366): progress quiet, problems amber.
+  await drive.capture('the notes the exchange left', () => drive.evaluate(`(async () => {
+    const notes = [...document.querySelectorAll('.lc-thread .lc-diagnostic')]
+    if (notes.length === 0) return 'no notes'
+    const first = notes[0]
+    let scroller = first.parentElement
+    while (scroller && scroller !== document.body && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement
+    if (scroller && scroller !== document.body) scroller.scrollTop += first.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 220
+    await new Promise((r) => setTimeout(r, 500))
+    return notes.map((note) => (note.className.includes('amber') ? 'AMBER ' : note.className.includes('muted') ? 'quiet ' : '') + note.textContent.trim()).join(' | ').slice(0, 600)
   })()`))
   // The window's own root must never scroll -- everything scrolls inside it.
   // (A scrollIntoView in the 0.363 drive moved the whole window 11px.)
