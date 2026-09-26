@@ -11,6 +11,20 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.354.0 - 2026-09-26
+
+### New
+
+- **Start with a team.** With nobody on your team yet, Home offers three
+  ready-made teams — Build software, Research & money, and Write & design —
+  of three teammates each, ready to talk to. They are ordinary teammates:
+  rename them, change their faces or models, or remove them.
+
+### Improved
+
+- **New teammate** on an empty Home is the same button as the ones in the
+  chat bar.
+
 ## 0.353.0 - 2026-09-26
 
 ### New
