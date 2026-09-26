@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.361.0 - 2026-09-26
+
+### Improved
+
+- **Your own model is called by its own name.** For a model you added under
+  Your own models, the chat bar, the conversation header, team cards and
+  every list that names a model now say "Acme Chat" instead of
+  "OpenCode / Acme Chat". OpenCode still runs it; hover the chat bar to see
+  the exact route.
+- The panel that opens from Activity is now called "About this reply"
+  instead of "Mission inspector".
+
 ## 0.360.0 - 2026-09-26
 
 ### Improved

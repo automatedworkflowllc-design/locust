@@ -6,7 +6,7 @@ import { roleLabelOf } from '../../../shared/ipc.js'
 import type { LiveActivity } from '../faceState.js'
 import { glancesAmong } from '../glances.js'
 import type { Handoff } from '../glances.js'
-import { routeModelName, shortRuntimeName } from '../routeName.js'
+import { routeChrome, routeModelName } from '../routeName.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { branchNameFor } from '../../../shared/worktree-name.js'
 import mark from '../assets/locust-mark.svg'
@@ -1222,7 +1222,7 @@ export function Sidebar({
                           * and then spells a product in lowercase. The exact id
                           * is the tooltip.
                           */}
-                        {shortRuntimeName(teammate.route.runtime)} / {routeModelName(teammate.route.runtime, teammate.route.model)}
+                        {routeChrome(teammate.route.runtime, teammate.route.model, routeModelName(teammate.route.runtime, teammate.route.model))}
                       </span>
                     )}
                     {/*
@@ -1599,7 +1599,7 @@ export function Sidebar({
               teammate={open}
               statusLabel={status.label}
               statusTone={status.tone === 'muted' ? 'muted' : status.tone}
-              route={open.route === undefined ? undefined : `${shortRuntimeName(open.route.runtime)} / ${routeModelName(open.route.runtime, open.route.model)}`}
+              route={open.route === undefined ? undefined : routeChrome(open.route.runtime, open.route.model, routeModelName(open.route.runtime, open.route.model))}
               missions={theirs}
               selectedMissionId={selectedMissionId}
               top={railAnchor.top}

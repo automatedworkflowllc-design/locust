@@ -23,7 +23,7 @@ import {
   runtimeIsUsable
 } from '../status.js'
 import { defaultEffort, sendBlockedReason } from '../status.js'
-import { freeTagOf, routeModelName, shortRuntimeName } from '../routeName.js'
+import { freeTagOf, isOwnRoute, routeModelName, shortRuntimeName } from '../routeName.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { AttachedImage } from './AttachedImage.js'
 import { MetalSend } from './MetalSend.js'
@@ -917,6 +917,9 @@ export function Composer({
    * run (Yurt's beta report, #12; the 0.268 design recheck asked for this).
    */
   const { name: modelName, free: freeModel } = freeTagOf(modelLabel)
+  // A model of the person's own is named by the name they gave it, with no
+  // "OpenCode /" in front (routeChrome, 0.361); the tooltip still says both.
+  const ownModel = isOwnRoute(shownModel)
   // What the RUNNING mission is actually on, which is not always what the
   // composer's next-run route says. A handoff has to be measured against the
   // live run, or picking "the same" route would still stop it.
@@ -1428,8 +1431,12 @@ export function Composer({
                     <span className="lc-control__model">No runtime</span>
                   ) : (
                     <>
-                      {runtimeLabel}
-                      <span className="lc-separator">/</span>
+                      {!ownModel && (
+                        <>
+                          {runtimeLabel}
+                          <span className="lc-separator">/</span>
+                        </>
+                      )}
                       <span className="lc-control__mono lc-control__model">{modelName}</span>
                       {freeModel && <span className="lc-control__free">Free</span>}
                     </>

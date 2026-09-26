@@ -79,15 +79,22 @@ export function Inspector({
   )
 
   return (
-    <aside className="lc-inspector" aria-label="Mission inspector">
+    <aside className="lc-inspector" aria-label="About this reply">
       <div className="lc-inspector__head">
-        <span className="lc-inspector__title">Mission inspector</span>
-        <button type="button" className="lc-inspector__close" aria-label="Close inspector" onClick={onClose}>
+        {/*
+          * "Mission inspector" was the panel's name in the code, in a
+          * developer's word, over a panel a person opens with a button that
+          * says Activity (0.361, after "Signal rail" became "What happened"
+          * in 0.354). It is about the reply above it: what happened, what it
+          * was allowed, the details, the files, the receipt.
+          */}
+        <span className="lc-inspector__title">About this reply</span>
+        <button type="button" className="lc-inspector__close" aria-label="Close About this reply" onClick={onClose}>
           ✕
         </button>
       </div>
 
-      <div className="lc-tabs" role="tablist" aria-label="Inspector sections">
+      <div className="lc-tabs" role="tablist" aria-label="About this reply">
         {TABS.map((name) => (
           <button
             key={name}

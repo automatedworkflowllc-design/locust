@@ -137,7 +137,7 @@ import { splitAttachments, withAttachments } from '../../shared/attachments.js'
 // different question from who owns a recorded mission.
 import { heldFor, routineOf } from './conversationList.js'
 import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
-import { modelDisplayName, rememberOwnModels, shortRuntimeName } from './routeName.js'
+import { isOwnRoute, modelDisplayName, rememberOwnModels, routeChrome } from './routeName.js'
 import { FeedbackDialog } from './components/FeedbackDialog.js'
 import { conversationText } from './feedback.js'
 import { withMessageDelta } from '../../shared/messageFragments.js'
@@ -5641,7 +5641,7 @@ export default function App(): ReactElement {
                   hue: mate.hue,
                   avatar: mate.avatar,
                   role: roleLabelOf(mate),
-                  ...(mate.route === undefined ? {} : { route: `${shortRuntimeName(mate.route.runtime)} · ${modelDisplayName(mate.route.runtime, mate.route.model)}` }),
+                  ...(mate.route === undefined ? {} : { route: routeChrome(mate.route.runtime, mate.route.model, modelDisplayName(mate.route.runtime, mate.route.model), ' · ') }),
                   working: [...runs.values()].some((run) => liveRunIsActive(run) && ownerOf(run) === mate.teammateId)
                 }))}
                 onMessageTeammate={selectTeammate}
@@ -5726,7 +5726,8 @@ export default function App(): ReactElement {
                       </span>
                       <span className="lc-workroom__role">
                         {missionOwner === undefined ? '' : `${roleLabelOf(missionOwner)} · `}
-                        {runtimeDisplayName(liveRun.data?.runtime ?? liveRun.runtime ?? 'codex')}
+                        {/* A model of your own is said as yours; the line under this names it (routeChrome, 0.361). */}
+                        {isOwnRoute(liveRun.data?.model ?? '') ? 'Your model' : runtimeDisplayName(liveRun.data?.runtime ?? liveRun.runtime ?? 'codex')}
                       </span>
                     </div>
                     <div className="lc-workroom__mission">
@@ -6427,7 +6428,7 @@ export default function App(): ReactElement {
               {
                 id: 'inspector',
                 group: 'Mission',
-                label: inspectorOpen ? 'Close the mission inspector' : 'Open the mission inspector',
+                label: inspectorOpen ? 'Close the Activity panel' : 'Open the Activity panel',
                 hint: 'Ctrl I',
                 run: () => setInspectorOpen(!inspectorOpen)
               },

@@ -5,7 +5,7 @@ import { SETTINGS_PAGES, matchedHeadings, pageMatches } from '../settingsPages.j
 import type { SettingsPageId } from '../settingsPages.js'
 import type { RuntimeUpdatesState, MetalMotion, MetalPreset, MetalStrength } from '../../../shared/ipc.js'
 import type { Spend } from '../../../shared/spend.js'
-import { modelDisplayName, routeModelName, shortRuntimeName } from '../routeName.js'
+import { modelDisplayName, routeChrome, routeModelName } from '../routeName.js'
 import type { ReactElement, ReactNode } from 'react'
 
 import type {
@@ -484,7 +484,7 @@ export function MissionsScreen({
                         three different ways depending on the screen (Grok's
                         finding 1). Receipts keep raw ids on purpose; a row is
                         not a receipt. */}
-                    {shortRuntimeName(mission.runtime)} / {modelDisplayName(mission.runtime, mission.model)}
+                    {routeChrome(mission.runtime, mission.model, modelDisplayName(mission.runtime, mission.model))}
                   </span>
                   <span className="lc-missionrow__stats lc-mono">
                     {/* A count of none says nothing (Yurt's beta report, #14). */}
@@ -653,7 +653,7 @@ export function TeammatesScreen({
                   ) : (
                     <>
                       <span className="lc-rostercard__model">
-                        {shortRuntimeName(teammate.route.runtime)} / {routeModelName(teammate.route.runtime, teammate.route.model)}
+                        {routeChrome(teammate.route.runtime, teammate.route.model, routeModelName(teammate.route.runtime, teammate.route.model))}
                       </span>
                       <span>{modeLabel(teammate.route.mode)}</span>
                     </>

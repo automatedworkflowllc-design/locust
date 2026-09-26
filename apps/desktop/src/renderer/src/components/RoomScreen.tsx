@@ -10,7 +10,7 @@ import { Icon } from './Icon.js'
 import type { ContextMenuState } from './ContextMenu.js'
 import { TeammateBot } from './TeammateBot.js'
 import { footLine } from '../roomExchange.js'
-import { modelDisplayName, shortRuntimeName } from '../routeName.js'
+import { modelDisplayName, routeChrome } from '../routeName.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { useFollowBottom } from '../useFollowBottom.js'
 import { QUIET_SECONDS_BEFORE_SAYING_SO } from '../quiet.js'
@@ -1073,10 +1073,11 @@ export function RoomScreen({
                           {/* The composer's spelling, not the catalog's full
                               display name and a raw model id. One route, one
                               name, on every surface (Grok's finding 1). */}
-                          {shortRuntimeName(answer.runtime as MissionRuntimeId)} /{' '}
-                          {answer.model === 'account-default'
-                            ? 'default'
-                            : modelDisplayName(answer.runtime, answer.model)}
+                          {routeChrome(
+                            answer.runtime as MissionRuntimeId,
+                            answer.model,
+                            answer.model === 'account-default' ? 'default' : modelDisplayName(answer.runtime, answer.model)
+                          )}
                         </span>
                         <span className="lc-roomanswer__sep lc-mono" aria-hidden="true">·</span>
                         {answer.phase === 'failed' ? (

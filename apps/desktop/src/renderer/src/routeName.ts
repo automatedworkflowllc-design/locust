@@ -120,6 +120,29 @@ export function rememberOwnModels(models: readonly { readonly id: string; readon
   for (const model of models) if (model.own === true) ownModelNames.set(model.id, model.displayName)
 }
 
+/** A route on one of the person's own models: `own-<8 hex>/<model>`. */
+export function isOwnRoute(modelId: string): boolean {
+  return OWN_ROUTE_MODEL.test(modelId)
+}
+
+/**
+ * A route as chrome, "Runtime / Model" -- and a model of the person's own by
+ * its own name alone (0.361).
+ *
+ * Every model of your own runs through OpenCode, so the chip read "OpenCode
+ * / Acme Chat": a company that brought its own model met another product's
+ * name in front of it, on every surface that names a route. OpenCode is
+ * still what runs it, and it stays where exact strings live -- the chip's
+ * tooltip, Details, the receipt -- but on chrome the name the person gave
+ * the model is the whole name.
+ *
+ * `model` is the name the surface already spells (a route's, or a past
+ * mission's); only whether the runtime's word goes in front is decided here.
+ */
+export function routeChrome(runtime: MissionRuntimeId, modelId: string, model: string, separator = ' / '): string {
+  return isOwnRoute(modelId) ? model : `${shortRuntimeName(runtime)}${separator}${model}`
+}
+
 export function modelDisplayName(runtime: string, modelId: string): string {
   const own = OWN_ROUTE_MODEL.exec(modelId)
   if (own !== null) return ownModelNames.get(modelId) ?? spellOut(own[1]!)

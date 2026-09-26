@@ -3,7 +3,7 @@ import type { ReactElement } from 'react'
 import { useModal } from '../useModal.js'
 
 import type { PublicGroup, TeammateRoute } from '../../../shared/ipc.js'
-import { routeModelName, shortRuntimeName } from '../routeName.js'
+import { routeChrome, routeModelName } from '../routeName.js'
 
 /** The store's own cap, said here so the box cannot promise more than the file keeps. */
 export const MAX_GROUP_INSTRUCTIONS = 4_000
@@ -12,7 +12,7 @@ export const COUNTER_FROM = 3_600
 
 /** What a route is called on screen: the same names the composer's chip uses. */
 export function routeLabel(route: TeammateRoute): string {
-  return `${shortRuntimeName(route.runtime)} / ${routeModelName(route.runtime, route.model)}`
+  return routeChrome(route.runtime, route.model, routeModelName(route.runtime, route.model))
 }
 
 /**

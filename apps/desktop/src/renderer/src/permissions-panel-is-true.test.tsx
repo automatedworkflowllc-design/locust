@@ -37,6 +37,14 @@ describe('the permissions panel', () => {
     }
   })
 
+  it('is called what it is about, not "inspector" (0.361)', () => {
+    const html = render('workspace-write')
+    // What a person reads or hears: the text, and every aria-label.
+    const words = [html.replace(/<[^>]+>/g, ' '), ...[...html.matchAll(/aria-label="([^"]*)"/g)].map((match) => match[1] ?? '')].join(' ')
+    expect(words).toContain('About this reply')
+    expect(words).not.toMatch(/inspector/i)
+  })
+
   it('never denies what Auto allows', () => {
     const auto = render('full-access')
     expect(auto).not.toContain('deny')

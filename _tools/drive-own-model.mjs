@@ -134,6 +134,18 @@ try {
   verdicts.push(`picked: ${/Acme Chat/.test(picked) ? 'PASS' : 'FAIL'}`)
   const answered = await drive.capture('Wren runs on Acme Chat', () => drive.evaluate(sendAndWaitScript('Say hello.', { waitSeconds: 180 })))
   verdicts.push(`answered: ${/Hello from Acme\./.test(answered) ? 'PASS' : 'FAIL'}`)
+  /*
+   * NAMED AS YOURS (0.361): the chip read "OpenCode / Acme Chat" and the
+   * header "Code & Migrations · OpenCode". The chip is the route button, the
+   * header's role line sits beside the name.
+   */
+  const named = await drive.evaluate(`JSON.stringify({
+    chip: (document.querySelector('form.command-dock button[aria-haspopup="listbox"]')?.innerText ?? '').replace(/\\s+/g, ' ').trim(),
+    header: (document.querySelector('.lc-workroom__role')?.innerText ?? '').replace(/\\s+/g, ' ').trim()
+  })`)
+  say(`named: ${named}`)
+  const { chip, header } = JSON.parse(named)
+  verdicts.push(`named as yours: ${/^Acme Chat/.test(chip) && !/OpenCode/.test(chip) && /Your model/.test(header) && !/OpenCode/.test(header) ? 'PASS' : 'FAIL'} (${chip} | ${header})`)
   // Test's own tools check is a chat call too, capped at one token: counted
   // apart from the run's.
   const completions = asked.filter((entry) => entry.url === '/v1/chat/completions' && entry.model === 'acme-70b')
