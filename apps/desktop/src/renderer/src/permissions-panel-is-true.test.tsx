@@ -31,10 +31,16 @@ const render = (sandbox: 'read-only' | 'workspace-write' | 'full-access'): strin
   )
 
 describe('the permissions panel', () => {
+  it("speaks in Locust's words, not the plumbing's", () => {
+    for (const sandbox of ['read-only', 'workspace-write', 'full-access'] as const) {
+      expect(render(sandbox)).not.toMatch(/host-selected|argv|app-server|workspace folder/)
+    }
+  })
+
   it('never denies what Auto allows', () => {
     const auto = render('full-access')
     expect(auto).not.toContain('deny')
-    expect(auto).toContain('anywhere this account can reach')
+    expect(auto).toContain('anywhere your account can reach')
   })
 
   it('says what the header says, from the same function', () => {
@@ -45,11 +51,11 @@ describe('the permissions panel', () => {
 
   it('still denies what a workspace-write run cannot do', () => {
     const scoped = render('workspace-write')
-    expect(scoped).toContain('anything outside the workspace')
-    expect(scoped).toContain('inside that same workspace folder')
+    expect(scoped).toContain('anything outside this folder')
+    expect(scoped).toContain('change files in this folder')
   })
 
   it('still refuses every write for a read-only run', () => {
-    expect(render('read-only')).toContain('every write to disk')
+    expect(render('read-only')).toContain('changing any file')
   })
 })

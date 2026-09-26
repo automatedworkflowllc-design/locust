@@ -6363,7 +6363,9 @@ export default function App(): ReactElement {
                 // anybody opening this wants, and a name says why it is
                 // first (frame pass, 2026-09-15).
                 group: 'This conversation',
-                label: 'Workroom',
+                // "Workroom" was the screen's name in the code, not a word a
+                // person has for it (first-impressions pass, 0.354).
+                label: 'Back to the conversation',
                 run: () => setScreen('workroom')
               },
               {

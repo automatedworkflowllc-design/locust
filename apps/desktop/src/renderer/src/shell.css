@@ -2069,36 +2069,44 @@ textarea {
  * -------------------------------------------------------------------- */
 .lc-savable {
   width: 100%;
-  max-width: 46ch;
+  max-width: 64ch;
   display: flex;
   flex-direction: column;
-  gap: var(--lc-space-1);
+  gap: var(--lc-space-3);
   margin-top: var(--lc-space-5);
   text-align: left;
 }
 
+/* A sentence, the way the definition above it is one. */
 .lc-savable__head {
-  font-size: var(--lc-text-mono-label);
-  letter-spacing: var(--lc-tracking-label);
-  text-transform: uppercase;
-  color: var(--lc-text-muted);
-  margin-bottom: var(--lc-space-2);
+  margin: 0;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-secondary);
 }
 
-/* The half that names the material stays in sentence case: it is the noun,
-   and shouting it would make the label read as two labels. */
-.lc-savable__from {
-  text-transform: none;
-  letter-spacing: 0;
-  color: var(--lc-text-secondary);
+/* The rows as ONE card, as a settings list is drawn, rather than lines
+   floating in the middle of the screen. */
+.lc-savable__card {
+  display: flex;
+  flex-direction: column;
+  padding: var(--lc-space-1);
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-raised);
 }
 
 .lc-savable__row {
   display: flex;
   align-items: center;
   gap: var(--lc-space-3);
-  padding: var(--lc-space-2) var(--lc-space-3);
+  padding: var(--lc-space-3) var(--lc-space-4);
   border-radius: var(--lc-radius-control);
+}
+
+.lc-savable__row + .lc-savable__row {
+  border-top: 1px solid var(--lc-border-hairline);
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }
 
 .lc-savable__row:hover {

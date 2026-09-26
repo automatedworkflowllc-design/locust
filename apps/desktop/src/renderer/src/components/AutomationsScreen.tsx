@@ -159,9 +159,14 @@ export function AutomationsScreen({
             <p className="lc-empty__how">{NOTHING_TO_SAVE_YET}</p>
           ) : (
             <div className="lc-savable">
-              <p className="lc-savable__head lc-mono">
-                Save one from <span className="lc-savable__from">your finished conversations</span>
-              </p>
+              {/*
+                * A card of rows under a plain sentence (first-impressions
+                * pass, 0.354): the rows floated free under "SAVE ONE FROM
+                * your finished conversations", half a shout and half a
+                * sentence, with a bare "Save" that did not say what it made.
+                */}
+              <p className="lc-savable__head">Save one of your finished conversations to start.</p>
+              <div className="lc-savable__card">
               {savable.map((mission) => {
                 const owner =
                   mission.ownerId === undefined
@@ -187,11 +192,12 @@ export function AutomationsScreen({
                       className="lc-button"
                       onClick={() => onSaveRoutine?.(mission.missionId)}
                     >
-                      Save
+                      Save as routine
                     </button>
                   </div>
                 )
               })}
+              </div>
             </div>
           )}
         </div>

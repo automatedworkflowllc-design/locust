@@ -32,6 +32,7 @@ import {
   peerGroups,
   peerSnippet,
   railLabel,
+  railToolName,
   recentlyUsedRoutes,
   relativePath,
   usageWindowLabel,
@@ -949,7 +950,7 @@ describe('signal rail', () => {
       [event('run.started', { runtimeThreadId: 't' }), toolStart('t1', 'shell', 'pnpm test')],
       { running: true }
     )
-    expect(rows[0]?.name).toBe('shell · pnpm test')
+    expect(rows[0]?.name).toBe('Ran pnpm test')
     expect(rows[1]?.name).toMatch(/^Started on /)
   })
 
@@ -961,7 +962,11 @@ describe('signal rail', () => {
     // on a dead run is the shell asserting something is happening when nothing
     // is.
     expect(buildSignalRail(open, { running: false })[0]?.live).toBe(false)
-    expect(buildSignalRail(closed, { running: true }).find((r) => r.name.endsWith('finished'))?.live).toBe(false)
+    // Settled, it is one row that says so -- not a second "finished" row.
+    const settled = buildSignalRail(closed, { running: true }).filter((r) => r.name.includes('pnpm test'))
+    expect(settled).toHaveLength(1)
+    expect(settled[0]?.live).toBe(false)
+    expect(settled[0]?.meta).toMatch(/· done$/)
   })
 
   it('colours by meaning, not decoration', () => {
@@ -991,12 +996,47 @@ describe('signal rail', () => {
       { running: false }
     )
     const names = rows.map((row) => row.name)
-    expect(names).toEqual(['Stopped', 'Usage limit · temporary rate limit', 'Plan updated · final', 'Step started · agent reasoning', expect.stringMatching(/^Started on /)])
+    // A step STARTING is bookkeeping; the reasoning step says "Thought" when it ends.
+    expect(names).toEqual(['Stopped', 'Usage limit · temporary rate limit', 'Plan updated · final', expect.stringMatching(/^Started on /)])
     for (const name of names) expect(name).not.toMatch(/\b(run|tool|step|route|plan|runtime|adapter)\.[a-z_]+/)
   })
 
   it('says nothing about events it does not understand', () => {
     expect(buildSignalRail([event('nonsense.event', {})], { running: true })).toEqual([])
+  })
+
+  /*
+   * First-impressions pass, 0.354: the rail read "shell . npm test", "shell
+   * finished", "file_change . C:\...", "Step finished . turn" -- the runtimes'
+   * type names, two rows a call. It reads as sentences now, one row a call.
+   */
+  it('says each call as a sentence, one row a call, with how it ended', () => {
+    const rows = buildSignalRail(
+      [
+        event('run.started', { runtimeThreadId: 't' }),
+        event('step.started', { stepKind: 'turn' }),
+        toolStart('t1', 'shell', 'npm test'),
+        event('tool.completed', { itemId: 't1', toolKind: 'command_execution', name: 'shell', phase: 'completed', exitCode: 1 }),
+        event('tool.started', { itemId: 't2', toolKind: 'file_change', name: 'file_change', phase: 'started', command: 'C:/work/app/src/signup.ts' }),
+        event('tool.completed', { itemId: 't2', toolKind: 'file_change', name: 'file_change', phase: 'completed' }),
+        // Reported only when it finished, as OpenCode does: still one row.
+        event('tool.completed', { itemId: 't3', toolKind: 'tool', name: 'read', phase: 'completed', command: 'C:/work/app/README.md' }),
+        event('step.completed', { stepKind: 'reasoning' }),
+        event('step.completed', { stepKind: 'turn' }),
+        event('run.completed', { process: {} })
+      ],
+      { running: false }
+    )
+    expect(rows.map((row) => row.name)).toEqual(['Finished', 'Thought', 'Read README.md', 'Changed signup.ts', 'Ran npm test', expect.stringMatching(/^Started on /)])
+    expect(rows.find((row) => row.name === 'Ran npm test')?.meta).toMatch(/· exit code 1$/)
+    expect(rows.find((row) => row.name === 'Changed signup.ts')?.meta).toMatch(/· done$/)
+    for (const row of rows) expect(row.name).not.toMatch(/file_change|finished|Step /)
+  })
+
+  it('names a call it does not recognise by its own name, never a guess', () => {
+    expect(railToolName({ name: 'robinhood.get_quotes', command: 'NVDA' })).toBe('robinhood.get_quotes · NVDA')
+    expect(railToolName({ name: 'shell', toolKind: 'command_execution' })).toBe('Ran a command')
+    expect(railToolName({ name: 'WebSearch', command: 'oracle force majeure' })).toBe('Searched the web for oracle force majeure')
   })
 })
 

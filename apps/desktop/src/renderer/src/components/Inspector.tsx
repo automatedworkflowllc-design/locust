@@ -101,7 +101,8 @@ export function Inspector({
       <div className="lc-inspector__scroll">
         {tab === 'Activity' && (
           <>
-            <div className="lc-fieldlabel lc-mono lc-rail__label">Signal rail</div>
+            {/* "Signal rail" was the panel's own jargon (first-impressions pass, 0.354). */}
+            <div className="lc-fieldlabel lc-mono lc-rail__label">What happened</div>
             {rows.length === 0 ? (
               <Empty>No events yet.</Empty>
             ) : (
@@ -123,55 +124,50 @@ export function Inspector({
 
             <div className="lc-permissions">
               <div className="lc-permissions__head">
-                <span className="lc-fieldlabel lc-mono">Tools &amp; permissions</span>
+                <span className="lc-fieldlabel lc-mono">What it may do</span>
                 <span className="lc-rail__meta">{sandboxPhrase(sandbox)}</span>
               </div>
               <div className="lc-permissions__rows">
                 <div className="lc-permissions__row">
                   <span className="lc-tone-green">allow</span>
-                  <span>read files in the host-selected workspace</span>
+                  <span>read the files in this folder</span>
                 </div>
                 {writes ? (
                   <div className="lc-permissions__row">
                     <span className="lc-tone-green">allow</span>
                     <span>
                       {anywhere
-                        ? 'write files anywhere this account can reach, inside the workspace and outside it'
-                        : 'write files inside that same workspace folder'}
+                        ? 'change files anywhere your account can reach, in this folder and outside it'
+                        : 'change files in this folder'}
                     </span>
                   </div>
                 ) : (
                   <div className="lc-permissions__row">
                     <span className="lc-tone-red">deny</span>
-                    <span>every write to disk</span>
+                    <span>changing any file</span>
                   </div>
                 )}
                 {anywhere ? (
                   <div className="lc-permissions__row">
                     <span className="lc-tone-amber">allow</span>
-                    <span>run any command this account can run, and reach any network the runtime reaches</span>
+                    <span>run any command your account can run, and reach any network</span>
                   </div>
                 ) : (
                   <div className="lc-permissions__row">
                     <span className="lc-tone-red">deny</span>
-                    <span>anything outside the workspace, and any network the runtime does not make itself</span>
+                    <span>anything outside this folder, and any network access beyond the model's own</span>
                   </div>
                 )}
               </div>
-              <p className="lc-permissions__note">
-                The host fixes the workspace, executable, argv and sandbox.{' '}
-                {/*
-                  * The second sentence is about `codex exec` specifically, and
-                  * until 2026-09-13 it was printed under every runtime's rows.
-                  * Astra measured it under an OpenCode run: a correct allow-list
-                  * with a footer explaining app-server approvals that had nothing
-                  * to do with the run being described. A true sentence about
-                  * another runtime is a false sentence here.
-                  */}
-                {route?.runtime === 'codex'
-                  ? '`codex exec` has no interactive approval channel, so consent is given when the mission starts rather than per action; mid-run approvals need the app-server protocol.'
-                  : 'They are set when the mission starts.'}
-              </p>
+              {/*
+                * In Locust's words, not the plumbing's: "The host fixes the
+                * workspace, executable, argv and sandbox" (first-impressions
+                * pass, 0.354). And no longer a sentence about `codex exec`
+                * having no approval channel: Codex runs on its app-server now,
+                * where Approve each asks per action, so that sentence had
+                * become false about the run it sat under.
+                */}
+              <p className="lc-permissions__note">Locust sets the folder, the tool and these limits when the mission starts; nothing here changes while it runs.</p>
             </div>
           </>
         )}

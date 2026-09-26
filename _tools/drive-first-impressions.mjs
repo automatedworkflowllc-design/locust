@@ -259,6 +259,45 @@ try {
   await drive.capture('1440 Settings (Ctrl 3)', () => screen('3'))
   await drive.capture('1440 Rooms (Ctrl 4)', () => screen('4'))
   await drive.capture('1440 Memory (Ctrl 5)', () => screen('5'))
+  // The surfaces the first pass never photographed (0.354): the Routines
+  // screen, a conversation's Activity panel, the teammate dialog, the
+  // command palette, and New teammate from Home.
+  const press = (label) => drive.evaluate(`(async () => {
+    const button = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === ${JSON.stringify(label)})
+    if (!button) return 'no ' + ${JSON.stringify(label)} + ' button'
+    button.click()
+    await new Promise((r) => setTimeout(r, 1100))
+    return (document.querySelector('.lc-screen, [role=dialog], main')?.innerText ?? '').replace(/\\s+/g, ' ').slice(0, 160)
+  })()`)
+  const escape = async () => {
+    await drive.evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`)
+    await sleep(500)
+  }
+  await drive.capture('1440 Routines', () => press('Routines'))
+  await drive.capture('1440 Wren, with Activity open', async () => {
+    await openConversation('Wren')
+    return press('Activity')
+  })
+  await drive.capture('1440 Edit teammate (Wren)', async () => {
+    await screen('2')
+    return drive.evaluate(`(async () => {
+      ;[...document.querySelectorAll('.lc-rostercard')].find((card) => card.querySelector('.lc-rostercard__name')?.textContent.trim() === 'Wren')?.querySelector('.lc-rostercard__edit')?.click()
+      await new Promise((r) => setTimeout(r, 1100))
+      return document.querySelector('[role=dialog]')?.innerText.replace(/\\s+/g, ' ').slice(0, 160) ?? 'no dialog'
+    })()`)
+  })
+  await escape()
+  await drive.capture('1440 the command palette (Ctrl K)', () => drive.evaluate(`(async () => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))
+    await new Promise((r) => setTimeout(r, 900))
+    return document.querySelector('[role=dialog]')?.innerText.replace(/\\s+/g, ' ').slice(0, 160) ?? 'no palette'
+  })()`))
+  await escape()
+  await drive.capture('1440 New teammate, from Home', async () => {
+    await home()
+    return press('New teammate')
+  })
+  await escape()
   await drive.resize(1280, 800)
   await sleep(1200)
   await drive.capture('1280 home', home)

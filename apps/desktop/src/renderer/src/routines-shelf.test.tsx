@@ -85,7 +85,8 @@ describe('the routines shelf', () => {
     })
     expect(html).toContain('Friday release checks')
     expect(html).toContain('4 turns')
-    expect(html).toContain('>Save<')
+    // Says what it makes (0.355): a bare "Save" did not.
+    expect(html).toContain('>Save as routine<')
     // The running one is not on offer, and the gesture is not narrated.
     expect(html).not.toContain('Still going')
     expect(html).not.toContain('right-click')

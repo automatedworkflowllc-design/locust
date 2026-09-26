@@ -3373,13 +3373,52 @@ export function clockOf(occurredAt: string): string {
  * tools are lime while running and neutral once settled, checkpoints blue,
  * limits amber, failures red.
  */
+/**
+ * A tool call as a sentence: what it did, to what.
+ *
+ * The rail said "shell . npm test", then "shell finished"; "file_change .
+ * C:/Users/.../src/signup.ts", then "file_change finished" -- the runtimes'
+ * own type names, two rows a call (first-impressions pass, 0.354). Locust is
+ * for any AI user, and a person reads "Ran npm test" and "Changed signup.ts".
+ * The words the thread's activity card already uses; a tool this does not
+ * recognise keeps its own name, never a guess.
+ */
+export function railToolName(tool: { readonly name: string; readonly toolKind?: string; readonly command?: string }): string {
+  const target = tool.command?.replace(/\s+/g, ' ').trim()
+  const shown = target === undefined || target.length === 0 ? undefined : target
+  if (isShellTool(tool.name, tool.toolKind)) return railLabel(shown === undefined ? 'Ran a command' : `Ran ${shellCommandText(shown)}`)
+  const file = shown === undefined ? undefined : (shown.split(/[\\/]/).filter((part) => part.length > 0).at(-1) ?? shown)
+  const words = tool.name.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z]+/).filter((word) => word.length > 0)
+  if (tool.name === 'file_change' || editToolName(tool.name)) return railLabel(file === undefined ? 'Changed a file' : `Changed ${file}`)
+  if (words.includes('websearch') || (words.includes('web') && words.includes('search'))) return railLabel(shown === undefined ? 'Searched the web' : `Searched the web for ${shown}`)
+  if (words.some((word) => word === 'search' || word === 'grep' || word === 'find' || word === 'glob')) return railLabel(shown === undefined ? 'Searched' : `Searched for ${shown}`)
+  if (words.some((word) => word === 'read' || word === 'view' || word === 'cat' || word === 'open')) return railLabel(file === undefined ? 'Read a file' : `Read ${file}`)
+  if (words.some((word) => word === 'fetch' || word === 'browse')) return railLabel(shown === undefined ? 'Opened a page' : `Opened ${shown}`)
+  return railLabel(shown === undefined ? tool.name : `${tool.name} · ${shown}`)
+}
+
 export function buildSignalRail(
   events: readonly NormalizedRuntimeEvent[],
   options: { readonly running: boolean }
 ): readonly SignalRow[] {
-  const settled = new Set<string>()
+  /*
+   * ONE ROW A TOOL CALL. It was two -- "shell . npm test", then "shell
+   * finished . exit code 0" -- which doubled the rail and put a call's
+   * outcome in a different row from the call. Now the call's row carries how
+   * it ended; a runtime that reports a call only when it finishes (OpenCode)
+   * still gets its one row, from that report.
+   */
+  const settledBy = new Map<string, Extract<NormalizedRuntimeEvent, { type: 'tool.completed' | 'tool.failed' }>>()
+  const started = new Set<string>()
   for (const event of events) {
-    if (event.type === 'tool.completed' || event.type === 'tool.failed') settled.add(event.payload.itemId)
+    if (event.type === 'tool.completed' || event.type === 'tool.failed') settledBy.set(event.payload.itemId, event)
+    if (event.type === 'tool.started') started.add(event.payload.itemId)
+  }
+  const outcome = (settled: Extract<NormalizedRuntimeEvent, { type: 'tool.completed' | 'tool.failed' }>): { readonly meta: string; readonly tone: SignalTone } => {
+    if (settled.type === 'tool.failed') return { meta: settled.payload.status === 'refused' ? 'refused' : 'failed', tone: 'red' }
+    // Exit 0 is what "done" means; any other code is worth its number.
+    const code = settled.payload.exitCode
+    return { meta: code === undefined || code === 0 ? 'done' : `exit code ${String(code)}`, tone: 'muted' }
   }
 
   const rows: SignalRow[] = []
@@ -3390,51 +3429,51 @@ export function buildSignalRail(
         rows.push({
           key: event.id,
           name: `Started on ${railRuntimeName(event.sourceAdapter)}`,
-          meta: `${clock} · connected`,
+          meta: clock,
           tone: 'muted',
           live: false
         })
         break
       case 'tool.started': {
-        const open = !settled.has(event.payload.itemId)
-        rows.push({
-          key: event.id,
-          name: railLabel(event.payload.command === undefined ? event.payload.name : `${event.payload.name} · ${event.payload.command}`),
-          meta: `${clock} · ${open ? 'running' : 'started'}`,
-          tone: open && options.running ? 'lime' : 'muted',
-          live: open && options.running
-        })
+        const settled = settledBy.get(event.payload.itemId)
+        if (settled === undefined) {
+          rows.push({
+            key: event.id,
+            name: railToolName(event.payload),
+            meta: `${clock} · ${options.running ? 'running' : 'did not finish'}`,
+            tone: options.running ? 'lime' : 'muted',
+            live: options.running
+          })
+        } else {
+          const ended = outcome(settled)
+          rows.push({ key: event.id, name: railToolName(event.payload), meta: `${clock} · ${ended.meta}`, tone: ended.tone, live: false })
+        }
         break
       }
       case 'tool.completed':
-        rows.push({
-          key: event.id,
-          name: `${event.payload.name} finished`,
-          meta: `${clock}${event.payload.exitCode === undefined ? '' : ` · exit code ${event.payload.exitCode}`}`,
-          tone: 'muted',
-          live: false
-        })
+      case 'tool.failed': {
+        // Its call already has its row, which says how it ended.
+        if (started.has(event.payload.itemId)) break
+        const ended = outcome(event)
+        rows.push({ key: event.id, name: railToolName(event.payload), meta: `${clock} · ${ended.meta}`, tone: ended.tone, live: false })
         break
-      case 'tool.failed':
-        rows.push({
-          key: event.id,
-          name: `${event.payload.name} ${event.payload.status === 'refused' ? 'refused' : 'failed'}`,
-          meta: event.payload.status === undefined || event.payload.status === 'failed' || event.payload.status === 'refused' ? clock : `${clock} · ${event.payload.status}`,
-          tone: 'red',
-          live: false
-        })
-        break
+      }
       case 'step.started':
       case 'step.completed':
-      case 'step.failed':
-        rows.push({
-          key: event.id,
-          name: `Step ${event.type === 'step.started' ? 'started' : event.type === 'step.completed' ? 'finished' : 'failed'} · ${railWords(event.payload.stepKind)}`,
-          meta: clock,
-          tone: event.type === 'step.failed' ? 'red' : 'muted',
-          live: false
-        })
+      case 'step.failed': {
+        /*
+         * A turn beginning and ending, an item opening: bookkeeping, and half
+         * the rail on a busy run ("Step finished . turn"). What a person reads
+         * of steps is that the model thought, and that a step failed.
+         */
+        const kind = railWords(event.payload.stepKind)
+        if (event.type === 'step.failed') {
+          rows.push({ key: event.id, name: 'A step failed', meta: `${clock} · ${kind}`, tone: 'red', live: false })
+        } else if (event.type === 'step.completed' && /reasoning/.test(kind)) {
+          rows.push({ key: event.id, name: 'Thought', meta: clock, tone: 'muted', live: false })
+        }
         break
+      }
       case 'plan.updated':
         rows.push({
           key: event.id,
@@ -3463,7 +3502,7 @@ export function buildSignalRail(
         })
         break
       case 'run.completed':
-        rows.push({ key: event.id, name: 'Finished', meta: `${clock} · receipt written`, tone: 'blue', live: false })
+        rows.push({ key: event.id, name: 'Finished', meta: clock, tone: 'blue', live: false })
         break
       case 'run.cancelled':
         rows.push({ key: event.id, name: 'Stopped', meta: `${clock} · by you`, tone: 'amber', live: false })
