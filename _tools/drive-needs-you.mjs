@@ -140,8 +140,8 @@ try {
   await drive.evaluate(openTeammateScript('Wren'))
   check('the paused run is counted, from Wren’s conversation', (await chip()) === '3 need you', `"${await chip()}"`)
   const three = JSON.parse(String(await drive.capture('the list with a paused run first', () => drive.evaluate(LIST))))
-  check('the paused run is first in the list', /^Pip needs your approval: /.test(three.rows[0] ?? ''), JSON.stringify(three.rows))
-  await drive.evaluate(pick('/^Pip needs your approval/'))
+  check('the paused run is first in the list, naming the command', /^Pip wants to run: .*NEEDS-YOU/.test(three.rows[0] ?? ''), JSON.stringify(three.rows))
+  await drive.evaluate(pick('/^Pip wants to run/'))
   const approval = String(await drive.evaluate(`(async () => {
     const card = document.querySelector('[role=group][aria-label="Approval required"]')
     if (card === null) return 'no approval card'

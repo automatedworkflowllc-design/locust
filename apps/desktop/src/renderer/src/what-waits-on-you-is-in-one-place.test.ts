@@ -17,7 +17,7 @@ const ASK = '<locust-ask>\nWhich port should the API use?\n- 3000 :: as document
 
 const names: Record<string, string> = { tm_wren: 'Wren', tm_pip: 'Pip' }
 const base = {
-  approvals: [] as { approvalId: string; runId: string; missionId: string; kind: string; summary: string }[],
+  approvals: [] as { approvalId: string; runId: string; missionId: string; kind: string; summary: string; detail: string }[],
   ownerOfRun: (runId: string) => (runId === 'run_w' ? 'tm_wren' : undefined),
   conversations: [] as { missionId: string; phase: string }[],
   ownerOfMission: (missionId: string) => (missionId === 'mission_p' ? 'tm_pip' : undefined),
@@ -50,8 +50,9 @@ describe('what waits on you', () => {
     const items = needsYou({
       ...base,
       approvals: [
-        { approvalId: 'a1', runId: 'run_w', missionId: 'mission_w', kind: 'approval', summary: 'Run npm test in the project folder' },
-        { approvalId: 'a2', runId: 'run_x', missionId: 'mission_x', kind: 'question', summary: 'Which branch?' }
+        { approvalId: 'a1', runId: 'run_w', missionId: 'mission_w', kind: 'command', summary: 'Run a command', detail: 'npm test' },
+        { approvalId: 'a2', runId: 'run_x', missionId: 'mission_x', kind: 'question', summary: 'Which branch?', detail: '' },
+        { approvalId: 'a3', runId: 'run_w', missionId: 'mission_w', kind: 'file-change', summary: 'Change src/app.ts', detail: '@@ -1 +1 @@' }
       ],
       conversations: [
         { missionId: 'mission_p', phase: 'completed' },
@@ -62,17 +63,18 @@ describe('what waits on you', () => {
       eventsOf: (missionId) => (missionId === 'mission_p' || missionId === 'mission_running' || missionId === 'mission_failed' ? [final(ASK), completed] : undefined),
       memoryWaiting: 3
     })
-    expect(items.map((item) => item.key)).toEqual(['approval:a1', 'approval:a2', 'decision:mission_p', 'memory'])
+    expect(items.map((item) => item.key)).toEqual(['approval:a1', 'approval:a2', 'approval:a3', 'decision:mission_p', 'memory'])
     expect(items.map(needsYouLabel)).toEqual([
-      'Wren needs your approval: Run npm test in the project folder',
+      'Wren wants to run: npm test',
       'A teammate is asking: Which branch?',
+      'Wren needs your approval: Change src/app.ts',
       'Pip asked: Which port should the API use?',
       '3 memory suggestions waiting'
     ])
   })
 
   it('says each thing in one line, short enough to be a menu row', () => {
-    const [item] = needsYou({ ...base, approvals: [{ approvalId: 'a1', runId: 'run_w', missionId: 'm', kind: 'approval', summary: `Run\n${'x'.repeat(300)}` }] })
+    const [item] = needsYou({ ...base, approvals: [{ approvalId: 'a1', runId: 'run_w', missionId: 'm', kind: 'command', summary: 'Run a command', detail: `echo\n${'x'.repeat(300)}` }] })
     const what = item?.kind === 'approval' ? item.what : ''
     expect(what.length).toBeLessThanOrEqual(NEEDS_YOU_TEXT)
     expect(what).not.toContain('\n')

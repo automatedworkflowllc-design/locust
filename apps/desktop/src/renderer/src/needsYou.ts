@@ -32,6 +32,8 @@ export type NeedsYouItem =
       readonly what: string
       /** A question the runtime put, rather than an action it wants to take. */
       readonly asking: boolean
+      /** `what` is the exact command it wants to run. */
+      readonly command: boolean
     }
   | {
       readonly kind: 'decision'
@@ -76,7 +78,7 @@ const asked = new WeakMap<readonly NormalizedRuntimeEvent[], string | null>()
 
 export function needsYou(input: {
   /** Runs paused for the person, in the order they arrived. */
-  readonly approvals: readonly { readonly approvalId: string; readonly runId: string; readonly missionId: string; readonly kind: string; readonly summary: string }[]
+  readonly approvals: readonly { readonly approvalId: string; readonly runId: string; readonly missionId: string; readonly kind: string; readonly summary: string; readonly detail: string }[]
   readonly ownerOfRun: (runId: string) => string | undefined
   /**
    * One per conversation, each its newest turn (`collapseConversations`):
@@ -94,14 +96,22 @@ export function needsYou(input: {
   const items: NeedsYouItem[] = []
   for (const request of input.approvals) {
     const teammateId = input.ownerOfRun(request.runId)
+    /*
+     * The command itself, where there is one: "Run a command" names nothing
+     * a person can decide on (drive-needs-you, 0.373). A desktop notification
+     * never shows it -- a lock screen is no place for a secret -- but this
+     * list is inside the app, where the card it opens shows it anyway.
+     */
+    const command = request.kind === 'command' && request.detail.trim().length > 0
     items.push({
       kind: 'approval',
       key: `approval:${request.approvalId}`,
       missionId: request.missionId,
       teammateId,
       name: who(teammateId),
-      what: oneLine(request.summary),
-      asking: request.kind === 'question'
+      what: oneLine(command ? request.detail : request.summary),
+      asking: request.kind === 'question',
+      command
     })
   }
   for (const conversation of input.conversations) {
@@ -120,7 +130,8 @@ export function needsYou(input: {
 export function needsYouLabel(item: NeedsYouItem): string {
   if (item.kind === 'memory') return `${String(item.count)} memory suggestion${item.count === 1 ? '' : 's'} waiting`
   if (item.kind === 'decision') return `${item.name} asked: ${item.what}`
-  return item.asking ? `${item.name} is asking: ${item.what}` : `${item.name} needs your approval: ${item.what}`
+  if (item.asking) return `${item.name} is asking: ${item.what}`
+  return item.command ? `${item.name} wants to run: ${item.what}` : `${item.name} needs your approval: ${item.what}`
 }
 
 /** The chip: how many things wait, as a sentence fragment. */
