@@ -136,6 +136,15 @@ export function hexColourOf(text: string): string | undefined {
   return /^#[0-9a-fA-F]{6}$/.test(trimmed) ? trimmed : undefined
 }
 
+/**
+ * The inside of a bold or italic run: plain text as it always was, and only
+ * a run that holds code, a link or a colour drawn through `inline`.
+ */
+function nested(text: string): ReactElement | string {
+  const spans = splitInlineCode(text)
+  return spans.length === 1 && spans[0]?.kind === 'plain' && hexColourOf(text) === undefined ? text : inline(text)
+}
+
 /** One run of prose, with inline code and link labels drawn. */
 function inline(text: string): ReactElement {
   /*
@@ -209,11 +218,19 @@ function inline(text: string): ReactElement {
            */
           return <OutboundLink key={`s${String(index)}`} href={span.href} text={span.text} host={host} />
         }
+        /*
+         * What is bold or italic can hold code (0.362). A palette written as
+         * "**Crust Brown `#6B4226`** -- Primary" showed its backticks as
+         * characters and no swatch, because a bold run was drawn as plain
+         * text (Iris's brand guide, packaged 0.362). Its contents go through
+         * this same function; the delimiters are already gone, so each level
+         * is strictly shorter than the one around it.
+         */
         if (span.kind === 'strong') {
-          return <strong key={`s${String(index)}`}>{span.text}</strong>
+          return <strong key={`s${String(index)}`}>{nested(span.text)}</strong>
         }
         if (span.kind === 'em') {
-          return <em key={`s${String(index)}`}>{span.text}</em>
+          return <em key={`s${String(index)}`}>{nested(span.text)}</em>
         }
         return <span key={`s${String(index)}`}>{span.text}</span>
       })}

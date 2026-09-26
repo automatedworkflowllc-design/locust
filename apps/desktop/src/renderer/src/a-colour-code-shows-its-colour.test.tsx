@@ -25,6 +25,18 @@ describe('a colour code in an answer', () => {
     expect(prose).not.toContain('lc-swatch')
   }, 10_000)
 
+  it('shows it inside bold and italic, with no backticks left showing (0.362)', () => {
+    // Iris's brand guide: "**Crust Brown `#6B4226`** -- Primary." drew its
+    // backticks as characters and no swatch.
+    const html = renderToStaticMarkup(<AgentText text={'- **Crust Brown `#6B4226`** — Primary.\n- *Berry Jam `#A63D40`* — accent.'} streaming={false} />)
+    expect(html).toContain('style="background-color:#6B4226"')
+    expect(html).toContain('style="background-color:#A63D40"')
+    expect(html).not.toContain('`')
+    expect(html).toMatch(/<strong><span>Crust Brown <\/span><code class="lc-code--inline">/)
+    // And bold with nothing inside it is drawn exactly as it always was.
+    expect(renderToStaticMarkup(<AgentText text={'**Plain bold.** After.'} streaming={false} />)).toContain('<strong>Plain bold.</strong>')
+  }, 10_000)
+
   it('draws nothing for code that is not exactly a colour', () => {
     const html = renderToStaticMarkup(<AgentText text={'Run `npm test`, see issue `#12a`, and `#7a9e8e;background:url(x)`.'} streaming={false} />)
     expect(html).not.toContain('lc-swatch')

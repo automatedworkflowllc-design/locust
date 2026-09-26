@@ -15,9 +15,10 @@ heading: the home screen then shows it once, as a splash.
 
 ### Improved
 
-- **Colours in a table show their colour.** A palette written as a table or
-  a list of hex codes now has a swatch beside each colour, as it already did
-  when the code was in backticks.
+- **Colours in a palette show their colour.** A hex code in a table, in a
+  list or in bold text now has a swatch beside it, as it already did on its
+  own in backticks. Bold or italic text holding code no longer shows the
+  backticks as characters.
 - Iris, the designer in the Write & design team, now suggests a one-page
   brand guide (palette, fonts and voice) instead of a web page. Locust never
   runs what a teammate writes, so a web page opened as its source code; a
