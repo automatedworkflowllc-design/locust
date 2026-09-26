@@ -11,6 +11,25 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.368.0 - 2026-09-26
+
+### Improved
+
+- **A busy free model says so.** Free OpenCode models are shared, and at busy
+  times their providers turn requests away for a while. A teammate on one
+  used to sit on "Starting…" for minutes with no reason given. Now the
+  conversation says what the provider answered, that OpenCode keeps trying on
+  its own, and that you can press Stop and pick another model to go on now.
+
+### Fixed
+
+- **A plan with steps left unticked no longer looks like a problem.** When a
+  teammate finished its turn without ticking off every step of its plan — a
+  writer asking you questions before it drafts, say — the plan showed
+  "not checked off" in amber, the colour for something that went wrong. It
+  is said plainly now, and amber is kept for a run that failed or was
+  stopped.
+
 ## 0.367.0 - 2026-09-26
 
 ### Improved
