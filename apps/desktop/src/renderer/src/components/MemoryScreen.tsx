@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { MemoryMode, MemoryScope, MemoryUpdateRequest, PublicForgottenMemory, PublicMemory, PublicTeammate } from '../../../shared/ipc.js'
 import { daysUnused, lastWritten, outOfDate } from '../../../shared/memory.js'
 import { TIDY_NUDGE_AT, readableReason } from '../../../shared/memory-tidy.js'
+import { Icon } from './Icon.js'
 import { TeammateBot } from './TeammateBot.js'
 
 /**
@@ -15,6 +16,32 @@ import { TeammateBot } from './TeammateBot.js'
  * edited, switched off, or removed; one a teammate proposed waits here for
  * a keep or a forget. Only kept, switched-on memories reach a teammate.
  */
+/**
+ * KEEP ALL (0.372).
+ *
+ * A tidy pass of a folder that needed one waits as ten suggestions, and ten
+ * presses is a chore that teaches a person to stop tidying (the 62-memory
+ * drive). Everything kept can be put back -- a merge or a change says what
+ * it was, a forgotten memory waits seven days under Recently forgotten -- so
+ * keeping them all at once risks nothing a single Keep does not.
+ *
+ * One after another, never at once: keeping one can change what a later one
+ * is about, and the store's check then refuses that one on its own
+ * ("What this suggestion would change has changed since it was made"). Every
+ * refusal is said, each reason once.
+ */
+export async function keepEvery(
+  memoryIds: readonly string[],
+  keep: (memoryId: string) => Promise<string | undefined>
+): Promise<string | undefined> {
+  const reasons: string[] = []
+  for (const memoryId of memoryIds) {
+    const refused = await keep(memoryId)
+    if (refused !== undefined && !reasons.includes(refused)) reasons.push(refused)
+  }
+  return reasons.length === 0 ? undefined : reasons.join(' ')
+}
+
 export function MemoryScreen({
   memories,
   workspaceId,
@@ -96,6 +123,11 @@ export function MemoryScreen({
     })
   }
 
+  /** Keep every suggestion waiting, one after another (0.372). */
+  const keepAll = async (): Promise<void> => {
+    await act(() => keepEvery(proposed.map((memory) => memory.memoryId), (memoryId) => onUpdate({ memoryId, keep: true })))
+  }
+
   const saveEdit = async (): Promise<void> => {
     if (editing === undefined) return
     await act(async () => {
@@ -117,18 +149,31 @@ export function MemoryScreen({
     const isEditing = editing?.memoryId === memory.memoryId
     return (
       <div key={memory.memoryId} className={`lc-memory${memory.enabled ? '' : ' is-off'}${memory.status === 'proposed' ? ' is-proposed' : ''}`}>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={memory.enabled}
-          aria-label={memory.enabled ? 'Switch this memory off' : 'Switch this memory on'}
-          className={`lc-memory__switch${memory.enabled ? ' is-on' : ''}`}
-          disabled={busy || memory.status === 'proposed'}
-          title={memory.status === 'proposed' ? 'Keep it first' : memory.enabled ? 'On: teammates read this' : 'Off: kept, but not read'}
-          onClick={() => void act(() => onUpdate({ memoryId: memory.memoryId, enabled: !memory.enabled }))}
-        >
-          <span className="lc-memory__knob" />
-        </button>
+        {memory.status === 'proposed' ? (
+          /*
+           * A suggestion has two answers, and they are its buttons. It wore
+           * the kept rows' on/off switch too -- disabled, dimmed, and drawn
+           * ON, a state that means nothing until it is kept (the 62-memory
+           * tidy drive, 0.372). The mark the conversation's memory card uses
+           * for a suggestion stands in its place, so the words still line up.
+           */
+          <span className="lc-memory__suggested" aria-hidden="true">
+            <Icon name="spark" size={14} />
+          </span>
+        ) : (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={memory.enabled}
+            aria-label={memory.enabled ? 'Switch this memory off' : 'Switch this memory on'}
+            className={`lc-memory__switch${memory.enabled ? ' is-on' : ''}`}
+            disabled={busy}
+            title={memory.enabled ? 'On: teammates read this' : 'Off: kept, but not read'}
+            onClick={() => void act(() => onUpdate({ memoryId: memory.memoryId, enabled: !memory.enabled }))}
+          >
+            <span className="lc-memory__knob" />
+          </button>
+        )}
         <div className="lc-memory__body">
           {isEditing ? (
             <textarea
@@ -296,6 +341,14 @@ export function MemoryScreen({
         {proposed.length > 0 && (
           <section className="lc-settings__section">
             <h2 className="lc-settings__heading">Waiting for you</h2>
+            {proposed.length >= 2 && (
+              <div className="lc-memoryform__row">
+                <span className="lc-settings__note">Anything you keep can be put back.</span>
+                <button type="button" className="lc-ghostbutton" disabled={busy} onClick={() => void keepAll()}>
+                  Keep all {proposed.length}
+                </button>
+              </div>
+            )}
             <div className="lc-memorylist">{proposed.map(row)}</div>
           </section>
         )}

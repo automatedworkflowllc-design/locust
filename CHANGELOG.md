@@ -13,6 +13,16 @@ heading: the home screen then shows it once, as a splash.
 
 ## 0.372.0 - 2026-09-26
 
+### Improved
+
+- **Keep all, for a tidy you agree with.** A tidy pass on a busy folder can
+  leave ten suggestions waiting. "Keep all" answers them in one press, and
+  anything kept can still be put back: a merge or a change shows what it
+  was, and a forgotten memory waits seven days under Recently forgotten.
+- **A suggestion no longer wears an on/off switch.** Waiting suggestions
+  carried a kept memory's switch, drawn on but unusable. They now show the
+  same spark as the memory card in the conversation.
+
 ### Fixed
 
 - **Tidy up no longer loses a teammate's suggestions.** Asked to tidy

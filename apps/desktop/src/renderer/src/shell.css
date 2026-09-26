@@ -2826,6 +2826,17 @@ textarea {
   cursor: default;
 }
 
+/* A suggestion's mark, where a kept memory's switch is: the switch's width,
+   so a suggestion's words start where a memory's do. */
+.lc-memory__suggested {
+  flex: 0 0 auto;
+  display: inline-flex;
+  justify-content: center;
+  width: 28px;
+  margin-top: 3px;
+  color: var(--lc-text-muted);
+}
+
 .lc-memory__knob {
   width: 10px;
   height: 10px;

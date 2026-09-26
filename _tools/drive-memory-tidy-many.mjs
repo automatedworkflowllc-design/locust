@@ -134,7 +134,10 @@ const SCREEN = `(async () => {
   })
 })()`
 const screen = async () => JSON.parse(String(await drive.evaluate(SCREEN)))
-const fileIds = async () => [...(await readFile(join(workspace, '.locust', 'memory.md'), 'utf8').catch(() => '')).matchAll(/\[(mem_[A-Za-z0-9_-]+)\]/g)].map((match) => match[1])
+// What the store keeps, read from the profile: `.locust/memory.md` is only
+// rewritten when the next run starts, so it cannot say what an answer did.
+const keptIds = async () =>
+  JSON.parse(await readFile(join(drive.profile, 'memories.json'), 'utf8')).memories.filter((memory) => memory.status === 'kept').map((memory) => memory.memoryId)
 
 try {
   await drive.ready()
@@ -172,33 +175,27 @@ try {
   const waiting = JSON.parse(String(await drive.capture('the suggestions, waiting', () => drive.evaluate(SCREEN))))
   say(`waiting (${String(waiting.waiting.length)}):\n    ${waiting.waiting.join('\n    ')}`)
   check('suggestions wait on the screen, first thing on it', waiting.waiting.length > 0 && waiting.firstSection === 'Waiting for you', JSON.stringify({ count: waiting.waiting.length, first: waiting.firstSection }))
-  check('nothing kept changed before an answer', (await fileIds()).length === total, `${String((await fileIds()).length)} of ${String(total)} in the file`)
+  const keptBefore = await keptIds()
+  check('nothing kept changed before an answer', keptBefore.length === total && memories.every((memory) => keptBefore.includes(memory.memoryId)), `${String(keptBefore.length)} of ${String(total)} kept`)
 
-  // Every suggestion, answered with its first button, the way a person who
-  // agrees with the pass would. The file then says what the pass did.
-  let answered = 0
-  for (let guard = 0; guard < 15; guard += 1) {
-    const pressed = await drive.evaluate(`(async () => {
-      ${memoryScreen}
-      const row = document.querySelector('.lc-memory.is-proposed')
-      if (row === null) return 'none left'
-      // The answer that agrees -- not the row's on/off switch, which is a button too.
-      const button = [...row.querySelectorAll('button')].find((b) => /^(Merge them|Forget it|Keep the change|Keep)$/.test(b.innerText.trim()))
-      if (button === undefined) return 'no answer button: ' + row.innerText.replace(/\\s+/g, ' ')
-      const label = button.innerText.trim()
-      button.click()
-      await new Promise(r => setTimeout(r, 900))
-      return label
-    })()`)
-    if (String(pressed) === 'none left') break
-    if (String(pressed).startsWith('no answer button')) {
-      say(`  ${String(pressed)}`)
-      break
+  // Every suggestion kept at once, with Keep all (0.372) -- what a person who
+  // agrees with the pass presses. The store then says what the pass did.
+  const kept = await drive.capture('Keep all', () => drive.evaluate(`(async () => {
+    ${memoryScreen}
+    const button = [...document.querySelectorAll('button')].find((b) => /^Keep all [0-9]+$/.test(b.innerText.trim()))
+    if (button === undefined) return 'no Keep all button'
+    const label = button.innerText.trim()
+    button.click()
+    for (let i = 0; i < 80; i += 1) {
+      await new Promise(r => setTimeout(r, 250))
+      if (document.querySelector('.lc-memory.is-proposed') === null) break
     }
-    answered += 1
-  }
+    return label + ' || still waiting: ' + String(document.querySelectorAll('.lc-memory.is-proposed').length)
+  })()`))
+  check('Keep all is offered for every suggestion, and answers them all', new RegExp(`^Keep all ${String(waiting.waiting.length)} [|][|] still waiting: 0$`).test(String(kept)), String(kept))
+  const answered = waiting.waiting.length
   const after = JSON.parse(String(await drive.capture('every suggestion answered', () => drive.evaluate(SCREEN))))
-  const left = await fileIds()
+  const left = await keptIds()
   const gone = memories.map((memory) => memory.memoryId).filter((id) => !left.includes(id))
   say(`answered ${String(answered)}; gone from the file: ${gone.join(', ')}`)
   const pairsMerged = PAIRS.filter(([ida, , idb]) => gone.includes(ida) !== gone.includes(idb) || (gone.includes(ida) && gone.includes(idb))).length
