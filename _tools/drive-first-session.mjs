@@ -38,12 +38,12 @@ const tag = arg('--tag')
 const team = arg('--team') ?? 'Research & money'
 const mate = arg('--mate') ?? 'Sable'
 const starter = arg('--starter') === undefined ? undefined : Number(arg('--starter'))
+const plain = process.argv.includes('--plain')
 const ask = arg('--ask') ?? (starter === undefined ? 'I have $12,000 saved and want to use it within three years. How should I think about where to keep it?' : undefined)
 const slug = `${team === 'Research & money' && mate === 'Sable' && starter === undefined ? '' : `-${mate.toLowerCase()}${starter === undefined ? '' : `-starter${String(starter)}`}`}${plain ? '-plain' : ''}`
 const outPath = tag === undefined ? undefined : join(new URL('../docs/beta-fixes-2026-09-24/', import.meta.url).pathname.slice(1), `first-session${slug}-${tag}`)
 if (outPath !== undefined) await mkdir(outPath, { recursive: true })
 
-const plain = process.argv.includes('--plain')
 const workspace = plain ? await mkdtemp(join(tmpdir(), 'locust-drive-first-session-plain-')) : await scratchRepository('locust-drive-first-session-ws-')
 if (plain) await writeFile(join(workspace, 'notes.md'), ['# My notes', '', 'A plain folder, no git.', ''].join('\n'), 'utf8')
 const drive = await startDrive({
