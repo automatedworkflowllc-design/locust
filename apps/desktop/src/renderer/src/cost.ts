@@ -334,10 +334,19 @@ export function headerCostTail(input: {
   readonly events: readonly NormalizedRuntimeEvent[]
   readonly running: boolean
 }): string {
-  const cost = runCostOf(input.events)
-  if (costUnit(cost) !== 'money') return ''
-  const line = costLine(cost)
+  const line = moneyLine(runCostOf(input.events))
   return line === undefined ? '' : ' · ' + (input.running ? 'so far ' : '') + line
+}
+
+/**
+ * A cost for the surfaces read AT A GLANCE -- the conversation's header, the
+ * relay's strip, a teammate's card: money, or nothing. Token counts and "in
+ * your plan" stay where a person goes for detail (Details, the Activity
+ * panel, the context ring's hover), not on every surface they pass
+ * (first-impressions pass, after 0.349).
+ */
+export function moneyLine(cost: RunCost | undefined): string | undefined {
+  return costUnit(cost) === 'money' ? costLine(cost) : undefined
 }
 
 export function missionCostTail(input: {

@@ -43,7 +43,7 @@ import { CliArtifacts } from './CliArtifacts.js'
 import { TeammateBot } from './TeammateBot.js'
 import { keepCurrentNote, offersUpdate, updateLine } from '../agentUpdates.js'
 import { Icon } from './Icon.js'
-import { costCell, costLabel, costLineOrWhyNot, costTotal, runCostOf } from '../cost.js'
+import { costCell, costTotal, moneyLine, runCostOf } from '../cost.js'
 import { agoLabel, teammateWork } from '../teammateWork.js'
 import { routineRunSummary, routineScheduleSummary, routineStepLabel } from '../routines.js'
 import { RoutineRecovery } from './RoutineRecovery.js'
@@ -671,14 +671,19 @@ export function TeammatesScreen({
                 {/* Only once there has been a run to report on: before the first,
                     "not reported by the runtime" blamed a runtime nobody had
                     used yet (design pass, 2026-09-22). */}
-                {work.lastRunAt !== undefined && (
+                {/*
+                  * MONEY, OR NO ROW (first-impressions pass, after 0.349). The
+                  * card said "USAGE 18k in . 612 out" for every teammate -- an
+                  * engineer's unit on the card a person reads to know who is on
+                  * their team. What a teammate COST is worth a row; a token
+                  * count is in their conversations' Details. No row claims
+                  * nothing, so a run that reported no price is never shown as
+                  * free.
+                  */}
+                {work.lastRunAt !== undefined && moneyLine(work.cost) !== undefined && (
                   <dl className="lc-rostercard__cost">
-                    {/* `Usage` when the receipts carry tokens and no price: a
-                        free route's numbers are a measurement, not a charge. */}
-                    <dt>{costLabel(work.cost)}</dt>
-                    <dd className={`lc-mono${work.cost === undefined ? ' is-unreported' : ''}`}>
-                      {costLineOrWhyNot(work.cost)}
-                    </dd>
+                    <dt>Cost</dt>
+                    <dd className="lc-mono">{moneyLine(work.cost)}</dd>
                   </dl>
                 )}
                 {work.recent.length > 0 && (

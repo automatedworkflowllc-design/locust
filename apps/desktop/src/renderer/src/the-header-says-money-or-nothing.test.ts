@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
-import { headerCostTail } from './cost.js'
+import { headerCostTail, moneyLine } from './cost.js'
 
 // First-impressions pass, after 0.349: the conversation header said
 // "9.0k in . 240 out" and "in your plan" -- an engineer's unit, and a
@@ -37,5 +37,17 @@ describe("what the conversation's header says a run cost", () => {
 
   it('says nothing before the run has reported', () => {
     expect(headerCostTail({ events: [], running: true })).toBe('')
+  }, 10_000)
+})
+
+// The same rule for every surface read at a glance -- the relay's strip and a
+// teammate's card use it too.
+describe('a cost for a glance', () => {
+  it('is money, or nothing', () => {
+    expect(moneyLine({ usd: 1.2 })).toBe('$1.20')
+    expect(moneyLine({ premiumRequests: 2 })).toBe('2 premium requests')
+    expect(moneyLine({ inputTokens: 9000, outputTokens: 240 })).toBeUndefined()
+    expect(moneyLine({ inputTokens: 9000, outputTokens: 240, plan: true })).toBeUndefined()
+    expect(moneyLine(undefined)).toBeUndefined()
   }, 10_000)
 })

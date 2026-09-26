@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ReactElement } from 'react'
 
-import { costLine } from '../cost.js'
+import { moneyLine } from '../cost.js'
 import type { ExchangeOverview } from '../exchange.js'
 import { Icon } from './Icon.js'
 
@@ -28,7 +28,8 @@ export function ExchangeStrip({
   readonly stopping: boolean
 }): ReactElement {
   const live = exchange.liveRunIds.length > 0
-  const cost = costLine(exchange.cost)
+  // Money, or nothing: the strip is read at a glance (`moneyLine`).
+  const cost = moneyLine(exchange.cost)
   const [open, setOpen] = useState(false)
 
   // Over, and not open: one line. Everything the band said is still here --

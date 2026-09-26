@@ -333,7 +333,14 @@ export function FirstLaunch({
               * on "we have not looked", which is the ordinary state at first
               * launch. See `freeStartStillFree`.
               */}
-            {freeStart === 'no' ? 'Your coding agents, on your own accounts.' : 'Your coding agents, on your own accounts. OpenCode works without one.'}
+            {/*
+              * "AI agents", not "coding agents" (2026-09-26). The tools are
+              * coding agents by their makers' name for them, and they do far
+              * more than code; Locust is for "quite literally ANY ai user" --
+              * code, money, design (Colin) -- and a person here for the second
+              * two was told on the first line that this was not for them.
+              */}
+            {freeStart === 'no' ? 'Your AI agents, on your own accounts.' : 'Your AI agents, on your own accounts. OpenCode works without one.'}
           </p>
         )}
 
@@ -527,7 +534,7 @@ export function FirstLaunch({
             const names = shown.filter((row) => row.connected).map((row) => row.runtime.displayName)
             return (
               <div className="lc-agenthead is-folded">
-                <span className="lc-agenthead__label">Coding agents</span>
+                <span className="lc-agenthead__label">AI agents</span>
                 <span className="lc-agenthead__note is-green">{headNote}</span>
                 <span className="lc-agenthead__names" title={names.join(', ')}>{names.join(' · ')}</span>
                 <button type="button" className="lc-agenthead__more" onClick={() => setAgentsOpen(true)}>
@@ -539,7 +546,7 @@ export function FirstLaunch({
           return (
             <>
               <div className="lc-agenthead">
-                <span className="lc-agenthead__label">Coding agents</span>
+                <span className="lc-agenthead__label">AI agents</span>
                 <span className={`lc-agenthead__note${connected > 0 && !checkingAny ? ' is-green' : ''}`}>{headNote}</span>
               </div>
               <div className="lc-runtimepanel">
