@@ -173,7 +173,9 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
   // A relaunch on the same profile (a scheduled routine after a quit) keeps
   // writing into the same record, numbering its steps after the first run's.
-  const out = outPath ?? join(new URL('../docs/user-session/', import.meta.url).pathname.slice(1), `${stamp}-${name}`)
+  // LOCUST_DRIVE_OUT moves the default record somewhere else -- the sweep
+  // (sweep-drives.mjs) keeps a whole run's captures out of the repository.
+  const out = outPath ?? join(process.env.LOCUST_DRIVE_OUT ?? new URL('../docs/user-session/', import.meta.url).pathname.slice(1), `${stamp}-${name}`)
   await mkdir(out, { recursive: true })
   const profile = profilePath ?? await mkdtemp(join(tmpdir(), `locust-drive-${name}-`))
   if (seed !== undefined) {
