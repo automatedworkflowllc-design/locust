@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
-import { Inspector } from './components/Inspector.js'
+import { Inspector, noArtifactsLine } from './components/Inspector.js'
 import { sandboxPhrase } from './status.js'
 
 /**
@@ -35,6 +35,15 @@ describe('the permissions panel', () => {
     for (const sandbox of ['read-only', 'workspace-write', 'full-access'] as const) {
       expect(render(sandbox)).not.toMatch(/host-selected|argv|app-server|workspace folder/)
     }
+  })
+
+  it('says why its Artifacts are empty for THIS run, not that every empty one was read-only (0.362)', () => {
+    // An editor's run in Edit that wrote nothing -- its teammate wrote the
+    // draft -- was told "A read-only mission produces none".
+    expect(noArtifactsLine('workspace-write', false)).toBe('This reply changed no files.')
+    expect(noArtifactsLine('full-access', false)).toBe('This reply changed no files.')
+    expect(noArtifactsLine('read-only', false)).toBe('This reply could only read, so it changed no files.')
+    expect(noArtifactsLine('workspace-write', true)).toBe('Files this reply changes appear here as it works.')
   })
 
   it('is called what it is about, not "inspector" (0.361)', () => {

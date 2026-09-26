@@ -138,6 +138,25 @@ export function hexColourOf(text: string): string | undefined {
 
 /** One run of prose, with inline code and link labels drawn. */
 function inline(text: string): ReactElement {
+  /*
+   * A WHOLE CELL THAT IS A COLOUR, drawn as one in backticks is (0.362).
+   *
+   * A palette is as often a table -- "| Crust | #C8A27A |" -- as a line of
+   * code spans, and then its colours were a column to imagine again (the
+   * Write & design drive, packaged 0.361). Only a run that is NOTHING but
+   * `#rrggbb` qualifies: a table cell, a list item, a line on its own. A hex
+   * inside a sentence stays text, which is GitHub's rule for the same reason
+   * -- "fixed in #123456" is not a colour.
+   */
+  const whole = hexColourOf(text)
+  if (whole !== undefined) {
+    return (
+      <code className="lc-code--inline">
+        <span className="lc-swatch" style={{ backgroundColor: whole }} aria-hidden="true" />
+        {text.trim()}
+      </code>
+    )
+  }
   return (
     <>
       {splitInlineCode(text).map((span, index) => {

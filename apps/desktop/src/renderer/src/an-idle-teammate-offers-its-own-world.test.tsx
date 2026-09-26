@@ -50,6 +50,23 @@ describe('an idle teammate', () => {
     }
   })
 
+  /*
+   * AND NOTHING LOCUST WOULD SHOW AS SOURCE (0.362).
+   *
+   * Iris's first starter asked for "a one-page website ... as a single HTML
+   * file" -- and Locust never runs what a teammate wrote
+   * (DECISION-2026-09-20), so the page she made opened as 212 lines of HTML
+   * (the Write & design drive, packaged 0.361). A starter for someone who is
+   * not a coder asks for something the app can show them.
+   */
+  it('never asks a non-coder for a page the app would only show as code', () => {
+    for (const template of TEAM_TEMPLATES.filter((entry) => entry.templateId !== 'software')) {
+      for (const mate of template.teammates) {
+        for (const starter of mate.starters) expect(starter).not.toMatch(/\b(HTML|CSS|JavaScript|website|web page)\b/i)
+      }
+    }
+  })
+
   it('says what the role is for, not that every role reads the workspace', () => {
     const sable = made(TEAM_TEMPLATES[1]!.teammates[0]!)
     expect(idle(sable)).toContain('Research &amp; Briefs · Reading, comparing, summarising.')

@@ -146,7 +146,10 @@ export const TEAM_TEMPLATES: readonly TeamTemplate[] = [
         hue: 'clay',
         bot: { shape: 'cloud', face: 'eyes' },
         starters: [
-          'Design a one-page website for a small bakery, as a single HTML file in this folder.',
+          // A brand guide, not a web page: Locust never runs what a teammate
+          // wrote (DECISION-2026-09-20), so a page she made would open here as
+          // its source code. A guide opens as a document, palette swatched.
+          'Make a one-page brand guide for a small bakery in this folder: a colour palette with hex codes, two font pairings, and the voice to write in.',
           'Suggest a colour palette and two font pairings for a calm, modern brand, with hex codes.',
           'Look at the files in this folder and suggest how to make them look more polished.'
         ]

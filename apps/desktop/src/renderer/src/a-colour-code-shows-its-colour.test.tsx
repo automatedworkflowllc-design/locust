@@ -13,6 +13,18 @@ describe('a colour code in an answer', () => {
     expect(html).toContain('style="background-color:#F6F3EE"')
   }, 10_000)
 
+  it('shows it for a table cell or a list item that is nothing but a colour (0.362)', () => {
+    // A palette as a table was a column to imagine again (Write & design drive, 0.361).
+    const table = renderToStaticMarkup(<AgentText text={['| Role | Hex |', '| --- | --- |', '| Crust | #C8A27A |', '| Flour | #F4EFE6 |'].join('\n')} streaming={false} />)
+    expect(table).toContain('style="background-color:#C8A27A"')
+    expect(table).toContain('style="background-color:#F4EFE6"')
+    const list = renderToStaticMarkup(<AgentText text={['- #2E4A3F', '- #D98E73'].join('\n')} streaming={false} />)
+    expect(list).toContain('style="background-color:#2E4A3F"')
+    // Inside a sentence it is text, as GitHub draws it: "fixed in #123456" is not a colour.
+    const prose = renderToStaticMarkup(<AgentText text={'Fixed in #123456 and the crust is #C8A27A now.'} streaming={false} />)
+    expect(prose).not.toContain('lc-swatch')
+  }, 10_000)
+
   it('draws nothing for code that is not exactly a colour', () => {
     const html = renderToStaticMarkup(<AgentText text={'Run `npm test`, see issue `#12a`, and `#7a9e8e;background:url(x)`.'} streaming={false} />)
     expect(html).not.toContain('lc-swatch')

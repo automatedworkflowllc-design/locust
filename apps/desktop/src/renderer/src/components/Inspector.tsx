@@ -20,6 +20,21 @@ function Empty({ children }: { readonly children: string }): ReactElement {
 }
 
 /**
+ * Why the Artifacts tab is empty, said for THIS run (0.362).
+ *
+ * It said "A read-only mission produces none; artifacts appear once a run
+ * can write" under every empty tab -- including an editor's run in Edit that
+ * simply wrote nothing because its teammate had written the draft (the Write
+ * & design drive, packaged 0.361). A run that could write and did not is not
+ * a read-only run.
+ */
+export function noArtifactsLine(sandbox: 'read-only' | 'workspace-write' | 'full-access' | undefined, running: boolean): string {
+  if (running) return 'Files this reply changes appear here as it works.'
+  if (sandbox === 'read-only') return 'This reply could only read, so it changed no files.'
+  return 'This reply changed no files.'
+}
+
+/**
  * The mission inspector. The Signal Rail is the honest home for detail: the
  * thread stays semantic and everything that actually happened lives here.
  *
@@ -200,9 +215,7 @@ export function Inspector({
 
         {tab === 'Artifacts' &&
           (artifacts.length === 0 ? (
-            <Empty>
-              No artifacts. A read-only mission produces none; artifacts appear once a run can write.
-            </Empty>
+            <Empty>{noArtifactsLine(sandbox, running)}</Empty>
           ) : (
             // The tab has made this promise since it was built and never kept
             // it: it said artifacts appear once a run can write, and then
