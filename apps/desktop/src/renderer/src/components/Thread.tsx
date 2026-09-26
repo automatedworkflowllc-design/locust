@@ -287,6 +287,7 @@ export function ThreadItems({
                   outcomes={!(planMode && item.touchedNothing === true)}
                   underway={runningOrb !== undefined}
                   finished={item.finished === true}
+                  stopped={item.stopped === true}
                 />
                 {/*
                   * Derived, and true: this run changed nothing, and the mode is

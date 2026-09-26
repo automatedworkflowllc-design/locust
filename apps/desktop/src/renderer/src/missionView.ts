@@ -1009,6 +1009,17 @@ export type ThreadItem =
        * often the most useful thing on the card.
        */
       readonly finished?: boolean
+      /**
+       * The run FAILED or was STOPPED before it closed its list.
+       *
+       * Then an unchecked step is one it did not get to, and the card says
+       * so in amber. After a run that completed, the same count is only the
+       * runtime's checklist left unticked: Quill asked its five questions
+       * and ended "Reply with your answers and I'll draft the page", and its
+       * card read "2 not checked off" in amber over a pause that was right
+       * to make (the Write & design first session, packaged 0.366).
+       */
+      readonly stopped?: boolean
     }
   | {
       /**
@@ -2849,6 +2860,7 @@ export function buildThread(
       steps: planSteps.steps,
       doneCount: planSteps.doneCount,
       ...(options.running ? {} : { finished: true }),
+      ...(['failed', 'cancelled'].includes(traceOutcome(events, options.running)) ? { stopped: true } : {}),
       // A turn that ran nothing planned and stopped. Anything else has
       // changed something, whatever its plan says.
       ...(activity.length === 0 ? { touchedNothing: true } : {})

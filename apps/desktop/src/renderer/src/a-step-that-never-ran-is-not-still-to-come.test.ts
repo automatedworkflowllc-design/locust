@@ -86,6 +86,15 @@ describe('a step that never ran is not still to come', () => {
     expect(live.finished).toBeUndefined()
   })
 
+  it('says the run stopped short only when it failed or was stopped (0.368)', () => {
+    // Quill asked its questions, waited for the answers, and its completed
+    // turn read "2 not checked off" in amber, the colour for interrupted.
+    expect((planItem(events, false) as { stopped?: boolean }).stopped).toBeUndefined()
+    const stoppedShort = (ending: string) => [...events.slice(0, 3), event(ending, {})]
+    expect((planItem(stoppedShort('run.failed'), false) as { stopped?: boolean }).stopped).toBe(true)
+    expect((planItem(stoppedShort('run.cancelled'), false) as { stopped?: boolean }).stopped).toBe(true)
+  })
+
   it('has nothing to report when the runtime closed its own plan', () => {
     // The ordinary case both earlier agents saw: every step done, so there
     // is no gap between what was planned and what happened.

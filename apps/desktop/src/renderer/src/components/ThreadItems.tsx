@@ -555,7 +555,8 @@ export function PlanSteps({
   doneCount,
   outcomes,
   underway = false,
-  finished = false
+  finished = false,
+  stopped = false
 }: {
   readonly steps: readonly PlanStep[]
   readonly doneCount: number
@@ -575,6 +576,12 @@ export function PlanSteps({
    * describing them in the present tense.
    */
   readonly finished?: boolean
+  /**
+   * Whether the run failed or was stopped before closing its list. Only
+   * then is an unchecked step one it did not get to, drawn in amber; after
+   * a run that completed it is the checklist left unticked, said plainly.
+   */
+  readonly stopped?: boolean
   /**
    * Whether the turn is still running, so the step underway gets its orb.
    *
@@ -670,13 +677,29 @@ export function PlanSteps({
             * the runtime's bookkeeping; whether the work happened is a
             * different fact, and this card can only report the first.
             */}
+          {/*
+            * AMBER ONLY WHEN THE RUN STOPPED SHORT (0.368). Amber says
+            * interrupted; a run that completed and left its list unticked
+            * was not -- Quill asking its questions and waiting for the
+            * answers read as a fault. After a completed run it is said in the
+            * header's own voice, after a separator.
+            */}
           {finished && outcomes && steps.length - doneCount > 0 && (
-            <span
-              className="lc-plancard__unreached"
-              title="The run ended without checking these off its list. That is the runtime's checklist, not a check of the work: see what it ran below."
-            >
-              {steps.length - doneCount} not checked off
-            </span>
+            <>
+              <span className="lc-separator" aria-hidden="true">
+                ·
+              </span>
+              <span
+                className={`lc-plancard__unreached${stopped ? ' is-stopped' : ''}`}
+                title={
+                  stopped
+                    ? 'The run stopped before checking these off its list: see what it ran below.'
+                    : "The run ended without checking these off its list. That is the runtime's checklist, not a check of the work: see what it ran below."
+                }
+              >
+                {steps.length - doneCount} not checked off
+              </span>
+            </>
           )}
         </span>
       </div>

@@ -47,7 +47,7 @@ describe("a rate-limited OpenCode run says it is retrying", () => {
         // `*.runtime_error` is what the thread shows before any tool has run,
         // the rule Codex's "Reconnecting... 2/5" already goes through.
         code: "opencode.runtime_error",
-        message: 'The model\'s provider answered "Rate limit exceeded", and OpenCode is trying again on its own.',
+        message: 'The model\'s provider answered "Rate limit exceeded", and OpenCode is trying again on its own. To go on now, press Stop and pick another model.',
       },
     });
   }, 10_000);
@@ -69,13 +69,39 @@ describe("a rate-limited OpenCode run says it is retrying", () => {
     const line = (said: string) =>
       `timestamp=${NOW} level=ERROR run=r message="stream error" providerID=p modelID=m session.id=s small=false agent=build mode=primary error.error="${said}"`;
 
-    expect(opencode.accept(stderrRecord(line("AI_APICallError: Rate limit exceeded"), 1))).toHaveLength(0);
-    expect(opencode.accept(stderrRecord(line("AI_APICallError: Rate limit exceeded"), 2))).toHaveLength(1);
+    // A rate limit and an overload are always retried: each is said on its first line (0.368).
+    expect(opencode.accept(stderrRecord(line("AI_APICallError: Rate limit exceeded"), 1))).toHaveLength(1);
+    expect(opencode.accept(stderrRecord(line("AI_APICallError: Rate limit exceeded"), 2))).toHaveLength(0);
     expect(opencode.accept(stderrRecord(line("AI_APICallError: Rate limit exceeded"), 3))).toHaveLength(0);
-    expect(opencode.accept(stderrRecord(line("AI_APICallError: Overloaded"), 4))).toHaveLength(0);
-    const overloaded = opencode.accept(stderrRecord(line("AI_APICallError: Overloaded"), 5));
+    const overloaded = opencode.accept(stderrRecord(line("AI_APICallError: Overloaded"), 4));
+    expect(opencode.accept(stderrRecord(line("AI_APICallError: Overloaded"), 5))).toHaveLength(0);
     expect(overloaded).toHaveLength(1);
     expect(overloaded[0]?.type === "adapter.diagnostic" ? overloaded[0].payload.message : "").toContain('"Overloaded"');
+  }, 10_000);
+
+  it("says it at once for the real free model, whose next try is minutes away (0.368)", () => {
+    // The 0.367 sweep: one build line, then minutes of "Starting" with nothing
+    // said, because the rule waited for a second line that was minutes off.
+    const free = readFileSync(new URL("./fixtures/opencode/rate-limited-free-1.18.27.stderr.txt", import.meta.url), "utf8")
+      .split("\n")
+      .filter((line) => line.trim().length > 0);
+    const opencode = normalizer();
+    const first = opencode.accept(stderrRecord(free[0]!, 1));
+    expect(first).toHaveLength(1);
+    const said = first[0]?.type === "adapter.diagnostic" ? first[0].payload.message : "";
+    expect(said).toContain('"Rate limit exceeded. Please try again later."');
+    expect(said).toContain("press Stop and pick another model");
+    expect(free.slice(1).flatMap((line, index) => opencode.accept(stderrRecord(line, index + 2)))).toEqual([]);
+  }, 10_000);
+
+  it("waits for the second line of an error of no known retried kind", () => {
+    const opencode = normalizer();
+    const odd =
+      `timestamp=${NOW} level=ERROR run=r message="stream error" providerID=p modelID=m session.id=s small=false agent=build mode=primary error.error="AI_APICallError: The proxy closed the connection"`;
+    expect(opencode.accept(stderrRecord(odd, 1))).toEqual([]);
+    const second = opencode.accept(stderrRecord(odd, 2));
+    expect(second).toHaveLength(1);
+    expect(second[0]?.type === "adapter.diagnostic" ? second[0].payload.message : "").not.toContain("press Stop");
   }, 10_000);
 
   it("claims no retry for an error that is not retried (0.358)", () => {

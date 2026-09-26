@@ -173,6 +173,14 @@ export function openCodeToolTitle(tool: string, input: JsonObject): string | und
 const OPENCODE_PLAN_TOOL = /^todo_?write$/i;
 
 /**
+ * What a provider says when it is busy rather than refusing: a rate limit,
+ * too many requests, an overload. The AI SDK OpenCode runs on retries these
+ * by status (429, 5xx) and never a 400, so a request that failed this way is
+ * one OpenCode is certainly going to try again.
+ */
+const RETRIED_ERROR = /rate.?limit|too many requests|\b429\b|overload|try again later/i;
+
+/**
  * Words OpenCode wrote to the MODEL, which `run` prints as if the model had
  * said them (A6.9).
  *
@@ -482,13 +490,21 @@ export function createOpenCodeEventNormalizer(
       const key = said ?? "";
       const seen = (attemptsSeen.get(key) ?? 0) + 1;
       attemptsSeen.set(key, seen);
-      if (seen !== 2) return [];
+      // A RATE LIMIT OR AN OVERLOAD IS SAID ON ITS FIRST LINE (0.368). Those
+      // are always tried again, so the claim is true at once -- and a real
+      // free provider's wait between tries is minutes, not the two seconds of
+      // the local endpoint the rule above was measured on: the 0.367 sweep's
+      // drives sat on "Starting" for six minutes with one line logged and
+      // nothing said (fixtures/opencode/rate-limited-free-1.18.27.stderr.txt).
+      // Any other error still waits for its second line.
+      const retried = said !== undefined && RETRIED_ERROR.test(said);
+      if (seen !== (retried ? 1 : 2)) return [];
       return [diagnostic(
         "warning",
         "opencode.runtime_error",
         said === undefined || said.length === 0
           ? "OpenCode's request to the model failed, and OpenCode is trying again on its own."
-          : `The model's provider answered "${said}", and OpenCode is trying again on its own.`,
+          : `The model's provider answered "${said}", and OpenCode is trying again on its own.${retried ? " To go on now, press Stop and pick another model." : ""}`,
         evidence,
       )];
     }

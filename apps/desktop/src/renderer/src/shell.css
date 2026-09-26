@@ -6535,7 +6535,8 @@ textarea {
  * a run that stops early having planned four steps is ordinary, and the
  * card's job is to stop describing those steps in the present tense.
  */
-.lc-plancard__unreached {
+/* The header's own voice after a run that completed; amber only when it stopped short. */
+.lc-plancard__unreached.is-stopped {
   color: var(--lc-amber-text);
 }
 
