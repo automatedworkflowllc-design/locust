@@ -2,6 +2,11 @@
 //
 //   node _tools/drive-first-session.mjs [--packaged <exe>] [--tag <name>]
 //        [--team "Write & design"] [--mate Iris] [--starter 1 | --ask "..."]
+//        [--plain]
+//
+// `--plain` works in a folder with no git in it -- which is what someone who
+// is not a coder has (0.365): the host must see a file a command made there
+// too, and the Artifacts tab must list it.
 //
 // Locust is for "quite literally ANY ai user" (Colin, 2026-09-26), so this is
 // someone who is not a coder: nobody on the team, nothing remembered. They
@@ -21,7 +26,8 @@
 // not just the conversation on screen: the reply comes back after Quill's
 // own run.
 
-import { mkdir } from 'node:fs/promises'
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { say, scratchRepository, sendAndWaitScript, sleep, startDrive, teammateFace, teammateRows } from './drive-lib.mjs'
@@ -33,11 +39,13 @@ const team = arg('--team') ?? 'Research & money'
 const mate = arg('--mate') ?? 'Sable'
 const starter = arg('--starter') === undefined ? undefined : Number(arg('--starter'))
 const ask = arg('--ask') ?? (starter === undefined ? 'I have $12,000 saved and want to use it within three years. How should I think about where to keep it?' : undefined)
-const slug = team === 'Research & money' && mate === 'Sable' && starter === undefined ? '' : `-${mate.toLowerCase()}${starter === undefined ? '' : `-starter${String(starter)}`}`
+const slug = `${team === 'Research & money' && mate === 'Sable' && starter === undefined ? '' : `-${mate.toLowerCase()}${starter === undefined ? '' : `-starter${String(starter)}`}`}${plain ? '-plain' : ''}`
 const outPath = tag === undefined ? undefined : join(new URL('../docs/beta-fixes-2026-09-24/', import.meta.url).pathname.slice(1), `first-session${slug}-${tag}`)
 if (outPath !== undefined) await mkdir(outPath, { recursive: true })
 
-const workspace = await scratchRepository('locust-drive-first-session-ws-')
+const plain = process.argv.includes('--plain')
+const workspace = plain ? await mkdtemp(join(tmpdir(), 'locust-drive-first-session-plain-')) : await scratchRepository('locust-drive-first-session-ws-')
+if (plain) await writeFile(join(workspace, 'notes.md'), ['# My notes', '', 'A plain folder, no git.', ''].join('\n'), 'utf8')
 const drive = await startDrive({
   name: 'first-session',
   port: 9617,

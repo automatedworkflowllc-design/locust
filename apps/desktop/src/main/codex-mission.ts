@@ -1899,7 +1899,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             cliVersion: chosen.version?.version ?? null,
             sandbox: effectiveSandbox,
             mode,
-            ...(mission.diskBefore !== undefined && !mission.sharedTree ? { watchesDisk: true as const } : {}),
+            ...(mission.diskBefore !== undefined && mission.diskBefore.partial !== true && !mission.sharedTree ? { watchesDisk: true as const } : {}),
             peerMessages: delivered.map((message) => publicPeerMessage(message, 'received')),
             peerDeliveryFailed,
             ...(resumedMissionId === undefined

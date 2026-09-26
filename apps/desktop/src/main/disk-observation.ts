@@ -32,7 +32,10 @@ import { ownGitArgs } from './git-guard.js'
  */
 
 /** Path -> two-letter porcelain status (`M `, `??`, ` D`, ...). */
-export type WorkspaceSnapshot = ReadonlyMap<string, string>
+export type WorkspaceSnapshot = ReadonlyMap<string, string> & {
+  /** The look stopped at a bound, so a change past it is not known (0.365). */
+  readonly partial?: true
+}
 
 const GIT_TIMEOUT_MS = 5_000
 
@@ -43,6 +46,8 @@ export interface DiskObservationOptions {
   readonly readText?: (absolutePath: string) => Promise<string | undefined>
   /** Test seam: a file's size and modification time; undefined when it cannot be read. */
   readonly statOf?: (absolutePath: string) => Promise<{ readonly size: number; readonly mtimeMs: number } | undefined>
+  /** Test seam: a folder's entries, for a folder git cannot answer for (0.365). */
+  readonly listDirectory?: (directory: string) => Promise<readonly FolderEntry[]>
 }
 
 /** The most of a file the host will turn into a diff on the runtime's behalf. */
@@ -83,20 +88,49 @@ export async function snapshotWorkspace(
   options: DiskObservationOptions = {}
 ): Promise<WorkspaceSnapshot | undefined> {
   const runGit = options.runGit ?? defaultRunGit
-  const readText = options.readText ?? defaultReadText
   let output: string
   try {
     output = await runGit(['status', '--porcelain', '-z', '--untracked-files=all'], workspacePath)
   } catch {
-    return undefined
+    // Not a repository, or no git on this machine at all -- which is the
+    // ordinary case for someone who is not a coder, whose folder is just a
+    // folder (0.365). Look at the folder itself instead.
+    return snapshotFolder(workspacePath, options)
   }
   const statOf = options.statOf ?? defaultStatOf
   const snapshot = new Map(parsePorcelain(output))
-  // An untracked file's status never changes while it stays untracked, so
-  // an edit to one between two snapshots was invisible: the second turn of
-  // a Codex CLI session appended to the file it made in the first and the
-  // fold showed nothing (2026-09-05). Its text rides on the status, bounded
-  // -- and past the bounds its size and time do, so the edit is still seen.
+  await carryUntracked(snapshot, workspacePath, options)
+  /*
+   * A TRACKED file that was already modified, and was modified again, kept
+   * the same status -- ` M` before and after -- so the second edit was
+   * invisible: no host record, no diff on its row ("did not report the
+   * change"), and no check after it. Found driving the check-after-edits
+   * feature (2026-09-25): a teammate's fix rewrote notes.txt, still
+   * differing from HEAD by a newline, and the host logged "nothing changed
+   * on disk". The same size-and-time stamp the untracked files carry past
+   * their text bounds, so any write is seen.
+   */
+  let stamped = 0
+  for (const [path, status] of snapshot) {
+    if (status === UNTRACKED || status.startsWith(UNTRACKED) || /D/.test(status.slice(0, 2))) continue
+    if (stamped >= MAX_UNTRACKED_LOOKED_AT) break
+    stamped += 1
+    const seen = await statOf(join(workspacePath, path))
+    if (seen !== undefined) snapshot.set(path, status + STAMP_MARK + `${String(seen.size)}:${String(Math.round(seen.mtimeMs))}`)
+  }
+  return snapshot
+}
+
+/**
+ * An untracked file's status never changes while it stays untracked, so an
+ * edit to one between two snapshots was invisible: the second turn of a
+ * Codex CLI session appended to the file it made in the first and the fold
+ * showed nothing (2026-09-05). Its text rides on the status, bounded -- and
+ * past the bounds its size and time do, so the edit is still seen.
+ */
+async function carryUntracked(snapshot: Map<string, string>, workspacePath: string, options: DiskObservationOptions): Promise<void> {
+  const readText = options.readText ?? defaultReadText
+  const statOf = options.statOf ?? defaultStatOf
   let lookedAt = 0
   let texts = 0
   let textBytes = 0
@@ -118,25 +152,90 @@ export async function snapshotWorkspace(
     }
     if (seen !== undefined) snapshot.set(path, UNTRACKED + STAMP_MARK + `${String(seen.size)}:${String(Math.round(seen.mtimeMs))}`)
   }
-  /*
-   * A TRACKED file that was already modified, and was modified again, kept
-   * the same status -- ` M` before and after -- so the second edit was
-   * invisible: no host record, no diff on its row ("did not report the
-   * change"), and no check after it. Found driving the check-after-edits
-   * feature (2026-09-25): a teammate's fix rewrote notes.txt, still
-   * differing from HEAD by a newline, and the host logged "nothing changed
-   * on disk". The same size-and-time stamp the untracked files carry past
-   * their text bounds, so any write is seen.
-   */
-  let stamped = 0
-  for (const [path, status] of snapshot) {
-    if (status === UNTRACKED || status.startsWith(UNTRACKED) || /D/.test(status.slice(0, 2))) continue
-    if (stamped >= MAX_UNTRACKED_LOOKED_AT) break
-    stamped += 1
-    const seen = await statOf(join(workspacePath, path))
-    if (seen !== undefined) snapshot.set(path, status + STAMP_MARK + `${String(seen.size)}:${String(Math.round(seen.mtimeMs))}`)
+}
+
+/** How deep a plain folder is looked into. */
+export const MAX_FOLDER_DEPTH = 8
+
+/**
+ * Folders a plain-folder look never walks into: a program's own trees and
+ * hidden ones (`.git`, `.venv`, Locust's own `.locust`), and names the
+ * system itself rewrites while a run goes -- Explorer's `desktop.ini` and
+ * `Thumbs.db`, macOS's `.DS_Store`, and the `~$budget.xlsx` Office leaves
+ * beside a file it has open -- which would read as changes nobody made.
+ */
+const SKIPPED_FOLDER = /^(?:node_modules|__pycache__|venv|site-packages)$|^\./
+const SKIPPED_FILE = /^(?:desktop\.ini|thumbs\.db|\.ds_store)$|^~\$/i
+
+export interface FolderEntry {
+  readonly name: string
+  readonly kind: 'file' | 'dir' | 'link' | 'other'
+}
+
+async function defaultListDirectory(directory: string): Promise<readonly FolderEntry[]> {
+  const { readdir } = await import('node:fs/promises')
+  const entries = await readdir(directory, { withFileTypes: true })
+  return entries.map((entry) => ({
+    name: entry.name,
+    // A link or junction is never followed: it can lead out of the folder, or round in a circle.
+    kind: entry.isSymbolicLink() ? 'link' : entry.isDirectory() ? 'dir' : entry.isFile() ? 'file' : 'other'
+  }))
+}
+
+/**
+ * A FOLDER THAT IS NOT A REPOSITORY, LOOKED AT DIRECTLY (0.365).
+ *
+ * The observation above rests on git, and a person who is not a coder
+ * keeps their work in a plain folder with no git in it -- often none on the
+ * machine. There, a file a command made (Penny's budget workbook, built by
+ * a Python command) was never seen, and all the Artifacts tab could say was
+ * that it might be missing (0.364).
+ *
+ * So the folder is walked, breadth first and bounded -- depth, files looked
+ * at, text carried -- and every file in it is treated as git treats an
+ * untracked one: its text while it is small, its size and time past that.
+ * Every later step (what changed, the diff of a new file, the row) is the
+ * same as in a repository. A walk that hit a bound is marked `partial`: the
+ * host then does not claim to have seen everything, and the Artifacts tab
+ * does not say "changed no files".
+ */
+export async function snapshotFolder(workspacePath: string, options: DiskObservationOptions = {}): Promise<WorkspaceSnapshot | undefined> {
+  const listDirectory = options.listDirectory ?? defaultListDirectory
+  const found: string[] = []
+  let partial = false
+  const queue: { readonly directory: string; readonly relative: string; readonly depth: number }[] = [{ directory: workspacePath, relative: '', depth: 0 }]
+  walk: while (queue.length > 0) {
+    const { directory, relative, depth } = queue.shift()!
+    let entries: readonly FolderEntry[]
+    try {
+      entries = await listDirectory(directory)
+    } catch {
+      // The folder itself unreadable: no observation. A subfolder: skipped, and said.
+      if (depth === 0) return undefined
+      partial = true
+      continue
+    }
+    for (const entry of entries) {
+      const path = relative === '' ? entry.name : `${relative}/${entry.name}`
+      if (entry.kind === 'dir') {
+        if (SKIPPED_FOLDER.test(entry.name)) continue
+        if (depth + 1 > MAX_FOLDER_DEPTH) {
+          partial = true
+          continue
+        }
+        queue.push({ directory: join(directory, entry.name), relative: path, depth: depth + 1 })
+      } else if (entry.kind === 'file' && !SKIPPED_FILE.test(entry.name)) {
+        if (found.length >= MAX_UNTRACKED_LOOKED_AT) {
+          partial = true
+          break walk
+        }
+        found.push(path)
+      }
+    }
   }
-  return snapshot
+  const snapshot = new Map<string, string>(found.map((path) => [path, UNTRACKED]))
+  await carryUntracked(snapshot, workspacePath, options)
+  return partial ? Object.assign(snapshot, { partial: true as const }) : snapshot
 }
 
 const UNTRACKED = '??'
@@ -182,10 +281,14 @@ export function changedPaths(before: WorkspaceSnapshot, after: WorkspaceSnapshot
   for (const [path, status] of after) {
     if (before.get(path) !== status) paths.add(path)
   }
+  // A look that stopped at a bound can lose a file off its END when a new
+  // one arrives earlier in the walk: gone from the second look, and not
+  // gone from the disk. So a partial pair reports no disappearances (0.365).
+  const whole = before.partial !== true && after.partial !== true
   for (const path of before.keys()) {
     // Was dirty, now clean: something reverted or committed it. Still a
     // change to the working tree the run was in.
-    if (!after.has(path)) paths.add(path)
+    if (!after.has(path) && whole) paths.add(path)
   }
   return [...paths].sort()
 }

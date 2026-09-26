@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.365.0 - 2026-09-26
+
+### Fixed
+
+- **Files a teammate makes are found in any folder.** Locust used to notice
+  a file made by a command, such as a spreadsheet built with Python, only in
+  a folder tracked with git. It now looks at an ordinary folder too, so the
+  file is listed and opens beside the conversation wherever your teammates
+  work. In a very large folder it says when it could not look at everything.
+
 ## 0.364.0 - 2026-09-26
 
 ### New

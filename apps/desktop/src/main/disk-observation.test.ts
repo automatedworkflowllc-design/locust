@@ -46,8 +46,11 @@ describe('reading git status', () => {
     ])
   })
 
-  it('is nothing at all when git cannot answer -- outside a repository, or with no git', async () => {
-    const snapshot = await snapshotWorkspace('C:/work/pebble', {
+  it('looks at the folder itself when git cannot answer, and is nothing when that cannot be read either', async () => {
+    // Outside a repository, or with no git: the plain folder is walked
+    // instead (0.365, a-plain-folder-is-watched-too). A folder that is not
+    // there gives no observation at all.
+    const snapshot = await snapshotWorkspace('C:/work/pebble-not-here-0365', {
       runGit: async () => {
         throw new Error('fatal: not a git repository')
       }
