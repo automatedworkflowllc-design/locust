@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.363.0 - 2026-09-26
+
+### Improved
+
+- **A new document shows as a document.** When a teammate writes a new
+  brief, guide or draft, the conversation now shows it as a page, with its
+  headings, lists and colour swatches, instead of a green block of raw text.
+  Open reads the whole thing beside the conversation, and Show the change
+  still gives the line-by-line view. A file that was edited still shows what
+  changed.
+
 ## 0.362.0 - 2026-09-26
 
 ### Improved

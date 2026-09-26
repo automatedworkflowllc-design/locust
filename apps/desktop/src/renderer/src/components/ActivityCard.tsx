@@ -24,6 +24,7 @@ import type { TraceSegment, ActivityDetail, ActivityEntry, PlanStep } from '../m
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { splitInlineCode } from '../agentText.js'
 import { DiffView } from './DiffView.js'
+import { DocPreview, isNewDocument } from './DocPreview.js'
 import { Icon } from './Icon.js'
 import { PlanSteps } from './ThreadItems.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
@@ -387,7 +388,17 @@ export function ActivityCard({
                       <Icon name="folder" size={13} />
                     </button>
                   </div>
-                  {isOpen(entry) && <DiffView file={entry.file} truncated={entry.truncated} reported={entry.reported} />}
+                  {isOpen(entry) &&
+                    (isNewDocument(entry.file) ? (
+                      <DocPreview
+                        file={entry.file}
+                        truncated={entry.truncated}
+                        reported={entry.reported}
+                        {...(onOpenFile === undefined ? {} : { onOpen: () => onOpenFile(entry.file.path) })}
+                      />
+                    ) : (
+                      <DiffView file={entry.file} truncated={entry.truncated} reported={entry.reported} />
+                    ))}
                 </>
               ) : entry.kind === 'helper' ? (
                 // A helper the runtime started for itself. What it did inside

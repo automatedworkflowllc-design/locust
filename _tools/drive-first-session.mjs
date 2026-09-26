@@ -117,6 +117,14 @@ try {
     await new Promise((r) => setTimeout(r, 600))
     return (document.querySelector('.lc-thread')?.innerText ?? '').replace(/\\s+/g, ' ').slice(-400)
   })()`))
+  // A new document shows in the conversation as the page it is (0.363).
+  await drive.capture('the document it wrote, in the conversation', () => drive.evaluate(`(async () => {
+    const preview = document.querySelector('.lc-docpreview')
+    if (!preview) return 'no document preview'
+    preview.closest('.lc-card')?.scrollIntoView({ block: 'start' })
+    await new Promise((r) => setTimeout(r, 600))
+    return (preview.innerText ?? '').replace(/\\s+/g, ' ').slice(0, 220)
+  })()`))
   // What a person does with a file their teammate made: open it. The pill
   // under the answer, or the fold's own open control when there is no pill.
   await drive.capture('open the file it made', () => drive.evaluate(`(async () => {
