@@ -33,6 +33,19 @@ const check = (what, ok, detail) => {
   if (!ok) failures += 1
   say(`  [${ok ? 'PASS' : 'FAIL'}] ${what}${detail === undefined ? '' : ` -- ${detail}`}`)
 }
+/*
+ * What the checks expect, READ FROM THE CHANGELOG this build ships rather than
+ * written out. They were written out on 2026-09-23 -- "0.295.0,0.277.0", "the
+ * newest is 0.295.0" -- and read FAIL on every later big build although
+ * nothing was wrong (packaged 0.350, the design pass marked big).
+ */
+const changelog = await readFile(new URL('../CHANGELOG.md', import.meta.url), 'utf8')
+const releases = [...changelog.matchAll(/^## (\d+\.\d+\.\d+) - (\d{4}-\d{2}-\d{2})\r?\n(<!-- big -->)?/gm)].map((match) => ({ version: match[1], date: match[2], big: match[3] !== undefined }))
+const newer = (a, b) => { const [x, y] = [a, b].map((v) => v.split('.').map(Number)); return x[0] - y[0] || x[1] - y[1] || x[2] - y[2] }
+const BIG_SINCE_276 = releases.filter((release) => release.big && newer(release.version, '0.276.0') > 0).map((release) => release.version)
+const NEWEST = releases[0].version
+const inWords = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+const NEWEST_BIG_DATE = inWords(releases.find((release) => release.big && release.version === BIG_SINCE_276[0]).date)
 const seed = { schemaVersion: 1, teammates: [], missionOwners: {}, settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: false } }
 const BANNER = /is running\. Here is what changed/
 
@@ -70,8 +83,8 @@ const launch = async (name, port, seen) =>
       })
     })()`))
     say(`splash: ${JSON.stringify(splash).slice(0, 500)}`)
-    check('Home shows the splash for the big builds since 0.276 -- the machine, then the bots', splash.versions.join() === '0.295.0,0.277.0' && /The title screen is a machine/.test(splash.text), splash.versions.join())
-    check("it reads like Claude Code's: a date in words and the version as a badge", splash.dates[0] === 'September 23, 2026', splash.dates.join())
+    check(`Home shows the splash for every big build since 0.276, newest first -- ${BIG_SINCE_276.join(', ')}`, splash.versions.join() === BIG_SINCE_276.join(), splash.versions.join())
+    check("it reads like Claude Code's: a date in words and the version as a badge", splash.dates[0] === NEWEST_BIG_DATE, `${splash.dates.join()} (expected first: ${NEWEST_BIG_DATE})`)
     check('with the way to every version, and a way out', splash.buttons.includes('See every version') && splash.buttons.includes('Got it'), splash.buttons.join(' / '))
     check('and it fits the window', splash.fits)
     check('there is no banner on Home', !BANNER.test(await drive.evaluate('document.body.innerText')))
@@ -93,7 +106,7 @@ const launch = async (name, port, seen) =>
     // spaced capitals: compare without case.
     const labels = page.labels.map((label) => label.toLowerCase())
     check('See every version opens Settings on the Changelog', /changelog/i.test(page.current) && page.heading.some((h) => /changelog/i.test(h)) && page.splashGone, page.current)
-    check('newest first, twelve builds, grouped New / Improved / Fixed, with the older ones a press away', page.builds === 12 && page.first === '0.295.0' && labels.includes('new') && labels.includes('improved') && labels.includes('fixed') && page.more, JSON.stringify({ builds: page.builds, first: page.first, labels: page.labels }))
+    check(`newest first (${NEWEST}), twelve builds, grouped New / Improved / Fixed, with the older ones a press away`, page.builds === 12 && page.first === NEWEST && labels.includes('new') && labels.includes('improved') && labels.includes('fixed') && page.more, JSON.stringify({ builds: page.builds, first: page.first, labels: page.labels }))
     await shoot('02-whats-new.png')
     await drive.evaluate(`(document.querySelector('.lc-whatsnew__more').click(), 'more')`)
     await sleep(400)

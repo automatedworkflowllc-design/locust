@@ -16,13 +16,13 @@ heading: the home screen then shows it once, as a splash.
 
 ### Improved
 
-- **Home leads with your team.** A card for each teammate -- their face,
-  what they do and the model they run on -- opens a conversation with them.
+- **Home leads with your team.** A card for each teammate — their face,
+  what they do and the model they run on — opens a conversation with them.
   When every coding agent on this machine is ready, the list of them folds
   to one line; it opens again the moment one needs you.
 - **Conversations read more like Claude's.** A conversation starts at the
   top of the window. The header shows the model, and says more only when
-  something happened -- running, stopped, failed. The record behind a
+  something happened — running, stopped, failed. The record behind a
   finished conversation is one quiet "Details" link instead of a card.
 - **Colour codes show their colour** beside them.
 - **The sidebar's titles are longer**, and each row's actions button now
