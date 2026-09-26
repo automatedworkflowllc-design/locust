@@ -153,3 +153,16 @@ export function memoryChangedNotice(update: {
   if (said.length === 0) return undefined
   return said.map((clause) => (/[.!?]"?$/.test(clause) ? clause : `${clause}.`)).join(' ')
 }
+
+/**
+ * Whether that notice points at something waiting on the Memory screen.
+ *
+ * "Wren suggested 2 changes to memory, waiting below" stayed at the top of
+ * the screen after both were answered -- a sentence about the past, still
+ * pointing at a section that was gone (drive-memory-tidy on 0.371). A notice
+ * like that goes once nothing is waiting: what was kept is in the list, and
+ * what was forgotten is under Recently forgotten.
+ */
+export function noticeWaits(update: Parameters<typeof memoryChangedNotice>[0]): boolean {
+  return update.proposed.length + (update.proposedChanges ?? []).length + (update.proposedForgets ?? []).length + (update.proposedTidy ?? 0) > 0
+}

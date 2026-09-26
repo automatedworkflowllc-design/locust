@@ -186,6 +186,74 @@ describe('the reader, on a real store', () => {
   })
 })
 
+/*
+ * 0.372: a fenced block is read, a bulleted line is read, and a line that is
+ * not a suggestion is SAID -- in the conversation, where the person is
+ * reading "Here are my suggestions:" -- rather than dropped in silence.
+ */
+describe('the reader, on a reply written the way models write', () => {
+  const SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: 6, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, keepATodoList: false, layout: 'auto', tube: 'full', replySize: 'standard' }
+  const read = async (reply: Reply) => {
+    const { memories, a, b, c } = await seeded()
+    const updates: CodexMissionUpdate[] = []
+    const reader = createMemoryReader({
+      memories,
+      ledger: {
+        getMission: async () =>
+          ({
+            metadata: { missionId: 'mission_tidy', runId: 'run_tidy', workspaceId: 'ws_shop' },
+            phase: 'completed',
+            events: [{ type: 'message.delta', payload: { itemId: 'm1', operation: 'append', text: reply(a.memoryId, b.memoryId, c.memoryId), final: true } }]
+          }) as never
+      },
+      teammates: {
+        list: async () => [{ teammateId: 'tm_wren', name: 'Wren' } as PublicTeammate],
+        missionOwners: async (): Promise<Readonly<Record<string, string>>> => ({ mission_tidy: 'tm_wren' }),
+        readSettings: async () => SETTINGS
+      },
+      workspaceName: 'shop',
+      notify: (update) => {
+        updates.push(update)
+      }
+    })
+    await reader.onRunEnded({ missionId: 'mission_tidy' })
+    return updates
+  }
+  type Reply = (a: string, b: string, c: string) => string
+  const FENCE = String.fromCharCode(96).repeat(3)
+
+  it('reads a block in a code fence, with bulleted and numbered lines', async () => {
+    const reply: Reply = (a, b, c) => `Here are my suggestions:\n\n${FENCE}\n<locust-tidy>\n- merge ${a} ${b} :: Deploys go out every Thursday.\n2. retire ${c} :: the API moved\n</locust-tidy>\n${FENCE}`
+    const updates = await read(reply)
+    expect(updates.find((update) => update.kind === 'memory-changed')).toMatchObject({ by: 'Wren', proposedTidy: 2 })
+    expect(updates.some((update) => update.kind === 'relay-notice')).toBe(false)
+  })
+
+  it('says, in the conversation, how many lines it could not read -- and still proposes the rest', async () => {
+    const reply: Reply = (a, b) => `Found some.\n<locust-tidy>\nmerge ${a} ${b} :: Deploys go out every Thursday.\nmerge: the two port notes -> one\nretire the old test command\n</locust-tidy>`
+    const updates = await read(reply)
+    expect(updates.find((update) => update.kind === 'memory-changed')).toMatchObject({ proposedTidy: 1 })
+    expect(updates.find((update) => update.kind === 'relay-notice')).toMatchObject({
+      kind: 'relay-notice',
+      missionId: 'mission_tidy',
+      message: "2 of Wren's suggestions were not written in a form Locust reads, so they were not put to you. Ask Wren to write them again, one per line."
+    })
+  })
+
+  it('says so even when nothing at all could be read', async () => {
+    const reply: Reply = () => 'Here are my suggestions:\n<locust-tidy>\nmerge the deploy ones\n</locust-tidy>'
+    const updates = await read(reply)
+    expect(updates.find((update) => update.kind === 'relay-notice')).toMatchObject({
+      message: "One of Wren's suggestions was not written in a form Locust reads, so it was not put to you. Ask Wren to write it again, one per line."
+    })
+  })
+
+  it('says nothing about the brief’s own example, repeated', async () => {
+    const reply: Reply = () => 'Nothing needs tidying. The form was:\n<locust-tidy>\nmerge mem_a mem_b :: the one sentence that replaces them\n</locust-tidy>'
+    expect(await read(reply)).toEqual([])
+  })
+})
+
 describe('the file a teammate reads', () => {
   it('names each memory by its id, so a tidy pass can', () => {
     const text = memoryFileText([{ id: 'mem_abc', text: 'Deploys go out on Thursdays.', scope: 'workspace', by: 'you', where: undefined, at: NOW }], new Date(NOW))

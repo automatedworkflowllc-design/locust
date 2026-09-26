@@ -16,6 +16,12 @@ describe("the bubble of a turn a button started", () => {
     expect(turnPromptLine({ prompt: TIDY_PROMPT })).toBe("Tidy this folder's team memory.")
   })
 
+  it('a tidy pass sent with the brief before 0.372, its example in a code fence: the same', () => {
+    const fence = String.fromCharCode(96).repeat(3)
+    const before = [TIDY_PROMPT.split(String.fromCharCode(10))[0], 'Suggest at most 10 changes...', fence, '<locust-tidy>', '</locust-tidy>', fence].join(String.fromCharCode(10))
+    expect(turnPromptLine({ prompt: before })).toBe("Tidy this folder's team memory.")
+  })
+
   it('a review: whose work, not the review material', () => {
     const brief = reviewBrief({
       request: 'Make the path handler work on Windows.',

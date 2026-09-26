@@ -1,5 +1,4 @@
 import { TIDY_BLOCK, boundedMemoryText } from './memory.js'
-import { blocksOutsideCode } from './protocolTags.js'
 
 /**
  * A TIDY PASS: a teammate reads the folder's memories and suggests merging,
@@ -23,7 +22,8 @@ import { blocksOutsideCode } from './protocolTags.js'
 
 export const TIDY_TAG = 'locust-tidy'
 const ID = /mem_[A-Za-z0-9_-]{1,60}/g
-const LINE = /^\s*(merge|retire|rewrite)\s+([^:]*?)\s*::\s*(.+?)\s*$/i
+// A bullet or a number in front is how a model writes a list; it is not part of the line.
+const LINE = /^\s*(?:[-*•]\s*|\d{1,2}[.)]\s*)?(merge|retire|rewrite)\s+([^:]*?)\s*::\s*(.+?)\s*$/i
 
 /** At most this many suggestions are taken from one reply: a person answers each one. */
 export const MAX_TIDY_SUGGESTIONS = 12
@@ -38,31 +38,78 @@ export type TidySuggestion =
   | { readonly kind: 'rewrite'; readonly id: string; readonly text: string }
 
 /**
- * The suggestions in a reply, in order, outside any code: the block inside a
- * code fence is an example -- the brief below shows one exactly that way. A
- * line that does not read, names the wrong number of ids, or names one twice
- * is dropped.
+ * The brief's own example, line by line. A reply that repeats the brief
+ * proposes nothing: these lines are skipped wherever they appear.
+ */
+export const TIDY_EXAMPLE_LINES: readonly string[] = [
+  'merge mem_a mem_b :: the one sentence that replaces them',
+  'retire mem_c :: why it no longer holds',
+  'rewrite mem_d :: the corrected sentence'
+]
+
+/**
+ * The suggestions in a reply, in order. A line that does not read, names the
+ * wrong number of ids, names one twice, or repeats an earlier suggestion is
+ * dropped.
+ *
+ * INSIDE A CODE FENCE TOO (0.372). Every other block this app reads is taken
+ * only outside code, because a fenced block is an example -- and this one was
+ * as well, since its brief showed the example in a fence. So the model
+ * copied the fence: on the 62-memory tidy drive, one run of two put ten
+ * correct suggestions in a fence, the pass proposed nothing, and the person
+ * saw "Here are my suggestions:" over an empty box. The brief no longer
+ * fences its example, and the only thing the fence protected against -- the
+ * brief's own example, repeated -- is skipped by its lines instead.
  */
 export function parseTidyBlocks(text: string): readonly TidySuggestion[] {
+  return readTidyBlocks(text).suggestions
+}
+
+/**
+ * The suggestions, and how many lines in the block could not be read as one.
+ *
+ * A line that names the wrong number of ids, or is not a suggestion at all,
+ * was dropped in silence: the person read "Here are my suggestions:" and
+ * nothing reached the Memory screen, with no word of why. The reader says
+ * how many were lost (memory-reader.ts). Blank lines, the brief's own
+ * example, a repeat, and lines past the limit are not counted: none of them
+ * is a suggestion that went missing.
+ */
+export function readTidyBlocks(text: string): { readonly suggestions: readonly TidySuggestion[]; readonly unread: number } {
   const found: TidySuggestion[] = []
-  for (const match of blocksOutsideCode(text, TIDY_BLOCK)) {
+  const seen = new Set<string>()
+  let unread = 0
+  for (const match of text.matchAll(TIDY_BLOCK)) {
     for (const raw of (match[1] ?? '').split(/\r?\n/)) {
+      if (raw.trim().length === 0 || TIDY_EXAMPLE_LINES.includes(raw.trim())) continue
+      if (found.length >= MAX_TIDY_SUGGESTIONS) return { suggestions: found, unread }
       const line = LINE.exec(raw)
-      if (line === null) continue
+      if (line === null) {
+        unread += 1
+        continue
+      }
       const verb = line[1]!.toLowerCase()
       const ids = [...(line[2] ?? '').matchAll(ID)].map((id) => id[0])
       const rest = boundedMemoryText(line[3] ?? '')
-      if (rest.length === 0 || new Set(ids).size !== ids.length) continue
-      if (verb === 'merge') {
-        if (ids.length < 2 || ids.length > MAX_MERGED) continue
-        found.push({ kind: 'merge', ids, text: rest })
-      } else if (ids.length === 1) {
-        found.push(verb === 'retire' ? { kind: 'retire', id: ids[0]!, reason: rest } : { kind: 'rewrite', id: ids[0]!, text: rest })
+      if (rest.length === 0 || new Set(ids).size !== ids.length) {
+        unread += 1
+        continue
       }
-      if (found.length >= MAX_TIDY_SUGGESTIONS) return found
+      // The same suggestion twice -- a block shown, then written -- is asked once.
+      const key = `${verb} ${ids.join(' ')}`
+      if (seen.has(key)) continue
+      if (verb === 'merge' && ids.length >= 2 && ids.length <= MAX_MERGED) {
+        found.push({ kind: 'merge', ids, text: rest })
+      } else if (verb !== 'merge' && ids.length === 1) {
+        found.push(verb === 'retire' ? { kind: 'retire', id: ids[0]!, reason: rest } : { kind: 'rewrite', id: ids[0]!, text: rest })
+      } else {
+        unread += 1
+        continue
+      }
+      seen.add(key)
     }
   }
-  return found
+  return { suggestions: found, unread }
 }
 
 /**
@@ -70,8 +117,10 @@ export function parseTidyBlocks(text: string): readonly TidySuggestion[] {
  *
  * Short, because the memories are not in it: `.locust/memory.md` holds every
  * one with its id, written where the run stands before it starts, and a
- * folder of 92 memories would not fit in a message. The example block is in a
- * code fence so a reply that repeats this brief does not propose it.
+ * folder of 92 memories would not fit in a message. The example is shown
+ * exactly as the block should be written -- NOT in a code fence, which the
+ * model copied (0.372) -- and a reply that repeats it proposes nothing
+ * (`TIDY_EXAMPLE_LINES`).
  */
 export const TIDY_PROMPT = [
   "Tidy this folder's team memory. Read .locust/memory.md -- every memory is listed there, with its id in square brackets at the end of its line.",
@@ -82,15 +131,11 @@ export const TIDY_PROMPT = [
   'Change nothing yourself: every suggestion waits for the person, who keeps it or not. The ids are for the block only; the person reads your reasons, so write them without ids.',
   'Say in a sentence or two what you found, then end your reply with a block in this form, one suggestion per line, each id exactly as the file shows it:',
   '',
-  '```',
   '<locust-tidy>',
-  'merge mem_a mem_b :: the one sentence that replaces them',
-  'retire mem_c :: why it no longer holds',
-  'rewrite mem_d :: the corrected sentence',
+  ...TIDY_EXAMPLE_LINES,
   '</locust-tidy>',
-  '```',
   '',
-  'Write your block without the code fence around it. If nothing needs tidying, say so and leave the block out.'
+  'Write the block as plain text, not in a code block. If nothing needs tidying, say so and leave the block out.'
 ].join('\n')
 
 /**

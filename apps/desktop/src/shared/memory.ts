@@ -191,9 +191,32 @@ export function parseMemoryBlocks(text: string): readonly MemoryOp[] {
   return ops
 }
 
-/** The reply without its memory blocks; the Memory screen shows what they did. */
+/**
+ * A code block with nothing left in it: what a fenced tidy block leaves once
+ * it is taken out. Drawn, it was an empty box under "Here are my
+ * suggestions:" (0.372).
+ */
+const EMPTY_FENCE = /(^|\n)[ \t]*```[^\n`]*\n\s*```[ \t]*(?=\n|$)/g
+
+/**
+ * The reply without its memory blocks; the Memory screen shows what they did.
+ *
+ * Only the blocks that were ACTED ON come out: a memory block outside code
+ * (`parseMemoryBlocks` reads no other), and a tidy block anywhere
+ * (`parseTidyBlocks`, from 0.372). A memory block in a code fence was not
+ * acted on, so it stays for the person to read -- taking out what nothing
+ * acted on is how a reply loses words silently.
+ */
 export function stripMemoryBlocks(text: string): string {
-  return text.replace(BLOCK, '').replace(TIDY_BLOCK, '').replace(/\n{3,}/g, '\n\n').trimEnd()
+  let kept = ''
+  let from = 0
+  for (const match of blocksOutsideCode(text, BLOCK)) {
+    const at = match.index ?? 0
+    kept += text.slice(from, at)
+    from = at + match[0].length
+  }
+  kept += text.slice(from)
+  return kept.replace(TIDY_BLOCK, '').replace(EMPTY_FENCE, '$1').replace(/\n{3,}/g, '\n\n').trimEnd()
 }
 
 /**

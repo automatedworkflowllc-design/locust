@@ -4,7 +4,7 @@ import type { CodexMissionUpdate, PublicTeammate, WorkspaceSettings } from '../s
 import { parseMemoryBlocks } from '../shared/memory.js'
 import type { MemoryStore } from './memory-store.js'
 import { createTranscriptTracker } from './peer-exchange.js'
-import { parseTidyBlocks } from '../shared/memory-tidy.js'
+import { readTidyBlocks } from '../shared/memory-tidy.js'
 
 /**
  * When a run ends, read its reply for a memory block and move the team's
@@ -61,8 +61,8 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
       const ops = parseMemoryBlocks(text)
       // A tidy pass's suggestions (A1.2): proposals whatever the mode, because
       // the pass was asked to suggest, not to change.
-      const tidy = parseTidyBlocks(text)
-      if (ops.length === 0 && tidy.length === 0) return
+      const { suggestions: tidy, unread: tidyUnread } = readTidyBlocks(text)
+      if (ops.length === 0 && tidy.length === 0 && tidyUnread === 0) return
 
       let by: { readonly teammateId?: string; readonly name: string } = { name: 'a conversation' }
       try {
@@ -192,7 +192,8 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
         rewritten.length === 0 &&
         refused.length === 0 &&
         proposedChanges.length === 0 &&
-        proposedForgets.length === 0
+        proposedForgets.length === 0 &&
+        tidyUnread === 0
       ) {
         return
       }
@@ -231,6 +232,19 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
           runId: recovered.metadata.runId,
           missionId: mission.missionId,
           message: `${by.name} tried to remember something and it was not kept. ${refused.join(' ')}`
+        })
+      }
+      if (tidyUnread > 0) {
+        /*
+         * Suggestions that could not be read, said where the person is reading
+         * "Here are my suggestions:" (0.372). Dropped in silence, the pass
+         * looked like it had proposed nothing, with no way to know why.
+         */
+        options.notify({
+          kind: 'relay-notice',
+          runId: recovered.metadata.runId,
+          missionId: mission.missionId,
+          message: `${tidyUnread === 1 ? `One of ${by.name}'s suggestions was` : `${String(tidyUnread)} of ${by.name}'s suggestions were`} not written in a form Locust reads, so ${tidyUnread === 1 ? 'it was' : 'they were'} not put to you. Ask ${by.name} to write ${tidyUnread === 1 ? 'it' : 'them'} again, one per line.`
         })
       }
       if (missed.length > 0) {

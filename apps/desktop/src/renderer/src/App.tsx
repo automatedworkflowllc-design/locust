@@ -58,7 +58,7 @@ import type { RoutineDraft } from './routines.js'
 import { RoutineDialog } from './components/RoutineDialog.js'
 import { AutomationsScreen } from './components/AutomationsScreen.js'
 import { TIDY_PROMPT } from '../../shared/memory-tidy.js'
-import { memoryChangedNotice, memoriesOfConversation, turnsOfConversation } from './conversationMemories.js'
+import { memoryChangedNotice, memoriesOfConversation, noticeWaits, turnsOfConversation } from './conversationMemories.js'
 import { createFrameBatcher } from './streamFrames.js'
 import { missingTranscripts, heldDigests, mergeHistory } from './historyMerge.js'
 import { savableMissionId } from './savableConversations.js'
@@ -1372,6 +1372,8 @@ export default function App(): ReactElement {
       .catch(() => setLayout(before))
   }
   const [memoryNotice, setMemoryNotice] = useState<string>()
+  /** The notice points at suggestions waiting on the Memory screen, so it goes once none is waiting. */
+  const [memoryNoticeWaits, setMemoryNoticeWaits] = useState(false)
   /**
    * The last scheduled routine that would not start, and why. Kept until it
    * is read: a routine that stops happening on a schedule is exactly the
@@ -2155,6 +2157,7 @@ export default function App(): ReactElement {
       if (update.kind === 'memory-changed') {
         refreshMemories()
         setMemoryNotice(memoryChangedNotice(update))
+        setMemoryNoticeWaits(noticeWaits(update))
         return
       }
       if (update.kind === 'routine-blocked') {
@@ -5472,6 +5475,7 @@ export default function App(): ReactElement {
               // still lit. Reproduced live by an outside QA, 2026-09-06.
               onOpenMission={openMission}
               notice={memoryNotice}
+              noticeWaits={memoryNoticeWaits}
               onDismissNotice={() => setMemoryNotice(undefined)}
             />
           ) : screen === 'automations' ? (

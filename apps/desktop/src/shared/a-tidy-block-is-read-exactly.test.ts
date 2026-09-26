@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { MAX_MERGED, MAX_TIDY_SUGGESTIONS, TIDY_PROMPT, parseTidyBlocks, readableReason } from './memory-tidy.js'
+import { MAX_MERGED, MAX_TIDY_SUGGESTIONS, TIDY_EXAMPLE_LINES, TIDY_PROMPT, parseTidyBlocks, readableReason } from './memory-tidy.js'
 import { stripMemoryBlocks } from './memory.js'
 import { defangProtocolBlocks } from './protocolTags.js'
 
@@ -52,9 +52,11 @@ describe('reading the block', () => {
     expect(parseTidyBlocks(block(...lines))).toHaveLength(MAX_TIDY_SUGGESTIONS)
   })
 
-  it('does not act on the example in its own brief, or on one in a code fence', () => {
+  it('does not act on the example in its own brief, fenced or not', () => {
     expect(parseTidyBlocks(TIDY_PROMPT)).toEqual([])
-    expect(parseTidyBlocks('Like this:\n```\n<locust-tidy>\nretire mem_a1 :: stale\n</locust-tidy>\n```')).toEqual([])
+    // The brief as it was sent before 0.372, its example in a fence.
+    const fencedExample = ['```', '<locust-tidy>', ...TIDY_EXAMPLE_LINES, '</locust-tidy>', '```'].join('\n')
+    expect(parseTidyBlocks(`Like this:\n${fencedExample}`)).toEqual([])
   })
 })
 

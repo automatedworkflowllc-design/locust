@@ -33,6 +33,7 @@ export function MemoryScreen({
   onTidy,
   onOpenMission,
   notice,
+  noticeWaits = false,
   onDismissNotice
 }: {
   readonly memories: readonly PublicMemory[]
@@ -57,6 +58,8 @@ export function MemoryScreen({
   readonly onOpenMission: (missionId: string) => void
   /** The host's last word about memory, when it had one. */
   readonly notice: string | undefined
+  /** The notice points at suggestions waiting below: it goes once none is waiting. */
+  readonly noticeWaits?: boolean
   /**
    * Clearing it. Without this the sentence stayed for the rest of the session
    * -- its siblings on the Automations and Rooms screens both have one, and
@@ -274,7 +277,7 @@ export function MemoryScreen({
         </span>
       </div>
       <div className="lc-screen__scroll">
-        {notice !== undefined && notice.length > 0 && (
+        {notice !== undefined && notice.length > 0 && !(noticeWaits && proposed.length === 0) && (
           <p className="lc-settings__note lc-memory__notice">
             {notice}{' '}
             <button type="button" className="lc-ghostbutton" onClick={onDismissNotice}>
@@ -283,6 +286,19 @@ export function MemoryScreen({
           </p>
         )}
         {error !== undefined && <p className="lc-dialog__error">{error}</p>}
+
+        {/*
+          * What needs an answer, first. It sat under "How memory is kept" -- a
+          * paragraph and the mode switch -- so a person sent here by "answer
+          * it on the Memory screen" arrived at the explanation and scrolled
+          * for the thing they came to do (drive-memory-tidy, 0.371).
+          */}
+        {proposed.length > 0 && (
+          <section className="lc-settings__section">
+            <h2 className="lc-settings__heading">Waiting for you</h2>
+            <div className="lc-memorylist">{proposed.map(row)}</div>
+          </section>
+        )}
 
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">How memory is kept</h2>
@@ -312,13 +328,6 @@ export function MemoryScreen({
                 : 'Teammates are not told what is remembered and cannot write memory. What is kept stays here.'}
           </p>
         </section>
-
-        {proposed.length > 0 && (
-          <section className="lc-settings__section">
-            <h2 className="lc-settings__heading">Waiting for you</h2>
-            <div className="lc-memorylist">{proposed.map(row)}</div>
-          </section>
-        )}
 
         <section className="lc-settings__section">
           {/* The folder's own name keeps its own spelling: titles are set in
