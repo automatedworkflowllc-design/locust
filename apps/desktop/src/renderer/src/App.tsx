@@ -97,6 +97,9 @@ import type { Screen } from './components/Screens.js'
 import { Icon } from './components/Icon.js'
 import { NewTeammateDialog } from './components/NewTeammateDialog.js'
 import type { TeammateDraft } from './components/NewTeammateDialog.js'
+import { templateAvatar } from './components/TeamTemplates.js'
+import { TEAM_TEMPLATES } from '../../shared/team-templates.js'
+import type { TeamTemplate } from '../../shared/team-templates.js'
 import { GroupSettingsDialog } from './components/GroupSettingsDialog.js'
 import { TeammateBot } from './components/TeammateBot.js'
 import { Sidebar } from './components/Sidebar.js'
@@ -3689,6 +3692,41 @@ export default function App(): ReactElement {
       .catch(() => setTeammateError('That teammate could not be created. Nobody was added.'))
   }
 
+  /*
+   * A WHOLE TEAM FROM A TEMPLATE (0.354), made one teammate at a time through
+   * the same create the dialog uses, so each is an ordinary teammate. One that
+   * will not make stops the rest and says why; any already made stay, and the
+   * roster is read back either way, so Home shows exactly what exists.
+   */
+  const makeTeamFrom = async (templateId: TeamTemplate['templateId']): Promise<string | undefined> => {
+    const bridge = window.desktop
+    const template = TEAM_TEMPLATES.find((entry) => entry.templateId === templateId)
+    if (bridge === undefined || template === undefined) return 'That team could not be made here.'
+    let problem: string | undefined
+    for (const mate of template.teammates) {
+      const response = await bridge
+        .createTeammate({
+          name: mate.name,
+          hue: mate.hue,
+          role: mate.role,
+          ...(mate.roleTitle === undefined ? {} : { roleTitle: mate.roleTitle }),
+          avatar: templateAvatar(templateId, mate)
+        })
+        .catch(() => undefined)
+      if (response === undefined || !response.ok) {
+        problem = response === undefined ? `${mate.name} could not be made.` : response.error.message
+        break
+      }
+    }
+    const listed = await bridge.listTeammates().catch(() => undefined)
+    if (listed?.ok === true) {
+      setTeammates(listed.data.teammates)
+      setMissionOwners(listed.data.missionOwners)
+      setMissionTitles(listed.data.missionTitles)
+    }
+    return problem
+  }
+
   const updateTeammate = (
     teammateId: string,
     input: TeammateDraft
@@ -5606,6 +5644,7 @@ export default function App(): ReactElement {
                   setTeammateError(undefined)
                   setNewTeammateOpen(true)
                 }}
+                onUseTemplate={makeTeamFrom}
                 onInstall={installRuntime}
                 installing={installing}
                 installLog={installLog}

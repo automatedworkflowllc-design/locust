@@ -5069,6 +5069,50 @@ textarea {
   outline-offset: 2px;
 }
 
+/* --- Home with nobody on it: a team in one click (TeamTemplates.tsx) -----
+ * The same section and grid the team becomes, so pressing a card turns the
+ * row into the team it offered without the page jumping. A template card
+ * stands taller than a teammate's: its three faces over the team's name,
+ * one line of who is on it, and their names. */
+.lc-teamtemplate {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  align-content: start;
+  gap: 10px;
+  padding: 14px;
+}
+
+.lc-teamtemplate__faces {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lc-teamtemplate__line {
+  font-size: var(--lc-text-description);
+  line-height: 1.45;
+  color: var(--lc-text-secondary);
+}
+
+.lc-teamtemplate:disabled {
+  cursor: default;
+}
+
+/* The other two, while one is being made: still there, plainly not now. */
+.lc-teamtemplate:disabled:not([aria-busy='true']) {
+  opacity: 0.55;
+}
+
+.lc-teamtemplates__note,
+.lc-teamtemplates__problem {
+  margin: 0;
+  font-size: var(--lc-text-description);
+}
+
+.lc-teamtemplates__note {
+  color: var(--lc-text-muted);
+}
+
 .lc-hometeam__text {
   display: flex;
   flex-direction: column;

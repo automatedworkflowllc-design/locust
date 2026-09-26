@@ -7,6 +7,8 @@ import { FREE_START_RUNTIME, installCommand, installSentence, runtimeInstallFact
 import { COVER_HEIGHT, HomeCover, coverGrowFor, coverScale } from './HomeCover.js'
 import { HomeTeam } from './HomeTeam.js'
 import type { HomeTeammate } from './HomeTeam.js'
+import { TeamTemplates } from './TeamTemplates.js'
+import type { TeamTemplate } from '../../../shared/team-templates.js'
 import { Icon } from './Icon.js'
 import { SignInButton } from './SignInButton.js'
 
@@ -81,7 +83,8 @@ export function FirstLaunch({
   onCheckAgain,
   workspaceMade = false,
   team = [],
-  onMessageTeammate
+  onMessageTeammate,
+  onUseTemplate
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
   /** Runtimes whose last run ended on the account's usage limit, with its own words. */
@@ -107,6 +110,8 @@ export function FirstLaunch({
   readonly onChooseFolder: () => void
   /** Opens the New teammate form: the home screen's way to the product's core action. */
   readonly onNewTeammate?: () => void
+  /** Makes a whole team from a template (TeamTemplates); resolves with why it could not. */
+  readonly onUseTemplate?: (templateId: TeamTemplate['templateId']) => Promise<string | undefined>
   /** Run the install for a runtime. Absent means the panel offers none. */
   readonly onInstall?: (runtime: string) => void
   /** The runtime being installed right now; every other button waits on it. */
@@ -348,7 +353,11 @@ export function FirstLaunch({
           <HomeTeam team={team} onMessage={onMessageTeammate} {...(onNewTeammate === undefined ? {} : { onNewTeammate })} />
         )}
 
-        {offerFirstTeammate && (
+        {offerFirstTeammate && onUseTemplate !== undefined && onNewTeammate !== undefined && (
+          <TeamTemplates onUse={onUseTemplate} onNewTeammate={onNewTeammate} />
+        )}
+
+        {offerFirstTeammate && onUseTemplate === undefined && (
           <div className="lc-firstteammate">
             <button type="button" className="lc-button lc-firstteammate__button" onClick={onNewTeammate}>
               <Icon name="plus" size={13} /> New teammate
