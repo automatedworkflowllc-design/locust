@@ -52,8 +52,11 @@ const drive = await startDrive({
   workspace,
   ...(packaged === undefined ? {} : { packaged }),
   ...(outPath === undefined ? {} : { outPath }),
-  // The settings a new profile has: teammates may message each other.
-  seed: { schemaVersion: 1, teammates: [], missionOwners: {}, settings: { swarm: false, relay: true, relayHopCap: 2, memoryMode: 'on' } }
+  // No settings at all: a new profile's own defaults. The seed used to say
+  // relayHopCap 2 (copied from the old relay drive), and Rook's first
+  // starter stopped after two automatic replies with no plan -- a cap no
+  // new person has; the default is 12 (DEFAULT_RELAY_HOP_CAP).
+  seed: { schemaVersion: 1, teammates: [], missionOwners: {} }
 })
 const verdicts = []
 

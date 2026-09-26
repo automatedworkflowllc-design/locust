@@ -2153,6 +2153,14 @@ export type CodexMissionUpdate =
       readonly runId: string
       readonly missionId: string
       readonly message: string
+      /**
+       * `info` for how an exchange is going -- waiting on two teammates, one
+       * replied -- and `warning` (the default) when something did not happen
+       * or a person may need to act. Every notice was amber, so the ordinary
+       * run of a Chief of Staff's first delegation read as five warnings
+       * (Rook's first starter, packaged 0.365).
+       */
+      readonly level?: 'info' | 'warning'
     }
   | {
       /**

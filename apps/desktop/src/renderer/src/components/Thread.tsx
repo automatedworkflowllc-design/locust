@@ -706,7 +706,7 @@ export interface ThreadProps {
     readonly self: PublicTeammate | undefined
     readonly teammates: readonly PublicTeammate[]
     readonly messages: readonly PublicPeerMessage[]
-    readonly notices: readonly string[]
+    readonly notices: readonly { readonly message: string; readonly level: 'info' | 'warning' }[]
     /** What this conversation taught the team, read from the memory list. */
     readonly memories?: readonly MemoryCardLine[]
   }
@@ -1122,7 +1122,7 @@ export function Thread({
 
         {cardsFor(earlierTurns.length, 'after-work').map(peerCard)}
         {peers.notices.map((notice, index) => (
-          <DiagnosticLine key={`peer_notice_${index}`} level="warning" message={notice} />
+          <DiagnosticLine key={`peer_notice_${index}`} level={notice.level} message={notice.message} />
         ))}
         {editCheck !== undefined && (
           <EditCheckCard check={editCheck} teammateName={peers.self?.name} {...(onSendEditCheck === undefined ? {} : { onSend: onSendEditCheck })} />

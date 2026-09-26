@@ -31,6 +31,30 @@ describe('a runtime asking which way to go', () => {
     ])
   })
 
+  /*
+   * THE TEMPLATE'S BRACKETS KEPT AROUND A MODEL'S OWN WORDS (0.366).
+   *
+   * Rook's first starter on the free model, packaged 0.365: the card offered
+   * "<option name>I'll supply my numbers" over "reply with ... the plan>".
+   */
+  it('drops the template brackets a model kept, and leaves arrows and comparisons alone', () => {
+    const asked = parseDecision(
+      block(
+        [
+          'How should I finalize your plan without your numbers?',
+          "- <option name>I'll supply my numbers :: reply with starting savings and costs, then I finalize the plan>",
+          '- <Use an illustrative example> :: <I build it on sample figures>',
+          '- Keep it small :: diffs stay < 50 lines, then a -> b'
+        ].join('\n')
+      )
+    )
+    expect(asked?.options).toEqual([
+      { label: "I'll supply my numbers", note: 'reply with starting savings and costs, then I finalize the plan' },
+      { label: 'Use an illustrative example', note: 'I build it on sample figures' },
+      { label: 'Keep it small', note: 'diffs stay < 50 lines, then a -> b' }
+    ])
+  })
+
   it('accepts an option that states no cost', () => {
     const asked = parseDecision(block('Which one?\n- Do it now\n- Wait for review'))
     expect(asked?.options.map((option) => option.note)).toEqual([undefined, undefined])

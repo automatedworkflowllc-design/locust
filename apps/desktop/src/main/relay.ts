@@ -550,7 +550,7 @@ interface DeferredReply {
   readonly from: SharingMission
   readonly origin: RelayOrigin
   /** Addressed to the thread that shared, so the wait is visible where it was caused. */
-  readonly notice: (message: string) => void
+  readonly notice: (message: string, level?: 'info' | 'warning') => void
   /** Registered once the held run actually starts, so the asker still hears silence. */
   readonly exchange: OpenExchange | undefined
 }
@@ -703,8 +703,8 @@ export function createRelay(options: RelayOptions): Relay {
    */
   const deferred = new Map<string, DeferredReply>()
 
-  const notify = (runId: string, missionId: string, message: string): void => {
-    options.notify({ kind: 'relay-notice', runId, missionId, message })
+  const notify = (runId: string, missionId: string, message: string, level: 'info' | 'warning' = 'warning'): void => {
+    options.notify({ kind: 'relay-notice', runId, missionId, message, level })
   }
 
   /*
@@ -747,7 +747,7 @@ export function createRelay(options: RelayOptions): Relay {
       ...(exchange.origin.relayedTo === undefined ? {} : { relayedTo: exchange.origin.relayedTo }),
       answering: [returned.messageId]
     }
-    const notice = (message: string): void => notify(exchange.askerRunId, exchange.askerMissionId, message)
+    const notice = (message: string, level?: 'info' | 'warning'): void => notify(exchange.askerRunId, exchange.askerMissionId, message, level)
     // The person-started mission is the first entry in `lastMissionOf`.
     const prompt = returnedAnswerPrompt(ended.peer.self.name, Object.keys(origin.lastMissionOf)[0] === asker.self.teammateId)
     // Never refused by the budget, but spent against it (A2.4).
@@ -796,7 +796,7 @@ export function createRelay(options: RelayOptions): Relay {
     readonly prompt: string
     readonly from: SharingMission
     readonly origin: RelayOrigin
-    readonly notice: (message: string) => void
+    readonly notice: (message: string, level?: 'info' | 'warning') => void
   }): Promise<StartOutcome> => {
     const { recipient, from } = input
     // Their turn in THIS exchange first; failing that, their hub. A reply
@@ -841,10 +841,19 @@ export function createRelay(options: RelayOptions): Relay {
       )
     }
     if (own === undefined) {
+      /*
+       * Said plainly, and as information (0.366). It read "Sable has not run
+       * on a route of their own yet, so this reply runs on Rook's OpenCode /
+       * opencode/muse-spark-1.3-contributor-free ... Message Sable once on
+       * the route they should keep" -- in amber, on the first delegation of
+       * every team a new person starts from Home (Rook's first starter,
+       * packaged 0.365). The exact model is in About this reply.
+       */
       input.notice(
-        `${recipient.self.name} has not run on a route of their own yet, so this reply runs on ${from.peer.self.name}'s ${runtimeDisplayName(route.runtime)} / ${route.model}, ${
-          route.mode === 'accept-edits' ? 'and may edit this folder' : 'read-only'
-        }. Message ${recipient.self.name} once on the route they should keep.`
+        `${recipient.self.name} has no model of their own yet, so this reply uses ${from.peer.self.name}'s (${runtimeDisplayName(route.runtime)})${
+          route.mode === 'accept-edits' ? ' and may edit this folder' : ', read-only'
+        }. To give ${recipient.self.name} their own, edit ${recipient.self.name} on the Team screen.`,
+        'info'
       )
     }
     /*
@@ -928,7 +937,7 @@ export function createRelay(options: RelayOptions): Relay {
    * queued): steering is a heads-up that arrives in time, not a second way to
    * answer, so the hop cap and the answer's return are untouched.
    */
-  const takeNowFor = async (recipient: MissionPeerContext, from: string, text: string, notice: (message: string) => void): Promise<void> => {
+  const takeNowFor = async (recipient: MissionPeerContext, from: string, text: string, notice: (message: string, level?: 'info' | 'warning') => void): Promise<void> => {
     const shown = withoutProtocolBlocks(text).trim().slice(0, 2000)
     let steered = false
     try {
@@ -940,13 +949,13 @@ export function createRelay(options: RelayOptions): Relay {
       steered = false
     }
     if (steered) {
-      notice(`${recipient.self.name} was shown this part-way through their run, without stopping it. It is also their next turn.`)
+      notice(`${recipient.self.name} was shown this part-way through their run, without stopping it. It is also their next turn.`, 'info')
       return
     }
     await interruptFor(recipient, notice)
   }
 
-  const interruptFor = async (recipient: MissionPeerContext, notice: (message: string) => void): Promise<void> => {
+  const interruptFor = async (recipient: MissionPeerContext, notice: (message: string, level?: 'info' | 'warning') => void): Promise<void> => {
     let allowed = false
     try {
       allowed = (await options.mayInterrupt?.()) === true
@@ -955,7 +964,8 @@ export function createRelay(options: RelayOptions): Relay {
     }
     if (!allowed) {
       notice(
-        `${recipient.self.name} was asked to take this before finishing. Teammates interrupting each other is switched off in Settings, so it waits for their run to end.`
+        `${recipient.self.name} was asked to take this before finishing. Teammates interrupting each other is switched off in Settings, so it waits for their run to end.`,
+        'info'
       )
       return
     }
@@ -1095,7 +1105,7 @@ export function createRelay(options: RelayOptions): Relay {
       return
     }
     reserve(origin.rootMissionId)
-    const notice = (message: string): void => notify(meeting.askerRunId, meeting.askerMissionId, message)
+    const notice = (message: string, level?: 'info' | 'warning'): void => notify(meeting.askerRunId, meeting.askerMissionId, message, level)
     const readByPerson = Object.keys(origin.lastMissionOf)[0] === asker.self.teammateId
     const outcome = await startFor({
       recipient: asker,
@@ -1150,7 +1160,7 @@ export function createRelay(options: RelayOptions): Relay {
         }
       }
       const root = mission.relay?.rootMissionId ?? shared ?? mission.missionId
-      const notice = (message: string): void => notify(mission.runId, mission.missionId, message)
+      const notice = (message: string, level?: 'info' | 'warning'): void => notify(mission.runId, mission.missionId, message, level)
 
       // A reply into an open meeting is held, not relayed: the asker's turn
       // starts once everyone has spoken. The message itself is already in
@@ -1166,7 +1176,8 @@ export function createRelay(options: RelayOptions): Relay {
             notify(
               meeting.askerRunId,
               meeting.askerMissionId,
-              `${mission.peer.self.name} replied. Still waiting on ${[...meeting.awaiting.values()].join(', ')}.`
+              `${mission.peer.self.name} replied. Still waiting on ${[...meeting.awaiting.values()].join(', ')}.`,
+              'info'
             )
           } else {
             await closeMeeting(meeting, mission)
@@ -1321,7 +1332,7 @@ export function createRelay(options: RelayOptions): Relay {
         }
         meetings.set(mission.missionId, opened)
         for (const entry of started) answering.set(entry.missionId, opened)
-        notice(`Waiting on ${started.map((entry) => entry.name).join(', ')} to reply before your next turn.`)
+        notice(`Waiting on ${started.map((entry) => entry.name).join(', ')} to reply before your next turn.`, 'info')
       } else {
         for (const entry of started) {
           exchanges.set(entry.missionId, {

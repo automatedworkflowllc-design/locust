@@ -130,6 +130,27 @@ const clean = (value: string): string =>
     .replace(/\s+/gu, ' ')
     .trim()
 
+/**
+ * THE TEMPLATE'S BRACKETS, WHERE A MODEL KEPT THEM (0.366).
+ *
+ * The brief shows an option as `- <option name> :: <what it costs or
+ * implies>`, and a free model on Rook's first starter kept the brackets
+ * around its own words: the card offered "<option name>I'll supply my
+ * numbers" over "reply with ... then I finalize the plan>" (packaged
+ * 0.365). The words are the model's; the brackets were ours. Gone are: the
+ * template's own placeholder in front of real words, one pair wrapping the
+ * whole of it, and a lone bracket left at either end -- never an arrow
+ * (`->`, `=>`) or a comparison inside the words.
+ */
+export function withoutTemplateMarks(value: string): string {
+  let text = value.replace(/^<(?:option name|option|name|what it costs or implies)>\s*(?=\S)/i, '')
+  const wrapped = /^<([^<>]+)>$/.exec(text)
+  if (wrapped !== null) text = (wrapped[1] ?? '').trim()
+  if (!text.includes('<') && /[^-=\s]>$/.test(text)) text = text.slice(0, -1).trimEnd()
+  if (!text.includes('>') && text.startsWith('<')) text = text.slice(1).trimStart()
+  return text
+}
+
 const bounded = (value: string, limit: number): string =>
   value.length <= limit ? value : `${value.slice(0, limit - 1).trimEnd()}…`
 
@@ -170,9 +191,9 @@ function readBlock(body: string): DecisionRequest | undefined {
       continue
     }
     const [label, ...rest] = (option[1] ?? '').split('::')
-    let text = clean(label ?? '')
+    let text = withoutTemplateMarks(clean(label ?? ''))
     if (text.length === 0) continue
-    let note = clean(rest.join('::'))
+    let note = withoutTemplateMarks(clean(rest.join('::')))
     // The brief's own placeholder copied as the option's name -- Colin's
     // screenshot, 2026-09-25, a free Mimo run on 0.345: two buttons titled
     // "The first option" and "The second option". The model's real words

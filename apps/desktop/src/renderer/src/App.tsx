@@ -249,7 +249,8 @@ interface LiveRunState {
   /** Workroom messages this run received or posted, as the host reported them. */
   readonly peerMessages?: readonly PublicPeerMessage[]
   /** Shares the host could not honour, in the host's words. */
-  readonly peerNotices?: readonly string[]
+  /** What the exchange around this run said, each at its own level (0.366). */
+  readonly peerNotices?: readonly { readonly message: string; readonly level: 'info' | 'warning' }[]
   /** A3.3: the person's check after this turn changed files. */
   readonly editCheck?: EditCheckShown
   /**
@@ -312,7 +313,10 @@ function applyMissionUpdate(run: LiveRunState, update: CodexMissionUpdate): Live
     return { ...live, peerMessages: [...(live.peerMessages ?? []), update.message] }
   }
   if (update.kind === 'peer-share-failed' || update.kind === 'relay-notice') {
-    return { ...live, peerNotices: [...(live.peerNotices ?? []), update.message] }
+    return {
+      ...live,
+      peerNotices: [...(live.peerNotices ?? []), { message: update.message, level: update.kind === 'relay-notice' ? (update.level ?? 'warning') : 'warning' }]
+    }
   }
   if (update.kind === 'edit-check') {
     const { kind: _kind, runId: _runId, missionId: _missionId, ...shown } = update
@@ -3412,7 +3416,7 @@ export default function App(): ReactElement {
                 }
               }),
           ...(response.data.peerDeliveryFailed
-            ? { peerNotices: ['Messages from teammates could not be read for this mission. Whatever was waiting is still waiting.'] }
+            ? { peerNotices: [{ message: 'Messages from teammates could not be read for this mission. Whatever was waiting is still waiting.', level: 'warning' as const }] }
             : {})
         }
         for (const update of queued) next = applyMissionUpdate(next, update)

@@ -327,8 +327,11 @@ describe('relaying a share', () => {
     await relay.onShared(sharing(), [message(BOOTY)])
     expect(starts[0]).toMatchObject({ runtime: 'cursor', model: 'composer-2.5', mode: 'accept-edits' })
     const said = notices.find((update) => update.kind === 'relay-notice')
-    expect(said?.kind === 'relay-notice' ? said.message : '').toContain('has not run on a route of their own')
-    expect(said?.kind === 'relay-notice' ? said.message : '').toContain('Cursor Agent / composer-2.5')
+    expect(said?.kind === 'relay-notice' ? said.message : '').toContain('has no model of their own yet')
+    // The runtime by name, never the raw model id, and as information (0.366).
+    expect(said?.kind === 'relay-notice' ? said.message : '').toContain('(Cursor Agent)')
+    expect(said?.kind === 'relay-notice' ? said.message : '').not.toContain('composer-2.5')
+    expect(said?.kind === 'relay-notice' ? said.level : undefined).toBe('info')
     // And what it may DO on that route. A sender on Auto lends `ask`, never
     // the run of the whole machine, and a person whose reply came back
     // read-only had no way to find out why (QA, 2026-09-06).
