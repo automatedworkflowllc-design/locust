@@ -11,6 +11,31 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.349.0 - 2026-09-26
+
+### Fixed
+
+- **A teammate's own branch is never handed over half-made.** On a big
+  project, making a teammate's own copy could be cut off part-way and then
+  used as it was -- to git, a copy with most of the project deleted. It now
+  has the time it needs, and a copy left unfinished is finished before
+  anyone works in it, keeping anything already there.
+- **Removing the teammate you had picked** no longer sends your next
+  message to a different teammate.
+- **Stop on a run that had just finished** no longer leaves it stuck on
+  "running".
+- **A message you stopped while it was starting** is no longer sent later.
+- **Typing with an input method** (Korean, Japanese, Chinese): Enter
+  confirms the word instead of sending the half-typed message, and Escape
+  no longer stops the run.
+- **A run stopped by a teammate's message** says "This run was stopped",
+  not "You stopped this run".
+- **An opened activity list stays in its own conversation** instead of
+  arriving open in the next one.
+- **Copilot** no longer shows "Unhandled Copilot record" under its answers.
+- **An Antigravity reply started by a teammate** is shown as theirs after
+  a restart, not as a conversation you began.
+
 ## 0.348.0 - 2026-09-25
 
 ### Improved
