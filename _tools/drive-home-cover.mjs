@@ -16,14 +16,14 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, sleep, startDrive, recordRoot } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tube = arg('--tube') ?? 'full'
 // Bots since 0.274; the pixel-face cover's frames stay in docs/home-cover-2026-09-22.
 // --out keeps a new run from writing over the 9/22 records, which are tracked.
-const OUT = arg('--out') ?? join(new URL('../docs/home-cover-bots-2026-09-22/', import.meta.url).pathname.slice(1), (packaged === undefined ? 'local' : 'packaged') + (tube === 'full' ? '' : '-tube-' + tube))
+const OUT = arg('--out') ?? join(recordRoot('home-cover-bots-2026-09-22'), (packaged === undefined ? 'local' : 'packaged') + (tube === 'full' ? '' : '-tube-' + tube))
 await mkdir(OUT, { recursive: true })
 
 const workspace = await scratchRepository('locust-drive-cover-ws-')
@@ -219,14 +219,18 @@ try {
     if (m.missing) { check(`${label}: the cover is on the home screen`, false); continue }
     say(`${label}: card ${Math.round(m.card.width)}x${Math.round(m.card.height)} at k=${m.k}; bots ${m.faces.map((f) => `${f.bot} ${f.width}px (canvas ${f.canvas})`).join(', ')}; claim ${m.claimFont.size} ${m.claimFont.family} ${m.claimFont.tracking}; name ${m.nameFont.size} ${m.nameFont.family} ${m.nameFont.weight}; pane overflow ${Math.round(m.scrolled.overflow)}px, scrolled ${Math.round(m.scrolled.top)}px`)
     // The machine cover has no card border, so its width is the cover's.
-    check(`${label}: k is the card's width over the cover's 960`, Math.abs(Number(m.k) - m.card.width / 960) < 0.002, `${m.k} vs ${(m.card.width / 960).toFixed(3)}`)
+    // Since 0.351 the drawing grows into spare height (coverGrowFor): at most
+    // 1.45x the card's share of 960, keeping 3% of the card clear each side.
+    const grown = Number(m.k) / (m.card.width / 960)
+    check(`${label}: k is the card's width over the cover's 960, grown at most 1.45x`, grown > 0.998 && grown <= 1.452, `${m.k} = ${(m.card.width / 960).toFixed(3)} x ${grown.toFixed(3)}`)
+    check(`${label}: grown, the machine keeps 3% of the card clear each side`, m.machine.left - m.card.left >= 0.03 * m.card.width - 1 && m.card.right - m.machine.right >= 0.03 * m.card.width - 1, `${Math.round(m.machine.left - m.card.left)}px and ${Math.round(m.card.right - m.machine.right)}px of ${Math.round(m.card.width)}`)
     check(`${label}: the claim is centred under the lockup (letters to letters)`, Math.abs(m.claimLetters.mid - m.lockupInk.mid) <= 1.5, `claim centre ${m.claimLetters.mid.toFixed(1)}, lockup centre ${m.lockupInk.mid.toFixed(1)}`)
     check(`${label}: the lockup is centred on the machine's glass`, Math.abs(m.lockupInk.mid - m.glass.mid) <= 3, `lockup centre ${m.lockupInk.mid.toFixed(1)}, glass centre ${m.glass.mid.toFixed(1)}`)
     check(`${label}: the claim is on the glass, under the lockup`, m.claim.top >= m.glass.top && m.claim.bottom <= m.glass.bottom && m.claim.top > m.lockup.bottom, `claim ${Math.round(m.claim.top)}-${Math.round(m.claim.bottom)}, glass ${Math.round(m.glass.top)}-${Math.round(m.glass.bottom)}`)
     check(`${label}: the machine is centred on the card`, Math.abs(m.machine.mid - m.card.mid) <= 2, `machine ${m.machine.mid.toFixed(1)}, card ${m.card.mid.toFixed(1)}`)
     // The droid and the Locust stand on the bezel's top edge; the ghost floats.
     const standing = m.faces.filter((face) => face.bot !== 'ghost')
-    check(`${label}: the teammates stand on the machine (their lowest drawn pixel at the bezel's top)`, standing.length === 2 && standing.every((face) => face.feet !== null && Math.abs(face.feet - m.machine.top) <= 8), standing.map((face) => `${face.bot} ${face.feet === null ? 'no ink' : Math.round(face.feet - m.machine.top) + 'px'}`).join(', '))
+    check(`${label}: the teammates stand on the machine (their lowest drawn pixel at the bezel's top)`, standing.length === 2 && standing.every((face) => face.feet !== null && Math.abs(face.feet - m.machine.top) <= 8 * Math.max(1, Number(m.k))), standing.map((face) => `${face.bot} ${face.feet === null ? 'no ink' : Math.round(face.feet - m.machine.top) + 'px'}`).join(', '))
     check(`${label}: the claim is Geist Mono capitals, the name Figtree 700`, /Geist Mono/.test(m.claimFont.family) && m.claimFont.transform === 'uppercase' && /Figtree/.test(m.nameFont.family) && m.nameFont.weight === '700', JSON.stringify({ claim: m.claimFont, name: m.nameFont }))
     check(`${label}: both faces are loaded, not fallbacks`, m.fontsReady.figtree700 && m.fontsReady.geistMono, JSON.stringify(m.fontsReady))
     check(`${label}: the claim is never under 10.5px`, parseFloat(m.claimFont.size) >= 10.5, m.claimFont.size)

@@ -21,11 +21,11 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { FREE_ROUTE, pickRouteScript, say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
+import { FREE_ROUTE, pickRouteScript, say, scratchRepository, sleep, startDrive, recordRoot } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
-const OUT = join(new URL('../docs/calm-bots-2026-09-23/', import.meta.url).pathname.slice(1), packaged === undefined ? 'local' : 'packaged')
+const OUT = join(recordRoot('calm-bots-2026-09-23'), packaged === undefined ? 'local' : 'packaged')
 await mkdir(OUT, { recursive: true })
 
 const mate = (id, name, hue, shape, extra = {}) => ({
@@ -98,7 +98,7 @@ const SAMPLER = `(() => {
       const transform = getComputedStyle(el).transform
       const matrix = new DOMMatrixReadOnly(transform === 'none' ? undefined : transform)
       const bot = bots[id] ?? (bots[id] = { where: where(el), bot: el.dataset.bot, teammate: el.dataset.teammate ?? '', motion: el.dataset.motion, size, samples: [] })
-      bot.samples.push({ a: el.dataset.activity, top: row < 0 ? null : (row / (canvas.height / shown)) / size, lift: -matrix.f / size, bouncing: el.classList.contains('is-bouncing') })
+      bot.samples.push({ t: Math.round(performance.now()), a: el.dataset.activity, top: row < 0 ? null : (row / (canvas.height / shown)) / size, lift: -matrix.f / size, bouncing: el.classList.contains('is-bouncing'), glance: el.dataset.glance ?? null, shown, pixels: canvas.height })
     }
   }
   const timer = setInterval(sample, 100)
@@ -185,6 +185,8 @@ try {
   const bouncers = copies.filter((b) => b.counted.working >= 15)
   check('at work the copies bounce, slightly (a lift between a twenty-fifth and a tenth of their size)', bouncers.length > 0 && bouncers.every((b) => b.bounce >= 0.04 && b.bounce <= 0.1), bouncers.map((b) => `${b.where} ${b.bounce.toFixed(3)}`).join(', ') || 'never at work for a second and a half')
   await writeFile(join(OUT, 'samples.json'), JSON.stringify(moving.map(({ samples, ...rest }) => ({ ...rest, samples: samples.length })), null, 2))
+  // Every sample too, so a number that moved can be traced to the moment it moved.
+  await writeFile(join(OUT, 'samples-raw.json'), JSON.stringify(moving, null, 1))
   say(failures === 0 ? '\nCALM BOTS PASSED' : `\nCALM BOTS: ${String(failures)} FAILED`)
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

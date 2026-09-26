@@ -16,12 +16,12 @@ import { mkdir, mkdtemp, readdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { FREE_ROUTE, say, sleep, startDrive } from './drive-lib.mjs'
+import { FREE_ROUTE, say, sleep, startDrive, recordRoot } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tag = arg('--tag')
-const outPath = tag === undefined ? undefined : join(new URL('../docs/beta-fixes-2026-09-24/', import.meta.url).pathname.slice(1), `own-branch-every-start-${tag}`)
+const outPath = tag === undefined ? undefined : join(recordRoot('beta-fixes-2026-09-24'), `own-branch-every-start-${tag}`)
 if (outPath !== undefined) await mkdir(outPath, { recursive: true })
 
 // Not a git repository: the branch cannot be made here.

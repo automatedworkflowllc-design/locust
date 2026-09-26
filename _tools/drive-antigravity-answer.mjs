@@ -24,12 +24,12 @@ import { readdir, readFile, stat, mkdir, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
-import { pickRouteScript, say, sleep, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, sleep, startDrive, recordRoot } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const WORKSPACE = 'C:/Users/<home>/Documents/antigravtest'
-const OUT = join(new URL('../docs/antigravity-answer-2026-09-23/', import.meta.url).pathname.slice(1), packaged === undefined ? 'local' : 'packaged')
+const OUT = join(recordRoot('antigravity-answer-2026-09-23'), packaged === undefined ? 'local' : 'packaged')
 await mkdir(OUT, { recursive: true })
 
 const drive = await startDrive({

@@ -15,12 +15,12 @@ import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 
-import { say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, sleep, startDrive, recordRoot } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tag = arg('--tag')
-const outPath = tag === undefined ? undefined : join(new URL('../docs/beta-fixes-2026-09-24/', import.meta.url).pathname.slice(1), `room-keeps-effort-${tag}`)
+const outPath = tag === undefined ? undefined : join(recordRoot('beta-fixes-2026-09-24'), `room-keeps-effort-${tag}`)
 if (outPath !== undefined) await mkdir(outPath, { recursive: true })
 
 const startedAt = new Date()

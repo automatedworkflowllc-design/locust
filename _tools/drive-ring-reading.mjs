@@ -17,7 +17,7 @@
 import { readdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace, recordRoot } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
@@ -31,7 +31,7 @@ const drive = await startDrive({
   port: 9412,
   workspace,
   spends: true,
-  outPath: join(new URL('../docs/ring-reading-2026-09-23/', import.meta.url).pathname.slice(1), tag),
+  outPath: join(recordRoot('ring-reading-2026-09-23'), tag),
   ...(packaged === undefined ? {} : { packaged }),
   seed: {
     schemaVersion: 1,

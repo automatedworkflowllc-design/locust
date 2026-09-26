@@ -15,11 +15,11 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { pickRouteScript, say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, sleep, startDrive, recordRoot } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
-const OUT = join(new URL('../docs/beams-2026-09-23/', import.meta.url).pathname.slice(1), packaged === undefined ? 'local' : 'packaged')
+const OUT = join(recordRoot('beams-2026-09-23'), packaged === undefined ? 'local' : 'packaged')
 await mkdir(OUT, { recursive: true })
 
 const workspace = await scratchRepository('locust-drive-beams-ws-')
@@ -92,7 +92,7 @@ try {
     const wrap = document.querySelector('.lc-coverbeam')
     if (!wrap) return JSON.stringify({ wrap: false })
     const after = getComputedStyle(wrap, '::after')
-    return JSON.stringify({ wrap: true, attrs: [...wrap.attributes].map((a) => a.name).join(','), afterAnim: after.animationName, afterOpacity: after.opacity, width: Math.round(wrap.getBoundingClientRect().width), card: Math.round(document.querySelector('.lc-cover').getBoundingClientRect().width) })
+    return JSON.stringify({ wrap: true, attrs: [...wrap.attributes].map((a) => a.name).join(','), afterAnim: after.animationName, afterOpacity: after.opacity, width: Math.round(wrap.getBoundingClientRect().width), card: Math.round(document.querySelector('.lc-cover').getBoundingClientRect().width), machine: Math.round(document.querySelector('.lc-cover__machineslot')?.getBoundingClientRect().width ?? -1) })
   })()`))
   say(`title box beam: ${JSON.stringify(cover)}`)
   const coverAnims = JSON.parse(await drive.evaluate(beamAnimations('.lc-coverbeam')))
@@ -101,7 +101,7 @@ try {
   // the package's `beam-*` animations.
   const beamStillGoing = coverAnims.filter((a) => a.name.startsWith('beam-') && a.state === 'running')
   check('once the lockup lights and the bots move, the beam is out', cover.wrap && beamStillGoing.length === 0 && !/data-active/.test(cover.attrs), `${JSON.stringify(beamStillGoing)}; ${cover.attrs}`)
-  check("the box keeps the card's whole width", cover.width === cover.card, `${cover.width} vs ${cover.card}`)
+  check("the beam keeps the machine's whole width", cover.width === (cover.machine > 0 ? cover.machine : cover.card), `${cover.width} vs ${cover.machine > 0 ? `machine ${cover.machine}` : `card ${cover.card}`}`)
   await clip('title-ready.png', '.lc-coverbeam', 16)
   await drive.send('Performance.enable')
   const a = await metric()

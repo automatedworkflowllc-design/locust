@@ -30,7 +30,7 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { say, scratchRepository, sendAndWaitScript, sleep, startDrive, teammateFace, teammateRows } from './drive-lib.mjs'
+import { say, scratchRepository, sendAndWaitScript, sleep, startDrive, teammateFace, teammateRows, recordRoot } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
@@ -41,7 +41,7 @@ const starter = arg('--starter') === undefined ? undefined : Number(arg('--start
 const plain = process.argv.includes('--plain')
 const ask = arg('--ask') ?? (starter === undefined ? 'I have $12,000 saved and want to use it within three years. How should I think about where to keep it?' : undefined)
 const slug = `${team === 'Research & money' && mate === 'Sable' && starter === undefined ? '' : `-${mate.toLowerCase()}${starter === undefined ? '' : `-starter${String(starter)}`}`}${plain ? '-plain' : ''}`
-const outPath = tag === undefined ? undefined : join(new URL('../docs/beta-fixes-2026-09-24/', import.meta.url).pathname.slice(1), `first-session${slug}-${tag}`)
+const outPath = tag === undefined ? undefined : join(recordRoot('beta-fixes-2026-09-24'), `first-session${slug}-${tag}`)
 if (outPath !== undefined) await mkdir(outPath, { recursive: true })
 
 const workspace = plain ? await mkdtemp(join(tmpdir(), 'locust-drive-first-session-plain-')) : await scratchRepository('locust-drive-first-session-ws-')

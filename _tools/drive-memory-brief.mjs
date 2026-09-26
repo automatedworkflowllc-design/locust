@@ -18,7 +18,7 @@ import { createHash } from 'node:crypto'
 import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { FREE_ROUTE, openTeammateScript, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+import { FREE_ROUTE, openTeammateScript, say, scratchRepository, sendAndWaitScript, startDrive, recordRoot } from './drive-lib.mjs'
 
 /*
  * Free by default. LOCUST_DRIVE_CLAUDE=1 runs Ash on Claude Haiku instead --
@@ -31,7 +31,7 @@ const ROUTE = ON_CLAUDE ? { runtime: 'claude', model: 'haiku', mode: 'accept-edi
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tag = arg('--tag')
-const outPath = tag === undefined ? undefined : join(new URL('../docs/beta-fixes-2026-09-24/', import.meta.url).pathname.slice(1), `memory-brief-${tag}`)
+const outPath = tag === undefined ? undefined : join(recordRoot('beta-fixes-2026-09-24'), `memory-brief-${tag}`)
 if (outPath !== undefined) await mkdir(outPath, { recursive: true })
 
 const workspace = await scratchRepository('locust-drive-brief-ws-')

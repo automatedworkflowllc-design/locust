@@ -13,12 +13,12 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, sleep, startDrive, recordRoot } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const tube = arg('--tube') ?? 'full'
 const packaged = arg('--packaged')
-const OUT = join(new URL('../docs/lockup-lighting-2026-09-22/', import.meta.url).pathname.slice(1), tube)
+const OUT = join(recordRoot('lockup-lighting-2026-09-22'), tube)
 await mkdir(OUT, { recursive: true })
 
 const workspace = await scratchRepository('locust-drive-lockup-ws-')

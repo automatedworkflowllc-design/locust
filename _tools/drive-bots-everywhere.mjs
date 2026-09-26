@@ -13,11 +13,11 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, sleep, startDrive, recordRoot } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
-const OUT = join(new URL('../docs/bots-everywhere-2026-09-22/', import.meta.url).pathname.slice(1), packaged === undefined ? 'local' : 'packaged')
+const OUT = join(recordRoot('bots-everywhere-2026-09-22'), packaged === undefined ? 'local' : 'packaged')
 await mkdir(OUT, { recursive: true })
 
 const mate = (id, name, hue, headwear, accessory, mouth, bot) => ({
@@ -119,7 +119,7 @@ try {
     const add = [...document.querySelectorAll('button[aria-label="Add"]')].find((b) => b.getBoundingClientRect().width > 0)
     add?.click()
     await new Promise((r) => setTimeout(r, 300))
-    ;[...document.querySelectorAll('.lc-menu__item')].find((b) => /New teammate/.test(b.textContent))?.click()
+    ;[...document.querySelectorAll('[role="menuitem"], .lc-menu__item')].find((b) => /New teammate/.test(b.textContent))?.click()
     await new Promise((r) => setTimeout(r, 900))
     const grid = document.querySelector('.lc-lookgrid')
     return JSON.stringify({ looks: grid ? grid.querySelectorAll('.lc-look').length : 0, drawn: grid ? [...grid.querySelectorAll('canvas')].filter((c) => c.width > 0).length : 0, colours: document.querySelectorAll('.lc-hues [role="radio"]').length })

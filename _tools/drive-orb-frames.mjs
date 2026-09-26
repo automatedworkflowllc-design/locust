@@ -11,11 +11,11 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { pickRouteScript, say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, sleep, startDrive, recordRoot } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const label = arg('--label') ?? 'main'
-const OUT = join(new URL('../docs/orb-frames-2026-09-22/', import.meta.url).pathname.slice(1), label)
+const OUT = join(recordRoot('orb-frames-2026-09-22'), label)
 await mkdir(OUT, { recursive: true })
 
 const workspace = await scratchRepository('locust-drive-orbframes-ws-')

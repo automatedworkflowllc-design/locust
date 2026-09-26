@@ -15,7 +15,7 @@
 // reads the thread the way a person would: is there a plan card with the
 // steps in it, and is the reply free of a typed list?
 
-import { say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
+import { say, scratchRepository, startDrive, teammateFace, recordRoot } from './drive-lib.mjs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
@@ -23,7 +23,7 @@ const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.i
 const packaged = arg('--packaged')
 const tag = arg('--tag') ?? (packaged === undefined ? 'local' : 'packaged')
 
-const OUT = join(new URL('../docs/beta-fixes-2026-09-23/', import.meta.url).pathname.slice(1), `codex-plan-card-${tag}`)
+const OUT = join(recordRoot('beta-fixes-2026-09-23'), `codex-plan-card-${tag}`)
 await mkdir(OUT, { recursive: true })
 const workspace = await scratchRepository('locust-drive-plancard-ws-')
 await writeFile(join(workspace, 'notes.txt'), 'alpha\nbeta\ngamma\ndelta\n')

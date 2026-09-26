@@ -10,12 +10,12 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { pickRouteScript, say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, sleep, startDrive, recordRoot } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tag = arg('--tag') ?? (packaged === undefined ? 'local' : 'packaged')
-const OUT = join(new URL('../docs/composer-buttons-2026-09-23/', import.meta.url).pathname.slice(1), `beam-${tag}`)
+const OUT = join(recordRoot('composer-buttons-2026-09-23'), `beam-${tag}`)
 await mkdir(OUT, { recursive: true })
 
 const drive = await startDrive({

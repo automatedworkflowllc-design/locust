@@ -20,12 +20,12 @@
 import { readFile, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, sleep, startDrive, recordRoot } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 // --out keeps a new run from writing over the 9/23 records, which are tracked.
-const OUT = arg('--out') ?? join(new URL('../docs/whats-new-2026-09-23/', import.meta.url).pathname.slice(1), packaged === undefined ? 'local' : 'packaged')
+const OUT = arg('--out') ?? join(recordRoot('whats-new-2026-09-23'), packaged === undefined ? 'local' : 'packaged')
 await mkdir(OUT, { recursive: true })
 
 let failures = 0

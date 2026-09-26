@@ -13,13 +13,13 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { say, scratchRepository, startDrive, teammateFace, teammateRows } from './drive-lib.mjs'
+import { say, scratchRepository, startDrive, teammateFace, teammateRows, recordRoot } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tag = arg('--tag')
 const REQUEST = process.argv.includes('--request')
-const outPath = tag === undefined ? undefined : join(new URL('../docs/beta-fixes-2026-09-24/', import.meta.url).pathname.slice(1), `closing-message-${tag}`)
+const outPath = tag === undefined ? undefined : join(recordRoot('beta-fixes-2026-09-24'), `closing-message-${tag}`)
 if (outPath !== undefined) await mkdir(outPath, { recursive: true })
 
 const T0 = '2026-09-05T05:00:00.000Z'

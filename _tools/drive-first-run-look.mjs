@@ -15,12 +15,12 @@
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, sleep, startDrive, recordRoot } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tag = arg('--tag') ?? (packaged === undefined ? 'local' : 'packaged')
-const OUT = join(new URL('../docs/beta-fixes-2026-09-23/', import.meta.url).pathname.slice(1), `first-run-look-${tag}`)
+const OUT = join(recordRoot('beta-fixes-2026-09-23'), `first-run-look-${tag}`)
 await mkdir(OUT, { recursive: true })
 
 const workspace = await scratchRepository('starter-project-')
@@ -47,9 +47,11 @@ try {
 
   const home = JSON.parse(String(await drive.capture('home, no teammates yet', () => drive.evaluate(`(() => {
     const button = [...document.querySelectorAll('button')].find((b) => (b.textContent ?? '').trim() === 'New teammate')
-    return JSON.stringify({ button: button !== undefined, about: document.querySelector('.lc-firstteammate__about')?.textContent ?? null })
+    return JSON.stringify({ button: button !== undefined, about: document.querySelector('.lc-firstteammate__about')?.textContent ?? null, teams: document.querySelectorAll('.lc-teamtemplate').length })
   })()`))))
-  check('the home screen offers a teammate by name', home.button === true && /grants no new access/.test(home.about ?? ''), JSON.stringify(home))
+  // Since the team templates the empty home offers three teams beside New
+  // teammate; the old fallback still says what a teammate is.
+  check('the home screen offers a teammate by name, or a team', home.button === true && (home.teams === 3 || /grants no new access/.test(home.about ?? '')), JSON.stringify(home))
 
   const form = JSON.parse(String(await drive.capture('New teammate, from the home screen', () => drive.evaluate(`(async () => {
     ;[...document.querySelectorAll('button')].find((b) => (b.textContent ?? '').trim() === 'New teammate')?.click()

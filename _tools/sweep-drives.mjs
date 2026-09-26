@@ -29,6 +29,25 @@ const only = arg('--only')?.split(',').map((name) => name.trim())
 const from = arg('--from')
 const LIMIT_MS = Number(arg('--limit-min') ?? '20') * 60_000
 
+/**
+ * Drives a sweep cannot run as they are, and why -- said in the summary, not
+ * dropped (the 0.367 sweep ran both and counted a usage error as a failure).
+ */
+const SKIP = {
+  'drive-context-menu': 'needs --reuse <profile>: it opens a profile another drive made',
+  'drive-update-lane': 'needs an OLDER build and --expect-latest / --expect-every: run by hand after a release'
+}
+
+/**
+ * What one drive needs to reach the thing it tests. The handoff drive picks
+ * Cursor while a free run goes on; a drive's window refuses every paid route
+ * first unless LOCUST_SPEND=1, so without it the drive guard's refusal is all
+ * it ever sees. Cursor is refused before it starts either way: nothing is spent.
+ */
+const ENV = {
+  'drive-handoff-refused': { LOCUST_SPEND: '1' }
+}
+
 const tools = new URL('./', import.meta.url).pathname.slice(1)
 const drives = readdirSync(tools)
   .filter((name) => /^drive-.*\.mjs$/.test(name) && name !== 'drive-lib.mjs')
@@ -49,7 +68,7 @@ const killTree = (pid) => new Promise((resolve) => execFile('taskkill', ['/PID',
 
 async function summarise() {
   const lines = results.map((result) => {
-    const verdict = result.timedOut ? 'TIMED OUT' : result.fails > 0 || result.failedLines.length > 0 ? 'FAIL' : result.code !== 0 ? `EXIT ${String(result.code)}` : result.passes > 0 ? 'PASS' : 'RAN'
+    const verdict = result.skipped === true ? 'SKIPPED' : result.timedOut ? 'TIMED OUT' : result.fails > 0 || result.failedLines.length > 0 ? 'FAIL' : result.code !== 0 ? `EXIT ${String(result.code)}` : result.passes > 0 ? 'PASS' : 'RAN'
     return `| ${result.name} | ${verdict} | ${String(result.passes)} | ${String(result.fails)} | ${Math.round(result.ms / 1000)}s | ${result.note.replace(/\|/g, '/').slice(0, 160)} |`
   })
   const md = [
@@ -68,9 +87,16 @@ async function summarise() {
 
 for (const name of drives.slice(start)) {
   const began = Date.now()
+  const skipped = SKIP[name.replace(/\.mjs$/, '')]
+  if (skipped !== undefined) {
+    results.push({ name: name.replace(/\.mjs$/, ''), code: 0, timedOut: false, skipped: true, passes: 0, fails: 0, failedLines: [], ms: 0, note: `skipped: ${skipped}` })
+    await summarise()
+    console.log(`${name}: skipped, ${skipped}`)
+    continue
+  }
   const child = spawn(process.execPath, [join(tools, name), '--packaged', packaged], {
     cwd: new URL('../', import.meta.url).pathname.slice(1),
-    env: { ...process.env, LOCUST_DRIVE_OUT: join(out, 'captures'), LOCUST_FREE_MODEL: process.env.LOCUST_FREE_MODEL ?? 'opencode/ling-3.0-flash-fin-free' },
+    env: { ...process.env, LOCUST_DRIVE_OUT: join(out, 'captures'), LOCUST_FREE_MODEL: process.env.LOCUST_FREE_MODEL ?? 'opencode/ling-3.0-flash-fin-free', ...(ENV[name.replace(/\.mjs$/, '')] ?? {}) },
     windowsHide: true
   })
   let text = ''

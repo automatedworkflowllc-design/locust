@@ -19,12 +19,12 @@ import { mkdtemp, readdir, readFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
+import { say, scratchRepository, startDrive, teammateFace, recordRoot } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tag = arg('--tag')
-const outPath = tag === undefined ? undefined : join(new URL('../docs/beta-fixes-2026-09-24/', import.meta.url).pathname.slice(1), `brief-once-${tag}`)
+const outPath = tag === undefined ? undefined : join(recordRoot('beta-fixes-2026-09-24'), `brief-once-${tag}`)
 
 const workspace = await scratchRepository('locust-drive-brief-ws-')
 const profilePath = await mkdtemp(join(tmpdir(), 'locust-drive-brief-profile-'))

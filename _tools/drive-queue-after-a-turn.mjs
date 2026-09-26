@@ -22,14 +22,14 @@ import { existsSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { pickRouteScript, say, scratchRepository, startDrive, teammateFace } from './drive-lib.mjs'
+import { pickRouteScript, say, scratchRepository, startDrive, teammateFace, recordRoot } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tag = arg('--tag') ?? (packaged === undefined ? 'local' : 'packaged')
 const MODEL = arg('--model') ?? 'lightning'
 const PAD = Number(arg('--pad') ?? '3000')
-const OUT = join(new URL('../docs/beta-fixes-2026-09-23/', import.meta.url).pathname.slice(1), `queue-after-a-turn-${tag}`)
+const OUT = join(recordRoot('beta-fixes-2026-09-23'), `queue-after-a-turn-${tag}`)
 await mkdir(OUT, { recursive: true })
 
 const workspace = await scratchRepository('locust-queue-ws-')

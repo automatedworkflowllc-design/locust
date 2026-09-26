@@ -18,13 +18,13 @@ import { mkdir, mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, sleep, startDrive, recordRoot } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tag = arg('--tag') ?? 'packaged'
 if (packaged === undefined) throw new Error('run this on a packaged build: --packaged <Locust.exe>')
-const OUT = join(new URL('../docs/beta-fixes-2026-09-23/', import.meta.url).pathname.slice(1), `start-and-lane-${tag}`)
+const OUT = join(recordRoot('beta-fixes-2026-09-23'), `start-and-lane-${tag}`)
 await mkdir(OUT, { recursive: true })
 
 const workspace = await scratchRepository('locust-start-lane-ws-')

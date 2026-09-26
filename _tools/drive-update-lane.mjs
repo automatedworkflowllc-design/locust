@@ -17,7 +17,7 @@ import { mkdir, mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, sleep, startDrive, recordRoot } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
@@ -27,7 +27,7 @@ const tag = arg('--tag') ?? 'packaged'
 if (packaged === undefined || expectLatest === undefined || expectEvery === undefined) {
   throw new Error('usage: --packaged <Locust.exe> --expect-latest <version> --expect-every <version>')
 }
-const OUT = join(new URL('../docs/beta-fixes-2026-09-23/', import.meta.url).pathname.slice(1), `update-lane-${tag}`)
+const OUT = join(recordRoot('beta-fixes-2026-09-23'), `update-lane-${tag}`)
 await mkdir(OUT, { recursive: true })
 
 const workspace = await scratchRepository('locust-update-lane-ws-')

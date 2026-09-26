@@ -49,6 +49,13 @@ const NPM_DIR = 'C:\\Users\\<home>\\AppData\\Roaming\\npm'
 // LOCUST_FREE_MODEL picks another of OpenCode's free models when this one is
 // down (Muse Spark was, 9/22-9/24); `opencode models | grep free` lists them.
 export const FREE_ROUTE = { runtime: 'opencode', model: process.env.LOCUST_FREE_MODEL ?? 'opencode/muse-spark-1.3-contributor-free', mode: 'accept-edits' }
+/**
+ * The folder a drive keeps its record in: docs/<folder> for a drive run by
+ * hand, or <LOCUST_DRIVE_OUT>/<folder> when the sweep runs it, so a sweep
+ * never writes into the repository.
+ */
+export const recordRoot = (folder) =>
+  process.env.LOCUST_DRIVE_OUT === undefined ? new URL(`../docs/${folder}/`, import.meta.url).pathname.slice(1) : join(process.env.LOCUST_DRIVE_OUT, folder)
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 export const say = (line) => console.error(line)
 export const git = (args, cwd) => new Promise((resolve, reject) => {

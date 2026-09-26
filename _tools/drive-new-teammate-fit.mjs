@@ -11,12 +11,12 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
+import { say, scratchRepository, sleep, startDrive, recordRoot } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const label = arg('--label') ?? 'after'
 const packaged = arg('--packaged')
-const OUT = join(new URL('../docs/new-teammate-fit-2026-09-22/', import.meta.url).pathname.slice(1), label)
+const OUT = join(recordRoot('new-teammate-fit-2026-09-22'), label)
 await mkdir(OUT, { recursive: true })
 
 const workspace = await scratchRepository('locust-drive-newmate-ws-')
@@ -42,7 +42,7 @@ const OPEN = `(async () => {
   if (!add) return JSON.stringify({ error: 'no + button' })
   add.click()
   await new Promise(r => setTimeout(r, 300))
-  const item = [...document.querySelectorAll('.lc-menu__item')].find((b) => /New teammate/.test(b.textContent))
+  const item = [...document.querySelectorAll('[role="menuitem"], .lc-menu__item')].find((b) => /New teammate/.test(b.textContent))
   if (!item) return JSON.stringify({ error: 'no New teammate item' })
   item.click()
   await new Promise(r => setTimeout(r, 600))

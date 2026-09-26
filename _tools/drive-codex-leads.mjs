@@ -18,12 +18,12 @@
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { openTeammateScript, pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+import { openTeammateScript, pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, recordRoot } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tag = arg('--tag')
-const outPath = tag === undefined ? undefined : join(new URL('../docs/beta-fixes-2026-09-24/', import.meta.url).pathname.slice(1), `codex-leads-${tag}`)
+const outPath = tag === undefined ? undefined : join(recordRoot('beta-fixes-2026-09-24'), `codex-leads-${tag}`)
 if (outPath !== undefined) await mkdir(outPath, { recursive: true })
 
 if (process.env.LOCUST_SPEND !== '1') {

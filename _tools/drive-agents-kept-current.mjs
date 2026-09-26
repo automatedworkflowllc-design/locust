@@ -26,13 +26,13 @@ import { mkdir, mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { say, sleep, scratchRepository, startDrive } from './drive-lib.mjs'
+import { say, sleep, scratchRepository, startDrive, recordRoot } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const ASK = process.argv.includes('--ask')
 const tag = arg('--tag') ?? `${packaged === undefined ? 'local' : 'packaged'}${ASK ? '-ask' : ''}`
-const OUT = join(new URL('../docs/beta-fixes-2026-09-23/', import.meta.url).pathname.slice(1), `agents-kept-current-${tag}`)
+const OUT = join(recordRoot('beta-fixes-2026-09-23'), `agents-kept-current-${tag}`)
 await mkdir(OUT, { recursive: true })
 
 // One line through cmd.exe, passed as written: Node would otherwise escape
@@ -66,6 +66,12 @@ if (!installed.ok) {
 }
 const scratchVersion = async () => (await cmd(`"${join(prefix, 'codex.cmd')}" --version`)).out
 say(`scratch Codex: ${await scratchVersion()}`)
+
+// Where Locust should land: npm's latest Codex on the day -- 0.156.1 when this
+// was written, 0.157.1 by 0.367's sweep -- not a number fixed in the drive.
+const LATEST = (await cmd('npm view @openai/codex@latest version', process.env, 120_000)).out.split(/\r?\n/).pop()?.trim() ?? ''
+if (!/^\d+\.\d+\.\d+$/.test(LATEST)) throw new Error(`could not read npm's latest Codex: ${LATEST}`)
+say(`npm's latest Codex: ${LATEST}`)
 
 const workspace = await scratchRepository('locust-kept-current-ws-')
 const drive = await startDrive({
@@ -121,7 +127,7 @@ try {
     // It updates on its own: the first look is 45 s after launch.
     const settled = await settle(360_000)
     const codex = (settled?.agents ?? []).find((agent) => agent.runtime === 'codex')
-    check('Locust updated Codex by itself', codex?.status.kind === 'updated' && codex.status.to === '0.156.1', JSON.stringify(codex?.status ?? settled))
+    check('Locust updated Codex by itself', codex?.status.kind === 'updated' && codex.status.to === LATEST, JSON.stringify(codex?.status ?? settled))
   } else {
     await drive.evaluate(`window.desktop.setRuntimeUpdates(false)`)
     // Past the first look (45 s after launch): it has looked, and downloaded nothing.
@@ -135,7 +141,7 @@ try {
     looked = await read()
     say(`after the first look: ${JSON.stringify(looked)}`)
     const waiting = (looked.agents ?? []).find((agent) => agent.runtime === 'codex')
-    check('it looked, found 0.156.1, and is waiting for the person', waiting?.status.kind === 'waiting' && waiting.status.why === 'ask' && waiting.status.version === '0.156.1', JSON.stringify(waiting?.status ?? looked))
+    check(`it looked, found ${LATEST}, and is waiting for the person`, waiting?.status.kind === 'waiting' && waiting.status.why === 'ask' && waiting.status.version === LATEST, JSON.stringify(waiting?.status ?? looked))
     const untouched = await scratchVersion()
     check('and downloaded nothing by itself', /0\.153\.0/.test(untouched), untouched)
 
@@ -151,7 +157,7 @@ try {
       return codexRow ? codexRow.innerText.replace(/\\s+/g, ' ').trim() : 'no Codex row'
     })()`))
     await shoot('01-update-offered.png')
-    check('the Codex row says 0.156.1 is out and offers Update', /0\.156\.1 is out\./.test(String(offered)) && /Update/.test(String(offered)), String(offered))
+    check(`the Codex row says ${LATEST} is out and offers Update`, String(offered).includes(`${LATEST} is out.`) && /Update/.test(String(offered)), String(offered))
     const pressed = await drive.evaluate(`(() => {
       const codexRow = [...document.querySelectorAll('.lc-runtimerow')].find((r) => /Codex/.test(r.textContent ?? ''))
       const button = [...(codexRow?.querySelectorAll('button') ?? [])].find((b) => (b.textContent ?? '').trim() === 'Update')
@@ -162,7 +168,7 @@ try {
 
     const settled = await settle(300_000)
     const codex = (settled?.agents ?? []).find((agent) => agent.runtime === 'codex')
-    check('pressed, it updated Codex', codex?.status.kind === 'updated' && codex.status.to === '0.156.1', JSON.stringify(codex?.status ?? settled))
+    check('pressed, it updated Codex', codex?.status.kind === 'updated' && codex.status.to === LATEST, JSON.stringify(codex?.status ?? settled))
   }
 
   // The new models, in the picker.
@@ -203,7 +209,7 @@ try {
     return codexRow ? codexRow.innerText.replace(/\\s+/g, ' ').trim() : 'no Codex row'
   })()`))
   await shoot('02-the-codex-row.png')
-  check("the Codex row says it was updated, and shows the new version", /Updated from 0\.153\.0 to 0\.156\.1/.test(String(row)) && /0\.156\.1/.test(String(row)), String(row))
+  check("the Codex row says it was updated, and shows the new version", String(row).includes(`Updated from 0.153.0 to ${LATEST}`), String(row))
   // The switch, as a person sees it: on unless they turned it off.
   const onItsOwn = await drive.evaluate(`(() => {
     const toggle = document.querySelector('button[role="switch"][aria-label="Update Codex CLI and Copilot CLI on their own"]')
@@ -221,7 +227,7 @@ try {
 
   // The scratch CLI itself.
   const after = await scratchVersion()
-  check("the scratch Codex is 0.156.1 now", /0\.156\.1/.test(after), after)
+  check(`the scratch Codex is ${LATEST} now`, after.includes(LATEST), after)
 
   const globalAfter = (await cmd(`"${GLOBAL_CODEX}" --version`)).out
   check("the machine's own Codex was not touched", /^codex-cli \d/.test(globalBefore) && globalAfter === globalBefore, `${globalBefore} -> ${globalAfter}`)
