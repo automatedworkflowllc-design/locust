@@ -50,6 +50,15 @@ const NPM_DIR = 'C:\\Users\\<home>\\AppData\\Roaming\\npm'
 // down (Muse Spark was, 9/22-9/24); `opencode models | grep free` lists them.
 export const FREE_ROUTE = { runtime: 'opencode', model: process.env.LOCUST_FREE_MODEL ?? 'opencode/muse-spark-1.3-contributor-free', mode: 'accept-edits' }
 /**
+ * That model's row in the picker, as pickRouteScript takes it: the words of
+ * its id in order, which is how the picker draws its name
+ * (`opencode/muse-spark-1.3-contributor-free` is "Muse Spark 1.3 Contributor
+ * Free"). It was Muse by name, so a drive moved onto the free route ran Muse
+ * whatever LOCUST_FREE_MODEL said -- and on 2026-09-26 Muse and Ling were both
+ * rate limited for hours while three other free models answered.
+ */
+export const FREE_ROW = '/' + FREE_ROUTE.model.replace(/^opencode\//, '').replace(/-free$/, '').split('-').map((word) => word.replace(/[.*+?^$()|[\]\\{}]/g, (character) => '\\' + character)).join('.*') + '/i'
+/**
  * The folder a drive keeps its record in: docs/<folder> for a drive run by
  * hand, or <LOCUST_DRIVE_OUT>/<folder> when the sweep runs it, so a sweep
  * never writes into the repository.
@@ -487,7 +496,7 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
          * 2026-09-23). Up to four picks, five seconds apart.
          */
         for (let attempt = 0; attempt < 4 && !isFree(route); attempt += 1) {
-          const said = await evaluate(pickRouteScript({ group: '/opencode/i', search: 'free', row: '/muse.*1\\.3/i' }))
+          const said = await evaluate(pickRouteScript({ group: '/opencode/i', search: 'free', row: FREE_ROW }))
           route = await routeText()
           if (!isFree(route) && attempt < 3) {
             say(`the free route is not there yet (${String(said).slice(0, 140)}); trying again`)
