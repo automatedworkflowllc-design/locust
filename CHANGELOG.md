@@ -11,6 +11,21 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.351.0 - 2026-09-26
+
+### Improved
+
+- **The Locust screen grows with your window.** On a tall window the
+  machine and the three teammates on it draw larger instead of leaving
+  the top of Home empty; on a small one they are as before.
+- **New teammate is a proper button**, the same as the ones in the chat
+  bar.
+- **Your team is three across** at every window size.
+- **Costs you see at a glance are money.** A conversation's header, a
+  teammate's card and a relay between teammates show dollars or premium
+  requests; token counts are in Details.
+- **Home speaks to everyone:** "Your AI agents", not "coding agents".
+
 ## 0.350.0 - 2026-09-26
 <!-- big -->
 
