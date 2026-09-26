@@ -74,7 +74,7 @@ describe("a busy model, through OpenCode's server", () => {
     const said = events.filter((event) => event.type === "adapter.diagnostic");
     expect(said).toHaveLength(1);
     const message = said[0]?.type === "adapter.diagnostic" ? said[0].payload.message : "";
-    expect(said[0]).toMatchObject({ payload: { level: "warning", code: "opencode.runtime_error" } });
+    expect(said[0]).toMatchObject({ payload: { level: "warning", code: "opencode.provider_busy.runtime_error" } });
     expect(message).toContain('"Rate limit exceeded. Please try again later."');
     expect(message).toContain("press Stop and pick another model");
   }, 10_000);

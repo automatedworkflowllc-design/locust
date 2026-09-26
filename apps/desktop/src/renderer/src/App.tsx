@@ -137,7 +137,7 @@ import { splitAttachments, withAttachments } from '../../shared/attachments.js'
 // Only `heldFor`: this file has its own `ownerOf` for live runs, which is a
 // different question from who owns a recorded mission.
 import { heldFor, routineOf } from './conversationList.js'
-import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
+import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, nextFreeModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
 import { isOwnRoute, modelDisplayName, rememberOwnModels, routeChrome } from './routeName.js'
 import { FeedbackDialog } from './components/FeedbackDialog.js'
 import { conversationText } from './feedback.js'
@@ -1537,6 +1537,8 @@ export default function App(): ReactElement {
   /** The latest still-allowed rate-limit reading per runtime, by words. */
   const [usageWindows, setUsageWindows] = useState<ReadonlyMap<string, string>>(new Map())
   const [route, setRoute] = useState<RouteChoice>({ runtime: 'codex', model: 'account-default' })
+  /** Words going back into the chat box (C9): a busy model's message, to send on another. */
+  const [handBack, setHandBack] = useState<{ readonly text: string; readonly attachments: readonly string[] }>()
   // Intent belongs to the addressed teammate, not to discovery or the last
   // thread visited. Session-only state deliberately clears on app restart.
   const [pickerRoutes, setPickerRoutes] = useState<ReadonlyMap<string, RouteChoice>>(new Map())
@@ -3678,6 +3680,59 @@ export default function App(): ReactElement {
         )
       })
   }
+
+  /**
+   * The person choosing a route: from the picker, or from a busy model's
+   * notice (C9). One path, so the teammate's own pick and the effort move with
+   * it whichever way it came.
+   */
+  const changeRoute = (next: RouteChoice): void => {
+    // From here on this route is theirs, and discovery stops
+    // moving it.
+    routeChosen.current = true
+    setRoute(next)
+    if (pickedTeammate !== undefined) {
+      setPickerRoutes((current) => new Map(current).set(pickedTeammate.teammateId, next))
+    }
+    // Effort belongs to a model, so a level the new model never
+    // advertised must not follow it across. But clearing to NOTHING
+    // is what made picking a model empty the effort control --
+    // Colin, 2026-09-07: "if the user just clicks the model it
+    // instantly defaults to no effort, it was cleaner before". So
+    // it lands on the new model's default instead.
+    // Through `modelFamily`, not a bare id match: a Cursor route
+    // resolved to a variant finds no family by id, and the effort
+    // control then reads as though the model had none.
+    const family = modelFamily(models, next.runtime, next.model)
+    setEffort(effortAfterRouteChange(effort, family?.supportedEfforts ?? [], family?.defaultEffort))
+  }
+
+  /*
+   * ONE PRESS OFF A BUSY FREE MODEL (C9). On 2026-09-26 two of OpenCode's free
+   * models were limited for hours while three others answered, and a new
+   * person starts on the first of them. The notice said to press Stop and pick
+   * another model; this names one -- the next free model after the run's --
+   * and the press does what the sentence says: stops the run, puts the chat
+   * box on that model and hands the message back, with its files. Enter sends
+   * it there. Nothing is sent for the person.
+   */
+  const busyOffer = ((): { readonly label: string; readonly onPress: () => void } | undefined => {
+    const shown = liveRun
+    const next = shown?.data === undefined ? undefined : nextFreeModel(shown.data.runtime, shown.data.model, models)
+    if (shown === undefined || next === undefined) return undefined
+    return {
+      // By the chip's own name for it: the catalogue's displayName for an
+      // OpenCode model is its id ("longcat-2.5-preview-free", the drive's
+      // first press), where the chip says "Longcat 2.5 Preview Free".
+      label: `Stop and switch to ${modelDisplayName(next.runtime, next.id)}`,
+      onPress: () => {
+        const split = splitAttachments(shown.prompt)
+        cancelMission()
+        changeRoute({ runtime: next.runtime, model: next.id })
+        setHandBack({ text: split.text, attachments: split.attachments })
+      }
+    }
+  })()
 
   // Returns the save, so the dialog can hold its button until it lands (L22).
   const createTeammate = ({ monthlyLimitUsd, ...input }: TeammateDraft): Promise<void> => {
@@ -6034,6 +6089,7 @@ export default function App(): ReactElement {
                 {...(liveRun.data?.sandbox === undefined ? {} : { sandbox: liveRun.data.sandbox })}
                 events={liveRun.events}
                 running={running}
+                {...(busyOffer === undefined ? {} : { busyModel: busyOffer })}
                 restoredMission={liveRun.restored === true ? liveRun.restoredMission : undefined}
                 {...(liveRun.data?.missionId === undefined ? {} : { shownMissionId: liveRun.data.missionId })}
                 error={liveRun.error}
@@ -6174,26 +6230,8 @@ export default function App(): ReactElement {
                 .catch(() => setAutoMode(false))
             }}
             route={composerRoute}
-            onRouteChange={(next) => {
-              // From here on this route is theirs, and discovery stops
-              // moving it.
-              routeChosen.current = true
-              setRoute(next)
-              if (pickedTeammate !== undefined) {
-                setPickerRoutes((current) => new Map(current).set(pickedTeammate.teammateId, next))
-              }
-              // Effort belongs to a model, so a level the new model never
-              // advertised must not follow it across. But clearing to NOTHING
-              // is what made picking a model empty the effort control --
-              // Colin, 2026-09-07: "if the user just clicks the model it
-              // instantly defaults to no effort, it was cleaner before". So
-              // it lands on the new model's default instead.
-              // Through `modelFamily`, not a bare id match: a Cursor route
-              // resolved to a variant finds no family by id, and the effort
-              // control then reads as though the model had none.
-              const family = modelFamily(models, next.runtime, next.model)
-              setEffort(effortAfterRouteChange(effort, family?.supportedEfforts ?? [], family?.defaultEffort))
-            }}
+            onRouteChange={changeRoute}
+            {...(handBack === undefined ? {} : { handBack })}
             models={models}
             resolvedModels={resolvedModels}
             recentRoutes={recentRoutes}

@@ -6899,6 +6899,40 @@ textarea {
   text-wrap: pretty;
 }
 
+/* A notice with something to do about it: the words, then the one button
+   under them, where the eye finishes reading (C9). */
+.lc-diagnostic__body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--lc-space-3);
+}
+
+/* The chat bar's own chip, as every button of this kind is. The notice's
+   amber is the notice's; the button speaks in the ordinary voice. */
+.lc-diagnostic__action {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 var(--lc-space-4);
+  border: 1px solid var(--lc-border-control);
+  border-radius: 999px;
+  background: var(--lc-bg-control);
+  color: var(--lc-text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.lc-diagnostic__action:hover {
+  border-color: var(--lc-border-hover);
+  background: var(--lc-hover-surface);
+}
+
+.lc-diagnostic__action:focus-visible {
+  outline: 2px solid var(--lc-focus-ring);
+  outline-offset: 2px;
+}
+
 /* --- Dialog ------------------------------------------------------------ */
 
 /*

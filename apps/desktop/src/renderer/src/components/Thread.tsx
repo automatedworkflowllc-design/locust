@@ -161,9 +161,16 @@ export function ThreadItems({
   decision,
   onOpenFile,
   planMode = false,
-  faces = true
+  faces = true,
+  busyModel
 }: {
   readonly items: readonly ThreadItem[]
+  /**
+   * Another model to go on with, when this turn's model is busy (C9): drawn
+   * under the latest busy notice. Absent on earlier turns and on a turn that
+   * is over, and whenever there is no other free model to offer.
+   */
+  readonly busyModel?: { readonly label: string; readonly onPress: () => void }
   /**
    * Draw the teammate's face beside what they said. Off where something
    * around these items already shows it -- a room's answer card has the face
@@ -195,6 +202,9 @@ export function ThreadItems({
    * opinions about one turn. Read off the items, which is the only place both
    * of them can agree by construction.
    */
+  // The busy notice that gets the way on: the latest, so a second busy model
+  // offers the one after it rather than the first offer again.
+  const lastBusy = [...items].reverse().find((entry) => entry.type === 'diagnostic' && entry.busy === true)?.key
   const live = items.find((entry) => entry.type === 'live-step')
   const runningOrb = live !== undefined && live.type === 'live-step' ? live.orb : undefined
   /*
@@ -407,7 +417,14 @@ export function ThreadItems({
             />
           )
         }
-        return <DiagnosticLine key={item.key} level={item.level} message={item.message} />
+        return (
+          <DiagnosticLine
+            key={item.key}
+            level={item.level}
+            message={item.message}
+            {...(busyModel !== undefined && item.key === lastBusy ? { action: busyModel } : {})}
+          />
+        )
       })}
     </>
   )
@@ -599,6 +616,12 @@ export interface ThreadProps {
    */
   readonly onAnswer?: (option: DecisionOption) => void
   /**
+   * Go on with another free model when this turn's is busy (C9): App names
+   * it and does the switch. Drawn only while the turn runs, under the latest
+   * busy notice.
+   */
+  readonly busyModel?: { readonly label: string; readonly onPress: () => void }
+  /**
    * Pick up an interrupted mission from its last checkpoint. Absent when this
    * thread cannot start a run at all, so the offer can never appear without a
    * way to accept it.
@@ -732,7 +755,8 @@ export function Thread({
   onOpenSenderRun,
   wasPlan,
   onAnswer,
-  onResume,
+  busyModel,
+onResume,
   resumeRefusal,
   sandbox,
   workspacePath,
@@ -1119,6 +1143,7 @@ export function Thread({
               ? undefined
               : { onChoose: onAnswer, busy: running, standing: decisionStanding({ sandbox: sandbox ?? restoredMission?.sandbox, events }) }
           }
+          {...(busyModel === undefined || !running ? {} : { busyModel })}
         />
 
         {cardsFor(earlierTurns.length, 'after-work').map(peerCard)}

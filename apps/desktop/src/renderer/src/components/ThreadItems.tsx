@@ -1089,15 +1089,35 @@ export function LiveStepCard({
  */
 export function DiagnosticLine({
   level,
-  message
+  message,
+  action
 }: {
   readonly level: 'info' | 'warning' | 'error'
   readonly message: string
+  /**
+   * The one thing the person can do about it, under it (C9): a busy free
+   * model's notice offers the next free model. Absent, the line is as it was.
+   */
+  readonly action?: { readonly label: string; readonly onPress: () => void }
 }): ReactElement {
+  const tone = `lc-diagnostic lc-tone-${level === 'error' ? 'red' : level === 'warning' ? 'amber' : 'muted'}`
+  if (action === undefined) {
+    return (
+      <div className={tone}>
+        <Icon name="shield" size={12} />
+        <span>{message}</span>
+      </div>
+    )
+  }
   return (
-    <div className={`lc-diagnostic lc-tone-${level === 'error' ? 'red' : level === 'warning' ? 'amber' : 'muted'}`}>
+    <div className={tone}>
       <Icon name="shield" size={12} />
-      <span>{message}</span>
+      <div className="lc-diagnostic__body">
+        <span>{message}</span>
+        <button type="button" className="lc-diagnostic__action" onClick={action.onPress}>
+          {action.label}
+        </button>
+      </div>
     </div>
   )
 }

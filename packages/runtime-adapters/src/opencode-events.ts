@@ -180,6 +180,13 @@ const OPENCODE_PLAN_TOOL = /^todo_?write$/i;
  */
 const RETRIED_ERROR = /rate.?limit|too many requests|\b429\b|overload|try again later/i;
 
+/**
+ * The code a busy provider's notice carries, so the thread can offer another
+ * model beside it (C9). It still ends `.runtime_error`, which is what the
+ * thread shows before any tool has run.
+ */
+export const OPENCODE_PROVIDER_BUSY = "opencode.provider_busy.runtime_error";
+
 /** What the thread says while OpenCode tries the model again, in the provider's own words. */
 function retryingSentence(said: string | undefined, busy: boolean): string {
   if (said === undefined || said.length === 0) return "OpenCode's request to the model failed, and OpenCode is trying again on its own.";
@@ -505,7 +512,7 @@ export function createOpenCodeEventNormalizer(
       // Any other error still waits for its second line.
       const retried = said !== undefined && RETRIED_ERROR.test(said);
       if (seen !== (retried ? 1 : 2)) return [];
-      return [diagnostic("warning", "opencode.runtime_error", retryingSentence(said, retried), evidence)];
+      return [diagnostic("warning", retried ? OPENCODE_PROVIDER_BUSY : "opencode.runtime_error", retryingSentence(said, retried), evidence)];
     }
 
     // The same news from OpenCode's server (opencode-serve-run, Approve each):
@@ -517,7 +524,7 @@ export function createOpenCodeEventNormalizer(
       const key = `served:${said ?? ""}`;
       if (attemptsSeen.has(key)) return [];
       attemptsSeen.set(key, 1);
-      return [diagnostic("warning", "opencode.runtime_error", retryingSentence(said, true), evidence)];
+      return [diagnostic("warning", OPENCODE_PROVIDER_BUSY, retryingSentence(said, true), evidence)];
     }
 
     // OpenCode says why it is about to die. Until 2026-09-07 this fell through

@@ -46,7 +46,7 @@ describe("a rate-limited OpenCode run says it is retrying", () => {
         level: "warning",
         // `*.runtime_error` is what the thread shows before any tool has run,
         // the rule Codex's "Reconnecting... 2/5" already goes through.
-        code: "opencode.runtime_error",
+        code: "opencode.provider_busy.runtime_error",
         message: 'The model\'s provider answered "Rate limit exceeded", and OpenCode is trying again on its own. To go on now, press Stop and pick another model.',
       },
     });

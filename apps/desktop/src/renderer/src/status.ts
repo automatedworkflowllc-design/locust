@@ -1682,6 +1682,27 @@ export function freeStartModel(
 }
 
 /**
+ * The free model to offer when this one's provider is busy (C9): the next of
+ * OpenCode's free models, in the catalogue's order, after the one the run is
+ * on -- round to the first after the last. On 2026-09-26 two free models were
+ * limited for hours while three others answered, and a new person starts on
+ * the first of them. Undefined when the run is not on one of OpenCode's free
+ * models, or there is no other: a paid route, or a model of the person's own,
+ * is theirs to leave. The next may be busy too; its notice then offers the
+ * one after it.
+ */
+export function nextFreeModel(
+  runtime: MissionRuntimeId,
+  model: string | undefined,
+  models: readonly PublicModel[]
+): PublicModel | undefined {
+  const free = models.filter((entry) => entry.runtime === FREE_START_RUNTIME && entry.own !== true && entry.id.endsWith('-free'))
+  const at = free.findIndex((entry) => entry.id === model)
+  if (runtime !== FREE_START_RUNTIME || at < 0 || free.length < 2) return undefined
+  return free[(at + 1) % free.length]
+}
+
+/**
  * Why Send is disabled, in the person's own terms — or `undefined` when it is
  * not.
  *

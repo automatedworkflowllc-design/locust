@@ -1,5 +1,5 @@
 import mark from '../assets/locust-mark.svg'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usagePercent, usageWindowSentence } from '../missionView.js'
 import { useDismissOnOutsidePress } from '../useDismissOnOutsidePress.js'
 import type { ClipboardEvent, FormEvent, KeyboardEvent, MouseEvent, ReactElement } from 'react'
@@ -144,6 +144,12 @@ export function connectorsNote(
 
 export interface ComposerProps {
   /**
+   * Words handed back to the box (C9): a busy model's message, with its
+   * attachments, when the person goes on with another model -- so Enter
+   * sends it there. A new object hands it back again.
+   */
+  readonly handBack?: { readonly text: string; readonly attachments: readonly string[] }
+  /**
    * Whether this machine's Claude Code has any connectors, so the mode menu
    * can say where they live when the route is not Claude. See
    * `connectorsNote`.
@@ -281,6 +287,7 @@ export function shiftTabMode<M extends string>(current: M, usable: readonly M[],
 }
 
 export function Composer({
+  handBack,
   hasConnectors = false,
   continuationNote,
   workspaceName,
@@ -672,6 +679,13 @@ export function Composer({
    * control keeps its press, and a press on the field itself is the field's.
    */
   const field = useRef<HTMLTextAreaElement>(null)
+  // Handed back (C9): the words and files return to the box, ready to send.
+  useEffect(() => {
+    if (handBack === undefined) return
+    setValue(handBack.text)
+    setAttached(handBack.attachments)
+    field.current?.focus()
+  }, [handBack])
   const pressBox = (event: MouseEvent<HTMLDivElement>): void => {
     if (event.button !== 0) return
     const target = event.target as HTMLElement

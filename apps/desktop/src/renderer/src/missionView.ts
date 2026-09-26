@@ -1046,6 +1046,12 @@ export type ThreadItem =
       readonly type: 'diagnostic'
       readonly level: 'info' | 'warning' | 'error'
       readonly message: string
+      /**
+       * The model's provider is turning requests away and the runtime is
+       * waiting to try again (`*.provider_busy.runtime_error`): the thread can
+       * offer another model beside it (C9).
+       */
+      readonly busy?: boolean
     }
 
 /**
@@ -2812,7 +2818,8 @@ export function buildThread(
           key: event.id,
           type: 'diagnostic',
           level: event.payload.level,
-          message: event.payload.message
+          message: event.payload.message,
+          ...(/\.provider_busy\.runtime_error$/.test(event.payload.code) ? { busy: true } : {})
         })
         break
       }
