@@ -292,7 +292,9 @@ export function completenessOf(
       totalHunks: total,
       remainingHunks: 0,
       remainingLines: 0,
-      statement: `All ${hunkWord(total)} shown`,
+      // In words a person uses: "hunk" is git's, and "All 1 hunk shown" read
+      // as a sentence missing its point (first-impressions drive, 0.349).
+      statement: total === 1 ? 'The whole change is shown' : `All ${String(total)} sections shown`,
       canExpand: false
     }
   }

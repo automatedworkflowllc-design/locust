@@ -1788,7 +1788,10 @@ textarea {
   justify-content: space-between;
   gap: 10px;
   width: 100%;
-  padding: 6px 0 0;
+  /* The card's own inset, as its head and its opened list have. It had none
+     sideways or below, so the line ran against the card's left edge and the
+     chevron against its right (first-impressions drive, packaged 0.349). */
+  padding: 0 var(--lc-space-5) var(--lc-space-4);
   border: 0;
   background: transparent;
   color: var(--lc-text-muted);
@@ -2570,6 +2573,10 @@ textarea {
 
 .lc-memory__meta {
   margin: 0;
+  /* The caption size every other meta line uses. Unset, it took the memory's
+     own size in the mono face and read LARGER than the memory above it
+     (first-impressions drive, packaged 0.349). */
+  font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-muted);
   display: flex;
   flex-wrap: wrap;
@@ -2716,6 +2723,16 @@ textarea {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--lc-space-2);
+}
+
+/* The Forget row's two ghost buttons sit where the section starts. Each
+   carried the base rule's `margin-left: auto`, so they split the free space
+   between them: the first floated to the middle of the column, the second to
+   its end (first-impressions drive, packaged 0.349). Two classes, for the
+   same cascade reason as `.lc-room__back`. Only there: the Tidy row's button
+   is meant to push itself to the row's end. */
+.lc-memoryform__row--start .lc-ghostbutton {
+  margin-left: 0;
 }
 
 /* The note register: a left rule, no border, no fill. What this conversation
@@ -9751,12 +9768,15 @@ textarea {
 }
 
 /* Route + mode. Identity, not status -- same voice as .lc-row__route in the
-   sidebar -- on its own row so it gets the full card width and wraps. */
+   sidebar -- on its own row so it gets the full card width and wraps.
+   The mode always takes its own line: sharing one wrapping row, a longer
+   model name pushed it down on that card only, and its tiles sat a line
+   lower than the cards beside it (first-impressions drive, packaged 0.349). */
 .lc-rostercard__route {
   display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: var(--lc-space-2) var(--lc-space-4);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--lc-space-1);
   font-family: var(--lc-font-mono);
   font-size: var(--lc-text-mono-caption);
   letter-spacing: 0.02em;

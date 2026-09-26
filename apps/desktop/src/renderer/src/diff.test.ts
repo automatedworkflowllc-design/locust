@@ -118,7 +118,7 @@ describe('no open file ends in silence', () => {
 
   it('says all hunks are shown when they are', () => {
     const done = completenessOf(file!, 2, false)
-    expect(done.statement).toBe('All 2 hunks shown')
+    expect(done.statement).toBe('All 2 sections shown')
     expect(done.canExpand).toBe(false)
   })
 

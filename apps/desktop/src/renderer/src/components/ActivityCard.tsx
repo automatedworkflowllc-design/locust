@@ -1,6 +1,18 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 
 /** "Thought for 12s", or just "Thought" when the runtime never said when it began. */
+/**
+ * The word a file row's status shows for the tool that touched it.
+ *
+ * The runtime's own tool name, which is a word for most of them (`read`,
+ * `edit`) -- but Codex reports every change as a record TYPE, `file_change`,
+ * and a row reading "src/signup.ts  file_change" was an internal name on the
+ * screen (first-impressions drive, 0.349). That one becomes a word.
+ */
+export function fileToolWord(tool: string): string {
+  return tool === 'file_change' ? 'changed' : tool
+}
+
 export function thoughtLine(durationMs: number | undefined): string {
   if (durationMs === undefined || durationMs < 500) return 'Thought'
   return `Thought for ${durationText(durationMs)}`
@@ -597,7 +609,7 @@ export function ActivityCard({
                   >
                     {relativePath(entry.name, workspacePath)}
                   </span>
-                  {entry.tool !== undefined && <span className="lc-filerow__status">{entry.tool}</span>}
+                  {entry.tool !== undefined && <span className="lc-filerow__status">{fileToolWord(entry.tool)}</span>}
                   {/*
                     * A FINISHED RUN HAS NOTHING STILL RUNNING IN IT.
                     *

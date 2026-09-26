@@ -1519,8 +1519,17 @@ export function SettingsScreen({
           <>
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Project folder</h2>
+          {/*
+            * Said as what moves with the folder and what does not. "Every
+            * teammate works inside one folder" read as teammates being tied to
+            * it -- Colin, 2026-09-26, holding this screen: "does this mean if
+            * the user switches workspace the teammates wont behave correctly?"
+            * They do: the roster, routes and modes are the app's; the folder's
+            * are its files, conversations, memories and LOCUST.md.
+            */}
           <p className="lc-settings__lede">
-            Every teammate works inside one folder, and every mission runs there.
+            Your teammates are the same in every folder. The folder is what they work on: its files, its conversations,
+            what they remember about it, and its LOCUST.md. Anything remembered for everywhere goes with them.
           </p>
           <More>
             <p>Changing the folder reopens Locust, so stop anything running first.</p>

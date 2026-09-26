@@ -423,7 +423,7 @@ export function MemoryScreen({
           <section className="lc-settings__section">
             <h2 className="lc-settings__heading">Forget</h2>
             {confirmClear === undefined ? (
-              <div className="lc-memoryform__row">
+              <div className="lc-memoryform__row lc-memoryform__row--start">
                 <button type="button" className="lc-ghostbutton" onClick={() => setConfirmClear('workspace')}>
                   Forget everything for this folder
                 </button>
