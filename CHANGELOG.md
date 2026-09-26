@@ -11,6 +11,34 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.369.0 - 2026-09-26
+
+### Improved
+
+- **One press off a busy free model.** When a free model's provider is
+  turning requests away, the notice now names the next free model — "Stop
+  and switch to Longcat 2.5 Preview Free". One press stops the waiting
+  message, moves the chat box to that model and puts your message back, with
+  its files. Press Enter to send it there.
+
+### Fixed
+
+- **The chat box stays on one line in a small window.** At the smallest
+  window size, with a free model picked, the chat box's buttons split onto
+  two lines. When space is short, the folder button now shows just its
+  folder icon — the folder's name is in the title bar and in the button's
+  hover — and the row stays on one line.
+- **A busy model says so in Approve each too.** 0.368 told you when a free
+  model's provider was turning requests away, but not after you had chosen
+  Approve each action. Now it does, the same way.
+- **"Starting…" stays true while a busy model waits.** Under that notice the
+  line below read "Working…" though nothing was working yet. It says
+  "Starting…" until the model answers.
+- **Text boxes no longer light up in lime.** Clicking into a text box, or
+  opening New teammate, which starts in its name box, drew a bright lime
+  ring meant only for moving around with the keyboard. Text boxes now take
+  the same quiet edge as the message box.
+
 ## 0.368.0 - 2026-09-26
 
 ### Improved
