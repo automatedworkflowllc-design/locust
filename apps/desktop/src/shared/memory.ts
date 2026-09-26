@@ -283,14 +283,28 @@ export function memoryAge(at: string | undefined, now: Date): string | undefined
 /**
  * Words that carry no topic, so "what is the secret word for this project"
  * scores on `secret`, `word` and `project` rather than on `the`, which every
- * memory contains. Small on purpose: this is a tie-breaker between notes,
- * not a search engine.
+ * memory contains.
+ *
+ * The first four lines were written by hand; the rest completes them to the
+ * standard English stop list search engines keep (Snowball's), words of one
+ * or two letters aside because those never count. MEASURED on Colin's store,
+ * 2026-09-26: "but", "now" and "below" were among the words most often making
+ * a note "bear on" a question it had nothing to do with. Completing the list
+ * took the notes "matched" by turns with no subject of their own ("send me
+ * an md of your report") from 30 to 21, and lost none that bore on anything.
  */
 const TOPICLESS: ReadonlySet<string> = new Set([
   'the', 'and', 'for', 'this', 'that', 'with', 'what', 'which', 'when', 'where', 'how', 'why', 'who',
   'are', 'was', 'were', 'have', 'has', 'had', 'does', 'did', 'not', 'you', 'your', 'our', 'its',
   'from', 'into', 'about', 'please', 'can', 'could', 'should', 'would', 'will', 'just', 'only',
-  'then', 'than', 'there', 'here', 'they', 'them', 'these', 'those', 'also', 'any', 'all', 'one'
+  'then', 'than', 'there', 'here', 'they', 'them', 'these', 'those', 'also', 'any', 'all', 'one',
+  'myself', 'ours', 'ourselves', 'yours', 'yourself', 'yourselves', 'him', 'his', 'himself', 'she', 'her', 'hers',
+  'herself', 'itself', 'their', 'theirs', 'themselves', 'whom', 'been', 'being', 'having', 'doing', 'but',
+  'because', 'until', 'while', 'against', 'between', 'through', 'during', 'before', 'after', 'above', 'below',
+  'down', 'out', 'off', 'over', 'under', 'again', 'further', 'once', 'both', 'each', 'few', 'more', 'most',
+  'other', 'some', 'such', 'nor', 'own', 'same', 'too', 'very', 'don', 'now', 'ain', 'aren', 'couldn',
+  'didn', 'doesn', 'hadn', 'hasn', 'haven', 'isn', 'mightn', 'mustn', 'needn', 'shan', 'shouldn', 'wasn',
+  'weren', 'won', 'wouldn'
 ])
 
 /** The words of a question worth matching a memory on. */
@@ -298,22 +312,6 @@ function topicWords(text: string): ReadonlySet<string> {
   return new Set(memoryKey(text).split(' ').filter((word) => word.length > 2 && !TOPICLESS.has(word)))
 }
 
-/**
- * Which memories a brief pastes, and in what order: the ones that share
- * words with what was asked first, then the newest.
- *
- * MEASURED on Colin's store, 2026-09-21: 76 memories, of which a turn pasted
- * the newest 8 -- chosen by DATE alone. A memory from 13 September that
- * matters to every run was outranked by anything trivial from this morning,
- * and the safety valve, the teammate opening `.locust/memory.md`, is the
- * model's manners. Grok Build hands its model a `memory_search` tool;
- * Locust drives six CLIs it cannot add a tool to, so the search is done on
- * this side, at brief time: score each memory by the topic words it shares
- * with the prompt, paste the matches first (most shared words, then newest),
- * and fill what is left of the allowance the old way. With no prompt, or a
- * prompt that matches nothing, this is exactly the list it always was. No
- * index: a linear scan of a few hundred one-line notes is microseconds.
- */
 /**
  * When a memory was last WRITTEN.
  *
@@ -333,15 +331,66 @@ export function byLastWritten<T extends { readonly createdAt: string; readonly u
   return [...memories].sort((left, right) => Date.parse(lastWritten(left)) - Date.parse(lastWritten(right)))
 }
 
+/**
+ * Which memories a brief pastes, and in what order: the ones that share
+ * words with what was asked first, then the newest.
+ *
+ * MEASURED on Colin's store, 2026-09-21: 76 memories, of which a turn pasted
+ * the newest 8 -- chosen by DATE alone. A memory from 13 September that
+ * matters to every run was outranked by anything trivial from this morning,
+ * and the safety valve, the teammate opening `.locust/memory.md`, is the
+ * model's manners. Grok Build hands its model a `memory_search` tool;
+ * Locust drives six CLIs it cannot add a tool to, so the search is done on
+ * this side, at brief time: score each memory by the topic words it shares
+ * with the prompt, paste the matches first (best score, then newest), and
+ * fill what is left of the allowance with the newest. No index: a linear scan
+ * of a few hundred one-line notes is microseconds.
+ *
+ * A WORD MOST NOTES SHARE SAYS NOTHING ABOUT WHICH NOTE BEARS ON A QUESTION.
+ * A memory scored one point per shared word, and MEASURED on Colin's store,
+ * 2026-09-26 (97 memories, 104 of his real prompts), 42 prompts had nine or
+ * more notes "bearing" on them: nearly every note says "Locust", and so does
+ * nearly every prompt. A shared word now counts by how rare it is among the
+ * notes -- the log of notes over notes carrying it, a search engine's inverse
+ * document frequency -- so a word every note carries weighs nothing and one
+ * note in a hundred weighs most.
+ *
+ * Judged against the notes a colleague would want for 76 of those prompts,
+ * picked by reading (136 notes in all), 0.351 pasted 63 of them and this
+ * pastes 70; counting shared words instead of weighing them pastes 67, and
+ * the newest in date order rather than newest first (below), 66. Two things
+ * tried beside it lost notes and were left out. A hard cut -- a word in more
+ * than a fifth of the notes counts for nothing -- found 66, because it
+ * dropped "app", which is how a question about "our app" finds where the
+ * app's code lives. Pasting only the notes that matched, with no newest to
+ * fill, found 60: a note about how the work is done bears on most questions
+ * without sharing a word with them.
+ */
 export function memoriesForBrief(memories: readonly MemoryLine[], query: string | undefined, maxLines: number): readonly MemoryLine[] {
   const here = memories.filter((memory) => memory.scope !== 'global')
   const everywhere = memories.filter((memory) => memory.scope === 'global')
-  // Folder-first, newest-within-group: the end of each list is the newest.
-  const byDate = [...here.slice(-maxLines), ...everywhere.slice(-maxLines)]
+  /*
+   * Folder first, and NEWEST FIRST within each: the brief spends its
+   * allowance from the front. This was the newest eight in date order, so
+   * when eight long notes did not fit, the ones cut were the ones written
+   * last -- on Colin's store, 47 of 104 turns pasted an older note and left
+   * out the newest (2026-09-26), which is usually the correction.
+   */
+  const newestFirst = (list: readonly MemoryLine[]): readonly MemoryLine[] => [...list].reverse().slice(0, maxLines)
+  const byDate = [...newestFirst(here), ...newestFirst(everywhere)]
   const wanted = query === undefined ? new Set<string>() : topicWords(query)
   if (wanted.size === 0) return byDate
+  const words = memories.map((memory) => topicWords(memory.text))
+  const carriers = new Map<string, number>()
+  for (const set of words) for (const word of set) carriers.set(word, (carriers.get(word) ?? 0) + 1)
+  // A word every note carries weighs nothing, one note in a hundred weighs most.
+  const weight = (word: string): number => Math.log(memories.length / (carriers.get(word) ?? memories.length))
   const relevant = memories
-    .map((memory, index) => ({ memory, index, score: [...topicWords(memory.text)].filter((word) => wanted.has(word)).length }))
+    .map((memory, index) => ({
+      memory,
+      index,
+      score: [...words[index]!].filter((word) => wanted.has(word)).reduce((sum, word) => sum + weight(word), 0)
+    }))
     .filter((entry) => entry.score > 0)
     .sort((left, right) => right.score - left.score || right.index - left.index)
     .map((entry) => entry.memory)

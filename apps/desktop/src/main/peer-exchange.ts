@@ -1,6 +1,7 @@
 import type { MissionLedger, Workroom, WorkroomMessage } from '@teammate/mission-store'
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
+import { splitAttachments } from '../shared/attachments.js'
 import type { CodexMissionUpdate, PublicPeerMessage } from '../shared/ipc.js'
 import { boundedShareText, MAX_SHARES_PER_MISSION, parseShareBlocks } from '../shared/peer-share.js'
 import { composeRuntimePrompt, composeSoloPrompt, MAX_INBOUND_MESSAGES, runtimeKeepsATodoList } from './workroom-briefing.js'
@@ -155,11 +156,33 @@ export interface ConversationHint {
 export interface MemoryBriefing {
   /**
    * `peer` is absent for a run that belongs to nobody; the folder and the
-   * memory are still the project's. `prompt` is what was asked, so the
-   * memories that bear on it are the ones pasted. `runtime` is the run's,
-   * so LOCUST.md's sections for other runtimes are left out (A4.2).
+   * memory are still the project's. `prompt` is what was asked (`askedIn`),
+   * so the memories that bear on it are the ones pasted. `runtime` is the
+   * run's, so LOCUST.md's sections for other runtimes are left out (A4.2).
    */
   section(peer: MissionPeerContext | undefined, conversation?: ConversationHint, prompt?: string, runtime?: string): Promise<string | undefined>
+}
+
+/**
+ * WHAT WAS ASKED, for the memory search -- not the host's words around it.
+ *
+ * The team's memory pastes the notes that share words with the prompt
+ * (shared/memory.ts). A relayed run's prompt is nothing but the relay's
+ * rules -- what a reply costs, when to write back -- with the message it
+ * answers quoted beside it, and on Colin's store (2026-09-26) eight of the
+ * nine relayed turns from Yurt pasted the same six notes, chosen by the
+ * rules' own words. It is searched by the messages it was started to answer.
+ * A message with files opens with the host's line naming them, which is left
+ * out.
+ *
+ * A handoff's brief is searched whole, measured: the previous agent's account
+ * of the work is ABOUT the work. Reading only the person's words out of it
+ * found one of the six notes that bore on Colin's handed-over orb test, and
+ * the whole brief found five.
+ */
+export function askedIn(prompt: string, answering?: readonly WorkroomMessage[]): string {
+  if (answering !== undefined) return answering.map((message) => message.text).join('\n\n')
+  return splitAttachments(prompt).text
 }
 
 /**
@@ -208,8 +231,19 @@ export function createPeerExchange(options: {
 }): PeerExchange {
   return {
     async prepare(prompt, peer, runtime, conversation) {
+      // What is waiting, read before memory: for a run the host started to
+      // answer a teammate, those messages are what was asked (`askedIn`).
+      // Reading marks nothing delivered, so the order changes nothing else.
+      const unread = await options.workroom
+        .unread(peer.self.teammateId, MAX_INBOUND_MESSAGES, conversation?.startedFor)
+        .catch(() => undefined)
+      const startedFor = conversation?.startedFor
+      const asked =
+        startedFor === undefined
+          ? askedIn(prompt)
+          : askedIn(prompt, (unread?.messages ?? []).filter((message) => startedFor.includes(message.messageId)))
       // Memory that cannot be read is left out, never a refusal to run.
-      const memory = options.memory === undefined ? undefined : await options.memory.section(peer, conversation, prompt, runtime).catch(() => undefined)
+      const memory = options.memory === undefined ? undefined : await options.memory.section(peer, conversation, asked, runtime).catch(() => undefined)
       /*
        * Both halves must be true, and the runtime half is not negotiable.
        * A setting that is on does not make Claude Code able to keep a list;
@@ -232,7 +266,7 @@ export function createPeerExchange(options: {
       const connectors =
         runtime === 'cursor' ? await options.readyConnectors?.().catch(() => undefined) : undefined
       try {
-        const unread = await options.workroom.unread(peer.self.teammateId, MAX_INBOUND_MESSAGES, conversation?.startedFor)
+        if (unread === undefined) throw new Error('The workroom could not be read.')
         const composed = composeRuntimePrompt({
           prompt,
           peer,
@@ -265,7 +299,7 @@ export function createPeerExchange(options: {
     },
 
     async briefSolo(prompt, runtime, conversation) {
-      const memory = options.memory === undefined ? undefined : await options.memory.section(undefined, conversation, prompt, runtime).catch(() => undefined)
+      const memory = options.memory === undefined ? undefined : await options.memory.section(undefined, conversation, askedIn(prompt), runtime).catch(() => undefined)
       const todos =
         runtime !== undefined &&
         runtimeKeepsATodoList(runtime) &&

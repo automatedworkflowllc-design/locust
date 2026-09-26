@@ -26,8 +26,8 @@ describe('a memory rewritten in place', () => {
 
   it('leads the brief as the newest, and says it is from today', () => {
     const lines = byLastWritten([status, older]).map((memory) => ({ ...memory, at: lastWritten(memory) }))
-    // With no query, the end of the list is the newest: the rewritten status.
-    expect(memoriesForBrief(lines, undefined, 8).at(-1)?.text).toBe(status.text)
+    // With no query, the brief opens with the newest: the rewritten status.
+    expect(memoriesForBrief(lines, undefined, 8)[0]?.text).toBe(status.text)
     const text = memorySection({ workspaceName: 'shop', memories: lines, askFirst: false, now: new Date('2026-09-24T06:00:00.000Z') })
     const statusLine = text.split('\n').find((line) => line.includes('31/31')) ?? ''
     expect(statusLine).not.toMatch(/weeks? ago|days? ago/)

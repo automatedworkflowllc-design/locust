@@ -35,12 +35,16 @@ const TWELVE: readonly MemoryLine[] = [
     'The changelog is written for people, not engineers.'
   ].map((text, index) => line(text, `2026-09-${String(2 + index).padStart(2, '0')}T05:00:00.000Z`))
 ]
+const NEWEST_EIGHT = TWELVE.slice(-8).reverse().map((memory) => memory.text)
 
 describe('the memories that bear on the ask come first', () => {
-  it('with no question, is exactly the newest-first list it always was', () => {
+  it('with no question, is the newest eight, newest first', () => {
     const chosen = memoriesForBrief(TWELVE, undefined, MEMORY_BRIEF_LINES_WITH_FILE)
     expect(chosen).toHaveLength(8)
-    expect(chosen.map((memory) => memory.text)).toEqual(TWELVE.slice(-8).map((memory) => memory.text))
+    // Newest FIRST, because the brief spends its allowance from the front: in
+    // date order, the notes cut when eight long ones did not fit were the
+    // ones written last (Colin's store, 2026-09-26: 47 of 104 turns).
+    expect(chosen.map((memory) => memory.text)).toEqual(NEWEST_EIGHT)
     expect(chosen.some((memory) => /PELICAN/.test(memory.text))).toBe(false)
   })
 
@@ -51,13 +55,13 @@ describe('the memories that bear on the ask come first', () => {
 
   it('a question that matches nothing changes nothing', () => {
     const chosen = memoriesForBrief(TWELVE, 'Refactor the login page', MEMORY_BRIEF_LINES_WITH_FILE)
-    expect(chosen.map((memory) => memory.text)).toEqual(TWELVE.slice(-8).map((memory) => memory.text))
+    expect(chosen.map((memory) => memory.text)).toEqual(NEWEST_EIGHT)
   })
 
   it('scores on topic words, not on "the"', () => {
     // Every memory contains "the"; a question made of nothing else ranks none.
     const chosen = memoriesForBrief(TWELVE, 'the and for this', MEMORY_BRIEF_LINES_WITH_FILE)
-    expect(chosen.map((memory) => memory.text)).toEqual(TWELVE.slice(-8).map((memory) => memory.text))
+    expect(chosen.map((memory) => memory.text)).toEqual(NEWEST_EIGHT)
   })
 
   it('more shared words outrank fewer, and among equals the newer wins', () => {
@@ -82,7 +86,7 @@ describe('the memories that bear on the ask come first', () => {
     ]
     const chosen = memoriesForBrief(memories, 'Show me the diffs, not prose', 8)
     expect(chosen[0]?.scope).toBe('global')
-    expect(chosen.slice(1).map((memory) => memory.text)).toEqual(['The API listens on port 4000.', 'Tests run with pnpm test.'])
+    expect(chosen.slice(1).map((memory) => memory.text)).toEqual(['Tests run with pnpm test.', 'The API listens on port 4000.'])
   })
 
   it('the brief pastes the answer when asked, and says the rest are in the file', () => {

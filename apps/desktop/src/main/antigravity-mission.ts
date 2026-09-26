@@ -660,7 +660,13 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
         let delivered: readonly WorkroomMessage[] = []
         let peerDeliveryFailed = false
         if (peer !== undefined && peerExchange !== undefined) {
-          const prepared = await peerExchange.prepare(prompt, peer, 'antigravity', route.followUpOf === undefined ? {} : { previousMissionId: route.followUpOf })
+          const prepared = await peerExchange.prepare(prompt, peer, 'antigravity', {
+            ...(route.followUpOf === undefined ? {} : { previousMissionId: route.followUpOf }),
+            // A2.12, as the other five runtimes have it: a relayed run is
+            // shown the messages it was started to answer first, and its
+            // memory is chosen by them rather than by the relay's own rules.
+            ...(route.relay?.answering === undefined ? {} : { startedFor: route.relay.answering })
+          })
           runtimePrompt = prepared.runtimePrompt
           delivered = prepared.delivered
           peerDeliveryFailed = prepared.failed
