@@ -40,8 +40,11 @@ describe('the permissions panel', () => {
   it('says why its Artifacts are empty for THIS run, not that every empty one was read-only (0.362)', () => {
     // An editor's run in Edit that wrote nothing -- its teammate wrote the
     // draft -- was told "A read-only mission produces none".
-    expect(noArtifactsLine('workspace-write', false)).toBe('This reply changed no files.')
-    expect(noArtifactsLine('full-access', false)).toBe('This reply changed no files.')
+    expect(noArtifactsLine('workspace-write', false, true)).toBe('This reply changed no files.')
+    expect(noArtifactsLine('full-access', false, true)).toBe('This reply changed no files.')
+    // And not flatly, when the host could not see the folder (0.364): a file
+    // a command wrote is then simply not known.
+    expect(noArtifactsLine('workspace-write', false, false)).toBe('No changed files were reported. A file a command wrote may not be listed here.')
     expect(noArtifactsLine('read-only', false)).toBe('This reply could only read, so it changed no files.')
     expect(noArtifactsLine('workspace-write', true)).toBe('Files this reply changes appear here as it works.')
   })

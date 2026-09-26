@@ -1,10 +1,12 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 
-import { viewerMode } from '../../../shared/text-files.js'
+import { csvWorkbook } from '../../../shared/sheet.js'
+import { extensionOf, viewerMode } from '../../../shared/text-files.js'
 import type { DiffCounts, DiffFile } from '../diff.js'
 import { DiffView } from './DiffView.js'
 import { Icon } from './Icon.js'
+import { SheetView } from './SheetView.js'
 import { AgentText } from './ThreadItems.js'
 
 /**
@@ -25,7 +27,13 @@ import { AgentText } from './ThreadItems.js'
  * diff: then what changed is the question.
  */
 export function isNewDocument(file: DiffFile): boolean {
-  return file.status === 'ADDED' && viewerMode(file.path) === 'markdown'
+  return file.status === 'ADDED' && (viewerMode(file.path) === 'markdown' || isTableFile(file.path))
+}
+
+/** A new CSV or TSV is a table, previewed as its first rows (0.364). */
+function isTableFile(path: string): boolean {
+  const extension = extensionOf(path)
+  return extension === 'csv' || extension === 'tsv'
 }
 
 /** The text a new file was written with: every added row, in order. */
@@ -70,9 +78,15 @@ export function DocPreview({
   }
   return (
     <div className="lc-docpreview" role="region" aria-label={`${name}, as written`}>
-      <div ref={page} className={`lc-docpreview__page${clipped ? ' is-clipped' : ''}`}>
-        <AgentText text={documentTextOf(file)} streaming={false} />
-      </div>
+      {isTableFile(file.path) ? (
+        <div className="lc-docpreview__table">
+          <SheetView workbook={csvWorkbook(name, documentTextOf(file), extensionOf(file.path) === 'tsv' ? '\t' : ',')} compact />
+        </div>
+      ) : (
+        <div ref={page} className={`lc-docpreview__page${clipped ? ' is-clipped' : ''}`}>
+          <AgentText text={documentTextOf(file)} streaming={false} />
+        </div>
+      )}
       <div className="lc-docpreview__foot">
         {onOpen !== undefined && (
           <button type="button" className="lc-docpreview__open" onClick={onOpen}>

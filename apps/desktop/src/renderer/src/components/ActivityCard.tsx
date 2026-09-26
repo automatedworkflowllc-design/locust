@@ -598,6 +598,41 @@ export function ActivityCard({
                   <span className="lc-filerow__path">{foldedToolsText(entry.names, entry.verb)}</span>
                   <span className="lc-filerow__result is-muted">done</span>
                 </div>
+              ) : entry.kind === 'unreported' && entry.observed === true ? (
+                /*
+                 * A FILE THE HOST SAW CHANGE (0.364): written by a command, or
+                 * with no text to diff -- Penny's budget workbook, made by a
+                 * Python command. It is a changed file, said as one, and it
+                 * opens like one; "OpenCode did not report the change" was
+                 * true and told the person nothing they could use.
+                 */
+                <div className="lc-filerow__line">
+                  <div className="lc-filerow is-static">
+                    <Icon name="file" size={14} />
+                    <span className="lc-filerow__path">{relativePath(entry.name, workspacePath)}</span>
+                    <span className="lc-filerow__result is-muted">changed · seen on disk</span>
+                  </div>
+                  {onOpenFile !== undefined && (
+                    <button
+                      type="button"
+                      className="lc-filerow__view"
+                      title={`Open ${relativePath(entry.name, workspacePath)}`}
+                      aria-label={`Open ${relativePath(entry.name, workspacePath)}`}
+                      onClick={() => onOpenFile(entry.name)}
+                    >
+                      <Icon name="maximize" size={13} />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="lc-filerow__reveal"
+                    title={`Show ${relativePath(entry.name, workspacePath)} in the file manager`}
+                    aria-label={`Show ${relativePath(entry.name, workspacePath)} in the file manager`}
+                    onClick={() => reveal(entry.name)}
+                  >
+                    <Icon name="folder" size={13} />
+                  </button>
+                </div>
               ) : (
                 // An edit the runtime recorded without the change itself. The
                 // row says so, in words: silence here would read as "nothing

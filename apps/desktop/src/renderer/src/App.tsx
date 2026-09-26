@@ -49,6 +49,7 @@ import type {
   PublicConnector
 } from '../../shared/ipc.js'
 import { roleLabelOf } from '../../shared/ipc.js'
+import type { Workbook } from '../../shared/sheet.js'
 import type { Spend } from '../../shared/spend.js'
 import { routineDraft, routineStepPhrase } from './routines.js'
 import { queueHome, combineQueued, queuedIn, queuedVerdict, requeuedRows, retriedAfterBusy, takeNext, withoutQueueOf } from './steering.js'
@@ -1427,7 +1428,9 @@ export default function App(): ReactElement {
     readonly path: string
     /** The file's text, or a `data:` URL when the mode is `image`. */
     readonly text: string
-    readonly mode: 'markdown' | 'code' | 'image'
+    readonly mode: 'markdown' | 'code' | 'image' | 'table'
+    /** A spreadsheet's cells, when the mode is `table` (0.364). */
+    readonly workbook?: Workbook
   }>()
   /** What the host said when a file could not be opened. Shown where the press was. */
   const [viewerRefusal, setViewerRefusal] = useState<string>()
@@ -1487,7 +1490,7 @@ export default function App(): ReactElement {
       .readTextFile(full)
       .then((answer) => {
         if (answer.ok) {
-          setViewingFile({ path: full, text: answer.text, mode: answer.mode })
+          setViewingFile({ path: full, text: answer.text, mode: answer.mode, ...(answer.workbook === undefined ? {} : { workbook: answer.workbook }) })
           return
         }
         setViewingFile(undefined)
@@ -6317,6 +6320,7 @@ export default function App(): ReactElement {
             path={viewingFile.path}
             text={viewingFile.text}
             mode={viewingFile.mode}
+            {...(viewingFile.workbook === undefined ? {} : { workbook: viewingFile.workbook })}
             turns={viewingFileTurns}
             onClose={() => setViewingFile(undefined)}
             onReveal={() => {

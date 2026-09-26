@@ -45,7 +45,12 @@ import { decideReveal } from './reveal-file.js'
 import { MAX_ATTACHMENTS } from '../shared/attachments.js'
 import { ATTACHMENT_DIR, attachmentDestination, excludeWith } from './attach-outside.js'
 import { imageMediaType, MAX_PREVIEW_BYTES } from '../shared/image-files.js'
-import { isViewableText, MAX_TEXT_BYTES, viewerMode } from '../shared/text-files.js'
+import { extensionOf, isViewableText, MAX_TEXT_BYTES, viewerMode } from '../shared/text-files.js'
+import { SHEET_EXTENSIONS, csvWorkbook } from '../shared/sheet.js'
+import { WorkbookUnreadable, readXlsx } from './xlsx.js'
+
+/** A spreadsheet the viewer reads may be this big on disk; the grid it draws is bounded anyway (0.364). */
+const MAX_SHEET_FILE_BYTES = 8 * 1024 * 1024
 import { createEditCheck } from './edit-check.js'
 import { createTeammateStore, parsedCheckCommand, TeammateNameTakenError, isTeammateRoute } from './teammate-store.js'
 import { createRoutineStore } from './routine-store.js'
@@ -2966,6 +2971,37 @@ if (!ownsSingleInstanceLock) {
       if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
       if (typeof requested !== 'string' || requested.length === 0) {
         return { ok: false, message: 'There is no file to open.' } as const
+      }
+      /*
+       * A SPREADSHEET, READ FOR ITS CELLS (0.364). Penny's budget workbook
+       * was refused here with the sentence below (Research & money drive,
+       * packaged 0.363); Colin: "it could also show in a viewer or as an
+       * artifact like Claude code does". Same containment and the same
+       * refusal-not-truncation rule as text; the grid is bounded instead.
+       */
+      const sheetKind = extensionOf(requested)
+      if (SHEET_EXTENSIONS.has(sheetKind)) {
+        const decision = decideReveal(requested, [...(workspaceChosen ? [workspacePath] : []), ...(await teammateFolders()), ledgerDirectory])
+        if (!decision.ok) {
+          return { ok: false, message: 'That file is outside the folder your teammates work in, so Locust will not open it.' } as const
+        }
+        try {
+          const measured = await stat(decision.path)
+          if (!measured.isFile()) return { ok: false, message: 'That is a folder, not a file.' } as const
+          if (measured.size > MAX_SHEET_FILE_BYTES) {
+            return {
+              ok: false,
+              message: `That spreadsheet is ${String(Math.round(measured.size / 1024))}KB, too big to show here. Save a copy and open it in Excel or Sheets.`
+            } as const
+          }
+          const bytes = await readFile(decision.path)
+          const name = requested.replace(/\\/g, '/').split('/').pop() ?? requested
+          const workbook = sheetKind === 'xlsx' ? readXlsx(bytes) : csvWorkbook(name, bytes.toString('utf8'), sheetKind === 'tsv' ? '\t' : ',')
+          return { ok: true, path: requested, text: '', mode: 'table', workbook } as const
+        } catch (error) {
+          if (error instanceof WorkbookUnreadable) return { ok: false, message: error.message } as const
+          return { ok: false, message: 'That file is not there. The teammate named it but did not write it.' } as const
+        }
       }
       if (!isViewableText(requested)) {
         return { ok: false, message: 'Locust does not open that kind of file here.' } as const

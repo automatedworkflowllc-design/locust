@@ -11,6 +11,25 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.364.0 - 2026-09-26
+
+### New
+
+- **Spreadsheets open as spreadsheets.** A CSV, TSV or Excel file a teammate
+  makes now opens beside the conversation as a grid: column letters, row
+  numbers, a tab for each sheet, numbers lined up on the right. A new CSV
+  also shows its first rows right in the conversation. Locust reads the
+  cells and runs nothing; a formula the file holds no answer for is shown
+  as written, and Excel or Sheets works it out.
+
+### Fixed
+
+- A file a teammate made by running a command, such as a budget workbook
+  built with Python, is now listed as a changed file you can open, instead
+  of not being listed at all.
+- The Artifacts tab no longer says a reply "changed no files" when Locust
+  could not see the folder to know. It says what it knows instead.
+
 ## 0.363.0 - 2026-09-26
 
 ### Improved

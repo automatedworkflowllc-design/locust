@@ -1,6 +1,7 @@
 import type { NormalizedRuntimeEvent, ToolPatch } from '@teammate/runtime-adapters'
 
 import { SUBAGENT_TOOL } from './faceState.js'
+import { READ_TOOL_WORDS, editToolName, isEditCommand, isShellTool } from '../../shared/tool-kinds.js'
 import { LARGE_FILE_LINES, fileCounts, parseUnifiedDiff } from './diff.js'
 import type { DiffCounts, DiffFile } from './diff.js'
 
@@ -295,6 +296,8 @@ export type ActivityEntry =
        * summary that said "1 refused".
        */
       readonly neverRan?: 'declined' | 'refused'
+      /** Seen changed on disk by the host rather than reported by the runtime (0.364). */
+      readonly observed?: true
     }
 
 /**
@@ -441,7 +444,10 @@ export function activityEntries(
         tool: detail.tool === detail.name ? undefined : detail.tool,
         settled: detail.settled,
         failed,
-        ...(detail.status === 'declined' || detail.status === 'refused' ? { neverRan: detail.status } : {})
+        ...(detail.status === 'declined' || detail.status === 'refused' ? { neverRan: detail.status } : {}),
+        // Seen changed on disk by the host, not reported by the runtime: a
+        // file a command wrote, or one with no text to diff (0.364).
+        ...(detail.kind === 'edit' && /on disk|from disk/.test(detail.status ?? '') ? { observed: true } : {})
       })
       return
     }
@@ -1174,25 +1180,6 @@ export function thisTurnsSteps(
   return plan.filter((step) => !finishedBefore.has(planKey(step.text)) || worked.has(planKey(step.text)))
 }
 
-/** Shell verbs that read as file edits rather than as commands. */
-const EDIT_COMMANDS = /^(?:apply_patch|patch|edit|write)\b/
-
-/**
- * Whether a shell command edits a file, as far as its own words say.
- *
- * M24 (the code review): every `sed` counted, so a read-only
- * `sed -n '1,40p' src/app.ts` became an edited file named after the
- * command -- "Edited 1 file" on an Ask run, the command listed as a
- * produced file, and its output never shown. `sed` edits only in place,
- * and `tee` only when it is given a file to write.
- */
-export function isEditCommand(command: string): boolean {
-  const text = command.trim()
-  if (EDIT_COMMANDS.test(text)) return true
-  if (/^sed\b/.test(text)) return /\s(?:-[a-zA-Z]*i[a-zA-Z.]*|--in-place\b)/.test(text)
-  if (/^tee\b/.test(text)) return /^tee(?:\s+-[a-zA-Z-]+)*\s+[^-\s|]/.test(text)
-  return false
-}
 
 function pluralize(count: number, singular: string): string {
   return `${count} ${singular}${count === 1 ? '' : 's'}`
@@ -1946,16 +1933,6 @@ export function withoutShellWrapper(command: string): string {
   return rest
 }
 
-export function isShellTool(name: string, toolKind: string | undefined): boolean {
-  // `run_command` is Antigravity's word, and leaving it out cost every one of
-  // its runs their commands: MEASURED 2026-09-13 across the recorded ledgers,
-  // 76 `run_command` calls, none of them counted as a command. So "Ran N
-  // commands" said nothing, the trace line had nothing to trace, and the
-  // reviewer's WHAT RAN was empty for a run that had run seventy-six things.
-  return /^(bash|shell|run_command|run_terminal_cmd|execute_command)$/i.test(name)
-    || toolKind === 'command_execution'
-    || toolKind === 'run_command'
-}
 
 /**
  * The orbs Locust draws — one per thing the live line can SAY.
@@ -2165,73 +2142,6 @@ function toolKindOf(event: Extract<NormalizedRuntimeEvent, { type: 'tool.started
   return editToolName(name) ? 'edit' : 'tool'
 }
 
-/**
- * Whether a tool name means "this touched a file".
- *
- * Matching `write` anywhere caught two tools that never touch one: OpenCode's
- * `todowrite`, the model's own to-do list -- offered even to read-only runs --
- * and Copilot's `write_agent`. Each names no path and carries no diff, so the
- * fold counted a changed file on a run that changed nothing (QA, 2026-09-06).
- * Missing `delete` was the same mistake from the other side: Cursor names a
- * removal `delete`, and a run that deleted a file reported a tool call and no
- * file.
- *
- * So the words are matched as whole words rather than as substrings, and the
- * list is the vocabulary the adapters actually produce.
- */
-const EDIT_TOOL_WORDS = new Set([
-  'file',
-  'files',
-  'patch',
-  'write',
-  'edit',
-  'delete',
-  'remove',
-  'create',
-  'move',
-  'rename'
-])
-const NOT_EDIT_TOOLS = /^(todowrite|todoread|todo_write|todo_read|write_agent|writeagent)$/i
-
-/**
- * Words that mean the tool LOOKED at something.
- *
- * They beat the nouns below, and they have to, because the noun is the half
- * the two kinds of tool share: `view_file` and `write_to_file` both contain
- * `file`, and matching nouns alone made READING a file count as changing one.
- *
- * MEASURED 2026-09-13 in the recorded ledgers: 38 Antigravity `view_file`
- * calls, every one of them counted as an edit. So an Antigravity run that
- * changed nothing reported changed files -- and since 0.96.0 those files are
- * handed to a reviewer under WHAT CHANGED, which makes it a false claim about
- * the work rather than a miscount.
- */
-/*
- * `websearch`, `fetch` and `browse` joined the set so LOOKING THINGS UP ON
- * THE WEB lands on the globe -- Colin, 2026-09-20: "searching for websearch
- * and any type of looking/search". `WebSearch` already matched through the
- * camelCase split; the one-word spellings did not, which is the shape of tool
- * name half the runtimes use.
- */
-const READ_TOOL_WORDS = new Set([
-  'view', 'read', 'open', 'show', 'list', 'cat', 'search', 'find', 'grep',
-  'websearch', 'fetch', 'browse', 'lookup'
-])
-
-export function editToolName(name: string): boolean {
-  const trimmed = name.trim()
-  if (trimmed.length === 0) return false
-  if (NOT_EDIT_TOOLS.test(trimmed)) return false
-  const words = trimmed
-    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-    .split(/[^A-Za-z]+/)
-    .map((word) => word.toLowerCase())
-  if (words.some((word) => READ_TOOL_WORDS.has(word))) return false
-  // Split on separators AND on camelCase, so `deleteFile`, `delete_file` and
-  // `DeleteFile` all read as the two words they are -- and `todowrite`, which
-  // is one word, reads as one and matches nothing.
-  return words.some((word) => EDIT_TOOL_WORDS.has(word))
-}
 
 /**
  * Rebuild the assistant text the way the transcript did. Deltas carry an
@@ -4527,3 +4437,6 @@ export function modeRefusedATool(error: string | undefined): boolean {
   if (error === undefined) return false
   return /^The mode this run is in does not allow (?:bash|edit|write|patch)\b/.test(error.trim())
 }
+
+// Moved to shared/tool-kinds.ts so the host reads a tool the same way (0.364).
+export { editToolName, isEditCommand, isShellTool }

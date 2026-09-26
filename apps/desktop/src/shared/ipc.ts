@@ -7,6 +7,7 @@ export type { RoutineSchedule } from './routine-schedule.js'
 import type { MemoryScope } from './memory.js'
 export type { MemoryScope } from './memory.js'
 import type { Spend } from './spend.js'
+import type { Workbook } from './sheet.js'
 
 /**
  * How a teammate's memory is treated: kept at once and shown (the Claude
@@ -681,7 +682,14 @@ export const WORKSPACE_IMAGE_CHANNEL = 'workspace:image'
  * allowlist.
  */
 export type WorkspaceTextResponse =
-  | { readonly ok: true; readonly path: string; readonly text: string; readonly mode: 'markdown' | 'code' }
+  | {
+      readonly ok: true
+      readonly path: string
+      readonly text: string
+      /** `table`: a spreadsheet, read for its cells (0.364), carried in `workbook`. */
+      readonly mode: 'markdown' | 'code' | 'table'
+      readonly workbook?: Workbook
+    }
   | { readonly ok: false; readonly message: string }
 
 export const WORKSPACE_TEXT_CHANNEL = 'workspace:text'
@@ -1861,6 +1869,13 @@ export interface MissionRouteSummary {
    * say which of the two a run was (the Activity panel's rows, 0.359).
    */
   readonly mode?: MissionMode
+  /**
+   * The host looked at the folder before and after this run (git, a folder
+   * it had to itself), so a file a COMMAND wrote is listed as changed too.
+   * Absent, only what the runtime reported is known -- and the Artifacts tab
+   * must not say "changed no files" about a run it could not see (0.364).
+   */
+  readonly watchesDisk?: true
 }
 
 /**

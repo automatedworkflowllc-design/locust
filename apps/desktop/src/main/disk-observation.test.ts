@@ -84,12 +84,27 @@ describe('what changed between two looks', () => {
 
 describe('which changes the runtime never mentioned', () => {
   // The 2026-09-05 case: OpenCode's stream said `task` and `read notes.ts`,
-  // and notes.ts changed. A read is not an edit, but the runtime DID name the
-  // file, so the observation would only repeat a row that exists; the
-  // unreported edit is the one it never said a word about.
-  it('keeps a changed path no tool named, and drops one a tool did name', () => {
-    const events = [toolEvent('tool.started', 'task'), toolEvent('tool.started', 'read', 'src/notes.ts')]
-    expect(unreportedPaths(['src/notes.ts', 'src/other.ts'], events)).toEqual(['src/other.ts'])
+  // and notes.ts changed. A read is not an edit: the thread draws it as a
+  // read, so the change it sat beside appeared nowhere until 0.364 -- when a
+  // command that only MENTIONED monthly_budget.xlsx hid a whole new workbook
+  // the same way (Research & money drive, packaged 0.363).
+  it('keeps a changed path only a read or a command named, and drops one an edit named', () => {
+    const events = [
+      toolEvent('tool.started', 'task'),
+      toolEvent('tool.started', 'read', 'src/notes.ts'),
+      toolEvent('tool.started', 'bash', "python3 -c \"import openpyxl; wb.save('monthly_budget.xlsx')\""),
+      toolEvent('tool.started', 'write', 'src/written.ts')
+    ]
+    expect(unreportedPaths(['src/notes.ts', 'src/other.ts', 'monthly_budget.xlsx', 'src/written.ts'], events)).toEqual([
+      'src/notes.ts',
+      'src/other.ts',
+      'monthly_budget.xlsx'
+    ])
+  })
+
+  it('counts a command whose own words are an edit as reporting it', () => {
+    expect(unreportedPaths(['notes.md'], [toolEvent('tool.started', 'bash', "sed -i 's/a/b/' notes.md")])).toEqual([])
+    expect(unreportedPaths(['notes.md'], [toolEvent('tool.started', 'bash', "sed -n '1,4p' notes.md")])).toEqual(['notes.md'])
   })
 
   it('matches on the file name, whatever the runtime wrote before it, case-blind', () => {

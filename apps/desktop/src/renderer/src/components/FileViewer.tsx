@@ -5,6 +5,8 @@ import type { FileTurn } from '../missionView.js'
 import { AgentText } from './ThreadItems.js'
 import { DiffView } from './DiffView.js'
 import { Icon } from './Icon.js'
+import { SheetView } from './SheetView.js'
+import type { Workbook } from '../../../shared/sheet.js'
 
 /**
  * A file a teammate wrote, open beside the conversation.
@@ -34,12 +36,15 @@ export function FileViewer({
   turns = [],
   onClose,
   onReveal,
-  onSave
+  onSave,
+  workbook
 }: {
   readonly path: string
   /** The file's text, or a `data:` URL when the mode is `image`. */
   readonly text: string
-  readonly mode: 'markdown' | 'code' | 'image'
+  readonly mode: 'markdown' | 'code' | 'image' | 'table'
+  /** A spreadsheet's cells, read by the host, when the mode is `table`. */
+  readonly workbook?: Workbook
   /**
    * The turns in this conversation that changed this file, oldest first.
    *
@@ -147,6 +152,9 @@ export function FileViewer({
             src={text}
             alt={path.replace(/\\/g, '/').split('/').pop() ?? 'image'}
           />
+        ) : mode === 'table' && workbook !== undefined ? (
+          // Read, never run: cells as escaped text (shared/sheet.ts).
+          <SheetView workbook={workbook} />
         ) : mode === 'markdown' ? (
           <div className="lc-viewer__prose">
             <AgentText text={text} streaming={false} />

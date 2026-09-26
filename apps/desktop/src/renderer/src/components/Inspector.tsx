@@ -28,10 +28,13 @@ function Empty({ children }: { readonly children: string }): ReactElement {
  * & design drive, packaged 0.361). A run that could write and did not is not
  * a read-only run.
  */
-export function noArtifactsLine(sandbox: 'read-only' | 'workspace-write' | 'full-access' | undefined, running: boolean): string {
+export function noArtifactsLine(sandbox: 'read-only' | 'workspace-write' | 'full-access' | undefined, running: boolean, watched = false): string {
   if (running) return 'Files this reply changes appear here as it works.'
   if (sandbox === 'read-only') return 'This reply could only read, so it changed no files.'
-  return 'This reply changed no files.'
+  // Said flat only when the host looked at the folder itself: otherwise a
+  // file a command wrote -- Penny's workbook -- is simply not known (0.364).
+  if (watched) return 'This reply changed no files.'
+  return 'No changed files were reported. A file a command wrote may not be listed here.'
 }
 
 /**
@@ -215,7 +218,7 @@ export function Inspector({
 
         {tab === 'Artifacts' &&
           (artifacts.length === 0 ? (
-            <Empty>{noArtifactsLine(sandbox, running)}</Empty>
+            <Empty>{noArtifactsLine(sandbox, running, route?.watchesDisk === true)}</Empty>
           ) : (
             // The tab has made this promise since it was built and never kept
             // it: it said artifacts appear once a run can write, and then

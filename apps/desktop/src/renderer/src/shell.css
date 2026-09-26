@@ -13831,6 +13831,147 @@ textarea {
   padding: var(--lc-space-5);
 }
 
+/*
+ * A SPREADSHEET (SheetView, 0.364): the grid a spreadsheet person reads --
+ * letters across, numbers down, both pinned while the cells scroll under
+ * them, the sheet tabs below it as Excel and Sheets put them. Hairlines,
+ * not boxes: the cells are the content, the rules only keep them in line.
+ */
+.lc-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-3);
+}
+
+.lc-sheet__scroll {
+  overflow: auto;
+  max-height: calc(100vh - 220px);
+  border: 1px solid var(--lc-border-hairline);
+  border-radius: var(--lc-radius-control);
+}
+
+.lc-sheet.is-compact .lc-sheet__scroll {
+  max-height: none;
+}
+
+.lc-sheet__grid {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-family: var(--lc-font-ui);
+  font-size: var(--lc-text-description);
+  font-variant-numeric: tabular-nums;
+  color: var(--lc-text-primary);
+}
+
+.lc-sheet__corner,
+.lc-sheet__col,
+.lc-sheet__row {
+  position: sticky;
+  background: var(--lc-bg-raised);
+  color: var(--lc-text-muted);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-label);
+  font-weight: 400;
+  border-right: 1px solid var(--lc-border-hairline);
+  border-bottom: 1px solid var(--lc-border-hairline);
+}
+
+.lc-sheet__corner {
+  top: 0;
+  left: 0;
+  z-index: 2;
+  min-width: 34px;
+}
+
+.lc-sheet__col {
+  top: 0;
+  z-index: 1;
+  padding: 2px 8px;
+  text-align: center;
+}
+
+.lc-sheet__row {
+  left: 0;
+  z-index: 1;
+  padding: 2px 8px;
+  text-align: right;
+}
+
+.lc-sheet__cell {
+  max-width: 280px;
+  padding: 4px 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  border-right: 1px solid var(--lc-border-hairline);
+  border-bottom: 1px solid var(--lc-border-hairline);
+}
+
+.lc-sheet__cell.is-number {
+  text-align: right;
+}
+
+.lc-sheet__cell.is-boolean {
+  text-align: center;
+}
+
+/* A formula the file holds no result for: what the file says, drawn quietly. */
+.lc-sheet__cell.is-formula {
+  color: var(--lc-text-muted);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+}
+
+.lc-sheet__cell.is-error {
+  color: var(--lc-red-text);
+}
+
+.lc-sheet__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.lc-sheet__tab {
+  height: 26px;
+  padding: 0 var(--lc-space-4);
+  border: 1px solid var(--lc-border-control);
+  border-radius: 999px;
+  background: var(--lc-bg-control);
+  color: var(--lc-text-secondary);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  cursor: pointer;
+}
+
+.lc-sheet__tab:hover {
+  border-color: var(--lc-border-hover);
+  background: var(--lc-hover-surface);
+}
+
+.lc-sheet__tab.is-active {
+  color: var(--lc-text-primary);
+  border-color: var(--lc-border-strong);
+}
+
+.lc-sheet__tab:focus-visible {
+  outline: 2px solid var(--lc-focus-ring);
+  outline-offset: 2px;
+}
+
+.lc-sheet__note {
+  margin: 0;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+  text-wrap: pretty;
+}
+
+/* A new CSV in the fold: its first rows, inset like the document page. */
+.lc-docpreview__table {
+  padding: var(--lc-space-4) var(--lc-space-5) var(--lc-space-2);
+}
+
 /* Prose in the reply's own voice: it is the same kind of reading. */
 .lc-viewer__prose {
   font-family: var(--lc-font-prose);

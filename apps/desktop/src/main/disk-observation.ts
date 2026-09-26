@@ -6,6 +6,7 @@ import { toolPatchFrom } from '@teammate/runtime-adapters'
 import type { NormalizedRuntimeEvent, ToolPatch } from '@teammate/runtime-adapters'
 
 import { unifiedPatchText } from '../shared/approval-patch.js'
+import { reportsAChange } from '../shared/tool-kinds.js'
 import { ownGitArgs } from './git-guard.js'
 
 /**
@@ -201,6 +202,17 @@ export function unreportedPaths(
   const named: string[] = []
   for (const event of events) {
     if (event.type !== 'tool.started' && event.type !== 'tool.completed' && event.type !== 'tool.failed') continue
+    /*
+     * Only a row that says it CHANGED a file reports the change (0.364).
+     *
+     * Any tool naming the file used to count, so a read of notes.ts or a
+     * Python command that merely mentioned monthly_budget.xlsx hid the change
+     * it sat beside: the thread drew a read or a command, never a changed
+     * file, and Penny's new budget workbook left the Artifacts tab saying
+     * "This reply changed no files" (Research & money drive, packaged 0.363).
+     * The rule is the thread's own (shared/tool-kinds.ts).
+     */
+    if (!reportsAChange(event.payload)) continue
     named.push(event.payload.name.toLowerCase())
     if (event.payload.command !== undefined) named.push(event.payload.command.toLowerCase())
   }
