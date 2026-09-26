@@ -83,6 +83,14 @@ describe('a room where a post was put to one teammate', () => {
     expect([...html.matchAll(/was not asked|were not asked/g)]).toHaveLength(1)
   })
 
+  it('keeps the members it was not put to in the head’s strip, dim and not failed', () => {
+    // Two posts, three members: the post to everyone missed Booty, the post
+    // to Wren did not ask Pip or Booty. None of the three ran, so none failed.
+    expect([...html.matchAll(/lc-posthead__face is-not-asked/g)]).toHaveLength(3)
+    expect(html).toContain('aria-label="Pip, not asked"')
+    expect(html).not.toContain('is-failed')
+  })
+
   it('asks everyone until someone is named', () => {
     expect(html).toContain('placeholder="Post to pair…"')
     expect(html).not.toContain('lc-askto')

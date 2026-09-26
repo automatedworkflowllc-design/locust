@@ -1006,21 +1006,27 @@ export function RoomScreen({
                     const waiting = (entry.queued ?? []).includes(id)
                     const phase = waiting
                       ? 'waiting'
-                      : found === undefined || found.phase === 'failed' || found.phase === 'cancelled'
-                        ? 'failed'
-                        : // Terminal, same as the headline above -- a pip that
-                          // said "answered" while the line said "still
-                          // working" would be the same fact told two ways.
-                          found.phase === 'completed'
-                          ? 'answered'
-                          : 'running'
+                      : // No mission is not a failure -- nothing ran to fail --
+                        // the headline's own rule. A post put to Wren alone
+                        // painted Pip's face red in its head (0.371).
+                        found === undefined
+                        ? 'not-asked'
+                        : found.phase === 'failed' || found.phase === 'cancelled'
+                          ? 'failed'
+                          : // Terminal, same as the headline above -- a pip that
+                            // said "answered" while the line said "still
+                            // working" would be the same fact told two ways.
+                            found.phase === 'completed'
+                            ? 'answered'
+                            : 'running'
+                    const said = phase === 'not-asked' ? 'not asked' : phase
                     return (
                       <button
                         key={id}
                         type="button"
                         className={`lc-posthead__face is-${phase}`}
-                        title={`${teammate?.name ?? id} · ${phase}`}
-                        aria-label={`${teammate?.name ?? id}, ${phase}`}
+                        title={`${teammate?.name ?? id} · ${said}`}
+                        aria-label={`${teammate?.name ?? id}, ${said}`}
                         onClick={() => jumpTo(entry.postId, id)}
                       >
                         {teammate !== undefined && (

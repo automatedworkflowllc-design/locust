@@ -3531,6 +3531,17 @@ textarea {
   border-color: var(--lc-border-strong);
 }
 
+/* Not asked -- a post put to someone else, or a member the room could not
+ * reach. Still in the strip, because the strip is the roster; dimmer than
+ * waiting and with no pip, because nothing ran, so nothing failed. */
+.lc-posthead__face.is-not-asked {
+  opacity: 0.3;
+}
+
+.lc-posthead__face.is-not-asked .lc-posthead__pip {
+  display: none;
+}
+
 .lc-roomwaiting {
   display: flex;
   align-items: baseline;

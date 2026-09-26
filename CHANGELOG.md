@@ -26,6 +26,9 @@ heading: the home screen then shows it once, as a splash.
 - **A room in the sidebar shows when it was last used.** A room you had
   just posted to could read "15h", the age of the room rather than of its
   last post. Replies teammates send each other now show their age there too.
+- **No red dot for a teammate who was not asked.** In a post's header, a
+  teammate the post never reached showed a red dot, as if they had failed.
+  Nothing ran, so nothing failed: their face is now dimmed, with no dot.
 
 ## 0.370.0 - 2026-09-26
 <!-- big -->
