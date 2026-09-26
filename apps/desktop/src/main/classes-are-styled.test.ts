@@ -58,6 +58,9 @@ const REACHED_NOT_STYLED: ReadonlySet<string> = new Set([
   // carry, and named so drive-room-ask-one can tell them from those.
   'lc-mentions',
   'lc-askto__tile',
+  // The notes tile in the chat box (0.376): an attachment tile it also
+  // carries draws it; named so drive-diff-notes can find it.
+  'lc-notestile',
   // A namespace, never worn alone: every use pairs it with `--switch`,
   // `--roletitle` or `--folder`, and those carry the layout.
   'lc-field',

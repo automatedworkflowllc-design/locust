@@ -39,6 +39,8 @@ import { effortFooter, effortName } from '../effortLevels.js'
 import { EffortSlider } from './EffortSlider.js'
 import { effortScale, joinEffort, splitEffort } from '../effortScale.js'
 import { ATTACHMENT_DIR, attachmentLabel, MAX_ATTACHMENTS, withAttachments } from '../../../shared/attachments.js'
+import { diffNotesTile, withDiffNotes } from '../diffNotes.js'
+import type { DiffNote } from '../diffNotes.js'
 import { availableCommands, matchingCommands, slashQuery } from '../slashCommands.js'
 import type { SlashCommand } from '../slashCommands.js'
 import { RoutePicker } from './RoutePicker.js'
@@ -208,6 +210,13 @@ export interface ComposerProps {
   readonly onSwarmChange: (swarm: boolean) => void
   /** True when it started; false, or the words saying why not (M27), when it did not. */
   readonly onStart: (prompt: string) => Promise<boolean | string>
+  /**
+   * Notes the person pinned to lines of a diff in this conversation
+   * (diffNotes.ts, 0.376). They go with the next message, as one block after
+   * its words, and are cleared once it has gone.
+   */
+  readonly diffNotes?: readonly DiffNote[]
+  readonly onClearDiffNotes?: () => void
   readonly onCancel: () => void
   readonly onOpenRoutePicker: () => void
   /**
@@ -324,6 +333,8 @@ export function Composer({
   swarm,
   onSwarmChange,
   onStart,
+  diffNotes,
+  onClearDiffNotes,
   onCancel,
   onOpenRoutePicker,
   onHandOff,
@@ -602,7 +613,10 @@ export function Composer({
 
   const submit = (submitEvent: FormEvent<HTMLFormElement>): void => {
     submitEvent.preventDefault()
-    const prompt = value.trim()
+    const typed = value.trim()
+    // Notes alone are a message: the person may have nothing to add to them.
+    const notes = diffNotes ?? []
+    const prompt = withDiffNotes(typed, notes)
     if (prompt.length === 0) return
     if (canQueue) {
       // With its files, and the tiles cleared, as a send does. L20 (the code
@@ -611,6 +625,7 @@ export function Composer({
       onQueue(prompt, attached)
       setValue('')
       setAttached([])
+      if (notes.length > 0) onClearDiffNotes?.()
       return
     }
     if (!canStart) {
@@ -630,7 +645,7 @@ export function Composer({
     // Newest last, and never the same line twice running -- pressing up
     // after sending the same thing twice should go back one message, not
     // one keystroke.
-    if (sent.current[sent.current.length - 1] !== prompt) sent.current = [...sent.current, prompt].slice(-50)
+    if (sent.current[sent.current.length - 1] !== typed && typed.length > 0) sent.current = [...sent.current, typed].slice(-50)
     setRecallAt(-1)
     // Cleared NOW, not when the host answers. The turn is already on screen as
     // a bubble the instant it is sent, so waiting for the round trip left the
@@ -642,11 +657,14 @@ export function Composer({
     setAttached([])
     void onStart(withAttachments(prompt, sending)).then((started) => {
       if (started !== true) {
-        setValue(prompt)
+        setValue(typed)
         setAttached(sending)
         // M27: and say why, when the host said.
         if (typeof started === 'string') setNote(started)
+        return
       }
+      // Gone with the message; kept, for another try, when it did not go.
+      if (notes.length > 0) onClearDiffNotes?.()
     })
   }
 
@@ -1147,8 +1165,22 @@ export function Composer({
           * belongs -- and each one removes itself, because attaching four
           * files and wanting three was previously all-or-nothing.
           */}
-        {attached.length > 0 && (
+        {(attached.length > 0 || (diffNotes ?? []).length > 0) && (
           <div className="lc-attached" aria-label={`${attachmentLabel(attached.length)} attached`}>
+            {/* Notes on the diff, as one tile: they go with the next message. */}
+            {(diffNotes ?? []).length > 0 && onClearDiffNotes !== undefined && (
+              <button
+                type="button"
+                className="lc-attached__tile lc-notestile"
+                title={`${diffNotesTile((diffNotes ?? []).length)} -- they go with your next message. Click to remove them all.`}
+                aria-label={`Remove ${diffNotesTile((diffNotes ?? []).length)}`}
+                onClick={onClearDiffNotes}
+              >
+                <Icon name="message" size={13} />
+                <span className="lc-attached__name">{diffNotesTile((diffNotes ?? []).length)}</span>
+                <Icon name="close" size={11} />
+              </button>
+            )}
             {attached.map((path) => {
               const wasCopied = copiedIn.has(path)
               return (
@@ -1654,7 +1686,8 @@ export function Composer({
                       runtimeReady: selectedReady,
                       routeCanRun,
                       busy: busyWith !== undefined,
-                      empty: value.trim().length === 0
+                      // Notes on the diff are a message on their own.
+                      empty: value.trim().length === 0 && (diffNotes ?? []).length === 0
                     }) ?? 'Start mission — Shift+Enter for a new line'
                   }
                 >

@@ -1758,8 +1758,86 @@ textarea {
 }
 
 .lc-diff__row {
+  position: relative;
   display: grid;
   grid-template-columns: 44px 44px 18px 1fr;
+}
+
+/*
+ * NOTES ON A DIFF (0.376): a "+" over a line's numbers, shown on hover or
+ * focus -- out of the grid, so a row's columns never move for it -- and the
+ * note under its line once written, marked by the same lime edge its line
+ * gets, so which line a note is about reads at a glance.
+ */
+.lc-diff__noteadd {
+  position: absolute;
+  top: 50%;
+  left: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: var(--lc-lime);
+  color: var(--lc-bg-terminal);
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-diff__row:hover .lc-diff__noteadd,
+.lc-diff__noteadd:focus-visible {
+  opacity: 1;
+}
+
+.lc-diff__row.has-note {
+  box-shadow: inset 2px 0 0 var(--lc-lime);
+}
+
+.lc-diff__note,
+.lc-diff__noteedit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+  margin: 2px 0 6px 106px;
+  padding: var(--lc-space-2) var(--lc-space-3);
+  border-left: 2px solid var(--lc-lime);
+  border-radius: 0 var(--lc-radius-control) var(--lc-radius-control) 0;
+  background: var(--lc-bg-raised-2);
+  font-family: var(--lc-font-ui);
+  font-size: var(--lc-text-description);
+  line-height: 1.5;
+}
+
+.lc-diff__note {
+  flex-direction: row;
+  align-items: baseline;
+  gap: var(--lc-space-3);
+}
+
+.lc-diff__notetext {
+  flex: 1;
+  min-width: 0;
+  color: var(--lc-text-primary);
+  white-space: pre-wrap;
+}
+
+.lc-diff__noteedit textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.lc-diff__noteactions {
+  display: flex;
+  gap: var(--lc-space-3);
+}
+
+.lc-diff__noteactions .lc-ghostbutton {
+  margin-left: 0;
 }
 
 .lc-diff__row.is-add {

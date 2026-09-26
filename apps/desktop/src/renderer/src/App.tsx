@@ -59,6 +59,10 @@ import { RoutineDialog } from './components/RoutineDialog.js'
 import { AutomationsScreen } from './components/AutomationsScreen.js'
 import { TIDY_PROMPT } from '../../shared/memory-tidy.js'
 import { needsYou, needsYouLabel } from './needsYou.js'
+import { withNote } from './diffNotes.js'
+import type { DiffNote } from './diffNotes.js'
+import { DiffNotesContext } from './components/DiffNotes.js'
+import type { DiffNotesPlace } from './components/DiffNotes.js'
 import { memoryChangedNotice, memoriesOfConversation, noticeWaits, turnsOfConversation } from './conversationMemories.js'
 import { createFrameBatcher } from './streamFrames.js'
 import { missingTranscripts, heldDigests, mergeHistory } from './historyMerge.js'
@@ -1721,6 +1725,12 @@ export default function App(): ReactElement {
       .catch(() => setCliArtifacts([]))
   }, [runtimeState.phase, usableKey])
   const [approvals, setApprovals] = useState<readonly MissionApprovalRequest[]>([])
+  /**
+   * Notes on a teammate's diff (diffNotes.ts, 0.376), by conversation, until
+   * they go with a message: moving to another conversation and back keeps
+   * them where they were written.
+   */
+  const [diffNotes, setDiffNotes] = useState<ReadonlyMap<string, readonly DiffNote[]>>(new Map())
   // M31: a card goes with its run -- one whose run ended is not left behind.
   useEffect(() => {
     setApprovals((current) => approvalsOfLiveRuns(current, runs))
@@ -4965,6 +4975,30 @@ export default function App(): ReactElement {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [approvals, runs, sidebarMissions, missionOwners, historyById, teammates, memories]
   )
+  // The conversation on screen, by its root, is where notes on its diffs live.
+  const notesMissionId = liveRun?.data?.missionId
+  const notesRow = notesMissionId === undefined ? undefined : sidebarMissions.find((entry) => (entry.memberIds ?? [entry.missionId]).includes(notesMissionId))
+  const notesKey = notesRow?.rootId ?? notesRow?.missionId ?? notesMissionId
+  const shownNotes = notesKey === undefined ? [] : diffNotes.get(notesKey) ?? []
+  const changeShownNotes = (change: (notes: readonly DiffNote[]) => readonly DiffNote[]): void => {
+    if (notesKey === undefined) return
+    setDiffNotes((current) => {
+      const next = new Map(current)
+      const changed = change(current.get(notesKey) ?? [])
+      if (changed.length === 0) next.delete(notesKey)
+      else next.set(notesKey, changed)
+      return next
+    })
+  }
+  const diffNotesPlace: DiffNotesPlace | undefined =
+    notesKey === undefined
+      ? undefined
+      : {
+          notes: shownNotes,
+          add: (note) => changeShownNotes((notes) => withNote(notes, note)),
+          remove: (key) => changeShownNotes((notes) => notes.filter((entry) => entry.key !== key)),
+          who: pickedTeammate?.name ?? 'your teammate'
+        }
   const openNeedsYou = (anchor: HTMLElement): void => {
     if (rowMenu?.anchor === anchor) {
       setRowMenu(undefined)
@@ -6037,6 +6071,7 @@ export default function App(): ReactElement {
                   onStop={() => stopExchange(exchange.liveRunIds)}
                 />
               )}
+              <DiffNotesContext.Provider value={diffNotesPlace}>
               <Thread
                 onOpenFile={openFileInViewer}
                 prompt={liveRun.prompt}
@@ -6204,6 +6239,7 @@ export default function App(): ReactElement {
                   return iso === undefined ? {} : { startedAtIso: iso }
                 })()}
               />
+              </DiffNotesContext.Provider>
             </>
           )}
           {/*
@@ -6297,6 +6333,8 @@ export default function App(): ReactElement {
             onRouteChange={changeRoute}
             {...(handBack === undefined ? {} : { handBack })}
             models={models}
+            diffNotes={shownNotes}
+            onClearDiffNotes={() => changeShownNotes(() => [])}
             resolvedModels={resolvedModels}
             recentRoutes={recentRoutes}
             platform={build?.platform}

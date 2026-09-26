@@ -3,6 +3,10 @@ import type { ReactElement } from 'react'
 
 import { HUNKS_SHOWN_FIRST, completenessOf, foldContext, hunkRange, pairedSpans } from '../diff.js'
 import type { DiffCounts, DiffFile, DiffHunk, DiffRow, WordSpan } from '../diff.js'
+import { diffNoteFor, diffNoteKey, MAX_DIFF_NOTE } from '../diffNotes.js'
+import { useDiffNotes } from './DiffNotes.js'
+import type { DiffNotesPlace } from './DiffNotes.js'
+import { Icon } from './Icon.js'
 
 /**
  * One file's change, unified, never side by side: the thread column caps at
@@ -27,6 +31,10 @@ export function DiffView({
   readonly reported: DiffCounts | undefined
 }): ReactElement {
   const [shownHunks, setShownHunks] = useState(Math.min(HUNKS_SHOWN_FIRST, file.hunks.length))
+  // A note can be written here only where it can be sent (DiffNotes.tsx).
+  const place = useDiffNotes()
+  /** The line a note is being written on, by `diffNoteKey`. */
+  const [editing, setEditing] = useState<string>()
   const moreParsed = shownHunks < file.hunks.length
   // Parsed hunks are offered before the truncation is confessed: a reader
   // should see every line that was recorded, then be told what was not.
@@ -34,7 +42,14 @@ export function DiffView({
   return (
     <div className="lc-diff" role="region" aria-label={`Changes to ${file.path}`}>
       {file.hunks.slice(0, completeness.shownHunks).map((hunk, index) => (
-        <Hunk key={`${String(hunk.oldStart)}-${String(hunk.newStart)}-${String(index)}`} hunk={hunk} />
+        <Hunk
+          key={`${String(hunk.oldStart)}-${String(hunk.newStart)}-${String(index)}`}
+          hunk={hunk}
+          path={file.path}
+          place={place}
+          editing={editing}
+          onEdit={setEditing}
+        />
       ))}
       <div className="lc-diff__foot">
         {completeness.canExpand ? (
@@ -58,7 +73,19 @@ export function DiffView({
   )
 }
 
-function Hunk({ hunk }: { readonly hunk: DiffHunk }): ReactElement {
+function Hunk({
+  hunk,
+  path,
+  place,
+  editing,
+  onEdit
+}: {
+  readonly hunk: DiffHunk
+  readonly path: string
+  readonly place: DiffNotesPlace | undefined
+  readonly editing: string | undefined
+  readonly onEdit: (key: string | undefined) => void
+}): ReactElement {
   const [openFolds, setOpenFolds] = useState<ReadonlySet<number>>(() => new Set())
   const spans = useMemo(() => pairedSpans(hunk.rows), [hunk])
   const segments = useMemo(() => foldContext(hunk.rows), [hunk])
@@ -71,7 +98,15 @@ function Hunk({ hunk }: { readonly hunk: DiffHunk }): ReactElement {
       {segments.map((segment, index) => {
         if (segment.kind === 'rows' || openFolds.has(index)) {
           return segment.rows.map((row, rowIndex) => (
-            <Row key={`${String(index)}-${String(rowIndex)}`} row={row} spans={spans.get(row)} />
+            <Row
+              key={`${String(index)}-${String(rowIndex)}`}
+              row={row}
+              spans={spans.get(row)}
+              path={path}
+              place={place}
+              editing={editing}
+              onEdit={onEdit}
+            />
           ))
         }
         return (
@@ -98,9 +133,129 @@ function Hunk({ hunk }: { readonly hunk: DiffHunk }): ReactElement {
  * The sign column carries the same fact as the row fill, so the diff reads
  * without colour. Gutters are unselectable: a copy of the diff yields code.
  */
-function Row({ row, spans }: { readonly row: DiffRow; readonly spans: readonly WordSpan[] | undefined }): ReactElement {
+function Row({
+  row,
+  spans,
+  path,
+  place,
+  editing,
+  onEdit
+}: {
+  readonly row: DiffRow
+  readonly spans: readonly WordSpan[] | undefined
+  readonly path: string
+  readonly place: DiffNotesPlace | undefined
+  readonly editing: string | undefined
+  readonly onEdit: (key: string | undefined) => void
+}): ReactElement {
+  const key = diffNoteKey(path, row)
+  const note = place?.notes.find((entry) => entry.key === key)
+  const where = row.kind === 'del' ? `removed line ${String(row.oldNo ?? '')}` : `line ${String(row.newNo ?? row.oldNo ?? '')}`
   return (
-    <div className={`lc-diff__row is-${row.kind}`}>
+    <>
+      <div className={`lc-diff__row is-${row.kind}${note === undefined ? '' : ' has-note'}`}>
+        {/*
+          * The "+" is on the line it is about, over its numbers, and only on
+          * hover or focus -- a column of buttons down every diff would be the
+          * loudest thing in the thread (GitHub's gutter, Orca's review).
+          */}
+        {place !== undefined && editing !== key && (
+          <button
+            type="button"
+            className="lc-diff__noteadd"
+            aria-label={`Add a note on ${path}, ${where}`}
+            title={`Add a note for ${place.who} on this line`}
+            onClick={() => onEdit(key)}
+          >
+            <Icon name="plus" size={11} />
+          </button>
+        )}
+        <DiffRowCells row={row} spans={spans} />
+      </div>
+      {note !== undefined && editing !== key && place !== undefined && (
+        <div className="lc-diff__note">
+          <span className="lc-diff__notetext">{note.text}</span>
+          <button type="button" className="lc-linkbutton" onClick={() => onEdit(key)}>
+            Edit
+          </button>
+          <button type="button" className="lc-linkbutton" aria-label={`Remove the note on ${where}`} onClick={() => place.remove(key)}>
+            Remove
+          </button>
+        </div>
+      )}
+      {editing === key && place !== undefined && (
+        <NoteEditor
+          initial={note?.text ?? ''}
+          who={place.who}
+          onSave={(text) => {
+            if (text.trim().length === 0) place.remove(key)
+            else place.add(diffNoteFor(path, row, text))
+            onEdit(undefined)
+          }}
+          onCancel={() => onEdit(undefined)}
+        />
+      )}
+    </>
+  )
+}
+
+/**
+ * The note being written, under its line. Enter keeps it; Shift+Enter is a
+ * new line; Escape puts it away; keeping it empty takes the note off.
+ */
+function NoteEditor({
+  initial,
+  who,
+  onSave,
+  onCancel
+}: {
+  readonly initial: string
+  readonly who: string
+  readonly onSave: (text: string) => void
+  readonly onCancel: () => void
+}): ReactElement {
+  const [text, setText] = useState(initial)
+  return (
+    <form
+      className="lc-diff__noteedit"
+      onSubmit={(event) => {
+        event.preventDefault()
+        onSave(text)
+      }}
+    >
+      <textarea
+        className="lc-input"
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.nativeEvent.isComposing || event.keyCode === 229) return
+          if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault()
+            onSave(text)
+          }
+          if (event.key === 'Escape') onCancel()
+        }}
+        placeholder={`A note for ${who} on this line. It goes with your next message.`}
+        aria-label="Note on this line"
+        rows={2}
+        maxLength={MAX_DIFF_NOTE}
+        autoFocus
+      />
+      <div className="lc-diff__noteactions">
+        <button type="submit" className="lc-button is-active">
+          {initial.length === 0 ? 'Add note' : 'Save note'}
+        </button>
+        <button type="button" className="lc-ghostbutton" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </form>
+  )
+}
+
+function DiffRowCells({ row, spans }: { readonly row: DiffRow; readonly spans: readonly WordSpan[] | undefined }): ReactElement {
+  return (
+    <>
       <span className="lc-diff__no" aria-hidden="true">
         {row.oldNo ?? ''}
       </span>
@@ -121,6 +276,6 @@ function Row({ row, spans }: { readonly row: DiffRow; readonly spans: readonly W
               )
             )}
       </span>
-    </div>
+    </>
   )
 }

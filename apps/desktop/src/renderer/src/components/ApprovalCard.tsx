@@ -6,6 +6,7 @@ import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { dataSentLine } from '../../../shared/approval-data.js'
 import { Icon } from './Icon.js'
 import { DiffView } from './DiffView.js'
+import { DiffNotesContext } from './DiffNotes.js'
 import { fileCounts, parseUnifiedDiff } from '../diff.js'
 
 
@@ -298,6 +299,9 @@ export function ApprovalCard({
       </dl>
 
       {request.patch !== undefined && (
+        // A change waiting for approval is approved or denied, not annotated:
+        // no "+" on its lines (DiffNotes.tsx).
+        <DiffNotesContext.Provider value={undefined}>
         <div className="lc-approval__patch">
           <div className="lc-approval__patchhead lc-mono">
             <span>The change, as Codex would apply it</span>
@@ -322,6 +326,7 @@ export function ApprovalCard({
             ))
           )}
         </div>
+        </DiffNotesContext.Provider>
       )}
 
       {/*
