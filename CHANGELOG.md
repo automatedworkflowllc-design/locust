@@ -11,6 +11,19 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.370.0 - 2026-09-26
+<!-- big -->
+
+### New
+
+- **A room remembers what was said.** Each post in a room used to reach
+  every teammate fresh: not the earlier posts, not the other teammates'
+  answers, not even their own. Now, before answering, each teammate is told
+  the room's last few posts and the answers to them, so "Wren, say more
+  about your second point" reaches a Wren who knows what that point was.
+  Another teammate's answer is passed on as their own account, to check
+  rather than take as fact. Your post is still exactly what you wrote.
+
 ## 0.369.0 - 2026-09-26
 
 ### Improved

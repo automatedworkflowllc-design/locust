@@ -10,6 +10,8 @@ import type { TeammateRole } from '../shared/ipc.js'
 import { BLOCK_PLACEMENT } from '../shared/trailer.js'
 import { FILE_TAG } from '../shared/handover.js'
 import { MEMORY_HEADING, MEMORY_RULES, MEMORY_TAG } from '../shared/memory.js'
+import { roomHistorySection } from '../shared/room-history.js'
+import type { RoomHistory } from '../shared/room-history.js'
 
 /**
  * What a teammate's runtime is told about its colleagues.
@@ -71,6 +73,13 @@ export interface MissionPeerContext {
   readonly connectors?: readonly string[]
   /** Why the worktree could not be made, when the teammate asked for one. */
   readonly worktreeRefused?: string
+  /**
+   * What was said in the room before the post this run answers, when it
+   * answers one (shared/room-history.ts). Told just ahead of the post, in
+   * whatever room the rest of the prompt leaves; never part of what the
+   * record keeps as the person's words.
+   */
+  readonly roomHistory?: RoomHistory
 }
 
 export interface RuntimePromptInput {
@@ -671,10 +680,23 @@ export function composeRuntimePrompt(input: RuntimePromptInput): RuntimePrompt {
   // What arrived this turn and what the person said are never held back:
   // only the standing part is what a session can already have (A2.5).
   const brief = standingFor(standing, input.alreadyGiven, input.peer)
+  const history = input.peer.roomHistory
   const assemble = (): string => {
     const sections: string[] = [...brief.sections]
     if (delivered.length > 0) sections.push(inboundSection(delivered, remaining, roster, input.now))
     if (input.overlap !== undefined) sections.push(input.overlap)
+    /*
+     * The room so far, just ahead of the post it leads into -- and in only
+     * the room everything else leaves. It is measured last, so a waiting
+     * message is never shed to make space for it: the loop below drops
+     * messages only while the rest is over the cap, and the history then
+     * takes what is left.
+     */
+    if (history !== undefined) {
+      const left = MAX_RUNTIME_PROMPT_LENGTH - [...sections, input.prompt].join(SECTION_GAP).length - SECTION_GAP.length
+      const told = roomHistorySection(history, input.peer.self.teammateId, left)
+      if (told !== undefined) sections.push(told)
+    }
     sections.push(input.prompt)
     return sections.join(SECTION_GAP)
   }

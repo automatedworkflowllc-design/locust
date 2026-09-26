@@ -58,6 +58,8 @@ import { createRoomStore, exchangeOfRoomPost } from './room-store.js'
 import { createRoomTasks } from './room-tasks.js'
 import type { RoomTasks } from './room-tasks.js'
 import { boardLines, fittedTaskSection, rowToClaimAtStart } from '../shared/room-task.js'
+import { ROOM_HISTORY_POSTS } from '../shared/room-history.js'
+import type { RoomHistory, RoomHistoryAnswer } from '../shared/room-history.js'
 import { createRoutineRunner } from './routine-runner.js'
 import { createMemoryStore } from './memory-store.js'
 import { WorktreeHasChangesError, createWorktreeManager } from './worktrees.js'
@@ -2409,7 +2411,7 @@ if (!ownsSingleInstanceLock) {
         } catch {
           return 'busy'
         }
-        const attempt = await startRoomMember(room, teammateId, post.text, roster)
+        const attempt = await startRoomMember(room, teammateId, post, roster)
         if (!attempt.ok) return attempt.retryable ? (attempt.pool === true ? 'no-slot' : 'busy') : { refused: attempt.message }
         sendToWindow({
           kind: 'mission-started',
@@ -3486,6 +3488,59 @@ if (!ownsSingleInstanceLock) {
       }
     })
 
+    /*
+     * A FINISHED ANSWER, READ ONCE (0.370).
+     *
+     * Every member of a post is told the room's earlier answers, and a post
+     * asks up to eight members: read afresh each time, one post would recover
+     * the same thirty-odd missions from disk eight times over. A finished
+     * answer never changes, so it is kept; one still running is read again
+     * next time, and is not told until it finishes.
+     */
+    const finishedAnswers = new Map<string, string>()
+    const finishedAnswerOf = async (missionId: string): Promise<string | undefined> => {
+      const known = finishedAnswers.get(missionId)
+      if (known !== undefined) return known
+      const recovered = await missionLedger.getMission(missionId).catch(() => undefined)
+      if (recovered === undefined) return undefined
+      const tracker = createTranscriptTracker()
+      tracker.track(recovered.events)
+      const text = tracker.latestFinal
+      if (!tracker.completed || text === undefined) return undefined
+      if (finishedAnswers.size >= 256) {
+        const oldest = finishedAnswers.keys().next()
+        if (oldest.done !== true) finishedAnswers.delete(oldest.value)
+      }
+      finishedAnswers.set(missionId, text)
+      return text
+    }
+
+    /**
+     * The room before `postId`: its last few posts and the answers to them
+     * that finished (shared/room-history.ts). A post that is not in `room`
+     * yet -- the post handler read the room before adding it -- comes after
+     * every post that is.
+     */
+    const roomHistoryOf = async (room: PublicRoom, postId: string, roster: readonly PublicTeammate[]): Promise<RoomHistory> => {
+      const at = room.posts.findIndex((entry) => entry.postId === postId)
+      const earlier = (at === -1 ? room.posts : room.posts.slice(0, at)).slice(-ROOM_HISTORY_POSTS)
+      const posts = await Promise.all(
+        earlier.map(async (entry) => {
+          const answers = await Promise.all(
+            Object.entries(entry.missions).map(async ([teammateId, missionId]): Promise<RoomHistoryAnswer | undefined> => {
+              const text = await finishedAnswerOf(missionId)
+              if (text === undefined) return undefined
+              // Said by someone who has since left: still said, and not by nobody.
+              const name = roster.find((mate) => mate.teammateId === teammateId)?.name ?? 'A teammate no longer on the team'
+              return { teammateId, name, text }
+            })
+          )
+          return { text: entry.text, answers: answers.filter((answer): answer is RoomHistoryAnswer => answer !== undefined) }
+        })
+      )
+      return { roomName: room.name, posts }
+    }
+
     /**
      * Start one room member's mission, or say why not.
      *
@@ -3502,17 +3557,23 @@ if (!ownsSingleInstanceLock) {
     const startRoomMember = async (
       room: PublicRoom,
       teammateId: string,
-      text: string,
+      post: { readonly postId: string; readonly text: string },
       roster: readonly PublicTeammate[]
     ): Promise<
       | { readonly ok: true; readonly data: CodexMissionStartData }
       | { readonly ok: false; readonly name: string; readonly message: string; readonly retryable: boolean; readonly pool?: boolean }
     > => {
+      const text = post.text
       const teammate = roster.find((entry) => entry.teammateId === teammateId)
-      const peer = await peerContextFor(teammateId)
-      if (teammate === undefined || peer === undefined) {
+      const briefedAs = await peerContextFor(teammateId)
+      if (teammate === undefined || briefedAs === undefined) {
         return { ok: false, name: teammate?.name ?? teammateId, message: 'No longer on the roster.', retryable: false }
       }
+      // A room is a conversation (0.370): the member is told what was said
+      // before this post. A room whose record cannot be read is told nothing
+      // more than the post, as before -- never a refusal to answer it.
+      const history = await roomHistoryOf(room, post.postId, roster).catch(() => undefined)
+      const peer = history === undefined || history.posts.length === 0 ? briefedAs : { ...briefedAs, roomHistory: history }
       const route = teammate.route ?? { runtime: 'codex' as const, model: 'account-default', mode: 'ask' as const }
       // The person's words, then the board: which room this is, who else
       // is in it, every task as it stands, and how to move one. The room
@@ -3617,7 +3678,7 @@ if (!ownsSingleInstanceLock) {
       sendToWindow({ kind: 'room-posted', roomId, postId: post.postId })
 
       for (const teammateId of room.teammateIds) {
-        const attempt = await startRoomMember(room, teammateId, text, roster)
+        const attempt = await startRoomMember(room, teammateId, post, roster)
         if (!attempt.ok) {
           /*
            * "Not now" is not a refusal.
