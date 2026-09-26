@@ -115,6 +115,13 @@ const IGNORED_TYPES = new Set([
   "session.mcp_server_status_changed",
   "session.mcp_servers_loaded",
   "session.tools_updated",
+  // Copilot CLI 1.0.88 (drive-copilot, packaged 0.348, 2026-09-25): shown in
+  // the fold as "Unhandled Copilot record: session.indexed_search". Search
+  // index housekeeping by its name; its shape was not captured (a second run
+  // in a smaller folder did not send it). Ignored rather than reported,
+  // because an unknown record's evidence is written to the ledger and a
+  // search record may carry what it found.
+  "session.indexed_search",
   "assistant.message_start",
   "assistant.tool_call_delta",
   "assistant.idle",

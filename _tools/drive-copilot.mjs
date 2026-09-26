@@ -1,16 +1,29 @@
 // A first message on Copilot CLI, read as a person reads it.
 //
-//   node _tools/drive-copilot.mjs
+//   LOCUST_SPEND=1 node _tools/drive-copilot.mjs [--packaged <exe>] [--tag <label>]
 //
 // Wren picks Copilot CLI / Auto from the composer, read-only, and is asked
 // one sentence about README.md. Kept: the picker's rows under Copilot, the
 // thread, the fold, the header. Spends one premium request on Colin's
 // Copilot plan.
 
+import { mkdir } from 'node:fs/promises'
+import { join } from 'node:path'
+
 import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace } from './drive-lib.mjs'
+
+const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
+const packaged = arg('--packaged')
+const tag = arg('--tag')
+const outPath = tag === undefined ? undefined : join(new URL('../docs/beta-fixes-2026-09-24/', import.meta.url).pathname.slice(1), `copilot-${tag}`)
+if (outPath !== undefined) await mkdir(outPath, { recursive: true })
 
 const workspace = await scratchRepository('locust-drive-copilot-ws-')
 const drive = await startDrive({
+  ...(packaged === undefined ? {} : { packaged }),
+  ...(outPath === undefined ? {} : { outPath }),
+  // One premium request on Colin's plan: the composer must stay on Copilot.
+  spends: true,
   name: 'copilot',
   port: 9308,
   workspace,
@@ -51,5 +64,5 @@ try {
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
-  await drive.finish({ intro: 'Build: whatever `pnpm build` last wrote to out/. Wren on Copilot CLI / Auto, read-only, one sentence about README.' })
+  await drive.finish({ intro: `Build: ${packaged ?? 'whatever pnpm build last wrote to out/'}. Wren on Copilot CLI / Auto, read-only, one sentence about README.` })
 }
