@@ -17,7 +17,17 @@ describe('free routes only', () => {
     expect(isFreeRoute('opencode', undefined)).toBe(false)
     expect(isFreeRoute('cursor', 'cursor-grok-4.6-free')).toBe(false)
     expect(isFreeRoute('opencode', 'freestyle-pro')).toBe(false)
+    // "free" inside an id is a word, not a price (code review B4, own runs 4).
+    expect(isFreeRoute('opencode', 'opencode/x-free-pro')).toBe(false)
+    expect(isFreeRoute('opencode', 'opencode/free-tier-preview-max')).toBe(false)
   })
+
+  it('knows every free model OpenCode 1.18.27 lists', () => {
+    // MEASURED 2026-09-26: `opencode models`, the six whose price is free.
+    for (const model of ['ling-3.0-flash-fin-free', 'mimo-v2.6-flash-free', 'muse-spark-1.3-contributor-free', 'nemotron-3-ultra-free', 'nemotron-3.5-lightning-free', 'space-bunny-free']) {
+      expect(isFreeRoute('opencode', `opencode/${model}`)).toBe(true)
+    }
+  }, 10_000)
 
   it('holds a launch with a debugging port to free routes', () => {
     // Every drive and smoke takes the window over this way, harness or not.

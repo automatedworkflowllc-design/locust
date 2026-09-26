@@ -39,9 +39,19 @@ export function freeRoutesOnly(
   return argv.some((argument) => argument.startsWith('--remote-debugging-port'))
 }
 
-/** OpenCode's free models: the only routes that cost nobody anything. */
+/**
+ * OpenCode's free models: the only routes that cost nobody anything.
+ *
+ * Only an id that ENDS in "free". It also took "-free" anywhere in the id,
+ * so `x-free-pro` -- a word in a name, not a price -- passed (code review
+ * B4, own runs 4). MEASURED 2026-09-26 on OpenCode 1.18.27: all six free
+ * models end "-free" (ling-3.0-flash-fin-free, mimo-v2.6-flash-free,
+ * muse-spark-1.3-contributor-free, nemotron-3-ultra-free,
+ * nemotron-3.5-lightning-free, space-bunny-free), so the stricter rule loses
+ * none of them.
+ */
 export function isFreeRoute(runtime: string, model: string | undefined): boolean {
-  return runtime === 'opencode' && model !== undefined && /(^|[-/])free$|-free\b/i.test(model)
+  return runtime === 'opencode' && model !== undefined && /(^|[-/])free$/i.test(model)
 }
 
 export const FREE_ONLY_REFUSAL =
