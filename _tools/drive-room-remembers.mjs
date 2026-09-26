@@ -151,6 +151,10 @@ try {
       answer === undefined ? 'no answer' : answer.text.slice(0, 200)
     )
   }
+  // The sidebar's row for the room is as old as its last post, not its
+  // making: the room was seeded at 05:00 and read "15h" on 0.369 and 0.370.
+  const age = String(await drive.evaluate(`(() => (document.querySelector('.lc-conv--room .lc-conv__age')?.textContent ?? '').trim())()`))
+  check('the sidebar says the room was just used', /^(now|[1-9]m|[1-5][0-9]m)$/.test(age), `"${age}"`)
   say(failures === 0 ? '\nROOM REMEMBERS PASSED' : `\nROOM REMEMBERS: ${String(failures)} FAILED`)
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

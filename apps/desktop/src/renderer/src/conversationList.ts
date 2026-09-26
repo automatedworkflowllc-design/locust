@@ -182,6 +182,26 @@ export type ListEntry =
   | { readonly kind: 'room'; readonly room: PublicRoom; readonly missions: readonly SidebarMission[] }
 
 /**
+ * When a room was last used: its newest answer or its newest post, whichever
+ * came later. Only a room nobody has posted to is as old as its making.
+ *
+ * It read the answers alone, and an answer's time can be missing -- a run
+ * the host started was adopted with none until 0.371 -- so a room posted to
+ * a minute ago read "15h", the age of the room.
+ */
+export function roomLastAt(room: PublicRoom, answers: readonly SidebarMission[]): string {
+  let newest: string | undefined
+  let newestAt = -Infinity
+  for (const at of [...answers.map((mission) => mission.lastAt), ...room.posts.map((post) => post.at)]) {
+    const parsed = at === undefined ? Number.NaN : Date.parse(at)
+    if (Number.isNaN(parsed) || parsed <= newestAt) continue
+    newest = at
+    newestAt = parsed
+  }
+  return newest ?? room.createdAt
+}
+
+/**
  * The list with each room drawn as the room: one row, where its newest answer
  * was, in place of the answers themselves.
  *
@@ -233,9 +253,7 @@ export function withRoomsFolded(
   const timeOf = (entry: ListEntry): number =>
     entry.kind === 'conversation'
       ? Date.parse(entry.mission.lastAt ?? '') || 0
-      : entry.missions.length === 0
-        ? Date.parse(entry.room.createdAt) || 0
-        : Math.max(0, ...entry.missions.map((mission) => Date.parse(mission.lastAt ?? '') || 0))
+      : Date.parse(roomLastAt(entry.room, entry.missions)) || 0
   const running = (entry: ListEntry): boolean =>
     entry.kind === 'conversation' ? entry.mission.phase === 'running' : entry.missions.some((mission) => mission.phase === 'running')
   const empty = rooms.filter((room) => room.posts.length === 0).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))

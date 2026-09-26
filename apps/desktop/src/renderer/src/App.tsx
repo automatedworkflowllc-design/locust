@@ -2231,6 +2231,17 @@ export default function App(): ReactElement {
             data: update.data,
             phase: 'running',
             events: [],
+            /*
+             * When it started: now, give or take the one message that said so.
+             *
+             * A run the window asked for is stamped when it asks; one the
+             * host started -- a room post's member, a teammate's reply, a
+             * routine -- was adopted with no time at all. Its row then had
+             * no age and sorted last, and a room's row fell back to the day
+             * the room was made: "pair 15h" straight after two posts
+             * (drive-room-remembers, 2026-09-26).
+             */
+            startedAtIso: new Date().toISOString(),
             teammateId: update.teammateId,
             peerMessages: update.data.peerMessages,
             startedBy: update.startedBy,

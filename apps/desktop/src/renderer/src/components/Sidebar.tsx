@@ -28,7 +28,7 @@ import { ThinkingOrb } from 'thinking-orbs'
 import { Icon } from './Icon.js'
 import { teammateTooltip } from '../teammateTooltip.js'
 import { railCountBadge, shortAgo } from '../railFlyout.js'
-import { conversationRows, heldFor, narrowingLine, ownerOf, unreadableSentence, withRoomsFolded } from '../conversationList.js'
+import { conversationRows, heldFor, narrowingLine, ownerOf, roomLastAt, unreadableSentence, withRoomsFolded } from '../conversationList.js'
 import { RailFlyout } from './RailFlyout.js'
 import { routineStepLabel } from '../routines.js'
 
@@ -551,9 +551,8 @@ export function Sidebar({
    */
   const roomRow = (room: PublicRoom, answers: readonly SidebarMission[]): ReactElement => {
     const running = answers.some((mission) => mission.phase === 'running')
-    // A room with no answers yet is as old as its making.
-    const newest = answers.map((mission) => mission.lastAt).filter((at): at is string => at !== undefined).sort().at(-1) ?? room.createdAt
-    const age = shortAgo(newest, now)
+    // Its newest answer or post; a room nobody has posted to is as old as its making.
+    const age = shortAgo(roomLastAt(room, answers), now)
     const members = room.teammateIds
       .map((id) => teammates.find((entry) => entry.teammateId === id)?.name)
       .filter((name): name is string => name !== undefined)

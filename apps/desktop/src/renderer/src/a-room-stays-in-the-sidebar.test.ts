@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { PublicRoom } from '../../shared/ipc.js'
 import type { SidebarMission } from './components/Sidebar.js'
-import { withRoomsFolded } from './conversationList.js'
+import { roomLastAt, withRoomsFolded } from './conversationList.js'
 
 /**
  * A ROOM STAYS IN THE SIDEBAR, AS ITSELF.
@@ -101,5 +101,39 @@ describe('rooms nobody has posted to', () => {
       [empty('room_a', 'Made first', '2026-09-23T01:00:00.000Z'), empty('room_b', 'Made second', '2026-09-23T02:00:00.000Z'), empty('room_c', 'Made third', '2026-09-23T03:00:00.000Z')]
     )
     expect(entries.map((entry) => (entry.kind === 'room' ? entry.room.name : entry.mission.title))).toEqual(['Made third', 'Made second', 'Made first', 'Old work'])
+  })
+})
+
+/*
+ * "pair 15h" straight after two posts (drive-room-remembers, 2026-09-26): the
+ * row read its answers' times alone, a run the host started had none, and the
+ * room fell back to the day it was made.
+ */
+describe('how old a room reads', () => {
+  const answer = (missionId: string, lastAt?: string): SidebarMission => ({
+    missionId,
+    title: 'x',
+    phase: 'completed',
+    integrityIssueCount: 0,
+    ...(lastAt === undefined ? {} : { lastAt })
+  })
+
+  it('is its newest post when no answer has a time', () => {
+    expect(roomLastAt(release, [answer('mission_wren'), answer('mission_booty')])).toBe('2026-09-23T04:31:00.000Z')
+  })
+
+  it('is its newest answer when that came after the post', () => {
+    expect(roomLastAt(release, [answer('mission_wren', '2026-09-23T04:35:00.000Z'), answer('mission_booty', '2026-09-23T04:33:00.000Z')])).toBe('2026-09-23T04:35:00.000Z')
+  })
+
+  it('is its making only when nobody has posted to it', () => {
+    const empty = { ...release, posts: [] } as unknown as PublicRoom
+    expect(roomLastAt(empty, [])).toBe('2026-09-23T04:30:00.000Z')
+  })
+
+  it('ignores a time that is not one', () => {
+    expect(roomLastAt(release, [answer('mission_wren', 'not a time')])).toBe('2026-09-23T04:31:00.000Z')
+    const unposted = { ...release, posts: [] } as unknown as PublicRoom
+    expect(roomLastAt(unposted, [answer('mission_wren', 'not a time')])).toBe('2026-09-23T04:30:00.000Z')
   })
 })
