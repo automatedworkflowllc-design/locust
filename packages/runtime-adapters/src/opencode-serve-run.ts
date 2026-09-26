@@ -212,6 +212,19 @@ export function startOpenCodeServeRun(options: OpenCodeServeRunOptions): Runtime
       void answer(props);
       return;
     }
+    // The server's word that it will try the model again: `session.status`
+    // with `type: "retry"` and what the provider answered. `run` writes the
+    // same thing to its log, which opencode-events reads; here it is an
+    // event, and it was ignored, so an Approve-each turn on a busy free model
+    // sat on "Starting" saying nothing (the 0.368 sweep's opencode-approve-each).
+    if (type === "session.status" && isObject(props.status) && text(props.status.type) === "retry") {
+      push({
+        type: "locust.retry",
+        message: text(props.status.message) ?? "",
+        ...(typeof props.status.attempt === "number" ? { attempt: props.status.attempt } : {}),
+      });
+      return;
+    }
     if (type === "session.error") {
       errored = true;
       push({ type: "error", error: isObject(props.error) ? props.error : { name: "UnknownError", data: { message: "OpenCode reported an error." } } });

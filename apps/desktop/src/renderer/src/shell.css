@@ -7025,7 +7025,19 @@ textarea {
 .lc-input:focus-visible {
   /* :focus-visible, not :focus -- every other ring in this file uses it, and
    * :focus gave mouse users a ring they did not ask for (sweep A1). */
-  border-color: var(--lc-hover-border);
+  /*
+   * THE SOFT TREATMENT, AND NO LIME RING (0.369). tokens.css rings every
+   * `input:focus-visible` in lime, and `input:focus-visible` outranks
+   * `.lc-input`'s own `outline: none` -- so a text box, which counts as
+   * focus-visible on a click too, wore the lime ring, and the New teammate
+   * dialog, which focuses its name box as it opens, opened with one (the
+   * 0.368 sweep's new-teammate-fit frames). A box you type in takes the
+   * message box's and the search field's treatment: the edge and the glow,
+   * no hue.
+   */
+  outline: none;
+  border-color: var(--lc-focus-edge);
+  box-shadow: 0 0 0 3px var(--lc-focus-glow);
 }
 
 .lc-hues {

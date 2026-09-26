@@ -1,6 +1,10 @@
 // A busy model says so, at once, on a build (0.368).
 //
-//   LOCUST_SPEND=1 node _tools/drive-busy-model.mjs [--packaged <exe>] [--tag <name>]
+//   LOCUST_SPEND=1 node _tools/drive-busy-model.mjs [--packaged <exe>] [--tag <name>] [--approve-each]
+//
+// --approve-each sends it in Approve each, which runs OpenCode as a server:
+// the same news arrives as the server's `retry` status instead of a log line
+// (0.369).
 //
 // The 0.367 sweep's drives sat on "Starting" for six minutes on the free Ling
 // model: its provider was answering "Rate limit exceeded. Please try again
@@ -24,7 +28,8 @@ import { FREE_ROUTE, pickRouteScript, say, scratchRepository, sendAndWaitScript,
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tag = arg('--tag')
-const outPath = tag === undefined ? undefined : join(recordRoot('beta-fixes-2026-09-24'), `busy-model-${tag}`)
+const APPROVE_EACH = process.argv.includes('--approve-each')
+const outPath = tag === undefined ? undefined : join(recordRoot('beta-fixes-2026-09-24'), `busy-model${process.argv.includes('--approve-each') ? '-approve-each' : ''}-${tag}`)
 if (outPath !== undefined) await mkdir(outPath, { recursive: true })
 
 const asked = []
@@ -95,6 +100,18 @@ const pressIn = (scope, label) => `(async () => {
   return 'nothing said'
 })()`
 
+
+/** Approve each, from the chat box's mode chip (as drive-opencode-approve-each). */
+const MODE = `(async () => {
+  const control = [...document.querySelectorAll('.lc-control')].find((b) => /^(Ask|Edit|Accept edits|Plan|Approve|Auto)\\b/.test(b.innerText))
+  if (!control) return 'no mode control'
+  control.click(); await new Promise((r) => setTimeout(r, 400))
+  const approve = [...document.querySelectorAll('[role=menuitemradio]')].find((b) => /^Approve each/.test(b.innerText.trim()))
+  if (!approve || approve.disabled) { control.click(); return 'no Approve each: ' + (approve?.getAttribute('title') ?? 'not listed') }
+  approve.click(); await new Promise((r) => setTimeout(r, 400))
+  return 'mode: ' + control.innerText.split(/\\s+/).join(' ').trim()
+})()`
+
 const verdicts = []
 try {
   await drive.capture('launch: Wren on the free route', () => drive.ready())
@@ -117,6 +134,10 @@ try {
   })()`))
   const picked = await drive.capture('the picker: Busy Chat under Your models', () => drive.evaluate(pickRouteScript({ group: '/Your models/i', search: 'Busy', row: '/Busy Chat/' })))
   verdicts.push(`picked: ${/Busy Chat/.test(picked) ? 'PASS' : 'FAIL'}`)
+  if (APPROVE_EACH) {
+    const mode = await drive.capture('Approve each, so OpenCode runs as a server', () => drive.evaluate(MODE))
+    verdicts.push(`approve each: ${/^mode: Approve/.test(String(mode)) ? 'PASS' : 'FAIL'}`)
+  }
 
   // One message, then watch the conversation for what the provider said.
   const sent = Date.now()

@@ -180,6 +180,12 @@ const OPENCODE_PLAN_TOOL = /^todo_?write$/i;
  */
 const RETRIED_ERROR = /rate.?limit|too many requests|\b429\b|overload|try again later/i;
 
+/** What the thread says while OpenCode tries the model again, in the provider's own words. */
+function retryingSentence(said: string | undefined, busy: boolean): string {
+  if (said === undefined || said.length === 0) return "OpenCode's request to the model failed, and OpenCode is trying again on its own.";
+  return `The model's provider answered "${said}", and OpenCode is trying again on its own.${busy ? " To go on now, press Stop and pick another model." : ""}`;
+}
+
 /**
  * Words OpenCode wrote to the MODEL, which `run` prints as if the model had
  * said them (A6.9).
@@ -499,14 +505,19 @@ export function createOpenCodeEventNormalizer(
       // Any other error still waits for its second line.
       const retried = said !== undefined && RETRIED_ERROR.test(said);
       if (seen !== (retried ? 1 : 2)) return [];
-      return [diagnostic(
-        "warning",
-        "opencode.runtime_error",
-        said === undefined || said.length === 0
-          ? "OpenCode's request to the model failed, and OpenCode is trying again on its own."
-          : `The model's provider answered "${said}", and OpenCode is trying again on its own.${retried ? " To go on now, press Stop and pick another model." : ""}`,
-        evidence,
-      )];
+      return [diagnostic("warning", "opencode.runtime_error", retryingSentence(said, retried), evidence)];
+    }
+
+    // The same news from OpenCode's server (opencode-serve-run, Approve each):
+    // its own `retry` status, so a retry by construction and said on its first
+    // report of each thing the provider answered. A retry means the model is
+    // not answering now, so the way on is said with it.
+    if (type === "locust.retry") {
+      const said = stringValue(parsed.message)?.replace(/^AI_[A-Za-z]+Error:\s*/, "").trim().slice(0, 300);
+      const key = `served:${said ?? ""}`;
+      if (attemptsSeen.has(key)) return [];
+      attemptsSeen.set(key, 1);
+      return [diagnostic("warning", "opencode.runtime_error", retryingSentence(said, true), evidence)];
     }
 
     // OpenCode says why it is about to die. Until 2026-09-07 this fell through
