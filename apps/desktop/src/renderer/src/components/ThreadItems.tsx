@@ -119,14 +119,33 @@ type AvatarSpecLike = Parameters<typeof TeammateBot>[0]['avatar']
  * markup. Wide code scrolls inside its own box rather than stretching the
  * thread.
  */
+/**
+ * The colour an inline code span names, when it is nothing but a hex colour.
+ *
+ * A design answer lists its palette as `#7a9e8e`, `#f6f3ee` -- and a column of
+ * hex codes is a thing a designer has to imagine. A chip beside each, the way
+ * design tools and GitHub draw them, shows it (first-impressions drive, 0.349).
+ *
+ * GitHub's rule: six hex digits, `#rrggbb`, and nothing else. The short forms
+ * are left out on purpose -- `#123` is as likely an issue number as a colour,
+ * and a chip beside an issue reference is a wrong statement. Only that
+ * validated string ever reaches a style: nothing else a model writes does.
+ */
+export function hexColourOf(text: string): string | undefined {
+  const trimmed = text.trim()
+  return /^#[0-9a-fA-F]{6}$/.test(trimmed) ? trimmed : undefined
+}
+
 /** One run of prose, with inline code and link labels drawn. */
 function inline(text: string): ReactElement {
   return (
     <>
       {splitInlineCode(text).map((span, index) => {
         if (span.kind === 'code') {
+          const colour = hexColourOf(span.text)
           return (
             <code className="lc-code--inline" key={`s${String(index)}`}>
+              {colour !== undefined && <span className="lc-swatch" style={{ backgroundColor: colour }} aria-hidden="true" />}
               {span.text}
             </code>
           )

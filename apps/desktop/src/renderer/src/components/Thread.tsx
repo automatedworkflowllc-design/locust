@@ -433,6 +433,30 @@ function ReceiptCard({
   const last = checkpoints.at(-1)
   const unsettled = last?.unsettledActions ?? []
   const [open, setOpen] = useState(false)
+  /*
+   * A RECEIPT WITH NO NEWS IS A LINK, NOT A CARD.
+   *
+   * Under every reopened answer sat "DURABLE RECEIPT . COMPLETED . codex
+   * 0.156.1 / account-default . no checkpoints . ledger verified" -- a boxed
+   * card of engineering words telling the person nothing they needed, on the
+   * conversations where nothing had gone wrong (first-impressions drive,
+   * packaged 0.349; Colin 2026-09-26: Claude's UI "and beyond" is the bar).
+   * Claude puts nothing there. The record still exists and still opens: a
+   * quiet "Details" under the answer. A receipt that DOES carry news -- a
+   * run that failed or was cut off, a ledger that could not be verified, an
+   * action that never reported back -- keeps the card, at rest, as before.
+   */
+  const routine = view.tone === 'blue' && verification === 'ledger verified' && unsettled.length === 0
+  if (routine && !open) {
+    return (
+      <div className="lc-receipt__quiet">
+        <button type="button" className="lc-receipt__details" aria-expanded={false} onClick={() => setOpen(true)}>
+          Details
+          <Icon name="chevron-right" size={11} />
+        </button>
+      </div>
+    )
+  }
   return (
     <div className={`lc-card is-terminal is-${view.tone === 'blue' ? 'blue' : view.tone === 'red' ? 'red' : 'amber'}`}>
       <div className="lc-card__head">

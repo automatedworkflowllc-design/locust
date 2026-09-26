@@ -319,6 +319,27 @@ export function costCell(cost: RunCost | undefined, model: string): string {
  * the same KIND of fact -- how much of a finite thing this conversation has
  * spent. See `conversationCostLine`.
  */
+/**
+ * What the conversation's header says a run cost: MONEY, or nothing.
+ *
+ * The header is the first line a person reads, and it said "9.0k in . 240
+ * out" and "in your plan" under every conversation -- token counts are an
+ * engineer's unit, and a subscription run cost nothing extra (Colin,
+ * 2026-09-23: a conversation cost "is silly for a subscription plan").
+ * Claude's header says neither. Dollars and Copilot's premium requests are
+ * what a person pays, so those stay; the rest is one hover away on the
+ * context ring and in Details (first-impressions pass, after 0.349).
+ */
+export function headerCostTail(input: {
+  readonly events: readonly NormalizedRuntimeEvent[]
+  readonly running: boolean
+}): string {
+  const cost = runCostOf(input.events)
+  if (costUnit(cost) !== 'money') return ''
+  const line = costLine(cost)
+  return line === undefined ? '' : ' · ' + (input.running ? 'so far ' : '') + line
+}
+
 export function missionCostTail(input: {
   readonly events: readonly NormalizedRuntimeEvent[]
   readonly earlierTurns: readonly { readonly events: readonly NormalizedRuntimeEvent[] }[]

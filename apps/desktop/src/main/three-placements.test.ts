@@ -48,9 +48,17 @@ describe('1 · the mission strip carries one scope and one tense', () => {
     expect(strip).not.toContain('sandboxPhrase')
   })
 
-  it('still names the mission, its model and its phase', () => {
-    expect(strip).toContain('shortMissionId')
+  it('names the model always, and the phase only when it is news', () => {
+    // The first-impressions pass (after 0.349; Colin, 2026-09-26: Claude's UI
+    // "and beyond" is the standard) took the ruling one step further. The
+    // eight-hex id went to Details -- it is a string to copy, not a fact to
+    // read on every screen -- and a conversation that finished normally no
+    // longer says "restored from the local ledger" or "completed". Running,
+    // failed, cancelled and interrupted still say so; the model always does.
     expect(strip).toContain('modelDisplayName')
+    expect(strip).not.toContain('shortMissionId')
+    expect(strip).not.toContain('restored from the local ledger')
+    expect(strip).toContain("liveRun.phase === 'completed'")
   })
 })
 

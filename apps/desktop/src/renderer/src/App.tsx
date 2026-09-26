@@ -124,7 +124,7 @@ import type { LiveStarter, TurnSwitch } from './missionView.js'
 import { folderName, ranOnLine } from './ranOn.js'
 import { reviewBrief } from './reviewBrief.js'
 import type { ReviewMaterial } from './reviewBrief.js'
-import { conversationCostLine, costLine, latestContext, missionCostTail } from './cost.js'
+import { conversationCostLine, costLine, headerCostTail, latestContext } from './cost.js'
 import { sequenceOfPost } from './roomExchange.js'
 import type { LiveTurn, RoomExchange, StartingReply } from './roomExchange.js'
 import { isStoppable, stopPress } from './stopPress.js'
@@ -135,7 +135,7 @@ import { splitAttachments, withAttachments } from '../../shared/attachments.js'
 // Only `heldFor`: this file has its own `ownerOf` for live runs, which is a
 // different question from who owns a recorded mission.
 import { heldFor, routineOf } from './conversationList.js'
-import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, shortMissionId, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
+import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
 import { modelDisplayName } from './routeName.js'
 import { FeedbackDialog } from './components/FeedbackDialog.js'
 import { conversationText } from './feedback.js'
@@ -4017,7 +4017,7 @@ export default function App(): ReactElement {
   const shownCostTail =
     liveRun === undefined
       ? ''
-      : missionCostTail({ events: liveRun.events, earlierTurns: liveRun.earlierTurns ?? [], running })
+      : headerCostTail({ events: liveRun.events, running })
   /**
    * How full the model's context is, from the newest turn that reported it.
    * Not the conversation's summed tokens: the window holds one prompt, so
@@ -5688,17 +5688,29 @@ export default function App(): ReactElement {
                          * the inspector-open width: 884px of line in 676px of
                          * column, down to 363px.
                          */
-                        : `${shortMissionId(liveRun.data.missionId)} · ${
+                        /*
+                         * THE MODEL, AND NEWS. (First-impressions pass, after
+                         * 0.349; Colin, 2026-09-26: Claude's UI "and beyond"
+                         * is the standard.) The eight-hex id and "restored
+                         * from the local ledger" were an engineer's facts on
+                         * the first line a person reads: the id is in
+                         * Details, and a conversation that finished normally
+                         * says nothing about it -- only running, failed,
+                         * cancelled or interrupted is news. The model stays:
+                         * which model did the work is the thing this app
+                         * exists to keep legible.
+                         */
+                        : `${
                             liveRun.data.model === undefined
-                              ? 'account-default'
+                              ? 'Account default'
                               : modelDisplayName(liveRun.data.runtime, liveRun.data.model)
-                          } · ${
+                          }${
                             running
                               ? // A routine's step says which one it is on.
-                                routineStepPhrase(liveRun.startedBy, routines) ?? 'running'
-                              : liveRun.restored === true
-                                ? 'restored from the local ledger'
-                                : liveRun.phase
+                                ` · ${routineStepPhrase(liveRun.startedBy, routines) ?? 'running'}`
+                              : liveRun.phase === 'completed'
+                                ? ''
+                                : ` · ${liveRun.phase}`
                           }${
                             // This run's own cost. The conversation's total
                             // is NOT here any more -- it is one row inside

@@ -541,9 +541,11 @@ textarea {
   white-space: nowrap;
 }
 
+/* The model, and news (App.tsx). In the reading face, as the composer's route
+   chip spells the same model -- it was mono while it carried an id and token
+   counts, which it no longer does. */
 .lc-workroom__mission {
-  font-family: var(--lc-font-mono);
-  font-size: var(--lc-text-mono-caption);
+  font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -1329,6 +1331,18 @@ textarea {
   color: var(--lc-text-primary);
 }
 
+/* The colour a hex code names, beside it (`hexColourOf`). A hairline ring so a
+   dark colour still has an edge on the dark ground. */
+.lc-swatch {
+  display: inline-block;
+  width: 0.78em;
+  height: 0.78em;
+  margin-right: 5px;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px var(--lc-border-strong);
+  vertical-align: -0.04em;
+}
+
 .lc-caret {
   display: inline-block;
   width: 7px;
@@ -1802,6 +1816,34 @@ textarea {
 
 .lc-receipt__summary:hover {
   color: var(--lc-text-primary);
+}
+
+/* A receipt with no news (`routine` in ReceiptCard): one quiet word under the
+   answer, in the place Claude keeps its own small actions. */
+.lc-receipt__quiet {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.lc-receipt__details {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  margin-left: -6px;
+  border: 0;
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  color: var(--lc-text-muted);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  cursor: pointer;
+  transition: color var(--lc-motion-hover) var(--lc-ease), background var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-receipt__details:hover {
+  color: var(--lc-text-secondary);
+  background: var(--lc-hover-surface);
 }
 
 .lc-receipt__line {
@@ -10120,21 +10162,20 @@ textarea {
 
 
 
-/* --- 2. Short threads sit on the composer -----------------------------
- * A conversation grows upward out of the box you type in; top-aligning it
- * left a ~70px void between the last card and the composer, so the receipt
- * hung in mid-air.
+/* --- 2. A conversation starts at the top -------------------------------
+ * As Claude's does. It used to sit on the composer and grow upward -- chosen
+ * because a top-aligned thread left the receipt card hanging in mid-air --
+ * and a short conversation at 1440x900 then opened with the top third of the
+ * window empty (first-impressions drive, packaged 0.349; Colin, 2026-09-26:
+ * Claude's UI "and beyond" is the standard). The receipt of a routine run is
+ * a quiet "Details" now, so nothing hangs.
  *
- * This was `justify-content: flex-end`, and "long threads are unaffected"
- * was wrong. On a scrolling flex column that property overflows the content
- * out of the TOP, and an overflowed top is not scrollable: past about a
- * screenful, everything above the newest work became permanently
- * unreachable. Colin, 2026-09-05, on a long Codex run: "no ability to scroll
- * on mouse through messages, just keeps going down and cant scroll up."
- *
- * `margin-top: auto` on the first child does the same job honestly -- it
- * eats the spare room when the thread is short and collapses to nothing when
- * there is none, so the scroll region always starts at the first message.
+ * If it is ever anchored to the bottom again: `margin-top: auto` on the first
+ * child, NEVER `justify-content: flex-end`. That was the first attempt, and
+ * on a scrolling flex column it overflows the content out of the TOP, which
+ * cannot be scrolled to -- past a screenful everything above the newest work
+ * was unreachable (Colin, 2026-09-05: "no ability to scroll on mouse through
+ * messages, just keeps going down and cant scroll up").
  */
 .lc-thread {
   display: flex;
@@ -10142,9 +10183,6 @@ textarea {
   justify-content: flex-start;
 }
 
-.lc-thread > *:first-child {
-  margin-top: auto;
-}
 
 /* The column must not stretch to fill the flex line, or its own 22px gaps
    turn into whatever is left over. */
@@ -12550,6 +12588,7 @@ textarea {
   align-items: center;
 }
 
+
 .lc-conv {
   flex: 1;
   min-width: 0;
@@ -12557,7 +12596,9 @@ textarea {
   align-items: center;
   gap: var(--lc-space-3);
   height: 28px;
-  padding: 0 32px 0 var(--lc-space-3);
+  /* No strip held for the `...`: it sits over the age's slot on hover
+     (`.lc-convrow:hover` above). */
+  padding: 0 var(--lc-space-3);
   border: 0;
   border-radius: var(--lc-radius-control);
   background: transparent;
@@ -12629,6 +12670,31 @@ textarea {
   font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-muted);
   font-variant-numeric: tabular-nums;
+}
+
+/*
+ * THE ROW'S `...` SHOWS, AND TAKES THE AGE'S PLACE -- the way Claude's list
+ * does it.
+ *
+ * The actions button (`.lc-teammate__missionmenu`) is hidden at rest and was
+ * revealed only by `.lc-teammate__missionrow:hover` -- the Team card's rows.
+ * In this list it never appeared on hover at all, while every row still kept
+ * 32px free on its right for it: titles cut at ~22 characters beside a
+ * control nobody could see (first-impressions drive, packaged 0.349).
+ *
+ * Now it shows on hover or focus, over the age's slot, and the age steps out
+ * of the way while it does -- so the two never blend, which is what the
+ * reserved space was for (Colin, twice, on a count "blending with the dots"),
+ * and the title keeps the width.
+ */
+.lc-convrow:hover .lc-teammate__missionmenu,
+.lc-convrow:focus-within .lc-teammate__missionmenu {
+  opacity: 1;
+}
+
+.lc-convrow:hover .lc-conv__age,
+.lc-convrow:focus-within .lc-conv__age {
+  visibility: hidden;
 }
 
 /* --- The roster, one row tall ----------------------------------------- */

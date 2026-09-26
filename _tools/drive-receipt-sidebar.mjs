@@ -58,15 +58,23 @@ try {
       const row = ${teammateRows()}.find(r => /Wren/.test(r.innerText))
       row?.conversation?.click()
       await new Promise(r => setTimeout(r, 1600))
+      // Since the first-impressions pass (after 0.349) a receipt with no news
+      // is a quiet "Details" under the answer, and the card opens from it.
+      const details = document.querySelector('.lc-receipt__details')
       const summary = document.querySelector('.lc-receipt__summary')
       const table = document.querySelector('.lc-receipt')
-      return 'summary: ' + (summary === null ? 'ABSENT' : summary.innerText.replace(/[ ]+/g, ' ').trim())
+      return 'details link: ' + (details === null ? 'ABSENT' : details.innerText.trim())
+        + ' || summary: ' + (summary === null ? 'ABSENT' : summary.innerText.replace(/[ ]+/g, ' ').trim())
         + ' || table open at rest: ' + (table !== null)
     })()`)
   })
 
   await drive.capture('open it: the table is still there', () => drive.evaluate(`(async () => {
-    document.querySelector('.lc-receipt__summary')?.click()
+    // One or the other: "Details" opens the card WITH its table showing, and
+    // the summary inside it is the toggle that would close it again.
+    const details = document.querySelector('.lc-receipt__details')
+    if (details) details.click()
+    else document.querySelector('.lc-receipt__summary')?.click()
     await new Promise(r => setTimeout(r, 500))
     const rows = document.querySelectorAll('.lc-receipt dt').length
     return 'rows behind the disclosure: ' + rows
