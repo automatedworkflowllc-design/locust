@@ -22,6 +22,12 @@ heading: the home screen then shows it once, as a splash.
   were looking at. Send them all at once, and your teammate isn't set off
   after every thought.
 
+### Fixed
+
+- **Your message keeps its line breaks.** A message you wrote over several
+  lines showed as one run-on paragraph in its bubble. It now reads as you
+  typed it, as a room's posts always have.
+
 ## 0.375.0 - 2026-09-26
 
 ### Fixed

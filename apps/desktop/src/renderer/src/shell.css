@@ -748,6 +748,9 @@ textarea {
   border-radius: var(--lc-radius-card);
   background: var(--lc-bg-bubble-user);
   text-wrap: pretty;
+  /* Your line breaks, as you typed them -- a room's post has kept them since
+     it existed; this bubble ran a list of notes into one paragraph (0.376). */
+  white-space: pre-line;
 }
 
 /*
