@@ -706,6 +706,12 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
             sandbox: 'workspace-write',
             executionPolicyVersion: 1,
             createdAt,
+            // Who started it, as every other runtime's record says (code
+            // review B4, own runs 3). The relay handed its origin in and this
+            // record dropped it, so a reply the host began read, after a
+            // restart, as a conversation the person began -- its prompt the
+            // host's briefing, shown as their words.
+            ...(route.relay === undefined ? {} : { startedBy: { kind: 'relay' as const, hop: route.relay.hop } }),
             ...(priorConversation === undefined
               ? {}
               : {
