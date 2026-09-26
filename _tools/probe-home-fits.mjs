@@ -48,6 +48,9 @@ const MEASURE = `(() => {
     coverTop: cover ? Math.round(cover.getBoundingClientRect().top - box.top) : null,
     dockTop: dock ? Math.round(dock.top) : null,
     agentsFolded: agents ? agents.classList.contains('is-folded') : null,
+    // The window's own root must never scroll: everything scrolls inside it.
+    rootOverflowPx: Math.round(document.scrollingElement.scrollHeight - document.scrollingElement.clientHeight),
+    rootOverflowXPx: Math.round(document.scrollingElement.scrollWidth - document.scrollingElement.clientWidth),
     // What sits above the top, by class, and whether a person could see it.
     above: [...scroller.querySelectorAll('*')]
       .map((el) => ({ el, r: el.getBoundingClientRect() }))

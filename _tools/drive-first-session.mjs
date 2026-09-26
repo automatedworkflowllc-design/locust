@@ -117,11 +117,21 @@ try {
     await new Promise((r) => setTimeout(r, 600))
     return (document.querySelector('.lc-thread')?.innerText ?? '').replace(/\\s+/g, ' ').slice(-400)
   })()`))
+  // The window's own root must never scroll -- everything scrolls inside it.
+  // (A scrollIntoView in the 0.363 drive moved the whole window 11px.)
+  const rootOverflow = await drive.evaluate(`JSON.stringify({ y: Math.round(document.scrollingElement.scrollHeight - document.scrollingElement.clientHeight), x: Math.round(document.scrollingElement.scrollWidth - document.scrollingElement.clientWidth), top: document.scrollingElement.scrollTop })`)
+  say(`root overflow in a conversation: ${rootOverflow}`)
+  verdicts.push(`the window root does not scroll: ${/"y":0,"x":0/.test(rootOverflow) ? 'PASS' : 'FAIL'} (${rootOverflow})`)
   // A new document shows in the conversation as the page it is (0.363).
   await drive.capture('the document it wrote, in the conversation', () => drive.evaluate(`(async () => {
     const preview = document.querySelector('.lc-docpreview')
     if (!preview) return 'no document preview'
-    preview.closest('.lc-card')?.scrollIntoView({ block: 'start' })
+    // The thread's own scroller only: scrollIntoView moves every scrollable
+    // ancestor, the window's root included.
+    const card = preview.closest('.lc-card')
+    let scroller = card?.parentElement
+    while (scroller && scroller !== document.body && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement
+    if (card && scroller && scroller !== document.body) scroller.scrollTop += card.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 12
     await new Promise((r) => setTimeout(r, 600))
     return (preview.innerText ?? '').replace(/\\s+/g, ' ').slice(0, 220)
   })()`))

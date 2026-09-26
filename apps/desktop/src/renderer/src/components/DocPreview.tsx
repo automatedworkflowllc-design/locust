@@ -76,7 +76,9 @@ export function DocPreview({
       <div className="lc-docpreview__foot">
         {onOpen !== undefined && (
           <button type="button" className="lc-docpreview__open" onClick={onOpen}>
-            <Icon name="maximize" size={12} />
+            {/* The document glyph the handed-file pill wears: `maximize` is a
+                bare square beside a word, and read as a checkbox. */}
+            <Icon name="file" size={12} />
             Open {name}
           </button>
         )}
