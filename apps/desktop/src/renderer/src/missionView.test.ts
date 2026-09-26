@@ -1417,6 +1417,10 @@ describe('runtime notices in the thread', () => {
     } as unknown as NormalizedRuntimeEvent
     const items = buildThread([retrying], { running: true })
     expect(items.some((item) => item.type === 'diagnostic' && /trying again on its own/.test(item.message))).toBe(true)
+    // And the line under it still says Starting: the provider refusing is not
+    // the run working (drive-busy-model, packaged 0.368, read "Working...").
+    const started = { ...retrying, id: 'd9', sequence: 0, type: 'run.started', payload: {} } as unknown as NormalizedRuntimeEvent
+    expect(buildThread([started, retrying], { running: true, startedAt: at }).find((item) => item.type === 'live-step')).toMatchObject({ label: 'Starting' })
   })
 
   it('shows a notice raised while the work was under way', () => {

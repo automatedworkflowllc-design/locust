@@ -3099,7 +3099,11 @@ export function buildThread(
          * SENTENCE while the word above it kept being drawn from the proxy.
          * Both come from the same fact now.
          */
-        const spoken = events.some((event) => event.type !== 'run.started')
+        // A runtime's remark about itself is not the run working: a provider
+        // answering "Rate limit exceeded" read as "Working..." under the line
+        // saying so, while OpenCode waited out the provider (drive-busy-model,
+        // packaged 0.368).
+        const spoken = events.some((event) => event.type !== 'run.started' && event.type !== 'adapter.diagnostic')
         items.push({
           key: 'live-step',
           type: 'live-step',
