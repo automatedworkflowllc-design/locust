@@ -46,6 +46,39 @@ if (outPath !== undefined) await mkdir(outPath, { recursive: true })
 
 const workspace = plain ? await mkdtemp(join(tmpdir(), 'locust-drive-first-session-plain-')) : await scratchRepository('locust-drive-first-session-ws-')
 if (plain) await writeFile(join(workspace, 'notes.md'), ['# My notes', '', 'A plain folder, no git.', ''].join('\n'), 'utf8')
+/*
+ * `--project`: a tiny shop with one real bug and a test that shows it, so a
+ * coder's first "fix one small thing" has something true to find -- a
+ * total that skips the first price. Committed, so the fix is a diff.
+ */
+if (process.argv.includes('--project')) {
+  await mkdir(join(workspace, 'src'), { recursive: true })
+  await mkdir(join(workspace, 'test'), { recursive: true })
+  await writeFile(join(workspace, 'package.json'), JSON.stringify({ name: 'shop-total', private: true, type: 'module', scripts: { test: 'node --test' } }, null, 2) + '\n', 'utf8')
+  await writeFile(join(workspace, 'src', 'total.js'), [
+    '// Adds up a basket of prices, in cents.',
+    'export function total(prices) {',
+    '  let sum = 0',
+    '  for (let i = 1; i < prices.length; i += 1) sum += prices[i]',
+    '  return sum',
+    '}',
+    ''
+  ].join('\n'), 'utf8')
+  await writeFile(join(workspace, 'test', 'total.test.js'), [
+    "import { test } from 'node:test'",
+    "import assert from 'node:assert/strict'",
+    '',
+    "import { total } from '../src/total.js'",
+    '',
+    "test('adds every price in the basket', () => {",
+    '  assert.equal(total([100, 250, 50]), 400)',
+    '})',
+    ''
+  ].join('\n'), 'utf8')
+  const { git } = await import('./drive-lib.mjs')
+  await git(['add', '.'], workspace)
+  await git(['commit', '-q', '-m', 'shop total'], workspace)
+}
 const drive = await startDrive({
   name: 'first-session',
   port: 9617,
