@@ -11,6 +11,22 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.358.0 - 2026-09-26
+
+### New
+
+- **Chat only, for a model that cannot use tools.** Some models only chat:
+  given the tools a teammate normally has, they refuse and the run ends.
+  Set one of your own models to Chat only and its teammates talk with it —
+  it just reads and changes no files. Test now checks this for you and sets
+  it, and the model list says "chat only" beside it.
+
+### Fixed
+
+- An OpenCode run whose model refused a request said "OpenCode is trying
+  again on its own" when it was not; the line now appears only once a retry
+  is actually under way.
+
 ## 0.357.0 - 2026-09-26
 <!-- big -->
 
