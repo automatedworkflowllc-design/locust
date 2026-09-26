@@ -3795,6 +3795,13 @@ textarea {
 .lc-cover--machine {
   border: 0;
   overflow: visible;
+  /* The three standing on the bezel reach above the cover's own box -- the
+     ghost at y -10 and floating, the droid's waiting frame -- and with the
+     page full, the box sits at the pane's top padding and they were cut at
+     the title bar (probe-home-fits, 0.359: the middle bot's frame 4px under
+     the edge at 1440x900, 1366x768 and 1280x800). Their reach is reserved
+     here, in the cover's own units, so it scales with them. */
+  margin-top: calc(48px * var(--lc-cover-k));
 }
 
 .lc-cover__machineslot {

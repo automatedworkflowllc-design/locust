@@ -535,10 +535,22 @@ export function FirstLaunch({
            * packaged 0.349), and one line says the same. The moment any of
            * that changes the list is the list again, rows and buttons and
            * all, because then it is the thing to act on; and Show all opens
-           * it any time. A first run is untouched: no team, no fold.
+           * it any time.
+           *
+           * With nobody on the team, only when EVERY agent is ready (0.360).
+           * Then there is nothing to add and nothing to fix, and the seven
+           * rows beside the team templates pushed the page past a 1440x900
+           * window -- 25px over, 157px at 1366x768, the cover's middle bot
+           * cut at the top (probe-home-fits, packaged 0.359). While any
+           * agent could still be added, the rows stay: before a team exists
+           * the list is how a new person learns what else Locust can drive
+           * (Colin, 2026-09-19: "maybe even ask them how to get the other
+           * agents working").
            */
           const everyInstalledReady = shown.every((row) => !row.runtime.installed || row.connected)
-          const folded = !agentsOpen && team.length > 0 && connected > 0 && !checkingAny && !stuckAny && installingName === undefined && everyInstalledReady
+          const everyAgentReady = shown.every((row) => row.connected)
+          const folded =
+            !agentsOpen && connected > 0 && !checkingAny && !stuckAny && installingName === undefined && everyInstalledReady && (team.length > 0 || everyAgentReady)
           if (folded) {
             const names = shown.filter((row) => row.connected).map((row) => row.runtime.displayName)
             return (

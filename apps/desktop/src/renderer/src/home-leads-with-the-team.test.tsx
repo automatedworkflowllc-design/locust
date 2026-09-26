@@ -64,10 +64,25 @@ describe('Home', () => {
     expect(html).toContain('lc-runtimepanel')
   }, 10_000)
 
-  it('keeps the whole list on a first run, with no team yet', () => {
-    const html = home([ready('codex', 'Codex CLI'), ready('claude', 'Claude Code')], [])
+  it('keeps the whole list on a first run while another agent could still be added', () => {
+    const html = home([ready('codex', 'Codex CLI'), ready('claude', 'Claude Code'), absent('cursor', 'Cursor Agent')], [])
     expect(html).not.toContain('Your team')
     expect(html).not.toContain('is-folded')
     expect(html).toContain('lc-runtimepanel')
+  }, 10_000)
+
+  /*
+   * NOTHING TO ADD, NOTHING TO FIX: ONE LINE, TEAM OR NOT (0.360).
+   *
+   * With every agent ready and nobody on the team, the seven rows beside the
+   * team templates pushed Home past a 1440x900 window and cut the cover's
+   * middle bot at the top (probe-home-fits, packaged 0.359).
+   */
+  it('folds on a first run too, once every agent is ready', () => {
+    const html = home([ready('codex', 'Codex CLI'), ready('claude', 'Claude Code')], [])
+    expect(html).toContain('lc-agenthead is-folded')
+    expect(html).not.toContain('lc-runtimepanel')
+    // And a signed-out one opens it again, team or not.
+    expect(home([ready('codex', 'Codex CLI'), signedOut('claude', 'Claude Code')], [])).toContain('lc-runtimepanel')
   }, 10_000)
 })

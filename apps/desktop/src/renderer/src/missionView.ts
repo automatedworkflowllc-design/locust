@@ -3474,15 +3474,25 @@ export function buildSignalRail(
         }
         break
       }
-      case 'plan.updated':
+      case 'plan.updated': {
+        /*
+         * WHERE THE PLAN STOOD, not that it moved (0.360). Four rows of
+         * "Plan updated" between a run's reads and writes said nothing a
+         * person could use (the first-session drive, packaged 0.358); the
+         * same event carries the steps, so each row now says how far the
+         * plan had got -- a trail of progress rather than a repeated word.
+         */
+        const steps = readPlan(event.payload.plan)
+        const done = steps.filter((step) => step.state === 'done').length
         rows.push({
           key: event.id,
-          name: `Plan updated${event.payload.final ? ' · final' : ''}`,
+          name: `${steps.length === 0 ? 'Plan updated' : `Plan: ${String(done)} of ${String(steps.length)} done`}${event.payload.final ? ' · final' : ''}`,
           meta: clock,
           tone: 'violet',
           live: false
         })
         break
+      }
       case 'route.limit_detected':
         rows.push({
           key: event.id,

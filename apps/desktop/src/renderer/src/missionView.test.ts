@@ -1001,6 +1001,15 @@ describe('signal rail', () => {
     for (const name of names) expect(name).not.toMatch(/\b(run|tool|step|route|plan|runtime|adapter)\.[a-z_]+/)
   })
 
+  it('says how far the plan had got, not only that it moved (0.360)', () => {
+    // Four rows of "Plan updated" between a run's reads and writes said
+    // nothing a person could use (the first-session drive, packaged 0.358).
+    const at = (statuses: readonly string[]) =>
+      event('plan.updated', { plan: statuses.map((status, index) => ({ id: String(index), content: `step ${String(index)}`, status })) })
+    const rows = buildSignalRail([at(['pending', 'pending']), at(['completed', 'in_progress']), at(['completed', 'completed'])], { running: false })
+    expect(rows.map((row) => row.name)).toEqual(['Plan: 2 of 2 done', 'Plan: 1 of 2 done', 'Plan: 0 of 2 done'])
+  })
+
   it('says nothing about events it does not understand', () => {
     expect(buildSignalRail([event('nonsense.event', {})], { running: true })).toEqual([])
   })

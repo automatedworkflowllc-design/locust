@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.360.0 - 2026-09-26
+
+### Improved
+
+- **Home fits a laptop screen.** With every AI agent ready, the list of them
+  now folds to one line even before you have a team, so the first screen
+  fits at 1440x900 and 1366x768 instead of scrolling. The three bots on the
+  Locust logo are no longer cut off at the top.
+- In a conversation's Activity panel, a plan's updates now say how far it
+  had got ("Plan: 1 of 2 done") instead of repeating "Plan updated".
+
 ## 0.359.0 - 2026-09-26
 
 ### Improved
