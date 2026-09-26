@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.367.0 - 2026-09-26
+
+### Improved
+
+- **Updates reach you without a restart.** Locust used to look for a new
+  version only when it started. Now it looks again every six hours while it
+  stays open, never while a teammate is working, and tells you the same way
+  as before when one is ready.
+
 ## 0.366.0 - 2026-09-26
 
 ### Improved

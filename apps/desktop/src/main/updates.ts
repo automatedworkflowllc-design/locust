@@ -88,6 +88,35 @@ export interface UpdateService {
    * relaunched app installs it on its own next quit, or on Install.
    */
   holdInstallForRelaunch(): void
+  /**
+   * Look again every so often while the app stays open (C2, 0.367). Returns
+   * the way to stop.
+   */
+  startPeriodicChecks(everyMs?: number, retryMs?: number): () => void
+}
+
+/**
+ * How often a Locust left open looks for a new version of itself.
+ *
+ * It looked ONCE, eight seconds after launch (known issue 5) -- so a person
+ * who keeps the app open for days, which is how a teammate app is used, never
+ * heard of a single release until they happened to restart it. Six hours is
+ * the same rhythm the coding agents' own updates keep (runtime-updates.ts).
+ */
+export const UPDATE_CHECK_EVERY_MS = 6 * 60 * 60 * 1000
+/** A look skipped because a teammate was working is tried again this soon, not six hours later. */
+export const UPDATE_RETRY_AFTER_RUN_MS = 15 * 60 * 1000
+
+/**
+ * Whether a periodic look should happen now: never while a teammate is
+ * working -- a download beside a run is the one thing a slow line notices --
+ * and never while a check is under way or a version is already found, on its
+ * way down, or waiting to be installed. After a check that could not
+ * complete, yes: that is what the next look is for.
+ */
+export function periodicCheckDue(state: AppUpdateState, liveMissions: number): boolean {
+  if (liveMissions > 0) return false
+  return state.phase === 'idle' || state.phase === 'current' || state.phase === 'failed'
 }
 
 /** `a` is a later version than `b`, by major.minor.patch; unreadable is never later. */
@@ -179,8 +208,33 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
   /** The version actually sitting in the pending folder, if any. */
   let downloadedVersion: string | undefined
 
-  return {
+  const service: UpdateService = {
     state: () => state,
+
+    startPeriodicChecks(everyMs = UPDATE_CHECK_EVERY_MS, retryMs = UPDATE_RETRY_AFTER_RUN_MS) {
+      let timer: ReturnType<typeof setTimeout> | undefined
+      let stopped = false
+      const schedule = (after: number): void => {
+        timer = setTimeout(tick, after)
+        // Never the reason the process stays alive.
+        ;(timer as { unref?: () => void }).unref?.()
+      }
+      const tick = (): void => {
+        if (stopped || !options.supported) return
+        const live = options.liveMissionCount()
+        if (live > 0) {
+          schedule(retryMs)
+          return
+        }
+        if (periodicCheckDue(state, live)) void service.check()
+        schedule(everyMs)
+      }
+      schedule(everyMs)
+      return () => {
+        stopped = true
+        if (timer !== undefined) clearTimeout(timer)
+      }
+    },
 
     setEveryBuild(next) {
       everyBuild = next
@@ -331,4 +385,5 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
       return { ok: true, data: state }
     }
   }
+  return service
 }

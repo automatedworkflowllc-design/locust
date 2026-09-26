@@ -4023,10 +4023,13 @@ if (!ownsSingleInstanceLock) {
       }
     })
     // One check a few seconds after launch, so a person is told a new version
-    // exists without ever being asked to go looking.
+    // exists without ever being asked to go looking -- and again every six
+    // hours while the app stays open, never while a teammate is working
+    // (C2, 0.367: it looked only at launch, known issue 5).
     setTimeout(() => {
       void updates.check()
     }, 8_000)
+    updates.startPeriodicChecks()
 
     ipcMain.handle(APP_UPDATE_CHECK_CHANNEL, async (event) => {
       if (!fromOwnWindow(event)) {
