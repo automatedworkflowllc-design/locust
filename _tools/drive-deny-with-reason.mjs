@@ -128,6 +128,10 @@ try {
   await drive.capture('Wren, after the reason', () => after)
   check('the folder was not deleted', existsSync(join(workspace, 'build', 'artifact.txt')), after.slice(0, 200))
   check('Wren read the reason and wrote kept.txt instead', existsSync(join(workspace, 'kept.txt')), after.slice(0, 300))
+  // The denied call reads as refused, never as a failure (0.375): Codex
+  // reports it as a failed script.
+  const fold = String(await drive.evaluate(`(() => (document.querySelector('.lc-activity')?.innerText ?? '').replace(/[ ]+/g, ' '))()`))
+  check('the denied call reads declined or refused, and nothing failed or exited non-zero', /(declined|refused)/.test(fold) && !/(failed|exited non-zero)/.test(fold), fold.slice(0, 240))
   say(failures === 0 ? '\nDENY WITH REASON PASSED' : `\nDENY WITH REASON: ${String(failures)} FAILED`)
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
