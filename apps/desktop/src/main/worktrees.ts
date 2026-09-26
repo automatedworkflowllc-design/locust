@@ -1,6 +1,8 @@
 import { execFile } from 'node:child_process'
-import { appendFile, mkdir, readFile, stat } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { appendFile, mkdir, readFile, rm, stat } from 'node:fs/promises'
+import { isAbsolute, join, relative, resolve } from 'node:path'
+
+import { releaseProcessTree } from '@teammate/runtime-adapters'
 
 import { branchNameFor, distinctBranchNameFor } from '../shared/worktree-name.js'
 import { ownGitArgs } from './git-guard.js'
@@ -24,6 +26,12 @@ import { ownGitArgs } from './git-guard.js'
  */
 
 const GIT_TIMEOUT_MS = 20_000
+/**
+ * Making a tree checks out the whole project, which on Windows -- a scanner in
+ * front of every file -- is not a twenty-second job for a big one. MEASURED
+ * 2026-09-26 on a 30,000-file repository: well past twenty seconds.
+ */
+const WORKTREE_CHECKOUT_TIMEOUT_MS = 15 * 60_000
 export const WORKTREE_DIR = join('.locust', 'worktrees')
 export { BRANCH_PREFIX, branchNameFor, distinctBranchNameFor } from '../shared/worktree-name.js'
 
@@ -82,16 +90,52 @@ export function changedPathsOf(porcelain: string): readonly string[] {
 export interface WorktreeManagerOptions {
   readonly workspacePath: string
   /** Test seam: run git once; resolves stdout, rejects on a non-zero exit. */
-  readonly runGit?: (args: readonly string[], cwd: string) => Promise<string>
+  readonly runGit?: (args: readonly string[], cwd: string, timeoutMs?: number) => Promise<string>
 }
 
-function defaultRunGit(args: readonly string[], cwd: string): Promise<string> {
+/**
+ * One git call, with a time limit that ends ALL of it.
+ *
+ * `execFile`'s own timeout kills the process it started and nothing under it.
+ * On Windows that is Git's `cmd\git.exe` launcher, and a `worktree add` runs
+ * its checkout in a further git process -- so MEASURED 2026-09-26 (30,000
+ * files, the limit at 0.7 s): the call reported itself killed, and the
+ * checkout went on in the background for another eighteen seconds and more,
+ * 2,699 files to 26,500, holding the tree's index lock. Now the whole tree
+ * ends, root last (once it is gone, taskkill cannot find the tree by it).
+ */
+export function defaultRunGit(args: readonly string[], cwd: string, timeoutMs = GIT_TIMEOUT_MS): Promise<string> {
   return new Promise((resolvePromise, reject) => {
-    execFile('git', ownGitArgs(args), { cwd, timeout: GIT_TIMEOUT_MS, windowsHide: true, maxBuffer: 4 * 1024 * 1024 }, (error, stdout, stderr) => {
-      if (error) reject(new Error(`git ${args[0] ?? ''}: ${String(stderr || error.message).trim().slice(0, 300)}`))
+    let timedOut = false
+    const child = execFile('git', ownGitArgs(args), { cwd, windowsHide: true, maxBuffer: 4 * 1024 * 1024 }, (error, stdout, stderr) => {
+      clearTimeout(timer)
+      if (timedOut) reject(new Error(`git ${args[0] ?? ''}: took longer than ${String(Math.round(timeoutMs / 1000))} s and was stopped.`))
+      else if (error) reject(new Error(`git ${args[0] ?? ''}: ${String(stderr || error.message).trim().slice(0, 300)}`))
       else resolvePromise(stdout)
     })
+    const timer = setTimeout(() => {
+      timedOut = true
+      if (process.platform === 'win32' && child.pid !== undefined) {
+        void releaseProcessTree(child.pid).catch(() => false).finally(() => child.kill())
+      } else {
+        child.kill()
+      }
+    }, timeoutMs)
   })
+}
+
+/**
+ * The directory git keeps a worktree's own state in, from its `.git` file --
+ * and only if it is where git puts those, in the folder's own repository.
+ * Anything else is not a tree this manager made, and nothing is done to it.
+ */
+async function adminDirectoryOf(gitFile: string, root: string): Promise<string | undefined> {
+  const text = await readFile(gitFile, 'utf8').catch(() => undefined)
+  const named = text?.match(/^gitdir:\s*(.+?)\s*$/m)?.[1]
+  if (named === undefined) return undefined
+  const admin = resolve(join(gitFile, '..'), named)
+  const inside = relative(join(root, '.git', 'worktrees'), admin)
+  return inside.length > 0 && !inside.startsWith('..') && !isAbsolute(inside) ? admin : undefined
 }
 
 /** Only a plain teammate id may name a directory under the folder. */
@@ -180,18 +224,71 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
     await appendFile(excludePath, `${current.length > 0 && !current.endsWith('\n') ? '\n' : ''}.locust/\n`, 'utf8')
   }
 
+  /** Trees whose `worktree add` is running in this process right now. */
+  const making = new Set<string>()
+
+  /**
+   * Finish a tree whose making was cut short, keeping everything in it.
+   *
+   * What a `git worktree add` ended part-way leaves -- MEASURED 2026-09-26 on
+   * a 30,000-file repository, ended 0.9 s in: its `.git` file (all this
+   * manager used to check), 1,915 of the 30,000 files, no index -- so
+   * `git status` reads all 30,000 as deleted, and a commit there would delete
+   * the project on that branch -- a stale `index.lock` that fails every later
+   * write, and git's own mark that the tree is not ready: `locked`,
+   * "initializing". Handed to a teammate as it was.
+   *
+   * Finished rather than removed, because a tree an older build handed out
+   * may already hold a teammate's work: the index is rebuilt from HEAD
+   * without touching a file (`reset -q`), only files that are MISSING are
+   * written (`checkout-index` without `-f` never overwrites one), and the
+   * mark comes off. MEASURED on that same tree with a changed file and a new
+   * one written into it: 28,085 files restored in 14.6 s, and `git status`
+   * showed just those two, the changed file still changed.
+   *
+   * `checkout-index` exits 1 whenever any file already exists ("already
+   * exists, no checkout"), even with `-q` -- which in a half-made tree is
+   * always -- so its exit says nothing. What says it worked is that no file
+   * the index names is missing afterwards.
+   *
+   * The lock file is removed only here -- git's mark says its add never
+   * finished, and no add for this tree is running in this process -- and
+   * only inside the repository's own `.git/worktrees` (`adminDirectoryOf`).
+   */
+  const finishMaking = async (path: string, admin: string): Promise<void> => {
+    await rm(join(admin, 'index.lock'), { force: true })
+    await runGit(['reset', '-q'], path, WORKTREE_CHECKOUT_TIMEOUT_MS)
+    await runGit(['checkout-index', '-a', '-q'], path, WORKTREE_CHECKOUT_TIMEOUT_MS).catch(() => '')
+    const missing = (await runGit(['ls-files', '--deleted'], path, WORKTREE_CHECKOUT_TIMEOUT_MS)).trim()
+    if (missing.length > 0) {
+      throw new Error('This teammate\'s own branch was left half-made, and Locust could not finish it. Remove it on the Worktrees screen and it will be made again.')
+    }
+    await runGit(['worktree', 'unlock', path], root)
+  }
+
   return {
     probe,
 
     async ensure(teammate) {
       const directory = safeTeammateDirectory(teammate.teammateId)
       const path = join(root, WORKTREE_DIR, directory)
-      // Already a worktree here: nothing to do. (A worktree's .git is a file.)
+      // Already a worktree here (a worktree's .git is a file) -- but only one
+      // git FINISHED making is used as it is (code review B4, main-stores 3).
+      let made = false
       try {
-        const marker = await stat(join(path, '.git'))
-        if (marker.isFile()) return path
+        made = (await stat(join(path, '.git'))).isFile()
       } catch {
-        // Not made yet.
+        made = false // Not made yet.
+      }
+      if (made) {
+        const admin = await adminDirectoryOf(join(path, '.git'), root)
+        const lock = admin === undefined ? undefined : await readFile(join(admin, 'locked'), 'utf8').catch(() => undefined)
+        if (admin === undefined || lock?.trim() !== 'initializing') return path
+        if (making.has(path)) {
+          throw new Error(`${teammate.name}'s own branch is still being made. A large project takes a while; try again in a minute.`)
+        }
+        await finishMaking(path, admin)
+        return path
       }
       const ready = await probe()
       if (!ready.repository) throw new Error(ready.reason ?? 'Own branches are not available in this folder.')
@@ -213,8 +310,13 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
       }
       // The branch is created from HEAD; uncommitted work in the main checkout
       // is not copied, and the card says so.
-      if (branchExists) await runGit(['worktree', 'add', path, branch], root)
-      else await runGit(['worktree', 'add', '-b', branch, path, 'HEAD'], root)
+      making.add(path)
+      try {
+        if (branchExists) await runGit(['worktree', 'add', path, branch], root, WORKTREE_CHECKOUT_TIMEOUT_MS)
+        else await runGit(['worktree', 'add', '-b', branch, path, 'HEAD'], root, WORKTREE_CHECKOUT_TIMEOUT_MS)
+      } finally {
+        making.delete(path)
+      }
       return path
     },
 
