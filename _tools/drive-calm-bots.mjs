@@ -181,7 +181,15 @@ try {
   const worked = thread.filter((b) => b.counted.working >= 10)
   check('the face in the thread hops at work (its body lifts by more than a tenth of its size)', worked.length > 0 && worked.every((b) => b.bodyAtWork >= 0.12), worked.map((b) => b.bodyAtWork.toFixed(3)).join(', ') || 'never at work for a second')
   const calm = copies.filter((b) => b.counted.animated >= 10)
-  check('the copies never hop or flip (their bodies move under a twelfth of their size)', calm.length > 0 && calm.every((b) => b.body < 0.08), calm.map((b) => `${b.where} ${b.body.toFixed(3)}`).join(', '))
+  // A FIFTH, NOT A TWELFTH (0.368). The subtle idle's own slow bob spans
+  // about a fifteenth of the size -- measured alone for 65 s, identically on
+  // 0.299's library-drawn bots and 0.367's rig -- and a busy renderer's late
+  // frames add a row at either end of it, so a minute of samples reads 0.10
+  // to 0.13 with nothing wrong (0.367 sweep and rerun). The twelfth came from
+  // a 15-second window that never saw the bob's whole range. What this check
+  // is for is far larger: the face in the thread hops 0.4 to 0.6 of its size
+  // and flips past 1.
+  check('the copies never hop or flip (their bodies move under a fifth of their size)', calm.length > 0 && calm.every((b) => b.body < 0.2), calm.map((b) => `${b.where} ${b.body.toFixed(3)}`).join(', '))
   const bouncers = copies.filter((b) => b.counted.working >= 15)
   check('at work the copies bounce, slightly (a lift between a twenty-fifth and a tenth of their size)', bouncers.length > 0 && bouncers.every((b) => b.bounce >= 0.04 && b.bounce <= 0.1), bouncers.map((b) => `${b.where} ${b.bounce.toFixed(3)}`).join(', ') || 'never at work for a second and a half')
   await writeFile(join(OUT, 'samples.json'), JSON.stringify(moving.map(({ samples, ...rest }) => ({ ...rest, samples: samples.length })), null, 2))
