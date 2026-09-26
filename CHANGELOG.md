@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.355.0 - 2026-09-26
+
+### Improved
+
+- **Activity says what happened in plain words.** "Ran npm test · done",
+  "Changed signup.ts", "Searched the web for …", "Thought" — one line for
+  each thing a teammate did, with how it ended. What a run may do is said
+  in plain words too.
+- **Routines, before you have any:** your finished conversations are one
+  list, each with a "Save as routine" button.
+- **The command palette** says "Back to the conversation".
+
 ## 0.354.0 - 2026-09-26
 
 ### New
