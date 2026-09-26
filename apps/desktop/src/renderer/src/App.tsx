@@ -136,7 +136,7 @@ import { splitAttachments, withAttachments } from '../../shared/attachments.js'
 // different question from who owns a recorded mission.
 import { heldFor, routineOf } from './conversationList.js'
 import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
-import { modelDisplayName } from './routeName.js'
+import { modelDisplayName, shortRuntimeName } from './routeName.js'
 import { FeedbackDialog } from './components/FeedbackDialog.js'
 import { conversationText } from './feedback.js'
 import { withMessageDelta } from '../../shared/messageFragments.js'
@@ -5551,6 +5551,16 @@ export default function App(): ReactElement {
                 workspacePath={workspacePath}
                 workspaceMade={workspaceMade}
                 teammateCount={teammates.length}
+                team={teammates.map((mate) => ({
+                  teammateId: mate.teammateId,
+                  name: mate.name,
+                  hue: mate.hue,
+                  avatar: mate.avatar,
+                  role: roleLabelOf(mate),
+                  ...(mate.route === undefined ? {} : { route: `${shortRuntimeName(mate.route.runtime)} · ${modelDisplayName(mate.route.runtime, mate.route.model)}` }),
+                  working: [...runs.values()].some((run) => liveRunIsActive(run) && ownerOf(run) === mate.teammateId)
+                }))}
+                onMessageTeammate={selectTeammate}
                 onChooseFolder={chooseWorkspace}
                 onNewTeammate={() => {
                   setTeammateError(undefined)

@@ -5,6 +5,8 @@ import type { PublicRuntimeStatus, TubePreference } from '../../../shared/ipc.js
 import { connectedRuntimeCount, deferredOthersSentence, integrationOf, routeRowStatus, runtimeIsUsable } from '../status.js'
 import { FREE_START_RUNTIME, installCommand, installSentence, runtimeInstallFacts, signInCommand } from '../../../shared/runtime-install.js'
 import { HomeCover } from './HomeCover.js'
+import { HomeTeam } from './HomeTeam.js'
+import type { HomeTeammate } from './HomeTeam.js'
 import { Icon } from './Icon.js'
 import { SignInButton } from './SignInButton.js'
 
@@ -77,7 +79,9 @@ export function FirstLaunch({
   npmDidNotAnswer = false,
   checkingGaveUp = false,
   onCheckAgain,
-  workspaceMade = false
+  workspaceMade = false,
+  team = [],
+  onMessageTeammate
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
   /** Runtimes whose last run ended on the account's usage limit, with its own words. */
@@ -96,6 +100,10 @@ export function FirstLaunch({
   /** The folder the teammates work in; undefined when none is chosen. */
   readonly workspacePath: string | undefined
   readonly teammateCount: number
+  /** The team, for the cards Home leads with (HomeTeam). */
+  readonly team?: readonly HomeTeammate[]
+  /** Pressing a teammate's card: talk to them. */
+  readonly onMessageTeammate?: (teammateId: string) => void
   readonly onChooseFolder: () => void
   /** Opens the New teammate form: the home screen's way to the product's core action. */
   readonly onNewTeammate?: () => void
@@ -159,6 +167,8 @@ export function FirstLaunch({
    * the list. Once anything is connected this state stops being consulted.
    */
   const [othersOpen, setOthersOpen] = useState(false)
+  /** The folded agent list, opened by its Show all (see `folded`). */
+  const [agentsOpen, setAgentsOpen] = useState(false)
   // Signed-in first, exceptions last -- the reference's own order, and the
   // one that reads: a person scanning this wants "what can I use" before
   // "what is not built yet". Discovery's order is alphabetical by id, which
@@ -294,6 +304,10 @@ export function FirstLaunch({
               */}
             {freeStart === 'no' ? 'Your coding agents, on your own accounts.' : 'Your coding agents, on your own accounts. OpenCode works without one.'}
           </p>
+        )}
+
+        {discoveryPhase === 'ready' && team.length > 0 && onMessageTeammate !== undefined && (
+          <HomeTeam team={team} onMessage={onMessageTeammate} {...(onNewTeammate === undefined ? {} : { onNewTeammate })} />
         )}
 
         {offerFirstTeammate && (
@@ -465,6 +479,32 @@ export function FirstLaunch({
             ? shown.filter((row) => row.runtime.id === FREE_START_RUNTIME || row.runtime.installed)
             : shown
           const deferred = shown.length - drawn.length
+          /*
+           * FOLDED TO ONE LINE when it has nothing to ask of the person: a team
+           * exists (Home leads with it), something is connected, and every
+           * agent on this machine is ready -- nothing checking, stuck,
+           * installing or signed out. Then seven rows of names and versions
+           * are a status panel on the first screen (first-impressions drive,
+           * packaged 0.349), and one line says the same. The moment any of
+           * that changes the list is the list again, rows and buttons and
+           * all, because then it is the thing to act on; and Show all opens
+           * it any time. A first run is untouched: no team, no fold.
+           */
+          const everyInstalledReady = shown.every((row) => !row.runtime.installed || row.connected)
+          const folded = !agentsOpen && team.length > 0 && connected > 0 && !checkingAny && !stuckAny && installingName === undefined && everyInstalledReady
+          if (folded) {
+            const names = shown.filter((row) => row.connected).map((row) => row.runtime.displayName)
+            return (
+              <div className="lc-agenthead is-folded">
+                <span className="lc-agenthead__label">Coding agents</span>
+                <span className="lc-agenthead__note is-green">{headNote}</span>
+                <span className="lc-agenthead__names" title={names.join(', ')}>{names.join(' · ')}</span>
+                <button type="button" className="lc-agenthead__more" onClick={() => setAgentsOpen(true)}>
+                  Show all
+                </button>
+              </div>
+            )
+          }
           return (
             <>
               <div className="lc-agenthead">

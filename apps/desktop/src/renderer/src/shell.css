@@ -4958,6 +4958,190 @@ textarea {
   color: var(--lc-green-text);
 }
 
+/* The list folded to one line when nothing on it needs the person
+   (FirstLaunch, `folded`): what is ready, by name, and the way to the rest. */
+.lc-agenthead.is-folded {
+  align-items: center;
+  margin-top: 0;
+  padding: 10px 10px 10px 14px;
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-raised);
+}
+
+.lc-agenthead__names {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lc-agenthead__more {
+  flex: none;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  color: var(--lc-text-secondary);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  cursor: pointer;
+  transition: color var(--lc-motion-hover) var(--lc-ease), background var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-agenthead__more:hover {
+  color: var(--lc-text-primary);
+  background: var(--lc-hover-surface);
+}
+
+/* --- Home: the team, first (HomeTeam.tsx) ------------------------------
+ * A card per teammate -- face, name, what they do, the model they run on --
+ * and pressing it is talking to them. The label speaks in the same voice as
+ * the agent list's head below it, so the two read as sections of one page. */
+.lc-hometeam {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-3);
+}
+
+.lc-hometeam__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lc-space-4);
+}
+
+/* New teammate: a quiet action at the head's end, like Claude's New project. */
+.lc-hometeam__new {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  margin-right: -8px;
+  border: 0;
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  color: var(--lc-text-secondary);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  cursor: pointer;
+  transition: color var(--lc-motion-hover) var(--lc-ease), background var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-hometeam__new:hover {
+  color: var(--lc-text-primary);
+  background: var(--lc-hover-surface);
+}
+
+.lc-hometeam__head {
+  margin: 0;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-label);
+  font-weight: 400;
+  letter-spacing: var(--lc-tracking-label);
+  text-transform: uppercase;
+  color: var(--lc-text-muted);
+}
+
+.lc-hometeam__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+  gap: var(--lc-space-3);
+}
+
+.lc-hometeam__card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 76px;
+  padding: 12px 10px 12px 14px;
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-raised);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--lc-motion-hover) var(--lc-ease), background var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-hometeam__card:hover {
+  border-color: var(--lc-hover-border);
+  background: linear-gradient(var(--lc-hover-surface), var(--lc-hover-surface)), var(--lc-bg-raised);
+}
+
+.lc-hometeam__card:focus-visible {
+  outline: 2px solid var(--lc-lime-border-strong);
+  outline-offset: 2px;
+}
+
+.lc-hometeam__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.lc-hometeam__name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--lc-text-teammate-name);
+  font-weight: 600;
+  color: var(--lc-text-name);
+}
+
+.lc-hometeam__working {
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-label);
+  font-weight: 400;
+  letter-spacing: var(--lc-tracking-label);
+  color: var(--lc-lime-text);
+}
+
+.lc-hometeam__role,
+.lc-hometeam__route {
+  font-size: var(--lc-text-description);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lc-hometeam__role {
+  color: var(--lc-text-secondary);
+}
+
+.lc-hometeam__route {
+  color: var(--lc-text-muted);
+}
+
+/* The way in, said only where the pointer is. */
+.lc-hometeam__go {
+  display: grid;
+  place-items: center;
+  color: var(--lc-text-muted);
+  opacity: 0;
+  transform: translateX(-3px);
+  transition: opacity var(--lc-motion-hover) var(--lc-ease), transform var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-hometeam__card:hover .lc-hometeam__go,
+.lc-hometeam__card:focus-visible .lc-hometeam__go {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-hometeam__go {
+    transform: none;
+    transition: none;
+  }
+}
+
 /* The thing a person is actually choosing between. */
 .lc-runtimecell__need {
   flex: 1;
