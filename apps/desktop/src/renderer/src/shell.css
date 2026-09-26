@@ -5046,9 +5046,13 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+/* `auto-fit`, capped: three teammates share a wide row instead of leaving a
+   fourth, empty slot beside them (auto-fill did, at 1920, and cut their model
+   names), and one teammate is a card, not a banner across the column. */
 .lc-hometeam__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(196px, 290px));
+  justify-content: start;
   gap: var(--lc-space-3);
 }
 

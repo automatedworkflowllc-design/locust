@@ -286,13 +286,20 @@ export function MissionsScreen({
     <div className="lc-screen">
       <ScreenHeader
         title="Missions"
-        meta={`${missions.length} local${elsewhere === 0 ? '' : `, ${missions.length - elsewhere} in this folder`} · ${
+        /*
+         * "3 conversations", not "3 local": the count in the word a person
+         * uses. And a total only when it is MONEY -- "54k in . 1.2k out across
+         * 3 measured" was an engineer's unit (first-impressions pass, after
+         * 0.349). The ledger's verdict stays: on this screen it is the claim
+         * the tests below it guard, and it is never said when untrue.
+         */
+        meta={`${missions.length} ${missions.length === 1 ? 'conversation' : 'conversations'}${elsewhere === 0 ? '' : `, ${missions.length - elsewhere} in this folder`} · ${
           ledgerUnreadable
             ? 'the ledger could not be read'
             : damaged === 0
               ? 'ledger verified'
               : ledgerDamageWords(withIssues, unreadableLedgers)
-        }${total === undefined ? '' : ` · ${total.line} across ${String(total.runs)} ${total.word}`}`}
+        }${total === undefined || total.word !== 'priced' ? '' : ` · ${total.line} across ${String(total.runs)} priced`}`}
       />
       {owner !== undefined && (
         <div className="lc-filters" role="status">
