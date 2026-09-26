@@ -11,6 +11,20 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.352.0 - 2026-09-26
+
+### Improved
+
+- **Teammates are handed the notes that matter.** Before a teammate starts,
+  Locust pastes the saved notes that bear on what you asked. A word most of
+  your notes share no longer makes every note look relevant, and rarer words
+  count for more. When there is not room for them all, the newest notes are
+  kept — before, the newest were the first to go, and the newest is usually
+  the correction.
+- **A teammate answering another teammate is handed notes about that
+  message**, rather than notes matched to Locust's own instructions for
+  replying, which are the same every time.
+
 ## 0.351.0 - 2026-09-26
 
 ### Improved
