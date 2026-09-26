@@ -135,8 +135,18 @@ export const TIDY_PROMPT = [
   ...TIDY_EXAMPLE_LINES,
   '</locust-tidy>',
   '',
-  'Write the block as plain text, not in a code block. If nothing needs tidying, say so and leave the block out.'
+  'Write the block in your reply itself -- not in a code block, a command or a file. If nothing needs tidying, say so and leave the block out.'
 ].join('\n')
+
+/**
+ * Whether a run was asked for a tidy pass: by the brief's first line, which
+ * every version of the brief has kept -- a pass recorded before 0.372 was
+ * sent it with its example in a code fence.
+ */
+export function isTidyPrompt(prompt: string | undefined): boolean {
+  const opening = TIDY_PROMPT.split('\n')[0] ?? TIDY_PROMPT
+  return prompt !== undefined && prompt.startsWith(opening)
+}
 
 /**
  * A retirement's reason, as the person reads it (A1.2).

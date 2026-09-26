@@ -54,6 +54,8 @@ describe('what the fence still protects against', () => {
 
   it('is no longer shown to the model in a fence', () => {
     expect(TIDY_PROMPT).not.toContain(FENCE)
+    // And says where it goes: on the 0.372 drive a model wrote it into a shell command, cat << 'EOF'.
+    expect(TIDY_PROMPT).toContain('Write the block in your reply itself -- not in a code block, a command or a file.')
     expect(TIDY_PROMPT).toContain(['<locust-tidy>', ...TIDY_EXAMPLE_LINES, '</locust-tidy>'].join('\n'))
   })
 })

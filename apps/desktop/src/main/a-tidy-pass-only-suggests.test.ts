@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import type { CodexMissionUpdate, PublicTeammate, WorkspaceSettings } from '../shared/ipc.js'
 import { memoryFileText } from './memory-file.js'
+import { TIDY_PROMPT } from '../shared/memory-tidy.js'
 import { createMemoryReader } from './memory-reader.js'
 import { SUGGESTION_OUT_OF_DATE, createMemoryStore } from './memory-store.js'
 
@@ -193,7 +194,7 @@ describe('the reader, on a real store', () => {
  */
 describe('the reader, on a reply written the way models write', () => {
   const SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: 6, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, keepATodoList: false, layout: 'auto', tube: 'full', replySize: 'standard' }
-  const read = async (reply: Reply) => {
+  const read = async (reply: Reply, prompt?: string) => {
     const { memories, a, b, c } = await seeded()
     const updates: CodexMissionUpdate[] = []
     const reader = createMemoryReader({
@@ -201,7 +202,7 @@ describe('the reader, on a reply written the way models write', () => {
       ledger: {
         getMission: async () =>
           ({
-            metadata: { missionId: 'mission_tidy', runId: 'run_tidy', workspaceId: 'ws_shop' },
+            metadata: { missionId: 'mission_tidy', runId: 'run_tidy', workspaceId: 'ws_shop', ...(prompt === undefined ? {} : { prompt }) },
             phase: 'completed',
             events: [{ type: 'message.delta', payload: { itemId: 'm1', operation: 'append', text: reply(a.memoryId, b.memoryId, c.memoryId), final: true } }]
           }) as never
@@ -246,6 +247,16 @@ describe('the reader, on a reply written the way models write', () => {
     expect(updates.find((update) => update.kind === 'relay-notice')).toMatchObject({
       message: "One of Wren's suggestions was not written in a form Locust reads, so it was not put to you. Ask Wren to write it again, one per line."
     })
+  })
+
+  it('says, quietly, when a tidy pass put nothing to the person -- and says nothing for any other reply', async () => {
+    // The 0.372 drive: the block went into a shell command, and the reply was a summary.
+    const summary: Reply = () => 'Summary: two deploy-day memories should merge; the port memory is stale.'
+    expect(await read(summary, TIDY_PROMPT)).toEqual([
+      { kind: 'relay-notice', runId: 'run_tidy', missionId: 'mission_tidy', message: 'Nothing from this tidy pass waits on the Memory screen.', level: 'info' }
+    ])
+    expect(await read(summary, 'What does this repo do?')).toEqual([])
+    expect(await read(summary)).toEqual([])
   })
 
   it('says nothing about the brief’s own example, repeated', async () => {

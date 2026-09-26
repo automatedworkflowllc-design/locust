@@ -31,7 +31,8 @@ heading: the home screen then shows it once, as a splash.
   dropped: you read "Here are my suggestions:" over an empty box, and
   nothing reached the Memory screen. Suggestions are now read wherever they
   are written, as a bulleted or numbered list too, and a line that still
-  cannot be read is said in the conversation instead of vanishing.
+  cannot be read is said in the conversation instead of vanishing. A tidy
+  pass that puts nothing to you now says so under its reply.
 - **What is waiting for you comes first on the Memory screen**, above how
   memory works: the place "answer it on the Memory screen" sends you.
 - **"Suggested N changes, waiting below" goes once they are answered.** It

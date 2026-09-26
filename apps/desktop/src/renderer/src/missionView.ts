@@ -18,7 +18,7 @@ import { parseDecision, stripDecisionBlocks } from '../../shared/decision.js'
 import { parseFileBlocks, stripFileBlocks } from '../../shared/handover.js'
 import type { HandedFile } from '../../shared/handover.js'
 import type { DecisionRequest } from '../../shared/decision.js'
-import { TIDY_PROMPT } from '../../shared/memory-tidy.js'
+import { isTidyPrompt } from '../../shared/memory-tidy.js'
 
 /**
  * Turns the normalized event stream into the thread the workroom renders.
@@ -4169,9 +4169,8 @@ export type LiveStarter =
  * The runtime still gets every word.
  */
 export function briefAskedFor(prompt: string): string | undefined {
-  // By its first line, which every version of the brief has kept: a tidy
-  // pass recorded before 0.372 was sent the brief with its example fenced.
-  if (prompt.startsWith(TIDY_PROMPT.split('\n')[0] ?? TIDY_PROMPT)) return "Tidy this folder's team memory."
+  // Any version of the brief, including the fenced one sent before 0.372.
+  if (isTidyPrompt(prompt)) return "Tidy this folder's team memory."
   const review = /^(.+?) finished a piece of work and you are reviewing it\. You did not do this work/.exec(prompt)
   return review === null ? undefined : `Review ${review[1]!}'s work.`
 }

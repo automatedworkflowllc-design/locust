@@ -4,7 +4,7 @@ import type { CodexMissionUpdate, PublicTeammate, WorkspaceSettings } from '../s
 import { parseMemoryBlocks } from '../shared/memory.js'
 import type { MemoryStore } from './memory-store.js'
 import { createTranscriptTracker } from './peer-exchange.js'
-import { readTidyBlocks } from '../shared/memory-tidy.js'
+import { isTidyPrompt, readTidyBlocks } from '../shared/memory-tidy.js'
 
 /**
  * When a run ends, read its reply for a memory block and move the team's
@@ -62,7 +62,26 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
       // A tidy pass's suggestions (A1.2): proposals whatever the mode, because
       // the pass was asked to suggest, not to change.
       const { suggestions: tidy, unread: tidyUnread } = readTidyBlocks(text)
-      if (ops.length === 0 && tidy.length === 0 && tidyUnread === 0) return
+      if (ops.length === 0 && tidy.length === 0 && tidyUnread === 0) {
+        /*
+         * A tidy pass that put nothing to the person says so, quietly (0.372).
+         * Its reply may say there was nothing to tidy -- or describe changes
+         * it then wrote somewhere Locust does not read: on the 0.372 drive a
+         * model put its block in a shell command. Either way nothing waits on
+         * the Memory screen, and the person, sent there by the button they
+         * pressed, is told so rather than left to look.
+         */
+        if (isTidyPrompt(recovered.metadata.prompt)) {
+          options.notify({
+            kind: 'relay-notice',
+            runId: recovered.metadata.runId,
+            missionId: mission.missionId,
+            message: 'Nothing from this tidy pass waits on the Memory screen.',
+            level: 'info'
+          })
+        }
+        return
+      }
 
       let by: { readonly teammateId?: string; readonly name: string } = { name: 'a conversation' }
       try {
