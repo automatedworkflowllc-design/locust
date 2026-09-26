@@ -6053,21 +6053,22 @@ textarea {
   margin-left: auto;
 }
 
+/*
+ * Two columns, so every row's words start at one edge: "deny" is narrower
+ * than "allow", and as a flex row each started where its own verdict ended
+ * (0.359, the per-runtime rows made the mix of the two common).
+ */
 .lc-permissions__rows {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: var(--lc-space-4);
+  row-gap: 7px;
   font-size: var(--lc-text-description);
 }
 
 .lc-permissions__row {
-  display: flex;
-  gap: var(--lc-space-4);
+  display: contents;
   color: var(--lc-text-secondary);
-}
-
-.lc-permissions__row span:first-child {
-  flex: none;
 }
 
 .lc-permissions__note {
