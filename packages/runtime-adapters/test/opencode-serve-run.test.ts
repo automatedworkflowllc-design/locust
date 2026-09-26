@@ -123,7 +123,24 @@ describe("OpenCode through its own server (A6.7)", () => {
     });
     for await (const _record of run.records) { /* drain */ }
     await run.completion;
-    expect(server.calls.find((call) => call.url.includes("/permission/"))?.body).toMatchObject({ reply: "reject" });
+    expect(server.calls.find((call) => call.url.includes("/permission/"))?.body).toEqual({ reply: "reject", message: "The person declined this in Locust." });
+  });
+
+  it("passes on why the person declined, when they said (0.374)", async () => {
+    const server = fakeServer();
+    const run = startOpenCodeServeRun({
+      spawn: server.spawn,
+      command: createOpenCodeServeCommand(EXECUTABLE, { workspacePath: "C:/work/pebble" }),
+      prompt: "go",
+      fetch: server.fetcher,
+      onPermission: async () => ({ reply: "reject", message: "The person declined this, and said: use the build script" }),
+    });
+    for await (const _record of run.records) { /* drain */ }
+    await run.completion;
+    expect(server.calls.find((call) => call.url.includes("/permission/"))?.body).toEqual({
+      reply: "reject",
+      message: "The person declined this, and said: use the build script",
+    });
   });
 
   it("asks for every action in its config, and never announces itself on the network", () => {

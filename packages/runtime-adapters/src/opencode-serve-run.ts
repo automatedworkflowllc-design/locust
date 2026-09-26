@@ -39,6 +39,8 @@ export interface OpenCodePermission {
 }
 
 export type OpenCodePermissionReply = "once" | "always" | "reject";
+/** A reply, or a rejection with what the person said about it -- the model reads the message (0.374). */
+export type OpenCodePermissionAnswer = OpenCodePermissionReply | { readonly reply: "reject"; readonly message: string };
 
 export interface OpenCodeServeRunOptions {
   readonly spawn: (executablePath: string, args: readonly string[], env?: Readonly<Record<string, string>>) => AppServerRunProcess;
@@ -49,7 +51,7 @@ export interface OpenCodeServeRunOptions {
   readonly variant?: string;
   readonly resumeSessionId?: string;
   /** Who answers. Absent: every request is refused, never approved. */
-  readonly onPermission?: (request: OpenCodePermission) => Promise<OpenCodePermissionReply>;
+  readonly onPermission?: (request: OpenCodePermission) => Promise<OpenCodePermissionAnswer>;
   readonly signal?: AbortSignal;
   readonly now?: () => Date;
   /** Test seam. */
@@ -175,14 +177,21 @@ export function startOpenCodeServeRun(options: OpenCodeServeRunOptions): Runtime
       metadata: isObject(asked.metadata) ? asked.metadata : {},
     };
     let reply: OpenCodePermissionReply = "reject";
+    let message = "The person declined this in Locust.";
     try {
-      reply = options.onPermission === undefined ? "reject" : await options.onPermission(permission);
+      const answered = options.onPermission === undefined ? "reject" : await options.onPermission(permission);
+      if (typeof answered === "string") {
+        reply = answered;
+      } else {
+        reply = answered.reply;
+        message = answered.message;
+      }
     } catch {
       reply = "reject";
     }
     if (settled) return;
     await call(`/permission/${encodeURIComponent(id)}/reply`, reply === "reject"
-      ? { reply, message: "The person declined this in Locust." }
+      ? { reply, message }
       : { reply }).catch(() => undefined);
   };
 

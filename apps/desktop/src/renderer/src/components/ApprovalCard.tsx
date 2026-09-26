@@ -173,7 +173,8 @@ export function ApprovalCard({
   busy
 }: {
   readonly request: MissionApprovalRequest
-  readonly onDecide: (decision: MissionApprovalDecision) => void
+  /** `reason`: why a denial was made, when the person said (0.374). */
+  readonly onDecide: (decision: MissionApprovalDecision, reason?: string) => void
   /**
    * Answer a QUESTION, keyed by question id.
    *
@@ -188,6 +189,22 @@ export function ApprovalCard({
 }): ReactElement {
   const isQuestion = request.kind === 'question'
   const questions = request.questions ?? []
+  /*
+   * DENY, AND SAY WHY (0.374).
+   *
+   * A bare denial left the teammate to guess what was wrong, and the guess
+   * was usually the same action by another route. Vibe Kanban's Deny opens
+   * "Let the agent know why". Here Deny opens one line for the reason; Enter
+   * with nothing in it still denies at once, so a plain no costs one key more
+   * and an explained one no extra click. The reason reaches the teammate with
+   * the denial on Claude and OpenCode, and as its next input on Codex.
+   */
+  const [denying, setDenying] = useState(false)
+  const [reason, setReason] = useState('')
+  const stopDenying = (): void => {
+    setDenying(false)
+    setReason('')
+  }
   // The change itself, when Codex sent it with the item (parity row 32).
   // Drawn with the same viewer the activity fold uses, so an approval and
   // its record read the same.
@@ -320,22 +337,52 @@ export function ApprovalCard({
         <QuestionForm questions={questions} onAnswer={onAnswer} skippable={request.skippable === true} busy={busy} />
       ) : (
         <>
-          <div className="lc-approval__actions">
-            <button
-              type="button"
-              className="lc-primarybutton"
-              disabled={busy}
-              onClick={() => onDecide('approve-once')}
+          {denying ? (
+            <form
+              className="lc-approval__actions lc-approval__deny"
+              onSubmit={(event) => {
+                event.preventDefault()
+                const said = reason.replace(/\s+/g, ' ').trim()
+                onDecide('deny', said.length === 0 ? undefined : said)
+              }}
             >
-              {isQuestion ? 'Allow once' : 'Approve once'}
-            </button>
-            <button type="button" className="lc-ghostbutton" disabled={busy} onClick={() => onDecide('approve-always')}>
-              Always allow this session
-            </button>
-            <button type="button" className="lc-denybutton" disabled={busy} onClick={() => onDecide('deny')}>
-              Deny
-            </button>
-          </div>
+              <input
+                className="lc-input lc-approval__reason"
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') stopDenying()
+                }}
+                placeholder="Why? Optional. The teammate reads it and can change course."
+                aria-label="Why you are denying it"
+                maxLength={500}
+                autoFocus
+              />
+              <button type="submit" className="lc-denybutton" disabled={busy}>
+                {reason.trim().length === 0 ? 'Deny' : 'Deny and say why'}
+              </button>
+              <button type="button" className="lc-ghostbutton" disabled={busy} onClick={stopDenying}>
+                Back
+              </button>
+            </form>
+          ) : (
+            <div className="lc-approval__actions">
+              <button
+                type="button"
+                className="lc-primarybutton"
+                disabled={busy}
+                onClick={() => onDecide('approve-once')}
+              >
+                {isQuestion ? 'Allow once' : 'Approve once'}
+              </button>
+              <button type="button" className="lc-ghostbutton" disabled={busy} onClick={() => onDecide('approve-always')}>
+                Always allow this session
+              </button>
+              <button type="button" className="lc-denybutton" disabled={busy} onClick={() => setDenying(true)}>
+                Deny…
+              </button>
+            </div>
+          )}
           <p className="lc-approval__note">
             {/*
               "Always" is scoped to this session on purpose, and says so. A grant

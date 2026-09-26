@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.374.0 - 2026-09-26
+
+### New
+
+- **Deny, and say why.** Deny on an approval card now opens one line for
+  your reason: "keep the folder, write kept.txt instead". Your teammate
+  reads it and can change course instead of guessing, or trying the same
+  thing another way. Press Enter with the line empty to deny without one.
+
 ## 0.373.0 - 2026-09-26
 
 ### New

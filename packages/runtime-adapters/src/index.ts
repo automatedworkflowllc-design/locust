@@ -30,7 +30,7 @@ export {
 export { createCodexEventNormalizer } from "./codex-events.js";
 export { asProcessNormalizer, notificationOfRecord, startCodexAppServerRun } from "./codex-app-server-run.js";
 export { runRecordFor, startOpenCodeServeRun } from "./opencode-serve-run.js";
-export type { OpenCodePermission, OpenCodePermissionReply, OpenCodeServeRunOptions } from "./opencode-serve-run.js";
+export type { OpenCodePermission, OpenCodePermissionAnswer, OpenCodePermissionReply, OpenCodeServeRunOptions } from "./opencode-serve-run.js";
 export type {
   AppServerRunProcess,
   CodexAppServerRun,

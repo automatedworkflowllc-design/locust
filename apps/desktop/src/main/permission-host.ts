@@ -7,6 +7,7 @@ import { join } from 'node:path'
 
 import type { MissionApprovalAnswer, MissionApprovalRequest } from '../shared/ipc.js'
 import { relativeToFolder } from '../shared/approval-patch.js'
+import { deniedSaying } from './approval-channel.js'
 
 /**
  * Locust as Claude Code's permission host.
@@ -285,7 +286,9 @@ export function createPermissionHost(options: {
         return true
       }
       if (answer.decision === 'deny') {
-        waiting.resolve(deny('Denied in Locust.'))
+        // Claude reads the denial's message as the tool's result, so a reason
+        // the person gave rides it (0.374).
+        waiting.resolve(deny(answer.reason === undefined ? 'Denied in Locust.' : `Denied in Locust. ${deniedSaying(answer.reason)}`))
         return true
       }
       if (answer.decision === 'approve-always') {

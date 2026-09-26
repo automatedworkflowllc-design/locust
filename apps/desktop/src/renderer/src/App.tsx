@@ -2691,8 +2691,8 @@ export default function App(): ReactElement {
       })
   }
 
-  const decideApproval = (approvalId: string, decision: MissionApprovalDecision): void =>
-    replyToApproval(approvalId, { decision })
+  const decideApproval = (approvalId: string, decision: MissionApprovalDecision, reason?: string): void =>
+    replyToApproval(approvalId, { decision, ...(reason === undefined ? {} : { reason }) })
 
   /** A question's answers, keyed by question id. Never a decision -- see the card. */
   const answerQuestion = (approvalId: string, answers: Readonly<Record<string, readonly string[]>>): void =>

@@ -1465,6 +1465,28 @@ if (!ownsSingleInstanceLock) {
         if (target && !target.isDestroyed() && !target.webContents.isDestroyed()) {
           target.webContents.send(CODEX_MISSION_UPDATE_CHANNEL, update)
         }
+      },
+      /*
+       * A denial the person explained, on Codex (0.374): its reply has no room
+       * for the reason, so the run is shown it as its next input. A run that
+       * can no longer take one is said so -- the reason must not vanish.
+       */
+      onDeniedSaying: ({ runId, missionId, reason }) => {
+        void codexMissions
+          .steer(runId, `I declined that. ${reason}`)
+          .catch(() => false)
+          .then((took) => {
+            if (took) return
+            const target = approvalWindow
+            if (target && !target.isDestroyed() && !target.webContents.isDestroyed()) {
+              target.webContents.send(CODEX_MISSION_UPDATE_CHANNEL, {
+                kind: 'relay-notice',
+                runId,
+                missionId,
+                message: 'Your reason was not passed on: the run could not take a message just then. Say it in your next message.'
+              })
+            }
+          })
       }
     })
 

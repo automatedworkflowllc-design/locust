@@ -191,7 +191,19 @@ export function approvalAnswerFrom(raw: unknown): MissionApprovalAnswer | undefi
     return { approvalId: payload.approvalId, answers: clean }
   }
   const decision = payload.decision
-  return { approvalId: payload.approvalId, decision: decision === 'approve-once' || decision === 'approve-always' ? decision : 'deny' }
+  if (decision === 'approve-once' || decision === 'approve-always') return { approvalId: payload.approvalId, decision }
+  // A denial may say why (0.374): the person's words, bounded, and nothing
+  // when there are none -- an empty reason is a plain denial.
+  const reason = typeof payload.reason === 'string' ? payload.reason.replace(/\s+/g, ' ').trim().slice(0, MAX_DENY_REASON) : ''
+  return { approvalId: payload.approvalId, decision: 'deny', ...(reason.length === 0 ? {} : { reason }) }
+}
+
+/** The most of a denial's reason that is passed on: a sentence or two, not a document. */
+export const MAX_DENY_REASON = 500
+
+/** What a runtime is told alongside a denial the person explained (0.374). */
+export function deniedSaying(reason: string): string {
+  return `The person declined this, and said: ${reason}`
 }
 
 /**
@@ -252,13 +264,15 @@ export function diffPatchFrom(diff: string, cwd: string): ReturnType<typeof tool
 }
 
 /** This channel's answer, as the reply an OpenCode server takes. Anything unclear is a refusal. */
-export function openCodeReplyFor(result: JsonValue): 'once' | 'always' | 'reject' {
-  const decision = typeof result === 'object' && result !== null && !Array.isArray(result) ? (result as { decision?: unknown }).decision : undefined
-  if (decision === 'accept') return 'once'
+export function openCodeReplyFor(result: JsonValue): 'once' | 'always' | 'reject' | { readonly reply: 'reject'; readonly message: string } {
+  const record = typeof result === 'object' && result !== null && !Array.isArray(result) ? (result as { decision?: unknown; reason?: unknown }) : {}
+  if (record.decision === 'accept') return 'once'
   // Session-scoped on Codex; the server here lives for one run, so "always"
   // lasts exactly as long.
-  if (decision === 'acceptForSession') return 'always'
-  return 'reject'
+  if (record.decision === 'acceptForSession') return 'always'
+  // OpenCode's reject carries a message the model reads (measured on
+  // 1.18.27), so a reason rides the denial itself (0.374).
+  return typeof record.reason === 'string' && record.reason.length > 0 ? { reply: 'reject', message: deniedSaying(record.reason) } : 'reject'
 }
 
 /** The protocol decision for each of the product's three authorization answers. */
@@ -368,6 +382,12 @@ export interface ApprovalChannelOptions {
   readonly emitApproval: (request: MissionApprovalRequest) => void
   /** Notices about a request that was refused without reaching the person. */
   readonly emitUpdate?: (update: CodexMissionUpdate) => void
+  /**
+   * A denial the person explained, on a runtime whose reply cannot carry it
+   * (Codex's app-server): the reason is shown to the run as its next input
+   * instead (0.374). OpenCode's reply carries it and never comes here.
+   */
+  readonly onDeniedSaying?: (denied: { readonly runId: string; readonly missionId: string; readonly reason: string }) => void
   readonly createId?: () => string
   readonly now?: () => Date
 }
@@ -388,6 +408,8 @@ export function createApprovalChannel(options: ApprovalChannelOptions): Approval
      * to still be in hand when the person replies.
      */
     readonly kind: MissionApprovalKind
+    /** Whose request: OpenCode's reply carries a denial's reason, Codex's does not. */
+    readonly runtime: MissionRuntimeId | undefined
     readonly resolve: (value: JsonValue) => void
   }
   const approvals = new Map<string, Pending>()
@@ -426,7 +448,7 @@ export function createApprovalChannel(options: ApprovalChannelOptions): Approval
         const offered = typeof requestParams.unifiedDiff === 'string' ? diffPatchFrom(requestParams.unifiedDiff, run.cwd) : undefined
         const patch = approvalPatchFrom(changes, run.cwd) ?? offered
         return await new Promise<JsonValue>((resolve) => {
-          approvals.set(approvalId, { runId, missionId, kind: described.kind, resolve })
+          approvals.set(approvalId, { runId, missionId, kind: described.kind, runtime: run.runtime, resolve })
           options.emitApproval({
             approvalId,
             runId,
@@ -478,7 +500,18 @@ export function createApprovalChannel(options: ApprovalChannelOptions): Approval
         pending.resolve(protocolAnswerFor({ approvalId: answer.approvalId, decision: 'deny' }))
         return false
       }
+      const reason = 'decision' in answer && answer.decision === 'deny' ? answer.reason : undefined
+      if (reason === undefined) {
+        pending.resolve(protocolAnswerFor(answer))
+        return true
+      }
+      if (pending.runtime === 'opencode') {
+        // Read by `openCodeReplyFor` here in main; it never reaches Codex.
+        pending.resolve({ ...(protocolAnswerFor(answer) as Record<string, JsonValue>), reason })
+        return true
+      }
       pending.resolve(protocolAnswerFor(answer))
+      options.onDeniedSaying?.({ runId: pending.runId, missionId: pending.missionId, reason })
       return true
     },
 

@@ -686,7 +686,7 @@ export interface ThreadProps {
   readonly startedAtIso?: string
   /** Approvals waiting on the user, oldest first. */
   readonly approvals: readonly MissionApprovalRequest[]
-  readonly onDecide: (approvalId: string, decision: MissionApprovalDecision) => void
+  readonly onDecide: (approvalId: string, decision: MissionApprovalDecision, reason?: string) => void
   /** A QUESTION's answers, keyed by question id. Distinct from `onAnswer`, which
    *  answers a decision block in the transcript -- different surface, different act. */
   readonly onAnswerQuestion: (approvalId: string, answers: Readonly<Record<string, readonly string[]>>) => void
@@ -1175,7 +1175,7 @@ onResume,
             key={request.approvalId}
             request={request}
             busy={decidingIds.includes(request.approvalId)}
-            onDecide={(decision) => onDecide(request.approvalId, decision)}
+            onDecide={(decision, reason) => onDecide(request.approvalId, decision, reason)}
             onAnswer={(answers) => onAnswerQuestion(request.approvalId, answers)}
           />
         ))}

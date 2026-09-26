@@ -97,6 +97,16 @@ describe('the permission host', () => {
     expect(answer.behavior === 'deny' && answer.message.length > 0).toBe(true)
   })
 
+  it('carries the person’s reason for a denial, when they gave one (0.374)', async () => {
+    const { host, cards } = await hostWithCards()
+    const { configPath } = await host.register({ runId: 'run1', missionId: 'm1', cwd: null })
+    const asked = post(host.port, { token: tokenOf(configPath), toolName: 'mcp__claude_ai_Gmail__send_message' })
+    await new Promise((r) => setTimeout(r, 30))
+    host.decide({ approvalId: cards[0]!.approvalId, decision: 'deny', reason: 'draft it instead of sending' })
+    const answer = await asked
+    expect(answer).toEqual({ behavior: 'deny', message: 'Denied in Locust. The person declined this, and said: draft it instead of sending' })
+  })
+
   it('remembers "always" for that connector on that run, and still asks about another', async () => {
     const { host, cards } = await hostWithCards()
     const { configPath } = await host.register({ runId: 'run1', missionId: 'm1', cwd: null })

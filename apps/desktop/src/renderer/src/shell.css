@@ -9257,6 +9257,20 @@ textarea {
   margin-left: 0;
 }
 
+/*
+ * DENY, AND SAY WHY (0.374): the reason's line takes the row, and its two
+ * buttons keep their size beside it -- on a narrow card the line wraps above
+ * them rather than squeezing to a few letters.
+ */
+.lc-approval__deny {
+  align-items: center;
+}
+
+.lc-approval__reason {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
 .lc-denybutton {
   height: 32px;
   padding: 0 15px;

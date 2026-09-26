@@ -1829,7 +1829,17 @@ export interface MissionQuestion {
  * for a question at all: it promised something the protocol has no way to mean.
  */
 export type MissionApprovalAnswer =
-  | { readonly approvalId: string; readonly decision: MissionApprovalDecision }
+  | {
+      readonly approvalId: string
+      readonly decision: MissionApprovalDecision
+      /**
+       * Why the person denied it, in their words (0.374). Only on a denial.
+       * A bare "denied" left a teammate to guess, and the guess was usually
+       * the same action by another route; Vibe Kanban asks "Let the agent
+       * know why" (docs/RESEARCH-2026-09-26-ROOMS-AND-PEERS.md).
+       */
+      readonly reason?: string
+    }
   | {
       readonly approvalId: string
       /** Keyed by `MissionQuestion.id`; each value is that question's answers. */
