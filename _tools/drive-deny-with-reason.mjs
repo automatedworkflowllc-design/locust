@@ -100,7 +100,8 @@ try {
   const typed = String(await drive.evaluate(`(() => ${CARD}?.querySelector('button[type=submit].lc-denybutton')?.innerText.trim() ?? '')()`))
   check('with a reason typed, the button says so', typed === 'Deny and say why', typed)
   await drive.capture('the reason, typed', () => drive.evaluate(`(() => ${CARD}?.querySelector('.lc-approval__reason')?.value ?? '')()`))
-  await drive.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
+  // A real Enter: the key, and the character a keyboard sends with it.
+  await drive.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: String.fromCharCode(13) })
   await drive.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 })
 
   // Whatever Wren asks next -- writing kept.txt -- is approved.

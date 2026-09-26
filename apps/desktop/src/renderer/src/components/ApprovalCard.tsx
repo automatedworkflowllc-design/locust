@@ -205,6 +205,10 @@ export function ApprovalCard({
     setDenying(false)
     setReason('')
   }
+  const submitDenial = (): void => {
+    const said = reason.replace(/\s+/g, ' ').trim()
+    onDecide('deny', said.length === 0 ? undefined : said)
+  }
   // The change itself, when Codex sent it with the item (parity row 32).
   // Drawn with the same viewer the activity fold uses, so an approval and
   // its record read the same.
@@ -342,8 +346,7 @@ export function ApprovalCard({
               className="lc-approval__actions lc-approval__deny"
               onSubmit={(event) => {
                 event.preventDefault()
-                const said = reason.replace(/\s+/g, ' ').trim()
-                onDecide('deny', said.length === 0 ? undefined : said)
+                submitDenial()
               }}
             >
               <input
@@ -351,6 +354,14 @@ export function ApprovalCard({
                 value={reason}
                 onChange={(event) => setReason(event.target.value)}
                 onKeyDown={(event) => {
+                  // Enter is said, not left to the form's own submission: a key
+                  // with no character behind it (drive-deny-with-reason) did not
+                  // submit, and an input method's Enter must confirm a word.
+                  if (event.nativeEvent.isComposing || event.keyCode === 229) return
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    if (!busy) submitDenial()
+                  }
                   if (event.key === 'Escape') stopDenying()
                 }}
                 placeholder="Why? Optional. The teammate reads it and can change course."
