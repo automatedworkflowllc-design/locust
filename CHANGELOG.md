@@ -11,6 +11,14 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.356.0 - 2026-09-26
+
+### Improved
+
+- **Calmer pages.** The sections inside Settings and Memory are named in a
+  quiet line of their own — "How memory is kept", "Project folder" — rather
+  than in large capitals. Each screen's title keeps the Locust lettering.
+
 ## 0.355.0 - 2026-09-26
 
 ### Improved
