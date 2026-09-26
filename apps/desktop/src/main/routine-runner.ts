@@ -311,11 +311,17 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
         await options.routines.saveProgress(routine.routineId, { ...intent, status: 'running',
           missionId: response.data.missionId, runId: response.data.runId }, intent.attemptId)
       } else if (step === 1 && (prior === undefined || prior.status === 'abandoned')
-        && ['INVALID_PROMPT', 'RUN_ALREADY_ACTIVE', 'CODEX_UNAVAILABLE'].includes(response.error.code)) {
+        && ['INVALID_PROMPT', 'RUN_ALREADY_ACTIVE', 'CODEX_UNAVAILABLE', 'SPEND_LIMIT_REACHED'].includes(response.error.code)) {
         // Only preflight refusals prove no dispatch. RUNTIME_START_FAILED and
         // PERSISTENCE_FAILED can also come from the spawn boundary; without an
         // id they remain uncertain, even though the service returned an error.
         await options.routines.clearProgress(routine.routineId, intent.attemptId)
+      } else if (response.error.code === 'SPEND_LIMIT_REACHED') {
+        // A later step at the teammate's monthly limit was refused before
+        // anything was recorded, which PROVES it never started: said exactly,
+        // never as "dispatch not confirmed ... review external work". It can
+        // go on once the limit is raised or the month turns.
+        await hold(routine, intent, `Step ${String(step)} was not started: ${response.error.message}`, true, true)
       } else {
         await hold(
           routine,

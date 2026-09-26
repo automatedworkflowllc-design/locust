@@ -9597,6 +9597,52 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+/* A teammate's monthly limit (0.353): the role title's field, with the
+ * currency drawn inside it, so what is typed is only the amount. Narrow,
+ * because an amount is short, and a full-width box asks for a sentence. */
+.lc-field--limit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-3);
+  margin-top: var(--lc-space-5);
+}
+
+.lc-limitinput {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 168px;
+}
+
+.lc-limitinput__currency {
+  position: absolute;
+  left: var(--lc-space-5);
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-control);
+  pointer-events: none;
+}
+
+.lc-limitinput input {
+  width: 100%;
+  padding: var(--lc-space-4) var(--lc-space-5) var(--lc-space-4) calc(var(--lc-space-5) + 12px);
+  border: 1px solid var(--lc-border-control);
+  border-radius: var(--lc-radius-control);
+  background: var(--lc-bg-field);
+  color: var(--lc-text-primary);
+  font: inherit;
+  font-size: var(--lc-text-control);
+  font-variant-numeric: tabular-nums;
+  outline: none;
+}
+
+.lc-limitinput input:focus-visible {
+  border-color: var(--lc-hover-border);
+}
+
+.lc-limitinput input[aria-invalid='true'] {
+  border-color: var(--lc-amber-border);
+}
+
 /* The folder one teammate works in, in the teammate dialog.
  *
  * A path is the widest thing this dialog ever shows, so it takes the row it
@@ -10065,6 +10111,18 @@ textarea {
   font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-primary);
   overflow-wrap: anywhere;
+}
+
+/* At the monthly limit the person set: this teammate starts nothing until
+ * it is raised or the month turns, which is worth seeing from across the
+ * room -- the same amber every other "waiting on you" state wears. */
+.lc-rostercard__cost.is-reached {
+  border-color: var(--lc-amber-border);
+  background: var(--lc-amber-tint);
+}
+
+.lc-rostercard__cost.is-reached dd {
+  color: var(--lc-amber-text);
 }
 
 /* `not reported`, `never`, `0`: the words stay exactly as written, but a

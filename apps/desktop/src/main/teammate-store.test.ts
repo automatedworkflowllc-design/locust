@@ -707,3 +707,40 @@ describe('the cursor bend is off until somebody asks for it', () => {
     expect((await createTeammateStore({ rootDirectory: root }).readSettings()).metalBend).toBe(false)
   })
 })
+
+describe("a teammate's monthly limit", () => {
+  const base = { name: 'Wren', hue: 'lime', role: 'Code & Migrations' } as const
+
+  it('is kept when set, and an edit that never mentions money keeps it', async () => {
+    const { store: teammates } = await store()
+    const made = await teammates.create({ ...base, monthlyLimitUsd: 5 })
+    expect(made.monthlyLimitUsd).toBe(5)
+    const renamed = await teammates.update({ ...base, teammateId: made.teammateId, name: 'Wren II', avatar: made.avatar })
+    expect(renamed.monthlyLimitUsd).toBe(5)
+    expect((await teammates.list())[0]?.monthlyLimitUsd).toBe(5)
+  })
+
+  it('is changed by an amount and lifted by null', async () => {
+    const { store: teammates } = await store()
+    const made = await teammates.create({ ...base, monthlyLimitUsd: 5 })
+    expect((await teammates.update({ ...base, teammateId: made.teammateId, avatar: made.avatar, monthlyLimitUsd: 12.5 })).monthlyLimitUsd).toBe(12.5)
+    const lifted = await teammates.update({ ...base, teammateId: made.teammateId, avatar: made.avatar, monthlyLimitUsd: null })
+    expect(lifted.monthlyLimitUsd).toBeUndefined()
+    expect('monthlyLimitUsd' in ((await teammates.list())[0] ?? {})).toBe(false)
+  })
+
+  it('refuses an amount that is not one, rather than saving a limit nobody meant', async () => {
+    const { store: teammates } = await store()
+    await expect(teammates.create({ ...base, monthlyLimitUsd: 0 })).rejects.toThrow(/limit is invalid/)
+    await expect(teammates.create({ ...base, monthlyLimitUsd: -5 })).rejects.toThrow(/limit is invalid/)
+    await expect(teammates.create({ ...base, monthlyLimitUsd: '5' })).rejects.toThrow(/limit is invalid/)
+    const made = await teammates.create(base)
+    await expect(teammates.update({ ...base, teammateId: made.teammateId, avatar: made.avatar, monthlyLimitUsd: Number.NaN })).rejects.toThrow(/limit is invalid/)
+  })
+
+  it('reads a limit that does not parse as NO limit -- never as zero, which would refuse every run', () => {
+    const record = { teammateId: 'tm_x', name: 'X', hue: 'lime', role: 'Code & Migrations', createdAt: '2026-09-26T00:00:00.000Z', monthlyLimitUsd: 'lots' }
+    expect(parsedTeammate(record)?.monthlyLimitUsd).toBeUndefined()
+    expect(parsedTeammate({ ...record, monthlyLimitUsd: 7.25 })?.monthlyLimitUsd).toBe(7.25)
+  })
+})

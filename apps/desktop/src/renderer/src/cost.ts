@@ -1,5 +1,8 @@
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
+import { dollars, limitReached, moneyOfUsage } from '../../shared/spend.js'
+import type { Spend } from '../../shared/spend.js'
+
 /**
  * What a run cost, read off its receipt and never estimated.
  *
@@ -54,13 +57,14 @@ export function runCostOf(events: readonly NormalizedRuntimeEvent[]): RunCost | 
   const usage = (completed.payload as { readonly usage?: unknown }).usage
   if (typeof usage !== 'object' || usage === null) return undefined
   const record = usage as Record<string, unknown>
-  const plan = record.billing === 'subscription'
-  const usd = plan ? undefined : count(record.usd ?? record.totalCostUsd ?? record.total_cost_usd)
+  // The host totals money by the same rule (shared/spend.ts), so a card and
+  // a receipt can never price one run two ways.
+  const { usd, premiumRequests, plan } = moneyOfUsage(record)
   const cost: RunCost = {
     ...(count(record.inputTokens ?? record.input_tokens) === undefined ? {} : { inputTokens: count(record.inputTokens ?? record.input_tokens) }),
     ...(count(record.outputTokens ?? record.output_tokens) === undefined ? {} : { outputTokens: count(record.outputTokens ?? record.output_tokens) }),
     ...(usd === undefined ? {} : { usd }),
-    ...(count(record.premiumRequests) === undefined ? {} : { premiumRequests: count(record.premiumRequests) }),
+    ...(premiumRequests === undefined ? {} : { premiumRequests }),
     ...(count(record.cacheReadTokens) === undefined ? {} : { cacheReadTokens: count(record.cacheReadTokens) }),
     ...(count(record.cacheWriteTokens) === undefined ? {} : { cacheWriteTokens: count(record.cacheWriteTokens) }),
     ...(count(record.contextWindow) === undefined ? {} : { contextWindow: count(record.contextWindow) }),
@@ -68,6 +72,16 @@ export function runCostOf(events: readonly NormalizedRuntimeEvent[]): RunCost | 
     ...(plan ? { plan: true as const } : {})
   }
   return Object.keys(cost).length === 0 ? undefined : cost
+}
+
+/**
+ * A conversation turn's cost: its receipt when the window holds its events,
+ * and otherwise the MONEY the host read from the whole record -- a row sent
+ * without its events still says what it cost. Its token counts are the one
+ * thing such a row cannot give back, and money is never lost (2026-09-26).
+ */
+export function missionCost(mission: { readonly events: readonly NormalizedRuntimeEvent[]; readonly money?: Spend }): RunCost | undefined {
+  return runCostOf(mission.events) ?? (mission.money === undefined ? undefined : { ...mission.money })
 }
 
 function tokens(value: number): string {
@@ -167,10 +181,10 @@ export function costTotal(costs: readonly (RunCost | undefined)[]): { readonly l
  * which the caller must render as silence, not as zero.
  */
 export function conversationCost(
-  earlierTurns: readonly { readonly events: readonly NormalizedRuntimeEvent[] }[],
+  earlierTurns: readonly { readonly events: readonly NormalizedRuntimeEvent[]; readonly money?: Spend }[],
   events: readonly NormalizedRuntimeEvent[]
 ): RunCost | undefined {
-  return sumCosts([...earlierTurns.map((turn) => runCostOf(turn.events)), runCostOf(events)])
+  return sumCosts([...earlierTurns.map((turn) => missionCost(turn)), runCostOf(events)])
 }
 
 /** Sum what can be summed; a mixed list keeps every unit it saw. */
@@ -347,6 +361,28 @@ export function headerCostTail(input: {
  */
 export function moneyLine(cost: RunCost | undefined): string | undefined {
   return costUnit(cost) === 'money' ? costLine(cost) : undefined
+}
+
+/**
+ * A teammate's month, for their card and their dialog: what they spent, and
+ * -- when the person set a limit -- against what. Money, or nothing, as
+ * every glance surface says it; with a limit there is always a line, because
+ * "$0.00 of $5.00" is a fact the person asked to see. Premium requests are
+ * said beside the dollars, never counted toward a dollar limit.
+ */
+export function monthSpendLine(
+  spend: Spend | undefined,
+  limitUsd: number | undefined
+): { readonly text: string; readonly reached: boolean } | undefined {
+  if (limitUsd === undefined) {
+    const line = moneyLine(spend)
+    return line === undefined ? undefined : { text: line, reached: false }
+  }
+  const requests = spend?.premiumRequests === undefined ? '' : ` · ${costLine({ premiumRequests: spend.premiumRequests })!}`
+  // Reached is said by the row's LABEL, not tacked onto the amount: on a
+  // card three across, "$0.02 of $0.01 . limit reached" broke over two lines
+  // (the 0.353 drive's Team screen).
+  return { text: `${dollars(spend?.usd ?? 0)} of ${dollars(limitUsd)}${requests}`, reached: limitReached(spend, limitUsd) }
 }
 
 export function missionCostTail(input: {

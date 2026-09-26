@@ -74,7 +74,8 @@ import { changedSince } from './memory-provenance.js'
 const ROUTINE_TICK_MS = 60_000
 const ROUTINE_FIRST_TICK_MS = 15_000
 import type { RoutineRunner } from './routine-runner.js'
-import { readOneMission, deleteMissionRecord, knownDigests, readMissionHistory } from './mission-history.js'
+import { readOneMission, deleteMissionRecord, knownDigests, readMissionHistory, spendByTeammate } from './mission-history.js'
+import { limitReached, limitRefusal, monthOf } from '../shared/spend.js'
 import { changelogPaths, entries as changelogEntries, readChangelog, splashEntries } from './changelog.js'
 import type { ChangelogEntry } from './changelog.js'
 import type { CodexMissionService } from './codex-mission.js'
@@ -191,7 +192,8 @@ import {
   TEAMMATE_CREATE_CHANNEL,
   TEAMMATE_LIST_CHANNEL,
   TEAMMATE_REMOVE_CHANNEL,
-  TEAMMATE_UPDATE_CHANNEL
+  TEAMMATE_UPDATE_CHANNEL,
+  TEAMMATE_SPEND_CHANNEL
 } from '../shared/ipc.js'
 import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { isMissionRuntime, runtimeDisplayName } from '../shared/runtimes.js'
@@ -1457,12 +1459,28 @@ if (!ownsSingleInstanceLock) {
     const editCheck = createEditCheck({
       commandFor: async () => (workspaceChosen ? (await teammates.readSettings()).checkCommands?.[workspaceIdFor(workspacePath)] : undefined)
     })
+    /*
+     * A teammate's monthly limit (shared/spend.ts), read fresh at every start
+     * so a limit changed in the dialog applies to the very next run. Only a
+     * teammate WITH a limit costs a pass over the ledger, and that pass goes
+     * through the history's own cache.
+     */
+    const spendRefusal = async (teammateId: string): Promise<string | undefined> => {
+      const teammate = (await teammates.list()).find((entry) => entry.teammateId === teammateId)
+      if (teammate?.monthlyLimitUsd === undefined) return undefined
+      const now = new Date()
+      const month = monthOf(now)
+      if (month === undefined) return undefined
+      const spent = (await spendByTeammate(missionLedger, await teammates.missionOwners(), month))?.get(teammateId)
+      return limitReached(spent, teammate.monthlyLimitUsd) ? limitRefusal(teammate.name, spent, teammate.monthlyLimitUsd, now) : undefined
+    }
     const codexMissions = createCodexMissionService({
       workspacePath,
       // A2.9: the overlap note -- who else changed the files a teammate did, lately.
       recentEdits: createRecentEdits(),
       // A scripted launch spends nothing unless told to (free-routes.ts).
       freeRoutesOnly: freeRoutesOnly(process.argv, process.env),
+      spendRefusal,
       permissionHost,
       approvals,
       // A ledger write that fails mid-run names its reason in locust-errors.log.
@@ -1559,6 +1577,7 @@ if (!ownsSingleInstanceLock) {
     const antigravityMissions = createAntigravityMissionService({
       workspacePath,
       freeRoutesOnly: freeRoutesOnly(process.argv, process.env),
+      spendRefusal,
       ledger: missionLedger,
       // One pool -- see the note on codexMissions above.
       liveElsewhere: () => codexMissions.liveMissionIds().length,
@@ -3087,7 +3106,7 @@ if (!ownsSingleInstanceLock) {
       try {
         // roleTitle was dropped here since Custom teammates got titles: every
         // one read "Custom" on the sidebar and in the brief (found 2026-09-05).
-        const teammate = await teammates.create({ name: input.name, hue: input.hue, role: input.role, roleTitle: input.roleTitle, worktree: input.worktree, avatar: input.avatar })
+        const teammate = await teammates.create({ name: input.name, hue: input.hue, role: input.role, roleTitle: input.roleTitle, worktree: input.worktree, avatar: input.avatar, monthlyLimitUsd: input.monthlyLimitUsd })
         // The model picked on the dialog's Model row, kept exactly as a
         // started mission keeps one (rememberRoute validates it).
         if (!isTeammateRoute(input.route)) return { ok: true, data: { teammate } } as const
@@ -3114,7 +3133,8 @@ if (!ownsSingleInstanceLock) {
           role: input.role,
           roleTitle: input.roleTitle,
           worktree: input.worktree,
-          avatar: input.avatar
+          avatar: input.avatar,
+          monthlyLimitUsd: input.monthlyLimitUsd
         })
         // A model picked on the Model row (0.311): until then a teammate's
         // model changed only when a message was sent to them on another.
@@ -3124,6 +3144,18 @@ if (!ownsSingleInstanceLock) {
       } catch (error) {
         if (error instanceof TeammateNameTakenError) return teammateRejected(error.message)
         return teammateRejected('That teammate could not be updated. Check the name, hue and role.')
+      }
+    })
+
+    ipcMain.handle(TEAMMATE_SPEND_CHANNEL, async (event) => {
+      const unavailable = { ok: false, error: { code: 'TEAMMATES_UNAVAILABLE', message: 'What your teammates spent could not be read.' } } as const
+      if (!fromOwnWindow(event)) return unavailable
+      try {
+        const month = monthOf(new Date())
+        const totals = month === undefined ? undefined : await spendByTeammate(missionLedger, await teammates.missionOwners(), month)
+        return { ok: true, data: { byTeammate: Object.fromEntries(totals ?? []) } } as const
+      } catch {
+        return unavailable
       }
     })
 
@@ -4163,6 +4195,9 @@ if (!ownsSingleInstanceLock) {
         } catch (error) {
           if (error instanceof PeerRecordError) {
             return { ok: false, error: { code: 'PERSISTENCE_FAILED', message: error.message } } as const
+          }
+          if (error instanceof AntigravityStartError && error.busy === 'limit') {
+            return { ok: false, error: { code: 'SPEND_LIMIT_REACHED', message: error.message } } as const
           }
           return {
             ok: false,

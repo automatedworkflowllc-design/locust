@@ -7,6 +7,7 @@ import { cleanAvatar, isAvatarSpec, seedAvatar } from '../shared/avatar.js'
 import type { PublicTeammate, TeammateHue, TeammateRole, TeammateRoute, WorkspaceSettings, MemoryMode, LayoutPreference, TubePreference, ReplyTextSize } from '../shared/ipc.js'
 import { DEFAULT_RELAY_HOP_CAP, MAX_RELAY_HOP_CAP, MIN_RELAY_HOP_CAP, DEFAULT_MEMORY_MODE } from '../shared/ipc.js'
 import { isMissionRuntime } from '../shared/runtimes.js'
+import { isMonthlyLimit } from '../shared/spend.js'
 
 /**
  * Teammates are local identity plus routing defaults: a name, an avatar hue, a
@@ -87,10 +88,14 @@ export const TEAMMATE_ROLES: readonly TeammateRole[] = [
 
 export interface TeammateStore {
   list(): Promise<readonly PublicTeammate[]>
-  create(input: { name: unknown; hue: unknown; role: unknown; roleTitle?: unknown; worktree?: unknown; avatar?: unknown }): Promise<PublicTeammate>
+  create(input: { name: unknown; hue: unknown; role: unknown; roleTitle?: unknown; worktree?: unknown; avatar?: unknown; monthlyLimitUsd?: unknown }): Promise<PublicTeammate>
   remove(teammateId: unknown): Promise<void>
-  /** Change what a person may change; the id and the missions filed under it stay. */
-  update(input: { teammateId: unknown; name: unknown; hue: unknown; role: unknown; roleTitle?: unknown; worktree?: unknown; avatar: unknown }): Promise<PublicTeammate>
+  /**
+   * Change what a person may change; the id and the missions filed under it
+   * stay. `monthlyLimitUsd`: a number sets it, `null` removes it, omitted
+   * keeps it.
+   */
+  update(input: { teammateId: unknown; name: unknown; hue: unknown; role: unknown; roleTitle?: unknown; worktree?: unknown; avatar: unknown; monthlyLimitUsd?: unknown }): Promise<PublicTeammate>
   /** Record the route a person just started this teammate on. Unknown teammate or bad route: nothing changes. */
   rememberRoute(teammateId: unknown, route: unknown): Promise<void>
   /**
@@ -377,7 +382,10 @@ export function parsedTeammate(value: unknown): PublicTeammate | undefined {
     ...(isTeammateRoute(record.route) ? { route: record.route } : {}),
     // A mission id or nothing: a hub pointing at a string that is not one
     // would be a face that opens nothing.
-    ...(safeId(record.hubMissionId) ? { hubMissionId: record.hubMissionId } : {})
+    ...(safeId(record.hubMissionId) ? { hubMissionId: record.hubMissionId } : {}),
+    // A limit that does not read is NO limit, the same as a record from
+    // before limits existed -- never zero, which would refuse every run.
+    ...(isMonthlyLimit(record.monthlyLimitUsd) ? { monthlyLimitUsd: record.monthlyLimitUsd } : {})
   }
 }
 
@@ -598,6 +606,7 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
         const clash = nameTaken(file.teammates, input.name)
         if (clash !== undefined) throw new TeammateNameTakenError(clash)
         if (input.avatar !== undefined && !isAvatarSpec(input.avatar)) throw new Error('Teammate avatar is invalid')
+        if (input.monthlyLimitUsd !== undefined && !isMonthlyLimit(input.monthlyLimitUsd)) throw new Error('Teammate limit is invalid')
         const teammateId = `tm_${randomUUID().replace(/-/g, '').slice(0, 24)}`
         const teammate: PublicTeammate = {
           teammateId,
@@ -607,7 +616,8 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           ...(roleTitleFor(input.role, input.roleTitle) === undefined ? {} : { roleTitle: roleTitleFor(input.role, input.roleTitle) }),
           ...(input.worktree === true ? { worktree: true } : {}),
           avatar: input.avatar === undefined ? seedAvatar(teammateId) : cleanAvatar(input.avatar),
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          ...(isMonthlyLimit(input.monthlyLimitUsd) ? { monthlyLimitUsd: input.monthlyLimitUsd } : {})
         }
         await write({ ...file, teammates: [...file.teammates, teammate] })
         return teammate
@@ -621,6 +631,9 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
         if (!isHue(input.hue)) throw new Error('Teammate hue is invalid')
         if (!isRole(input.role)) throw new Error('Teammate role is invalid')
         if (!isAvatarSpec(input.avatar)) throw new Error('Teammate avatar is invalid')
+        if (input.monthlyLimitUsd !== undefined && input.monthlyLimitUsd !== null && !isMonthlyLimit(input.monthlyLimitUsd)) {
+          throw new Error('Teammate limit is invalid')
+        }
         const file = await read()
         const existing = file.teammates.find((teammate) => teammate.teammateId === input.teammateId)
         if (existing === undefined) throw new Error('Unknown teammate')
@@ -647,7 +660,14 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           ...(existing.route === undefined ? {} : { route: existing.route }),
           // Carried like the route: renaming a teammate must not lose the
           // conversation their replies live in.
-          ...(existing.hubMissionId === undefined ? {} : { hubMissionId: existing.hubMissionId })
+          ...(existing.hubMissionId === undefined ? {} : { hubMissionId: existing.hubMissionId }),
+          // Set, removed (null), or -- omitted -- carried: an edit that never
+          // mentions money must not lift a limit the person set.
+          ...(isMonthlyLimit(input.monthlyLimitUsd)
+            ? { monthlyLimitUsd: input.monthlyLimitUsd }
+            : input.monthlyLimitUsd === undefined && existing.monthlyLimitUsd !== undefined
+              ? { monthlyLimitUsd: existing.monthlyLimitUsd }
+              : {})
         }
         await write({
           ...file,

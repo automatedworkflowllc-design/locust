@@ -14,6 +14,44 @@ import { RoutePicker } from './RoutePicker.js'
 import type { RouteChoice } from './RoutePicker.js'
 import { TeammateBot } from './TeammateBot.js'
 import { branchNameFor } from '../../../shared/worktree-name.js'
+import { dollars, isMonthlyLimit } from '../../../shared/spend.js'
+import type { Spend } from '../../../shared/spend.js'
+
+/** What the dialog hands back. A limit is `null` when an edit removes one. */
+export interface TeammateDraft {
+  readonly name: string
+  readonly hue: TeammateHue
+  readonly role: TeammateRole
+  readonly roleTitle?: string
+  readonly worktree?: boolean
+  readonly avatar: AvatarSpec
+  readonly route?: TeammateRoute
+  readonly monthlyLimitUsd?: number | null
+}
+
+/**
+ * The limit as typed: nothing is no limit; "$12.50", "12.5" and "1,000" are
+ * amounts, rounded to the cent; anything else is `invalid`, and the dialog
+ * says so rather than saving a limit the person did not mean.
+ */
+/**
+ * What the limit field says under itself: how the limit works, and -- for a
+ * teammate who has spent money this month -- how much, so a person setting
+ * a limit sees what it is set against.
+ */
+export function limitHint(name: string, spent: Spend | undefined, editing: boolean): string {
+  const how = `Checked before each run: once this month's priced runs reach it, ${name} starts nothing until you raise it or the month ends. A run already going finishes. Plans and free models are not priced, so they never count.`
+  if (!editing || spent?.usd === undefined) return how
+  return `${dollars(spent.usd)} spent this month so far. ${how}`
+}
+
+export function parsedLimit(text: string): number | undefined | 'invalid' {
+  const cleaned = text.trim().replace(/^\$/, '').replace(/,/g, '').trim()
+  if (cleaned.length === 0) return undefined
+  if (!/^\d+(\.\d*)?$|^\.\d+$/.test(cleaned)) return 'invalid'
+  const amount = Math.round(Number(cleaned) * 100) / 100
+  return isMonthlyLimit(amount) ? amount : 'invalid'
+}
 
 const HUES: readonly { readonly hue: TeammateHue; readonly label: string }[] = [
   { hue: 'lime', label: 'Lime' },
@@ -98,6 +136,7 @@ const ROLES: readonly { readonly role: TeammateRole; readonly description: strin
 export function NewTeammateDialog({
   onCancel,
   onCreate,
+  spentThisMonth,
   error,
   initial,
   mode,
@@ -113,7 +152,9 @@ export function NewTeammateDialog({
 }: {
   readonly onCancel: () => void
   /** Resolves when the save has landed; the button is held until then (L22). */
-  readonly onCreate: (input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; worktree?: boolean; avatar: AvatarSpec; route?: TeammateRoute }) => void | Promise<unknown>
+  readonly onCreate: (input: TeammateDraft) => void | Promise<unknown>
+  /** What this teammate has spent this month, for the limit field to say (editing only). */
+  readonly spentThisMonth?: Spend
   readonly error: string | undefined
   /** Set to edit an existing teammate: the same dialog, filled in, saving instead of creating. */
   readonly initial?: PublicTeammate
@@ -173,6 +214,14 @@ export function NewTeammateDialog({
   const [roleTitle, setRoleTitle] = useState(initial?.roleTitle ?? '')
   const [worktree, setWorktree] = useState(initial?.worktree === true)
   /*
+   * A MONTHLY LIMIT, in dollars (0.353; Paperclip's idea worth taking). A
+   * teammate that replies and runs routines on its own can spend while
+   * nobody is watching; the host checks this before every run it starts.
+   * Typed as text so "12.50" can be typed through "12." on the way.
+   */
+  const [limitText, setLimitText] = useState(initial?.monthlyLimitUsd === undefined ? '' : initial.monthlyLimitUsd.toFixed(2))
+  const limit = parsedLimit(limitText)
+  /*
    * THE TEAMMATE'S OWN MODEL, chosen here (0.311). Colin, 2026-09-24: "do we
    * have the ability to switch a teammates model? like not when youre in the
    * chat but the actual designated teammate". It could only change by
@@ -220,7 +269,7 @@ export function NewTeammateDialog({
   const trimmed = name.trim()
   // A2.18: a name another teammate has would make both unreachable by name.
   const taken = takenNames.find((other) => other.trim().toLowerCase() === trimmed.toLowerCase())
-  const canCreate = trimmed.length > 0 && taken === undefined
+  const canCreate = trimmed.length > 0 && taken === undefined && limit !== 'invalid'
   const look = botFor(avatar)
 
   // Focus in (the name field, above), Tab held inside, Escape closes -- from
@@ -546,6 +595,29 @@ export function NewTeammateDialog({
             </span>
           </div>
 
+          <label className="lc-field lc-field--limit">
+            <span className="lc-fieldlabel lc-mono">Monthly limit</span>
+            <span className="lc-limitinput">
+              <span className="lc-limitinput__currency lc-mono" aria-hidden="true">$</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={limitText}
+                placeholder="No limit"
+                aria-invalid={limit === 'invalid'}
+                onChange={(event) => setLimitText(event.target.value)}
+                onBlur={() => {
+                  if (typeof limit === 'number') setLimitText(limit.toFixed(2))
+                }}
+              />
+            </span>
+            <span className={`lc-field__hint${limit === 'invalid' ? ' lc-tone-amber' : ''}`}>
+              {limit === 'invalid'
+                ? 'Enter an amount like 5 or 12.50, or leave it empty for no limit.'
+                : limitHint(trimmed.length === 0 ? 'This teammate' : trimmed, spentThisMonth, editing)}
+            </span>
+          </label>
+
           <div className="lc-dialog__summary">
             {/*
               * The mode the next mission will ACTUALLY run in. This said
@@ -587,7 +659,10 @@ export function NewTeammateDialog({
                   ...(role === 'Custom' && roleTitle.trim().length > 0 ? { roleTitle: roleTitle.trim() } : {}),
                   ...(worktree ? { worktree: true } : {}),
                   avatar,
-                  ...(picked === undefined ? {} : { route: picked })
+                  ...(picked === undefined ? {} : { route: picked }),
+                  // An edit always says: an amount, or null to lift one. A new
+                  // teammate only says when there is an amount.
+                  ...(typeof limit === 'number' ? { monthlyLimitUsd: limit } : editing ? { monthlyLimitUsd: null } : {})
                 })
               ).finally(() => {
                 pressed.current = false

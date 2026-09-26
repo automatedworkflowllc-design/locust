@@ -70,7 +70,7 @@ interface Harness {
   readonly notices: { message: string }[]
 }
 
-function harness(options: { host?: AntigravityHost | undefined; lines?: string[]; idleTimeoutMs?: number; askingNoticeMs?: number; refuseAppend?: boolean; ended?: string[] } = {}): Harness {
+function harness(options: { host?: AntigravityHost | undefined; lines?: string[]; idleTimeoutMs?: number; askingNoticeMs?: number; refuseAppend?: boolean; ended?: string[]; spendRefusal?: (teammateId: string) => Promise<string | undefined> } = {}): Harness {
   const { ledger, created, appended } = fakeLedger(options.refuseAppend === true)
   const api = { calls: [] as { kind: string; input: unknown }[] }
   const transcript = { lines: options.lines ?? [] }
@@ -101,7 +101,8 @@ function harness(options: { host?: AntigravityHost | undefined; lines?: string[]
     notify: ({ message }) => notices.push({ message }),
     ...(options.ended === undefined ? {} : { onRunEnded: async ({ missionId }) => { options.ended!.push(missionId) } }),
     ...(options.idleTimeoutMs === undefined ? {} : { idleTimeoutMs: options.idleTimeoutMs }),
-    ...(options.askingNoticeMs === undefined ? {} : { askingNoticeMs: options.askingNoticeMs })
+    ...(options.askingNoticeMs === undefined ? {} : { askingNoticeMs: options.askingNoticeMs }),
+    ...(options.spendRefusal === undefined ? {} : { spendRefusal: options.spendRefusal })
   })
   return { service, api, transcript, emitted, created, appended, updates, notices }
 }
@@ -365,6 +366,17 @@ describe('a mission through Antigravity', () => {
     const extra = { self: { teammateId: 'tm_extra', name: 'Extra', role: 'Code & Migrations' }, others: [] }
     const refused = await h.service.start('one more', extra, {}).then(() => undefined, (error: unknown) => error)
     expect(antigravityStartRefusal(refused).error).toMatchObject({ code: 'RUN_ALREADY_ACTIVE', busy: 'pool' })
+  })
+
+  it("refuses a teammate at their monthly limit before Antigravity is even asked, and it is not 'busy'", async () => {
+    const said = "Wren has reached this month's limit: $5.02 of $5.00. Raise the limit by editing Wren, or it starts again on October 1."
+    const h = harness({ lines: [], spendRefusal: async (teammateId) => (teammateId === 'tm_w' ? said : undefined) })
+    const peer = { self: { teammateId: 'tm_w', name: 'Wren', role: 'Code & Migrations' }, others: [] }
+    const refused = await h.service.start('one', peer, {}).then(() => undefined, (error: unknown) => error)
+    // Its own code: waiting for a run to end would start nothing, so a relay must not hold it.
+    expect(antigravityStartRefusal(refused)).toEqual({ ok: false, error: { code: 'SPEND_LIMIT_REACHED', message: said } })
+    expect(h.api.calls).toEqual([])
+    expect(h.created).toHaveLength(0)
   })
 })
 

@@ -77,6 +77,8 @@ export interface AntigravityMissionOptions {
    * only use free ones. See `free-routes.ts`.
    */
   readonly freeRoutesOnly?: boolean
+  /** The teammate's monthly limit, checked before every start (codex-mission.ts). */
+  readonly spendRefusal?: (teammateId: string) => Promise<string | undefined>
   readonly ledger: MissionLedger
   /** Missions live on the other transports; the cap is one pool. See codex-mission.ts. */
   readonly liveElsewhere?: () => number
@@ -153,7 +155,7 @@ export interface AntigravityMissionService {
  * sentence, it refused the reply as if Antigravity could not take it.
  */
 export class AntigravityStartError extends Error {
-  constructor(message: string, readonly busy?: 'teammate' | 'pool') {
+  constructor(message: string, readonly busy?: 'teammate' | 'pool' | 'limit') {
     super(message)
   }
 }
@@ -166,8 +168,12 @@ export class AntigravityStartError extends Error {
  */
 export function antigravityStartRefusal(error: unknown): {
   readonly ok: false
-  readonly error: { readonly code: 'RUN_ALREADY_ACTIVE' | 'RUNTIME_START_FAILED'; readonly message: string; readonly busy?: 'pool' }
+  readonly error: { readonly code: 'RUN_ALREADY_ACTIVE' | 'RUNTIME_START_FAILED' | 'SPEND_LIMIT_REACHED'; readonly message: string; readonly busy?: 'pool' }
 } {
+  // Not busy: at the limit, waiting for the run to end starts nothing.
+  if (error instanceof AntigravityStartError && error.busy === 'limit') {
+    return { ok: false, error: { code: 'SPEND_LIMIT_REACHED', message: error.message } }
+  }
   if (error instanceof AntigravityStartError && error.busy !== undefined) {
     return { ok: false, error: { code: 'RUN_ALREADY_ACTIVE', message: error.message, ...(error.busy === 'pool' ? { busy: 'pool' as const } : {}) } }
   }
@@ -614,6 +620,9 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
     async start(prompt, peer, route) {
       if (disposed) throw new AntigravityStartError('The mission service is shutting down.')
       if (options.freeRoutesOnly === true) throw new AntigravityStartError(FREE_ONLY_REFUSAL)
+      // As on the other five: a limit that cannot be checked lets the run start.
+      const overLimit = peer === undefined ? undefined : await options.spendRefusal?.(peer.self.teammateId).catch(() => undefined)
+      if (overLimit !== undefined) throw new AntigravityStartError(overLimit, 'limit')
       const owner = ownerKeyOf(peer)
       if (starting.has(owner) || [...runs.values()].some((run) => ownerKeyOf(run.peer) === owner)) {
         throw new AntigravityStartError(

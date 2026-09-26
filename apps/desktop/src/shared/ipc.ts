@@ -6,6 +6,7 @@ import type { RoutineSchedule } from './routine-schedule.js'
 export type { RoutineSchedule } from './routine-schedule.js'
 import type { MemoryScope } from './memory.js'
 export type { MemoryScope } from './memory.js'
+import type { Spend } from './spend.js'
 
 /**
  * How a teammate's memory is treated: kept at once and shown (the Claude
@@ -441,6 +442,8 @@ export const TEAMMATE_LIST_CHANNEL = 'teammates:list'
 export const TEAMMATE_CREATE_CHANNEL = 'teammates:create'
 export const TEAMMATE_REMOVE_CHANNEL = 'teammates:remove'
 export const TEAMMATE_UPDATE_CHANNEL = 'teammates:update'
+/** What each teammate has spent this calendar month, from every conversation (shared/spend.ts). */
+export const TEAMMATE_SPEND_CHANNEL = 'teammates:spend'
 export const TEAMMATE_ASSIGN_CHANNEL = 'teammates:assign'
 /**
  * Give a conversation a name of your own.
@@ -833,6 +836,17 @@ export interface PublicTeammate {
    * the teammate first replies on their own.
    */
   readonly hubMissionId?: string
+  /**
+   * The most, in dollars, this teammate may spend in a calendar month.
+   *
+   * Paperclip's idea, the one worth taking (2026-09-26): a teammate that
+   * replies and runs routines on its own can spend while nobody watches. The
+   * host checks it before EVERY start -- a message, a relayed reply, a
+   * routine step, a room post -- and refuses once the month's priced runs
+   * reach it. Only dollars count; a plan's runs and Copilot's premium
+   * requests are not dollars (shared/spend.ts). Absent means no limit.
+   */
+  readonly monthlyLimitUsd?: number
 }
 
 export interface TeammateRoute {
@@ -886,6 +900,8 @@ export interface TeammateCreateRequest {
   readonly avatar?: AvatarSpec
   /** The model picked on the dialog's Model row; omitted, their first mission's is kept. */
   readonly route?: TeammateRoute
+  /** Dollars a month; omitted, no limit. */
+  readonly monthlyLimitUsd?: number
 }
 
 /**
@@ -907,6 +923,11 @@ export interface TeammateUpdateRequest {
    * route stays what it was.
    */
   readonly route?: TeammateRoute
+  /**
+   * Dollars a month. `null` removes the limit; OMITTED keeps whatever it is,
+   * so no other edit can quietly lift a limit the person set.
+   */
+  readonly monthlyLimitUsd?: number | null
 }
 
 export type TeammateListResponse =
@@ -919,6 +940,15 @@ export type TeammateListResponse =
         readonly missionTitles: Readonly<Record<string, string>>
       }
     }
+  | { readonly ok: false; readonly error: { readonly code: 'TEAMMATES_UNAVAILABLE'; readonly message: string } }
+
+/**
+ * Each teammate's money this calendar month, by id. A teammate with none is
+ * absent -- no money, not "$0.00" -- so a card that reads it cannot turn a
+ * runtime that reported nothing into "free".
+ */
+export type TeammateSpendResponse =
+  | { readonly ok: true; readonly data: { readonly byTeammate: Readonly<Record<string, Spend>> } }
   | { readonly ok: false; readonly error: { readonly code: 'TEAMMATES_UNAVAILABLE'; readonly message: string } }
 
 export type TeammateMutationResponse =
@@ -1281,6 +1311,11 @@ export type RuntimeDiscoveryResponse =
 
 export type CodexMissionErrorCode =
   | 'INVALID_PROMPT'
+  /**
+   * The teammate has reached the monthly limit the person set. Nothing was
+   * started or recorded; the message says what was spent and how to go on.
+   */
+  | 'SPEND_LIMIT_REACHED'
   | 'RUN_ALREADY_ACTIVE'
   | 'CODEX_UNAVAILABLE'
   | 'RUNTIME_START_FAILED'
@@ -2085,6 +2120,13 @@ export interface PublicRecoveredMission {
   readonly eventCount: number
   readonly eventsTruncated: boolean
   /**
+   * What the run cost in MONEY -- dollars a runtime priced, or Copilot's
+   * premium requests -- read by the host from the whole record. Present on a
+   * row sent without its events too, so a total over rows is a total over
+   * every row (shared/spend.ts). Absent when the run reported no money.
+   */
+  readonly money?: Spend
+  /**
    * A fingerprint of this record exactly as it was sent, on a record that came
    * with its events. The window hands it back on its next history read, and a
    * record that has not changed since comes back without them (`eventsKept`).
@@ -2257,6 +2299,7 @@ export interface DesktopApi {
   listTeammates(): Promise<TeammateListResponse>
   createTeammate(request: TeammateCreateRequest): Promise<TeammateMutationResponse>
   updateTeammate(request: TeammateUpdateRequest): Promise<TeammateMutationResponse>
+  teammateSpend(): Promise<TeammateSpendResponse>
   removeTeammate(teammateId: string): Promise<TeammateMutationResponse>
   assignMission(teammateId: string, missionId: string): Promise<TeammateMutationResponse>
   /** Name a conversation. An empty name clears it back to what was typed. */

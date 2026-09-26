@@ -73,6 +73,7 @@ import {
   TEAMMATE_LIST_CHANNEL,
   TEAMMATE_REMOVE_CHANNEL,
   TEAMMATE_UPDATE_CHANNEL,
+  TEAMMATE_SPEND_CHANNEL,
   MEMORY_LIST_CHANNEL,
   MEMORY_ADD_CHANNEL,
   MEMORY_UPDATE_CHANNEL,
@@ -136,6 +137,7 @@ import type {
   TeammateCreateRequest,
   TeammateListResponse,
   TeammateMutationResponse,
+  TeammateSpendResponse,
   TeammateUpdateRequest,
   RoutineCreateRequest,
   RoutineListResponse,
@@ -229,6 +231,7 @@ const desktopApi: DesktopApi = {
     ipcRenderer.invoke(TEAMMATE_REMOVE_CHANNEL, teammateId) as Promise<TeammateMutationResponse>,
   updateTeammate: (request: TeammateUpdateRequest) =>
     ipcRenderer.invoke(TEAMMATE_UPDATE_CHANNEL, request) as Promise<TeammateMutationResponse>,
+  teammateSpend: () => ipcRenderer.invoke(TEAMMATE_SPEND_CHANNEL) as Promise<TeammateSpendResponse>,
   assignMission: (teammateId: string, missionId: string) =>
     ipcRenderer.invoke(TEAMMATE_ASSIGN_CHANNEL, { teammateId, missionId }) as Promise<TeammateMutationResponse>,
   renameMission: (missionId: string, title: string) =>

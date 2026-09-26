@@ -1,6 +1,6 @@
 import type { PublicRecoveredMission } from '../../shared/ipc.js'
 import type { RunCost } from './cost.js'
-import { runCostOf, sumCosts } from './cost.js'
+import { missionCost, sumCosts } from './cost.js'
 
 /**
  * What a teammate has actually done, for their card to say.
@@ -59,7 +59,7 @@ export function teammateWork(
     lastRunAt: theirs[0]?.lastUpdatedAt,
     // Undefined, not zero: a runtime that reported no usage has not told us
     // the work was free, and a card must not say it was.
-    cost: sumCosts(theirs.map((mission) => runCostOf(mission.events))),
+    cost: sumCosts(theirs.map((mission) => missionCost(mission))),
     recent: theirs.slice(0, RECENT_MISSION_LIMIT).map((mission) => ({
       missionId: mission.missionId,
       title: titleOf(mission),

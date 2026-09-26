@@ -4,6 +4,7 @@ import { WhatsNew } from './WhatsNew.js'
 import { SETTINGS_PAGES, matchedHeadings, pageMatches } from '../settingsPages.js'
 import type { SettingsPageId } from '../settingsPages.js'
 import type { RuntimeUpdatesState, MetalMotion, MetalPreset, MetalStrength } from '../../../shared/ipc.js'
+import type { Spend } from '../../../shared/spend.js'
 import { modelDisplayName, routeModelName, shortRuntimeName } from '../routeName.js'
 import type { ReactElement, ReactNode } from 'react'
 
@@ -43,7 +44,7 @@ import { CliArtifacts } from './CliArtifacts.js'
 import { TeammateBot } from './TeammateBot.js'
 import { keepCurrentNote, offersUpdate, updateLine } from '../agentUpdates.js'
 import { Icon } from './Icon.js'
-import { costCell, costTotal, moneyLine, runCostOf } from '../cost.js'
+import { costCell, costTotal, missionCost, monthSpendLine } from '../cost.js'
 import { agoLabel, teammateWork } from '../teammateWork.js'
 import { routineRunSummary, routineScheduleSummary, routineStepLabel } from '../routines.js'
 import { RoutineRecovery } from './RoutineRecovery.js'
@@ -256,7 +257,7 @@ export function MissionsScreen({
   // rather than as free. "priced" is a claim about money: when every receipt
   // reported tokens and no price -- which is what a free route gives -- the
   // honest word for the same count is "measured". See `costTotal`.
-  const total = costTotal(shown.map((mission) => runCostOf(mission.events)))
+  const total = costTotal(shown.map((mission) => missionCost(mission)))
 
   /*
    * A running mission cannot be deleted -- the host refuses, because
@@ -491,7 +492,7 @@ export function MissionsScreen({
                       : `${String(mission.checkpoints.length)} checkpoint${mission.checkpoints.length === 1 ? '' : 's'} · ${elapsed}`}
                   </span>
                   <span className="lc-missionrow__cost lc-mono" title="What the runtime reported this run cost">
-                    {costCell(runCostOf(mission.events), mission.model)}
+                    {costCell(missionCost(mission), mission.model)}
                   </span>
                   <span className={`lc-missionrow__tag lc-mono lc-tone-${view.tone}`}>{view.tag}</span>
                 </button>
@@ -509,6 +510,7 @@ export function TeammatesScreen({
   teammates,
   missions,
   missionOwners,
+  spendByTeammate,
   viewByTeammate,
   titleOf,
   onOpenMission,
@@ -532,6 +534,8 @@ export function TeammatesScreen({
   /** Every recovered mission, so a card can say what its teammate has done. */
   readonly missions: readonly PublicRecoveredMission[]
   readonly missionOwners: Readonly<Record<string, string>>
+  /** Each teammate's money this month, from the host's read of every conversation. */
+  readonly spendByTeammate: Readonly<Record<string, Spend>>
   /** The words a person typed, which for a continuation is not its own prompt. */
   readonly titleOf: (mission: PublicRecoveredMission) => string
   readonly onOpenMission: (missionId: string) => void
@@ -570,6 +574,7 @@ export function TeammatesScreen({
           {teammates.map((teammate) => {
             const owned = Object.values(missionOwners).filter((owner) => owner === teammate.teammateId).length
             const work = teammateWork(teammate.teammateId, missions, missionOwners, titleOf)
+            const month = monthSpendLine(spendByTeammate[teammate.teammateId], teammate.monthlyLimitUsd)
             const theirRoutines = routines.filter((routine) => routine.teammateId === teammate.teammateId)
             const replaying = routineStepByTeammate[teammate.teammateId]
             return (
@@ -679,11 +684,17 @@ export function TeammatesScreen({
                   * count is in their conversations' Details. No row claims
                   * nothing, so a run that reported no price is never shown as
                   * free.
+                  *
+                  * THIS MONTH, from the host (2026-09-26). The row added up the
+                  * conversations the window held events for -- the newest
+                  * twenty -- so older work fell out of a figure labelled as the
+                  * whole. The host reads every conversation, and this month is
+                  * the figure a limit is set against.
                   */}
-                {work.lastRunAt !== undefined && moneyLine(work.cost) !== undefined && (
-                  <dl className="lc-rostercard__cost">
-                    <dt>Cost</dt>
-                    <dd className="lc-mono">{moneyLine(work.cost)}</dd>
+                {month !== undefined && (
+                  <dl className={`lc-rostercard__cost${month.reached ? ' is-reached' : ''}`}>
+                    <dt>{month.reached ? 'Limit reached' : 'This month'}</dt>
+                    <dd className="lc-mono">{month.text}</dd>
                   </dl>
                 )}
                 {work.recent.length > 0 && (

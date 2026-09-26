@@ -1,7 +1,7 @@
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
 import type { PublicPeerMessage } from '../../shared/ipc.js'
-import { runCostOf, sumCosts } from './cost.js'
+import { missionCost, sumCosts } from './cost.js'
 import type { RunCost } from './cost.js'
 
 /**
@@ -130,7 +130,7 @@ export function exchangeAcross(
   return {
     participants: [...participants.entries()].map(([teammateId, entry]) => ({ teammateId, ...entry })),
     hops,
-    cost: sumCosts(members.map((mission) => runCostOf(mission.events))),
+    cost: sumCosts(members.map((mission) => missionCost(mission))),
     liveRunIds: members.filter((mission) => mission.live && mission.runId !== undefined).map((mission) => mission.runId!),
     missionIds: members.map((mission) => mission.missionId)
   }

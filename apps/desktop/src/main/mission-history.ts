@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto'
 
 import { workspaceIdFor } from './workspace.js'
 import { joinMessageFragments } from '../shared/messageFragments.js'
+import { monthOf, moneyOfRun, sumSpend } from '../shared/spend.js'
+import type { RunMoney, Spend } from '../shared/spend.js'
 import type { MissionLedger, RecoveredMission, Workroom, WorkroomMessage } from '@teammate/mission-store'
 import type { MissionReadResponse,
   MissionDeleteResponse,
@@ -132,6 +134,15 @@ export function usageWindowsFrom(missions: readonly RecoveredMission[]): Record<
   return windows
 }
 
+/** A run's money as a row carries it: the amounts, not the moment. */
+function amountsOf(money: RunMoney | undefined): Spend | undefined {
+  if (money === undefined) return undefined
+  return {
+    ...(money.usd === undefined ? {} : { usd: money.usd }),
+    ...(money.premiumRequests === undefined ? {} : { premiumRequests: money.premiumRequests })
+  }
+}
+
 export function publicRecoveredMission(
   mission: RecoveredMission,
   workroomMessages: ReadonlyMap<string, WorkroomMessage> = new Map()
@@ -144,6 +155,7 @@ export function publicRecoveredMission(
     : [whole[0], ...whole.slice(-(MAX_HISTORY_EVENTS - 1))]
         .filter((event) => event !== undefined)
   const hostFailureMessage = mission.hostFailures.at(-1)?.message
+  const money = amountsOf(moneyOfRun(mission.events))
   return {
     missionId: mission.metadata.missionId,
     runId: mission.metadata.runId,
@@ -167,6 +179,10 @@ export function publicRecoveredMission(
     phase: mission.phase,
     events,
     eventCount: mission.events.length,
+    // Read from the WHOLE record, here, so a row sent without its events
+    // still says what it cost: the window's totals were adding up the
+    // newest twenty and calling it everything (2026-09-26).
+    ...(money === undefined ? {} : { money }),
     // What the person is told about. Joining fragments loses nothing, so it
     // is not truncation; only the window below it drops anything.
     eventsTruncated: events.length !== whole.length,
@@ -403,22 +419,31 @@ async function ancestorsOf(
  *
  * Held LIGHT: a parsed ledger kept whole is 63.6 MB for that same ledger
  * (measured), so everything but the newest few keeps its record with the
- * events dropped, plus the two numbers a row needs from them.
+ * events dropped, plus the numbers a row needs from them -- including what
+ * the run cost, which the monthly totals read (`spendByTeammate`).
  */
 interface CachedLedgerFile {
+  readonly missionId: string
   readonly stamp: string
   readonly issues: number
   /** The record without its events; absent when the file produced no mission. */
   readonly light?: RecoveredMission
   readonly eventCount: number
   readonly eventsTruncated: boolean
+  /** What the run cost in money, and when it ended; absent when it reported none. */
+  readonly money?: RunMoney
   /** The whole record, kept only while it is among the newest. */
   full?: RecoveredMission
 }
 
 interface HistoryPage {
   /** Newest first: whole records for the first few, light ones after. */
-  readonly missions: readonly { readonly mission: RecoveredMission; readonly eventCount?: number; readonly eventsTruncated?: boolean }[]
+  readonly missions: readonly {
+    readonly mission: RecoveredMission
+    readonly eventCount?: number
+    readonly eventsTruncated?: boolean
+    readonly money?: RunMoney
+  }[]
   readonly issueCount: number
   readonly unreadableCount: number
 }
@@ -437,7 +462,17 @@ async function eachLimited<T>(items: readonly T[], limit: number, work: (item: T
   await Promise.all(runners)
 }
 
-async function cachedHistoryPage(ledger: MissionLedger, limit: number): Promise<HistoryPage | undefined> {
+/**
+ * Every ledger file's cached entry, brought up to date: a file that changed
+ * since the last read is parsed again, one that is gone is forgotten.
+ * Undefined for a ledger that cannot list its files (a test's fake).
+ */
+async function refreshedLedger(ledger: MissionLedger): Promise<{
+  readonly cache: Map<string, CachedLedgerFile>
+  readonly entries: readonly CachedLedgerFile[]
+  readonly listingIssues: number
+  readonly readMission: NonNullable<MissionLedger['readMission']>
+} | undefined> {
   if (ledger.missionFiles === undefined || ledger.readMission === undefined) return undefined
   const readMission = ledger.readMission.bind(ledger)
   const cache = ledgerCaches.get(ledger) ?? new Map<string, CachedLedgerFile>()
@@ -450,15 +485,18 @@ async function cachedHistoryPage(ledger: MissionLedger, limit: number): Promise<
     const answer = await readMission(missionId)
     const mission = answer.mission
     if (mission === undefined) {
-      cache.set(missionId, { stamp, issues: answer.issues.length, eventCount: 0, eventsTruncated: false })
+      cache.set(missionId, { missionId, stamp, issues: answer.issues.length, eventCount: 0, eventsTruncated: false })
       return
     }
+    const money = moneyOfRun(mission.events)
     cache.set(missionId, {
+      missionId,
       stamp,
       issues: answer.issues.length,
       light: { ...mission, events: [] },
       eventCount: mission.events.length,
       eventsTruncated: joinMessageFragments(mission.events).length > MAX_HISTORY_EVENTS,
+      ...(money === undefined ? {} : { money }),
       full: mission
     })
   }
@@ -470,6 +508,44 @@ async function cachedHistoryPage(ledger: MissionLedger, limit: number): Promise<
     const entry = cache.get(file.missionId)
     return entry === undefined ? [] : [entry]
   })
+  return { cache, entries, listingIssues: listing.issues.length, readMission }
+}
+
+/**
+ * WHAT EACH TEAMMATE HAS SPENT IN ONE CALENDAR MONTH, from every
+ * conversation the ledger holds -- not the newest twenty the window is sent.
+ *
+ * A run counts in the month it ENDED, on this machine's clock, toward the
+ * teammate the host recorded it for (`missionOwners`); a run that belongs to
+ * nobody counts toward nobody. Read through the same cache as the history,
+ * so after the first read it costs a pass over a few hundred small entries.
+ * Undefined when the ledger cannot be listed file by file.
+ */
+export async function spendByTeammate(
+  ledger: MissionLedger,
+  owners: Readonly<Record<string, string>>,
+  month: string
+): Promise<ReadonlyMap<string, Spend> | undefined> {
+  const refreshed = await refreshedLedger(ledger)
+  if (refreshed === undefined) return undefined
+  const runs = new Map<string, Spend[]>()
+  for (const entry of refreshed.entries) {
+    const owner = owners[entry.missionId]
+    if (owner === undefined || entry.money === undefined || monthOf(entry.money.at) !== month) continue
+    runs.set(owner, [...(runs.get(owner) ?? []), entry.money])
+  }
+  const totals = new Map<string, Spend>()
+  for (const [teammateId, list] of runs) {
+    const total = sumSpend(list)
+    if (total !== undefined) totals.set(teammateId, total)
+  }
+  return totals
+}
+
+async function cachedHistoryPage(ledger: MissionLedger, limit: number): Promise<HistoryPage | undefined> {
+  const refreshed = await refreshedLedger(ledger)
+  if (refreshed === undefined) return undefined
+  const { entries, readMission } = refreshed
   const readable = entries
     .filter((entry): entry is CachedLedgerFile & { readonly light: RecoveredMission } => entry.light !== undefined)
     .sort((left, right) => Date.parse(right.light.lastUpdatedAt) - Date.parse(left.light.lastUpdatedAt))
@@ -493,9 +569,14 @@ async function cachedHistoryPage(ledger: MissionLedger, limit: number): Promise<
     missions: readable.map((entry) =>
       entry.full !== undefined
         ? { mission: entry.full }
-        : { mission: entry.light, eventCount: entry.eventCount, eventsTruncated: entry.eventsTruncated }
+        : {
+            mission: entry.light,
+            eventCount: entry.eventCount,
+            eventsTruncated: entry.eventsTruncated,
+            ...(entry.money === undefined ? {} : { money: entry.money })
+          }
     ),
-    issueCount: listing.issues.length + entries.reduce((total, entry) => total + entry.issues, 0),
+    issueCount: refreshed.listingIssues + entries.reduce((total, entry) => total + entry.issues, 0),
     unreadableCount: entries.filter((entry) => entry.light === undefined).length
   }
 }
@@ -591,7 +672,9 @@ export async function readMissionHistory(
       events: [],
       // A light record has no events to count; the kept numbers say it.
       ...(entry.eventCount === undefined ? {} : { eventCount: entry.eventCount }),
-      ...(entry.eventsTruncated === undefined ? {} : { eventsTruncated: entry.eventsTruncated })
+      ...(entry.eventsTruncated === undefined ? {} : { eventsTruncated: entry.eventsTruncated }),
+      // Nor to price: the money read when its file was parsed says it.
+      ...(amountsOf(entry.money) === undefined ? {} : { money: amountsOf(entry.money)! })
     }))
     const listed = [...shown, ...listedOnly]
     return {

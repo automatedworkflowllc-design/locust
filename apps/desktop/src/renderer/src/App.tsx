@@ -3,8 +3,6 @@ import type { ReactElement } from 'react'
 
 import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
-import type { AvatarSpec } from '../../shared/avatar.js'
-
 import type {
   RuntimeUpdatesState,
   LayoutPreference,
@@ -37,8 +35,6 @@ import type {
   PublicPeerMessage,
   PublicRoutine,
   PublicTeammate,
-  TeammateHue,
-  TeammateRole,
   TeammateRoute, PublicRoom, RoomTaskRequest,
   RoutineSchedule,
   MemoryListResponse,
@@ -53,6 +49,7 @@ import type {
   PublicConnector
 } from '../../shared/ipc.js'
 import { roleLabelOf } from '../../shared/ipc.js'
+import type { Spend } from '../../shared/spend.js'
 import { routineDraft, routineStepPhrase } from './routines.js'
 import { queueHome, combineQueued, queuedIn, queuedVerdict, requeuedRows, retriedAfterBusy, takeNext, withoutQueueOf } from './steering.js'
 import type { QueuedRow } from './steering.js'
@@ -99,6 +96,7 @@ import type { StartAs } from '../../shared/route-at-start.js'
 import type { Screen } from './components/Screens.js'
 import { Icon } from './components/Icon.js'
 import { NewTeammateDialog } from './components/NewTeammateDialog.js'
+import type { TeammateDraft } from './components/NewTeammateDialog.js'
 import { GroupSettingsDialog } from './components/GroupSettingsDialog.js'
 import { TeammateBot } from './components/TeammateBot.js'
 import { Sidebar } from './components/Sidebar.js'
@@ -1495,6 +1493,24 @@ export default function App(): ReactElement {
       .catch(() => setViewerRefusal('Locust could not read that file. Nothing was changed.'))
   }
   const [screen, setScreen] = useState<Screen>('workroom')
+  /*
+   * What each teammate has spent this month, from the host, which reads every
+   * conversation: the window holds events for the newest twenty, and a total
+   * added up here was short by everything older (2026-09-26). Asked for while
+   * the Team screen or a teammate's dialog is open, and again as history moves.
+   */
+  const [spendByTeammate, setSpendByTeammate] = useState<Readonly<Record<string, Spend>>>({})
+  const wantsSpend = screen === 'teammates' || editingTeammate !== undefined
+  useEffect(() => {
+    if (!wantsSpend) return
+    let current = true
+    void window.desktop?.teammateSpend().then((response) => {
+      if (current && response.ok) setSpendByTeammate(response.data.byTeammate)
+    }).catch(() => undefined)
+    return () => {
+      current = false
+    }
+  }, [wantsSpend, history])
   const [paletteOpen, setPaletteOpen] = useState(false)
   // Accept edits, not Ask. A person who opens a workroom and says "add a
   // discount function" means it; under Ask the sandbox refuses the write and
@@ -3109,7 +3125,7 @@ export default function App(): ReactElement {
   const [resumeRefusal, setResumeRefusal] = useState<{ readonly missionId: string; readonly message: string }>()
   const startFromComposer = async (prompt: string): Promise<boolean | string> => {
     startRefusal.current = undefined
-    const started = await startMission(prompt)
+    const started = await startMission(prompt, undefined, { fromComposer: true })
     return started ? true : (startRefusal.current ?? false)
   }
   const startMission = async (
@@ -3124,6 +3140,8 @@ export default function App(): ReactElement {
        * of theirs: whatever is on screen is not theirs to continue.
        */
       readonly as?: StartAs
+      /** Typed in the box and sent from it: a refusal can hand the words back. */
+      readonly fromComposer?: boolean
     }
   ): Promise<boolean> => {
     const as = options?.as
@@ -3300,6 +3318,26 @@ export default function App(): ReactElement {
             setQueued((rows) => [back, ...rows])
             return true
           }
+          startRefusal.current = `Not sent: ${response.error.message} Your message is back in the box.`
+          return false
+        }
+        /*
+         * AT THE MONTHLY LIMIT (0.353) nothing started, and nothing broke: the
+         * person set a limit and it held. Drawn as a failure, the turn read
+         * "The run could not continue" in red under the person's own words
+         * (the 0.353 drive's first run). Claude's answer to its own usage
+         * limit is the model: the message is not sent, the words stay where
+         * they were typed, and the reason is said beside them. A message the
+         * QUEUE sent keeps its card instead -- the words are in its bubble,
+         * nowhere else, and its Run it again works once the limit is raised.
+         */
+        if (response.error.code === 'SPEND_LIMIT_REACHED' && options?.fromComposer === true) {
+          setRuns((current) => {
+            const next = new Map(current)
+            next.delete(key)
+            return next
+          })
+          setShownKey((current) => (current === key ? previousKey : current))
           startRefusal.current = `Not sent: ${response.error.message} Your message is back in the box.`
           return false
         }
@@ -3628,11 +3666,12 @@ export default function App(): ReactElement {
   }
 
   // Returns the save, so the dialog can hold its button until it lands (L22).
-  const createTeammate = (input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; worktree?: boolean; avatar: AvatarSpec; route?: TeammateRoute }): Promise<void> => {
+  const createTeammate = ({ monthlyLimitUsd, ...input }: TeammateDraft): Promise<void> => {
     const bridge = window.desktop
     if (!bridge) return Promise.resolve()
     return bridge
-      .createTeammate(input)
+      // A new teammate has no limit to lift: an amount, or nothing.
+      .createTeammate({ ...input, ...(typeof monthlyLimitUsd === 'number' ? { monthlyLimitUsd } : {}) })
       .then((response) => {
         if (!response.ok) {
           setTeammateError(response.error.message)
@@ -3652,7 +3691,7 @@ export default function App(): ReactElement {
 
   const updateTeammate = (
     teammateId: string,
-    input: { name: string; hue: TeammateHue; role: TeammateRole; roleTitle?: string; worktree?: boolean; avatar: AvatarSpec; route?: TeammateRoute }
+    input: TeammateDraft
   ): Promise<void> => {
     const bridge = window.desktop
     if (!bridge) return Promise.resolve()
@@ -5271,6 +5310,7 @@ export default function App(): ReactElement {
               teammates={teammates}
               missions={history}
               missionOwners={missionOwners}
+              spendByTeammate={spendByTeammate}
               viewByTeammate={viewByTeammate}
               titleOf={(mission) => missionTitle(typedPrompt(mission, historyById))}
               onOpenMission={openMission}
@@ -6417,6 +6457,7 @@ export default function App(): ReactElement {
             setEditingTeammate(undefined)
           }}
           onCreate={(input) => updateTeammate(editingTeammate.teammateId, input)}
+          {...(spendByTeammate[editingTeammate.teammateId] === undefined ? {} : { spentThisMonth: spendByTeammate[editingTeammate.teammateId]! })}
           composerRoute={{ runtime: route.runtime, model: route.model, mode, ...(effort === undefined ? {} : { effort }) }}
           picker={{ runtimes, models, resolvedModels, recentRoutes, limitedRuntimes }}
           {...(build?.platform === undefined ? {} : { platform: build.platform })}

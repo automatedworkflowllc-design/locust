@@ -337,6 +337,13 @@ interface CodexMissionServiceOptions {
   /** Refuse every run that is not on a free route. See `free-routes.ts`. */
   readonly freeRoutesOnly?: boolean
   /**
+   * Why this teammate may not start a run now, when they have reached the
+   * monthly limit the person set; undefined when they may, or have no limit.
+   * Asked before EVERY start and every handoff, because every way a run
+   * starts passes through here (shared/spend.ts).
+   */
+  readonly spendRefusal?: (teammateId: string) => Promise<string | undefined>
+  /**
    * Ask before every connector call: send no allow rules, so each one goes
    * to the permission host. Read at run start, never cached. The env seam
    * LOCUST_ASK_CONNECTORS=1 does the same for the drives.
@@ -404,7 +411,7 @@ interface CodexMissionServiceOptions {
 }
 
 function error(
-  code: 'INVALID_PROMPT' | 'RUN_ALREADY_ACTIVE' | 'CODEX_UNAVAILABLE' | 'RUNTIME_START_FAILED' | 'PERSISTENCE_FAILED' | 'RUN_NOT_ACTIVE' | 'HANDOFF_REFUSED',
+  code: 'INVALID_PROMPT' | 'RUN_ALREADY_ACTIVE' | 'CODEX_UNAVAILABLE' | 'RUNTIME_START_FAILED' | 'PERSISTENCE_FAILED' | 'RUN_NOT_ACTIVE' | 'HANDOFF_REFUSED' | 'SPEND_LIMIT_REACHED',
   message: string,
   busy?: 'pool'
 ): CodexMissionStartResponse | CodexMissionCancelResponse | MissionHandoffResponse {
@@ -925,6 +932,21 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
   }
 
   /**
+   * A limit that cannot be checked -- the ledger will not read -- lets the
+   * run start, and says so in the log: a turn is never refused over a check
+   * that could not be made, and the next start checks again.
+   */
+  async function spendRefusalFor(teammateId: string): Promise<string | undefined> {
+    if (options.spendRefusal === undefined) return undefined
+    try {
+      return await options.spendRefusal(teammateId)
+    } catch (cause) {
+      options.note?.('spend-limit', `could not check ${teammateId}'s monthly limit: ${cause instanceof Error ? cause.message : String(cause)}`)
+      return undefined
+    }
+  }
+
+  /**
    * M9 (the code review): why `runtime` would refuse this run whatever the
    * run did -- asked before a handoff stops anything. These are start()'s own
    * checks that do not depend on the run: a paid route in a free window, Auto
@@ -936,10 +958,14 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
   async function targetRefusal(
     runtime: MissionRuntimeId,
     mode: MissionMode,
-    route: { readonly model?: string }
+    route: { readonly model?: string },
+    /** The teammate the run belongs to, whose monthly limit applies to the run it hands to. */
+    teammateId?: string
   ): Promise<string | undefined> {
     const chosenModel = route.model === undefined || route.model === 'account-default' ? undefined : route.model
     if (options.freeRoutesOnly === true && !isFreeRoute(runtime, chosenModel)) return FREE_ONLY_REFUSAL
+    const overLimit = teammateId === undefined ? undefined : await spendRefusalFor(teammateId)
+    if (overLimit !== undefined) return overLimit
     if (mode === 'auto' && !(await (options.autoModeAllowed ?? (async () => false))())) return AUTO_OFF_REFUSAL
     const readOnly = mode !== 'auto' && mode !== 'accept-edits' && mode !== 'approve-each'
     if (runtime === 'cursor' && readOnly && !cursorCanEnforceReadOnly(hostPlatform)) return CURSOR_READ_ONLY_REFUSAL
@@ -988,6 +1014,11 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       if (peer?.worktreeRefused !== undefined) {
         return error('RUNTIME_START_FAILED', peer.worktreeRefused) as CodexMissionStartResponse
       }
+      // The teammate's monthly limit, on the same shared path, before
+      // anything is recorded. Its own code: a refusal that proves nothing
+      // was sent, which a routine must not hold as "dispatch not confirmed".
+      const overLimit = peer === undefined ? undefined : await spendRefusalFor(peer.self.teammateId)
+      if (overLimit !== undefined) return error('SPEND_LIMIT_REACHED', overLimit) as CodexMissionStartResponse
       // Read-only unless the renderer explicitly asked for edits. The host
       // decides the sandbox from this one value; the renderer never passes a
       // sandbox string of its own.
@@ -1919,7 +1950,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
 
       // Asked before the run is stopped, so a refusal known in advance
       // costs nothing (M9).
-      const refused = await targetRefusal(runtime, mode, route)
+      const refused = await targetRefusal(runtime, mode, route, previous.peer?.self.teammateId)
       if (refused !== undefined) {
         return {
           ok: false,

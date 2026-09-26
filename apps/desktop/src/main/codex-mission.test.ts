@@ -949,6 +949,55 @@ describe('mission sandbox', () => {
     expect(start).not.toHaveBeenCalled()
   })
 
+  /*
+   * A teammate's MONTHLY LIMIT (0.353), on the same shared path as the branch
+   * above: whoever starts the run -- a message, a relayed reply, a routine
+   * step, a room post -- it is refused before anything is recorded, with its
+   * own code, so a routine can tell it from a dispatch that may have run.
+   */
+  it('refuses a teammate at the monthly limit, whoever started it, before anything is recorded', async () => {
+    const createMission = vi.fn<MissionLedger['createMission']>(async () => undefined)
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const said = "Wren has reached this month's limit: $5.02 of $5.00. Raise the limit by editing Wren, or it starts again on October 1."
+    const asked: string[] = []
+    const { service } = scheduledService({ start }, fakeLedger({ createMission }), {
+      spendRefusal: async (teammateId) => {
+        asked.push(teammateId)
+        return teammateId === 'tm_wren' ? said : undefined
+      }
+    })
+    const wren: MissionPeerContext = { self: { teammateId: 'tm_wren', name: 'Wren', role: 'Code & Migrations' }, others: [] }
+    const response = await service.start('Fix the typo.', 'codex', 'accept-edits', {}, () => undefined, undefined, wren)
+    expect(response).toMatchObject({ ok: false, error: { code: 'SPEND_LIMIT_REACHED', message: said } })
+    expect(start).not.toHaveBeenCalled()
+    expect(createMission).not.toHaveBeenCalled()
+
+    // Another teammate, and a run that belongs to nobody, start as before.
+    const juno: MissionPeerContext = { self: { teammateId: 'tm_juno', name: 'Juno', role: 'Reviewer' }, others: [] }
+    expect(await service.start('Look around.', 'codex', 'ask', {}, () => undefined, undefined, juno)).toMatchObject({ ok: true })
+    expect(asked).toEqual(['tm_wren', 'tm_juno'])
+  })
+
+  it('lets the run start when the limit cannot be checked, and says why in the log', async () => {
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const notes: string[] = []
+    const { service } = scheduledService({ start }, fakeLedger(), {
+      spendRefusal: async () => {
+        throw new Error('the ledger would not read')
+      },
+      note: (label, detail) => notes.push(`${label}: ${detail}`)
+    })
+    const wren: MissionPeerContext = { self: { teammateId: 'tm_wren', name: 'Wren', role: 'Code & Migrations' }, others: [] }
+    expect(await service.start('Look around.', 'codex', 'ask', {}, () => undefined, undefined, wren)).toMatchObject({ ok: true })
+    expect(notes).toEqual(["spend-limit: could not check tm_wren's monthly limit: the ledger would not read"])
+  })
+
   it('runs read-only when the mode is ask', async () => {
     const { start, service } = specFor('ask')
     await service.start('Look around.', 'codex', 'ask', {}, () => undefined)
