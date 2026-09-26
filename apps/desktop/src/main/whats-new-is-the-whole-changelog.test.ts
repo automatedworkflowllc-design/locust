@@ -92,12 +92,15 @@ describe('the changelog that ships', () => {
     expect(all.every((entry) => entry.groups.length > 0)).toBe(true)
   })
 
-  it('gives someone arriving from 0.276 the bots and the machine, from 0.280 the machine, and from 0.295 nothing', () => {
-    // 0.295.0 is big too: the title screen became a machine (A2).
+  it('gives someone arriving from 0.276 the bots, the machine and the design pass; from 0.295 the design pass; from 0.350 nothing', () => {
+    // 0.295.0 is big too: the title screen became a machine (A2). And 0.350.0:
+    // the first-impressions design pass -- Home leads with the team, a
+    // conversation reads like Claude's (Colin, 2026-09-26).
     const newest = all[0]!.version
-    expect(splashEntries(all, '0.276.0', newest).map((entry) => entry.version)).toEqual(['0.295.0', '0.277.0'])
-    expect(splashEntries(all, '0.280.0', newest).map((entry) => entry.version)).toEqual(['0.295.0'])
-    expect(splashEntries(all, '0.295.0', newest)).toEqual([])
+    expect(splashEntries(all, '0.276.0', newest).map((entry) => entry.version)).toEqual(['0.350.0', '0.295.0', '0.277.0'])
+    expect(splashEntries(all, '0.280.0', newest).map((entry) => entry.version)).toEqual(['0.350.0', '0.295.0'])
+    expect(splashEntries(all, '0.295.0', newest).map((entry) => entry.version)).toEqual(['0.350.0'])
+    expect(splashEntries(all, '0.350.0', newest)).toEqual([])
   })
 })
 
