@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.373.0 - 2026-09-26
+
+### New
+
+- **What needs you, in one place.** When a teammate stops for your
+  approval, ends a turn by asking you something, or suggests a memory, the
+  title bar says so, "2 need you", beside what is running. Press it for the
+  list: each line opens where it is answered, a paused run first, and the
+  count goes down as you answer.
+
 ## 0.372.0 - 2026-09-26
 
 ### Improved

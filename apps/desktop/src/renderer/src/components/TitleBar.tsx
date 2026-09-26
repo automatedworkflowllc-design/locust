@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react'
 
 import { Icon } from './Icon.js'
+import { needsYouChip } from '../needsYou.js'
 
 /**
  * Window chrome. The design draws macOS traffic lights; this build runs on
@@ -11,11 +12,17 @@ import { Icon } from './Icon.js'
 export function TitleBar({
   workspaceName,
   runningCount,
-  swarm
+  swarm,
+  needsYou = 0,
+  onNeedsYou
 }: {
   readonly workspaceName: string
   readonly runningCount: number
   readonly swarm: boolean
+  /** How many things wait on the person (needsYou.ts); the chip shows only above zero. */
+  readonly needsYou?: number
+  /** Opens the list under the chip. */
+  readonly onNeedsYou?: (anchor: HTMLElement) => void
 }): ReactElement {
   return (
     <header className="lc-titlebar" onDoubleClick={() => window.desktop?.toggleMaximize()}>
@@ -24,6 +31,13 @@ export function TitleBar({
       <div className="lc-titlebar__right" onDoubleClick={(event) => event.stopPropagation()}>
         {/* A workspace-wide setting deserves a persistent, visible statement. */}
         {swarm && <span className="lc-swarmchip">Swarm · every mission at max effort</span>}
+        {/* What waits on the person, before what is merely running: the list is one press away. */}
+        {needsYou > 0 && onNeedsYou !== undefined && (
+          <button type="button" className="lc-needsyou" aria-haspopup="menu" onClick={(event) => onNeedsYou(event.currentTarget)}>
+            <span className="lc-dot lc-tone-amber" />
+            {needsYouChip(needsYou)}
+          </button>
+        )}
         {runningCount > 0 && (
           <span className="lc-runstate">
             <span className="lc-dot is-pulsing lc-tone-lime" />

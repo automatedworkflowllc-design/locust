@@ -58,6 +58,7 @@ import type { RoutineDraft } from './routines.js'
 import { RoutineDialog } from './components/RoutineDialog.js'
 import { AutomationsScreen } from './components/AutomationsScreen.js'
 import { TIDY_PROMPT } from '../../shared/memory-tidy.js'
+import { needsYou, needsYouLabel } from './needsYou.js'
 import { memoryChangedNotice, memoriesOfConversation, noticeWaits, turnsOfConversation } from './conversationMemories.js'
 import { createFrameBatcher } from './streamFrames.js'
 import { missingTranscripts, heldDigests, mergeHistory } from './historyMerge.js'
@@ -4937,6 +4938,51 @@ export default function App(): ReactElement {
   routinesRef.current = routines
   historyByIdRef.current = historyById
   missionOwnersRef.current = missionOwners
+  /*
+   * Everything waiting on the person (needsYou.ts, 0.373): paused runs,
+   * questions a teammate stopped on, memory suggestions. The title bar says
+   * how many; its list opens where each is answered.
+   */
+  const needsYouItems = useMemo(
+    () =>
+      needsYou({
+        approvals,
+        ownerOfRun: (runId) => {
+          const run = runs.get(runId)
+          return run === undefined ? undefined : ownerOf(run)
+        },
+        conversations: sidebarMissions,
+        ownerOfMission: (missionId) => missionOwners[missionId],
+        eventsOf: (missionId) => {
+          const live = [...runs.values()].find((run) => run.data?.missionId === missionId)
+          if (live !== undefined) return live.events
+          const recorded = historyById.get(missionId)
+          return recorded === undefined || recorded.events.length === 0 ? undefined : recorded.events
+        },
+        nameOf: (teammateId) => teammates.find((entry) => entry.teammateId === teammateId)?.name,
+        memoryWaiting: memories.filter((memory) => memory.status === 'proposed').length
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [approvals, runs, sidebarMissions, missionOwners, historyById, teammates, memories]
+  )
+  const openNeedsYou = (anchor: HTMLElement): void => {
+    if (rowMenu?.anchor === anchor) {
+      setRowMenu(undefined)
+      return
+    }
+    const box = anchor.getBoundingClientRect()
+    setRowMenuArmed(undefined)
+    setRowMenu({
+      x: box.left,
+      y: box.bottom + 4,
+      title: 'Waiting for you',
+      anchor,
+      items: needsYouItems.map((item) => ({
+        label: needsYouLabel(item),
+        onSelect: () => (item.kind === 'memory' ? setScreen('memory') : openMission(item.missionId))
+      }))
+    })
+  }
   // What each teammate's live run is doing, from its events -- the same
   // function the thread's working line uses, so the two cannot disagree.
   const liveActivityByOwner: Record<string, LiveActivity> = {}
@@ -5275,6 +5321,8 @@ export default function App(): ReactElement {
         workspaceName={workspaceName.length === 0 ? `Locust${build === undefined ? '' : ` ${build.version}`}` : workspaceName}
         runningCount={runningCount}
         swarm={swarm}
+        needsYou={needsYouItems.length}
+        onNeedsYou={openNeedsYou}
       />
       <div className="lc-body">
         {rowMenu !== undefined && (

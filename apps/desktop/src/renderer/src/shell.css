@@ -96,6 +96,33 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+/*
+ * NEEDS YOU (0.373): the one line in the title bar a person must act on.
+ * The running line's type, in amber, and a button -- it opens the list of
+ * what waits. A hairline only on hover, so at rest it reads as a line of
+ * state like its neighbour, not a second toolbar.
+ */
+.lc-needsyou {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+  margin: 0 calc(-1 * var(--lc-space-2));
+  padding: 3px var(--lc-space-2);
+  border: 1px solid transparent;
+  border-radius: var(--lc-radius-control);
+  background: none;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-amber-text);
+  cursor: pointer;
+  transition: border-color var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-needsyou:hover {
+  border-color: var(--lc-border-strong);
+}
+
+
 .lc-windowcontrols {
   display: flex;
   gap: var(--lc-space-1);
