@@ -35,7 +35,6 @@ function rules(css: string): { readonly selector: string; readonly props: Record
 /** Set in capitals on purpose, and not labels: titles, the cover, and the Changelog's Claude Code groups. */
 const NOT_LABELS = new Set([
   '.lc-screen__title',
-  '.lc-settings__heading',
   '.lc-lockup__name',
   '.lc-cover .lc-cover__claim',
   '.lc-release__label'

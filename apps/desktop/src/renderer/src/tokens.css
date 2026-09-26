@@ -420,6 +420,8 @@
    */
   --lc-text-display: 27px;
   --lc-text-screen-title: 20px;
+  /* A section inside a screen: one step above the text under it (0.356). */
+  --lc-text-section: 16px;
   --lc-text-teammate-name: 14.5px;
   --lc-text-body: 13.5px;
   /*

@@ -67,14 +67,21 @@ describe("the app's voice", () => {
 })
 
 describe('a title is set the way the wordmark is', () => {
-  it('screen titles and Settings sections take the title tokens, in capitals', () => {
-    for (const selector of ['.lc-screen__title', '.lc-settings__heading']) {
-      const body = rule(selector)
-      expect(body, selector).toContain('font-weight: var(--lc-title-weight)')
-      expect(body, selector).toContain('letter-spacing: var(--lc-title-tracking)')
-      expect(body, selector).toContain('text-transform: uppercase')
-    }
+  it("a screen's title takes the title tokens, in capitals", () => {
+    const body = rule('.lc-screen__title')
+    expect(body).toContain('font-weight: var(--lc-title-weight)')
+    expect(body).toContain('letter-spacing: var(--lc-title-tracking)')
+    expect(body).toContain('text-transform: uppercase')
     expect(tokens).toMatch(/--lc-title-weight: 700;/)
+  })
+
+  it('a section inside a screen is a sentence, one step above its text (Colin, 0.356)', () => {
+    // Shown both ways side by side (heading-case-question); he chose this.
+    const body = rule('.lc-settings__heading')
+    expect(body).toContain('font-size: var(--lc-text-section)')
+    expect(body).not.toContain('text-transform')
+    expect(body).not.toContain('var(--lc-title-tracking)')
+    expect(tokens).toMatch(/--lc-text-section: 16px;/)
   })
 
   it('a section label below a title stays a label, not a second title', () => {

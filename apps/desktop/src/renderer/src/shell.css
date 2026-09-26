@@ -7747,14 +7747,24 @@ textarea {
   text-transform: none;
 }
 
-/* A section of Settings is a place too, so it is named the same way. The
-   `--section` block names below override every property set here. */
+/*
+ * A SECTION INSIDE A SCREEN IS A SENTENCE (0.356).
+ *
+ * It was set exactly as the screen's title is -- the wordmark's bold,
+ * wide-tracked capitals -- so Memory read as a column of shouted titles:
+ * HOW MEMORY IS KEPT, THIS FOLDER, EVERYWHERE, REMEMBER SOMETHING, FORGET.
+ * Claude sets a section as a calm line one step above the text under it.
+ * Shown to Colin both ways on the same build, side by side
+ * (docs/beta-fixes-2026-09-24/heading-case-question), and he went with this
+ * one. The screen's own title keeps the wordmark's capitals, which is where
+ * the brand lives. The `--section` block names below override every
+ * property set here.
+ */
 .lc-settings__heading {
   margin: 0 0 var(--lc-space-2);
-  font-size: var(--lc-title-size);
-  font-weight: var(--lc-title-weight);
-  letter-spacing: var(--lc-title-tracking);
-  text-transform: uppercase;
+  font-size: var(--lc-text-section);
+  font-weight: 600;
+  letter-spacing: -0.005em;
 }
 
 /*

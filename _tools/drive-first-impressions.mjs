@@ -257,6 +257,17 @@ try {
   await drive.capture('1440 Missions (Ctrl 1)', () => screen('1'))
   await drive.capture('1440 Team (Ctrl 2)', () => screen('2'))
   await drive.capture('1440 Settings (Ctrl 3)', () => screen('3'))
+  // Every Settings page, not only the first (0.356: a section heading's
+  // look changed on all of them at once).
+  for (const page of ['Runtimes', 'Teammates', 'Appearance', 'General', 'Changelog']) {
+    await drive.capture(`1440 Settings: ${page}`, () => drive.evaluate(`(async () => {
+      const item = [...document.querySelectorAll('.lc-settings button, .lc-settings a, nav button')].find((b) => b.textContent.trim() === ${JSON.stringify(page)})
+      if (!item) return 'no ' + ${JSON.stringify(page)} + ' in the Settings list'
+      item.click()
+      await new Promise((r) => setTimeout(r, 900))
+      return [...document.querySelectorAll('.lc-settings__heading')].map((h) => h.textContent).join(' | ').slice(0, 160)
+    })()`))
+  }
   await drive.capture('1440 Rooms (Ctrl 4)', () => screen('4'))
   await drive.capture('1440 Memory (Ctrl 5)', () => screen('5'))
   // The surfaces the first pass never photographed (0.354): the Routines
