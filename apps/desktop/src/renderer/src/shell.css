@@ -8852,6 +8852,34 @@ textarea {
   text-wrap: pretty;
 }
 
+/*
+ * ASK ONE TEAMMATE IN A ROOM (0.371).
+ *
+ * The @ menu is the command menu -- same edge, same rows -- with a face where
+ * a command's name is. The recipients are attachment tiles with a face: the
+ * box already has one way of showing what a message carries, and this is it.
+ * "To" before them is the one word that says the tiles are people, not files.
+ */
+.lc-mentions__who {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lc-askto {
+  align-items: center;
+}
+
+.lc-askto__label {
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+}
+
+/* "To Wren ·" before a post's time: who it was put to, in the post's own quiet line. */
+.lc-roompost__to {
+  color: var(--lc-text-secondary);
+}
+
 /* --- Route picker ------------------------------------------------------ */
 
 .lc-picker {

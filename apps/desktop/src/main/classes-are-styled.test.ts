@@ -53,6 +53,11 @@ const REACHED_NOT_STYLED: ReadonlySet<string> = new Set([
   'lc-handoff__from',
   // The post's words, inside `lc-roompost__you`, which sets the bubble.
   'lc-roompost__text',
+  // A room's @ menu and its recipient tiles (0.371): drawn as the command
+  // menu (`lc-slash`) and an attachment tile (`lc-attached__tile`) they also
+  // carry, and named so drive-room-ask-one can tell them from those.
+  'lc-mentions',
+  'lc-askto__tile',
   // A namespace, never worn alone: every use pairs it with `--switch`,
   // `--roletitle` or `--folder`, and those carry the layout.
   'lc-field',

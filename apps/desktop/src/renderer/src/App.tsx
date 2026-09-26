@@ -3105,10 +3105,11 @@ export default function App(): ReactElement {
       .catch(() => setRoomNotice('That room could not be removed. It and its posts are still there.'))
   }
 
-  const postToRoom = async (roomId: string, text: string): Promise<string | undefined> => {
+  const postToRoom = async (roomId: string, text: string, to?: readonly string[]): Promise<string | undefined> => {
     const bridge = window.desktop
     if (bridge === undefined) return 'The secure desktop bridge is unavailable.'
-    const response = await bridge.postToRoom({ roomId, text }).catch(() => undefined)
+    // `to`: the members the person named (0.371); absent asks everyone.
+    const response = await bridge.postToRoom({ roomId, text, ...(to === undefined || to.length === 0 ? {} : { to }) }).catch(() => undefined)
     if (response === undefined) return 'The post could not be made. Nothing was added to the room.'
     if (!response.ok) return response.error.message
     refreshRooms()

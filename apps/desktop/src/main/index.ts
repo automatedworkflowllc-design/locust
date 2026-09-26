@@ -54,7 +54,7 @@ const MAX_SHEET_FILE_BYTES = 8 * 1024 * 1024
 import { createEditCheck } from './edit-check.js'
 import { createTeammateStore, parsedCheckCommand, TeammateNameTakenError, isTeammateRoute } from './teammate-store.js'
 import { createRoutineStore } from './routine-store.js'
-import { createRoomStore, exchangeOfRoomPost } from './room-store.js'
+import { createRoomStore, exchangeOfRoomPost, recipientsOf } from './room-store.js'
 import { createRoomTasks } from './room-tasks.js'
 import type { RoomTasks } from './room-tasks.js'
 import { boardLines, fittedTaskSection, rowToClaimAtStart } from '../shared/room-task.js'
@@ -3535,7 +3535,16 @@ if (!ownsSingleInstanceLock) {
               return { teammateId, name, text }
             })
           )
-          return { text: entry.text, answers: answers.filter((answer): answer is RoomHistoryAnswer => answer !== undefined) }
+          // Who it was put to, when the person named someone: the others were not asked.
+          const to = entry.to?.map((teammateId) => ({
+            teammateId,
+            name: roster.find((mate) => mate.teammateId === teammateId)?.name ?? 'a teammate no longer on the team'
+          }))
+          return {
+            text: entry.text,
+            ...(to === undefined || to.length === 0 ? {} : { to }),
+            answers: answers.filter((answer): answer is RoomHistoryAnswer => answer !== undefined)
+          }
         })
       )
       return { roomName: room.name, posts }
@@ -3638,6 +3647,9 @@ if (!ownsSingleInstanceLock) {
         return roomRejected('The rooms file could not be read, so nothing was posted.')
       }
       if (room === undefined) return roomRejected('That room no longer exists.')
+      // 0.371: the members the person named, or everyone (`recipientsOf`).
+      const recipients = recipientsOf(room.teammateIds, input.to)
+      if (!recipients.ok) return roomRejected(recipients.message)
 
       // One run per teammate, each on THEIR route. A teammate with no route
       // of their own yet -- never started by a person -- runs on Codex's
@@ -3668,7 +3680,12 @@ if (!ownsSingleInstanceLock) {
        */
       let post: RoomPost
       try {
-        post = await rooms.addPost(roomId, { text, missions: {}, queued: [...room.teammateIds] })
+        post = await rooms.addPost(roomId, {
+          text,
+          missions: {},
+          queued: [...recipients.asked],
+          ...(recipients.to === undefined ? {} : { to: recipients.to })
+        })
       } catch (error) {
         return roomRejected(error instanceof Error ? error.message : 'The post could not be recorded.')
       }
@@ -3677,7 +3694,7 @@ if (!ownsSingleInstanceLock) {
       // screen where they put them.
       sendToWindow({ kind: 'room-posted', roomId, postId: post.postId })
 
-      for (const teammateId of room.teammateIds) {
+      for (const teammateId of recipients.asked) {
         const attempt = await startRoomMember(room, teammateId, post, roster)
         if (!attempt.ok) {
           /*

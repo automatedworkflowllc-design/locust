@@ -48,6 +48,8 @@ export interface RoomHistoryAnswer {
 export interface RoomHistoryPost {
   /** The person's words. */
   readonly text: string
+  /** Who the person put it to, when they named someone (0.371). Absent is everyone. */
+  readonly to?: readonly { readonly teammateId: string; readonly name: string }[]
   /** The members who finished answering it. */
   readonly answers: readonly RoomHistoryAnswer[]
 }
@@ -91,10 +93,18 @@ const HEADER = (roomName: string): string =>
 /** The line between the room so far and what the person has just posted. */
 export const ROOM_HISTORY_CLOSE = "That is the room so far. The person's new post:"
 
+/** " to you", " to Wren", " to you and Wren": who a post was put to, from the reader's side. */
+function toWhom(to: RoomHistoryPost['to'], selfId: string): string {
+  if (to === undefined || to.length === 0) return ''
+  const names = to.map((entry) => (entry.teammateId === selfId ? 'you' : entry.name))
+  const last = names[names.length - 1] ?? ''
+  return ` to ${names.length === 1 ? last : `${names.slice(0, -1).join(', ')} and ${last}`}`
+}
+
 function render(roomName: string, selfId: string, posts: readonly RoomHistoryPost[], answerLimit: number): string {
   const lines: string[] = [HEADER(roomName)]
   for (const post of posts) {
-    lines.push('', `The person wrote: ${clipped(defangProtocolBlocks(post.text), ROOM_HISTORY_POST_TEXT)}`)
+    lines.push('', `The person wrote${toWhom(post.to, selfId)}: ${clipped(defangProtocolBlocks(post.text), ROOM_HISTORY_POST_TEXT)}`)
     for (const answer of post.answers) {
       const said = clipped(quotedAnswer(answer.text), answerLimit)
       if (said.length === 0) continue

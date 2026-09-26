@@ -1,7 +1,8 @@
-import type { ReactElement } from 'react'
-import { useEffect, useState } from 'react'
+import type { KeyboardEvent, ReactElement } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import type { PublicRoom, PublicTeammate, RoomTaskRequest } from '../../../shared/ipc.js'
+import { roleLabelOf } from '../../../shared/ipc.js'
 import type { ThreadItem } from '../missionView.js'
 import { ThreadItems } from './Thread.js'
 import { MAX_ROOM_TEAMMATES } from '../../../shared/live-missions.js'
@@ -16,6 +17,7 @@ import { useFollowBottom } from '../useFollowBottom.js'
 import { QUIET_SECONDS_BEFORE_SAYING_SO } from '../quiet.js'
 import { JumpToBottom } from './JumpToBottom.js'
 import type { RoomExchange } from '../roomExchange.js'
+import { mentionAt, mentionChoices, mentionCompleted, namesSaid, withoutMention } from '../roomMentions.js'
 
 /**
  * A room: a named set of teammates and the thread of what a person said to
@@ -415,7 +417,8 @@ export function RoomScreen({
   readonly onMenu?: (menu: ContextMenuState) => void
   /** Give the room a name. Absent where renaming is not offered. */
   readonly onRenameRoom?: (roomId: string, name: string) => void
-  readonly onPost: (roomId: string, text: string) => Promise<string | undefined>
+  /** `to`: the members the post is put to, when the person named someone; absent is everyone. */
+  readonly onPost: (roomId: string, text: string, to?: readonly string[]) => Promise<string | undefined>
   readonly onOpenMission: (missionId: string) => void
   /**
    * The folder, so a file reads the same here as it does in the thread.
@@ -443,6 +446,20 @@ export function RoomScreen({
   const [boardError, setBoardError] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [formError, setFormError] = useState<string>()
+  /**
+   * Who the next post is put to (0.371), by teammate id: empty is everyone.
+   * Set by Reply on an answer or an @ in the box, shown as tiles in the box,
+   * and cleared once the post is made -- naming someone is per post, as it
+   * is in every chat that has it.
+   */
+  const [askTo, setAskTo] = useState<readonly string[]>([])
+  const box = useRef<HTMLTextAreaElement>(null)
+  /** Where the caret is in the box, so an @ is read where it is being typed. */
+  const [caret, setCaret] = useState(0)
+  /** The @ whose menu was put away with Escape, by where it starts. */
+  const [mentionOff, setMentionOff] = useState<number>()
+  /** Which member the arrow keys are on in the @ menu. */
+  const [mentionIndex, setMentionIndex] = useState(0)
 
   // A room is a chat, so it scrolls like one: following the newest answer
   // while the person is at the bottom, and offering the way back as soon as
@@ -450,9 +467,10 @@ export function RoomScreen({
   // teammates grew under the reader and never moved.
   const follow = useFollowBottom()
   // Opening a different room starts at its newest post, not wherever the last
-  // one was left.
+  // one was left -- and asks everyone in it until someone is named there.
   useEffect(() => {
     follow.jumpNow()
+    setAskTo([])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentRoomId])
 
@@ -519,12 +537,103 @@ export function RoomScreen({
      * out they never landed.
      */
     setDraftText('')
-    const error = await onPost(room.roomId, sending)
+    // Only members still in the room: someone removed since they were named
+    // is not asked, and nobody left named is everyone.
+    const naming = askTo.filter((id) => room.teammateIds.includes(id))
+    const error = await onPost(room.roomId, sending, naming.length === 0 ? undefined : naming)
     setBusy(false)
     if (error !== undefined) {
       setFormError(error)
-      // Theirs to try again with, in the box they typed it in.
+      // Theirs to try again with, in the box they typed it in, to the same people.
       setDraftText((current) => (current.length === 0 ? sending : current))
+      return
+    }
+    setAskTo([])
+  }
+
+  /** Put the next post to one teammate, from their answer: the Reply on a card. */
+  const replyTo = (teammateId: string): void => {
+    setAskTo([teammateId])
+    box.current?.focus()
+  }
+
+  // The @ menu: the room's members, by what follows the @ at the caret.
+  const roomMembers = members.filter((member): member is PublicTeammate => member !== undefined)
+  const mention = mentionAt(draftText, caret)
+  const mentionOpen = mention !== undefined && mention.start !== mentionOff
+  const choices = mentionOpen ? mentionChoices(roomMembers, askTo, mention.query) : []
+  const activeChoice = choices[Math.min(mentionIndex, choices.length - 1)]
+  const askedNames = askTo.map((id) => roomMembers.find((member) => member.teammateId === id)?.name ?? id)
+
+  /** Name a member from the @ menu: the tile goes in, the @-word comes out. */
+  const pick = (member: PublicTeammate): void => {
+    if (mention === undefined) return
+    const next = withoutMention(draftText, mention)
+    setAskTo((current) => (current.includes(member.teammateId) ? current : [...current, member.teammateId]))
+    setDraftText(next.text)
+    setCaret(next.caret)
+    setMentionIndex(0)
+    // The caret goes back where the @ was, once React has put the text in.
+    requestAnimationFrame(() => {
+      box.current?.focus()
+      box.current?.setSelectionRange(next.caret, next.caret)
+    })
+  }
+
+  /** What was typed, and "@Wren " becoming its tile without the menu. */
+  const typed = (text: string, at: number): void => {
+    // A menu put away with Escape stays away for that @ only.
+    if (mentionAt(text, at) === undefined) setMentionOff(undefined)
+    setMentionIndex(0)
+    const done = mentionCompleted(roomMembers, askTo, text, at)
+    if (done === undefined) {
+      setDraftText(text)
+      setCaret(at)
+      return
+    }
+    const next = withoutMention(text.slice(0, at - 1) + text.slice(at), done.mention)
+    setAskTo((current) => [...current, done.member.teammateId])
+    setDraftText(next.text)
+    setCaret(next.caret)
+    setMentionIndex(0)
+    requestAnimationFrame(() => box.current?.setSelectionRange(next.caret, next.caret))
+  }
+
+  /** Keys in the room's box: the @ menu's first, then a tile's, then sending. */
+  const keyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+    // Every key belongs to an input method while it is composing: Enter there
+    // confirms a word and must not post it (the main box's rule, code review B4).
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return
+    if (choices.length > 0) {
+      const at = Math.min(mentionIndex, choices.length - 1)
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault()
+        setMentionIndex((at + (event.key === 'ArrowDown' ? 1 : choices.length - 1)) % choices.length)
+        return
+      }
+      // Enter names the member highlighted: it must never post "@Wr".
+      if ((event.key === 'Enter' && !event.shiftKey) || event.key === 'Tab') {
+        event.preventDefault()
+        if (activeChoice !== undefined) pick(activeChoice)
+        return
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setMentionOff(mention?.start)
+        return
+      }
+    }
+    // Backspace at the very start takes the last name off, as a list of
+    // names in any chat box does.
+    const field = event.currentTarget
+    if (event.key === 'Backspace' && askTo.length > 0 && field.selectionStart === 0 && field.selectionEnd === 0) {
+      event.preventDefault()
+      setAskTo((current) => current.slice(0, -1))
+      return
+    }
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault()
+      void post()
     }
   }
 
@@ -818,7 +927,7 @@ export function RoomScreen({
           * the end of a reply; this is where a person moves it by hand.
           */}
         {room.posts.length === 0 && (
-          <p className="lc-settings__note">Nothing posted yet. Whatever you write below goes to everyone in the room.</p>
+          <p className="lc-settings__note">Nothing posted yet. Whatever you write below goes to everyone in the room, or type @ to ask one teammate.</p>
         )}
         {room.posts.map((entry) => {
           const answers = answersFor(room, entry.postId)
@@ -826,8 +935,11 @@ export function RoomScreen({
           const waiting = waitingLine(
             (entry.queued ?? []).map((id) => teammates.find((candidate) => candidate.teammateId === id)?.name ?? id)
           )
+          // Only the members it was put to can be missing from it: a post to
+          // Wren does not report Pip as "not asked" -- the person chose that.
           const absent = absentLine(
-            room.teammateIds
+            (entry.to ?? room.teammateIds)
+              .filter((id) => room.teammateIds.includes(id) || entry.missions[id] !== undefined)
               .filter((id) => answers.every((candidate) => candidate.teammateId !== id) && !(entry.queued ?? []).includes(id))
               .map((id) => ({
                 name: teammates.find((candidate) => candidate.teammateId === id)?.name ?? id,
@@ -839,6 +951,12 @@ export function RoomScreen({
               <div className="lc-roompost__you">
                 <span className="lc-roompost__text">{entry.text}</span>
                 <span className="lc-roompost__at lc-mono">
+                  {/* Who it was put to, when the person named someone. */}
+                  {entry.to !== undefined && entry.to.length > 0 && (
+                    <span className="lc-roompost__to">
+                      To {namesSaid(entry.to.map((id) => teammates.find((candidate) => candidate.teammateId === id)?.name ?? id))} ·{' '}
+                    </span>
+                  )}
                   {new Date(entry.at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
@@ -1085,6 +1203,16 @@ export function RoomScreen({
                         ) : (
                           <AnswerState phase={answer.phase} startedAt={answer.startedAt} />
                         )}
+                        {/* The next post to this teammate only (0.371). */}
+                        <button
+                          type="button"
+                          className="lc-ghostbutton"
+                          title={`Put your next post to ${name} only`}
+                          aria-label={`Reply to ${name}`}
+                          onClick={() => replyTo(teammateId)}
+                        >
+                          Reply
+                        </button>
                         <button type="button" className="lc-ghostbutton" onClick={() => onOpenMission(answer.missionId)}>
                           Open
                         </button>
@@ -1370,27 +1498,83 @@ export function RoomScreen({
           void post()
         }}
       >
+        {/*
+          * The room's members, for an @ -- in the menu the main box draws its
+          * commands in, above the field and sharing its edge. A mouse press
+          * keeps the caret in the box, so picking with the mouse types on.
+          */}
+        {choices.length > 0 && (
+          <div className="lc-slash lc-mentions" role="listbox" aria-label={`Ask someone in ${room.name}`}>
+            {choices.map((member, index) => (
+              <button
+                key={member.teammateId}
+                type="button"
+                role="option"
+                aria-selected={member === activeChoice}
+                className={`lc-slash__item${member === activeChoice ? ' is-active' : ''}`}
+                onMouseEnter={() => setMentionIndex(index)}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => pick(member)}
+              >
+                <span className="lc-slash__name lc-mentions__who">
+                  <TeammateBot hue={member.hue} avatar={member.avatar} size={16} activity="idle" presence="none" />
+                  {member.name}
+                </span>
+                <span className="lc-slash__detail">{roleLabelOf(member)}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {/*
+          * Who this post goes to, when it is not everyone: a tile per
+          * teammate, inside the box, the way an attached file is -- where a
+          * person looks to see what is being sent. Removing the last one asks
+          * everyone again.
+          */}
+        {askTo.length > 0 && (
+          <div className="lc-attached lc-askto" aria-label={`Asking ${namesSaid(askedNames)} only`}>
+            <span className="lc-askto__label lc-mono">To</span>
+            {askTo.map((id, index) => {
+              const member = roomMembers.find((entry) => entry.teammateId === id)
+              const name = askedNames[index] ?? id
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  className="lc-attached__tile lc-askto__tile"
+                  title={askTo.length === 1 ? `Only ${name} is asked. Remove to ask everyone in ${room.name}.` : `Remove ${name}`}
+                  aria-label={`Stop asking ${name}`}
+                  onClick={() => {
+                    setAskTo((current) => current.filter((entry) => entry !== id))
+                    box.current?.focus()
+                  }}
+                >
+                  {member !== undefined && <TeammateBot hue={member.hue} avatar={member.avatar} size={14} activity="idle" presence="none" />}
+                  <span className="lc-attached__name">{name}</span>
+                  <Icon name="close" size={11} />
+                </button>
+              )
+            })}
+          </div>
+        )}
         <div className="lc-composer__box">
           <textarea
+            ref={box}
             className="lc-roomcompose__box"
             value={draftText}
-            onChange={(event) => setDraftText(event.target.value)}
-            placeholder={`Post to ${room.name}…`}
-            aria-label={`Post to ${room.name}`}
+            onChange={(event) => typed(event.target.value, event.target.selectionStart ?? event.target.value.length)}
+            onSelect={(event) => setCaret(event.currentTarget.selectionStart ?? 0)}
+            placeholder={askTo.length === 0 ? `Post to ${room.name}…` : `Ask ${namesSaid(askedNames)}…`}
+            aria-label={askTo.length === 0 ? `Post to ${room.name}` : `Ask ${namesSaid(askedNames)} in ${room.name}`}
             rows={1}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault()
-                void post()
-              }
-            }}
+            onKeyDown={keyDown}
           />
           <button
             type="submit"
             className="send-button lc-send"
             disabled={busy || draftText.trim().length === 0}
-            aria-label={`Post to ${room.name}`}
-            title={`Post to ${room.name} — Shift+Enter for a new line`}
+            aria-label={askTo.length === 0 ? `Post to ${room.name}` : `Ask ${namesSaid(askedNames)}`}
+            title={`${askTo.length === 0 ? `Post to ${room.name}` : `Ask ${namesSaid(askedNames)}`} — Shift+Enter for a new line`}
           >
             <Icon name="arrow-up" size={15} />
           </button>

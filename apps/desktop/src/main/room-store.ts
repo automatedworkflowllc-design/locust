@@ -54,6 +54,8 @@ export interface RoomStore {
       readonly refused?: Readonly<Record<string, string>>
       /** Who is waiting for a slot, in the order they will get one. */
       readonly queued?: readonly string[]
+      /** Who the person put it to, when they named someone; absent is everyone. */
+      readonly to?: readonly string[]
     }
   ): Promise<RoomPost>
   /**
@@ -123,6 +125,30 @@ export function exchangeOfRoomPost(rooms: readonly PublicRoom[], missionId: stri
     if (post !== undefined) return `room:${room.roomId}:${post.postId}`
   }
   return undefined
+}
+
+/**
+ * Who a post asks (0.371): the members the person named, or everyone.
+ *
+ * `to` comes from the window, so it is read as untrusted: ids only, each
+ * once, members only, in the room's own order -- the order they are started
+ * in. A list that names every member is everyone, and is recorded as such.
+ * A list that names only people who are not in the room is REFUSED rather
+ * than widened to everyone: a question put to one teammate must never
+ * quietly become a question put to all of them.
+ */
+export function recipientsOf(
+  teammateIds: readonly string[],
+  to: unknown
+):
+  | { readonly ok: true; readonly asked: readonly string[]; readonly to?: readonly string[] }
+  | { readonly ok: false; readonly message: string } {
+  if (!Array.isArray(to) || to.length === 0) return { ok: true, asked: [...teammateIds] }
+  const named = new Set(to.filter((id): id is string => typeof id === 'string' && safeId(id)))
+  const asked = teammateIds.filter((id) => named.has(id))
+  if (asked.length === 0) return { ok: false, message: 'Nobody you named is in this room any more, so nothing was posted.' }
+  if (asked.length === teammateIds.length) return { ok: true, asked }
+  return { ok: true, asked, to: asked }
 }
 
 export function validRoomName(value: unknown): value is string {
@@ -197,6 +223,9 @@ function parsedPost(value: unknown): RoomPost | undefined {
       if (safeId(teammateId) && typeof reason === 'string' && reason.length > 0) refused[teammateId] = reason.slice(0, 200)
     }
   }
+  // Who it was put to (0.371). Absent before then, and a malformed list costs
+  // the naming rather than the post: read as everyone, which is what it was.
+  const to = Array.isArray(record.to) ? [...new Set(record.to.filter((id): id is string => typeof id === 'string' && safeId(id)))] : []
   return {
     postId: record.postId,
     text: record.text,
@@ -205,7 +234,8 @@ function parsedPost(value: unknown): RoomPost | undefined {
     // Anyone who already has a mission is not waiting, whatever the file says
     // -- and a queue with nobody left in it is no queue, not an empty one.
     ...(queued.filter((id) => missions[id] === undefined).length === 0 ? {} : { queued: queued.filter((id) => missions[id] === undefined) }),
-    ...(Object.keys(refused).length === 0 ? {} : { refused })
+    ...(Object.keys(refused).length === 0 ? {} : { refused }),
+    ...(to.length === 0 ? {} : { to })
   }
 }
 
@@ -415,13 +445,16 @@ export function createRoomStore(options: {
           if (safeId(teammateId) && typeof reason === 'string' && reason.length > 0) refused[teammateId] = reason.slice(0, 200)
         }
         const queued = (post.queued ?? []).filter((teammateId) => safeId(teammateId) && missions[teammateId] === undefined)
+        // Only members: a post cannot be put to someone who is not in the room.
+        const to = [...new Set((post.to ?? []).filter((teammateId) => safeId(teammateId) && room.teammateIds.includes(teammateId)))]
         const added: RoomPost = {
           postId: `post_${createId()}`,
           text: post.text,
           at: now().toISOString(),
           missions,
           ...(queued.length === 0 ? {} : { queued }),
-          ...(Object.keys(refused).length === 0 ? {} : { refused })
+          ...(Object.keys(refused).length === 0 ? {} : { refused }),
+          ...(to.length === 0 ? {} : { to })
         }
         // The newest MAX_ROOM_POSTS posts; the missions themselves are the
         // durable record, so an old post dropping off the room loses nothing.

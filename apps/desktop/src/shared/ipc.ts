@@ -1104,6 +1104,17 @@ export interface RoomPost {
    * explanation at all. Absent on posts written before this existed.
    */
   readonly refused?: Readonly<Record<string, string>>
+  /**
+   * Who the person put this post to, when they named someone (0.371).
+   *
+   * A post asked everyone in the room, and "Wren, say more about your second
+   * point" ran every member -- each of them answering a question meant for
+   * one. Open WebUI's channels and Buzz both answer only the agent that is
+   * mentioned (docs/RESEARCH-2026-09-26-ROOMS-AND-PEERS.md). Recorded on the
+   * post so the room can say who was asked, and so the room's history tells
+   * the others it was not put to them. Absent means everyone.
+   */
+  readonly to?: readonly string[]
 }
 
 /**
@@ -1243,6 +1254,12 @@ export interface RoomCreateRequest {
 export interface RoomPostRequest {
   readonly roomId: string
   readonly text: string
+  /**
+   * The members this post is put to, by teammate id (0.371): a Reply on an
+   * answer, or an @ in the room's box. Absent or empty means everyone in the
+   * room, as every post was before.
+   */
+  readonly to?: readonly string[]
 }
 
 export type RoomListResponse =

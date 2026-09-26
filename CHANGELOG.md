@@ -11,6 +11,22 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.371.0 - 2026-09-26
+
+### New
+
+- **Ask one teammate in a room.** Press Reply on an answer, or type @ and
+  a name in the room's box, and your next post goes to that teammate only —
+  the others are not run. The teammate shows in the box before you send, the
+  post says who it was put to, and the rest of the room is told it was not
+  theirs. With no one named, everyone is asked, as before.
+
+### Fixed
+
+- **A room in the sidebar shows when it was last used.** A room you had
+  just posted to could read "15h", the age of the room rather than of its
+  last post. Replies teammates send each other now show their age there too.
+
 ## 0.370.0 - 2026-09-26
 <!-- big -->
 
