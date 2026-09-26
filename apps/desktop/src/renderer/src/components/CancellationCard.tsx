@@ -16,10 +16,18 @@ import type { CancellationSummary } from '../missionView.js'
  */
 export function CancellationCard({
   summary,
-  stoppedAt
+  stoppedAt,
+  byPerson = true
 }: {
   readonly summary: CancellationSummary
   readonly stoppedAt: string | undefined
+  /**
+   * Whether the person pressed Stop. A teammate's message can stop a run too
+   * (the relay's interrupt), and a reopened conversation cannot say who did,
+   * so only a press seen in this window reads "You stopped" (code review B4,
+   * renderer-thread (f)).
+   */
+  readonly byPerson?: boolean
 }): ReactElement {
   const nothingHappened =
     summary.settled.length === 0 && summary.interrupted.length === 0 && summary.neverStarted === 0
@@ -30,7 +38,7 @@ export function CancellationCard({
     <div className="lc-card is-standing">
       <div className="lc-card__head">
         <span className="lc-approval__title">
-          You stopped this run{stoppedAt === undefined ? '' : ` at ${stoppedAt}`}
+          {byPerson ? 'You stopped this run' : 'This run was stopped'}{stoppedAt === undefined ? '' : ` at ${stoppedAt}`}
         </span>
         <span className="lc-tag is-amber">Stopped</span>
       </div>

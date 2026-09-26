@@ -675,6 +675,8 @@ export interface ThreadProps {
    */
   /** A3.3: the person's check after this turn, and sending its findings back. */
   readonly editCheck?: EditCheckShown
+  /** The person pressed Stop on this run; otherwise the card does not say "You". */
+  readonly stoppedByPerson?: boolean
   readonly onSendEditCheck?: (text: string) => void
   readonly peers: {
     readonly self: PublicTeammate | undefined
@@ -690,6 +692,7 @@ export function Thread({
   prompt,
   editCheck,
   onSendEditCheck,
+  stoppedByPerson = false,
   startedBy,
   onOpenFile,
   onOpenPeerRun,
@@ -1119,7 +1122,7 @@ export function Thread({
           />
         ))}
 
-        {stopped !== undefined && <CancellationCard summary={stopped} stoppedAt={stoppedAt} />}
+        {stopped !== undefined && <CancellationCard summary={stopped} stoppedAt={stoppedAt} byPerson={stoppedByPerson} />}
 
         {/*
           * A MODE REFUSAL IS ONE CARD, NOT TWO (beta review of 0.255.0, #8).

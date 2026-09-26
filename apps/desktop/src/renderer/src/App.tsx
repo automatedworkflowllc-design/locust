@@ -250,6 +250,12 @@ interface LiveRunState {
   readonly peerNotices?: readonly string[]
   /** A3.3: the person's check after this turn changed files. */
   readonly editCheck?: EditCheckShown
+  /**
+   * The person pressed Stop on this run, in this window. A run can also be
+   * stopped by a teammate's message (the relay's interrupt), and its card
+   * must not say "You stopped this run" then (code review B4, (f)).
+   */
+  readonly stopPressed?: boolean
 }
 
 type RuntimeDiscoveryState =
@@ -488,6 +494,37 @@ function withoutRun(runs: RunMap, key: string): RunMap {
  * model's maximum, so it is the last effort THIS model reported rather than a
  * fixed name some models do not have.
  */
+/**
+ * Who a message goes to: the teammate the person picked, and ONLY that one.
+ *
+ * It used to be `selectedTeammate` whenever an id was set -- and that falls
+ * back to the first teammate. Removing the teammate you had picked left the id
+ * set, so the composer silently addressed whoever was first in the roster, a
+ * teammate the person never chose (code review B4, renderer-thread (c)). An id
+ * that matches nobody now addresses nobody, which is a plain conversation --
+ * the same thing the home screen sends.
+ */
+export function addressedTeammate<T extends { readonly teammateId: string }>(
+  teammates: readonly T[],
+  selectedTeammateId: string | undefined
+): T | undefined {
+  return selectedTeammateId === undefined ? undefined : teammates.find((teammate) => teammate.teammateId === selectedTeammateId)
+}
+
+/**
+ * A Stop press, applied to a run: marked as cancelling only while it is still
+ * going.
+ *
+ * It was unconditional (code review B4, renderer-thread (d)). A run that
+ * finished between the screen being drawn and the click was re-marked
+ * cancelling, the host then answered that nothing was running, and that answer
+ * -- read as "the cancel failed, so it is still going" -- put it back to
+ * running for good: a Stop button on a finished run that nothing would clear.
+ */
+export function markedCancelling(run: LiveRunState): LiveRunState {
+  return liveRunIsActive(run) ? { ...run, phase: 'cancelling', error: undefined, stopPressed: true } : run
+}
+
 export function swarmEffortFor(
   models: readonly PublicModel[],
   modelId: string,
@@ -2653,7 +2690,7 @@ export default function App(): ReactElement {
    * to a teammate afterwards (Colin, 2026-09-05: no Conversation tab; a
    * mission already is one, a teammate is a saved route with a face).
    */
-  const pickedTeammate = selectedTeammateId === undefined ? undefined : selectedTeammate
+  const pickedTeammate = addressedTeammate(teammates, selectedTeammateId)
   const composerRoute = composerRouteFor(route, pickedTeammate, pickerRoutes)
 
   /** Who a run belongs to: what it was started with, or what the host recorded. */
@@ -3055,7 +3092,7 @@ export default function App(): ReactElement {
     setStoppingExchange(true)
     void Promise.all(
       runIds.map((runId) => {
-        setRuns((all) => withRun(all, runId, (run) => ({ ...run, phase: 'cancelling', error: undefined })))
+        setRuns((all) => withRun(all, runId, markedCancelling))
         return bridge.cancelCodexMission({ runId }).catch(() => undefined)
       })
     ).finally(() => setStoppingExchange(false))
@@ -3241,6 +3278,13 @@ export default function App(): ReactElement {
           // conversation it replaced, or the window is left on nothing and
           // falls back to the teammate's home screen (0.297 drive, turn 5).
           setShownKey((current) => (current === key ? previousKey : current))
+          // Stopped while it was starting (code review B4, renderer-thread
+          // (e)): the person pressed Stop on this message, so it is not queued
+          // to go later. It was queued, and sent when the run in front ended.
+          if (cancelWhenNamedRef.current.delete(key)) {
+            startRefusal.current = 'Stopped before it was sent. Your message is back in the box.'
+            return false
+          }
           if (inFront !== undefined) {
             setQueued((rows) => [...rows, { id: `q_${String(rows.length)}_${inFront}`, key: inFront, text: prompt, origin: 'person' as const }])
             return true
@@ -3332,7 +3376,7 @@ export default function App(): ReactElement {
       // Stopped while it was still starting: the person pressed the button
       // and meant it, so the run is cancelled the moment it can be named.
       if (cancelWhenNamedRef.current.delete(key)) {
-        setRuns((all) => withRun(all, runId, (run) => ({ ...run, phase: 'cancelling', error: undefined })))
+        setRuns((all) => withRun(all, runId, markedCancelling))
         void bridge
           .cancelCodexMission({ runId })
           .then((answer) => {
@@ -3557,11 +3601,11 @@ export default function App(): ReactElement {
     // stopped mission run to completion (measured 2026-09-10).
     if (press.kind === 'cancel-when-named') {
       cancelWhenNamedRef.current.add(press.key)
-      setRuns((all) => withRun(all, press.key, (run) => ({ ...run, phase: 'cancelling', error: undefined })))
+      setRuns((all) => withRun(all, press.key, markedCancelling))
       return
     }
     const runId = press.runId
-    setRuns((all) => withRun(all, runId, (run) => ({ ...run, phase: 'cancelling', error: undefined })))
+    setRuns((all) => withRun(all, runId, markedCancelling))
     void bridge
       .cancelCodexMission({ runId })
       .then((response) => {
@@ -3922,6 +3966,8 @@ export default function App(): ReactElement {
       .then(() => bridge.listTeammates())
       .then(async (listed) => {
         if (!listed.ok) return
+        // Not left picked: see `addressedTeammate`.
+        setSelectedTeammateId((current) => (current === teammateId ? undefined : current))
         setTeammates(listed.data.teammates)
         setMissionOwners(listed.data.missionOwners)
         setMissionTitles(listed.data.missionTitles)
@@ -5883,6 +5929,7 @@ export default function App(): ReactElement {
                 onAnswerQuestion={answerQuestion}
                 decidingIds={decidingIds}
                 cancelled={liveRun.phase === 'cancelled'}
+                stoppedByPerson={liveRun.stopPressed === true}
                 handoff={liveRun.handoff}
                 {...(liveRun.switchedFrom === undefined ? {} : { switchedFrom: liveRun.switchedFrom })}
                 {...((() => {
