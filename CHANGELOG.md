@@ -11,6 +11,20 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.357.0 - 2026-09-26
+<!-- big -->
+
+### New
+
+- **Add your own model.** A model your company runs, or one on this
+  machine, can work on your team. In Settings, Runtimes, under Your own
+  models, give it a name, its address and — if it needs one — a key.
+  Anything that speaks the OpenAI chat API works: a company's own endpoint,
+  vLLM, Ollama, LM Studio. Test checks the address serves the model before
+  you add it. It then appears first in every teammate's model list, under
+  Your models, by the name you gave it. The key is kept encrypted by
+  Windows and is never shown again.
+
 ## 0.356.0 - 2026-09-26
 
 ### Improved
