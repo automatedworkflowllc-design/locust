@@ -3364,3 +3364,62 @@ describe('Approve-each is a mode of this service', () => {
     expect(service.decide({ approvalId: 'ap_1', decision: 'approve-once' })).toBe(false)
   })
 })
+
+describe('a model of your own (0.357)', () => {
+  const opencodeRuntime = (): RuntimeDiscovery => {
+    const codex = codexRuntime()
+    return { ...codex, id: 'opencode', displayName: 'OpenCode', executable: { ...codex.executable!, commandName: 'opencode' } }
+  }
+  const run = () =>
+    vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+
+  it('is declared to OpenCode for the run, key and all, in the child environment only', async () => {
+    const start = run()
+    const { service } = scheduledService({ start }, fakeLedger(), {
+      discover: async () => [opencodeRuntime()],
+      ownProvider: async (model) =>
+        model === 'own-a1b2c3d4/acme-70b'
+          ? { id: 'own-a1b2c3d4', provider: { name: 'Acme Chat', baseUrl: 'https://llm.acme.example/v1', apiKey: 'sk-acme-secret', models: ['acme-70b'] } }
+          : undefined
+    })
+    const started = await service.start('Say hello.', 'opencode', 'accept-edits', { model: 'own-a1b2c3d4/acme-70b' }, () => undefined)
+    expect(started.ok).toBe(true)
+    const spec = start.mock.calls[0]?.[0] as { readonly args: readonly string[]; readonly env?: Record<string, string> }
+    const config = JSON.parse(spec.env?.OPENCODE_CONFIG_CONTENT ?? '{}')
+    expect(config.provider['own-a1b2c3d4'].options).toEqual({ baseURL: 'https://llm.acme.example/v1', apiKey: 'sk-acme-secret' })
+    expect(spec.args).toContain('own-a1b2c3d4/acme-70b')
+    expect(spec.args.join(' ')).not.toContain('sk-acme-secret')
+  })
+
+  it('is refused in words, before anything is written, once it has been removed', async () => {
+    const start = run()
+    const createMission = vi.fn<MissionLedger['createMission']>(async () => undefined)
+    const { service } = scheduledService({ start }, fakeLedger({ createMission }), {
+      discover: async () => [opencodeRuntime()],
+      ownProvider: async () => undefined
+    })
+    const refused = await service.start('Say hello.', 'opencode', 'accept-edits', { model: 'own-a1b2c3d4/acme-70b' }, () => undefined)
+    expect(refused).toMatchObject({ ok: false, error: { code: 'RUNTIME_START_FAILED', message: expect.stringContaining('no longer in Your own models') } })
+    expect(start).not.toHaveBeenCalled()
+    expect(createMission).not.toHaveBeenCalled()
+  })
+
+  it('changes nothing for any other OpenCode model', async () => {
+    const start = run()
+    const asked: string[] = []
+    const { service } = scheduledService({ start }, fakeLedger(), {
+      discover: async () => [opencodeRuntime()],
+      ownProvider: async (model) => {
+        asked.push(model)
+        return undefined
+      }
+    })
+    expect((await service.start('Say hello.', 'opencode', 'accept-edits', { model: 'opencode/ling-3.0-flash-fin-free' }, () => undefined)).ok).toBe(true)
+    expect(asked).toEqual([])
+    const spec = start.mock.calls[0]?.[0] as { readonly env?: Record<string, string> }
+    expect(JSON.parse(spec.env?.OPENCODE_CONFIG_CONTENT ?? '{}').provider).toBeUndefined()
+  })
+})

@@ -415,6 +415,15 @@ export interface RuntimeCommandOptions {
    */
   readonly connectors?: readonly string[];
   /**
+   * Models the person added themselves (0.357): an OpenAI-compatible
+   * endpoint -- their company's model, or one running on this machine --
+   * declared to OpenCode as a provider of its own, by id. OpenCode only;
+   * every other builder ignores it. The key rides in the child's own
+   * environment with the rest of the config, and nowhere else: no argv, no
+   * record.
+   */
+  readonly providers?: Readonly<Record<string, OpenCodeProvider>>;
+  /**
    * Locust as the permission host for this run.
    *
    * `configPath` is an mcp.json naming Locust's bridge as a stdio server;
@@ -1347,6 +1356,48 @@ const MUSE_EFFORTS: readonly string[] = [
   "ultra",
 ];
 
+/** An OpenAI-compatible endpoint, as OpenCode is told of it. */
+export interface OpenCodeProvider {
+  /** What the person called it; OpenCode shows it as the provider's name. */
+  readonly name: string;
+  /** The endpoint's base address, ending before `/chat/completions`. */
+  readonly baseUrl: string;
+  /** Absent for an endpoint that asks for none. */
+  readonly apiKey?: string;
+  /** The model ids it serves that runs may name. */
+  readonly models: readonly string[];
+}
+
+const PROVIDER_ID = /^[a-z0-9][a-z0-9-]{0,47}$/;
+
+/**
+ * The run's config with the person's own providers declared in it.
+ *
+ * `@ai-sdk/openai-compatible` is the package OpenCode's own docs name for
+ * any OpenAI-compatible endpoint -- vLLM, Ollama's /v1, LM Studio, a
+ * company's gateway -- and the shape MEASURED working through this very
+ * builder on 2026-09-25 (_tools/probe-opencode-rate-limit.mjs). An endpoint
+ * that asks for no key is still sent a placeholder: the SDK refuses to
+ * start without one, and a server that checks none ignores it.
+ */
+export function withOpenCodeProviders(config: string | undefined, providers: Readonly<Record<string, OpenCodeProvider>> | undefined): string | undefined {
+  const entries = Object.entries(providers ?? {});
+  if (entries.length === 0) return config;
+  const parsed = config === undefined ? {} : (JSON.parse(config) as Record<string, unknown>);
+  const declared: Record<string, unknown> = {};
+  for (const [id, provider] of entries) {
+    if (!PROVIDER_ID.test(id)) throw new Error(`"${id}" is not a provider id OpenCode can take`);
+    if (!/^https?:\/\/[^\s]+$/i.test(provider.baseUrl)) throw new Error(`${provider.name}'s address is not an http(s) address`);
+    declared[id] = {
+      npm: "@ai-sdk/openai-compatible",
+      name: provider.name,
+      options: { baseURL: provider.baseUrl, apiKey: provider.apiKey ?? "not-needed" },
+      models: Object.fromEntries(provider.models.map((model) => [model, { name: model }])),
+    };
+  }
+  return JSON.stringify({ ...parsed, provider: { ...((parsed.provider as Record<string, unknown> | undefined) ?? {}), ...declared } });
+}
+
 export function createOpenCodeRunCommand(
   executable: ExecutableLaunch,
   options: RuntimeCommandOptions,
@@ -1408,8 +1459,9 @@ export function createOpenCodeRunCommand(
   // (OPENCODE_PURE, "run without external plugins"; plugin/index.ts:181).
   // Only for read-only runs: a run that may edit is already trusted with
   // the folder, and the person's own plugins are theirs to have there.
+  const configured = withOpenCodeProviders(config, options.providers);
   const env = {
-    ...(config === undefined ? {} : { OPENCODE_CONFIG_CONTENT: config }),
+    ...(configured === undefined ? {} : { OPENCODE_CONFIG_CONTENT: configured }),
     ...(readOnly ? { OPENCODE_PURE: "1" } : {}),
   };
   return baseSpec("opencode", executable, options.workspacePath, args, {
@@ -1436,7 +1488,12 @@ export function createOpenCodeRunCommand(
  */
 export function createOpenCodeServeCommand(
   executable: ExecutableLaunch,
-  options: { readonly workspacePath: string; readonly repositoryRoot?: string },
+  options: {
+    readonly workspacePath: string;
+    readonly repositoryRoot?: string;
+    /** The person's own models, as for a run (withOpenCodeProviders). */
+    readonly providers?: Readonly<Record<string, OpenCodeProvider>>;
+  },
 ): RuntimeCommandSpec {
   const config = JSON.stringify({
     permission: {
@@ -1451,7 +1508,7 @@ export function createOpenCodeServeCommand(
   return baseSpec("opencode", executable, options.workspacePath, ["serve", "--port", "0", "--hostname", "127.0.0.1"], {
     stdin: "protocol",
     sandbox: "workspace-write",
-    env: { OPENCODE_CONFIG_CONTENT: config },
+    env: { OPENCODE_CONFIG_CONTENT: withOpenCodeProviders(config, options.providers) ?? config },
   });
 }
 

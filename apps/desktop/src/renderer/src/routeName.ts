@@ -101,7 +101,28 @@ function spellOut(id: string): string {
  *      Cursor.
  *   3. What is left is spelled as a name rather than an identifier.
  */
+/**
+ * The names of the person's own models, by route id (0.357).
+ *
+ * A model of your own runs as `own-1a2b3c4d/acme-70b` -- the provider id
+ * OpenCode is given -- and every surface names a route from its id alone,
+ * which would spell that as "Own 1a2b3c4d/Acme 70b". The catalog is where
+ * the name the person typed lives; the window hands it here each time it
+ * reads the catalog, so the chip, the picker and a mission row all say
+ * "Acme Chat". A route whose model has since been removed says its model
+ * id, spelled, and never the internal half.
+ */
+const ownModelNames = new Map<string, string>()
+const OWN_ROUTE_MODEL = /^own-[a-f0-9]{8}\/(.+)$/
+
+export function rememberOwnModels(models: readonly { readonly id: string; readonly displayName: string; readonly own?: true }[]): void {
+  ownModelNames.clear()
+  for (const model of models) if (model.own === true) ownModelNames.set(model.id, model.displayName)
+}
+
 export function modelDisplayName(runtime: string, modelId: string): string {
+  const own = OWN_ROUTE_MODEL.exec(modelId)
+  if (own !== null) return ownModelNames.get(modelId) ?? spellOut(own[1]!)
   const named = modelLabelFor(runtime, modelId)
   const slash = named.indexOf('/')
   if (slash > 0) {

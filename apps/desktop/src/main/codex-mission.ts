@@ -31,7 +31,7 @@ import type {
   RuntimeProcessRunner, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { workspaceIdFor } from './workspace.js'
 import type { MissionContinuation, MissionLedger, RecoveredMission, Workroom, WorkroomMessage } from '@teammate/mission-store'
-import type { MissionSandbox, RuntimeCommandSpec } from '@teammate/runtime-adapters'
+import type { MissionSandbox, OpenCodeProvider, RuntimeCommandSpec } from '@teammate/runtime-adapters'
 import { createHash, randomUUID } from 'node:crypto'
 import { isAbsolute } from 'node:path'
 import type {
@@ -343,6 +343,12 @@ interface CodexMissionServiceOptions {
    * starts passes through here (shared/spend.ts).
    */
   readonly spendRefusal?: (teammateId: string) => Promise<string | undefined>
+  /**
+   * The provider a model of the person's own needs (main/own-models.ts):
+   * undefined for one no longer kept. Asked only for an OpenCode route whose
+   * model is `own-...`.
+   */
+  readonly ownProvider?: (model: string) => Promise<{ readonly id: string; readonly provider: OpenCodeProvider } | undefined>
   /**
    * Ask before every connector call: send no allow rules, so each one goes
    * to the permission host. Read at run start, never cached. The env seam
@@ -1387,6 +1393,24 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           runtime === 'claude' && effectiveSandbox !== 'full-access' && options.permissionHost !== undefined
             ? await options.permissionHost.register({ runId, missionId, cwd: runCwd })
             : undefined
+        /*
+         * A MODEL OF THE PERSON'S OWN (0.357) is declared to OpenCode for this
+         * run only, key and all, in the child's environment. One that has
+         * since been removed is refused in words before anything is written:
+         * OpenCode itself would fail with "model not found" in a log nobody
+         * reads.
+         */
+        const own =
+          runtime === 'opencode' && chosenModel !== undefined && chosenModel.startsWith('own-')
+            ? await options.ownProvider?.(chosenModel).catch(() => undefined)
+            : undefined
+        if (runtime === 'opencode' && chosenModel !== undefined && chosenModel.startsWith('own-') && own === undefined) {
+          return error(
+            'RUNTIME_START_FAILED',
+            'That model is no longer in Your own models (Settings, Runtimes & accounts). Pick another, or add it again.'
+          ) as CodexMissionStartResponse
+        }
+        const providers = own === undefined ? undefined : { [own.id]: own.provider }
         let command: RuntimeCommandSpec
         // OpenCode and Copilot take the prompt as an argument, not on stdin,
         // so their argv is built once now with the person's own words -- so a
@@ -1402,7 +1426,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           if (runtime === 'opencode' && opencodeServes) {
             return createOpenCodeServeCommand(executable, {
               workspacePath: runCwd,
-              ...(repositoryRoot === undefined ? {} : { repositoryRoot })
+              ...(repositoryRoot === undefined ? {} : { repositoryRoot }),
+              ...(providers === undefined ? {} : { providers })
             })
           }
           if (runtime === 'opencode') {
@@ -1413,6 +1438,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               // Only when this run is in a worktree, which is exactly when
               // the folder it stands in is not the repository it belongs to.
               ...(repositoryRoot === undefined ? {} : { repositoryRoot }),
+              ...(providers === undefined ? {} : { providers }),
               ...choice
             })
           }

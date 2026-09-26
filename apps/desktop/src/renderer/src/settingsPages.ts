@@ -65,12 +65,13 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
   {
     id: 'runtimes',
     label: 'Runtimes',
-    headings: ['Runtimes & accounts', 'Connectors', 'When a route hits its limit'],
+    headings: ['Runtimes & accounts', 'Your own models', 'Connectors', 'When a route hits its limit'],
     alsoKnownAs: {
       // "node" and "npm" are what a person types after the first screen has
       // just talked to them about Node. This is the page about the CLIs that
       // are installed with them.
       'Runtimes & accounts': ['node', 'node.js', 'npm', 'install', 'cli', 'model', 'models', 'sign in', 'account', 'api key'],
+      'Your own models': ['own model', 'custom model', 'add model', 'endpoint', 'base url', 'address', 'openai', 'compatible', 'ollama', 'vllm', 'lm studio', 'local model', 'company', 'key'],
       Connectors: ['mcp', 'tools', 'server'],
       'When a route hits its limit': ['limit', 'quota', 'rate limit', 'usage', 'fallback']
     }

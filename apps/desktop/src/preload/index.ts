@@ -74,6 +74,10 @@ import {
   TEAMMATE_REMOVE_CHANNEL,
   TEAMMATE_UPDATE_CHANNEL,
   TEAMMATE_SPEND_CHANNEL,
+  OWN_MODEL_LIST_CHANNEL,
+  OWN_MODEL_ADD_CHANNEL,
+  OWN_MODEL_REMOVE_CHANNEL,
+  OWN_MODEL_TEST_CHANNEL,
   MEMORY_LIST_CHANNEL,
   MEMORY_ADD_CHANNEL,
   MEMORY_UPDATE_CHANNEL,
@@ -139,6 +143,11 @@ import type {
   TeammateMutationResponse,
   TeammateSpendResponse,
   TeammateUpdateRequest,
+  OwnModelAddRequest,
+  OwnModelListResponse,
+  OwnModelMutationResponse,
+  OwnModelTestRequest,
+  OwnModelTestResponse,
   RoutineCreateRequest,
   RoutineListResponse,
   RoutineMutationResponse,
@@ -232,6 +241,10 @@ const desktopApi: DesktopApi = {
   updateTeammate: (request: TeammateUpdateRequest) =>
     ipcRenderer.invoke(TEAMMATE_UPDATE_CHANNEL, request) as Promise<TeammateMutationResponse>,
   teammateSpend: () => ipcRenderer.invoke(TEAMMATE_SPEND_CHANNEL) as Promise<TeammateSpendResponse>,
+  listOwnModels: () => ipcRenderer.invoke(OWN_MODEL_LIST_CHANNEL) as Promise<OwnModelListResponse>,
+  addOwnModel: (request: OwnModelAddRequest) => ipcRenderer.invoke(OWN_MODEL_ADD_CHANNEL, request) as Promise<OwnModelMutationResponse>,
+  removeOwnModel: (ownId: string) => ipcRenderer.invoke(OWN_MODEL_REMOVE_CHANNEL, ownId) as Promise<OwnModelMutationResponse>,
+  testOwnModel: (request: OwnModelTestRequest) => ipcRenderer.invoke(OWN_MODEL_TEST_CHANNEL, request) as Promise<OwnModelTestResponse>,
   assignMission: (teammateId: string, missionId: string) =>
     ipcRenderer.invoke(TEAMMATE_ASSIGN_CHANNEL, { teammateId, missionId }) as Promise<TeammateMutationResponse>,
   renameMission: (missionId: string, title: string) =>

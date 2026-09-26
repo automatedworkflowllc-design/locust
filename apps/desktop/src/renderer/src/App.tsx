@@ -137,7 +137,7 @@ import { splitAttachments, withAttachments } from '../../shared/attachments.js'
 // different question from who owns a recorded mission.
 import { heldFor, routineOf } from './conversationList.js'
 import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
-import { modelDisplayName, shortRuntimeName } from './routeName.js'
+import { modelDisplayName, rememberOwnModels, shortRuntimeName } from './routeName.js'
 import { FeedbackDialog } from './components/FeedbackDialog.js'
 import { conversationText } from './feedback.js'
 import { withMessageDelta } from '../../shared/messageFragments.js'
@@ -1767,7 +1767,9 @@ export default function App(): ReactElement {
     void bridge
       .listModels()
       .then((response) => {
-        if (response.ok) setModels(response.data.models)
+        if (!response.ok) return
+        rememberOwnModels(response.data.models)
+        setModels(response.data.models)
       })
       .catch(() => {
         // Optional, as it always was: without it the picker offers the
@@ -2465,6 +2467,8 @@ export default function App(): ReactElement {
       .listModels()
       .then((response) => {
         if (!active || !response.ok) return
+        // Before the models land, so the first render names your own ones.
+        rememberOwnModels(response.data.models)
         setModels(response.data.models)
       })
       .catch(() => {
@@ -5507,6 +5511,7 @@ export default function App(): ReactElement {
                   .catch(() => setAutoMode(!next))
               }}
               askConnectors={askConnectors}
+              onOwnModelsChanged={readModels}
               onAskConnectorsChange={(next) => {
                 setAskConnectors(next)
                 void window.desktop

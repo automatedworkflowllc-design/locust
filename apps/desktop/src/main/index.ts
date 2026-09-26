@@ -5,7 +5,7 @@ import { ownGitArgs } from './git-guard.js'
 import { APP_USER_MODEL_ID, DEVELOPMENT_APP_USER_MODEL_ID, mayShowToasts, repairStartMenuShortcut, sweepStaleElectronShortcuts } from './stale-shortcut.js'
 import { openingPlacement, readSavedWindow } from './window-bounds.js'
 import type { SavedWindow } from './window-bounds.js'
-import { app, BrowserWindow, crashReporter, dialog, ipcMain, nativeTheme, Notification, screen, session, shell } from 'electron'
+import { app, BrowserWindow, crashReporter, dialog, ipcMain, nativeTheme, Notification, safeStorage, screen, session, shell } from 'electron'
 import electronUpdater from 'electron-updater'
 
 const { autoUpdater } = electronUpdater
@@ -76,6 +76,7 @@ const ROUTINE_FIRST_TICK_MS = 15_000
 import type { RoutineRunner } from './routine-runner.js'
 import { readOneMission, deleteMissionRecord, knownDigests, readMissionHistory, spendByTeammate } from './mission-history.js'
 import { limitReached, limitRefusal, monthOf } from '../shared/spend.js'
+import { createOwnModelStore, OwnModelRefusal, ownModelAddress, ownModelId, testOwnEndpoint } from './own-models.js'
 import { changelogPaths, entries as changelogEntries, readChangelog, splashEntries } from './changelog.js'
 import type { ChangelogEntry } from './changelog.js'
 import type { CodexMissionService } from './codex-mission.js'
@@ -193,7 +194,11 @@ import {
   TEAMMATE_LIST_CHANNEL,
   TEAMMATE_REMOVE_CHANNEL,
   TEAMMATE_UPDATE_CHANNEL,
-  TEAMMATE_SPEND_CHANNEL
+  TEAMMATE_SPEND_CHANNEL,
+  OWN_MODEL_LIST_CHANNEL,
+  OWN_MODEL_ADD_CHANNEL,
+  OWN_MODEL_REMOVE_CHANNEL,
+  OWN_MODEL_TEST_CHANNEL
 } from '../shared/ipc.js'
 import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { isMissionRuntime, runtimeDisplayName } from '../shared/runtimes.js'
@@ -1223,6 +1228,19 @@ if (!ownsSingleInstanceLock) {
     // (2026-09-05): the shared memory Claude Code and Cursor keep, managed
     // from the app -- so every memory names who, where and from what.
     const memories = createMemoryStore({ rootDirectory: app.getPath('userData') })
+    /*
+     * The person's own models (0.357): their company's endpoint, or one on
+     * this machine, run through OpenCode. A key is kept only as the
+     * operating system encrypts it (safeStorage: DPAPI on Windows).
+     */
+    const ownModels = createOwnModelStore({
+      rootDirectory: app.getPath('userData'),
+      secrets: {
+        available: () => safeStorage.isEncryptionAvailable(),
+        encrypt: (text) => safeStorage.encryptString(text),
+        decrypt: (cipher) => safeStorage.decryptString(cipher)
+      }
+    })
     const memoryWorkspaceId = workspaceChosen ? workspaceIdFor(workspacePath) : 'ws_none'
     const memoryWorkspaceName = workspaceChosen ? basename(workspacePath) || workspacePath : 'no folder'
     // The folder's own LOCUST.md rides in the same slot, first: read fresh at
@@ -1481,6 +1499,7 @@ if (!ownsSingleInstanceLock) {
       // A scripted launch spends nothing unless told to (free-routes.ts).
       freeRoutesOnly: freeRoutesOnly(process.argv, process.env),
       spendRefusal,
+      ownProvider: (model) => ownModels.providerFor(model),
       permissionHost,
       approvals,
       // A ledger write that fails mid-run names its reason in locust-errors.log.
@@ -1832,7 +1851,65 @@ if (!ownsSingleInstanceLock) {
       if (!fromOwnWindow(event)) {
         return { ok: false, error: { code: 'MODELS_UNAVAILABLE', message: 'Models could not be read.' } } as const
       }
-      return modelCatalog.read()
+      const read = await modelCatalog.read()
+      // The person's own, first, read fresh: adding one must show at once,
+      // not after the catalogue's ten-minute cache (0.357).
+      const own = await ownModels.catalog().catch(() => [])
+      if (own.length === 0) return read
+      return { ok: true, data: { models: [...own, ...(read.ok ? read.data.models : [])] } } as const
+    })
+
+    ipcMain.handle(OWN_MODEL_LIST_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return { ok: false, error: { code: 'OWN_MODELS_UNAVAILABLE', message: 'Your own models could not be read.' } } as const
+      try {
+        return { ok: true, data: { models: await ownModels.list() } } as const
+      } catch {
+        return { ok: false, error: { code: 'OWN_MODELS_UNAVAILABLE', message: 'Your own models could not be read.' } } as const
+      }
+    })
+    ipcMain.handle(OWN_MODEL_ADD_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, error: { code: 'OWN_MODEL_REFUSED', message: 'That model could not be added.' } } as const
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      try {
+        const model = await ownModels.add({ name: input.name, baseUrl: input.baseUrl, model: input.model, key: input.key })
+        return { ok: true, data: { model } } as const
+      } catch (error) {
+        // The store's own sentence when it refused; nothing about the key.
+        return { ok: false, error: { code: 'OWN_MODEL_REFUSED', message: error instanceof OwnModelRefusal ? error.message : 'That model could not be added.' } } as const
+      }
+    })
+    ipcMain.handle(OWN_MODEL_REMOVE_CHANNEL, async (event, ownId: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, error: { code: 'OWN_MODEL_REFUSED', message: 'That model could not be removed.' } } as const
+      try {
+        await ownModels.remove(ownId)
+        return { ok: true, data: {} } as const
+      } catch {
+        return { ok: false, error: { code: 'OWN_MODEL_REFUSED', message: 'That model could not be removed.' } } as const
+      }
+    })
+    ipcMain.handle(OWN_MODEL_TEST_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, error: { code: 'OWN_MODEL_REFUSED', message: 'That model could not be tested.' } } as const
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      try {
+        // A kept model is tested with its kept key, which never leaves this process.
+        if (typeof input.ownId === 'string') {
+          const kept = (await ownModels.list()).find((model) => model.ownId === input.ownId)
+          if (kept === undefined) return { ok: false, error: { code: 'OWN_MODEL_REFUSED', message: 'That model is no longer kept.' } } as const
+          const key = await ownModels.keyOf(kept.ownId)
+          const result = await testOwnEndpoint({ baseUrl: kept.baseUrl, model: kept.model, ...(key === undefined ? {} : { key }) })
+          return { ok: true, data: { reached: result.ok, said: result.said } } as const
+        }
+        const baseUrl = ownModelAddress(input.baseUrl)
+        const model = ownModelId(input.model)
+        if (baseUrl === undefined || model === undefined) {
+          return { ok: false, error: { code: 'OWN_MODEL_REFUSED', message: 'Fill in the address and the model first.' } } as const
+        }
+        const key = typeof input.key === 'string' && input.key.trim().length > 0 ? input.key.trim() : undefined
+        const result = await testOwnEndpoint({ baseUrl, model, ...(key === undefined ? {} : { key }) })
+        return { ok: true, data: { reached: result.ok, said: result.said } } as const
+      } catch {
+        return { ok: false, error: { code: 'OWN_MODEL_REFUSED', message: 'That model could not be tested.' } } as const
+      }
     })
 
     // What the person already set up inside the CLIs themselves. Read-only,

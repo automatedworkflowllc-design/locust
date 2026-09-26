@@ -3,7 +3,7 @@ import type { KeyboardEvent, ReactElement } from 'react'
 
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import type { PublicModel, PublicRuntimeStatus } from '../../../shared/ipc.js'
-import { ROUTE_GROUP_LIMIT, capRouteRows, integrationOf, modelFamily, orderRouteRows, recentRouteRows, routeRowStatus, routeRowTag, routeSearchText } from '../status.js'
+import { OWN_MODELS_GROUP, ROUTE_GROUP_LIMIT, capRouteRows, integrationOf, modelFamily, orderRouteRows, recentRouteRows, routeRowStatus, routeRowTag, routeSearchText } from '../status.js'
 import type { RouteTag } from '../status.js'
 import { modelDisplayName, routeModelName } from '../routeName.js'
 import { levelsLine } from '../effortScale.js'
@@ -137,7 +137,8 @@ function buildRows(
                 || levelsLine(model.supportedEfforts, effortName)
                 || efforts,
               fullDetail: described === undefined || described.length === 0 ? measured : `${described} · ${measured}`,
-              older: model.older === true
+              older: model.older === true,
+              own: model.own === true
             }
           })
         : // The catalogue could not be read for this runtime, so there is one
@@ -145,7 +146,7 @@ function buildRows(
           // the catalogue labels it -- a person reading a lowercase
           // `account-default` on the only ACTIVE row is reading a placeholder
           // that leaked (outside review, 2026-09-07).
-          [{ model: 'account-default', label: 'Account default', detail: status.detail, fullDetail: status.detail, older: false }]
+          [{ model: 'account-default', label: 'Account default', detail: status.detail, fullDetail: status.detail, older: false, own: false }]
 
     for (const entry of entries) {
       // A route saved on one of a family's variants is still on that row: a
@@ -156,7 +157,8 @@ function buildRows(
         (entry.model === active.model || modelFamily(models, runtime.id, active.model)?.id === entry.model)
       rows.push({
         key: `${runtime.id}:${entry.model}`,
-        group,
+        // A model the person added runs on OpenCode and is listed as theirs.
+        group: entry.own ? OWN_MODELS_GROUP : group,
         runtime: runtime.id as MissionRuntimeId,
         model: entry.model,
         label: entry.label,

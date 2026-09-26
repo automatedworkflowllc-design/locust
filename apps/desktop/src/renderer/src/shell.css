@@ -8004,6 +8004,77 @@ textarea {
 }
 .lc-settingrow:first-child { border-top: 0; }
 .lc-settingrow:hover { background: var(--lc-hover-surface); }
+
+/* --- Your own models (OwnModels.tsx, 0.357) ------------------------------
+ * The kept ones as setting rows -- name, then the model, the address and
+ * whether a key is kept, in the machine's voice -- and the form to add one
+ * as a card of the same kind below them. */
+.lc-ownmodels {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-4);
+}
+
+.lc-ownmodel {
+  gap: var(--lc-space-3);
+}
+
+.lc-ownmodel__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lc-ownmodel__name {
+  font-size: var(--lc-text-control);
+  font-weight: 600;
+  color: var(--lc-text-primary);
+}
+
+.lc-ownmodel__meta {
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-ownmodel__said {
+  margin: 0;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-secondary);
+}
+
+.lc-ownmodel__form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--lc-space-3) var(--lc-space-4);
+  padding: var(--lc-space-4) var(--lc-space-5);
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-raised);
+}
+
+.lc-ownmodel__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+  min-width: 0;
+}
+
+.lc-ownmodel__field--wide,
+.lc-ownmodel__actions,
+.lc-ownmodel__form .lc-ownmodel__said {
+  grid-column: 1 / -1;
+}
+
+.lc-ownmodel__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--lc-space-3);
+}
 .lc-settingrow > .lc-settings__note { flex: 1 1 auto; min-width: 0; }
 
 /*

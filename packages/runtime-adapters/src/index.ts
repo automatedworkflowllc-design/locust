@@ -129,6 +129,7 @@ export type {
   RuntimeReadiness,
 } from "./types.js";
 export { parseClaudeModelHints } from "./commands.js";
+export type { OpenCodeProvider } from "./commands.js";
 export type { RuntimeModelHints } from "./types.js";
 export {
   createCursorPrintCommand,
@@ -149,6 +150,7 @@ export {
   PROMPT_FILE_PLACEHOLDER,
   createOpenCodeRunCommand,
   createOpenCodeServeCommand,
+  withOpenCodeProviders,
   OPENCODE_READ_ONLY_CONFIG,
   MUSE_REQUIRED_FEATURES,
   OPENCODE_REQUIRED_FEATURES,

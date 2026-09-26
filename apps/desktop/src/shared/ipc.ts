@@ -1422,7 +1422,59 @@ export interface PublicModel {
    * is great, accessible but not crowding".
    */
   readonly older?: boolean
+  /**
+   * A model the person added themselves (0.357): their company's endpoint,
+   * or one on this machine, run through OpenCode. The picker lists these in
+   * a group of their own, first.
+   */
+  readonly own?: true
 }
+
+/**
+ * A model of the person's own, as the window sees it: never its key, only
+ * whether one is kept (main/own-models.ts).
+ */
+export interface PublicOwnModel {
+  readonly ownId: string
+  /** What the person called it. */
+  readonly name: string
+  /** The OpenAI-compatible address, like https://llm.example.com/v1. */
+  readonly baseUrl: string
+  /** The id the endpoint knows the model by. */
+  readonly model: string
+  readonly hasKey: boolean
+  readonly createdAt: string
+}
+
+export const OWN_MODEL_LIST_CHANNEL = 'ownModels:list'
+export const OWN_MODEL_ADD_CHANNEL = 'ownModels:add'
+export const OWN_MODEL_REMOVE_CHANNEL = 'ownModels:remove'
+export const OWN_MODEL_TEST_CHANNEL = 'ownModels:test'
+
+export interface OwnModelAddRequest {
+  readonly name: string
+  readonly baseUrl: string
+  readonly model: string
+  /** Absent for an endpoint that asks for none. Kept only encrypted, and never sent back. */
+  readonly key?: string
+}
+
+/** Test a model before adding it (the form's own values), or one already kept (by id, with its kept key). */
+export type OwnModelTestRequest =
+  | { readonly baseUrl: string; readonly model: string; readonly key?: string }
+  | { readonly ownId: string }
+
+export type OwnModelListResponse =
+  | { readonly ok: true; readonly data: { readonly models: readonly PublicOwnModel[] } }
+  | { readonly ok: false; readonly error: { readonly code: 'OWN_MODELS_UNAVAILABLE'; readonly message: string } }
+
+export type OwnModelMutationResponse =
+  | { readonly ok: true; readonly data: { readonly model?: PublicOwnModel } }
+  | { readonly ok: false; readonly error: { readonly code: 'OWN_MODEL_REFUSED'; readonly message: string } }
+
+export type OwnModelTestResponse =
+  | { readonly ok: true; readonly data: { readonly reached: boolean; readonly said: string } }
+  | { readonly ok: false; readonly error: { readonly code: 'OWN_MODEL_REFUSED'; readonly message: string } }
 
 export type ModelCatalogResponse =
   | { readonly ok: true; readonly data: { readonly models: readonly PublicModel[] } }
@@ -2300,6 +2352,10 @@ export interface DesktopApi {
   createTeammate(request: TeammateCreateRequest): Promise<TeammateMutationResponse>
   updateTeammate(request: TeammateUpdateRequest): Promise<TeammateMutationResponse>
   teammateSpend(): Promise<TeammateSpendResponse>
+  listOwnModels(): Promise<OwnModelListResponse>
+  addOwnModel(request: OwnModelAddRequest): Promise<OwnModelMutationResponse>
+  removeOwnModel(ownId: string): Promise<OwnModelMutationResponse>
+  testOwnModel(request: OwnModelTestRequest): Promise<OwnModelTestResponse>
   removeTeammate(teammateId: string): Promise<TeammateMutationResponse>
   assignMission(teammateId: string, missionId: string): Promise<TeammateMutationResponse>
   /** Name a conversation. An empty name clears it back to what was typed. */

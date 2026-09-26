@@ -1134,6 +1134,9 @@ export function recentRouteRows<TRow extends { readonly key: string; readonly gr
   return picked
 }
 
+/** The picker's group for the models a person added themselves. */
+export const OWN_MODELS_GROUP = 'Your models'
+
 export function orderRouteRows<
   TRow extends {
     readonly key: string
@@ -1216,6 +1219,10 @@ export function orderRouteRows<
      */
     const byBand = (groupBand.get(left.group) ?? 9) - (groupBand.get(right.group) ?? 9)
     if (byBand !== 0) return byBand
+    // The person's own models lead their band (0.357): a model you added is
+    // the one you came to use, and "Your models" would otherwise sort last.
+    const own = Number(right.group === OWN_MODELS_GROUP) - Number(left.group === OWN_MODELS_GROUP)
+    if (own !== 0) return own
     const byGroup = left.group.localeCompare(right.group)
     if (byGroup !== 0) return byGroup
     return score(left) - score(right)

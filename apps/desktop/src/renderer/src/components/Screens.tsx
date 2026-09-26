@@ -55,6 +55,7 @@ import { FeedbackDialog } from './FeedbackDialog.js'
 import { WorktreeRow } from './WorktreeRow.js'
 import type { WorktreeRemoval } from './WorktreeRow.js'
 import { ArmedButton } from './ArmedButton.js'
+import { OwnModels } from './OwnModels.js'
 import { routineAwaitsReview } from '../../../shared/routine-recovery.js'
 
 export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings' | 'rooms' | 'memory' | 'automations'
@@ -1295,6 +1296,7 @@ export function SettingsScreen({
   keepATodoList,
   onKeepATodoListChange,
   onAskConnectorsChange,
+  onOwnModelsChanged,
   swarm,
   tube,
   replySize,
@@ -1400,6 +1402,8 @@ export function SettingsScreen({
   readonly onAutoModeChange: (autoMode: boolean) => void
   readonly askConnectors: boolean
   readonly onAskConnectorsChange: (askConnectors: boolean) => void
+  /** A model of the person's own was added or removed: the model list is read again. */
+  readonly onOwnModelsChanged?: () => void
   readonly keepATodoList: boolean
   readonly onKeepATodoListChange: (keepATodoList: boolean) => void
   /** The autonomy budget: automatic replies one exchange may use before it waits for a person. */
@@ -1901,6 +1905,33 @@ export function SettingsScreen({
             </div>
           )}
         </section>
+        {/*
+          * A company's own model, or one on this machine (0.357). Colin: his
+          * father's company builds a model of its own and could "just insert
+          * their model". Anything that speaks the OpenAI chat API runs
+          * through OpenCode, listed under its own name.
+          */}
+        {onOwnModelsChanged !== undefined && (
+          <section className="lc-settings__section">
+            <h2 className="lc-settings__heading">Your own models</h2>
+            <p className="lc-settings__lede">
+              A model your company runs, or one on this machine, in every teammate&rsquo;s model list under its own name.
+            </p>
+            <More>
+              <p>
+                Anything that speaks the OpenAI chat API works: a company&rsquo;s own endpoint, vLLM, Ollama&rsquo;s /v1,
+                LM Studio. Teammates reach it through OpenCode, so OpenCode needs to be installed; it is the model&rsquo;s
+                name, not OpenCode&rsquo;s, that the model list and the chat bar show.
+              </p>
+              <p>
+                A key is kept only as Windows encrypts it for your account, and never shown again; it is sent to that
+                address and nowhere else. Test asks the address which models it serves, so a mistyped model name is
+                caught before a teammate tries it.
+              </p>
+            </More>
+            <OwnModels onChanged={onOwnModelsChanged} />
+          </section>
+        )}
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Connectors</h2>
           <p className="lc-settings__lede">
