@@ -1075,6 +1075,14 @@ export function Thread({
         {cardsFor(earlierTurns.length, 'before-work').map(peerCard)}
 
         <ThreadItems
+          /*
+           * Keyed by the turn's mission (code review B4, renderer-thread (b)).
+           * The window draws one Thread and swaps what it shows, so without a
+           * key this list -- and the activity card inside it, open, toggled,
+           * "show all" -- was the SAME component from one conversation to the
+           * next, and a card opened in one arrived open in another.
+           */
+          key={restoredMission?.missionId ?? events.find((event) => event.missionId !== undefined)?.missionId ?? 'starting'}
           {...(onOpenFile === undefined ? {} : { onOpenFile })}
           items={items}
           owner={peers.self}

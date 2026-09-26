@@ -715,6 +715,12 @@ export function Composer({
   }
 
   const keyDown = (keyEvent: KeyboardEvent<HTMLTextAreaElement>): void => {
+    // Every key belongs to an input method while it is composing (code review
+    // B4, renderer-thread (a)): Enter there confirms a Korean or Japanese
+    // word, and was sending the half-typed message; Escape cancels the
+    // composition, and was stopping the run. 229 is the key code an IME
+    // reports where `isComposing` is not set.
+    if (keyEvent.nativeEvent.isComposing || keyEvent.keyCode === 229) return
     // While the slash menu is open the arrows and Enter belong to it. Enter
     // must NOT fall through to submit: sending "/plan" as a message to a
     // teammate is the one outcome this feature exists to prevent.
