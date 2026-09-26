@@ -3209,6 +3209,18 @@ textarea {
   gap: var(--lc-space-6);
 }
 
+/*
+ * A stuck post head sits flush with the top of the room, not 14px below it.
+ *
+ * Sticky keeps to the scroller's padding, and `.lc-screen__scroll` has 14px on
+ * top -- so a post's answers scrolled through a strip ABOVE its own stuck
+ * head, a row of card chrome peeking over "2 asked · all answered"
+ * (drive-room-ask-one, 2026-09-26).
+ */
+.lc-room__thread .lc-posthead {
+  top: -14px;
+}
+
 .lc-roompost {
   display: flex;
   flex-direction: column;
@@ -3584,6 +3596,12 @@ textarea {
 
 .lc-roomanswer__who .lc-ghostbutton {
   margin-left: auto;
+}
+
+/* Reply and Open are one pair at the end of the line (0.371): only the first
+   takes the free space, or the two split it and Reply floats mid-card. */
+.lc-roomanswer__who .lc-ghostbutton + .lc-ghostbutton {
+  margin-left: 0;
 }
 
 .lc-roomanswer__text {
