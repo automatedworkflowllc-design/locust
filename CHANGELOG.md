@@ -11,6 +11,28 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.353.0 - 2026-09-26
+
+### New
+
+- **A monthly limit for each teammate.** In Edit teammate, set the most a
+  teammate may spend in a month. Locust checks it before every run it starts
+  for them — your messages, their replies to other teammates, routines and
+  rooms — and once this month's priced runs reach it, that teammate starts
+  nothing until you raise the limit or the month ends. A message you send
+  stays in the box, with the reason. Runs on a plan or a free model are not
+  priced, so they never count.
+
+### Improved
+
+- **A teammate's card says what they spent this month**, and against their
+  limit when they have one.
+
+### Fixed
+
+- A teammate's cost, and the Missions total, left out older conversations:
+  only your most recent ones were added up.
+
 ## 0.352.0 - 2026-09-26
 
 ### Improved
