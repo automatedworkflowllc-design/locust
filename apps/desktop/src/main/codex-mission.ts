@@ -42,7 +42,7 @@ import type {
   MissionHandoffResponse,
   MissionMode
 } from '../shared/ipc.js'
-import { openCodePermissionRequest, openCodeReplyFor, withFileChanges } from './approval-channel.js'
+import { openCodePermissionRequest, openCodeReplyFor, withDeclines, withFileChanges } from './approval-channel.js'
 import type { EditCheckResult } from './edit-check.js'
 import type { ApprovalChannel } from './approval-channel.js'
 import { fileChangesOf, itemOf } from './approval-patch.js'
@@ -1343,7 +1343,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
                 const changes = fileChangesOf(found.item)
                 if (changes !== undefined) changesByItem.set(found.id, changes)
               }
-              return withFileChanges(inner.accept(record), changesByItem, runCwd)
+              // A call the person declined reads as declined, however Codex put it (0.374).
+              return withDeclines(withFileChanges(inner.accept(record), changesByItem, runCwd), options.approvals?.declined(runId))
             },
             finish: (completion) => inner.finish(completion)
           }

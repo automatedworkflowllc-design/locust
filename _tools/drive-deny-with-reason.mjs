@@ -12,7 +12,9 @@
 // Wren asks next. The folder must still be there; kept.txt is the evidence
 // Wren read the reason and changed course.
 //
-// Free model only.
+// Free model by default. LOCUST_DENY_ON_CODEX=1 (with LOCUST_SPEND=1) runs
+// Wren on Codex (GPT-6-Luna, low effort) instead: Codex's reply has no room
+// for a reason, so there the reason reaches the run as its next input.
 
 import { existsSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
@@ -26,19 +28,24 @@ const tag = arg('--tag') ?? 'local'
 const OUT = join(recordRoot('deny-with-reason-2026-09-26'), `deny-with-reason-${tag}`)
 await mkdir(OUT, { recursive: true })
 
-const MODEL = process.env.LOCUST_FREE_MODEL ?? 'opencode/nemotron-3-ultra-free'
+const ON_CODEX = process.env.LOCUST_DENY_ON_CODEX === '1'
+const MODEL = ON_CODEX ? 'gpt-6-luna' : process.env.LOCUST_FREE_MODEL ?? 'opencode/nemotron-3-ultra-free'
+const ROUTE = ON_CODEX ? { runtime: 'codex', model: MODEL, mode: 'accept-edits', effort: 'low' } : { runtime: 'opencode', model: MODEL, mode: 'accept-edits' }
 const workspace = await scratchRepository('locust-deny-reason-ws-')
 await mkdir(join(workspace, 'build'), { recursive: true })
 await writeFile(join(workspace, 'build', 'artifact.txt'), 'built\n')
 const drive = await startDrive({
   name: `deny-with-reason-${tag}`,
   port: 9675,
+  spends: ON_CODEX,
+  // LOCUST_DRIVE_KEEP=1 leaves the profile, and its record, for reading afterwards.
+  keep: process.env.LOCUST_DRIVE_KEEP === '1',
   workspace,
   outPath: OUT,
   ...(packaged === undefined ? {} : { packaged }),
   seed: {
     schemaVersion: 1,
-    teammates: [{ teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: '2026-09-26T05:00:00.000Z', route: { runtime: 'opencode', model: MODEL, mode: 'accept-edits' } }],
+    teammates: [{ teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: '2026-09-26T05:00:00.000Z', route: ROUTE }],
     missionOwners: {},
     settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: false }
   }

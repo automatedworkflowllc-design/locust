@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.375.0 - 2026-09-26
+
+### Fixed
+
+- **A command you deny on Codex reads as refused, not failed.** Codex now
+  reports a denied command as a failed script, so the row showed "failed"
+  in red and the summary counted a command that "exited non-zero". Locust
+  answered that approval itself, so it now says what happened: refused.
+
 ## 0.374.0 - 2026-09-26
 
 ### New

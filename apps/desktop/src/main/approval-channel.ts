@@ -353,6 +353,31 @@ export function withFileChanges(
   })
 }
 
+/**
+ * A call the person declined, recorded as declined (0.374).
+ *
+ * Codex 0.157 runs a command inside a script, and a declined approval comes
+ * back as the script FAILING -- `Rejected("approval request failed")`, no
+ * `declined` status -- so the row read "failed" in red and the fold counted
+ * it as a command that "exited non-zero" (drive-deny-with-reason on Codex).
+ * Nothing failed: the person said no. Locust answered that approval itself,
+ * so it does not need Codex's words for it -- a failure of an item the
+ * person declined is said as declined, and reads "refused" like every other
+ * runtime's.
+ */
+export function withDeclines(
+  events: readonly NormalizedRuntimeEvent[],
+  declined: ReadonlySet<string> | undefined
+): readonly NormalizedRuntimeEvent[] {
+  if (declined === undefined || declined.size === 0) return events
+  return events.map((event) => {
+    if (event.type !== 'tool.failed') return event
+    const payload = event.payload as { readonly itemId?: string; readonly status?: string }
+    if (payload.itemId === undefined || !declined.has(payload.itemId) || payload.status === 'declined') return event
+    return { ...event, payload: { ...payload, status: 'declined' } } as NormalizedRuntimeEvent
+  })
+}
+
 /** What a request handler needs to know about the run it is answering for. */
 export interface ApprovalRun {
   readonly runId: string
@@ -375,6 +400,8 @@ export interface ApprovalChannel {
   decide(answer: MissionApprovalAnswer): boolean
   /** The run is over: refuse whatever it was still asking, so no card waits forever. */
   release(runId: string): void
+  /** The items in a run the person declined, by item id (`withDeclines`). */
+  declined(runId: string): ReadonlySet<string>
   readonly pendingCount: number
 }
 
@@ -410,11 +437,15 @@ export function createApprovalChannel(options: ApprovalChannelOptions): Approval
     readonly kind: MissionApprovalKind
     /** Whose request: OpenCode's reply carries a denial's reason, Codex's does not. */
     readonly runtime: MissionRuntimeId | undefined
+    /** The item the request is about, when the runtime named one. */
+    readonly itemId: string | undefined
     readonly resolve: (value: JsonValue) => void
   }
   const approvals = new Map<string, Pending>()
+  const declinedByRun = new Map<string, Set<string>>()
 
   const release = (runId: string): void => {
+    declinedByRun.delete(runId)
     for (const [approvalId, pending] of approvals) {
       if (pending.runId !== runId) continue
       approvals.delete(approvalId)
@@ -448,7 +479,7 @@ export function createApprovalChannel(options: ApprovalChannelOptions): Approval
         const offered = typeof requestParams.unifiedDiff === 'string' ? diffPatchFrom(requestParams.unifiedDiff, run.cwd) : undefined
         const patch = approvalPatchFrom(changes, run.cwd) ?? offered
         return await new Promise<JsonValue>((resolve) => {
-          approvals.set(approvalId, { runId, missionId, kind: described.kind, runtime: run.runtime, resolve })
+          approvals.set(approvalId, { runId, missionId, kind: described.kind, runtime: run.runtime, itemId, resolve })
           options.emitApproval({
             approvalId,
             runId,
@@ -500,6 +531,11 @@ export function createApprovalChannel(options: ApprovalChannelOptions): Approval
         pending.resolve(protocolAnswerFor({ approvalId: answer.approvalId, decision: 'deny' }))
         return false
       }
+      if ('decision' in answer && answer.decision === 'deny' && pending.itemId !== undefined) {
+        const declined = declinedByRun.get(pending.runId) ?? new Set<string>()
+        declined.add(pending.itemId)
+        declinedByRun.set(pending.runId, declined)
+      }
       const reason = 'decision' in answer && answer.decision === 'deny' ? answer.reason : undefined
       if (reason === undefined) {
         pending.resolve(protocolAnswerFor(answer))
@@ -516,6 +552,10 @@ export function createApprovalChannel(options: ApprovalChannelOptions): Approval
     },
 
     release,
+
+    declined(runId) {
+      return declinedByRun.get(runId) ?? new Set<string>()
+    },
 
     get pendingCount() {
       return approvals.size
