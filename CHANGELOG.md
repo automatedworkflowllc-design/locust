@@ -11,6 +11,32 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.350.0 - 2026-09-26
+<!-- big -->
+
+### Improved
+
+- **Home leads with your team.** A card for each teammate -- their face,
+  what they do and the model they run on -- opens a conversation with them.
+  When every coding agent on this machine is ready, the list of them folds
+  to one line; it opens again the moment one needs you.
+- **Conversations read more like Claude's.** A conversation starts at the
+  top of the window. The header shows the model, and says more only when
+  something happened -- running, stopped, failed. The record behind a
+  finished conversation is one quiet "Details" link instead of a card.
+- **Colour codes show their colour** beside them.
+- **The sidebar's titles are longer**, and each row's actions button now
+  appears when you point at the row.
+
+### Fixed
+
+- The receipt's text sat against the card's edge; Team cards did not line
+  up when a model name was long; memory by-lines were larger than the
+  memories; the Forget buttons were out of place; "All 1 hunk shown";
+  Codex file rows said "file_change".
+- Settings now says plainly that your teammates are the same in every
+  folder, and what changes with the folder.
+
 ## 0.349.0 - 2026-09-26
 
 ### Fixed
