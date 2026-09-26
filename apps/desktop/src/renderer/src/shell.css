@@ -5014,28 +5014,6 @@ textarea {
   gap: var(--lc-space-4);
 }
 
-/* New teammate: a quiet action at the head's end, like Claude's New project. */
-.lc-hometeam__new {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
-  margin-right: -8px;
-  border: 0;
-  border-radius: var(--lc-radius-control);
-  background: transparent;
-  color: var(--lc-text-secondary);
-  font: inherit;
-  font-size: var(--lc-text-description);
-  cursor: pointer;
-  transition: color var(--lc-motion-hover) var(--lc-ease), background var(--lc-motion-hover) var(--lc-ease);
-}
-
-.lc-hometeam__new:hover {
-  color: var(--lc-text-primary);
-  background: var(--lc-hover-surface);
-}
-
 .lc-hometeam__head {
   margin: 0;
   font-family: var(--lc-font-mono);
@@ -5046,13 +5024,21 @@ textarea {
   color: var(--lc-text-muted);
 }
 
-/* `auto-fit`, capped: three teammates share a wide row instead of leaving a
-   fourth, empty slot beside them (auto-fill did, at 1920, and cut their model
-   names), and one teammate is a card, not a banner across the column. */
+/*
+ * THREE ACROSS, always -- the column is never narrower than 700px, so a third
+ * of it is a card with room for a model's name.
+ *
+ * Two automatic layouts were tried and each failed at a size: `auto-fill`
+ * made room for a fourth card at 1920 and left an empty slot beside three,
+ * cutting their names; `auto-fit` with a width cap counted columns by the cap,
+ * so at 1440 three teammates wrapped two and one (drive-first-impressions,
+ * cover-grows). Fixed thirds: three teammates fill the row at every width, one
+ * is a third-width card rather than a banner, and a fourth starts the next
+ * row, as Claude's own project grid does.
+ */
 .lc-hometeam__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(196px, 290px));
-  justify-content: start;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--lc-space-3);
 }
 
@@ -13791,8 +13777,12 @@ textarea {
  * above, and at equal specificity the later rule wins.
  */
 
-/* A chip: 36px, a pill, frosted -- a ring and a top highlight, no border. */
-.lc-composer__controls .lc-control--boxed {
+/* A chip: 36px, a pill, frosted -- a ring and a top highlight, no border.
+   `.lc-chipbutton` is the same chip outside the composer (Home's New
+   teammate): one rule for both, so the two can never drift apart (Colin,
+   2026-09-26: "a proper button like the ones in the chatbar"). */
+.lc-composer__controls .lc-control--boxed,
+.lc-chipbutton {
   height: 36px;
   padding: 0 10px 0 14px;
   gap: 4px;
@@ -13807,8 +13797,21 @@ textarea {
   line-height: 14px;
 }
 
-.lc-composer__controls .lc-control--boxed:hover:not(:disabled) {
+.lc-composer__controls .lc-control--boxed:hover:not(:disabled),
+.lc-chipbutton:hover:not(:disabled) {
   background: var(--lc-chip-bg-hover);
+}
+
+/* A chip that leads with its icon mirrors one that ends in a chevron: the
+   tighter side is the icon's. */
+.lc-chipbutton {
+  padding: 0 14px 0 11px;
+  gap: 6px;
+}
+
+.lc-chipbutton:focus-visible {
+  outline: 2px solid var(--lc-lime-border-strong);
+  outline-offset: 2px;
 }
 
 /*

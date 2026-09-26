@@ -49,8 +49,9 @@ export function HomeTeam({
       <div className="lc-hometeam__top">
         <h2 className="lc-hometeam__head">Your team</h2>
         {onNewTeammate !== undefined && (
-          <button type="button" className="lc-hometeam__new" onClick={onNewTeammate}>
-            <Icon name="plus" size={12} /> New teammate
+          <button type="button" className="lc-control lc-control--boxed lc-chipbutton" onClick={onNewTeammate}>
+            <Icon name="plus" size={13} />
+            New teammate
           </button>
         )}
       </div>

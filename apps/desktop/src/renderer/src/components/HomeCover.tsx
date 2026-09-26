@@ -49,6 +49,35 @@ export const COVER_HEIGHT = 254
 /** The narrowest reading column, and so the scale the card starts at before it is measured. */
 const FIRST_SCALE = 760 / COVER_WIDTH
 
+/**
+ * HOW MUCH THE DRAWING MAY GROW INTO SPARE HEIGHT.
+ *
+ * Colin, 2026-09-26, on Home at a large window: "theres lots of dead space,
+ * might need to make logo bigger". The card takes the column's width, and the
+ * column stops at 980px, so on a tall window the cover stayed its width's size
+ * and every extra pixel of height was empty space above it. The DRAWING only
+ * spans the middle of its canvas -- the machine is 560 of 960 units wide, the
+ * three bots stand on it -- so it can grow about its centre without the card,
+ * or the column the composer shares, moving at all.
+ *
+ * Two limits, both measured rather than guessed: the drawing keeps 3% of the
+ * card clear on each side (`coverWidthGrow`), and it grows at most 1.45x --
+ * past that the machine stops reading as an object on the page and starts
+ * reading as the page.
+ */
+export const COVER_MAX_GROW = 1.45
+
+/** The most the drawing can grow and keep 3% of the card clear each side. Read from the machine, which is the drawing's widest part. */
+function coverWidthGrow(): number {
+  return (0.94 * COVER_WIDTH) / COVER_MACHINE.width
+}
+
+/** The grow factor for this much spare height above a cover of this height. */
+export function coverGrowFor(room: number, baseHeight: number): number {
+  if (!Number.isFinite(room) || !Number.isFinite(baseHeight) || baseHeight <= 0 || room <= 0) return 1
+  return Math.round(Math.min(COVER_MAX_GROW, coverWidthGrow(), 1 + room / baseHeight) * 1000) / 1000
+}
+
 /** The cover drawn to fit a card this many pixels wide. */
 export function coverScale(width: number): number {
   if (!Number.isFinite(width) || width <= 0) return Math.round(FIRST_SCALE * 1000) / 1000
@@ -235,7 +264,7 @@ function reducedMotion(): boolean {
 }
 
 /** The swarm, once: every flight, then it tells the cover it has gone. */
-function SwarmRun({ scale, onGone }: { readonly scale: number; readonly onGone: () => void }): ReactElement {
+function SwarmRun({ scale, originX = 0, onGone }: { readonly scale: number; readonly originX?: number; readonly onGone: () => void }): ReactElement {
   const flyers = useRef<(HTMLSpanElement | null)[]>([])
   useEffect(() => {
     const running: Animation[] = []
@@ -268,7 +297,7 @@ function SwarmRun({ scale, onGone }: { readonly scale: number; readonly onGone: 
     // One run per mount: the cover gives each run its own key.
   }, [])
   return (
-    <span className="lc-cover__swarm" aria-hidden="true">
+    <span className="lc-cover__swarm" aria-hidden="true" style={originX === 0 ? undefined : { transform: `translateX(${String(originX)}px)` }}>
       {SWARM_FLIGHTS.map((flight, index) => (
         <span
           key={index}
@@ -288,13 +317,16 @@ function SwarmRun({ scale, onGone }: { readonly scale: number; readonly onGone: 
 export function HomeCover({
   ready,
   tube,
-  swarmCalls = 0
+  swarmCalls = 0,
+  grow = 1
 }: {
   /** The runtimes have answered: the loading screen's work is done. */
   readonly ready: boolean
   readonly tube: TubePreference
   /** How many times swarm has been turned on this session: each new one flies the swarm across. */
   readonly swarmCalls?: number
+  /** Spare height the page gives the drawing, as a factor (`coverGrowFor`). */
+  readonly grow?: number
 }): ReactElement {
   const card = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(() => coverScale(0))
@@ -419,7 +451,14 @@ export function HomeCover({
     return () => observer.disconnect()
   }, [])
 
-  const at = (value: number): number => Math.round(value * scale)
+  // `scale` fits the canvas to the card; `drawn` is that grown by the room
+  // the page gives (`grow`), about the canvas's centre -- so `left` is offset
+  // by half of what the canvas outgrew, and the drawing stays centred on a
+  // card that did not move.
+  const drawn = Math.round(scale * Math.min(Math.max(1, grow), COVER_MAX_GROW, coverWidthGrow()) * 1000) / 1000
+  const originX = Math.round((scale - drawn) * COVER_WIDTH / 2)
+  const at = (value: number): number => Math.round(value * drawn)
+  const atX = (value: number): number => originX + at(value)
   return (
     /*
      * A mono beam goes round the title box WHILE THE RUNTIMES ARE BEING
@@ -435,10 +474,10 @@ export function HomeCover({
      * does not wait for the window's focus as the bots do: loading is a few
      * seconds, and a window that is still being shown may not have it yet.
      */
-      <div className="lc-cover lc-cover--machine" ref={card} style={{ '--lc-cover-k': String(scale) } as CSSProperties}>
+      <div className="lc-cover lc-cover--machine" ref={card} style={{ '--lc-cover-k': String(drawn) } as CSSProperties}>
         <div
           className="lc-cover__machineslot"
-          style={{ left: at(COVER_MACHINE.x), top: at(COVER_MACHINE.y), width: at(COVER_MACHINE.width), height: at(COVER_MACHINE.height) }}
+          style={{ left: atX(COVER_MACHINE.x), top: at(COVER_MACHINE.y), width: at(COVER_MACHINE.width), height: at(COVER_MACHINE.height) }}
         >
           <Beam size="md" strength={0.85} active={!ready} className="lc-coverbeam lc-coverbeam--machine">
             <div className="lc-cover__machine">
@@ -453,13 +492,13 @@ export function HomeCover({
             </div>
           </Beam>
         </div>
-        {swarmRun !== undefined && <SwarmRun key={swarmRun} scale={scale} onGone={swarmGone} />}
+        {swarmRun !== undefined && <SwarmRun key={swarmRun} scale={drawn} originX={originX} onGone={swarmGone} />}
         {COVER_CAST.map((mate, index) => {
           const size = at(FACE)
           const color = mate.hue === undefined ? undefined : hueColor(mate.hue)
           const state = mate.key === SLEEPER && sleeper.awake ? 'default' : mate.state
           return (
-            <span key={mate.key} className="lc-cover__face" style={{ left: at(mate.x), top: at(mate.y) }}>
+            <span key={mate.key} className="lc-cover__face" style={{ left: atX(mate.x), top: at(mate.y) }}>
               <span
                 className={`lc-bot${ready && mate.floats === true ? ' is-floating' : ''}${ready && !awake ? ' is-resting' : ''}`}
                 data-bot={mate.type}

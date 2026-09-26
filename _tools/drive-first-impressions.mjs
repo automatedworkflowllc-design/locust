@@ -267,6 +267,14 @@ try {
   await sleep(1200)
   await drive.capture('1920 home', home)
   await drive.capture('1920 Wren', () => openConversation('Wren'))
+  // The two ends of the cover's growth (coverGrowFor): a big screen with room
+  // to spare, and a compact window with none, where it must be as it was.
+  await drive.resize(2560, 1440)
+  await sleep(1200)
+  await drive.capture('2560 home', home)
+  await drive.resize(1120, 720)
+  await sleep(1200)
+  await drive.capture('1120 home', home)
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {

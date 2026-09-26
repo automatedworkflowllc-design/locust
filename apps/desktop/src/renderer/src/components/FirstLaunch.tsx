@@ -4,7 +4,7 @@ import type { ReactElement } from 'react'
 import type { PublicRuntimeStatus, TubePreference } from '../../../shared/ipc.js'
 import { connectedRuntimeCount, deferredOthersSentence, integrationOf, routeRowStatus, runtimeIsUsable } from '../status.js'
 import { FREE_START_RUNTIME, installCommand, installSentence, runtimeInstallFacts, signInCommand } from '../../../shared/runtime-install.js'
-import { HomeCover } from './HomeCover.js'
+import { COVER_HEIGHT, HomeCover, coverGrowFor, coverScale } from './HomeCover.js'
 import { HomeTeam } from './HomeTeam.js'
 import type { HomeTeammate } from './HomeTeam.js'
 import { Icon } from './Icon.js'
@@ -245,11 +245,42 @@ export function FirstLaunch({
     }
   }, [])
 
+  /*
+   * THE COVER GROWS INTO SPARE HEIGHT (see `coverGrowFor`). Measured from what
+   * the page holds WITHOUT the cover's own growth -- everything else in the
+   * column, plus the cover at its width's size -- so a cover that grows does
+   * not shrink the room it was given and the two never chase each other. A
+   * little of the spare height is always left as air above it, and a window
+   * with none to spare draws the cover exactly as before.
+   */
+  const inner = useRef<HTMLDivElement>(null)
+  const [coverGrow, setCoverGrow] = useState(1)
+  useEffect(() => {
+    const paneEl = pane.current
+    const innerEl = inner.current
+    if (paneEl === null || innerEl === null || typeof ResizeObserver === 'undefined') return
+    const measure = (): void => {
+      const cover = innerEl.querySelector<HTMLElement>('.lc-cover')
+      if (cover === null) return
+      const padding = getComputedStyle(paneEl)
+      const usable = paneEl.clientHeight - parseFloat(padding.paddingTop) - parseFloat(padding.paddingBottom)
+      const base = COVER_HEIGHT * coverScale(cover.clientWidth)
+      const others = innerEl.offsetHeight - cover.offsetHeight
+      const air = Math.max(48, usable * 0.1)
+      setCoverGrow(coverGrowFor(usable - others - base - air, base))
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(paneEl)
+    observer.observe(innerEl)
+    return () => observer.disconnect()
+  }, [])
+
   return (
     <div className="lc-empty" ref={pane}>
-      <div className="lc-empty__inner">
+      <div className="lc-empty__inner" ref={inner}>
         {/* The design system's cover: the lockup lighting up once the runtimes have answered, and the teammates. */}
-        <HomeCover ready={discoveryPhase === 'ready'} tube={tube ?? 'full'} swarmCalls={swarmCalls} />
+        <HomeCover ready={discoveryPhase === 'ready'} tube={tube ?? 'full'} swarmCalls={swarmCalls} grow={coverGrow} />
 
         {/*
           * The only words on the screen, both carrying information: what
