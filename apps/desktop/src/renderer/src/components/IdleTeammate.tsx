@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 
 import type { MissionMode, PublicTeammate, TeammateRole } from '../../../shared/ipc.js'
-import { roleLabelOf } from '../../../shared/ipc.js'
+import { ROLE_DESCRIPTIONS, roleLabelOf } from '../../../shared/ipc.js'
 import { modeSentence } from '../status.js'
 import { TeammateBot } from './TeammateBot.js'
 
@@ -29,6 +29,12 @@ export { modeSentence }
  * They are suggestions, not capabilities: everything here is read-only phrasing
  * that any runtime can attempt, so a starter cannot promise something the
  * sandbox would refuse.
+ *
+ * A teammate made from a team template brings its own (0.359), in its team's
+ * world; these are for a teammate made by hand. Only the roles that ARE code
+ * speak of code: a Research or Data teammate may be looking at a folder of
+ * statements or drafts, and "this codebase" told a person who picked
+ * Research & money that Locust was not for them.
  */
 const STARTERS: Readonly<Record<TeammateRole, readonly string[]>> = {
   'Code & Migrations': [
@@ -37,34 +43,34 @@ const STARTERS: Readonly<Record<TeammateRole, readonly string[]>> = {
     'What would break first if traffic doubled?'
   ],
   'Research & Briefs': [
-    'Summarize what this codebase is for, for someone joining tomorrow.',
-    'List the decisions this project has already made that would be expensive to reverse.',
-    'What questions would you ask the author before changing anything?'
+    'Summarize what is in this folder, for someone seeing it for the first time.',
+    'List the decisions already made here that would be expensive to reverse.',
+    'What would you want to know before you started on anything here?'
   ],
   'Ops & Scheduling': [
-    'What routine work does this project seem to need that nobody has automated?',
-    'Read the scripts here and tell me what runs on a schedule.',
-    'Which failures here would nobody notice for a week?'
+    'What work here repeats, and which of it could run on a schedule?',
+    'Which failures here would nobody notice for a week?',
+    'Make me a checklist for the routine work this folder seems to need.'
   ],
   'Docs & QA': [
-    'Find documentation in this repo that no longer matches the code.',
-    'What is untested that would hurt most if it broke?',
-    'Read the README and tell me what a new person would still get wrong.'
+    'Find anything written here that no longer matches what it describes.',
+    'What here is unchecked that would hurt most if it were wrong?',
+    'Read the main document here and tell me what a new reader would still get wrong.'
   ],
   'Data & Reporting': [
-    'What data does this project produce, and where does it go?',
-    'Find every number this codebase reports and say where it comes from.',
-    'What would a weekly summary of this project contain?'
+    'Find the numbers in this folder and say where each one comes from.',
+    'What would a weekly summary of the work here contain?',
+    'Which figure here would you check first, and why?'
   ],
   'Chief of Staff': [
-    'Look at the team and tell me who should take what in this project.',
-    'Ask each teammate for one thing they would fix first, and bring me the list.',
-    'What is the state of this project? Delegate the reading and report back.'
+    'Look at the team and tell me who should take what.',
+    'Ask each teammate for one thing they would do first, and bring me the list.',
+    'What is the state of the work here? Delegate the reading and report back.'
   ],
   Custom: [
-    'Read this project and tell me what it does.',
-    'What is the most surprising thing in this codebase?',
-    'What should I look at first?'
+    'What can you help me with? Give me three concrete examples.',
+    'Ask me three questions about what I need, then suggest where to start.',
+    'Look at the files in this folder and tell me what you could do with them.'
   ]
 }
 
@@ -90,7 +96,9 @@ export function IdleTeammate({
   /** The composer's current permission mode: the sentence below must say what THIS mode does. */
   readonly mode: MissionMode
 }): ReactElement {
-  const starters = STARTERS[teammate.role] ?? STARTERS.Custom
+  const starters = teammate.starters ?? STARTERS[teammate.role] ?? STARTERS.Custom
+  // A Custom teammate's title is what they do; a built-in role says it in a few words.
+  const about = teammate.role === 'Custom' ? undefined : ROLE_DESCRIPTIONS[teammate.role]
 
   return (
     <div className="lc-empty">
@@ -98,7 +106,8 @@ export function IdleTeammate({
         <TeammateBot hue={teammate.hue} avatar={teammate.avatar} size={56} />
         <h1>{teammate.name}</h1>
         <p>
-          {roleLabelOf(teammate)} · reads this workspace and explains what it finds. {modeSentence(mode)}
+          {roleLabelOf(teammate)}
+          {about === undefined ? '' : ` · ${about}`}. {modeSentence(mode)}
         </p>
 
         <div className="lc-starters">

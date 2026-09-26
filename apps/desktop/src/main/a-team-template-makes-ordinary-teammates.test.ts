@@ -32,6 +32,10 @@ describe('the team templates', () => {
         expect(isBotSpec(mate.bot)).toBe(true)
         // A Custom teammate says what they do; a built-in role says it itself.
         expect(mate.role === 'Custom' ? (mate.roleTitle ?? '').length > 0 : mate.roleTitle === undefined).toBe(true)
+        // Three first messages of their own, each one the store keeps (0.359).
+        expect(mate.starters).toHaveLength(3)
+        expect(new Set(mate.starters).size).toBe(3)
+        for (const starter of mate.starters) expect(starter.length).toBeLessThanOrEqual(300)
       }
     }
   })
@@ -43,11 +47,27 @@ describe('the team templates', () => {
       const store = createTeammateStore({ rootDirectory: root })
       for (const mate of template.teammates) {
         const avatar = { ...seedAvatar(`template_${template.templateId}_${mate.name}`), bot: mate.bot }
-        const made = await store.create({ name: mate.name, hue: mate.hue, role: mate.role, ...(mate.roleTitle === undefined ? {} : { roleTitle: mate.roleTitle }), avatar })
+        const made = await store.create({ name: mate.name, hue: mate.hue, role: mate.role, ...(mate.roleTitle === undefined ? {} : { roleTitle: mate.roleTitle }), avatar, starters: mate.starters })
         expect(made.avatar.bot).toEqual(mate.bot)
         expect(made.route).toBeUndefined()
+        expect(made.starters).toEqual(mate.starters)
       }
       expect((await store.list()).map((mate) => mate.name)).toEqual(template.teammates.map((mate) => mate.name))
+    }
+  })
+
+  it("keep a teammate's first messages through an edit, and refuse a list that is not one (0.359)", async () => {
+    const root = await mkdtemp(join(tmpdir(), 'locust-template-'))
+    roots.push(root)
+    const store = createTeammateStore({ rootDirectory: root })
+    const sable = TEAM_TEMPLATES[1]!.teammates[0]!
+    const made = await store.create({ name: sable.name, hue: sable.hue, role: sable.role, starters: sable.starters })
+    // An edit of the name must not turn her money questions back into her role's.
+    const renamed = await store.update({ teammateId: made.teammateId, name: 'Sable Two', hue: made.hue, role: made.role, avatar: made.avatar })
+    expect(renamed.starters).toEqual(sable.starters)
+    expect((await store.list())[0]?.starters).toEqual(sable.starters)
+    for (const bad of [[], ['one', ''], ['x'.repeat(301)], ['a', 'b', 'c', 'd', 'e'], 'one line', [7]]) {
+      await expect(store.create({ name: 'Nope', hue: 'lime', role: 'Custom', starters: bad })).rejects.toThrow(/starters are invalid/)
     }
   })
 })

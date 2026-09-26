@@ -3714,6 +3714,7 @@ export default function App(): ReactElement {
           hue: mate.hue,
           role: mate.role,
           ...(mate.roleTitle === undefined ? {} : { roleTitle: mate.roleTitle }),
+          starters: mate.starters,
           avatar: templateAvatar(templateId, mate)
         })
         .catch(() => undefined)

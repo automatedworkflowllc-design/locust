@@ -18,14 +18,14 @@ import { sandboxPhrase } from './status.js'
  * but confidently inverted.
  */
 
-const render = (sandbox: 'read-only' | 'workspace-write' | 'full-access'): string =>
+const render = (sandbox: 'read-only' | 'workspace-write' | 'full-access', runtime = 'cursor', mode?: string): string =>
   renderToStaticMarkup(
     <Inspector
       events={[]}
       running={false}
       workspacePath={undefined}
       restoredMission={undefined}
-      route={{ runtime: 'cursor', model: 'composer-2.5', sandbox } as never}
+      route={{ runtime, model: 'composer-2.5', sandbox, ...(mode === undefined ? {} : { mode }) } as never}
       onClose={() => undefined}
     />
   )
@@ -50,9 +50,37 @@ describe('the permissions panel', () => {
   })
 
   it('still denies what a workspace-write run cannot do', () => {
-    const scoped = render('workspace-write')
-    expect(scoped).toContain('anything outside this folder')
+    const scoped = render('workspace-write', 'opencode')
+    expect(scoped).toContain('opening files outside this folder')
     expect(scoped).toContain('change files in this folder')
+  })
+
+  /*
+   * THE PANEL UNDER A RUN THAT SEARCHED THE WEB (0.359).
+   *
+   * One sentence served every runtime, and for OpenCode -- the free model a
+   * new person starts on -- it was false: "deny: ... any network access
+   * beyond the model's own", under two "Searched the web" rows (the
+   * first-session drive, packaged 0.358). What each runtime is given is
+   * pinned against its real command in what-it-may-do-is-what-it-was-given.
+   */
+  it('says an OpenCode run may search the web, and no runtime is told a network rule it was not given', () => {
+    expect(render('workspace-write', 'opencode')).toContain('search the web and open web pages')
+    for (const runtime of ['codex', 'claude', 'cursor', 'opencode', 'copilot', 'muse', 'antigravity']) {
+      for (const sandbox of ['read-only', 'workspace-write'] as const) {
+        expect(render(sandbox, runtime)).not.toContain("beyond the model's own")
+      }
+    }
+  })
+
+  it("leaves the rest to the runtime's own settings, by name", () => {
+    expect(render('workspace-write', 'antigravity')).toContain("Anything not listed is left to Antigravity&#x27;s own settings.")
+  })
+
+  it('says Approve each asks, rather than drawing Edit', () => {
+    const asking = render('workspace-write', 'opencode', 'approve-each')
+    expect(asking).toContain('once you approve each change')
+    expect(asking).not.toContain('opening files outside this folder, other than')
   })
 
   it('still refuses every write for a read-only run', () => {

@@ -1898,6 +1898,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             resolvedRouteId,
             cliVersion: chosen.version?.version ?? null,
             sandbox: effectiveSandbox,
+            mode,
             peerMessages: delivered.map((message) => publicPeerMessage(message, 'received')),
             peerDeliveryFailed,
             ...(resumedMissionId === undefined

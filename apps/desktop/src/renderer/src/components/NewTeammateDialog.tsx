@@ -5,6 +5,7 @@ import { useModal } from '../useModal.js'
 import { BOT_SHAPES, botFor, seedAvatar, shuffledAvatar } from '../../../shared/avatar.js'
 import type { AvatarSpec, BotShape } from '../../../shared/avatar.js'
 import type { MissionMode, PublicTeammate, TeammateHue, TeammateRole, PublicConnector, PublicModel, PublicRuntimeStatus, TeammateRoute } from '../../../shared/ipc.js'
+import { ROLE_DESCRIPTIONS } from '../../../shared/ipc.js'
 import { defaultEffort, modelFamily, modeRunsOn, modesFor, modeSummary } from '../status.js'
 import { effortFooter } from '../effortLevels.js'
 import { effortScale, joinEffort, splitEffort } from '../effortScale.js'
@@ -103,15 +104,9 @@ const SHAPE_NAMES: Readonly<Record<BotShape, string>> = {
   swarm: 'Swarm, a Locust'
 }
 
-const ROLES: readonly { readonly role: TeammateRole; readonly description: string }[] = [
-  { role: 'Code & Migrations', description: 'Repo work, refactors, test runs' },
-  { role: 'Research & Briefs', description: 'Reading, comparing, summarising' },
-  { role: 'Ops & Scheduling', description: 'Routine jobs and reminders' },
-  { role: 'Docs & QA', description: 'Written output and checking' },
-  { role: 'Data & Reporting', description: 'Spreadsheets, figures, digests' },
-  { role: 'Chief of Staff', description: 'Routes work to the team, reports back' },
-  { role: 'Custom', description: 'Describe the work yourself' }
-]
+const ROLES: readonly { readonly role: TeammateRole; readonly description: string }[] = (
+  ['Code & Migrations', 'Research & Briefs', 'Ops & Scheduling', 'Docs & QA', 'Data & Reporting', 'Chief of Staff', 'Custom'] as const
+).map((role) => ({ role, description: ROLE_DESCRIPTIONS[role] }))
 
 /**
  * The face is generated, then owned: the dialog seeds a look the moment it

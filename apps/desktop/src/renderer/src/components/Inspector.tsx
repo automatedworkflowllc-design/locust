@@ -9,6 +9,7 @@ import { buildSignalRail, buildThread, producedFiles } from '../missionView.js'
 import { accountPhrase, checkpointLabel, ledgerVerificationLabel, sandboxPhrase, shortMissionId } from '../status.js'
 import { modelDisplayName } from '../routeName.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
+import { whatItMayDo } from '../../../shared/may-do.js'
 import { Icon } from './Icon.js'
 
 const TABS = ['Activity', 'Details', 'Artifacts', 'Receipt'] as const
@@ -23,10 +24,9 @@ function Empty({ children }: { readonly children: string }): ReactElement {
  * thread stays semantic and everything that actually happened lives here.
  *
  * The Tools & permissions block the reference draws is deliberately reduced to
- * what this build can prove. Codex runs read-only with no approval channel, so
- * a grid of allow/ask/deny rules would be a picture of a permission system that
- * does not exist yet -- it states the one policy that is real and says the rest
- * arrives with approvals.
+ * what this build can prove: the rows Locust handed this run's runtime in this
+ * run's mode (shared/may-do.ts), and a line that leaves the rest to the
+ * runtime's own settings rather than guessing at them.
  */
 export function Inspector({
   events,
@@ -63,7 +63,11 @@ export function Inspector({
    */
   const sandbox = route?.sandbox
   const writes = sandbox === 'workspace-write' || sandbox === 'full-access'
-  const anywhere = sandbox === 'full-access'
+  // Runtime by runtime, from what Locust handed THAT runtime (shared/may-do.ts):
+  // the same three rows for every runtime told a person that an OpenCode run
+  // which had just searched the web could not reach the network (0.359).
+  const mode = route?.mode ?? restoredMission?.mode
+  const mayDo = route === undefined ? undefined : whatItMayDo(route.runtime, route.sandbox, mode)
   const rows = buildSignalRail(events, { running })
   const [artifactNotice, setArtifactNotice] = useState<string | undefined>(undefined)
   // Every file this run touched, gathered from the same activity the fold
@@ -122,53 +126,33 @@ export function Inspector({
               </div>
             )}
 
-            <div className="lc-permissions">
-              <div className="lc-permissions__head">
-                <span className="lc-fieldlabel lc-mono">What it may do</span>
-                <span className="lc-rail__meta">{sandboxPhrase(sandbox)}</span>
-              </div>
-              <div className="lc-permissions__rows">
-                <div className="lc-permissions__row">
-                  <span className="lc-tone-green">allow</span>
-                  <span>read the files in this folder</span>
+            {mayDo !== undefined && (
+              <div className="lc-permissions">
+                <div className="lc-permissions__head">
+                  <span className="lc-fieldlabel lc-mono">What it may do</span>
+                  <span className="lc-rail__meta">{sandboxPhrase(sandbox)}</span>
                 </div>
-                {writes ? (
-                  <div className="lc-permissions__row">
-                    <span className="lc-tone-green">allow</span>
-                    <span>
-                      {anywhere
-                        ? 'change files anywhere your account can reach, in this folder and outside it'
-                        : 'change files in this folder'}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="lc-permissions__row">
-                    <span className="lc-tone-red">deny</span>
-                    <span>changing any file</span>
-                  </div>
-                )}
-                {anywhere ? (
-                  <div className="lc-permissions__row">
-                    <span className="lc-tone-amber">allow</span>
-                    <span>run any command your account can run, and reach any network</span>
-                  </div>
-                ) : (
-                  <div className="lc-permissions__row">
-                    <span className="lc-tone-red">deny</span>
-                    <span>anything outside this folder, and any network access beyond the model's own</span>
-                  </div>
-                )}
+                <div className="lc-permissions__rows">
+                  {mayDo.rows.map((row) => (
+                    <div className="lc-permissions__row" key={row.text}>
+                      <span className={row.verdict === 'deny' ? 'lc-tone-red' : row.wide === true ? 'lc-tone-amber' : 'lc-tone-green'}>{row.verdict}</span>
+                      <span>{row.text}</span>
+                    </div>
+                  ))}
+                </div>
+                {/*
+                  * In Locust's words, not the plumbing's: "The host fixes the
+                  * workspace, executable, argv and sandbox" (first-impressions
+                  * pass, 0.354). And no longer a sentence about `codex exec`
+                  * having no approval channel: Codex runs on its app-server now,
+                  * where Approve each asks per action, so that sentence had
+                  * become false about the run it sat under.
+                  */}
+                <p className="lc-permissions__note">
+                  Locust sets the folder, the tool and these limits when the mission starts; nothing here changes while it runs. {mayDo.rest}
+                </p>
               </div>
-              {/*
-                * In Locust's words, not the plumbing's: "The host fixes the
-                * workspace, executable, argv and sandbox" (first-impressions
-                * pass, 0.354). And no longer a sentence about `codex exec`
-                * having no approval channel: Codex runs on its app-server now,
-                * where Approve each asks per action, so that sentence had
-                * become false about the run it sat under.
-                */}
-              <p className="lc-permissions__note">Locust sets the folder, the tool and these limits when the mission starts; nothing here changes while it runs.</p>
-            </div>
+            )}
           </>
         )}
 

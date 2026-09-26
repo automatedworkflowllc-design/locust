@@ -11,6 +11,27 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.359.0 - 2026-09-26
+
+### Improved
+
+- **A team from Home speaks its own language.** Add the Research & money or
+  Write & design team and each teammate now suggests first messages from its
+  own world: Sable offers to compare where to keep savings, Penny to build a
+  budget spreadsheet, Iris to design a one-page website. They used to offer
+  questions about a codebase. Moss, the editor, is set up as an editor.
+- Under a teammate's name, an empty conversation now says what their role is
+  for, instead of "reads this workspace" for every role.
+
+### Fixed
+
+- **"What it may do" is now true for every AI agent.** The Activity panel
+  told you each run was denied network access, even under an OpenCode run
+  that had just searched the web. It now lists what Locust actually allowed
+  that agent in that mode (changing files, running commands, searching the
+  web, reaching outside the folder) and says anything else is left to the
+  agent's own settings.
+
 ## 0.358.0 - 2026-09-26
 
 ### New

@@ -3197,7 +3197,7 @@ if (!ownsSingleInstanceLock) {
       try {
         // roleTitle was dropped here since Custom teammates got titles: every
         // one read "Custom" on the sidebar and in the brief (found 2026-09-05).
-        const teammate = await teammates.create({ name: input.name, hue: input.hue, role: input.role, roleTitle: input.roleTitle, worktree: input.worktree, avatar: input.avatar, monthlyLimitUsd: input.monthlyLimitUsd })
+        const teammate = await teammates.create({ name: input.name, hue: input.hue, role: input.role, roleTitle: input.roleTitle, worktree: input.worktree, avatar: input.avatar, monthlyLimitUsd: input.monthlyLimitUsd, starters: input.starters })
         // The model picked on the dialog's Model row, kept exactly as a
         // started mission keeps one (rememberRoute validates it).
         if (!isTeammateRoute(input.route)) return { ok: true, data: { teammate } } as const

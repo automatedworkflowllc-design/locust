@@ -88,7 +88,7 @@ export const TEAMMATE_ROLES: readonly TeammateRole[] = [
 
 export interface TeammateStore {
   list(): Promise<readonly PublicTeammate[]>
-  create(input: { name: unknown; hue: unknown; role: unknown; roleTitle?: unknown; worktree?: unknown; avatar?: unknown; monthlyLimitUsd?: unknown }): Promise<PublicTeammate>
+  create(input: { name: unknown; hue: unknown; role: unknown; roleTitle?: unknown; worktree?: unknown; avatar?: unknown; monthlyLimitUsd?: unknown; starters?: unknown }): Promise<PublicTeammate>
   remove(teammateId: unknown): Promise<void>
   /**
    * Change what a person may change; the id and the missions filed under it
@@ -281,6 +281,20 @@ export function validRoleTitle(value: unknown): value is string {
   return trimmed.length > 0 && trimmed.length <= MAX_ROLE_TITLE_LENGTH && !/[\u0000-\u001f\u007f]/.test(trimmed)
 }
 
+const MAX_STARTERS = 4
+const MAX_STARTER_LENGTH = 300
+
+/**
+ * A template's first messages for a teammate (0.359): one to four lines of
+ * plain text, or nothing. On disk a malformed list is dropped -- the role's
+ * own are offered instead -- and never a reason to lose the teammate.
+ */
+function parsedStarters(value: unknown): readonly string[] | undefined {
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_STARTERS) return undefined
+  const lines = value.map((line) => (typeof line === 'string' ? line.trim() : ''))
+  return lines.every((line) => line.length > 0 && line.length <= MAX_STARTER_LENGTH && !/[\u0000-\u001f\u007f]/.test(line)) ? lines : undefined
+}
+
 /** Only a Custom role keeps a title, and only a valid one. Anything else is dropped, never rejected. */
 function roleTitleFor(role: TeammateRole, value: unknown): string | undefined {
   if (role !== 'Custom' || !validRoleTitle(value)) return undefined
@@ -368,6 +382,7 @@ export function parsedTeammate(value: unknown): PublicTeammate | undefined {
     hue: record.hue,
     role: record.role,
     ...(roleTitleFor(record.role, record.roleTitle) === undefined ? {} : { roleTitle: roleTitleFor(record.role, record.roleTitle) }),
+    ...(parsedStarters(record.starters) === undefined ? {} : { starters: parsedStarters(record.starters) }),
     // Only a literal true: a malformed record cannot move a teammate onto a branch.
     ...(record.worktree === true ? { worktree: true } : {}),
     // An absolute path or nothing. A relative one would resolve against
@@ -607,6 +622,7 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
         if (clash !== undefined) throw new TeammateNameTakenError(clash)
         if (input.avatar !== undefined && !isAvatarSpec(input.avatar)) throw new Error('Teammate avatar is invalid')
         if (input.monthlyLimitUsd !== undefined && !isMonthlyLimit(input.monthlyLimitUsd)) throw new Error('Teammate limit is invalid')
+        if (input.starters !== undefined && parsedStarters(input.starters) === undefined) throw new Error('Teammate starters are invalid')
         const teammateId = `tm_${randomUUID().replace(/-/g, '').slice(0, 24)}`
         const teammate: PublicTeammate = {
           teammateId,
@@ -614,6 +630,7 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           hue: input.hue,
           role: input.role,
           ...(roleTitleFor(input.role, input.roleTitle) === undefined ? {} : { roleTitle: roleTitleFor(input.role, input.roleTitle) }),
+          ...(parsedStarters(input.starters) === undefined ? {} : { starters: parsedStarters(input.starters) }),
           ...(input.worktree === true ? { worktree: true } : {}),
           avatar: input.avatar === undefined ? seedAvatar(teammateId) : cleanAvatar(input.avatar),
           createdAt: new Date().toISOString(),
@@ -647,6 +664,9 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           hue: input.hue,
           role: input.role,
           ...(roleTitleFor(input.role, input.roleTitle) === undefined ? {} : { roleTitle: roleTitleFor(input.role, input.roleTitle) }),
+          // Carried: no edit in the dialog touches them, and a rename must not
+          // turn Sable's money questions back into her role's.
+          ...(existing.starters === undefined ? {} : { starters: existing.starters }),
           ...(input.worktree === true ? { worktree: true } : {}),
           // Carried, not taken from the request: the renderer never names a
           // path, so an edit of the name or the face cannot move a teammate

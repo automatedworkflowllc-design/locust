@@ -769,6 +769,15 @@ export interface PublicTeammate {
    */
   readonly roleTitle?: string
   /**
+   * What this teammate offers as a first message, on their empty
+   * conversation (0.359). Set by the team template they came from: Sable,
+   * the analyst in Research & money, offered "Summarize what this codebase
+   * is for" because her ROLE is Research & Briefs, and so did every other
+   * template teammate outside Build software (the first-session drive,
+   * packaged 0.358). Absent, the role's own are offered.
+   */
+  readonly starters?: readonly string[]
+  /**
    * Works on its own branch: missions run in this teammate's own worktree of
    * the folder's repository (`.locust/worktrees/<id>`, branch `locust/<name>`),
    * so two teammates editing one repository do not collide. Off by default.
@@ -902,6 +911,8 @@ export interface TeammateCreateRequest {
   readonly route?: TeammateRoute
   /** Dollars a month; omitted, no limit. */
   readonly monthlyLimitUsd?: number
+  /** A template's first messages for this teammate; omitted, the role's are offered. */
+  readonly starters?: readonly string[]
 }
 
 /**
@@ -1844,6 +1855,12 @@ export interface MissionRouteSummary {
    * real posture of THIS run rather than whatever mode the composer shows now.
    */
   readonly sandbox: 'read-only' | 'workspace-write' | 'full-access'
+  /**
+   * What was ASKED for, beside what it was allowed: Approve-each shares
+   * Edit's sandbox and stops before each act, so the sandbox alone cannot
+   * say which of the two a run was (the Activity panel's rows, 0.359).
+   */
+  readonly mode?: MissionMode
 }
 
 /**
@@ -2508,6 +2525,22 @@ export interface DesktopApi {
 }
 
 /** The words for what a teammate does: their own for a Custom role, the role's name otherwise. */
+/**
+ * What each role is for, in a few words: the role picker's second line, and
+ * the line under an idle teammate's name. That line said "reads this
+ * workspace and explains what it finds" for every role -- a coder, a
+ * bookkeeper and a writer alike (the first-session drive, 0.358).
+ */
+export const ROLE_DESCRIPTIONS: Readonly<Record<TeammateRole, string>> = {
+  'Code & Migrations': 'Repo work, refactors, test runs',
+  'Research & Briefs': 'Reading, comparing, summarising',
+  'Ops & Scheduling': 'Routine jobs and reminders',
+  'Docs & QA': 'Written output and checking',
+  'Data & Reporting': 'Spreadsheets, figures, digests',
+  'Chief of Staff': 'Routes work to the team, reports back',
+  Custom: 'Describe the work yourself'
+}
+
 export function roleLabelOf(teammate: Pick<PublicTeammate, 'role' | 'roleTitle'>): string {
   const title = teammate.roleTitle?.trim() ?? ''
   return teammate.role === 'Custom' && title.length > 0 ? title : teammate.role
