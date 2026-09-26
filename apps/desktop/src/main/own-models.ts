@@ -37,6 +37,8 @@ interface StoredOwnModel {
   readonly createdAt: string
   /** The key as the operating system encrypted it, base64. */
   readonly key?: string
+  /** A model that only chats: its runs get no tools (0.358). Absent: it takes tools. */
+  readonly chatOnly?: true
 }
 
 interface StoredFile {
@@ -93,7 +95,15 @@ function hostOf(baseUrl: string): string {
 }
 
 function publicOf(model: StoredOwnModel): PublicOwnModel {
-  return { ownId: model.ownId, name: model.name, baseUrl: model.baseUrl, model: model.model, hasKey: model.key !== undefined, createdAt: model.createdAt }
+  return {
+    ownId: model.ownId,
+    name: model.name,
+    baseUrl: model.baseUrl,
+    model: model.model,
+    hasKey: model.key !== undefined,
+    chatOnly: model.chatOnly === true,
+    createdAt: model.createdAt
+  }
 }
 
 function parsedStored(value: unknown): StoredOwnModel | undefined {
@@ -110,13 +120,16 @@ function parsedStored(value: unknown): StoredOwnModel | undefined {
     baseUrl,
     model,
     createdAt: record.createdAt,
-    ...(typeof record.key === 'string' && record.key.length > 0 ? { key: record.key } : {})
+    ...(typeof record.key === 'string' && record.key.length > 0 ? { key: record.key } : {}),
+    ...(record.chatOnly === true ? { chatOnly: true as const } : {})
   }
 }
 
 export interface OwnModelStore {
   list(): Promise<readonly PublicOwnModel[]>
-  add(input: { readonly name: unknown; readonly baseUrl: unknown; readonly model: unknown; readonly key?: unknown }): Promise<PublicOwnModel>
+  add(input: { readonly name: unknown; readonly baseUrl: unknown; readonly model: unknown; readonly key?: unknown; readonly chatOnly?: unknown }): Promise<PublicOwnModel>
+  /** Whether a kept model only chats (0.358): what a failed first run, or a Test, finds out after it is added. */
+  setChatOnly(ownId: unknown, chatOnly: unknown): Promise<PublicOwnModel>
   remove(ownId: unknown): Promise<void>
   /** The provider a run on this route model needs, key decrypted; undefined for a model no longer kept. */
   providerFor(routeModel: string): Promise<{ readonly id: string; readonly provider: OpenCodeProvider } | undefined>
@@ -190,10 +203,23 @@ export function createOwnModelStore(options: {
           baseUrl,
           model,
           createdAt: now().toISOString(),
-          ...(key === undefined ? {} : { key: options.secrets.encrypt(key).toString('base64') })
+          ...(key === undefined ? {} : { key: options.secrets.encrypt(key).toString('base64') }),
+          ...(input.chatOnly === true ? { chatOnly: true as const } : {})
         }
         await write({ schemaVersion: 1, models: [...file.models, stored] })
         return publicOf(stored)
+      }),
+
+    setChatOnly: (ownId, chatOnly) =>
+      serialize(async () => {
+        if (typeof ownId !== 'string' || typeof chatOnly !== 'boolean') throw new OwnModelRefusal('That model could not be changed.')
+        const file = await read()
+        const kept = file.models.find((model) => model.ownId === ownId)
+        if (kept === undefined) throw new OwnModelRefusal('That model is no longer kept.')
+        const { chatOnly: _was, ...rest } = kept
+        const changed: StoredOwnModel = chatOnly ? { ...rest, chatOnly: true } : rest
+        await write({ schemaVersion: 1, models: file.models.map((model) => (model.ownId === ownId ? changed : model)) })
+        return publicOf(changed)
       }),
 
     remove: (ownId) =>
@@ -213,7 +239,13 @@ export function createOwnModelStore(options: {
         const apiKey = decryptKey(kept)
         return {
           id: `${OWN_PREFIX}${kept.ownId}`,
-          provider: { name: kept.name, baseUrl: kept.baseUrl, models: [kept.model], ...(apiKey === undefined ? {} : { apiKey }) }
+          provider: {
+            name: kept.name,
+            baseUrl: kept.baseUrl,
+            models: [kept.model],
+            ...(apiKey === undefined ? {} : { apiKey }),
+            ...(kept.chatOnly === true ? { toolCalls: false } : {})
+          }
         }
       }),
 
@@ -230,7 +262,7 @@ export function createOwnModelStore(options: {
             id: ownRouteModel(model),
             runtime: 'opencode',
             displayName: model.name,
-            description: `Your model · ${hostOf(model.baseUrl)}`,
+            description: `Your model · ${hostOf(model.baseUrl)}${model.chatOnly === true ? ' · chat only' : ''}`,
             supportedEfforts: [],
             own: true
           })
@@ -249,6 +281,19 @@ export async function testOwnEndpoint(
   input: { readonly baseUrl: string; readonly model: string; readonly key?: string },
   fetcher: typeof fetch = fetch,
   timeoutMs = 8000
+): Promise<{ readonly ok: boolean; readonly said: string; readonly tools?: boolean }> {
+  const listed = await listedModels(input, fetcher, timeoutMs)
+  if (!listed.ok) return listed
+  const tools = await takesTools(input, fetcher, timeoutMs)
+  if (tools === false) return { ok: true, said: `${listed.said} It cannot use tools, so it is set to chat only.`, tools: false }
+  if (tools === true) return { ok: true, said: `${listed.said} It can use tools.`, tools: true }
+  return listed
+}
+
+async function listedModels(
+  input: { readonly baseUrl: string; readonly model: string; readonly key?: string },
+  fetcher: typeof fetch,
+  timeoutMs: number
 ): Promise<{ readonly ok: boolean; readonly said: string }> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
@@ -270,6 +315,43 @@ export async function testOwnEndpoint(
       ok: false,
       said: controller.signal.aborted ? `No answer in ${String(Math.round(timeoutMs / 1000))} seconds.` : `It could not be reached: ${error instanceof Error ? error.message : String(error)}.`
     }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/**
+ * Whether the model takes tools, asked the one way that settles it: a
+ * request carrying one tool, answer capped at a single token. A model or
+ * server without tool support refuses it outright -- 400 "does not support
+ * tools" is Ollama's wording; vLLM's names `--enable-auto-tool-choice` -- and
+ * a teammate's run would end the same way. Undefined when the answer says
+ * neither.
+ */
+async function takesTools(
+  input: { readonly baseUrl: string; readonly model: string; readonly key?: string },
+  fetcher: typeof fetch,
+  timeoutMs: number
+): Promise<boolean | undefined> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const response = await fetcher(`${input.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...(input.key === undefined ? {} : { authorization: `Bearer ${input.key}` }) },
+      body: JSON.stringify({
+        model: input.model,
+        messages: [{ role: 'user', content: 'Reply with OK.' }],
+        max_tokens: 1,
+        tools: [{ type: 'function', function: { name: 'noop', description: 'Does nothing.', parameters: { type: 'object', properties: {} } } }]
+      }),
+      signal: controller.signal
+    })
+    if (response.ok) return true
+    const text = await response.text().catch(() => '')
+    return (response.status === 400 || response.status === 422 || response.status === 501) && /tool/i.test(text) ? false : undefined
+  } catch {
+    return undefined
   } finally {
     clearTimeout(timer)
   }

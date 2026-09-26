@@ -78,6 +78,7 @@ import {
   OWN_MODEL_ADD_CHANNEL,
   OWN_MODEL_REMOVE_CHANNEL,
   OWN_MODEL_TEST_CHANNEL,
+  OWN_MODEL_CHAT_ONLY_CHANNEL,
   MEMORY_LIST_CHANNEL,
   MEMORY_ADD_CHANNEL,
   MEMORY_UPDATE_CHANNEL,
@@ -245,6 +246,8 @@ const desktopApi: DesktopApi = {
   addOwnModel: (request: OwnModelAddRequest) => ipcRenderer.invoke(OWN_MODEL_ADD_CHANNEL, request) as Promise<OwnModelMutationResponse>,
   removeOwnModel: (ownId: string) => ipcRenderer.invoke(OWN_MODEL_REMOVE_CHANNEL, ownId) as Promise<OwnModelMutationResponse>,
   testOwnModel: (request: OwnModelTestRequest) => ipcRenderer.invoke(OWN_MODEL_TEST_CHANNEL, request) as Promise<OwnModelTestResponse>,
+  setOwnModelChatOnly: (ownId: string, chatOnly: boolean) =>
+    ipcRenderer.invoke(OWN_MODEL_CHAT_ONLY_CHANNEL, { ownId, chatOnly }) as Promise<OwnModelMutationResponse>,
   assignMission: (teammateId: string, missionId: string) =>
     ipcRenderer.invoke(TEAMMATE_ASSIGN_CHANNEL, { teammateId, missionId }) as Promise<TeammateMutationResponse>,
   renameMission: (missionId: string, title: string) =>

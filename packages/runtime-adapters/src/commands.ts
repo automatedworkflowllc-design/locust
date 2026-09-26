@@ -1366,6 +1366,16 @@ export interface OpenCodeProvider {
   readonly apiKey?: string;
   /** The model ids it serves that runs may name. */
   readonly models: readonly string[];
+  /**
+   * False for a model that only chats (0.358). OpenCode sends every model
+   * its tools -- ten of them, `tool_choice: "auto"` -- and a model or server
+   * without tool support answers 400 "does not support tools" and the run
+   * ends. Declaring the model without them in OpenCode's own model config
+   * changes nothing (MEASURED 2026-09-26: still ten tools); turning every
+   * tool off for the run does -- no `tools`, no `tool_choice`, and the same
+   * model answers. Absent means it takes tools, as every model did before.
+   */
+  readonly toolCalls?: boolean;
 }
 
 const PROVIDER_ID = /^[a-z0-9][a-z0-9-]{0,47}$/;
@@ -1395,7 +1405,14 @@ export function withOpenCodeProviders(config: string | undefined, providers: Rea
       models: Object.fromEntries(provider.models.map((model) => [model, { name: model }])),
     };
   }
-  return JSON.stringify({ ...parsed, provider: { ...((parsed.provider as Record<string, unknown> | undefined) ?? {}), ...declared } });
+  // A run on a model that only chats is a run with no tools at all: it can
+  // talk, and it can neither read nor change a file.
+  const chatOnly = entries.some(([, provider]) => provider.toolCalls === false);
+  return JSON.stringify({
+    ...parsed,
+    provider: { ...((parsed.provider as Record<string, unknown> | undefined) ?? {}), ...declared },
+    ...(chatOnly ? { tools: { "*": false } } : {}),
+  });
 }
 
 export function createOpenCodeRunCommand(

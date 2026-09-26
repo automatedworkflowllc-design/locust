@@ -1925,8 +1925,10 @@ export function SettingsScreen({
               </p>
               <p>
                 A key is kept only as Windows encrypts it for your account, and never shown again; it is sent to that
-                address and nowhere else. Test asks the address which models it serves, so a mistyped model name is
-                caught before a teammate tries it.
+                address and nowhere else. Test asks the address which models it serves, and sends the model one request
+                capped at a single word to see whether it can use tools -- so a mistyped name, or a model that can only
+                chat, is caught before a teammate tries it. A model set to chat only talks with its teammates and reads
+                and changes no files.
               </p>
             </More>
             <OwnModels onChanged={onOwnModelsChanged} />

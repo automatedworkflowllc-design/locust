@@ -43,7 +43,7 @@ describe('a model of your own', () => {
   it('is kept with its key encrypted, and the window is told only that a key is kept', async () => {
     const { rootDirectory, models } = await store()
     const added = await models.add(ACME)
-    expect(added).toEqual({ ownId: 'a1b2c3d0', name: 'Acme Chat', baseUrl: 'https://llm.acme.example/v1', model: 'acme-70b', hasKey: true, createdAt: '2026-09-26T09:00:00.000Z' })
+    expect(added).toEqual({ ownId: 'a1b2c3d0', name: 'Acme Chat', baseUrl: 'https://llm.acme.example/v1', model: 'acme-70b', hasKey: true, chatOnly: false, createdAt: '2026-09-26T09:00:00.000Z' })
     expect(JSON.stringify(await models.list())).not.toContain('sk-acme-secret')
     const onDisk = await readFile(join(rootDirectory, 'own-models.json'), 'utf8')
     expect(onDisk).not.toContain('sk-acme-secret')
@@ -72,6 +72,18 @@ describe('a model of your own', () => {
     ])
   })
 
+  it('that only chats gives its runs no tools, and says so in the list (0.358)', async () => {
+    const { models } = await store()
+    const plain = await models.add({ ...ACME, chatOnly: true })
+    expect(plain.chatOnly).toBe(true)
+    expect((await models.providerFor(ownRouteModel(plain)))?.provider.toolCalls).toBe(false)
+    expect((await models.catalog())[0]?.description).toBe('Your model · llm.acme.example · chat only')
+    // And back: a model found to take tools after all.
+    expect((await models.setChatOnly(plain.ownId, false)).chatOnly).toBe(false)
+    expect((await models.providerFor(ownRouteModel(plain)))?.provider.toolCalls).toBeUndefined()
+    await expect(models.setChatOnly('nobody00', true)).rejects.toThrow(/no longer kept/)
+  })
+
   it('keeps no key on a machine that cannot protect one -- and says so', async () => {
     const { models } = await store(false)
     await expect(models.add(ACME)).rejects.toThrow(/cannot protect a key/)
@@ -90,11 +102,43 @@ describe('a model of your own', () => {
 })
 
 describe('testing an endpoint', () => {
-  const answering = (status: number, body: unknown): typeof fetch =>
-    (async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch
+  /** An endpoint: its model list, and how it answers a request that carries a tool. */
+  const endpoint = (list: { status: number; body: unknown }, chat: { status: number; body: unknown } = { status: 200, body: {} }): typeof fetch =>
+    (async (url: string) => {
+      const answer = url.endsWith('/models') ? list : chat
+      return new Response(JSON.stringify(answer.body), { status: answer.status })
+    }) as unknown as typeof fetch
+  const answering = (status: number, body: unknown): typeof fetch => endpoint({ status, body }, { status: 500, body: {} })
 
   it('says it answered and serves the model', async () => {
     expect(await testOwnEndpoint({ baseUrl: 'https://x/v1', model: 'acme-70b' }, answering(200, { data: [{ id: 'acme-70b' }] }))).toEqual({ ok: true, said: 'It answered, and serves acme-70b.' })
+  })
+
+  it('says whether it takes tools, and finds a model that only chats (0.358)', async () => {
+    const listed = { status: 200, body: { data: [{ id: 'acme-70b' }] } }
+    expect(await testOwnEndpoint({ baseUrl: 'https://x/v1', model: 'acme-70b' }, endpoint(listed, { status: 200, body: { choices: [] } }))).toEqual({
+      ok: true,
+      said: 'It answered, and serves acme-70b. It can use tools.',
+      tools: true
+    })
+    // Ollama's own words for a model without tool support.
+    const refused = { status: 400, body: { error: { message: 'registry.ollama.ai/library/plain does not support tools' } } }
+    expect(await testOwnEndpoint({ baseUrl: 'https://x/v1', model: 'acme-70b' }, endpoint(listed, refused))).toEqual({
+      ok: true,
+      said: 'It answered, and serves acme-70b. It cannot use tools, so it is set to chat only.',
+      tools: false
+    })
+  })
+
+  it('asks about tools with one request, capped at a single token', async () => {
+    const bodies: string[] = []
+    const recording = (async (url: string, init?: RequestInit) => {
+      if (url.endsWith('/chat/completions')) bodies.push(String(init?.body))
+      return new Response(JSON.stringify(url.endsWith('/models') ? { data: [{ id: 'm' }] } : {}), { status: 200 })
+    }) as unknown as typeof fetch
+    await testOwnEndpoint({ baseUrl: 'https://x/v1', model: 'm' }, recording)
+    expect(bodies).toHaveLength(1)
+    expect(JSON.parse(bodies[0]!)).toMatchObject({ model: 'm', max_tokens: 1, tools: [{ type: 'function' }] })
   })
 
   it('catches a model name the endpoint does not know, naming what it does', async () => {
@@ -107,13 +151,16 @@ describe('testing an endpoint', () => {
   })
 
   it('sends the key as a bearer token, to that address only', async () => {
-    let asked: { url: string; auth: string | undefined } | undefined
+    const asked: { url: string; auth: string | undefined }[] = []
     const recording = (async (url: string, init?: RequestInit) => {
-      asked = { url, auth: (init?.headers as Record<string, string> | undefined)?.authorization }
+      asked.push({ url, auth: (init?.headers as Record<string, string> | undefined)?.authorization })
       return new Response(JSON.stringify({ data: [] }), { status: 200 })
     }) as unknown as typeof fetch
     await testOwnEndpoint({ baseUrl: 'https://llm.acme.example/v1', model: 'm', key: 'sk-1' }, recording)
-    expect(asked).toEqual({ url: 'https://llm.acme.example/v1/models', auth: 'Bearer sk-1' })
+    expect(asked).toEqual([
+      { url: 'https://llm.acme.example/v1/models', auth: 'Bearer sk-1' },
+      { url: 'https://llm.acme.example/v1/chat/completions', auth: 'Bearer sk-1' }
+    ])
   })
 
   it('says it could not be reached, rather than throwing', async () => {

@@ -1443,10 +1443,13 @@ export interface PublicOwnModel {
   /** The id the endpoint knows the model by. */
   readonly model: string
   readonly hasKey: boolean
+  /** A model that only chats: its teammates talk with it, and it reads and changes no file (0.358). */
+  readonly chatOnly: boolean
   readonly createdAt: string
 }
 
 export const OWN_MODEL_LIST_CHANNEL = 'ownModels:list'
+export const OWN_MODEL_CHAT_ONLY_CHANNEL = 'ownModels:chatOnly'
 export const OWN_MODEL_ADD_CHANNEL = 'ownModels:add'
 export const OWN_MODEL_REMOVE_CHANNEL = 'ownModels:remove'
 export const OWN_MODEL_TEST_CHANNEL = 'ownModels:test'
@@ -1457,6 +1460,8 @@ export interface OwnModelAddRequest {
   readonly model: string
   /** Absent for an endpoint that asks for none. Kept only encrypted, and never sent back. */
   readonly key?: string
+  /** A model that only chats (0.358). */
+  readonly chatOnly?: boolean
 }
 
 /** Test a model before adding it (the form's own values), or one already kept (by id, with its kept key). */
@@ -1473,7 +1478,7 @@ export type OwnModelMutationResponse =
   | { readonly ok: false; readonly error: { readonly code: 'OWN_MODEL_REFUSED'; readonly message: string } }
 
 export type OwnModelTestResponse =
-  | { readonly ok: true; readonly data: { readonly reached: boolean; readonly said: string } }
+  | { readonly ok: true; readonly data: { readonly reached: boolean; readonly said: string; readonly tools?: boolean } }
   | { readonly ok: false; readonly error: { readonly code: 'OWN_MODEL_REFUSED'; readonly message: string } }
 
 export type ModelCatalogResponse =
@@ -2356,6 +2361,7 @@ export interface DesktopApi {
   addOwnModel(request: OwnModelAddRequest): Promise<OwnModelMutationResponse>
   removeOwnModel(ownId: string): Promise<OwnModelMutationResponse>
   testOwnModel(request: OwnModelTestRequest): Promise<OwnModelTestResponse>
+  setOwnModelChatOnly(ownId: string, chatOnly: boolean): Promise<OwnModelMutationResponse>
   removeTeammate(teammateId: string): Promise<TeammateMutationResponse>
   assignMission(teammateId: string, missionId: string): Promise<TeammateMutationResponse>
   /** Name a conversation. An empty name clears it back to what was typed. */

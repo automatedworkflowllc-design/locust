@@ -258,7 +258,7 @@ export function createOpenCodeEventNormalizer(
   // own; the exit code, which says 1 for any error seen, cannot tell.
   let overflow: "none" | "waiting" | "compacted" | "recovered" = "none";
   /** The retry errors already said, so a run retrying one rate limit says it once. */
-  const retriesSaid = new Set<string>();
+  const attemptsSeen = new Map<string, number>();
   // The messages of the step now open and whether it called a tool, and the
   // same for the step that last finished. A compaction's summary is the text
   // of the step just before OpenCode's continue note, and that step has no
@@ -467,13 +467,22 @@ export function createOpenCodeEventNormalizer(
     // Only one line in it is news: a request to the model that failed and is
     // being tried again. Said once per distinct error, so nine retries of the
     // same rate limit are one line; everything else in the log is ignored.
+    //
+    // Said on the SECOND time an error is logged, which is the retry seen
+    // rather than assumed (0.358). A line is written for every failed request,
+    // and one that is not retried -- a model answering 400 "does not support
+    // tools" -- is followed by the run's own failure, not by another attempt;
+    // said on the first line, the thread claimed "OpenCode is trying again"
+    // about a run that had already stopped (measured with a model that
+    // refuses tools, 2026-09-26).
     if (type === "locust.stderr") {
       const line = stringValue(parsed.line) ?? "";
       if (!/message="stream error"/.test(line) || !/(?:^|\s)agent=build(?:\s|$)/.test(line)) return [];
       const said = /error\.error="([^"]{1,300})"/.exec(line)?.[1]?.replace(/^AI_[A-Za-z]+Error:\s*/, "").trim();
       const key = said ?? "";
-      if (retriesSaid.has(key)) return [];
-      retriesSaid.add(key);
+      const seen = (attemptsSeen.get(key) ?? 0) + 1;
+      attemptsSeen.set(key, seen);
+      if (seen !== 2) return [];
       return [diagnostic(
         "warning",
         "opencode.runtime_error",

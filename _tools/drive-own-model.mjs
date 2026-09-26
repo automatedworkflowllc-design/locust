@@ -32,17 +32,25 @@ const server = createServer((request, response) => {
   let body = ''
   request.on('data', (chunk) => { body += chunk })
   request.on('end', () => {
-    asked.push({ method: request.method, url: request.url, auth: request.headers.authorization ?? null, model: (() => { try { return JSON.parse(body).model ?? null } catch { return null } })() })
+    const parsed = (() => { try { return JSON.parse(body) } catch { return {} } })()
+    const tools = Array.isArray(parsed.tools) ? parsed.tools.length : 0
+    asked.push({ method: request.method, url: request.url, auth: request.headers.authorization ?? null, model: parsed.model ?? null, tools })
     if (request.method === 'GET' && request.url === '/v1/models') {
       response.writeHead(200, { 'content-type': 'application/json' })
-      response.end(JSON.stringify({ object: 'list', data: [{ id: 'acme-70b', object: 'model' }] }))
+      response.end(JSON.stringify({ object: 'list', data: [{ id: 'acme-70b', object: 'model' }, { id: 'plain-1', object: 'model' }] }))
+      return
+    }
+    // plain-1 is a model that cannot take tools, answering the way Ollama does.
+    if (request.method === 'POST' && request.url === '/v1/chat/completions' && parsed.model === 'plain-1' && tools > 0) {
+      response.writeHead(400, { 'content-type': 'application/json' })
+      response.end(JSON.stringify({ error: { message: 'registry.example/plain-1 does not support tools', type: 'invalid_request_error' } }))
       return
     }
     if (request.method === 'POST' && request.url === '/v1/chat/completions') {
       response.writeHead(200, { 'content-type': 'text/event-stream' })
       const chunk = (data) => response.write(`data: ${JSON.stringify(data)}\n\n`)
-      const base = { id: 'acme-1', object: 'chat.completion.chunk', created: 1, model: 'acme-70b' }
-      chunk({ ...base, choices: [{ index: 0, delta: { role: 'assistant', content: 'Hello from Acme.' }, finish_reason: null }] })
+      const base = { id: 'acme-1', object: 'chat.completion.chunk', created: 1, model: parsed.model ?? 'acme-70b' }
+      chunk({ ...base, choices: [{ index: 0, delta: { role: 'assistant', content: parsed.model === 'plain-1' ? 'Plain hello.' : 'Hello from Acme.' }, finish_reason: null }] })
       chunk({ ...base, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 12, completion_tokens: 4, total_tokens: 16 } })
       response.end('data: [DONE]\n\n')
       return
@@ -126,8 +134,39 @@ try {
   verdicts.push(`picked: ${/Acme Chat/.test(picked) ? 'PASS' : 'FAIL'}`)
   const answered = await drive.capture('Wren runs on Acme Chat', () => drive.evaluate(sendAndWaitScript('Say hello.', { waitSeconds: 180 })))
   verdicts.push(`answered: ${/Hello from Acme\./.test(answered) ? 'PASS' : 'FAIL'}`)
-  const completions = asked.filter((entry) => entry.url === '/v1/chat/completions')
-  verdicts.push(`at the endpoint: ${completions.length > 0 && completions.every((entry) => entry.auth === `Bearer ${KEY}` && entry.model === 'acme-70b') ? 'PASS' : 'FAIL'} (${String(completions.length)} chat calls)`)
+  // Test's own tools check is a chat call too, capped at one token: counted
+  // apart from the run's.
+  const completions = asked.filter((entry) => entry.url === '/v1/chat/completions' && entry.model === 'acme-70b')
+  verdicts.push(`at the endpoint: ${completions.length > 0 && completions.every((entry) => entry.auth === `Bearer ${KEY}`) ? 'PASS' : 'FAIL'} (${String(completions.length)} chat calls)`)
+
+  /*
+   * A MODEL THAT ONLY CHATS (0.358). plain-1 refuses any request carrying
+   * tools. Test must find that out and set it to chat only; a teammate on it
+   * must then be answered, its runs carrying no tools at all.
+   */
+  await drive.capture('Settings again, for a model that cannot take tools', () => drive.evaluate(settingsRuntimes))
+  await drive.evaluate(type(inputs(1), 'Plain Chat'))
+  await drive.evaluate(type(inputs(2), 'plain-1'))
+  await drive.evaluate(type(inputs(3), ADDRESS))
+  const plainTested = await drive.capture('Test finds it cannot take tools', () => drive.evaluate(pressIn('.lc-ownmodel__actions', 'Test')))
+  const switchSays = await drive.evaluate(`document.querySelector('.lc-ownmodel__tools .lc-ownmodel__name')?.textContent ?? 'no switch'`)
+  verdicts.push(`found chat only: ${/cannot use tools, so it is set to chat only/.test(plainTested) && switchSays === 'Chat only' ? 'PASS' : 'FAIL'}`)
+  await drive.capture('Add the chat-only model', () => drive.evaluate(pressIn('.lc-ownmodel__actions', 'Add model')))
+  const plainRow = await drive.evaluate(`[...document.querySelectorAll('.lc-ownmodel')].map((row) => row.innerText.replace(/\\s+/g, ' ')).find((text) => text.includes('Plain Chat')) ?? 'no row'`)
+  verdicts.push(`listed chat only: ${/chat only/.test(plainRow) ? 'PASS' : 'FAIL'}`)
+  await drive.capture('open Wren again', () => drive.evaluate(`(async () => {
+    const face = ${teammateFace('Wren')}
+    face?.click()
+    await new Promise((r) => setTimeout(r, 1200))
+    return document.querySelector('form.command-dock textarea')?.getAttribute('placeholder') ?? 'no composer'
+  })()`))
+  const plainPicked = await drive.capture('the picker: Plain Chat under Your models', () => drive.evaluate(pickRouteScript({ group: '/Your models/i', search: 'Plain', row: '/Plain Chat/' })))
+  verdicts.push(`picked chat only: ${/Plain Chat/.test(plainPicked) ? 'PASS' : 'FAIL'}`)
+  const plainAnswered = await drive.capture('Wren chats on Plain Chat', () => drive.evaluate(sendAndWaitScript('Say hello again.', { waitSeconds: 180 })))
+  verdicts.push(`answered chat only: ${/Plain hello\./.test(plainAnswered) ? 'PASS' : 'FAIL'}`)
+  const plainRuns = asked.filter((entry) => entry.url === '/v1/chat/completions' && entry.model === 'plain-1')
+  // The Test's own check carried one tool, on purpose; every run request carried none.
+  verdicts.push(`no tools sent in the run: ${plainRuns.filter((entry) => entry.tools === 0).length > 0 && plainRuns.filter((entry) => entry.tools > 0).length === 1 ? 'PASS' : 'FAIL'} (${plainRuns.map((entry) => String(entry.tools)).join(',')})`)
   const onDisk = await readFile(join(drive.profile, 'own-models.json'), 'utf8').catch(() => '')
   verdicts.push(`key on disk in the clear: ${onDisk.length > 0 && !onDisk.includes(KEY) ? 'no -- PASS' : 'FAIL'}`)
   say(verdicts.join(' | '))

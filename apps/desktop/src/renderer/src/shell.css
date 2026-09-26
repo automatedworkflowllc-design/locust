@@ -8065,9 +8065,24 @@ textarea {
 }
 
 .lc-ownmodel__field--wide,
+.lc-ownmodel__tools,
 .lc-ownmodel__actions,
 .lc-ownmodel__form .lc-ownmodel__said {
   grid-column: 1 / -1;
+}
+
+/* Uses tools / Chat only (0.358): the switch, then what it means. */
+.lc-ownmodel__tools {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--lc-space-3);
+}
+
+.lc-ownmodel__toolstext {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .lc-ownmodel__actions {

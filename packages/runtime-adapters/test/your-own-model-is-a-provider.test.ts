@@ -60,6 +60,16 @@ describe("your own model", () => {
     expect(config.provider["own-local"].options.apiKey).toBe("not-needed");
   });
 
+  it("turns every tool off for a model that only chats, and only for it (0.358)", () => {
+    // MEASURED 2026-09-26 against an endpoint that refuses tools: declared
+    // `tool_call: false` in OpenCode's model config, it was still sent ten;
+    // with every tool off for the run it was sent none, and answered.
+    const chatOnly = JSON.parse(withOpenCodeProviders("{}", { "own-chat": { ...acme, toolCalls: false } }) ?? "{}");
+    expect(chatOnly.tools).toEqual({ "*": false });
+    const withTools = JSON.parse(withOpenCodeProviders("{}", { "own-a1b2": acme }) ?? "{}");
+    expect(withTools.tools).toBeUndefined();
+  });
+
   it("changes nothing when there is no model of your own", () => {
     expect(withOpenCodeProviders('{"permission":{}}', undefined)).toBe('{"permission":{}}');
     expect(withOpenCodeProviders(undefined, {})).toBeUndefined();

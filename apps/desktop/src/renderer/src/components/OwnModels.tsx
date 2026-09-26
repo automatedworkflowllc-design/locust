@@ -23,6 +23,12 @@ export function OwnModels({ onChanged }: { readonly onChanged: () => void }): Re
   const [baseUrl, setBaseUrl] = useState('')
   const [model, setModel] = useState('')
   const [key, setKey] = useState('')
+  /*
+   * CHAT ONLY (0.358): a model that cannot take tools -- OpenCode sends it
+   * ten, and it answers 400 "does not support tools" -- still talks when its
+   * runs are given none. Test finds out and sets this; so can the person.
+   */
+  const [chatOnly, setChatOnly] = useState(false)
   const [busy, setBusy] = useState(false)
   const [said, setSaid] = useState<{ readonly text: string; readonly good: boolean }>()
   const [testedKept, setTestedKept] = useState<Readonly<Record<string, { readonly text: string; readonly good: boolean }>>>({})
@@ -47,11 +53,28 @@ export function OwnModels({ onChanged }: { readonly onChanged: () => void }): Re
                 <span className="lc-ownmodel__name">{kept.name}</span>
                 <span className="lc-ownmodel__meta lc-mono">
                   {kept.model} · {hostOf(kept.baseUrl)} · {kept.hasKey ? 'key kept' : 'no key'}
+                  {kept.chatOnly ? ' · chat only' : ''}
                 </span>
                 {testedKept[kept.ownId] !== undefined && (
                   <span className={`lc-ownmodel__said${testedKept[kept.ownId]!.good ? '' : ' lc-tone-amber'}`}>{testedKept[kept.ownId]!.text}</span>
                 )}
               </span>
+              <button
+                type="button"
+                className={`lc-switch${kept.chatOnly ? '' : ' is-on'}`}
+                role="switch"
+                aria-checked={!kept.chatOnly}
+                aria-label={`${kept.name} uses tools`}
+                title={kept.chatOnly ? 'Chat only: its runs get no tools' : 'Uses tools: it may read and change files'}
+                onClick={() => {
+                  void window.desktop?.setOwnModelChatOnly(kept.ownId, !kept.chatOnly).then(() => {
+                    load()
+                    onChanged()
+                  })
+                }}
+              >
+                <span className="lc-switch__knob" />
+              </button>
               <button
                 type="button"
                 className="lc-button"
@@ -61,6 +84,11 @@ export function OwnModels({ onChanged }: { readonly onChanged: () => void }): Re
                       ...held,
                       [kept.ownId]: response.ok ? { text: response.data.said, good: response.data.reached } : { text: response.error.message, good: false }
                     }))
+                    // A Test that found out whether it takes tools has set it.
+                    if (response.ok && response.data.tools !== undefined) {
+                      load()
+                      onChanged()
+                    }
                   })
                 }}
               >
@@ -92,7 +120,7 @@ export function OwnModels({ onChanged }: { readonly onChanged: () => void }): Re
           setBusy(true)
           setSaid(undefined)
           void window.desktop
-            ?.addOwnModel({ name: name.trim(), ...typed })
+            ?.addOwnModel({ name: name.trim(), ...typed, ...(chatOnly ? { chatOnly: true } : {}) })
             .then((response) => {
               if (!response.ok) {
                 setSaid({ text: response.error.message, good: false })
@@ -103,6 +131,7 @@ export function OwnModels({ onChanged }: { readonly onChanged: () => void }): Re
               setBaseUrl('')
               setModel('')
               setKey('')
+              setChatOnly(false)
               load()
               onChanged()
             })
@@ -150,6 +179,26 @@ export function OwnModels({ onChanged }: { readonly onChanged: () => void }): Re
             onChange={(event) => setKey(event.target.value)}
           />
         </label>
+        <div className="lc-ownmodel__tools">
+          <button
+            type="button"
+            className={`lc-switch${chatOnly ? '' : ' is-on'}`}
+            role="switch"
+            aria-checked={!chatOnly}
+            aria-label="Uses tools"
+            onClick={() => setChatOnly(!chatOnly)}
+          >
+            <span className="lc-switch__knob" />
+          </button>
+          <span className="lc-ownmodel__toolstext">
+            <span className="lc-ownmodel__name">{chatOnly ? 'Chat only' : 'Uses tools'}</span>
+            <span className="lc-field__hint">
+              {chatOnly
+                ? 'Its teammates talk with it, and it reads and changes no files. For a model that cannot take tools.'
+                : 'It may read and change files in the project, as other models do. Test turns this off if it cannot.'}
+            </span>
+          </span>
+        </div>
         <div className="lc-ownmodel__actions">
           <button
             type="button"
@@ -159,6 +208,7 @@ export function OwnModels({ onChanged }: { readonly onChanged: () => void }): Re
               setSaid(undefined)
               void window.desktop?.testOwnModel(typed).then((response) => {
                 setSaid(response.ok ? { text: response.data.said, good: response.data.reached } : { text: response.error.message, good: false })
+                if (response.ok && response.data.tools !== undefined) setChatOnly(!response.data.tools)
               })
             }}
           >

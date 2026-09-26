@@ -198,7 +198,8 @@ import {
   OWN_MODEL_LIST_CHANNEL,
   OWN_MODEL_ADD_CHANNEL,
   OWN_MODEL_REMOVE_CHANNEL,
-  OWN_MODEL_TEST_CHANNEL
+  OWN_MODEL_TEST_CHANNEL,
+  OWN_MODEL_CHAT_ONLY_CHANNEL
 } from '../shared/ipc.js'
 import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { isMissionRuntime, runtimeDisplayName } from '../shared/runtimes.js'
@@ -1871,11 +1872,20 @@ if (!ownsSingleInstanceLock) {
       if (!fromOwnWindow(event)) return { ok: false, error: { code: 'OWN_MODEL_REFUSED', message: 'That model could not be added.' } } as const
       const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
       try {
-        const model = await ownModels.add({ name: input.name, baseUrl: input.baseUrl, model: input.model, key: input.key })
+        const model = await ownModels.add({ name: input.name, baseUrl: input.baseUrl, model: input.model, key: input.key, chatOnly: input.chatOnly })
         return { ok: true, data: { model } } as const
       } catch (error) {
         // The store's own sentence when it refused; nothing about the key.
         return { ok: false, error: { code: 'OWN_MODEL_REFUSED', message: error instanceof OwnModelRefusal ? error.message : 'That model could not be added.' } } as const
+      }
+    })
+    ipcMain.handle(OWN_MODEL_CHAT_ONLY_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, error: { code: 'OWN_MODEL_REFUSED', message: 'That model could not be changed.' } } as const
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      try {
+        return { ok: true, data: { model: await ownModels.setChatOnly(input.ownId, input.chatOnly) } } as const
+      } catch (error) {
+        return { ok: false, error: { code: 'OWN_MODEL_REFUSED', message: error instanceof OwnModelRefusal ? error.message : 'That model could not be changed.' } } as const
       }
     })
     ipcMain.handle(OWN_MODEL_REMOVE_CHANNEL, async (event, ownId: unknown) => {
@@ -1897,7 +1907,11 @@ if (!ownsSingleInstanceLock) {
           if (kept === undefined) return { ok: false, error: { code: 'OWN_MODEL_REFUSED', message: 'That model is no longer kept.' } } as const
           const key = await ownModels.keyOf(kept.ownId)
           const result = await testOwnEndpoint({ baseUrl: kept.baseUrl, model: kept.model, ...(key === undefined ? {} : { key }) })
-          return { ok: true, data: { reached: result.ok, said: result.said } } as const
+          // A kept model found unable to take tools is set to chat only, as
+          // the form sets a new one: the next run would otherwise fail on it.
+          if (result.tools === false && !kept.chatOnly) await ownModels.setChatOnly(kept.ownId, true)
+          if (result.tools === true && kept.chatOnly) await ownModels.setChatOnly(kept.ownId, false)
+          return { ok: true, data: { reached: result.ok, said: result.said, ...(result.tools === undefined ? {} : { tools: result.tools }) } } as const
         }
         const baseUrl = ownModelAddress(input.baseUrl)
         const model = ownModelId(input.model)
@@ -1906,7 +1920,7 @@ if (!ownsSingleInstanceLock) {
         }
         const key = typeof input.key === 'string' && input.key.trim().length > 0 ? input.key.trim() : undefined
         const result = await testOwnEndpoint({ baseUrl, model, ...(key === undefined ? {} : { key }) })
-        return { ok: true, data: { reached: result.ok, said: result.said } } as const
+        return { ok: true, data: { reached: result.ok, said: result.said, ...(result.tools === undefined ? {} : { tools: result.tools }) } } as const
       } catch {
         return { ok: false, error: { code: 'OWN_MODEL_REFUSED', message: 'That model could not be tested.' } } as const
       }

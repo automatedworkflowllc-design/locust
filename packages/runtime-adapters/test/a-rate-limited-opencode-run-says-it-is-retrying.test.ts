@@ -64,16 +64,27 @@ describe("a rate-limited OpenCode run says it is retrying", () => {
     expect(opencode.accept(stderrRecord("permission requested: bash (ls); auto-rejecting", 3))).toEqual([]);
   }, 10_000);
 
-  it("says a different error again, once", () => {
+  it("says a different error again, once, when it too is retried", () => {
     const opencode = normalizer();
     const line = (said: string) =>
       `timestamp=${NOW} level=ERROR run=r message="stream error" providerID=p modelID=m session.id=s small=false agent=build mode=primary error.error="${said}"`;
 
-    expect(opencode.accept(stderrRecord(line("AI_APICallError: Rate limit exceeded"), 1))).toHaveLength(1);
-    expect(opencode.accept(stderrRecord(line("AI_APICallError: Rate limit exceeded"), 2))).toHaveLength(0);
-    const overloaded = opencode.accept(stderrRecord(line("AI_APICallError: Overloaded"), 3));
+    expect(opencode.accept(stderrRecord(line("AI_APICallError: Rate limit exceeded"), 1))).toHaveLength(0);
+    expect(opencode.accept(stderrRecord(line("AI_APICallError: Rate limit exceeded"), 2))).toHaveLength(1);
+    expect(opencode.accept(stderrRecord(line("AI_APICallError: Rate limit exceeded"), 3))).toHaveLength(0);
+    expect(opencode.accept(stderrRecord(line("AI_APICallError: Overloaded"), 4))).toHaveLength(0);
+    const overloaded = opencode.accept(stderrRecord(line("AI_APICallError: Overloaded"), 5));
     expect(overloaded).toHaveLength(1);
     expect(overloaded[0]?.type === "adapter.diagnostic" ? overloaded[0].payload.message : "").toContain('"Overloaded"');
+  }, 10_000);
+
+  it("claims no retry for an error that is not retried (0.358)", () => {
+    // A model that cannot take tools answers 400 once, and the run stops.
+    // The line is logged, and nothing follows it: there is no retry to say.
+    const opencode = normalizer();
+    const refused =
+      `timestamp=${NOW} level=ERROR run=r message="stream error" providerID=own-1 modelID=plain-1 session.id=s small=false agent=build mode=primary error.error="AI_APICallError: registry.example/plain-1 does not support tools"`;
+    expect(opencode.accept(stderrRecord(refused, 1))).toEqual([]);
   }, 10_000);
 
   it("is asked for: every OpenCode run prints its errors and forwards them", () => {
