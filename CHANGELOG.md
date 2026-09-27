@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.405.0 - 2026-09-27
+
+### Fixed
+
+- **Home fits beside a conversation.** With a conversation opened beside
+  Home on a smaller window, Home is narrow, and several things in it were
+  cut off. Now the team cards stack one per row instead of cutting off
+  names and roles, the AI agent icons wrap instead of running under **Show
+  all**, the chat box keeps its buttons inside it, and the Locust sign
+  leaves out its tagline when there is no room for it.
+
 ## 0.404.0 - 2026-09-27
 
 ### Fixed

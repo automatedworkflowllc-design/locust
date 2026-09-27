@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactElement } from 'react'
 
 import type { BotAvatarState } from 'bot-avatars'
@@ -494,6 +494,24 @@ export function HomeCover({
   const originX = Math.round((scale - drawn) * COVER_WIDTH / 2)
   const at = (value: number): number => Math.round(value * drawn)
   const atX = (value: number): number => originX + at(value)
+  /*
+   * THE CLAIM STEPS ASIDE WHEN THE GLASS IS NARROWER THAN IT (0.405).
+   *
+   * The claim stops at 10.5px to stay readable; the glass keeps shrinking
+   * with the card. In Home beside a conversation at 1215x800 the claim was
+   * wider than the glass and, laid out on one line, pushed the lockup
+   * sideways: "LOC" and "AUTONOMOUS TEAMMATES ON", both cut (fresh-eyes
+   * check). Measured, not guessed: the claim is taken out of the layout but
+   * kept measurable (`is-claimless`), so it returns when it fits again.
+   */
+  const [claimFits, setClaimFits] = useState(true)
+  useLayoutEffect(() => {
+    const element = card.current
+    const glass = element?.querySelector<HTMLElement>('.lc-cover__glass')
+    const claim = element?.querySelector<HTMLElement>('.lc-cover__claim')
+    if (glass === null || glass === undefined || claim === null || claim === undefined || glass.clientWidth === 0) return
+    setClaimFits(claim.getBoundingClientRect().width + 24 <= glass.clientWidth)
+  }, [drawn])
   return (
     /*
      * A mono beam goes round the title box WHILE THE RUNTIMES ARE BEING
@@ -509,7 +527,7 @@ export function HomeCover({
      * does not wait for the window's focus as the bots do: loading is a few
      * seconds, and a window that is still being shown may not have it yet.
      */
-      <div className="lc-cover lc-cover--machine" ref={card} style={{ '--lc-cover-k': String(drawn) } as CSSProperties}>
+      <div className={`lc-cover lc-cover--machine${claimFits ? '' : ' is-claimless'}`} ref={card} style={{ '--lc-cover-k': String(drawn) } as CSSProperties}>
         <div
           className="lc-cover__machineslot"
           style={{ left: atX(COVER_MACHINE.x), top: at(COVER_MACHINE.y), width: at(COVER_MACHINE.width), height: at(COVER_MACHINE.height) }}

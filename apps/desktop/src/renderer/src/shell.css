@@ -4515,6 +4515,12 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+/* Too wide for the glass: out of the layout, still measured (HomeCover, 0.405). */
+.lc-cover.is-claimless .lc-cover__claim {
+  position: absolute;
+  visibility: hidden;
+}
+
 /*
  * THE LOCKUP, POWERING ON -- see PoweredLockup.tsx.
  *
@@ -5418,6 +5424,9 @@ textarea {
   flex: 1;
   min-width: 0;
   display: flex;
+  /* In a narrow Home (a conversation beside it) the marks ran under Show
+     all (0.405, fresh-eyes check): they wrap instead. */
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   color: var(--lc-text-secondary);
@@ -5581,6 +5590,22 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: var(--lc-space-3);
+  container-type: inline-size;
+}
+
+/*
+ * ONE CARD A ROW WHEN THE SECTION IS NARROW (0.405). With a conversation
+ * open beside Home at 1215x800 the section is ~400px, and three cards of
+ * 128px cut every name and role ("Wren", "Res...") -- the 0.402 beta retest,
+ * measured by drive-home-beside. Three read whole down to ~200px a card;
+ * below 600px the cards stack instead of squeezing. The section's own
+ * width, not the window's: the panel beside it is what narrows it.
+ */
+@container (max-width: 600px) {
+  /* Scoped to the section so it outranks the grid's own rule further down. */
+  .lc-hometeam .lc-hometeam__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .lc-hometeam__top {
@@ -6298,6 +6323,27 @@ textarea {
 }
 
 /* Mode and add sit left; route, effort and swarm sit right. */
+/*
+ * THE NARROWEST BOX (0.405): Home beside a conversation at 1215x800 left the
+ * composer ~380px, and the right group -- route, effort, send, which never
+ * shrinks -- stuck out past the box into the conversation beside it
+ * (fresh-eyes check). Below 480px the model name is cut shorter and the
+ * group wraps onto its own lines, right-aligned. Scoped to the controls so
+ * it outranks the base rules whatever their order.
+ */
+@container (max-width: 480px) {
+  .lc-composer__controls .lc-composer__group + .lc-composer__group {
+    flex-shrink: 1;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    row-gap: var(--lc-space-2);
+  }
+
+  .lc-composer__controls .lc-control__model {
+    max-width: 9ch;
+  }
+}
+
 .lc-composer__group + .lc-composer__group {
   margin-left: auto;
   gap: 12px;
