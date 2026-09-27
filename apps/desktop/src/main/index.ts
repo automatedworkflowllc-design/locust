@@ -618,6 +618,14 @@ let npmSeen: boolean | undefined
  */
 let npmAnswered = true
 const NPM_PROBE_TIMEOUT_MS = 5_000
+/** Whether the person's own PATH has npm -- what their terminal would run. PATH only: not the app's own npm folders. */
+let npmOnPathSeen: boolean | undefined
+const npmOnPath = async (): Promise<boolean> => {
+  if (npmOnPathSeen !== undefined) return npmOnPathSeen
+  npmOnPathSeen = (await createPathExecutableLocator().find('npm').catch(() => undefined)) !== undefined
+  return npmOnPathSeen
+}
+
 const npmPresent = async (): Promise<boolean> => {
   if (npmSeen !== undefined) return npmSeen
   npmSeen = await new Promise<boolean>((resolve) => {
@@ -699,7 +707,14 @@ const runtimeDiscovery = createRuntimeDiscoveryService({
   // Only when it is the one that WILL run: the installer prefers a machine's
   // own npm and falls back to this, so with Node installed the note would be
   // saying something untrue about the install that is about to happen.
-  npmIsBundled: async () => bundledNpm !== undefined && !(await npmPresent()),
+  //
+  // AND never while the person's own PATH has npm (0.412). `npmPresent` runs
+  // `npm --version` against a five-second clock, at the launch moment every
+  // runtime probe runs too; one slow answer read as "no Node" for the whole
+  // session, and Colin -- Node in Program Files, npm answering in 0.35s --
+  // was told to install Node.js. What his terminal would find is a lookup,
+  // not a race: the PATH alone, without the app's own npm folders.
+  npmIsBundled: async () => bundledNpm !== undefined && !(await npmPresent()) && !(await npmOnPath()),
   // Said apart, because the sentence differs: an npm that hung is not a
   // machine without Node, and a person who installed Node is told otherwise.
   npmDidNotAnswer: async () => {

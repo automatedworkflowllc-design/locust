@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.412.0 - 2026-09-27
+
+### Fixed
+
+- **No "install Node.js" note when you have Node.js.** Home could say
+  "To use one in your own terminal too, install Node.js" on a machine that
+  already had it, when Node was slow to answer while Locust was starting.
+  Locust now looks for it where your own terminal does.
+
 ## 0.411.0 - 2026-09-27
 
 ### Improved
