@@ -22,6 +22,13 @@ describe('Settings switches', () => {
     expect(screens).not.toContain("'Switch this off' : 'Switch this on'")
   })
 
+  it('show an off knob you can see: muted text on the track, not a raised surface (0.419)', () => {
+    const css = readFileSync(fileURLToPath(new URL('../renderer/src/shell.css', import.meta.url)), 'utf8')
+    // The later of the two switch blocks is the one that paints the knob.
+    const later = css.slice(css.lastIndexOf('.lc-switch__knob {'))
+    expect(later.slice(0, later.indexOf('}'))).toContain('background: var(--lc-text-muted);')
+  })
+
   it('and the two between teammates say their name before their state', () => {
     expect(screens).toContain("'Automatic replies: off. Messages wait for the recipient\\'s next run.'")
     expect(screens).toContain("'Urgent messages interrupt: off. An urgent message still waits for the recipient to finish.'")

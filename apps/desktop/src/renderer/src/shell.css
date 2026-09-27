@@ -13012,11 +13012,18 @@ textarea {
   transition: background var(--lc-motion-hover) var(--lc-ease);
 }
 
+/*
+ * An OFF knob you can see (0.419). It was --lc-bg-raised-2 on a
+ * --lc-border-button track: #1b1e1f on about #2f3131, 1.3:1, so an off
+ * switch in Settings read as a smudge (fresh-eyes area 13). Muted text is
+ * what the first switch block asked for, and it stands off the track; on,
+ * the knob goes dark against lime, as it was.
+ */
 .lc-switch__knob {
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  background: var(--lc-bg-raised-2);
+  background: var(--lc-text-muted);
   transition: transform var(--lc-motion-hover) var(--lc-ease);
 }
 
@@ -13026,6 +13033,7 @@ textarea {
 
 .is-on .lc-switch__knob {
   transform: translateX(12px);
+  background: var(--lc-bg-raised);
 }
 
 /*

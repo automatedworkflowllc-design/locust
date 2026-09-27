@@ -21,6 +21,8 @@ heading: the home screen then shows it once, as a splash.
   was. They now read "Automatic replies: off. …" and "Urgent messages
   interrupt: off. …". Screen readers now hear each switch's name, not
   "Switch this on".
+- **Switches that are off are easy to see.** An off switch was a dark knob
+  on a dark track and almost disappeared. The knob is now a light grey.
 - **Tidier wording.** Settings labels no longer end in full stops, and a
   typed "--" in several places is now a proper dash.
 
