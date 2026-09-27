@@ -32,6 +32,8 @@ import {
   RUNTIME_SIGN_IN_CHANNEL,
   OPEN_IN_TERMINAL_CHANNEL,
   TERMINAL_CATCH_UP_CHANNEL,
+  TEAM_CARD_SAVE_CHANNEL,
+  TEAM_CARD_ADD_CHANNEL,
   RUNTIME_INSTALL_PROGRESS_CHANNEL,
   RUNTIME_UPDATES_CHANNEL,
   RUNTIME_UPDATES_EVENT_CHANNEL,
@@ -172,7 +174,10 @@ import type {
   RuntimeInstallResponse,
   RuntimeSignInResponse,
   OpenInTerminalResponse,
-  TerminalCatchUpResponse
+  TerminalCatchUpResponse,
+  TeamCardRect,
+  TeamCardSaveResponse,
+  TeamCardAddResponse
 } from '../shared/ipc.js'
 import { ROUTINE_RECOVERY_CHANNEL } from '../shared/routine-recovery.js'
 import type { RoutineRecoveryRequest, RoutineRecoveryResponse } from '../shared/routine-recovery.js'
@@ -309,6 +314,8 @@ const desktopApi: DesktopApi = {
     ipcRenderer.invoke(OPEN_IN_TERMINAL_CHANNEL, missionId) as Promise<OpenInTerminalResponse>,
   catchUpTerminal: (missionId: string) =>
     ipcRenderer.invoke(TERMINAL_CATCH_UP_CHANNEL, missionId) as Promise<TerminalCatchUpResponse>,
+  saveTeamCard: (rect: TeamCardRect) => ipcRenderer.invoke(TEAM_CARD_SAVE_CHANNEL, rect) as Promise<TeamCardSaveResponse>,
+  addTeamFromCard: () => ipcRenderer.invoke(TEAM_CARD_ADD_CHANNEL) as Promise<TeamCardAddResponse>,
   onRuntimeInstallProgress: (listener: (progress: RuntimeInstallProgress) => void) => {
     const handler = (_event: unknown, progress: RuntimeInstallProgress): void => listener(progress)
     ipcRenderer.on(RUNTIME_INSTALL_PROGRESS_CHANNEL, handler)

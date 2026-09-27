@@ -31,6 +31,8 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { MAX_PROMPT_LENGTH, createCodexMissionService, runtimeThreadIdOf } from './codex-mission.js'
 import { openInTerminal, terminalRequestFor } from './open-in-terminal.js'
 import { createTerminalCatchUp, createTerminalImports, createTranscriptReader } from './terminal-catch-up.js'
+import { readTextChunk, withTextChunk } from './png-text.js'
+import { TEAM_CARD_KEYWORD, freeName, readTeamCard, teamCardOf } from '../shared/team-card.js'
 import { approvalAnswerFrom, createApprovalChannel } from './approval-channel.js'
 import { PeerRecordError } from './peer-exchange.js'
 import { readNpmBinDirectory } from './npm-prefix.js'
@@ -157,6 +159,8 @@ import {
   RUNTIME_SIGN_IN_CHANNEL,
   OPEN_IN_TERMINAL_CHANNEL,
   TERMINAL_CATCH_UP_CHANNEL,
+  TEAM_CARD_SAVE_CHANNEL,
+  TEAM_CARD_ADD_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
   TEAMMATE_RENAME_MISSION_CHANNEL,
   GROUP_LIST_CHANNEL,
@@ -2763,6 +2767,87 @@ if (!ownsSingleInstanceLock) {
      */
     // The window asks when it shows a conversation, and when it comes back
     // into focus on one (0.391): whatever was done in the terminal meanwhile.
+    /*
+     * THE TEAM AS A PICTURE OF ITSELF (0.398; shared/team-card.ts).
+     *
+     * Saving photographs the card the window drew -- this window, never the
+     * screen -- and writes the team into the image as data built HERE from the
+     * roster, not from anything the window sent. Adding reads that data back
+     * and makes each teammate through the store's own checks, as the New
+     * teammate dialog does. `LOCUST_TEAM_CARD_PATH` is a drive's stand-in for
+     * both file dialogs, which a drive cannot press.
+     */
+    ipcMain.handle(TEAM_CARD_SAVE_CHANNEL, async (event, raw: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      const rect = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>
+      const edge = (value: unknown): number | undefined => (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 8000 ? Math.round(value) : undefined)
+      const [x, y, width, height] = [edge(rect.x), edge(rect.y), edge(rect.width), edge(rect.height)]
+      if (x === undefined || y === undefined || width === undefined || height === undefined || width < 40 || height < 40) {
+        return { ok: false, message: 'The card could not be photographed.' } as const
+      }
+      const window = BrowserWindow.fromWebContents(event.sender)
+      if (window === null) return { ok: false, message: 'That request was rejected.' } as const
+      try {
+        const photo = await event.sender.capturePage({ x, y, width, height })
+        const card = teamCardOf(await teammates.list())
+        const png = withTextChunk(photo.toPNG(), TEAM_CARD_KEYWORD, JSON.stringify(card))
+        const scripted = process.env.LOCUST_TEAM_CARD_PATH
+        const target = scripted !== undefined && scripted.length > 0
+          ? scripted
+          : (await dialog.showSaveDialog(window, {
+              title: 'Save your team as an image',
+              defaultPath: join(app.getPath('downloads'), 'Locust team.png'),
+              filters: [{ name: 'PNG image', extensions: ['png'] }],
+              properties: ['createDirectory', 'showOverwriteConfirmation']
+            })).filePath
+        if (target === undefined || target.length === 0) return { ok: true } as const
+        await writeFile(target, png)
+        return { ok: true, path: target } as const
+      } catch {
+        return { ok: false, message: 'The team card could not be saved. Nothing was written.' } as const
+      }
+    })
+
+    ipcMain.handle(TEAM_CARD_ADD_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      const window = BrowserWindow.fromWebContents(event.sender)
+      if (window === null) return { ok: false, message: 'That request was rejected.' } as const
+      const scripted = process.env.LOCUST_TEAM_CARD_PATH
+      const picked = scripted !== undefined && scripted.length > 0
+        ? scripted
+        : (await dialog.showOpenDialog(window, {
+            title: 'Add a team from an image',
+            buttonLabel: 'Add team',
+            filters: [{ name: 'Locust team card', extensions: ['png'] }],
+            properties: ['openFile']
+          })).filePaths[0]
+      if (picked === undefined) return { ok: true, added: [], skipped: [] } as const
+      try {
+        if ((await stat(picked)).size > 20 * 1024 * 1024) return { ok: false, message: 'That image is too large to be a team card.' } as const
+        const text = readTextChunk(await readFile(picked), TEAM_CARD_KEYWORD)
+        const entries = text === undefined ? undefined : readTeamCard(JSON.parse(text))
+        if (entries === undefined) return { ok: false, message: 'That image is not a Locust team card: it carries no team.' } as const
+        const taken = new Set((await teammates.list()).map((teammate) => teammate.name))
+        const added: string[] = []
+        const skipped: string[] = []
+        for (const entry of entries) {
+          const given = typeof entry.name === 'string' ? entry.name.trim() : ''
+          try {
+            const name = freeName(given, taken)
+            const teammate = await teammates.create({ name, hue: entry.hue, role: entry.role, roleTitle: entry.roleTitle, avatar: entry.avatar })
+            if (isTeammateRoute(entry.route)) await teammates.rememberRoute(teammate.teammateId, entry.route)
+            taken.add(name)
+            added.push(name)
+          } catch {
+            skipped.push(given.length > 0 ? given : 'A teammate with no name')
+          }
+        }
+        return { ok: true, added, skipped } as const
+      } catch {
+        return { ok: false, message: 'That image could not be read as a Locust team card.' } as const
+      }
+    })
+
     ipcMain.handle(TERMINAL_CATCH_UP_CHANNEL, async (event, requested: unknown) => {
       if (!fromOwnWindow(event) || typeof requested !== 'string' || requested.length === 0 || requested.length > 128) {
         return { imported: 0 }

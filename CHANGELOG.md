@@ -11,6 +11,19 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.398.0 - 2026-09-27
+
+### New
+
+- **Share your team as an image.** On the Team screen, **Share team**
+  shows a card with every teammate's face, name, role and model, and saves
+  it as a picture. The picture also carries the team, so anyone with Locust
+  can add the same teammates with **Add team from image**, or with **Team
+  from an image** on Home if they're just starting. Only names, roles, looks
+  and models travel. Conversations, memories, folders, spending limits and
+  models you added yourself stay on your machine, and a teammate set to Auto
+  arrives on Edit.
+
 ## 0.397.0 - 2026-09-27
 
 ### New

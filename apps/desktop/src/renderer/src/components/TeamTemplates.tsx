@@ -21,11 +21,18 @@ import { TeammateBot } from './TeammateBot.js'
  */
 export function TeamTemplates({
   onUse,
-  onNewTeammate
+  onNewTeammate,
+  onAddFromImage
 }: {
   /** Makes the team; resolves with why it could not, or undefined once it has. */
   readonly onUse: (templateId: TeamTemplate['templateId']) => Promise<string | undefined>
   readonly onNewTeammate: () => void
+  /**
+   * Someone sent you their team as an image (0.398, TeamCard.tsx). The
+   * person with no team yet is the one most likely to have been sent one,
+   * and this row is the only thing they see -- the Team screen needs a team.
+   */
+  readonly onAddFromImage?: () => void
 }): ReactElement {
   const [making, setMaking] = useState<TeamTemplate['templateId']>()
   const [problem, setProblem] = useState<string>()
@@ -33,6 +40,11 @@ export function TeamTemplates({
     <section className="lc-hometeam lc-teamtemplates" aria-label="Start with a team">
       <div className="lc-hometeam__top">
         <h2 className="lc-hometeam__head">Start with a team</h2>
+        {onAddFromImage !== undefined && (
+          <button type="button" className="lc-control lc-control--boxed lc-chipbutton lc-teamtemplates__image" onClick={onAddFromImage}>
+            Team from an image
+          </button>
+        )}
         <button type="button" className="lc-control lc-control--boxed lc-chipbutton" onClick={onNewTeammate}>
           <Icon name="plus" size={13} />
           New teammate

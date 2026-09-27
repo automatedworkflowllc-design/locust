@@ -80,11 +80,12 @@ export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings' | 'rooms
 /** Why the relay's own settings are off while it is. */
 const RELAY_FIRST = 'This applies once teammates reply to each other. Switch that on first.'
 
-export function ScreenHeader({ title, meta }: { readonly title: string; readonly meta: string }): ReactElement {
+export function ScreenHeader({ title, meta, actions }: { readonly title: string; readonly meta: string; readonly actions?: ReactNode }): ReactElement {
   return (
     <div className="lc-screen__header">
       <span className="lc-screen__title">{title}</span>
       <span className="lc-screen__meta lc-mono">{meta}</span>
+      {actions !== undefined && <span className="lc-screen__actions">{actions}</span>}
     </div>
   )
 }
@@ -533,6 +534,9 @@ export function TeammatesScreen({
   onRemoveRoutine,
   routineNotice,
   onDismissRoutineNotice,
+  onShareTeam,
+  onAddTeamFromCard,
+  teamNotice,
   finishedUnseen,
   runningMissionIds
 }: {
@@ -548,6 +552,12 @@ export function TeammatesScreen({
   /** M30: why a routine's Run did not start, said where it was pressed. */
   readonly routineNotice?: string
   readonly onDismissRoutineNotice?: () => void
+  /** Open the team card to save (0.398). */
+  readonly onShareTeam?: () => void
+  /** What adding a team from an image did, said on this screen (0.398). */
+  readonly teamNotice?: string
+  /** Pick a team card and add its teammates (0.398). */
+  readonly onAddTeamFromCard?: () => void
   readonly teammates: readonly PublicTeammate[]
   /** Every recovered mission, so a card can say what its teammate has done. */
   readonly missions: readonly PublicRecoveredMission[]
@@ -788,7 +798,23 @@ export function TeammatesScreen({
       <ScreenHeader
         title="Team"
         meta={`${teammates.length} teammate${teammates.length === 1 ? '' : 's'} · avatars and roles are yours to set`}
+        actions={
+          /* The team as a picture of itself, out and in (0.398; TeamCard.tsx). */
+          <>
+            {onAddTeamFromCard !== undefined && (
+              <button type="button" className="lc-ghostbutton" onClick={onAddTeamFromCard} title="Add the teammates on a Locust team card">
+                Add team from image
+              </button>
+            )}
+            {onShareTeam !== undefined && teammates.length > 0 && (
+              <button type="button" className="lc-ghostbutton" onClick={onShareTeam} title="Save your team as an image anyone with Locust can add">
+                Share team
+              </button>
+            )}
+          </>
+        }
       />
+      {teamNotice !== undefined && <p className="lc-claim lc-claim--hint lc-teamnotice" role="status">{teamNotice}</p>}
       {routineNotice !== undefined && (
         <p className="lc-claim lc-claim--hint lc-tone-amber" role="alert">
           {routineNotice}{' '}

@@ -588,6 +588,20 @@ export const OPEN_IN_TERMINAL_CHANNEL = 'mission:open-in-terminal'
  * and which turn is newest now.
  */
 export const TERMINAL_CATCH_UP_CHANNEL = 'mission:terminal-catch-up'
+/** The team as a picture of itself (shared/team-card.ts, 0.398). */
+export const TEAM_CARD_SAVE_CHANNEL = 'team-card:save'
+export const TEAM_CARD_ADD_CHANNEL = 'team-card:add'
+/** Where on the window the card is drawn, in CSS pixels: what is photographed. */
+export interface TeamCardRect {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+}
+/** `path` absent: the person cancelled the save, which is not a failure. */
+export type TeamCardSaveResponse = { readonly ok: true; readonly path?: string } | { readonly ok: false; readonly message: string }
+/** Who was added, and who could not be (by the name the card gave them). Nothing picked: both empty. */
+export type TeamCardAddResponse = { readonly ok: true; readonly added: readonly string[]; readonly skipped: readonly string[] } | { readonly ok: false; readonly message: string }
 
 export interface TerminalCatchUpResponse {
   readonly imported: number
@@ -2529,6 +2543,8 @@ export interface DesktopApi {
   openInTerminal(missionId: string): Promise<OpenInTerminalResponse>
   /** Bring what was done in the terminal on this conversation into it (0.391). */
   catchUpTerminal(missionId: string): Promise<TerminalCatchUpResponse>
+  saveTeamCard(rect: TeamCardRect): Promise<TeamCardSaveResponse>
+  addTeamFromCard(): Promise<TeamCardAddResponse>
   readWorkspaceSettings(): Promise<WorkspaceSettings>
   /** Pick the folder the teammates work in. Reopens the app there on success. */
   chooseWorkspace(): Promise<WorkspaceChooseResponse>

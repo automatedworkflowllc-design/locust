@@ -74,6 +74,7 @@ export function FirstLaunch({
   teammateCount,
   onChooseFolder,
   onNewTeammate,
+  onAddTeamFromCard,
   onInstall,
   installing,
   installLine,
@@ -115,6 +116,8 @@ export function FirstLaunch({
   readonly onChooseFolder: () => void
   /** Opens the New teammate form: the home screen's way to the product's core action. */
   readonly onNewTeammate?: () => void
+  /** Add the team on a Locust team card (0.398). */
+  readonly onAddTeamFromCard?: () => void
   /** Makes a whole team from a template (TeamTemplates); resolves with why it could not. */
   readonly onUseTemplate?: (templateId: TeamTemplate['templateId']) => Promise<string | undefined>
   /** Run the install for a runtime. Absent means the panel offers none. */
@@ -359,7 +362,7 @@ export function FirstLaunch({
         )}
 
         {offerFirstTeammate && onUseTemplate !== undefined && onNewTeammate !== undefined && (
-          <TeamTemplates onUse={onUseTemplate} onNewTeammate={onNewTeammate} />
+          <TeamTemplates onUse={onUseTemplate} onNewTeammate={onNewTeammate} {...(onAddTeamFromCard === undefined ? {} : { onAddFromImage: onAddTeamFromCard })} />
         )}
 
         {offerFirstTeammate && onUseTemplate === undefined && (

@@ -109,6 +109,7 @@ import type { TeamTemplate } from '../../shared/team-templates.js'
 import { GroupSettingsDialog } from './components/GroupSettingsDialog.js'
 import { TeammateBot } from './components/TeammateBot.js'
 import { BesideConversation } from './components/BesideConversation.js'
+import { ShareTeamDialog } from './components/TeamCard.js'
 import { RuntimeMark } from './components/RuntimeMark.js'
 import { OpenInTerminalButton, terminalOffer } from './components/OpenInTerminal.js'
 import type { TerminalOffer } from './components/OpenInTerminal.js'
@@ -4763,6 +4764,32 @@ export default function App(): ReactElement {
    * 2026-09-08, on a build where assign demonstrably worked).
    */
   const [rowNotice, setRowNotice] = useState<string>()
+  // The team as a picture of itself (0.398): the Share dialog, and what adding one did.
+  const [sharingTeam, setSharingTeam] = useState(false)
+  const [teamNotice, setTeamNotice] = useState<string>()
+  const addTeamFromCard = (fromHome = false): void => {
+    const bridge = window.desktop
+    if (bridge === undefined) return
+    setTeamNotice(undefined)
+    void bridge
+      .addTeamFromCard()
+      .then(async (answer) => {
+        if (!answer.ok) {
+          setTeamNotice(answer.message)
+          if (fromHome) setScreen('teammates')
+          return
+        }
+        if (answer.added.length === 0 && answer.skipped.length === 0) return
+        const roster = await bridge.listTeammates()
+        if (roster.ok) setTeammates(roster.data.teammates)
+        const added = answer.added.length === 0 ? 'No one was added.' : `Added ${answer.added.join(', ')} from the team card.`
+        // From Home, the Team screen is where the team, and this sentence, are.
+        if (fromHome) setScreen('teammates')
+        const skipped = answer.skipped.length === 0 ? '' : ` ${answer.skipped.join(', ')} could not be added: the card's details for them did not read.`
+        setTeamNotice(`${added}${skipped}`)
+      })
+      .catch(() => setTeamNotice('That image could not be read as a Locust team card.'))
+  }
   // It confirms a thing that already happened, so it goes away on its own. A
   // standing green line would become furniture, and furniture is not read.
   useEffect(() => {
@@ -5733,6 +5760,9 @@ export default function App(): ReactElement {
             />
           ) : screen === 'teammates' ? (
             <TeammatesScreen
+              onShareTeam={() => setSharingTeam(true)}
+              onAddTeamFromCard={() => addTeamFromCard()}
+              {...(teamNotice === undefined ? {} : { teamNotice })}
               finishedUnseen={finishedUnseen}
               runningMissionIds={runningMissionIds}
               {...(routineNotice === undefined ? {} : { routineNotice })}
@@ -6014,6 +6044,7 @@ export default function App(): ReactElement {
                */
 
               <FirstLaunch
+                onAddTeamFromCard={() => addTeamFromCard(true)}
                 runtimes={runtimes}
                 freeStart={freeStartStillFree(runtimes, models)}
                 limitedRuntimes={limitedRuntimes}
@@ -6766,6 +6797,7 @@ export default function App(): ReactElement {
           )
         )}
       </div>
+      {sharingTeam && <ShareTeamDialog teammates={teammates} onClose={() => setSharingTeam(false)} />}
       {paletteOpen && (
         <CommandPalette
           onClose={() => setPaletteOpen(false)}
