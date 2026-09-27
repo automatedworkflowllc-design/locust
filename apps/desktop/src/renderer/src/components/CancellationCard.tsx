@@ -58,9 +58,14 @@ export function CancellationCard({
          * changes. `nothingHappened` is still exactly "no tool call settled,
          * none was interrupted, none was planned", which is what "any work"
          * means on this card.
+         *
+         * "Any TOOLS", not "any work" (0.420): a stopped Claude Haiku had
+         * written the numbers 1 to 191 into the thread above this card, and
+         * "before it did any work" sat under them (fresh-eyes area 17). The
+         * condition is about tool calls, so the sentence names tool calls.
          */
         <div className="lc-card__body">
-          Stopped before it did any work, so there is nothing half-done.
+          Stopped before it used any tools, so nothing is half-done.
         </div>
       ) : (
         <dl className="lc-receipt">

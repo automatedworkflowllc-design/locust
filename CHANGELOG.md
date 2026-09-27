@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.420.0 - 2026-09-28
+
+### Fixed
+
+- **The card after you stop a run no longer says it "did no work" after a
+  long answer.** It said "Stopped before it did any work" even when the
+  teammate had already written a lot. It meant no tools had been used, and
+  now says so: "Stopped before it used any tools, so nothing is half-done."
+
 ## 0.419.0 - 2026-09-28
 
 ### Improved
