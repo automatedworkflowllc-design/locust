@@ -310,6 +310,28 @@ export function RoutePicker({
   )
   const needle = routeSearchText(query)
   const searching = needle.length > 0
+
+  /*
+   * THE PICKER OPENS ON WHAT IS CHOSEN (0.411). It opened at the top of its
+   * list, Claude Code's models, whatever the teammate was on: a teammate on
+   * an OpenCode free model had to scroll to find its own route (fresh-eyes
+   * check, the chat box). Claude Code's picker opens on the current model.
+   * Once per opening, when the chosen row is out of view, and never while
+   * searching; rows load as discovery answers, so it waits for the row.
+   */
+  const listRef = useRef<HTMLDivElement>(null)
+  const shownChosen = useRef(false)
+  useEffect(() => {
+    if (shownChosen.current || searching) return
+    const list = listRef.current
+    const row = list?.querySelector<HTMLElement>('.lc-picker__row.is-active')
+    if (list === null || list === undefined || row === null || row === undefined) return
+    shownChosen.current = true
+    const box = list.getBoundingClientRect()
+    const at = row.getBoundingClientRect()
+    if (at.top >= box.top && at.bottom <= box.bottom) return
+    list.scrollTop += at.top - box.top - (box.height - at.height) / 2
+  }, [rows, searching])
   const matched = useMemo(
     () =>
       unfoldedRows(
@@ -432,7 +454,7 @@ export function RoutePicker({
           */}
       </div>
       {notice !== undefined && <div className="lc-picker__notice">{notice}</div>}
-      <div className="lc-picker__list">
+      <div className="lc-picker__list" ref={listRef}>
         {shown.map((row, index) => {
           const header = row.group === lastGroup ? undefined : row.group
           lastGroup = row.group

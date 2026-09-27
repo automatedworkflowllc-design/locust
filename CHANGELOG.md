@@ -11,6 +11,14 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.411.0 - 2026-09-27
+
+### Improved
+
+- **The model picker opens on the model you're using.** It always opened at
+  the top of its list, so a teammate on a model further down meant
+  scrolling to find it. It now opens with the chosen model in view.
+
 ## 0.410.0 - 2026-09-27
 
 ### Fixed
