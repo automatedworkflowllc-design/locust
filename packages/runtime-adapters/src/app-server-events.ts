@@ -172,6 +172,42 @@ function resetClock(resets: unknown): string | undefined {
  * either -- a field it cannot see is a field it silently drops, which is how
  * the window and the reset went missing from the message for so long.
  */
+/**
+ * The whole reading, as Claude's is kept (`claude.usage_window`, the same
+ * words): "5-hour window 34% used · resets <ISO> · weekly window 12% used ·
+ * resets <ISO>", fullest first (0.388).
+ *
+ * Only the warnings were kept before -- "limit 93% used" from 90% up -- so
+ * the usage a person watches for (Orca's status bar shows it for every
+ * account; Locust shows only what a run reported) was there for Claude and
+ * blank for Codex until it was nearly gone. Read off a real snapshot's shape
+ * (a Codex rollout, 2026-09-27): `primary` 3% of 300 minutes, `secondary`
+ * 0% of 10,080, each with its `resets_at` in epoch seconds; `credits` and
+ * `plan_type` are not windows and are passed over. Both spellings, as below.
+ */
+export function usageWindowFromSnapshot(snapshot: unknown): string | undefined {
+  if (!isObject(snapshot)) return undefined;
+  const number = (value: unknown): number | undefined => (typeof value === "number" && Number.isFinite(value) ? value : undefined);
+  const parts: { label: string; used: number; resets: string | undefined }[] = [];
+  for (const [label, value] of Object.entries(snapshot)) {
+    if (!isObject(value)) continue;
+    const used = number(value.usedPercent)
+      ?? number(value.used_percent)
+      ?? (number(value.utilization) === undefined ? undefined : (value.utilization as number) * 100);
+    if (used === undefined) continue;
+    const minutes = number(value.windowDurationMins) ?? number(value.windowMinutes) ?? number(value.window_minutes);
+    const seconds = number(value.resetsAt) ?? number(value.resets_at);
+    parts.push({
+      label: `${windowName(minutes, label)} window`,
+      used: Math.max(0, Math.min(100, Math.round(used))),
+      resets: seconds === undefined || seconds < 1_000_000_000 ? undefined : new Date(seconds * 1000).toISOString(),
+    });
+  }
+  if (parts.length === 0) return undefined;
+  parts.sort((a, b) => b.used - a.used);
+  return parts.map((part) => `${part.label} ${String(part.used)}% used${part.resets === undefined ? "" : ` · resets ${part.resets}`}`).join(" · ");
+}
+
 export function limitFromSnapshot(
   snapshot: unknown,
 ): { readonly kind: "quota-exhausted" | "temporary-rate-limit"; readonly message: string } | undefined {
@@ -253,6 +289,8 @@ export function createAppServerEventNormalizer(
   // Per kind, as the exec transport keeps them: one flag for every limit
   // meant an exhausted quota was never said once a warning had been (M3).
   const announcedLimits = new Set<CodexLimitKind>();
+  // The last usage reading kept, so a snapshot pushed again unchanged is not.
+  let lastUsageWindow: string | undefined;
   /*
    * A compaction, said once however it is reported (A2.5). Codex 0.156.1
    * has both a `contextCompaction` item and a `thread/compacted` notification
@@ -515,18 +553,36 @@ export function createAppServerEventNormalizer(
         }
 
         case "account/rateLimits/updated": {
+          const out: NormalizedRuntimeEvent[] = [];
+          // The reading itself, kept by the host as the latest for Codex --
+          // not a line in the thread (the window drops `.usage_window`
+          // diagnostics from it) -- and only when it changed.
+          const window = usageWindowFromSnapshot(params.rateLimits);
+          if (window !== undefined && window !== lastUsageWindow) {
+            lastUsageWindow = window;
+            out.push(
+              emit("adapter.diagnostic", {
+                code: "codex.usage_window",
+                level: "info",
+                terminal: false,
+                message: window,
+                evidence: evidence(notification),
+              }),
+            );
+          }
           const limit = limitFromSnapshot(params.rateLimits);
           // Say it once. The server pushes this repeatedly, and a transcript
           // that repeats the same warning is a transcript nobody reads.
-          if (limit === undefined || announcedLimits.has(limit.kind)) return [];
+          if (limit === undefined || announcedLimits.has(limit.kind)) return out;
           announcedLimits.add(limit.kind);
-          return [
+          out.push(
             emit("route.limit_detected", {
               kind: limit.kind,
               message: limit.message,
               evidence: evidence(notification),
             }),
-          ];
+          );
+          return out;
         }
 
         case "error": {

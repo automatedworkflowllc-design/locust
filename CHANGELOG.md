@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.388.0 - 2026-09-27
+
+### New
+
+- **See how much of your plan each agent has used.** On Home, the AI agents
+  line puts a thin ring around each agent's logo showing how full its
+  current usage window is. The readings come from what that agent's own
+  runs reported, so Claude and Codex have them. Hover a logo for the
+  details, like "35% of the 5-hour window used, resets 22:10".
+- The model button under the message box shows the same ring once that
+  agent passes 80%, in amber, and red when the window is used up.
+
 ## 0.387.0 - 2026-09-27
 
 ### New

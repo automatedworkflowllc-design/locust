@@ -419,6 +419,39 @@ textarea {
 }
 
 /*
+ * A usage ring (UsageRing.tsx, 0.388): the fullest window of the account a
+ * runtime runs on, round its mark -- muted while there is room, amber from
+ * 80%, red when the window is spent.
+ */
+.lc-usagering {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+}
+
+.lc-usagering__ring {
+  position: absolute;
+  inset: 0;
+}
+
+.lc-usagering__track {
+  stroke: var(--lc-border-card);
+}
+
+.lc-usagering__arc {
+  stroke: var(--lc-text-muted);
+}
+
+.lc-usagering.is-pressing .lc-usagering__arc {
+  stroke: var(--lc-amber);
+}
+
+.lc-usagering.is-spent .lc-usagering__arc {
+  stroke: var(--lc-red);
+}
+
+/*
  * A new version is ready. One line above the composer; the install is a click.
  *
  * A card, and the install is the app's one offer colour -- the lime the

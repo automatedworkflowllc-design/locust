@@ -7,6 +7,8 @@ import { FREE_START_RUNTIME, installCommand, installSentence, runtimeInstallFact
 import { COVER_HEIGHT, HomeCover, coverGrowFor, coverScale } from './HomeCover.js'
 import { HomeTeam } from './HomeTeam.js'
 import { RuntimeMark } from './RuntimeMark.js'
+import { UsageRing } from './UsageRing.js'
+import { usagePercent, usageWindowSentence } from '../missionView.js'
 import type { HomeTeammate } from './HomeTeam.js'
 import { TeamTemplates } from './TeamTemplates.js'
 import type { TeamTemplate } from '../../../shared/team-templates.js'
@@ -64,6 +66,7 @@ function vendorUrl(runtime: string): string | undefined {
 export function FirstLaunch({
   runtimes,
   limitedRuntimes,
+  usageWindows,
   discoveryPhase,
   tube,
   swarmCalls = 0,
@@ -90,6 +93,8 @@ export function FirstLaunch({
   readonly runtimes: readonly PublicRuntimeStatus[]
   /** Runtimes whose last run ended on the account's usage limit, with its own words. */
   readonly limitedRuntimes: ReadonlyMap<string, string>
+  /** The latest usage reading per runtime, from what runs reported (0.388). */
+  readonly usageWindows?: ReadonlyMap<string, string>
   /**
    * Whether the no-account runtime still lists something free. Absent reads
    * as `unknown`, which keeps the promise: this is a correction on disproof,
@@ -569,9 +574,23 @@ export function FirstLaunch({
                   * hover, and the line's title lists them all.
                   */}
                 <span className="lc-agenthead__marks" title={names.join(', ')}>
-                  {ready.map((row) => (
-                    <RuntimeMark key={row.runtime.id} runtime={row.runtime.id} size={15} label={row.runtime.displayName} />
-                  ))}
+                  {ready.map((row) => {
+                    /*
+                     * AND HOW FULL EACH ACCOUNT IS (0.388): the ring of the
+                     * fullest window a run last reported, where one has, and
+                     * the reading in words as the mark's name.
+                     */
+                    const said = usageWindows?.get(row.runtime.id)
+                    const used = said === undefined ? undefined : usagePercent(said)
+                    const label = said === undefined ? row.runtime.displayName : `${row.runtime.displayName}: ${usageWindowSentence(said)}`
+                    return used === undefined ? (
+                      <RuntimeMark key={row.runtime.id} runtime={row.runtime.id} size={15} label={label} />
+                    ) : (
+                      <UsageRing key={row.runtime.id} used={used} size={15}>
+                        <RuntimeMark runtime={row.runtime.id} size={15} label={label} />
+                      </UsageRing>
+                    )
+                  })}
                 </span>
                 <button type="button" className="lc-agenthead__more" onClick={() => setAgentsOpen(true)}>
                   Show all

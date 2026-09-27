@@ -46,6 +46,7 @@ import type { SlashCommand } from '../slashCommands.js'
 import { RoutePicker } from './RoutePicker.js'
 import type { RouteChoice } from './RoutePicker.js'
 import { RuntimeMark } from './RuntimeMark.js'
+import { UsageRing } from './UsageRing.js'
 
 const MAX_PROMPT_LENGTH = 8_000
 
@@ -1434,7 +1435,9 @@ export function Composer({
                 <button
                   ref={routeChip}
                   type="button"
-                  className={`lc-control lc-control--boxed${usagePressing ? ' is-pressing' : ''}`}
+                  // From 80%: the ring round the mark says it (UsageRing, 0.388);
+                  // a chip with no mark keeps the amber dot.
+                  className={`lc-control lc-control--boxed${usagePressing && (nothingConnected || ownModel) ? ' is-pressing' : ''}`}
                   /*
                    * Hover said "OpenCode / account-default" while the chip
                    * itself read "No runtime" -- the label was fixed in pass 2
@@ -1472,7 +1475,13 @@ export function Composer({
                   {nothingConnected || ownModel ? (
                     <span className={`lc-dot ${selectedReady ? 'lc-tone-lime' : 'lc-tone-muted'}`} />
                   ) : (
-                    <RuntimeMark runtime={shownRuntime} size={13} muted={!selectedReady} />
+                    usagePressing && usagePercentNow !== undefined ? (
+                      <UsageRing used={usagePercentNow} size={13}>
+                        <RuntimeMark runtime={shownRuntime} size={13} muted={!selectedReady} />
+                      </UsageRing>
+                    ) : (
+                      <RuntimeMark runtime={shownRuntime} size={13} muted={!selectedReady} />
+                    )
                   )}
                   {/*
                     * With NOTHING connected, this chip names no route.

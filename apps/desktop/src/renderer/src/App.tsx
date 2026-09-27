@@ -5905,6 +5905,7 @@ export default function App(): ReactElement {
                 runtimes={runtimes}
                 freeStart={freeStartStillFree(runtimes, models)}
                 limitedRuntimes={limitedRuntimes}
+                usageWindows={usageWindows}
                 discoveryPhase={runtimeState.phase}
                 tube={tube}
                 swarmCalls={swarmCalls}

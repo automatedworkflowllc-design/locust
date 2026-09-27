@@ -33,6 +33,12 @@ describe("a runtime mark's colour", () => {
     expect([...shell.matchAll(/\.lc-runtimemark\[data-runtime='([a-z]+)'\]/g)].map((match) => match[1])).toEqual(['claude'])
   })
 
+  it("rings an account's usage in the app's own tones: muted, amber from 80%, red when spent (0.388)", () => {
+    expect(shell).toMatch(/\.lc-usagering__arc \{\s*stroke: var\(--lc-text-muted\);/)
+    expect(shell).toMatch(/\.lc-usagering\.is-pressing \.lc-usagering__arc \{\s*stroke: var\(--lc-amber\);/)
+    expect(shell).toMatch(/\.lc-usagering\.is-spent \.lc-usagering__arc \{\s*stroke: var\(--lc-red\);/)
+  })
+
   it('goes grey with its words when the runtime cannot take work, brand colour and all', () => {
     // `[data-runtime]` lifts the muted rule over the brand's, whatever the order.
     expect(shell).toMatch(/\.lc-runtimemark\.is-muted\[data-runtime\] \{\s*color: inherit;\s*opacity: 0\.5;/)

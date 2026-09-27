@@ -4,6 +4,7 @@ import {
   APP_SERVER_COMPACTED,
   createAppServerEventNormalizer,
   limitFromSnapshot,
+  usageWindowFromSnapshot,
   toolCommandOf,
   toolNameOf,
 } from "../src/app-server-events.js";
@@ -183,11 +184,60 @@ describe("rate limits", () => {
 
   it("announces a limit once rather than on every push", () => {
     const app = normalizer();
+    const limits = (events: readonly { readonly type: string }[]) => events.filter((event) => event.type === "route.limit_detected");
     const first = app.accept(note("account/rateLimits/updated", { rateLimits: { weekly: { usedPercent: 95 } } }));
     const second = app.accept(note("account/rateLimits/updated", { rateLimits: { weekly: { usedPercent: 96 } } }));
-    expect(first.map((event) => event.type)).toEqual(["route.limit_detected"]);
-    // A transcript that repeats the same warning is one nobody reads.
-    expect(second).toEqual([]);
+    expect(limits(first)).toHaveLength(1);
+    // A transcript that repeats the same warning is one nobody reads. (The
+    // reading itself changed, 95 to 96, so that is kept -- as a reading.)
+    expect(limits(second)).toEqual([]);
+  });
+});
+
+/*
+ * THE READING, NOT ONLY THE WARNING (0.388). Claude's windows were kept as a
+ * `claude.usage_window` reading on every push; Codex's only as a warning from
+ * 90% up, so a usage meter had nothing to show for Codex until it was nearly
+ * gone. The shape below is a real snapshot's, read off a Codex rollout on
+ * 2026-09-27 (snake_case on disk; the app-server sends camelCase).
+ */
+describe("usage readings", () => {
+  const ROLLOUT = {
+    limit_id: "codex",
+    limit_name: null,
+    primary: { used_percent: 3.0, window_minutes: 300, resets_at: 1790363478 },
+    secondary: { used_percent: 0.0, window_minutes: 10080, resets_at: 1790950278 },
+    credits: { has_credits: false, unlimited: false, balance: "0" },
+    individual_limit: null,
+    plan_type: "plus",
+  };
+
+  it("reads every window, fullest first, in the words Claude's reading uses", () => {
+    expect(usageWindowFromSnapshot(ROLLOUT)).toBe(
+      `5-hour window 3% used · resets ${new Date(1790363478 * 1000).toISOString()} · weekly window 0% used · resets ${new Date(1790950278 * 1000).toISOString()}`,
+    );
+    expect(usageWindowFromSnapshot({ primary: { usedPercent: 34, windowDurationMins: 300 }, secondary: { usedPercent: 71.6, windowDurationMins: 10080 } })).toBe(
+      "weekly window 72% used · 5-hour window 34% used",
+    );
+  });
+
+  it("reads nothing where there are no windows", () => {
+    expect(usageWindowFromSnapshot({ credits: { balance: "0" }, plan_type: "plus" })).toBeUndefined();
+    expect(usageWindowFromSnapshot(null)).toBeUndefined();
+  });
+
+  it("keeps a reading as a codex.usage_window diagnostic, once per change", () => {
+    const app = normalizer();
+    const readings = (events: readonly { readonly type: string; readonly payload: unknown }[]) =>
+      events.filter((event) => event.type === "adapter.diagnostic" && (event.payload as { code: string }).code === "codex.usage_window").map((event) => (event.payload as { message: string }).message);
+    const first = app.accept(note("account/rateLimits/updated", { rateLimits: { primary: { usedPercent: 12, windowDurationMins: 300 } } }));
+    const same = app.accept(note("account/rateLimits/updated", { rateLimits: { primary: { usedPercent: 12, windowDurationMins: 300 } } }));
+    const moved = app.accept(note("account/rateLimits/updated", { rateLimits: { primary: { usedPercent: 13, windowDurationMins: 300 } } }));
+    expect(readings(first)).toEqual(["5-hour window 12% used"]);
+    expect(same).toEqual([]);
+    expect(readings(moved)).toEqual(["5-hour window 13% used"]);
+    // A reading is never a limit: nothing near the line was said.
+    expect([...first, ...moved].some((event) => event.type === "route.limit_detected")).toBe(false);
   });
 });
 
@@ -207,8 +257,10 @@ describe("limits and sign-in on the app-server transport", () => {
     const app = normalizer();
     const warned = app.accept(note("account/rateLimits/updated", { rateLimits: { weekly: { usedPercent: 95 } } }));
     const spent = app.accept(note("account/rateLimits/updated", { rateLimits: { weekly: { usedPercent: 100 } } }));
-    expect(warned.map((event) => event.type === "route.limit_detected" && event.payload.kind)).toEqual(["temporary-rate-limit"]);
-    expect(spent.map((event) => event.type === "route.limit_detected" && event.payload.kind)).toEqual(["quota-exhausted"]);
+    // Limit events only: each push also carries the reading itself (0.388).
+    const kinds = (events: typeof warned) => events.flatMap((event) => (event.type === "route.limit_detected" ? [event.payload.kind] : []));
+    expect(kinds(warned)).toEqual(["temporary-rate-limit"]);
+    expect(kinds(spent)).toEqual(["quota-exhausted"]);
   });
 
   it("classifies a usage-limit error from Codex's own error info, and names the limit", () => {
