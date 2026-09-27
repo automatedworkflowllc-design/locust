@@ -631,7 +631,7 @@ export function FirstLaunch({
                     <div className={`lc-runtimecell${usable ? ' is-ready' : ''}${onRamp ? ' is-onramp' : ''}`} key={runtime.id}>
                       <span className={`lc-runtimecell__dot${dot}`} />
                       <span className="lc-runtimecell__name" title={status.detail}>
-                        <RuntimeMark runtime={runtime.id} size={13} className={usable ? 'is-inline' : 'is-inline is-muted'} />
+                        <RuntimeMark runtime={runtime.id} size={13} muted={!usable} className="is-inline" />
                         {runtime.displayName}
                       </span>
                       {need !== undefined && (

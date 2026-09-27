@@ -145,7 +145,7 @@ import { splitAttachments, withAttachments } from '../../shared/attachments.js'
 // different question from who owns a recorded mission.
 import { heldFor, routineOf } from './conversationList.js'
 import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, nextFreeModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
-import { isOwnRoute, modelDisplayName, rememberOwnModels, routeChrome } from './routeName.js'
+import { homeRouteOf, isOwnRoute, modelDisplayName, rememberOwnModels } from './routeName.js'
 import { FeedbackDialog } from './components/FeedbackDialog.js'
 import { conversationText } from './feedback.js'
 import { withMessageDelta } from '../../shared/messageFragments.js'
@@ -5874,8 +5874,7 @@ export default function App(): ReactElement {
                   hue: mate.hue,
                   avatar: mate.avatar,
                   role: roleLabelOf(mate),
-                  ...(mate.route === undefined ? {} : { route: routeChrome(mate.route.runtime, mate.route.model, modelDisplayName(mate.route.runtime, mate.route.model), ' · ') }),
-                  ...(mate.route === undefined || isOwnRoute(mate.route.model) ? {} : { runtime: mate.route.runtime }),
+                  ...(mate.route === undefined ? {} : homeRouteOf(mate.route, resolvedModels)),
                   working: [...runs.values()].some((run) => liveRunIsActive(run) && ownerOf(run) === mate.teammateId)
                 }))}
                 onMessageTeammate={selectTeammate}

@@ -326,11 +326,14 @@
   --lc-hue-pearl-face: #16161b;
 
   /* --- Runtime marks (RuntimeMark.tsx, 0.383) ----------------------------
-   * The two marks whose colour is part of the mark: Claude's orange and
-   * Gemini's violet, each the hex Simple Icons records for it. Every other
-   * runtime's mark is drawn in the colour of the words beside it. */
+   * The marks whose colour is part of the mark: Claude's orange (the hex
+   * Simple Icons records for it) and the three stops of Gemini's sparkle
+   * (Google's own file, 0.384). Every other runtime's mark is drawn in the
+   * colour of the words beside it. */
   --lc-mark-claude: #d97757;
-  --lc-mark-gemini: #8e75b2;
+  --lc-mark-gemini-violet: #9168c0;
+  --lc-mark-gemini-blue: #5684d1;
+  --lc-mark-gemini-cyan: #1ba1e3;
 
   /* THE TWO HUES THAT HAD NO TEXT SIBLING.
    *

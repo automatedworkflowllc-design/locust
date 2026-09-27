@@ -6,8 +6,9 @@ import { describe, expect, it } from 'vitest'
 /*
  * THE RUNTIME MARKS' COLOURS ARE TOKENS (0.383).
  *
- * Claude's orange and Gemini's violet are part of those marks; every other
- * runtime's mark is drawn in the colour of the words beside it. The first cut
+ * Claude's orange and Gemini's gradient are part of those marks (Gemini's
+ * since 0.384, Google's own sparkle); every other runtime's mark is drawn in
+ * the colour of the words beside it. The first cut
  * set the colour on the element through a custom property with a `var()`
  * fallback, and the token gate refused both: a fallback defeats the gate, and
  * a colour belongs in `tokens.css`. The renderer's `RuntimeMark` sets no
@@ -19,15 +20,17 @@ const tokens = read('tokens.css')
 const shell = read('shell.css')
 
 describe("a runtime mark's colour", () => {
-  it('is a token, for the two marks whose colour is part of the mark', () => {
+  it('is a token, for every mark whose colour is part of the mark', () => {
     expect(tokens).toContain('--lc-mark-claude: #d97757;')
-    expect(tokens).toContain('--lc-mark-gemini: #8e75b2;')
+    // The three stops of Google's own sparkle, exactly as its file has them.
+    expect(tokens).toContain('--lc-mark-gemini-violet: #9168c0;')
+    expect(tokens).toContain('--lc-mark-gemini-blue: #5684d1;')
+    expect(tokens).toContain('--lc-mark-gemini-cyan: #1ba1e3;')
   })
 
-  it('is painted by runtime, on exactly those two', () => {
+  it('is painted by runtime for Claude alone: Gemini carries its gradient in the mark', () => {
     expect(shell).toMatch(/\.lc-runtimemark\[data-runtime='claude'\] \{\s*color: var\(--lc-mark-claude\);/)
-    expect(shell).toMatch(/\.lc-runtimemark\[data-runtime='gemini'\] \{\s*color: var\(--lc-mark-gemini\);/)
-    expect([...shell.matchAll(/\.lc-runtimemark\[data-runtime='([a-z]+)'\]/g)].map((match) => match[1]).sort()).toEqual(['claude', 'gemini'])
+    expect([...shell.matchAll(/\.lc-runtimemark\[data-runtime='([a-z]+)'\]/g)].map((match) => match[1])).toEqual(['claude'])
   })
 
   it('goes grey with its words when the runtime cannot take work, brand colour and all', () => {

@@ -28,7 +28,9 @@ export interface HomeTeammate {
   readonly role: string
   /** The route in words, "Codex . Account default"; absent before a first run. */
   readonly route?: string
-  /** Whose mark goes before the route (0.383); absent on a model of the person's own. */
+  /** The model alone, "Opus 5.5": what the line shows beside the runtime's mark (0.384). */
+  readonly model?: string
+  /** Whose mark stands for the runtime (0.383); absent on a model of the person's own. */
   readonly runtime?: MissionRuntimeId
   /** Running right now. */
   readonly working: boolean
@@ -66,7 +68,7 @@ export function HomeTeam({
             key={mate.teammateId}
             className="lc-hometeam__card"
             onClick={() => onMessage(mate.teammateId)}
-            aria-label={`Message ${mate.name}, ${mate.role}${mate.working ? ', working now' : ''}`}
+            aria-label={`Message ${mate.name}, ${mate.role}${mate.working ? ', working now' : ''}${mate.route === undefined ? '' : `, on ${mate.route}`}`}
           >
             <TeammateBot hue={mate.hue} avatar={mate.avatar} size={34} teammateId={mate.teammateId} activity={mate.working ? 'working' : 'idle'} />
             <span className="lc-hometeam__text">
@@ -75,9 +77,27 @@ export function HomeTeam({
                 {mate.working && <span className="lc-hometeam__working">working</span>}
               </span>
               <span className="lc-hometeam__role">{mate.role}</span>
-              <span className="lc-hometeam__route">
-                {mate.route !== undefined && mate.runtime !== undefined && <RuntimeMark runtime={mate.runtime} size={11} className="is-inline" />}
-                {mate.route ?? 'runs on the model you pick'}
+              {/*
+                * THE MARK SAYS THE RUNTIME; THE WORDS SAY THE MODEL (0.384).
+                *
+                * "Cursor · Grok 4.7 Medium" did not fit a card and was cut to
+                * "Mediu..." on Colin's own Home (2026-09-26), and the runtime's
+                * word said again what its mark, one glyph to the left, already
+                * said. The whole route is the line's hover and the card's
+                * accessible name. A model of the person's own has no mark and
+                * keeps its name, which is the whole of its route anyway.
+                */}
+              <span className="lc-hometeam__route" {...(mate.route === undefined ? {} : { title: mate.route })}>
+                {mate.route === undefined ? (
+                  'runs on the model you pick'
+                ) : mate.runtime !== undefined && mate.model !== undefined ? (
+                  <>
+                    <RuntimeMark runtime={mate.runtime} size={11} className="is-inline" />
+                    {mate.model}
+                  </>
+                ) : (
+                  mate.route
+                )}
               </span>
             </span>
             <span className="lc-hometeam__go" aria-hidden="true">

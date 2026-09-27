@@ -6,6 +6,8 @@ import { join } from 'node:path'
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 import { parseAntigravityProjects, projectIdForWorkspace } from '@teammate/runtime-adapters'
 
+import { ANTIGRAVITY_TIER_NAMES } from '../shared/antigravity-models.js'
+
 /**
  * Antigravity, EXPERIMENTAL.
  *
@@ -62,10 +64,11 @@ export interface AntigravityProbeOptions {
   readonly run?: (executable: string, args: readonly string[], env: Readonly<Record<string, string>>) => Promise<{ stdout: string; stderr: string; code: number | null }>
 }
 
+// Named from the one table the window reads too (shared/antigravity-models.ts).
 export const ANTIGRAVITY_MODELS = [
-  { id: 'flash', displayName: 'Gemini Flash', description: 'Antigravity tier flash' },
-  { id: 'pro', displayName: 'Gemini Pro', description: 'Antigravity tier pro' },
-  { id: 'flash_lite', displayName: 'Gemini Flash Lite', description: 'Antigravity tier flash_lite' }
+  { id: 'flash', displayName: ANTIGRAVITY_TIER_NAMES.flash!, description: 'Antigravity tier flash' },
+  { id: 'pro', displayName: ANTIGRAVITY_TIER_NAMES.pro!, description: 'Antigravity tier pro' },
+  { id: 'flash_lite', displayName: ANTIGRAVITY_TIER_NAMES.flash_lite!, description: 'Antigravity tier flash_lite' }
 ] as const
 
 const PROBE_TTL_MS = 10_000

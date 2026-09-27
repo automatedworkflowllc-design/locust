@@ -2,13 +2,14 @@
 //
 //   node _tools/drive-runtime-marks.mjs [--packaged <exe>] [--tag <name>]
 //
-// Five teammates on five runtimes -- Wren on Claude, Juno on Codex, Quill on
-// Copilot, Pip on Cursor, Sable on OpenCode's free model -- and each surface
-// that names a runtime, photographed: Home (the team's cards and the agents
-// line), the Team board, a teammate open (the sidebar's faces and the
-// composer's chip), the model picker, and an approval card with the
-// conversation's header over it. Only Sable runs anything, on the free model; the other four
-// routes are seeded and never started.
+// Six teammates on six runtimes -- Wren on Claude, Juno on Codex, Quill on
+// Copilot, Pip on Cursor, Sable on OpenCode's free model, Boss on
+// Antigravity's Flash (0.384) -- and each surface that names a runtime,
+// photographed: Home (the team's cards and the agents line), the Team board,
+// a teammate open (the sidebar's faces and the composer's chip), the model
+// picker, and an approval card with the conversation's header over it. Only
+// Sable runs anything, on the free model; the other five routes are seeded
+// and never started.
 
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -23,7 +24,7 @@ await mkdir(OUT, { recursive: true })
 const MODEL = process.env.LOCUST_FREE_MODEL ?? 'opencode/nemotron-3-ultra-free'
 const at = '2026-09-26T05:00:00.000Z'
 const mate = (teammateId, name, hue, role, runtime, model) => ({ teammateId, name, hue, role, createdAt: at, route: { runtime, model, mode: 'accept-edits' } })
-const SEEDED = { Wren: 'claude', Juno: 'codex', Quill: 'copilot', Pip: 'cursor', Sable: 'opencode' }
+const SEEDED = { Wren: 'claude', Juno: 'codex', Quill: 'copilot', Pip: 'cursor', Sable: 'opencode', Boss: 'antigravity' }
 
 const workspace = await scratchRepository('locust-runtime-marks-ws-')
 const drive = await startDrive({
@@ -40,7 +41,9 @@ const drive = await startDrive({
       mate('tm_juno', 'Juno', 'violet', 'Docs & QA', 'codex', 'account-default'),
       mate('tm_quill', 'Quill', 'clay', 'Research & Briefs', 'copilot', 'auto'),
       mate('tm_pip', 'Pip', 'teal', 'Ops & Scheduling', 'cursor', 'auto'),
-      mate('tm_sable', 'Sable', 'blue', 'Data & Reporting', 'opencode', MODEL)
+      mate('tm_sable', 'Sable', 'blue', 'Data & Reporting', 'opencode', MODEL),
+      // 0.384: Colin's own Home read "Antigravity · Flash" and "Claude · Opus".
+      mate('tm_boss', 'Boss', 'slate', 'Ops & Scheduling', 'antigravity', 'flash')
     ],
     missionOwners: {},
     settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: false }
@@ -74,18 +77,24 @@ try {
   await sleep(1200)
   const home = await json(`{
     cards: ${marksBy('.lc-hometeam__card', '.lc-hometeam__name', '.lc-hometeam__route .lc-runtimemark')},
+    // What each card's route line SAYS, beside its mark (0.384).
+    lines: Object.fromEntries([...document.querySelectorAll('.lc-hometeam__card')].map((card) => [
+      card.querySelector('.lc-hometeam__name')?.textContent.trim().split(/\\s+/)[0] ?? '',
+      card.querySelector('.lc-hometeam__route')?.textContent.trim() ?? ''
+    ])),
     folded: [...document.querySelectorAll('.lc-agenthead__marks .lc-runtimemark')].map((svg) => svg.getAttribute('aria-label')),
     rows: [...document.querySelectorAll('.lc-runtimecell__name .lc-runtimemark')].map((svg) => svg.getAttribute('data-runtime'))
   }`)
   await drive.capture('Home: the team, and the agents on this machine', () => JSON.stringify(home))
   check('every Home card wears its route’s mark', everyoneWearsTheirs(home.cards) && home.cards.every(([, runtime]) => runtime !== null), JSON.stringify(home.cards))
+  check('Home names the model a teammate RUNS: Sonnet 5, Gemini 3.8 Flash -- the mark stands for the runtime', home.lines.Wren === 'Sonnet 5' && home.lines.Boss === 'Gemini 3.8 Flash', JSON.stringify(home.lines))
   check('the agents line shows marks, named, or each agent row has one', home.folded.length > 0 ? home.folded.every((label) => typeof label === 'string' && label.length > 0) : home.rows.length > 0, JSON.stringify(home))
 
   // 2. The Team board.
   await shortcut('2')
   const board = await json(marksBy('.lc-rostercard:not(.lc-rostercard--new)', '.lc-rostercard__name', '.lc-rostercard__model .lc-runtimemark'))
   await drive.capture('the Team board', () => JSON.stringify(board))
-  check('every Team card wears its route’s mark', everyoneWearsTheirs(board) && board.filter(([name]) => SEEDED[name] !== undefined).length === 5, JSON.stringify(board))
+  check('every Team card wears its route’s mark', everyoneWearsTheirs(board) && board.filter(([name]) => SEEDED[name] !== undefined).length === 6, JSON.stringify(board))
 
   // 3. Wren open: the sidebar rows, and the composer's chip.
   say(String(await drive.evaluate(openTeammateScript('Wren'))))
@@ -103,7 +112,9 @@ try {
     })()
   }`)
   await drive.capture('Wren open: the sidebar and the composer', () => JSON.stringify(open))
-  check('each face in the sidebar wears its route’s mark', everyoneWearsTheirs(open.faces) && open.faces.filter(([, runtime]) => runtime !== null).length === 5, JSON.stringify(open.faces))
+  // Six or more teammates draw four faces and a "+N" (Sidebar), so: every
+  // face DRAWN wears its route's mark.
+  check('each face in the sidebar wears its route’s mark', open.faces.length >= 4 && everyoneWearsTheirs(open.faces) && open.faces.every(([, runtime]) => runtime !== null), JSON.stringify(open.faces))
   check('the composer’s chip wears Claude’s mark, and no dot', open.chip.runtime === 'claude' && open.chip.dot === false, JSON.stringify(open.chip))
 
   // 4. The model picker.
@@ -161,5 +172,5 @@ try {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
-  await drive.finish({ intro: `Five teammates on five runtimes (Claude, Codex, Copilot, Cursor, and OpenCode's ${MODEL}); each surface that names a runtime, photographed. Only Sable ran, on the free model.` })
+  await drive.finish({ intro: `Six teammates on six runtimes (Claude, Codex, Copilot, Cursor, OpenCode's ${MODEL}, Antigravity's Flash); each surface that names a runtime, photographed. Only Sable ran, on the free model.` })
 }

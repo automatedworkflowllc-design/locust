@@ -1472,7 +1472,7 @@ export function Composer({
                   {nothingConnected || ownModel ? (
                     <span className={`lc-dot ${selectedReady ? 'lc-tone-lime' : 'lc-tone-muted'}`} />
                   ) : (
-                    <RuntimeMark runtime={shownRuntime} size={13} {...(selectedReady ? {} : { className: 'is-muted' })} />
+                    <RuntimeMark runtime={shownRuntime} size={13} muted={!selectedReady} />
                   )}
                   {/*
                     * With NOTHING connected, this chip names no route.

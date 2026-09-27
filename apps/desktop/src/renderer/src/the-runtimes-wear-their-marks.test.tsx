@@ -42,7 +42,12 @@ describe('the marks', () => {
     // which tools a person uses. A local-first app draws its own.
     const source = MARKS_SOURCE
     expect(source).not.toMatch(/https?:\/\//)
-    expect(source).not.toMatch(/fetch\(|new Image|<img|googleusercontent|gstatic/)
+    // Named sources in the comments are documentation; what is DRAWN is
+    // path data and nothing else.
+    expect(source).not.toMatch(/fetch\(|new Image|<img|<image|xlink:href|data:image/)
+    for (const [runtime, mark] of Object.entries(RUNTIME_MARKS)) {
+      for (const d of [...mark.paths, ...(mark.strokes ?? [])]) expect(d, runtime).toMatch(/^[Mm][MmLlHhVvCcSsQqTtAaZz0-9.,\s-]*$/)
+    }
     // The component draws the paths inline, and loads nothing either.
     const component = MARK_COMPONENT
     expect(component).not.toMatch(/https?:\/\/|fetch\(|<img|<image/)
@@ -67,6 +72,38 @@ describe('the marks', () => {
     expect(named).toContain('role="img"')
     expect(named).toContain('aria-label="Copilot CLI"')
     expect(named).toContain('<title>Copilot CLI</title>')
+  })
+
+  it("draw Gemini in Google's own gradient, its stops tokens, each instance its own", () => {
+    const html = renderToStaticMarkup(
+      <>
+        <RuntimeMark runtime="gemini" />
+        <RuntimeMark runtime="gemini" />
+      </>
+    )
+    const ids = [...html.matchAll(/<radialGradient id="([^"]+)"/g)].map((match) => match[1])
+    expect(ids).toHaveLength(2)
+    expect(new Set(ids).size).toBe(2)
+    for (const id of ids) expect(html).toContain(`fill="url(#${String(id)})"`)
+    for (const token of ['--lc-mark-gemini-violet', '--lc-mark-gemini-blue', '--lc-mark-gemini-cyan']) expect(html).toContain(`stop-color:var(${token})`)
+    expect(html).toContain('viewBox="0 0 28 28"')
+  })
+
+  it('grey Gemini with its words: no gradient when muted', () => {
+    const html = renderToStaticMarkup(<RuntimeMark runtime="gemini" muted />)
+    expect(html).toContain('class="lc-runtimemark is-muted"')
+    expect(html).not.toContain('radialGradient')
+    expect(html).toContain('fill="currentColor"')
+  })
+
+  it("draw Antigravity's own arch and Meta's mark for Muse Code, not Locust's monograms", () => {
+    expect(RUNTIME_MARKS.antigravity.strokes).toBeUndefined()
+    expect(RUNTIME_MARKS.antigravity.viewBox).toBe('14 14.2 83.6 83.6')
+    expect(RUNTIME_MARKS.antigravity.source).toContain("Antigravity's own")
+    expect(RUNTIME_MARKS.muse.strokes).toBeUndefined()
+    expect(RUNTIME_MARKS.muse.source).toContain('Meta')
+    // Only Codex is drawn by Locust, and that is its own banner's prompt.
+    expect(Object.entries(RUNTIME_MARKS).filter(([, mark]) => mark.strokes !== undefined).map(([runtime]) => runtime)).toEqual(['codex'])
   })
 
   it('draw nothing for what no teammate runs on', () => {

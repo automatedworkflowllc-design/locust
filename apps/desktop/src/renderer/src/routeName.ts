@@ -3,6 +3,7 @@ import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { modelLabelFor } from './status.js'
 import { runtimeDisplayName } from '../../shared/runtimes.js'
 import { claudeRouteModelName } from '../../shared/claude-models.js'
+import { antigravityTierName } from '../../shared/antigravity-models.js'
 
 /**
  * How a route reads when it is CHROME rather than prose.
@@ -178,6 +179,12 @@ export function routeModelName(runtime: string, modelId: string, earned?: string
     const named = claudeRouteModelName(modelId, earned)
     if (named !== undefined) return named
   }
+  // An Antigravity tier by the model it runs -- "Gemini 3.8 Flash", not the
+  // tier's bare word (0.384; see shared/antigravity-models.ts).
+  if (runtime === 'antigravity') {
+    const named = antigravityTierName(modelId)
+    if (named !== undefined) return named
+  }
   return modelDisplayName(runtime, modelId)
 }
 
@@ -189,4 +196,20 @@ export function routeModelName(runtime: string, modelId: string, earned?: string
  */
 export function freeTagOf(label: string): { readonly name: string; readonly free: boolean } {
   return / free$/i.test(label) && label.length > 5 ? { name: label.slice(0, -5), free: true } : { name: label, free: false }
+}
+
+/**
+ * A teammate's route on Home's card (0.384): the model by the name it RUNS as
+ * -- "Opus 5.5", "Gemini 3.8 Flash", as the Team screen and the chip name it
+ * (routeModelName) -- where Home had spelled the alias, "Claude · Opus"
+ * (Colin's frame, 2026-09-26). The whole route, runtime and all, stays for the
+ * card's hover and its accessible name; the line itself shows the runtime's
+ * mark and the model.
+ */
+export function homeRouteOf(
+  route: { readonly runtime: MissionRuntimeId; readonly model: string },
+  resolved: ReadonlyMap<string, string>
+): { readonly route: string; readonly model: string; readonly runtime?: MissionRuntimeId } {
+  const model = routeModelName(route.runtime, route.model, resolved.get(`${route.runtime}:${route.model}`))
+  return { route: routeChrome(route.runtime, route.model, model, ' · '), model, ...(isOwnRoute(route.model) ? {} : { runtime: route.runtime }) }
 }

@@ -407,10 +407,6 @@ textarea {
   color: var(--lc-mark-claude);
 }
 
-.lc-runtimemark[data-runtime='gemini'] {
-  color: var(--lc-mark-gemini);
-}
-
 .lc-runtimemark.is-inline {
   margin-right: 0.42em;
 }

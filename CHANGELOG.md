@@ -11,6 +11,19 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.384.0 - 2026-09-26
+
+### Improved
+
+- **Real logos for Gemini, Antigravity and Muse Code.** Gemini now shows
+  Google's own sparkle, Antigravity its own arch, and Muse Code the Meta
+  logo that Meta puts on it.
+- **Home names the model each teammate runs.** A teammate on Claude's Opus
+  reads "Opus 5.5" on Home, as it does on the Team screen, and Antigravity's
+  Flash reads "Gemini 3.8 Flash". Each card shows the agent's logo in place
+  of its name, so a long model name like "Grok 4.7 Medium" fits. Hover the
+  line for the full route.
+
 ## 0.383.0 - 2026-09-26
 
 ### Improved
