@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.409.0 - 2026-09-27
+
+### Fixed
+
+- **Making the window smaller keeps the newest reply in view.** If you were
+  reading the end of a conversation and made the window smaller, the reply
+  slid below the visible area. Locust now keeps you at the newest reply,
+  unless you had scrolled up yourself.
+
 ## 0.408.0 - 2026-09-27
 
 ### Fixed

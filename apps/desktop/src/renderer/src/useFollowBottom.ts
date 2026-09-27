@@ -129,14 +129,26 @@ export function useFollowBottom(): FollowBottom {
     // Where the view starts, so the first scroll a person makes is measured
     // from where it really was -- from 0, a first move up reads as a move down.
     lastTop.current = box.scrollTop
+    /*
+     * AND THE VIEW ITSELF (0.409). A window made shorter shrinks the scroller
+     * while its scrollTop stays: the bottom slides out of sight with no growth
+     * and no scroll event, so a person who was AT the newest reply was left
+     * above it (fresh-eyes check, a conversation at 1440x900 then 1120x720:
+     * "DONE" below the view). A view that got shorter while following is
+     * taken back to the bottom.
+     */
+    let lastView = box.clientHeight
     const observer = new ResizeObserver(() => {
       const grew = box.scrollHeight > lastHeight.current
       lastHeight.current = box.scrollHeight
-      if (following.current && grew && walking.current === 0) {
+      const shrank = box.clientHeight < lastView
+      lastView = box.clientHeight
+      if (following.current && (grew || shrank) && walking.current === 0) {
         walking.current = requestAnimationFrame(stepToBottom)
       }
     })
     observer.observe(content)
+    observer.observe(box)
     watched.current = { node: content, observer }
   })
 
