@@ -128,6 +128,7 @@ import { cappedLiveEvents, LIVE_EVENT_CAP,
   stitchedHandoff,
   runtimeNeverStarted, typedPrompt, buildThread, lastActivityAt, relativePath, fileTurns, shellCommandText, turnText, groupBoundary, groupJoins, groupLeavings, latestSetupNotes } from './missionView.js'
 import type { LiveStarter, TurnSwitch } from './missionView.js'
+import { finishedToast } from './finishedToast.js'
 import { folderName, ranOnLine } from './ranOn.js'
 import { reviewBrief } from './reviewBrief.js'
 import type { ReviewMaterial } from './reviewBrief.js'
@@ -4975,6 +4976,44 @@ export default function App(): ReactElement {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [approvals, runs, sidebarMissions, missionOwners, historyById, teammates, memories]
   )
+  // The same count on the taskbar (0.379): a dot while anything needs you, a
+  // flash when more does while the window is elsewhere (taskbar-attention.ts).
+  const needsYouCount = needsYouItems.length
+  useEffect(() => {
+    window.desktop?.setNeedsYouCount?.(needsYouCount)
+  }, [needsYouCount])
+  /*
+   * "Wren finished" (0.379): a long run the person started, seen ending here.
+   * Only the moment a live run BECOMES finished -- each run is told once --
+   * and finishedToast.ts decides whether it is worth a toast at all; the host
+   * says it only while the window is elsewhere.
+   */
+  const phaseSeen = useRef(new Map<string, LiveRunPhase>())
+  useEffect(() => {
+    for (const [key, run] of runs) {
+      const before = phaseSeen.current.get(key)
+      phaseSeen.current.set(key, run.phase)
+      const wasLive = before === 'starting' || before === 'running' || before === 'cancelling'
+      if (!wasLive || (run.phase !== 'completed' && run.phase !== 'failed')) continue
+      const toast = finishedToast({
+        phase: run.phase,
+        startedAtIso: run.startedAtIso,
+        endedAtMs: Date.now(),
+        startedBy: run.startedBy,
+        restored: run.restored === true,
+        teammateName: run.teammateId === undefined ? undefined : teammates.find((entry) => entry.teammateId === run.teammateId)?.name,
+        events: run.events,
+        error: run.error
+      })
+      if (toast !== undefined) {
+        window.desktop?.notifyFinished?.({ ...toast, ...(run.data?.missionId === undefined ? {} : { missionId: run.data.missionId }) })
+      }
+    }
+  }, [runs, teammates])
+  // Its toast, clicked, opens the conversation it finished in.
+  const openMissionRef = useRef<(missionId: string) => void>(() => undefined)
+  openMissionRef.current = openMission
+  useEffect(() => window.desktop?.onAttentionOpenMission?.((missionId) => openMissionRef.current(missionId)), [])
   // The conversation on screen, by its root, is where notes on its diffs live.
   const notesMissionId = liveRun?.data?.missionId
   const notesRow = notesMissionId === undefined ? undefined : sidebarMissions.find((entry) => (entry.memberIds ?? [entry.missionId]).includes(notesMissionId))

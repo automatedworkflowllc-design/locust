@@ -22,6 +22,36 @@ export interface AttentionSurface {
   readonly notify: (input: { readonly title: string; readonly body: string; readonly onClick: () => void }) => void
   /** Bring the window forward. */
   readonly focusWindow: () => void
+  /** Open a conversation in the window (0.379: a finished run's toast opens where it finished). */
+  readonly openMission?: (missionId: string) => void
+}
+
+/**
+ * How long finishes are gathered before one toast says them (0.379): two
+ * teammates ending within a few seconds of each other are one thing to hear.
+ */
+export const FINISH_TOAST_WINDOW_MS = 4_000
+
+/** What the renderer asks to be said about a finished run, bounded -- it is a toast, not a transcript. */
+export function finishFrom(raw: unknown): { readonly title: string; readonly body: string; readonly missionId: string | undefined } | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined
+  const value = raw as { title?: unknown; body?: unknown; missionId?: unknown }
+  if (typeof value.title !== 'string' || typeof value.body !== 'string') return undefined
+  const title = value.title.replace(/\s+/g, ' ').trim().slice(0, 120)
+  const body = value.body.trim().slice(0, 400)
+  if (title.length === 0) return undefined
+  return { title, body, missionId: typeof value.missionId === 'string' && value.missionId.length > 0 && value.missionId.length <= 200 ? value.missionId : undefined }
+}
+
+/** Several finishes, as one toast: each said in a line, the newest last, three at most. */
+export function finishedNotificationText(finishes: readonly { readonly title: string; readonly body: string }[]): { readonly title: string; readonly body: string } {
+  if (finishes.length === 1) return { title: finishes[0]!.title, body: finishes[0]!.body }
+  const shown = finishes.slice(-3)
+  const hidden = finishes.length - shown.length
+  return {
+    title: `${String(finishes.length)} teammates are done`,
+    body: [...(hidden > 0 ? [`… and ${String(hidden)} more`] : []), ...shown.map((finish) => `${finish.title}: ${finish.body}`)].join('\n')
+  }
 }
 
 export function shouldNotify(input: { readonly focused: boolean; readonly supported: boolean }): boolean {
@@ -112,10 +142,32 @@ export function createAttention(
   decisionAsked(teammateName: string | undefined, question: string): boolean
   /** A run stopped at its account limit and waits for a person to pick where it continues. */
   limitHit(teammateName: string | undefined, runtimeName: string, message: string | undefined): boolean
+  /**
+   * A run the person started finished, after long enough to have walked away
+   * (the renderer decides that: finishedToast.ts). Gathered briefly, said once,
+   * and only while the window is elsewhere; a click opens the conversation.
+   */
+  runFinished(finish: { readonly title: string; readonly body: string; readonly missionId: string | undefined }): void
   /** Test seam: what is waiting to be said. */
   pending(): ReadonlyMap<string, readonly string[]>
 } {
   const held = new Map<string, { readonly roomName: string; readonly messages: string[]; readonly handle: unknown }>()
+  let finishes: { readonly title: string; readonly body: string; readonly missionId: string | undefined }[] = []
+  const flushFinishes = (): void => {
+    const said = finishes
+    finishes = []
+    if (said.length === 0) return
+    if (!shouldNotify({ focused: surface.focused(), supported: surface.supported() })) return
+    // The newest finish with a conversation is the one a click opens.
+    const opens = [...said].reverse().find((finish) => finish.missionId !== undefined)?.missionId
+    surface.notify({
+      ...finishedNotificationText(said),
+      onClick: () => {
+        surface.focusWindow()
+        if (opens !== undefined) surface.openMission?.(opens)
+      }
+    })
+  }
   const flush = (roomId: string): void => {
     const entry = held.get(roomId)
     held.delete(roomId)
@@ -139,6 +191,10 @@ export function createAttention(
       if (!shouldNotify({ focused: surface.focused(), supported: surface.supported() })) return false
       surface.notify({ ...limitNotificationText(teammateName, runtimeName, message), onClick: () => surface.focusWindow() })
       return true
+    },
+    runFinished(finish) {
+      finishes.push(finish)
+      if (finishes.length === 1) timers.schedule(flushFinishes, FINISH_TOAST_WINDOW_MS)
     },
     roomChanged(input) {
       const entry = held.get(input.roomId)

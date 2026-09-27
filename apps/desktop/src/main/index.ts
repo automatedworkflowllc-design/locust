@@ -5,7 +5,7 @@ import { ownGitArgs } from './git-guard.js'
 import { APP_USER_MODEL_ID, DEVELOPMENT_APP_USER_MODEL_ID, mayShowToasts, repairStartMenuShortcut, sweepStaleElectronShortcuts } from './stale-shortcut.js'
 import { openingPlacement, readSavedWindow } from './window-bounds.js'
 import type { SavedWindow } from './window-bounds.js'
-import { app, BrowserWindow, crashReporter, dialog, ipcMain, nativeTheme, Notification, safeStorage, screen, session, shell } from 'electron'
+import { app, BrowserWindow, crashReporter, dialog, ipcMain, nativeImage, nativeTheme, Notification, powerSaveBlocker, safeStorage, screen, session, shell } from 'electron'
 import electronUpdater from 'electron-updater'
 
 const { autoUpdater } = electronUpdater
@@ -38,6 +38,8 @@ import { describeGone, diagnosticLine, shouldRoll, startupDetail } from './diagn
 import { createGroupStore } from './group-store.js'
 import { createBriefSessions } from './brief-sessions.js'
 import { createRunEnd } from './run-end.js'
+import { createKeepAwake, KEEP_AWAKE_BEAT_MS } from './keep-awake.js'
+import { attentionDot, needsYouCountFrom, taskbarAttention } from './taskbar-attention.js'
 import { createRecentEdits } from './recent-edits.js'
 import { readRuntimeArtifacts } from './runtime-artifacts.js'
 import { relative } from 'node:path'
@@ -90,7 +92,7 @@ import type { CodexMissionService } from './codex-mission.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 import { createConnectorReader } from './connector-reader.js'
 import { createRelay } from './relay.js'
-import { createAttention } from './attention.js'
+import { createAttention, finishFrom } from './attention.js'
 import { boundedShutdown } from './bounded-shutdown.js'
 import { createPermissionHost } from './permission-host.js'
 import { isInsideDirectory, readRememberedWorkspace, resolveWorkspacePath, WORKSPACE_ARGUMENT, writeRememberedWorkspace, workspaceIdFor } from './workspace.js'
@@ -124,6 +126,9 @@ import {
   MISSION_HANDOFF_CHANNEL,
   MISSION_RESUME_CHANNEL,
   APP_INFO_CHANNEL,
+  NEEDS_YOU_COUNT_CHANNEL,
+  RUN_FINISHED_CHANNEL,
+  ATTENTION_OPEN_MISSION_CHANNEL,
   APP_CHANGELOG_CHANNEL,
   APP_CHANGELOG_SEEN_CHANNEL,
   APP_UPDATE_CHECK_CHANNEL,
@@ -1616,6 +1621,12 @@ if (!ownsSingleInstanceLock) {
         toast.on('click', onClick)
         toast.show()
       },
+      openMission: (missionId) => {
+        const target = approvalWindow
+        if (target && !target.isDestroyed() && !target.webContents.isDestroyed()) {
+          target.webContents.send(ATTENTION_OPEN_MISSION_CHANNEL, missionId)
+        }
+      },
       focusWindow: () => {
         const target = approvalWindow
         if (target === undefined || target.isDestroyed()) return
@@ -1657,6 +1668,21 @@ if (!ownsSingleInstanceLock) {
       },
       onShared: (mission, posted) => runEnd.onShared(mission, posted),
       onRunEnded: (mission) => runEnd.onRunEnded(mission)
+    })
+    // 0.379: the computer stays awake while any teammate works, in either
+    // transport, and not a moment longer (keep-awake.ts). The system, not
+    // the screen: the display may still sleep.
+    const keepAwake = createKeepAwake({
+      start: () => powerSaveBlocker.start('prevent-app-suspension'),
+      stop: (id) => powerSaveBlocker.stop(id)
+    })
+    const awakeBeat = setInterval(() => {
+      keepAwake.update(codexMissions.liveMissionIds().length + antigravityMissions.liveMissionIds().length)
+    }, KEEP_AWAKE_BEAT_MS)
+    awakeBeat.unref()
+    app.once('will-quit', () => {
+      clearInterval(awakeBeat)
+      keepAwake.dispose()
     })
     const sendToWindow = (update: CodexMissionUpdate): void => {
       const target = approvalWindow
@@ -4627,6 +4653,34 @@ if (!ownsSingleInstanceLock) {
     })
     ipcMain.on('window:close', (event) => {
       windowFromValidSender(event)?.close()
+    })
+    /*
+     * 0.379: the taskbar says when something needs you (taskbar-attention.ts)
+     * -- the amber dot while anything does, a flash when more does while the
+     * window is elsewhere. The renderer counts; only a small whole number is
+     * believed.
+     */
+    let needsYouShown = 0
+    const attentionDotImage = nativeImage.createFromBitmap(attentionDot(16), { width: 16, height: 16 })
+    ipcMain.on(NEEDS_YOU_COUNT_CHANNEL, (event, raw: unknown) => {
+      const window = windowFromValidSender(event)
+      const count = needsYouCountFrom(raw)
+      if (!window || count === undefined) return
+      const said = taskbarAttention(needsYouShown, count, window.isFocused() && !window.isMinimized())
+      needsYouShown = count
+      window.setOverlayIcon(said.overlay === 'dot' ? attentionDotImage : null, said.overlay === 'dot' ? said.description : '')
+      if (said.flash) {
+        window.flashFrame(true)
+        window.once('focus', () => window.flashFrame(false))
+      }
+    })
+    // 0.379: a long run the person started finished (the renderer decides
+    // which: finishedToast.ts). Said once, gathered, only while the window is
+    // elsewhere; a click opens the conversation.
+    ipcMain.on(RUN_FINISHED_CHANNEL, (event, raw: unknown) => {
+      if (!windowFromValidSender(event)) return
+      const finish = finishFrom(raw)
+      if (finish !== undefined) attention.runFinished(finish)
     })
 
     /*

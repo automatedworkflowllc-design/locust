@@ -11,6 +11,22 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.379.0 - 2026-09-26
+
+### New
+
+- **Know when a teammate is done.** When a teammate you set going finishes
+  a job that took a minute or more while you're in another app, Locust
+  tells you, with the first line of what they said, and clicking it opens
+  that conversation. A reply you were watching stays quiet, and teammates
+  who finish together are told as one.
+- **The taskbar shows when something needs you.** An amber dot sits on
+  Locust's taskbar button while an approval or a question is waiting, and
+  the button flashes when a new one arrives while you're elsewhere.
+- **Your computer stays awake while a teammate works.** Windows won't go to
+  sleep in the middle of a teammate's job; the screen can still turn off,
+  and once nothing is running, your usual sleep settings apply again.
+
 ## 0.378.0 - 2026-09-26
 
 ### Fixed

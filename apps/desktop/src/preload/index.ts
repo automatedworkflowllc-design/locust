@@ -9,6 +9,9 @@ import {
   MISSION_HANDOFF_CHANNEL,
   MISSION_RESUME_CHANNEL,
   APP_INFO_CHANNEL,
+  NEEDS_YOU_COUNT_CHANNEL,
+  RUN_FINISHED_CHANNEL,
+  ATTENTION_OPEN_MISSION_CHANNEL,
   APP_CHANGELOG_CHANNEL,
   APP_CHANGELOG_SEEN_CHANNEL,
   APP_UPDATE_CHECK_CHANNEL,
@@ -203,6 +206,17 @@ export type {
 
 const desktopApi: DesktopApi = {
   platform: process.platform,
+  setNeedsYouCount: (count) => ipcRenderer.send(NEEDS_YOU_COUNT_CHANNEL, count),
+  notifyFinished: (finish) => ipcRenderer.send(RUN_FINISHED_CHANNEL, finish),
+  onAttentionOpenMission: (listener: (missionId: string) => void) => {
+    const handler = (_event: unknown, missionId: unknown): void => {
+      if (typeof missionId === 'string') listener(missionId)
+    }
+    ipcRenderer.on(ATTENTION_OPEN_MISSION_CHANNEL, handler)
+    return () => {
+      ipcRenderer.removeListener(ATTENTION_OPEN_MISSION_CHANNEL, handler)
+    }
+  },
   minimize: () => ipcRenderer.send('window:minimize'),
   toggleMaximize: () => ipcRenderer.send('window:toggle-maximize'),
   close: () => ipcRenderer.send('window:close'),

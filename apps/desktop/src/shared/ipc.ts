@@ -243,6 +243,12 @@ export const MISSION_HISTORY_CHANNEL = 'mission-history:list'
 export const MISSION_READ_CHANNEL = 'mission-history:read'
 export const MISSION_DELETE_CHANNEL = 'mission:delete'
 export const APP_INFO_CHANNEL = 'app:info'
+/** 0.379: how many things need the person, for the taskbar's dot and flash. */
+export const NEEDS_YOU_COUNT_CHANNEL = 'attention:needs-you-count'
+/** 0.379: a long run the person started finished; main says it if the window is elsewhere. */
+export const RUN_FINISHED_CHANNEL = 'attention:run-finished'
+/** 0.379: a finished run's toast was clicked -- open its conversation. */
+export const ATTENTION_OPEN_MISSION_CHANNEL = 'attention:open-mission'
 export const APP_CHANGELOG_CHANNEL = 'app:changelog'
 /** The banner was drawn: this version is seen. Not when the changelog was read. */
 export const APP_CHANGELOG_SEEN_CHANNEL = 'app:changelog-seen'
@@ -2375,6 +2381,12 @@ export type MissionDeleteResponse =
 
 export interface DesktopApi {
   readonly platform: string
+  /** How many things need the person now: the taskbar shows it (0.379). */
+  setNeedsYouCount(count: number): void
+  /** A long run the person started finished: said as a toast while the window is elsewhere (0.379). */
+  notifyFinished(finish: { readonly title: string; readonly body: string; readonly missionId?: string }): void
+  /** A finished run's toast was clicked: the conversation to open. */
+  onAttentionOpenMission(listener: (missionId: string) => void): () => void
   minimize(): void
   toggleMaximize(): void
   close(): void

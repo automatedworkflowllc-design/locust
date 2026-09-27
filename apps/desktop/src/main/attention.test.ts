@@ -197,3 +197,65 @@ describe('the two other ways a run ends waiting for a person', () => {
     expect(shown).toHaveLength(2)
   })
 })
+
+/**
+ * 0.379: a long run the person started finished while they were elsewhere
+ * (the renderer decides "long" and "theirs": finishedToast.ts).
+ */
+describe('a finished run, told once', () => {
+  const surface = (focused: boolean) => {
+    const shown: { title: string; body: string; onClick: () => void }[] = []
+    const opened: string[] = []
+    let focusedWindow = 0
+    const scheduled: (() => void)[] = []
+    const attention = createAttention(
+      {
+        focused: () => focused,
+        supported: () => true,
+        notify: (input) => shown.push(input),
+        focusWindow: () => { focusedWindow += 1 },
+        openMission: (missionId) => opened.push(missionId)
+      },
+      { schedule: (task) => scheduled.push(task), clear: () => undefined }
+    )
+    return { attention, shown, opened, scheduled, focusedWindow: () => focusedWindow }
+  }
+
+  it('gathers finishes that land together into one toast, and a click opens the newest', () => {
+    const { attention, shown, opened, scheduled, focusedWindow } = surface(false)
+    attention.runFinished({ title: 'Wren finished', body: 'Moved the port. · took 4 min', missionId: 'm1' })
+    attention.runFinished({ title: 'Juno stopped', body: 'Not signed in. · after 2 min', missionId: 'm2' })
+    // One timer for the burst, not one per finish.
+    expect(scheduled).toHaveLength(1)
+    expect(shown).toHaveLength(0)
+    scheduled[0]!()
+    expect(shown).toHaveLength(1)
+    expect(shown[0]).toMatchObject({ title: '2 teammates are done', body: 'Wren finished: Moved the port. · took 4 min\nJuno stopped: Not signed in. · after 2 min' })
+    shown[0]!.onClick()
+    expect(focusedWindow()).toBe(1)
+    expect(opened).toEqual(['m2'])
+  })
+
+  it('one finish is said as itself', () => {
+    const { attention, shown, scheduled } = surface(false)
+    attention.runFinished({ title: 'Wren finished', body: 'Done. · took 3 min', missionId: undefined })
+    scheduled[0]!()
+    expect(shown[0]).toMatchObject({ title: 'Wren finished', body: 'Done. · took 3 min' })
+  })
+
+  it('says nothing while the person is looking at the window', () => {
+    const { attention, shown, scheduled } = surface(true)
+    attention.runFinished({ title: 'Wren finished', body: 'Done.', missionId: 'm1' })
+    scheduled[0]!()
+    expect(shown).toHaveLength(0)
+  })
+
+  it('believes only a bounded title and body from the renderer', async () => {
+    const { finishFrom } = await import('./attention.js')
+    expect(finishFrom({ title: 'Wren finished', body: 'Done.', missionId: 'm1' })).toEqual({ title: 'Wren finished', body: 'Done.', missionId: 'm1' })
+    expect(finishFrom({ title: '', body: 'x' })).toBeUndefined()
+    expect(finishFrom({ title: 7, body: 'x' })).toBeUndefined()
+    expect(finishFrom(null)).toBeUndefined()
+    expect(finishFrom({ title: 't'.repeat(500), body: 'b'.repeat(900) })?.title.length).toBe(120)
+  })
+})
