@@ -44,6 +44,9 @@ const drive = await startDrive({
   // LOCUST_DRIVE_KEEP=1 leaves the profile, and its record, for reading afterwards.
   keep: process.env.LOCUST_DRIVE_KEEP === '1',
   workspace,
+  // The app stands in its profile folder and is TOLD the workspace, so
+  // "the approved command ran in the folder" can fail.
+  launchElsewhere: true,
   outPath: OUT,
   ...(packaged === undefined ? {} : { packaged }),
   seed: {

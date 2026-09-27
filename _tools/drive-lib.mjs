@@ -179,7 +179,7 @@ export function assertMaySpend(name) {
   process.exit(1)
 }
 
-export async function startDrive({ name, port, workspace, seed, files = {}, env = {}, keep = false, profilePath, outPath, stepFrom = 0, spends = false, sendsNothing = false, packaged }) {
+export async function startDrive({ name, port, workspace, seed, files = {}, env = {}, keep = false, profilePath, outPath, stepFrom = 0, spends = false, sendsNothing = false, packaged, launchElsewhere = false }) {
   if (spends) assertMaySpend(name)
   try {
     const already = await fetch(`http://127.0.0.1:${String(port)}/json/list`, { signal: AbortSignal.timeout(1500) })
@@ -254,8 +254,20 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
   else appEnv.LOCUST_FREE_ONLY = '1'
   // Held until `ready()` returns (or `finish`, for a drive that never asks).
   await takeLaunchTurn(name)
-  const child = spawn(launch[0], [...launch[1], `--remote-debugging-port=${String(port)}`, `--user-data-dir=${profile}`], {
-    cwd: workspace,
+  /*
+   * WHERE THE APP STANDS, AND WHERE IT WORKS, ARE NOT THE SAME FOLDER.
+   *
+   * A real launch never stands in the workspace: from the Start menu the
+   * app's own folder is its install directory, and the workspace comes from
+   * memory or Documents\Locust (main/workspace.ts). A drive launched IN the
+   * workspace hands every child process that is started without a folder
+   * the right one by accident -- so a check that work landed in the folder
+   * could not fail (found 2026-09-26: OpenCode's server is started with no
+   * folder of its own). `launchElsewhere` launches from the profile folder
+   * and names the workspace the way the app reopens itself in one.
+   */
+  const child = spawn(launch[0], [...launch[1], `--remote-debugging-port=${String(port)}`, `--user-data-dir=${profile}`, ...(launchElsewhere ? [`--workspace=${workspace}`] : [])], {
+    cwd: launchElsewhere ? profile : workspace,
     env: appEnv,
     stdio: ['ignore', 'pipe', 'pipe']
   })
