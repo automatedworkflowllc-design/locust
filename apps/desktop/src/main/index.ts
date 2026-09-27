@@ -40,6 +40,7 @@ import { createBriefSessions } from './brief-sessions.js'
 import { createRunEnd } from './run-end.js'
 import { createKeepAwake, KEEP_AWAKE_BEAT_MS } from './keep-awake.js'
 import { attentionDot, needsYouCountFrom, taskbarAttention } from './taskbar-attention.js'
+import { CLOSE_BUTTONS, closeQuestion, shouldAskBeforeClosing } from './quit-guard.js'
 import { createRecentEdits } from './recent-edits.js'
 import { readRuntimeArtifacts } from './runtime-artifacts.js'
 import { relative } from 'node:path'
@@ -4733,8 +4734,53 @@ if (!ownsSingleInstanceLock) {
       })
       .catch(() => undefined)
 
+    /*
+     * 0.382: closing the window while a teammate works asks first
+     * (quit-guard.ts). Only the person's own close: a quit already under
+     * way (a relaunch, the updater) and a session ending pass straight
+     * through, and "Quit anyway" closes.
+     */
+    const guardClose = (window: BrowserWindow): void => {
+      let confirmed = false
+      let asking = false
+      let sessionEnding = false
+      window.on('session-end', () => {
+        sessionEnding = true
+      })
+      window.on('close', (event) => {
+        const liveIds = [...codexMissions.liveMissionIds(), ...antigravityMissions.liveMissionIds()]
+        if (!shouldAskBeforeClosing({ liveRuns: liveIds.length, appQuitting, sessionEnding, confirmed })) return
+        event.preventDefault()
+        if (asking) return
+        asking = true
+        void (async () => {
+          const [roster, owners] = await Promise.all([teammates.list(), teammates.missionOwners()]).catch(() => [[], {}] as const)
+          const names = liveIds
+            .map((missionId) => roster.find((entry) => entry.teammateId === (owners as Readonly<Record<string, string>>)[missionId])?.name)
+            .filter((name): name is string => name !== undefined)
+          const question = closeQuestion(names, liveIds.length)
+          const answer = await dialog.showMessageBox(window, {
+            type: 'question',
+            buttons: [...CLOSE_BUTTONS],
+            defaultId: 0,
+            cancelId: 0,
+            noLink: true,
+            title: 'Locust',
+            message: question.message,
+            detail: question.detail
+          })
+          asking = false
+          if (answer.response === 1 && !window.isDestroyed()) {
+            confirmed = true
+            window.close()
+          }
+        })()
+      })
+    }
+
     createWindow(codexMissions, (window) => {
       approvalWindow = window
+      guardClose(window)
       replayDiscoveryToWindow()
       // The sweep may begin: there is somebody to watch it now.
       windowIsUp()
@@ -4753,6 +4799,7 @@ if (!ownsSingleInstanceLock) {
       if (BrowserWindow.getAllWindows().length === 0) {
         createWindow(codexMissions, (window) => {
           approvalWindow = window
+          guardClose(window)
           replayDiscoveryToWindow()
         })
       }
@@ -4762,6 +4809,12 @@ if (!ownsSingleInstanceLock) {
     app.exit(1)
   })
 }
+
+/** Set the moment any quit begins, so the window's close guard never stands in its way (quit-guard.ts). */
+let appQuitting = false
+app.on('before-quit', () => {
+  appQuitting = true
+})
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
