@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.413.0 - 2026-09-27
+
+### Fixed
+
+- **Claude runs no longer stop when your account is near its limit.** Since
+  0.407, a Claude run stopped in its first seconds with "the mission ledger
+  could not be written" whenever Claude warned that your usage was getting
+  high. The warning's two notes were saved in the wrong order, and Locust
+  refused them. They are saved in order now, and the run carries on.
+
 ## 0.412.0 - 2026-09-27
 
 ### Fixed

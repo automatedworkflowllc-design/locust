@@ -304,6 +304,10 @@ describe("trap 3: a rate-limit warning is not exhaustion", () => {
       }),
     );
     expect(events.map((event) => event.type)).toEqual(["route.limit_detected", "adapter.diagnostic"]);
+    // 0.413: in COUNTING order -- the ledger refuses a batch whose sequences
+    // do not count up, and 0.407-0.412 returned N+1 before N, stopping every
+    // Claude run at its first usage warning.
+    expect(events.map((event) => event.sequence)).toEqual([events[0]!.sequence, events[0]!.sequence + 1]);
     const reading = events[1];
     expect(reading?.type === "adapter.diagnostic" && reading.payload.code).toBe("claude.usage_window");
     expect(reading?.type === "adapter.diagnostic" && reading.payload.message).toBe("7-day window 79% used · resets 2026-09-07T07:00:00.000Z");

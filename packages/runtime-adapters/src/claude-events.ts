@@ -558,18 +558,22 @@ export function createClaudeEventNormalizer(
        * warning may name only its own window; that one window is a reading.
        */
       const window = usageWindowText(info.unifiedWindows) ?? ownWindowText(info);
+      /*
+       * EMITTED IN THE ORDER RETURNED (0.413). `emit` takes the next
+       * sequence, and the ledger refuses a batch whose sequences do not
+       * count up. 0.407 emitted the reading first and returned it second, so
+       * every warning handed the ledger N+1 then N -- "Mission event sequence
+       * is invalid" -- and the run was stopped at its first warning: every
+       * Claude run above a usage warning line, from 0.407 to 0.412 (Colin's
+       * Drop, 2026-09-27, 6 seconds in).
+       */
+      const limit = kind === undefined
+        ? []
+        : [emit("route.limit_detected", { kind, message: boundedMessageText(limitSentence(info)), evidence })];
       const reading = window === undefined
         ? []
         : [emit("adapter.diagnostic", { code: "claude.usage_window", level: "info", terminal: false, message: window, evidence })];
-      if (kind === undefined) return reading;
-      return [
-        emit("route.limit_detected", {
-          kind,
-          message: boundedMessageText(limitSentence(info)),
-          evidence,
-        }),
-        ...reading,
-      ];
+      return [...limit, ...reading];
     }
 
     if (type === "system") {
