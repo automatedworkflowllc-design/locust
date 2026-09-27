@@ -307,7 +307,9 @@ export function ApprovalCard({
         <DiffNotesContext.Provider value={undefined}>
         <div className="lc-approval__patch">
           <div className="lc-approval__patchhead lc-mono">
-            <span>The change, as Codex would apply it</span>
+            {/* Whose change, by the runtime asking: an OpenCode edit read
+                "as Codex would apply it" (beta pass on 0.390, 2026-09-27). */}
+            <span>{`The change, as ${runtimeDisplayName(request.runtime ?? 'codex')} would apply it`}</span>
             <span className="lc-activity__counts">
               <span className="lc-diff__addmark">+{request.patch.added}</span>
               <span className="lc-diff__delmark">−{request.patch.removed}</span>

@@ -50,7 +50,14 @@ export interface RoutineRecoveryRequest {
   readonly routineId: string
   readonly attemptId: string
   readonly step: number
-  readonly decision: 'continue' | 'abandon'
+  /**
+   * `keep` (0.392): the person reviewed the attempt and wants the routine to
+   * go on as it was -- the attempt is cleared, the schedule stays, and the
+   * next run starts from step 1 when it is next due. The 0.390 beta pass
+   * found no way out of an interrupted LAST step but Abandon, which also
+   * removes the schedule.
+   */
+  readonly decision: 'continue' | 'abandon' | 'keep'
 }
 export type RoutineRecoveryResponse =
   | { readonly ok: true }
@@ -62,5 +69,5 @@ export function isRoutineRecoveryRequest(value: unknown): value is RoutineRecove
   return typeof input.routineId === 'string' && /^[\w-]{1,100}$/.test(input.routineId)
     && typeof input.attemptId === 'string' && /^[\w-]{1,100}$/.test(input.attemptId)
     && Number.isInteger(input.step) && Number(input.step) >= 1 && Number(input.step) <= 12
-    && (input.decision === 'continue' || input.decision === 'abandon')
+    && (input.decision === 'continue' || input.decision === 'abandon' || input.decision === 'keep')
 }

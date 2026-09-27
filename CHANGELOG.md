@@ -11,6 +11,28 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.392.0 - 2026-09-27
+
+### Improved
+
+- **A new mark for a teammate at work.** A conversation that's running now
+  shows Claude Code's own spinner in the sidebar, a small lime spark
+  turning through ✢ ✳ ✶ ✻ ✽, in place of the dotted shape that morphed
+  from circle to square. It stays sharp at sidebar size, and it becomes the
+  quiet dot again when the work is done. With reduced motion turned on in
+  Windows, it holds still.
+
+### Fixed
+
+- **A routine stopped on its last step has a way forward.** "Continue
+  remaining steps" no longer sits greyed out when there's nothing left to
+  continue: the card says it was the last step. A new **Keep the schedule**
+  button clears the attempt and leaves the routine scheduled, so the next
+  run comes when it's due instead of right away. Where an earlier step
+  didn't finish, the card says why Continue waits.
+- **An approval shows whose change it is.** An edit OpenCode asks to make
+  is headed "as OpenCode would apply it", not "as Codex would".
+
 ## 0.391.0 - 2026-09-27
 
 ### New

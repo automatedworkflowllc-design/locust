@@ -47,23 +47,18 @@ describe('the orb uses the asset that reads', () => {
     expect(orb).toContain('resolvePreset(state, 64)')
   })
 
-  it('does not shrink the sidebar row, because this shape has no room to', () => {
+  it('keeps the sidebar row off the orbs: it wears the spark, a glyph, which no scale can smudge (0.392)', () => {
     /*
-     * The one place a transform is right. Scaling an outline DOWN is a
-     * downscale of a 20px raster -- sharp, with no point density to lose --
-     * where scaling any of them UP enlarges the raster itself. The sidebar
-     * row wears the dotted outline precisely because it holds its shape at
-     * any size a row can spare.
+     * The row wore the dotted outline from 0.225 to 0.391 and could never be
+     * shrunk -- at 0.75 and 0.85 of its 20px it was a grey smudge. Colin,
+     * 2026-09-27: "getting outdated". It is Claude Code's spinner now
+     * (WorkingSpark.tsx), and the rule that let the outline spill from the
+     * dot's box is gone with it.
      */
-    /*
-     * IT IS NOT SCALED, and the measurement is the reason. `morph` keeps 75%
-     * of its points at inline size against 11-31% for every other shape, and
-     * fattens them 1.011x against 1.4-2.4x -- so it is the one drawing in the
-     * set with no room to shrink. Rendered at the row's real geometry: 0.75
-     * and 0.85 are a smudge, 1.0 is a clean dotted circle.
-     */
-    const row = css.slice(css.indexOf('.lc-row__orb > * {'))
-    expect(row.slice(0, 1600)).not.toContain('transform: scale(')
+    const sidebar = readFileSync(`${SRC}components/Sidebar.tsx`, 'utf8')
+    expect(sidebar).not.toContain('ThinkingOrb')
+    expect(sidebar.split('<WorkingSpark />').length - 1).toBe(2)
+    expect(css).not.toContain('.lc-row__orb')
   })
 
   it('paints the 64 design down with a filter that looks at every pixel', () => {

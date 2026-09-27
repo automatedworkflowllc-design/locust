@@ -45,7 +45,8 @@ const harness = (held: PublicRoutine, answers: readonly ('ok' | 'limit')[]) => {
         const { execution: _execution, ...rest } = map.get(id)!
         map.set(id, rest)
       },
-      abandon: async () => undefined
+      abandon: async () => undefined,
+      keepSchedule: async () => undefined
     },
     peerContextFor: async () => ({ self: { teammateId: 'tm_wren', name: 'Wren', role: 'Code & Migrations' }, others: [] }),
     start: async () => {

@@ -64,6 +64,10 @@ function harness(input: {
       abandon: async (id) => {
         const { schedule: _schedule, ...rest } = held.get(id)!
         held.set(id, { ...rest, execution: { ...rest.execution!, status: 'abandoned' } })
+      },
+      keepSchedule: async (id) => {
+        const { execution, ...rest } = held.get(id)!
+        held.set(id, { ...rest, lastRunAt: execution!.startedAt })
       }
     },
     peerContextFor: async () => ('peer' in input ? input.peer : WREN),

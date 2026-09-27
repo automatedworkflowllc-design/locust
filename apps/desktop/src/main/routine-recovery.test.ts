@@ -172,6 +172,37 @@ describe('durable routine recovery — policy (c)', () => {
     expect(await next.recover({ ...request, decision: 'abandon' })).toMatchObject({ ok: false })
   })
 
+  it('keep: an interrupted LAST step is put down with the schedule kept, and the next run comes when due, from step 1 (0.392)', async () => {
+    // The 0.390 beta pass: step 2 of 2 interrupted, Continue held with nothing
+    // after it to continue, and Abandon -- which removes the schedule -- the
+    // only way out.
+    const f = await fixture()
+    await f.store.update({ routineId: f.routine.routineId, name: 'Release', steps: ['Open the PR.', 'Report the result.'] })
+    const first = f.restart()
+    await first.run(f.routine.routineId)
+    f.phases.set('mission_1', 'completed')
+    await first.onRunEnded({ missionId: 'mission_1' })
+    const next = f.restart()
+    await next.reconcile()
+    const execution = (await f.read())!.execution!
+    expect(execution).toMatchObject({ step: 2, of: 2, status: 'held', canContinue: false })
+    expect(await next.recover({ routineId: f.routine.routineId, attemptId: execution.attemptId, step: execution.step, decision: 'keep' })).toEqual({ ok: true })
+    const kept = (await f.read())!
+    expect(kept.execution).toBeUndefined()
+    expect(kept.schedule).toEqual({ kind: 'every', hours: 6 })
+    expect(kept.runs).toBe(0)
+    expect(kept.lastRunAt).toBe(execution.startedAt)
+    // Not the moment it is cleared: six hours from when the attempt started.
+    const started = Date.parse(execution.startedAt)
+    await next.tick(new Date(started + 60_000))
+    expect(f.start).toHaveBeenCalledTimes(2)
+    await next.tick(new Date(started + 6 * 3_600_000 + 60_000))
+    expect(f.start).toHaveBeenCalledTimes(3)
+    expect(f.start).toHaveBeenLastCalledWith(expect.objectContaining({ prompt: 'Open the PR.' }))
+    // A decision about an attempt that is gone is stale.
+    expect(await next.recover({ routineId: f.routine.routineId, attemptId: execution.attemptId, step: execution.step, decision: 'keep' })).toMatchObject({ ok: false })
+  })
+
   it('abandon is durable acknowledgement, removes the schedule and never claims completion', async () => {
     const f = await fixture()
     await f.restart().run(f.routine.routineId)

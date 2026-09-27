@@ -64,6 +64,13 @@ export interface RoutineStore {
   recordRun(routineId: unknown, attemptId: string): Promise<void>
   saveProgress(routineId: string, progress: RoutineExecution, expectedAttemptId: string | null): Promise<void>
   abandon(routineId: string, attemptId: string): Promise<void>
+  /**
+   * A held attempt, reviewed and put down, with the schedule kept (0.392).
+   * Counted from when the attempt STARTED, so a routine that is due every
+   * four hours does not start again the moment it is cleared; not counted as
+   * a completed run, because it was not one.
+   */
+  keepSchedule(routineId: string, attemptId: string): Promise<void>
   clearProgress(routineId: string, attemptId: string): Promise<void>
   /** Drop every routine of a teammate who is gone; their steps had nobody to run them. */
   removeForTeammate(teammateId: unknown): Promise<void>
@@ -380,6 +387,17 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
         if (held?.execution?.attemptId !== attemptId) throw new Error('Routine execution changed.')
         const { execution: _execution, ...rest } = held
         await write({ ...file, routines: file.routines.map((routine) => routine.routineId === routineId ? rest : routine) })
+      })
+    },
+
+    keepSchedule(routineId, attemptId) {
+      return serialize(async () => {
+        const file = await read()
+        const held = file.routines.find((routine) => routine.routineId === routineId)
+        if (held?.execution?.attemptId !== attemptId || held.execution.status !== 'held') throw new Error('Routine execution changed; reload before continuing.')
+        const { execution, ...rest } = held
+        const next: PublicRoutine = { ...rest, lastRunAt: execution.startedAt }
+        await write({ ...file, routines: file.routines.map((routine) => (routine.routineId === routineId ? next : routine)) })
       })
     },
 

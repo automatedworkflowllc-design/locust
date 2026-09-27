@@ -14781,53 +14781,63 @@ textarea {
  */
 
 /*
- * The orb on a running conversation row.
+ * THE SPARK on a running conversation row (WorkingSpark.tsx, 0.392):
+ * Claude Code's own spinner, · ✢ ✳ ✶ ✻ ✽ and back, in the live lime.
  *
- * The dot it replaces is 6px and the orb's only inline preset is 20, which
- * would shove the row's text sideways every time a run started and stopped.
- * So the orb is drawn at its own size and the BOX is the dot's, with the
- * overflow allowed to spill: the row's layout never moves, and the mark grows
- * out of where the dot was rather than pushing the name along.
+ * It replaced the dotted outline that morphed circle to square, which held
+ * its shape only at its own 20px -- at 0.75 and 0.85 it was a grey smudge,
+ * measured 2026-09-21 -- and read as an older kind of loader by 2026-09-27
+ * (Colin: "getting outdated"). A glyph is sharp at any size.
+ *
+ * The BOX is the finished dot's 6px, with the glyph allowed to spill, so the
+ * row's layout never moves when a run starts or stops: the mark grows out of
+ * where the dot was rather than pushing the name along. The frames are the
+ * pseudo-element's `content`, stepped -- each frame held for its whole slot
+ * -- so running rows cost no renders. Text presentation (FE0E) on every
+ * glyph, because Windows would otherwise draw ✳ as an emoji.
  */
-.lc-row__orb {
+.lc-spark {
   flex: none;
   position: relative;
-  display: grid;
-  place-items: center;
   width: 6px;
   height: 6px;
   overflow: visible;
 }
 
-.lc-row__orb > * {
+.lc-spark::before {
+  content: '\273B\FE0E';
   position: absolute;
-  /*
-   * AT ITS OWN SIZE, and the shrink is gone AGAIN -- this time with the
-   * measurement that says why it cannot come back.
-   *
-   * Colin, 2026-09-21: *"the notification shape changing animation... the
-   * pixels are so dense it doesnt look as clean as it used to"*. "As it used
-   * to" is exactly right and the timeline agrees with him: this row was
-   * full-size in 0.225, he asked for it smaller in 0.226, and 0.75 is what
-   * made it dense.
-   *
-   * WHY THIS SHAPE IN PARTICULAR, from the library's own preset table:
-   * `morph` keeps **75%** of its points at inline size and fattens them
-   * 1.011x. Every other shape in the set drops to 11-31% and fattens 1.4-2.4x
-   * -- `ring` keeps 11%, `rubik` 25%, `orbits` 24%. So morph is by a wide
-   * margin the densest, finest-dotted drawing the library ships, and scaling
-   * it down puts its dots under a device pixel. The other eight have room to
-   * shrink; this one never did.
-   *
-   * MEASURED BEFORE CHANGING IT, all three at the row's real geometry: at
-   * 0.75 and 0.85 morph turns to a grey smudge; at 1.0 it is a clean,
-   * complete dotted circle. `ring` at the same sizes is so sparse it reads as
-   * a broken arc rather than a shape.
-   *
-   * So the row cannot have both. It is clean at its own size, and the only
-   * shapes that would survive shrinking are the dense spheres -- a different
-   * look, and not the one he picked for this row.
-   */
+  left: 50%;
+  top: 50%;
+  translate: -50% -52%;
+  font-family: var(--lc-font-symbol);
+  font-size: 13px;
+  line-height: 1;
+  color: var(--lc-lime);
+  animation: lc-spark 1.44s steps(1, end) infinite;
+}
+
+@keyframes lc-spark {
+  0% { content: '\00B7'; }
+  8.333% { content: '\2722\FE0E'; }
+  16.667% { content: '\2733\FE0E'; }
+  25% { content: '\2736\FE0E'; }
+  33.333% { content: '\273B\FE0E'; }
+  41.667% { content: '\273D\FE0E'; }
+  50% { content: '\273D\FE0E'; }
+  58.333% { content: '\273B\FE0E'; }
+  66.667% { content: '\2736\FE0E'; }
+  75% { content: '\2733\FE0E'; }
+  83.333% { content: '\2722\FE0E'; }
+  91.667% { content: '\00B7'; }
+  100% { content: '\00B7'; }
+}
+
+/* Still, for a person who asked for less motion: the spark at rest. */
+@media (prefers-reduced-motion: reduce) {
+  .lc-spark::before {
+    animation: none;
+  }
 }
 
 /*

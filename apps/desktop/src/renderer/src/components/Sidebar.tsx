@@ -25,8 +25,8 @@ import {
 import { TeammateBot } from './TeammateBot.js'
 import { RuntimeMark } from './RuntimeMark.js'
 import type { TeammateStatusView } from '../status.js'
-import { ThinkingOrb } from 'thinking-orbs'
 import { Icon } from './Icon.js'
+import { WorkingSpark } from './WorkingSpark.js'
 import { teammateTooltip } from '../teammateTooltip.js'
 import { railCountBadge, shortAgo } from '../railFlyout.js'
 import { conversationRows, heldFor, narrowingLine, ownerOf, roomLastAt, unreadableSentence, withRoomsFolded } from '../conversationList.js'
@@ -567,13 +567,7 @@ export function Sidebar({
           aria-current={here ? 'true' : undefined}
           onClick={() => onOpenRoom(room.roomId)}
         >
-          {running ? (
-            <span className="lc-row__orb" aria-hidden="true" data-orb="shaping">
-              <ThinkingOrb state="shaping" size={20} theme="dark" />
-            </span>
-          ) : (
-            <span className="lc-dot lc-tone-blue is-quiet" />
-          )}
+          {running ? <WorkingSpark /> : <span className="lc-dot lc-tone-blue is-quiet" />}
           <span className="lc-conv__room" aria-hidden="true">
             <Icon name="users" size={13} />
           </span>
@@ -694,44 +688,30 @@ export function Sidebar({
                       * something.
                       */}
                     {/*
-                      * AN ORB WHILE IT RUNS, A QUIET DOT WHEN IT IS DONE.
+                      * A SPARK WHILE IT RUNS, A QUIET DOT WHEN IT IS DONE.
                       *
                       * Colin, 2026-09-20: *"instead of this dot next to the
                       * face we can just use a smaller orb to show that they
                       * are working that turns into a white/gray dot like
-                      * claude code when done."*
+                      * claude code when done."* The orb he picked then, the
+                      * dotted outline morphing circle to square, gave way on
+                      * 2026-09-27 to Claude Code's own spinner -- "i think the
+                      * one i suggested is getting outdated" (WorkingSpark.tsx).
                       *
                       * `working` rather than the live line's own state, on
                       * purpose. This row is a list entry for a whole
                       * conversation, not a report on the current tool: it
                       * claims only "this one is going", which is exactly what
-                      * the generic orb says. Reaching for the specific state
-                      * would make a sidebar row assert something it then has
-                      * to keep up with.
+                      * the spark says. Reaching for the specific state would
+                      * make a sidebar row assert something it then has to
+                      * keep up with.
                       *
                       * Every other phase keeps the dot, because a finished
                       * conversation is a state rather than an activity — and
                       * the tone still carries whether it ended well.
                       */}
                     {mission.phase === 'running' ? (
-                      <span className="lc-row__orb" aria-hidden="true" data-orb="shaping">
-                        {/*
-                          * The dotted outline that morphs circle to triangle
-                          * to square, at the library's INLINE drawing and its
-                          * own 20px -- Colin picked it off a contact sheet:
-                          * *"replace the sidebar notifier, ALSO with the
-                          * original .221 20 preset @ 20px"*.
-                          *
-                          * It is the right species for this row. Every other
-                          * orb here is a cloud of points, and a cloud at the
-                          * size a sidebar row can spare is a smudge; an
-                          * OUTLINE keeps its silhouette all the way down,
-                          * which is the same reason this shape kept the
-                          * inline drawing on the live line instead of the
-                          * 64 asset. See `Orb.tsx`.
-                          */}
-                        <ThinkingOrb state="shaping" size={20} theme="dark" />
-                      </span>
+                      <WorkingSpark />
                     ) : (
                       <span
                         className={`lc-dot lc-tone-${missionPhaseView(mission.phase, mission.integrityIssueCount > 0).tone}${

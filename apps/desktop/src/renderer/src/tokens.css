@@ -399,6 +399,12 @@
   --lc-title-weight: 700;
   --lc-title-tracking: 0.14em;
   --lc-font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /*
+   * The dingbats the working spark turns through (· ✢ ✳ ✶ ✻ ✽), from each
+   * system's own symbol face -- named first, so ✳ never falls back to a
+   * colour emoji face. Nothing bundled: every desktop ships one of these.
+   */
+  --lc-font-symbol: 'Segoe UI Symbol', 'Apple Symbols', 'Noto Sans Symbols 2', 'DejaVu Sans', sans-serif;
   /* The teammate's voice. Only the reply prose wears it; everything the app says stays in Geist. */
   /*
    * THE BASE TEXT IS GEIST NOW, and the swap is one token wide.

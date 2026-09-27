@@ -46,8 +46,8 @@ describe('recovery where a person looks for routines', () => {
     expect(html).not.toContain('checked=""')
     expect(html).toMatch(/disabled="">Continue remaining steps/)
     expect(html).toMatch(/disabled="">Abandon attempt and remove schedule/)
-    expect(html).toContain('does not stop a runtime or undo work')
-    expect(html).toContain('starts again from step 1')
+    expect(html).toContain('Neither stops a runtime or undoes work')
+    expect(html).toContain('starts from step 1')
     expect(html).toContain('Open PR')
     expect(html).toContain('codex')
   })
@@ -77,6 +77,20 @@ describe('recovery where a person looks for routines', () => {
     expect(html).not.toContain('Review required')
     expect(html).toContain('title="mission_two">Open the saved conversation</button>')
     expect(html).not.toContain('Saved mission:')
+  })
+
+  it('says why Continue is off, and offers to keep the schedule (0.390 beta pass)', () => {
+    const earlier = renderToStaticMarkup(<RoutineRecovery routine={routine} recover={async () => ({ ok: true })} />)
+    expect(earlier).toContain('Continue waits for step 2 to be confirmed finished. It was not, so step 3 would build on work that may not be there.')
+    expect(earlier).toMatch(/disabled="">Keep the schedule/)
+    expect(earlier).toContain('its next run starts from step 1 when it is next due')
+    const last = { ...routine, execution: { ...routine.execution!, step: 3 } }
+    const html = renderToStaticMarkup(<RoutineRecovery routine={last} recover={async () => ({ ok: true })} />)
+    expect(html).toContain('This was the last step, so there is nothing left to continue.')
+    expect(html).not.toContain('Continue remaining steps')
+    expect(html).toContain('Keep the schedule')
+    const { schedule: _schedule, ...unscheduled } = last
+    expect(renderToStaticMarkup(<RoutineRecovery routine={unscheduled} recover={async () => ({ ok: true })} />)).toContain('Keep the routine')
   })
 
   it('an unresolved dispatch has the same visible protection; no optimistic next-run promise', () => {

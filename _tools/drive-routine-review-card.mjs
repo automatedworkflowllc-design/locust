@@ -116,13 +116,24 @@ try {
     check(`${String(width)}px: "Open the saved conversation" sits with its lines, not across the card`, open !== undefined && open.box.x - seen.card.x < 40, open === undefined ? 'missing' : `${String(open.box.x - seen.card.x)}px in`)
     check(`${String(width)}px: no raw mission id on the card`, !seen.text.includes('mission_bc5e76ad'))
   }
-  await drive.capture('ticking the review box enables Abandon; Continue stays held (the run cannot continue)', async () => {
+  // 0.392, from the 0.390 beta pass: the LAST step offers no Continue, says
+  // why, and Keep puts the attempt down with the schedule left in place.
+  check('the last step says there is nothing left to continue', String(await drive.evaluate(`document.querySelector('.lc-automations .lc-recovery')?.innerText ?? ''`)).includes('This was the last step, so there is nothing left to continue.'))
+  await drive.capture('ticking the review box: Keep the schedule and Abandon ready, no Continue', async () => {
     await drive.evaluate(`document.querySelector('.lc-automations .lc-recovery input[type="checkbox"]')?.click()`)
     await sleep(400)
     return drive.evaluate(`JSON.stringify([...document.querySelectorAll('.lc-automations .lc-recovery__actions button')].map((b) => b.innerText + ':' + (b.disabled ? 'held' : 'ready')))`)
   })
-  const buttons = JSON.parse(String(await drive.evaluate(`JSON.stringify([...document.querySelectorAll('.lc-automations .lc-recovery__actions button')].map((b) => b.disabled))`)))
-  check('after the box: Continue held, Abandon ready', JSON.stringify(buttons) === JSON.stringify([true, false]), JSON.stringify(buttons))
+  const buttons = JSON.parse(String(await drive.evaluate(`JSON.stringify([...document.querySelectorAll('.lc-automations .lc-recovery__actions button')].map((b) => b.innerText + ':' + (b.disabled ? 'held' : 'ready')))`)))
+  check('after the box: Keep the schedule ready, Abandon ready, no Continue', JSON.stringify(buttons) === JSON.stringify(['Keep the schedule:ready', 'Abandon attempt and remove schedule:ready']), JSON.stringify(buttons))
+  await drive.capture('Keep the schedule: the card goes, the routine stays scheduled', async () => {
+    await drive.evaluate(`[...document.querySelectorAll('.lc-automations .lc-recovery__actions button')].find((b) => b.innerText === 'Keep the schedule')?.click()`)
+    await sleep(1500)
+    return drive.evaluate(`document.querySelector('.lc-automations')?.innerText.replace(/\\s+/g, ' ').slice(0, 300) ?? ''`)
+  })
+  const after = String(await drive.evaluate(`JSON.stringify({ card: document.querySelector('.lc-automations .lc-recovery') !== null, text: document.querySelector('.lc-automations .lc-routinerow')?.innerText.replace(/\\s+/g, ' ') ?? '' })`))
+  const kept = JSON.parse(after)
+  check('kept: no review card, still every 6 hours, not run now', !kept.card && /every 6 hours/.test(kept.text) && !/held for review/.test(kept.text), kept.text)
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

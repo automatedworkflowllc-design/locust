@@ -39,7 +39,7 @@ export interface RoutineRunnerOptions {
    * from. Undefined when neither says; such a routine runs as before (M15).
    */
   readonly homeOf?: (routine: PublicRoutine) => Promise<string | undefined>
-  readonly routines: Pick<RoutineStore, 'get' | 'list' | 'recordRun' | 'saveProgress' | 'clearProgress' | 'abandon'>
+  readonly routines: Pick<RoutineStore, 'get' | 'list' | 'recordRun' | 'saveProgress' | 'clearProgress' | 'abandon' | 'keepSchedule'>
   /** Whether the teammate has a live run of anyone's. A scheduled routine waits for it to end. */
   readonly teammateBusy?: (teammateId: string) => Promise<boolean>
   readonly peerContextFor: (teammateId: string) => Promise<MissionPeerContext | undefined>
@@ -370,6 +370,11 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       const execution = routine?.execution
       if (routine === undefined || execution?.status !== 'held' || execution.attemptId !== request.attemptId || execution.step !== request.step) {
         return { ok: false, error: { message: 'This recovery decision is stale. Reload routines and review the current attempt.' } }
+      }
+      if (request.decision === 'keep') {
+        await options.routines.keepSchedule(routine.routineId, execution.attemptId)
+        changed()
+        return { ok: true }
       }
       if (request.decision === 'abandon') {
         await options.routines.abandon(routine.routineId, execution.attemptId)
