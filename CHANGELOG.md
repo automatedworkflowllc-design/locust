@@ -11,6 +11,19 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.399.0 - 2026-09-27
+
+### New
+
+- **Build on an answer, merge the answers, read them side by side.** In a
+  room, every finished answer now has **Build on**, which starts your next
+  post to everyone as a reply to that answer. When a post has more than one
+  finished answer, each also has **Merge**, which starts a post asking that
+  teammate to combine them into one: what they agree on, where they differ,
+  and whose each part was. Neither sends anything until you do. The new
+  button beside More actions lays a post's answers out in columns so you
+  can compare them.
+
 ## 0.398.0 - 2026-09-27
 
 ### New

@@ -3500,6 +3500,23 @@ textarea {
 }
 
 /*
+ * SIDE BY SIDE (0.399): a post's answers in columns, to read across --
+ * where they agree, where one says what the others miss. Each column keeps
+ * a reading width and the row scrolls sideways rather than squeezing them.
+ */
+.lc-roompost__answers.is-columns {
+  flex-direction: row;
+  align-items: flex-start;
+  overflow-x: auto;
+  padding-bottom: var(--lc-space-2);
+}
+
+.lc-roompost__answers.is-columns > .lc-roomanswer {
+  flex: 1 0 320px;
+  min-width: 320px;
+}
+
+/*
  * A post that became a conversation, drawn as one.
  *
  * No card, no box, no grid: a card is Standing and a teammate talking is

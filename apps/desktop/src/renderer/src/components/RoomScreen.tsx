@@ -556,6 +556,26 @@ export function RoomScreen({
     setAskTo([teammateId])
     box.current?.focus()
   }
+  /*
+   * ROOMS, ROUND TWO (0.399; the rooms-and-peers research, item 7).
+   *
+   * Build on one answer, or have one teammate merge them all. Both only
+   * write the next post for you -- nothing is sent until you send it --
+   * because every member is already briefed with the room's last posts and
+   * their finished answers (0.370): naming the answer is all a post needs.
+   */
+  const buildOn = (name: string): void => {
+    setAskTo([])
+    setDraftText(`Build on ${name}\u2019s answer above: `)
+    box.current?.focus()
+  }
+  const mergeBy = (teammateId: string): void => {
+    setAskTo([teammateId])
+    setDraftText('Merge the answers to my last post into one: keep what they agree on, say plainly where they differ, and name whose each part was.')
+    box.current?.focus()
+  }
+  // Answers in columns, for comparing them across (0.399). This room, this visit.
+  const [sideBySide, setSideBySide] = useState(false)
 
   // The @ menu: the room's members, by what follows the @ at the caret.
   const roomMembers = members.filter((member): member is PublicTeammate => member !== undefined)
@@ -889,6 +909,16 @@ export function RoomScreen({
         <div className="lc-workroom__actions">
           <button
             type="button"
+            className={`lc-button${sideBySide ? ' is-active' : ''}`}
+            aria-pressed={sideBySide}
+            aria-label="Answers side by side"
+            title={sideBySide ? 'Answers one under another' : 'Answers side by side, to compare them'}
+            onClick={() => setSideBySide((current) => !current)}
+          >
+            <Icon name="diff" size={13} />
+          </button>
+          <button
+            type="button"
             className="lc-button"
             aria-label="More actions"
             aria-haspopup="menu"
@@ -1156,7 +1186,7 @@ export function RoomScreen({
                   </p>
                 </div>
               ) : (
-              <div className={`lc-roompost__answers${answers.length > ANSWERS_BEFORE_A_LIST ? ' is-list' : ''}`}>
+              <div className={`lc-roompost__answers${answers.length > ANSWERS_BEFORE_A_LIST ? ' is-list' : ''}${sideBySide && answers.length > 1 ? ' is-columns' : ''}`}>
                 {/*
                   * WHOEVER REPLIED FIRST, first.
                   *
@@ -1219,6 +1249,16 @@ export function RoomScreen({
                         >
                           Reply
                         </button>
+                        {answer.phase === 'completed' && (
+                          <button type="button" className="lc-ghostbutton" title={`Your next post, to everyone, building on ${name}\u2019s answer`} onClick={() => buildOn(name)}>
+                            Build on
+                          </button>
+                        )}
+                        {answer.phase === 'completed' && answers.filter((other) => other.phase === 'completed').length > 1 && (
+                          <button type="button" className="lc-ghostbutton" title={`Your next post, to ${name} only: merge the answers into one`} onClick={() => mergeBy(teammateId)}>
+                            Merge
+                          </button>
+                        )}
                         <button type="button" className="lc-ghostbutton" onClick={() => onOpenMission(answer.missionId)}>
                           Open
                         </button>
