@@ -2242,15 +2242,39 @@ export function SettingsScreen({
           * design review: "Appearance: reading comfort before ornament").
           */}
         {shownPage === 'appearance' && (
-        <section className="lc-settings__section">
-          <h2 className="lc-settings__heading">Reply text size</h2>
-          <p className="lc-settings__lede">
-            {replySize === 'largest'
-              ? 'Largest. For reading at a distance, or a long reply you want to sit with.'
-              : replySize === 'large'
-                ? 'Large. A step up without turning the thread into a slide.'
-                : 'Standard. The size a reply has always been set at.'}
-          </p>
+        <section className="lc-settings__section lc-settings__section--line">
+          <div className="lc-settingline">
+            <div className="lc-settingline__text">
+              <h2 className="lc-settings__heading">Reply text size</h2>
+              <p className="lc-settings__lede">
+                {replySize === 'largest'
+                  ? 'Largest. For reading at a distance, or a long reply you want to sit with.'
+                  : replySize === 'large'
+                    ? 'Large. A step up without turning the thread into a slide.'
+                    : 'Standard. The size a reply has always been set at.'}
+              </p>
+            </div>
+            <div className="lc-segmented" role="radiogroup" aria-label="How big to set a reply">
+              {(
+                [
+                  ['standard', 'Standard'],
+                  ['large', 'Large'],
+                  ['largest', 'Largest']
+                ] as const
+              ).map(([option, label]) => (
+                <button
+                  key={option}
+                  type="button"
+                  role="radio"
+                  aria-checked={replySize === option}
+                  className={`lc-button${replySize === option ? ' is-active' : ''}`}
+                  onClick={() => onReplySizeChange(option)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
           <More>
             <p>
               A teammate's reply is the one thing on this screen you read rather than scan, so it is set
@@ -2263,37 +2287,10 @@ export function SettingsScreen({
               characters at Standard and 72 at Large.
             </p>
           </More>
-          <div className="lc-settingrows">
-            <div className="lc-settingrow">
-              <span className="lc-settings__note">How big to set it.</span>
-              <div className="lc-segmented" role="radiogroup" aria-label="How big to set a reply">
-                {(
-                  [
-                    ['standard', 'Standard'],
-                    ['large', 'Large'],
-                    ['largest', 'Largest']
-                  ] as const
-                ).map(([option, label]) => (
-                  <button
-                    key={option}
-                    type="button"
-                    role="radio"
-                    aria-checked={replySize === option}
-                    className={`lc-button${replySize === option ? ' is-active' : ''}`}
-                    onClick={() => onReplySizeChange(option)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
         </section>
         )}
         {shownPage === 'appearance' && (
-        <section className="lc-settings__section">
-          <h2 className="lc-settings__heading">Sidebar</h2>
-          <div className="lc-settingrows">
+        <section className="lc-settings__section lc-settings__section--line">
           {/*
             * The shell layout. It was decided by window width alone, so the
             * only way to get the compact rail was to shrink the window and the
@@ -2301,10 +2298,17 @@ export function SettingsScreen({
             * have it be an optional toggle as well?"). Auto still follows the
             * width, and it is what everyone gets until they choose.
             */}
-          <div className="lc-settingrow">
-            <span className="lc-settings__note">
-              Sidebar layout{layout === 'auto' ? ` — following this window, currently ${layoutMode}` : ''}
-            </span>
+          <div className="lc-settingline">
+            <div className="lc-settingline__text">
+              <h2 className="lc-settings__heading">Sidebar</h2>
+              <p className="lc-settings__lede">
+                {layout === 'auto'
+                  ? `Auto. Following this window, currently ${layoutMode === 'wide' ? 'full' : 'the rail'}.`
+                  : layout === 'wide'
+                    ? 'Full. The names beside the faces, whatever the window.'
+                    : 'Rail. Faces only, whatever the window.'}
+              </p>
+            </div>
             <div className="lc-segmented" role="radiogroup" aria-label="Sidebar layout">
               {(
                 [
@@ -2325,7 +2329,6 @@ export function SettingsScreen({
                 </button>
               ))}
             </div>
-          </div>
           </div>
         </section>
         )}
@@ -2456,15 +2459,42 @@ export function SettingsScreen({
         </section>
         )}
         {shownPage === 'appearance' && (
-        <section className="lc-settings__section">
-          <h2 className="lc-settings__heading">Boot screen</h2>
-          <p className="lc-settings__lede">
-            {tube === 'off'
-              ? 'Off. Locust goes straight to the workspace while it finds your runtimes.'
-              : tube === 'subtle'
-                ? 'Subtle. The screen without the flicker or the glare.'
-                : 'Full. The whole monitor while your runtimes are found.'}
-          </p>
+        <section className="lc-settings__section lc-settings__section--line">
+          <div className="lc-settingline">
+            <div className="lc-settingline__text">
+              <h2 className="lc-settings__heading">Boot screen</h2>
+              <p className="lc-settings__lede">
+                {tube === 'off'
+                  ? 'Off. Locust goes straight to the workspace while it finds your runtimes.'
+                  : tube === 'subtle'
+                    ? 'Subtle. The screen without the flicker or the glare.'
+                    : 'Full. The whole monitor while your runtimes are found.'}
+              </p>
+            </div>
+            {/* `lc-button is-active` is what every other segmented choice
+              * in this app already uses -- inventing a class for this one
+              * would be a second spelling of a solved thing. */}
+            <div className="lc-segmented" role="radiogroup" aria-label="How much of the boot screen to draw">
+              {(
+                [
+                  ['full', 'Full'],
+                  ['subtle', 'Subtle'],
+                  ['off', 'Off']
+                ] as const
+              ).map(([option, label]) => (
+                <button
+                  key={option}
+                  type="button"
+                  role="radio"
+                  aria-checked={tube === option}
+                  className={`lc-button${tube === option ? ' is-active' : ''}`}
+                  onClick={() => onTubeChange(option)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
           <More>
             <p>
               Finding the runtimes on this machine takes as long as it takes -- each one is a real command
@@ -2477,34 +2507,6 @@ export function SettingsScreen({
               and clicking anywhere on it puts it away.
             </p>
           </More>
-          <div className="lc-settingrows">
-            <div className="lc-settingrow">
-              <span className="lc-settings__note">How much of it to draw.</span>
-              {/* `lc-button is-active` is what every other segmented choice
-                * in this app already uses -- inventing a class for this one
-                * would be a second spelling of a solved thing. */}
-              <div className="lc-segmented" role="radiogroup" aria-label="How much of the boot screen to draw">
-                {(
-                  [
-                    ['full', 'Full'],
-                    ['subtle', 'Subtle'],
-                    ['off', 'Off']
-                  ] as const
-                ).map(([option, label]) => (
-                  <button
-                    key={option}
-                    type="button"
-                    role="radio"
-                    aria-checked={tube === option}
-                    className={`lc-button${tube === option ? ' is-active' : ''}`}
-                    onClick={() => onTubeChange(option)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
 
         </section>
         )}

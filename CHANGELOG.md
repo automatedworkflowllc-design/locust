@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.394.0 - 2026-09-27
+
+### Improved
+
+- **A key is never remembered.** A teammate's memory goes into every
+  teammate's instructions, whichever service runs them. Locust now refuses
+  to keep a memory that contains an API key, access token, private key or
+  password, and says so in the conversation. Edits to a memory and
+  suggestions from a memory tidy-up are checked the same way.
+- **Appearance reads like the rest of Settings.** Reply text size, Sidebar
+  and Boot screen are one line each, with the choice on the right.
+
 ## 0.393.0 - 2026-09-27
 
 ### Improved

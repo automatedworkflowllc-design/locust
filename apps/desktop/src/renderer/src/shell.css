@@ -8856,6 +8856,12 @@ textarea {
   border-top: 0;
 }
 
+/* A section of several rows after a run of lines starts a group of its own:
+   room above it, the way it has room below. */
+.lc-settings__pane .lc-settings__section--line + .lc-settings__section:not(.lc-settings__section--line) {
+  margin-top: 22px;
+}
+
 .lc-settingline {
   display: flex;
   align-items: center;

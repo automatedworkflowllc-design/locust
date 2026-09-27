@@ -51,9 +51,9 @@ describe('the settings pane', () => {
     expect(CSS).toMatch(/\.lc-settings__pane \.lc-settingrow:hover \{\s*background: transparent;/)
   })
 
-  it('draws a setting that is one switch as one line: name and description left, the switch right', () => {
-    expect(SCREENS.split('lc-settings__section lc-settings__section--line').length - 1).toBe(3)
-    for (const name of ['Swarm', 'Auto mode', 'Plans']) {
+  it('draws a setting that is one control as one line: name and description left, the control right (0.393, Appearance 0.394)', () => {
+    expect(SCREENS.split('lc-settings__section lc-settings__section--line').length - 1).toBe(6)
+    for (const name of ['Swarm', 'Auto mode', 'Plans', 'Reply text size', 'Sidebar', 'Boot screen']) {
       const at = SCREENS.indexOf(`<h2 className="lc-settings__heading">${name}</h2>`)
       const line = SCREENS.lastIndexOf('<div className="lc-settingline">', at)
       expect(at - line, name).toBeLessThan(120)

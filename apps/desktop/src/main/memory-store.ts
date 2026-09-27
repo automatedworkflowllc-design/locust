@@ -5,6 +5,7 @@ import { isAbsolute, join } from 'node:path'
 
 import type { MemoryScope, PublicForgottenMemory, PublicMemory } from '../shared/ipc.js'
 import { boundedMemoryText, forgetMatch, memoryKey, memoryName } from '../shared/memory.js'
+import { secretIn, secretRefusal } from '../shared/secrets.js'
 import { MAX_MERGED } from '../shared/memory-tidy.js'
 import type { TidySuggestion } from '../shared/memory-tidy.js'
 import { safeId } from './teammate-store.js'
@@ -395,6 +396,9 @@ export function createMemoryStore(options: {
     add(input): Promise<{ readonly memory: PublicMemory; readonly created: boolean; readonly rewritten?: boolean; readonly proposedChange?: boolean }> {
       return serialize(async () => {
         if (!validMemoryText(input.text)) throw new Error('A memory is one line of text, up to 300 characters.')
+        // A key in a memory would be pasted into every brief, on every provider (0.394).
+        const secret = secretIn(input.text)
+        if (secret !== undefined) throw new Error(secretRefusal(secret))
         if (!validScope(input.scope)) throw new Error('A memory is for this folder or for everywhere.')
         const text = boundedMemoryText(input.text)
         const file = await read()
@@ -522,6 +526,8 @@ export function createMemoryStore(options: {
         if (input.text !== undefined && !validMemoryText(input.text)) {
           throw new Error('A memory is one line of text, up to 300 characters.')
         }
+        const secret = input.text === undefined ? undefined : secretIn(input.text)
+        if (secret !== undefined) throw new Error(secretRefusal(secret))
         if (input.enabled !== undefined && typeof input.enabled !== 'boolean') throw new Error('That change could not be read.')
         /*
          * KEEPING A PROPOSED CHANGE APPLIES IT (0.315): a rewrite replaces
@@ -796,6 +802,12 @@ export function createMemoryStore(options: {
           ...what
         })
         for (const suggestion of input.suggestions) {
+          // A tidy pass writes new wording too; a key in it is refused like one written directly.
+          const secret = suggestion.kind === 'retire' ? undefined : secretIn(suggestion.text)
+          if (secret !== undefined) {
+            refused.push(secretRefusal(secret))
+            continue
+          }
           if (file.memories.length + added.length >= MAX_MEMORIES) {
             refused.push(`Locust keeps at most ${String(MAX_MEMORIES)} memories, so the rest were not kept. Forget some first.`)
             break
