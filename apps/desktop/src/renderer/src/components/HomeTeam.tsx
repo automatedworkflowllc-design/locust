@@ -1,8 +1,10 @@
+import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import type { ReactElement } from 'react'
 
 import type { AvatarSpec } from '../../../shared/avatar.js'
 import type { TeammateHue } from '../../../shared/ipc.js'
 import { Icon } from './Icon.js'
+import { RuntimeMark } from './RuntimeMark.js'
 import { TeammateBot } from './TeammateBot.js'
 
 /**
@@ -26,6 +28,8 @@ export interface HomeTeammate {
   readonly role: string
   /** The route in words, "Codex . Account default"; absent before a first run. */
   readonly route?: string
+  /** Whose mark goes before the route (0.383); absent on a model of the person's own. */
+  readonly runtime?: MissionRuntimeId
   /** Running right now. */
   readonly working: boolean
 }
@@ -71,7 +75,10 @@ export function HomeTeam({
                 {mate.working && <span className="lc-hometeam__working">working</span>}
               </span>
               <span className="lc-hometeam__role">{mate.role}</span>
-              <span className="lc-hometeam__route">{mate.route ?? 'runs on the model you pick'}</span>
+              <span className="lc-hometeam__route">
+                {mate.route !== undefined && mate.runtime !== undefined && <RuntimeMark runtime={mate.runtime} size={11} className="is-inline" />}
+                {mate.route ?? 'runs on the model you pick'}
+              </span>
             </span>
             <span className="lc-hometeam__go" aria-hidden="true">
               <Icon name="chevron-right" size={13} />

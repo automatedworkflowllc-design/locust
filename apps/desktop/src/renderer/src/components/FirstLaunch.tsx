@@ -6,6 +6,7 @@ import { connectedRuntimeCount, deferredOthersSentence, integrationOf, routeRowS
 import { FREE_START_RUNTIME, installCommand, installSentence, runtimeInstallFacts, signInCommand } from '../../../shared/runtime-install.js'
 import { COVER_HEIGHT, HomeCover, coverGrowFor, coverScale } from './HomeCover.js'
 import { HomeTeam } from './HomeTeam.js'
+import { RuntimeMark } from './RuntimeMark.js'
 import type { HomeTeammate } from './HomeTeam.js'
 import { TeamTemplates } from './TeamTemplates.js'
 import type { TeamTemplate } from '../../../shared/team-templates.js'
@@ -552,12 +553,26 @@ export function FirstLaunch({
           const folded =
             !agentsOpen && connected > 0 && !checkingAny && !stuckAny && installingName === undefined && everyInstalledReady && (team.length > 0 || everyAgentReady)
           if (folded) {
-            const names = shown.filter((row) => row.connected).map((row) => row.runtime.displayName)
+            const ready = shown.filter((row) => row.connected)
+            const names = ready.map((row) => row.runtime.displayName)
             return (
               <div className="lc-agenthead is-folded">
                 <span className="lc-agenthead__label">AI agents</span>
                 <span className="lc-agenthead__note is-green">{headNote}</span>
-                <span className="lc-agenthead__names" title={names.join(', ')}>{names.join(' · ')}</span>
+                {/*
+                  * THEIR MARKS, NOT A LIST OF NAMES (0.383). "Codex CLI ·
+                  * Claude Code · Cursor Agent · ..." was a sentence to read
+                  * on a line that says nothing needs you; five marks are
+                  * seen at once, as Orca shows its agents (Colin,
+                  * 2026-09-26: logos "to signify which model is being used
+                  * by what"). Each mark is named for a screen reader and on
+                  * hover, and the line's title lists them all.
+                  */}
+                <span className="lc-agenthead__marks" title={names.join(', ')}>
+                  {ready.map((row) => (
+                    <RuntimeMark key={row.runtime.id} runtime={row.runtime.id} size={15} label={row.runtime.displayName} />
+                  ))}
+                </span>
                 <button type="button" className="lc-agenthead__more" onClick={() => setAgentsOpen(true)}>
                   Show all
                 </button>
@@ -616,6 +631,7 @@ export function FirstLaunch({
                     <div className={`lc-runtimecell${usable ? ' is-ready' : ''}${onRamp ? ' is-onramp' : ''}`} key={runtime.id}>
                       <span className={`lc-runtimecell__dot${dot}`} />
                       <span className="lc-runtimecell__name" title={status.detail}>
+                        <RuntimeMark runtime={runtime.id} size={13} className={usable ? 'is-inline' : 'is-inline is-muted'} />
                         {runtime.displayName}
                       </span>
                       {need !== undefined && (

@@ -45,6 +45,7 @@ import { availableCommands, matchingCommands, slashQuery } from '../slashCommand
 import type { SlashCommand } from '../slashCommands.js'
 import { RoutePicker } from './RoutePicker.js'
 import type { RouteChoice } from './RoutePicker.js'
+import { RuntimeMark } from './RuntimeMark.js'
 
 const MAX_PROMPT_LENGTH = 8_000
 
@@ -1455,7 +1456,24 @@ export function Composer({
                   aria-haspopup="listbox"
                   aria-expanded={pickerOpen}
                 >
-                  <span className={`lc-dot ${selectedReady ? 'lc-tone-lime' : 'lc-tone-muted'}`} />
+                  {/*
+                    * THE RUNTIME'S MARK, where the dot was (0.383).
+                    *
+                    * Colin, 2026-09-26, on Orca: logos "to signify which model
+                    * is being used by what". The lime dot said only "ready",
+                    * the normal state, beside words that already named the
+                    * runtime; the mark names it at a glance and greys when
+                    * the runtime cannot take work, which is the one thing the
+                    * dot was there to say. A model of the person's own shows
+                    * no maker's mark -- it is named as theirs (routeChrome) --
+                    * and nothing connected names no runtime at all, so both
+                    * keep the dot.
+                    */}
+                  {nothingConnected || ownModel ? (
+                    <span className={`lc-dot ${selectedReady ? 'lc-tone-lime' : 'lc-tone-muted'}`} />
+                  ) : (
+                    <RuntimeMark runtime={shownRuntime} size={13} {...(selectedReady ? {} : { className: 'is-muted' })} />
+                  )}
                   {/*
                     * With NOTHING connected, this chip names no route.
                     *

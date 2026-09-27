@@ -108,6 +108,7 @@ import { TEAM_TEMPLATES } from '../../shared/team-templates.js'
 import type { TeamTemplate } from '../../shared/team-templates.js'
 import { GroupSettingsDialog } from './components/GroupSettingsDialog.js'
 import { TeammateBot } from './components/TeammateBot.js'
+import { RuntimeMark } from './components/RuntimeMark.js'
 import { Sidebar } from './components/Sidebar.js'
 import type { SidebarMission } from './components/Sidebar.js'
 import { ContextMenu } from './components/ContextMenu.js'
@@ -5874,6 +5875,7 @@ export default function App(): ReactElement {
                   avatar: mate.avatar,
                   role: roleLabelOf(mate),
                   ...(mate.route === undefined ? {} : { route: routeChrome(mate.route.runtime, mate.route.model, modelDisplayName(mate.route.runtime, mate.route.model), ' · ') }),
+                  ...(mate.route === undefined || isOwnRoute(mate.route.model) ? {} : { runtime: mate.route.runtime }),
                   working: [...runs.values()].some((run) => liveRunIsActive(run) && ownerOf(run) === mate.teammateId)
                 }))}
                 onMessageTeammate={selectTeammate}
@@ -5959,7 +5961,14 @@ export default function App(): ReactElement {
                       <span className="lc-workroom__role">
                         {missionOwner === undefined ? '' : `${roleLabelOf(missionOwner)} · `}
                         {/* A model of your own is said as yours; the line under this names it (routeChrome, 0.361). */}
-                        {isOwnRoute(liveRun.data?.model ?? '') ? 'Your model' : runtimeDisplayName(liveRun.data?.runtime ?? liveRun.runtime ?? 'codex')}
+                        {isOwnRoute(liveRun.data?.model ?? '') ? (
+                          'Your model'
+                        ) : (
+                          <>
+                            <RuntimeMark runtime={liveRun.data?.runtime ?? liveRun.runtime ?? 'codex'} size={12} className="is-inline" />
+                            {runtimeDisplayName(liveRun.data?.runtime ?? liveRun.runtime ?? 'codex')}
+                          </>
+                        )}
                       </span>
                     </div>
                     <div className="lc-workroom__mission">

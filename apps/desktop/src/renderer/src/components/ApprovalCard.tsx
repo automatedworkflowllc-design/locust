@@ -5,6 +5,7 @@ import type { MissionApprovalDecision, MissionApprovalRequest, MissionQuestion }
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { dataSentLine } from '../../../shared/approval-data.js'
 import { Icon } from './Icon.js'
+import { RuntimeMark } from './RuntimeMark.js'
 import { DiffView } from './DiffView.js'
 import { DiffNotesContext } from './DiffNotes.js'
 import { fileCounts, parseUnifiedDiff } from '../diff.js'
@@ -268,6 +269,8 @@ export function ApprovalCard({
         {/* Named by the request, not assumed: a Claude Code connector
             permission wore "Codex CLI" in its first drive (2026-09-10). */}
         <span className="lc-rail__meta">
+          {/* Which program is asking, at a glance (0.383). */}
+          <RuntimeMark runtime={request.runtime ?? 'codex'} size={12} className="is-inline" />
           {runtimeDisplayName(request.runtime ?? 'codex')}
           {request.cwd === null ? ' · this workspace' : ''}
         </span>

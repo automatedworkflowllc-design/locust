@@ -11,6 +11,24 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.383.0 - 2026-09-26
+
+### Improved
+
+- **You can see which AI each teammate runs on.** Every AI agent now shows
+  its logo, wherever Locust names it:
+  - on your teammates' faces in the sidebar;
+  - on their cards on Home and the Team screen;
+  - in the model button under the message box, and in the model list;
+  - in a conversation's header, and on approval cards.
+
+  The model button's green dot is now the agent's logo, greyed out when that
+  agent can't take work. The logos are built into Locust and never
+  downloaded, so nothing outside your computer learns which tools you use.
+- **Home shows your AI agents as logos.** When nothing needs you, the AI
+  agents line on Home is a row of logos instead of a line of names. Hover
+  one to see its name.
+
 ## 0.382.0 - 2026-09-26
 
 ### Improved

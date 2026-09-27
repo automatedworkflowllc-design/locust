@@ -51,7 +51,12 @@ describe('Home', () => {
   it('folds the agent list to one line when every installed agent is ready', () => {
     const html = home([ready('codex', 'Codex CLI'), ready('claude', 'Claude Code'), absent('gemini', 'Gemini CLI')])
     expect(html).toContain('lc-agenthead is-folded')
-    expect(html).toContain('Codex CLI · Claude Code')
+    // The ready agents as their marks (0.383), each named, and the line's
+    // title naming them all -- not a sentence of names to read.
+    expect(html).toContain('aria-label="Codex CLI"')
+    expect(html).toContain('aria-label="Claude Code"')
+    expect(html).toContain('title="Codex CLI, Claude Code"')
+    expect(html).not.toContain('Codex CLI · Claude Code')
     expect(html).toContain('Show all')
     // An agent that is not installed is an offer, not a problem: it does not
     // hold the list open.

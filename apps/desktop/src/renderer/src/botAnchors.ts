@@ -86,6 +86,10 @@ export function anchorsOf(body: BodyBox): BotAnchors {
  * percentages of the bot's box. The dot is placed by its right and bottom
  * and pulled half its own size back (translate), so its CENTRE lands there
  * whatever size it is drawn at.
+ *
+ * The runtime's mark (0.383) wears the dot's mirror image: the same point on
+ * the body's lower LEFT, so a face can carry both -- what it is doing on one
+ * side, what it runs on on the other.
  */
 export function anchorVariables(anchors: BotAnchors): Readonly<Record<string, string>> {
   const percent = (fraction: number): string => `${(fraction * 100).toFixed(2)}%`
@@ -95,6 +99,7 @@ export function anchorVariables(anchors: BotAnchors): Readonly<Record<string, st
     '--lc-bot-ring-side': percent(anchors.ring.side),
     '--lc-bot-dot-right': percent(1 - anchors.dot.x),
     '--lc-bot-dot-bottom': percent(1 - anchors.dot.y),
-    '--lc-bot-dot-shift': '50%'
+    '--lc-bot-dot-shift': '50%',
+    '--lc-bot-mark-left': percent(2 * (anchors.ring.left + anchors.ring.side / 2) - anchors.dot.x)
   }
 }

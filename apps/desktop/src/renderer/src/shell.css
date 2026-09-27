@@ -391,6 +391,38 @@ textarea {
 }
 
 /*
+ * A runtime's mark (RuntimeMark.tsx, 0.383): the brand's colour where the
+ * mark has one, the words' colour otherwise. In a line of text it sits on the
+ * text, first, and a line that ellipsises still does -- the words give way
+ * after it. In a flex row the row's own gap spaces it, so `is-inline` alone
+ * carries a margin.
+ */
+.lc-runtimemark {
+  display: inline-block;
+  flex: none;
+  vertical-align: -0.16em;
+}
+
+.lc-runtimemark[data-runtime='claude'] {
+  color: var(--lc-mark-claude);
+}
+
+.lc-runtimemark[data-runtime='gemini'] {
+  color: var(--lc-mark-gemini);
+}
+
+.lc-runtimemark.is-inline {
+  margin-right: 0.42em;
+}
+
+/* A runtime that cannot take work right now: the mark greys with its words,
+   brand colour and all. */
+.lc-runtimemark.is-muted[data-runtime] {
+  color: inherit;
+  opacity: 0.5;
+}
+
+/*
  * A new version is ready. One line above the composer; the install is a click.
  *
  * A card, and the install is the app's one offer colour -- the lime the
@@ -4156,6 +4188,7 @@ textarea {
   --lc-bot-ring-side: 88%;
   --lc-bot-dot-right: 6%;
   --lc-bot-dot-bottom: 6%;
+  --lc-bot-mark-left: 6%;
   --lc-bot-dot-shift: 0%;
 }
 
@@ -4197,6 +4230,28 @@ textarea {
   /* Anchored, the dot's CENTRE is the point: pulled back half its own size. */
   transform: translate(var(--lc-bot-dot-shift), var(--lc-bot-dot-shift));
   z-index: 1;
+}
+
+/*
+ * The runtime's mark on a face (TeammateBot `runtime`, 0.383): the dot's
+ * mirror image on the body's lower left, on a disc of the ground it stands on
+ * so it reads as a badge and never as part of the bot's own drawing.
+ */
+.lc-bot__mark {
+  position: absolute;
+  left: var(--lc-bot-mark-left);
+  bottom: var(--lc-bot-dot-bottom);
+  transform: translate(-50%, 50%);
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 46%;
+  height: 46%;
+  border-radius: 50%;
+  background: var(--lc-bg-sidebar);
+  box-shadow: 0 0 0 1px var(--lc-border-hairline);
+  color: var(--lc-text-secondary);
+  pointer-events: none;
 }
 
 /*
@@ -5222,14 +5277,16 @@ textarea {
   background: var(--lc-bg-raised);
 }
 
-.lc-agenthead__names {
+/* The ready agents as their marks (0.383), in the words' own quiet colour
+   where a mark has no colour of its own. */
+.lc-agenthead__marks {
   flex: 1;
   min-width: 0;
-  font-size: var(--lc-text-description);
-  color: var(--lc-text-muted);
-  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   overflow: hidden;
-  text-overflow: ellipsis;
+  color: var(--lc-text-secondary);
 }
 
 .lc-agenthead__more {

@@ -5,7 +5,8 @@ import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import type { PublicModel, PublicRuntimeStatus } from '../../../shared/ipc.js'
 import { OWN_MODELS_GROUP, ROUTE_GROUP_LIMIT, capRouteRows, integrationOf, modelFamily, orderRouteRows, recentRouteRows, routeRowStatus, routeRowTag, routeSearchText } from '../status.js'
 import type { RouteTag } from '../status.js'
-import { modelDisplayName, routeModelName } from '../routeName.js'
+import { isOwnRoute, modelDisplayName, routeModelName } from '../routeName.js'
+import { RuntimeMark } from './RuntimeMark.js'
 import { levelsLine } from '../effortScale.js'
 import { effortName } from '../effortLevels.js'
 import { FREE_START_RUNTIME } from '../../../shared/runtime-install.js'
@@ -374,7 +375,11 @@ export function RoutePicker({
         </span>
         {recent ? (
           pointsAt === undefined ? null : (
-            <span className="lc-picker__pointer lc-mono">{`↓ ${pointsAt}`}</span>
+            <span className="lc-picker__pointer lc-mono">
+              {'↓ '}
+              {!isOwnRoute(row.model) && <RuntimeMark runtime={row.runtime} size={11} className="is-inline" />}
+              {pointsAt}
+            </span>
           )
         ) : (
         <span
@@ -440,6 +445,10 @@ export function RoutePicker({
             <div key={row.key} className={recent ? 'lc-picker__tray' : undefined}>
               {header !== undefined && (
                 <div className="lc-picker__group">
+                  {/* The runtime's mark on its own group (0.383); not on
+                      Recent, which mixes runtimes, nor on the person's own
+                      models, which are named as theirs. */}
+                  {!recent && row.group !== OWN_MODELS_GROUP && <RuntimeMark runtime={row.runtime} size={12} className="is-inline" />}
                   {header}
                   {recent && <span className="lc-picker__grouphint">shortcuts to rows below</span>}
                 </div>

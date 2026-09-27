@@ -7,6 +7,7 @@ import type { GlanceSide } from '../glances.js'
 import { Bot } from './Bot.js'
 import type { Glance } from './Bot.js'
 import { PRESENCE_TONE } from './PixelFace.js'
+import { RuntimeMark } from './RuntimeMark.js'
 import type { PixelFaceProps } from './PixelFace.js'
 
 /**
@@ -142,7 +143,18 @@ export interface TeammateBotProps extends PixelFaceProps {
    * to, or that just handed it one (glances.ts). Wakes a still bot for it.
    */
   readonly glance?: GlanceSide
+  /**
+   * The runtime this teammate runs on, worn as a small mark on the body's
+   * lower left, opposite the presence dot (0.383). For a face that stands
+   * without its route in words beside it -- the sidebar's row of faces --
+   * so which model is who reads at a glance. Drawn only where the face is
+   * big enough for the mark to be a mark.
+   */
+  readonly runtime?: string
 }
+
+/** Below this a badge is a speck: the mark is not drawn. */
+export const MARKED_FACE_MIN = 24
 
 export function TeammateBot({
   hue,
@@ -155,7 +167,8 @@ export function TeammateBot({
   name,
   motion = 'subtle',
   hopsWhenDone = true,
-  glance
+  glance,
+  runtime
 }: TeammateBotProps): ReactElement {
   const bot = botFor(avatar)
   const { state, paused, jumpEvery, bounces, hops } = botMotion(activity === 'done' && !hopsWhenDone ? 'idle' : activity, motion)
@@ -185,6 +198,11 @@ export function TeammateBot({
         {...(jumpEvery === undefined ? {} : { jumpEvery })}
       />
       {tone !== undefined && <span className={`lc-presence lc-presence--${tone}`} />}
+      {runtime !== undefined && size >= MARKED_FACE_MIN && (
+        <span className="lc-bot__mark" data-runtime={runtime}>
+          <RuntimeMark runtime={runtime} size={Math.round(size * 0.3)} />
+        </span>
+      )}
     </span>
   )
 }

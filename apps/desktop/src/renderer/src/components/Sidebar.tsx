@@ -6,7 +6,7 @@ import { roleLabelOf } from '../../../shared/ipc.js'
 import type { LiveActivity } from '../faceState.js'
 import { glancesAmong } from '../glances.js'
 import type { Handoff } from '../glances.js'
-import { routeChrome, routeModelName } from '../routeName.js'
+import { isOwnRoute, routeChrome, routeModelName } from '../routeName.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { branchNameFor } from '../../../shared/worktree-name.js'
 import mark from '../assets/locust-mark.svg'
@@ -23,6 +23,7 @@ import {
   teammateStatusView
 } from '../status.js'
 import { TeammateBot } from './TeammateBot.js'
+import { RuntimeMark } from './RuntimeMark.js'
 import type { TeammateStatusView } from '../status.js'
 import { ThinkingOrb } from 'thinking-orbs'
 import { Icon } from './Icon.js'
@@ -929,6 +930,9 @@ export function Sidebar({
                   avatar={teammate.avatar}
                   size={26}
                   teammateId={teammate.teammateId}
+                  // Which model is who, on the one surface that names nobody's
+                  // route in words (0.383) -- not on a model of their own.
+                  {...(teammate.route === undefined || isOwnRoute(teammate.route.model) ? {} : { runtime: teammate.route.runtime })}
                   {...(status === undefined ? {} : { activity: status.activity, presence: facePresenceFor(status.status) })}
                   {...(stripGlances.has(teammate.teammateId) ? { glance: stripGlances.get(teammate.teammateId) } : {})}
                 />
@@ -1219,8 +1223,10 @@ export function Sidebar({
                           * spells it -- `Cursor / Grok 4.6`, not `Cursor Agent
                           * / cursor-grok-4.6-medium`, which says cursor twice
                           * and then spells a product in lowercase. The exact id
-                          * is the tooltip.
+                          * is the tooltip. The runtime's mark goes first
+                          * (0.383), except on a model of the person's own.
                           */}
+                        {!isOwnRoute(teammate.route.model) && <RuntimeMark runtime={teammate.route.runtime} size={11} className="is-inline" />}
                         {routeChrome(teammate.route.runtime, teammate.route.model, routeModelName(teammate.route.runtime, teammate.route.model))}
                       </span>
                     )}

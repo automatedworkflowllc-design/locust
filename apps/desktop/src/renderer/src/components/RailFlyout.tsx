@@ -6,6 +6,8 @@ import { missionPhaseView } from '../status.js'
 import { railEmptyLine, railRows, shortAgo } from '../railFlyout.js'
 import { Icon } from './Icon.js'
 import { TeammateBot } from './TeammateBot.js'
+import { RuntimeMark } from './RuntimeMark.js'
+import { isOwnRoute } from '../routeName.js'
 import type { SidebarMission } from './Sidebar.js'
 
 /**
@@ -124,7 +126,12 @@ export function RailFlyout({
         <span className="lc-railflyout__who">
           <span className="lc-railflyout__name">{teammate.name}</span>
           <span className={`lc-railflyout__status lc-tone-${statusTone}`}>{statusLabel}</span>
-          {route !== undefined && <span className="lc-railflyout__route lc-mono">{route}</span>}
+          {route !== undefined && (
+            <span className="lc-railflyout__route lc-mono">
+              {teammate.route !== undefined && !isOwnRoute(teammate.route.model) && <RuntimeMark runtime={teammate.route.runtime} size={11} className="is-inline" />}
+              {route}
+            </span>
+          )}
         </span>
       </div>
 

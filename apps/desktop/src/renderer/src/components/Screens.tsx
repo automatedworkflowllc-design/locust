@@ -6,7 +6,7 @@ import { SETTINGS_PAGES, matchedHeadings, pageMatches } from '../settingsPages.j
 import type { SettingsPageId } from '../settingsPages.js'
 import type { RuntimeUpdatesState, MetalMotion, MetalPreset, MetalStrength } from '../../../shared/ipc.js'
 import type { Spend } from '../../../shared/spend.js'
-import { modelDisplayName, routeChrome, routeModelName } from '../routeName.js'
+import { isOwnRoute, modelDisplayName, routeChrome, routeModelName } from '../routeName.js'
 import type { ReactElement, ReactNode } from 'react'
 
 import type {
@@ -43,6 +43,7 @@ import {
 } from '../status.js'
 import { CliArtifacts } from './CliArtifacts.js'
 import { TeammateBot } from './TeammateBot.js'
+import { RuntimeMark } from './RuntimeMark.js'
 import { keepCurrentNote, offersUpdate, updateLine } from '../agentUpdates.js'
 import { Icon } from './Icon.js'
 import { costCell, costTotal, missionCost, monthSpendLine } from '../cost.js'
@@ -485,6 +486,7 @@ export function MissionsScreen({
                         three different ways depending on the screen (Grok's
                         finding 1). Receipts keep raw ids on purpose; a row is
                         not a receipt. */}
+                    {!isOwnRoute(mission.model) && <RuntimeMark runtime={mission.runtime} size={11} className="is-inline" />}
                     {routeChrome(mission.runtime, mission.model, modelDisplayName(mission.runtime, mission.model))}
                   </span>
                   <span className="lc-missionrow__stats lc-mono">
@@ -653,6 +655,7 @@ export function TeammatesScreen({
           ) : (
             <>
               <span className="lc-rostercard__model">
+                {!isOwnRoute(teammate.route.model) && <RuntimeMark runtime={teammate.route.runtime} size={12} className="is-inline" />}
                 {routeChrome(teammate.route.runtime, teammate.route.model, routeModelName(teammate.route.runtime, teammate.route.model))}
               </span>
               <span>{modeLabel(teammate.route.mode)}</span>
