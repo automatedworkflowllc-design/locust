@@ -11,6 +11,14 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.416.0 - 2026-09-27
+
+### Improved
+
+- **Room cards say who's in the room and when it was last used.** On the
+  Rooms screen a room read "2 teammates · 1 post". It now names them, as in
+  "Atlas · Quill · 1 post · 2m".
+
 ## 0.415.0 - 2026-09-27
 
 ### Improved

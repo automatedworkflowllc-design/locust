@@ -12,6 +12,7 @@ import type { ContextMenuState } from './ContextMenu.js'
 import { TeammateBot } from './TeammateBot.js'
 import { footLine } from '../roomExchange.js'
 import { modelDisplayName, routeChrome } from '../routeName.js'
+import { shortAgo } from '../railFlyout.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { useFollowBottom } from '../useFollowBottom.js'
 import { QUIET_SECONDS_BEFORE_SAYING_SO } from '../quiet.js'
@@ -56,6 +57,28 @@ export interface RoomAnswer {
   readonly items: readonly ThreadItem[]
   readonly runtime: string
   readonly model: string
+}
+
+/**
+ * A room's card on the Rooms screen: who is in it, how much has been said,
+ * and when (0.416).
+ *
+ * It read "2 teammates · 1 post" -- a count where a person looks for faces
+ * they know, and nothing to say which room they used last (fresh-eyes area
+ * 10). Three names fit; past that, two and how many more.
+ */
+export function roomCardMeta(
+  room: Pick<PublicRoom, 'teammateIds' | 'posts' | 'createdAt'>,
+  teammates: readonly Pick<PublicTeammate, 'teammateId' | 'name'>[],
+  now: Date = new Date()
+): string {
+  const names = room.teammateIds
+    .map((id) => teammates.find((entry) => entry.teammateId === id)?.name)
+    .filter((name): name is string => name !== undefined)
+  const who = names.length <= 3 ? names.join(' · ') : `${names.slice(0, 2).join(' · ')} +${String(names.length - 2)}`
+  const said = room.posts.length === 0 ? 'nothing posted yet' : `${String(room.posts.length)} post${room.posts.length === 1 ? '' : 's'}`
+  const ago = shortAgo(room.posts[room.posts.length - 1]?.at ?? room.createdAt, now)
+  return [who, said, ago].filter((part): part is string => part !== undefined && part.length > 0).join(' · ')
 }
 
 /**
@@ -674,9 +697,7 @@ export function RoomScreen({
                 {rooms.map((entry) => (
                   <button key={entry.roomId} type="button" className="lc-roomcard" onClick={() => onSelectRoom(entry.roomId)}>
                     <span className="lc-roomcard__name">{entry.name}</span>
-                    <span className="lc-roomcard__meta lc-mono">
-                      {String(entry.teammateIds.length)} teammate{entry.teammateIds.length === 1 ? '' : 's'} · {String(entry.posts.length)} post{entry.posts.length === 1 ? '' : 's'}
-                    </span>
+                    <span className="lc-roomcard__meta lc-mono">{roomCardMeta(entry, teammates)}</span>
                   </button>
                 ))}
               </div>
