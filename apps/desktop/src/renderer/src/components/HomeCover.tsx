@@ -67,14 +67,31 @@ const FIRST_SCALE = 760 / COVER_WIDTH
  */
 export const COVER_MAX_GROW = 1.45
 
+/**
+ * AND HOW MUCH IT MAY GIVE BACK WHEN THE PAGE IS SHORT (0.401).
+ *
+ * A new person's Home at 1440x900 -- the three team templates and seven
+ * runtimes under the cover -- was 66px taller than its pane. The pane keeps
+ * to its end (FirstLaunch), so those 66px came off the top: the air above
+ * the cover, then the cover's own top, and the mascots stood cut off by the
+ * title bar on the first screen a person sees (drive-signed-out). The
+ * drawing now gives back height the way it takes it, about its centre, down
+ * to this. The floor is the claim's: it stops at 10.5px so it stays
+ * readable, and the glass keeps shrinking -- at 0.75 the claim ran from edge
+ * to edge of the glass (drive-signed-out measures the margin). A page still
+ * too tall scrolls as before.
+ */
+export const COVER_MIN_GROW = 0.85
+
 /** The most the drawing can grow and keep 3% of the card clear each side. Read from the machine, which is the drawing's widest part. */
 function coverWidthGrow(): number {
   return (0.94 * COVER_WIDTH) / COVER_MACHINE.width
 }
 
-/** The grow factor for this much spare height above a cover of this height. */
+/** The grow factor for this much spare height above a cover of this height; short of room, below 1. */
 export function coverGrowFor(room: number, baseHeight: number): number {
-  if (!Number.isFinite(room) || !Number.isFinite(baseHeight) || baseHeight <= 0 || room <= 0) return 1
+  if (!Number.isFinite(room) || !Number.isFinite(baseHeight) || baseHeight <= 0 || room === 0) return 1
+  if (room < 0) return Math.round(Math.max(COVER_MIN_GROW, 1 + room / baseHeight) * 1000) / 1000
   return Math.round(Math.min(COVER_MAX_GROW, coverWidthGrow(), 1 + room / baseHeight) * 1000) / 1000
 }
 
@@ -455,7 +472,7 @@ export function HomeCover({
   // the page gives (`grow`), about the canvas's centre -- so `left` is offset
   // by half of what the canvas outgrew, and the drawing stays centred on a
   // card that did not move.
-  const drawn = Math.round(scale * Math.min(Math.max(1, grow), COVER_MAX_GROW, coverWidthGrow()) * 1000) / 1000
+  const drawn = Math.round(scale * Math.min(Math.max(COVER_MIN_GROW, grow), COVER_MAX_GROW, coverWidthGrow()) * 1000) / 1000
   const originX = Math.round((scale - drawn) * COVER_WIDTH / 2)
   const at = (value: number): number => Math.round(value * drawn)
   const atX = (value: number): number => originX + at(value)

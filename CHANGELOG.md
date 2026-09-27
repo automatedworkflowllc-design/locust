@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.401.0 - 2026-09-27
+
+### Fixed
+
+- **The Locust sign on Home is no longer cut off for someone just
+  starting.** With the team templates and the list of AI agents both on
+  Home, a 1440x900 window was a little too short, and the teammates standing
+  on the sign were cut off at the top. The sign now draws a little smaller
+  when the window is short, so it shows whole, with room above it. On a
+  smaller window it still scrolls away above the chat box, as before.
+
 ## 0.400.0 - 2026-09-27
 
 ### Fixed
