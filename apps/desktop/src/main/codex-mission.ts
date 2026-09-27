@@ -277,12 +277,14 @@ interface CodexMissionServiceOptions {
   ) => AppServerRunProcess
   /**
    * How to start `opencode serve`, which an OpenCode run in Approve-each rides
-   * so it can stop and ask (A6.7). Absent: OpenCode has no Approve-each.
+   * so it can stop and ask (A6.7) -- IN the teammate's folder (0.378).
+   * Absent: OpenCode has no Approve-each.
    */
   readonly opencodeServeSpawn?: (
     executablePath: string,
     args: readonly string[],
-    env?: Readonly<Record<string, string>>
+    env?: Readonly<Record<string, string>>,
+    cwd?: string
   ) => AppServerRunProcess
   /**
    * How to start an Agent Client Protocol agent -- `copilot --acp`, which a

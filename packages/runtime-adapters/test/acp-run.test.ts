@@ -362,10 +362,10 @@ describe("what Copilot is started with, to ask", () => {
 
   it("--acp and nothing that stops it asking: no --allow-all-tools, no prompt, no session on the argv", () => {
     const spec = createCopilotAcpCommand(copilot, { workspacePath: "C:\\work" });
-    expect(spec.args).toEqual(["--acp"]);
+    expect(spec.args).toEqual(["--acp", "--excluded-tools=session_store_sql"]);
     expect(spec.stdin).toBe("protocol");
     expect(spec.cwd).toBe("C:\\work");
-    expect(createCopilotAcpCommand(copilot, { workspacePath: "C:\\work", model: "gpt-5.6-luna" }).args).toEqual(["--acp", "--model", "gpt-5.6-luna"]);
+    expect(createCopilotAcpCommand(copilot, { workspacePath: "C:\\work", model: "gpt-5.6-luna" }).args).toEqual(["--acp", "--excluded-tools=session_store_sql", "--model", "gpt-5.6-luna"]);
   });
 
   it("holds the session to the mode that asks, with allow-all off -- by Copilot's own ids", () => {

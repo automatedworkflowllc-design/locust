@@ -1540,8 +1540,10 @@ if (!ownsSingleInstanceLock) {
       // `liveElsewhere` is: the spawner is defined further down this same
       // setup, and nothing starts a mission until all of it has run.
       appServerSpawn: (executablePath, args, env) => spawnAppServer(executablePath, args, env),
-      // A6.7: OpenCode's own server, for Approve-each; the same launcher (tree kill on Windows).
-      opencodeServeSpawn: (executablePath, args, env) => spawnAppServer(executablePath, args, env),
+      // A6.7: OpenCode's own server, for Approve-each; the same launcher (tree
+      // kill on Windows), started IN its folder (0.378) -- a session made
+      // without naming one is the server's own folder's.
+      opencodeServeSpawn: (executablePath, args, env, cwd) => spawnAppServer(executablePath, args, env, cwd),
       // 0.377: an Agent Client Protocol agent (Copilot, for Approve-each), started IN its folder.
       acpSpawn: (executablePath, args, env, cwd) => spawnAppServer(executablePath, args, env, cwd),
       // A3.3: the person's check for THIS folder, after a turn that changed files.

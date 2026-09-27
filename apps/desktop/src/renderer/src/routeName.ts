@@ -146,6 +146,10 @@ export function routeChrome(runtime: MissionRuntimeId, modelId: string, model: s
 export function modelDisplayName(runtime: string, modelId: string): string {
   const own = OWN_ROUTE_MODEL.exec(modelId)
   if (own !== null) return ownModelNames.get(modelId) ?? spellOut(own[1]!)
+  // `auto` is the runtime choosing its own model (Copilot's, Cursor's). Said
+  // bare, beside a mode, it read as the Auto MODE -- "Auto · running" over an
+  // Approve-each turn (drive-copilot-approve-each, 0.377). It says it is one.
+  if (modelId.trim().toLowerCase() === 'auto') return 'Auto model'
   const named = modelLabelFor(runtime, modelId)
   const slash = named.indexOf('/')
   if (slash > 0) {

@@ -11,6 +11,22 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.378.0 - 2026-09-26
+
+### Fixed
+
+- **OpenCode's Approve each works in your folder.** Opened the usual way,
+  an OpenCode teammate in Approve each ran the commands you approved in
+  Locust's own install folder rather than yours, while its card named
+  yours. It now starts in your folder, as every other teammate does.
+- **A Copilot teammate keeps to its own conversation.** Copilot has a tool
+  that searches every Copilot conversation on your computer, and it ran it
+  without asking. Locust now turns that tool off for its teammates.
+- **A command waiting on you says "running", not "ran".** While an approval
+  card was up, the line above it already said the command had run.
+- **Copilot's model reads "Auto model".** Beside a teammate's mode, a bare
+  "Auto" read like the Auto mode.
+
 ## 0.377.0 - 2026-09-26
 
 ### New

@@ -2355,6 +2355,28 @@ describe('the trace line for a finished turn (SURFACES-0.22)', () => {
     expect(segments.find((seg) => seg.key === 'calls')).toBeUndefined()
   })
 
+  it('says the one command is RUNNING while it has no result -- not that it ran (0.378)', () => {
+    // An approval card up beside the fold said "Nothing has happened yet"
+    // while the line said "ran echo LOCUST-ACP-OK > approved.txt"
+    // (drive-copilot-approve-each, 0.377; every runtime's Approve each read
+    // the same). No result and a live turn: running, or waiting on the card.
+    const started = [
+      ev(1, 'run.started', { runtimeThreadId: 't', process: {} }, 0),
+      ev(2, 'tool.started', { itemId: 'a', toolKind: 'command_execution', name: 'shell', command: 'echo hi', phase: 'started' }, 1)
+    ]
+    const live = buildThread(started, { running: true }).find((item) => item.type === 'activity')
+    const liveDetails = live?.type === 'activity' ? live.details : []
+    expect(activityTrace(liveDetails, started, traceOutcome(started, true)).find((seg) => seg.key === 'commands')?.text).toBe('running echo hi')
+    const done = [
+      ...started,
+      ev(3, 'tool.completed', { itemId: 'a', toolKind: 'command_execution', name: 'shell', command: 'echo hi', phase: 'completed', exitCode: 0 }, 2),
+      ev(4, 'run.completed', { runtimeThreadId: 't', process: {} }, 2)
+    ]
+    const after = buildThread(done, { running: false }).find((item) => item.type === 'activity')
+    const afterDetails = after?.type === 'activity' ? after.details : []
+    expect(activityTrace(afterDetails, done, traceOutcome(done, false)).find((seg) => seg.key === 'commands')?.text).toBe('ran echo hi')
+  })
+
   it('counts several commands and says how they came out', () => {
     // Naming one of several would be arbitrary, so several get a count -- and
     // it carries what came back, which is the whole of Astra's first ask: a

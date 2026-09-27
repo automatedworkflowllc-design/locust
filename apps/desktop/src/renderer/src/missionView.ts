@@ -1569,7 +1569,12 @@ export function activityTrace(
    */
   if (shellCommands.length === 1 && onlyCommand !== undefined && onlyCommand.length > 0) {
     const one = commandsRunText(commandsRun(details, finished))
-    const named = `ran ${onlyCommand.length > 60 ? `${onlyCommand.slice(0, 59)}…` : onlyCommand}`
+    // Not yet RUN while it has no result and the turn is live -- running, or
+    // waiting on the person's card. "ran" beside a card that says "Nothing has
+    // happened yet" was the line claiming the past (drive-copilot-approve-each,
+    // 0.377; every runtime's Approve each read the same).
+    const verb = !finished && shellCommands[0]?.settled !== true ? 'running' : 'ran'
+    const named = `${verb} ${onlyCommand.length > 60 ? `${onlyCommand.slice(0, 59)}…` : onlyCommand}`
     segments.push({
       key: 'commands',
       // The command's own exit code is on its ROW, so the line repeats it only

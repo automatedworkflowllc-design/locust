@@ -434,6 +434,17 @@ describe("Copilot CLI 1.0.83's stream, measured 2026-09-06", () => {
     expect(n.accept(rec({ type: "assistant.something_new", data: {} }))).toEqual([])
   })
 
+  it("says nothing of the tools Locust itself turned off, and still says any other notice once (0.378)", () => {
+    // Every run now excludes session_store_sql, and Copilot says so, verbatim
+    // (copilot 1.0.88, measured 2026-09-26). Shown, it was "Unhandled Copilot
+    // record" on every turn.
+    const n = fresh()
+    expect(n.accept(rec({ type: "session.info", data: { infoType: "configuration", message: "Disabled tools: session_store_sql" }, ephemeral: true }))).toEqual([])
+    const other = n.accept(rec({ type: "session.info", data: { infoType: "model", message: "Switched to another model" } }))
+    expect(other).toHaveLength(1)
+    expect(other[0]).toMatchObject({ type: "adapter.diagnostic", payload: { code: "copilot.unknown_event" } })
+  })
+
   it("names what view, glob and grep acted on", () => {
     const n = fresh()
     const view = n.accept(rec({ type: "tool.execution_start", data: { toolCallId: "c1", toolName: "view", arguments: { path: "README.md" } } }))

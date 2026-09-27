@@ -61,3 +61,14 @@ describe('how a route reads on a chip', () => {
     expect(shortRuntimeName('antigravity')).toBe('Antigravity')
   })
 })
+
+describe('a model the runtime picks for itself', () => {
+  it('says it is a model, never the bare word a mode is named (0.378)', () => {
+    // "Auto · running" over an Approve-each turn read as the Auto MODE
+    // (drive-copilot-approve-each, 0.377).
+    expect(modelDisplayName('copilot', 'auto')).toBe('Auto model')
+    expect(modelDisplayName('cursor', 'auto')).toBe('Auto model')
+    // Every other id is spelled as before.
+    expect(modelDisplayName('copilot', 'gpt-5.6-luna')).not.toContain('model')
+  })
+})

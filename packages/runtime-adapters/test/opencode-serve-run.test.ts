@@ -22,12 +22,14 @@ function fakeServer() {
   const calls: { url: string; auth: string | undefined; body: unknown }[] = [];
   let spawnedEnv: Readonly<Record<string, string>> | undefined;
   let spawnedArgs: readonly string[] = [];
+  let spawnedIn: string | undefined;
   let killed = false;
   let prompted!: () => void;
   const promptSent = new Promise<void>((resolve) => { prompted = resolve; });
-  const spawn = (_exe: string, args: readonly string[], env?: Readonly<Record<string, string>>): AppServerRunProcess => {
+  const spawn = (_exe: string, args: readonly string[], env?: Readonly<Record<string, string>>, cwd?: string): AppServerRunProcess => {
     spawnedArgs = args;
     spawnedEnv = env;
+    spawnedIn = cwd;
     return {
       write: () => undefined,
       kill: () => { killed = true; },
@@ -57,10 +59,23 @@ function fakeServer() {
     if (url.includes("/permission/")) return Response.json(true);
     return new Response(null, { status: 404 });
   }) as typeof fetch;
-  return { spawn, fetcher, calls, get env() { return spawnedEnv; }, get args() { return spawnedArgs; }, get killed() { return killed; } };
+  return { spawn, fetcher, calls, get env() { return spawnedEnv; }, get args() { return spawnedArgs; }, get cwd() { return spawnedIn; }, get killed() { return killed; } };
 }
 
 describe("OpenCode through its own server (A6.7)", () => {
+  it("starts the server IN the teammate's folder, never where the app itself stands (0.378)", async () => {
+    // A session made without naming a folder is the server's own folder's.
+    // Started with none, the server stood in the app's -- in real use its
+    // install directory -- and an approved edit would have landed there.
+    const server = fakeServer();
+    const command = createOpenCodeServeCommand(EXECUTABLE, { workspacePath: "C:/work/pebble" });
+    const run = startOpenCodeServeRun({ spawn: server.spawn, command, prompt: "hi", fetch: server.fetcher });
+    expect(command.cwd).toBe("C:/work/pebble");
+    expect(server.cwd).toBe("C:/work/pebble");
+    for await (const record of run.records) void record;
+    await run.completion;
+  });
+
   it("asks the person, sends their answer back, and reads as an ordinary OpenCode run", async () => {
     const server = fakeServer();
     const asked: OpenCodePermission[] = [];

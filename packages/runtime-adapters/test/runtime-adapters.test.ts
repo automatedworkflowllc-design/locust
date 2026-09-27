@@ -6,6 +6,7 @@ import {
   COPILOT_REQUIRED_FEATURES,
   createClaudePrintCommand,
   createCodexExecCommand,
+  createCopilotAcpCommand,
   createCopilotPromptCommand,
   createCursorPrintCommand,
   createGeminiPrintCommand,
@@ -1250,8 +1251,20 @@ describe("OpenCode and Copilot CLI commands", () => {
     expect(spec.stdin).toBe("none");
     expect(spec.args).toEqual([
       "-p", PROMPT, "--output-format", "json", "--allow-all-tools", "--no-color",
-      "--deny-tool=write,shell", "--session-id", "uuid-1",
+      "--excluded-tools=session_store_sql", "--deny-tool=write,shell", "--session-id", "uuid-1",
     ]);
+  });
+
+  it("never offers a Copilot teammate the machine's other Copilot conversations, on either route (0.378)", () => {
+    // `session_store_sql` reads every Copilot session on the machine, and runs
+    // without asking: measured answering a cold follow-up from an unrelated one.
+    for (const spec of [
+      createCopilotPromptCommand(copilot, { workspacePath, prompt: PROMPT, sessionId: "uuid-1" }),
+      createCopilotPromptCommand(copilot, { workspacePath, prompt: PROMPT, sandbox: "full-access", resumeThreadId: "uuid-1" }),
+      createCopilotAcpCommand(copilot, { workspacePath }),
+    ]) {
+      expect(spec.args).toContain("--excluded-tools=session_store_sql");
+    }
   });
 
   it("lets a workspace-write Copilot mission edit, and resumes by the id the host minted", () => {

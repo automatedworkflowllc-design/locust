@@ -1530,6 +1530,21 @@ export function createOpenCodeServeCommand(
 }
 
 /**
+ * Copilot's tools that a Locust teammate is never given (0.378).
+ *
+ * `session_store_sql` queries Copilot's LOCAL SESSION STORE -- every Copilot
+ * conversation on the machine, not only this teammate's -- and Copilot marks
+ * it safe, so it runs without asking, even in Approve each. MEASURED
+ * 2026-09-26 (drive-copilot-approve-each, first run): a cold follow-up made
+ * twelve calls to it and answered with a word from an unrelated session. A
+ * teammate knows its own conversation; the person's other Copilot history
+ * does not belong in a Locust thread, or a room. Excluded, the model is not
+ * offered the tool at all -- rather than asking for it and being refused.
+ */
+export const COPILOT_EXCLUDED_TOOLS = ["session_store_sql"] as const;
+const COPILOT_EXCLUDED = `--excluded-tools=${COPILOT_EXCLUDED_TOOLS.join(",")}`;
+
+/**
  * GitHub Copilot CLI, non-interactive.
  *
  * `--allow-all-tools` is not a bypass here, it is the only way to run without
@@ -1556,6 +1571,7 @@ export function createCopilotPromptCommand(
     "--allow-all-tools",
     // Colour codes would land in the JSON strings this adapter parses.
     "--no-color",
+    COPILOT_EXCLUDED,
   ];
   if (sandboxArgument(options.sandbox) === "read-only") {
     args.push("--deny-tool=write,shell");
@@ -1603,7 +1619,7 @@ export function createCopilotAcpCommand(
   executable: ExecutableLaunch,
   options: RuntimeCommandOptions,
 ): RuntimeCommandSpec {
-  const args = ["--acp"];
+  const args = ["--acp", COPILOT_EXCLUDED];
   if (options.model !== undefined) {
     args.push("--model", requireText(options.model, "Model"));
   }

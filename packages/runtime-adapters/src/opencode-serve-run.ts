@@ -43,7 +43,19 @@ export type OpenCodePermissionReply = "once" | "always" | "reject";
 export type OpenCodePermissionAnswer = OpenCodePermissionReply | { readonly reply: "reject"; readonly message: string };
 
 export interface OpenCodeServeRunOptions {
-  readonly spawn: (executablePath: string, args: readonly string[], env?: Readonly<Record<string, string>>) => AppServerRunProcess;
+  /**
+   * Started IN the teammate's folder (0.378). A session made without naming
+   * a folder is the server's own folder's, and a server started with none
+   * stood where the app stands -- in real use its install directory, which
+   * the app refuses as a workspace. Every drive passed anyway, because the
+   * drives launched the app IN the workspace (drive-lib `launchElsewhere`).
+   */
+  readonly spawn: (
+    executablePath: string,
+    args: readonly string[],
+    env?: Readonly<Record<string, string>>,
+    cwd?: string,
+  ) => AppServerRunProcess;
   readonly command: RuntimeCommandSpec;
   readonly prompt: string;
   /** `provider/model`, as every other OpenCode route names it. */
@@ -117,10 +129,15 @@ export function startOpenCodeServeRun(options: OpenCodeServeRunOptions): Runtime
   const roles = new Map<string, string>();
   const emitted = new Set<string>();
 
-  const child = options.spawn(options.command.executablePath, options.command.args, {
-    ...(options.command.env ?? {}),
-    OPENCODE_SERVER_PASSWORD: password,
-  });
+  const child = options.spawn(
+    options.command.executablePath,
+    options.command.args,
+    {
+      ...(options.command.env ?? {}),
+      OPENCODE_SERVER_PASSWORD: password,
+    },
+    options.command.cwd,
+  );
 
   const finish = (): void => {
     if (settled) return;

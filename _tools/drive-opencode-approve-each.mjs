@@ -22,16 +22,27 @@ const outPath = tag === undefined ? undefined : join(recordRoot('beta-fixes-2026
 if (outPath !== undefined) await mkdir(outPath, { recursive: true })
 
 const workspace = await scratchRepository('locust-drive-oc-approve-ws-')
+// The free model, by default the one the drive was written on; Ling is often busy.
+const MODEL = process.env.LOCUST_FREE_MODEL ?? 'opencode/ling-3.0-flash-fin-free'
+/*
+ * LAUNCHED ELSEWHERE (0.378). Launched IN the workspace, this drive passed
+ * while OpenCode's server was started with no folder of its own: it stood
+ * where the app stood, and the drive stood the app in the workspace. A real
+ * launch stands in the install directory. So the app stands in its profile
+ * folder here, and the file the approved command writes is looked for in
+ * BOTH places -- the workspace, where it belongs, and the app's own folder.
+ */
 const drive = await startDrive({
   ...(packaged === undefined ? {} : { packaged }),
   ...(outPath === undefined ? {} : { outPath }),
   name: 'opencode-approve-each',
   port: 9321,
   workspace,
+  launchElsewhere: true,
   seed: {
     schemaVersion: 1,
     teammates: [
-      { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: '2026-09-25T05:00:00.000Z', route: { runtime: 'opencode', model: 'opencode/ling-3.0-flash-fin-free', mode: 'accept-edits' } }
+      { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: '2026-09-25T05:00:00.000Z', route: { runtime: 'opencode', model: MODEL, mode: 'accept-edits' } }
     ],
     missionOwners: {},
     settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: false }
@@ -88,19 +99,23 @@ const ask = (text, answer) => `(async () => {
 })()`
 
 try {
-  await drive.capture('Wren on the free Ling: Approve each chosen', async () => {
+  await drive.capture(`Wren on ${MODEL}: Approve each chosen`, async () => {
     await drive.ready()
     await drive.evaluate(openTeammateScript('Wren'))
     return drive.evaluate(MODE)
   })
   await drive.capture('a shell command, approved once', () =>
     drive.evaluate(ask('Run exactly this shell command with your bash tool: echo APPROVED-RUN > approved.txt   Then reply with one sentence saying whether it ran.', 'approve')))
-  await drive.capture('the file the approved command wrote', () => `approved.txt: ${existsSync(join(workspace, 'approved.txt')) ? 'PRESENT' : 'ABSENT'}`)
+  const inWorkspace = existsSync(join(workspace, 'approved.txt'))
+  const inAppFolder = existsSync(join(drive.profile, 'approved.txt'))
+  await drive.capture('where the approved command wrote its file', () =>
+    `in the workspace: ${inWorkspace ? 'PRESENT' : 'ABSENT'} · where the app stands: ${inAppFolder ? 'PRESENT' : 'ABSENT'}`)
+  say(`  [${inWorkspace && !inAppFolder ? 'PASS' : 'FAIL'}] the approved command ran IN the workspace, not where the app stands`)
   await drive.capture('a shell command, declined', () =>
     drive.evaluate(ask('Run exactly this shell command with your bash tool: echo DENIED-RUN > denied.txt   If it is declined, do not try another way; say so in one sentence.', 'deny')))
   await drive.capture('the file the declined command would have written', () => `denied.txt: ${existsSync(join(workspace, 'denied.txt')) ? 'PRESENT' : 'ABSENT'}`)
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
-  await drive.finish({ intro: `Build: ${packaged ?? 'whatever pnpm build last wrote to out/'}. Wren on OpenCode / the free Ling, Approve each action; one shell command approved once, one declined.` })
+  await drive.finish({ intro: `Build: ${packaged ?? 'whatever pnpm build last wrote to out/'}. Wren on OpenCode / ${MODEL}, Approve each action, the app launched outside the workspace; one shell command approved once, one declined.` })
 }

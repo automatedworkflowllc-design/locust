@@ -144,6 +144,9 @@ describe('Copilot runs Approve-each over ACP, held to the mode that asks', () =>
   it('the host starts the agent IN its folder, and admits the mode for Copilot', async () => {
     const main = await read('index.ts')
     expect(main).toContain('acpSpawn: (executablePath, args, env, cwd) => spawnAppServer(executablePath, args, env, cwd)')
+    // And OpenCode's server too (0.378): it was started with no folder, so
+    // it stood in the app's own -- the install directory, in real use.
+    expect(main).toContain('opencodeServeSpawn: (executablePath, args, env, cwd) => spawnAppServer(executablePath, args, env, cwd)')
     expect(main).toContain("runtime !== 'codex' && runtime !== 'opencode' && runtime !== 'copilot'")
   })
 })

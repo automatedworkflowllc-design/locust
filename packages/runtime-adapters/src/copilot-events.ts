@@ -555,6 +555,15 @@ export function createCopilotEventNormalizer(
       return [];
     }
 
+    // Copilot narrating its own configuration -- "Disabled tools:
+    // session_store_sql", the exclusion Locust asks for on every run (0.378;
+    // measured, copilot 1.0.88). Only this kind: any other `session.info`
+    // might be something the person needs, and keeps the one line an unknown
+    // record gets below.
+    if (type === "session.info" && stringValue(data.infoType) === "configuration") {
+      return [];
+    }
+
     if (type === "result") {
       sawResult = true;
       // The CLI's own session id, and the only place it prints one. It is the
