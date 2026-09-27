@@ -109,6 +109,7 @@ import type { TeamTemplate } from '../../shared/team-templates.js'
 import { GroupSettingsDialog } from './components/GroupSettingsDialog.js'
 import { TeammateBot } from './components/TeammateBot.js'
 import { RuntimeMark } from './components/RuntimeMark.js'
+import { OpenInTerminalButton, terminalOffer } from './components/OpenInTerminal.js'
 import { Sidebar } from './components/Sidebar.js'
 import type { SidebarMission } from './components/Sidebar.js'
 import { ContextMenu } from './components/ContextMenu.js'
@@ -4671,6 +4672,28 @@ export default function App(): ReactElement {
     return () => window.clearTimeout(clear)
   }, [rowNotice])
   /*
+   * Why a conversation did not open in a terminal (0.387), said where the
+   * delete refusal is said, and gone on its own: it answers one press.
+   */
+  const [terminalError, setTerminalError] = useState<string>()
+  useEffect(() => {
+    if (terminalError === undefined) return
+    const clear = window.setTimeout(() => setTerminalError(undefined), 8_000)
+    return () => window.clearTimeout(clear)
+  }, [terminalError])
+  const openConversationInTerminal = (missionId: string): void => {
+    setTerminalError(undefined)
+    const bridge = window.desktop
+    if (bridge === undefined) return
+    void bridge
+      .openInTerminal(missionId)
+      .then((answer) => {
+        if (answer.ok) setRowNotice(`Opened in ${answer.where}. Locust won't see what happens there.`)
+        else setTerminalError(answer.message)
+      })
+      .catch(() => setTerminalError('The terminal could not be opened. The conversation is here, as it was.'))
+  }
+  /*
    * The trash, from the window's side.
    *
    * A restore has to put the conversation back where a person looks for it,
@@ -5113,6 +5136,26 @@ export default function App(): ReactElement {
    * no button at all.
    */
   const headerActions: ContextMenuItem[] = []
+  /*
+   * `</>` Open in terminal (0.387; components/OpenInTerminal.tsx): the header
+   * button, and the same action first in the ... menu.
+   */
+  const terminalMissionId = liveRun?.data?.missionId ?? liveRun?.restoredMission?.missionId
+  const shownTerminal =
+    liveRun === undefined
+      ? undefined
+      : terminalOffer({
+          runtime: liveRun.data?.runtime ?? liveRun.runtime,
+          model: liveRun.data?.model,
+          missionId: terminalMissionId,
+          running,
+          // `missionOwner` is declared further down; the same lookup, here.
+          teammateName: teammates.find((teammate) => teammate.teammateId === ownerOf(liveRun))?.name
+        })
+  if (shownTerminal !== undefined && shownTerminal.disabled === undefined && terminalMissionId !== undefined) {
+    const id = terminalMissionId
+    headerActions.push({ label: `Open in terminal (${shownTerminal.runtimeName})`, onSelect: () => openConversationInTerminal(id) })
+  }
   if (liveRun !== undefined && !running) {
     for (const reviewer of reviewersFor(liveRun)) {
       headerActions.push({
@@ -6100,6 +6143,9 @@ export default function App(): ReactElement {
                     * menu: `Ask Yurt for a review` is one click instead of
                     * two and says who it goes to before you commit.
                     */}
+                  {shownTerminal !== undefined && terminalMissionId !== undefined && (
+                    <OpenInTerminalButton offer={shownTerminal} onOpen={() => openConversationInTerminal(terminalMissionId)} />
+                  )}
                   {headerActions.length > 0 && (
                     <button
                       type="button"
@@ -6333,6 +6379,12 @@ export default function App(): ReactElement {
             <div className="lc-diagnostic lc-tone-red" role="alert">
               <Icon name="shield" size={12} />
               <span>{deleteError}</span>
+            </div>
+          )}
+          {terminalError !== undefined && (
+            <div className="lc-diagnostic lc-tone-amber" role="alert">
+              <Icon name="code" size={12} />
+              <span>{terminalError}</span>
             </div>
           )}
           {rowNotice !== undefined && (

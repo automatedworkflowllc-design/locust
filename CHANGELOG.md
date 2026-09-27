@@ -11,6 +11,20 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.387.0 - 2026-09-27
+
+### New
+
+- **Open a conversation in its own terminal.** The new `</>` button in a
+  conversation's header (and the same action in the ⋯ menu) opens that
+  session in the agent's own terminal app: Claude Code, Codex, Copilot,
+  Cursor, OpenCode or Muse Code. It opens in the teammate's folder, and in
+  Windows Terminal when you have it.
+  - Locust won't see what you do there, and the terminal runs with the
+    agent's own permissions, not the conversation's mode.
+  - It's available once a reply has finished.
+  - Antigravity conversations stay in Antigravity's own window.
+
 ## 0.386.0 - 2026-09-27
 
 ### Improved

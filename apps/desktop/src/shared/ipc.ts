@@ -572,6 +572,18 @@ export const RUNTIME_SIGN_IN_CHANNEL = 'runtime:sign-in'
 export type RuntimeSignInResponse =
   | { readonly ok: true }
   | { readonly ok: false; readonly what: string; readonly next: string }
+
+/**
+ * Open a conversation in its runtime's own terminal interface: the same
+ * session, in the teammate's folder (0.387). The renderer names a mission;
+ * the host finds its session in the ledger, its folder from the roster and
+ * its program from discovery. See `main/open-in-terminal.ts`.
+ */
+export const OPEN_IN_TERMINAL_CHANNEL = 'mission:open-in-terminal'
+
+export type OpenInTerminalResponse =
+  | { readonly ok: true; readonly where: 'Windows Terminal' | 'a console window' }
+  | { readonly ok: false; readonly message: string }
 export const WORKSPACE_SETTINGS_READ_CHANNEL = 'workspace-settings:read'
 export const WORKSPACE_SETTINGS_WRITE_CHANNEL = 'workspace-settings:write'
 export const WORKSPACE_CHOOSE_CHANNEL = 'workspace:choose'
@@ -2478,6 +2490,8 @@ export interface DesktopApi {
   onRuntimeUpdates(listener: (state: RuntimeUpdatesState) => void): () => void
   /** Open the runtime's sign-in in its own window. */
   signInRuntime(runtime: string): Promise<RuntimeSignInResponse>
+  /** Open this conversation's session in its runtime's own terminal (0.387). */
+  openInTerminal(missionId: string): Promise<OpenInTerminalResponse>
   readWorkspaceSettings(): Promise<WorkspaceSettings>
   /** Pick the folder the teammates work in. Reopens the app there on success. */
   chooseWorkspace(): Promise<WorkspaceChooseResponse>

@@ -30,6 +30,7 @@ import {
   RUNTIME_ARTIFACTS_CHANNEL,
   RUNTIME_INSTALL_CHANNEL,
   RUNTIME_SIGN_IN_CHANNEL,
+  OPEN_IN_TERMINAL_CHANNEL,
   RUNTIME_INSTALL_PROGRESS_CHANNEL,
   RUNTIME_UPDATES_CHANNEL,
   RUNTIME_UPDATES_EVENT_CHANNEL,
@@ -168,7 +169,8 @@ import type {
   RuntimeInstallProgress,
   RuntimeUpdatesState,
   RuntimeInstallResponse,
-  RuntimeSignInResponse
+  RuntimeSignInResponse,
+  OpenInTerminalResponse
 } from '../shared/ipc.js'
 import { ROUTINE_RECOVERY_CHANNEL } from '../shared/routine-recovery.js'
 import type { RoutineRecoveryRequest, RoutineRecoveryResponse } from '../shared/routine-recovery.js'
@@ -301,6 +303,8 @@ const desktopApi: DesktopApi = {
     ipcRenderer.invoke(RUNTIME_INSTALL_CHANNEL, runtime) as Promise<RuntimeInstallResponse>,
   signInRuntime: (runtime: string) =>
     ipcRenderer.invoke(RUNTIME_SIGN_IN_CHANNEL, runtime) as Promise<RuntimeSignInResponse>,
+  openInTerminal: (missionId: string) =>
+    ipcRenderer.invoke(OPEN_IN_TERMINAL_CHANNEL, missionId) as Promise<OpenInTerminalResponse>,
   onRuntimeInstallProgress: (listener: (progress: RuntimeInstallProgress) => void) => {
     const handler = (_event: unknown, progress: RuntimeInstallProgress): void => listener(progress)
     ipcRenderer.on(RUNTIME_INSTALL_PROGRESS_CHANNEL, handler)

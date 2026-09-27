@@ -28,7 +28,8 @@ import { basename, dirname, join } from 'node:path'
 import { release } from 'node:os'
 import { execFile } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
-import { MAX_PROMPT_LENGTH, createCodexMissionService } from './codex-mission.js'
+import { MAX_PROMPT_LENGTH, createCodexMissionService, runtimeThreadIdOf } from './codex-mission.js'
+import { openInTerminal, terminalRequestFor } from './open-in-terminal.js'
 import { approvalAnswerFrom, createApprovalChannel } from './approval-channel.js'
 import { PeerRecordError } from './peer-exchange.js'
 import { readNpmBinDirectory } from './npm-prefix.js'
@@ -153,6 +154,7 @@ import {
   RUNTIME_UPDATES_SET_CHANNEL,
   RUNTIME_INSTALL_PROGRESS_CHANNEL,
   RUNTIME_SIGN_IN_CHANNEL,
+  OPEN_IN_TERMINAL_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
   TEAMMATE_RENAME_MISSION_CHANNEL,
   GROUP_LIST_CHANNEL,
@@ -2722,6 +2724,42 @@ if (!ownsSingleInstanceLock) {
           error: { code: 'REJECTED', message: error instanceof Error ? error.message : 'That folder could not be saved.' }
         } as const
       }
+    })
+
+    /*
+     * A conversation, in its runtime's own terminal (0.387; open-in-terminal.ts).
+     *
+     * The window names a mission and nothing else. The session comes from
+     * that mission's own record, the folder from its teammate the way a run
+     * finds it (peerContextFor), and the program from discovery -- so the
+     * only words that reach the terminal are the runtime's own resume flag
+     * and a session id checked to be a plain token.
+     */
+    ipcMain.handle(OPEN_IN_TERMINAL_CHANNEL, async (event, requested: unknown) => {
+      if (!fromOwnWindow(event) || typeof requested !== 'string' || requested.length === 0 || requested.length > 128) {
+        return { ok: false, message: 'That conversation cannot be opened in a terminal.' } as const
+      }
+      const request = await terminalRequestFor(requested, {
+        liveMissionIds: () => [...codexMissions.liveMissionIds(), ...antigravityMissions.liveMissionIds()],
+        getMission: async (missionId) => {
+          const mission = await missionLedger.getMission(missionId)
+          return mission === undefined ? undefined : { runtime: mission.metadata.runtime, model: mission.metadata.model, session: runtimeThreadIdOf(mission) }
+        },
+        ownerOf: async (missionId) => {
+          const [owners, roster] = await Promise.all([teammates.missionOwners(), teammates.list()])
+          const owner = roster.find((entry) => entry.teammateId === owners[missionId])
+          return owner === undefined ? undefined : { teammateId: owner.teammateId, name: owner.name }
+        },
+        cwdFor: async (teammateId) => (await peerContextFor(teammateId))?.cwd,
+        workspacePath,
+        launchFor: async (runtime) => (await discoverForWork()).find((entry) => entry.id === runtime)?.executable
+      })
+      if ('refused' in request) return { ok: false, message: request.refused } as const
+      return openInTerminal(request, {
+        ...(process.env.LOCALAPPDATA === undefined ? {} : { localAppData: process.env.LOCALAPPDATA }),
+        // The drives' seam: a console window is one they can find and close.
+        ...(process.env.LOCUST_TERMINAL === 'console' ? { prefer: 'console' as const } : {})
+      })
     })
 
     ipcMain.handle(WORKSPACE_CHOOSE_CHANNEL, async (event) => {
