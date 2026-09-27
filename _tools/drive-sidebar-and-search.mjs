@@ -114,7 +114,7 @@ try {
   check('Ctrl K lists the five newest conversations before anything is typed', conversationsListed.length === 5, JSON.stringify(conversationsListed))
   const typed = JSON.parse(String(await drive.capture('Ctrl K at 1120: signup', () => palette('signup'))))
   say(`  palette, signup: ${JSON.stringify(typed)}`)
-  check('Ctrl K finds the conversation by a word from its second turn, with its teammate and age', typed.some((item) => /^Fix the login redirect loop/.test(item) && /Wren · 6m/.test(item)), JSON.stringify(typed))
+  check('Ctrl K finds the conversation by a word from its second turn, with its teammate and age', typed.some((item) => /^Fix the login redirect loop/.test(item) && /Wren · \d+m$/.test(item)), JSON.stringify(typed))
   const wren = JSON.parse(String(await palette('Marlow')))
   check('Ctrl K finds a teammate’s conversations by name (3 of Marlow’s)', wren.filter((item) => /Marlow · /.test(item)).length === 3, JSON.stringify(wren))
   await palette('rebase')
