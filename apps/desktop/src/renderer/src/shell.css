@@ -11910,29 +11910,14 @@ textarea {
 }
 
 /*
- * The liquid's source: unstyled, its surface and shadow are the blob the
- * library draws from its box (the page's `.sl-thumb`). Smaller than the thumb
- * on purpose -- the blob of a 12 x 16 box under a 6px goo blur comes out about
- * 10 x 12, so at rest it and its shadow are covered by the thumb, and only
- * the part that lags behind a moving thumb shows.
- */
-.lc-effortpanel__drop {
-  position: absolute;
-  left: 0;
-  top: 2px;
-  width: 12px;
-  height: 16px;
-  border-radius: 6px;
-  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-/*
  * THE THUMB: Claude Code's, measured off Colin's frame of it (2026-09-24) --
- * white, a rounded rectangle 16 x 20 with 4px corners, the track's full
- * height, and a soft shadow that darkens the fill for about 10px either side.
- * Drawn, not melted: it lies over the liquid, which only shows as the tail it
- * leaves (EffortSlider). It glides with the fill on a key or a let-go, and
- * is under the pointer, with no ease, while held.
+ * a rounded rectangle 16 x 20 with 4px corners, the track's full height.
+ * ONE thumb (0.378, Colin: "we gotta pick one"): this box is the shape the
+ * liquid paints, white with its shadow (the Liquid's fill and shadow, from
+ * the same tokens), and nothing paints it besides -- a crisp rectangle over
+ * the goo was two things at once. It glides with the fill on a key or a
+ * let-go, and is under the pointer, with no ease, while held; moved, the
+ * liquid stretches after it.
  */
 .lc-effortpanel__thumb {
   position: absolute;
@@ -11941,14 +11926,11 @@ textarea {
   width: 16px;
   height: 20px;
   border-radius: 4px;
-  background: var(--lc-effort-thumb);
-  box-shadow: var(--lc-effort-thumb-lift);
   pointer-events: none;
   transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.lc-effortpanel__scale.is-held .lc-effortpanel__thumb,
-.lc-effortpanel__scale.is-held .lc-effortpanel__drop {
+.lc-effortpanel__scale.is-held .lc-effortpanel__thumb {
   transition: none;
 }
 

@@ -7,14 +7,22 @@
 // uses. Wren on Copilot (auto), in Approve each:
 //
 //   1. a shell command, approved once -- it must run, and in the folder;
-//   2. one denied with a reason typed by real key events -- it must not run,
-//      the call must read refused, and the reason must reach Copilot as its
-//      next prompt (ACP's answer has no room for one);
-//   3. the next message in Ask -- Copilot's print route -- must continue the
-//      same session, knowing what the reason asked for.
+//   2. the next message, in the same mode: a NEW Copilot process that loads
+//      the session (`session/load`). Its command is denied with a reason
+//      typed by real key events -- it must not run, the call must read
+//      refused, and the reason must reach Copilot as its next prompt (ACP's
+//      answer has no room for one). The reason asks for a word AND, from
+//      memory, what the first command wrote: the answer proves the session
+//      was loaded, since nothing else in this process knows it.
 //
-// Four premium requests: the approved turn, the denied turn, the reason sent
-// on, the follow-up. Any card after the first denial is denied too.
+// A message in ANOTHER mode is not tried: a changed mode starts the session
+// cold, by design, for every runtime (codex-mission.ts, "a changed mode
+// starts cold rather than resuming"). The 0.377 build's first run of this
+// drive tried it, and the answer came from Copilot searching its own
+// history instead.
+//
+// Three premium requests: the approved turn, the denied turn, the reason sent
+// on. Any card after the first denial is denied too.
 
 import { existsSync, readFileSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
@@ -50,6 +58,16 @@ let failures = 0
 const check = (what, ok, detail) => {
   if (!ok) failures += 1
   say(`  [${ok ? 'PASS' : 'FAIL'}] ${what}${detail === undefined ? '' : ` -- ${detail}`}`)
+}
+
+/**
+ * A file as text. Copilot's shell on Windows is PowerShell, whose `>` writes
+ * UTF-16 with a byte-order mark: read as UTF-8, a file that said the right
+ * thing failed the check (this drive's first run, on 0.377).
+ */
+const textOf = (path) => {
+  const bytes = readFileSync(path)
+  return bytes[0] === 0xff && bytes[1] === 0xfe ? bytes.subarray(2).toString('utf16le') : bytes.toString('utf8')
 }
 
 const CARD = `document.querySelector('[role=group][aria-label="Approval required"]')`
@@ -112,24 +130,6 @@ const answerUntilEnd = (answer) => `(async () => {
   return String(cards.length) + ' more card(s) ${answer === 'approve' ? 'approved' : 'denied'}' + (cards.length === 0 ? '' : ': ' + cards.join(' ;; ')) + ' || thread: ' + ${THREAD}.slice(-360)
 })()`
 
-/** Wait for a run started in Ask to end, with no card expected. */
-const sendAndWaitForEnd = (text) => `(async () => {
-  const field = document.querySelector('form.command-dock textarea')
-  const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
-  setter.call(field, ${JSON.stringify(text)})
-  field.dispatchEvent(new Event('input', { bubbles: true }))
-  for (let i = 0; i < 120; i += 1) {
-    await new Promise((r) => setTimeout(r, 250))
-    const button = document.querySelector('button[aria-label="Start mission"]')
-    if (button && !button.disabled) { button.click(); break }
-  }
-  for (let i = 0; i < 900; i += 1) {
-    await new Promise((r) => setTimeout(r, 400))
-    if (i > 8 && !${RUNNING}) break
-  }
-  await new Promise((r) => setTimeout(r, 900))
-  return ${THREAD}.slice(-360)
-})()`
 
 try {
   await drive.ready()
@@ -151,7 +151,10 @@ try {
   })()`))
   const afterApprove = String(await drive.capture('after approving once', () => drive.evaluate(answerUntilEnd('approve'))))
   const written = join(workspace, 'approved.txt')
-  check('the approved command ran, in the folder', existsSync(written) && readFileSync(written, 'utf8').includes('LOCUST-ACP-OK'), `${approvedOnce} || ${existsSync(written) ? readFileSync(written, 'utf8').trim() : 'no approved.txt in the folder'} || ${afterApprove.slice(-160)}`)
+  check('the approved command ran, in the folder', existsSync(written) && textOf(written).includes('LOCUST-ACP-OK'), `${approvedOnce} || ${existsSync(written) ? textOf(written).trim() : 'no approved.txt in the folder'} || ${afterApprove.slice(-160)}`)
+  // How many times the thread says it so far: the second turn's answer must add one.
+  const oks = async () => (String(await drive.evaluate(THREAD)).match(/LOCUST-ACP-OK/g) ?? []).length
+  const oksBefore = await oks()
 
   // 2. Denied, with a reason typed by real key events.
   const askedAgain = String(await drive.capture('Copilot asks before the second command', () =>
@@ -165,7 +168,7 @@ try {
     return JSON.stringify({ field: field !== null, focused: document.activeElement === field })
   })()`))
   check('Deny… opens the reason’s line, focused', JSON.parse(opened).field === true && JSON.parse(opened).focused === true, opened)
-  const REASON = 'Do not write that file. Reply with the single word PEAR instead.'
+  const REASON = 'Do not write that file. Reply with the word PEAR, then, from memory and without running anything, the exact text the first command wrote.'
   for (const character of REASON) await drive.send('Input.insertText', { text: character })
   await sleep(300)
   await drive.capture('the reason, typed on the card', () => drive.evaluate(`(() => ${CARD}?.querySelector('.lc-approval__reason')?.value ?? '')()`))
@@ -174,22 +177,16 @@ try {
   const afterDeny = String(await drive.capture('Copilot, after the reason', () => drive.evaluate(answerUntilEnd('deny'))))
   check('the denied command did not run', !existsSync(join(workspace, 'denied.txt')), afterDeny.slice(0, 120))
   check('the reason reached Copilot as its next prompt: it answered PEAR', /\bPEAR\b/i.test(afterDeny), afterDeny.slice(-240))
-  const fold = String(await drive.evaluate(`(() => (document.querySelector('.lc-activity')?.innerText ?? '').replace(/[ ]+/g, ' '))()`))
+  // Nothing in this second process knew the first turn but the loaded session.
+  const oksAfter = await oks()
+  check('and it remembered the first turn from memory: the session was loaded', oksAfter > oksBefore, `${String(oksBefore)} -> ${String(oksAfter)} || ${afterDeny.slice(-200)}`)
+  // The LAST turn's fold: the first one's is the approved command.
+  const fold = String(await drive.evaluate(`(() => ([...document.querySelectorAll('.lc-activity')].at(-1)?.innerText ?? '').replace(/[ ]+/g, ' '))()`))
   check('the denied call reads refused or declined, and nothing failed', /(declined|refused)/i.test(fold) && !/(failed|exited non-zero)/i.test(fold), fold.slice(0, 240))
-
-  // 3. The next message, in Ask: Copilot's print route, on the same session.
-  // Counted in the whole thread before and after: the follow-up's own words never say PEAR.
-  const pears = async () => (String(await drive.evaluate(THREAD)).match(/\bPEAR\b/gi) ?? []).length
-  const pearsBefore = await pears()
-  const askMode = String(await drive.evaluate(chooseMode('Ask')))
-  const followUp = String(await drive.capture('the next message, in Ask, on the same session', () =>
-    drive.evaluate(sendAndWaitForEnd('Earlier, after I declined a command, I asked you to reply with a single word. Which word was it? Reply with just the word.'))))
-  const pearsAfter = await pears()
-  check('in Ask (the print route) the session continues: it remembers the word', /^mode: Ask/.test(askMode) && pearsAfter > pearsBefore, `${askMode} || ${followUp.slice(-200)}`)
 
   say(failures === 0 ? '\nCOPILOT APPROVE EACH PASSED' : `\nCOPILOT APPROVE EACH: ${String(failures)} FAILED`)
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
-  await drive.finish({ intro: `Build: ${packaged ?? 'whatever pnpm build last wrote to out/'}. Wren on Copilot (auto), Approve each over ACP: one command approved once, one denied with a typed reason, then a follow-up in Ask on the print route.` })
+  await drive.finish({ intro: `Build: ${packaged ?? 'whatever pnpm build last wrote to out/'}. Wren on Copilot (auto), Approve each over ACP: one command approved once; then, in a new process that loads the session, one denied with a typed reason that asks for a word and what the first command wrote.` })
 }

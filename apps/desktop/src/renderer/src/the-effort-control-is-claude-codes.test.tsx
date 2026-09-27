@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
-import { DROP_WIDTH, EFFORT_TRACK_WIDTH, EffortSlider, stopPosition, THUMB_WIDTH } from './components/EffortSlider.js'
+import { EFFORT_TRACK_WIDTH, EffortSlider, MOVE, stopPosition, THUMB_WIDTH } from './components/EffortSlider.js'
 import { effortName } from './effortLevels.js'
 
 /**
@@ -64,15 +64,25 @@ describe('the control', () => {
     expect(stopPosition(4, 5)).toBeLessThan(EFFORT_TRACK_WIDTH)
     expect(stopPosition(0, 5) + stopPosition(4, 5)).toBeCloseTo(EFFORT_TRACK_WIDTH)
     expect(stopPosition(0, 1)).toBe(EFFORT_TRACK_WIDTH / 2)
-    // The thumb, and the drop the liquid is made from, both centred on the level.
+    // The thumb, centred on the level.
     expect(draw({ index: 2 })).toContain(`translateX(${String(stopPosition(2, 5) - THUMB_WIDTH / 2)}px)`)
-    expect(draw({ index: 2 })).toContain(`translateX(${String(stopPosition(2, 5) - DROP_WIDTH / 2)}px)`)
   })
 
-  it("draws the thumb over the liquid, not as it (Colin, 2026-09-24: \"our white ball/square is off\")", () => {
-    // The drop is inside the liquid; the thumb is the next thing after the
-    // liquid closes -- a crisp element, so the goo's blur cannot round it.
-    expect(draw()).toMatch(/lc-effortpanel__liquid[\s\S]*lc-effortpanel__drop[\s\S]*<\/div><span class="lc-effortpanel__thumb"/)
+  it('has ONE thumb, and it is the liquid (Colin, 2026-09-26: "we gotta pick one")', () => {
+    // 0.377 drew a crisp rectangle over the liquid, and the liquid showed
+    // behind it as a second, gooey shape. The thumb is now inside the
+    // liquid -- the box it paints -- and there is no other.
+    const html = draw()
+    expect(html).toMatch(/lc-effortpanel__liquid[\s\S]*<span class="lc-effortpanel__thumb"/)
+    expect(html.match(/lc-effortpanel__thumb/g)).toHaveLength(1)
+    expect(html).not.toContain('lc-effortpanel__drop')
+  })
+
+  it('leaves no tail (Colin, 2026-09-26: "if you cant make the main asset gooey thats fine but no tail")', () => {
+    // The library's tail is a second circle chasing the thumb. The liquid is
+    // all in the thumb's own squash and stretch.
+    expect(MOVE.trail).toBe(0)
+    expect(MOVE.stretch).toBeGreaterThan(0)
   })
 
   it('is a real range input over the track: the browser keeps its keys, its snapping and its name', () => {

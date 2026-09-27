@@ -19,8 +19,14 @@ heading: the home screen then shows it once, as a splash.
   teammate and it stops before every command and edit it makes, on the
   same card Codex and OpenCode use: approve it once, approve it for the
   rest of the run, or deny it and say why. Copilot reads your reason the
-  moment the step it was on ends. A conversation can move between Approve
-  each and Copilot's other modes and keep its whole thread.
+  moment the step it was on ends.
+
+### Fixed
+
+- **One thumb on the effort slider.** It had become two things at once: a
+  crisp rectangle, with a gooey blob showing behind it whenever it moved.
+  The thumb is now the liquid itself, in the same shape, so when you drag
+  it, the thumb you are holding is what stretches and pours.
 
 ## 0.376.0 - 2026-09-26
 

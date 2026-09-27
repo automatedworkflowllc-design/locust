@@ -27,13 +27,16 @@ const px = (block: string, property: string): number => {
 }
 const token = (name: string): string => new RegExp(`${name}:\\s*([^;]+);`).exec(tokens)?.[1]?.trim() ?? ''
 
+const slider = readFileSync(fileURLToPath(new URL('../renderer/src/components/EffortSlider.tsx', import.meta.url)), 'utf8')
+
 describe("the effort thumb", () => {
-  it("is Claude Code's: a white rounded rectangle, 16 x 20, 4px corners", () => {
+  it("is Claude Code's: a white rounded rectangle, 16 x 20, 4px corners -- painted by the liquid", () => {
     const thumb = rule('.lc-effortpanel__thumb')
     expect(px(thumb, 'width')).toBe(16)
     expect(px(thumb, 'height')).toBe(20)
     expect(px(thumb, 'border-radius')).toBe(4)
-    expect(thumb).toContain('background: var(--lc-effort-thumb)')
+    // The liquid paints this box, white, from the token; the box itself is not painted.
+    expect(slider).toContain("fill: style.getPropertyValue('--lc-effort-thumb')")
     expect(token('--lc-effort-thumb')).toBe('#ffffff')
   })
 
@@ -42,13 +45,15 @@ describe("the effort thumb", () => {
     expect(px(rule('.lc-effortpanel__thumb'), 'height')).toBe(px(rule('.lc-effortpanel__scale'), 'height'))
   })
 
-  it('covers its liquid at rest: the drop the goo is made from is smaller than the thumb', () => {
-    const drop = rule('.lc-effortpanel__drop')
+  it('is ONE thing (Colin, 2026-09-26: "a rectangle with no gooey with a gooey circle behind it, we gotta pick one")', () => {
+    // No drop under it, and nothing but the liquid paints it: a background
+    // or a box-shadow here would be the crisp rectangle over the goo again.
+    expect(rule('.lc-effortpanel__drop')).toBe('')
     const thumb = rule('.lc-effortpanel__thumb')
-    expect(px(drop, 'width')).toBeLessThan(px(thumb, 'width'))
-    expect(px(drop, 'height')).toBeLessThan(px(thumb, 'height'))
-    // Centred under it: its top inset is half of what it is shorter by.
-    expect(px(drop, 'top')).toBe((px(thumb, 'height') - px(drop, 'height')) / 2)
+    expect(thumb).not.toMatch(/(?:^|[\s;{])background\s*:/)
+    expect(thumb).not.toMatch(/box-shadow\s*:/)
+    // Claude Code's soft lift goes with it, onto the liquid.
+    expect(slider).toContain("'--lc-effort-thumb-lift'")
   })
 
   it("sits on a fill that shows, as Claude Code's does", () => {
