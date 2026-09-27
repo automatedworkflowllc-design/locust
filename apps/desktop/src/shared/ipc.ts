@@ -1536,7 +1536,18 @@ export type OwnModelTestResponse =
   | { readonly ok: false; readonly error: { readonly code: 'OWN_MODEL_REFUSED'; readonly message: string } }
 
 export type ModelCatalogResponse =
-  | { readonly ok: true; readonly data: { readonly models: readonly PublicModel[] } }
+  | {
+      readonly ok: true
+      readonly data: {
+        readonly models: readonly PublicModel[]
+        /**
+         * What an account has used, read with the models (0.390): Codex's
+         * `account/rateLimits/read`, asked in the same server session as
+         * `model/list` -- no turn spent -- in the reading's usual words.
+         */
+        readonly usageWindows?: Readonly<Record<string, string>>
+      }
+    }
   | { readonly ok: false; readonly error: { readonly code: 'MODELS_UNAVAILABLE'; readonly message: string } }
 
 /**

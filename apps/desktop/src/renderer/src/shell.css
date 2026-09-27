@@ -5333,26 +5333,40 @@ textarea {
   display: grid;
 }
 
+/* The name, and the state UNDER it: side by side, "Cursor Agent" and
+   "Ready · 2026.09.26" ran off the card's edge (Colin, 2026-09-27, with a
+   frame of it). Each line ellipsises rather than ever running off. */
 .lc-agentcard__head {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 7px;
+  column-gap: 8px;
+  row-gap: 1px;
   min-width: 0;
+}
+
+.lc-agentcard__head > .lc-runtimemark {
+  grid-row: span 2;
+}
+
+.lc-agentcard__name,
+.lc-agentcard__state {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .lc-agentcard__name {
   font-size: var(--lc-text-description);
   font-weight: 600;
   color: var(--lc-text-name);
-  white-space: nowrap;
 }
 
 .lc-agentcard__state {
-  margin-left: auto;
   font-family: var(--lc-font-mono);
   font-size: var(--lc-text-mono-caption);
   color: var(--lc-green-text);
-  white-space: nowrap;
 }
 
 .lc-agentcard__window {

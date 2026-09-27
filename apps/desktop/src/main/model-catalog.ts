@@ -1,4 +1,4 @@
-import { createAppServerClient } from '@teammate/runtime-adapters'
+import { createAppServerClient, usageWindowFromSnapshot } from '@teammate/runtime-adapters'
 import type { MissionRuntimeId, RuntimeDiscovery } from '@teammate/runtime-adapters'
 
 import type { PublicModel, ModelCatalogResponse } from '../shared/ipc.js'
@@ -505,7 +505,25 @@ export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {
       if (models.length === 0) {
         return { ok: false, error: { code: 'MODELS_UNAVAILABLE', message: 'No models were reported.' } }
       }
-      return { ok: true, data: { models } }
+      /*
+       * AND WHAT THE ACCOUNT HAS USED (0.390), in the same server session: no
+       * turn spent. Colin, 2026-09-27, over his Home: "codex usage isnt
+       * showing" -- a reading only ever came from a run, and his Codex runs
+       * were all before 0.388 kept one. `account/rateLimits/read` returns the
+       * snapshot a turn would push (its shape read from `codex app-server
+       * generate-json-schema`, 0.157.1). An older Codex without the method,
+       * or an account that will not say, just leaves the reading out.
+       */
+      let usageWindows: Record<string, string> | undefined
+      try {
+        const limits = await client.request('account/rateLimits/read', {})
+        const snapshot = typeof limits === 'object' && limits !== null ? (limits as { readonly rateLimits?: unknown }).rateLimits : undefined
+        const reading = usageWindowFromSnapshot(snapshot)
+        if (reading !== undefined) usageWindows = { codex: reading }
+      } catch {
+        // No reading, and nothing else lost.
+      }
+      return { ok: true, data: { models, ...(usageWindows === undefined ? {} : { usageWindows }) } }
     } catch {
       return advertisedModels.length > 0
         ? { ok: true, data: { models: withAccountDefaults(advertisedModels) } }

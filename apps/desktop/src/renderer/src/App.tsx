@@ -1546,6 +1546,21 @@ export default function App(): ReactElement {
   const [limitedRuntimes, setLimitedRuntimes] = useState<ReadonlyMap<string, string>>(new Map())
   /** The latest still-allowed rate-limit reading per runtime, by words. */
   const [usageWindows, setUsageWindows] = useState<ReadonlyMap<string, string>>(new Map())
+  /*
+   * The readings the catalog asked for (0.390): fresh from the account's own
+   * server, so they replace whatever the ledger last kept -- a reading from
+   * a run days ago is older than one read a moment ago. A run's live
+   * reading, arriving later, replaces them in turn.
+   */
+  const adoptCatalogUsage = (windows: Readonly<Record<string, string>> | undefined): void => {
+    const entries = Object.entries(windows ?? {})
+    if (entries.length === 0) return
+    setUsageWindows((current) => {
+      const next = new Map(current)
+      for (const [runtime, said] of entries) next.set(runtime, said)
+      return next
+    })
+  }
   const [route, setRoute] = useState<RouteChoice>({ runtime: 'codex', model: 'account-default' })
   /** Words going back into the chat box (C9): a busy model's message, to send on another. */
   const [handBack, setHandBack] = useState<{ readonly text: string; readonly attachments: readonly string[] }>()
@@ -1795,6 +1810,7 @@ export default function App(): ReactElement {
         if (!response.ok) return
         rememberOwnModels(response.data.models)
         setModels(response.data.models)
+        adoptCatalogUsage(response.data.usageWindows)
       })
       .catch(() => {
         // Optional, as it always was: without it the picker offers the
@@ -2521,6 +2537,7 @@ export default function App(): ReactElement {
         // Before the models land, so the first render names your own ones.
         rememberOwnModels(response.data.models)
         setModels(response.data.models)
+        adoptCatalogUsage(response.data.usageWindows)
       })
       .catch(() => {
         // The catalog is optional: without it the picker offers the account

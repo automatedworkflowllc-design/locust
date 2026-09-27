@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.390.0 - 2026-09-27
+
+### Fixed
+
+- **Codex's usage shows without running it first.** Locust now asks Codex
+  for your usage when it reads Codex's models, so Codex's card on Home has
+  its bars even if you haven't run Codex since updating. Nothing is spent
+  asking.
+- **Agent cards no longer cut off text.** The version now sits under the
+  agent's name, so a long one like Cursor Agent's fits.
+
 ## 0.389.0 - 2026-09-27
 
 ### Improved

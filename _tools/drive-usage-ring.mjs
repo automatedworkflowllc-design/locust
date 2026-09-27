@@ -1,6 +1,11 @@
 // An account shows how full it is -- on hover (0.389; 0.388 drew a ring).
 //
 //   LOCUST_SPEND=1 node _tools/drive-usage-ring.mjs [--packaged <exe>] [--tag <name>]
+//   node _tools/drive-usage-ring.mjs --no-turn [--packaged <exe>] [--tag <name>]
+//
+// --no-turn spends nothing: since 0.390 the model catalog asks Codex's own
+// server for the account's usage (`account/rateLimits/read`) beside its
+// models, so the card has a reading before any turn has run.
 //
 // SPENDS one tiny turn of the person's own Codex plan (the cheapest model the
 // catalog lists, one word asked for). The round trip is the point: Codex's
@@ -22,6 +27,7 @@ const tag = arg('--tag') ?? 'local'
 const OUT = join(recordRoot('usage-ring-2026-09-27'), `usage-hover-${tag}`)
 await mkdir(OUT, { recursive: true })
 const MODEL = process.env.LOCUST_CODEX_MODEL ?? 'gpt-6-luna'
+const NO_TURN = process.argv.includes('--no-turn')
 
 const workspace = await scratchRepository('locust-usage-hover-ws-')
 const drive = await startDrive({
@@ -30,7 +36,7 @@ const drive = await startDrive({
   workspace,
   launchElsewhere: true,
   outPath: OUT,
-  spends: true,
+  spends: !NO_TURN,
   ...(packaged === undefined ? {} : { packaged }),
   seed: {
     schemaVersion: 1,
@@ -66,6 +72,9 @@ const hover = async (runtime) => {
       name: card?.querySelector('.lc-agentcard__name')?.textContent ?? null,
       state: card?.querySelector('.lc-agentcard__state')?.textContent ?? null,
       windows: [...(card?.querySelectorAll('.lc-agentcard__window') ?? [])].map((w) => [w.querySelector('.lc-agentcard__label')?.textContent, w.querySelector('.lc-agentcard__percent')?.textContent, w.querySelector('.lc-agentcard__fill')?.style.width]),
+      // Nothing in the card runs off its edge (Colin, 2026-09-27: "the text
+      // clearly running off" on Cursor's).
+      runsOff: card === null || card === undefined ? null : [card, ...card.querySelectorAll('*')].some((node) => node.scrollWidth > node.clientWidth + 1 && getComputedStyle(node).textOverflow !== 'ellipsis'),
       above: rect === undefined ? null : rect.bottom <= mark.getBoundingClientRect().top,
       inView: rect === undefined ? null : rect.top >= 0 && rect.left >= 0 && rect.right <= window.innerWidth
     }
@@ -75,6 +84,7 @@ const hover = async (runtime) => {
 try {
   await drive.ready()
   await drive.resize(1440, 900)
+  if (!NO_TURN) {
   say(String(await drive.evaluate(openTeammateScript('Juno'))))
   const sent = String(await drive.evaluate(`(async () => {
     const field = document.querySelector('form.command-dock textarea')
@@ -95,6 +105,10 @@ try {
     if (!live) break
     await sleep(500)
   }
+  } else {
+    // Only the catalog: give it the time its server read takes.
+    await sleep(9000)
+  }
   // Home: the row, then the pointer on Codex's mark.
   await drive.evaluate(`document.querySelector('.lc-brand__lockup')?.click()`)
   await sleep(1500)
@@ -108,6 +122,7 @@ try {
   check('the card opens above the mark, inside the window', codex?.above === true && codex.inView === true, JSON.stringify({ above: codex?.above, inView: codex?.inView }))
   const other = await hover('cursor')
   check('an agent whose runs reported nothing opens its name and state alone', other === null || (other.open === true && other.windows.length === 0), JSON.stringify(other))
+  check('no text in either card runs off its edge', codex?.runsOff === false && (other === null || other.runsOff === false), JSON.stringify({ codex: codex?.runsOff, cursor: other?.runsOff }))
   await drive.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 5, y: 5 })
   await sleep(300)
   const closed = String(await drive.evaluate(`String([...document.querySelectorAll('.lc-agentcard')].every((card) => getComputedStyle(card).display === 'none'))`))

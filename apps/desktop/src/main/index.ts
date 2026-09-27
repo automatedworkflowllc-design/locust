@@ -1922,7 +1922,8 @@ if (!ownsSingleInstanceLock) {
       // not after the catalogue's ten-minute cache (0.357).
       const own = await ownModels.catalog().catch(() => [])
       if (own.length === 0) return read
-      return { ok: true, data: { models: [...own, ...(read.ok ? read.data.models : [])] } } as const
+      // The usage reading rides along with the models it was read beside (0.390).
+      return { ok: true, data: { ...(read.ok ? read.data : {}), models: [...own, ...(read.ok ? read.data.models : [])] } } as const
     })
 
     ipcMain.handle(OWN_MODEL_LIST_CHANNEL, async (event) => {
