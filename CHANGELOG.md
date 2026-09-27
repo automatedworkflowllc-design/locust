@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.382.0 - 2026-09-26
+
+### Improved
+
+- **Closing Locust while a teammate works asks first.** Closing the window
+  used to stop everyone's work on the spot. Now Locust tells you who is
+  still working and asks: keep working, or quit anyway. Quitting still lets
+  you resume from the conversation when you're back.
+
 ## 0.381.0 - 2026-09-26
 
 ### Improved
