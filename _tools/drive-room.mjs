@@ -1,6 +1,6 @@
 // A person makes a room, posts to it, and watches every teammate answer.
 //
-//   node _tools/drive-room.mjs
+//   node _tools/drive-room.mjs [--packaged <exe>]
 //
 // Two teammates on the free OpenCode model. The room is made through the
 // form a person uses (name, members, Create room), one post goes in, and
@@ -8,8 +8,12 @@
 
 import { FREE_ROUTE, say, scratchRepository, startDrive } from './drive-lib.mjs'
 
+// C6 (plan 2026-09-24): the same drive against a packaged build.
+const packaged = process.argv.includes('--packaged') ? process.argv[process.argv.indexOf('--packaged') + 1] : undefined
+
 const workspace = await scratchRepository('locust-drive-room-ws-')
 const drive = await startDrive({
+  ...(packaged === undefined ? {} : { packaged }),
   name: 'room',
   port: 9296,
   workspace,
@@ -143,5 +147,5 @@ try {
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
-  await drive.finish({ intro: 'Build: whatever `pnpm build` last wrote to out/. Wren and Booty on the free OpenCode model, read-only. A room made through the form, one post, both answers watched.' })
+  await drive.finish({ intro: (packaged === undefined ? 'Build: whatever `pnpm build` last wrote to out/.' : 'Build: the packaged build.') + ' Wren and Booty on the free OpenCode model, read-only. A room made through the form, one post, both answers watched.' })
 }

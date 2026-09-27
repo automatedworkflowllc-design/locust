@@ -1,6 +1,6 @@
 // A person watches the team remember things, and manages what it kept.
 //
-//   node _tools/drive-memory.mjs
+//   node _tools/drive-memory.mjs [--packaged <exe>]
 //
 // Two teammates on the free OpenCode model, memory on ("keep and tell me"),
 // one memory seeded as if typed earlier. Wren is asked to quote it; Booty is
@@ -11,10 +11,14 @@ import { createHash } from 'node:crypto'
 
 import { FREE_ROUTE, pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace } from './drive-lib.mjs'
 
+// C6 (plan 2026-09-24): the same drive against a packaged build.
+const packaged = process.argv.includes('--packaged') ? process.argv[process.argv.indexOf('--packaged') + 1] : undefined
+
 const workspace = await scratchRepository('locust-drive-memory-ws-')
 const workspaceId = `ws_${createHash('sha256').update(workspace, 'utf8').digest('hex').slice(0, 32)}`
 const T0 = '2026-09-05T05:00:00.000Z'
 const drive = await startDrive({
+  ...(packaged === undefined ? {} : { packaged }),
   name: 'memory',
   port: 9298,
   workspace,
@@ -54,6 +58,9 @@ try {
   await drive.capture('Settings counts the seeded memory', () => drive.evaluate(`(async () => {
     document.querySelector('button[title="Settings (Ctrl 3)"]').click()
     await new Promise(r => setTimeout(r, 800))
+    // Settings has pages since 0.393 and opens on General; memory is its own page.
+    ;[...document.querySelectorAll('.lc-settings__navitem')].find((item) => item.innerText.trim() === 'Memory')?.click()
+    await new Promise(r => setTimeout(r, 500))
     const box = document.querySelector('.lc-settings__heading') ? document.querySelector('.lc-screen__scroll') : null
     const heading = [...document.querySelectorAll('.lc-settings__heading')].find(h => /remembers/.test(h.textContent))
     heading?.scrollIntoView({ block: 'start' })
@@ -124,5 +131,5 @@ try {
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
-  await drive.finish({ intro: 'Build: whatever `pnpm build` last wrote to out/. Wren and Booty on the free OpenCode model, memory on (keep and tell me), one memory seeded as typed earlier.' })
+  await drive.finish({ intro: (packaged === undefined ? 'Build: whatever `pnpm build` last wrote to out/.' : 'Build: the packaged build.') + ' Wren and Booty on the free OpenCode model, memory on (keep and tell me), one memory seeded as typed earlier.' })
 }
