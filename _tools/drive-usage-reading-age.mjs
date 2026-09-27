@@ -74,7 +74,7 @@ try {
   })()`))))
   check('the Claude mark is on Home', seen.found === true, JSON.stringify(seen).slice(0, 200))
   check('its card shows the 7-day window, still true', /7-day window\s*66%/.test(seen.card), seen.card)
-  check('and does not show the 5-hour window as 20% used -- it reset since', !/20%/.test(seen.card) && /5-hour window reset since/.test(seen.card), seen.card)
+  check('and does not show the 5-hour window as 20% used -- it reset since', !/20%/.test(seen.card) && /5-hour window\s*reset since/.test(seen.card), seen.card)
   check('and says the reading is from Locust’s last run, not counting use outside', /From Locust.s last run on it, .+Use outside Locust since then isn.t counted\./.test(seen.card), seen.card)
   check('the screen reader is told the same', /66% of the 7-day window used/.test(seen.label) && /the 5-hour window has reset since/.test(seen.label) && !/20%/.test(seen.label), seen.label)
 } catch (error) {
