@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.402.0 - 2026-09-27
+
+### Fixed
+
+- **The Locust sign on Home is back to its full size when Home fits.** 0.401
+  drew it smaller on Home screens that already fit the window, such as a
+  team's Home at 1440x900. It now draws smaller only when Home is too tall
+  for the window.
+
 ## 0.401.0 - 2026-09-27
 
 ### Fixed

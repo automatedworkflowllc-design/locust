@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
-import { COVER_HEIGHT, COVER_MACHINE, COVER_MAX_GROW, COVER_MIN_GROW, COVER_WIDTH, HomeCover, coverGrowFor } from './components/HomeCover.js'
+import { COVER_HEIGHT, COVER_MACHINE, COVER_MAX_GROW, COVER_MIN_GROW, COVER_WIDTH, HomeCover, coverGrowFor, coverRoomFor } from './components/HomeCover.js'
 
 /*
  * Colin, 2026-09-26, on Home at a large window: "theres lots of dead space,
@@ -37,6 +37,27 @@ describe('how much the cover grows', () => {
     expect(COVER_MAX_GROW).toBe(1.45)
     expect(coverGrowFor(base * 10, base)).toBe(1.45)
   }, 10_000)
+})
+
+/*
+ * 0.402: 0.401 read the growing rule's air as a shortfall, and a team's Home
+ * that FITTED at 1440x900 (119px free above its cover) drew the cover at the
+ * floor. The room is short only when the page does not fit.
+ */
+describe('the room the cover is given', () => {
+  it('a page that fits is never short: it grows past some air, or stays as it is', () => {
+    expect(coverRoomFor(800, 400, 200)).toBe(120)
+    expect(coverRoomFor(800, 560, 200)).toBe(0)
+    expect(coverRoomFor(800, 600, 200)).toBe(0)
+  })
+
+  it('a page that does not fit is short by what it lacks, and a little air', () => {
+    expect(coverRoomFor(726, 590, 201)).toBe(-89)
+  })
+
+  it('measures nothing into nothing', () => {
+    expect(coverRoomFor(Number.NaN, 0, 200)).toBe(0)
+  })
 })
 
 describe('the grown drawing', () => {

@@ -88,6 +88,24 @@ function coverWidthGrow(): number {
   return (0.94 * COVER_WIDTH) / COVER_MACHINE.width
 }
 
+/**
+ * The room `coverGrowFor` is given, from what the page has: the pane's usable
+ * height, everything else in its column, and the cover at its width's size.
+ *
+ * A page that FITS is never given less than nothing: it grows into what is
+ * left once some air above is kept, or stays as it is. Only a page that does
+ * not fit is short, by what it is short plus a little air. 0.401 took the
+ * growing rule's air as a shortfall, and a team's Home at 1120x720 -- which
+ * fitted, with 108px above the cover -- drew its cover at the floor for
+ * nothing (drive-signed-out's sizes, with a team).
+ */
+export function coverRoomFor(usable: number, others: number, base: number): number {
+  const spare = usable - others - base
+  if (!Number.isFinite(spare)) return 0
+  if (spare >= 0) return Math.max(0, spare - Math.max(48, usable * 0.1))
+  return spare - 24
+}
+
 /** The grow factor for this much spare height above a cover of this height; short of room, below 1. */
 export function coverGrowFor(room: number, baseHeight: number): number {
   if (!Number.isFinite(room) || !Number.isFinite(baseHeight) || baseHeight <= 0 || room === 0) return 1

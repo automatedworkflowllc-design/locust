@@ -4,7 +4,7 @@ import type { ReactElement } from 'react'
 import type { PublicRuntimeStatus, TubePreference } from '../../../shared/ipc.js'
 import { connectedRuntimeCount, deferredOthersSentence, integrationOf, routeRowStatus, runtimeIsUsable } from '../status.js'
 import { FREE_START_RUNTIME, installCommand, installSentence, runtimeInstallFacts, signInCommand } from '../../../shared/runtime-install.js'
-import { COVER_HEIGHT, HomeCover, coverGrowFor, coverScale } from './HomeCover.js'
+import { COVER_HEIGHT, HomeCover, coverGrowFor, coverRoomFor, coverScale } from './HomeCover.js'
 import { HomeTeam } from './HomeTeam.js'
 import { RuntimeMark } from './RuntimeMark.js'
 import { AgentMark } from './AgentMark.js'
@@ -279,8 +279,7 @@ export function FirstLaunch({
       const usable = paneEl.clientHeight - parseFloat(padding.paddingTop) - parseFloat(padding.paddingBottom)
       const base = COVER_HEIGHT * coverScale(cover.clientWidth)
       const others = innerEl.offsetHeight - cover.offsetHeight
-      const air = Math.max(48, usable * 0.1)
-      setCoverGrow(coverGrowFor(usable - others - base - air, base))
+      setCoverGrow(coverGrowFor(coverRoomFor(usable, others, base), base))
     }
     measure()
     const observer = new ResizeObserver(measure)
