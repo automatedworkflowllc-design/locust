@@ -149,7 +149,7 @@ import { splitAttachments, withAttachments } from '../../shared/attachments.js'
 // different question from who owns a recorded mission.
 import { heldFor, routineOf } from './conversationList.js'
 import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, nextFreeModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
-import { homeRouteOf, isOwnRoute, modelDisplayName, rememberOwnModels } from './routeName.js'
+import { homeRouteOf, isOwnRoute, modelDisplayName, rememberOwnModels, routeChrome } from './routeName.js'
 import { FeedbackDialog } from './components/FeedbackDialog.js'
 import { conversationText } from './feedback.js'
 import { withMessageDelta } from '../../shared/messageFragments.js'
@@ -7000,7 +7000,13 @@ export default function App(): ReactElement {
           routeLabel={
             routineDialog.route === undefined
               ? undefined
-              : `${runtimeDisplayName(routineDialog.route.runtime)} / ${routineDialog.route.model}`
+              : // The composer's spelling, as a room answer has it -- not the raw
+                // id: "OpenCode / opencode/nemotron-3-ultra-free" (0.417).
+                routeChrome(
+                  routineDialog.route.runtime,
+                  routineDialog.route.model,
+                  routineDialog.route.model === 'account-default' ? 'default' : modelDisplayName(routineDialog.route.runtime, routineDialog.route.model)
+                )
           }
           busy={routineDialog.busy}
           error={routineDialog.error}

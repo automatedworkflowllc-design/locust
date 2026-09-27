@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.417.0 - 2026-09-28
+
+### Fixed
+
+- **Save as routine names the model in plain words.** The dialog said who
+  runs the routine "on OpenCode / opencode/nemotron-3-ultra-free", the
+  model's internal id. It now says "OpenCode / Nemotron 3 Ultra Free", as
+  the rest of the app does.
+
 ## 0.416.0 - 2026-09-27
 
 ### Improved
