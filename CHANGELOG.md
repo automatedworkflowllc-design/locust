@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.418.0 - 2026-09-28
+
+### Fixed
+
+- **Editing or switching off a memory now reaches a conversation already
+  going.** A teammate you'd been talking to kept the old version: after a
+  memory was changed and switched off, the teammate still quoted the old
+  wording when asked again in the same conversation. It's now told that the
+  new list replaces the old one.
+
 ## 0.417.0 - 2026-09-28
 
 ### Fixed

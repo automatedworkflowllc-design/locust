@@ -197,8 +197,29 @@ function standingFor(standing: readonly string[], alreadyGiven: ReadonlySet<stri
   // Nothing held yet is a first brief, said whole rather than behind a line
   // claiming an earlier one.
   if (fresh.length === paragraphs.length) return { sections: standing, given }
-  return { sections: [stillHoldsLine(standing.join(SECTION_GAP), peer), ...fresh], given }
+  return {
+    sections: [
+      stillHoldsLine(standing.join(SECTION_GAP), peer),
+      ...fresh.map((paragraph) => (paragraph.startsWith(MEMORY_HEADING) ? `${MEMORY_LIST_REPLACES}${String.fromCharCode(10)}${paragraph}` : paragraph))
+    ],
+    given
+  }
 }
+
+/**
+ * Said above a memory list sent again to a session that holds an earlier one
+ * (0.418).
+ *
+ * The still-holds line tells a resumed session that what it was given
+ * "still holds" and only what changed follows -- so a new list read as MORE
+ * memories, beside the old ones. Fresh-eyes area 12, packaged 0.417 on
+ * Nemotron, twice: a memory edited from PELICAN to HERON and switched off,
+ * and Wren, asked again in the same conversation, quoted PELICAN as
+ * remembered "(this folder, by the person, 3 weeks ago)". The list is whole
+ * every time it is sent, so it can say it replaces the last one.
+ */
+export const MEMORY_LIST_REPLACES =
+  'The list of what is remembered below replaces the one you were given earlier in this conversation. A memory on the earlier list that is not on this one was changed or forgotten by the person: do not use it or quote it.'
 
 /**
  * How long ago a waiting message was sent, once it is old enough to matter

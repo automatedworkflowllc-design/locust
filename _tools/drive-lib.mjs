@@ -554,7 +554,10 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
     try { socket.close() } catch { /* gone */ }
     endTree(child)
     await sleep(1500)
-    if (!keep && last) await rm(profile, { recursive: true, force: true }).catch(() => undefined)
+    // LOCUST_DRIVE_KEEP=1 keeps any drive's profile, to read its ledger after.
+    const kept = keep || process.env.LOCUST_DRIVE_KEEP === '1'
+    if (!kept && last) await rm(profile, { recursive: true, force: true }).catch(() => undefined)
+    if (last && kept) say(`profile kept: ${profile}`)
     if (last) say(`\nrecord: ${out}`)
     return { out, profile, step }
   }
