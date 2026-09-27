@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.397.0 - 2026-09-27
+
+### New
+
+- **Close the window, keep the work going.** When you close Locust while a
+  teammate is working, the first choice is now **Keep working in the
+  background**: the window closes, Locust stays in the system tray, and
+  your teammates carry on, with a notification when they finish. The
+  tray's tooltip says who's working. Click it to open Locust again, or use
+  its menu to quit. **Quit anyway** still stops the runs, and **Cancel**
+  leaves the window open.
+
 ## 0.396.0 - 2026-09-27
 
 ### New

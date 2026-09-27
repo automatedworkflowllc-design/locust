@@ -30,23 +30,41 @@ export function shouldAskBeforeClosing(moment: CloseMoment): boolean {
   return moment.liveRuns > 0 && !moment.appQuitting && !moment.sessionEnding && !moment.confirmed
 }
 
-/** The question, naming who is working when the names are known. */
+/** Who is working, as a sentence's subject: "Wren is", "Wren and Sable are", "2 teammates are". */
+function whoIsWorking(workingNames: readonly string[], liveRuns: number): string {
+  const names = [...new Set(workingNames)]
+  return names.length === 0
+    ? liveRuns === 1 ? 'A teammate is' : `${String(liveRuns)} teammates are`
+    : names.length === 1
+      ? `${names[0]!} is`
+      : names.length === 2
+        ? `${names[0]!} and ${names[1]!} are`
+        : `${names.slice(0, -1).join(', ')} and ${names.at(-1)!} are`
+}
+
+/**
+ * The question, naming who is working when the names are known.
+ *
+ * 0.397: the answer that keeps the work going no longer means "don't close"
+ * -- it closes the WINDOW and keeps Locust running in the tray until the
+ * work is done (Orca's #3, the part that fits: runs that outlive the window).
+ * Before, a person who wanted the window gone had to choose between it and
+ * the run.
+ */
 export function closeQuestion(workingNames: readonly string[], liveRuns: number): { readonly message: string; readonly detail: string } {
   const names = [...new Set(workingNames)]
-  const who =
-    names.length === 0
-      ? liveRuns === 1 ? 'A teammate is' : `${String(liveRuns)} teammates are`
-      : names.length === 1
-        ? `${names[0]!} is`
-        : names.length === 2
-          ? `${names[0]!} and ${names[1]!} are`
-          : `${names.slice(0, -1).join(', ')} and ${names.at(-1)!} are`
   const them = names.length === 1 || (names.length === 0 && liveRuns === 1) ? 'the run stops' : 'their runs stop'
   return {
-    message: `${who} still working.`,
-    detail: `If you quit now, ${them}. You can resume from the conversation when you're back.`
+    message: `${whoIsWorking(workingNames, liveRuns)} still working.`,
+    detail: `Keep them working and Locust closes to the tray until you open it again, with a notification when they finish. If you quit now, ${them}; you can resume from the conversation when you're back.`
   }
 }
 
-/** The buttons, in order: keeping the work going is the default and the escape. */
-export const CLOSE_BUTTONS = ['Keep working', 'Quit anyway'] as const
+/** The buttons, in order: keeping the work going is the default; Cancel leaves the window open. */
+export const CLOSE_BUTTONS = ['Keep working in the background', 'Quit anyway', 'Cancel'] as const
+
+/** The tray's line while Locust runs without a window: who is working, or that nobody is. */
+export function trayLine(workingNames: readonly string[], liveRuns: number): string {
+  if (liveRuns === 0) return 'Locust: nobody is working. Click to open.'
+  return `Locust: ${whoIsWorking(workingNames, liveRuns).replace(/ (is|are)$/, ' $1 working')}.`
+}

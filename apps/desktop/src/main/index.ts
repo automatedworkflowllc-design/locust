@@ -5,7 +5,7 @@ import { ownGitArgs } from './git-guard.js'
 import { APP_USER_MODEL_ID, DEVELOPMENT_APP_USER_MODEL_ID, mayShowToasts, repairStartMenuShortcut, sweepStaleElectronShortcuts } from './stale-shortcut.js'
 import { openingPlacement, readSavedWindow } from './window-bounds.js'
 import type { SavedWindow } from './window-bounds.js'
-import { app, BrowserWindow, crashReporter, dialog, ipcMain, nativeImage, nativeTheme, Notification, powerSaveBlocker, safeStorage, screen, session, shell } from 'electron'
+import { app, BrowserWindow, crashReporter, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, powerSaveBlocker, safeStorage, screen, session, shell, Tray } from 'electron'
 import electronUpdater from 'electron-updater'
 
 const { autoUpdater } = electronUpdater
@@ -42,7 +42,7 @@ import { createBriefSessions } from './brief-sessions.js'
 import { createRunEnd } from './run-end.js'
 import { createKeepAwake, KEEP_AWAKE_BEAT_MS } from './keep-awake.js'
 import { attentionDot, needsYouCountFrom, taskbarAttention } from './taskbar-attention.js'
-import { CLOSE_BUTTONS, closeQuestion, shouldAskBeforeClosing } from './quit-guard.js'
+import { CLOSE_BUTTONS, closeQuestion, shouldAskBeforeClosing, trayLine } from './quit-guard.js'
 import { createRecentEdits } from './recent-edits.js'
 import { readRuntimeArtifacts } from './runtime-artifacts.js'
 import { relative } from 'node:path'
@@ -1114,6 +1114,8 @@ if (!ownsSingleInstanceLock) {
     const window = BrowserWindow.getAllWindows()[0]
     if (!window) return
     if (window.isMinimized()) window.restore()
+    // In the tray while teammates work (0.397): opening Locust again brings it back.
+    if (!window.isVisible()) window.show()
     window.focus()
   })
 
@@ -4812,6 +4814,52 @@ if (!ownsSingleInstanceLock) {
      * way (a relaunch, the updater) and a session ending pass straight
      * through, and "Quit anyway" closes.
      */
+    /*
+     * 0.397: KEEP WORKING IN THE BACKGROUND. The first answer closes the
+     * window and keeps Locust in the tray while the runs go on -- the part
+     * of Orca's "runs that outlive the window" that needs no second process:
+     * the runs, the ledger, routines and the finish notification all live in
+     * this one, which simply stays up. The tray says who is working; a click
+     * opens the window again; its menu can quit.
+     */
+    let tray: Tray | undefined
+    let trayBeat: ReturnType<typeof setInterval> | undefined
+    const workingNames = async (liveIds: readonly string[]): Promise<readonly string[]> => {
+      const [roster, owners] = await Promise.all([teammates.list(), teammates.missionOwners()]).catch(() => [[], {}] as const)
+      return liveIds
+        .map((missionId) => roster.find((entry) => entry.teammateId === (owners as Readonly<Record<string, string>>)[missionId])?.name)
+        .filter((name): name is string => name !== undefined)
+    }
+    const leaveTray = (): void => {
+      if (trayBeat !== undefined) clearInterval(trayBeat)
+      trayBeat = undefined
+      tray?.destroy()
+      tray = undefined
+    }
+    const toTray = (window: BrowserWindow, quit: () => void): void => {
+      const reopen = (): void => {
+        leaveTray()
+        if (window.isDestroyed()) return
+        window.show()
+        window.focus()
+      }
+      if (tray === undefined) {
+        tray = new Tray(nativeImage.createFromPath(app.isPackaged ? join(process.resourcesPath, 'icon.ico') : join(__dirname, '../../resources/icon-512.png')))
+        tray.on('click', reopen)
+        tray.setContextMenu(Menu.buildFromTemplate([
+          { label: 'Open Locust', click: reopen },
+          { type: 'separator' },
+          { label: 'Quit Locust', click: () => { leaveTray(); quit() } }
+        ]))
+      }
+      const say = (): void => {
+        const liveIds = [...codexMissions.liveMissionIds(), ...antigravityMissions.liveMissionIds()]
+        void workingNames(liveIds).then((names) => tray?.setToolTip(trayLine(names, liveIds.length)))
+      }
+      say()
+      trayBeat ??= setInterval(say, 5_000)
+      window.hide()
+    }
     const guardClose = (window: BrowserWindow): void => {
       let confirmed = false
       let asking = false
@@ -4819,30 +4867,43 @@ if (!ownsSingleInstanceLock) {
       window.on('session-end', () => {
         sessionEnding = true
       })
+      // Shown again from anywhere (a notification, the taskbar): the tray has done its job.
+      window.on('show', () => leaveTray())
+      const quit = (): void => {
+        confirmed = true
+        app.quit()
+      }
       window.on('close', (event) => {
         const liveIds = [...codexMissions.liveMissionIds(), ...antigravityMissions.liveMissionIds()]
-        if (!shouldAskBeforeClosing({ liveRuns: liveIds.length, appQuitting, sessionEnding, confirmed })) return
+        if (!shouldAskBeforeClosing({ liveRuns: liveIds.length, appQuitting, sessionEnding, confirmed })) {
+          leaveTray()
+          return
+        }
         event.preventDefault()
         if (asking) return
         asking = true
         void (async () => {
-          const [roster, owners] = await Promise.all([teammates.list(), teammates.missionOwners()]).catch(() => [[], {}] as const)
-          const names = liveIds
-            .map((missionId) => roster.find((entry) => entry.teammateId === (owners as Readonly<Record<string, string>>)[missionId])?.name)
-            .filter((name): name is string => name !== undefined)
-          const question = closeQuestion(names, liveIds.length)
-          const answer = await dialog.showMessageBox(window, {
+          const question = closeQuestion(await workingNames(liveIds), liveIds.length)
+          /*
+           * A DRIVE'S ANSWER, labelled as such: a native dialog cannot be
+           * pressed through the page a drive talks to, so a drive names the
+           * button it would press. `LOCUST_CLOSE_ANSWER` is read nowhere else.
+           */
+          const seam = ({ background: 0, quit: 1, cancel: 2 } as Record<string, number>)[process.env.LOCUST_CLOSE_ANSWER ?? '']
+          const response = seam ?? (await dialog.showMessageBox(window, {
             type: 'question',
             buttons: [...CLOSE_BUTTONS],
             defaultId: 0,
-            cancelId: 0,
+            cancelId: 2,
             noLink: true,
             title: 'Locust',
             message: question.message,
             detail: question.detail
-          })
+          })).response
           asking = false
-          if (answer.response === 1 && !window.isDestroyed()) {
+          if (window.isDestroyed()) return
+          if (response === 0) toTray(window, quit)
+          if (response === 1) {
             confirmed = true
             window.close()
           }
