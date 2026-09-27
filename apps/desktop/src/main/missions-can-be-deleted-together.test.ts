@@ -31,7 +31,9 @@ describe('what may be selected', () => {
      * checkbox either: an offer the screen knows will be refused is worse
      * than no offer.
      */
-    expect(SCREENS).toContain('const deletable = shown.filter((mission) => !runningMissionIds.has(mission.missionId))')
+    // A row is a conversation since 0.415: it is not offered while ANY of its turns runs.
+    expect(SCREENS).toContain('const deletable = shown.filter((entry) => !entry.members.some((mission) => runningMissionIds.has(mission.missionId)))')
+    expect(SCREENS).toContain('const running = entry.members.some((turn) => runningMissionIds.has(turn.missionId))')
     expect(SCREENS).toContain('disabled={running}')
   })
 
@@ -43,7 +45,7 @@ describe('what may be selected', () => {
     // A mission that started running between the click and the confirm must
     // not go. The set is rebuilt from `deletable` rather than sent as picked.
     const handler = SCREENS.slice(SCREENS.indexOf('const going = deletable'))
-    expect(handler.slice(0, 200)).toContain('picked.has(missionId)')
+    expect(handler.slice(0, 200)).toContain('.filter((entry) => picked.has(entry.key))')
   })
 })
 

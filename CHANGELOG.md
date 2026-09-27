@@ -11,6 +11,19 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.415.0 - 2026-09-27
+
+### Improved
+
+- **Missions lists conversations, the way the sidebar does.** Every message
+  you sent had its own row, so "Good, ship it" sat alone meaning nothing,
+  and the count didn't match the sidebar. Now each conversation is one row,
+  named by how it started, with how many turns it took. Opening it opens the
+  whole conversation, and deleting it deletes all of it.
+- **Missions says when.** Each row shows how long ago it happened.
+- **Longer titles on Missions.** In an ordinary-sized window the details now
+  sit on a second line, so the title gets most of the row.
+
 ## 0.414.0 - 2026-09-27
 
 ### Improved

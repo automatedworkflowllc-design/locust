@@ -8211,27 +8211,36 @@ textarea {
  * the cost on the second, under the same columns. Selector carries the
  * list's class because the base rule below is later in the file and would
  * otherwise win on order alone (it did, first try).
+ *
+ * 1240px, not 960 (0.415): with the when column the single line left a
+ * 1440 window's titles 220px -- "Fix the login redirect loop on the a..."
+ * (fresh-eyes area 9). Two lines give the title most of the row until the
+ * list is wide enough for one line to hold it too.
  */
-@container (max-width: 960px) {
+@container (max-width: 1240px) {
   .lc-missionrows .lc-missionrow {
     /* Wider third and fourth columns than the wide form's 130/104: the
        counts and the cost sit under them now, and "0 checkpoints · 1m 2s"
        and "14k in · 1.1k out" were ellipsed at the narrower widths. */
-    grid-template-columns: 14px minmax(0, 1fr) 170px 128px;
+    /* The when column (0.415) sits between the title and who. */
+    grid-template-columns: 14px minmax(0, 1fr) 56px 170px 128px;
     row-gap: 4px;
   }
   .lc-missionrows .lc-missionrow > .lc-rail__dot { grid-row: 1; grid-column: 1; }
   .lc-missionrows .lc-missionrow__name { grid-row: 1; grid-column: 2; }
-  .lc-missionrows .lc-missionrow__owner { grid-row: 1; grid-column: 3; }
-  .lc-missionrows .lc-missionrow__tag { grid-row: 1; grid-column: 4; }
+  .lc-missionrows .lc-missionrow__when { grid-row: 1; grid-column: 3; }
+  .lc-missionrows .lc-missionrow__owner { grid-row: 1; grid-column: 4; }
+  .lc-missionrows .lc-missionrow__tag { grid-row: 1; grid-column: 5; }
   .lc-missionrows .lc-missionrow__route { grid-row: 2; grid-column: 2; }
-  .lc-missionrows .lc-missionrow__stats { grid-row: 2; grid-column: 3; }
-  .lc-missionrows .lc-missionrow__cost { grid-row: 2; grid-column: 4; text-align: right; }
+  .lc-missionrows .lc-missionrow__stats { grid-row: 2; grid-column: 4; }
+  .lc-missionrows .lc-missionrow__cost { grid-row: 2; grid-column: 5; text-align: right; }
 }
 
 .lc-missionrow {
   display: grid;
-  grid-template-columns: 14px 1fr 130px 190px 92px 118px 104px;
+  /* dot, title, when (0.415), who, route, time, cost, state. Time is 124px
+     since it can say "3 turns · 1m 39s" (0.415); it was 92. */
+  grid-template-columns: 14px 1fr 56px 130px 190px 124px 118px 104px;
   align-items: center;
   gap: 14px;
   padding: 13px var(--lc-space-6);
@@ -8273,6 +8282,13 @@ textarea {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.lc-missionrow__when {
+  color: var(--lc-text-muted);
+  font-size: 11px;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .lc-missionrow__owner {

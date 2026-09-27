@@ -46,7 +46,9 @@ import { TeammateBot } from './TeammateBot.js'
 import { RuntimeMark } from './RuntimeMark.js'
 import { keepCurrentNote, offersUpdate, updateLine } from '../agentUpdates.js'
 import { Icon } from './Icon.js'
-import { costCell, costTotal, missionCost, monthSpendLine } from '../cost.js'
+import { costCell, costTotal, missionCost, monthSpendLine, sumCosts } from '../cost.js'
+import { conversationsOf } from '../missionsList.js'
+import { shortAgo } from '../railFlyout.js'
 import { agoLabel, teammateWork } from '../teammateWork.js'
 import { routineRunSummary, routineScheduleSummary, routineStepLabel } from '../routines.js'
 import { RoutineRecovery } from './RoutineRecovery.js'
@@ -229,8 +231,12 @@ export function MissionsScreen({
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set())
   const [armed, setArmed] = useState(false)
   const owner = ownerId === undefined ? undefined : teammates.find((teammate) => teammate.teammateId === ownerId)
-  const shown = missions.filter((mission) =>
-    matchesFilter(mission, filter, runningMissionIds) && (ownerId === undefined || missionOwners[mission.missionId] === ownerId))
+  // One row per conversation, as the sidebar lists them (0.415): see missionsList.ts.
+  const conversations = conversationsOf(missions)
+  const ownerOfEntry = (entry: (typeof conversations)[number]): string | undefined =>
+    entry.members.map((mission) => missionOwners[mission.missionId]).find((id) => id !== undefined)
+  const shown = conversations.filter((entry) =>
+    matchesFilter(entry.leaf, filter, runningMissionIds) && (ownerId === undefined || ownerOfEntry(entry) === ownerId))
   const withIssues = missions.filter((mission) => mission.integrityIssueCount > 0).length
   /*
    * "ledger verified" is a claim, and it must cover the files that are NOT here.
@@ -255,13 +261,13 @@ export function MissionsScreen({
   const elsewhere =
     workspaceId === undefined
       ? 0
-      : missions.filter((mission) => mission.workspaceId !== workspaceId).length
+      : conversations.filter((entry) => entry.leaf.workspaceId !== workspaceId).length
   // What the shown missions cost, in whatever units their receipts carry.
   // Runtimes that report nothing contribute nothing, and are counted as such
   // rather than as free. "priced" is a claim about money: when every receipt
   // reported tokens and no price -- which is what a free route gives -- the
   // honest word for the same count is "measured". See `costTotal`.
-  const total = costTotal(shown.map((mission) => missionCost(mission)))
+  const total = costTotal(shown.flatMap((entry) => entry.members.map((mission) => missionCost(mission))))
 
   /*
    * A running mission cannot be deleted -- the host refuses, because
@@ -270,15 +276,15 @@ export function MissionsScreen({
    * not selectable here either: offering a checkbox for something that will
    * be refused is an offer the screen knows it cannot keep.
    */
-  const deletable = shown.filter((mission) => !runningMissionIds.has(mission.missionId))
-  const pickedHere = deletable.filter((mission) => picked.has(mission.missionId))
+  const deletable = shown.filter((entry) => !entry.members.some((mission) => runningMissionIds.has(mission.missionId)))
+  const pickedHere = deletable.filter((entry) => picked.has(entry.key))
   const allPicked = deletable.length > 0 && pickedHere.length === deletable.length
-  const toggle = (missionId: string): void => {
+  const toggle = (key: string): void => {
     setArmed(false)
     setPicked((current) => {
       const next = new Set(current)
-      if (next.has(missionId)) next.delete(missionId)
-      else next.add(missionId)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
       return next
     })
   }
@@ -298,7 +304,7 @@ export function MissionsScreen({
          * 0.349). The ledger's verdict stays: on this screen it is the claim
          * the tests below it guard, and it is never said when untrue.
          */
-        meta={`${missions.length} ${missions.length === 1 ? 'conversation' : 'conversations'}${elsewhere === 0 ? '' : `, ${missions.length - elsewhere} in this folder`} · ${
+        meta={`${conversations.length} ${conversations.length === 1 ? 'conversation' : 'conversations'}${elsewhere === 0 ? '' : `, ${conversations.length - elsewhere} in this folder`} · ${
           ledgerUnreadable
             ? 'the ledger could not be read'
             : damaged === 0
@@ -366,7 +372,7 @@ export function MissionsScreen({
             className="lc-pickbar__link"
             onClick={() => {
               setArmed(false)
-              setPicked(allPicked ? new Set() : new Set(deletable.map((mission) => mission.missionId)))
+              setPicked(allPicked ? new Set() : new Set(deletable.map((entry) => entry.key)))
             }}
           >
             {allPicked ? 'Select none' : `Select all ${deletable.length}`}
@@ -383,12 +389,14 @@ export function MissionsScreen({
               if (event.detail > 1) return
               // Only what is still selectable: a mission that started running
               // between the click and the confirm must not go.
+              // A conversation goes with every turn, as the sidebar's Delete does.
+              const goingKeys = deletable.map((entry) => entry.key).filter((key) => picked.has(key))
               const going = deletable
-                .map((mission) => mission.missionId)
-                .filter((missionId) => picked.has(missionId))
+                .filter((entry) => picked.has(entry.key))
+                .flatMap((entry) => entry.members.map((mission) => mission.missionId))
               onDeleteMissions(going)
               // Only the ones that went; a pick this filter hides stays picked.
-              setPicked((current) => new Set([...current].filter((missionId) => !going.includes(missionId))))
+              setPicked((current) => new Set([...current].filter((key) => !goingKeys.includes(key))))
               setArmed(false)
             }}
           >
@@ -405,7 +413,9 @@ export function MissionsScreen({
           </p>
         ) : (
           <div className="lc-missionrows">
-            {shown.map((mission) => {
+            {shown.map((entry) => {
+              // The row stands for the conversation and reads as where it is now: its newest turn.
+              const mission = entry.leaf
               /*
                 * RUNNING comes from the host, not the ledger.
                 *
@@ -422,9 +432,8 @@ export function MissionsScreen({
                 missionRowPhase(mission, runningMissionIds),
                 mission.integrityIssueCount > 0
               )
-              const owner = teammates.find(
-                (teammate) => teammate.teammateId === missionOwners[mission.missionId]
-              )
+              const owner = teammates.find((teammate) => teammate.teammateId === ownerOfEntry(entry))
+              const title = titleOf(entry.root)
               /*
                * ONE clock, `durationText`.
                *
@@ -434,15 +443,14 @@ export function MissionsScreen({
                * 2026-09-13, and the same shape as every other one in that
                * report: two surfaces computing one fact separately.
                */
-              const elapsed = durationText(
-                runSpanMs(mission.events) ?? Math.max(0, Date.parse(mission.lastUpdatedAt) - Date.parse(mission.createdAt))
-              )
+              const elapsed = durationText(entry.members.reduce((sum, turn) =>
+                sum + (runSpanMs(turn.events) ?? Math.max(0, Date.parse(turn.lastUpdatedAt) - Date.parse(turn.createdAt))), 0))
               const secondary = secondaryOf?.(mission.missionId)
-              const running = runningMissionIds.has(mission.missionId)
-              const isPicked = picked.has(mission.missionId)
+              const running = entry.members.some((turn) => runningMissionIds.has(turn.missionId))
+              const isPicked = picked.has(entry.key)
               return (
                 <div
-                  key={mission.missionId}
+                  key={entry.key}
                   className={`lc-missionrowwrap${isPicked ? ' is-picked' : ''}`}
                 >
                   {/*
@@ -457,9 +465,9 @@ export function MissionsScreen({
                       className="lc-missionrow__pick"
                       checked={isPicked}
                       disabled={running}
-                      aria-label={running ? `${titleOf(mission)} is still running` : `Select ${titleOf(mission)}`}
+                      aria-label={running ? `${title} is still running` : `Select ${title}`}
                       title={running ? 'Still running — stop it first' : undefined}
-                      onChange={() => toggle(mission.missionId)}
+                      onChange={() => toggle(entry.key)}
                     />
                   )}
                 <button
@@ -476,8 +484,12 @@ export function MissionsScreen({
                     * this says what for, without opening it.
                     */}
                   <span className="lc-missionrow__name">
-                    <span className="lc-missionrow__title">{titleOf(mission)}</span>
+                    <span className="lc-missionrow__title">{title}</span>
                     {secondary !== undefined && <span className="lc-missionrow__doing">{secondary}</span>}
+                  </span>
+                  {/* When: every row said who and on what, and none said when (0.415). */}
+                  <span className="lc-missionrow__when lc-mono" title={new Date(mission.lastUpdatedAt).toLocaleString()}>
+                    {shortAgo(mission.lastUpdatedAt) ?? ''}
                   </span>
                   <span className="lc-missionrow__owner">{owner?.name ?? '—'}</span>
                   <span className="lc-missionrow__route lc-mono">
@@ -492,12 +504,14 @@ export function MissionsScreen({
                   </span>
                   <span className="lc-missionrow__stats lc-mono">
                     {/* A count of none says nothing (Yurt's beta report, #14). */}
-                    {mission.checkpoints.length === 0
-                      ? elapsed
-                      : `${String(mission.checkpoints.length)} checkpoint${mission.checkpoints.length === 1 ? '' : 's'} · ${elapsed}`}
+                    {entry.members.length > 1
+                      ? `${String(entry.members.length)} turns · ${elapsed}`
+                      : mission.checkpoints.length === 0
+                        ? elapsed
+                        : `${String(mission.checkpoints.length)} checkpoint${mission.checkpoints.length === 1 ? '' : 's'} · ${elapsed}`}
                   </span>
                   <span className="lc-missionrow__cost lc-mono" title="What the runtime reported this run cost">
-                    {costCell(missionCost(mission), mission.model)}
+                    {costCell(sumCosts(entry.members.map((turn) => missionCost(turn))), mission.model)}
                   </span>
                   <span className={`lc-missionrow__tag lc-mono lc-tone-${view.tone}`}>{view.tag}</span>
                 </button>
