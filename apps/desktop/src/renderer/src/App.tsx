@@ -1374,6 +1374,23 @@ export default function App(): ReactElement {
       .then((settings) => setCheckCommand(settings.checkCommand ?? ''))
       .catch(() => undefined)
   }
+  /*
+   * About you (0.423): the person's standing note, read by every teammate
+   * (shared/about-you.ts). Saved whole; '' removes it. Answers an error
+   * sentence or undefined, as the Memory screen's other writes do.
+   */
+  const [aboutYou, setAboutYou] = useState('')
+  const saveAboutYou = async (next: string): Promise<string | undefined> => {
+    const bridge = window.desktop
+    if (!bridge) return 'Locust is not ready yet. Nothing was saved.'
+    try {
+      const settings = await bridge.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, replySize, layout, tube, aboutYou: next })
+      setAboutYou(settings.aboutYou ?? '')
+      return undefined
+    } catch {
+      return 'Your note could not be saved. What your teammates read is unchanged.'
+    }
+  }
   const chooseReplySize = (next: ReplyTextSize): void => {
     const before = replySize
     setReplySize(next)
@@ -2546,6 +2563,7 @@ export default function App(): ReactElement {
           setAskConnectors(settings.askConnectors === true)
           setKeepATodoList(settings.keepATodoList === true)
           setCheckCommand(settings.checkCommand ?? '')
+          setAboutYou(settings.aboutYou ?? '')
           setRelayHopCap(settings.relayHopCap)
           setInterrupt(settings.interrupt)
           setMemoryMode(settings.memoryMode)
@@ -5811,6 +5829,8 @@ export default function App(): ReactElement {
               {...(briefTrackingSince === undefined ? {} : { briefTrackingSince })}
               onRestore={restoreMemory}
               onTidy={openTidyMenu}
+              aboutYou={aboutYou}
+              onSaveAboutYou={saveAboutYou}
               // `openMission`, like every other opener. This had its own two
               // lines, and `setShownKey` wants a RUN key -- `runs` is keyed by
               // `run_...` -- so a `mission_...` id matched nothing and the

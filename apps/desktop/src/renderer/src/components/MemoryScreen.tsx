@@ -1,8 +1,9 @@
 import type { ReactElement } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import type { MemoryMode, MemoryScope, MemoryUpdateRequest, PublicForgottenMemory, PublicMemory, PublicTeammate } from '../../../shared/ipc.js'
 import { daysUnused, lastWritten, outOfDate } from '../../../shared/memory.js'
+import { MAX_ABOUT_YOU } from '../../../shared/about-you.js'
 import { TIDY_NUDGE_AT, readableReason } from '../../../shared/memory-tidy.js'
 import { Icon } from './Icon.js'
 import { TeammateBot } from './TeammateBot.js'
@@ -61,7 +62,9 @@ export function MemoryScreen({
   onOpenMission,
   notice,
   noticeWaits = false,
-  onDismissNotice
+  onDismissNotice,
+  aboutYou,
+  onSaveAboutYou
 }: {
   readonly memories: readonly PublicMemory[]
   readonly workspaceId: string
@@ -93,6 +96,9 @@ export function MemoryScreen({
    * this is the screen where the person is already acting on what it says.
    */
   readonly onDismissNotice: () => void
+  /** About you (0.423): the person's standing note, as saved. Absent hides the card. */
+  readonly aboutYou?: string
+  readonly onSaveAboutYou?: (text: string) => Promise<string | undefined>
 }): ReactElement {
   const [draft, setDraft] = useState('')
   const [draftScope, setDraftScope] = useState<MemoryScope>('workspace')
@@ -353,6 +359,10 @@ export function MemoryScreen({
           </section>
         )}
 
+        {aboutYou !== undefined && onSaveAboutYou !== undefined && (
+          <AboutYouCard saved={aboutYou} onSave={onSaveAboutYou} />
+        )}
+
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">How memory is kept</h2>
           <p className="lc-settings__lede">
@@ -521,5 +531,65 @@ export function MemoryScreen({
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * About you (0.423): the person's own standing note, read by every teammate
+ * before every run (shared/about-you.ts). Written here and nowhere else; a
+ * teammate never changes it.
+ */
+function AboutYouCard({
+  saved,
+  onSave
+}: {
+  readonly saved: string
+  readonly onSave: (text: string) => Promise<string | undefined>
+}): ReactElement {
+  const [text, setText] = useState(saved)
+  const [busy, setBusy] = useState(false)
+  const [said, setSaid] = useState<string | undefined>(undefined)
+  // What was saved elsewhere (a relaunch, a second window) replaces an untouched draft.
+  useEffect(() => {
+    setText(saved)
+  }, [saved])
+  const changed = text.trim() !== saved.trim()
+  const left = MAX_ABOUT_YOU - text.length
+  const save = async (): Promise<void> => {
+    setBusy(true)
+    const error = await onSave(text.trim())
+    setBusy(false)
+    setSaid(error ?? (text.trim().length === 0 ? 'Removed. Teammates are no longer given a note about you.' : 'Saved. Every teammate reads this from their next run.'))
+  }
+  return (
+    <section className="lc-settings__section lc-aboutyou">
+      <h2 className="lc-settings__heading">About you</h2>
+      <p className="lc-settings__lede">
+        Every teammate reads this before each run, on every runtime — how you like to work, what to always or never do.
+        Only you change it.
+      </p>
+      <div className="lc-memoryform">
+        <textarea
+          className="lc-input lc-aboutyou__text"
+          aria-label="About you"
+          placeholder="For example: I read diffs, not long explanations. Keep answers short. Ask before deleting anything."
+          rows={4}
+          maxLength={MAX_ABOUT_YOU}
+          value={text}
+          onChange={(event) => {
+            setText(event.target.value)
+            setSaid(undefined)
+          }}
+        />
+        <div className="lc-memoryform__row">
+          <span className="lc-settings__note" role="status">
+            {said ?? (left < 200 ? `${String(left)} characters left` : '')}
+          </span>
+          <button type="button" className="lc-primarybutton" disabled={busy || !changed} onClick={() => void save()}>
+            {text.trim().length === 0 && saved.length > 0 ? 'Remove' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </section>
   )
 }

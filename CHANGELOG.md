@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.423.0 - 2026-09-28
+
+### New
+
+- **About you.** A note at the top of the Memory screen that every teammate
+  reads before each run, on every runtime: how you like to work, what to
+  always or never do. Only you change it, and it's given even when teammate
+  memory is switched off. Edit it mid-conversation and the teammate is told
+  the new note replaces the old one.
+
 ## 0.422.0 - 2026-09-28
 
 ### Fixed

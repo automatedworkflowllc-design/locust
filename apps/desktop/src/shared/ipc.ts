@@ -1740,6 +1740,12 @@ export interface WorkspaceSettings {
   readonly checkCommand?: string
   /** Every folder's check command, by workspace id. Kept by the host. */
   readonly checkCommands?: Readonly<Record<string, string>>
+  /**
+   * About you: the person's standing note, read by every teammate before
+   * every run (shared/about-you.ts). Absent means none. Only the person
+   * writes it, on the Memory screen.
+   */
+  readonly aboutYou?: string
 }
 
 /*

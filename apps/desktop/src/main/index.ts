@@ -53,6 +53,7 @@ import { MAX_ATTACHMENTS } from '../shared/attachments.js'
 import { ATTACHMENT_DIR, attachmentDestination, excludeWith } from './attach-outside.js'
 import { imageMediaType, MAX_PREVIEW_BYTES } from '../shared/image-files.js'
 import { extensionOf, isViewableText, MAX_TEXT_BYTES, viewerMode } from '../shared/text-files.js'
+import { aboutYouSection } from '../shared/about-you.js'
 import { SHEET_EXTENSIONS, csvWorkbook } from '../shared/sheet.js'
 import { WorkbookUnreadable, readXlsx } from './xlsx.js'
 
@@ -1342,6 +1343,10 @@ if (!ownsSingleInstanceLock) {
           if (inGroup !== undefined) sections.push(groupSection(inGroup.name, inGroup.instructions))
         }
         const settings = await teammates.readSettings()
+        // About you (0.423): the person's own standing note, before memory
+        // and whatever the memory mode says -- switching teammate memory off
+        // does not silence the person (shared/about-you.ts).
+        if (settings.aboutYou !== undefined) sections.push(aboutYouSection(settings.aboutYou))
         if (settings.memoryMode !== 'off') {
           sections.push(await memoryPart(peer, query))
         } else {

@@ -8,6 +8,7 @@ import type { PublicTeammate, TeammateHue, TeammateRole, TeammateRoute, Workspac
 import { DEFAULT_RELAY_HOP_CAP, MAX_RELAY_HOP_CAP, MIN_RELAY_HOP_CAP, DEFAULT_MEMORY_MODE } from '../shared/ipc.js'
 import { isMissionRuntime } from '../shared/runtimes.js'
 import { isMonthlyLimit } from '../shared/spend.js'
+import { parsedAboutYou } from '../shared/about-you.js'
 
 /**
  * Teammates are local identity plus routing defaults: a name, an avatar hue, a
@@ -549,6 +550,12 @@ function parsedFile(text: string): StoredFile {
         ? parsedCheckCommands((rawSettings as Record<string, unknown>).checkCommands)
         : undefined
       return checkCommands === undefined ? {} : { checkCommands }
+    })(),
+    ...(() => {
+      const aboutYou = typeof rawSettings === 'object' && rawSettings !== null
+        ? parsedAboutYou((rawSettings as Record<string, unknown>).aboutYou)
+        : undefined
+      return aboutYou === undefined ? {} : { aboutYou }
     })()
   }
 
@@ -928,6 +935,11 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           ...(() => {
             const checkCommands = parsedCheckCommands((settings as Record<string, unknown>).checkCommands)
             return checkCommands === undefined ? {} : { checkCommands }
+          })(),
+          // Kept across every write that does not name it; '' clears it (0.423).
+          ...(() => {
+            const aboutYou = parsedAboutYou((settings as Record<string, unknown>).aboutYou)
+            return aboutYou === undefined ? {} : { aboutYou }
           })()
         }
         await write({ ...stored, settings: next })

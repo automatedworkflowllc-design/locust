@@ -10,6 +10,7 @@ import type { TeammateRole } from '../shared/ipc.js'
 import { BLOCK_PLACEMENT } from '../shared/trailer.js'
 import { FILE_TAG } from '../shared/handover.js'
 import { MEMORY_HEADING, MEMORY_RULES, MEMORY_TAG } from '../shared/memory.js'
+import { ABOUT_YOU_HEADING } from '../shared/about-you.js'
 import { roomHistorySection } from '../shared/room-history.js'
 import type { RoomHistory } from '../shared/room-history.js'
 
@@ -200,7 +201,12 @@ function standingFor(standing: readonly string[], alreadyGiven: ReadonlySet<stri
   return {
     sections: [
       stillHoldsLine(standing.join(SECTION_GAP), peer),
-      ...fresh.map((paragraph) => (paragraph.startsWith(MEMORY_HEADING) ? `${MEMORY_LIST_REPLACES}${String.fromCharCode(10)}${paragraph}` : paragraph))
+      ...fresh.map((paragraph) =>
+        paragraph.startsWith(MEMORY_HEADING)
+          ? `${MEMORY_LIST_REPLACES}${String.fromCharCode(10)}${paragraph}`
+          : paragraph.startsWith(ABOUT_YOU_HEADING)
+            ? `${ABOUT_YOU_REPLACES}${String.fromCharCode(10)}${paragraph}`
+            : paragraph)
     ],
     given
   }
@@ -218,6 +224,10 @@ function standingFor(standing: readonly string[], alreadyGiven: ReadonlySet<stri
  * remembered "(this folder, by the person, 3 weeks ago)". The list is whole
  * every time it is sent, so it can say it replaces the last one.
  */
+/** The same, for the person's About-you note when they edit it mid-conversation (0.423). */
+export const ABOUT_YOU_REPLACES =
+  'The note below replaces the one about the person you were given earlier in this conversation.'
+
 export const MEMORY_LIST_REPLACES =
   'The list of what is remembered below replaces the one you were given earlier in this conversation. A memory on the earlier list that is not on this one was changed or forgotten by the person: do not use it or quote it.'
 

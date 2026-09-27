@@ -3100,6 +3100,17 @@ textarea {
   gap: var(--lc-space-2);
 }
 
+/* About you (0.423): room for a few lines of how the person works, and Save
+   at the row's end, away from the sentence that reports what happened. */
+.lc-aboutyou__text {
+  min-height: calc(5 * 1.5em + 2 * var(--lc-space-3));
+  resize: vertical;
+}
+
+.lc-aboutyou .lc-memoryform__row .lc-primarybutton {
+  margin-left: auto;
+}
+
 /* The Forget row's two ghost buttons sit where the section starts. Each
    carried the base rule's `margin-left: auto`, so they split the free space
    between them: the first floated to the middle of the column, the second to
