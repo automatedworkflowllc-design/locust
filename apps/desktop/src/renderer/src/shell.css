@@ -14630,6 +14630,44 @@ textarea {
   background: var(--lc-bg-chrome);
 }
 
+/*
+ * A SECOND CONVERSATION BESIDE THE ONE IN THE MIDDLE (BesideConversation.tsx,
+ * 0.396): the file viewer's panel, holding a thread. Who and what at the top
+ * on two lines; the thread itself scrolls below, a little tighter than in the
+ * middle because the panel is narrower.
+ */
+/* The panel's own ground, a step below the middle, so two threads side by
+   side read as the one you are in and the one you are watching. */
+.lc-beside {
+  background: var(--lc-bg-chrome);
+}
+
+.lc-beside__who {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.lc-beside__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+}
+
+.lc-beside__thread {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.lc-beside__thread .lc-thread {
+  padding: var(--lc-space-6) var(--lc-space-5);
+}
+
 .lc-viewer__head {
   display: flex;
   align-items: center;

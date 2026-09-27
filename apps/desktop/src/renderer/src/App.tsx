@@ -108,6 +108,7 @@ import { TEAM_TEMPLATES } from '../../shared/team-templates.js'
 import type { TeamTemplate } from '../../shared/team-templates.js'
 import { GroupSettingsDialog } from './components/GroupSettingsDialog.js'
 import { TeammateBot } from './components/TeammateBot.js'
+import { BesideConversation } from './components/BesideConversation.js'
 import { RuntimeMark } from './components/RuntimeMark.js'
 import { OpenInTerminalButton, terminalOffer } from './components/OpenInTerminal.js'
 import type { TerminalOffer } from './components/OpenInTerminal.js'
@@ -934,6 +935,8 @@ export default function App(): ReactElement {
        */
       items: [
         { label: 'Open', shortcut: 'o', onSelect: () => openMission(missionId) },
+        // 0.396: watch it beside the one you are in (the side-by-side on Orca's list).
+        { label: 'Open beside', shortcut: 'b', onSelect: () => setBesideId(missionId) },
         {
           label: 'Rename',
           shortcut: 'r',
@@ -1453,6 +1456,16 @@ export default function App(): ReactElement {
    * whichever is open, with the file winning -- it was opened by a press on a
    * specific thing, which is a more specific intent than a toggle.
    */
+  /*
+   * A SECOND CONVERSATION, BESIDE THE ONE ON SCREEN (0.396).
+   *
+   * Orca's list, item 4: two agents side by side. Read-only on purpose --
+   * the chat box stays with the conversation you are in, so there is never
+   * a question which one a message goes to -- and live: a run still going
+   * streams into it. Any turn of the conversation names it; the newest is
+   * what is drawn.
+   */
+  const [besideId, setBesideId] = useState<string>()
   const [viewingFile, setViewingFile] = useState<{
     readonly path: string
     /** The file's text, or a `data:` URL when the mode is `image`. */
@@ -5060,6 +5073,18 @@ export default function App(): ReactElement {
       return chosen === undefined ? row : { ...row, title: chosen }
     })
   }, [history, historyById, runs, workspaceId, missionTitles])
+  const besideRow = besideId === undefined ? undefined : sidebarMissions.find((entry) => (entry.memberIds ?? [entry.missionId]).includes(besideId))
+  const besideRun = ((): LiveRunState | undefined => {
+    if (besideId === undefined) return undefined
+    const newest = besideRow?.missionId ?? besideId
+    const members = besideRow?.memberIds ?? [newest]
+    // The one on screen already is not drawn twice.
+    if (liveRun?.data?.missionId !== undefined && members.includes(liveRun.data.missionId)) return undefined
+    const live = [...runs.values()].find((run) => run.data?.missionId === newest)
+    if (live !== undefined) return live
+    const held = historyById.get(newest)
+    return held === undefined ? undefined : reopenedRun(held, historyById)
+  })()
   // The right-click menu is built outside render and names the row it was
   // opened on, so it reads the rows through this.
   /*
@@ -5555,7 +5580,7 @@ export default function App(): ReactElement {
    * rule, whichever of the two is occupying the space.
    */
   return (
-    <div className={`lc-shell${layoutMode === 'compact' ? ' is-compact' : ''}${(viewingFile !== undefined || viewerRefusal !== undefined) && screen === 'workroom' ? ' has-viewer' : inspectorOpen && liveRun !== undefined && screen === 'workroom' ? ' has-inspector' : ''}`}>
+    <div className={`lc-shell${layoutMode === 'compact' ? ' is-compact' : ''}${(viewingFile !== undefined || viewerRefusal !== undefined || besideRun !== undefined) && screen === 'workroom' ? ' has-viewer' : inspectorOpen && liveRun !== undefined && screen === 'workroom' ? ' has-inspector' : ''}`}>
       <TitleBar
         // With no folder the composer chip already says so; the bar shows the
         // build instead (Colin, 2026-09-05).
@@ -6698,6 +6723,20 @@ export default function App(): ReactElement {
               if (bridge === undefined || workspacePath === undefined) return
               void bridge.saveCopy(viewingFile.path).catch(() => undefined)
             }}
+          />
+        ) : besideRun !== undefined && screen === 'workroom' ? (
+          <BesideConversation
+            run={besideRun}
+            title={besideRow?.title ?? 'Conversation'}
+            owner={teammates.find((entry) => entry.teammateId === ownerOf(besideRun))}
+            teammates={teammates}
+            workspacePath={workspacePath}
+            onOpenHere={() => {
+              const id = besideRun.data?.missionId
+              setBesideId(undefined)
+              if (id !== undefined) openMission(id)
+            }}
+            onClose={() => setBesideId(undefined)}
           />
         ) : (
           inspectorOpen && liveRun !== undefined && screen === 'workroom' && (

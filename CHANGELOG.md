@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.396.0 - 2026-09-27
+
+### New
+
+- **Watch two teammates at once.** Right-click a conversation and choose
+  **Open beside** to keep it open in a panel on the right while you work in
+  another. It updates live as that teammate works. The chat box stays with
+  the conversation in the middle, so there's never a question of where your
+  message goes. Press **Open it here** to swap it into the middle and
+  answer it.
+
 ## 0.395.0 - 2026-09-27
 
 ### New
