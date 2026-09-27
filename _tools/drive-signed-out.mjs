@@ -58,7 +58,9 @@ const MEASURE = `(() => {
     overflow: (pane?.scrollHeight ?? 0) - (pane?.clientHeight ?? 0),
     coverTop: Math.round((cover?.getBoundingClientRect().top ?? 0) - (pane?.getBoundingClientRect().top ?? 0)),
     k: Number(cover ? getComputedStyle(cover).getPropertyValue('--lc-cover-k') : 0),
-    widthK: Math.round(((cover?.clientWidth ?? 0) / 960) * 1000) / 1000
+    widthK: Math.round(((cover?.clientWidth ?? 0) / 960) * 1000) / 1000,
+    scrollTop: Math.round(pane?.scrollTop ?? 0),
+    faded: pane ? /gradient/.test(getComputedStyle(pane).maskImage || getComputedStyle(pane).webkitMaskImage || '') : false
   })
 })()`
 
@@ -74,6 +76,8 @@ async function home(label, teammates, port, sizes, judge) {
       await sleep(1800)
       const seen = JSON.parse(String(await drive.capture(`Home at ${String(width)}x${String(height)}, ${label}`, () => drive.evaluate(MEASURE))))
       judge(`${label} ${String(width)}x${String(height)}`, width, seen)
+      // 0.403: a scrolled Home fades its top edge; one at rest does not.
+      check(`${label} ${String(width)}x${String(height)}: the top fades exactly when Home is scrolled`, seen.faded === seen.scrollTop > 0, JSON.stringify(seen))
       check(`${label} ${String(width)}x${String(height)}: the claim sits inside the glass, 12px clear each side`, seen.claimMargin >= 12, JSON.stringify(seen))
     }
     return String(await drive.evaluate(`document.querySelector('.lc-empty')?.innerText.replace(/\\s+/g, ' ') ?? ''`))

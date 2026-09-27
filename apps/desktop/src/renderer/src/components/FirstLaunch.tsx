@@ -237,15 +237,25 @@ export function FirstLaunch({
    * they are.
    */
   const pane = useRef<HTMLDivElement>(null)
+  /*
+   * SCROLLED, SO THE TOP FADES (0.403). What scrolls away above -- the cover,
+   * at 1120x720 -- was cut by the pane's edge mid-drawing: the sign's box
+   * sliced through, or one thin line of it left at the top, which read as a
+   * glitch rather than as more above (fresh-eyes check, Home). A scrolled
+   * pane fades its top edge instead.
+   */
+  const [scrolled, setScrolled] = useState(false)
   useEffect(() => {
     const el = pane.current
     if (el === null || typeof ResizeObserver === 'undefined') return
     let atEnd = true
     const onScroll = (): void => {
       atEnd = el.scrollHeight - el.scrollTop - el.clientHeight < 4
+      setScrolled(el.scrollTop > 0)
     }
     const follow = (): void => {
       if (atEnd) el.scrollTop = el.scrollHeight
+      setScrolled(el.scrollTop > 0)
     }
     el.addEventListener('scroll', onScroll)
     const observer = new ResizeObserver(follow)
@@ -289,7 +299,7 @@ export function FirstLaunch({
   }, [])
 
   return (
-    <div className="lc-empty" ref={pane}>
+    <div className={`lc-empty${scrolled ? ' is-scrolled' : ''}`} ref={pane}>
       <div className="lc-empty__inner" ref={inner}>
         {/* The design system's cover: the lockup lighting up once the runtimes have answered, and the teammates. */}
         <HomeCover ready={discoveryPhase === 'ready'} tube={tube ?? 'full'} swarmCalls={swarmCalls} grow={coverGrow} />

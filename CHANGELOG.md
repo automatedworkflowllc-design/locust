@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.403.0 - 2026-09-27
+
+### Fixed
+
+- **Home on a small window no longer looks cut off.** When Home is taller
+  than the window, its top scrolls out of view, and the window's edge used
+  to slice straight through the Locust sign. The top of Home now fades out
+  while it is scrolled, so what is above dissolves instead.
+
 ## 0.402.0 - 2026-09-27
 
 ### Fixed

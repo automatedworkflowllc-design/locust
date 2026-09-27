@@ -2577,6 +2577,15 @@ textarea {
   font-size: var(--lc-text-screen-title);
 }
 
+/*
+ * A Home scrolled down fades its top edge (0.403), so what scrolls away above
+ * -- the cover, on a small window -- dissolves instead of being cut through.
+ */
+.lc-empty.is-scrolled {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 56px);
+  mask-image: linear-gradient(to bottom, transparent, #000 56px);
+}
+
 .lc-empty {
   flex: 1;
   display: flex;
