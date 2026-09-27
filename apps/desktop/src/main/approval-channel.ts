@@ -1,7 +1,14 @@
 import { randomUUID } from 'node:crypto'
 
 import { toolPatchFrom } from '@teammate/runtime-adapters'
-import type { AppServerRequest, JsonValue, MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
+import type {
+  AcpPermissionAnswer,
+  AcpPermissionRequest,
+  AppServerRequest,
+  JsonValue,
+  MissionRuntimeId,
+  NormalizedRuntimeEvent
+} from '@teammate/runtime-adapters'
 
 import type {
   CodexMissionUpdate,
@@ -273,6 +280,48 @@ export function openCodeReplyFor(result: JsonValue): 'once' | 'always' | 'reject
   // OpenCode's reject carries a message the model reads (measured on
   // 1.18.27), so a reason rides the denial itself (0.374).
   return typeof record.reason === 'string' && record.reason.length > 0 ? { reply: 'reject', message: deniedSaying(record.reason) } : 'reject'
+}
+
+/**
+ * An Agent Client Protocol agent's permission request, as the request this
+ * channel already knows how to put to a person (0.377; Copilot's Approve
+ * each).
+ *
+ * A shell call is a command card with the command it will run -- or, when
+ * the agent did not say, one that says so, rather than passing its own
+ * description off as the command. An edit, a delete or a move is a
+ * file-change card naming the files, with the change itself when the agent
+ * sent its before and after. Anything else -- a fetch, a path outside the
+ * folder -- is a command card in the agent's own words and what it names.
+ */
+export function acpPermissionRequest(asked: AcpPermissionRequest, cwd: string): AppServerRequest {
+  const base = { cwd, ...(asked.toolCallId === undefined ? {} : { itemId: asked.toolCallId }) }
+  const files = asked.paths.map((path) => relativeToFolder(path, cwd)).join(', ')
+  if (asked.kind === 'execute') {
+    return { id: 0, method: 'item/commandExecution/requestApproval', params: { ...base, command: asked.command ?? '' } }
+  }
+  if (asked.kind === 'edit' || asked.kind === 'delete' || asked.kind === 'move') {
+    return {
+      id: 0,
+      method: 'item/fileChange/requestApproval',
+      params: { ...base, summary: files.length > 0 ? files : (asked.title ?? ''), ...(asked.diff === undefined ? {} : { unifiedDiff: asked.diff }) }
+    }
+  }
+  const what = asked.title ?? `Use ${asked.kind ?? 'a tool'}`
+  const target = asked.command ?? (files.length > 0 ? files : undefined)
+  return { id: 0, method: 'item/commandExecution/requestApproval', params: { ...base, command: target === undefined ? what : `${what}: ${target}` } }
+}
+
+/**
+ * This channel's answer, as the kind of ACP option to choose. "Always" stays
+ * "always" here; the run keeps it for itself and never passes it on
+ * (acp-run.ts). Anything unclear is a refusal.
+ */
+export function acpAnswerFor(result: JsonValue): AcpPermissionAnswer {
+  const record = typeof result === 'object' && result !== null && !Array.isArray(result) ? (result as { decision?: unknown }) : {}
+  if (record.decision === 'accept') return 'allow_once'
+  if (record.decision === 'acceptForSession') return 'allow_always'
+  return 'reject_once'
 }
 
 /** The protocol decision for each of the product's three authorization answers. */

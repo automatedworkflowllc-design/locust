@@ -1542,6 +1542,8 @@ if (!ownsSingleInstanceLock) {
       appServerSpawn: (executablePath, args, env) => spawnAppServer(executablePath, args, env),
       // A6.7: OpenCode's own server, for Approve-each; the same launcher (tree kill on Windows).
       opencodeServeSpawn: (executablePath, args, env) => spawnAppServer(executablePath, args, env),
+      // 0.377: an Agent Client Protocol agent (Copilot, for Approve-each), started IN its folder.
+      acpSpawn: (executablePath, args, env, cwd) => spawnAppServer(executablePath, args, env, cwd),
       // A3.3: the person's check for THIS folder, after a turn that changed files.
       afterEdits: (cwd) => editCheck.after(cwd),
       /*
@@ -1757,8 +1759,8 @@ if (!ownsSingleInstanceLock) {
 
     // Started and stopped in one place for the mission transport and the model
     // probe -- stopped once, without holding the app; see app-server-process.ts.
-    const spawnAppServer = (executablePath: string, args: readonly string[], env?: Readonly<Record<string, string>>) =>
-      startAppServerProcess(executablePath, args, undefined, env)
+    const spawnAppServer = (executablePath: string, args: readonly string[], env?: Readonly<Record<string, string>>, cwd?: string) =>
+      startAppServerProcess(executablePath, args, undefined, env, cwd)
 
     // Installing is its own service: one at a time, and it asks discovery
     // again after a clean exit rather than trusting npm's exit code alone.
@@ -4438,13 +4440,14 @@ if (!ownsSingleInstanceLock) {
           } as const
         }
       }
-      // Codex asks through its app-server, OpenCode through its own server (A6.7).
-      if (mode === 'approve-each' && runtime !== 'codex' && runtime !== 'opencode') {
+      // Codex asks through its app-server, OpenCode through its own server
+      // (A6.7), Copilot through the Agent Client Protocol (0.377).
+      if (mode === 'approve-each' && runtime !== 'codex' && runtime !== 'opencode' && runtime !== 'copilot') {
         return {
           ok: false,
           error: {
             code: 'RUNTIME_START_FAILED',
-            message: `Per-action approvals run on Codex CLI and OpenCode only. Pick another mode for ${runtimeDisplayName(runtime)}, or switch the route.`
+            message: `Per-action approvals run on Codex CLI, OpenCode and Copilot CLI only. Pick another mode for ${runtimeDisplayName(runtime)}, or switch the route.`
           }
         } as const
       }

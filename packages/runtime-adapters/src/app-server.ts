@@ -163,11 +163,17 @@ export function createAppServerClient(options: AppServerClientOptions): AppServe
             message: `Answering ${method} failed: ${error instanceof Error ? error.message : 'unknown'}`
           })
           if (disposed) return
+          // A handler may name its JSON-RPC error -- "Method not found" for a
+          // method the client never offered (ACP, 0.377). Anything else is the
+          // generic failure it always was.
+          const code = error instanceof Error && Number.isInteger((error as Error & { code?: unknown }).code)
+            ? (error as Error & { code: number }).code
+            : -32_000
           options.transport.send(
             `${JSON.stringify({
               jsonrpc: '2.0',
               id: request.id,
-              error: { code: -32_000, message: 'The client could not answer this request.' }
+              error: { code, message: code === -32_000 ? 'The client could not answer this request.' : (error as Error).message }
             })}\n`
           )
         })

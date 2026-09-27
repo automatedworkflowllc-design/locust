@@ -30,6 +30,11 @@ export {
 export { createCodexEventNormalizer } from "./codex-events.js";
 export { asProcessNormalizer, notificationOfRecord, startCodexAppServerRun } from "./codex-app-server-run.js";
 export { runRecordFor, startOpenCodeServeRun } from "./opencode-serve-run.js";
+export { ACP_DECLINED, ACP_PROMPT_RESULT, ACP_SESSION, acpToolNaming, createAcpEventNormalizer } from "./acp-events.js";
+export type { AcpEventNormalizer, AcpInvocationContext } from "./acp-events.js";
+export { ACP_PROTOCOL_VERSION, acpPermissionRequestOf, startAcpRun } from "./acp-run.js";
+export type { AcpPermissionAnswer, AcpPermissionOption, AcpPermissionRequest, AcpRun, AcpRunOptions } from "./acp-run.js";
+export { unifiedDiffOf } from "./line-diff.js";
 export type { OpenCodePermission, OpenCodePermissionAnswer, OpenCodePermissionReply, OpenCodeServeRunOptions } from "./opencode-serve-run.js";
 export type {
   AppServerRunProcess,
@@ -143,8 +148,10 @@ export { parseCursorModelList } from "./commands.js";
 export type { RuntimeModelName } from "./types.js";
 export { cursorCanEnforceReadOnly } from "./commands.js";
 export {
+  COPILOT_ACP_SESSION,
   COPILOT_MODEL_HINTS,
   COPILOT_REQUIRED_FEATURES,
+  createCopilotAcpCommand,
   createCopilotPromptCommand,
   createMuseExecCommand,
   PROMPT_FILE_PLACEHOLDER,

@@ -66,7 +66,11 @@ describe('a runtime declares what it can do', () => {
     // `opencode serve`, which stops and asks -- measured, and driven
     // (drive-opencode-approve-each: an approved command ran, a declined one
     // did not). `run` could only reject, which is why it was not offered.
-    opencode: ['ask', 'accept-edits', 'approve-each', 'plan', 'auto']
+    opencode: ['ask', 'accept-edits', 'approve-each', 'plan', 'auto'],
+    // Copilot gained Approve-each on 2026-09-26 (0.377): it rides the Agent
+    // Client Protocol (`copilot --acp`), which stops and asks -- measured
+    // with probes, and driven (drive-copilot-approve-each).
+    copilot: ['ask', 'accept-edits', 'approve-each', 'plan', 'auto']
   }
 
   it('answers exactly as the if-chain did, except where a claim was corrected on purpose', () => {
@@ -153,7 +157,7 @@ describe('a runtime declares what it can do', () => {
         if (reason === undefined || runtime === 'codex') continue
         // Approve-each names Codex and OpenCode on purpose -- it says which
         // runtimes DO have it -- so only the second half is checked.
-        const aboutThisRuntime = mode === 'approve-each' ? reason.replace('Codex CLI and OpenCode only.', '') : reason
+        const aboutThisRuntime = mode === 'approve-each' ? reason.replace('Codex CLI, OpenCode and Copilot CLI only.', '') : reason
         expect(aboutThisRuntime, `${runtime} / ${mode}: ${reason}`).not.toContain('Codex CLI')
       }
     }

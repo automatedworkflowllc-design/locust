@@ -1588,3 +1588,35 @@ export function createCopilotPromptCommand(
   }
   return baseSpec("copilot", executable, options.workspacePath, args, { stdin: "none", sandbox: sandboxArgument(options.sandbox) });
 }
+
+/**
+ * GitHub Copilot CLI as an Agent Client Protocol server, for Approve each
+ * (0.377; acp-run.ts). The same CLI and the same model rule as the print
+ * route, and none of the flags that exist only because print mode cannot
+ * ask: no `--allow-all-tools` -- asking is the point -- and no prompt or
+ * session id on the argv, since both travel over the protocol. MEASURED
+ * 2026-09-26 on copilot 1.0.88: `--acp` starts with `--model` and `--effort`
+ * beside it (though a model it does not know is not refused -- the turn ran
+ * anyway -- so only a model the picker offered is ever passed).
+ */
+export function createCopilotAcpCommand(
+  executable: ExecutableLaunch,
+  options: RuntimeCommandOptions,
+): RuntimeCommandSpec {
+  const args = ["--acp"];
+  if (options.model !== undefined) {
+    args.push("--model", requireText(options.model, "Model"));
+  }
+  return baseSpec("copilot", executable, options.workspacePath, args, { stdin: "protocol", sandbox: "workspace-write" });
+}
+
+/**
+ * What an Approve-each session on Copilot must be, by Copilot's own ids
+ * (session/new, copilot 1.0.88): its Agent mode -- which asks -- never Plan or
+ * Autopilot ("enables allow-all"), and its `allow_all` switch off. A loaded
+ * session in another state is put back; one that cannot be is not run.
+ */
+export const COPILOT_ACP_SESSION = {
+  modeId: "https://agentclientprotocol.com/protocol/session-modes#agent",
+  requiredConfig: { allow_all: "off" },
+} as const;

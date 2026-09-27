@@ -119,3 +119,31 @@ describe('the live-mission cap is one pool across the transports', () => {
     expect([...main.matchAll(/liveElsewhere: \(\) =>/g)]).toHaveLength(2)
   })
 })
+
+/**
+ * 0.377: Copilot asks too, over the Agent Client Protocol. The run's own
+ * rules are tested against a scripted agent in runtime-adapters
+ * (acp-run.test.ts); what is pinned here is that the mission hands it the
+ * rules at all.
+ */
+describe('Copilot runs Approve-each over ACP, held to the mode that asks', () => {
+  it('rides ACP in Approve-each only, with Agent mode and allow-all off', async () => {
+    const codex = await read('codex-mission.ts')
+    expect(codex).toContain("const copilotAcp = runtime === 'copilot' && mode === 'approve-each' && options.acpSpawn !== undefined")
+    expect(codex).toContain('modeId: COPILOT_ACP_SESSION.modeId')
+    expect(codex).toContain('requiredConfig: COPILOT_ACP_SESSION.requiredConfig')
+  })
+
+  it('what it asks is the card every runtime uses, named as Copilot, and a reason reaches it as its next prompt', async () => {
+    const codex = await read('codex-mission.ts')
+    expect(codex).toContain("requestHandlerFor({ runId, missionId, cwd: runCwd, changesByItem, runtime: 'copilot' })")
+    expect(codex).toContain('acpAnswerFor(await handler(acpPermissionRequest(asked, runCwd)))')
+    expect(codex).toContain('steer = acp.steer')
+  })
+
+  it('the host starts the agent IN its folder, and admits the mode for Copilot', async () => {
+    const main = await read('index.ts')
+    expect(main).toContain('acpSpawn: (executablePath, args, env, cwd) => spawnAppServer(executablePath, args, env, cwd)')
+    expect(main).toContain("runtime !== 'codex' && runtime !== 'opencode' && runtime !== 'copilot'")
+  })
+})

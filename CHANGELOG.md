@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.377.0 - 2026-09-26
+
+### New
+
+- **Copilot can ask before each action.** Choose Approve each for a Copilot
+  teammate and it stops before every command and edit it makes, on the
+  same card Codex and OpenCode use: approve it once, approve it for the
+  rest of the run, or deny it and say why. Copilot reads your reason the
+  moment the step it was on ends. A conversation can move between Approve
+  each and Copilot's other modes and keep its whole thread.
+
 ## 0.376.0 - 2026-09-26
 
 ### New

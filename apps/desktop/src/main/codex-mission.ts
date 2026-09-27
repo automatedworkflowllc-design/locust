@@ -1,12 +1,15 @@
 import {
   asProcessNormalizer,
   codexAppServerPolicy,
+  COPILOT_ACP_SESSION,
+  createAcpEventNormalizer,
   createAppServerEventNormalizer,
   createClaudeEventNormalizer,
   createClaudePrintCommand,
   createCodexAppServerCommand,
   createCodexEventNormalizer,
   createCodexExecCommand,
+  createCopilotAcpCommand,
   createCopilotEventNormalizer,
   createCopilotPromptCommand,
   createCursorEventNormalizer,
@@ -18,6 +21,7 @@ import {
   createOpenCodeServeCommand,
   cursorCanEnforceReadOnly,
   notificationOfRecord,
+  startAcpRun,
   startCodexAppServerRun,
   startOpenCodeServeRun
 } from '@teammate/runtime-adapters'
@@ -42,7 +46,7 @@ import type {
   MissionHandoffResponse,
   MissionMode
 } from '../shared/ipc.js'
-import { openCodePermissionRequest, openCodeReplyFor, withDeclines, withFileChanges } from './approval-channel.js'
+import { acpAnswerFor, acpPermissionRequest, openCodePermissionRequest, openCodeReplyFor, withDeclines, withFileChanges } from './approval-channel.js'
 import type { EditCheckResult } from './edit-check.js'
 import type { ApprovalChannel } from './approval-channel.js'
 import { fileChangesOf, itemOf } from './approval-patch.js'
@@ -279,6 +283,17 @@ interface CodexMissionServiceOptions {
     executablePath: string,
     args: readonly string[],
     env?: Readonly<Record<string, string>>
+  ) => AppServerRunProcess
+  /**
+   * How to start an Agent Client Protocol agent -- `copilot --acp`, which a
+   * Copilot run in Approve-each rides so it can stop and ask (0.377) -- IN
+   * the folder it is told. Absent: Copilot has no Approve-each.
+   */
+  readonly acpSpawn?: (
+    executablePath: string,
+    args: readonly string[],
+    env?: Readonly<Record<string, string>>,
+    cwd?: string
   ) => AppServerRunProcess
   readonly ledger: MissionLedger
   /**
@@ -1323,6 +1338,9 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // OpenCode asks only through its server; every other OpenCode mode
         // stays on `run`, which is what they were measured on.
         const opencodeServes = runtime === 'opencode' && mode === 'approve-each' && options.opencodeServeSpawn !== undefined
+        // Copilot asks only over the Agent Client Protocol (0.377); every
+        // other Copilot mode stays on `-p`, which is what they were measured on.
+        const copilotAcp = runtime === 'copilot' && mode === 'approve-each' && options.acpSpawn !== undefined
         // What the run has announced it will change, by item id. Read off the
         // stream so a file-change tool row can carry its diff, and so an
         // approval card for that item can show what it is about.
@@ -1357,6 +1375,10 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             ? createCursorEventNormalizer(normalizerContext)
             : runtime === 'opencode'
               ? createOpenCodeEventNormalizer(normalizerContext)
+              : copilotAcp
+                // The session is the agent's to name on a first run; the
+                // stream's first record says it (acp-events.ts).
+                ? createAcpEventNormalizer({ ...normalizerContext, runtime: 'copilot', ...(resumeThreadId === undefined ? {} : { sessionId: resumeThreadId }) })
               : runtime === 'copilot'
                 ? createCopilotEventNormalizer({ ...normalizerContext, sessionId: copilotSessionId! })
                 : runtime === 'muse'
@@ -1453,6 +1475,13 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               sandbox: effectiveSandbox,
               prompt: promptText,
               ...choice
+            })
+          }
+          if (runtime === 'copilot' && copilotAcp) {
+            // The prompt and the session travel over the protocol, not the argv.
+            return createCopilotAcpCommand(executable, {
+              workspacePath: runCwd,
+              ...(chosenModel === undefined || chosenModel === 'auto' ? {} : { model: chosenModel })
             })
           }
           if (runtime === 'copilot') {
@@ -1798,6 +1827,28 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               signal: controller.signal,
               now
             })
+          } else if (copilotAcp) {
+            // Each thing Copilot asks becomes the same card Codex's do. A
+            // denial's reason -- which ACP's answer has no room for -- and a
+            // message to the busy teammate both reach it as its next prompt,
+            // the moment this one ends (`steer`).
+            const handler = options.approvals?.requestHandlerFor({ runId, missionId, cwd: runCwd, changesByItem, runtime: 'copilot' })
+            const acp = startAcpRun({
+              spawn: options.acpSpawn!,
+              command,
+              prompt: runtimePrompt,
+              ...(resumeThreadId === undefined ? {} : { resumeSessionId: resumeThreadId }),
+              // Agent mode, which asks; never Autopilot, and allow-all off.
+              modeId: COPILOT_ACP_SESSION.modeId,
+              requiredConfig: COPILOT_ACP_SESSION.requiredConfig,
+              ...(handler === undefined
+                ? {}
+                : { onPermission: async (asked) => acpAnswerFor(await handler(acpPermissionRequest(asked, runCwd))) }),
+              signal: controller.signal,
+              now
+            })
+            process = acp
+            steer = acp.steer
           } else {
             process = options.runner.start(command, runtimePrompt, { signal: controller.signal })
             // A2.10: Claude Code's input stays open while its turn runs, so a
