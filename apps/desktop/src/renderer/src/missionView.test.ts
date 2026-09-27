@@ -38,6 +38,8 @@ import {
   usageWindowLabel,
   usageWindowSentence,
   usagePercent,
+  usageReadOf,
+  usageReadLine,
   activityTrace,
   durationText,
   traceOutcome,
@@ -2445,9 +2447,32 @@ describe('the trace line for a finished turn (SURFACES-0.22)', () => {
 describe('utilisation, in the words of the spec', () => {
   it('reads the fullest window and words the sentence', () => {
     const said = '5-hour window 67% used · resets 2026-09-06T02:10:00.000Z · 7-day window 53% used · resets 2026-09-07T07:00:00.000Z'
-    expect(usagePercent(said)).toBe(67)
-    expect(usageWindowSentence(said)).toMatch(/^67% of the 5-hour window used, resets .+ · 53% of the 7-day window, resets .+$/)
+    const before = new Date('2026-09-06T01:00:00.000Z')
+    expect(usagePercent(said, before)).toBe(67)
+    expect(usageWindowSentence(said, before)).toMatch(/^67% of the 5-hour window used, resets .+ · 53% of the 7-day window, resets .+$/)
     expect(usagePercent('nothing')).toBeUndefined()
+  })
+
+  /*
+   * 0.406, Colin: "my claude code usage hasnt seem to have updated". His
+   * reading was from Locust's last Claude run the night before, and its
+   * 5-hour window had reset hours ago -- still drawn as 20% used.
+   */
+  it('does not count a window whose reset has passed, and says it has reset', () => {
+    const said = '7-day window 66% used · resets 2026-09-28T07:00:00.000Z · 5-hour window 20% used · resets 2026-09-27T05:30:00.000Z · from a run at 2026-09-27T01:23:19.233Z'
+    const later = new Date('2026-09-27T15:30:00.000Z')
+    expect(usagePercent(said, later)).toBe(66)
+    const sentence = usageWindowSentence(said, later)
+    expect(sentence).toMatch(/^66% of the 7-day window used, resets .+ · the 5-hour window has reset since \(as of Locust's last run .+\)$/)
+    expect(sentence).not.toContain('20%')
+  })
+
+  it('says where a reading came from: the last run in Locust, or the account', () => {
+    expect(usageReadOf('5-hour window 20% used · from a run at 2026-09-27T01:23:19.233Z')).toEqual({ kind: 'run', at: '2026-09-27T01:23:19.233Z' })
+    expect(usageReadOf('primary 10% used · as of 2026-09-27T15:00:00.000Z')).toEqual({ kind: 'account', at: '2026-09-27T15:00:00.000Z' })
+    expect(usageReadOf('5-hour window 20% used')).toBeUndefined()
+    expect(usageReadLine('5-hour window 20% used · from a run at 2026-09-27T01:23:19.233Z')).toMatch(/^From Locust's last run on it, .+\. Use outside Locust since then isn't counted\.$/)
+    expect(usageReadLine('primary 10% used · as of 2026-09-27T15:00:00.000Z')).toMatch(/^Read from your account at .+\.$/)
   })
 })
 

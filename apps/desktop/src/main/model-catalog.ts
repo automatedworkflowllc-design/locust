@@ -519,7 +519,8 @@ export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {
         const limits = await client.request('account/rateLimits/read', {})
         const snapshot = typeof limits === 'object' && limits !== null ? (limits as { readonly rateLimits?: unknown }).rateLimits : undefined
         const reading = usageWindowFromSnapshot(snapshot)
-        if (reading !== undefined) usageWindows = { codex: reading }
+        // Read from the account itself, so it counts use outside Locust too (0.406).
+        if (reading !== undefined) usageWindows = { codex: `${reading} · as of ${new Date().toISOString()}` }
       } catch {
         // No reading, and nothing else lost.
       }

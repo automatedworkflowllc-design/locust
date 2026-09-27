@@ -5564,6 +5564,24 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+/* A window reset since the reading: named, no bar -- its percentage is no
+   longer true (0.406). */
+.lc-agentcard__window.is-reset .lc-agentcard__resets {
+  color: var(--lc-text-secondary);
+}
+
+/* Where and when the reading was taken (0.406): Locust's last run on the
+   agent, or the account itself. */
+.lc-agentcard__read {
+  display: block;
+  margin-top: 4px;
+  max-width: 30ch;
+  font-size: var(--lc-text-mono-caption);
+  line-height: 1.4;
+  color: var(--lc-text-muted);
+  white-space: normal;
+}
+
 .lc-agenthead__more {
   flex: none;
   padding: 3px 8px;

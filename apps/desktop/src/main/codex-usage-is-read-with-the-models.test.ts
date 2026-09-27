@@ -76,9 +76,11 @@ describe("Codex's usage, read with its models", () => {
     const catalog = createModelCatalog({ discover: async () => [codexRuntime()], spawn: () => fake.process })
     const response = await catalog.read()
     expect(response.ok).toBe(true)
-    expect(response.ok && response.data.usageWindows).toEqual({
-      codex: `weekly window 71% used · resets ${new Date((RESETS + 86400) * 1000).toISOString()} · 5-hour window 34% used · resets ${new Date(RESETS * 1000).toISOString()}`
-    })
+    // 0.406: read from the account, and said so with when -- " · as of <now>".
+    const reading = response.ok ? response.data.usageWindows?.codex ?? '' : ''
+    expect(reading.startsWith(`weekly window 71% used · resets ${new Date((RESETS + 86400) * 1000).toISOString()} · 5-hour window 34% used · resets ${new Date(RESETS * 1000).toISOString()} · as of `)).toBe(true)
+    const asOf = Date.parse(/ · as of (\S+)$/.exec(reading)?.[1] ?? '')
+    expect(Math.abs(asOf - Date.now())).toBeLessThan(60_000)
     // In the same server session as the models: one server, two questions.
     expect(fake.asked).toEqual(['initialize', 'model/list', 'account/rateLimits/read'])
   })

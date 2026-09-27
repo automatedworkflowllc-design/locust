@@ -11,6 +11,23 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.406.0 - 2026-09-27
+
+### Fixed
+
+- **Usage says how old it is.** Locust knows an agent's usage only from its
+  own runs, so after a quiet night Claude's card could still show last
+  night's figures as if they were current. The card now says when the
+  reading was taken, for example "From Locust's last run on it, Sat 21:40.
+  Use outside Locust since then isn't counted." A usage window whose reset
+  time has passed now says it has reset, instead of showing its old
+  percentage. Codex's usage, read from your account, says so.
+- **Updates say what happens when you restart.** Installing an update closes
+  Locust for a minute or two and then opens it again by itself. The update
+  prompt now says so before you click, and says it is installing after, so
+  it's clear there is no need to open Locust again yourself. Opening it
+  during the install would start the old version.
+
 ## 0.405.0 - 2026-09-27
 
 ### Fixed

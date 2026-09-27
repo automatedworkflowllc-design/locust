@@ -509,7 +509,11 @@ describe('the latest usage window per runtime, from the ledger', () => {
       recovered({ events: [windowEvent('claude', '2026-09-05T10:00:00.000Z', '5-hour window 20% used'), windowEvent('claude', '2026-09-05T11:00:00.000Z', '5-hour window 35% used')] }),
       recovered({ events: [windowEvent('codex', '2026-09-05T09:00:00.000Z', 'primary 10% used')] })
     ]
-    expect(usageWindowsFrom(missions)).toEqual({ claude: '5-hour window 35% used', codex: 'primary 10% used' })
+    // 0.406: each carries when it was seen, from which run's event.
+    expect(usageWindowsFrom(missions)).toEqual({
+      claude: '5-hour window 35% used · from a run at 2026-09-05T11:00:00.000Z',
+      codex: 'primary 10% used · from a run at 2026-09-05T09:00:00.000Z'
+    })
     expect(usageWindowsFrom([recovered({ events: [] })])).toEqual({})
   })
 })

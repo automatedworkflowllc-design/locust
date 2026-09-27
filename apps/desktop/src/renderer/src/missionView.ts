@@ -596,22 +596,49 @@ export function usageWindowLabel(said: string): string {
   })
 }
 
-/** The fullest window's percentage in a usage-window reading, or undefined. */
-export function usagePercent(said: string): number | undefined {
-  const found = [...said.matchAll(/(\d{1,3})% used/g)].map((match) => Number(match[1]))
+/** The fullest window's percentage in a usage-window reading, or undefined. A window that has reset since does not count. */
+export function usagePercent(said: string, now: Date = new Date()): number | undefined {
+  const found = usageWindowsOf(said, now).filter((window) => window.expired !== true).map((window) => window.percent)
   return found.length === 0 ? undefined : Math.max(...found)
+}
+
+/**
+ * WHERE AND WHEN A READING WAS TAKEN (0.406). `run`: the usage the last run
+ * in Locust reported -- use outside Locust since then is not in it. `account`:
+ * read from the account itself (Codex), so it counts everything. Absent on a
+ * reading from before 0.406.
+ */
+export function usageReadOf(said: string): { readonly kind: 'run' | 'account'; readonly at: string } | undefined {
+  const run = / · from a run at (\d{4}-\d{2}-\d{2}T[\d:.]+Z)/.exec(said)
+  if (run !== null) return { kind: 'run', at: run[1]! }
+  const account = / · as of (\d{4}-\d{2}-\d{2}T[\d:.]+Z)/.exec(said)
+  return account === null ? undefined : { kind: 'account', at: account[1]! }
+}
+
+/** "from Locust's last run, Sat 21:23" / "read from your account at 11:40". */
+export function usageReadLine(said: string): string | undefined {
+  const read = usageReadOf(said)
+  if (read === undefined) return undefined
+  const when = usageWindowLabel(read.at)
+  return read.kind === 'run' ? `From Locust's last run on it, ${when}. Use outside Locust since then isn't counted.` : `Read from your account at ${when}.`
 }
 
 /**
  * The reading in the spec's words: "67% of the 5-hour window used, resets
  * 10:10 PM · 53% of the 7-day window, resets Sun 3:00 AM" (SURFACES-0.22 §3).
  */
-export function usageWindowSentence(said: string): string {
-  const parts = [...usageWindowLabel(said).matchAll(/([^·]+?) window (\d{1,3})% used(?: · resets ([^·]+?))?(?= · |$)/g)]
-  if (parts.length === 0) return usageWindowLabel(said)
-  return parts
-    .map((match, index) => `${match[2]}% of the ${match[1].trim()} window${index === 0 ? ' used' : ''}${match[3] === undefined ? '' : `, resets ${match[3].trim()}`}`)
-    .join(' · ')
+export function usageWindowSentence(said: string, now: Date = new Date()): string {
+  const windows = usageWindowsOf(said, now)
+  if (windows.length === 0) return usageWindowLabel(said)
+  let first = true
+  const parts = windows.map((window) => {
+    if (window.expired === true) return `the ${window.name} has reset since`
+    const text = `${String(window.percent)}% of the ${window.name}${first ? ' used' : ''}${window.resets === undefined ? '' : `, resets ${window.resets}`}`
+    first = false
+    return text
+  })
+  const read = usageReadOf(said)
+  return parts.join(' · ') + (read === undefined ? '' : ` (${read.kind === 'run' ? "as of Locust's last run" : 'as of'} ${usageWindowLabel(read.at)})`)
 }
 
 /** One usage window, as a bar draws it: "5-hour window", 35, "22:10". */
@@ -619,18 +646,27 @@ export interface UsageWindowReading {
   readonly name: string
   readonly percent: number
   readonly resets?: string
+  /** Its reset time has passed since the reading: what it said is no longer true (0.406). */
+  readonly expired?: true
 }
 
 /**
  * A reading's windows, in the runtime's order (fullest first), each with its
  * reset as a local time -- what an agent's hover card draws as bars (0.389).
  */
-export function usageWindowsOf(said: string): readonly UsageWindowReading[] {
-  return [...usageWindowLabel(said).matchAll(/([^·]+?) window (\d{1,3})% used(?: · resets ([^·]+?))?(?= · |$)/g)].map((match) => ({
-    name: `${match[1]!.trim()} window`,
-    percent: Math.min(100, Number(match[2])),
-    ...(match[3] === undefined ? {} : { resets: match[3].trim() })
-  }))
+export function usageWindowsOf(said: string, now: Date = new Date()): readonly UsageWindowReading[] {
+  // Read from the RAW reading, where a reset is still an instant: whether
+  // it has passed is a comparison, and a clock time cannot be compared.
+  return [...said.matchAll(/([^·]+?) window (\d{1,3})% used(?: · resets ([^·]+?))?(?= · |$)/g)].map((match) => {
+    const reset = match[3]?.trim()
+    const resetAt = reset === undefined ? Number.NaN : Date.parse(reset)
+    return {
+      name: `${match[1]!.trim()} window`,
+      percent: Math.min(100, Number(match[2])),
+      ...(reset === undefined ? {} : { resets: usageWindowLabel(reset) }),
+      ...(!Number.isNaN(resetAt) && resetAt <= now.getTime() ? { expired: true as const } : {})
+    }
+  })
 }
 
 export function clockTime(iso: string): string {

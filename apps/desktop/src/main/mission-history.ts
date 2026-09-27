@@ -130,7 +130,10 @@ export function usageWindowsFrom(missions: readonly RecoveredMission[]): Record<
     }
   }
   const windows: Record<string, string> = {}
-  for (const [runtime, entry] of latest) windows[runtime] = entry.said
+  // 0.406: with WHEN it was seen. A reading is only what the last run in
+  // Locust reported; shown bare, last night's 20% read as now (Colin,
+  // 2026-09-27: "my claude code usage hasnt seem to have updated").
+  for (const [runtime, entry] of latest) windows[runtime] = `${entry.said} · from a run at ${entry.at}`
   return windows
 }
 

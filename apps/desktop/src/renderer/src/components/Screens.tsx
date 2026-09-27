@@ -1079,6 +1079,7 @@ function UpdateControl({
 }): ReactElement {
   const [busy, setBusy] = useState(false)
   const [refusal, setRefusal] = useState<string>()
+  const [installing, setInstalling] = useState(false)
 
   const phase = update?.phase ?? 'idle'
   const line =
@@ -1093,7 +1094,9 @@ function UpdateControl({
             : phase === 'downloading'
               ? `Downloading ${update?.availableVersion ?? ''}${update?.percent === undefined ? '' : ` · ${String(update.percent)}%`}`
               : phase === 'ready'
-                ? `Version ${update?.availableVersion ?? ''} is downloaded and ready to install.`
+                ? installing
+                  ? installingLine(update?.availableVersion)
+                  : `Version ${update?.availableVersion ?? ''} is downloaded and ready to install. ${INSTALL_TAKES}`
                 : phase === 'failed'
                   ? update?.message ?? 'The update check could not complete.'
                   : 'Not checked yet.'
@@ -1127,6 +1130,7 @@ function UpdateControl({
               void onInstall()
                 .then((response) => {
                   if (!response.ok) setRefusal(response.error.message)
+                  else setInstalling(true)
                 })
                 .finally(() => {
                   setBusy(false)
@@ -2666,6 +2670,20 @@ export function SettingsScreen({
 }
 
 
+/*
+ * WHAT A RESTART TO INSTALL LOOKS LIKE, said before and after the click
+ * (0.406). The install is silent: Locust closes, the installer replaces it
+ * with nothing on screen, and the app opens again by itself. On 2026-09-27
+ * that took a few minutes, and Colin opened Locust three times meanwhile --
+ * getting the OLD version each time, which read as "my update doesn't seem to
+ * be working" (his app's own log: 0.402 at 11:28, 11:29, 11:30; 0.405 at
+ * 11:31). The installer is the assisted kind, so a visible one would show its
+ * wizard; the words are what can change.
+ */
+export const INSTALL_TAKES = 'Locust closes while it installs and opens again by itself in a minute or two.'
+export const installingLine = (version: string | undefined): string =>
+  `Installing Locust${version === undefined || version === '' ? '' : ` ${version}`}. It opens again by itself in a minute or two; there is no need to open it.`
+
 /**
  * The one line that says a new version is here. Settings knew; the person
  * did not, because nobody opens Settings to find out. It sits above the
@@ -2681,11 +2699,12 @@ export function UpdateBanner({
 }): ReactElement | null {
   const [busy, setBusy] = useState(false)
   const [refusal, setRefusal] = useState<string>()
+  const [installing, setInstalling] = useState(false)
   if (update === undefined || update.phase !== 'ready') return null
   return (
     <div className="lc-updatebanner" role="status">
       <span className="lc-updatebanner__text">
-        Locust {update.availableVersion ?? ''} is downloaded and ready. It installs when you restart.
+        {installing ? installingLine(update.availableVersion) : `Locust ${update.availableVersion ?? ''} is downloaded and ready. ${INSTALL_TAKES}`}
         {refusal !== undefined && <span className="lc-tone-amber"> {refusal}</span>}
       </span>
       <button
@@ -2698,6 +2717,7 @@ export function UpdateBanner({
           void onInstall()
             .then((response) => {
               if (!response.ok) setRefusal(response.error.message)
+              else setInstalling(true)
             })
             .finally(() => setBusy(false))
         }}

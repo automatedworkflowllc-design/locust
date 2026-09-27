@@ -2167,7 +2167,7 @@ export default function App(): ReactElement {
       if (update.kind === 'event') {
         const runtime = update.event.sourceAdapter
         if (update.event.type === 'adapter.diagnostic' && /\.usage_window$/.test(update.event.payload.code)) {
-          const said = update.event.payload.message
+          const said = `${update.event.payload.message} · from a run at ${update.event.occurredAt}`
           setUsageWindows((current) => (current.get(runtime) === said ? current : new Map(current).set(runtime, said)))
         }
         if (update.event.type === 'route.limit_detected' && update.event.payload.kind === 'quota-exhausted') {

@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 
-import { usageWindowSentence, usageWindowsOf } from '../missionView.js'
+import { usageReadLine, usageWindowSentence, usageWindowsOf } from '../missionView.js'
 import { RuntimeMark } from './RuntimeMark.js'
 
 /**
@@ -29,11 +29,14 @@ export interface AgentMarkProps {
   readonly state: string
   /** The latest usage reading for this agent's account, as the host keeps it. */
   readonly usage?: string
+  /** The clock a reset is compared against; tests pass one. */
+  readonly now?: Date
 }
 
-export function AgentMark({ runtime, name, state, usage }: AgentMarkProps): ReactElement {
-  const windows = usage === undefined ? [] : usageWindowsOf(usage)
-  const said = [name, state, ...(usage === undefined || windows.length === 0 ? [] : [usageWindowSentence(usage)])].join('. ')
+export function AgentMark({ runtime, name, state, usage, now = new Date() }: AgentMarkProps): ReactElement {
+  const windows = usage === undefined ? [] : usageWindowsOf(usage, now)
+  const read = usage === undefined ? undefined : usageReadLine(usage)
+  const said = [name, state, ...(usage === undefined || windows.length === 0 ? [] : [usageWindowSentence(usage, now)])].join('. ')
   return (
     <span className="lc-agentmark" tabIndex={0} role="img" aria-label={said}>
       <RuntimeMark runtime={runtime} size={15} />
@@ -44,6 +47,15 @@ export function AgentMark({ runtime, name, state, usage }: AgentMarkProps): Reac
           <span className="lc-agentcard__state">{state}</span>
         </span>
         {windows.map((window) => {
+          // Reset since the reading: its percentage is no longer true (0.406).
+          if (window.expired === true) {
+            return (
+              <span className="lc-agentcard__window is-reset" key={window.name}>
+                <span className="lc-agentcard__label">{window.name.charAt(0).toUpperCase() + window.name.slice(1)}</span>
+                <span className="lc-agentcard__resets">reset since{window.resets === undefined ? '' : ` (${window.resets})`}</span>
+              </span>
+            )
+          }
           const tone = window.percent >= 100 ? ' is-spent' : window.percent >= 80 ? ' is-pressing' : ''
           return (
             <span className={`lc-agentcard__window${tone}`} key={window.name}>
@@ -56,6 +68,7 @@ export function AgentMark({ runtime, name, state, usage }: AgentMarkProps): Reac
             </span>
           )
         })}
+        {windows.length > 0 && read !== undefined && <span className="lc-agentcard__read">{read}</span>}
       </span>
     </span>
   )

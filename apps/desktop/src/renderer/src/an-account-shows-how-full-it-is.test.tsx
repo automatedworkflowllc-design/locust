@@ -17,7 +17,9 @@ import { usageWindowsOf } from './missionView.js'
  * logo the usage window can appear". So the row is plain marks again, and
  * each opens a card on hover or focus: name, state, and a bar per window.
  */
-const RESETS = '2026-09-27T22:10:00.000Z'
+// Far ahead: a reset that has passed is drawn as reset (0.406), and a date
+// that is "later today" when written stops being so the next morning.
+const RESETS = '2099-09-27T22:10:00.000Z'
 const ready = (id: LocalRuntimeId, name: string): PublicRuntimeStatus => ({ id, displayName: name, installed: true, version: '2.1.283', auth: 'authenticated', ready: true, status: 'ready' })
 
 describe('a usage reading', () => {
@@ -58,6 +60,20 @@ describe("an agent's mark on Home", () => {
     const html = card()
     expect(html).not.toContain('lc-agentcard__window')
     expect(html).toContain('aria-label="Claude Code. Ready · 2.1.283"')
+  })
+
+  /*
+   * 0.406, Colin: "my claude code usage hasnt seem to have updated since
+   * implementation". His reading was from Locust's last Claude run the night
+   * before; its 5-hour window had reset hours ago and was still drawn at 20%.
+   */
+  it('draws a window reset since the reading as reset, without its old bar, and says when the reading was taken', () => {
+    const said = '7-day window 66% used · resets 2026-09-28T07:00:00.000Z · 5-hour window 20% used · resets 2026-09-27T05:30:00.000Z · from a run at 2026-09-27T01:23:19.233Z'
+    const html = renderToStaticMarkup(<AgentMark runtime="claude" name="Claude Code" state="Ready" usage={said} now={new Date('2026-09-27T15:30:00.000Z')} />)
+    expect(html).toContain('style="width:66%"')
+    expect(html).not.toContain('style="width:20%"')
+    expect(html).toMatch(/<span class="lc-agentcard__window is-reset"><span class="lc-agentcard__label">5-hour window<\/span><span class="lc-agentcard__resets">reset since \([^)]+\)<\/span><\/span>/)
+    expect(html).toMatch(/<span class="lc-agentcard__read">From Locust&#x27;s last run on it, [^<]+\. Use outside Locust since then isn&#x27;t counted\.<\/span>/)
   })
 })
 
