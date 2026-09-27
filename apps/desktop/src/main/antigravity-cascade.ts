@@ -93,6 +93,8 @@ export interface CascadeApi {
   pendingQuestion(conversationId: string, fromStep: number): Promise<AntigravityPendingQuestion | undefined>
   /** Answer it. Throws, saying why, when Antigravity did not take the answer. */
   answerQuestion(conversationId: string, pending: AntigravityPendingQuestion, responses: readonly AntigravityQuestionResponse[]): Promise<void>
+  /** Every answer step's whole text, at or after `fromStep` -- what the transcript cut short (0.389). */
+  plannerTexts(conversationId: string, fromStep: number): Promise<readonly string[]>
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -133,6 +135,21 @@ export function pendingQuestionIn(response: unknown, fromStep: number): Antigrav
     return { trajectoryId, stepIndex, action: text(metadata.toolAction), questions }
   }
   return undefined
+}
+
+/**
+ * Every PLANNER_RESPONSE step's text in a `GetCascadeTrajectorySteps`
+ * response, both of the forms the server keeps -- `modifiedResponse` and
+ * `response` -- so the one the transcript was cut from is among them (0.389;
+ * field names from the descriptors compiled into `language_server.exe`).
+ */
+export function plannerTextsIn(response: unknown): readonly string[] {
+  const steps = isRecord(response) && Array.isArray(response.steps) ? response.steps : []
+  return steps.flatMap((step) => {
+    if (!isRecord(step) || step.type !== 'CORTEX_STEP_TYPE_PLANNER_RESPONSE') return []
+    const planner = isRecord(step.plannerResponse) ? step.plannerResponse : {}
+    return [text(planner.modifiedResponse), text(planner.response)].filter((value): value is string => value !== undefined)
+  })
 }
 
 /**
@@ -259,6 +276,10 @@ export function createCascadeApi(host: AntigravityHost, post: CascadePost = post
     },
     async answerQuestion(conversationId, pending, responses) {
       await call('HandleCascadeUserInteraction', questionInteraction(conversationId, pending, responses))
+    },
+    async plannerTexts(conversationId, fromStep) {
+      const response = await call('GetCascadeTrajectorySteps', { cascadeId: conversationId, stepOffset: Math.max(0, fromStep) })
+      return plannerTextsIn(response)
     }
   }
 }

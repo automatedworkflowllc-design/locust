@@ -418,38 +418,6 @@ textarea {
   opacity: 0.5;
 }
 
-/*
- * A usage ring (UsageRing.tsx, 0.388): the fullest window of the account a
- * runtime runs on, round its mark -- muted while there is room, amber from
- * 80%, red when the window is spent.
- */
-.lc-usagering {
-  position: relative;
-  display: inline-grid;
-  place-items: center;
-  flex: none;
-}
-
-.lc-usagering__ring {
-  position: absolute;
-  inset: 0;
-}
-
-.lc-usagering__track {
-  stroke: var(--lc-border-card);
-}
-
-.lc-usagering__arc {
-  stroke: var(--lc-text-muted);
-}
-
-.lc-usagering.is-pressing .lc-usagering__arc {
-  stroke: var(--lc-amber);
-}
-
-.lc-usagering.is-spent .lc-usagering__arc {
-  stroke: var(--lc-red);
-}
 
 /*
  * A new version is ready. One line above the composer; the install is a click.
@@ -5313,9 +5281,126 @@ textarea {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 12px;
-  overflow: hidden;
+  gap: 6px;
   color: var(--lc-text-secondary);
+}
+
+/*
+ * An agent's mark on Home, and its card on hover or focus (AgentMark.tsx,
+ * 0.389). The mark is a thing to point at: a quiet square on hover, the
+ * app's focus edge on focus. The card opens ABOVE, since the row sits just
+ * over the message box, and draws only what the runs reported.
+ */
+.lc-agentmark {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  padding: 3px;
+  border-radius: var(--lc-radius-control);
+  outline: none;
+  transition: background var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-agentmark:hover,
+.lc-agentmark:focus-visible {
+  background: var(--lc-hover-surface);
+}
+
+.lc-agentmark:focus-visible {
+  box-shadow: 0 0 0 1.5px var(--lc-focus-edge);
+}
+
+.lc-agentcard {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  z-index: 20;
+  display: none;
+  gap: 9px;
+  width: 232px;
+  padding: 10px 12px 11px;
+  transform: translateX(-50%);
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-raised);
+  box-shadow: var(--lc-shadow-pending);
+  text-align: left;
+  pointer-events: none;
+}
+
+.lc-agentmark:hover .lc-agentcard,
+.lc-agentmark:focus-visible .lc-agentcard {
+  display: grid;
+}
+
+.lc-agentcard__head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.lc-agentcard__name {
+  font-size: var(--lc-text-description);
+  font-weight: 600;
+  color: var(--lc-text-name);
+  white-space: nowrap;
+}
+
+.lc-agentcard__state {
+  margin-left: auto;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-green-text);
+  white-space: nowrap;
+}
+
+.lc-agentcard__window {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  row-gap: 4px;
+}
+
+.lc-agentcard__label {
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-secondary);
+}
+
+.lc-agentcard__percent {
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  font-variant-numeric: tabular-nums;
+  color: var(--lc-text-secondary);
+}
+
+.lc-agentcard__bar {
+  grid-column: 1 / -1;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--lc-border-card);
+}
+
+.lc-agentcard__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--lc-text-secondary);
+}
+
+.lc-agentcard__window.is-pressing .lc-agentcard__fill {
+  background: var(--lc-amber);
+}
+
+.lc-agentcard__window.is-spent .lc-agentcard__fill {
+  background: var(--lc-red);
+}
+
+.lc-agentcard__resets {
+  grid-column: 1 / -1;
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
 }
 
 .lc-agenthead__more {

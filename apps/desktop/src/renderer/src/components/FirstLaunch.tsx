@@ -7,8 +7,7 @@ import { FREE_START_RUNTIME, installCommand, installSentence, runtimeInstallFact
 import { COVER_HEIGHT, HomeCover, coverGrowFor, coverScale } from './HomeCover.js'
 import { HomeTeam } from './HomeTeam.js'
 import { RuntimeMark } from './RuntimeMark.js'
-import { UsageRing } from './UsageRing.js'
-import { usagePercent, usageWindowSentence } from '../missionView.js'
+import { AgentMark } from './AgentMark.js'
 import type { HomeTeammate } from './HomeTeam.js'
 import { TeamTemplates } from './TeamTemplates.js'
 import type { TeamTemplate } from '../../../shared/team-templates.js'
@@ -559,7 +558,6 @@ export function FirstLaunch({
             !agentsOpen && connected > 0 && !checkingAny && !stuckAny && installingName === undefined && everyInstalledReady && (team.length > 0 || everyAgentReady)
           if (folded) {
             const ready = shown.filter((row) => row.connected)
-            const names = ready.map((row) => row.runtime.displayName)
             return (
               <div className="lc-agenthead is-folded">
                 <span className="lc-agenthead__label">AI agents</span>
@@ -573,22 +571,22 @@ export function FirstLaunch({
                   * by what"). Each mark is named for a screen reader and on
                   * hover, and the line's title lists them all.
                   */}
-                <span className="lc-agenthead__marks" title={names.join(', ')}>
+                {/*
+                  * THE MARKS, AND ON HOVER WHAT EACH KNOWS (AgentMark, 0.389):
+                  * the row is as calm as it was before usage rings (0.388),
+                  * and pointing at a mark opens its name, state and usage.
+                  */}
+                <span className="lc-agenthead__marks">
                   {ready.map((row) => {
-                    /*
-                     * AND HOW FULL EACH ACCOUNT IS (0.388): the ring of the
-                     * fullest window a run last reported, where one has, and
-                     * the reading in words as the mark's name.
-                     */
-                    const said = usageWindows?.get(row.runtime.id)
-                    const used = said === undefined ? undefined : usagePercent(said)
-                    const label = said === undefined ? row.runtime.displayName : `${row.runtime.displayName}: ${usageWindowSentence(said)}`
-                    return used === undefined ? (
-                      <RuntimeMark key={row.runtime.id} runtime={row.runtime.id} size={15} label={label} />
-                    ) : (
-                      <UsageRing key={row.runtime.id} used={used} size={15}>
-                        <RuntimeMark runtime={row.runtime.id} size={15} label={label} />
-                      </UsageRing>
+                    const usage = usageWindows?.get(row.runtime.id)
+                    return (
+                      <AgentMark
+                        key={row.runtime.id}
+                        runtime={row.runtime.id}
+                        name={row.runtime.displayName}
+                        state={row.runtime.version === undefined || row.runtime.version === null ? 'Ready' : `Ready · ${shortVersion(row.runtime.version)}`}
+                        {...(usage === undefined ? {} : { usage })}
+                      />
                     )
                   })}
                 </span>

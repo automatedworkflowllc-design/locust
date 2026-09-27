@@ -602,6 +602,25 @@ export function usageWindowSentence(said: string): string {
     .join(' · ')
 }
 
+/** One usage window, as a bar draws it: "5-hour window", 35, "22:10". */
+export interface UsageWindowReading {
+  readonly name: string
+  readonly percent: number
+  readonly resets?: string
+}
+
+/**
+ * A reading's windows, in the runtime's order (fullest first), each with its
+ * reset as a local time -- what an agent's hover card draws as bars (0.389).
+ */
+export function usageWindowsOf(said: string): readonly UsageWindowReading[] {
+  return [...usageWindowLabel(said).matchAll(/([^·]+?) window (\d{1,3})% used(?: · resets ([^·]+?))?(?= · |$)/g)].map((match) => ({
+    name: `${match[1]!.trim()} window`,
+    percent: Math.min(100, Number(match[2])),
+    ...(match[3] === undefined ? {} : { resets: match[3].trim() })
+  }))
+}
+
 export function clockTime(iso: string): string {
   const at = new Date(iso)
   if (Number.isNaN(at.getTime())) return '--:--'

@@ -179,7 +179,9 @@ function fakeCascade(pending: boolean): CascadeApi & { answers: AntigravityQuest
     },
     answerQuestion: async (_conversationId: string, _pending: unknown, responses: readonly AntigravityQuestionResponse[]) => {
       fake.answers.push([...responses])
-    }
+    },
+    // No gaps in these transcripts, so nothing is asked for.
+    plannerTexts: async () => []
   }
   return fake
 }

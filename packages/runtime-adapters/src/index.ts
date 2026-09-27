@@ -203,8 +203,12 @@ export type { ToolPatch, ToolQuestion } from "./codex-events.js";
 export {
   antigravityToolArg,
   antigravityToolCommand,
+  antigravityMessageStep,
   antigravityWritePatch,
   createAntigravityEventNormalizer,
+  hasAntigravityGap,
+  restoreTruncated,
+  withRestoredGaps,
 } from "./antigravity-events.js";
 export type {
   AntigravityEventNormalizer,

@@ -1,13 +1,15 @@
-// An account shows how full it is (0.388): one real Codex turn, then Home.
+// An account shows how full it is -- on hover (0.389; 0.388 drew a ring).
 //
 //   LOCUST_SPEND=1 node _tools/drive-usage-ring.mjs [--packaged <exe>] [--tag <name>]
 //
 // SPENDS one tiny turn of the person's own Codex plan (the cheapest model the
 // catalog lists, one word asked for). The round trip is the point: Codex's
-// app-server pushes its rate-limit snapshot during a turn; 0.388 keeps it as
-// a `codex.usage_window` reading; the host hands the latest to the window;
-// Home's agents line rings Codex's mark with the fullest window and names the
-// reading. A reading that never arrives is the finding, not a failure to hide.
+// app-server pushes its rate-limit snapshot during a turn; Locust keeps it as
+// a `codex.usage_window` reading (0.388); the host hands the latest to the
+// window; and on Home, POINTING at Codex's mark -- the mouse moved there
+// through the window's own input, as a hand would -- opens its card with a
+// bar for each window. Colin, 2026-09-27, of 0.388: "the hover logo wasnt
+// working". The row itself must be plain marks, no rings.
 
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -17,13 +19,13 @@ import { openTeammateScript, recordRoot, say, scratchRepository, sleep, startDri
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tag = arg('--tag') ?? 'local'
-const OUT = join(recordRoot('usage-ring-2026-09-27'), `usage-ring-${tag}`)
+const OUT = join(recordRoot('usage-ring-2026-09-27'), `usage-hover-${tag}`)
 await mkdir(OUT, { recursive: true })
 const MODEL = process.env.LOCUST_CODEX_MODEL ?? 'gpt-6-luna'
 
-const workspace = await scratchRepository('locust-usage-ring-ws-')
+const workspace = await scratchRepository('locust-usage-hover-ws-')
 const drive = await startDrive({
-  name: `usage-ring-${tag}`,
+  name: `usage-hover-${tag}`,
   port: 9689,
   workspace,
   launchElsewhere: true,
@@ -43,13 +45,37 @@ const check = (what, ok, detail) => {
   if (!ok) failures += 1
   say(`  [${ok ? 'PASS' : 'FAIL'}] ${what}${detail === undefined ? '' : ` -- ${detail}`}`)
 }
+/** Move the pointer to the middle of the mark for `runtime`, as the mouse would, and read what shows. */
+const hover = async (runtime) => {
+  const box = JSON.parse(String(await drive.evaluate(`JSON.stringify((() => {
+    const mark = document.querySelector('.lc-agenthead__marks .lc-agentmark .lc-runtimemark[data-runtime="${runtime}"]')?.closest('.lc-agentmark')
+    if (!mark) return null
+    const rect = mark.getBoundingClientRect()
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+  })())`)))
+  if (box === null) return null
+  await drive.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: Math.round(box.x), y: Math.round(box.y) })
+  await sleep(400)
+  return JSON.parse(String(await drive.evaluate(`JSON.stringify((() => {
+    const mark = document.querySelector('.lc-agenthead__marks .lc-agentmark .lc-runtimemark[data-runtime="${runtime}"]')?.closest('.lc-agentmark')
+    const card = mark?.querySelector('.lc-agentcard')
+    const style = card ? getComputedStyle(card) : null
+    const rect = card?.getBoundingClientRect()
+    return {
+      open: style !== null && style.display !== 'none',
+      name: card?.querySelector('.lc-agentcard__name')?.textContent ?? null,
+      state: card?.querySelector('.lc-agentcard__state')?.textContent ?? null,
+      windows: [...(card?.querySelectorAll('.lc-agentcard__window') ?? [])].map((w) => [w.querySelector('.lc-agentcard__label')?.textContent, w.querySelector('.lc-agentcard__percent')?.textContent, w.querySelector('.lc-agentcard__fill')?.style.width]),
+      above: rect === undefined ? null : rect.bottom <= mark.getBoundingClientRect().top,
+      inView: rect === undefined ? null : rect.top >= 0 && rect.left >= 0 && rect.right <= window.innerWidth
+    }
+  })())`)))
+}
 
 try {
   await drive.ready()
   await drive.resize(1440, 900)
   say(String(await drive.evaluate(openTeammateScript('Juno'))))
-  const route = String(await drive.evaluate(`[...document.querySelectorAll('.lc-control')].find((b) => b.getAttribute('aria-haspopup') === 'listbox')?.innerText.split(/\\s+/).join(' ').trim() ?? ''`))
-  say(`route: ${route}`)
   const sent = String(await drive.evaluate(`(async () => {
     const field = document.querySelector('form.command-dock textarea')
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
@@ -69,21 +95,27 @@ try {
     if (!live) break
     await sleep(500)
   }
-  await drive.capture('Juno answered on Codex', () => route)
-  // Home: the agents line.
+  // Home: the row, then the pointer on Codex's mark.
   await drive.evaluate(`document.querySelector('.lc-brand__lockup')?.click()`)
   await sleep(1500)
-  const home = JSON.parse(String(await drive.evaluate(`JSON.stringify((() => {
-    const codex = document.querySelector('.lc-agenthead__marks .lc-runtimemark[data-runtime="codex"]')
-    const ring = codex?.closest('.lc-usagering')
-    return { label: codex?.getAttribute('aria-label') ?? null, used: ring?.getAttribute('data-used') ?? null, tone: ring?.className ?? null, folded: document.querySelector('.lc-agenthead.is-folded') !== null }
-  })())`)))
-  await drive.capture('Home: the agents line, Codex ringed', () => JSON.stringify(home))
-  check('Home rings Codex’s mark with the reading its turn reported', home.used !== null && /^Codex CLI: \d{1,3}% of the /.test(home.label ?? ''), JSON.stringify(home))
-  say(failures === 0 ? '\nUSAGE RING PASSED' : `\nUSAGE RING: ${String(failures)} FAILED`)
+  // Every item in the row is a mark and nothing else -- the rings of 0.388
+  // wrapped some of them.
+  const row = JSON.parse(String(await drive.evaluate(`JSON.stringify({ marks: document.querySelectorAll('.lc-agenthead__marks > .lc-agentmark').length, items: document.querySelector('.lc-agenthead__marks')?.children.length ?? 0 })`)))
+  check('the row is plain marks again: every item a mark', row.marks > 0 && row.items === row.marks, JSON.stringify(row))
+  const codex = await hover('codex')
+  await drive.capture('Home: pointing at Codex’s mark', () => JSON.stringify(codex))
+  check('pointing at Codex’s mark opens its card: name, state, a bar per window its turn reported', codex?.open === true && codex.name === 'Codex CLI' && /^Ready/.test(codex.state ?? '') && codex.windows.length >= 1 && codex.windows.every(([label, percent, width]) => /window$/.test(label ?? '') && /^\d{1,3}%$/.test(percent ?? '') && width === percent), JSON.stringify(codex))
+  check('the card opens above the mark, inside the window', codex?.above === true && codex.inView === true, JSON.stringify({ above: codex?.above, inView: codex?.inView }))
+  const other = await hover('cursor')
+  check('an agent whose runs reported nothing opens its name and state alone', other === null || (other.open === true && other.windows.length === 0), JSON.stringify(other))
+  await drive.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 5, y: 5 })
+  await sleep(300)
+  const closed = String(await drive.evaluate(`String([...document.querySelectorAll('.lc-agentcard')].every((card) => getComputedStyle(card).display === 'none'))`))
+  check('and it closes when the pointer leaves', closed === 'true', closed)
+  say(failures === 0 ? '\nUSAGE HOVER PASSED' : `\nUSAGE HOVER: ${String(failures)} FAILED`)
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
-  await drive.finish({ intro: `Juno on Codex's ${MODEL}, one word asked -- then Home's agents line, to see the reading that turn reported as a ring round Codex's mark.` })
+  await drive.finish({ intro: `Juno on Codex's ${MODEL}, one word asked -- then Home, pointing at Codex's mark to open the card with the reading that turn reported.` })
 }

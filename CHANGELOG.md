@@ -11,6 +11,24 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.389.0 - 2026-09-27
+
+### Improved
+
+- **Point at an agent to see its usage.** The AI agents line on Home is
+  plain logos again. Hover over a logo, or tab to it, and a card opens with
+  the agent's name and version and a bar for each usage window its runs
+  reported, with when each resets. Claude and Codex report usage.
+- The model button keeps its amber dot from 80%, as before.
+
+### Fixed
+
+- **Long Antigravity answers no longer have a hole in the middle.**
+  Antigravity cuts long answers short in the transcript Locust reads, which
+  showed up as "1066 bytes the runtime did not keep". Locust now asks
+  Antigravity for the whole answer before saving it. Answers saved before
+  this update keep the note.
+
 ## 0.388.0 - 2026-09-27
 
 ### New

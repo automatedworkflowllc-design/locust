@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 
 import type { MissionLedger, Workroom, WorkroomMessage } from '@teammate/mission-store'
-import { createAntigravityEventNormalizer } from '@teammate/runtime-adapters'
+import { antigravityMessageStep, createAntigravityEventNormalizer, hasAntigravityGap, withRestoredGaps } from '@teammate/runtime-adapters'
 import type { NormalizedRuntimeEvent, RuntimeProcessCompletion, ToolQuestion } from '@teammate/runtime-adapters'
 
 import type { CodexMissionUpdate, MissionApprovalAnswer, MissionApprovalRequest, MissionQuestion, PublicPeerMessage } from '../shared/ipc.js'
@@ -501,16 +501,38 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
     }
   }
 
+  /*
+   * THE HOLES ANTIGRAVITY'S TRANSCRIPT LEAVES, FILLED BEFORE ANYTHING IS
+   * RECORDED (0.389; withRestoredGaps in the adapter says why and how). Asked
+   * of Antigravity's own server only when a message has a gap -- from the
+   * gapped step on, since the transcript's step numbers are the server's
+   * offsets (the question route relies on the same) -- and a server that does
+   * not answer leaves the gap, drawn as before.
+   */
+  const restoreGaps = async (run: LiveRun, events: readonly NormalizedRuntimeEvent[]): Promise<readonly NormalizedRuntimeEvent[]> => {
+    const gapped = events.filter(hasAntigravityGap)
+    if (gapped.length === 0) return events
+    const steps = gapped.map((event) => (event.type === 'message.delta' ? antigravityMessageStep(event.payload.itemId) : undefined))
+    const from = steps.every((step): step is number => step !== undefined) ? Math.min(...steps) : 0
+    try {
+      return withRestoredGaps(events, await run.cascade.plannerTexts(run.conversationId, from))
+    } catch {
+      return events
+    }
+  }
+
   const poll = async (run: LiveRun): Promise<void> => {
     if (run.polling || run.ended) return
     run.polling = true
     try {
       const text = await readTranscript(run.transcriptPath)
       const lines = text === undefined ? [] : text.split('\n').filter((line) => line.trim().length > 0)
-      const fresh: NormalizedRuntimeEvent[] = []
+      let fresh: readonly NormalizedRuntimeEvent[] = []
+      const read: NormalizedRuntimeEvent[] = []
       for (let index = run.fed; index < lines.length; index += 1) {
-        fresh.push(...run.normalizer.accept({ sequence: index + 1, raw: lines[index]! }))
+        read.push(...run.normalizer.accept({ sequence: index + 1, raw: lines[index]! }))
       }
+      fresh = await restoreGaps(run, read)
       /*
        * The cursor advances only once the events are DURABLE.
        *

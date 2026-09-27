@@ -33,10 +33,12 @@ describe("a runtime mark's colour", () => {
     expect([...shell.matchAll(/\.lc-runtimemark\[data-runtime='([a-z]+)'\]/g)].map((match) => match[1])).toEqual(['claude'])
   })
 
-  it("rings an account's usage in the app's own tones: muted, amber from 80%, red when spent (0.388)", () => {
-    expect(shell).toMatch(/\.lc-usagering__arc \{\s*stroke: var\(--lc-text-muted\);/)
-    expect(shell).toMatch(/\.lc-usagering\.is-pressing \.lc-usagering__arc \{\s*stroke: var\(--lc-amber\);/)
-    expect(shell).toMatch(/\.lc-usagering\.is-spent \.lc-usagering__arc \{\s*stroke: var\(--lc-red\);/)
+  it("draws an account's usage bars in the app's own tones: quiet, amber from 80%, red when spent (0.389)", () => {
+    expect(shell).toMatch(/\.lc-agentcard__fill \{[^}]*background: var\(--lc-text-secondary\);/)
+    expect(shell).toMatch(/\.lc-agentcard__window\.is-pressing \.lc-agentcard__fill \{\s*background: var\(--lc-amber\);/)
+    expect(shell).toMatch(/\.lc-agentcard__window\.is-spent \.lc-agentcard__fill \{\s*background: var\(--lc-red\);/)
+    // The rings of 0.388 are gone from the stylesheet with the component.
+    expect(shell).not.toContain('lc-usagering')
   })
 
   it('goes grey with its words when the runtime cannot take work, brand colour and all', () => {

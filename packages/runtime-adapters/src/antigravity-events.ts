@@ -5,6 +5,7 @@ import {
   isObject,
   malformedEvidence,
   processEvidence,
+  redactSecrets,
   redactText,
   requireContextText,
   stringValue,
@@ -636,4 +637,76 @@ export function antigravityQuestion(args: unknown): AntigravityQuestion | undefi
     ? first.options.filter((option): option is string => typeof option === "string" && option.length > 0)
     : [];
   return { question, options, multiSelect: first.is_multi_select === true };
+}
+
+/**
+ * ANTIGRAVITY'S GAPS, FILLED FROM ITS OWN SERVER (0.389).
+ *
+ * Antigravity writes `<truncated N bytes>` into its transcript when it keeps
+ * only part of a long record -- and the transcript is what this adapter reads
+ * -- so a long answer arrived with a hole in its middle. 0.311 drew the hole
+ * honestly ("1066 bytes the runtime did not keep"); Colin, 2026-09-27, over a
+ * Chief of Staff answer cut at "forced-colors: acti": "slight bug". The text
+ * was never lost: the language server's `GetCascadeTrajectorySteps` returns
+ * every PLANNER_RESPONSE step whole, as `plannerResponse.response` and
+ * `plannerResponse.modifiedResponse` (the field names read from the
+ * descriptors compiled into `language_server.exe`).
+ *
+ * `candidates` are those texts. A transcript text is restored from one only
+ * when that one begins with the words before the first gap, ends with the
+ * words after the last, and holds every piece between in order -- so an
+ * answer is never swapped for a different step's. Anything else keeps the
+ * gap, drawn as before.
+ */
+const GAP = /\n?<truncated \d+ bytes>\n?/;
+
+export function restoreTruncated(truncated: string, candidates: readonly string[]): string | undefined {
+  const pieces = truncated.split(GAP);
+  if (pieces.length < 2) return undefined;
+  const first = pieces[0]!;
+  const last = pieces[pieces.length - 1]!;
+  for (const full of candidates) {
+    if (GAP.test(full) || full.length <= first.length + last.length) continue;
+    if (!full.startsWith(first) || !full.endsWith(last)) continue;
+    let at = first.length;
+    let whole = true;
+    for (const piece of pieces.slice(1, -1)) {
+      const found = full.indexOf(piece, at);
+      if (found < 0) {
+        whole = false;
+        break;
+      }
+      at = found + piece.length;
+    }
+    if (whole && at <= full.length - last.length) return full;
+  }
+  return undefined;
+}
+
+/** The step a message item came from: `msg_12` is step 12. */
+export function antigravityMessageStep(itemId: string): number | undefined {
+  const matched = /^msg_(\d+)$/.exec(itemId);
+  return matched === null ? undefined : Number(matched[1]);
+}
+
+/** Whether an event is a message with one of Antigravity's gaps in it. */
+export function hasAntigravityGap(event: NormalizedRuntimeEvent): boolean {
+  return event.type === "message.delta" && GAP.test(event.payload.text);
+}
+
+/**
+ * `events`, with every gapped message whole again where one of `candidates`
+ * restores it -- bounded and scrubbed exactly as the adapter bounds and scrubs
+ * every text it records. Everything else is returned as it came.
+ */
+export function withRestoredGaps(events: readonly NormalizedRuntimeEvent[], candidates: readonly string[]): readonly NormalizedRuntimeEvent[] {
+  // Scrubbed before comparing: the transcript's text was scrubbed when it was
+  // read, so a key the model repeated reads "[redacted]" on one side and would
+  // never match the other.
+  const scrubbed = candidates.map(redactSecrets);
+  return events.map((event) => {
+    if (event.type !== "message.delta" || !GAP.test(event.payload.text)) return event;
+    const full = restoreTruncated(event.payload.text, scrubbed);
+    return full === undefined ? event : { ...event, payload: { ...event.payload, text: boundedMessageText(full) } };
+  });
 }
