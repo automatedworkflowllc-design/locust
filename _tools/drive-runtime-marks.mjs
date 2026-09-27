@@ -82,12 +82,19 @@ try {
       card.querySelector('.lc-hometeam__name')?.textContent.trim().split(/\\s+/)[0] ?? '',
       card.querySelector('.lc-hometeam__route')?.textContent.trim() ?? ''
     ])),
+    // The whole route, on hover: with its effort level where the model has one (0.386).
+    titles: Object.fromEntries([...document.querySelectorAll('.lc-hometeam__card')].map((card) => [
+      card.querySelector('.lc-hometeam__name')?.textContent.trim().split(/\\s+/)[0] ?? '',
+      card.querySelector('.lc-hometeam__route')?.getAttribute('title') ?? ''
+    ])),
     folded: [...document.querySelectorAll('.lc-agenthead__marks .lc-runtimemark')].map((svg) => svg.getAttribute('aria-label')),
     rows: [...document.querySelectorAll('.lc-runtimecell__name .lc-runtimemark')].map((svg) => svg.getAttribute('data-runtime'))
   }`)
   await drive.capture('Home: the team, and the agents on this machine', () => JSON.stringify(home))
   check('every Home card wears its route’s mark', everyoneWearsTheirs(home.cards) && home.cards.every(([, runtime]) => runtime !== null), JSON.stringify(home.cards))
   check('Home names the model a teammate RUNS: Sonnet 5, Gemini 3.8 Flash -- the mark stands for the runtime', home.lines.Wren === 'Sonnet 5' && home.lines.Boss === 'Gemini 3.8 Flash', JSON.stringify(home.lines))
+  // Sonnet reports levels; Antigravity's tiers report none.
+  check('the hover names the whole route, with the level where the model has one', /^Claude · Sonnet 5 · [A-Z]/.test(home.titles.Wren ?? '') && home.titles.Boss === 'Antigravity · Gemini 3.8 Flash', JSON.stringify(home.titles))
   check('the agents line shows marks, named, or each agent row has one', home.folded.length > 0 ? home.folded.every((label) => typeof label === 'string' && label.length > 0) : home.rows.length > 0, JSON.stringify(home))
 
   // 2. The Team board.
