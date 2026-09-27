@@ -3143,6 +3143,9 @@ textarea {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  /* In from the card's edges as its facts, buttons and note are (0.410): the
+     diff below runs edge to edge, this line did too, touching both sides. */
+  padding-inline: var(--lc-space-5);
   font-size: 11px;
   color: var(--lc-text-muted);
 }

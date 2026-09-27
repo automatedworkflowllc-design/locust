@@ -11,6 +11,20 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.410.0 - 2026-09-27
+
+### Fixed
+
+- **Approving a new file calls it new.** The approval card for a file that
+  doesn't exist yet labelled it "MODIFIED"; it now says "ADDED", as the
+  file does once it's written.
+- **Saying no with a reason reads as declined.** When you denied an
+  OpenCode teammate's action and typed why, the steps said "refused", the
+  word Locust uses when a mode blocks something. They now say "declined",
+  as they already did when you denied without a reason.
+- **The approval card's change header sits inside the card.** Its first line
+  touched both edges of the card; it's now inset like the rest.
+
 ## 0.409.0 - 2026-09-27
 
 ### Fixed

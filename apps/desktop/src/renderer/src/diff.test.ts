@@ -211,3 +211,21 @@ describe('a line inside a hunk that looks like a header', () => {
     ])
   })
 })
+
+/*
+ * 0.410, fresh-eyes check (Approvals): OpenCode's diff for a file it is about
+ * to create names the same path on both sides, no /dev/null, and starts from
+ * "-0,0". The approval card read "MODIFIED"; the written file reads "ADDED".
+ */
+describe('a file that had no lines before', () => {
+  const created = ['--- hello.txt', '+++ hello.txt', '@@ -0,0 +1 @@', '+hi', ''].join('\n')
+
+  it('is ADDED, whatever its header says', () => {
+    expect(parseUnifiedDiff(created)[0]?.status).toBe('ADDED')
+  })
+
+  it('but a file edited from its first line is still MODIFIED', () => {
+    const edited = ['--- hello.txt', '+++ hello.txt', '@@ -1 +1 @@', '-hi', '+bye', ''].join('\n')
+    expect(parseUnifiedDiff(edited)[0]?.status).toBe('MODIFIED')
+  })
+})

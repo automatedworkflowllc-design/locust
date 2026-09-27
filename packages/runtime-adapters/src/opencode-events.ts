@@ -131,7 +131,11 @@ export function openCodeToolOutcome(state: JsonObject): {
   if (status === "error" && /rejected permission/i.test(stringValue(state.error) ?? "")) {
     // The person said no on a card: Locust's own reply says so, and it is
     // not the mode refusing (the beta report asked for the two to differ).
-    return { failed: true, status: /declined this in Locust/i.test(stringValue(state.error) ?? "") ? "declined" : "refused" };
+    // A person's decline, with or without a reason: "The person declined this
+    // in Locust." bare, "The person declined this, and said: ..." with one
+    // (deniedSaying). The reason form was drawn as "refused" -- a mode's word
+    // -- until 0.410 (fresh-eyes check, Approvals).
+    return { failed: true, status: /declined this in Locust|The person declined this, and said:/i.test(stringValue(state.error) ?? "") ? "declined" : "refused" };
   }
   return { failed: true, status: status ?? "unknown" };
 }

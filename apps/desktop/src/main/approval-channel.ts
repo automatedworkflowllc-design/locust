@@ -210,6 +210,9 @@ export const MAX_DENY_REASON = 500
 
 /** What a runtime is told alongside a denial the person explained (0.374). */
 export function deniedSaying(reason: string): string {
+  // OpenCode's normalizer reads a person's decline by this sentence as well as
+  // by "declined this in Locust" (opencode-events.ts, 0.410): with a reason it
+  // had been drawn as "refused", a mode's word.
   return `The person declined this, and said: ${reason}`
 }
 

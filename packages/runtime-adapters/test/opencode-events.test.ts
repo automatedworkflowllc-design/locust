@@ -212,6 +212,10 @@ describe("what a tool call's status means", () => {
     // Declined on a card, in the words OpenCode's server wrote (measured).
     expect(openCodeToolOutcome({ status: "error", error: "The user rejected permission to use this specific tool call with the following feedback: The person declined this in Locust." }))
       .toEqual({ failed: true, status: "declined" });
+    // 0.410: declined WITH a reason (deniedSaying) was drawn "refused" -- a
+    // mode's word -- because it lacked "in Locust" (fresh-eyes check).
+    expect(openCodeToolOutcome({ status: "error", error: "The user rejected permission to use this specific tool call with the following feedback: The person declined this, and said: Keep it as hi, please." }))
+      .toEqual({ failed: true, status: "declined" });
     for (const shape of [{ status: "pending" }, { status: "" }, {}]) {
       expect(openCodeToolOutcome(shape).failed).toBe(true);
     }

@@ -72,8 +72,18 @@ export function parseUnifiedDiff(text: string): readonly DiffFile[] {
       hunks = []
       return
     }
+    /*
+     * A file whose ONLY hunk starts from nothing ("@@ -0,0 ...") had no lines
+     * before: it is new, whatever its header says (0.410). OpenCode's own
+     * diff for a file it is about to create names the same path on both
+     * sides, no /dev/null -- and an approval to create hello.txt read
+     * "MODIFIED" while the same file read "ADDED" once written (fresh-eyes
+     * check, Approvals). An existing EMPTY file given its first lines reads
+     * the same, and "added" is true of every line in it.
+     */
+    const fromNothing = hunks.length === 1 && hunks[0]!.oldStart === 0 && hunks[0]!.oldCount === 0 && hunks[0]!.newCount > 0
     const status: DiffFileStatus =
-      oldPath === '/dev/null' ? 'ADDED'
+      oldPath === '/dev/null' || fromNothing ? 'ADDED'
         : newPath === '/dev/null' ? 'DELETED'
           : oldPath !== undefined && newPath !== undefined && oldPath !== newPath ? 'RENAMED'
             : 'MODIFIED'
