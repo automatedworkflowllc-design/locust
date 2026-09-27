@@ -11,6 +11,20 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.408.0 - 2026-09-27
+
+### Fixed
+
+- **New teammate suggests a name you can use.** The name box always
+  suggested "Wren", even with a Wren already on the team. It now suggests
+  the first of its example names that isn't taken.
+- **A teammate who hasn't run yet reads the same everywhere.** The Team
+  screen said "route set by their first mission"; like Home, it now says
+  "runs on the model you pick".
+- **Sharing a team no longer mentions dropping the image.** Locust adds a
+  team from an image with **Add team from image**; the Share window now
+  says that.
+
 ## 0.407.0 - 2026-09-27
 
 ### Fixed

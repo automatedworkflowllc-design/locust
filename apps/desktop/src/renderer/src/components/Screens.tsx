@@ -661,7 +661,7 @@ export function TeammatesScreen({
           */}
         <div className="lc-rostercard__route lc-mono">
           {teammate.route === undefined ? (
-            <span>not run yet · route set by their first mission</span>
+            <span>not run yet · runs on the model you pick</span>
           ) : (
             <>
               <span className="lc-rostercard__model">

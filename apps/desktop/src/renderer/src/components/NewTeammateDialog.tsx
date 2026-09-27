@@ -75,6 +75,17 @@ const HUES: readonly { readonly hue: TeammateHue; readonly label: string }[] = [
  * conversation is -- could not tell them apart (the design review, #7). The
  * person can still pick any colour; this is only where the picker starts.
  */
+/**
+ * The name the empty box suggests: the first of these not already on the team
+ * (0.408). It was always "Wren" -- and with the Build software starter team
+ * made, Wren is the one name the box would refuse (fresh-eyes check).
+ */
+export const EXAMPLE_NAMES = ['Wren', 'Robin', 'Sable', 'Juno', 'Atlas', 'Pip', 'Quill', 'Iris', 'Moss', 'Rook', 'Penny', 'Fern'] as const
+export function suggestedName(taken: readonly string[]): string {
+  const lower = new Set(taken.map((name) => name.trim().toLowerCase()))
+  return EXAMPLE_NAMES.find((name) => !lower.has(name.toLowerCase())) ?? 'Wren'
+}
+
 export function freshHue(taken: readonly TeammateHue[]): TeammateHue {
   const unused = HUES.find((option) => !taken.includes(option.hue))
   return unused?.hue ?? HUES[taken.length % HUES.length]!.hue
@@ -310,7 +321,7 @@ export function NewTeammateDialog({
                 value={name}
                 maxLength={40}
                 onChange={(event) => setName(event.target.value)}
-                placeholder="Wren"
+                placeholder={suggestedName(takenNames)}
                 autoComplete="off"
                 {...(taken === undefined ? {} : { 'aria-invalid': true, 'aria-describedby': 'lc-teammate-name-taken' })}
               />

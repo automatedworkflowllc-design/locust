@@ -78,7 +78,7 @@ export function ShareTeamDialog({ teammates, onClose }: { readonly teammates: re
             <TeamCardView teammates={teammates} />
           </div>
           <p className="lc-shareteam__claim">
-            The image carries each teammate&rsquo;s name, role, look and model, so it can be dropped into Locust as a team.
+            The image carries each teammate&rsquo;s name, role, look and model, so anyone with Locust can add the team from it with Add team from image.
             Nothing else goes with it: no conversations, memories, folders, limits or keys, and not a model of your own.
           </p>
           {said !== undefined && <p className="lc-shareteam__claim lc-shareteam__said" role="status">{said}</p>}
