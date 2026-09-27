@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.381.0 - 2026-09-26
+
+### Improved
+
+- **Friendlier to company laptops.** We checked how Locust starts the
+  tools your teammates run against the patterns corporate security software
+  flags. Your messages never pass through a command-line shell, and the few
+  places Locust does start a shell now hand it a single, fixed line.
+
 ## 0.380.0 - 2026-09-26
 
 ### New

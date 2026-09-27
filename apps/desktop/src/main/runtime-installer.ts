@@ -341,7 +341,10 @@ function runNpm(
     // `shell: true` because Windows will not spawn `npm.cmd` otherwise: without
     // it the child exits with a null code and no output, which is
     // indistinguishable from the install failing for a reason nobody can name.
-    const child = spawn(command, [...args], { shell: true, windowsHide: true })
+    // One command string: every token passed SAFE_ARGUMENT above, so joining
+    // them is exactly the line Node built from an array -- which it joins
+    // unescaped, and deprecates (DEP0190).
+    const child = spawn([command, ...args].join(' '), { shell: true, windowsHide: true })
     let output = ''
     let pending = ''
     const take = (chunk: Buffer): void => {

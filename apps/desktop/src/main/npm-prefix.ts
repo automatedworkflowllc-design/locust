@@ -75,7 +75,9 @@ export async function readNpmBinDirectory(options: {
         // kills the outer shell and leaves what it started, which is how a
         // hung `npm` shim survived Locust as `npm config get prefix` plus
         // its sleep (Fable, pass 1, finding 3).
-        const child = spawn('npm', ['config', 'get', 'prefix'], {
+        // One command string: an array beside `shell: true` is joined
+        // unescaped anyway, and Node deprecates it (DEP0190).
+        const child = spawn('npm config get prefix', {
           shell: true,
           windowsHide: true,
           stdio: ['ignore', 'pipe', 'ignore'],

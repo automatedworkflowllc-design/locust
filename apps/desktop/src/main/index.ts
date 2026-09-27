@@ -616,7 +616,10 @@ const npmPresent = async (): Promise<boolean> => {
     // `--version` because it is the cheapest thing npm will answer.
     // Its own group off Windows, so the timeout below can end the shell AND
     // what it started.
-    const probe = spawn('npm', ['--version'], { shell: true, windowsHide: true, ...(process.platform === 'win32' ? {} : { detached: true }) })
+    // One command string, not a string and an array: Node joins an array
+    // into the shell's line unescaped anyway, and warns that it will stop
+    // (DEP0190, in every packaged launch's log until 0.381).
+    const probe = spawn('npm --version', { shell: true, windowsHide: true, ...(process.platform === 'win32' ? {} : { detached: true }) })
     /*
      * Bounded, like every CLI probe. It had no timeout, and every discovery
      * answer waited on it: one `npm` shim that never answers -- nvm-windows
