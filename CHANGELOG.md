@@ -26,9 +26,10 @@ heading: the home screen then shows it once, as a splash.
 ### Fixed
 
 - **Usage says how old it is.** Locust knows an agent's usage only from its
-  own runs, so after a quiet night Claude's card could still show last
-  night's figures as if they were current. The card now says when the
-  reading was taken, for example "From Locust's last run on it, Sat 21:40.
+  own runs, and the card never said when its reading was taken, so an old
+  figure looked current. (Why Claude's figure stopped updating even after
+  new runs is fixed in 0.407.) The card now says when the reading was
+  taken, for example "From Locust's last run on it, Sat 21:40.
   Use outside Locust since then isn't counted." A usage window whose reset
   time has passed now says it has reset, instead of showing its old
   percentage. Codex's usage, read from your account, says so.
