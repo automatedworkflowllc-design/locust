@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { boardSectionOf, teamBoard } from '../teamBoard.js'
 import { durationText, runSpanMs, usagePercent, usageWindowSentence } from '../missionView.js'
 import { WhatsNew } from './WhatsNew.js'
 import { SETTINGS_PAGES, matchedHeadings, pageMatches } from '../settingsPages.js'
@@ -507,6 +508,9 @@ export function MissionsScreen({
   )
 }
 
+/** Nobody's finish is waiting, when the shell passes none. */
+const NONE_UNSEEN: ReadonlySet<string> = new Set()
+
 export function TeammatesScreen({
   teammates,
   missions,
@@ -526,8 +530,19 @@ export function TeammatesScreen({
   onEditRoutine,
   onRemoveRoutine,
   routineNotice,
-  onDismissRoutineNotice
+  onDismissRoutineNotice,
+  finishedUnseen,
+  runningMissionIds
 }: {
+  /**
+   * Missions with a live run in this window. The record calls a mission that
+   * has not ended `interrupted` -- it has no word for running -- so a live job
+   * drew a red dot in Recent (0.380, seen on the board). The Missions screen
+   * already takes this; the Team screen now does too.
+   */
+  readonly runningMissionIds?: ReadonlySet<string>
+  /** 0.380: teammates whose run ended while nobody was looking -- the board's "Just finished". */
+  readonly finishedUnseen?: ReadonlySet<string>
   /** M30: why a routine's Run did not start, said where it was pressed. */
   readonly routineNotice?: string
   readonly onDismissRoutineNotice?: () => void
@@ -556,6 +571,215 @@ export function TeammatesScreen({
   readonly onEditRoutine: (routine: PublicRoutine) => void
   readonly onRemoveRoutine: (routineId: string) => void
 }): ReactElement {
+  // One card per teammate, the same in the plain grid and in each board section.
+  const card = (teammate: PublicTeammate): ReactElement => {
+    const owned = Object.values(missionOwners).filter((owner) => owner === teammate.teammateId).length
+    const work = teammateWork(teammate.teammateId, missions, missionOwners, titleOf)
+    const month = monthSpendLine(spendByTeammate[teammate.teammateId], teammate.monthlyLimitUsd)
+    const theirRoutines = routines.filter((routine) => routine.teammateId === teammate.teammateId)
+    const replaying = routineStepByTeammate[teammate.teammateId]
+    return (
+      <div className={`lc-rostercard lc-rostercard--${boardSectionOf(viewByTeammate[teammate.teammateId], finishedUnseen?.has(teammate.teammateId) === true)}`} key={teammate.teammateId}>
+        <div className="lc-rostercard__head">
+          <TeammateBot
+            hue={teammate.hue}
+            avatar={teammate.avatar}
+            size={36}
+            activity={viewByTeammate[teammate.teammateId]?.activity ?? 'idle'}
+            // The roster had no dot because it had no status. It has
+            // both now, from the same call the sidebar reads.
+            presence={facePresenceFor(viewByTeammate[teammate.teammateId]?.status ?? 'idle')}
+            teammateId={teammate.teammateId}
+          />
+          <div className="lc-rostercard__id">
+            <div className="lc-rostercard__name">{teammate.name}</div>
+            <div className="lc-rostercard__role">{roleLabelOf(teammate)}</div>
+          </div>
+          {/*
+            * ICONS, as the Routines row draws the same two actions.
+            *
+            * "Edit" and "Remove" as words took the width beside the
+            * name, so a role like "Code & Migrations" wrapped to two
+            * lines and cards in one row stood at different heights,
+            * their stat boxes out of line (design pass and beta review
+            * of 0.255.0, #4). Both carry a title and an accessible name.
+            */}
+          <div className="lc-rostercard__actions">
+            {/*
+              * The rail draws four faces once the team is six or more,
+              * and its +N opens this screen -- which had no way to
+              * talk to anyone on it. A fifth teammate could be edited
+              * and removed, never messaged (found fixing the drives'
+              * one way to open a teammate, 2026-09-23).
+              */}
+            <button
+              type="button"
+              className="lc-ghostbutton lc-iconbutton lc-rostercard__message"
+              title="Message teammate"
+              aria-label={`Message ${teammate.name}`}
+              onClick={() => onMessage(teammate.teammateId)}
+            >
+              <Icon name="message" size={14} />
+            </button>
+            <button
+              type="button"
+              className="lc-ghostbutton lc-iconbutton lc-rostercard__edit"
+              title="Edit teammate"
+              aria-label={`Edit ${teammate.name}`}
+              onClick={() => onEdit(teammate)}
+            >
+              <Icon name="pencil" size={14} />
+            </button>
+            {/* H2: asks first, as the right-click Remove does. */}
+            <ArmedButton
+              className="lc-ghostbutton lc-iconbutton lc-rostercard__remove"
+              title="Remove teammate"
+              ariaLabel={`Remove ${teammate.name}`}
+              armedLabel={theirRoutines.length === 0 ? `Remove ${teammate.name}?` : `Remove, with ${String(theirRoutines.length)} ${theirRoutines.length === 1 ? 'routine' : 'routines'}?`}
+              onConfirm={() => onRemove(teammate.teammateId)}
+            >
+              <Icon name="close" size={14} />
+            </ArmedButton>
+          </div>
+        </div>
+        {/*
+          * Route and mode are identity, not status, and the model name
+          * is the fact this product exists to keep legible -- so it
+          * gets a full-width row and wraps rather than ever being cut.
+          */}
+        <div className="lc-rostercard__route lc-mono">
+          {teammate.route === undefined ? (
+            <span>not run yet · route set by their first mission</span>
+          ) : (
+            <>
+              <span className="lc-rostercard__model">
+                {routeChrome(teammate.route.runtime, teammate.route.model, routeModelName(teammate.route.runtime, teammate.route.model))}
+              </span>
+              <span>{modeLabel(teammate.route.mode)}</span>
+            </>
+          )}
+        </div>
+        <dl className="lc-rostercard__stats">
+          <div className="lc-rostercard__stat">
+            <dt>Missions</dt>
+            <dd className={`lc-mono${owned === 0 ? ' is-unreported' : ''}`}>{owned}</dd>
+          </div>
+          <div className="lc-rostercard__stat">
+            <dt>Last run</dt>
+            <dd className={`lc-mono${work.lastRunAt === undefined ? ' is-unreported' : ''}`}>
+              {work.lastRunAt === undefined ? 'never' : agoLabel(work.lastRunAt) ?? 'unknown'}
+            </dd>
+          </div>
+        </dl>
+        {/* Undefined is not zero: a runtime that reported no usage has
+          * not said the work was free, and `not reported` must never
+          * be truncated into saying something else. */}
+        {/* Only once there has been a run to report on: before the first,
+            "not reported by the runtime" blamed a runtime nobody had
+            used yet (design pass, 2026-09-22). */}
+        {/*
+          * MONEY, OR NO ROW (first-impressions pass, after 0.349). The
+          * card said "USAGE 18k in . 612 out" for every teammate -- an
+          * engineer's unit on the card a person reads to know who is on
+          * their team. What a teammate COST is worth a row; a token
+          * count is in their conversations' Details. No row claims
+          * nothing, so a run that reported no price is never shown as
+          * free.
+          *
+          * THIS MONTH, from the host (2026-09-26). The row added up the
+          * conversations the window held events for -- the newest
+          * twenty -- so older work fell out of a figure labelled as the
+          * whole. The host reads every conversation, and this month is
+          * the figure a limit is set against.
+          */}
+        {month !== undefined && (
+          <dl className={`lc-rostercard__cost${month.reached ? ' is-reached' : ''}`}>
+            <dt>{month.reached ? 'Limit reached' : 'This month'}</dt>
+            <dd className="lc-mono">{month.text}</dd>
+          </dl>
+        )}
+        {work.recent.length > 0 && (
+          <div className="lc-rostercard__recent">
+            <div className="lc-rostercard__recentlabel lc-mono">Recent</div>
+            {work.recent.map((entry) => (
+              <button
+                type="button"
+                key={entry.missionId}
+                className="lc-rostercard__mission"
+                onClick={() => onOpenMission(entry.missionId)}
+              >
+                <span className={`lc-dot lc-tone-${runningMissionIds?.has(entry.missionId) === true ? missionPhaseView('running', false).tone : missionPhaseView(entry.phase, entry.hasIntegrityIssues).tone}`} />
+                <span className="lc-rostercard__missiontitle">{entry.title}</span>
+                <span className="lc-rostercard__missionage lc-mono">{agoLabel(entry.at) ?? ''}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {/*
+          * Routines: conversations this teammate has been taught, and
+          * can replay. Shown here rather than in a screen of their own
+          * because a routine belongs to a teammate -- it runs on their
+          * route, with their permissions, and dies with them.
+          */}
+        {theirRoutines.length > 0 && (
+          <div className="lc-routinelist">
+            <div className="lc-rostercard__recentlabel lc-mono">Routines</div>
+            {theirRoutines.map((routine) => (
+              <div className="lc-routinerow" key={routine.routineId}>
+                <span className="lc-routinerow__name" title={routine.steps.join(STEP_GAP)}>
+                  {routine.name}
+                  <span className="lc-routinerow__meta lc-mono"> · {routineRunSummary(routine)}</span>
+                  <RoutineRecovery key={`${routine.execution?.attemptId}:${routine.execution?.step}`} routine={routine} onOpenMission={onOpenMission}
+                    {...(onRecoverRoutine === undefined ? {} : { recover: onRecoverRoutine })} />
+                  {routineScheduleSummary(routine, new Date()) !== undefined && (
+                    <span className="lc-routinerow__meta lc-mono lc-routinerow__sched">
+                      {routineScheduleSummary(routine, new Date())}
+                    </span>
+                  )}
+                </span>
+                <button
+                  type="button"
+                  className="lc-ghostbutton"
+                  disabled={replaying !== undefined || (routine.execution !== undefined && routine.execution.status !== 'abandoned')}
+                  title={
+                    replaying === undefined
+                      ? undefined
+                      : `${replaying.name} is running: ${routineStepLabel(replaying)}`
+                  }
+                  onClick={() => onRunRoutine(routine.routineId)}
+                >
+                  Run
+                </button>
+                <span className="lc-routinerow__meta">
+                  <button type="button" className="lc-ghostbutton" onClick={() => onEditRoutine(routine)}>
+                    Edit
+                  </button>
+                  <ArmedButton
+                    className="lc-ghostbutton"
+                    ariaLabel={`Remove ${routine.name}`}
+                    armedLabel="Remove for good?"
+                    {...(routineAwaitsReview(routine) ? { disabled: true, title: 'Waiting for your review: check it and abandon it before removing it' } : {})}
+                    onConfirm={() => onRemoveRoutine(routine.routineId)}
+                  >
+                    Remove
+                  </ArmedButton>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+  const newTeammate = (
+    <button type="button" className="lc-rostercard lc-rostercard--new" onClick={onNewTeammate}>
+      <span className="lc-rostercard__plus">+</span>
+      <span className="lc-rostercard__name">New teammate</span>
+      <span className="lc-rostercard__role">Name, role and avatar. Missions group under them.</span>
+    </button>
+  )
+  // 0.380: grouped by what each needs from the person, or the plain grid for a quiet team.
+  const board = teamBoard(teammates, viewByTeammate, finishedUnseen ?? NONE_UNSEEN)
   return (
     <div className="lc-screen">
       <ScreenHeader
@@ -571,212 +795,28 @@ export function TeammatesScreen({
         </p>
       )}
       <div className="lc-screen__scroll">
-        <div className="lc-rostergrid">
-          {teammates.map((teammate) => {
-            const owned = Object.values(missionOwners).filter((owner) => owner === teammate.teammateId).length
-            const work = teammateWork(teammate.teammateId, missions, missionOwners, titleOf)
-            const month = monthSpendLine(spendByTeammate[teammate.teammateId], teammate.monthlyLimitUsd)
-            const theirRoutines = routines.filter((routine) => routine.teammateId === teammate.teammateId)
-            const replaying = routineStepByTeammate[teammate.teammateId]
-            return (
-              <div className="lc-rostercard" key={teammate.teammateId}>
-                <div className="lc-rostercard__head">
-                  <TeammateBot
-                    hue={teammate.hue}
-                    avatar={teammate.avatar}
-                    size={36}
-                    activity={viewByTeammate[teammate.teammateId]?.activity ?? 'idle'}
-                    // The roster had no dot because it had no status. It has
-                    // both now, from the same call the sidebar reads.
-                    presence={facePresenceFor(viewByTeammate[teammate.teammateId]?.status ?? 'idle')}
-                    teammateId={teammate.teammateId}
-                  />
-                  <div className="lc-rostercard__id">
-                    <div className="lc-rostercard__name">{teammate.name}</div>
-                    <div className="lc-rostercard__role">{roleLabelOf(teammate)}</div>
-                  </div>
-                  {/*
-                    * ICONS, as the Routines row draws the same two actions.
-                    *
-                    * "Edit" and "Remove" as words took the width beside the
-                    * name, so a role like "Code & Migrations" wrapped to two
-                    * lines and cards in one row stood at different heights,
-                    * their stat boxes out of line (design pass and beta review
-                    * of 0.255.0, #4). Both carry a title and an accessible name.
-                    */}
-                  <div className="lc-rostercard__actions">
-                    {/*
-                      * The rail draws four faces once the team is six or more,
-                      * and its +N opens this screen -- which had no way to
-                      * talk to anyone on it. A fifth teammate could be edited
-                      * and removed, never messaged (found fixing the drives'
-                      * one way to open a teammate, 2026-09-23).
-                      */}
-                    <button
-                      type="button"
-                      className="lc-ghostbutton lc-iconbutton lc-rostercard__message"
-                      title="Message teammate"
-                      aria-label={`Message ${teammate.name}`}
-                      onClick={() => onMessage(teammate.teammateId)}
-                    >
-                      <Icon name="message" size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      className="lc-ghostbutton lc-iconbutton lc-rostercard__edit"
-                      title="Edit teammate"
-                      aria-label={`Edit ${teammate.name}`}
-                      onClick={() => onEdit(teammate)}
-                    >
-                      <Icon name="pencil" size={14} />
-                    </button>
-                    {/* H2: asks first, as the right-click Remove does. */}
-                    <ArmedButton
-                      className="lc-ghostbutton lc-iconbutton lc-rostercard__remove"
-                      title="Remove teammate"
-                      ariaLabel={`Remove ${teammate.name}`}
-                      armedLabel={theirRoutines.length === 0 ? `Remove ${teammate.name}?` : `Remove, with ${String(theirRoutines.length)} ${theirRoutines.length === 1 ? 'routine' : 'routines'}?`}
-                      onConfirm={() => onRemove(teammate.teammateId)}
-                    >
-                      <Icon name="close" size={14} />
-                    </ArmedButton>
-                  </div>
-                </div>
-                {/*
-                  * Route and mode are identity, not status, and the model name
-                  * is the fact this product exists to keep legible -- so it
-                  * gets a full-width row and wraps rather than ever being cut.
-                  */}
-                <div className="lc-rostercard__route lc-mono">
-                  {teammate.route === undefined ? (
-                    <span>not run yet · route set by their first mission</span>
-                  ) : (
-                    <>
-                      <span className="lc-rostercard__model">
-                        {routeChrome(teammate.route.runtime, teammate.route.model, routeModelName(teammate.route.runtime, teammate.route.model))}
-                      </span>
-                      <span>{modeLabel(teammate.route.mode)}</span>
-                    </>
-                  )}
-                </div>
-                <dl className="lc-rostercard__stats">
-                  <div className="lc-rostercard__stat">
-                    <dt>Missions</dt>
-                    <dd className={`lc-mono${owned === 0 ? ' is-unreported' : ''}`}>{owned}</dd>
-                  </div>
-                  <div className="lc-rostercard__stat">
-                    <dt>Last run</dt>
-                    <dd className={`lc-mono${work.lastRunAt === undefined ? ' is-unreported' : ''}`}>
-                      {work.lastRunAt === undefined ? 'never' : agoLabel(work.lastRunAt) ?? 'unknown'}
-                    </dd>
-                  </div>
-                </dl>
-                {/* Undefined is not zero: a runtime that reported no usage has
-                  * not said the work was free, and `not reported` must never
-                  * be truncated into saying something else. */}
-                {/* Only once there has been a run to report on: before the first,
-                    "not reported by the runtime" blamed a runtime nobody had
-                    used yet (design pass, 2026-09-22). */}
-                {/*
-                  * MONEY, OR NO ROW (first-impressions pass, after 0.349). The
-                  * card said "USAGE 18k in . 612 out" for every teammate -- an
-                  * engineer's unit on the card a person reads to know who is on
-                  * their team. What a teammate COST is worth a row; a token
-                  * count is in their conversations' Details. No row claims
-                  * nothing, so a run that reported no price is never shown as
-                  * free.
-                  *
-                  * THIS MONTH, from the host (2026-09-26). The row added up the
-                  * conversations the window held events for -- the newest
-                  * twenty -- so older work fell out of a figure labelled as the
-                  * whole. The host reads every conversation, and this month is
-                  * the figure a limit is set against.
-                  */}
-                {month !== undefined && (
-                  <dl className={`lc-rostercard__cost${month.reached ? ' is-reached' : ''}`}>
-                    <dt>{month.reached ? 'Limit reached' : 'This month'}</dt>
-                    <dd className="lc-mono">{month.text}</dd>
-                  </dl>
-                )}
-                {work.recent.length > 0 && (
-                  <div className="lc-rostercard__recent">
-                    <div className="lc-rostercard__recentlabel lc-mono">Recent</div>
-                    {work.recent.map((entry) => (
-                      <button
-                        type="button"
-                        key={entry.missionId}
-                        className="lc-rostercard__mission"
-                        onClick={() => onOpenMission(entry.missionId)}
-                      >
-                        <span className={`lc-dot lc-tone-${missionPhaseView(entry.phase, entry.hasIntegrityIssues).tone}`} />
-                        <span className="lc-rostercard__missiontitle">{entry.title}</span>
-                        <span className="lc-rostercard__missionage lc-mono">{agoLabel(entry.at) ?? ''}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {/*
-                  * Routines: conversations this teammate has been taught, and
-                  * can replay. Shown here rather than in a screen of their own
-                  * because a routine belongs to a teammate -- it runs on their
-                  * route, with their permissions, and dies with them.
-                  */}
-                {theirRoutines.length > 0 && (
-                  <div className="lc-routinelist">
-                    <div className="lc-rostercard__recentlabel lc-mono">Routines</div>
-                    {theirRoutines.map((routine) => (
-                      <div className="lc-routinerow" key={routine.routineId}>
-                        <span className="lc-routinerow__name" title={routine.steps.join(STEP_GAP)}>
-                          {routine.name}
-                          <span className="lc-routinerow__meta lc-mono"> · {routineRunSummary(routine)}</span>
-                          <RoutineRecovery key={`${routine.execution?.attemptId}:${routine.execution?.step}`} routine={routine} onOpenMission={onOpenMission}
-                            {...(onRecoverRoutine === undefined ? {} : { recover: onRecoverRoutine })} />
-                          {routineScheduleSummary(routine, new Date()) !== undefined && (
-                            <span className="lc-routinerow__meta lc-mono lc-routinerow__sched">
-                              {routineScheduleSummary(routine, new Date())}
-                            </span>
-                          )}
-                        </span>
-                        <button
-                          type="button"
-                          className="lc-ghostbutton"
-                          disabled={replaying !== undefined || (routine.execution !== undefined && routine.execution.status !== 'abandoned')}
-                          title={
-                            replaying === undefined
-                              ? undefined
-                              : `${replaying.name} is running: ${routineStepLabel(replaying)}`
-                          }
-                          onClick={() => onRunRoutine(routine.routineId)}
-                        >
-                          Run
-                        </button>
-                        <span className="lc-routinerow__meta">
-                          <button type="button" className="lc-ghostbutton" onClick={() => onEditRoutine(routine)}>
-                            Edit
-                          </button>
-                          <ArmedButton
-                            className="lc-ghostbutton"
-                            ariaLabel={`Remove ${routine.name}`}
-                            armedLabel="Remove for good?"
-                            {...(routineAwaitsReview(routine) ? { disabled: true, title: 'Waiting for your review: check it and abandon it before removing it' } : {})}
-                            onConfirm={() => onRemoveRoutine(routine.routineId)}
-                          >
-                            Remove
-                          </ArmedButton>
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+        {board === undefined ? (
+          <div className="lc-rostergrid">
+            {teammates.map(card)}
+            {newTeammate}
+          </div>
+        ) : (
+          <div className="lc-teamboard">
+          {board.map((section, index) => (
+            <section key={section.key} className={`lc-boardsection lc-boardsection--${section.key}`} aria-label={section.title}>
+              <h2 className="lc-boardsection__title">
+                <span className="lc-boardsection__mark" aria-hidden="true" />
+                {section.title}
+                <span className="lc-boardsection__count lc-mono">{section.members.length}</span>
+              </h2>
+              <div className="lc-rostergrid">
+                {section.members.map(card)}
+                {index === board.length - 1 ? newTeammate : null}
               </div>
-            )
-          })}
-          <button type="button" className="lc-rostercard lc-rostercard--new" onClick={onNewTeammate}>
-            <span className="lc-rostercard__plus">+</span>
-            <span className="lc-rostercard__name">New teammate</span>
-            <span className="lc-rostercard__role">Name, role and avatar. Missions group under them.</span>
-          </button>
-        </div>
+            </section>
+          ))}
+          </div>
+        )}
       </div>
     </div>
   )

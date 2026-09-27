@@ -1925,6 +1925,13 @@ export default function App(): ReactElement {
    * workroom messages it is shown, and under whose name it may share.
    */
   const [selectedTeammateId, setSelectedTeammateId] = useState<string>()
+  /*
+   * A finish the person has not looked at yet (0.380): the Team board's
+   * "Just finished". Set when a teammate's run ends while their conversation
+   * is not the one on screen; cleared the moment it is.
+   */
+  const [finishedUnseen, setFinishedUnseen] = useState<ReadonlySet<string>>(new Set())
+  const lookingAtRef = useRef<{ readonly screen: Screen; readonly teammateId: string | undefined }>({ screen: 'workroom', teammateId: undefined })
   /**
    * Stops pressed before the run had a name, by the key it had at the time.
    *
@@ -2127,6 +2134,13 @@ export default function App(): ReactElement {
             next.delete(runtime)
             return next
           })
+        }
+      }
+      if (update.kind === 'event' && (update.event.type === 'run.completed' || update.event.type === 'run.failed')) {
+        const owner = missionOwnersRef.current[update.missionId]
+        const looking = lookingAtRef.current
+        if (owner !== undefined && !(looking.screen === 'workroom' && looking.teammateId === owner)) {
+          setFinishedUnseen((current) => (current.has(owner) ? current : new Set([...current, owner])))
         }
       }
       if (update.kind === 'event' && update.event.type === 'run.completed') {
@@ -4978,10 +4992,33 @@ export default function App(): ReactElement {
   )
   // The same count on the taskbar (0.379): a dot while anything needs you, a
   // flash when more does while the window is elsewhere (taskbar-attention.ts).
+  // Missions with a live run here: the record has no word for running, so
+  // every screen that draws a mission's state reads this (Missions, Team).
+  const runningMissionIds = useMemo(
+    () =>
+      new Set(
+        [...runs.values()]
+          .filter((run) => liveRunIsActive(run) && run.data !== undefined)
+          .map((run) => run.data!.missionId)
+      ),
+    [runs]
+  )
   const needsYouCount = needsYouItems.length
   useEffect(() => {
     window.desktop?.setNeedsYouCount?.(needsYouCount)
   }, [needsYouCount])
+  // What is on screen, for the update handler to read (0.380): a finish the
+  // person is looking at is not an unseen one. And looking clears it.
+  lookingAtRef.current = { screen, teammateId: selectedTeammateId }
+  useEffect(() => {
+    if (screen !== 'workroom' || selectedTeammateId === undefined) return
+    setFinishedUnseen((current) => {
+      if (!current.has(selectedTeammateId)) return current
+      const next = new Set(current)
+      next.delete(selectedTeammateId)
+      return next
+    })
+  }, [screen, selectedTeammateId])
   /*
    * "Wren finished" (0.379): a long run the person started, seen ending here.
    * Only the moment a live run BECOMES finished -- each run is told once --
@@ -5520,13 +5557,7 @@ export default function App(): ReactElement {
               unreadableLedgers={unreadableLedgers}
               ledgerUnreadable={ledgerUnreadable}
               workspaceId={workspaceId}
-              runningMissionIds={
-                new Set(
-                  [...runs.values()]
-                    .filter((run) => liveRunIsActive(run) && run.data !== undefined)
-                    .map((run) => run.data!.missionId)
-                )
-              }
+              runningMissionIds={runningMissionIds}
               titleOf={(mission) => missionTitle(typedPrompt(mission, historyById))}
               secondaryOf={missionDoing}
               /*
@@ -5546,6 +5577,8 @@ export default function App(): ReactElement {
             />
           ) : screen === 'teammates' ? (
             <TeammatesScreen
+              finishedUnseen={finishedUnseen}
+              runningMissionIds={runningMissionIds}
               {...(routineNotice === undefined ? {} : { routineNotice })}
               onDismissRoutineNotice={() => setRoutineNotice(undefined)}
               teammates={teammates}

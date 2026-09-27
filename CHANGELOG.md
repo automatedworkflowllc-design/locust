@@ -11,6 +11,22 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.380.0 - 2026-09-26
+
+### New
+
+- **Your team, as a board.** When anyone on your team is busy, the Team
+  screen sorts them into columns by what they need from you: **Needs you**
+  (in amber: waiting on an approval or a question), **Working**, **Just
+  finished** (in green, until you've looked), and **Ready**. Everyone at a
+  glance, the most urgent first. When nobody's busy, it's the familiar
+  roster.
+
+### Fixed
+
+- **A teammate's current job no longer shows as interrupted.** On the Team
+  screen, a mission still running wore the red dot of an interrupted one.
+
 ## 0.379.0 - 2026-09-26
 
 ### New

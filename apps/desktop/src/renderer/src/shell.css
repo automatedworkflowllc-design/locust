@@ -7936,6 +7936,133 @@ textarea {
   text-align: left;
 }
 
+/*
+ * THE TEAM BOARD (0.380; teamBoard.ts). The cards grouped by what each
+ * teammate needs from the person, most urgent first. Tint means "look here"
+ * (Orca's rule, and a good one): amber for waiting on you, green for a finish
+ * not yet seen. Working stays neutral -- the face already moves -- and Ready
+ * is the roster as it always was. A quiet team gets no headings at all.
+ */
+/* Its own name: `.lc-board` is the room task board's, a flex COLUMN, and
+   sharing it stacked these columns and leaked this layout into Rooms (the
+   fifth drive). */
+/* Columns side by side, as a board is read: each state one column, cards
+   stacked in it, only the columns with someone in them -- so a team in four
+   states is one screen, not four sections stacked out of view (the first
+   drive of this, 1440 x 900: "Ready" was below the fold). */
+.lc-teamboard {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lc-space-6);
+  align-items: flex-start;
+}
+
+/* An urgent state is a column a card wide; Ready grows into the rest of the
+   row and lays its cards out as the roster does, so a big idle team is a
+   grid and a column never sits empty between two others (the fourth drive:
+   a CSS grid put Ready in the LAST track, `auto / -1` being one track). */
+.lc-boardsection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-4);
+  /* 256: four fit on one line at 1440 wide -- flex wraps by this basis
+     before it shrinks anything, and at 280 Ready fell to a second row. */
+  flex: 0 1 256px;
+  min-width: 232px;
+}
+
+.lc-boardsection--ready {
+  flex: 1 1 256px;
+}
+
+/* A state's cards stacked, each held to its column: a bare `1fr` track grew
+   to a card's longest unbreakable line, and the cards overlapped the next
+   column (the second drive, 1440 x 900). */
+.lc-teamboard .lc-boardsection:not(.lc-boardsection--ready) .lc-rostergrid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.lc-boardsection--ready .lc-rostergrid {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+/* On the board a card's Message / Edit / Remove sit over its corner, shown
+   on hover or keyboard focus: in a column, three icons beside the name
+   pushed every role onto two lines ("Code & / Migrations", the third drive).
+   Each is also on the face in the rail and its right-click menu. */
+.lc-teamboard .lc-rostercard {
+  position: relative;
+}
+
+.lc-teamboard .lc-rostercard__actions {
+  position: absolute;
+  top: var(--lc-space-5);
+  right: var(--lc-space-5);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.lc-teamboard .lc-rostercard:hover .lc-rostercard__actions,
+.lc-teamboard .lc-rostercard:focus-within .lc-rostercard__actions {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-teamboard .lc-rostercard__actions {
+    transition: none;
+  }
+}
+
+.lc-boardsection__title {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+  margin: 0;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-label);
+  font-weight: 400;
+  letter-spacing: var(--lc-tracking-label);
+  text-transform: uppercase;
+  color: var(--lc-text-muted);
+}
+
+.lc-boardsection__mark {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--lc-text-muted);
+}
+
+.lc-boardsection--needs-you .lc-boardsection__mark {
+  background: var(--lc-amber);
+}
+
+.lc-boardsection--working .lc-boardsection__mark {
+  background: var(--lc-lime);
+}
+
+.lc-boardsection--finished .lc-boardsection__mark {
+  background: var(--lc-green);
+}
+
+.lc-boardsection--needs-you .lc-boardsection__title {
+  color: var(--lc-amber-text);
+}
+
+.lc-boardsection__count {
+  opacity: 0.7;
+}
+
+.lc-rostercard--needs-you {
+  border-color: var(--lc-amber-border);
+  background: linear-gradient(var(--lc-amber-tint), var(--lc-amber-tint)), var(--lc-bg-raised);
+}
+
+.lc-rostercard--finished {
+  border-color: var(--lc-green-border);
+  background: linear-gradient(var(--lc-green-tint), var(--lc-green-tint)), var(--lc-bg-raised);
+}
+
 .lc-rostercard--new {
   align-items: flex-start;
   gap: var(--lc-space-4);
