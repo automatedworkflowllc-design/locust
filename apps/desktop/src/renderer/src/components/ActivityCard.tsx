@@ -22,11 +22,10 @@ import type { ReactElement } from 'react'
 import { activityCounts, activityEntries, boundedShellOutput, defaultOpenEntry, foldedToolsText, relativePath, durationText } from '../missionView.js'
 import type { TraceSegment, ActivityDetail, ActivityEntry, PlanStep } from '../missionView.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
-import { splitInlineCode } from '../agentText.js'
 import { DiffView } from './DiffView.js'
 import { DocPreview, isNewDocument } from './DocPreview.js'
 import { Icon } from './Icon.js'
-import { PlanSteps } from './ThreadItems.js'
+import { AgentText, PlanSteps } from './ThreadItems.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 
 /**
@@ -548,13 +547,12 @@ export function ActivityCard({
                  */
                 <div className="lc-filerow is-static lc-filerow--said">
                   <Icon name="message" size={14} />
-                  <span className="lc-filerow__said">
-                    {splitInlineCode(entry.text).map((span, index) =>
-                      span.kind === 'code'
-                        ? <code className="lc-code--inline" key={index}>{span.text}</code>
-                        : <Fragment key={index}>{span.text}</Fragment>
-                    )}
-                  </span>
+                  {/* The reply's own renderer (0.421): this drew inline code
+                      only, so a note with a fenced block showed its
+                      ```javascript fences as text (fresh-eyes area 23). */}
+                  <div className="lc-filerow__said">
+                    <AgentText text={entry.text} streaming={false} />
+                  </div>
                 </div>
               ) : entry.kind === 'thought' ? (
                 /*

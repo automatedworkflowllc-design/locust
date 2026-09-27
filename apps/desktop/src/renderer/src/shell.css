@@ -14728,6 +14728,15 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+/* Blocks from the reply's renderer (0.421), set close: this is commentary. */
+.lc-filerow__said > * {
+  margin: 0;
+}
+
+.lc-filerow__said > * + * {
+  margin-top: var(--lc-space-2);
+}
+
 /* The words, under the line that says how long: quoted, muted, and only when asked for. */
 .lc-filerow__thought {
   display: block;

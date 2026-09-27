@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.421.0 - 2026-09-28
+
+### Fixed
+
+- **Notes between a teammate's steps show code properly.** When a teammate
+  wrote a note with a block of code while working, the steps panel showed
+  the raw ```` ``` ```` marks around it. Those notes now render like the
+  reply does, including code blocks, bold text and links.
+
 ## 0.420.0 - 2026-09-28
 
 ### Fixed
