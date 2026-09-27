@@ -12,7 +12,7 @@ import type {
   PublicRecoveredMission,
   PublicTeammate
 } from '../../../shared/ipc.js'
-import { buildThread, cancellationSummary, decisionStanding, errorAlreadyShown, foldNoticeKeys, lastPlanOf, modeRefusedATool, readPlan, terminalSeamBefore, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
+import { buildThread, cancellationSummary, editedFiles, decisionStanding, errorAlreadyShown, foldNoticeKeys, lastPlanOf, modeRefusedATool, readPlan, terminalSeamBefore, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
 import type { GroupBoundary, GroupLeaving, LiveStarter, TurnSwitch } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
 import { folderName, ranOnLine } from '../ranOn.js'
@@ -39,6 +39,9 @@ import { ResumeCard } from './ResumeCard.js'
 import { resumeOffer } from '../resume.js'
 import { HandoffDivider } from './HandoffDivider.js'
 import { TerminalDivider } from './TerminalDivider.js'
+import { SentNotes } from './SentNotes.js'
+import { splitDiffNotes } from '../diffNotes.js'
+import type { DiffFile } from '../diff.js'
 import { TimeMarker } from './TimeMarker.js'
 import { PeerThread } from './PeerThread.js'
 import type { ThreadItem, ThreadPeerCard } from '../missionView.js'
@@ -955,11 +958,20 @@ onResume,
    * teammate wrote: "where is it" is the question a file attracts, and it
    * should have the same answer wherever the file appears.
    */
-  const userTurn = (line: string | undefined, attached: readonly string[]): ReactElement | undefined => {
-    if (line === undefined && attached.length === 0) return undefined
+  /*
+   * `edited` is asked for only when the message carried review notes, and
+   * only once its turn is over: the files that turn changed, which is what
+   * each note is held against (SentNotes.tsx, 0.395).
+   */
+  const userTurn = (line: string | undefined, attached: readonly string[], edited?: () => readonly DiffFile[]): ReactElement | undefined => {
+    const split = line === undefined ? undefined : splitDiffNotes(line)
+    const words = split === undefined || split.text.trim().length === 0 ? undefined : split.text
+    const notes = split?.notes ?? []
+    if (words === undefined && attached.length === 0 && notes.length === 0) return undefined
     return (
       <>
-        {line !== undefined && <div className="lc-bubble">{line}</div>}
+        {words !== undefined && <div className="lc-bubble">{words}</div>}
+        {notes.length > 0 && <SentNotes notes={notes} edited={edited?.()} />}
         {attached.length > 0 && (
           <div className="lc-sentfiles">
             {attached.map((path) => (
@@ -1068,7 +1080,7 @@ onResume,
               {joinNotes((beforeTurn) => beforeTurn === index)}
               {turn.switchedFrom !== undefined && <HandoffDivider {...turn.switchedFrom} />}
               {seam !== undefined && <TerminalDivider seam={seam} />}
-              {userTurn(turnPromptLine(turn), turnAttachments(turn))}
+              {userTurn(turnPromptLine(turn), turnAttachments(turn), () => editedFiles(turn.events, workspacePath))}
               {cardsFor(index, 'before-work').map(peerCard)}
               {earlierWork[index]}
               {cardsFor(index, 'after-work').map(peerCard)}
@@ -1112,7 +1124,7 @@ onResume,
         */}
         {switchedFrom !== undefined && <HandoffDivider {...switchedFrom} />}
         {currentSeam !== undefined && <TerminalDivider seam={currentSeam} />}
-        {userTurn(currentLine, turnAttachments({ prompt, ...(startedBy === undefined ? {} : { startedBy }) }))}
+        {userTurn(currentLine, turnAttachments({ prompt, ...(startedBy === undefined ? {} : { startedBy }) }), running ? undefined : () => editedFiles(events, workspacePath))}
 
         {handoff !== undefined && (
           <>

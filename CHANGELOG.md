@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.395.0 - 2026-09-27
+
+### New
+
+- **Review notes stay with your message.** When you send notes you pinned
+  to lines of a teammate's change, they no longer disappear into the end of
+  your message. Each one is shown under it with its file, its line and what
+  you wrote. Once the teammate has worked through them, each note says what
+  happened: **Line changed**, **File changed, not this line**, **Not
+  changed**, or **File deleted**. You can see at a glance which notes were
+  dealt with.
+
 ## 0.394.0 - 2026-09-27
 
 ### Improved

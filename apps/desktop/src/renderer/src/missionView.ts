@@ -511,6 +511,18 @@ export interface FileTurn {
  * change to a file and which rows are steps inside it, chief among them. A
  * second reader of the same events would drift from the fold it sits beside.
  */
+/** Every file one turn's run changed, as its diff (0.395: what a review note is held against). */
+export function editedFiles(events: readonly NormalizedRuntimeEvent[], workspacePath: string | undefined): readonly DiffFile[] {
+  const out: DiffFile[] = []
+  for (const item of buildThread(events, { running: false, ...(workspacePath === undefined ? {} : { workspacePath }) })) {
+    if (item.type !== 'activity') continue
+    for (const entry of activityEntries(item.details, workspacePath)) {
+      if (entry.kind === 'file') out.push(entry.file)
+    }
+  }
+  return out
+}
+
 export function fileTurns(
   turns: readonly {
     readonly missionId: string

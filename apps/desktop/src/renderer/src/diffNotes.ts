@@ -82,6 +82,79 @@ export function withNote(notes: readonly DiffNote[], note: DiffNote): readonly D
   return [...notes.filter((existing) => existing.key !== note.key), note]
 }
 
+/*
+ * NOTES THAT SURVIVE A REVISION (0.395, Orca's #5).
+ *
+ * Sent, the notes were words at the end of the person's message and nothing
+ * else: the bubble printed the block raw, and nothing said what became of a
+ * note once the teammate revised. Orca keeps each review note on its line
+ * through the agent's next pass and says whether that pass touched it. Here
+ * the block is read back out of the sent message -- it is written by
+ * `diffNotesBlock` above, so its shape is ours -- and each note is held
+ * against what that turn went on to change.
+ */
+export interface SentDiffNote {
+  readonly path: string
+  readonly line: number | undefined
+  /** It was on a line the earlier change had removed. */
+  readonly removed: boolean
+  readonly code: string | undefined
+  readonly text: string
+}
+
+const BLOCK_HEAD = /(?:^|\n\n)Notes on your changes \((\d+)\):\n((?:- .*(?:\n|$))+)\s*$/
+const NOTE_LINE = /^- (.+?)(?:, (removed line|line) (\d+))?(?: `([^`]*)`)?: (.*)$/
+
+/** A sent message's own words, and the notes it carried, read back out of it. */
+export function splitDiffNotes(text: string): { readonly text: string; readonly notes: readonly SentDiffNote[] } {
+  const found = BLOCK_HEAD.exec(text)
+  if (found === null) return { text, notes: [] }
+  const notes: SentDiffNote[] = []
+  for (const row of (found[2] ?? '').split('\n')) {
+    const note = NOTE_LINE.exec(row.trim())
+    if (note === null) continue
+    notes.push({
+      path: note[1]!,
+      line: note[3] === undefined ? undefined : Number(note[3]),
+      removed: note[2] === 'removed line',
+      code: note[4],
+      text: note[5]!.trim()
+    })
+  }
+  if (notes.length === 0) return { text, notes: [] }
+  return { text: text.slice(0, found.index).trimEnd(), notes }
+}
+
+/** What the turn that received a note went on to do where it was. */
+export type NoteOutcome = 'line' | 'file' | 'untouched' | 'deleted'
+
+/**
+ * A note's line is the file as it was BEFORE the turn that read it, which is
+ * the old side of that turn's own diff: a removed or rewritten row with that
+ * old number is the line the note was on.
+ */
+export function noteOutcome(note: SentDiffNote, edited: readonly { readonly path: string; readonly status: string; readonly hunks: readonly { readonly rows: readonly { readonly kind: string; readonly oldNo?: number }[] }[] }[]): NoteOutcome {
+  const key = (path: string): string => path.replace(/[\\/]+/g, '/').replace(/^\.\//, '').toLowerCase()
+  const wanted = key(note.path)
+  const file = edited.find((entry) => {
+    const have = key(entry.path)
+    return have === wanted || have.endsWith(`/${wanted}`) || wanted.endsWith(`/${have}`)
+  })
+  if (file === undefined) return 'untouched'
+  if (file.status === 'DELETED') return 'deleted'
+  if (note.line === undefined || note.removed) return 'file'
+  const onTheLine = file.hunks.some((hunk) => hunk.rows.some((row) => row.kind === 'del' && row.oldNo === note.line))
+  return onTheLine ? 'line' : 'file'
+}
+
+/** The chip a note wears once the turn is over. */
+export function noteOutcomeWords(outcome: NoteOutcome): string {
+  if (outcome === 'line') return 'Line changed'
+  if (outcome === 'file') return 'File changed, not this line'
+  if (outcome === 'deleted') return 'File deleted'
+  return 'Not changed'
+}
+
 /** The chat box's tile for them: "1 note on the changes", "3 notes on the changes". */
 export function diffNotesTile(count: number): string {
   return count === 1 ? '1 note on the changes' : `${String(count)} notes on the changes`

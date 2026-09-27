@@ -129,8 +129,20 @@ try {
   const after = await readFile(join(workspace, 'app.js'), 'utf8')
   await drive.capture('Wren, after the note', () => after)
   check('the tile is gone once the message went', String(await drive.evaluate(`(() => document.querySelector('.lc-notestile') === null)()`)) === 'true')
-  check('the message carried the note, with its file, line and code', /Notes on your changes \(1\):/.test(sentBubble) && /app\.js, line 3 `const port = 3001`: Read the port from the PORT/.test(sentBubble), sentBubble.slice(0, 300))
+  // 0.395 (Orca's #5): the bubble holds the person's words and the note is
+  // drawn under it -- where it was, the line, what was said -- and, once the
+  // revision is over, what became of it.
+  check('the bubble is the words alone, not the notes block', /One note on your change\./.test(sentBubble) && !/Notes on your changes/.test(sentBubble), sentBubble.slice(0, 300))
+  const sentNotes = String(await drive.capture('the note under the message, and what the revision did to its line', () => drive.evaluate(`(() => JSON.stringify([...document.querySelectorAll('.lc-sentnote')].map((row) => ({
+    place: row.querySelector('.lc-sentnote__place')?.textContent ?? '',
+    code: row.querySelector('.lc-sentnote__code')?.textContent ?? '',
+    text: row.querySelector('.lc-sentnote__text')?.textContent ?? '',
+    outcome: row.querySelector('.lc-sentnote__outcome')?.textContent ?? ''
+  }))))()`)))
+  const drawn = JSON.parse(sentNotes)
+  check('the note survives under the message, with its place, line and words', drawn.length === 1 && drawn[0].place === 'app.js:3' && drawn[0].code === 'const port = 3001' && drawn[0].text === NOTE, sentNotes)
   check('Wren acted on the note', answered === 'ended' && /process\.env\.PORT/.test(after), after.split('\n').filter((line) => /port/i.test(line)).join(' / '))
+  check('and the note says its line changed', drawn[0]?.outcome === 'Line changed', drawn[0]?.outcome)
   say(failures === 0 ? '\nDIFF NOTES PASSED' : `\nDIFF NOTES: ${String(failures)} FAILED`)
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
