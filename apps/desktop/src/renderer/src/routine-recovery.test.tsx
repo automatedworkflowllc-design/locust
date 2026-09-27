@@ -79,11 +79,19 @@ describe('recovery where a person looks for routines', () => {
     expect(html).not.toContain('Saved mission:')
   })
 
+  it('names when Keep runs it next -- six hours from the decision, not the attempt (0.402 beta retest)', () => {
+    const now = new Date('2026-09-27T14:00:00.000Z')
+    const html = renderToStaticMarkup(<RoutineRecovery routine={routine} recover={async () => ({ ok: true })} now={now} />)
+    const sixHoursOn = new Date(now.getTime() + 6 * 3_600_000).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' })
+    expect(html).toContain(`its next run starts from step 1 at ${sixHoursOn}, not straight away`)
+  })
+
   it('says why Continue is off, and offers to keep the schedule (0.390 beta pass)', () => {
     const earlier = renderToStaticMarkup(<RoutineRecovery routine={routine} recover={async () => ({ ok: true })} />)
     expect(earlier).toContain('Continue waits for step 2 to be confirmed finished. It was not, so step 3 would build on work that may not be there.')
     expect(earlier).toMatch(/disabled="">Keep the schedule/)
-    expect(earlier).toContain('its next run starts from step 1 when it is next due')
+    // 0.404: the next run named, one interval from the decision, never at once.
+    expect(earlier).toMatch(/its next run starts from step 1 at [^<]+, not straight away/)
     const last = { ...routine, execution: { ...routine.execution!, step: 3 } }
     const html = renderToStaticMarkup(<RoutineRecovery routine={last} recover={async () => ({ ok: true })} />)
     expect(html).toContain('This was the last step, so there is nothing left to continue.')

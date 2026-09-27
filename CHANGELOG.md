@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.404.0 - 2026-09-27
+
+### Fixed
+
+- **Keeping a routine's schedule no longer starts it again right away.**
+  When a routine was held for review after its time had already passed,
+  **Keep the schedule** made it due at once, and step 1 started within a
+  minute, which the card only showed after the click. Keeping it now starts
+  the routine's clock from the moment you decide, and the card says when
+  the next run will be before you choose, for example "at Sun 4:30 PM, not
+  straight away". To run it now, press its Run button.
+
 ## 0.403.0 - 2026-09-27
 
 ### Fixed

@@ -2,15 +2,18 @@ import { useState } from 'react'
 import type { ReactElement } from 'react'
 import type { PublicRoutine } from '../../../shared/ipc.js'
 import type { RoutineRecoveryRequest, RoutineRecoveryResponse } from '../../../shared/routine-recovery.js'
+import { nextRunAfter } from '../../../shared/routine-schedule.js'
 
 export type RecoverRoutine = (request: RoutineRecoveryRequest) => Promise<RoutineRecoveryResponse>
 
 /** This is durable card content, not a dismissible toast: missing one event
  * must not hide a routine that has been waiting for four days. */
-export function RoutineRecovery({ routine, recover, onOpenMission }: {
+export function RoutineRecovery({ routine, recover, onOpenMission, now = new Date() }: {
   readonly routine: PublicRoutine
   readonly recover?: RecoverRoutine
   readonly onOpenMission?: (missionId: string) => void
+  /** The clock the next run is read from; tests pass one. */
+  readonly now?: Date
 }): ReactElement | null {
   const [busy, setBusy] = useState(false)
   const [reviewed, setReviewed] = useState(false)
@@ -77,7 +80,14 @@ export function RoutineRecovery({ routine, recover, onOpenMission }: {
       {lastStep
         ? <span className="lc-recovery__line">This was the last step, so there is nothing left to continue.</span>
         : !execution.canContinue && <span className="lc-recovery__line">{`Continue waits for step ${String(execution.step)} to be confirmed finished. It was not, so step ${String(execution.step + 1)} would build on work that may not be there.`}</span>}
-      <span className="lc-recovery__line">{`Keep clears this attempt and leaves the routine as it was; its next run starts from step 1${routine.schedule === undefined ? ' when you press Run' : ' when it is next due'}. Abandon also removes the schedule. Neither stops a runtime or undoes work.`}</span>
+      {/*
+        * WHEN KEEP RUNS IT NEXT, said before the click (0.404). Keep starts
+        * the routine's clock at the decision, so the next run is one
+        * interval (or the next daily time) from now -- never at once, which
+        * is what a routine held past its interval did until 0.404, shown
+        * only after the click (the 0.402 beta retest).
+        */}
+      <span className="lc-recovery__line">{`Keep clears this attempt and leaves the routine as it was; its next run starts from step 1 ${routine.schedule === undefined ? 'when you press Run' : `at ${nextRunAfter(routine.schedule, now.toISOString(), now).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' })}, not straight away`}. Abandon also removes the schedule. Neither stops a runtime or undoes work.`}</span>
       <label className="lc-recovery__ack"><input type="checkbox" checked={reviewed} disabled={busy}
         onChange={(event) => setReviewed(event.target.checked)} /> I reviewed the saved mission and external work, and whether the remaining work is still wanted.</label>
       <span className="lc-recovery__actions">

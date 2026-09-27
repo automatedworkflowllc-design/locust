@@ -10,7 +10,7 @@
 // and the receipt here is the one in his screenshot (step 2 of 2, the run
 // interrupted). Spends nothing.
 
-import { mkdir } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { recordRoot, say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
@@ -125,6 +125,8 @@ try {
     return drive.evaluate(`JSON.stringify([...document.querySelectorAll('.lc-automations .lc-recovery__actions button')].map((b) => b.innerText + ':' + (b.disabled ? 'held' : 'ready')))`)
   })
   const buttons = JSON.parse(String(await drive.evaluate(`JSON.stringify([...document.querySelectorAll('.lc-automations .lc-recovery__actions button')].map((b) => b.innerText + ':' + (b.disabled ? 'held' : 'ready')))`)))
+  const keepLine = String(await drive.evaluate(`document.querySelector('.lc-automations .lc-recovery')?.innerText ?? ''`))
+  check('before the click, the card says when Keep runs it next, and not straight away', /its next run starts from step 1 at .+, not straight away/.test(keepLine), (keepLine.match(/Keep clears[^.]*\./) ?? ['(no Keep line)'])[0])
   check('after the box: Keep the schedule ready, Abandon ready, no Continue', JSON.stringify(buttons) === JSON.stringify(['Keep the schedule:ready', 'Abandon attempt and remove schedule:ready']), JSON.stringify(buttons))
   await drive.capture('Keep the schedule: the card goes, the routine stays scheduled', async () => {
     await drive.evaluate(`[...document.querySelectorAll('.lc-automations .lc-recovery__actions button')].find((b) => b.innerText === 'Keep the schedule')?.click()`)
@@ -134,6 +136,17 @@ try {
   const after = String(await drive.evaluate(`JSON.stringify({ card: document.querySelector('.lc-automations .lc-recovery') !== null, text: document.querySelector('.lc-automations .lc-routinerow')?.innerText.replace(/\\s+/g, ' ') ?? '' })`))
   const kept = JSON.parse(after)
   check('kept: no review card, still every 6 hours, not run now', !kept.card && /every 6 hours/.test(kept.text) && !/held for review/.test(kept.text), kept.text)
+  /*
+   * 0.404, from the 0.402 beta retest: this attempt started at 06:13 and the
+   * routine runs every 6 hours, so by the time this drive runs it is OVERDUE.
+   * Kept, its clock used to restart at the attempt's start -- due at once --
+   * and the scheduler's next tick (every 60s) started step 1. Wait past one.
+   */
+  await sleep(80_000)
+  const disk = JSON.parse(await readFile(join(drive.profile, 'routines.json'), 'utf8')).routines.find((entry) => entry.routineId === 'rt_readme')
+  const later = String(await drive.evaluate(`document.querySelector('.lc-automations .lc-routinerow')?.innerText.replace(/\\s+/g, ' ') ?? ''`))
+  check('a tick after Keep: nothing started, and the row does not say due now', disk.execution === undefined && disk.runs === 0 && !/due now|running/i.test(later), `${JSON.stringify({ execution: disk.execution?.status, runs: disk.runs, lastRunAt: disk.lastRunAt })} | ${later.slice(0, 160)}`)
+  await drive.capture('a minute after Keep: still waiting for its next time', () => later)
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

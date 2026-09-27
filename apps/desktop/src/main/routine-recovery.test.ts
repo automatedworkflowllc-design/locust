@@ -186,21 +186,49 @@ describe('durable routine recovery — policy (c)', () => {
     await next.reconcile()
     const execution = (await f.read())!.execution!
     expect(execution).toMatchObject({ step: 2, of: 2, status: 'held', canContinue: false })
+    const deciding = Date.now()
     expect(await next.recover({ routineId: f.routine.routineId, attemptId: execution.attemptId, step: execution.step, decision: 'keep' })).toEqual({ ok: true })
     const kept = (await f.read())!
     expect(kept.execution).toBeUndefined()
     expect(kept.schedule).toEqual({ kind: 'every', hours: 6 })
     expect(kept.runs).toBe(0)
-    expect(kept.lastRunAt).toBe(execution.startedAt)
-    // Not the moment it is cleared: six hours from when the attempt started.
-    const started = Date.parse(execution.startedAt)
-    await next.tick(new Date(started + 60_000))
+    // 0.404: six hours from the DECISION, not from when the attempt started --
+    // a routine held past its interval would otherwise run the moment it was
+    // kept (the 0.402 beta retest).
+    const keptAt = Date.parse(kept.lastRunAt!)
+    expect(keptAt).toBeGreaterThanOrEqual(deciding)
+    expect(keptAt).toBeLessThanOrEqual(Date.now())
+    await next.tick(new Date(keptAt + 60_000))
     expect(f.start).toHaveBeenCalledTimes(2)
-    await next.tick(new Date(started + 6 * 3_600_000 + 60_000))
+    await next.tick(new Date(keptAt + 6 * 3_600_000 + 60_000))
     expect(f.start).toHaveBeenCalledTimes(3)
     expect(f.start).toHaveBeenLastCalledWith(expect.objectContaining({ prompt: 'Open the PR.' }))
     // A decision about an attempt that is gone is stale.
     expect(await next.recover({ routineId: f.routine.routineId, attemptId: execution.attemptId, step: execution.step, decision: 'keep' })).toMatchObject({ ok: false })
+  })
+
+  it('keep: a routine held PAST its interval does not start again the moment it is kept (0.402 beta retest)', async () => {
+    const f = await fixture()
+    await f.restart().run(f.routine.routineId)
+    const next = f.restart()
+    await next.reconcile()
+    // Held for seven hours before anyone decided: past its six-hour interval.
+    const file = await f.disk()
+    const longAgo = new Date(Date.now() - 7 * 3_600_000).toISOString()
+    const backdated = file.routines.map((routine) =>
+      routine.routineId === f.routine.routineId ? { ...routine, execution: { ...routine.execution!, startedAt: longAgo } } : routine)
+    await writeFile(join(f.directory, 'routines.json'), JSON.stringify({ ...file, routines: backdated }), 'utf8')
+    const execution = (await f.read())!.execution!
+    expect(execution.startedAt).toBe(longAgo)
+    const calls = f.start.mock.calls.length
+    expect(await next.recover({ routineId: f.routine.routineId, attemptId: execution.attemptId, step: execution.step, decision: 'keep' })).toEqual({ ok: true })
+    // Ticks from the wall clock at the decision, NOT from what was stored:
+    // measured from the stored time, the old rule agreed with itself.
+    const decided = Date.now()
+    await next.tick(new Date(decided + 60_000))
+    expect(f.start).toHaveBeenCalledTimes(calls)
+    await next.tick(new Date(decided + 6 * 3_600_000 + 60_000))
+    expect(f.start).toHaveBeenCalledTimes(calls + 1)
   })
 
   it('abandon is durable acknowledgement, removes the schedule and never claims completion', async () => {

@@ -372,7 +372,7 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
         return { ok: false, error: { message: 'This recovery decision is stale. Reload routines and review the current attempt.' } }
       }
       if (request.decision === 'keep') {
-        await options.routines.keepSchedule(routine.routineId, execution.attemptId)
+        await options.routines.keepSchedule(routine.routineId, execution.attemptId, new Date().toISOString())
         changed()
         return { ok: true }
       }

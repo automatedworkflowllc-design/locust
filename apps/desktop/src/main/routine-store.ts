@@ -70,7 +70,8 @@ export interface RoutineStore {
    * four hours does not start again the moment it is cleared; not counted as
    * a completed run, because it was not one.
    */
-  keepSchedule(routineId: string, attemptId: string): Promise<void>
+  /** Put the held attempt down and keep the routine, its clock started at `keptAt` (the decision). */
+  keepSchedule(routineId: string, attemptId: string, keptAt: string): Promise<void>
   clearProgress(routineId: string, attemptId: string): Promise<void>
   /** Drop every routine of a teammate who is gone; their steps had nobody to run them. */
   removeForTeammate(teammateId: unknown): Promise<void>
@@ -390,13 +391,20 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
       })
     },
 
-    keepSchedule(routineId, attemptId) {
+    keepSchedule(routineId, attemptId, keptAt) {
       return serialize(async () => {
         const file = await read()
         const held = file.routines.find((routine) => routine.routineId === routineId)
         if (held?.execution?.attemptId !== attemptId || held.execution.status !== 'held') throw new Error('Routine execution changed; reload before continuing.')
         const { execution, ...rest } = held
-        const next: PublicRoutine = { ...rest, lastRunAt: execution.startedAt }
+        /*
+         * THE CLOCK STARTS AT THE DECISION (0.404), as Abandon's does: an
+         * acknowledgement is not permission to replay step 1 a minute later.
+         * From the attempt's start, a routine held past its interval was due
+         * the moment it was kept, and step 1 ran on the next tick -- shown only
+         * after the click (the 0.402 beta retest).
+         */
+        const next: PublicRoutine = { ...rest, lastRunAt: keptAt }
         await write({ ...file, routines: file.routines.map((routine) => (routine.routineId === routineId ? next : routine)) })
       })
     },
