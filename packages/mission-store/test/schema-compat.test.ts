@@ -123,10 +123,12 @@ describe('ledger schema versions', () => {
 
     const header = JSON.parse((await readFile(join(root, 'mission_1.jsonl'), 'utf8')).split('\n')[0] ?? '{}')
 
-    // v17 added the person's check result after a turn (mission.edit_check).
-    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(17)
-    expect(header.schemaVersion).toBe(17)
-    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17])
+    // v17 added the person's check result after a turn (mission.edit_check);
+    // v18 the terminal starter, a turn brought back from the runtime's own
+    // terminal (0.391).
+    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(18)
+    expect(header.schemaVersion).toBe(18)
+    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18])
     /*
      * THE PAIR THAT DRIFTED, checked as a pair.
      *
@@ -468,6 +470,42 @@ describe('ledger schema versions', () => {
     expect(recovered?.metadata.startedBy).toEqual({ kind: 'routine', routineId: 'rt_abc', step: 2 })
   })
 
+  it('round-trips a terminal starter at the current version (v18)', async () => {
+    // A turn the person had in the runtime's own terminal, brought back
+    // (docs/PLAN-TERMINAL-CATCH-UP-2026-09-27.md).
+    const root = await temporaryRoot()
+    await createFileMissionLedger({ rootDirectory: root }).createMission(
+      v1Metadata({ startedBy: { kind: 'terminal', exchange: 2 } }) as unknown as MissionLedgerMetadata
+    )
+
+    const recovered = await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')
+
+    expect(recovered?.issues).toEqual([])
+    expect(recovered?.metadata.startedBy).toEqual({ kind: 'terminal', exchange: 2 })
+  })
+
+  it('refuses a terminal starter whose exchange is below 1', async () => {
+    const root = await temporaryRoot()
+    await expect(
+      createFileMissionLedger({ rootDirectory: root }).createMission(
+        v1Metadata({ startedBy: { kind: 'terminal', exchange: 0 } }) as unknown as MissionLedgerMetadata
+      )
+    ).rejects.toThrow()
+  })
+
+  it('refuses a terminal starter in a file written before version 18', async () => {
+    const root = await temporaryRoot()
+    // No writer before v18 brought a terminal's turns back.
+    const metadata = v1Metadata({ startedBy: { kind: 'terminal', exchange: 1 } })
+    await writeFile(
+      join(root, 'mission_1.jsonl'),
+      `${JSON.stringify({ schemaVersion: 17, recordType: 'mission.created', ledgerSequence: 1, occurredAt: metadata.createdAt, metadata })}\n`,
+      'utf8'
+    )
+
+    expect(await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')).toBeUndefined()
+  })
+
   it('refuses a routine starter with no routine id or a step below 1', async () => {
     const root = await temporaryRoot()
     const ledger = createFileMissionLedger({ rootDirectory: root })
@@ -735,7 +773,7 @@ describe('ledger schema versions', () => {
       join(root, 'mission_1.jsonl'),
       `${JSON.stringify({
         // One past the newest this reader knows. Bump when the schema does.
-        schemaVersion: 18,
+        schemaVersion: 19,
         recordType: 'mission.created',
         ledgerSequence: 1,
         occurredAt: metadata.createdAt,

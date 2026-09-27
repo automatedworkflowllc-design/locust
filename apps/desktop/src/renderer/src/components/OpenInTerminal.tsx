@@ -15,9 +15,11 @@ import { Icon } from './Icon.js'
  *
  * The host does the opening (main/open-in-terminal.ts): the same session, in
  * the runtime's own interface, in this teammate's folder. What the button
- * says is what that means for the person: Locust will not see what happens
- * there, and the terminal runs with the runtime's own permissions, not this
- * conversation's mode.
+ * says is what that means for the person: the terminal runs with the
+ * runtime's own permissions, not this conversation's mode -- and, for Claude
+ * Code and Codex, what they do there comes back into the conversation (0.391,
+ * main/terminal-catch-up.ts). The others keep their sessions where Locust
+ * does not read yet, and it says so.
  */
 export interface TerminalOffer {
   /** "Claude Code": whose interface opens. */
@@ -28,10 +30,14 @@ export interface TerminalOffer {
   readonly title: string
   /** Why it cannot be pressed now, when it cannot. */
   readonly disabled?: string
+  /** What is said once it opened: whether what happens there comes back. */
+  readonly opened: (where: string) => string
 }
 
 /** Runtimes with an interface of their own to resume a session in (open-in-terminal.ts). */
 const RESUMABLE: ReadonlySet<string> = new Set(['codex', 'claude', 'copilot', 'cursor', 'opencode', 'muse'])
+/** The ones whose sessions Locust reads back afterwards (terminal-catch-up.ts). */
+const COMES_BACK: ReadonlySet<string> = new Set(['codex', 'claude'])
 
 export function terminalOffer(input: {
   readonly runtime: string | undefined
@@ -46,10 +52,13 @@ export function terminalOffer(input: {
   if (model !== undefined && isOwnRoute(model)) return undefined
   const runtimeName = runtimeDisplayName(runtime)
   const whose = teammateName === undefined ? 'this folder' : `${teammateName}'s folder`
+  const comesBack = COMES_BACK.has(runtime)
+  const afterwards = comesBack ? 'What you do there comes back into this conversation' : "Locust won't see what you do there"
   return {
     runtimeName,
     label: `Open in ${runtimeName}, in a terminal`,
-    title: `Open in ${runtimeName}, in a terminal\nThe same session, in ${whose}. Locust won't see what you do there, and it runs with ${runtimeName}'s own permissions, not this conversation's mode.`,
+    title: `Open in ${runtimeName}, in a terminal\nThe same session, in ${whose}. ${afterwards}, and it runs with ${runtimeName}'s own permissions, not this conversation's mode.`,
+    opened: (where) => (comesBack ? `Opened in ${where}. What you do there comes back here when you return.` : `Opened in ${where}. Locust won't see what happens there.`),
     ...(running
       ? { disabled: `Available when ${teammateName ?? 'this run'} finishes: Locust's run and a terminal can't share one session at once.` }
       : {})

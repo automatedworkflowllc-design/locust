@@ -50,7 +50,10 @@ export function routineDraft(
   const said: { readonly missionId: string; readonly prompt: string; readonly phase: string | undefined }[] = []
   for (const turn of turns) {
     const held = byId.get(turn.missionId)
-    // Host-written turns carry a briefing, not a person's words.
+    // Host-written turns carry a briefing, not a person's words. A turn typed
+    // in the runtime's own terminal (0.391) is the person's, but it can be a
+    // terminal command ("/review") that a replay here would not run the same
+    // way, so it is not offered as a step either.
     if (held?.startedBy !== undefined) continue
     // A turn on another runtime was STARTED with the host's briefing; the
     // person's words are the part of it they typed (`typedPrompt`). Read raw,

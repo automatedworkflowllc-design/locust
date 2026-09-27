@@ -3794,6 +3794,21 @@ export interface ConversationTurn {
   readonly peerMessages: PublicRecoveredMission['peerMessages']
   /** Set when this turn was a reply sent to another runtime. */
   readonly switchedFrom?: TurnSwitch
+  /** Set when the person had this exchange in that runtime's own terminal (0.391). */
+  readonly inTerminal?: MissionRuntimeId
+}
+
+/**
+ * Where a conversation went into a runtime's own terminal, or came back
+ * (0.391): into it before the first exchange brought back from there, back in
+ * Locust before the next turn Locust ran. Nothing between two turns that were
+ * both had there.
+ */
+export type TerminalSeam = { readonly into: MissionRuntimeId } | { readonly back: true }
+
+export function terminalSeamBefore(previous: MissionRuntimeId | undefined, current: MissionRuntimeId | undefined): TerminalSeam | undefined {
+  if (current !== undefined) return current === previous ? undefined : { into: current }
+  return previous === undefined ? undefined : { back: true }
 }
 
 /**
@@ -3868,7 +3883,8 @@ export function conversationTurns(
       prompt: latest.prompt,
       events: latest.events,
       peerMessages: latest.peerMessages,
-      ...(switchedFrom === undefined ? {} : { switchedFrom })
+      ...(switchedFrom === undefined ? {} : { switchedFrom }),
+      ...(latest.startedBy?.kind === 'terminal' ? { inTerminal: latest.runtime } : {})
     })
     // The turn before this one: a follow-up on the same runtime, or a reply
     // sent to another runtime -- the conversation carried on either way, and
@@ -4215,8 +4231,9 @@ export function turnPromptLine(turn: {
   if (turn.startedBy === undefined) return splitAttachments(turn.prompt).text
   // A routine step is the person's own words, saved from a conversation they
   // had; it is theirs to see, even though the host pressed go. A room post
-  // is the person's own words too, said to several at once.
-  if (turn.startedBy.kind === 'routine' || turn.startedBy.kind === 'room') {
+  // is the person's own words too, said to several at once, and so is what
+  // they typed in the runtime's own terminal (0.391).
+  if (turn.startedBy.kind === 'routine' || turn.startedBy.kind === 'room' || turn.startedBy.kind === 'terminal') {
     return splitAttachments(turn.prompt).text
   }
   // A relayed turn's prompt IS the message that started it, and the thread

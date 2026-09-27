@@ -11641,10 +11641,74 @@ textarea {
 
 .lc-routinerow > .lc-recovery {
   grid-column: 1 / -1;
-  /* The inline overrides this used to carry, now that it is a real element in
-     a real place: it wraps, and it is a block. */
-  white-space: normal;
   margin-top: var(--lc-space-2);
+}
+
+/*
+ * A routine waiting on a person, as a card of its own (RoutineRecovery.tsx):
+ * the lines it is, stacked, on an amber edge. It used to borrow the row's
+ * meta class, and the Routines screen crushed it into one clipped cell.
+ */
+.lc-recovery {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--lc-space-3);
+  min-width: 0;
+  padding: var(--lc-space-4) var(--lc-space-5);
+  border: 1px solid var(--lc-amber-border);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-amber-tint);
+  font-size: var(--lc-text-description);
+  line-height: 1.45;
+  white-space: normal;
+  color: var(--lc-text-secondary);
+}
+
+.lc-recovery__head {
+  color: var(--lc-text-muted);
+}
+
+.lc-recovery__line {
+  max-width: 72ch;
+  text-wrap: pretty;
+}
+
+.lc-recovery__details > summary {
+  cursor: pointer;
+  color: var(--lc-text-muted);
+}
+
+.lc-recovery__details > ol {
+  margin: var(--lc-space-2) 0 0;
+  padding-left: var(--lc-space-7);
+}
+
+.lc-recovery__ack {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--lc-space-3);
+  max-width: 72ch;
+}
+
+.lc-recovery__ack > input {
+  margin: 2px 0 0;
+}
+
+.lc-recovery__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lc-space-3);
+}
+
+/* `.lc-ghostbutton` pushes itself right; here each control stays with its lines. */
+.lc-recovery .lc-ghostbutton {
+  margin-left: 0;
+}
+
+/* On the Routines screen: under the name, across the rest of the row. */
+.lc-automations .lc-routinerow > .lc-recovery {
+  grid-column: 2 / -1;
 }
 
 /*

@@ -262,6 +262,13 @@ interface CodexMissionServiceOptions {
    * `discoverForStart`. Passing nothing is the old full sweep.
    */
   readonly discover: (runtimeId?: string) => Promise<readonly RuntimeDiscovery[]>
+  /**
+   * Bring what the person did in the runtime's own terminal on a conversation
+   * into its record, and say its newest turn (0.391; terminal-catch-up.ts).
+   * Called before a follow-up starts, so the new turn continues from the last
+   * of what was done there.
+   */
+  readonly catchUpTerminal?: (missionId: string) => Promise<{ readonly latestMissionId: string }>
   readonly runner: RuntimeProcessRunner
   /**
    * How to start `codex app-server`, which is the transport every Codex mode
@@ -1171,6 +1178,14 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // Whether the session being resumed compacted during that turn: then
         // it holds a summary, not the brief, and this turn is briefed in full.
         let resumedCompacted = false
+        // What the person did in the runtime's own terminal on this
+        // conversation lands first (0.391), so this turn continues from the
+        // last of it. After the busy check above, which knows the settled
+        // turn by the id the window sent.
+        if (followUpOf !== undefined && options.catchUpTerminal !== undefined) {
+          const named = followUpOf
+          followUpOf = (await options.catchUpTerminal(named).catch(() => undefined))?.latestMissionId ?? named
+        }
         if (followUpOf !== undefined) {
           const prior = await options.ledger.getMission(followUpOf).catch(() => undefined)
           const priorThread = prior === undefined ? undefined : runtimeThreadIdOf(prior)

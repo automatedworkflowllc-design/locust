@@ -32,37 +32,47 @@ export function RoutineRecovery({ routine, recover, onOpenMission }: {
     }
   }
   /*
-   * `lc-recovery` rather than an inline style.
+   * A CARD OF ITS OWN, laid out as the lines it is.
    *
-   * This carried `style={{ display: 'block', whiteSpace: 'normal' }}` because
-   * it used to live INSIDE `lc-routinerow__name`, a one-line ellipsised span
-   * that would otherwise have collapsed it. It is a row of its own now, so the
-   * override is no longer holding anything up and the class can say what this
-   * is instead.
+   * It wore the row's `lc-routinerow__meta` class as well, and the Routines
+   * screen lays a row's meta out as ONE flex line in ONE grid cell, clipped
+   * -- so every sentence here became a column a few words wide, and the
+   * review box and both decisions were cut off where nobody could reach them
+   * (Colin's screenshot from testing, 2026-09-27). The Team screen's card was
+   * never given that class's rules, which is why it looked right there.
    *
    * Amber is right and stays: this holds controls and is waiting on a person,
-   * which is the pending register.
+   * which is the pending register -- the head says it in amber, on an amber
+   * edge, and the sentences under it are read in the ordinary ink.
    */
-  return <div className="lc-recovery lc-routinerow__meta lc-tone-amber">
-    <strong>{execution.status === 'abandoned' ? 'Attempt abandoned' : 'Waiting for your review'}</strong>
-    {' · '}Step {execution.step} of {execution.of}{' · '}Attempt started {new Date(execution.startedAt).toLocaleString()}
-    <span style={{ display: 'block' }}>{execution.reason ?? 'Dispatch outcome is uncertain. Nothing will be replayed automatically.'}</span>
-    {execution.missionId !== undefined && <span style={{ display: 'block' }}>Saved mission: {execution.missionId}</span>}
-    {execution.missionId !== undefined && onOpenMission !== undefined && <button type="button" className="lc-ghostbutton"
-      onClick={() => onOpenMission(execution.missionId!)}>Open saved mission</button>}
+  // The head already says it waits for review; the host's reason says so again.
+  const reason = (execution.reason ?? 'Dispatch outcome is uncertain. Nothing will be replayed automatically.')
+    .replace(/^Review required: (\S)/, (_whole, first: string) => first.toUpperCase())
+  return <div className="lc-recovery">
+    <span className="lc-recovery__head">
+      <strong className="lc-tone-amber">{execution.status === 'abandoned' ? 'Attempt abandoned' : 'Waiting for your review'}</strong>
+      {` · Step ${String(execution.step)} of ${String(execution.of)} · Attempt started ${new Date(execution.startedAt).toLocaleString()}`}
+    </span>
+    <span className="lc-recovery__line">{reason}</span>
+    {execution.missionId !== undefined && (onOpenMission !== undefined
+      ? <button type="button" className="lc-ghostbutton" title={execution.missionId}
+          onClick={() => onOpenMission(execution.missionId!)}>Open the saved conversation</button>
+      : <span className="lc-recovery__line lc-mono">Saved mission: {execution.missionId}</span>)}
     {execution.status !== 'abandoned' && <>
-      <details><summary>Review saved steps and route</summary>
-        <span>{execution.route.runtime} · {execution.route.model} · {execution.route.mode}</span>
+      <details className="lc-recovery__details"><summary>Review saved steps and route</summary>
+        <span className="lc-mono">{execution.route.runtime} · {execution.route.model} · {execution.route.mode}</span>
         <ol>{execution.steps.map((step, index) => <li key={index}>{step}</li>)}</ol>
       </details>
-      <span style={{ display: 'block' }}>Abandon removes the schedule; it does not stop a runtime or undo work. A later Run starts again from step 1.</span>
-      <label style={{ display: 'block' }}><input type="checkbox" checked={reviewed} disabled={busy}
+      <span className="lc-recovery__line">Abandon removes the schedule; it does not stop a runtime or undo work. A later Run starts again from step 1.</span>
+      <label className="lc-recovery__ack"><input type="checkbox" checked={reviewed} disabled={busy}
         onChange={(event) => setReviewed(event.target.checked)} /> I reviewed the saved mission and external work, and whether the remaining work is still wanted.</label>
-      <button type="button" className="lc-ghostbutton" disabled={busy || !reviewed || !execution.canContinue || recover === undefined}
-        onClick={() => { void decide('continue') }}>Continue remaining steps</button>
-      <button type="button" className="lc-ghostbutton" disabled={busy || !reviewed || recover === undefined}
-        onClick={() => { void decide('abandon') }}>Abandon attempt and remove schedule</button>
+      <span className="lc-recovery__actions">
+        <button type="button" className="lc-ghostbutton" disabled={busy || !reviewed || !execution.canContinue || recover === undefined}
+          onClick={() => { void decide('continue') }}>Continue remaining steps</button>
+        <button type="button" className="lc-ghostbutton" disabled={busy || !reviewed || recover === undefined}
+          onClick={() => { void decide('abandon') }}>Abandon attempt and remove schedule</button>
+      </span>
     </>}
-    {error !== undefined && <span role="alert">{error}</span>}
+    {error !== undefined && <span role="alert" className="lc-recovery__line lc-tone-red">{error}</span>}
   </div>
 }

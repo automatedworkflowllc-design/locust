@@ -25,11 +25,12 @@ import { spawn } from 'node:child_process'
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync, existsSync, renameSync, statSync, unlinkSync } from 'node:fs'
 import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
-import { release } from 'node:os'
+import { homedir, release } from 'node:os'
 import { execFile } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
 import { MAX_PROMPT_LENGTH, createCodexMissionService, runtimeThreadIdOf } from './codex-mission.js'
 import { openInTerminal, terminalRequestFor } from './open-in-terminal.js'
+import { createTerminalCatchUp, createTerminalImports, createTranscriptReader } from './terminal-catch-up.js'
 import { approvalAnswerFrom, createApprovalChannel } from './approval-channel.js'
 import { PeerRecordError } from './peer-exchange.js'
 import { readNpmBinDirectory } from './npm-prefix.js'
@@ -85,7 +86,7 @@ import { changedSince } from './memory-provenance.js'
 const ROUTINE_TICK_MS = 60_000
 const ROUTINE_FIRST_TICK_MS = 15_000
 import type { RoutineRunner } from './routine-runner.js'
-import { readOneMission, deleteMissionRecord, knownDigests, readMissionHistory, spendByTeammate } from './mission-history.js'
+import { readOneMission, deleteMissionRecord, knownDigests, newestTurnOf, readMissionHistory, spendByTeammate } from './mission-history.js'
 import { limitReached, limitRefusal, monthOf } from '../shared/spend.js'
 import { createOwnModelStore, OwnModelRefusal, ownModelAddress, ownModelId, testOwnEndpoint } from './own-models.js'
 import { changelogPaths, entries as changelogEntries, readChangelog, splashEntries } from './changelog.js'
@@ -155,6 +156,7 @@ import {
   RUNTIME_INSTALL_PROGRESS_CHANNEL,
   RUNTIME_SIGN_IN_CHANNEL,
   OPEN_IN_TERMINAL_CHANNEL,
+  TERMINAL_CATCH_UP_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
   TEAMMATE_RENAME_MISSION_CHANNEL,
   GROUP_LIST_CHANNEL,
@@ -1533,8 +1535,29 @@ if (!ownsSingleInstanceLock) {
       const spent = (await spendByTeammate(missionLedger, await teammates.missionOwners(), month))?.get(teammateId)
       return limitReached(spent, teammate.monthlyLimitUsd) ? limitRefusal(teammate.name, spent, teammate.monthlyLimitUsd, now) : undefined
     }
+    /*
+     * 0.391: what the person did in a runtime's own terminal comes back into
+     * the conversation (terminal-catch-up.ts). Read lazily: the services and
+     * the roster it asks are made further down, and it is only ever called
+     * after they exist.
+     */
+    const terminalImports = createTerminalImports(join(app.getPath('userData'), 'terminal-imports.json'))
+    const catchUp = createTerminalCatchUp({
+      ledger: missionLedger,
+      newestTurnOf: (missionId) => newestTurnOf(missionLedger, missionId),
+      liveMissionIds: () => [...codexMissions.liveMissionIds(), ...antigravityMissions.liveMissionIds()],
+      sessionOf: runtimeThreadIdOf,
+      transcriptOf: createTranscriptReader({
+        claudeHome: process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.claude'),
+        codexHome: process.env.CODEX_HOME ?? join(homedir(), '.codex')
+      }),
+      imports: terminalImports,
+      ownerOf: async (id) => (await teammates.missionOwners())[id],
+      assign: (teammateId, id) => teammates.assignMission(teammateId, id)
+    })
     const codexMissions = createCodexMissionService({
       workspacePath,
+      catchUpTerminal: catchUp,
       // A2.9: the overlap note -- who else changed the files a teammate did, lately.
       recentEdits: createRecentEdits(),
       // A scripted launch spends nothing unless told to (free-routes.ts).
@@ -2736,6 +2759,16 @@ if (!ownsSingleInstanceLock) {
      * only words that reach the terminal are the runtime's own resume flag
      * and a session id checked to be a plain token.
      */
+    // The window asks when it shows a conversation, and when it comes back
+    // into focus on one (0.391): whatever was done in the terminal meanwhile.
+    ipcMain.handle(TERMINAL_CATCH_UP_CHANNEL, async (event, requested: unknown) => {
+      if (!fromOwnWindow(event) || typeof requested !== 'string' || requested.length === 0 || requested.length > 128) {
+        return { imported: 0 }
+      }
+      const result = await catchUp(requested).catch(() => ({ imported: 0, latestMissionId: requested }))
+      return result
+    })
+
     ipcMain.handle(OPEN_IN_TERMINAL_CHANNEL, async (event, requested: unknown) => {
       if (!fromOwnWindow(event) || typeof requested !== 'string' || requested.length === 0 || requested.length > 128) {
         return { ok: false, message: 'That conversation cannot be opened in a terminal.' } as const

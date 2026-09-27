@@ -11,6 +11,28 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.391.0 - 2026-09-27
+
+### New
+
+- **What you do in the terminal comes back.** Open a Claude Code or Codex
+  conversation in its own terminal with the `</>` button, keep working
+  there, and come back: the conversation catches up when you return to
+  Locust. Your prompts and the answers join the thread under
+  "In Claude Code's terminal", and "Back in Locust" marks where Locust picks
+  up again. Your next message carries on from there, in the same session,
+  so the teammate knows what was said. An answer still being written stays
+  in the terminal until it finishes. Other runtimes keep their sessions
+  where Locust can't read them yet, and the button says so.
+
+### Fixed
+
+- **A routine waiting for your review is readable again.** On the Routines
+  screen its card was squeezed into narrow columns, and the review box and
+  the Continue and Abandon buttons were cut off. The card now spans the
+  routine, reads top to bottom, and opens the saved conversation instead of
+  printing its id.
+
 ## 0.390.0 - 2026-09-27
 
 ### Fixed

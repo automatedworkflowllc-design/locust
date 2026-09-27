@@ -14,13 +14,23 @@ import APP from './App.tsx?raw'
 const base = { runtime: 'claude', model: 'opus', missionId: 'm1', running: false, teammateName: 'Wren' } as const
 
 describe('the terminal offer', () => {
-  it('names the runtime whose interface opens, and says Locust will not see it and its permissions are not this mode', () => {
+  it('names the runtime whose interface opens, says what happens there comes back, and that its permissions are not this mode', () => {
     const offer = terminalOffer(base)
     expect(offer?.label).toBe('Open in Claude Code, in a terminal')
     expect(offer?.title).toContain("The same session, in Wren's folder.")
-    expect(offer?.title).toContain("Locust won't see what you do there")
+    expect(offer?.title).toContain('What you do there comes back into this conversation')
     expect(offer?.title).toContain("Claude Code's own permissions, not this conversation's mode")
+    expect(offer?.opened('Windows Terminal')).toBe('Opened in Windows Terminal. What you do there comes back here when you return.')
     expect(offer?.disabled).toBeUndefined()
+    expect(terminalOffer({ ...base, runtime: 'codex' })?.title).toContain('What you do there comes back into this conversation')
+  })
+
+  it("says Locust won't see it for a runtime whose sessions it does not read back (0.391)", () => {
+    for (const runtime of ['copilot', 'cursor', 'opencode', 'muse']) {
+      const offer = terminalOffer({ ...base, runtime })
+      expect(offer?.title, runtime).toContain("Locust won't see what you do there")
+      expect(offer?.opened('Windows Terminal'), runtime).toBe("Opened in Windows Terminal. Locust won't see what happens there.")
+    }
   })
 
   it('is held while the run is going, saying until when and why', () => {

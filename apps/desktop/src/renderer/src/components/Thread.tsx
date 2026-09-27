@@ -12,7 +12,7 @@ import type {
   PublicRecoveredMission,
   PublicTeammate
 } from '../../../shared/ipc.js'
-import { buildThread, cancellationSummary, decisionStanding, errorAlreadyShown, foldNoticeKeys, lastPlanOf, modeRefusedATool, readPlan, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
+import { buildThread, cancellationSummary, decisionStanding, errorAlreadyShown, foldNoticeKeys, lastPlanOf, modeRefusedATool, readPlan, terminalSeamBefore, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
 import type { GroupBoundary, GroupLeaving, LiveStarter, TurnSwitch } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
 import { folderName, ranOnLine } from '../ranOn.js'
@@ -38,6 +38,7 @@ import { DecisionCard } from './DecisionCard.js'
 import { ResumeCard } from './ResumeCard.js'
 import { resumeOffer } from '../resume.js'
 import { HandoffDivider } from './HandoffDivider.js'
+import { TerminalDivider } from './TerminalDivider.js'
 import { TimeMarker } from './TimeMarker.js'
 import { PeerThread } from './PeerThread.js'
 import type { ThreadItem, ThreadPeerCard } from '../missionView.js'
@@ -655,6 +656,8 @@ export interface ThreadProps {
     readonly startedBy?: LiveStarter
     /** Set when that turn was a reply sent to another runtime: its divider goes above it. */
     readonly switchedFrom?: TurnSwitch
+    /** Set when the person had that exchange in the runtime's own terminal (0.391). */
+    readonly inTerminal?: MissionRuntimeId
   }[]
   /**
    * Where this conversation's group began briefing it, if it is in one with
@@ -706,6 +709,8 @@ export interface ThreadProps {
    * mission handed over is `handoff`, drawn after the prompt instead.)
    */
   readonly switchedFrom?: TurnSwitch
+  /** Set when THIS turn was had in the runtime's own terminal and brought back (0.391). */
+  readonly inTerminal?: MissionRuntimeId
   readonly handoff:
     | {
         readonly from: MissionRuntimeId
@@ -776,6 +781,7 @@ onResume,
   decidingIds,
   cancelled,
   switchedFrom,
+  inTerminal,
   handoff,
   peers
 }: ThreadProps): ReactElement {
@@ -935,6 +941,7 @@ onResume,
   // What the current turn is called: the person's words, or -- for a turn the
   // host briefed -- the message that caused it, or nothing at all.
   const currentLine = turnPromptLine({ prompt, startedBy, peerMessages: peers.messages })
+  const currentSeam = terminalSeamBefore(earlierTurns.at(-1)?.inTerminal, inTerminal)
   /*
    * The person's turn: what they typed, and under it the files they attached.
    *
@@ -1051,6 +1058,7 @@ onResume,
         */}
         {earlierTurns.map((turn, index) => {
           const marker = markers.find((candidate) => candidate.beforeTurn === index)
+          const seam = terminalSeamBefore(earlierTurns[index - 1]?.inTerminal, turn.inTerminal)
           return (
             <Fragment key={turn.missionId}>
               {marker !== undefined && (
@@ -1059,6 +1067,7 @@ onResume,
               {leavingNotes((beforeTurn) => beforeTurn === index)}
               {joinNotes((beforeTurn) => beforeTurn === index)}
               {turn.switchedFrom !== undefined && <HandoffDivider {...turn.switchedFrom} />}
+              {seam !== undefined && <TerminalDivider seam={seam} />}
               {userTurn(turnPromptLine(turn), turnAttachments(turn))}
               {cardsFor(index, 'before-work').map(peerCard)}
               {earlierWork[index]}
@@ -1102,6 +1111,7 @@ onResume,
           as if one runtime had answered both turns.
         */}
         {switchedFrom !== undefined && <HandoffDivider {...switchedFrom} />}
+        {currentSeam !== undefined && <TerminalDivider seam={currentSeam} />}
         {userTurn(currentLine, turnAttachments({ prompt, ...(startedBy === undefined ? {} : { startedBy }) }))}
 
         {handoff !== undefined && (

@@ -110,6 +110,7 @@ import { GroupSettingsDialog } from './components/GroupSettingsDialog.js'
 import { TeammateBot } from './components/TeammateBot.js'
 import { RuntimeMark } from './components/RuntimeMark.js'
 import { OpenInTerminalButton, terminalOffer } from './components/OpenInTerminal.js'
+import type { TerminalOffer } from './components/OpenInTerminal.js'
 import { Sidebar } from './components/Sidebar.js'
 import type { SidebarMission } from './components/Sidebar.js'
 import { ContextMenu } from './components/ContextMenu.js'
@@ -218,6 +219,8 @@ interface LiveRunState {
     readonly peerMessages?: readonly PublicPeerMessage[]
     /** Set when that turn was a reply sent to another runtime: the seam before it. */
     readonly switchedFrom?: TurnSwitch
+    /** Set when the person had that exchange in the runtime's own terminal (0.391). */
+    readonly inTerminal?: MissionRuntimeId
   }[]
   /**
    * Set when THIS turn is a reply sent to another runtime than the turn
@@ -368,6 +371,15 @@ function applyMissionUpdate(run: LiveRunState, update: CodexMissionUpdate): Live
 }
 
 /**
+ * Whether a turn on screen was had in its runtime's own terminal (0.391), as
+ * the field every copy of a turn carries. One place, because the copy a reply
+ * makes once dropped it and drew "Back in Locust" above the turn it answered.
+ */
+function inTerminalOf(run: LiveRunState): { readonly inTerminal?: MissionRuntimeId } {
+  return run.restoredMission?.startedBy?.kind === 'terminal' ? { inTerminal: run.restoredMission.runtime } : {}
+}
+
+/**
  * The turns before a host-started reply, so it renders as the next turn of
  * the conversation it continues. Read from the live run when the renderer
  * still holds it, else from history; empty when neither knows the mission,
@@ -392,7 +404,8 @@ function earlierTurnsOf(
         events: live.events,
         ...(live.peerMessages === undefined ? {} : { peerMessages: live.peerMessages }),
         ...(live.startedBy === undefined ? {} : { startedBy: live.startedBy }),
-        ...(live.switchedFrom === undefined ? {} : { switchedFrom: live.switchedFrom })
+        ...(live.switchedFrom === undefined ? {} : { switchedFrom: live.switchedFrom }),
+        ...inTerminalOf(live)
       }
     ]
   }
@@ -405,7 +418,8 @@ function earlierTurnsOf(
       prompt: record === undefined ? turn.prompt : typedPrompt(record, byId),
       events: turn.events,
       peerMessages: turn.peerMessages,
-      ...(turn.switchedFrom === undefined ? {} : { switchedFrom: turn.switchedFrom })
+      ...(turn.switchedFrom === undefined ? {} : { switchedFrom: turn.switchedFrom }),
+      ...(turn.inTerminal === undefined ? {} : { inTerminal: turn.inTerminal })
     }
   })
 }
@@ -434,7 +448,8 @@ function reopenedRun(
               prompt: held === undefined ? turn.prompt : typedPrompt(held, byId),
               events: turn.events,
               peerMessages: turn.peerMessages,
-              ...(turn.switchedFrom === undefined ? {} : { switchedFrom: turn.switchedFrom })
+              ...(turn.switchedFrom === undefined ? {} : { switchedFrom: turn.switchedFrom }),
+              ...(turn.inTerminal === undefined ? {} : { inTerminal: turn.inTerminal })
             }
           })
         }),
@@ -3292,7 +3307,11 @@ export default function App(): ReactElement {
             ...(continuing.peerMessages === undefined ? {} : { peerMessages: continuing.peerMessages }),
             // And where that turn itself switched runtime, so its divider
             // stays above it once the conversation moves on.
-            ...(continuing.switchedFrom === undefined ? {} : { switchedFrom: continuing.switchedFrom })
+            ...(continuing.switchedFrom === undefined ? {} : { switchedFrom: continuing.switchedFrom }),
+            // And whether it was had in the terminal: without it the reply's
+            // thread drew "Back in Locust" ABOVE the turn it was replying to
+            // (the 0.391 drive's own text, read after its checks had passed).
+            ...inTerminalOf(continuing)
           }
         ]
     const starting: LiveRunState = {
@@ -4477,6 +4496,56 @@ export default function App(): ReactElement {
     })
   }
 
+  /*
+   * WHAT HAPPENED IN THE TERMINAL COMES BACK (0.391).
+   *
+   * The `</>` button opens a conversation in its runtime's own terminal. What
+   * the person does there is asked for when the conversation is shown, and
+   * again whenever the window comes back into focus on it: the host records
+   * it as turns of the conversation, and the window opens the newest once
+   * history holds it, so the thread shows it where it happened. Only a
+   * settled conversation, on a runtime whose sessions the host can read.
+   */
+  const catchUpId =
+    liveRun?.data !== undefined && !liveRunIsActive(liveRun) && (liveRun.data.runtime === 'claude' || liveRun.data.runtime === 'codex')
+      ? liveRun.data.missionId
+      : undefined
+  const caughtUp = useRef<{ readonly from: string; readonly to: string } | undefined>(undefined)
+  useEffect(() => {
+    const bridge = window.desktop
+    if (catchUpId === undefined || bridge?.catchUpTerminal === undefined) return
+    let gone = false
+    const ask = (): void => {
+      void bridge
+        .catchUpTerminal(catchUpId)
+        .then((result) => {
+          if (gone || result.imported === 0 || result.latestMissionId === undefined) return
+          // Whose they are, before anything is drawn: a message is a REPLY
+          // only when the turn on screen is its teammate's.
+          const owners = result.owners
+          if (owners !== undefined) setMissionOwners((current) => ({ ...current, ...owners }))
+          caughtUp.current = { from: catchUpId, to: result.latestMissionId }
+          refreshHistory()
+        })
+        .catch(() => undefined)
+    }
+    ask()
+    window.addEventListener('focus', ask)
+    return () => {
+      gone = true
+      window.removeEventListener('focus', ask)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catchUpId])
+  useEffect(() => {
+    const pending = caughtUp.current
+    if (pending === undefined || !historyById.has(pending.to)) return
+    caughtUp.current = undefined
+    // Only while the conversation it came back into is still the one shown.
+    if (liveRun?.data?.missionId === pending.from) openMission(pending.to)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyById])
+
   /**
    * Delete the shown mission's record for good. The host refuses while it is
    * live, and that refusal is shown rather than swallowed. On success the
@@ -4698,14 +4767,14 @@ export default function App(): ReactElement {
     const clear = window.setTimeout(() => setTerminalError(undefined), 8_000)
     return () => window.clearTimeout(clear)
   }, [terminalError])
-  const openConversationInTerminal = (missionId: string): void => {
+  const openConversationInTerminal = (missionId: string, offer: TerminalOffer): void => {
     setTerminalError(undefined)
     const bridge = window.desktop
     if (bridge === undefined) return
     void bridge
       .openInTerminal(missionId)
       .then((answer) => {
-        if (answer.ok) setRowNotice(`Opened in ${answer.where}. Locust won't see what happens there.`)
+        if (answer.ok) setRowNotice(offer.opened(answer.where))
         else setTerminalError(answer.message)
       })
       .catch(() => setTerminalError('The terminal could not be opened. The conversation is here, as it was.'))
@@ -5171,7 +5240,8 @@ export default function App(): ReactElement {
         })
   if (shownTerminal !== undefined && shownTerminal.disabled === undefined && terminalMissionId !== undefined) {
     const id = terminalMissionId
-    headerActions.push({ label: `Open in terminal (${shownTerminal.runtimeName})`, onSelect: () => openConversationInTerminal(id) })
+    const offer = shownTerminal
+    headerActions.push({ label: `Open in terminal (${shownTerminal.runtimeName})`, onSelect: () => openConversationInTerminal(id, offer) })
   }
   if (liveRun !== undefined && !running) {
     for (const reviewer of reviewersFor(liveRun)) {
@@ -6162,7 +6232,7 @@ export default function App(): ReactElement {
                     * two and says who it goes to before you commit.
                     */}
                   {shownTerminal !== undefined && terminalMissionId !== undefined && (
-                    <OpenInTerminalButton offer={shownTerminal} onOpen={() => openConversationInTerminal(terminalMissionId)} />
+                    <OpenInTerminalButton offer={shownTerminal} onOpen={() => openConversationInTerminal(terminalMissionId, shownTerminal)} />
                   )}
                   {headerActions.length > 0 && (
                     <button
@@ -6231,6 +6301,7 @@ export default function App(): ReactElement {
                 }}
                 onOpenSenderRun={(missionId) => () => openMission(missionId)}
                 earlierTurns={liveRun.earlierTurns ?? []}
+                {...inTerminalOf(liveRun)}
                 {...(() => {
                   // Where this conversation's group began briefing it. The
                   // row knows every id the conversation has worn; the

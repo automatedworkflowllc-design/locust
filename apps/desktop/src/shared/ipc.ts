@@ -581,6 +581,21 @@ export type RuntimeSignInResponse =
  */
 export const OPEN_IN_TERMINAL_CHANNEL = 'mission:open-in-terminal'
 
+/**
+ * Bring what the person did in a runtime's own terminal on a conversation
+ * into its record (0.391; main/terminal-catch-up.ts). The window names the
+ * conversation's newest turn; the answer says how many exchanges came back
+ * and which turn is newest now.
+ */
+export const TERMINAL_CATCH_UP_CHANNEL = 'mission:terminal-catch-up'
+
+export interface TerminalCatchUpResponse {
+  readonly imported: number
+  readonly latestMissionId?: string
+  /** The turns just recorded, by the teammate they belong to (terminal-catch-up.ts). */
+  readonly owners?: Readonly<Record<string, string>>
+}
+
 export type OpenInTerminalResponse =
   | { readonly ok: true; readonly where: 'Windows Terminal' | 'a console window' }
   | { readonly ok: false; readonly message: string }
@@ -2344,6 +2359,15 @@ export interface PublicRecoveredMission {
         readonly routineId: string
         readonly step: number
       }
+    | {
+        /**
+         * A turn the person had in the runtime's own terminal, on this
+         * conversation's session, brought back into the record (0.391).
+         * Its prompt is the person's own words; Locust did not run it.
+         */
+        readonly kind: 'terminal'
+        readonly exchange: number
+      }
 }
 
 /** H3: one mission, projected as history projects the newest ones. */
@@ -2503,6 +2527,8 @@ export interface DesktopApi {
   signInRuntime(runtime: string): Promise<RuntimeSignInResponse>
   /** Open this conversation's session in its runtime's own terminal (0.387). */
   openInTerminal(missionId: string): Promise<OpenInTerminalResponse>
+  /** Bring what was done in the terminal on this conversation into it (0.391). */
+  catchUpTerminal(missionId: string): Promise<TerminalCatchUpResponse>
   readWorkspaceSettings(): Promise<WorkspaceSettings>
   /** Pick the folder the teammates work in. Reopens the app there on success. */
   chooseWorkspace(): Promise<WorkspaceChooseResponse>

@@ -61,6 +61,24 @@ describe('recovery where a person looks for routines', () => {
     expect(routineRunSummary(abandoned)).toContain('last attempt abandoned')
   })
 
+  it('is a card of its own, never the row meta the Routines screen crushes into one clipped cell (2026-09-27)', () => {
+    // Colin's screenshot: every sentence a column a few words wide, and the
+    // review box and both decisions cut off, because the card wore this class.
+    const html = renderToStaticMarkup(<RoutineRecovery routine={routine} onOpenMission={nothing} />)
+    expect(html).toMatch(/^<div class="lc-recovery">/)
+    expect(html).not.toContain('lc-routinerow__meta')
+    expect(html).toContain('<span class="lc-recovery__actions">')
+  })
+
+  it('says the reason once, and opens the saved conversation rather than printing its id', () => {
+    const interrupted = { ...routine, execution: { ...routine.execution!, reason: 'Review required: that run was interrupted. Nothing will be replayed.' } }
+    const html = renderToStaticMarkup(<RoutineRecovery routine={interrupted} onOpenMission={nothing} />)
+    expect(html).toContain('That run was interrupted. Nothing will be replayed.')
+    expect(html).not.toContain('Review required')
+    expect(html).toContain('title="mission_two">Open the saved conversation</button>')
+    expect(html).not.toContain('Saved mission:')
+  })
+
   it('an unresolved dispatch has the same visible protection; no optimistic next-run promise', () => {
     const dispatching = { ...routine, execution: { ...routine.execution!, status: 'dispatching' as const } }
     expect(renderToStaticMarkup(<RoutineRecovery routine={dispatching} />)).toContain('Waiting for your review')

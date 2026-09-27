@@ -236,7 +236,9 @@ export function publicRecoveredMission(
                 step: mission.metadata.startedBy.step
               }
             }
-          : { startedBy: { kind: 'resume' as const, epoch: mission.metadata.startedBy.epoch } })
+          : mission.metadata.startedBy.kind === 'terminal'
+            ? { startedBy: { kind: 'terminal' as const, exchange: mission.metadata.startedBy.exchange } }
+            : { startedBy: { kind: 'resume' as const, epoch: mission.metadata.startedBy.epoch } })
   }
 }
 
@@ -606,6 +608,34 @@ export async function readOneMission(ledger: MissionLedger, workroom: Workroom |
     return { ok: true, data: { mission: { ...mission, digest: missionDigest(JSON.stringify(mission)) } } }
   } catch {
     return unavailable
+  }
+}
+
+/**
+ * A conversation's newest turn, from any turn of it (0.391): the turns that
+ * continue it, followed forward, the latest-made at each step. Through the
+ * history's own cache, so it re-reads only files that changed. The turn named
+ * when the ledger cannot be listed file by file.
+ */
+export async function newestTurnOf(ledger: MissionLedger, missionId: string): Promise<string> {
+  const refreshed = await refreshedLedger(ledger)
+  if (refreshed === undefined) return missionId
+  const next = new Map<string, { readonly missionId: string; readonly createdAt: string }[]>()
+  for (const entry of refreshed.entries) {
+    const metadata = entry.light?.metadata
+    const from = metadata?.continuesFrom?.missionId
+    if (metadata === undefined || from === undefined) continue
+    next.set(from, [...(next.get(from) ?? []), { missionId: metadata.missionId, createdAt: metadata.createdAt }])
+  }
+  const seen = new Set([missionId])
+  let newest = missionId
+  for (;;) {
+    const later = (next.get(newest) ?? [])
+      .filter((turn) => !seen.has(turn.missionId))
+      .reduce<{ readonly missionId: string; readonly createdAt: string } | undefined>((best, turn) => (best === undefined || turn.createdAt > best.createdAt ? turn : best), undefined)
+    if (later === undefined) return newest
+    seen.add(later.missionId)
+    newest = later.missionId
   }
 }
 

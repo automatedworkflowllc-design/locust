@@ -26,7 +26,7 @@ import type { CheckpointReason, ReconciledCheckpoint } from './checkpoint.js'
  */
 export type MissionRecordedMode = "ask" | "plan" | "accept-edits" | "approve-each" | "auto";
 
-export const MISSION_LEDGER_SCHEMA_VERSION = 17 as const
+export const MISSION_LEDGER_SCHEMA_VERSION = 18 as const
 
 /**
  * Versions this reader accepts, each a strict subset of the next, so all are
@@ -124,8 +124,16 @@ export const MISSION_LEDGER_SCHEMA_VERSION = 17 as const
  * said -- and without a record a reopened conversation lost the card and its
  * Send button. A v16 reader stops at the first record it cannot name, so the
  * number moves for the reason it moved at v5.
+ *
+ * v17 -> v18: `startedBy.kind` gains `terminal`, a turn the person had with
+ * the runtime in its own terminal, on this conversation's session, brought
+ * back into the record (docs/PLAN-TERMINAL-CATCH-UP-2026-09-27.md;
+ * `exchange` counts them from 1). Locust did not run it -- no command, no
+ * mode it chose -- and a v17 reader would refuse a starter it does not know
+ * rather than draw it as a run Locust made, so the number moves for the
+ * reason it moved at v11 and v13.
  */
-export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17] as const
+export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18] as const
 
 export type MissionLedgerSchemaVersion =
   (typeof SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS)[number]
@@ -251,6 +259,16 @@ export type MissionStarter =
       readonly routineId: string
       /** Which step of the routine this run is, counting from 1. */
       readonly step: number
+    }
+  | {
+      /**
+       * A turn the person had with the runtime in its own terminal, on this
+       * conversation's session, brought back into the record (v18). Locust
+       * did not run it.
+       */
+      readonly kind: 'terminal'
+      /** Which exchange of that terminal session this is, counting from 1. */
+      readonly exchange: number
     }
 
 /**
@@ -737,9 +755,11 @@ function validateMetadata(metadata: MissionLedgerMetadata): MissionLedgerMetadat
           ? starter.epoch
           : starter.kind === 'routine'
             ? starter.step
-            : undefined
+            : starter.kind === 'terminal'
+              ? starter.exchange
+              : undefined
     if (
-      (starter.kind !== 'relay' && starter.kind !== 'resume' && starter.kind !== 'routine')
+      (starter.kind !== 'relay' && starter.kind !== 'resume' && starter.kind !== 'routine' && starter.kind !== 'terminal')
       || counter === undefined
       || !Number.isSafeInteger(counter)
       || counter < 1
@@ -925,6 +945,10 @@ function parsedMetadata(
     return undefined
   }
   if (schemaVersion < 13 && candidate.startedBy?.kind === 'routine') {
+    return undefined
+  }
+  // And no writer before v18 brought a terminal's turns back.
+  if (schemaVersion < 18 && candidate.startedBy?.kind === 'terminal') {
     return undefined
   }
   // And no writer before v7 knew Cursor Agent or Gemini CLI.
