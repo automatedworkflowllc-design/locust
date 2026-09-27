@@ -1173,7 +1173,7 @@ export function Composer({
               <button
                 type="button"
                 className="lc-attached__tile lc-notestile"
-                title={`${diffNotesTile((diffNotes ?? []).length)} -- they go with your next message. Click to remove them all.`}
+                title={`${diffNotesTile((diffNotes ?? []).length)} — they go with your next message. Click to remove them all.`}
                 aria-label={`Remove ${diffNotesTile((diffNotes ?? []).length)}`}
                 onClick={onClearDiffNotes}
               >

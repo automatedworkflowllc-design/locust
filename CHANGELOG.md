@@ -11,6 +11,19 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.419.0 - 2026-09-28
+
+### Improved
+
+- **Every Settings switch says what it controls.** Under Between teammates,
+  the two switches were labelled only with what happens right now
+  ("Messages wait for the recipient's next run."), so neither said what it
+  was. They now read "Automatic replies: off. …" and "Urgent messages
+  interrupt: off. …". Screen readers now hear each switch's name, not
+  "Switch this on".
+- **Tidier wording.** Settings labels no longer end in full stops, and a
+  typed "--" in several places is now a proper dash.
+
 ## 0.418.0 - 2026-09-28
 
 ### Fixed

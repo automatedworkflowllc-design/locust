@@ -2828,7 +2828,7 @@ export default function App(): ReactElement {
     && !liveRunIsActive(liveRun)
     && shownData.runtime !== composerRoute.runtime
     && ownerOf(liveRun) === pickedTeammate?.teammateId
-      ? `Continues on ${runtimeNameOf(composerRoute.runtime)} from ${runtimeNameOf(shownData.runtime)}'s checkpoint -- briefed on what was done, not handed the memory.`
+      ? `Continues on ${runtimeNameOf(composerRoute.runtime)} from ${runtimeNameOf(shownData.runtime)}'s checkpoint — briefed on what was done, not handed the memory.`
       : undefined
 
   /**

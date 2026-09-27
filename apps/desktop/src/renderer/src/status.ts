@@ -964,7 +964,7 @@ export function sandboxPhrase(sandbox: 'read-only' | 'workspace-write' | 'full-a
  */
 export function accountPhrase(route: { readonly runtime: MissionRuntimeId; readonly model: string; readonly resolvedRouteId: string }): string {
   if (route.resolvedRouteId === 'antigravity:hub') return 'through the Antigravity app'
-  if (/-free$/i.test(route.model)) return 'none -- a free model'
+  if (/-free$/i.test(route.model)) return 'none — a free model'
   return `your ${runtimeDisplayName(route.runtime)} sign-in`
 }
 

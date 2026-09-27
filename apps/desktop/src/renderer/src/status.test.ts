@@ -945,7 +945,7 @@ describe('the Auto mode, which has to be switched on before it is offered', () =
     expect(accountPhrase({ runtime: 'codex', model: 'account-default', resolvedRouteId: 'codex-account:default' })).toBe('your Codex CLI sign-in')
     expect(accountPhrase({ runtime: 'antigravity', model: 'flash', resolvedRouteId: 'antigravity:hub' })).toBe('through the Antigravity app')
     // A free model needs no account; "your OpenCode sign-in" would say it did.
-    expect(accountPhrase({ runtime: 'opencode', model: 'opencode/ling-3.0-flash-fin-free', resolvedRouteId: 'opencode-account:default' })).toBe('none -- a free model')
+    expect(accountPhrase({ runtime: 'opencode', model: 'opencode/ling-3.0-flash-fin-free', resolvedRouteId: 'opencode-account:default' })).toBe('none — a free model')
   })
 
   it('says what it allowed, not what it was called', () => {

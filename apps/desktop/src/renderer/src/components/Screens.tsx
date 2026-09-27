@@ -1702,7 +1702,7 @@ export function SettingsScreen({
               <span className="lc-settings__note">
                 {workspaceBrief === null
                   ? 'None in this folder. Add a LOCUST.md at its root and every teammate, on every runtime, is given it before each mission.'
-                  : `${String(workspaceBrief.lines)} line${workspaceBrief.lines === 1 ? '' : 's'} briefed to every teammate before each mission${workspaceBrief.truncated ? ' -- longer than 200 lines, so the rest is not loaded. Put long checklists in files of their own and name them in LOCUST.md; a teammate reads one when it applies' : ''}.`}
+                  : `${String(workspaceBrief.lines)} line${workspaceBrief.lines === 1 ? '' : 's'} briefed to every teammate before each mission${workspaceBrief.truncated ? ' — longer than 200 lines, so the rest is not loaded. Put long checklists in files of their own and name them in LOCUST.md; a teammate reads one when it applies' : ''}.`}
               </span>
             </div>
           )}
@@ -1753,7 +1753,7 @@ export function SettingsScreen({
               when one has nothing more to say, or when the budget below is spent.
             </p>
             <p>
-              Each teammate answers on their own route -- their runtime, model and mode, not the sender&rsquo;s --
+              Each teammate answers on their own route — their runtime, model and mode, not the sender&rsquo;s --
               which is how two models end up on one piece of work. Switch replies off to make messages wait
               for you instead.
             </p>
@@ -1768,14 +1768,17 @@ export function SettingsScreen({
           <div className="lc-settingrows">
             <div className="lc-settingrow">
               <span className="lc-settings__note">
-                {relay ? 'Teammates reply to each other until the work is done.' : 'Messages wait for the recipient\'s next run.'}
+                {/* Named, then what is true now (0.419): the row said only the
+                    state, so it never said what the switch was, and its switch
+                    was "Switch this on" to a screen reader (fresh-eyes area 13). */}
+                {relay ? 'Automatic replies: on. Teammates reply to each other until the work is done.' : 'Automatic replies: off. Messages wait for the recipient\'s next run.'}
               </span>
               <button
                 type="button"
                 className={`lc-switch${relay ? ' is-on' : ''}`}
                 role="switch"
                 aria-checked={relay}
-                aria-label={relay ? 'Switch this off' : 'Switch this on'}
+                aria-label="Automatic replies"
                 onClick={() => onRelayChange(!relay)}
               >
                 <span className="lc-switch__knob" />
@@ -1800,15 +1803,15 @@ export function SettingsScreen({
             <div className="lc-settingrow">
               <span className="lc-settings__note">
                 {interrupt
-                  ? 'An urgent message stops the recipient part-way. Their unfinished work stays in their own conversation.'
-                  : 'An urgent message still waits for the recipient to finish.'}
+                  ? 'Urgent messages interrupt: on. An urgent message stops the recipient part-way. Their unfinished work stays in their own conversation.'
+                  : 'Urgent messages interrupt: off. An urgent message still waits for the recipient to finish.'}
               </span>
               <button
                 type="button"
                 className={`lc-switch${interrupt ? ' is-on' : ''}`}
                 role="switch"
                 aria-checked={interrupt}
-                aria-label={interrupt ? 'Switch this off' : 'Switch this on'}
+                aria-label="Urgent messages interrupt"
                 disabled={!relay}
                 // A control that is off for a reason says the reason (Yurt's
                 // beta report, #13: "disabled with no reason given").
@@ -1873,7 +1876,7 @@ export function SettingsScreen({
           <More>
             <p>
               Locust never pools subscriptions or proxies your requests. Under each runtime is what it has
-              set up for itself -- MCP servers and hooks, read from its own files -- so a tool a teammate
+              set up for itself — MCP servers and hooks, read from its own files — so a tool a teammate
               reaches for, or a script that runs mid-mission, is never a surprise. Locust changes nothing there.
             </p>
           </More>
@@ -2024,7 +2027,7 @@ export function SettingsScreen({
               <p>
                 A key is kept only as Windows encrypts it for your account, and never shown again; it is sent to that
                 address and nowhere else. Test asks the address which models it serves, and sends the model one request
-                capped at a single word to see whether it can use tools -- so a mistyped name, or a model that can only
+                capped at a single word to see whether it can use tools — so a mistyped name, or a model that can only
                 chat, is caught before a teammate tries it. A model set to chat only talks with its teammates and reads
                 and changes no files.
               </p>
@@ -2044,7 +2047,7 @@ export function SettingsScreen({
             <p>
               A connector is not on this machine: it acts on the service it reaches, so no permission mode
               governs it. By default a teammate may use whichever connectors your own Claude Code has, the
-              way you can -- the question was answered when you connected them.
+              way you can — the question was answered when you connected them.
             </p>
             <p>
               Switch this on and every connector call stops the run and asks you first, with the exact
@@ -2127,7 +2130,7 @@ export function SettingsScreen({
               className={`lc-switch${swarm ? ' is-on' : ''}`}
               role="switch"
               aria-checked={swarm}
-              aria-label={swarm ? 'Switch this off' : 'Switch this on'}
+              aria-label="Swarm"
               onClick={() => onSwarmChange(!swarm)}
             >
               <span className="lc-switch__knob" />
@@ -2137,11 +2140,11 @@ export function SettingsScreen({
             <p>
               Swarm is a statement about every mission rather than about one of them: while it is on, each
               run is given the highest effort the model it lands on reports, and the effort control says who
-              is holding it. A model that reports no levels is unaffected -- there is nothing to raise.
+              is holding it. A model that reports no levels is unaffected — there is nothing to raise.
             </p>
             <p>
               The mark on the composer is the same switch seen from the other side. It is the glance; this
-              is the record, and the way to take it back from a screen that has no composer on it -- which
+              is the record, and the way to take it back from a screen that has no composer on it — which
               is every screen but the workroom, and the workroom itself while a mission is running.
             </p>
           </More>
@@ -2164,7 +2167,7 @@ export function SettingsScreen({
               className={`lc-switch${autoMode ? ' is-on' : ''}`}
               role="switch"
               aria-checked={autoMode}
-              aria-label={autoMode ? 'Switch this off' : 'Switch this on'}
+              aria-label="Auto mode"
               onClick={() => onAutoModeChange(!autoMode)}
             >
               <span className="lc-switch__knob" />
@@ -2181,8 +2184,8 @@ export function SettingsScreen({
               It exists because some work genuinely lives in more than one place. Auto is always in the
               composer's permission menu and picking it there is what switches it on, so this is the same
               decision seen from the other side: what is on now, and the way to take it back. It is checked
-              again each time a run starts -- switching it off here stops the next run, including one a
-              teammate or a routine was about to start -- and it is never the mode a malformed or missing
+              again each time a run starts — switching it off here stops the next run, including one a
+              teammate or a routine was about to start — and it is never the mode a malformed or missing
               choice falls back to.
             </p>
           </More>
@@ -2217,7 +2220,7 @@ export function SettingsScreen({
               mark one in progress, mark it done when it is done.
             </p>
             <p>
-              It is off by default because it is not free -- the bookkeeping costs tokens and changes how a
+              It is off by default because it is not free — the bookkeeping costs tokens and changes how a
               teammate narrates itself. It is worth switching on when you are watching the board rather
               than reading every line.
             </p>
@@ -2322,7 +2325,7 @@ export function SettingsScreen({
           <More>
             <p>
               A teammate's reply is the one thing on this screen you read rather than scan, so it is set
-              in a serif and sized on its own -- the app's own chrome stays where it is whatever you pick
+              in a serif and sized on its own — the app's own chrome stays where it is whatever you pick
               here.
             </p>
             <p>
@@ -2392,7 +2395,7 @@ export function SettingsScreen({
               source, because a look is settled by seeing it rather than by describing it.
             </p>
             <p>
-              Its recommendation was silver at Standard, on hover only -- the argument being that in this
+              Its recommendation was silver at Standard, on hover only — the argument being that in this
               app a thing that moves means work is happening, so a button that shimmers all the time says
               "running" on a screen where nothing is. Always on is here so you can disagree with that
               after looking at it.
@@ -2404,7 +2407,7 @@ export function SettingsScreen({
           </More>
           <div className="lc-settingrows">
             <div className="lc-settingrow">
-              <span className="lc-settings__note">Which metal.</span>
+              <span className="lc-settings__note">Which metal</span>
               <div className="lc-segmented" role="radiogroup" aria-label="Which metal">
                 {(
                   [
@@ -2428,7 +2431,7 @@ export function SettingsScreen({
               </div>
             </div>
             <div className="lc-settingrow">
-              <span className="lc-settings__note">How strong.</span>
+              <span className="lc-settings__note">How strong</span>
               <div className="lc-segmented" role="radiogroup" aria-label="How strong the metal is">
                 {(
                   [
@@ -2452,7 +2455,7 @@ export function SettingsScreen({
               </div>
             </div>
             <div className="lc-settingrow">
-              <span className="lc-settings__note">When it moves.</span>
+              <span className="lc-settings__note">When it moves</span>
               <div className="lc-segmented" role="radiogroup" aria-label="When the metal moves">
                 {(
                   [
@@ -2476,7 +2479,7 @@ export function SettingsScreen({
             </div>
             <div className="lc-settingrow">
               <span className="lc-settings__note">
-                The cursor bend -- a liquid dent that rides the ring as you move across it.
+                Cursor bend: a liquid dent that rides the ring as you move across it
               </span>
               <div className="lc-segmented" role="radiogroup" aria-label="The cursor bend">
                 {(
@@ -2541,7 +2544,7 @@ export function SettingsScreen({
           </div>
           <More>
             <p>
-              Finding the runtimes on this machine takes as long as it takes -- each one is a real command
+              Finding the runtimes on this machine takes as long as it takes — each one is a real command
               and some of them are slow to answer. The screen shows that happening rather than a spinner
               standing in for it, and every line on it is something the app actually read.
             </p>
