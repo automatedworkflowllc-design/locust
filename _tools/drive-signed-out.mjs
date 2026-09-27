@@ -90,7 +90,7 @@ async function home(label, teammates, port, sizes, judge) {
   }
 }
 
-const newPerson = await home('new-person', [], 9713, [[1440, 900], [1120, 720]], (what, width, seen) => {
+const newPerson = await home('new-person', [], 9713, [[1920, 1080], [1440, 900], [1120, 720]], (what, width, seen) => {
   // 1120x720 is ~210px short with seven runtimes: past what the cover can
   // give back, so its lockup scrolls away above, as FirstLaunch intends.
   if (width === 1440) check(`${what}: the cover starts below the pane's top, with air above it`, seen.coverTop >= 24, JSON.stringify(seen))
