@@ -1862,7 +1862,8 @@ textarea {
 .lc-diff__row {
   position: relative;
   display: grid;
-  grid-template-columns: 44px 44px 18px 1fr;
+  /* minmax(0, ...): a long line wraps in its cell rather than widening the row (0.422). */
+  grid-template-columns: 44px 44px 18px minmax(0, 1fr);
 }
 
 /*
@@ -1975,9 +1976,16 @@ textarea {
   color: var(--lc-diff-del-mark);
 }
 
+/*
+ * A long line WRAPS (0.422). Each code cell scrolled on its own, so a new
+ * index.html with long <p> lines drew a stack of little scrollbars, one per
+ * line, each hiding the end of its sentence (fresh-eyes area 25). Wrapped,
+ * the whole line is read, and the numbers stay on the row they belong to.
+ */
 .lc-diff__code {
-  white-space: pre;
-  overflow-x: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  min-width: 0;
   padding-right: var(--lc-space-6);
   color: var(--lc-text-secondary);
 }

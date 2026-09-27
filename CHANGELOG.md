@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.422.0 - 2026-09-28
+
+### Fixed
+
+- **Long lines in a change wrap instead of scrolling one by one.** In a
+  change with long lines, like a new web page, each long line had its own
+  little scrollbar and hid the end of its sentence. Long lines now wrap, so
+  you can read the whole change without scrolling sideways.
+
 ## 0.421.0 - 2026-09-28
 
 ### Fixed
