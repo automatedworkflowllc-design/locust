@@ -64,9 +64,6 @@ export function RuntimeMark({
       {mark.paths.map((d) => (
         <path key={d} d={d} fill={painted ? `url(#${gradientId})` : 'currentColor'} />
       ))}
-      {mark.strokes?.map((d) => (
-        <path key={d} d={d} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
-      ))}
     </svg>
   )
 }

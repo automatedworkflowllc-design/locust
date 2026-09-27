@@ -11,6 +11,13 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.385.0 - 2026-09-26
+
+### Improved
+
+- **Codex shows the OpenAI logo.** Codex teammates now carry OpenAI's own
+  logo everywhere Locust names the agent they run on.
+
 ## 0.384.0 - 2026-09-26
 
 ### Improved

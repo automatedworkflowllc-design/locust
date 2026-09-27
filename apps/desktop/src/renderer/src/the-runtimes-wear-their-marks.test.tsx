@@ -31,7 +31,7 @@ describe('the marks', () => {
   it('cover every runtime a teammate can run on', () => {
     for (const runtime of EVERY_RUNTIME) {
       const mark = RUNTIME_MARKS[runtime]
-      expect(mark.paths.length + (mark.strokes?.length ?? 0), runtime).toBeGreaterThan(0)
+      expect(mark.paths.length, runtime).toBeGreaterThan(0)
       expect(mark.source.length, runtime).toBeGreaterThan(0)
     }
     expect(Object.keys(RUNTIME_MARKS).sort()).toEqual([...EVERY_RUNTIME].sort())
@@ -46,19 +46,23 @@ describe('the marks', () => {
     // path data and nothing else.
     expect(source).not.toMatch(/fetch\(|new Image|<img|<image|xlink:href|data:image/)
     for (const [runtime, mark] of Object.entries(RUNTIME_MARKS)) {
-      for (const d of [...mark.paths, ...(mark.strokes ?? [])]) expect(d, runtime).toMatch(/^[Mm][MmLlHhVvCcSsQqTtAaZz0-9.,\s-]*$/)
+      for (const d of mark.paths) expect(d, runtime).toMatch(/^[Mm][MmLlHhVvCcSsQqTtAaZz0-9.,\s-]*$/)
     }
     // The component draws the paths inline, and loads nothing either.
     const component = MARK_COMPONENT
     expect(component).not.toMatch(/https?:\/\/|fetch\(|<img|<image/)
   })
 
-  it("never draw OpenAI's logo: Simple Icons removed it, so Codex wears its own prompt", () => {
+  it("draw Codex as OpenAI's blossom, as Colin asked (0.385), in the words' colour", () => {
+    // Colin, 2026-09-26, with the blossom attached: "lets use the actual
+    // codex/openai logo" -- where 0.383 drew Codex as its banner's `>_`.
     const codex = RUNTIME_MARKS.codex
-    expect(codex.paths).toEqual([])
-    expect(codex.strokes).toEqual(['M3.5 6l6 6-6 6', 'M12 18h8.5'])
-    expect(codex.source).toContain('>_')
-    expect(MARKS_SOURCE).toContain("NOT OpenAI's logo")
+    expect(codex.paths).toHaveLength(1)
+    expect(codex.paths[0]).toMatch(/^M22\.2819 9\.8211a5\.9847 5\.9847 0 0 0-\.5157-4\.9108/)
+    expect(codex.source).toContain('OpenAI')
+    expect(codex.gradient).toBeUndefined()
+    const html = renderToStaticMarkup(<RuntimeMark runtime="codex" />)
+    expect(html).toContain('fill="currentColor"')
   })
 
   it("are decorative beside a name, and named where they stand in for one", () => {
@@ -97,13 +101,11 @@ describe('the marks', () => {
   })
 
   it("draw Antigravity's own arch and Meta's mark for Muse Code, not Locust's monograms", () => {
-    expect(RUNTIME_MARKS.antigravity.strokes).toBeUndefined()
     expect(RUNTIME_MARKS.antigravity.viewBox).toBe('14 14.2 83.6 83.6')
     expect(RUNTIME_MARKS.antigravity.source).toContain("Antigravity's own")
-    expect(RUNTIME_MARKS.muse.strokes).toBeUndefined()
     expect(RUNTIME_MARKS.muse.source).toContain('Meta')
-    // Only Codex is drawn by Locust, and that is its own banner's prompt.
-    expect(Object.entries(RUNTIME_MARKS).filter(([, mark]) => mark.strokes !== undefined).map(([runtime]) => runtime)).toEqual(['codex'])
+    // Every mark is its maker's; none is a glyph Locust drew.
+    for (const [runtime, mark] of Object.entries(RUNTIME_MARKS)) expect(mark.source, runtime).not.toMatch(/^Locust/)
   })
 
   it('draw nothing for what no teammate runs on', () => {
