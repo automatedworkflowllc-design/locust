@@ -38,7 +38,8 @@ const drive = await startDrive({
   }
 })
 
-const PAGES = ['Workspace', 'Runtimes', 'Teammates', 'Appearance', 'General']
+// 0.393: eleven pages in five groups (settingsPages.ts).
+const PAGES = ['General', 'Appearance', 'Privacy & data', 'Teammates', 'Memory', 'Between teammates', 'Runtimes', 'Your own models', 'Connectors', 'Project folder', "What's new"]
 
 try {
   await drive.capture('launch', () => drive.ready())

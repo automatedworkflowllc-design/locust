@@ -1,3 +1,5 @@
+import type { IconName } from './components/Icon.js'
+
 /**
  * Settings as PAGES, not one scroll.
  *
@@ -37,11 +39,37 @@
  * the better sentence. The two lists are kept apart so the drift guard goes
  * on meaning exactly what it means.
  */
-export type SettingsPageId = 'workspace' | 'runtimes' | 'teammates' | 'appearance' | 'app' | 'whatsnew'
+/*
+ * ELEVEN PAGES IN FIVE GROUPS, each with an icon (0.393).
+ *
+ * Colin, 2026-09-27, with a screenshot of Claude's own settings: "we should
+ * just make our settings like claude codes, way cleaner and more organized
+ * than ours and has icons". Claude files each subject on a page of its own
+ * under a small group label, with an icon beside every name. Five pages that
+ * each held two to four unrelated subjects became eleven that each hold what
+ * their name says; the sections themselves are unchanged.
+ */
+export type SettingsPageId =
+  | 'app'
+  | 'appearance'
+  | 'privacy'
+  | 'teammates'
+  | 'memory'
+  | 'relay'
+  | 'runtimes'
+  | 'models'
+  | 'connectors'
+  | 'workspace'
+  | 'whatsnew'
+
+/** The label a run of pages sits under in the list. */
+export type SettingsGroup = 'Locust' | 'Team' | 'Agents' | 'This folder' | 'About'
 
 export interface SettingsPage {
   readonly id: SettingsPageId
   readonly label: string
+  readonly group: SettingsGroup
+  readonly icon: IconName
   readonly headings: readonly string[]
   /**
    * Words a person types that are not the name of anything on the page,
@@ -53,44 +81,21 @@ export interface SettingsPage {
 
 export const SETTINGS_PAGES: readonly SettingsPage[] = [
   {
-    id: 'workspace',
-    label: 'Workspace',
-    headings: ['Project folder', 'Between teammates'],
+    id: 'app',
+    label: 'General',
+    group: 'Locust',
+    icon: 'settings',
+    headings: ['Updates', 'Report a problem'],
     alsoKnownAs: {
-      // Own branches are set here, under the folder they branch from.
-      'Project folder': ['worktree', 'worktrees', 'branch', 'branches', 'folder', 'path', 'directory', 'project', 'repo'],
-      'Between teammates': ['relay', 'reply', 'replies', 'answer', 'message', 'messages', 'interrupt', 'role', 'roles', 'name', 'rename']
-    }
-  },
-  {
-    id: 'runtimes',
-    label: 'Runtimes',
-    headings: ['Runtimes & accounts', 'Your own models', 'Connectors', 'When a route hits its limit'],
-    alsoKnownAs: {
-      // "node" and "npm" are what a person types after the first screen has
-      // just talked to them about Node. This is the page about the CLIs that
-      // are installed with them.
-      'Runtimes & accounts': ['node', 'node.js', 'npm', 'install', 'cli', 'model', 'models', 'sign in', 'account', 'api key'],
-      'Your own models': ['own model', 'custom model', 'add model', 'endpoint', 'base url', 'address', 'openai', 'compatible', 'ollama', 'vllm', 'lm studio', 'local model', 'company', 'key'],
-      Connectors: ['mcp', 'tools', 'server'],
-      'When a route hits its limit': ['limit', 'quota', 'rate limit', 'usage', 'fallback']
-    }
-  },
-  {
-    id: 'teammates',
-    label: 'Teammates',
-    headings: ['Swarm', 'Auto mode', 'Plans', 'What your team remembers'],
-    alsoKnownAs: {
-      Swarm: ['parallel', 'at once', 'concurrent'],
-      'Auto mode': ['permission', 'approve', 'ask first', 'sandbox'],
-      Plans: ['plan', 'steps'],
-      // The one Grok said to do first.
-      'What your team remembers': ['memory', 'remember', 'remembers', 'notes', 'recall']
+      Updates: ['version', 'upgrade'],
+      'Report a problem': ['bug', 'feedback', 'support', 'crash']
     }
   },
   {
     id: 'appearance',
     label: 'Appearance',
+    group: 'Locust',
+    icon: 'palette',
     headings: ['Reply text size', 'Sidebar', 'Send button', 'Boot screen'],
     alsoKnownAs: {
       // 'font' moved to Reply text size, which is the only setting in this
@@ -104,25 +109,105 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
     }
   },
   {
-    id: 'app',
-    label: 'General',
-    headings: ['Updates', 'Privacy & local data', 'Trash', 'Report a problem'],
+    id: 'privacy',
+    label: 'Privacy & data',
+    group: 'Locust',
+    icon: 'shield',
+    headings: ['Privacy & local data', 'Trash'],
     alsoKnownAs: {
-      Updates: ['version', 'upgrade'],
       // "ledger" is a word the app itself says to people, in the sentence
       // telling them where the record of a run lives -- and it was the
       // fourth miss.
       'Privacy & local data': ['ledger', 'log', 'logs', 'telemetry', 'privacy', 'where is my data'],
       // "recycle bin" is here because that is what Trash is called on the
       // platform this ships to.
-      Trash: ['deleted', 'delete', 'restore', 'undo', 'recycle', 'recycle bin', 'bin'],
-      'Report a problem': ['bug', 'feedback', 'support', 'crash']
+      Trash: ['deleted', 'delete', 'restore', 'undo', 'recycle', 'recycle bin', 'bin']
+    }
+  },
+  {
+    id: 'teammates',
+    label: 'Teammates',
+    group: 'Team',
+    icon: 'users',
+    headings: ['Swarm', 'Auto mode', 'Plans'],
+    alsoKnownAs: {
+      Swarm: ['parallel', 'at once', 'concurrent'],
+      'Auto mode': ['permission', 'approve', 'ask first', 'sandbox'],
+      Plans: ['plan', 'steps']
+    }
+  },
+  {
+    id: 'memory',
+    label: 'Memory',
+    group: 'Team',
+    icon: 'brain',
+    headings: ['What your team remembers'],
+    alsoKnownAs: {
+      // The one Grok said to do first.
+      'What your team remembers': ['memory', 'remember', 'remembers', 'notes', 'recall']
+    }
+  },
+  {
+    id: 'relay',
+    label: 'Between teammates',
+    group: 'Team',
+    icon: 'message',
+    headings: ['Between teammates'],
+    alsoKnownAs: {
+      'Between teammates': ['relay', 'reply', 'replies', 'answer', 'message', 'messages', 'interrupt', 'role', 'roles', 'name', 'rename']
+    }
+  },
+  {
+    id: 'runtimes',
+    label: 'Runtimes',
+    group: 'Agents',
+    icon: 'terminal',
+    headings: ['Runtimes & accounts', 'When a route hits its limit'],
+    alsoKnownAs: {
+      // "node" and "npm" are what a person types after the first screen has
+      // just talked to them about Node. This is the page about the CLIs that
+      // are installed with them.
+      'Runtimes & accounts': ['node', 'node.js', 'npm', 'install', 'cli', 'model', 'models', 'sign in', 'account', 'api key'],
+      'When a route hits its limit': ['limit', 'quota', 'rate limit', 'usage', 'fallback']
+    }
+  },
+  {
+    id: 'models',
+    label: 'Your own models',
+    group: 'Agents',
+    icon: 'chip',
+    headings: ['Your own models'],
+    alsoKnownAs: {
+      'Your own models': ['own model', 'custom model', 'add model', 'endpoint', 'base url', 'address', 'openai', 'compatible', 'ollama', 'vllm', 'lm studio', 'local model', 'company', 'key']
+    }
+  },
+  {
+    id: 'connectors',
+    label: 'Connectors',
+    group: 'Agents',
+    icon: 'plug',
+    headings: ['Connectors'],
+    alsoKnownAs: {
+      Connectors: ['mcp', 'tools', 'server']
+    }
+  },
+  {
+    id: 'workspace',
+    label: 'Project folder',
+    group: 'This folder',
+    icon: 'folder',
+    headings: ['Project folder'],
+    alsoKnownAs: {
+      // Own branches are set here, under the folder they branch from.
+      'Project folder': ['worktree', 'worktrees', 'branch', 'branches', 'folder', 'path', 'directory', 'project', 'repo', 'workspace']
     }
   },
   {
     // The whole changelog, as Claude Code's What's new (Colin, 2026-09-23).
     id: 'whatsnew',
-    label: 'Changelog',
+    label: "What's new",
+    group: 'About',
+    icon: 'spark',
     headings: ['Changelog'],
     alsoKnownAs: {
       Changelog: ['what’s new', "what's new", 'what changed', 'release notes', 'releases', 'history', 'versions', 'new']

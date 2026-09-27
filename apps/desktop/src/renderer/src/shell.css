@@ -4779,17 +4779,46 @@ textarea {
 .lc-settings__navitem {
   border: 1px solid transparent;
   border-radius: 9px;
-  padding: 8px 10px;
+  padding: 6px 10px;
 }
+/*
+ * The page you are on, as Claude's own settings mark it (0.393): a filled
+ * pill, no outline, the name in full ink. The outlined version matched the
+ * sidebar; Colin held Claude's list up as the one to match.
+ */
 .lc-settings__navitem.is-current {
   background: var(--lc-bg-selected);
-  border-color: var(--lc-border-card);
   color: var(--lc-text-primary);
   font-weight: 500;
 }
 
+/* The icon, then the name, on one line. */
 .lc-settings__navlabel {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lc-settings__navicon {
+  flex: none;
+  display: inline-flex;
+  color: var(--lc-text-muted);
+}
+
+.lc-settings__navitem:hover .lc-settings__navicon,
+.lc-settings__navitem.is-current .lc-settings__navicon {
+  color: var(--lc-text-primary);
+}
+
+/* A group's name, above its first page: small, muted, in sentence case. */
+.lc-settings__navgroup {
+  margin: var(--lc-space-6) 10px var(--lc-space-2);
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+}
+
+.lc-settings__search + .lc-settings__navgroup {
+  margin-top: var(--lc-space-2);
 }
 
 /* Which settings on that page matched what you typed. */
@@ -8743,6 +8772,124 @@ textarea {
   font-size: var(--lc-text-description);
   color: var(--lc-text-secondary);
   text-wrap: pretty;
+}
+
+/*
+ * SETTINGS AS CLAUDE DRAWS ITS OWN (0.393).
+ *
+ * Colin, 2026-09-27, holding Claude's settings up beside ours: "way cleaner
+ * and more organized than ours". The difference is the card. Claude puts no
+ * box around a setting: its rows sit on the pane with a hairline between
+ * them, the words on the left and the control on the right, and nothing
+ * lights up under the pointer that is not itself a control. Scoped to the
+ * Settings pane, because these row classes are used on other screens too.
+ */
+.lc-settings__pane .lc-settings__section {
+  max-width: 720px;
+  margin-bottom: 36px;
+}
+
+.lc-settings__pane .lc-settingrows,
+.lc-settings__pane .lc-settingcard {
+  border: 0;
+  border-top: 1px solid var(--lc-border-hairline);
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+.lc-settings__pane .lc-settingrow,
+.lc-settings__pane .lc-settingcard > .lc-folder,
+.lc-settings__pane .lc-settingcard > .lc-policyrow,
+.lc-settings__pane .lc-settingcard > .lc-runtimerow {
+  padding: 12px 0;
+  border: 0;
+  border-top: 1px solid var(--lc-border-hairline);
+  border-radius: 0;
+  background: transparent;
+}
+
+.lc-settings__pane .lc-settingrow:first-child,
+.lc-settings__pane .lc-settingcard > :first-child {
+  border-top: 0;
+}
+
+.lc-settings__pane .lc-settingrow:hover {
+  background: transparent;
+}
+
+/* A row's own words are its label: full ink, the size a control reads at. */
+.lc-settings__pane .lc-settingrow > .lc-settings__note {
+  font-size: var(--lc-text-control);
+  color: var(--lc-text-primary);
+}
+
+/* With no card there is no inset to line up with: the note sits under the folder's own words. */
+.lc-settings__pane .lc-settingcard > .lc-folder__warns {
+  padding: 0 0 var(--lc-space-4);
+}
+
+/* A policy line on its own reads like a row too, not a card. */
+.lc-settings__pane .lc-policyrow {
+  padding: 12px 0;
+  border: 0;
+  border-top: 1px solid var(--lc-border-hairline);
+  border-radius: 0;
+  background: transparent;
+}
+
+/*
+ * A setting that is one switch is one LINE (0.393): its name and what it is
+ * doing on the left, the switch on the right, "How it works" under them.
+ * It used to be a heading, a sentence, and then a row saying the sentence
+ * again beside the switch. A run of them reads as one list, a hairline
+ * between each, which is how Claude's own settings sit.
+ */
+.lc-settings__pane .lc-settings__section--line {
+  margin-bottom: 0;
+  padding: 14px 0;
+  border-top: 1px solid var(--lc-border-hairline);
+}
+
+.lc-settings__pane .lc-settings__section--line:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.lc-settingline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lc-space-6);
+}
+
+.lc-settingline__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lc-settingline .lc-settings__heading {
+  margin: 0;
+  font-size: var(--lc-text-control);
+  font-weight: 500;
+}
+
+.lc-settingline .lc-settings__lede {
+  margin: 0;
+}
+
+.lc-settings__section--line .lc-settings__more {
+  margin: var(--lc-space-3) 0 0;
+}
+
+/* "How it works", said in sentence case like the rest of the page. */
+.lc-settings__pane .lc-settings__more > summary {
+  font-family: inherit;
+  font-size: var(--lc-text-description);
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 /* --- Command palette --------------------------------------------------- */

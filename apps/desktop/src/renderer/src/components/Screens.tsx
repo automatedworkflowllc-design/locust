@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { boardSectionOf, teamBoard } from '../teamBoard.js'
 import { durationText, runSpanMs, usagePercent, usageWindowSentence } from '../missionView.js'
 import { WhatsNew } from './WhatsNew.js'
@@ -1474,7 +1474,7 @@ export function SettingsScreen({
   readonly initialPage?: SettingsPageId
   readonly onPrune: (days: number) => Promise<MissionPruneResponse>
 }): ReactElement {
-  const [page, setPage] = useState<SettingsPageId>(initialPage ?? 'workspace')
+  const [page, setPage] = useState<SettingsPageId>(initialPage ?? 'app')
   const [query, setQuery] = useState('')
   const asked = query.trim()
   // A page earns its place in the list when its name or one of its settings
@@ -1538,15 +1538,25 @@ export function SettingsScreen({
           {shownPages.length === 0 ? (
             <p className="lc-settings__note">Nothing matches. The pages are still here; clear the search to see them.</p>
           ) : (
-            shownPages.map((entry) => (
+            /*
+             * Pages under their group's label, each with its icon: the list
+             * Claude's own settings draw (0.393). A group label is said once,
+             * above the first page of its run, so a search that leaves two
+             * pages of one group still names the group they are in.
+             */
+            shownPages.map((entry, index) => (
+              <Fragment key={entry.id}>
+              {shownPages[index - 1]?.group !== entry.group && <span className="lc-settings__navgroup">{entry.group}</span>}
               <button
                 type="button"
-                key={entry.id}
                 className={`lc-settings__navitem${entry.id === shownPage ? ' is-current' : ''}`}
                 aria-current={entry.id === shownPage ? 'page' : undefined}
                 onClick={() => setPage(entry.id)}
               >
-                <span className="lc-settings__navlabel">{entry.label}</span>
+                <span className="lc-settings__navlabel">
+                  <span className="lc-settings__navicon" aria-hidden="true"><Icon name={entry.icon} size={16} /></span>
+                  {entry.label}
+                </span>
                 {query.trim().length > 0 && (
                   <span className="lc-settings__navhits">
                     {/*
@@ -1559,6 +1569,7 @@ export function SettingsScreen({
                   </span>
                 )}
               </button>
+              </Fragment>
             ))
           )}
         </nav>
@@ -1586,7 +1597,6 @@ export function SettingsScreen({
           * the setting.
           */}
         {shownPage === 'workspace' && (
-          <>
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Project folder</h2>
           {/*
@@ -1676,6 +1686,8 @@ export function SettingsScreen({
           )}
           </div>
         </section>
+        )}
+        {shownPage === 'relay' && (
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Between teammates</h2>
           <p className="lc-settings__lede">
@@ -1791,11 +1803,9 @@ export function SettingsScreen({
             </div>
           </div>
         </section>
-
-          </>
         )}
+
         {shownPage === 'runtimes' && (
-          <>
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Runtimes &amp; accounts</h2>
           <p className="lc-settings__lede">
@@ -1948,13 +1958,14 @@ export function SettingsScreen({
             </div>
           )}
         </section>
+        )}
         {/*
           * A company's own model, or one on this machine (0.357). Colin: his
           * father's company builds a model of its own and could "just insert
           * their model". Anything that speaks the OpenAI chat API runs
           * through OpenCode, listed under its own name.
           */}
-        {onOwnModelsChanged !== undefined && (
+        {shownPage === 'models' && onOwnModelsChanged !== undefined && (
           <section className="lc-settings__section">
             <h2 className="lc-settings__heading">Your own models</h2>
             <p className="lc-settings__lede">
@@ -1977,6 +1988,7 @@ export function SettingsScreen({
             <OwnModels onChanged={onOwnModelsChanged} />
           </section>
         )}
+        {shownPage === 'connectors' && (
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Connectors</h2>
           <p className="lc-settings__lede">
@@ -2017,6 +2029,8 @@ export function SettingsScreen({
             </div>
           </div>
         </section>
+        )}
+        {shownPage === 'runtimes' && (
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">When a route hits its limit</h2>
           <p className="lc-settings__lede">
@@ -2051,18 +2065,30 @@ export function SettingsScreen({
           </div>
           </More>
         </section>
-
-          </>
         )}
+
         {shownPage === 'teammates' && (
-          <>
-        <section className="lc-settings__section">
-          <h2 className="lc-settings__heading">Swarm</h2>
-          <p className="lc-settings__lede">
-            {swarm
-              ? 'On. Every mission runs at its model\u2019s maximum effort.'
-              : 'Off. Each mission runs at the effort its route is set to.'}
-          </p>
+        <section className="lc-settings__section lc-settings__section--line">
+          <div className="lc-settingline">
+            <div className="lc-settingline__text">
+              <h2 className="lc-settings__heading">Swarm</h2>
+              <p className="lc-settings__lede">
+                {swarm
+                  ? 'On. Every mission runs at its model\u2019s maximum effort.'
+                  : 'Off. Each mission runs at the effort its route is set to.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              className={`lc-switch${swarm ? ' is-on' : ''}`}
+              role="switch"
+              aria-checked={swarm}
+              aria-label={swarm ? 'Switch this off' : 'Switch this on'}
+              onClick={() => onSwarmChange(!swarm)}
+            >
+              <span className="lc-switch__knob" />
+            </button>
+          </div>
           <More>
             <p>
               Swarm is a statement about every mission rather than about one of them: while it is on, each
@@ -2075,34 +2101,31 @@ export function SettingsScreen({
               is every screen but the workroom, and the workroom itself while a mission is running.
             </p>
           </More>
-          <div className="lc-settingrows">
-            <div className="lc-settingrow">
-              <span className="lc-settings__note">
-                {swarm
-                  ? 'On. Every mission runs at its model\u2019s maximum.'
-                  : 'Off. The mark on the composer switches it back on.'}
-              </span>
-              <button
-                type="button"
-                className={`lc-switch${swarm ? ' is-on' : ''}`}
-                role="switch"
-                aria-checked={swarm}
-                aria-label={swarm ? 'Switch this off' : 'Switch this on'}
-                onClick={() => onSwarmChange(!swarm)}
-              >
-                <span className="lc-switch__knob" />
-              </button>
-            </div>
-          </div>
 
         </section>
-        <section className="lc-settings__section">
-          <h2 className="lc-settings__heading">Auto mode</h2>
-          <p className="lc-settings__lede">
-            {autoMode
-              ? 'On. A mission started in Auto runs without asking and is not confined to the workspace folder.'
-              : 'Off. Missions may edit files inside the workspace folder and nowhere else.'}
-          </p>
+        )}
+        {shownPage === 'teammates' && (
+        <section className="lc-settings__section lc-settings__section--line">
+          <div className="lc-settingline">
+            <div className="lc-settingline__text">
+              <h2 className="lc-settings__heading">Auto mode</h2>
+              <p className="lc-settings__lede">
+                {autoMode
+                  ? 'On. A mission started in Auto runs without asking and is not confined to the workspace folder.'
+                  : 'Off. Missions may edit files inside the workspace folder and nowhere else.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              className={`lc-switch${autoMode ? ' is-on' : ''}`}
+              role="switch"
+              aria-checked={autoMode}
+              aria-label={autoMode ? 'Switch this off' : 'Switch this on'}
+              onClick={() => onAutoModeChange(!autoMode)}
+            >
+              <span className="lc-switch__knob" />
+            </button>
+          </div>
           <More>
             <p>
               Every other mode confines a run to the folder you chose for it, and a runtime that wants to
@@ -2119,33 +2142,30 @@ export function SettingsScreen({
               choice falls back to.
             </p>
           </More>
-          <div className="lc-settingrows">
-            <div className="lc-settingrow">
-              <span className="lc-settings__note">
-                {autoMode
-                  ? 'On. A run in Auto may change files anywhere on this machine.'
-                  : 'Off. Picking Auto in the composer switches it back on.'}
-              </span>
-              <button
-                type="button"
-                className={`lc-switch${autoMode ? ' is-on' : ''}`}
-                role="switch"
-                aria-checked={autoMode}
-                aria-label={autoMode ? 'Switch this off' : 'Switch this on'}
-                onClick={() => onAutoModeChange(!autoMode)}
-              >
-                <span className="lc-switch__knob" />
-              </button>
-            </div>
-          </div>
         </section>
-        <section className="lc-settings__section">
-          <h2 className="lc-settings__heading">Plans</h2>
-          <p className="lc-settings__lede">
-            {keepATodoList
-              ? 'Asking for a plan. Teammates that can keep a todo list are asked to, and the board fills in as they work.'
-              : 'Not asking. A teammate keeps a list only if it decides to on its own.'}
-          </p>
+        )}
+        {shownPage === 'teammates' && (
+        <section className="lc-settings__section lc-settings__section--line">
+          <div className="lc-settingline">
+            <div className="lc-settingline__text">
+              <h2 className="lc-settings__heading">Plans</h2>
+              <p className="lc-settings__lede">
+                {keepATodoList
+                  ? 'Asking for a plan. Teammates that can keep a todo list are asked to, and the board fills in as they work.'
+                  : 'Not asking. A teammate keeps a list only if it decides to on its own.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              className={`lc-switch${keepATodoList ? ' is-on' : ''}`}
+              role="switch"
+              aria-checked={keepATodoList}
+              aria-label={keepATodoList ? 'Stop asking teammates to keep a todo list' : 'Ask teammates to keep a todo list'}
+              onClick={() => onKeepATodoListChange(!keepATodoList)}
+            >
+              <span className="lc-switch__knob" />
+            </button>
+          </div>
           <More>
             <p>
               Codex, Cursor and OpenCode each have a tool for keeping a todo list, and the board in a room
@@ -2163,26 +2183,9 @@ export function SettingsScreen({
               for a Claude Code teammate, in either position.
             </p>
           </More>
-          <div className="lc-settingrows">
-            <div className="lc-settingrow">
-              <span className="lc-settings__note">
-                {keepATodoList
-                  ? 'On. Codex, Cursor and OpenCode teammates are asked to keep the board current.'
-                  : 'Off. Nothing is asked for; a teammate may still keep one.'}
-              </span>
-              <button
-                type="button"
-                className={`lc-switch${keepATodoList ? ' is-on' : ''}`}
-                role="switch"
-                aria-checked={keepATodoList}
-                aria-label={keepATodoList ? 'Stop asking teammates to keep a todo list' : 'Ask teammates to keep a todo list'}
-                onClick={() => onKeepATodoListChange(!keepATodoList)}
-              >
-                <span className="lc-switch__knob" />
-              </button>
-            </div>
-          </div>
         </section>
+        )}
+        {shownPage === 'memory' && (
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">What your team remembers</h2>
           <p className="lc-settings__lede">
@@ -2230,17 +2233,15 @@ export function SettingsScreen({
           </div>
           </div>
         </section>
-
-          </>
         )}
-        {shownPage === 'appearance' && (
-          <>
+
         {/*
           * READING COMFORT FIRST. The one setting here that changes how a
           * reply reads sat under the sidebar and the send button's metal
           * effects -- a hundred and twenty lines of ornament above it (the
           * design review: "Appearance: reading comfort before ornament").
           */}
+        {shownPage === 'appearance' && (
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Reply text size</h2>
           <p className="lc-settings__lede">
@@ -2288,6 +2289,8 @@ export function SettingsScreen({
             </div>
           </div>
         </section>
+        )}
+        {shownPage === 'appearance' && (
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Sidebar</h2>
           <div className="lc-settingrows">
@@ -2325,6 +2328,8 @@ export function SettingsScreen({
           </div>
           </div>
         </section>
+        )}
+        {shownPage === 'appearance' && (
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Send button</h2>
           <p className="lc-settings__lede">
@@ -2449,6 +2454,8 @@ export function SettingsScreen({
             </div>
           </div>
         </section>
+        )}
+        {shownPage === 'appearance' && (
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Boot screen</h2>
           <p className="lc-settings__lede">
@@ -2500,11 +2507,9 @@ export function SettingsScreen({
           </div>
 
         </section>
-
-          </>
         )}
+
         {shownPage === 'app' && (
-          <>
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Updates</h2>
           <p className="lc-settings__lede">
@@ -2551,13 +2556,15 @@ export function SettingsScreen({
             </div>
           )}
           <p className="lc-settings__note">
-            This is {changelog?.version ?? 'this version'}. Every version, and what it changed, is in the{' '}
+            This is {changelog?.version ?? 'this version'}. Every version, and what it changed, is in{' '}
             <button type="button" className="lc-linkbutton" onClick={() => setPage('whatsnew')}>
-              Changelog
+              What&rsquo;s new
             </button>
             .
           </p>
         </section>
+        )}
+        {shownPage === 'privacy' && (
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Privacy &amp; local data</h2>
           <p className="lc-settings__lede">
@@ -2596,6 +2603,8 @@ export function SettingsScreen({
           </More>
           <RetentionControl report={storage} onPreview={onPreviewPrune} onPrune={onPrune} />
         </section>
+        )}
+        {shownPage === 'privacy' && (
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Trash</h2>
           <p className="lc-settings__lede">
@@ -2604,6 +2613,8 @@ export function SettingsScreen({
           </p>
           <TrashControl onList={onListTrash} onRestore={onRestoreMission} onEmpty={onEmptyTrash} />
         </section>
+        )}
+        {shownPage === 'app' && (
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Report a problem</h2>
           <p className="lc-settings__lede">
@@ -2611,9 +2622,8 @@ export function SettingsScreen({
           </p>
           <ProblemReport />
         </section>
-
-          </>
         )}
+
         {shownPage === 'whatsnew' && (
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Changelog</h2>

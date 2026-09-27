@@ -124,13 +124,17 @@ describe('settings rows live in a card', () => {
     expect(SCREENS).toContain('lc-segmented is-numeric')
   })
 
-  it('speaks the sidebar\u2019s language in the sub-nav', () => {
-    // Two navigations in one window were using two languages: a filled pill
-    // here, `bg-selected` + `border-card` three inches to the left. 9px is
-    // `.lc-row`'s own radius, so "matches the sidebar" is literally true.
+  it('marks the page you are on the way Claude\u2019s settings do: the sidebar\u2019s ground, no outline (0.393)', () => {
+    // This asserted the sidebar's outline too (`border-card`), so the two
+    // navigations spoke one language. Colin, 2026-09-27, held Claude's own
+    // settings up as the one to match, and Claude marks the current page
+    // with a filled pill and no outline. The ground and the 9px radius stay
+    // the sidebar's; the outline goes. (In the Settings pane the rows also
+    // come out of their card -- settings-read-like-claudes.test.ts; this
+    // file's card rules still hold everywhere else the rows are used.)
     const current = bodyOf('.lc-settings__navitem.is-current')
     expect(current).toContain('--lc-bg-selected')
-    expect(current).toContain('--lc-border-card')
+    expect(current).not.toContain('--lc-border-card')
     expect(bodyOf('.lc-settings__navitem')).toContain('border-radius: 9px')
     expect(bodyOf('.lc-row')).toContain('9px')
   })

@@ -25,12 +25,12 @@ import { SETTINGS_PAGES, matchedHeadings, pageMatches } from './settingsPages.js
  * a place rather than echoing the question.
  */
 
-/** The four words that were measured missing, and where each one lives. */
+/** The four words that were measured missing, and where each one lives -- on its own page since 0.393. */
 const THE_FOUR = [
-  { typed: 'memory', page: 'teammates', heading: 'What your team remembers' },
+  { typed: 'memory', page: 'memory', heading: 'What your team remembers' },
   { typed: 'worktree', page: 'workspace', heading: 'Project folder' },
   { typed: 'node', page: 'runtimes', heading: 'Runtimes & accounts' },
-  { typed: 'ledger', page: 'app', heading: 'Privacy & local data' }
+  { typed: 'ledger', page: 'privacy', heading: 'Privacy & local data' }
 ] as const
 
 /** Pages that answer a typed word, the way the screen filters them. */
@@ -62,8 +62,8 @@ describe('the words that already worked', () => {
   // The control. These four were measured finding their page on 0.177.0, and
   // an index rewritten to fix the misses must not lose them.
   it.each([
-    { typed: 'trash', page: 'app', heading: 'Trash' },
-    { typed: 'connector', page: 'runtimes', heading: 'Connectors' },
+    { typed: 'trash', page: 'privacy', heading: 'Trash' },
+    { typed: 'connector', page: 'connectors', heading: 'Connectors' },
     { typed: 'update', page: 'app', heading: 'Updates' },
     { typed: 'auto', page: 'teammates', heading: 'Auto mode' }
   ])('$typed still finds $heading', ({ typed, page, heading }) => {

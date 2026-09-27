@@ -11,6 +11,21 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.393.0 - 2026-09-27
+
+### Improved
+
+- **Settings, reorganized the way Claude's are.** The list down the side
+  has an icon beside every page and groups them under small labels:
+  Locust, Team, Agents, This folder and About. Pages that held several
+  unrelated subjects are split up, so Memory, Between teammates, Your own
+  models, Connectors and Privacy & data each have a page of their own.
+  Settings opens on General.
+- **Cleaner rows.** Settings no longer sit in boxes: each one is a row on a
+  hairline, with its name on the left and its control on the right. Swarm,
+  Auto mode and Plans are one line each with their switch, instead of
+  saying the same thing twice. "How it works" is in plain type.
+
 ## 0.392.0 - 2026-09-27
 
 ### Improved
