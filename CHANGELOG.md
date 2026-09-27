@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.386.0 - 2026-09-27
+
+### Improved
+
+- **Home's teammate cards read alike.** Every card names its model the same
+  way, so a Cursor teammate reads "Grok 4.7" like the others rather than
+  carrying an effort level they don't. Hover a card's model line to see the
+  full route, effort level included. The level is still set and shown beside
+  the message box.
+
 ## 0.385.0 - 2026-09-26
 
 ### Improved

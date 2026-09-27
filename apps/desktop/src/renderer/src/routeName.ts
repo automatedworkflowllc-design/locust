@@ -1,6 +1,9 @@
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 
-import { modelLabelFor } from './status.js'
+import { defaultEffort, modelFamily, modelLabelFor } from './status.js'
+import { effortName } from './effortLevels.js'
+import { splitEffort } from './effortScale.js'
+import type { PublicModel } from '../../shared/ipc.js'
 import { runtimeDisplayName } from '../../shared/runtimes.js'
 import { claudeRouteModelName } from '../../shared/claude-models.js'
 import { antigravityTierName } from '../../shared/antigravity-models.js'
@@ -199,17 +202,50 @@ export function freeTagOf(label: string): { readonly name: string; readonly free
 }
 
 /**
+ * The effort a route runs at, found the way the composer's chip finds it
+ * (0.386): the level chosen for it; else the level a variant id carries --
+ * Cursor's `grok-4.7-medium` IS medium; else the model's default. Only for a
+ * model the catalog says has levels, and only once the catalog has answered:
+ * before that, nothing is said rather than a level guessed.
+ */
+export function routeEffortOf(
+  route: { readonly runtime: string; readonly model: string; readonly effort?: string },
+  models: readonly PublicModel[]
+): string | undefined {
+  const family = modelFamily(models, route.runtime, route.model)
+  if (family === undefined || family.supportedEfforts.length === 0) return undefined
+  const ofId = Object.entries(family.variants ?? {}).find(([, id]) => id === route.model)?.[0]
+  return route.effort ?? ofId ?? defaultEffort(family.supportedEfforts, family.defaultEffort)
+}
+
+/**
  * A teammate's route on Home's card (0.384): the model by the name it RUNS as
  * -- "Opus 5.5", "Gemini 3.8 Flash", as the Team screen and the chip name it
  * (routeModelName) -- where Home had spelled the alias, "Claude · Opus"
  * (Colin's frame, 2026-09-26). The whole route, runtime and all, stays for the
  * card's hover and its accessible name; the line itself shows the runtime's
  * mark and the model.
+ *
+ * THE LEVEL IS THE HOVER, NOT THE LINE (0.386). Colin, 2026-09-27, over his
+ * Home: "some teammates on home page not showing model effort" -- Robin's
+ * card read "Grok 4.7 Medium" only because Cursor writes the level into the
+ * model's id, and the two on Opus said nothing of theirs. Then: "its honestly
+ * up to you if effort level is even worth showing on the home page ...
+ * whatever is best for user and design". So every card says the same kind of
+ * thing: the model, by name -- a Cursor family by the family, "Grok 4.7", as
+ * the chip names it -- and the level it runs at is in the hover and the
+ * accessible name, "Cursor · Grok 4.7 · Medium". Home is who is on the team;
+ * how hard one thinks is a knob, set and shown beside the message box.
  */
 export function homeRouteOf(
-  route: { readonly runtime: MissionRuntimeId; readonly model: string },
-  resolved: ReadonlyMap<string, string>
+  route: { readonly runtime: MissionRuntimeId; readonly model: string; readonly effort?: string },
+  resolved: ReadonlyMap<string, string>,
+  models: readonly PublicModel[] = []
 ): { readonly route: string; readonly model: string; readonly runtime?: MissionRuntimeId } {
-  const model = routeModelName(route.runtime, route.model, resolved.get(`${route.runtime}:${route.model}`))
-  return { route: routeChrome(route.runtime, route.model, model, ' · '), model, ...(isOwnRoute(route.model) ? {} : { runtime: route.runtime }) }
+  const family = modelFamily(models, route.runtime, route.model)
+  const name = routeModelName(route.runtime, family?.variants !== undefined ? family.displayName : route.model, resolved.get(`${route.runtime}:${route.model}`))
+  const effort = routeEffortOf(route, models)
+  const level = effort === undefined ? undefined : splitEffort(effort)
+  const withLevel = level === undefined ? name : `${name} · ${effortName(level.base)}${level.fast ? ' · Fast' : ''}`
+  return { route: routeChrome(route.runtime, route.model, withLevel, ' · '), model: name, ...(isOwnRoute(route.model) ? {} : { runtime: route.runtime }) }
 }

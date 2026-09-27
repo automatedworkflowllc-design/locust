@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 
 import { seedAvatar } from '../../shared/avatar.js'
 import { HomeTeam } from './components/HomeTeam.js'
-import { homeRouteOf, routeModelName } from './routeName.js'
+import type { PublicModel } from '../../shared/ipc.js'
+import { homeRouteOf, routeEffortOf, routeModelName } from './routeName.js'
 import APP from './App.tsx?raw'
 
 /**
@@ -33,8 +34,48 @@ describe("a teammate's route on Home", () => {
   })
 
   it("is what Home's cards are given -- not the alias, spelled", () => {
-    expect(APP).toContain('homeRouteOf(mate.route, resolvedModels)')
+    expect(APP).toContain('homeRouteOf(mate.route, resolvedModels, models)')
     expect(APP).not.toMatch(/route: routeChrome\(mate\.route\.runtime, mate\.route\.model, modelDisplayName/)
+  })
+
+  /*
+   * THE LEVEL IS THE HOVER (0.386). Colin, 2026-09-27, over his Home: "some
+   * teammates on home page not showing model effort" -- Robin's read "Grok
+   * 4.7 Medium" because Cursor writes the level into the id; the two on Opus
+   * said none. Then "whatever is best for user and design": every line names
+   * the model alone, and the level is in the hover and the accessible name.
+   */
+  const OPUS: PublicModel = { id: 'opus', runtime: 'claude', displayName: 'Opus', description: 'Always the newest Opus', supportedEfforts: ['low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'medium' }
+  const GROK: PublicModel = {
+    id: 'grok-4.7-low',
+    runtime: 'cursor',
+    displayName: 'Grok 4.7',
+    description: '',
+    supportedEfforts: ['low', 'medium', 'high'],
+    variants: { low: 'grok-4.7-low', medium: 'grok-4.7-medium', high: 'grok-4.7-high' }
+  }
+  const FLASH: PublicModel = { id: 'flash', runtime: 'antigravity', displayName: 'Gemini 3.8 Flash', description: 'Antigravity tier flash', supportedEfforts: [] }
+
+  it("names the model alone on the line, every card alike, and the level in the whole route -- the one chosen, else the model's default", () => {
+    const opus = homeRouteOf({ runtime: 'claude', model: 'opus' }, new Map(), [OPUS])
+    expect(opus.model).toBe('Opus 5.5')
+    expect(opus.route).toBe('Claude · Opus 5.5 · Medium')
+    expect(homeRouteOf({ runtime: 'claude', model: 'opus', effort: 'xhigh' }, new Map(), [OPUS]).route).toBe('Claude · Opus 5.5 · Extra high')
+  })
+
+  it("names a Cursor family by the family, so its line carries no level where the others carry none", () => {
+    const robin = homeRouteOf({ runtime: 'cursor', model: 'grok-4.7-medium' }, new Map(), [GROK])
+    expect(robin.model).toBe('Grok 4.7')
+    // The level its id carries, in the whole route -- said once. `-high`, so
+    // it cannot pass as the family's default (medium) by coincidence.
+    expect(robin.route).toBe('Cursor · Grok 4.7 · Medium')
+    expect(homeRouteOf({ runtime: 'cursor', model: 'grok-4.7-high' }, new Map(), [GROK]).route).toBe('Cursor · Grok 4.7 · High')
+  })
+
+  it('says no level for a model that has none, and guesses none before the catalog has answered', () => {
+    expect(homeRouteOf({ runtime: 'antigravity', model: 'flash' }, new Map(), [FLASH]).route).toBe('Antigravity · Gemini 3.8 Flash')
+    expect(homeRouteOf({ runtime: 'claude', model: 'opus' }, new Map(), []).route).toBe('Claude · Opus 5.5')
+    expect(routeEffortOf({ runtime: 'claude', model: 'opus' }, [])).toBeUndefined()
   })
 
   it("shows no maker's mark for a model of the person's own", () => {

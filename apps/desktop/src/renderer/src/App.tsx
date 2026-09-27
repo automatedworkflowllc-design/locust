@@ -5874,7 +5874,7 @@ export default function App(): ReactElement {
                   hue: mate.hue,
                   avatar: mate.avatar,
                   role: roleLabelOf(mate),
-                  ...(mate.route === undefined ? {} : homeRouteOf(mate.route, resolvedModels)),
+                  ...(mate.route === undefined ? {} : homeRouteOf(mate.route, resolvedModels, models)),
                   working: [...runs.values()].some((run) => liveRunIsActive(run) && ownerOf(run) === mate.teammateId)
                 }))}
                 onMessageTeammate={selectTeammate}
