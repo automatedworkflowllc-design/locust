@@ -25,7 +25,8 @@ describe('Settings switches', () => {
   it('show an off knob you can see: muted text on the track, not a raised surface (0.419)', () => {
     const css = readFileSync(fileURLToPath(new URL('../renderer/src/shell.css', import.meta.url)), 'utf8')
     // The later of the two switch blocks is the one that paints the knob.
-    const later = css.slice(css.lastIndexOf('.lc-switch__knob {'))
+    // At a line start: `.is-on .lc-switch__knob {` holds the same words.
+    const later = css.slice(css.lastIndexOf('\n.lc-switch__knob {'))
     expect(later.slice(0, later.indexOf('}'))).toContain('background: var(--lc-text-muted);')
   })
 
