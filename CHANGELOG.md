@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.400.0 - 2026-09-27
+
+### Fixed
+
+- **A conversation cut off mid-work no longer shows a false answer.** When
+  a teammate's run was interrupted (Locust closed under it, or it failed or
+  was stopped), the last thing it said before its last step, such as "Let
+  me check the file first", was shown below the steps as if it were the
+  answer. It now sits inside the steps, where it was said, and the turn
+  shows no answer, because it never gave one.
+
 ## 0.399.0 - 2026-09-27
 
 ### New

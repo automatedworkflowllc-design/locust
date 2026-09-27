@@ -82,6 +82,49 @@ describe('where each message goes', () => {
     expect(narrationOf(events, born, ['m1', 'm2'])).toEqual([{ itemId: 'm1', beforeRow: 0 }])
   })
 
+  /*
+   * B15's last part: a recovered routine run showed "Let me check..." below
+   * the fold, as if it were the answer. The turn had no answer -- Locust
+   * closed under it -- so the reply rule above, which is for a finished turn,
+   * must not keep its last narration below.
+   */
+  const stoppedMidWork = (end: NormalizedRuntimeEvent[]): NormalizedRuntimeEvent[] => [
+    event('run.started', {}),
+    said('m1', 'Writing the file now.'),
+    toolStart('t1', 'write', 'a.txt'),
+    toolDone('t1', 'write', 'a.txt'),
+    said('m2', 'Let me check it was written.'),
+    toolStart('t2', 'read', 'a.txt'),
+    ...end
+  ]
+
+  it('takes a stopped turn’s last words into the fold too: failed, cancelled, or interrupted with no end at all', () => {
+    for (const end of [[event('run.failed', { reason: 'x' })], [event('run.cancelled', {})], []]) {
+      const events = stoppedMidWork(end)
+      expect(narrationOf(events, [2, 5], ['m1', 'm2'])).toEqual([
+        { itemId: 'm1', beforeRow: 0 },
+        { itemId: 'm2', beforeRow: 1 }
+      ])
+    }
+  })
+
+  it('but keeps a finished turn’s last words below, as before', () => {
+    const events = stoppedMidWork([toolDone('t2', 'read', 'a.txt'), completed()])
+    expect(narrationOf(events, [2, 5], ['m1', 'm2'])).toEqual([{ itemId: 'm1', beforeRow: 0 }])
+  })
+
+  it('draws an interrupted turn with nothing below the fold posing as its answer', () => {
+    const items = buildThread(stoppedMidWork([]), { running: false })
+    const below = items.filter((item) => item.type === 'agent-message').map((item) => (item.type === 'agent-message' ? item.text : ''))
+    expect(below).not.toContain('Let me check it was written.')
+    const fold = items.find((item) => item.type === 'activity')
+    if (fold?.type !== 'activity') throw new Error('no fold')
+    expect(fold.details.filter((detail) => detail.kind === 'said').map((detail) => detail.output)).toEqual([
+      'Writing the file now.',
+      'Let me check it was written.'
+    ])
+  })
+
   it('does not count a row the host added after the run ended (its look at the disk)', () => {
     const events = [
       event('run.started', {}),

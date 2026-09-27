@@ -2264,8 +2264,8 @@ export interface Narration {
  * the fold, before the first row that came after it began; what follows the
  * last row is the reply. Nothing said is lost -- Colin's rule since
  * 2026-09-13, "a turn is what was said, all of it, in order" -- it is put back
- * in its order. The reply is never taken: when nothing was said after the
- * last row, the last thing said stays below the fold. Rows the host adds after
+ * in its order. A finished turn's reply is never taken: when nothing was said
+ * after the last row, the last thing said stays below the fold. Rows the host adds after
  * the run has ended (its look at the disk) do not count as the runtime's.
  *
  * `born` is the event each fold row came from, in row order; `candidates` the
@@ -2292,7 +2292,15 @@ export function narrationOf(
   })
   const said = candidates.filter((itemId) => (last.get(itemId) ?? Number.POSITIVE_INFINITY) < lastRow)
   const reply = candidates.at(-1)
-  const moving = said.length === candidates.length && reply !== undefined ? said.filter((itemId) => itemId !== reply) : said
+  /*
+   * The reply is kept below only for a turn that FINISHED. One that failed,
+   * was stopped, or was interrupted (no end at all: Locust closed under it,
+   * as the routine runner reads it) has no reply -- its last words were said
+   * before its last step ("Let me check..." on a recovered routine run, B15),
+   * and drawn below the fold they read as the answer.
+   */
+  const finished = terminal !== -1 && events[terminal]?.type === 'run.completed'
+  const moving = finished && said.length === candidates.length && reply !== undefined ? said.filter((itemId) => itemId !== reply) : said
   return moving.map((itemId) => {
     const began = first.get(itemId) ?? 0
     const row = born.findIndex((at) => at > began)
