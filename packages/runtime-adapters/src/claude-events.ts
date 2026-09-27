@@ -225,6 +225,19 @@ export function limitKindFor(status: unknown): "quota-exhausted" | "temporary-ra
  * `unifiedWindows` ({five_hour: {utilization, resetsAt}, seven_day: ...}).
  * The fuller window leads; both are named when both are known.
  */
+/**
+ * One window from a record that names only its own (`rateLimitType`,
+ * `utilization`, `resetsAt`) -- how a warning arrives: "7-day window 79%
+ * used · resets <iso>" (0.407).
+ */
+export function ownWindowText(info: JsonObject): string | undefined {
+  const key = stringValue(info.rateLimitType);
+  const utilization = info.utilization;
+  if (key === undefined || typeof utilization !== "number" || !Number.isFinite(utilization)) return undefined;
+  const resets = resetsAtIso(info.resetsAt);
+  return `${windowName(key)} window ${String(Math.round(utilization * 100))}% used${resets === undefined ? "" : ` · resets ${resets}`}`;
+}
+
 export function usageWindowText(windows: unknown): string | undefined {
   if (!isObject(windows)) return undefined;
   const parts: { label: string; used: number; resets: string | undefined }[] = [];
@@ -535,29 +548,27 @@ export function createClaudeEventNormalizer(
       if (isObject(info.unifiedWindows) && Object.keys(info.unifiedWindows).length > 0) onUsageWindows = true;
       if (info.isUsingOverage === true) usedExtraUsage = true;
       const kind = limitKindFor(info.status);
-      if (kind === undefined) {
-        // Allowed, with the windows' utilisation: what Claude Code's own
-        // status line shows ("35% of the 5-hour window"). Not a thread item;
-        // the host keeps the latest per runtime for the route chip and
-        // Settings (MEASURED 2026-09-05; parity table row).
-        const window = usageWindowText(info.unifiedWindows);
-        if (window === undefined) return [];
-        return [
-          emit("adapter.diagnostic", {
-            code: "claude.usage_window",
-            level: "info",
-            terminal: false,
-            message: window,
-            evidence,
-          }),
-        ];
-      }
+      /*
+       * The reading, whatever the status (0.407). Allowed, it is what Claude
+       * Code's own status line shows ("35% of the 5-hour window"; MEASURED
+       * 2026-09-05). But a WARNING carries the same figures, and was kept
+       * only as a limit notice: Colin's runs on the morning of 2026-09-27 sent
+       * nine, at 78-79% of the 7-day window, and the card stayed on the 66%
+       * of the night before ("thats not true, i used claude today"). A
+       * warning may name only its own window; that one window is a reading.
+       */
+      const window = usageWindowText(info.unifiedWindows) ?? ownWindowText(info);
+      const reading = window === undefined
+        ? []
+        : [emit("adapter.diagnostic", { code: "claude.usage_window", level: "info", terminal: false, message: window, evidence })];
+      if (kind === undefined) return reading;
       return [
         emit("route.limit_detected", {
           kind,
           message: boundedMessageText(limitSentence(info)),
           evidence,
         }),
+        ...reading,
       ];
     }
 

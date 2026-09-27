@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.407.0 - 2026-09-27
+
+### Fixed
+
+- **Claude's usage updates when it's high.** Once a usage window passes a
+  certain level, Claude reports it as a warning, and Locust kept only the
+  warning, so the usage card stopped updating exactly when the number
+  mattered most. Warnings now update the card too, and readings already
+  saved from earlier runs are picked up when you update.
+
 ## 0.406.0 - 2026-09-27
 
 ### Fixed

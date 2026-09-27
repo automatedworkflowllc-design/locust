@@ -291,6 +291,41 @@ describe("trap 3: a rate-limit warning is not exhaustion", () => {
     );
   });
 
+  /*
+   * 0.407, Colin: "thats not true, i used claude today and it hadnt updated".
+   * His morning runs sent nine warnings at 78-79% of the 7-day window; each
+   * was kept as a notice and the usage card stayed on the night before's 66%.
+   */
+  it("keeps a warning's figures as a usage reading too, beside the notice", () => {
+    const events = normalizer().accept(
+      record({
+        type: "rate_limit_event",
+        rate_limit_info: { status: "allowed_warning", rateLimitType: "seven_day", utilization: 0.79, resetsAt: 1788764400 },
+      }),
+    );
+    expect(events.map((event) => event.type)).toEqual(["route.limit_detected", "adapter.diagnostic"]);
+    const reading = events[1];
+    expect(reading?.type === "adapter.diagnostic" && reading.payload.code).toBe("claude.usage_window");
+    expect(reading?.type === "adapter.diagnostic" && reading.payload.message).toBe("7-day window 79% used · resets 2026-09-07T07:00:00.000Z");
+  });
+
+  it("prefers every window a warning carries over its own one", () => {
+    const events = normalizer().accept(
+      record({
+        type: "rate_limit_event",
+        rate_limit_info: {
+          status: "allowed_warning",
+          rateLimitType: "seven_day",
+          utilization: 0.79,
+          resetsAt: 1788764400,
+          unifiedWindows: { seven_day: { utilization: 0.79, resetsAt: 1788764400 }, five_hour: { utilization: 0.4, resetsAt: 1788764400 } },
+        },
+      }),
+    );
+    const reading = events.find((event) => event.type === "adapter.diagnostic");
+    expect(reading?.type === "adapter.diagnostic" && reading.payload.message).toMatch(/7-day window 79% used.* · 5-hour window 40% used/);
+  });
+
   it("words a limit from the window's own reading when the record has no top-level figure, and a rejection without the warning", () => {
     expect(
       limitSentence({

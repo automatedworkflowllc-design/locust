@@ -119,14 +119,32 @@ export function limitedRuntimesFrom(missions: readonly RecoveredMission[]): Reco
  * so a reload does not forget what the route chip said. A limit that hit
  * (`route.limit_detected`) is the other map; this one is the number before it.
  */
+/**
+ * A usage WARNING read back as a reading (0.407): "You've used 79% of your
+ * 7-day window · resets <iso>" is "7-day window 79% used · resets <iso>".
+ * Before 0.407 a warning was kept only as the notice, so a ledger written
+ * then holds its figure only here -- Colin's did, nine times, the morning his
+ * card still said 66%.
+ */
+export function readingOfWarning(message: string): string | undefined {
+  const found = /^You've used (\d{1,3})% of your (.+?) window(?: · resets (\S+))?$/.exec(message)
+  if (found === null) return undefined
+  return `${found[2]!} window ${found[1]!}% used${found[3] === undefined ? '' : ` · resets ${found[3]}`}`
+}
+
 export function usageWindowsFrom(missions: readonly RecoveredMission[]): Record<string, string> {
   const latest = new Map<string, { readonly at: string; readonly said: string }>()
   for (const mission of missions) {
     for (const event of mission.events) {
-      if (event.type !== 'adapter.diagnostic' || !/\.usage_window$/.test(event.payload.code)) continue
+      const said = event.type === 'adapter.diagnostic' && /\.usage_window$/.test(event.payload.code)
+        ? event.payload.message
+        : event.type === 'route.limit_detected' && event.payload.kind === 'temporary-rate-limit'
+          ? readingOfWarning(event.payload.message)
+          : undefined
+      if (said === undefined) continue
       const runtime = event.sourceAdapter
       const current = latest.get(runtime)
-      if (current === undefined || event.occurredAt > current.at) latest.set(runtime, { at: event.occurredAt, said: event.payload.message })
+      if (current === undefined || event.occurredAt > current.at) latest.set(runtime, { at: event.occurredAt, said })
     }
   }
   const windows: Record<string, string> = {}

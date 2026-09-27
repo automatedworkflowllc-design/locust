@@ -2,7 +2,7 @@ import type { MissionLedger, RecoveredMission, WorkroomMessage } from '@teammate
 import { joinMessageFragments } from '../shared/messageFragments.js'
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { describe, expect, it, vi } from 'vitest'
-import { deleteMissionRecord, limitedRuntimesFrom, publicRecoveredMission, usageWindowsFrom, withinByteBudget, readMissionHistory } from './mission-history.js'
+import { deleteMissionRecord, limitedRuntimesFrom, publicRecoveredMission, readingOfWarning, usageWindowsFrom, withinByteBudget, readMissionHistory } from './mission-history.js'
 
 const NOW = '2026-08-31T15:00:00.000Z'
 
@@ -515,5 +515,23 @@ describe('the latest usage window per runtime, from the ledger', () => {
       codex: 'primary 10% used · from a run at 2026-09-05T09:00:00.000Z'
     })
     expect(usageWindowsFrom([recovered({ events: [] })])).toEqual({})
+  })
+
+  /*
+   * 0.407: a ledger written before it keeps a warning's figure only in the
+   * notice. Colin's held nine at 78-79% the morning his card still said 66%.
+   */
+  it('reads a newer usage warning back as the reading', () => {
+    const warning = (at: string, said: string) => ({
+      id: `l-${at}`, runId: 'run_1', missionId: 'mission_1', sequence: 2, occurredAt: at, sourceAdapter: 'claude',
+      type: 'route.limit_detected', payload: { kind: 'temporary-rate-limit', message: said, evidence: { redacted: true } }
+    }) as never
+    const missions = [recovered({ events: [
+      windowEvent('claude', '2026-09-27T01:23:19.233Z', '7-day window 66% used · resets 2026-09-28T07:00:00.000Z · 5-hour window 20% used'),
+      warning('2026-09-27T14:11:40.000Z', "You've used 79% of your 7-day window · resets 2026-09-28T07:00:00.000Z")
+    ] })]
+    expect(usageWindowsFrom(missions)).toEqual({ claude: '7-day window 79% used · resets 2026-09-28T07:00:00.000Z · from a run at 2026-09-27T14:11:40.000Z' })
+    expect(readingOfWarning('Your 7-day window is running low')).toBeUndefined()
+    expect(readingOfWarning("You've used 31% of your 5-hour window")).toBe('5-hour window 31% used')
   })
 })
