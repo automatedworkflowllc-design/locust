@@ -3840,14 +3840,27 @@ textarea {
   color: var(--lc-text-muted);
 }
 
-.lc-roomanswer__who .lc-ghostbutton {
+/* Reply, Build on, Merge and Open are one group at the end of the line
+   (0.371, grouped 0.399): the group takes the free space, so the buttons
+   stay together instead of splitting it and floating mid-card. */
+.lc-roomanswer__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lc-space-2);
   margin-left: auto;
 }
 
-/* Reply and Open are one pair at the end of the line (0.371): only the first
-   takes the free space, or the two split it and Reply floats mid-card. */
-.lc-roomanswer__who .lc-ghostbutton + .lc-ghostbutton {
+/* A ghost button pushes itself right everywhere else; in the group, the
+   group does that once. */
+.lc-roomanswer__acts .lc-ghostbutton {
   margin-left: 0;
+}
+
+/* In columns the route is long and the column is not: the group gets a
+   line of its own rather than breaking in two around it (0.399). */
+.lc-roompost__answers.is-columns .lc-roomanswer__acts {
+  flex-basis: 100%;
+  justify-content: flex-end;
 }
 
 .lc-roomanswer__text {

@@ -1239,6 +1239,9 @@ export function RoomScreen({
                         ) : (
                           <AnswerState phase={answer.phase} startedAt={answer.startedAt} />
                         )}
+                        {/* What you can do with the answer, as one group: in columns
+                            it takes its own line under the route (0.399). */}
+                        <span className="lc-roomanswer__acts">
                         {/* The next post to this teammate only (0.371). */}
                         <button
                           type="button"
@@ -1262,6 +1265,7 @@ export function RoomScreen({
                         <button type="button" className="lc-ghostbutton" onClick={() => onOpenMission(answer.missionId)}>
                           Open
                         </button>
+                        </span>
                       </div>
                       {/*
                         * The thread's own renderer, not a summary of it.

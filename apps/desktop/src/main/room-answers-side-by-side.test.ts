@@ -28,6 +28,15 @@ describe('answers side by side', () => {
     expect(column).toContain('flex: 1 0 320px')
   })
 
+  it('give an answer’s buttons a line of their own, together -- the first packaged drive found them broken in two around the route', () => {
+    const group = rule('.lc-roomanswer__acts')
+    expect(group).toContain('display: flex')
+    expect(group).toContain('margin-left: auto')
+    // A ghost button pushes itself right on its own; in the group it must not.
+    expect(rule('.lc-roomanswer__acts .lc-ghostbutton')).toContain('margin-left: 0')
+    expect(rule('.lc-roompost__answers.is-columns .lc-roomanswer__acts')).toContain('flex-basis: 100%')
+  })
+
   it('build on the one-under-another column, which is flex', () => {
     expect(rule('.lc-roompost__answers')).toContain('display: flex')
   })
