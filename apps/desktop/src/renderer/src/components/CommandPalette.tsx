@@ -8,6 +8,10 @@ export interface PaletteAction {
   readonly group: string
   readonly label: string
   readonly hint?: string
+  /** More words it is found by than its label -- a conversation's every turn, its teammate. */
+  readonly keywords?: string
+  /** Listed only once something is typed: every conversation is too many to scroll past. */
+  readonly whenTyped?: boolean
   readonly run: () => void
 }
 
@@ -36,8 +40,8 @@ export function CommandPalette({
 
   const matches = useMemo(() => {
     const needle = query.trim().toLowerCase()
-    if (needle.length === 0) return actions
-    return actions.filter((action) => `${action.group} ${action.label}`.toLowerCase().includes(needle))
+    if (needle.length === 0) return actions.filter((action) => action.whenTyped !== true)
+    return actions.filter((action) => `${action.group} ${action.label} ${action.keywords ?? ''}`.toLowerCase().includes(needle))
   }, [actions, query])
 
   /*
@@ -129,7 +133,7 @@ export function CommandPalette({
             className="lc-palette__input"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Type a command, teammate or mission…"
+            placeholder="Search conversations, or type a command…"
             aria-label="Command palette search"
             autoComplete="off"
           />

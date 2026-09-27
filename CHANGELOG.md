@@ -11,6 +11,20 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.414.0 - 2026-09-27
+
+### Improved
+
+- **Search finds a conversation by anything you said in it.** It only looked
+  at a conversation's name, which is its first message, so a word from a
+  later message found nothing. It now looks at every message you sent, and
+  typing a teammate's name finds their conversations.
+- **Ctrl K finds conversations.** The palette now lists your newest
+  conversations and searches all of them. In a narrow window, where the
+  sidebar becomes a strip of faces and its search box is hidden, this is how
+  you search.
+- **Escape clears the search box.**
+
 ## 0.413.0 - 2026-09-27
 
 ### Fixed

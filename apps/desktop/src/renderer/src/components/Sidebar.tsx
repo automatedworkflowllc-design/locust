@@ -72,6 +72,10 @@ export interface SidebarMission {
   readonly memberIds?: readonly string[]
   /** Turns in the conversation; 1 is an ordinary single-run mission. */
   readonly turns?: number
+  /** This turn's own words, before the collapse names the row by its first. */
+  readonly words?: string
+  /** What the person said in every turn, for search (`collapseConversations`). */
+  readonly said?: string
   /** When this conversation last moved, for the rail flyout's age column. */
   readonly lastAt?: string
   /**
@@ -464,7 +468,12 @@ export function Sidebar({
    * clicking it again clears it. The teammate is still a property of every
    * row either way.
    */
-  const shownConversations = conversationRows(missionsMatching(missions, query)).filter(
+  // A conversation answers to its teammate's name too: "Atlas" finds Atlas's (0.414).
+  const ownerName = (mission: SidebarMission): string | undefined => {
+    const owner = ownerOf(mission, missionOwners)
+    return owner === undefined ? undefined : teammates.find((entry) => entry.teammateId === owner)?.name
+  }
+  const shownConversations = conversationRows(missionsMatching(missions, query, ownerName)).filter(
     (mission) => faceFilter === undefined || ownerOf(mission, missionOwners) === faceFilter
   )
   /*
@@ -828,6 +837,14 @@ export function Sidebar({
           aria-label="Search conversations"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
+          // Escape empties the search, as it does Claude Code's prompt; an
+          // empty box lets it through to whatever else Escape closes (0.414).
+          onKeyDown={(event) => {
+            if (event.key !== 'Escape' || query.length === 0) return
+            event.preventDefault()
+            event.stopPropagation()
+            setQuery('')
+          }}
           autoComplete="off"
         />
       </div>
@@ -1069,7 +1086,7 @@ export function Sidebar({
             // What this teammate's rows show while a search is running. Their
             // status still comes from ALL their work: a teammate does not stop
             // working because someone typed in a box.
-            const shownOwned = missionsMatching(owned, query)
+            const shownOwned = missionsMatching(owned, query, ownerName)
             // The runtime this teammate's own work is on, or is set to use.
             // Asking about Codex for everyone told a person their teammate
             // needed a sign-in while she was visibly working on Claude Code;
@@ -1639,7 +1656,7 @@ export function Sidebar({
           simply empties, which reads as "you have no missions" rather than
           "none of them match".
         */}
-        {query.trim().length > 0 && missionsMatching(missions, query).length === 0 && (
+        {query.trim().length > 0 && missionsMatching(missions, query, ownerName).length === 0 && (
           <p className="lc-sidebar__empty lc-row__meta">No conversations match that.</p>
         )}
 

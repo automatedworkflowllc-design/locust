@@ -1243,14 +1243,22 @@ export function orderRouteRows<
  * Matching is on the words a person can see: a mission's title, and its short
  * id, so the id in a receipt can be pasted straight in.
  */
-export function missionsMatching<TRow extends { readonly title: string; readonly missionId: string }>(
+export function missionsMatching<TRow extends { readonly title: string; readonly missionId: string; readonly said?: string }>(
   rows: readonly TRow[],
-  query: string
+  query: string,
+  /**
+   * Another name a row answers to -- the sidebar passes the teammate's, so
+   * typing "Atlas" finds Atlas's conversations (0.414).
+   */
+  alsoCalled?: (row: TRow) => string | undefined
 ): readonly TRow[] {
   const needle = query.trim().toLowerCase()
   if (needle.length === 0) return rows
   return rows.filter((row) =>
-    row.title.toLowerCase().includes(needle) || row.missionId.toLowerCase().includes(needle)
+    row.title.toLowerCase().includes(needle)
+    || row.missionId.toLowerCase().includes(needle)
+    || (row.said?.toLowerCase().includes(needle) ?? false)
+    || (alsoCalled?.(row)?.toLowerCase().includes(needle) ?? false)
   )
 }
 
@@ -1275,6 +1283,12 @@ export interface ConversationRowExtras {
   readonly memberIds: readonly string[]
   /** How many turns it holds. 1 means an ordinary single-run mission. */
   readonly turns: number
+  /**
+   * What the person said in every turn, for search. The row is named by its
+   * first turn, so a word from a follow-up -- "also check the signup form" --
+   * found nothing: fresh-eyes area 8, 0.413 (0.414).
+   */
+  readonly said: string
 }
 
 /**
@@ -1379,6 +1393,8 @@ export function collapseConversations<
     readonly integrityIssueCount: number
     readonly rootId?: string
     readonly parentId?: string
+    /** This turn's own words; `title` is already the conversation's name. */
+    readonly words?: string
   }
 >(rows: readonly TRow[]): readonly (TRow & ConversationRowExtras)[] {
   const order: string[] = []
@@ -1407,7 +1423,8 @@ export function collapseConversations<
       phase: running === undefined ? leaf.phase : running.phase,
       integrityIssueCount: Math.max(...members.map((row) => row.integrityIssueCount)),
       memberIds: members.map((row) => row.missionId),
-      turns: members.length
+      turns: members.length,
+      said: members.map((row) => row.words ?? row.title).join(' · ')
     }
   })
 }

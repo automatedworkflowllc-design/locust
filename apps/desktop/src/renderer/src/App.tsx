@@ -157,6 +157,7 @@ import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
 import type { Handoff } from './glances.js'
 import type { LiveActivity } from './faceState.js'
 import type { TeammateStatusView } from './status.js'
+import { shortAgo } from './railFlyout.js'
 import type { WorktreeRemoval } from './components/WorktreeRow.js'
 import { approvalsOfLiveRuns } from './approvalsOfLiveRuns.js'
 
@@ -5069,6 +5070,8 @@ export default function App(): ReactElement {
           relayedTitle(rootMission(mission, historyById)) ?? rootMission(mission, historyById).prompt
         ),
         rootId: rootMission(mission, historyById).missionId,
+        // What this turn said, for search: a follow-up's words are not in the title (0.414).
+        words: splitAttachments(typedPrompt(mission, historyById)).text,
         ...(mission.continuesFrom === undefined ? {} : { parentId: mission.continuesFrom.missionId }),
         ...(routineOf(rootMission(mission, historyById).startedBy) === undefined
           ? {}
@@ -6881,7 +6884,32 @@ export default function App(): ReactElement {
                       run: cancelMission
                     }
                   ]
-                : [])
+                : []),
+              /*
+               * The conversations, found by any word said in them or by the
+               * teammate's name (0.414). The placeholder has always promised
+               * "teammate or mission" and the palette listed none -- and in the
+               * rail layout, under 1200px, the sidebar's search box is hidden,
+               * so this was the only search there and it could not find a
+               * conversation. The five newest show before anything is typed.
+               */
+              ...[...sidebarMissions]
+                .sort((left, right) => Date.parse(right.lastAt ?? '') - Date.parse(left.lastAt ?? ''))
+                .map((mission, position) => {
+                  const ownerId = mission.ownerId ?? missionOwners[mission.missionId]
+                  const owner = teammates.find((entry) => entry.teammateId === ownerId)?.name
+                  const age = shortAgo(mission.lastAt)
+                  const hint = [owner, age].filter((part): part is string => part !== undefined).join(' · ')
+                  return {
+                    id: `conversation:${mission.missionId}`,
+                    group: 'Conversations',
+                    label: mission.title,
+                    ...(hint.length === 0 ? {} : { hint }),
+                    keywords: `${mission.said ?? ''} ${owner ?? ''}`,
+                    ...(position < 5 ? {} : { whenTyped: true }),
+                    run: () => openMission(mission.missionId)
+                  }
+                })
             ] satisfies PaletteAction[]
           }
         />

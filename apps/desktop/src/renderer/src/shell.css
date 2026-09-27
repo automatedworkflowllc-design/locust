@@ -9115,6 +9115,15 @@ textarea {
   color: var(--lc-text-primary);
 }
 
+/*
+ * The head's lit edge is the palette's focus; tokens.css's lime ring on every
+ * `input:focus-visible` outranked the `outline: none` above and drew a square
+ * box inside the rounded panel (fresh-eyes area 8, 0.414).
+ */
+.lc-palette__input:focus-visible {
+  outline: none;
+}
+
 .lc-palette__input::placeholder {
   color: var(--lc-text-muted);
 }
