@@ -3296,7 +3296,10 @@ if (!ownsSingleInstanceLock) {
      * main/page-preview.ts; Colin's decision, docs/DECISION-2026-09-28-PAGE-
      * PREVIEW.md). The same folders the viewer opens files from.
      */
-    const pages = createPageServer({ roots: async () => [...(workspaceChosen ? [workspacePath] : []), ...(await teammateFolders())] })
+    const pages = createPageServer({
+      roots: async () => [...(workspaceChosen ? [workspacePath] : []), ...(await teammateFolders())],
+      base: () => (workspaceChosen ? workspacePath : undefined)
+    })
     protocol.handle(PAGE_SCHEME, (request) => pages.handle(request.url))
     // The `/` menu's runtime half (0.426).
     /*

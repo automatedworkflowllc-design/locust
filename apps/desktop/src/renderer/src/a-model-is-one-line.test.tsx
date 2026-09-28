@@ -36,7 +36,7 @@ const fable: PublicModel = {
 const bare: PublicModel = {
   id: 'sonnet',
   runtime: 'claude',
-  displayName: 'Sonnet 5',
+  displayName: 'Sonnet 5.5',
   // A catalogue with nothing to say about it.
   description: '',
   supportedEfforts: ['low', 'high']
@@ -71,7 +71,7 @@ describe('a model is one line in the picker', () => {
   })
 
   it('a model the catalogue says nothing about keeps its levels as its line, in words', () => {
-    expect(detailOf(draw([bare]), 'Sonnet 5')).toBe('Low, High')
+    expect(detailOf(draw([bare]), 'Sonnet 5.5')).toBe('Low, High')
     // Many levels read as a range, and a fast variant is said once.
     const cursorish = { ...bare, id: 'opus', displayName: 'Claude Opus 5.5 1M', supportedEfforts: ['low', 'low-fast', 'medium', 'high', 'xhigh', 'max', 'max-fast'] }
     // A Claude row is named from Claude Code's alias table: `opus` reads Opus 5.5.

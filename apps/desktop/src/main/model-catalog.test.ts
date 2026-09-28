@@ -376,7 +376,7 @@ describe('Claude models from what its CLI advertised', () => {
      * (`aliases.<family>.default`) -- see shared/claude-models.ts.
      */
     const models = claudeModelsFrom([claude('ready', { aliases: ['fable', 'opus', 'sonnet'], efforts: [] })])
-    expect(models.filter((model) => model.older !== true).map((model) => model.displayName)).toEqual(['Fable 5.1', 'Opus 5.5', 'Sonnet 5', 'Haiku 4.5'])
+    expect(models.filter((model) => model.older !== true).map((model) => model.displayName)).toEqual(['Fable 5.1', 'Opus 5.5', 'Sonnet 5.5', 'Haiku 4.5'])
     // What the alias is for: it moves with its family.
     expect(models[1]?.description).toBe('Always the newest Opus')
     // An alias the table does not know keeps its own name, not a made-up version.
@@ -389,7 +389,7 @@ describe('Claude models from what its CLI advertised', () => {
     const older = models.filter((model) => model.older === true)
     expect(models.findIndex((model) => model.older === true)).toBe(4)
     expect(older.map((model) => model.displayName)).toEqual([
-      'Opus 5', 'Opus 4.8', 'Opus 4.7', 'Opus 4.6', 'Opus 4.5', 'Fable 5', 'Sonnet 4.6', 'Sonnet 4.5'
+      'Opus 5', 'Opus 4.8', 'Opus 4.7', 'Opus 4.6', 'Opus 4.5', 'Fable 5', 'Sonnet 5', 'Sonnet 4.6', 'Sonnet 4.5'
     ])
     // Their levels are their own, not the aliases' advertised ones.
     expect(older.find((model) => model.id === 'claude-sonnet-4-5')?.supportedEfforts).toEqual([])

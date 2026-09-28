@@ -25,10 +25,16 @@
  * same registry maps some aliases elsewhere on other providers (a gateway's
  * `opus` is claude-opus-4-7), and the first run there corrects the name.
  */
+/*
+ * 2026-09-28: Sonnet 5.5 came out, and Claude Code updated itself to 2.1.284,
+ * whose table maps `sonnet` to claude-sonnet-5-5 for an Anthropic account --
+ * so a Sonnet run in Locust already ran 5.5 while the picker still read
+ * "Sonnet 5". Colin, the same day: "sonnet 5.5 is out (:".
+ */
 export const CLAUDE_ALIAS_DEFAULTS: Readonly<Record<string, string>> = {
   fable: 'claude-fable-5-1',
   opus: 'claude-opus-5-5',
-  sonnet: 'claude-sonnet-5',
+  sonnet: 'claude-sonnet-5-5',
   haiku: 'claude-haiku-4-5'
 }
 
@@ -63,6 +69,7 @@ export const CLAUDE_OLDER_MODELS: readonly ClaudeOlderModel[] = [
   { id: 'claude-opus-4-6', efforts: FOUR },
   { id: 'claude-opus-4-5', efforts: [] },
   { id: 'claude-fable-5', efforts: FIVE },
+  { id: 'claude-sonnet-5', efforts: FIVE },
   { id: 'claude-sonnet-4-6', efforts: FOUR },
   { id: 'claude-sonnet-4-5', efforts: [] }
 ]

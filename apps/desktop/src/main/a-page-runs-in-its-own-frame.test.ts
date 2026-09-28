@@ -34,6 +34,26 @@ async function site() {
 }
 
 describe('the page server', () => {
+  it('opens a page named relative to the folder, as a comparison column names the one in its copy (0.446)', async () => {
+    const { root } = await site()
+    await mkdir(join(root, '.locust', 'compare', 'cmp_1-a'), { recursive: true })
+    await writeFile(join(root, '.locust', 'compare', 'cmp_1-a', 'index.html'), '<h1>Column A</h1>', 'utf8')
+    const server = createPageServer({ roots: async () => [root], base: () => root })
+    const opened = await server.urlFor('.locust/compare/cmp_1-a/index.html')
+    expect(opened.ok).toBe(true)
+    if (!opened.ok) return
+    expect(await (await server.handle(opened.url)).text()).toBe('<h1>Column A</h1>')
+    expect((await server.urlFor('site/index.html')).ok).toBe(true)
+    // Kept: the copy is removed, and the page is the folder's own at the same place.
+    await writeFile(join(root, 'index.html'), '<h1>Kept</h1>', 'utf8')
+    await rm(join(root, '.locust', 'compare', 'cmp_1-a'), { recursive: true, force: true })
+    const after = await server.urlFor('.locust/compare/cmp_1-a/index.html')
+    expect(after.ok).toBe(true)
+    if (after.ok) expect(await (await server.handle(after.url)).text()).toBe('<h1>Kept</h1>')
+    // Relative never means outside: `..` out of the folder is still refused.
+    expect((await server.urlFor('../elsewhere.html')).ok).toBe(false)
+  })
+
   it('gives a page inside the folder its own address, on its own scheme, with a random host', async () => {
     const { url } = await site()
     expect(url).toMatch(new RegExp(`^${PAGE_SCHEME}://[0-9a-f]{24}/site/index\\.html$`))

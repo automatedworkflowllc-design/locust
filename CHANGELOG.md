@@ -11,6 +11,25 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.446.0 - 2026-09-28
+
+### New
+
+- **Sonnet 5.5 in the picker.** Claude Code already runs Sonnet 5.5 when
+  you pick Sonnet; the picker now says so, and Sonnet 5 moves to the older
+  versions.
+- **Pages built in a comparison run side by side.** Ask two models to make
+  a web page in an Edit comparison, and each column shows its page working,
+  not as code. The page you keep still runs in the conversation afterwards,
+  from your folder.
+
+### Fixed
+
+- A long new web page opens running, like a short one, instead of folded
+  away as a large file.
+- A page a model named by its place in your folder, rather than by its full
+  path, now opens; it used to say the page was not there.
+
 ## 0.445.0 - 2026-09-28
 <!-- big -->
 

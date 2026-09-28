@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { readFile, realpath, stat } from 'node:fs/promises'
-import { extname, join, relative, resolve, sep } from 'node:path'
+import { extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 
 /**
  * A WEB PAGE A TEAMMATE MADE, SHOWN WORKING, INSIDE LOCUST (0.425).
@@ -63,6 +63,14 @@ export interface PageServer {
 export function createPageServer(options: {
   /** The folders a page may be served from, read at every request. */
   readonly roots: () => Promise<readonly string[]>
+  /**
+   * The folder a RELATIVE path is read from (0.446): the one teammates work
+   * in. A runtime may name the page it wrote relative to that folder --
+   * OpenCode does, and a comparison column's page sits in its copy under
+   * `.locust/compare/` -- and the main process's own working folder is
+   * wherever Locust was launched from, so such a page read as "not there".
+   */
+  readonly base?: () => string | undefined
   readonly platform?: NodeJS.Platform
 }): PageServer {
   const platform = options.platform ?? process.platform
@@ -78,7 +86,14 @@ export function createPageServer(options: {
   return {
     async urlFor(path) {
       if (!isPagePath(path)) return { ok: false, message: 'Only a web page (.html) opens as a page.' }
-      const real = await realpath(resolve(path)).catch(() => undefined)
+      const from = options.base?.()
+      const full = isAbsolute(path) || from === undefined ? resolve(path) : resolve(from, path)
+      // A comparison column's copy is removed once one is kept, and the kept
+      // one's page is then in the folder itself, at the same place (0.446).
+      const kept = from === undefined ? undefined : /^(.*?)[\\/]\.locust[\\/]compare[\\/][^\\/]+[\\/](.+)$/.exec(full)
+      const real = await realpath(full).catch(async () =>
+        kept?.[1] !== undefined && kept[2] !== undefined && within(kept[1], from!, platform) ? realpath(join(kept[1], kept[2])).catch(() => undefined) : undefined
+      )
       if (real === undefined) return { ok: false, message: 'That page is not there. The teammate named it but did not write it.' }
       const root = (await realRoots()).find((candidate) => within(real, candidate, platform))
       if (root === undefined) return { ok: false, message: 'That page is outside the folder your teammates work in, so Locust will not open it.' }

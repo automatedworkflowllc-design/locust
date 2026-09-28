@@ -1821,6 +1821,20 @@ describe('the activity card reads the change, not a receipt of it', () => {
     expect(defaultOpenEntry(big)).toBeUndefined()
   })
 
+  it('opens a new web page however long it is, because it is shown running (0.446)', () => {
+    // drive-compare-pages: the column that built the longer page showed a
+    // folded "index.html ADDED LARGE" row beside its rival's running page.
+    const page = [
+      '--- /dev/null',
+      '+++ b/index.html',
+      `@@ -0,0 +1,400 @@`,
+      ...Array.from({ length: 400 }, (_, i) => `+<p>line ${String(i)}</p>`)
+    ].join('\n')
+    const built = activityEntries(edited({ text: page, added: 400, removed: 0, truncated: false }))
+    expect(built[0]?.kind === 'file' ? [built[0].large, built[0].file.status] : undefined).toEqual([true, 'ADDED'])
+    expect(defaultOpenEntry(built)).toBe(built[0]?.key)
+  })
+
   it('attaches a completion patch to the tool that opened, and names the runtime that reported it', () => {
     const thread = buildThread(
       [

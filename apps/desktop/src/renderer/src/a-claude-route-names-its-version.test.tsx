@@ -31,11 +31,11 @@ describe('how a Claude model id reads', () => {
     expect(claudeModelName('gpt-6')).toBeUndefined()
   })
 
-  it("carries Claude Code 2.1.280's own alias table", () => {
+  it("carries Claude Code's own alias table (2.1.284: Sonnet 5.5)", () => {
     expect(CLAUDE_ALIAS_DEFAULTS).toEqual({
       fable: 'claude-fable-5-1',
       opus: 'claude-opus-5-5',
-      sonnet: 'claude-sonnet-5',
+      sonnet: 'claude-sonnet-5-5',
       haiku: 'claude-haiku-4-5'
     })
   })

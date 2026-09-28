@@ -84,6 +84,8 @@ describe('what the fold holds', () => {
       'claude-opus-4-6',
       'claude-opus-4-5',
       'claude-fable-5',
+      // Sonnet 5 joined the fold when `sonnet` moved on to 5.5 (Claude Code 2.1.284).
+      'claude-sonnet-5',
       'claude-sonnet-4-6',
       'claude-sonnet-4-5'
     ])

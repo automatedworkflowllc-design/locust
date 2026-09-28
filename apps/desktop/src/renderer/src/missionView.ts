@@ -580,7 +580,11 @@ export function activityCounts(details: readonly ActivityDetail[], workspacePath
 export function defaultOpenEntry(entries: readonly ActivityEntry[]): string | undefined {
   const first = entries.find((entry) => entry.kind === 'file')
   if (first === undefined || first.kind !== 'file') return undefined
-  return first.large ? undefined : first.key
+  // A NEW web page opens anyway (0.446): it is shown running, in a frame of a
+  // fixed height, so its length costs the thread nothing -- and a column of a
+  // comparison that built the longer page showed nothing beside its rival's.
+  const newPage = first.file.status === 'ADDED' && /\.html?$/i.test(first.file.path)
+  return first.large && !newPage ? undefined : first.key
 }
 
 /** `14:44`, in the host's own timezone. */
