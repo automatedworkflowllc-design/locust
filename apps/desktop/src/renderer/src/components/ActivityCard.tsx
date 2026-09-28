@@ -24,7 +24,7 @@ import type { TraceSegment, ActivityDetail, ActivityEntry, PlanStep } from '../m
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { DiffView } from './DiffView.js'
 import { DocPreview, isNewDocument } from './DocPreview.js'
-import { PinnedPagesContext } from '../pinnedPages.js'
+import { InComparisonCell, PinnedPagesContext } from '../pinnedPages.js'
 import { Icon } from './Icon.js'
 import { AgentText, PlanSteps } from './ThreadItems.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
@@ -266,6 +266,7 @@ export function ActivityCard({
   const [toggled, setToggled] = useState<ReadonlyMap<string, boolean>>(() => new Map())
   // A page shown running above, in a comparison's cell, stays folded here (0.450).
   const pinned = useContext(PinnedPagesContext)
+  const inComparison = useContext(InComparisonCell)
   const firstOpen = defaultOpenEntry(entries)
   const initiallyOpen = entries.some((entry) => entry.key === firstOpen && entry.kind === 'file' && pinned.has(entry.file.path)) ? undefined : firstOpen
   const isOpen = (entry: ActivityEntry): boolean => toggled.get(entry.key) ?? entry.key === initiallyOpen
@@ -309,7 +310,7 @@ export function ActivityCard({
             ))}
           </span>
         )}
-        {anyPatch && (
+        {anyPatch && !inComparison && (
           <span className="lc-activity__counts lc-mono">
             <span className="lc-diff__addmark">+{counts.added}</span>
             <span className="lc-diff__delmark">−{counts.removed}</span>

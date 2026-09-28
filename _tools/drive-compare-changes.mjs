@@ -112,6 +112,7 @@ try {
       heads: [...document.querySelectorAll('.lc-compare__head')].map((el) => el.innerText.replace(/\\s+/g, ' ').trim()),
       feet: [...document.querySelectorAll('.lc-compare__numbers')].map((el) => el.textContent.trim()),
       keepTitle: document.querySelector('.lc-compare__foot .lc-primarybutton')?.title ?? '',
+      tallies: document.querySelectorAll('.lc-compare .lc-activity__counts').length,
       internal: (document.querySelector('.lc-compare')?.innerText ?? '').includes('.locust/compare')
     })
   })()`))))
@@ -122,6 +123,7 @@ try {
   check("the folder's own cart.py is untouched while they compare, and nothing in it changed", inFolder() === CART && status().length === 0, JSON.stringify({ status: status() }))
   check('each column has its own copy, on its own branch', copies().length === 2 && branches().filter((branch) => branch.startsWith('locust/compare-')).length === 2, JSON.stringify({ copies: copies(), branches: branches() }))
   check("no row shows a copy's own path: each file reads as the folder's", worked.internal === false, JSON.stringify({ internal: worked.internal }))
+  check("a column's summary does not repeat a running tally beside the foot (0.453)", worked.tallies === 0, JSON.stringify({ tallies: worked.tallies }))
   check('Keep says where the changes go', /Its changes come into your folder, not committed/.test(worked.keepTitle), worked.keepTitle)
 
   const kept = JSON.parse(String(await drive.capture("Kept: its change is in the folder, uncommitted, and the copies are gone", () => drive.evaluate(`(async () => {

@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.453.0 - 2026-09-28
+
+### Fixed
+
+- **One count per column.** In a comparison, a column's work summary no
+  longer shows a running tally of every edit along the way beside the
+  footer's count of what actually changed. The footer is what Keep would
+  bring into your folder.
+
 ## 0.452.0 - 2026-09-28
 
 ### Fixed

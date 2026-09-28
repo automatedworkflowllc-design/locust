@@ -11,3 +11,11 @@ import { createContext } from 'react'
  * left folded there.
  */
 export const PinnedPagesContext = createContext<ReadonlySet<string>>(new Set())
+
+/**
+ * Inside a comparison column (0.453). Its foot says what the column changed
+ * -- measured in its copy, exactly what Keep would bring in -- so a fold's
+ * running tally of every edit on the way ("+9 -5" beside a foot's "+3 -1",
+ * the free cents comparison, 2026-09-28) reads as a contradiction there.
+ */
+export const InComparisonCell = createContext(false)

@@ -5,7 +5,7 @@ import type { CompareSlotId, PublicCompare } from '../../../shared/compare.js'
 import type { PublicTeammate } from '../../../shared/ipc.js'
 import { activityEntries } from '../missionView.js'
 import type { ThreadItem } from '../missionView.js'
-import { PinnedPagesContext } from '../pinnedPages.js'
+import { InComparisonCell, PinnedPagesContext } from '../pinnedPages.js'
 import { PagePreview } from './DocPreview.js'
 import { ApprovalCard } from './ApprovalCard.js'
 import type { MissionApprovalDecision, MissionApprovalRequest } from '../../../shared/ipc.js'
@@ -240,6 +240,7 @@ export function CompareView({
                             </div>
                           )}
                           <PinnedPagesContext.Provider value={page === undefined ? NO_PAGES : new Set([page])}>
+                            <InComparisonCell.Provider value={true}>
                             <ThreadItems
                               items={cell.items}
                               owner={owner}
@@ -248,6 +249,7 @@ export function CompareView({
                               workspacePath={workspacePath}
                               decision={undefined}
                             />
+                            </InComparisonCell.Provider>
                           </PinnedPagesContext.Provider>
                         </>
                       )}
