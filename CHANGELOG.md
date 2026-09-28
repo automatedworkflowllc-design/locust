@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.429.0 - 2026-09-28
+
+### Improved
+
+- **The working marker in the sidebar is monochrome.** The little spinner
+  beside a conversation that's running is now white like the rest of the
+  sidebar, instead of the one green thing on it.
+- **The / menu shows a runtime's own commands without scrolling to find
+  them.** It's a little taller, so the section with Claude Code's, Codex's
+  or OpenCode's commands starts in view under Locust's own.
+
 ## 0.428.0 - 2026-09-28
 
 ### New

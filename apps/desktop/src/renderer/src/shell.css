@@ -9628,7 +9628,10 @@ textarea {
   border-bottom: 0;
   box-shadow: var(--lc-shadow-menu);
   overflow: hidden;
-  max-height: 260px;
+  /* Tall enough that a runtime's own section shows its heading under
+     Locust's seven on a bare slash (0.429): at 260px it began below the
+     fold, and the menu looked like it had only Locust's. */
+  max-height: 340px;
   overflow-y: auto;
 }
 
@@ -15290,7 +15293,9 @@ textarea {
   font-family: var(--lc-font-symbol);
   font-size: 13px;
   line-height: 1;
-  color: var(--lc-lime);
+  /* Monochrome (0.429), Colin 2026-09-28: it was the one coloured thing in
+     the sidebar. The motion says it is working. */
+  color: var(--lc-text-primary);
   animation: lc-spark 1.44s steps(1, end) infinite;
 }
 

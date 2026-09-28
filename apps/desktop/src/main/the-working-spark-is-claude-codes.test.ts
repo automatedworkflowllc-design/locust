@@ -41,9 +41,11 @@ describe('the working spark', () => {
     expect(rule('.lc-spark::before')).toContain("content: '\\273B\\FE0E';")
   })
 
-  it("is in the live lime, from a symbol face named ahead of any emoji face", () => {
+  it("is monochrome, from a symbol face named ahead of any emoji face", () => {
+    // Colin, 2026-09-28: lime was the one green thing in the sidebar (0.429).
     const before = rule('.lc-spark::before')
-    expect(before).toContain('color: var(--lc-lime);')
+    expect(before).toContain('color: var(--lc-text-primary);')
+    expect(before).not.toContain('lime')
     expect(before).toContain('font-family: var(--lc-font-symbol);')
     expect(tokens).toMatch(/--lc-font-symbol: 'Segoe UI Symbol', 'Apple Symbols'/)
   })
