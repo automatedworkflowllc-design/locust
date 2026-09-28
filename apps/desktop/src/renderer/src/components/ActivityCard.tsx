@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState, useContext } from 'react'
 
 /** "Thought for 12s", or just "Thought" when the runtime never said when it began. */
 /**
@@ -24,6 +24,7 @@ import type { TraceSegment, ActivityDetail, ActivityEntry, PlanStep } from '../m
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { DiffView } from './DiffView.js'
 import { DocPreview, isNewDocument } from './DocPreview.js'
+import { PinnedPagesContext } from '../pinnedPages.js'
 import { Icon } from './Icon.js'
 import { AgentText, PlanSteps } from './ThreadItems.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
@@ -263,7 +264,10 @@ export function ActivityCard({
   const counts = activityCounts(details, workspacePath)
   const anyPatch = entries.some((entry) => entry.kind === 'file')
   const [toggled, setToggled] = useState<ReadonlyMap<string, boolean>>(() => new Map())
-  const initiallyOpen = defaultOpenEntry(entries)
+  // A page shown running above, in a comparison's cell, stays folded here (0.450).
+  const pinned = useContext(PinnedPagesContext)
+  const firstOpen = defaultOpenEntry(entries)
+  const initiallyOpen = entries.some((entry) => entry.key === firstOpen && entry.kind === 'file' && pinned.has(entry.file.path)) ? undefined : firstOpen
   const isOpen = (entry: ActivityEntry): boolean => toggled.get(entry.key) ?? entry.key === initiallyOpen
   const decide = (next: boolean): void => {
     decided.current = true

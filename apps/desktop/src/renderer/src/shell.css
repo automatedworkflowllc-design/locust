@@ -10416,6 +10416,18 @@ textarea {
   padding-bottom: var(--lc-space-4);
 }
 
+/* What the column built, running, first in its cell (0.450): the pages line up across the columns. */
+.lc-compare__page {
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+  overflow: hidden;
+}
+
+.lc-compare__page .lc-docpreview__frame {
+  height: 420px;
+  border-bottom: 0;
+}
+
 /* A column has no faces, so it has no face gutter: its cards and its words start at one edge. */
 .lc-compare__cell .lc-agentline {
   gap: 0;

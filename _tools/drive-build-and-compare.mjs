@@ -113,6 +113,10 @@ try {
   const mine = copiesNow().filter((name) => !before.has(name))
   check('both columns are done', built.heads.length === 2 && built.heads.every((head) => / done$/.test(head)), JSON.stringify(built.heads))
   check('each column runs its own page, from its own copy', built.frames.length === 2 && built.frames.every((frame) => frame.src.startsWith('locust-page://') && frame.height > 150) && new Set(built.frames.map((frame) => frame.column)).size === 2 && built.frames[0].src !== built.frames[1].src && built.waits.length === 0, JSON.stringify({ frames: built.frames, waits: built.waits }))
+  // 0.450: each column's page first in its cell, so the pages line up, and none runs twice.
+  const tops = await drive.evaluate(`JSON.stringify([...document.querySelectorAll('.lc-compare__page iframe')].map((frame) => Math.round(frame.getBoundingClientRect().top)))`)
+  const aligned = JSON.parse(String(tops))
+  check('the two pages start level, first in their columns, and neither runs twice', aligned.length === 2 && Math.abs(aligned[0] - aligned[1]) <= 2 && built.frames.length === 2, JSON.stringify({ tops: aligned, frames: built.frames.length }))
   check('each foot says what its model changed', built.feet.length === 2 && built.feet.every((foot) => /^\+\d+ −\d+ in 1 file/.test(foot)), JSON.stringify(built.feet))
   check('no row shows a copy\'s own path', built.internal === false)
   check('the folder is untouched while they build: the copies are outside it', !existsSync(join(workspace, 'index.html')) && mine.filter((name) => !name.endsWith('.json')).length === 2, JSON.stringify({ mine, folder: readdirSync(workspace) }))

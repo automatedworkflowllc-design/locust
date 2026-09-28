@@ -3,7 +3,10 @@ import { useState, type CSSProperties, type ReactElement } from 'react'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import type { CompareSlotId, PublicCompare } from '../../../shared/compare.js'
 import type { PublicTeammate } from '../../../shared/ipc.js'
+import { activityEntries } from '../missionView.js'
 import type { ThreadItem } from '../missionView.js'
+import { PinnedPagesContext } from '../pinnedPages.js'
+import { PagePreview } from './DocPreview.js'
 import { Icon } from './Icon.js'
 import { RuntimeMark } from './RuntimeMark.js'
 import { ThreadItems } from './Thread.js'
@@ -43,6 +46,19 @@ export interface CompareColumnView {
   readonly span?: string
   /** What it cost, as its runtime reported it. */
   readonly cost?: string
+}
+
+/** The web page a turn created, if it made one: what its column shows running at the top (0.450). */
+const NO_PAGES: ReadonlySet<string> = new Set()
+
+export function builtPageOf(items: readonly ThreadItem[], workspacePath: string | undefined): string | undefined {
+  for (const item of items) {
+    if (item.type !== 'activity') continue
+    for (const entry of activityEntries(item.details, workspacePath)) {
+      if (entry.kind === 'file' && entry.file.status === 'ADDED' && /\.html?$/i.test(entry.file.path)) return entry.file.path
+    }
+  }
+  return undefined
 }
 
 export function CompareView({
@@ -194,6 +210,7 @@ export function CompareView({
                 {columns.map((column) => {
                   const cell = column.turns[turn]
                   if (railed(column.slot)) return <div key={`cell:${column.slot}:${String(turn)}`} className="lc-compare__cell is-rail" />
+                  const page = cell === undefined || cell.running ? undefined : builtPageOf(cell.items, workspacePath)
                   return (
                     <div key={`cell:${column.slot}:${String(turn)}`} className="lc-compare__cell" aria-label={`${column.name}'s answer`}>
                       {cell === undefined ? (
@@ -201,14 +218,23 @@ export function CompareView({
                       ) : cell.items.length === 0 ? (
                         <p className="lc-compare__quiet">{cell.running ? 'Starting…' : 'No answer was recorded.'}</p>
                       ) : (
-                        <ThreadItems
-                          items={cell.items}
-                          owner={owner}
-                          faces={false}
-                          activity={cell.running ? 'thinking' : 'idle'}
-                          workspacePath={workspacePath}
-                          decision={undefined}
-                        />
+                        <>
+                          {page !== undefined && (
+                            <div className="lc-compare__page" aria-label={`The page ${column.name} made, running`}>
+                              <PagePreview path={page} name={page.replace(/\\/g, '/').split('/').pop() ?? page} />
+                            </div>
+                          )}
+                          <PinnedPagesContext.Provider value={page === undefined ? NO_PAGES : new Set([page])}>
+                            <ThreadItems
+                              items={cell.items}
+                              owner={owner}
+                              faces={false}
+                              activity={cell.running ? 'thinking' : 'idle'}
+                              workspacePath={workspacePath}
+                              decision={undefined}
+                            />
+                          </PinnedPagesContext.Provider>
+                        </>
                       )}
                     </div>
                   )

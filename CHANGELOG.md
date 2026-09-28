@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.450.0 - 2026-09-28
+
+### Improved
+
+- **Built pages line up side by side.** When models build a web page in a
+  comparison, each column now shows its page first, running, at the top.
+  The pages sit level with each other however many steps each model took to
+  get there, and the plan and commands follow underneath.
+
 ## 0.449.0 - 2026-09-28
 
 ### New

@@ -41,7 +41,7 @@ function isPageFile(path: string): boolean {
  * uses (main/page-preview.ts), sized to the card. Colin, 2026-09-28: "full
  * functionality, sacrifice nothing."
  */
-function PagePreview({ path, name }: { readonly path: string; readonly name: string }): ReactElement {
+export function PagePreview({ path, name }: { readonly path: string; readonly name: string }): ReactElement {
   const [url, setUrl] = useState<string>()
   const [refused, setRefused] = useState<string>()
   useEffect(() => {
