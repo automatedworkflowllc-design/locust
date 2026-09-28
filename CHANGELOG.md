@@ -11,6 +11,20 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.444.0 - 2026-09-28
+
+### New
+
+- **Every column in a comparison has its own buttons.** Copy puts that
+  model's answer on your clipboard. The arrows give one answer the whole
+  width, with the others kept to a narrow strip at the side that still names
+  them; press the strip to switch, or the arrows again to see every answer
+  side by side.
+- **Try again.** A column whose answer failed or was cut short, because a
+  provider was down or Locust closed mid-answer, offers Try again where Keep
+  would be. It asks that one model the same question again, and its new
+  answer takes the old one's place. The other columns are left alone.
+
 ## 0.443.0 - 2026-09-28
 
 ### Improved

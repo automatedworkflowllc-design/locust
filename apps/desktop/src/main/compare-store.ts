@@ -20,6 +20,8 @@ const MAX_FILE_BYTES = 4 * 1024 * 1024
 export const MAX_COMPARES = 200
 const MAX_PROMPT = 8_000
 const MAX_TURNS_PER_SLOT = 200
+/** Tries-again a column remembers, so their missions stay folded into it. */
+const MAX_RETRIED_PER_SLOT = 50
 const UNREADABLE = 'The saved comparisons could not be read. Nothing was changed.'
 
 interface StoredFile {
@@ -35,6 +37,12 @@ export interface CompareStore {
   create(input: { readonly teammateId?: string; readonly prompt: string; readonly routes: readonly CompareRoute[] }): Promise<PublicCompare>
   /** A column's next turn started. */
   addTurn(compareId: string, slot: CompareSlotId, missionId: string): Promise<PublicCompare>
+  /**
+   * A column's newest answer tried again (0.444): the new mission takes its
+   * place, and the one it replaces is kept as the comparison's, undrawn. A
+   * column that could not start takes its first turn and loses its refusal.
+   */
+  retry(compareId: string, slot: CompareSlotId, missionId: string): Promise<PublicCompare>
   /** A column could not start, and why. */
   refuse(compareId: string, slot: CompareSlotId, why: string): Promise<PublicCompare>
   keep(compareId: string, slot: CompareSlotId): Promise<PublicCompare>
@@ -55,7 +63,14 @@ function parsedSlot(value: unknown): PublicCompareSlot | undefined {
   const label = text(route.label, 120)
   const missionIds = Array.isArray(record.missionIds) ? record.missionIds.filter((id): id is string => typeof id === 'string' && id.length > 0 && id.length <= 200).slice(-MAX_TURNS_PER_SLOT) : []
   const refused = text(record.refused, 1_000)
-  return { slot: record.slot, route: { runtime, model, ...(effort === undefined ? {} : { effort }), ...(label === undefined ? {} : { label }) }, missionIds, ...(refused === undefined ? {} : { refused }) }
+  const retried = Array.isArray(record.retried) ? record.retried.filter((id): id is string => typeof id === 'string' && id.length > 0 && id.length <= 200).slice(-MAX_RETRIED_PER_SLOT) : []
+  return {
+    slot: record.slot,
+    route: { runtime, model, ...(effort === undefined ? {} : { effort }), ...(label === undefined ? {} : { label }) },
+    missionIds,
+    ...(refused === undefined ? {} : { refused }),
+    ...(retried.length === 0 ? {} : { retried })
+  }
 }
 
 function parsedCompare(value: unknown): PublicCompare | undefined {
@@ -198,6 +213,18 @@ export function createCompareStore(options: {
     addTurn: (compareId, slot, missionId) =>
       change(compareId, (compare) =>
         inSlot(compare, slot, (column) => ({ ...column, missionIds: [...column.missionIds, missionId].slice(-MAX_TURNS_PER_SLOT) }))
+      ),
+
+    retry: (compareId, slot, missionId) =>
+      change(compareId, (compare) =>
+        inSlot(compare, slot, (column) => {
+          const replaced = column.missionIds.at(-1)
+          const { refused: _refused, ...rest } = column
+          void _refused
+          return replaced === undefined
+            ? { ...rest, missionIds: [missionId] }
+            : { ...rest, missionIds: [...column.missionIds.slice(0, -1), missionId], retried: [...(column.retried ?? []), replaced].slice(-MAX_RETRIED_PER_SLOT) }
+        })
       ),
 
     refuse: (compareId, slot, why) => change(compareId, (compare) => inSlot(compare, slot, (column) => ({ ...column, refused: why.slice(0, 1_000) }))),

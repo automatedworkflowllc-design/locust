@@ -10150,6 +10150,10 @@ textarea {
   /* How many columns: CompareView sets it on the element; two until it does. */
   --lc-compare-columns: 2;
   --lc-compare-min: 300px;
+  /* A column set aside while another has the width (Focus, 0.444). */
+  --lc-compare-rail: 168px;
+  /* Every column alike, until one is focused (CompareView sets it then). */
+  --lc-compare-template: repeat(var(--lc-compare-columns), minmax(var(--lc-compare-min), 1fr));
   flex: 1;
   min-height: 0;
   display: flex;
@@ -10194,7 +10198,7 @@ textarea {
 .lc-compare__cells,
 .lc-compare__feet {
   display: grid;
-  grid-template-columns: repeat(var(--lc-compare-columns), minmax(var(--lc-compare-min), 1fr));
+  grid-template-columns: var(--lc-compare-template);
   column-gap: 0;
 }
 
@@ -10226,6 +10230,55 @@ textarea {
   padding-block: 12px 10px;
   border-bottom: 1px solid var(--lc-border-card);
   background: var(--lc-bg-window);
+}
+
+/* A rail's head is the whole of it: who, and whether it is still going. Pressing it focuses it. */
+.lc-compare__head.is-rail {
+  font: inherit;
+  color: var(--lc-text-muted);
+  text-align: left;
+  border-top: 0;
+  border-right: 0;
+  cursor: pointer;
+}
+
+.lc-compare__head.is-rail:first-child {
+  border-left: 0;
+}
+
+.lc-compare__head.is-rail:hover .lc-compare__name,
+.lc-compare__head.is-rail:focus-visible .lc-compare__name {
+  color: var(--lc-text-primary);
+}
+
+.lc-compare__head.is-rail .lc-compare__name {
+  color: var(--lc-text-muted);
+  font-weight: 500;
+}
+
+.lc-compare__tool {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--lc-text-muted);
+  cursor: pointer;
+}
+
+.lc-compare__tool:hover:not(:disabled),
+.lc-compare__tool:focus-visible {
+  color: var(--lc-text-primary);
+  background: var(--lc-hover-surface);
+}
+
+.lc-compare__tool:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .lc-compare__head.is-kept {

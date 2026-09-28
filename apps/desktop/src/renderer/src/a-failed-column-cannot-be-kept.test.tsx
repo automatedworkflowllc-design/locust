@@ -11,6 +11,10 @@ import type { CompareColumnView } from './components/CompareView.js'
  * The first packaged compare drive: one free model's provider was down, its
  * column said "failed" -- and still offered Keep this one, which would have
  * carried the conversation on from an error.
+ *
+ * 0.444: where Keep would have been, a failed column offers Try again -- the
+ * same ask on the same model (Arena's per-column Regenerate) -- and its head
+ * offers Copy only once there are words to copy.
  */
 const compare: PublicCompare = {
   compareId: 'cmp_1',
@@ -30,6 +34,8 @@ const column = (slot: 'a' | 'b', keepable: boolean, state: string): CompareColum
   turns: [{ missionId: `m_${slot}`, items: [], running: false }],
   running: false,
   keepable,
+  retryable: !keepable,
+  answer: keepable ? 'It lets you check out a second branch in its own folder.' : '',
   state
 })
 
@@ -43,15 +49,25 @@ describe('keeping a column', () => {
         owner={undefined}
         workspacePath={undefined}
         keeping={false}
+        retrying={undefined}
         onKeep={() => undefined}
+        onRetry={() => undefined}
         onBack={undefined}
       />
     )
-    const buttons = html.match(/<button[^>]*>Keep this one<\/button>/g) ?? []
-    expect(buttons).toHaveLength(2)
-    expect(buttons[0]).not.toContain('disabled')
-    expect(buttons[1]).toContain('disabled')
-    expect(buttons[1]).toContain('Nothing to keep: its answer did not finish.')
+    const keeps = html.match(/<button[^>]*>Keep this one<\/button>/g) ?? []
+    expect(keeps).toHaveLength(1)
+    expect(keeps[0]).not.toContain('disabled')
+    const again = html.match(/<button[^>]*>Try again<\/button>/g) ?? []
+    expect(again).toHaveLength(1)
+    expect(again[0]).toContain('Ask it again, on the same model.')
+    expect(again[0]).not.toContain('disabled')
+    // Copy is there for both, and pressable only where there are words.
+    const copies = html.match(/<button[^>]*aria-label="Copy [^"]*"[^>]*>/g) ?? []
+    expect(copies).toHaveLength(2)
+    expect(copies[0]).not.toContain('disabled')
+    expect(copies[1]).toContain('disabled')
+    expect(html.match(/aria-label="Focus on /g) ?? []).toHaveLength(2)
     expect(html).toContain('Comparing Nemotron 3 Ultra Free and Ling 3.0 Flash Fin Free.')
   })
 })

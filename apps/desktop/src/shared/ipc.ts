@@ -791,6 +791,8 @@ export const ROOM_POST_CHANNEL = 'rooms:post'
 export const COMPARE_START_CHANNEL = 'compare:start'
 export const COMPARE_ASK_CHANNEL = 'compare:ask'
 export const COMPARE_KEEP_CHANNEL = 'compare:keep'
+/** Try one column's newest ask again, on the same model (0.444). */
+export const COMPARE_RETRY_CHANNEL = 'compare:retry'
 export const COMPARE_LIST_CHANNEL = 'compare:list'
 export interface CompareStartRequest {
   /** Whose conversation; absent to compare with nobody. */
@@ -2739,6 +2741,7 @@ export interface DesktopApi {
   startCompare(request: CompareStartRequest): Promise<CompareResponse>
   askCompare(compareId: string, prompt: string): Promise<CompareResponse>
   keepCompare(compareId: string, slot: CompareSlotId): Promise<CompareResponse>
+  retryCompare(compareId: string, slot: CompareSlotId): Promise<CompareResponse>
   listCompares(): Promise<CompareListResponse>
   updateRoomTask(request: RoomTaskRequest): Promise<RoomTaskResponse>
   listMemories(): Promise<MemoryListResponse>

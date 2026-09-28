@@ -41,4 +41,23 @@ describe('the sidebar', () => {
     expect(comparisonOf(['m_b1', 'm_b2'], [compare('b')])?.compareId).toBe('cmp_1')
     expect(comparisonOf(['m_other'], [compare('b')])).toBeUndefined()
   })
+
+  it('still lists it once after columns were tried again, as a row holding a current answer (0.444)', () => {
+    // Caught by drive-compare-column-actions: after both columns were tried
+    // again, the sidebar listed three rows -- the replaced answers each came
+    // back as a conversation of their own.
+    const tried: PublicCompare = {
+      ...compare(),
+      slots: [
+        { slot: 'a', route: { runtime: 'claude', model: 'fable', label: 'Fable 5.1' }, missionIds: ['m_a1_again'], retried: ['m_a1'] },
+        { slot: 'b', route: { runtime: 'codex', model: 'gpt-6-astra', label: 'GPT-6 Astra' }, missionIds: ['m_b1_again'], retried: ['m_b1'] }
+      ]
+    }
+    const everyRow = [...rows, { missionId: 'm_a1_again', title: 'Add a discount code field.' }, { missionId: 'm_b1_again', title: 'Add a discount code field.' }]
+    const folded = foldComparisons(everyRow, [tried])
+    expect(folded.map((row) => row.missionId)).toEqual(['m_other', 'm_a1_again'])
+    expect(folded[1]?.compareId).toBe('cmp_1')
+    // A replaced answer still finds its comparison.
+    expect(comparisonOf(['m_b1'], [tried])?.compareId).toBe('cmp_1')
+  })
 })

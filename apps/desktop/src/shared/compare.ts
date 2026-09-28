@@ -33,6 +33,11 @@ export interface PublicCompareSlot {
   readonly missionIds: readonly string[]
   /** Why this column could not start, when it could not. */
   readonly refused?: string
+  /**
+   * Answers that were tried again (0.444): still this comparison's, so they
+   * never surface as conversations of their own, but no longer drawn.
+   */
+  readonly retried?: readonly string[]
 }
 
 export interface PublicCompare {
@@ -59,7 +64,7 @@ export function compareMembership(compares: readonly PublicCompare[]): {
   const byMission = new Map<string, { compareId: string; slot: CompareSlotId }>()
   for (const compare of compares) {
     for (const slot of compare.slots) {
-      for (const missionId of slot.missionIds) byMission.set(missionId, { compareId: compare.compareId, slot: slot.slot })
+      for (const missionId of [...(slot.retried ?? []), ...slot.missionIds]) byMission.set(missionId, { compareId: compare.compareId, slot: slot.slot })
     }
   }
   return { byMission }

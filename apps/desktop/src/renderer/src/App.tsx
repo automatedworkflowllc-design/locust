@@ -1530,6 +1530,8 @@ export default function App(): ReactElement {
   const [compareOn, setCompareOn] = useState(false)
   const [comparePicks, setComparePicks] = useState<readonly ComparePick[]>([])
   const [keepingCompare, setKeepingCompare] = useState(false)
+  /** The column being asked again (0.444), while it starts. */
+  const [retryingCompare, setRetryingCompare] = useState<CompareSlotId | undefined>(undefined)
   const [compareProblem, setCompareProblem] = useState<string>()
   /** Home's Compare models opens the composer's picker (0.442). */
   const [pickerRequest, setPickerRequest] = useState(0)
@@ -3439,6 +3441,24 @@ export default function App(): ReactElement {
     }
   }
 
+  /** Ask one column again, on the same model (0.444): a provider that was down gets another go. */
+  const retryCompareColumn = async (compare: PublicCompare, slot: CompareSlotId): Promise<void> => {
+    const bridge = window.desktop
+    if (!bridge) return
+    setRetryingCompare(slot)
+    setCompareProblem(undefined)
+    try {
+      const answer = await bridge.retryCompare(compare.compareId, slot).catch(() => undefined)
+      if (answer === undefined || !answer.ok) {
+        setCompareProblem(answer?.ok === false ? answer.error.message : 'That column could not be asked again. Nothing was started.')
+        return
+      }
+      replaceCompare(answer.data.compare)
+    } finally {
+      setRetryingCompare(undefined)
+    }
+  }
+
   /** The columns, from the live runs where they are going and the record where they are done. */
   const compareColumnsFor = (compare: PublicCompare): { readonly prompts: readonly string[]; readonly columns: readonly CompareColumnView[] } => {
     const cellOf = (missionId: string) => {
@@ -3479,6 +3499,10 @@ export default function App(): ReactElement {
         turns: cells.map((cell) => ({ missionId: cell.missionId, items: cell.items, running: cell.running })),
         running,
         keepable: !running && last?.phase === 'completed',
+        retryable: compare.kept === undefined && !running && (last === undefined ? column.refused !== undefined : last.phase !== 'completed'),
+        answer: (last?.items ?? [])
+          .flatMap((item) => (item.type === 'agent-message' && item.text.trim().length > 0 ? [item.text.trim()] : []))
+          .join('\n\n'),
         state,
         ...(spanMs > 0 ? { span: durationText(spanMs) } : {}),
         ...(cost === undefined ? {} : { cost })
@@ -6308,8 +6332,10 @@ export default function App(): ReactElement {
                   owner={pickedTeammate}
                   workspacePath={workspacePath}
                   keeping={keepingCompare}
+                  retrying={retryingCompare}
                   {...(compareProblem === undefined ? {} : { problem: compareProblem })}
                   onKeep={(slot) => void keepCompareColumn(comparing, slot)}
+                  onRetry={(slot) => void retryCompareColumn(comparing, slot)}
                   onBack={comparing.kept === undefined ? undefined : () => setComparingId(undefined)}
                 />
               )

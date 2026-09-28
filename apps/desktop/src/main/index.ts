@@ -234,6 +234,7 @@ import {
   COMPARE_START_CHANNEL,
   COMPARE_ASK_CHANNEL,
   COMPARE_KEEP_CHANNEL,
+  COMPARE_RETRY_CHANNEL,
   COMPARE_LIST_CHANNEL,
   RUNTIME_DISCOVERY_EVENT_CHANNEL,
   RUNTIME_DISCOVERY_LOG_CHANNEL,
@@ -4028,7 +4029,7 @@ if (!ownsSingleInstanceLock) {
      * answers on several models at once.
      */
     const compareRefused = (message: string) => ({ ok: false, error: { code: 'COMPARE_REFUSED', message } }) as const
-    const startCompareColumn = async (compare: PublicCompare, column: PublicCompareSlot, prompt: string, followUpOf?: string): Promise<string | undefined> => {
+    const startCompareColumn = async (compare: PublicCompare, column: PublicCompareSlot, prompt: string, followUpOf?: string, retrying = false): Promise<string | undefined> => {
       const peer = compare.teammateId === undefined ? undefined : await peerContextFor(compare.teammateId)
       if (compare.teammateId !== undefined && peer === undefined) return 'That teammate is no longer on the team.'
       const cannot = compareRefusalOf(column.route.runtime)
@@ -4059,7 +4060,7 @@ if (!ownsSingleInstanceLock) {
       )
       if (!response.ok) return response.error.code === 'RUN_ALREADY_ACTIVE' ? 'This column is still answering. Ask again when it has finished.' : response.error.message
       if (compare.teammateId !== undefined) await assignOwner(compare.teammateId, response.data.missionId)
-      await compares.addTurn(compare.compareId, column.slot, response.data.missionId)
+      await (retrying ? compares.retry(compare.compareId, column.slot, response.data.missionId) : compares.addTurn(compare.compareId, column.slot, response.data.missionId))
       sendToWindow({
         kind: 'mission-started',
         runId: response.data.runId,
@@ -4134,6 +4135,32 @@ if (!ownsSingleInstanceLock) {
       } catch (error) {
         return compareRefused(error instanceof Error ? error.message : 'That column could not be kept.')
       }
+    })
+    /*
+     * TRY AGAIN (0.444, Arena's per-column Regenerate): one column's newest
+     * ask again, on the same model, following the same turn it followed. The
+     * answer it replaces stays the comparison's, undrawn. The answer to a free
+     * provider that was down, which a drive met on 2026-09-28.
+     */
+    ipcMain.handle(COMPARE_RETRY_CHANNEL, async (event, compareId: unknown, slot: unknown) => {
+      if (!fromOwnWindow(event)) return compareRefused('The request was rejected.')
+      const compare = await compares.get(compareId).catch(() => undefined)
+      if (compare === undefined) return compareRefused('That comparison is no longer here.')
+      if (compare.kept !== undefined) return compareRefused('You kept one already; this conversation carries on with it.')
+      const column = compare.slots.find((one) => one.slot === slot)
+      if (column === undefined) return compareRefused('That comparison has no such column.')
+      const newest = column.missionIds.at(-1)
+      let prompt = compare.prompt
+      if (newest !== undefined) {
+        const recorded = await missionLedger.getMission(newest).catch(() => undefined)
+        if (recorded === undefined) return compareRefused('Its last ask could not be read, so it cannot be tried again.')
+        prompt = recorded.metadata.prompt
+      }
+      const why = await startCompareColumn(compare, column, prompt, column.missionIds.at(-2), true).catch((error: unknown) =>
+        error instanceof Error ? error.message : 'It could not be started.'
+      )
+      if (why !== undefined) return compareRefused(why)
+      return { ok: true, data: { compare: (await compares.get(compare.compareId)) ?? compare, refused: [] } } as const
     })
     ipcMain.handle(COMPARE_LIST_CHANNEL, async (event) => {
       if (!fromOwnWindow(event)) return compareRefused('The request was rejected.')

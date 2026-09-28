@@ -1,9 +1,10 @@
-import type { CSSProperties, ReactElement } from 'react'
+import { useState, type CSSProperties, type ReactElement } from 'react'
 
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import type { CompareSlotId, PublicCompare } from '../../../shared/compare.js'
 import type { PublicTeammate } from '../../../shared/ipc.js'
 import type { ThreadItem } from '../missionView.js'
+import { Icon } from './Icon.js'
 import { RuntimeMark } from './RuntimeMark.js'
 import { ThreadItems } from './Thread.js'
 import { WorkingSpark } from './WorkingSpark.js'
@@ -32,6 +33,10 @@ export interface CompareColumnView {
   readonly running: boolean
   /** Its newest answer finished: a failed or empty column has nothing to keep. */
   readonly keepable: boolean
+  /** Its newest ask did not get an answer (failed, stopped, or never started): it can be asked again. */
+  readonly retryable: boolean
+  /** Its newest answer's words, for Copy; empty when there are none. */
+  readonly answer: string
   /** "done", "working", "stopped", "failed" -- what the head says. */
   readonly state: string
   /** "41s", summed over its turns, when known. */
@@ -47,8 +52,10 @@ export function CompareView({
   owner,
   workspacePath,
   keeping,
+  retrying,
   problem,
   onKeep,
+  onRetry,
   onBack
 }: {
   readonly compare: PublicCompare
@@ -59,15 +66,49 @@ export function CompareView({
   readonly workspacePath: string | undefined
   /** A keep is under way: no second one. */
   readonly keeping: boolean
+  /** The column being asked again, while it is being started. */
+  readonly retrying: CompareSlotId | undefined
   /** What the last keep could not do, said in the bar. */
   readonly problem?: string
   readonly onKeep: (slot: CompareSlotId) => void
+  readonly onRetry: (slot: CompareSlotId) => void
   /** Kept already: back to the conversation it carries on in. */
   readonly onBack: (() => void) | undefined
 }): ReactElement {
   const kept = compare.kept?.slot
   const keptName = columns.find((column) => column.slot === kept)?.name
-  const style = { '--lc-compare-columns': String(columns.length) } as CSSProperties
+  /*
+   * FOCUS (0.444, Arena's Expand): one column wide, the others narrowed to
+   * rails that still say who they are and how they are doing. A rail's head
+   * focuses it; the wide column's own button shows them all again.
+   */
+  const [focusedSlot, setFocusedSlot] = useState<CompareSlotId | undefined>(undefined)
+  const focused = columns.some((column) => column.slot === focusedSlot) ? focusedSlot : undefined
+  const railed = (slot: CompareSlotId): boolean => focused !== undefined && slot !== focused
+  const [copied, setCopied] = useState<CompareSlotId | undefined>(undefined)
+  const copy = (column: CompareColumnView): void => {
+    const done = (): void => {
+      setCopied(column.slot)
+      window.setTimeout(() => setCopied((now) => (now === column.slot ? undefined : now)), 1_600)
+    }
+    // Same fallback as the shell output's Copy: `navigator.clipboard` is not always there for a packaged page.
+    navigator.clipboard?.writeText(column.answer).then(done).catch(() => {
+      const field = document.createElement('textarea')
+      field.value = column.answer
+      document.body.appendChild(field)
+      field.select()
+      try {
+        document.execCommand('copy')
+        done()
+      } finally {
+        field.remove()
+      }
+    })
+  }
+  const style = {
+    '--lc-compare-columns': String(columns.length),
+    ...(focused === undefined ? {} : { '--lc-compare-template': columns.map((column) => (column.slot === focused ? 'minmax(var(--lc-compare-min), 1fr)' : 'var(--lc-compare-rail)')).join(' ') })
+  } as CSSProperties
   return (
     <section className="lc-compare" aria-label="Comparison" style={style}>
       <div className="lc-compare__bar">
@@ -85,7 +126,19 @@ export function CompareView({
       </div>
       <div className="lc-compare__scroll">
         <div className="lc-compare__grid">
-          {columns.map((column) => (
+          {columns.map((column) => railed(column.slot) ? (
+            <button
+              key={`head:${column.slot}`}
+              type="button"
+              className={`lc-compare__head is-rail${column.slot === kept ? ' is-kept' : ''}`}
+              title={`${column.name}: ${column.state}. Focus on it.`}
+              onClick={() => setFocusedSlot(column.slot)}
+            >
+              <RuntimeMark runtime={column.runtime} size={13} />
+              <span className="lc-compare__name">{column.name}</span>
+              {column.running && <WorkingSpark />}
+            </button>
+          ) : (
             <div key={`head:${column.slot}`} className={`lc-compare__head${column.slot === kept ? ' is-kept' : ''}`}>
               <RuntimeMark runtime={column.runtime} size={13} />
               <span className="lc-compare__name">{column.name}</span>
@@ -99,6 +152,28 @@ export function CompareView({
                 {column.running && <WorkingSpark />}
                 {column.state}
               </span>
+              <button
+                type="button"
+                className="lc-compare__tool"
+                aria-label={`Copy ${column.name}'s answer`}
+                title={column.answer.length === 0 ? 'No answer to copy yet.' : copied === column.slot ? 'Copied.' : 'Copy its answer.'}
+                disabled={column.answer.length === 0}
+                onClick={() => copy(column)}
+              >
+                <Icon name={copied === column.slot ? 'check' : 'copy'} size={14} />
+              </button>
+              {columns.length > 1 && (
+                <button
+                  type="button"
+                  className="lc-compare__tool"
+                  aria-label={focused === column.slot ? 'Show every answer' : `Focus on ${column.name}`}
+                  title={focused === column.slot ? 'Show every answer side by side.' : 'Give this answer the width. The others stay at the side.'}
+                  aria-pressed={focused === column.slot}
+                  onClick={() => setFocusedSlot(focused === column.slot ? undefined : column.slot)}
+                >
+                  <Icon name={focused === column.slot ? 'collapse' : 'expand'} size={14} />
+                </button>
+              )}
             </div>
           ))}
           {prompts.map((prompt, turn) => (
@@ -107,6 +182,7 @@ export function CompareView({
               <div className="lc-compare__cells">
                 {columns.map((column) => {
                   const cell = column.turns[turn]
+                  if (railed(column.slot)) return <div key={`cell:${column.slot}:${String(turn)}`} className="lc-compare__cell is-rail" />
                   return (
                     <div key={`cell:${column.slot}:${String(turn)}`} className="lc-compare__cell" aria-label={`${column.name}'s answer`}>
                       {cell === undefined ? (
@@ -133,9 +209,19 @@ export function CompareView({
       </div>
       <div className="lc-compare__feet">
         {columns.map((column) => (
-          <div key={`foot:${column.slot}`} className="lc-compare__foot">
-            <span className="lc-compare__numbers lc-mono">{[column.span, column.cost].filter((part) => part !== undefined && part.length > 0).join(' · ')}</span>
-            {kept === undefined ? (
+          <div key={`foot:${column.slot}`} className={`lc-compare__foot${railed(column.slot) ? ' is-rail' : ''}`}>
+            {!railed(column.slot) && <span className="lc-compare__numbers lc-mono">{[column.span, column.cost].filter((part) => part !== undefined && part.length > 0).join(' · ')}</span>}
+            {railed(column.slot) ? null : kept === undefined && column.retryable ? (
+              <button
+                type="button"
+                className="lc-button"
+                disabled={retrying !== undefined || keeping}
+                title="Ask it again, on the same model. The answer it gives takes this one's place."
+                onClick={() => onRetry(column.slot)}
+              >
+                {retrying === column.slot ? 'Starting…' : 'Try again'}
+              </button>
+            ) : kept === undefined ? (
               <button
                 type="button"
                 className="lc-primarybutton"
