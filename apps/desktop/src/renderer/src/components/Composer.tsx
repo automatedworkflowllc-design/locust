@@ -10,7 +10,7 @@ import type {
   PublicModel,
   PublicRuntimeStatus
 } from '../../../shared/ipc.js'
-import type { RuntimeCommandsResponse } from '../../../shared/ipc.js'
+import type { PublicTeammate, RuntimeCommandsResponse } from '../../../shared/ipc.js'
 import { hostCanRunMission, isMissionRuntime, runtimeDisplayName } from '../../../shared/runtimes.js'
 import type { ModeFacts } from '../status.js'
 import {
@@ -216,6 +216,16 @@ export interface ComposerProps {
   /** True when it started; false, or the words saying why not (M27), when it did not. */
   readonly onStart: (prompt: string) => Promise<boolean | string>
   /**
+   * TAG A TEAMMATE FROM ANY CONVERSATION (0.438, shared/tagging.ts): the team
+   * `@` offers, who is on screen (never offered), and what happens to the
+   * tagged -- sent the message in a conversation of their own. Called BEFORE
+   * the send, so the conversation on screen is still the one they came from.
+   */
+  readonly team?: readonly PublicTeammate[]
+  readonly currentTeammateId?: string
+  /** Answers what to say under the box: who it went to, or who could not take it. */
+  readonly onTag?: (teammateIds: readonly string[], prompt: string) => Promise<{ readonly text: string; readonly sent: boolean } | undefined>
+  /**
    * Notes the person pinned to lines of a diff in this conversation
    * (diffNotes.ts, 0.376). They go with the next message, as one block after
    * its words, and are cleared once it has gone.
@@ -339,6 +349,9 @@ export function Composer({
   swarm,
   onSwarmChange,
   onStart,
+  team,
+  currentTeammateId,
+  onTag,
   diffNotes,
   onClearDiffNotes,
   onCancel,
@@ -375,7 +388,7 @@ export function Composer({
    * refused, and drawing it in the red of a failure taught the eye to read a
    * success as a problem (seen in a drive, 2026-09-08).
    */
-  const [refusal, setRefusal] = useState<{ readonly text: string; readonly plain?: boolean }>()
+  const [refusal, setRefusal] = useState<{ readonly text: string; readonly plain?: boolean; readonly icon?: 'users' }>()
   const type = (next: string): void => {
     setValue(next)
     // Typing leaves the history. Without this, editing a recalled message and
@@ -514,9 +527,29 @@ export function Composer({
       if (answer.ok) setProjectFiles(answer.paths)
     }).catch(() => undefined)
   }, [wantsFiles])
-  const atChoices = typedAt === undefined || projectFiles === undefined || atDismissed === value
+  const fileChoices = typedAt === undefined || projectFiles === undefined || atDismissed === value
     ? []
     : fileMatches(projectFiles.filter((path) => !attached.includes(path)), typedAt)
+  // Teammates first, by the start of their name; never the one on screen, never one tagged already.
+  const [tagged, setTagged] = useState<readonly string[]>([])
+  const teammateChoices = typedAt === undefined || atDismissed === value || team === undefined || onTag === undefined
+    ? []
+    : team.filter((mate) => mate.teammateId !== currentTeammateId && !tagged.includes(mate.teammateId) && mate.name.toLowerCase().startsWith(typedAt.toLowerCase())).slice(0, 6)
+  type AtChoice = { readonly kind: 'teammate'; readonly mate: PublicTeammate } | { readonly kind: 'file'; readonly path: string }
+  const atChoices: readonly AtChoice[] = [
+    ...teammateChoices.map((mate) => ({ kind: 'teammate' as const, mate })),
+    ...fileChoices.map((path) => ({ kind: 'file' as const, path }))
+  ]
+  const pickTeammate = (teammateId: string): void => {
+    setAtAt(0)
+    setValue(withoutAtQuery(value))
+    setTagged((current) => [...new Set([...current, teammateId])].slice(0, 5))
+    requestAnimationFrame(() => field.current?.focus())
+  }
+  const pickChoice = (choice: AtChoice): void => {
+    if (choice.kind === 'teammate') pickTeammate(choice.mate.teammateId)
+    else pickFile(choice.path)
+  }
   const pickFile = (path: string): void => {
     setAtAt(0)
     setValue(withoutAtQuery(value))
@@ -678,6 +711,21 @@ export function Composer({
     const notes = diffNotes ?? []
     const prompt = withDiffNotes(typed, notes)
     if (prompt.length === 0) return
+    // The tagged are sent it first, while the conversation on screen is still
+    // the one they came from; with nobody on screen they are who it goes to.
+    if (tagged.length > 0 && onTag !== undefined) {
+      // Who it went to is a report, not a refusal: plain, with the team's icon.
+      void onTag(tagged, withAttachments(prompt, attached)).then((said) => {
+        if (said !== undefined) setRefusal({ text: said.text, ...(said.sent ? { plain: true, icon: 'users' as const } : {}) })
+      })
+      setTagged([])
+      if (currentTeammateId === undefined) {
+        setValue('')
+        setAttached([])
+        if (notes.length > 0) onClearDiffNotes?.()
+        return
+      }
+    }
     if (canQueue) {
       // With its files, and the tiles cleared, as a send does. L20 (the code
       // review): the queued row dropped them, and the tiles then rode along
@@ -854,7 +902,7 @@ export function Composer({
       if ((keyEvent.key === 'Enter' && !keyEvent.shiftKey) || keyEvent.key === 'Tab') {
         keyEvent.preventDefault()
         const chosen = atChoices[Math.min(atAt, atChoices.length - 1)]
-        if (chosen !== undefined) pickFile(chosen)
+        if (chosen !== undefined) pickChoice(chosen)
         return
       }
       if (keyEvent.key === 'Escape') {
@@ -1108,7 +1156,7 @@ export function Composer({
           <div className={`lc-notice${refusal.plain === true ? ' is-plain' : ''}`} role="status" aria-live="polite">
             {/* The shield says "refused". A note about what the host DID is
                 not a refusal, so it gets the icon for the thing it is. */}
-            <Icon name={refusal.plain === true ? 'file' : 'shield'} size={13} />
+            <Icon name={refusal.icon ?? (refusal.plain === true ? 'file' : 'shield')} size={13} />
             {refusal.text}
           </div>
         )}
@@ -1209,11 +1257,33 @@ export function Composer({
           */}
         {atChoices.length > 0 && (
           <div className="lc-slash" role="listbox" aria-label="Files">
-            <div className="lc-slash__group lc-mono" role="presentation">Files in this folder</div>
-            {atChoices.map((path, index) => {
-              const cut = path.lastIndexOf('/')
+            {atChoices.map((choice, index) => {
               const active = index === Math.min(atAt, atChoices.length - 1)
+              const heading = index === 0 || atChoices[index - 1]?.kind !== choice.kind
+              if (choice.kind === 'teammate') {
+                return (
+                  <Fragment key={`mate:${choice.mate.teammateId}`}>
+                    {heading && <div className="lc-slash__group lc-mono" role="presentation">Teammates</div>}
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={active}
+                      className={`lc-slash__item${active ? ' is-active' : ''}`}
+                      title={`Tag ${choice.mate.name}: they are sent this message too`}
+                      onMouseEnter={() => setAtAt(index)}
+                      onClick={() => pickChoice(choice)}
+                    >
+                      <span className="lc-slash__name lc-mono">@{choice.mate.name}</span>
+                      <span className="lc-slash__detail">{choice.mate.role}: sent this message too</span>
+                    </button>
+                  </Fragment>
+                )
+              }
+              const path = choice.path
+              const cut = path.lastIndexOf('/')
               return (
+                <Fragment key={`file:${path}`}>
+                {heading && <div className="lc-slash__group lc-mono" role="presentation">Files in this folder</div>}
                 <button
                   key={path}
                   type="button"
@@ -1222,11 +1292,12 @@ export function Composer({
                   className={`lc-slash__item${active ? ' is-active' : ''}`}
                   title={path}
                   onMouseEnter={() => setAtAt(index)}
-                  onClick={() => pickFile(path)}
+                  onClick={() => pickChoice(choice)}
                 >
                   <span className="lc-slash__name lc-mono">{path.slice(cut + 1)}</span>
                   <span className="lc-slash__detail">{cut < 0 ? 'the folder itself' : path.slice(0, cut)}</span>
                 </button>
+                </Fragment>
               )
             })}
           </div>
@@ -1281,6 +1352,29 @@ export function Composer({
           * belongs -- and each one removes itself, because attaching four
           * files and wanting three was previously all-or-nothing.
           */}
+        {/* Who is tagged (0.438): where the message goes besides the one on screen, removable. */}
+        {tagged.length > 0 && (
+          <div className="lc-tagged" aria-label="Tagged">
+            {tagged.map((id) => {
+              const name = team?.find((mate) => mate.teammateId === id)?.name ?? 'Someone'
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  className="lc-tagged__chip lc-mono"
+                  aria-label={`Untag ${name}`}
+                  title={`Untag ${name}`}
+                  onClick={() => setTagged(tagged.filter((held) => held !== id))}
+                >
+                  @{name} ×
+                </button>
+              )
+            })}
+            <span className="lc-tagged__note">
+              {currentTeammateId === undefined ? 'this goes to them' : 'they are sent this too, each in a conversation of their own'}
+            </span>
+          </div>
+        )}
         {(attached.length > 0 || (diffNotes ?? []).length > 0) && (
           <div className="lc-attached" aria-label={`${attachmentLabel(attached.length)} attached`}>
             {/* Notes on the diff, as one tile: they go with the next message. */}

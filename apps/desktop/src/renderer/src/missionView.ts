@@ -20,6 +20,7 @@ import type { HandedFile } from '../../shared/handover.js'
 import type { DecisionRequest } from '../../shared/decision.js'
 import { isTidyPrompt } from '../../shared/memory-tidy.js'
 import { stepWordsOf } from '../../shared/hand-off.js'
+import { taggedWordsOf } from '../../shared/tagging.js'
 
 /**
  * Turns the normalized event stream into the thread the workroom renders.
@@ -4173,7 +4174,9 @@ export function handoffInstruction(prompt: string): string | undefined {
  * this one and answered:" after a restart.
  */
 export function shownPrompt(mission: { readonly prompt: string; readonly startedBy?: { readonly kind: string } }): string {
-  return mission.startedBy?.kind === 'routine' ? stepWordsOf(mission.prompt) : mission.prompt
+  if (mission.startedBy?.kind === 'routine') return stepWordsOf(mission.prompt)
+  // A teammate tagged in another conversation is named by the message, not the context after it (0.438).
+  return mission.startedBy === undefined || mission.startedBy.kind === 'tag' ? taggedWordsOf(mission.prompt) : mission.prompt
 }
 
 export function typedPrompt(
@@ -4191,7 +4194,7 @@ export function typedPrompt(
     if (current.startedBy?.kind === 'routine') return stepWordsOf(current.prompt)
     // Only where the host wrote the prompt. A mission a PERSON typed is their
     // words already, whatever sentences it happens to contain.
-    if (current.continuesFrom?.reason !== 'route-switch') return current.prompt
+    if (current.continuesFrom?.reason !== 'route-switch') return current.startedBy === undefined ? taggedWordsOf(current.prompt) : current.prompt
     const asked = handoffInstruction(current.prompt)
     if (asked !== undefined) return asked
     const priorId = current.continuesFrom.missionId
@@ -4271,6 +4274,7 @@ export function peerRunFor(
 export type LiveStarter =
   | PublicRecoveredMission['startedBy']
   | { readonly kind: 'room'; readonly roomId: string; readonly postId: string }
+  | { readonly kind: 'tag' }
 
 /**
  * What the person ASKED FOR, when a button sent a brief in their name (A1.2).
@@ -4303,12 +4307,14 @@ export function turnPromptLine(turn: {
   // the sentence is in.
   const asked = briefAskedFor(turn.prompt)
   if (asked !== undefined) return asked
-  if (turn.startedBy === undefined) return splitAttachments(turn.prompt).text
+  // A tagged teammate's run is recorded as an ordinary one: the bubble is the
+  // message, without the context that followed it (0.438, shared/tagging.ts).
+  if (turn.startedBy === undefined) return splitAttachments(taggedWordsOf(turn.prompt)).text
   // A routine step is the person's own words, saved from a conversation they
   // had; it is theirs to see, even though the host pressed go. A room post
   // is the person's own words too, said to several at once, and so is what
   // they typed in the runtime's own terminal (0.391).
-  if (turn.startedBy.kind === 'routine' || turn.startedBy.kind === 'room' || turn.startedBy.kind === 'terminal') {
+  if (turn.startedBy.kind === 'routine' || turn.startedBy.kind === 'room' || turn.startedBy.kind === 'terminal' || turn.startedBy.kind === 'tag') {
     // A handed-off routine step carries the answer before it; the bubble is the step (0.435).
     return splitAttachments(turn.startedBy.kind === 'routine' ? stepWordsOf(turn.prompt) : turn.prompt).text
   }

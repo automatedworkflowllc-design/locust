@@ -11,6 +11,24 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.438.0 - 2026-09-28
+
+### New
+
+- **Tag teammates from any conversation.** Type @ in the message box and
+  your teammates are listed above your files. Tagging one loops them in:
+  the teammate you're talking to still gets the message, and each one you
+  tagged is sent it too, in a conversation of their own, with the latest
+  answer from where you tagged them. On Home, with nobody picked, the
+  message goes to whoever you tag.
+
+### Fixed
+
+- **A hand-off chain's checker reads the files itself.** A checker could
+  refuse a right answer because the teammate before it couldn't read files
+  in its mode. It's now told it can read the folder, and to treat the
+  answer it's given as a claim to check.
+
 ## 0.437.0 - 2026-09-28
 
 ### Fixed

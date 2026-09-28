@@ -208,7 +208,8 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       approved: false,
       why: verdict === undefined
         ? `${name}, the checker, gave no verdict`
-        : `${name}, the checker, asked for changes${verdict.changes.length > 0 ? `: ${verdict.changes}` : ''}`
+        // Without its own full stop: the notice adds one ("the code.." in the 0.437 frames).
+        : `${name}, the checker, asked for changes${verdict.changes.length > 0 ? `: ${verdict.changes.replace(/[.!\s]+$/, '')}` : ''}`
     }
   }
 

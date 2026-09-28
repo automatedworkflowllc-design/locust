@@ -9503,6 +9503,34 @@ textarea {
  * a `1 file` chip put it 14px over its own width, with the effort chip running
  * under the swarm mark.
  */
+/* Tagged teammates (0.438), above the attachments: where the message also goes. */
+.lc-tagged {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lc-space-2);
+  padding: 8px 12px 0;
+}
+
+.lc-tagged__chip {
+  padding: 3px 8px;
+  border: 1px solid var(--lc-border-strong);
+  border-radius: 999px;
+  background: var(--lc-bg-raised-2);
+  color: var(--lc-text-primary);
+  font-size: var(--lc-text-description);
+  cursor: pointer;
+}
+
+.lc-tagged__chip:hover {
+  border-color: var(--lc-lime-border-strong);
+}
+
+.lc-tagged__note {
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+}
+
 .lc-attached {
   display: flex;
   flex-wrap: wrap;

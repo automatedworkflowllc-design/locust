@@ -3311,6 +3311,32 @@ export default function App(): ReactElement {
   const startRefusal = useRef<string | undefined>(undefined)
   /** M28: why the last Resume from checkpoint did not start, for the card that was pressed. */
   const [resumeRefusal, setResumeRefusal] = useState<{ readonly missionId: string; readonly message: string }>()
+  /**
+   * Send a message to the teammates tagged in it (0.438, shared/tagging.ts),
+   * each in a conversation of their own; the conversation on screen is where
+   * it came from. Answers the line the composer shows.
+   */
+  const tagTeammates = async (teammateIds: readonly string[], prompt: string): Promise<{ readonly text: string; readonly sent: boolean } | undefined> => {
+    const bridge = window.desktop
+    if (!bridge) return { text: 'Locust is not ready yet. Nobody tagged was sent it.', sent: false }
+    const fromMissionId = liveRunRef.current?.data?.missionId
+    try {
+      const answer = await bridge.tagTeammates({
+        teammateIds,
+        message: prompt,
+        ...(pickedTeammate === undefined ? {} : { fromTeammateId: pickedTeammate.teammateId }),
+        ...(fromMissionId === undefined ? {} : { fromMissionId })
+      })
+      if (!answer.ok) return { text: answer.message, sent: false }
+      const sent = answer.started.length === 0 ? '' : `Sent to ${answer.started.join(' and ')}${pickedTeammate === undefined ? '' : ' too'}.`
+      const refused = answer.refused.map((entry) => entry.message.startsWith(entry.name) ? entry.message : `${entry.name}: ${entry.message}`).join(' ')
+      const text = [sent, refused].filter((part) => part.length > 0).join(' ')
+      // Plain only when everyone tagged was sent it; a refusal keeps the warning's look.
+      return text.length === 0 ? undefined : { text, sent: refused.length === 0 }
+    } catch {
+      return { text: 'The tagged teammates could not be sent it.', sent: false }
+    }
+  }
   const startFromComposer = async (prompt: string): Promise<boolean | string> => {
     startRefusal.current = undefined
     const started = await startMission(prompt, undefined, { fromComposer: true })
@@ -6767,6 +6793,10 @@ export default function App(): ReactElement {
                 : undefined
             }
             onStart={startFromComposer}
+            // Tag a teammate from any conversation (0.438).
+            team={teammates}
+            {...(pickedTeammate === undefined ? {} : { currentTeammateId: pickedTeammate.teammateId })}
+            onTag={tagTeammates}
             onCancel={cancelMission}
             onOpenRoutePicker={() => {
               // Opening the picker is the moment the list matters most, and

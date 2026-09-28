@@ -786,6 +786,19 @@ export const ROOM_REMOVE_CHANNEL = 'rooms:remove'
 /** Name a room that was made from an ask, and so began as `Untitled room`. */
 export const ROOM_RENAME_CHANNEL = 'rooms:rename'
 export const ROOM_POST_CHANNEL = 'rooms:post'
+/** Tag teammates from any conversation (0.438, shared/tagging.ts). */
+export const TEAMMATES_TAG_CHANNEL = 'teammates:tag'
+export interface TagTeammatesRequest {
+  readonly teammateIds: readonly string[]
+  /** What the person sent, attachments line included. */
+  readonly message: string
+  /** The conversation it was sent in: its teammate, and its newest turn for context. */
+  readonly fromTeammateId?: string
+  readonly fromMissionId?: string
+}
+export type TagTeammatesResponse =
+  | { readonly ok: true; readonly started: readonly string[]; readonly refused: readonly { readonly name: string; readonly message: string }[] }
+  | { readonly ok: false; readonly message: string }
 export const ROOM_TASK_CHANNEL = 'rooms:task'
 export const MEMORY_LIST_CHANNEL = 'memory:list'
 export const MEMORY_ADD_CHANNEL = 'memory:add'
@@ -2214,6 +2227,8 @@ export type CodexMissionUpdate =
         | { readonly kind: 'relay'; readonly hop: number }
         | { readonly kind: 'routine'; readonly routineId: string; readonly step: number }
         | { readonly kind: 'room'; readonly roomId: string; readonly postId: string }
+        // A teammate tagged from a conversation (0.438): the person's words, live only, like a room's.
+        | { readonly kind: 'tag' }
       /**
        * Present when this run is the newest turn of the teammate's hub (see
        * `PublicTeammate.hubMissionId`), so the roster on screen learns it
@@ -2630,6 +2645,8 @@ export interface DesktopApi {
   /** Give a room a name. A room made from an ask starts as `Untitled room`. */
   renameRoom(roomId: string, name: string): Promise<RoomMutationResponse>
   postToRoom(request: RoomPostRequest): Promise<RoomPostResponse>
+  /** Send a message to the teammates tagged in it, each in a conversation of their own (0.438). */
+  tagTeammates(request: TagTeammatesRequest): Promise<TagTeammatesResponse>
   updateRoomTask(request: RoomTaskRequest): Promise<RoomTaskResponse>
   listMemories(): Promise<MemoryListResponse>
   /** Each runtime's own MCP servers and hooks, read-only. */

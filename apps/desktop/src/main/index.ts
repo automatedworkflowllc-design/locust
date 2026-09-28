@@ -11,6 +11,7 @@ import { createPageServer, fromPagePreview, PAGE_SCHEME } from './page-preview.j
 import { createRuntimeCommands } from './runtime-commands.js'
 import { createCursorDefaultModel } from './cursor-default-model.js'
 import { listWorkspaceFiles } from './workspace-files.js'
+import { MAX_TAGGED, taggedPrompt } from '../shared/tagging.js'
 import electronUpdater from 'electron-updater'
 
 const { autoUpdater } = electronUpdater
@@ -220,6 +221,7 @@ import {
   ROOM_REMOVE_CHANNEL,
   ROOM_RENAME_CHANNEL,
   ROOM_POST_CHANNEL,
+  TEAMMATES_TAG_CHANNEL,
   RUNTIME_DISCOVERY_EVENT_CHANNEL,
   RUNTIME_DISCOVERY_LOG_CHANNEL,
   SPLASH_DONE_CHANNEL,
@@ -3993,6 +3995,66 @@ if (!ownsSingleInstanceLock) {
       return { ok: true, data: response.data }
     }
 
+
+    /*
+     * TAG TEAMMATES FROM ANY CONVERSATION (0.438, shared/tagging.ts): each
+     * teammate tagged is started on their own route, in a conversation of
+     * their own, and announced like a room member so the screen stays where
+     * the person is. Busy is said, not queued.
+     */
+    ipcMain.handle(TEAMMATES_TAG_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      const refused = noWorkspaceRefusal()
+      if (refused !== undefined) return { ok: false, message: refused.error.message } as const
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      const message = typeof input.message === 'string' ? input.message : ''
+      const ids = Array.isArray(input.teammateIds) ? [...new Set(input.teammateIds.filter((id): id is string => typeof id === 'string'))].slice(0, MAX_TAGGED) : []
+      if (message.trim().length === 0 || ids.length === 0) return { ok: false, message: 'Nobody was tagged, or there was nothing to send.' } as const
+      const roster = await teammates.list()
+      const fromName = typeof input.fromTeammateId === 'string' ? roster.find((entry) => entry.teammateId === input.fromTeammateId)?.name : undefined
+      let answer: string | undefined
+      if (typeof input.fromMissionId === 'string') {
+        const recovered = await missionLedger.getMission(input.fromMissionId).catch(() => undefined)
+        if (recovered !== undefined) {
+          const tracker = createTranscriptTracker()
+          tracker.track(recovered.events)
+          answer = tracker.latestFinal
+        }
+      }
+      const started: string[] = []
+      const notStarted: { name: string; message: string }[] = []
+      for (const teammateId of ids) {
+        const teammate = roster.find((entry) => entry.teammateId === teammateId)
+        const peer = await peerContextFor(teammateId)
+        if (teammate === undefined || peer === undefined) {
+          notStarted.push({ name: teammate?.name ?? teammateId, message: 'No longer on the team.' })
+          continue
+        }
+        const route = teammate.route ?? { runtime: 'codex' as const, model: 'account-default', mode: 'ask' as const }
+        if (route.runtime === 'antigravity') {
+          notStarted.push({ name: teammate.name, message: 'Antigravity cannot be tagged yet.' })
+          continue
+        }
+        const prompt = taggedPrompt({ message, ...(fromName === undefined ? {} : { fromName }), ...(answer === undefined ? {} : { answer }) })
+        const response = await codexMissions.start(
+          prompt,
+          route.runtime,
+          route.mode,
+          { ...(route.model === 'account-default' ? {} : { model: route.model }), ...(route.effort === undefined ? {} : { effort: route.effort }) },
+          sendToWindow,
+          undefined,
+          peer
+        )
+        if (!response.ok) {
+          notStarted.push({ name: teammate.name, message: response.error.code === 'RUN_ALREADY_ACTIVE' ? `${teammate.name} is busy. Tag them again when they are free.` : response.error.message })
+          continue
+        }
+        await assignOwner(teammateId, response.data.missionId)
+        sendToWindow({ kind: 'mission-started', runId: response.data.runId, missionId: response.data.missionId, teammateId, prompt: message, data: response.data, startedBy: { kind: 'tag' } })
+        started.push(teammate.name)
+      }
+      return { ok: true, started, refused: notStarted } as const
+    })
 
     ipcMain.handle(ROOM_POST_CHANNEL, async (event, request: unknown) => {
       const owner = BrowserWindow.fromWebContents(event.sender)

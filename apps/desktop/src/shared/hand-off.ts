@@ -14,6 +14,10 @@ import { STEP_BUDGET } from './step-budget.js'
 /** What a checker must end with: approval, or what has to change. */
 export const CHECK_RULE =
   'You are the checker for this routine: the run counts as done only if you approve. Check the work above against what was asked. ' +
+  // Measured, 0.437 promo frames: a Codex checker quoted an OpenCode teammate
+  // whose read-only mode has no shell, and concluded IT could not read the
+  // files either -- it never tried, and refused a right answer.
+  'Read the files it concerns yourself: you can read this folder, whatever the teammate before you could or could not do in their mode, and their answer is a claim to check, not a fact. ' +
   'End your reply with exactly one line: "VERDICT: APPROVED", or "VERDICT: CHANGES NEEDED -- " followed by what must change.'
 
 /** Room for the quoted answer: the prompt must fit the mission's own limit with the step's words and the rule. */

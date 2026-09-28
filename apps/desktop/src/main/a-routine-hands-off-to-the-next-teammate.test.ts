@@ -144,6 +144,20 @@ describe('a routine whose steps go to different teammates', () => {
     expect(h.held.get('rt_chain')!.execution!.status).toBe('held')
   })
 
+  it('says what the checker asked for with one full stop, however the checker ended it', async () => {
+    const h = harness([chain()])
+    const runner = createRoutineRunner(h.options)
+    await runner.run('rt_chain')
+    await h.finish(runner, 'mission_1', 'Found it.')
+    await h.finish(runner, 'mission_2', 'A plan.')
+    await h.finish(runner, 'mission_3', 'VERDICT: CHANGES NEEDED -- read the code first.')
+    expect(h.notices().at(-1)).toBe('Routine "Intake to review" stopped at step 3 of 3: Sable, the checker, asked for changes: read the code first.')
+  })
+
+  it("tells the checker it can read the folder itself, whatever the step before could do", () => {
+    expect(CHECK_RULE).toContain('you can read this folder, whatever the teammate before you could or could not do in their mode')
+  })
+
   it('does not count a checker that gave no verdict', async () => {
     const h = harness([chain()])
     const runner = createRoutineRunner(h.options)
