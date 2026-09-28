@@ -11,6 +11,23 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.441.0 - 2026-09-28
+<!-- big -->
+
+### New
+
+- **Compare models side by side.** In a teammate's conversation, open the
+  model picker, switch it to **Compare** and tick two or three models: Fable
+  and GPT-6 Astra, say, or two free ones. Your ask goes to each, and the
+  answers come back in columns side by side, each saying how long it took
+  and what it cost. A follow-up goes to every column. **Keep this one** stops
+  the others and carries the conversation on with the model you kept; the
+  comparison stays one click away.
+- **Nothing changes while you compare.** Every column answers in Ask, so a
+  comparison works in any folder and no two models can get in each other's
+  way. A model that cannot be held read-only on this computer says so in the
+  picker instead of joining.
+
 ## 0.440.0 - 2026-09-28
 <!-- big -->
 

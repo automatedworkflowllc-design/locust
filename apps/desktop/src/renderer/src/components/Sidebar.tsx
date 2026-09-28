@@ -85,6 +85,8 @@ export interface SidebarMission {
    * told apart by opening them (0.271 design recheck, finding 2).
    */
   readonly routineId?: string
+  /** This row stands for a comparison not yet decided (0.441, compareRows.ts): it opens the comparison. */
+  readonly compareId?: string
 }
 
 /** Whether a row is the conversation the workroom is showing. */
@@ -744,6 +746,7 @@ export function Sidebar({
                         <Icon name="clock" size={11} />
                       </span>
                     )}
+                    {mission.compareId !== undefined && <span className="lc-conv__vs lc-mono" aria-label="A comparison">vs</span>}
                     <span className="lc-conv__title">{mission.title}</span>
                     {/*
                       * A routine's conversation says which step it is on

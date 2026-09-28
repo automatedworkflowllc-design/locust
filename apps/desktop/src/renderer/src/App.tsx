@@ -101,7 +101,12 @@ import { FileViewer } from './components/FileViewer.js'
 import { MissionsScreen, SettingsScreen, TeammatesScreen, UpdateBanner } from './components/Screens.js'
 import { WhatsNewSplash } from './components/WhatsNew.js'
 import type { SettingsPageId } from './settingsPages.js'
-import type { RouteChoice } from './components/RoutePicker.js'
+import type { ComparePick, ComparePicking, RouteChoice } from './components/RoutePicker.js'
+import { CompareView } from './components/CompareView.js'
+import { comparisonOf, foldComparisons } from './compareRows.js'
+import type { CompareColumnView } from './components/CompareView.js'
+import { compareMembership, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../../shared/compare.js'
+import type { CompareSlotId, PublicCompare } from '../../shared/compare.js'
 import { composerRouteFor, startAs } from '../../shared/route-at-start.js'
 import type { StartAs } from '../../shared/route-at-start.js'
 import type { Screen } from './components/Screens.js'
@@ -137,13 +142,13 @@ import { cappedLiveEvents, LIVE_EVENT_CAP,
   rootMission,
   startedLabel,
   stitchedHandoff,
-  runtimeNeverStarted, shownPrompt, typedPrompt, buildThread, lastActivityAt, relativePath, fileTurns, shellCommandText, turnText, groupBoundary, groupJoins, groupLeavings, latestSetupNotes } from './missionView.js'
+  runtimeNeverStarted, shownPrompt, typedPrompt, buildThread, durationText, runSpanMs, lastActivityAt, relativePath, fileTurns, shellCommandText, turnText, groupBoundary, groupJoins, groupLeavings, latestSetupNotes } from './missionView.js'
 import type { LiveStarter, TurnSwitch } from './missionView.js'
 import { finishedToast } from './finishedToast.js'
 import { folderName, ranOnLine } from './ranOn.js'
 import { reviewBrief } from './reviewBrief.js'
 import type { ReviewMaterial } from './reviewBrief.js'
-import { conversationCostLine, costLine, headerCostTail, latestContext } from './cost.js'
+import { conversationCostLine, costLine, headerCostTail, latestContext, runCostOf, sumCosts } from './cost.js'
 import { sequenceOfPost } from './roomExchange.js'
 import type { LiveTurn, RoomExchange, StartingReply } from './roomExchange.js'
 import { isStoppable, stopPress } from './stopPress.js'
@@ -154,7 +159,7 @@ import { splitAttachments, withAttachments } from '../../shared/attachments.js'
 // Only `heldFor`: this file has its own `ownerOf` for live runs, which is a
 // different question from who owns a recorded mission.
 import { heldFor, routineOf } from './conversationList.js'
-import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, nextFreeModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
+import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, modeUnavailableReason, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, nextFreeModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
 import { homeRouteOf, isOwnRoute, modelDisplayName, rememberOwnModels, routeChrome } from './routeName.js'
 import { FeedbackDialog } from './components/FeedbackDialog.js'
 import { conversationText } from './feedback.js'
@@ -1516,6 +1521,21 @@ export default function App(): ReactElement {
   /** Why a folder request for one teammate did nothing. */
   const [folderNotice, setFolderNotice] = useState<string>()
   const [inspectorOpen, setInspectorOpen] = useState(false)
+  /**
+   * COMPARE (0.441, shared/compare.ts): the saved comparisons, the one on
+   * screen, and the models ticked in the picker for the next ask.
+   */
+  const [compares, setCompares] = useState<readonly PublicCompare[]>([])
+  const [comparingId, setComparingId] = useState<string>()
+  const [compareOn, setCompareOn] = useState(false)
+  const [comparePicks, setComparePicks] = useState<readonly ComparePick[]>([])
+  const [keepingCompare, setKeepingCompare] = useState(false)
+  const [compareProblem, setCompareProblem] = useState<string>()
+  useEffect(() => {
+    void window.desktop?.listCompares().then((answer) => {
+      if (answer.ok) setCompares(answer.data.compares)
+    }).catch(() => undefined)
+  }, [])
   /** Review changes (0.439): the teammate whose own branch is open beside the thread. */
   const [reviewingId, setReviewingId] = useState<string>()
   /*
@@ -2897,6 +2917,9 @@ export default function App(): ReactElement {
    * mission already is one, a teammate is a saved route with a face).
    */
   const pickedTeammate = addressedTeammate(teammates, selectedTeammateId)
+  // A comparison follows the teammate it was started with (0.441).
+  const comparing = compares.find((compare) => compare.compareId === comparingId && compare.teammateId === pickedTeammate?.teammateId)
+  const compareMembers = useMemo(() => compareMembership(compares).byMission, [compares])
   // Review changes follows the teammate on screen: another conversation never shows this one's branch.
   const reviewing = pickedTeammate !== undefined && pickedTeammate.teammateId === reviewingId && pickedTeammate.worktree === true ? pickedTeammate : undefined
   const composerRoute = composerRouteFor(route, pickedTeammate, pickerRoutes)
@@ -3316,6 +3339,150 @@ export default function App(): ReactElement {
   const startRefusal = useRef<string | undefined>(undefined)
   /** M28: why the last Resume from checkpoint did not start, for the card that was pressed. */
   const [resumeRefusal, setResumeRefusal] = useState<{ readonly missionId: string; readonly message: string }>()
+  /*
+   * COMPARE (0.441, shared/compare.ts, docs/PLAN-2026-09-28-COMPARE.md).
+   *
+   * The picker's One / Compare switch lives in a teammate's conversation;
+   * the ask then goes to every ticked model, each its own mission, and the
+   * comparison takes the thread's place until one is kept.
+   */
+  const samePick = (a: RouteChoice, b: RouteChoice): boolean => a.runtime === b.runtime && a.model === b.model
+  const comparePicking: ComparePicking | undefined = pickedTeammate === undefined
+    ? undefined
+    : {
+        on: compareOn,
+        picks: comparePicks,
+        onMode: (on) => {
+          setCompareOn(on)
+          if (!on) setComparePicks([])
+        },
+        onToggle: (pick) =>
+          setComparePicks((current) =>
+            current.some((one) => samePick(one, pick))
+              ? current.filter((one) => !samePick(one, pick))
+              : current.length >= MAX_COMPARE_SLOTS ? current : [...current, pick]
+          ),
+        // A comparison answers read-only: a model that cannot be held read-only here cannot join one.
+        refusal: (choice) =>
+          modeRunsOn('ask', choice.runtime, build?.platform)
+            ? undefined
+            : `${modeUnavailableReason('ask', choice.runtime, build?.platform) ?? 'It cannot answer read-only here.'} A comparison answers read-only, so it cannot join one.`
+      }
+  const replaceCompare = (next: PublicCompare): void =>
+    setCompares((current) => [...current.filter((one) => one.compareId !== next.compareId), next])
+
+  /** The send, when a comparison is ticked or on screen; otherwise the ordinary one. */
+  const sendOrCompare = async (prompt: string): Promise<boolean | string> => {
+    const bridge = window.desktop
+    if (comparing !== undefined && comparing.kept === undefined) {
+      if (!bridge) return 'Locust is not ready yet. Nothing was sent.'
+      const answer = await bridge.askCompare(comparing.compareId, prompt).catch(() => undefined)
+      if (answer === undefined) return 'The comparison could not be asked. Nothing was started.'
+      if (!answer.ok) return answer.error.message
+      replaceCompare(answer.data.compare)
+      const asked = answer.data.compare.slots.filter((column) => column.refused === undefined && column.missionIds.length > 0).length
+      // Every column refused: the words come back with the reason.
+      return answer.data.refused.length >= asked && answer.data.refused[0] !== undefined ? answer.data.refused[0].message : true
+    }
+    // A kept comparison on screen: the conversation it became is where this goes.
+    if (comparing !== undefined) setComparingId(undefined)
+    if (compareOn && comparePicks.length > 0 && pickedTeammate !== undefined) {
+      if (comparePicks.length < MIN_COMPARE_SLOTS) return 'Pick one more model to compare with, or switch the picker back to One.'
+      if (!bridge) return 'Locust is not ready yet. Nothing was sent.'
+      const answer = await bridge
+        .startCompare({ teammateId: pickedTeammate.teammateId, prompt, routes: comparePicks.map((pick) => ({ runtime: pick.runtime, model: pick.model, label: pick.label })) })
+        .catch(() => undefined)
+      if (answer === undefined) return 'The comparison could not be started. Nothing was sent.'
+      if (!answer.ok) return answer.error.message
+      replaceCompare(answer.data.compare)
+      setCompareProblem(undefined)
+      setComparingId(answer.data.compare.compareId)
+      setCompareOn(false)
+      setComparePicks([])
+      return true
+    }
+    return startFromComposer(prompt)
+  }
+
+  /** Keep one column: the others stop, and the conversation carries on from the kept one. */
+  const keepCompareColumn = async (compare: PublicCompare, slot: CompareSlotId): Promise<void> => {
+    const bridge = window.desktop
+    if (!bridge) return
+    setKeepingCompare(true)
+    setCompareProblem(undefined)
+    try {
+      for (const column of compare.slots) {
+        if (column.slot === slot) continue
+        for (const [runKey, run] of runs.entries()) {
+          if (runKey.startsWith('pending:') || !liveRunIsActive(run)) continue
+          if (run.data?.missionId !== undefined && column.missionIds.includes(run.data.missionId)) {
+            await bridge.cancelCodexMission({ runId: runKey }).catch(() => undefined)
+          }
+        }
+      }
+      const answer = await bridge.keepCompare(compare.compareId, slot).catch(() => undefined)
+      if (answer === undefined || !answer.ok) {
+        setCompareProblem(answer?.ok === false ? answer.error.message : 'That column could not be kept. Nothing changed.')
+        return
+      }
+      replaceCompare(answer.data.compare)
+      const newest = answer.data.compare.slots.find((column) => column.slot === slot)?.missionIds.at(-1)
+      if (newest !== undefined) openMission(newest)
+      setComparingId(undefined)
+    } finally {
+      setKeepingCompare(false)
+    }
+  }
+
+  /** The columns, from the live runs where they are going and the record where they are done. */
+  const compareColumnsFor = (compare: PublicCompare): { readonly prompts: readonly string[]; readonly columns: readonly CompareColumnView[] } => {
+    const cellOf = (missionId: string) => {
+      const live = [...runs.values()].find((run) => run.data?.missionId === missionId)
+      const recorded = historyById.get(missionId)
+      const events = live !== undefined && live.events.length > 0 ? live.events : recorded?.events ?? []
+      const running = live !== undefined && liveRunIsActive(live)
+      return {
+        missionId,
+        events,
+        running,
+        phase: live?.phase ?? recorded?.phase ?? 'unknown',
+        prompt: splitAttachments(live?.prompt ?? recorded?.prompt ?? '').text,
+        items: buildThread(events, { running, mayEdit: false, ...(workspacePath === undefined ? {} : { workspacePath }) })
+      }
+    }
+    const cellsBySlot = compare.slots.map((column) => column.missionIds.map(cellOf))
+    const columns = compare.slots.map((column, index): CompareColumnView => {
+      const cells = cellsBySlot[index] ?? []
+      const running = cells.some((cell) => cell.running)
+      const last = cells.at(-1)
+      const spanMs = cells.reduce((total, cell) => total + (runSpanMs(cell.events) ?? 0), 0)
+      const cost = costLine(sumCosts(cells.map((cell) => runCostOf(cell.events))))
+      const state =
+        cells.length === 0 ? (column.refused === undefined ? 'waiting' : 'could not start')
+        : running ? 'working'
+        : last?.phase === 'completed' ? 'done'
+        : last?.phase === 'cancelled' ? 'stopped'
+        : last?.phase === 'failed' ? 'failed'
+        : String(last?.phase ?? '')
+      return {
+        slot: column.slot,
+        name: column.route.label ?? column.route.model,
+        runtime: column.route.runtime as MissionRuntimeId,
+        runtimeName: runtimeNameOf(column.route.runtime),
+        ...(column.refused === undefined ? {} : { refused: column.refused }),
+        turns: cells.map((cell) => ({ missionId: cell.missionId, items: cell.items, running: cell.running })),
+        running,
+        state,
+        ...(spanMs > 0 ? { span: durationText(spanMs) } : {}),
+        ...(cost === undefined ? {} : { cost })
+      }
+    })
+    // Each ask once, from the column that has taken the most of them.
+    const longest = cellsBySlot.reduce((best, cells) => (cells.length > best.length ? cells : best), [] as ReturnType<typeof cellOf>[])
+    const prompts = longest.length === 0 ? [compare.prompt] : longest.map((cell, turn) => (turn === 0 ? compare.prompt : cell.prompt))
+    return { prompts, columns }
+  }
+
   /**
    * Send a message to the teammates tagged in it (0.438, shared/tagging.ts),
    * each in a conversation of their own; the conversation on screen is where
@@ -4567,6 +4734,8 @@ export default function App(): ReactElement {
   }
 
   const openMission = (missionId: string): void => {
+    // Opening a conversation leaves any comparison on screen (0.441).
+    setComparingId(undefined)
     // Opening a conversation SHOWS it. Every caller but one used to have to
     // remember `setScreen('workroom')` first, and the sidebar did not -- so
     // from the Missions screen a click lit the row and left you looking at
@@ -5216,14 +5385,15 @@ export default function App(): ReactElement {
      * header, the search that filters on `title`, and the row all read the
      * same string.
      */
-    return collapseConversations(rows).map((row) => {
+    // A comparison is one row until a column is kept (0.441, compareRows.ts).
+    return foldComparisons(collapseConversations(rows), compares).map((row) => {
       // Asked for under every id this conversation has worn, not only its
       // root -- a name typed while the row was keyed by a live turn was
       // stored against that turn and is otherwise never found again.
       const chosen = heldFor(row, missionTitles)
       return chosen === undefined ? row : { ...row, title: chosen }
     })
-  }, [history, historyById, runs, workspaceId, missionTitles])
+  }, [history, historyById, runs, workspaceId, missionTitles, compares])
   const besideRow = besideId === undefined ? undefined : sidebarMissions.find((entry) => (entry.memberIds ?? [entry.missionId]).includes(besideId))
   const besideRun = ((): LiveRunState | undefined => {
     if (besideId === undefined) return undefined
@@ -5769,7 +5939,13 @@ export default function App(): ReactElement {
           // first teammate read as chosen while the composer addressed
           // nobody (user session, 2026-09-05).
           selectedTeammateId={pickedTeammate?.teammateId}
-          onSelectMission={openMission}
+          onSelectMission={(missionId) => {
+            // A comparison's row opens the comparison, until one of its columns is kept (0.441).
+            const member = compareMembers.get(missionId)
+            const compare = member === undefined ? undefined : compares.find((one) => one.compareId === member.compareId)
+            openMission(missionId)
+            if (compare !== undefined && compare.kept === undefined) setComparingId(compare.compareId)
+          }}
           onMissionMenu={openMissionMenu}
           groups={groups}
           groupMembers={groupMembers}
@@ -6114,6 +6290,23 @@ export default function App(): ReactElement {
             {...(settingsLanding === undefined ? {} : { initialPage: settingsLanding })}
               onPrune={prune}
             />
+          ) : comparing !== undefined ? (
+            (() => {
+              const { prompts, columns } = compareColumnsFor(comparing)
+              return (
+                <CompareView
+                  compare={comparing}
+                  prompts={prompts}
+                  columns={columns}
+                  owner={pickedTeammate}
+                  workspacePath={workspacePath}
+                  keeping={keepingCompare}
+                  {...(compareProblem === undefined ? {} : { problem: compareProblem })}
+                  onKeep={(slot) => void keepCompareColumn(comparing, slot)}
+                  onBack={comparing.kept === undefined ? undefined : () => setComparingId(undefined)}
+                />
+              )
+            })()
           ) : liveRun === undefined ? (
             // A CHOSEN teammate with nothing running gets their own
             // capability-led state. Nothing chosen -- which is how every
@@ -6485,6 +6678,21 @@ export default function App(): ReactElement {
                   onStop={() => stopExchange(exchange.liveRunIds)}
                 />
               )}
+              {(() => {
+                // A conversation that began as a comparison says so, and opens it (0.441).
+                const row = liveRun.data?.missionId === undefined ? undefined : sidebarMissions.find((entry) => (entry.memberIds ?? [entry.missionId]).includes(liveRun.data!.missionId))
+                const compare = row === undefined ? undefined : comparisonOf(row.memberIds ?? [row.missionId], compares)
+                if (compare?.kept === undefined) return null
+                const others = compare.slots.filter((column) => column.slot !== compare.kept!.slot).map((column) => column.route.label ?? column.route.model)
+                return (
+                  <div className="lc-compared">
+                    <span>Compared with {others.join(' and ')}.</span>
+                    <button type="button" className="lc-compared__open" onClick={() => setComparingId(compare.compareId)}>
+                      Open the comparison
+                    </button>
+                  </div>
+                )
+              })()}
               <DiffNotesContext.Provider value={diffNotesPlace}>
               <Thread
                 onOpenFile={openFileInViewer}
@@ -6812,7 +7020,12 @@ export default function App(): ReactElement {
                 ? 'No runtime can run a mission yet. Locust runs the coding-agent CLIs on this machine — Settings shows what to install, and OpenCode needs no account.'
                 : undefined
             }
-            onStart={startFromComposer}
+            onStart={sendOrCompare}
+            // Compare (0.441): the picker's switch, and a comparison on screen.
+            {...(comparePicking === undefined ? {} : { compare: comparePicking })}
+            {...(comparing === undefined || comparing.kept !== undefined
+              ? {}
+              : { asking: { label: comparing.slots.map((column) => column.route.label ?? column.route.model).join(' vs '), columns: comparing.slots.filter((column) => column.missionIds.length > 0).length } })}
             // Tag a teammate from any conversation (0.438).
             team={teammates}
             {...(pickedTeammate === undefined ? {} : { currentTeammateId: pickedTeammate.teammateId })}

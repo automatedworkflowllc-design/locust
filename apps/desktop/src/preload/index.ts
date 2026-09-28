@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { CompareSlotId } from '../shared/compare.js'
 import {
   CODEX_MISSION_CANCEL_CHANNEL,
   CODEX_MISSION_START_CHANNEL,
@@ -65,6 +66,10 @@ import {
   ROOM_RENAME_CHANNEL,
   ROOM_POST_CHANNEL,
   TEAMMATES_TAG_CHANNEL,
+  COMPARE_START_CHANNEL,
+  COMPARE_ASK_CHANNEL,
+  COMPARE_KEEP_CHANNEL,
+  COMPARE_LIST_CHANNEL,
   ROOM_TASK_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
   TEAMMATE_RENAME_MISSION_CHANNEL,
@@ -156,6 +161,9 @@ import type {
   RoomPostResponse,
   TagTeammatesRequest,
   TagTeammatesResponse,
+  CompareStartRequest,
+  CompareResponse,
+  CompareListResponse,
   RoomCreateRequest,
   RoomPostRequest,
   RoomTaskRequest,
@@ -379,6 +387,10 @@ const desktopApi: DesktopApi = {
     ipcRenderer.invoke(ROOM_RENAME_CHANNEL, { roomId, name }) as Promise<RoomMutationResponse>,
   postToRoom: (request: RoomPostRequest) => ipcRenderer.invoke(ROOM_POST_CHANNEL, request) as Promise<RoomPostResponse>,
   tagTeammates: (request: TagTeammatesRequest) => ipcRenderer.invoke(TEAMMATES_TAG_CHANNEL, request) as Promise<TagTeammatesResponse>,
+  startCompare: (request: CompareStartRequest) => ipcRenderer.invoke(COMPARE_START_CHANNEL, request) as Promise<CompareResponse>,
+  askCompare: (compareId: string, prompt: string) => ipcRenderer.invoke(COMPARE_ASK_CHANNEL, compareId, prompt) as Promise<CompareResponse>,
+  keepCompare: (compareId: string, slot: CompareSlotId) => ipcRenderer.invoke(COMPARE_KEEP_CHANNEL, compareId, slot) as Promise<CompareResponse>,
+  listCompares: () => ipcRenderer.invoke(COMPARE_LIST_CHANNEL) as Promise<CompareListResponse>,
   updateRoomTask: (request: RoomTaskRequest) => ipcRenderer.invoke(ROOM_TASK_CHANNEL, request) as Promise<RoomTaskResponse>,
   listMemories: () => ipcRenderer.invoke(MEMORY_LIST_CHANNEL) as Promise<MemoryListResponse>,
   readRuntimeSetup: () => ipcRenderer.invoke(RUNTIME_SETUP_CHANNEL) as Promise<RuntimeSetupResponse>,

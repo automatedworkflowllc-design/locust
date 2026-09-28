@@ -4286,6 +4286,8 @@ export type LiveStarter =
   | PublicRecoveredMission['startedBy']
   | { readonly kind: 'room'; readonly roomId: string; readonly postId: string }
   | { readonly kind: 'tag' }
+  // A comparison's column (0.441): the person's ask, put to several models at once.
+  | { readonly kind: 'compare'; readonly compareId: string; readonly slot: string }
 
 /**
  * What the person ASKED FOR, when a button sent a brief in their name (A1.2).
@@ -4325,7 +4327,7 @@ export function turnPromptLine(turn: {
   // had; it is theirs to see, even though the host pressed go. A room post
   // is the person's own words too, said to several at once, and so is what
   // they typed in the runtime's own terminal (0.391).
-  if (turn.startedBy.kind === 'routine' || turn.startedBy.kind === 'room' || turn.startedBy.kind === 'terminal' || turn.startedBy.kind === 'tag') {
+  if (turn.startedBy.kind === 'routine' || turn.startedBy.kind === 'room' || turn.startedBy.kind === 'terminal' || turn.startedBy.kind === 'tag' || turn.startedBy.kind === 'compare') {
     // A handed-off routine step carries the answer before it; the bubble is the step (0.435).
     return splitAttachments(turn.startedBy.kind === 'routine' ? stepWordsOf(turn.prompt) : turn.prompt).text
   }

@@ -10,12 +10,34 @@ import { RuntimeMark } from './RuntimeMark.js'
 import { levelsLine } from '../effortScale.js'
 import { effortName } from '../effortLevels.js'
 import { FREE_START_RUNTIME } from '../../../shared/runtime-install.js'
+import { MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../../../shared/compare.js'
 
 export interface RouteChoice {
   readonly runtime: MissionRuntimeId
   /** The model identifier a mission would actually be started with. */
   readonly model: string
 }
+
+/** A model picked for a comparison (0.441, shared/compare.ts), with the name its row shows. */
+export interface ComparePick extends RouteChoice {
+  readonly label: string
+}
+
+/**
+ * COMPARE IN THE PICKER (0.441). The picker the person already knows, with a
+ * One / Compare switch: in Compare a row ticks instead of choosing, up to
+ * three, and the foot says how many times the ask will run.
+ */
+export interface ComparePicking {
+  readonly on: boolean
+  readonly picks: readonly ComparePick[]
+  readonly onMode: (on: boolean) => void
+  readonly onToggle: (pick: ComparePick) => void
+  /** Why a model cannot be compared (it cannot be held read-only here), or nothing. */
+  readonly refusal: (choice: RouteChoice) => string | undefined
+}
+
+const samePick = (a: RouteChoice, b: RouteChoice): boolean => a.runtime === b.runtime && a.model === b.model
 
 interface RouteRow {
   readonly key: string
@@ -263,7 +285,8 @@ export function RoutePicker({
   onSelect,
   onClose,
   notice,
-  limitedRuntimes
+  limitedRuntimes,
+  compare
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
   /** Runtimes whose last run ended on the account's usage limit, with its own words. */
@@ -295,7 +318,10 @@ export function RoutePicker({
    * Together they take the composer from seven controls to four.
    */
   /** The maximum level swarm would hold every mission at, when one is known. */
+  /** Compare (0.441): absent where a comparison cannot start (a run is live, or nobody is on screen). */
+  readonly compare?: ComparePicking
 }): ReactElement {
+  const comparing = compare?.on === true
   const [query, setQuery] = useState('')
   const [olderOpen, setOlderOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -357,8 +383,12 @@ export function RoutePicker({
 
   /** One model row, the same wherever it is drawn: in its group or under a fold. */
   const drawRow = (row: RouteRow): ReactElement => {
-    const isActive = row.tag === 'ACTIVE'
+    const isActive = !comparing && row.tag === 'ACTIVE'
     const recent = row.group === 'Recent'
+    const choice = { runtime: row.runtime, model: row.model }
+    const picked = comparing && (compare?.picks ?? []).some((pick) => samePick(pick, choice))
+    const refused = comparing ? compare?.refusal(choice) : undefined
+    const full = comparing && !picked && (compare?.picks.length ?? 0) >= MAX_COMPARE_SLOTS
     // Which runtime the canonical row below sits under, so a recent row can
     // say why it appears twice.
     const pointsAt = recent
@@ -367,16 +397,22 @@ export function RoutePicker({
     return (
       <button
         type="button"
-        className={`lc-picker__row${isActive ? ' is-active' : ''}${recent ? ' is-recent' : ''}`}
-        disabled={!row.selectable}
+        className={`lc-picker__row${isActive ? ' is-active' : ''}${recent ? ' is-recent' : ''}${picked ? ' is-picked' : ''}`}
+        disabled={!row.selectable || refused !== undefined || full}
         aria-current={isActive}
+        {...(comparing ? { 'aria-pressed': picked } : {})}
         // The whole of it, on hover: the row itself is one line.
-        title={`${row.label} · ${row.fullDetail}`}
+        title={refused ?? (full ? `Three at most. Untick one to pick ${row.label}.` : `${row.label} · ${row.fullDetail}`)}
         onClick={() => {
-          onSelect({ runtime: row.runtime, model: row.model })
+          if (comparing && compare !== undefined) {
+            compare.onToggle({ ...choice, label: row.label })
+            return
+          }
+          onSelect(choice)
           onClose()
         }}
       >
+        {comparing && <span className="lc-picker__check" aria-hidden="true">{picked ? '✓' : ''}</span>}
         <span
           className={`lc-dot ${
             row.tag === 'ACTIVE'
@@ -437,6 +473,16 @@ export function RoutePicker({
           aria-label="Search runtimes and models"
           autoComplete="off"
         />
+        {compare !== undefined && (
+          <span className="lc-picker__modes" role="group" aria-label="One model or compare">
+            <button type="button" className={`lc-picker__mode${comparing ? '' : ' is-on'}`} aria-pressed={!comparing} onClick={() => compare.onMode(false)}>
+              One
+            </button>
+            <button type="button" className={`lc-picker__mode${comparing ? ' is-on' : ''}`} aria-pressed={comparing} onClick={() => compare.onMode(true)}>
+              Compare
+            </button>
+          </span>
+        )}
         {/*
           * Swarm, as a pill beside the search rather than a row of its own.
           * It is a statement about how every mission runs, so it sits with
@@ -528,9 +574,22 @@ export function RoutePicker({
           */}
         {shown.length === 0 && <p className="lc-inspector__empty">{pickerEmptyMessage(models.length)}</p>}
       </div>
-      <div className="lc-picker__foot">
-        Fallback chain, privacy and permissions live in Settings.
-      </div>
+      {comparing && compare !== undefined ? (
+        <div className="lc-picker__foot lc-picker__foot--compare">
+          <span>
+            {compare.picks.length < MIN_COMPARE_SLOTS
+              ? `Pick ${compare.picks.length === 0 ? 'two or three models' : 'one or two more'}. Each answers the same ask without changing files.`
+              : `${String(compare.picks.length)} picked. Your ask runs ${compare.picks.length === 2 ? 'twice' : 'three times'}, once on each.`}
+          </span>
+          <button type="button" className="lc-primarybutton" disabled={compare.picks.length < MIN_COMPARE_SLOTS} onClick={onClose}>
+            Done
+          </button>
+        </div>
+      ) : (
+        <div className="lc-picker__foot">
+          Fallback chain, privacy and permissions live in Settings.
+        </div>
+      )}
     </div>
   )
 }

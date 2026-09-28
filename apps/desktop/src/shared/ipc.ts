@@ -9,6 +9,7 @@ export type { MemoryScope } from './memory.js'
 import type { Spend } from './spend.js'
 import type { Workbook } from './sheet.js'
 import type { AboutYouSuggestion } from './about-you.js'
+import type { CompareSlotId, PublicCompare } from './compare.js'
 
 /**
  * How a teammate's memory is treated: kept at once and shown (the Claude
@@ -786,6 +787,22 @@ export const ROOM_REMOVE_CHANNEL = 'rooms:remove'
 /** Name a room that was made from an ask, and so began as `Untitled room`. */
 export const ROOM_RENAME_CHANNEL = 'rooms:rename'
 export const ROOM_POST_CHANNEL = 'rooms:post'
+/** Compare (0.441, shared/compare.ts): one ask to two or three models, side by side. */
+export const COMPARE_START_CHANNEL = 'compare:start'
+export const COMPARE_ASK_CHANNEL = 'compare:ask'
+export const COMPARE_KEEP_CHANNEL = 'compare:keep'
+export const COMPARE_LIST_CHANNEL = 'compare:list'
+export interface CompareStartRequest {
+  readonly teammateId: string
+  readonly prompt: string
+  readonly routes: readonly { readonly runtime: MissionRuntimeId; readonly model: string; readonly effort?: string; readonly label?: string }[]
+}
+export type CompareResponse =
+  | { readonly ok: true; readonly data: { readonly compare: PublicCompare; readonly refused: readonly { readonly slot: CompareSlotId; readonly message: string }[] } }
+  | { readonly ok: false; readonly error: { readonly code: 'COMPARE_REFUSED'; readonly message: string } }
+export type CompareListResponse =
+  | { readonly ok: true; readonly data: { readonly compares: readonly PublicCompare[] } }
+  | { readonly ok: false; readonly error: { readonly code: 'COMPARE_REFUSED'; readonly message: string } }
 /** Tag teammates from any conversation (0.438, shared/tagging.ts). */
 export const TEAMMATES_TAG_CHANNEL = 'teammates:tag'
 export interface TagTeammatesRequest {
@@ -2296,6 +2313,8 @@ export type CodexMissionUpdate =
         | { readonly kind: 'room'; readonly roomId: string; readonly postId: string }
         // A teammate tagged from a conversation (0.438): the person's words, live only, like a room's.
         | { readonly kind: 'tag' }
+        /** A comparison's column (0.441): drawn in the comparison, never focused on its own. */
+        | { readonly kind: 'compare'; readonly compareId: string; readonly slot: CompareSlotId }
       /**
        * Present when this run is the newest turn of the teammate's hub (see
        * `PublicTeammate.hubMissionId`), so the roster on screen learns it
@@ -2714,6 +2733,11 @@ export interface DesktopApi {
   postToRoom(request: RoomPostRequest): Promise<RoomPostResponse>
   /** Send a message to the teammates tagged in it, each in a conversation of their own (0.438). */
   tagTeammates(request: TagTeammatesRequest): Promise<TagTeammatesResponse>
+  /** Compare (0.441): start one, ask every column again, keep one, list them. */
+  startCompare(request: CompareStartRequest): Promise<CompareResponse>
+  askCompare(compareId: string, prompt: string): Promise<CompareResponse>
+  keepCompare(compareId: string, slot: CompareSlotId): Promise<CompareResponse>
+  listCompares(): Promise<CompareListResponse>
   updateRoomTask(request: RoomTaskRequest): Promise<RoomTaskResponse>
   listMemories(): Promise<MemoryListResponse>
   /** Each runtime's own MCP servers and hooks, read-only. */

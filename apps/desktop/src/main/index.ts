@@ -12,6 +12,9 @@ import { createRuntimeCommands } from './runtime-commands.js'
 import { createCursorDefaultModel } from './cursor-default-model.js'
 import { listWorkspaceFiles } from './workspace-files.js'
 import { MAX_TAGGED, taggedPrompt } from '../shared/tagging.js'
+import { compareSlotKey, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../shared/compare.js'
+import type { CompareSlotId, PublicCompare, PublicCompareSlot } from '../shared/compare.js'
+import { createCompareStore } from './compare-store.js'
 import electronUpdater from 'electron-updater'
 
 const { autoUpdater } = electronUpdater
@@ -227,6 +230,10 @@ import {
   ROOM_RENAME_CHANNEL,
   ROOM_POST_CHANNEL,
   TEAMMATES_TAG_CHANNEL,
+  COMPARE_START_CHANNEL,
+  COMPARE_ASK_CHANNEL,
+  COMPARE_KEEP_CHANNEL,
+  COMPARE_LIST_CHANNEL,
   RUNTIME_DISCOVERY_EVENT_CHANNEL,
   RUNTIME_DISCOVERY_LOG_CHANNEL,
   SPLASH_DONE_CHANNEL,
@@ -2438,6 +2445,8 @@ if (!ownsSingleInstanceLock) {
     // its own ledger, recorded as started by the routine.
     const routines = createRoutineStore({ rootDirectory: app.getPath('userData') })
     const rooms = createRoomStore({ rootDirectory: app.getPath('userData') })
+    // Comparisons (0.441, shared/compare.ts), kept beside the rooms, outside the ledger.
+    const compares = createCompareStore({ rootDirectory: app.getPath('userData') })
     routineRunner = createRoutineRunner({
       workspaceId: memoryWorkspaceId,
       // M15: where a routine was made; for an older one, where it was learned.
@@ -4009,6 +4018,112 @@ if (!ownsSingleInstanceLock) {
      * their own, and announced like a room member so the screen stays where
      * the person is. Busy is said, not queued.
      */
+    /*
+     * COMPARE (0.441, shared/compare.ts, docs/PLAN-2026-09-28-COMPARE.md): one
+     * ask to two or three models, each column its own mission in the
+     * teammate's conversation with only the route changed. Phase one compares
+     * ANSWERS: every column runs in Ask, so it works in any folder and no two
+     * columns can collide. Each column holds its own run slot, so one teammate
+     * answers on several models at once.
+     */
+    const compareRefused = (message: string) => ({ ok: false, error: { code: 'COMPARE_REFUSED', message } }) as const
+    const startCompareColumn = async (compare: PublicCompare, column: PublicCompareSlot, prompt: string, followUpOf?: string): Promise<string | undefined> => {
+      const peer = await peerContextFor(compare.teammateId)
+      if (peer === undefined) return 'That teammate is no longer on the team.'
+      if (column.route.runtime === 'antigravity') return 'Antigravity cannot be compared yet: it answers only in the folder it has open.'
+      const response = await codexMissions.start(
+        prompt,
+        column.route.runtime as MissionRuntimeId,
+        'ask',
+        { ...(column.route.model === 'account-default' ? {} : { model: column.route.model }), ...(column.route.effort === undefined ? {} : { effort: column.route.effort }) },
+        sendToWindow,
+        undefined,
+        { ...peer, slotKey: compareSlotKey(compare.teammateId, compare.compareId, column.slot) },
+        followUpOf
+      )
+      if (!response.ok) return response.error.code === 'RUN_ALREADY_ACTIVE' ? 'This column is still answering. Ask again when it has finished.' : response.error.message
+      await assignOwner(compare.teammateId, response.data.missionId)
+      await compares.addTurn(compare.compareId, column.slot, response.data.missionId)
+      sendToWindow({
+        kind: 'mission-started',
+        runId: response.data.runId,
+        missionId: response.data.missionId,
+        teammateId: compare.teammateId,
+        prompt,
+        data: response.data,
+        startedBy: { kind: 'compare', compareId: compare.compareId, slot: column.slot }
+      })
+      return undefined
+    }
+    /** Start every column that can take the ask; a column that cannot says why in its own place. */
+    const askEveryColumn = async (compare: PublicCompare, prompt: string, followingUp: boolean) => {
+      const refused: { slot: CompareSlotId; message: string }[] = []
+      for (const column of compare.slots) {
+        if (followingUp && (column.refused !== undefined || column.missionIds.length === 0)) continue
+        const why = await startCompareColumn(compare, column, prompt, followingUp ? column.missionIds[column.missionIds.length - 1] : undefined).catch((error: unknown) =>
+          error instanceof Error ? error.message : 'It could not be started.'
+        )
+        if (why === undefined) continue
+        refused.push({ slot: column.slot, message: why })
+        if (!followingUp) await compares.refuse(compare.compareId, column.slot, why).catch(() => undefined)
+      }
+      return { ok: true, data: { compare: (await compares.get(compare.compareId)) ?? compare, refused } } as const
+    }
+    ipcMain.handle(COMPARE_START_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return compareRefused('The request was rejected.')
+      const noFolder = noWorkspaceRefusal()
+      if (noFolder !== undefined) return compareRefused(noFolder.error.message)
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      const prompt = typeof input.prompt === 'string' ? input.prompt.trim() : ''
+      const teammateId = typeof input.teammateId === 'string' ? input.teammateId : ''
+      const routes = (Array.isArray(input.routes) ? input.routes : [])
+        .filter((route): route is Record<string, unknown> => typeof route === 'object' && route !== null)
+        .map((route) => ({
+          runtime: typeof route.runtime === 'string' ? route.runtime : '',
+          model: typeof route.model === 'string' && route.model.length > 0 ? route.model : 'account-default',
+          ...(typeof route.effort === 'string' ? { effort: route.effort } : {}),
+          ...(typeof route.label === 'string' && route.label.trim().length > 0 ? { label: route.label.trim() } : {})
+        }))
+        .filter((route) => route.runtime.length > 0)
+      const distinct = new Set(routes.map((route) => `${route.runtime}\n${route.model}`))
+      if (prompt.length === 0) return compareRefused('There is nothing to compare yet. Write the ask first.')
+      if (routes.length < MIN_COMPARE_SLOTS || routes.length > MAX_COMPARE_SLOTS || distinct.size !== routes.length) {
+        return compareRefused(`Pick ${String(MIN_COMPARE_SLOTS)} or ${String(MAX_COMPARE_SLOTS)} different models to compare.`)
+      }
+      if (!(await teammates.list()).some((entry) => entry.teammateId === teammateId)) return compareRefused('Compare starts in a teammate\'s conversation. Open one, then compare.')
+      try {
+        return await askEveryColumn(await compares.create({ teammateId, prompt, routes }), prompt, false)
+      } catch (error) {
+        return compareRefused(error instanceof Error ? error.message : 'The comparison could not be started.')
+      }
+    })
+    ipcMain.handle(COMPARE_ASK_CHANNEL, async (event, compareId: unknown, prompt: unknown) => {
+      if (!fromOwnWindow(event)) return compareRefused('The request was rejected.')
+      const compare = await compares.get(compareId).catch(() => undefined)
+      if (compare === undefined) return compareRefused('That comparison is no longer here.')
+      if (compare.kept !== undefined) return compareRefused('You kept one already; this conversation carries on with it.')
+      const text = typeof prompt === 'string' ? prompt.trim() : ''
+      if (text.length === 0) return compareRefused('There is nothing to ask.')
+      return askEveryColumn(compare, text, true)
+    })
+    ipcMain.handle(COMPARE_KEEP_CHANNEL, async (event, compareId: unknown, slot: unknown) => {
+      if (!fromOwnWindow(event)) return compareRefused('The request was rejected.')
+      if (typeof compareId !== 'string' || typeof slot !== 'string') return compareRefused('That column is not in a comparison.')
+      try {
+        return { ok: true, data: { compare: await compares.keep(compareId, slot as CompareSlotId), refused: [] } } as const
+      } catch (error) {
+        return compareRefused(error instanceof Error ? error.message : 'That column could not be kept.')
+      }
+    })
+    ipcMain.handle(COMPARE_LIST_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return compareRefused('The request was rejected.')
+      try {
+        return { ok: true, data: { compares: await compares.list() } } as const
+      } catch (error) {
+        return compareRefused(error instanceof Error ? error.message : 'The comparisons could not be read.')
+      }
+    })
+
     ipcMain.handle(TEAMMATES_TAG_CHANNEL, async (event, request: unknown) => {
       if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
       const refused = noWorkspaceRefusal()

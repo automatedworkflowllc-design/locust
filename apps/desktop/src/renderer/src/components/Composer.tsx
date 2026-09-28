@@ -46,6 +46,8 @@ import { availableCommands, matchingCommands, runtimeSlashCommands, slashQuery }
 import { atQuery, fileMatches, withoutAtQuery } from '../fileMentions.js'
 import type { SlashCommand } from '../slashCommands.js'
 import { RoutePicker } from './RoutePicker.js'
+import type { ComparePicking } from './RoutePicker.js'
+import { versusLabel } from '../../../shared/compare.js'
 import type { RouteChoice } from './RoutePicker.js'
 import { RuntimeMark } from './RuntimeMark.js'
 
@@ -226,6 +228,13 @@ export interface ComposerProps {
   /** Answers what to say under the box: who it went to, or who could not take it. */
   readonly onTag?: (teammateIds: readonly string[], prompt: string) => Promise<{ readonly text: string; readonly sent: boolean } | undefined>
   /**
+   * COMPARE (0.441, shared/compare.ts): the picker's One / Compare switch and
+   * the models ticked; absent where a comparison cannot start. `asking` is a
+   * comparison on screen: the box then asks every column.
+   */
+  readonly compare?: ComparePicking
+  readonly asking?: { readonly label: string; readonly columns: number }
+  /**
    * Notes the person pinned to lines of a diff in this conversation
    * (diffNotes.ts, 0.376). They go with the next message, as one block after
    * its words, and are cleared once it has gone.
@@ -352,6 +361,8 @@ export function Composer({
   team,
   currentTeammateId,
   onTag,
+  compare,
+  asking,
   diffNotes,
   onClearDiffNotes,
   onCancel,
@@ -634,7 +645,10 @@ export function Composer({
 
   // With a message queued the box is shut, and the caption under that
   // message already says when it goes: the box says how to change it.
-  const placeholder = workingNow
+  // Compare (0.441): the ticked models, or the comparison on screen, speak for the route chip.
+  const comparing = asking !== undefined || (compare?.on === true && compare.picks.length > 0)
+  const versus = asking?.label ?? versusLabel((compare?.picks ?? []).map((pick) => pick.label))
+  const placeholder = asking !== undefined ? `Ask ${asking.columns === 2 ? 'both' : `all ${String(asking.columns)}`}…` : workingNow
     ? queued === undefined
       ? `Say what is next — it goes to ${workingName} when this finishes…`
       : 'Edit the queued message to change it…'
@@ -1549,11 +1563,11 @@ export function Composer({
                   aria-haspopup="menu"
                   aria-expanded={modeOpen}
                   aria-label="Permission mode"
-                  title={connectorsNote(route.runtime, effectiveMode, hasConnectors) ?? 'Permission mode'}
-                  disabled={running}
+                  title={comparing ? 'A comparison answers in Ask: every model reads, and nothing in your folder changes.' : connectorsNote(route.runtime, effectiveMode, hasConnectors) ?? 'Permission mode'}
+                  disabled={running || comparing}
                   onClick={() => setModeOpen(!modeOpen)}
                 >
-                  {MODES.find((option) => option.mode === effectiveMode)?.chip ?? 'Ask'}
+                  {comparing ? 'Ask' : MODES.find((option) => option.mode === effectiveMode)?.chip ?? 'Ask'}
                   <ChevronGlyph />
                 </button>
               </span>
@@ -1626,6 +1640,8 @@ export function Composer({
                       })
                     }}
                     onClose={() => setPickerOpen(false)}
+                    // Compare (0.441): only where one can start -- nothing running, no comparison on screen.
+                    {...(compare === undefined || asking !== undefined || running ? {} : { compare })}
                     {...(handoff === 'available'
                       ? {
                           notice:
@@ -1678,7 +1694,9 @@ export function Composer({
                     * and nothing connected names no runtime at all, so both
                     * keep the dot.
                     */}
-                  {nothingConnected || ownModel ? (
+                  {comparing ? (
+                    <span className="lc-control__model lc-control__versus">{versus}</span>
+                  ) : nothingConnected || ownModel ? (
                     <span className={`lc-dot ${selectedReady ? 'lc-tone-lime' : 'lc-tone-muted'}`} />
                   ) : (
                     <RuntimeMark runtime={shownRuntime} size={13} muted={!selectedReady} />
@@ -1700,7 +1718,7 @@ export function Composer({
                     * confident words. The picker still opens, because that is
                     * where a person goes to see what could be installed.
                     */}
-                  {nothingConnected ? (
+                  {comparing ? null : nothingConnected ? (
                     <span className="lc-control__model">No runtime</span>
                   ) : (
                     <>
@@ -1750,7 +1768,8 @@ export function Composer({
                 * refuses to send it either way; this stops the app offering a
                 * choice that does not exist.
                 */}
-              {shownEffort !== undefined && supportedEfforts.length > 0 && (
+              {/* A comparison runs each model at its own default: no one effort applies to all. */}
+              {shownEffort !== undefined && supportedEfforts.length > 0 && !comparing && (
                 <span className="lc-control__anchor" ref={effortAnchor}>
                   {effortOpen && (
                     /*

@@ -68,6 +68,12 @@ export interface MissionPeerContext {
    */
   readonly repositoryRoot?: string
   /**
+   * A comparison's column (0.441, shared/compare.ts): the run slot it holds
+   * in place of the teammate's own, so one teammate can answer on two models
+   * at once. Host-only. Absent means the teammate's slot, one run at a time.
+   */
+  readonly slotKey?: string
+  /**
    * The connectors this teammate is narrowed to, when it is. Host-only, never
    * printed into a prompt. Absent means every connector the person has.
    */

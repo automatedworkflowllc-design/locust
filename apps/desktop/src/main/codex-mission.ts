@@ -639,7 +639,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
   const interruptedMissionIds = new Set<string>()
   const startOperations = new Set<Promise<void>>()
   const consumeOperations = new Set<Promise<void>>()
-  const ownerKeyOf = (peer: MissionPeerContext | undefined): string => peer?.self.teammateId ?? NOBODY
+  // A comparison's column holds its own slot (0.441); everything else, the teammate's.
+  const ownerKeyOf = (peer: MissionPeerContext | undefined): string => peer?.slotKey ?? peer?.self.teammateId ?? NOBODY
   const peerExchange: PeerExchange | undefined =
     options.workroom === undefined
       ? undefined
