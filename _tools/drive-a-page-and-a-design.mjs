@@ -7,7 +7,7 @@
 // files on disk and photographs how each reads in the thread, then opens the
 // page from the thread to see what Locust shows a person for a design.
 
-import { mkdir, readFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { openTeammateScript, recordRoot, say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
@@ -64,18 +64,70 @@ try {
   const html = await readFile(join(workspace, 'index.html'), 'utf8').catch(() => undefined)
   check('index.html is written: one page, a big heading, set for phones', built === 'ended' && /<html/i.test(html ?? '') && /<h1/i.test(html ?? '') && /name=["']viewport["']/i.test(html ?? ''), JSON.stringify((html ?? '').slice(0, 120)))
 
+  // 0.425: the card of the turn that made the page shows it RUNNING.
+  const card = JSON.parse(String(await drive.capture('index.html on its card, running', () => drive.evaluate(`(async () => {
+    for (let i = 0; i < 20 && !document.querySelector('.lc-docpreview__frame'); i += 1) await new Promise((r) => setTimeout(r, 300))
+    const frame = [...document.querySelectorAll('.lc-docpreview__frame')].pop()
+    frame?.scrollIntoView({ block: 'center' })
+    await new Promise((r) => setTimeout(r, 1200))
+    return JSON.stringify({ frame: !!frame, src: frame?.getAttribute('src') ?? '', height: Math.round(frame?.getBoundingClientRect().height ?? 0) })
+  })()`))))
+  check('the card of the turn that made index.html shows the page running', card.frame && /^locust-page:\/\/[0-9a-f]{24}\//.test(card.src) && card.height > 200, JSON.stringify(card))
+
   // 0.422: every long line of a diff scrolled on its own; a line wraps now.
+  await drive.evaluate(`[...document.querySelectorAll('.lc-docpreview')].pop()?.querySelector('.lc-docpreview__switch')?.click()`)
+  await sleep(600)
   const bars = Number(await drive.evaluate(`[...document.querySelectorAll('.lc-diff__code')].filter((cell) => cell.scrollWidth > cell.clientWidth + 1).length`))
-  check('no diff line scrolls on its own: long lines wrap', bars === 0, `${String(bars)} lines scroll sideways`)
-  const opened = String(await drive.capture('Open index.html from the thread', () => drive.evaluate(`(async () => {
+  const lines = Number(await drive.evaluate(`document.querySelectorAll('.lc-diff__code').length`))
+  check('shown as a change, no line scrolls on its own: long lines wrap', lines > 0 && bars === 0, `${String(bars)} of ${String(lines)} lines scroll sideways`)
+  await drive.evaluate(`[...document.querySelectorAll('.lc-docpreview')].pop()?.querySelector('.lc-docpreview__switch')?.click()`)
+
+  // THE PROBE (0.425): the page is swapped for one that reports what it could
+  // reach, and the drive reads that report from the app's own window.
+  await mkdir(join(workspace, 'css'), { recursive: true })
+  await mkdir(join(workspace, 'js'), { recursive: true })
+  await writeFile(join(workspace, 'css', 'probe.css'), 'h1 { color: rgb(12, 34, 56); }\n', 'utf8')
+  await writeFile(join(workspace, 'data.json'), '{ "ok": true }\n', 'utf8')
+  await writeFile(join(workspace, 'js', 'probe.js'), [
+    '(async () => {',
+    "  const report = { js: true, color: getComputedStyle(document.querySelector('h1')).color }",
+    "  try { report.data = (await (await fetch('data.json')).json()).ok } catch (error) { report.data = 'failed: ' + String(error) }",
+    "  try { report.parentDocument = typeof parent.document.body } catch { report.parentDocument = 'refused' }",
+    '  report.bridge = typeof window.desktop',
+    "  try { localStorage.setItem('probe', 'kept'); report.storage = localStorage.getItem('probe') } catch { report.storage = 'refused' }",
+    "  try { await fetch('https://example.com/', { mode: 'no-cors' }); report.web = 'reached' } catch { report.web = 'blocked' }",
+    "  parent.postMessage({ locustProbe: report }, '*')",
+    '})()',
+    ''
+  ].join('\n'), 'utf8')
+  await writeFile(join(workspace, 'index.html'), '<!doctype html>\n<html><head><meta charset="utf-8"><link rel="stylesheet" href="css/probe.css"><script src="js/probe.js" defer></script></head>\n<body><h1>Corner Shop</h1></body></html>\n', 'utf8')
+  const probe = JSON.parse(String(await drive.capture('Open index.html: the page, running in the viewer', () => drive.evaluate(`(async () => {
+    window.__probes = []
+    window.addEventListener('message', (event) => { if (event.data && event.data.locustProbe) window.__probes.push(event.data.locustProbe) })
     const open = [...document.querySelectorAll('button')].filter((b) => /^Open index\\.html/.test(b.innerText.trim())).pop()
-    if (!open) return JSON.stringify({ open: false, buttons: [...document.querySelectorAll('.lc-thread button')].map((b) => b.innerText.trim()).filter(Boolean).slice(-8) })
+    if (!open) return JSON.stringify({ open: false })
     open.click()
-    await new Promise((r) => setTimeout(r, 1500))
-    const viewer = document.querySelector('.lc-viewer, .has-viewer [class*="viewer"]')
-    return JSON.stringify({ open: true, viewer: !!viewer, frame: !!document.querySelector('iframe, webview'), text: (viewer?.innerText ?? '').replace(/\\s+/g, ' ').slice(0, 300) })
+    for (let i = 0; i < 40 && window.__probes.length === 0; i += 1) await new Promise((r) => setTimeout(r, 250))
+    const frame = document.querySelector('.lc-viewer__page')
+    // The app's own window, asked the same: it must still reach nothing.
+    let appWeb = 'blocked'
+    try { await fetch('https://example.com/', { mode: 'no-cors' }); appWeb = 'reached' } catch { appWeb = 'blocked' }
+    return JSON.stringify({ open: true, frame: !!frame, src: frame?.getAttribute('src') ?? '', report: window.__probes[0] ?? null, appWeb, register: document.querySelector('.lc-viewer__register')?.innerText ?? '' })
+  })()`))))
+  say(`  probe: ${JSON.stringify(probe)}`)
+  const report = probe.report ?? {}
+  check('Open index.html runs the page in the viewer, at its own address', probe.open && probe.frame && /^locust-page:\/\//.test(probe.src), JSON.stringify({ open: probe.open, frame: probe.frame, src: probe.src }))
+  check('its script runs, its own CSS applies, it reads its own data and keeps its own storage', report.js === true && report.color === 'rgb(12, 34, 56)' && report.data === true && report.storage === 'kept', JSON.stringify(report))
+  check('it cannot reach Locust: not the window it sits in, not the bridge', report.parentDocument === 'refused' && report.bridge === 'undefined', JSON.stringify({ parentDocument: report.parentDocument, bridge: report.bridge }))
+  if (packaged !== undefined) {
+    check('on the packaged build it may reach the web, and Locust’s own window still may not', report.web === 'reached' && probe.appWeb === 'blocked', JSON.stringify({ page: report.web, app: probe.appWeb }))
+  }
+  const source = String(await drive.capture('the Source tab', () => drive.evaluate(`(async () => {
+    ;[...document.querySelectorAll('.lc-viewer__pagetabs button')].find((b) => b.innerText.trim() === 'Source')?.click()
+    await new Promise((r) => setTimeout(r, 400))
+    return document.querySelector('.lc-viewer__code')?.innerText ?? ''
   })()`)))
-  say(`  opened: ${opened}`)
+  check('Source shows the page’s own text', /<h1>Corner Shop<\/h1>/.test(source), source.slice(0, 120))
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.425.0 - 2026-09-28
+<!-- big -->
+
+### New
+
+- **Web pages open and run inside Locust.** When a teammate makes a web
+  page, the conversation shows it working, not as code. Open it and it
+  fills the viewer beside the conversation, with its scripts, styles and
+  images, and a Source tab for the code. It runs in a frame of its own, so
+  it can't reach Locust, your files or your accounts. A link it opens in a
+  new window goes to your browser.
+
 ## 0.424.0 - 2026-09-28
 
 ### New

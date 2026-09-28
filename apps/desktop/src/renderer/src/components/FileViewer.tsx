@@ -37,7 +37,8 @@ export function FileViewer({
   onClose,
   onReveal,
   onSave,
-  workbook
+  workbook,
+  pageUrl
 }: {
   readonly path: string
   /** The file's text, or a `data:` URL when the mode is `image`. */
@@ -56,9 +57,17 @@ export function FileViewer({
   /** Show it in the file manager -- the thing the pill did before this existed. */
   readonly onReveal: () => void
   readonly onSave: () => void
+  /**
+   * A web page's address in the preview (0.425): shown WORKING, in a frame
+   * with its own origin (main/page-preview.ts), its source one tab away.
+   */
+  readonly pageUrl?: string
 }): ReactElement {
   /** Which turn's change is being read, or undefined for the file as it is. */
   const [showing, setShowing] = useState<number>()
+  const [asSource, setAsSource] = useState(false)
+  const [reloads, setReloads] = useState(0)
+  const running = pageUrl !== undefined && !asSource
   const version = showing === undefined ? undefined : turns[showing]
   return (
     <aside className="lc-viewer" aria-label={`Viewing ${path}`}>
@@ -73,6 +82,23 @@ export function FileViewer({
           {path.replace(/\\/g, '/').split('/').pop() ?? path}
         </span>
         <span className="lc-viewer__spacer" />
+        {pageUrl !== undefined && (
+          <>
+            <div className="lc-segmented lc-viewer__pagetabs" role="radiogroup" aria-label="Show the page or its source">
+              <button type="button" role="radio" aria-checked={!asSource} className={`lc-button${asSource ? '' : ' is-active'}`} onClick={() => setAsSource(false)}>
+                Page
+              </button>
+              <button type="button" role="radio" aria-checked={asSource} className={`lc-button${asSource ? ' is-active' : ''}`} onClick={() => setAsSource(true)}>
+                Source
+              </button>
+            </div>
+            {running && (
+              <button type="button" className="lc-viewer__action" title="Reload the page" aria-label="Reload the page" onClick={() => setReloads((count) => count + 1)}>
+                <Icon name="refresh" size={13} />
+              </button>
+            )}
+          </>
+        )}
         <button type="button" className="lc-viewer__action" title="Show it in the file manager" onClick={onReveal}>
           <Icon name="folder" size={13} />
         </button>
@@ -134,6 +160,20 @@ export function FileViewer({
           </p>
           <DiffView key={showing} file={version.file} truncated={version.truncated} reported={version.reported} />
         </div>
+      ) : running ? (
+        /*
+         * THE PAGE, RUNNING (0.425). Its own origin (locust-page://<token>),
+         * never the app's, so allow-same-origin gives it its OWN storage and
+         * nothing of Locust's; the host answers IPC from the top frame only,
+         * and a sub-frame gets no preload. docs/DECISION-2026-09-28-PAGE-PREVIEW.md.
+         */
+        <iframe
+          key={reloads}
+          className="lc-viewer__page"
+          src={pageUrl}
+          title={`${path.replace(/\\/g, '/').split('/').pop() ?? 'page'}, running`}
+          sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads"
+        />
       ) : (
       <div className="lc-viewer__scroll">
         {mode === 'image' ? (
@@ -184,7 +224,9 @@ export function FileViewer({
         * control somebody forgot.
         */}
       <p className="lc-viewer__register">
-        Locust does not open files — a teammate chose this file's name and contents. Reveal hands it to Windows.
+        {running
+          ? 'This page runs here, in a frame of its own: it cannot reach Locust, your files or your accounts.'
+          : "Locust does not open files — a teammate chose this file's name and contents. Reveal hands it to Windows."}
       </p>
     </aside>
   )

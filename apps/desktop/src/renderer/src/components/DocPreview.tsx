@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import { csvWorkbook } from '../../../shared/sheet.js'
@@ -27,7 +27,44 @@ import { AgentText } from './ThreadItems.js'
  * diff: then what changed is the question.
  */
 export function isNewDocument(file: DiffFile): boolean {
-  return file.status === 'ADDED' && (viewerMode(file.path) === 'markdown' || isTableFile(file.path))
+  return file.status === 'ADDED' && (viewerMode(file.path) === 'markdown' || isTableFile(file.path) || isPageFile(file.path))
+}
+
+/** A new web page is shown running, in a frame of its own (0.425). */
+function isPageFile(path: string): boolean {
+  const extension = extensionOf(path)
+  return extension === 'html' || extension === 'htm'
+}
+
+/**
+ * A web page a teammate just made, running (0.425): the same frame the viewer
+ * uses (main/page-preview.ts), sized to the card. Colin, 2026-09-28: "full
+ * functionality, sacrifice nothing."
+ */
+function PagePreview({ path, name }: { readonly path: string; readonly name: string }): ReactElement {
+  const [url, setUrl] = useState<string>()
+  const [refused, setRefused] = useState<string>()
+  useEffect(() => {
+    let live = true
+    void window.desktop?.pageUrlFor(path).then((answer) => {
+      if (!live) return
+      if (answer.ok) setUrl(answer.url)
+      else setRefused(answer.message)
+    }).catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [path])
+  return url === undefined ? (
+    <p className="lc-docpreview__framewait">{refused ?? 'Opening the page…'}</p>
+  ) : (
+    <iframe
+      className="lc-docpreview__frame"
+      src={url}
+      title={`${name}, running`}
+      sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads"
+    />
+  )
 }
 
 /** A new CSV or TSV is a table, previewed as its first rows (0.364). */
@@ -78,7 +115,9 @@ export function DocPreview({
   }
   return (
     <div className="lc-docpreview" role="region" aria-label={`${name}, as written`}>
-      {isTableFile(file.path) ? (
+      {isPageFile(file.path) ? (
+        <PagePreview path={file.path} name={name} />
+      ) : isTableFile(file.path) ? (
         <div className="lc-docpreview__table">
           <SheetView workbook={csvWorkbook(name, documentTextOf(file), extensionOf(file.path) === 'tsv' ? '\t' : ',')} compact />
         </div>
@@ -96,7 +135,7 @@ export function DocPreview({
             Open {name}
           </button>
         )}
-        {(clipped || truncated) && (
+        {(clipped || truncated) && !isPageFile(file.path) && (
           <span className="lc-docpreview__note">{truncated ? 'Only its start was recorded here.' : 'The rest is in the file.'}</span>
         )}
         <button type="button" className="lc-docpreview__switch" onClick={() => setAsChange(true)}>

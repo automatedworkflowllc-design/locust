@@ -1520,6 +1520,8 @@ export default function App(): ReactElement {
     /** The file's text, or a `data:` URL when the mode is `image`. */
     readonly text: string
     readonly mode: 'markdown' | 'code' | 'image' | 'table'
+    /** A web page's address in the preview frame (0.425); its text stays the source. */
+    readonly pageUrl?: string
     /** A spreadsheet's cells, when the mode is `table` (0.364). */
     readonly workbook?: Workbook
   }>()
@@ -1582,6 +1584,13 @@ export default function App(): ReactElement {
       .then((answer) => {
         if (answer.ok) {
           setViewingFile({ path: full, text: answer.text, mode: answer.mode, ...(answer.workbook === undefined ? {} : { workbook: answer.workbook }) })
+          // A web page opens WORKING (0.425, Colin: "full functionality,
+          // sacrifice nothing"); its source is one tab away.
+          if (/\.html?$/i.test(full)) {
+            void bridge.pageUrlFor(full).then((page) => {
+              if (page.ok) setViewingFile((current) => (current?.path === full ? { ...current, pageUrl: page.url } : current))
+            }).catch(() => undefined)
+          }
           return
         }
         setViewingFile(undefined)
@@ -6800,6 +6809,7 @@ export default function App(): ReactElement {
             text={viewingFile.text}
             mode={viewingFile.mode}
             {...(viewingFile.workbook === undefined ? {} : { workbook: viewingFile.workbook })}
+            {...(viewingFile.pageUrl === undefined ? {} : { pageUrl: viewingFile.pageUrl })}
             turns={viewingFileTurns}
             onClose={() => setViewingFile(undefined)}
             onReveal={() => {

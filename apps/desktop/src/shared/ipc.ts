@@ -741,6 +741,9 @@ export type WorkspaceTextResponse =
   | { readonly ok: false; readonly message: string }
 
 export const WORKSPACE_TEXT_CHANNEL = 'workspace:text'
+/** A web page's address in the preview (0.425): main/page-preview.ts. */
+export const WORKSPACE_PAGE_CHANNEL = 'workspace:page'
+export type WorkspacePageResponse = { readonly ok: true; readonly url: string } | { readonly ok: false; readonly message: string }
 
 /**
  * An attached image, as a `data:` URL the renderer can put in an `<img>`.
@@ -2568,6 +2571,8 @@ export interface DesktopApi {
   saveCopy(path: string): Promise<RevealFileResponse>
   /** Read a workspace text file for the viewer. */
   readTextFile(path: string): Promise<WorkspaceTextResponse>
+  /** Where a web page in the folder is served for the preview frame (0.425). */
+  pageUrlFor(path: string): Promise<WorkspacePageResponse>
   /** Show the diagnostics log in the file manager. Names no path. */
   revealDiagnostics(): Promise<void>
   /** Open the feedback report, filled in, in the person's browser. Names no address. */

@@ -6,7 +6,8 @@ import { ownGitArgs } from './git-guard.js'
 import { APP_USER_MODEL_ID, DEVELOPMENT_APP_USER_MODEL_ID, mayShowToasts, repairStartMenuShortcut, sweepStaleElectronShortcuts } from './stale-shortcut.js'
 import { openingPlacement, readSavedWindow } from './window-bounds.js'
 import type { SavedWindow } from './window-bounds.js'
-import { app, BrowserWindow, crashReporter, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, powerSaveBlocker, safeStorage, screen, session, shell, Tray } from 'electron'
+import { app, BrowserWindow, crashReporter, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, powerSaveBlocker, protocol, safeStorage, screen, session, shell, Tray } from 'electron'
+import { createPageServer, fromPagePreview, PAGE_SCHEME } from './page-preview.js'
 import electronUpdater from 'electron-updater'
 
 const { autoUpdater } = electronUpdater
@@ -198,6 +199,7 @@ import {
   WORKSPACE_REVEAL_CHANNEL,
   WORKSPACE_SAVE_COPY_CHANNEL,
   WORKSPACE_TEXT_CHANNEL,
+  WORKSPACE_PAGE_CHANNEL,
   DIAGNOSTICS_REVEAL_CHANNEL,
   FEEDBACK_CHANNEL,
   DIAGNOSTICS_REPORT_CHANNEL,
@@ -995,7 +997,12 @@ const createWindow = (
 
   rememberWindow(window)
 
-  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  // A link a previewed page opens in a new window goes to the person's
+  // browser (0.425); nothing else ever opens a window.
+  window.webContents.setWindowOpenHandler(({ url, referrer }) => {
+    if (referrer.url.startsWith(`${PAGE_SCHEME}://`) && /^https?:\/\//i.test(url)) void shell.openExternal(url)
+    return { action: 'deny' }
+  })
 
   window.webContents.on('will-navigate', (event, url) => {
     const activeUrl = window.webContents.getURL()
@@ -1127,6 +1134,16 @@ app.on('web-contents-created', (_event, contents) => {
  */
 crashReporter.start({ uploadToServer: false })
 
+/*
+ * The page preview's scheme (0.425, main/page-preview.ts). Registered before
+ * the app is ready, as a scheme must be: STANDARD so a page's relative links
+ * resolve, SECURE so it is treated as https would be, fetch and streaming so
+ * its own scripts and video work.
+ */
+protocol.registerSchemesAsPrivileged([
+  { scheme: PAGE_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } }
+])
+
 
 if (!ownsSingleInstanceLock) {
   app.quit()
@@ -1203,8 +1220,10 @@ if (!ownsSingleInstanceLock) {
     if (app.isPackaged) {
       session.defaultSession.webRequest.onBeforeRequest(
         { urls: ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*'] },
-        (_details, respond) => {
-          respond({ cancel: true })
+        (details, respond) => {
+          // A web page shown in the preview may load what it links to, as in
+          // a browser; Locust's own window still loads nothing (0.425).
+          respond({ cancel: !fromPagePreview(details.frame) })
         }
       )
     }
@@ -3216,6 +3235,19 @@ if (!ownsSingleInstanceLock) {
      * escapes every value, which is the same treatment a reply gets, and for
      * the same reason: a file in the workspace was written by a model.
      */
+    /*
+     * A web page, served to the preview frame and run there (0.425,
+     * main/page-preview.ts; Colin's decision, docs/DECISION-2026-09-28-PAGE-
+     * PREVIEW.md). The same folders the viewer opens files from.
+     */
+    const pages = createPageServer({ roots: async () => [...(workspaceChosen ? [workspacePath] : []), ...(await teammateFolders())] })
+    protocol.handle(PAGE_SCHEME, (request) => pages.handle(request.url))
+    ipcMain.handle(WORKSPACE_PAGE_CHANNEL, async (event, requested: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      if (typeof requested !== 'string' || requested.length === 0) return { ok: false, message: 'There is no page to open.' } as const
+      return pages.urlFor(requested)
+    })
+
     ipcMain.handle(WORKSPACE_TEXT_CHANNEL, async (event, requested: unknown) => {
       if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
       if (typeof requested !== 'string' || requested.length === 0) {

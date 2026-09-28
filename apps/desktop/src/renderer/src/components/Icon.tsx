@@ -30,6 +30,7 @@ export type IconName =
   | 'pause'
   | 'pencil'
   | 'play'
+  | 'refresh'
   | 'plus'
   | 'route'
   | 'search'
@@ -84,6 +85,7 @@ export function Icon({ name, size = 16 }: { name: IconName; size?: number }): Re
     minimize: <path d="M5 12h14" />,
     pause: <><path d="M9 7v10" /><path d="M15 7v10" /></>,
     play: <path d="m9 7 8 5-8 5z" />,
+    refresh: <><path d="M19 12a7 7 0 1 1-2.05-4.95" /><path d="M19 5v4h-4" /></>,
     plus: <><path d="M12 5v14" /><path d="M5 12h14" /></>,
     route: <><circle cx="6" cy="6" r="2" /><circle cx="18" cy="18" r="2" /><path d="M8 6h4a4 4 0 0 1 4 4v4" /><path d="m13 12 3 3 3-3" /></>,
     search: <><circle cx="11" cy="11" r="7" /><path d="m16 16 4 4" /></>,

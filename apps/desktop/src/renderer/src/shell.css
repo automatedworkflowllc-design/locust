@@ -14882,6 +14882,39 @@ textarea {
   padding: var(--lc-space-5);
 }
 
+/* A web page, running (0.425): the whole pane, edge to edge, on white --
+   a page that sets no background expects a browser's. */
+.lc-viewer__page {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  border: 0;
+  background: #fff;
+}
+
+/* A new web page in the thread, running (0.425): a window onto it, sized
+   like the card's other previews, on white as a browser would draw it. */
+.lc-docpreview__frame {
+  display: block;
+  width: 100%;
+  height: 360px;
+  border: 0;
+  border-bottom: 1px solid var(--lc-border-card);
+  background: #fff;
+}
+
+.lc-docpreview__framewait {
+  margin: 0;
+  padding: var(--lc-space-5);
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
+}
+
+.lc-viewer__pagetabs .lc-button {
+  padding: 2px var(--lc-space-3);
+  font-size: var(--lc-text-mono-caption);
+}
+
 /*
  * A SPREADSHEET (SheetView, 0.364): the grid a spreadsheet person reads --
  * letters across, numbers down, both pinned while the cells scroll under

@@ -1,5 +1,11 @@
 # Decision: Locust never runs code a model wrote
 
+> **Amended 2026-09-28 — web pages run.** Colin, as the product's owner:
+> "full functionality, sacrifice nothing." A web page a teammate made now
+> opens running, inside Locust, in a frame of its own origin with no bridge
+> to the app. See `DECISION-2026-09-28-PAGE-PREVIEW.md`. Everything else
+> below still holds: the host executes nothing else a model wrote.
+
 **The question** (`PLAN-2026-09-20-VIEWER-AND-ARTIFACTS.md`, item **b**):
 *should Locust ever run code a model wrote, in any sandbox, on this machine?*
 
