@@ -2516,6 +2516,8 @@ export function buildThread(
   let workBegan = false
   /** Diagnostics the thread gate drops, drawn at the foot of the fold instead. */
   const foldNotices: { readonly level: 'info' | 'warning' | 'error'; readonly message: string; readonly source: MissionRuntimeId }[] = []
+  /** What the host saved on the teammate's branch (0.439): the turn's last line. */
+  const receipts: ThreadItem[] = []
 
   for (const [eventIndex, event] of events.entries()) {
     switch (event.type) {
@@ -2863,6 +2865,14 @@ export function buildThread(
         // item. Only the former is worth interrupting an empty thread for.
         // A usage window is state the host keeps, not a line in the thread.
         if (/\.usage_window$/.test(event.payload.code)) break
+        // What the host saved on the teammate's branch (0.439) is said when the
+        // turn is over: after its work and its answer, never above them. The
+        // first packaged drive drew "Saved this turn" under the ask, before
+        // the work it saved.
+        if (event.payload.code === 'host.turn_checkpoint') {
+          receipts.push({ key: event.id, type: 'diagnostic', level: event.payload.level, message: event.payload.message })
+          break
+        }
         // A record the adapter does not know yet is this app's gap, not the
         // run's news: a runtime updates and adds record types before Locust
         // has learned them, and Claude Code 2.1.280's `tool_progress` heartbeat
@@ -3266,6 +3276,7 @@ export function buildThread(
     }
   }
 
+  items.push(...receipts)
   return items
 }
 
