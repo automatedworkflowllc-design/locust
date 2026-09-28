@@ -796,7 +796,7 @@ export const COMPARE_RETRY_CHANNEL = 'compare:retry'
 /** What each column of a comparison that edits has changed so far (0.445). */
 export const COMPARE_CHANGES_CHANNEL = 'compare:changes'
 export type CompareChangesResponse =
-  | { readonly ok: true; readonly data: { readonly columns: Partial<Record<CompareSlotId, { readonly files: number; readonly added: number; readonly removed: number }>> } }
+  | { readonly ok: true; readonly data: { readonly columns: Partial<Record<CompareSlotId, { readonly files: number; readonly added?: number; readonly removed?: number }>> } }
   | { readonly ok: false; readonly error: { readonly code: 'COMPARE_REFUSED'; readonly message: string } }
 export const COMPARE_LIST_CHANNEL = 'compare:list'
 export interface CompareStartRequest {

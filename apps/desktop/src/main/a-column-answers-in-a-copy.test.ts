@@ -63,10 +63,11 @@ describe('a copy for a column', () => {
     await makeCompareCopy({ folder, compareId: 'cmp_3', slot: 'b', root })
     await makeCompareCopy({ folder, compareId: 'cmp_4', slot: 'a', root })
     await removeCompareCopies('cmp_3', root)
-    expect((await readdir(root)).sort()).toEqual(['cmp_4-a'])
+    // Each copy has its manifest beside it (0.448); both go together.
+    expect((await readdir(root)).sort()).toEqual(['cmp_4-a', 'cmp_4-a.manifest.json'])
     // A name that is not a comparison's removes nothing.
     await removeCompareCopies('../x', root)
-    expect(await readdir(root)).toEqual(['cmp_4-a'])
+    expect((await readdir(root)).sort()).toEqual(['cmp_4-a', 'cmp_4-a.manifest.json'])
   })
 
   it('refuses an id that could name a path outside its root', async () => {

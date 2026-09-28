@@ -13,7 +13,7 @@ import { createCursorDefaultModel } from './cursor-default-model.js'
 import { listWorkspaceFiles } from './workspace-files.js'
 import { MAX_TAGGED, taggedPrompt } from '../shared/tagging.js'
 import { COMPARE_TREES_DIRECTORY, comparesGoneWith, compareNeedsCopy, compareRefusalOf, compareSlotKey, compareTreeId, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../shared/compare.js'
-import { makeCompareCopy, removeCompareCopies } from './compare-copies.js'
+import { bringInCopy, COPY_ROOT, copyLineChanges, makeCompareCopy, removeCompareCopies } from './compare-copies.js'
 import type { CompareSlotId, PublicCompare, PublicCompareSlot } from '../shared/compare.js'
 import { createCompareStore } from './compare-store.js'
 import electronUpdater from 'electron-updater'
@@ -84,7 +84,7 @@ import { ROOM_HISTORY_POSTS } from '../shared/room-history.js'
 import type { RoomHistory, RoomHistoryAnswer } from '../shared/room-history.js'
 import { createRoutineRunner } from './routine-runner.js'
 import { createMemoryStore } from './memory-store.js'
-import { WorktreeHasChangesError, createWorktreeManager } from './worktrees.js'
+import { WorktreeHasChangesError, createWorktreeManager, defaultRunGit } from './worktrees.js'
 import { readRuntimeSetup } from './runtime-setup.js'
 import { briefSection, readWorkspaceBrief, whereSection, worktreeSection, groupSection } from './workspace-brief.js'
 import { createConversationChain, groupBriefFor } from './conversation-chain.js'
@@ -3297,7 +3297,8 @@ if (!ownsSingleInstanceLock) {
      * PREVIEW.md). The same folders the viewer opens files from.
      */
     const pages = createPageServer({
-      roots: async () => [...(workspaceChosen ? [workspacePath] : []), ...(await teammateFolders())],
+      // And a comparison's plain copies (0.448), whose pages each column runs.
+      roots: async () => [...(workspaceChosen ? [workspacePath] : []), ...(await teammateFolders()), COPY_ROOT],
       base: () => (workspaceChosen ? workspacePath : undefined)
     })
     protocol.handle(PAGE_SCHEME, (request) => pages.handle(request.url))
@@ -4041,7 +4042,7 @@ if (!ownsSingleInstanceLock) {
      */
     const compareTrees = () => createWorktreeManager({ workspacePath, directory: COMPARE_TREES_DIRECTORY })
     const discardCompareTrees = async (compare: PublicCompare): Promise<void> => {
-      if (compare.changes !== true) return
+      if (compare.changes !== true || compare.changesIn === 'copy') return
       for (const column of compare.slots) await compareTrees().discard(compareTreeId(compare.compareId, column.slot)).catch(() => undefined)
     }
     const startCompareColumn = async (compare: PublicCompare, column: PublicCompareSlot, prompt: string, followUpOf?: string, retrying = false): Promise<string | undefined> => {
@@ -4051,7 +4052,14 @@ if (!ownsSingleInstanceLock) {
       if (cannot !== undefined) return cannot
       // A comparison that edits: the column's own copy of the project (0.445).
       let tree: string | undefined
-      if (compare.changes === true) {
+      if (compare.changes === true && compare.changesIn === 'copy') {
+        // Not a git project (0.448): a plain copy of the folder, which Keep writes back from.
+        try {
+          tree = await makeCompareCopy({ folder: workspacePath, compareId: compare.compareId, slot: column.slot })
+        } catch (error) {
+          return error instanceof Error ? error.message.replace('It answers in a copy of the folder, and this', 'It works in a copy of the folder, and this') : 'A copy of the folder could not be made for it.'
+        }
+      } else if (compare.changes === true) {
         try {
           tree = await compareTrees().ensure({ teammateId: compareTreeId(compare.compareId, column.slot), name: `compare ${compare.compareId} ${column.slot}` })
         } catch (error) {
@@ -4134,12 +4142,10 @@ if (!ownsSingleInstanceLock) {
         return compareRefused(`Pick ${String(MIN_COMPARE_SLOTS)} or ${String(MAX_COMPARE_SLOTS)} different models to compare.`)
       }
       if (teammateId !== undefined && !(await teammates.list()).some((entry) => entry.teammateId === teammateId)) return compareRefused('That teammate is no longer on the team.')
-      if (changes) {
-        const probe = await compareTrees().probe()
-        if (!probe.repository) return compareRefused(`Comparing changes needs a git project, so each model can have its own copy. ${probe.reason ?? ''} Compare in Ask instead: they answer, and nothing changes.`.replace(/\s+/g, ' ').trim())
-      }
+      // A git project gives each column a worktree; any other folder, a plain copy (0.448).
+      const changesIn = changes && !(await compareTrees().probe()).repository ? ('copy' as const) : undefined
       try {
-        return await askEveryColumn(await compares.create({ ...(teammateId === undefined ? {} : { teammateId }), prompt, routes, changes }), prompt, false)
+        return await askEveryColumn(await compares.create({ ...(teammateId === undefined ? {} : { teammateId }), prompt, routes, changes, ...(changesIn === undefined ? {} : { changesIn }) }), prompt, false)
       } catch (error) {
         return compareRefused(error instanceof Error ? error.message : 'The comparison could not be started.')
       }
@@ -4161,9 +4167,10 @@ if (!ownsSingleInstanceLock) {
         if (compare === undefined) return compareRefused('That comparison is no longer here.')
         let brought: readonly string[] | undefined
         if (compare.changes === true && compare.kept === undefined) {
-          const result = await compareTrees()
-            .bringIn(compareTreeId(compareId, slot as CompareSlotId))
-            .catch((error: unknown) => ({ kind: 'does-not-apply' as const, message: error instanceof Error ? error.message : 'git did not say why.' }))
+          const result = await (compare.changesIn === 'copy'
+            ? bringInCopy({ folder: workspacePath, compareId, slot: slot as CompareSlotId })
+            : compareTrees().bringIn(compareTreeId(compareId, slot as CompareSlotId))
+          ).catch((error: unknown) => ({ kind: 'does-not-apply' as const, message: error instanceof Error ? error.message : 'It did not say why.' }))
           if (result.kind === 'your-changes') {
             return compareRefused(`You have changed ${result.files.slice(0, 3).join(', ')}${result.files.length > 3 ? ` and ${String(result.files.length - 3)} more` : ''} yourself, and this answer changes ${result.files.length === 1 ? 'it' : 'them'} too, so nothing was put into your folder. Save or undo your change first, then keep it again.`)
           }
@@ -4211,12 +4218,14 @@ if (!ownsSingleInstanceLock) {
       if (!fromOwnWindow(event)) return compareRefused('The request was rejected.')
       const compare = await compares.get(compareId).catch(() => undefined)
       if (compare === undefined) return compareRefused('That comparison is no longer here.')
-      const columns: Partial<Record<CompareSlotId, { files: number; added: number; removed: number }>> = {}
+      const columns: Partial<Record<CompareSlotId, { files: number; added?: number; removed?: number }>> = {}
       if (compare.changes === true && compare.kept === undefined) {
         for (const column of compare.slots) {
           if (column.missionIds.length === 0) continue
           try {
-            columns[column.slot] = await compareTrees().changes(compareTreeId(compare.compareId, column.slot))
+            columns[column.slot] = compare.changesIn === 'copy'
+              ? await copyLineChanges({ folder: workspacePath, compareId: compare.compareId, slot: column.slot, runGit: defaultRunGit })
+              : await compareTrees().changes(compareTreeId(compare.compareId, column.slot))
           } catch {
             // A copy that cannot be read says nothing, rather than a number it cannot stand behind.
           }

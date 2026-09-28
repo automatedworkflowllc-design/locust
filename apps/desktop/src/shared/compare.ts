@@ -55,6 +55,12 @@ export interface PublicCompare {
    */
   readonly changes?: true
   /**
+   * Where a comparison that edits keeps its columns' copies (0.448): 'copy'
+   * is a plain copy of a folder that is not a git project; absent, each
+   * column is a git worktree.
+   */
+  readonly changesIn?: 'copy'
+  /**
    * The column the person kept; the conversation carries on from its newest
    * mission. `brought` names the files its changes put into the folder, in a
    * comparison that edits.
@@ -76,8 +82,9 @@ export function compareTreeId(compareId: string, slot: CompareSlotId): string {
 }
 
 /** "+12 -3 in 2 files", or what a column that changed nothing says. */
-export function changesLine(changes: { readonly files: number; readonly added: number; readonly removed: number }): string {
+export function changesLine(changes: { readonly files: number; readonly added?: number; readonly removed?: number }): string {
   if (changes.files === 0) return 'no changes'
+  if (changes.added === undefined || changes.removed === undefined) return `${String(changes.files)} ${changes.files === 1 ? 'file' : 'files'} changed`
   return `+${String(changes.added)} \u2212${String(changes.removed)} in ${String(changes.files)} ${changes.files === 1 ? 'file' : 'files'}`
 }
 

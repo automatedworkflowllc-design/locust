@@ -1,6 +1,7 @@
-import { cp, lstat, mkdir, readdir, rm, stat } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { cp, lstat, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join, relative, resolve, sep } from 'node:path'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 
 import type { CompareSlotId } from '../shared/compare.js'
 
@@ -84,7 +85,93 @@ export async function makeCompareCopy(input: {
       return !inside.split(sep).some((part) => LEFT_OUT.has(part))
     }
   })
+  // What each file was when copied (0.448): so Keep knows what the column
+  // changed, and whether the person has since changed the same file.
+  await writeFile(manifestPath(root, input.compareId, input.slot), JSON.stringify(await hashTree(target)), 'utf8')
   return target
+}
+
+/** Beside the copy, never in it: a column must not find Locust's bookkeeping among its files. */
+const manifestPath = (root: string, compareId: string, slot: CompareSlotId): string => join(root, `${safeName(compareId, slot)}.manifest.json`)
+
+const hashOf = async (path: string): Promise<string> => createHash('sha256').update(await readFile(path)).digest('hex')
+
+/** Every file under a tree, by its path inside it (forward slashes), with its content's hash. */
+async function hashTree(tree: string): Promise<Record<string, string>> {
+  const out: Record<string, string> = {}
+  const walk = async (directory: string): Promise<void> => {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      if (LEFT_OUT.has(entry.name)) continue
+      const path = join(directory, entry.name)
+      if (entry.isDirectory()) await walk(path)
+      else if (entry.isFile()) out[relative(tree, path).split(sep).join('/')] = await hashOf(path)
+    }
+  }
+  await walk(tree)
+  return out
+}
+
+/** What a column changed in its copy: new or changed files, and files it deleted. */
+export interface CopyChanges {
+  readonly changed: readonly string[]
+  readonly deleted: readonly string[]
+}
+
+/**
+ * A COMPARISON THAT EDITS, IN ANY FOLDER (0.448).
+ *
+ * 0.445 gave each column a git worktree, so comparing work needed a git
+ * project -- and a new person's folder (Documents\Locust) is not one, which
+ * left the Home starters Colin agreed to ("Make a landing page") with nowhere
+ * clean to run. A column in a folder that is not a git project edits a plain
+ * copy of it instead, and these read what it did against what it was given.
+ */
+export async function copyChanges(input: { readonly compareId: string; readonly slot: CompareSlotId; readonly root?: string }): Promise<CopyChanges> {
+  const root = input.root ?? COPY_ROOT
+  const target = join(root, safeName(input.compareId, input.slot))
+  const before = JSON.parse(await readFile(manifestPath(root, input.compareId, input.slot), 'utf8')) as Record<string, string>
+  const now = await hashTree(target)
+  const changed = Object.keys(now).filter((path) => before[path] !== now[path]).sort()
+  const deleted = Object.keys(before).filter((path) => now[path] === undefined).sort()
+  return { changed, deleted }
+}
+
+export type CopyBringIn =
+  | { readonly kind: 'brought'; readonly files: readonly string[] }
+  | { readonly kind: 'nothing' }
+  | { readonly kind: 'your-changes'; readonly files: readonly string[] }
+
+/**
+ * Keep this one, from a copy: the column's changed files are written into the
+ * folder and the ones it deleted are removed -- and nothing is, when the
+ * person has since changed any of those same files themselves.
+ */
+export async function bringInCopy(input: { readonly folder: string; readonly compareId: string; readonly slot: CompareSlotId; readonly root?: string }): Promise<CopyBringIn> {
+  const root = input.root ?? COPY_ROOT
+  const target = join(root, safeName(input.compareId, input.slot))
+  const before = JSON.parse(await readFile(manifestPath(root, input.compareId, input.slot), 'utf8')) as Record<string, string>
+  const { changed, deleted } = await copyChanges(input)
+  const touched = [...changed, ...deleted]
+  if (touched.length === 0) return { kind: 'nothing' }
+  const folder = resolve(input.folder)
+  const inFolder = (path: string): string => {
+    const full = resolve(folder, ...path.split('/'))
+    if (full !== folder && !full.startsWith(folder + sep)) throw new Error('A copy named a file outside the folder.')
+    return full
+  }
+  // The person's own changes since the copy was made: a file that is not as it was then.
+  const yours: string[] = []
+  for (const path of touched) {
+    const current = await hashOf(inFolder(path)).catch(() => undefined)
+    if (current !== before[path]) yours.push(path)
+  }
+  if (yours.length > 0) return { kind: 'your-changes', files: yours }
+  for (const path of changed) {
+    await mkdir(dirname(inFolder(path)), { recursive: true })
+    await cp(join(target, ...path.split('/')), inFolder(path), { force: true })
+  }
+  for (const path of deleted) await rm(inFolder(path), { force: true })
+  return { kind: 'brought', files: touched.sort() }
 }
 
 /** Every copy a comparison made. Nothing else under the root is touched. */
@@ -92,6 +179,47 @@ export async function removeCompareCopies(compareId: string, root: string = COPY
   if (!/^cmp_[A-Za-z0-9]{1,40}$/.test(compareId)) return
   const names = await readdir(root).catch(() => [] as string[])
   for (const name of names) {
+    // The copy and its manifest beside it.
     if (name.startsWith(`${compareId}-`)) await rm(join(root, name), { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   }
+}
+
+/**
+ * "+a -b in N files" for a copy, the way git counts it: each changed file
+ * against the folder's, through `git diff --no-index --numstat`, which exits 1
+ * when they differ (and says so on stdout). A file git cannot count adds a
+ * file and no lines -- never a guessed number.
+ */
+export async function copyLineChanges(input: {
+  readonly folder: string
+  readonly compareId: string
+  readonly slot: CompareSlotId
+  readonly root?: string
+  readonly runGit: (args: readonly string[], cwd: string) => Promise<string>
+}): Promise<{ readonly files: number; readonly added?: number; readonly removed?: number }> {
+  const root = input.root ?? COPY_ROOT
+  const target = join(root, safeName(input.compareId, input.slot))
+  const { changed, deleted } = await copyChanges(input)
+  let added = 0
+  let removed = 0
+  let counted = false
+  const count = async (from: string, to: string): Promise<void> => {
+    const printed = await input.runGit(['diff', '--no-index', '--numstat', '--no-color', '--no-ext-diff', '--', from, to], root).catch((error: unknown) => String((error as { stdout?: string }).stdout ?? ''))
+    for (const line of printed.split(/\r?\n/)) {
+      const [plus, minus] = line.split('\t')
+      if (minus !== undefined) counted = true
+      if (plus !== undefined && /^\d+$/.test(plus)) added += Number(plus)
+      if (minus !== undefined && /^\d+$/.test(minus)) removed += Number(minus)
+    }
+  }
+  // git reads a missing side as the null device, so a new or deleted file counts whole.
+  const empty = process.platform === 'win32' ? 'NUL' : '/dev/null'
+  for (const path of changed) {
+    const mine = resolve(input.folder, ...path.split('/'))
+    const there = await stat(mine).then(() => mine, () => empty)
+    await count(there, join(target, ...path.split('/')))
+  }
+  for (const path of deleted) await count(resolve(input.folder, ...path.split('/')), empty)
+  // Git counted nothing (not installed, or refused): the files, and no invented numbers.
+  return counted ? { files: changed.length + deleted.length, added, removed } : { files: changed.length + deleted.length }
 }

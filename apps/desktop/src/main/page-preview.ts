@@ -89,10 +89,12 @@ export function createPageServer(options: {
       const from = options.base?.()
       const full = isAbsolute(path) || from === undefined ? resolve(path) : resolve(from, path)
       // A comparison column's copy is removed once one is kept, and the kept
-      // one's page is then in the folder itself, at the same place (0.446).
-      const kept = from === undefined ? undefined : /^(.*?)[\\/]\.locust[\\/]compare[\\/][^\\/]+[\\/](.+)$/.exec(full)
+      // one's page is then in the folder itself, at the same place (0.446) --
+      // whether the copy was a worktree in the folder or, in a folder that is
+      // not a git project, a plain copy under ~/.locust/compare (0.448).
+      const kept = from === undefined ? undefined : /[\\/]\.locust[\\/]compare[\\/]cmp_[A-Za-z0-9]+-[abc][\\/](.+)$/.exec(full)
       const real = await realpath(full).catch(async () =>
-        kept?.[1] !== undefined && kept[2] !== undefined && within(kept[1], from!, platform) ? realpath(join(kept[1], kept[2])).catch(() => undefined) : undefined
+        kept?.[1] !== undefined && from !== undefined ? realpath(join(from, kept[1])).catch(() => undefined) : undefined
       )
       if (real === undefined) return { ok: false, message: 'That page is not there. The teammate named it but did not write it.' }
       const root = (await realRoots()).find((candidate) => within(real, candidate, platform))

@@ -1359,6 +1359,11 @@ export function relativePath(path: string, workspacePath: string | undefined): s
   const root = normalise(workspacePath)
   const full = normalise(path)
   if (root.length === 0) return path
+  // A comparison column's plain copy, under ~/.locust/compare (0.448): the
+  // same project, outside the folder, so its files read as the folder's --
+  // the long home path would be the one row in the column nobody can read.
+  const copied = /(?:^|\/)\.locust\/compare\/cmp_[A-Za-z0-9]+-[abc]\/(.+)$/.exec(full)
+  if (copied?.[1] !== undefined) return copied[1]
   // Windows paths are case-insensitive; comparing them case-sensitively is how
   // a correct prefix fails to match and the row keeps the unreadable path.
   const mirrored = cursorMirrorRelative(full, root)

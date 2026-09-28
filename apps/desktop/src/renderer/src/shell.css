@@ -5437,6 +5437,36 @@ textarea {
 
 /* The list folded to one line when nothing on it needs the person
    (FirstLaunch, `folded`): what is ready, by name, and the way to the rest. */
+/* Build and compare (0.448): one quiet line under the agents, its starters as small pills. */
+.lc-buildhead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 10px 0 14px;
+}
+
+.lc-buildhead .lc-agenthead__label {
+  margin-right: 4px;
+}
+
+.lc-buildhead__starter {
+  padding: 3px 10px;
+  border: 1px solid var(--lc-border-card);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lc-text-secondary);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  cursor: pointer;
+}
+
+.lc-buildhead__starter:hover,
+.lc-buildhead__starter:focus-visible {
+  color: var(--lc-text-primary);
+  background: var(--lc-hover-surface);
+}
+
 .lc-agenthead.is-folded {
   align-items: center;
   margin-top: 0;

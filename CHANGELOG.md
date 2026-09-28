@@ -11,6 +11,21 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.448.0 - 2026-09-28
+<!-- big -->
+
+### New
+
+- **Build and compare, from Home.** Under your AI agents: a landing page, a
+  dashboard or a small game. Pick one, tick two or three models, and each
+  builds it in its own copy of your folder. You watch every version running
+  side by side, then keep the one you like. Only that one comes into your
+  folder.
+- **Comparing work no longer needs a git project.** In any folder, set a
+  comparison to Edit and each model works in a plain copy. Keep writes back
+  only the files that model changed, and changes nothing if you have edited
+  one of them yourself in the meantime.
+
 ## 0.447.0 - 2026-09-28
 
 ### Fixed

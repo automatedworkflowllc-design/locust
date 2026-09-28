@@ -62,6 +62,13 @@ function vendorUrl(runtime: string): string | undefined {
   return facts !== undefined && facts.install.kind === 'vendor' ? facts.install.url : undefined
 }
 
+/** What Build and compare offers on Home: one file each, so every column can show it running. */
+export const COMPARE_STARTERS: readonly { readonly label: string; readonly prompt: string }[] = [
+  { label: 'A landing page', prompt: 'Make index.html: a one-page landing page for a small coffee shop, with a headline, three menu items with prices, and opening hours. One file, all CSS inside it.' },
+  { label: 'A dashboard', prompt: 'Make dashboard.html: a one-page sales dashboard with four headline numbers and a bar chart of the last six months, drawn with plain HTML and CSS. One file, made-up numbers, no libraries.' },
+  { label: 'A small game', prompt: 'Make game.html: a small game playable with the keyboard, with a score and a way to restart. One file, all CSS and JavaScript inside it, no libraries.' }
+]
+
 export function FirstLaunch({
   runtimes,
   limitedRuntimes,
@@ -86,6 +93,7 @@ export function FirstLaunch({
   checkingGaveUp = false,
   onCheckAgain,
   onCompare,
+  onCompareStarter,
   workspaceMade = false,
   team = [],
   onMessageTeammate,
@@ -167,6 +175,8 @@ export function FirstLaunch({
    * users to be able to try that out" -- so it is on Home, by the agents.
    */
   readonly onCompare?: () => void
+  /** Build and compare (0.448): a starter's words in the box, two or three models to tick, each building in its own copy. */
+  readonly onCompareStarter?: (prompt: string) => void
   /**
    * Locust INVENTED the folder it is about to work in, because the one it was
    * launched from was refused. The screen has to say so; see the card below.
@@ -578,6 +588,7 @@ export function FirstLaunch({
           if (folded) {
             const ready = shown.filter((row) => row.connected)
             return (
+              <>
               <div className="lc-agenthead is-folded">
                 <span className="lc-agenthead__label">AI agents</span>
                 <span className="lc-agenthead__note is-green">{headNote}</span>
@@ -618,6 +629,29 @@ export function FirstLaunch({
                   Show all
                 </button>
               </div>
+              {/*
+                * BUILD AND COMPARE (0.448; Arena's starters, PLAN-2026-09-28-NEXT
+                * item 4). Two or three models make the same thing, each in its
+                * own copy, and each shows it running; the one kept comes into
+                * the folder. One line, so Home still fits a 1440x900 window.
+                */}
+              {onCompareStarter !== undefined && (
+                <div className="lc-buildhead">
+                  <span className="lc-agenthead__label">Build and compare</span>
+                  {COMPARE_STARTERS.map((starter) => (
+                    <button
+                      key={starter.label}
+                      type="button"
+                      className="lc-buildhead__starter"
+                      title={`${starter.prompt} Pick two or three models; each builds it in its own copy, and you keep one.`}
+                      onClick={() => onCompareStarter(starter.prompt)}
+                    >
+                      {starter.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              </>
             )
           }
           return (

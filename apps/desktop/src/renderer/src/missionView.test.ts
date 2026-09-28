@@ -178,6 +178,12 @@ describe('how a path is written in a row', () => {
     expect(relativePath(String.raw`C:\Users\x\projects\streaks\.locust\compare\cmp_1-b\src\streak.js`, WS)).toBe('src/streak.js')
   })
 
+  it("drops a comparison column's plain copy outside the folder too (0.448)", () => {
+    expect(relativePath(String.raw`C:\Users\x\.locust\compare\cmp_ab12-b\site\index.html`, WS)).toBe('site/index.html')
+    // Anything else outside the folder keeps its whole path: there the place IS the information.
+    expect(relativePath(String.raw`C:\Users\x\.locust\other\index.html`, WS)).toBe(String.raw`C:\Users\x\.locust\other\index.html`)
+  })
+
   it('keeps the tree root itself, since there is nothing shorter that is true', () => {
     expect(relativePath(String.raw`C:\Users\x\projects\streaks\.locust\worktrees\tm_abc123`, WS)).toBe('.locust/worktrees/tm_abc123')
   })

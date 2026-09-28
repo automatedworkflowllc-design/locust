@@ -1539,6 +1539,8 @@ export default function App(): ReactElement {
   const [compareProblem, setCompareProblem] = useState<string>()
   /** Home's Compare models opens the composer's picker (0.442). */
   const [pickerRequest, setPickerRequest] = useState(0)
+  /** Words put in the message box from outside it (0.448: a Build and compare starter). */
+  const [composerFill, setComposerFill] = useState<{ readonly text: string; readonly seq: number }>()
   useEffect(() => {
     void window.desktop?.listCompares().then((answer) => {
       if (answer.ok) setCompares(answer.data.compares)
@@ -3402,8 +3404,7 @@ export default function App(): ReactElement {
         },
         changes: compareChanges,
         onChanges: setCompareChanges,
-        // Changes need a git project, so each model can have its own copy of it.
-        ...(worktrees?.reason === undefined ? {} : { changesRefusal: `Only in a git project. ${worktrees.reason}` }),
+        // Any folder: a git project gives each model a worktree, any other a plain copy (0.448).
         onToggle: (pick) =>
           setComparePicks((current) =>
             current.some((one) => samePick(one, pick))
@@ -6510,6 +6511,12 @@ export default function App(): ReactElement {
                   setCompareOn(true)
                   setPickerRequest((count) => count + 1)
                 }}
+                onCompareStarter={(prompt) => {
+                  setCompareOn(true)
+                  setCompareChanges(true)
+                  setComposerFill((current) => ({ text: prompt, seq: (current?.seq ?? 0) + 1 }))
+                  setPickerRequest((count) => count + 1)
+                }}
                 onCheckAgain={() => {
                   // The repair the app can actually perform: ask again, from
                   // the top, with CHECKING honest once more while it does.
@@ -7121,6 +7128,7 @@ export default function App(): ReactElement {
             // Compare (0.441): the picker's switch, and a comparison on screen.
             {...(comparePicking === undefined ? {} : { compare: comparePicking })}
             pickerRequest={pickerRequest}
+            {...(composerFill === undefined ? {} : { fill: composerFill })}
             {...(comparing === undefined || comparing.kept !== undefined
               ? {}
               : { asking: { label: comparing.slots.map((column) => column.route.label ?? column.route.model).join(' vs '), columns: comparing.slots.filter((column) => column.missionIds.length > 0).length, ...(comparing.changes === true ? { changes: true } : {}) } })}
