@@ -1531,6 +1531,8 @@ export default function App(): ReactElement {
   const [comparePicks, setComparePicks] = useState<readonly ComparePick[]>([])
   const [keepingCompare, setKeepingCompare] = useState(false)
   const [compareProblem, setCompareProblem] = useState<string>()
+  /** Home's Compare models opens the composer's picker (0.442). */
+  const [pickerRequest, setPickerRequest] = useState(0)
   useEffect(() => {
     void window.desktop?.listCompares().then((answer) => {
       if (answer.ok) setCompares(answer.data.compares)
@@ -2370,7 +2372,8 @@ export default function App(): ReactElement {
         // A teammate replying on their own. The host started it; the renderer
         // adopts it exactly as it adopts a run it asked for, so the sidebar
         // shows them working from this moment rather than after a refresh.
-        setMissionOwners((current) => ({ ...current, [update.missionId]: update.teammateId }))
+        const startedFor = update.teammateId
+        if (startedFor !== undefined) setMissionOwners((current) => ({ ...current, [update.missionId]: startedFor }))
         // The hub moved, or began. Mirrored so the face opens it from this
         // moment rather than after the roster is next re-read.
         if (update.hubMissionId !== undefined) {
@@ -2422,7 +2425,7 @@ export default function App(): ReactElement {
              * (drive-room-remembers, 2026-09-26).
              */
             startedAtIso: new Date().toISOString(),
-            teammateId: update.teammateId,
+            ...(update.teammateId === undefined ? {} : { teammateId: update.teammateId }),
             peerMessages: update.data.peerMessages,
             startedBy: update.startedBy,
             ...(update.data.followsUp === undefined
@@ -3347,7 +3350,8 @@ export default function App(): ReactElement {
    * comparison takes the thread's place until one is kept.
    */
   const samePick = (a: RouteChoice, b: RouteChoice): boolean => a.runtime === b.runtime && a.model === b.model
-  const comparePicking: ComparePicking | undefined = pickedTeammate === undefined
+  // Anywhere: no teammate is needed to compare (Colin, 2026-09-28), so a new person can try it first thing.
+  const comparePicking: ComparePicking | undefined = runtimes.length === 0
     ? undefined
     : {
         on: compareOn,
@@ -3386,11 +3390,11 @@ export default function App(): ReactElement {
     }
     // A kept comparison on screen: the conversation it became is where this goes.
     if (comparing !== undefined) setComparingId(undefined)
-    if (compareOn && comparePicks.length > 0 && pickedTeammate !== undefined) {
+    if (compareOn && comparePicks.length > 0) {
       if (comparePicks.length < MIN_COMPARE_SLOTS) return 'Pick one more model to compare with, or switch the picker back to One.'
       if (!bridge) return 'Locust is not ready yet. Nothing was sent.'
       const answer = await bridge
-        .startCompare({ teammateId: pickedTeammate.teammateId, prompt, routes: comparePicks.map((pick) => ({ runtime: pick.runtime, model: pick.model, label: pick.label })) })
+        .startCompare({ ...(pickedTeammate === undefined ? {} : { teammateId: pickedTeammate.teammateId }), prompt, routes: comparePicks.map((pick) => ({ runtime: pick.runtime, model: pick.model, label: pick.label })) })
         .catch(() => undefined)
       if (answer === undefined) return 'The comparison could not be started. Nothing was sent.'
       if (!answer.ok) return answer.error.message
@@ -6421,6 +6425,10 @@ export default function App(): ReactElement {
                 npmIsBundled={runtimeState.phase === 'ready' && runtimeState.npmIsBundled === true}
                 npmDidNotAnswer={runtimeState.phase === 'ready' && runtimeState.npmDidNotAnswer === true}
                 checkingGaveUp={runtimeState.phase === 'ready' && runtimeState.gaveUp === true}
+                onCompare={() => {
+                  setCompareOn(true)
+                  setPickerRequest((count) => count + 1)
+                }}
                 onCheckAgain={() => {
                   // The repair the app can actually perform: ask again, from
                   // the top, with CHECKING honest once more while it does.
@@ -7024,6 +7032,7 @@ export default function App(): ReactElement {
             onStart={sendOrCompare}
             // Compare (0.441): the picker's switch, and a comparison on screen.
             {...(comparePicking === undefined ? {} : { compare: comparePicking })}
+            pickerRequest={pickerRequest}
             {...(comparing === undefined || comparing.kept !== undefined
               ? {}
               : { asking: { label: comparing.slots.map((column) => column.route.label ?? column.route.model).join(' vs '), columns: comparing.slots.filter((column) => column.missionIds.length > 0).length } })}

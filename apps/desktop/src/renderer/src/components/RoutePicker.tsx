@@ -318,7 +318,7 @@ export function RoutePicker({
    * Together they take the composer from seven controls to four.
    */
   /** The maximum level swarm would hold every mission at, when one is known. */
-  /** Compare (0.441): absent where a comparison cannot start (a run is live, or nobody is on screen). */
+  /** Compare (0.441): absent where a comparison cannot start (a run is live, or a comparison is on screen). */
   readonly compare?: ComparePicking
 }): ReactElement {
   const comparing = compare?.on === true

@@ -114,6 +114,8 @@ interface ActiveCodexMission {
   readonly runtime: MissionRuntimeId
   /** Who this mission belongs to and who it may share with; absent for a mission of nobody's. */
   readonly peer: MissionPeerContext | undefined
+  /** A comparison's column (0.441): the run slot it holds in place of its owner's. */
+  readonly slot?: string
   /** Assistant text as the transcript rebuilt it, read for share blocks at the end. */
   readonly transcript: TranscriptTracker
   /** What this run may touch and which model it runs, so a relayed reply inherits both. */
@@ -204,7 +206,13 @@ export interface CodexMissionService {
      * words -- never a relay, a room post or a routine, whose text is not a
      * person addressing the runtime (slash-is-composer-only.test.ts).
      */
-    asCommand?: boolean
+    asCommand?: boolean,
+    /**
+     * A comparison's column (0.441, shared/compare.ts): the run slot it holds
+     * in place of its owner's, so one teammate -- or nobody -- answers on two
+     * models at once. Only the compare handler supplies it.
+     */
+    slot?: string
   ): Promise<CodexMissionStartResponse>
   cancel(runId: unknown): CodexMissionCancelResponse
   /**
@@ -639,8 +647,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
   const interruptedMissionIds = new Set<string>()
   const startOperations = new Set<Promise<void>>()
   const consumeOperations = new Set<Promise<void>>()
-  // A comparison's column holds its own slot (0.441); everything else, the teammate's.
-  const ownerKeyOf = (peer: MissionPeerContext | undefined): string => peer?.slotKey ?? peer?.self.teammateId ?? NOBODY
+  // A comparison's column holds its own slot (0.441), teammate or not; everything else, its owner's.
+  const ownerKeyOf = (peer: MissionPeerContext | undefined, slot?: string): string => slot ?? peer?.self.teammateId ?? NOBODY
   const peerExchange: PeerExchange | undefined =
     options.workroom === undefined
       ? undefined
@@ -1081,7 +1089,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       followUpOf?: string,
       relay?: RelayOrigin,
       startedBy?: MissionStarter,
-      asCommand?: boolean
+      asCommand?: boolean,
+      slot?: string
     ): Promise<CodexMissionStartResponse> {
       // `account-default` is the shell's word for "send no --model", not a
       // model id. Passing it through would make the CLI look for a model that
@@ -1138,7 +1147,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         resolveStartOperation = resolve
       })
       startOperations.add(startOperation)
-      const owner = ownerKeyOf(peer)
+      const owner = ownerKeyOf(peer, slot)
       let claimed = false
       try {
         if (disposed) {
@@ -1171,7 +1180,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         const winding = (mission: ActiveCodexMission): boolean =>
           mission.settled && followUpOf !== undefined && mission.missionId === followUpOf && mission.runtime === runtime
         const live = [...active.values()].filter((mission) => !winding(mission))
-        const ownerBusy = starting.has(owner) || live.some((mission) => ownerKeyOf(mission.peer) === owner)
+        const ownerBusy = starting.has(owner) || live.some((mission) => ownerKeyOf(mission.peer, mission.slot) === owner)
         if (ownerBusy) {
           return error(
             'RUN_ALREADY_ACTIVE',
@@ -2005,6 +2014,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           prompt,
           runtime,
           peer,
+          ...(slot === undefined ? {} : { slot }),
           transcript: createTranscriptTracker(),
           sandbox: effectiveSandbox,
           model: chosenModel,
@@ -2343,7 +2353,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
     },
 
     runIdOwnedBy(teammateId: string): string | undefined {
-      return [...active.values()].find((mission) => ownerKeyOf(mission.peer) === teammateId)?.runId
+      return [...active.values()].find((mission) => ownerKeyOf(mission.peer, mission.slot) === teammateId)?.runId
     },
 
     liveMissionIds(): readonly string[] {

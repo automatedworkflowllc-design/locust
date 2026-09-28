@@ -793,7 +793,8 @@ export const COMPARE_ASK_CHANNEL = 'compare:ask'
 export const COMPARE_KEEP_CHANNEL = 'compare:keep'
 export const COMPARE_LIST_CHANNEL = 'compare:list'
 export interface CompareStartRequest {
-  readonly teammateId: string
+  /** Whose conversation; absent to compare with nobody. */
+  readonly teammateId?: string
   readonly prompt: string
   readonly routes: readonly { readonly runtime: MissionRuntimeId; readonly model: string; readonly effort?: string; readonly label?: string }[]
 }
@@ -2298,7 +2299,8 @@ export type CodexMissionUpdate =
       readonly kind: 'mission-started'
       readonly runId: string
       readonly missionId: string
-      readonly teammateId: string
+      /** Absent for a run of nobody's: a comparison started with no teammate (0.441). */
+      readonly teammateId?: string
       readonly prompt: string
       readonly data: CodexMissionStartData
       /**

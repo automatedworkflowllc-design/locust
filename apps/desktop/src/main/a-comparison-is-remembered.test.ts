@@ -70,6 +70,17 @@ describe('a comparison', () => {
     await expect(store.create({ teammateId: 'tm_wren', prompt: 'Go', routes: ROUTES })).rejects.toThrow(/could not be read/)
   })
 
+  it('may belong to nobody: no teammate is needed to compare', async () => {
+    const root = await folder()
+    const store = createCompareStore({ rootDirectory: root, createId: () => 'cmp_3' })
+    const made = await store.create({ prompt: 'Go', routes: ROUTES })
+    expect(made.teammateId).toBeUndefined()
+    const again = await createCompareStore({ rootDirectory: root }).get('cmp_3')
+    expect(again?.compareId).toBe('cmp_3')
+    expect(again?.teammateId).toBeUndefined()
+    expect(compareSlotKey(undefined, 'cmp_3', 'a')).not.toBe(compareSlotKey(undefined, 'cmp_3', 'b'))
+  })
+
   it('gives each column a run slot of its own', () => {
     expect(compareSlotKey('tm_wren', 'cmp_1', 'a')).not.toBe(compareSlotKey('tm_wren', 'cmp_1', 'b'))
     expect(compareSlotKey('tm_wren', 'cmp_1', 'a')).not.toBe('tm_wren')

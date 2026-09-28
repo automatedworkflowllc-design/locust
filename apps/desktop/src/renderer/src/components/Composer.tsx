@@ -234,6 +234,8 @@ export interface ComposerProps {
    */
   readonly compare?: ComparePicking
   readonly asking?: { readonly label: string; readonly columns: number }
+  /** Opens the model picker when it changes: Home's Compare models (0.442). */
+  readonly pickerRequest?: number
   /**
    * Notes the person pinned to lines of a diff in this conversation
    * (diffNotes.ts, 0.376). They go with the next message, as one block after
@@ -363,6 +365,7 @@ export function Composer({
   onTag,
   compare,
   asking,
+  pickerRequest,
   diffNotes,
   onClearDiffNotes,
   onCancel,
@@ -448,6 +451,9 @@ export function Composer({
   }, [slashAt])
   const [effortOpen, setEffortOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
+  useEffect(() => {
+    if (pickerRequest !== undefined && pickerRequest > 0) setPickerOpen(true)
+  }, [pickerRequest])
 
   /*
    * These three panels closed only by pressing their own control again,

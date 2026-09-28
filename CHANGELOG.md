@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.442.0 - 2026-09-28
+
+### Improved
+
+- **Compare without a teammate.** A comparison no longer needs a teammate:
+  from Home, **Compare models** beside the AI agents opens the model picker
+  already switched to Compare, so the first thing a new person tries can be
+  two models answering the same question side by side. In a conversation
+  with nobody, the picker's Compare switch works the same way.
+
 ## 0.441.0 - 2026-09-28
 <!-- big -->
 

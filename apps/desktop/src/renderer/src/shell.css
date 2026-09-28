@@ -5610,6 +5610,13 @@ textarea {
   white-space: normal;
 }
 
+/* Compare models, beside Show all on Home (0.442): the one invitation on the line. */
+.lc-agenthead__more.lc-agenthead__compare {
+  margin-left: auto;
+  border: 1px solid var(--lc-border-card);
+  color: var(--lc-text-primary);
+}
+
 .lc-agenthead__more {
   flex: none;
   padding: 3px 8px;

@@ -85,6 +85,7 @@ export function FirstLaunch({
   npmDidNotAnswer = false,
   checkingGaveUp = false,
   onCheckAgain,
+  onCompare,
   workspaceMade = false,
   team = [],
   onMessageTeammate,
@@ -160,6 +161,12 @@ export function FirstLaunch({
   readonly checkingGaveUp?: boolean
   /** Ask discovery again, from the top: the one repair the app can perform for a CLI that never answered. */
   readonly onCheckAgain?: () => void
+  /**
+   * Compare (0.442): opens the model picker already switched to Compare.
+   * Colin, 2026-09-28: "You dont NEED a teammate assigned ... want new
+   * users to be able to try that out" -- so it is on Home, by the agents.
+   */
+  readonly onCompare?: () => void
   /**
    * Locust INVENTED the folder it is about to work in, because the one it was
    * launched from was refused. The screen has to say so; see the card below.
@@ -602,6 +609,11 @@ export function FirstLaunch({
                     )
                   })}
                 </span>
+                {onCompare !== undefined && (
+                  <button type="button" className="lc-agenthead__more lc-agenthead__compare" title="Ask two or three models the same thing and see the answers side by side" onClick={onCompare}>
+                    Compare models
+                  </button>
+                )}
                 <button type="button" className="lc-agenthead__more" onClick={() => setAgentsOpen(true)}>
                   Show all
                 </button>

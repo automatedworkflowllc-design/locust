@@ -21,7 +21,7 @@ import type { MissionPeerContext } from './workroom-briefing.js'
  */
 const NOW = '2026-09-28T15:00:00.000Z'
 const WREN: MissionPeerContext = { self: { teammateId: 'tm_wren', name: 'Wren', role: 'Code & Migrations' }, others: [] }
-const column = (slot: 'a' | 'b'): MissionPeerContext => ({ ...WREN, slotKey: compareSlotKey('tm_wren', 'cmp_1', slot) })
+const slotOf = (slot: 'a' | 'b', teammateId: string | undefined = 'tm_wren'): string => compareSlotKey(teammateId, 'cmp_1', slot)
 
 describe('a comparison', () => {
   let folder: string
@@ -96,8 +96,8 @@ describe('a comparison', () => {
 
   it('runs one teammate on two models at once, a column each', async () => {
     const missions = service()
-    const first = await missions.start('Add a discount code field.', 'codex', 'ask', { model: 'gpt-6-luna' }, () => undefined, undefined, column('a'))
-    const second = await missions.start('Add a discount code field.', 'codex', 'ask', { model: 'gpt-6-astra' }, () => undefined, undefined, column('b'))
+    const first = await missions.start('Add a discount code field.', 'codex', 'ask', { model: 'gpt-6-luna' }, () => undefined, undefined, WREN, undefined, undefined, undefined, undefined, slotOf('a'))
+    const second = await missions.start('Add a discount code field.', 'codex', 'ask', { model: 'gpt-6-astra' }, () => undefined, undefined, WREN, undefined, undefined, undefined, undefined, slotOf('b'))
     expect(first.ok).toBe(true)
     expect(second.ok).toBe(true)
   })
@@ -110,10 +110,21 @@ describe('a comparison', () => {
     if (!again.ok) expect(again.error.code).toBe('RUN_ALREADY_ACTIVE')
   })
 
+  it('runs on two models with no teammate at all -- none is needed to compare', async () => {
+    const missions = service()
+    // Nobody's missions share one slot: two at once are refused without a comparison's.
+    expect((await missions.start('One', 'codex', 'ask', {}, () => undefined)).ok).toBe(true)
+    expect((await missions.start('Two', 'codex', 'ask', {}, () => undefined)).ok).toBe(false)
+    const a = await missions.start('Go', 'codex', 'ask', {}, () => undefined, undefined, undefined, undefined, undefined, undefined, undefined, slotOf('a', undefined))
+    const b = await missions.start('Go', 'codex', 'ask', {}, () => undefined, undefined, undefined, undefined, undefined, undefined, undefined, slotOf('b', undefined))
+    expect(a.ok).toBe(true)
+    expect(b.ok).toBe(true)
+  })
+
   it('refuses a second run in the same column while its first is going', async () => {
     const missions = service()
-    expect((await missions.start('One', 'codex', 'ask', {}, () => undefined, undefined, column('a'))).ok).toBe(true)
-    const again = await missions.start('Two', 'codex', 'ask', {}, () => undefined, undefined, column('a'))
+    expect((await missions.start('One', 'codex', 'ask', {}, () => undefined, undefined, WREN, undefined, undefined, undefined, undefined, slotOf('a'))).ok).toBe(true)
+    const again = await missions.start('Two', 'codex', 'ask', {}, () => undefined, undefined, WREN, undefined, undefined, undefined, undefined, slotOf('a'))
     expect(again.ok).toBe(false)
   })
 })

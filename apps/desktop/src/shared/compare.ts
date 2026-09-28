@@ -37,7 +37,8 @@ export interface PublicCompareSlot {
 
 export interface PublicCompare {
   readonly compareId: string
-  readonly teammateId: string
+  /** Whose conversation it was started in; absent for nobody's -- no teammate is needed to compare. */
+  readonly teammateId?: string
   /** What the person asked first: the comparison's name. */
   readonly prompt: string
   readonly createdAt: string
@@ -47,8 +48,8 @@ export interface PublicCompare {
 }
 
 /** The run slot a column holds, so one teammate can run on two models at once. */
-export function compareSlotKey(teammateId: string, compareId: string, slot: CompareSlotId): string {
-  return `${teammateId}#${compareId}/${slot}`
+export function compareSlotKey(teammateId: string | undefined, compareId: string, slot: CompareSlotId): string {
+  return `${teammateId ?? 'nobody'}#${compareId}/${slot}`
 }
 
 /** Every mission that belongs to a comparison, and the one kept (drawn as an ordinary conversation). */

@@ -4028,8 +4028,8 @@ if (!ownsSingleInstanceLock) {
      */
     const compareRefused = (message: string) => ({ ok: false, error: { code: 'COMPARE_REFUSED', message } }) as const
     const startCompareColumn = async (compare: PublicCompare, column: PublicCompareSlot, prompt: string, followUpOf?: string): Promise<string | undefined> => {
-      const peer = await peerContextFor(compare.teammateId)
-      if (peer === undefined) return 'That teammate is no longer on the team.'
+      const peer = compare.teammateId === undefined ? undefined : await peerContextFor(compare.teammateId)
+      if (compare.teammateId !== undefined && peer === undefined) return 'That teammate is no longer on the team.'
       if (column.route.runtime === 'antigravity') return 'Antigravity cannot be compared yet: it answers only in the folder it has open.'
       const response = await codexMissions.start(
         prompt,
@@ -4038,17 +4038,21 @@ if (!ownsSingleInstanceLock) {
         { ...(column.route.model === 'account-default' ? {} : { model: column.route.model }), ...(column.route.effort === undefined ? {} : { effort: column.route.effort }) },
         sendToWindow,
         undefined,
-        { ...peer, slotKey: compareSlotKey(compare.teammateId, compare.compareId, column.slot) },
-        followUpOf
+        peer,
+        followUpOf,
+        undefined,
+        undefined,
+        undefined,
+        compareSlotKey(compare.teammateId, compare.compareId, column.slot)
       )
       if (!response.ok) return response.error.code === 'RUN_ALREADY_ACTIVE' ? 'This column is still answering. Ask again when it has finished.' : response.error.message
-      await assignOwner(compare.teammateId, response.data.missionId)
+      if (compare.teammateId !== undefined) await assignOwner(compare.teammateId, response.data.missionId)
       await compares.addTurn(compare.compareId, column.slot, response.data.missionId)
       sendToWindow({
         kind: 'mission-started',
         runId: response.data.runId,
         missionId: response.data.missionId,
-        teammateId: compare.teammateId,
+        ...(compare.teammateId === undefined ? {} : { teammateId: compare.teammateId }),
         prompt,
         data: response.data,
         startedBy: { kind: 'compare', compareId: compare.compareId, slot: column.slot }
@@ -4075,7 +4079,8 @@ if (!ownsSingleInstanceLock) {
       if (noFolder !== undefined) return compareRefused(noFolder.error.message)
       const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
       const prompt = typeof input.prompt === 'string' ? input.prompt.trim() : ''
-      const teammateId = typeof input.teammateId === 'string' ? input.teammateId : ''
+      // No teammate is needed to compare (Colin, 2026-09-28): absent is nobody's conversation.
+      const teammateId = typeof input.teammateId === 'string' && input.teammateId.length > 0 ? input.teammateId : undefined
       const routes = (Array.isArray(input.routes) ? input.routes : [])
         .filter((route): route is Record<string, unknown> => typeof route === 'object' && route !== null)
         .map((route) => ({
@@ -4090,9 +4095,9 @@ if (!ownsSingleInstanceLock) {
       if (routes.length < MIN_COMPARE_SLOTS || routes.length > MAX_COMPARE_SLOTS || distinct.size !== routes.length) {
         return compareRefused(`Pick ${String(MIN_COMPARE_SLOTS)} or ${String(MAX_COMPARE_SLOTS)} different models to compare.`)
       }
-      if (!(await teammates.list()).some((entry) => entry.teammateId === teammateId)) return compareRefused('Compare starts in a teammate\'s conversation. Open one, then compare.')
+      if (teammateId !== undefined && !(await teammates.list()).some((entry) => entry.teammateId === teammateId)) return compareRefused('That teammate is no longer on the team.')
       try {
-        return await askEveryColumn(await compares.create({ teammateId, prompt, routes }), prompt, false)
+        return await askEveryColumn(await compares.create({ ...(teammateId === undefined ? {} : { teammateId }), prompt, routes }), prompt, false)
       } catch (error) {
         return compareRefused(error instanceof Error ? error.message : 'The comparison could not be started.')
       }

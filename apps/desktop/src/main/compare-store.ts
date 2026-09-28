@@ -32,7 +32,7 @@ export interface CompareStore {
   list(): Promise<readonly PublicCompare[]>
   get(compareId: unknown): Promise<PublicCompare | undefined>
   /** A new comparison, its columns named in order; the oldest past `MAX_COMPARES` is forgotten. */
-  create(input: { readonly teammateId: string; readonly prompt: string; readonly routes: readonly CompareRoute[] }): Promise<PublicCompare>
+  create(input: { readonly teammateId?: string; readonly prompt: string; readonly routes: readonly CompareRoute[] }): Promise<PublicCompare>
   /** A column's next turn started. */
   addTurn(compareId: string, slot: CompareSlotId, missionId: string): Promise<PublicCompare>
   /** A column could not start, and why. */
@@ -65,13 +65,13 @@ function parsedCompare(value: unknown): PublicCompare | undefined {
   const teammateId = text(record.teammateId, 200)
   const prompt = text(record.prompt, MAX_PROMPT)
   const createdAt = text(record.createdAt, 40)
-  if (compareId === undefined || teammateId === undefined || prompt === undefined || createdAt === undefined || !Array.isArray(record.slots)) return undefined
+  if (compareId === undefined || (record.teammateId !== undefined && teammateId === undefined) || prompt === undefined || createdAt === undefined || !Array.isArray(record.slots)) return undefined
   const slots = record.slots.map(parsedSlot).filter((slot): slot is PublicCompareSlot => slot !== undefined)
   if (slots.length < MIN_COMPARE_SLOTS || slots.length > MAX_COMPARE_SLOTS || new Set(slots.map((slot) => slot.slot)).size !== slots.length) return undefined
   const kept = typeof record.kept === 'object' && record.kept !== null ? (record.kept as Record<string, unknown>) : undefined
   const keptAt = text(kept?.at, 40)
   const keptSlot = kept !== undefined && isSlot(kept.slot) && keptAt !== undefined && slots.some((slot) => slot.slot === kept.slot) ? { slot: kept.slot, at: keptAt } : undefined
-  return { compareId, teammateId, prompt, createdAt, slots, ...(keptSlot === undefined ? {} : { kept: keptSlot }) }
+  return { compareId, ...(teammateId === undefined ? {} : { teammateId }), prompt, createdAt, slots, ...(keptSlot === undefined ? {} : { kept: keptSlot }) }
 }
 
 export function parsedCompareFile(raw: string): StoredFile {
@@ -177,7 +177,7 @@ export function createCompareStore(options: {
         const file = await read()
         const compare: PublicCompare = {
           compareId: createId(),
-          teammateId: input.teammateId,
+          ...(input.teammateId === undefined ? {} : { teammateId: input.teammateId }),
           prompt,
           createdAt: now().toISOString(),
           slots: input.routes.map((route, index) => ({
