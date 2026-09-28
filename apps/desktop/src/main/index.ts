@@ -8,6 +8,7 @@ import { openingPlacement, readSavedWindow } from './window-bounds.js'
 import type { SavedWindow } from './window-bounds.js'
 import { app, BrowserWindow, crashReporter, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, powerSaveBlocker, protocol, safeStorage, screen, session, shell, Tray } from 'electron'
 import { createPageServer, fromPagePreview, PAGE_SCHEME } from './page-preview.js'
+import { createRuntimeCommands } from './runtime-commands.js'
 import electronUpdater from 'electron-updater'
 
 const { autoUpdater } = electronUpdater
@@ -200,6 +201,7 @@ import {
   WORKSPACE_SAVE_COPY_CHANNEL,
   WORKSPACE_TEXT_CHANNEL,
   WORKSPACE_PAGE_CHANNEL,
+  RUNTIME_COMMANDS_CHANNEL,
   DIAGNOSTICS_REVEAL_CHANNEL,
   FEEDBACK_CHANNEL,
   DIAGNOSTICS_REPORT_CHANNEL,
@@ -1601,6 +1603,8 @@ if (!ownsSingleInstanceLock) {
       ownerOf: async (id) => (await teammates.missionOwners())[id],
       assign: (teammateId, id) => teammates.assignMission(teammateId, id)
     })
+    // Each runtime's own slash commands, as its CLI last listed them (0.426).
+    const runtimeCommands = createRuntimeCommands({ file: join(app.getPath('userData'), 'runtime-commands.json') })
     const codexMissions = createCodexMissionService({
       workspacePath,
       catchUpTerminal: catchUp,
@@ -1664,6 +1668,12 @@ if (!ownsSingleInstanceLock) {
       askConnectors: async () => (await teammates.readSettings()).askConnectors === true,
       keepATodoList: async () => (await teammates.readSettings()).keepATodoList === true,
       readyConnectors: cursorReadyConnectors,
+      // Each runtime's own slash commands (0.426, runtime-commands.ts).
+      onRuntimeCommands: (runtime, commands) => {
+        void runtimeCommands.set(runtime, commands).then((changed) => {
+          if (changed) sendToWindow({ kind: 'runtime-commands-changed' })
+        }).catch((error: unknown) => note('runtime-commands', `could not keep ${runtime}'s commands: ${error instanceof Error ? error.message : String(error)}`))
+      },
       allowConnectors: async (workspace) => allowCursorConnectors(workspace, await cursorConfiguredConnectorNames()),
       discover: discoverForStart,
       runner: createNodeRuntimeProcessRunner(),
@@ -3242,6 +3252,11 @@ if (!ownsSingleInstanceLock) {
      */
     const pages = createPageServer({ roots: async () => [...(workspaceChosen ? [workspacePath] : []), ...(await teammateFolders())] })
     protocol.handle(PAGE_SCHEME, (request) => pages.handle(request.url))
+    // The `/` menu's runtime half (0.426).
+    ipcMain.handle(RUNTIME_COMMANDS_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return {}
+      return runtimeCommands.list().catch(() => ({}))
+    })
     ipcMain.handle(WORKSPACE_PAGE_CHANNEL, async (event, requested: unknown) => {
       if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
       if (typeof requested !== 'string' || requested.length === 0) return { ok: false, message: 'There is no page to open.' } as const
@@ -4723,7 +4738,11 @@ if (!ownsSingleInstanceLock) {
           },
           undefined,
           peer,
-          followUpOf
+          followUpOf,
+          undefined,
+          undefined,
+          // The person's own message, typed as one of the runtime's commands (0.426).
+          runtimeCommands.isCommand(runtime, prompt)
         )
         if (response.ok) {
           await assignOwner(peer?.self.teammateId, response.data.missionId)

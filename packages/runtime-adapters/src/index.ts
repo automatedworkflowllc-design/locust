@@ -49,6 +49,7 @@ export {
   createClaudeEventNormalizer,
   limitKindFor,
   resetsAtIso,
+  runtimeCommandsFrom,
   summarizeInit,
 } from "./claude-events.js";
 export { createNodeProbeRunner, killSpawnedTree } from "./node-runner.js";
@@ -91,6 +92,7 @@ export type {
 export type {
   ClaudeEventNormalizer,
   ClaudeInvocationContext,
+  RuntimeCommandInfo,
 } from "./claude-events.js";
 export type {
   DiscoverInstalledRuntimesOptions,

@@ -743,6 +743,10 @@ export type WorkspaceTextResponse =
 export const WORKSPACE_TEXT_CHANNEL = 'workspace:text'
 /** A web page's address in the preview (0.425): main/page-preview.ts. */
 export const WORKSPACE_PAGE_CHANNEL = 'workspace:page'
+/** Each runtime's own slash commands, for the `/` menu (0.426): main/runtime-commands.ts. */
+export const RUNTIME_COMMANDS_CHANNEL = 'runtime:commands'
+export interface RuntimeCommandRow { readonly name: string; readonly description: string; readonly argumentHint: string }
+export type RuntimeCommandsResponse = Readonly<Partial<Record<'claude', readonly RuntimeCommandRow[]>>>
 export type WorkspacePageResponse = { readonly ok: true; readonly url: string } | { readonly ok: false; readonly message: string }
 
 /**
@@ -2219,6 +2223,8 @@ export type CodexMissionUpdate =
       readonly roomName: string
       readonly message: string
     }
+  /** A runtime listed a different set of its own commands; the `/` menu re-reads them (0.426). */
+  | { readonly kind: 'runtime-commands-changed' }
   /** A teammate's reply changed the team's memory; the Memory screen and sidebar re-read it. */
   | {
       readonly kind: 'memory-changed'
@@ -2573,6 +2579,8 @@ export interface DesktopApi {
   readTextFile(path: string): Promise<WorkspaceTextResponse>
   /** Where a web page in the folder is served for the preview frame (0.425). */
   pageUrlFor(path: string): Promise<WorkspacePageResponse>
+  /** Each runtime's own slash commands, as its CLI last listed them (0.426). */
+  runtimeCommands(): Promise<RuntimeCommandsResponse>
   /** Show the diagnostics log in the file manager. Names no path. */
   revealDiagnostics(): Promise<void>
   /** Open the feedback report, filled in, in the person's browser. Names no address. */

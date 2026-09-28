@@ -9676,6 +9676,22 @@ textarea {
   color: var(--lc-text-primary);
 }
 
+/* 0.426: a runtime's own commands sit under its name, as its CLI lists them. */
+.lc-slash__group {
+  padding: 8px 10px 4px;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-label);
+  letter-spacing: var(--lc-tracking-label-wide);
+  text-transform: uppercase;
+  color: var(--lc-text-muted);
+}
+
+.lc-slash__hint {
+  flex: none;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+}
+
 .lc-slash__detail {
   flex: 1;
   min-width: 0;

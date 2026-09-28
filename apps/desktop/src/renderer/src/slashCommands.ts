@@ -26,6 +26,8 @@ export type SlashAction =
   | { readonly kind: 'route' }
   | { readonly kind: 'stop' }
   | { readonly kind: 'swarm' }
+  /** One of the runtime's own commands (0.426): written into the box, to be sent as the message. */
+  | { readonly kind: 'runtime' }
 
 export interface SlashCommand {
   /** Typed after the slash, lowercase. */
@@ -33,6 +35,10 @@ export interface SlashCommand {
   /** What it does, in the words the menu shows. */
   readonly detail: string
   readonly action: SlashAction
+  /** The heading it sits under, for a runtime's own command (0.426). */
+  readonly group?: string
+  /** What goes after it, as the runtime says: `[instructions]`. */
+  readonly hint?: string
   /**
    * This one has consequences the others do not, and is drawn apart.
    *
@@ -74,8 +80,29 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
  * never addressed to it.
  */
 export function slashQuery(text: string): string | undefined {
-  const match = /^\/([a-z]*)$/i.exec(text.trim())
+  // Letters, digits and the marks a runtime's command names carry --
+  // `security-review`, `plugin:skill` (0.426).
+  const match = /^\/([A-Za-z0-9:._-]*)$/.exec(text.trim())
   return match === null ? undefined : (match[1] ?? '').toLowerCase()
+}
+
+/**
+ * A runtime's own commands as menu rows (0.426), under the runtime's name.
+ * Colin, 2026-09-28: "Lots of the nerdier coders live by their commands."
+ * Choosing one writes `/name ` into the box, where its arguments go, and the
+ * message is sent to the runtime as that command (main/runtime-commands.ts).
+ */
+export function runtimeSlashCommands(
+  group: string,
+  rows: readonly { readonly name: string; readonly description: string; readonly argumentHint: string }[]
+): readonly SlashCommand[] {
+  return rows.map((row) => ({
+    name: row.name,
+    detail: row.description.length > 0 ? row.description : `${group}'s own command.`,
+    action: { kind: 'runtime' as const },
+    group,
+    ...(row.argumentHint.length > 0 ? { hint: row.argumentHint } : {})
+  }))
 }
 
 /**
@@ -89,8 +116,12 @@ export function availableCommands(input: {
   readonly modes: readonly MissionMode[]
   readonly running: boolean
   readonly canSwarm: boolean
+  /** The runtime's own, after Locust's; a name Locust already uses stays Locust's. */
+  readonly runtimeCommands?: readonly SlashCommand[]
 }): readonly SlashCommand[] {
-  return SLASH_COMMANDS.filter((command) => {
+  const own = new Set(SLASH_COMMANDS.map((command) => command.name))
+  const theirs = (input.runtimeCommands ?? []).filter((command) => !own.has(command.name.toLowerCase()))
+  return [...SLASH_COMMANDS.filter((command) => {
     switch (command.action.kind) {
       case 'mode':
         return input.modes.includes(command.action.mode)
@@ -101,7 +132,7 @@ export function availableCommands(input: {
       default:
         return true
     }
-  })
+  }), ...(input.running ? [] : theirs)]
 }
 
 /** Those whose name starts with what has been typed so far. */
@@ -109,5 +140,5 @@ export function matchingCommands(
   query: string,
   available: readonly SlashCommand[]
 ): readonly SlashCommand[] {
-  return available.filter((command) => command.name.startsWith(query))
+  return available.filter((command) => command.name.toLowerCase().startsWith(query))
 }

@@ -1,5 +1,5 @@
 import mark from '../assets/locust-mark.svg'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usagePercent, usageWindowSentence } from '../missionView.js'
 import { useDismissOnOutsidePress } from '../useDismissOnOutsidePress.js'
 import type { ClipboardEvent, FormEvent, KeyboardEvent, MouseEvent, ReactElement } from 'react'
@@ -10,6 +10,7 @@ import type {
   PublicModel,
   PublicRuntimeStatus
 } from '../../../shared/ipc.js'
+import type { RuntimeCommandsResponse } from '../../../shared/ipc.js'
 import { hostCanRunMission, isMissionRuntime, runtimeDisplayName } from '../../../shared/runtimes.js'
 import type { ModeFacts } from '../status.js'
 import {
@@ -41,7 +42,7 @@ import { effortScale, joinEffort, splitEffort } from '../effortScale.js'
 import { ATTACHMENT_DIR, attachmentLabel, MAX_ATTACHMENTS, withAttachments } from '../../../shared/attachments.js'
 import { diffNotesTile, withDiffNotes } from '../diffNotes.js'
 import type { DiffNote } from '../diffNotes.js'
-import { availableCommands, matchingCommands, slashQuery } from '../slashCommands.js'
+import { availableCommands, matchingCommands, runtimeSlashCommands, slashQuery } from '../slashCommands.js'
 import type { SlashCommand } from '../slashCommands.js'
 import { RoutePicker } from './RoutePicker.js'
 import type { RouteChoice } from './RoutePicker.js'
@@ -152,6 +153,8 @@ export interface ComposerProps {
    * sends it there. A new object hands it back again.
    */
   readonly handBack?: { readonly text: string; readonly attachments: readonly string[] }
+  /** Each runtime's own slash commands, as its CLI last listed them (0.426). */
+  readonly runtimeCommands?: RuntimeCommandsResponse
   /**
    * Whether this machine's Claude Code has any connectors, so the mode menu
    * can say where they live when the route is not Claude. See
@@ -298,6 +301,7 @@ export function shiftTabMode<M extends string>(current: M, usable: readonly M[],
 
 export function Composer({
   handBack,
+  runtimeCommands,
   hasConnectors = false,
   continuationNote,
   workspaceName,
@@ -412,6 +416,11 @@ export function Composer({
    * and clamping means the index can never name a command that is not there.
    */
   const [slashAt, setSlashAt] = useState(0)
+  // With a runtime's commands the list is long: the row the arrows reach stays in view (0.426).
+  const slashList = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    slashList.current?.querySelector('.lc-slash__item.is-active')?.scrollIntoView({ block: 'nearest' })
+  }, [slashAt])
   const [effortOpen, setEffortOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
 
@@ -468,16 +477,33 @@ export function Composer({
    * never be offered and then refused.
    */
   const slashing = slashQuery(value)
-  const slashChoices = slashing === undefined
+  const slashMatches = slashing === undefined
     ? []
     : matchingCommands(slashing, availableCommands({
         modes: modesFor(route.runtime, platform),
         running,
-        canSwarm: !running
+        canSwarm: !running,
+        // The runtime's own, under its name (0.426).
+        ...(route.runtime === 'claude' && runtimeCommands?.claude !== undefined
+          ? { runtimeCommands: runtimeSlashCommands('Claude Code', runtimeCommands.claude) }
+          : {})
       }))
+  // A runtime's command followed by a space is complete: what comes next is
+  // its arguments, and Enter sends it. Left open, the menu took that Enter
+  // and wrote the same command back into the box, forever (0.426).
+  const writingArguments = /\s$/.test(value) &&
+    slashMatches.some((command) => command.action.kind === 'runtime' && command.name.toLowerCase() === slashing)
+  const slashChoices = writingArguments ? [] : slashMatches
   const runSlash = (command: SlashCommand): void => {
-    setValue('')
     setSlashAt(0)
+    // A runtime's own command is written into the box, where its arguments
+    // go; sending it sends that command (0.426).
+    if (command.action.kind === 'runtime') {
+      setValue(`/${command.name} `)
+      requestAnimationFrame(() => field.current?.focus())
+      return
+    }
+    setValue('')
     switch (command.action.kind) {
       case 'mode':
         // Exactly what choosing the mode in the menu does, including the part
@@ -1125,8 +1151,12 @@ export function Composer({
           * would be refused, so nothing here can be chosen and then fail.
           */}
         {slashChoices.length > 0 && (
-          <div className="lc-slash" role="listbox" aria-label="Commands">
+          <div className="lc-slash" role="listbox" aria-label="Commands" ref={slashList}>
             {slashChoices.map((command, index) => (
+              <Fragment key={`${command.group ?? 'locust'}:${command.name}`}>
+              {command.group !== undefined && slashChoices[index - 1]?.group !== command.group && (
+                <div className="lc-slash__group lc-mono" role="presentation">{command.group}</div>
+              )}
               <button
                 key={command.name}
                 type="button"
@@ -1144,11 +1174,13 @@ export function Composer({
               >
                 <span className="lc-slash__name lc-mono">
                   {command.weighted === true && <Icon name="shield" size={11} />}/{command.name}
+                  {command.hint !== undefined && <span className="lc-slash__hint"> {command.hint}</span>}
                 </span>
                 <span className={`lc-slash__detail${command.weighted === true ? ' lc-tone-amber' : ''}`}>
                   {command.detail}
                 </span>
               </button>
+              </Fragment>
             ))}
           </div>
         )}

@@ -11,6 +11,21 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.426.0 - 2026-09-28
+<!-- big -->
+
+### New
+
+- **Claude Code's own commands, in the / menu.** Type / in the chat box
+  with a Claude Code teammate and, under Locust's own commands, you'll find
+  Claude Code's: /compact, /context, /init, /security-review and the
+  rest, plus your own custom commands and skills, each with what it
+  does. Pick one, add anything it takes, and press Enter: it goes to Claude
+  Code as that command, exactly as if you'd typed it there. The list comes
+  from Claude Code itself, so it stays current. Commands that would change
+  your Claude Code setup (its model, settings, MCP servers, sign-in) are
+  left out; you set those for a teammate in Locust.
+
 ## 0.425.0 - 2026-09-28
 <!-- big -->
 

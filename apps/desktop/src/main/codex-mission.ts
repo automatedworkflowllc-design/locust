@@ -35,7 +35,7 @@ import type {
   RuntimeProcessRunner, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { workspaceIdFor } from './workspace.js'
 import type { MissionContinuation, MissionLedger, RecoveredMission, Workroom, WorkroomMessage } from '@teammate/mission-store'
-import type { MissionSandbox, OpenCodeProvider, RuntimeCommandSpec } from '@teammate/runtime-adapters'
+import type { MissionSandbox, OpenCodeProvider, RuntimeCommandInfo, RuntimeCommandSpec } from '@teammate/runtime-adapters'
 import { createHash, randomUUID } from 'node:crypto'
 import { isAbsolute } from 'node:path'
 import type {
@@ -190,7 +190,16 @@ export interface CodexMissionService {
      * Who started this run, when it was not a person and not the relay. Only
      * `resume` supplies it; the relay derives its own from `relay` above.
      */
-    startedBy?: MissionStarter
+    startedBy?: MissionStarter,
+    /**
+     * The person typed one of the runtime's own slash commands (0.426,
+     * runtime-commands.ts), and it is sent AS IT IS: a CLI reads a command
+     * only at the very start of what it is given, and the brief would bury
+     * it. Only the direct-message handler sets it, from the person's own
+     * words -- never a relay, a room post or a routine, whose text is not a
+     * person addressing the runtime (slash-is-composer-only.test.ts).
+     */
+    asCommand?: boolean
   ): Promise<CodexMissionStartResponse>
   cancel(runId: unknown): CodexMissionCancelResponse
   /**
@@ -379,6 +388,8 @@ interface CodexMissionServiceOptions {
    * LOCUST_ASK_CONNECTORS=1 does the same for the drives.
    */
   readonly askConnectors?: () => Promise<boolean>
+  /** A runtime's own slash commands, as its CLI listed them this run (0.426). */
+  readonly onRuntimeCommands?: (runtime: 'claude', commands: readonly RuntimeCommandInfo[]) => void
   /** The person's opt-in for a runtime-kept todo list. Absent reads as off. */
   readonly keepATodoList?: () => Promise<boolean>
   /** Connectors a Cursor teammate can call, by name, for its briefing. */
@@ -1024,7 +1035,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       peer?: MissionPeerContext,
       followUpOf?: string,
       relay?: RelayOrigin,
-      startedBy?: MissionStarter
+      startedBy?: MissionStarter,
+      asCommand?: boolean
     ): Promise<CodexMissionStartResponse> {
       // `account-default` is the shell's word for "send no --model", not a
       // model id. Passing it through would make the CLI look for a model that
@@ -1340,7 +1352,11 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           requestedRouteId: routeId,
           resolvedRouteId,
           ...(chosen.version?.version === undefined ? {} : { cliVersion: chosen.version.version }),
-          now
+          now,
+          // Claude Code lists its commands at the start of a run (0.426).
+          ...(runtime === 'claude' && options.onRuntimeCommands !== undefined
+            ? { onCommands: (commands: readonly RuntimeCommandInfo[]) => options.onRuntimeCommands?.('claude', commands) }
+            : {})
         }
         // Copilot resumes by a session id the HOST chooses on a first run, so
         // the host mints it here and hands the same id to the normalizer; the
@@ -1607,7 +1623,13 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             : undefined
         const plan = briefPlan({ resumes: resumeThreadId !== undefined, compacted: resumedCompacted, earlier: earlierBrief })
         let briefGiven: readonly string[] | undefined
-        if (peer !== undefined && peerExchange !== undefined) {
+        // A command is sent bare, and records no brief: the session it acts
+        // on may be cleared or compacted by it, so the next turn is briefed
+        // whole (briefSessions.after finds nothing for this one).
+        const bare = asCommand === true && relay === undefined && startedBy === undefined
+        if (bare) {
+          runtimePrompt = sentPrompt.trim()
+        } else if (peer !== undefined && peerExchange !== undefined) {
           // The turn this one continues, so the brief can find the
           // conversation's group. A route switch names it in `continuation`;
           // a follow-up in `resumedMissionId`; a first turn has none.
@@ -1656,10 +1678,10 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // the app cannot keep, whichever of the two ever changes.
         // A read-only OpenCode run is told it has no shell, before the plan
         // instruction so that one stays last (A2.20, workroom-briefing.ts).
-        if (runtime === 'opencode' && sandbox === 'read-only') {
+        if (!bare && runtime === 'opencode' && sandbox === 'read-only') {
           runtimePrompt = [runtimePrompt, openCodeReadOnlySection()].join('\n\n')
         }
-        if (mode === 'plan' && sandbox === 'read-only') {
+        if (!bare && mode === 'plan' && sandbox === 'read-only') {
           runtimePrompt = [runtimePrompt, planSection()].join('\n\n')
         }
 

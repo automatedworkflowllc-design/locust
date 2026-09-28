@@ -8,6 +8,7 @@ import {
   limitKindFor,
   limitSentence,
   resetsAtIso,
+  runtimeCommandsFrom,
   summarizeInit,
   usageWindowText,
 } from "../src/claude-events.js";
@@ -899,5 +900,49 @@ describe("Claude Code compacting its conversation", () => {
       commands: [{ name: "deliver", description: "a person's own skill", argumentHint: "" }],
     };
     expect(normalizer().accept(record(listed))).toEqual([]);
+  });
+
+  it("hands the command list to the host for the / menu, and still keeps it out of the record (0.426)", () => {
+    const heard: (readonly { name: string; description: string; argumentHint: string }[])[] = [];
+    const listening = createClaudeEventNormalizer({
+      runId: "run_1",
+      missionId: "mission_1",
+      cliVersion: "2.1.283",
+      now: () => new Date(NOW),
+      onCommands: (commands) => heard.push(commands),
+    });
+    const listed = {
+      type: "system",
+      subtype: "commands_changed",
+      commands: [
+        { name: "compact", description: "Clear conversation history but keep a summary in context", argumentHint: "<optional custom summarization instructions>" },
+        { name: "/security-review", description: "Complete a security review\n  of the pending changes" },
+        { name: "plugin:skill", description: "", argumentHint: "" },
+        // Not a command name: refused rather than drawn in the menu.
+        { name: "rm -rf /", description: "x" },
+        { name: "", description: "x" },
+        { description: "no name" },
+        "compact",
+      ],
+    };
+    expect(listening.accept(record(listed))).toEqual([]);
+    expect(heard).toEqual([
+      [
+        { name: "compact", description: "Clear conversation history but keep a summary in context", argumentHint: "<optional custom summarization instructions>" },
+        // A leading slash dropped, and the text on one line.
+        { name: "security-review", description: "Complete a security review of the pending changes", argumentHint: "" },
+        { name: "plugin:skill", description: "", argumentHint: "" },
+      ],
+    ]);
+  });
+
+  it("bounds what a command list can put in the menu", () => {
+    const many = Array.from({ length: 900 }, (_, index) => ({ name: `c${String(index)}`, description: "d".repeat(5000), argumentHint: "h".repeat(500) }));
+    const commands = runtimeCommandsFrom(many);
+    expect(commands).toHaveLength(400);
+    expect(commands[0]?.description).toHaveLength(240);
+    expect(commands[0]?.argumentHint).toHaveLength(80);
+    expect(runtimeCommandsFrom({ not: "a list" })).toEqual([]);
+    expect(runtimeCommandsFrom([{ name: "x".repeat(65) }])).toEqual([]);
   });
 });

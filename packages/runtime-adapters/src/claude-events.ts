@@ -37,6 +37,30 @@ export interface ClaudeInvocationContext {
   readonly cliVersion?: string;
   /** Test seam and host clock. */
   readonly now?: () => Date;
+  /**
+   * The CLI's own commands, as it lists them at the start of a run (0.426):
+   * handed to the host, never written into the mission's record.
+   */
+  readonly onCommands?: (commands: readonly RuntimeCommandInfo[]) => void;
+}
+
+/** One of a runtime's own slash commands, as the CLI names and describes it. */
+export interface RuntimeCommandInfo {
+  readonly name: string;
+  readonly description: string;
+  readonly argumentHint: string;
+}
+
+/** The list as a CLI sent it, bounded: at most 400, names a command could have, text cut short. */
+export function runtimeCommandsFrom(value: unknown): readonly RuntimeCommandInfo[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 400).flatMap((entry): RuntimeCommandInfo[] => {
+    if (!isObject(entry) || typeof entry.name !== "string") return [];
+    const name = entry.name.trim().replace(/^\//, "");
+    if (!/^[A-Za-z0-9][A-Za-z0-9:._-]{0,63}$/.test(name)) return [];
+    const text = (field: unknown, max: number): string => (typeof field === "string" ? field.replace(/\s+/g, " ").trim().slice(0, max) : "");
+    return [{ name, description: text(entry.description, 240), argumentHint: text(entry.argumentHint, 80) }];
+  });
 }
 
 export interface ClaudeEventNormalizer {
@@ -721,7 +745,12 @@ export function createClaudeEventNormalizer(
       // steps whose evidence carried the whole list into every mission's
       // record. It is the CLI's setup, not the run's news, and not something
       // the ledger should hold a copy of per run.
-      if (subtype === "commands_changed") return [];
+      // 0.426: handed to the host for the `/` menu -- still not the ledger's.
+      if (subtype === "commands_changed") {
+        const commands = runtimeCommandsFrom(parsed.commands);
+        if (commands.length > 0) context.onCommands?.(commands);
+        return [];
+      }
       // The session compacted (A2.5): measured the same day with `/compact`
       // on a two-turn Haiku session -- `status` "compacting", then this
       // record with `compact_metadata.trigger` ("manual" there, "auto" when

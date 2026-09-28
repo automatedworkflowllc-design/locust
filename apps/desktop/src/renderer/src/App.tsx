@@ -77,6 +77,7 @@ import { imageMediaType } from '../../shared/image-files.js'
 import { signInCommand } from '../../shared/runtime-install.js'
 import { SIGN_IN_OPENED_EVENT } from './signInEvents.js'
 import { DEFAULT_RELAY_HOP_CAP, DEFAULT_MEMORY_MODE } from '../../shared/ipc.js'
+import type { RuntimeCommandsResponse } from '../../shared/ipc.js'
 import { stripTaskBlocks } from '../../shared/room-task.js'
 import { stripMemoryBlocks } from '../../shared/memory.js'
 import { stripDecisionBlocks } from '../../shared/decision.js'
@@ -347,6 +348,8 @@ function applyMissionUpdate(run: LiveRunState, update: CodexMissionUpdate): Live
   if (update.kind === 'room-posted') return live
   // Memory moving is the Memory screen's business, not this run's.
   if (update.kind === 'memory-changed') return live
+  // A runtime's command list is the `/` menu's business (0.426).
+  if (update.kind === 'runtime-commands-changed') return live
   // A scheduled routine that would not start has no run to belong to.
   if (update.kind === 'routine-blocked') return live
   if (update.kind === 'routine-recovery-changed') return live
@@ -1381,6 +1384,15 @@ export default function App(): ReactElement {
    * (shared/about-you.ts). Saved whole; '' removes it. Answers an error
    * sentence or undefined, as the Memory screen's other writes do.
    */
+  /*
+   * Each runtime's own slash commands (0.426), as its CLI last listed them.
+   * Read once, and again when a run brings a changed list.
+   */
+  const [runtimeCommands, setRuntimeCommands] = useState<RuntimeCommandsResponse>({})
+  const rereadRuntimeCommands = (): void => {
+    void window.desktop?.runtimeCommands().then(setRuntimeCommands).catch(() => undefined)
+  }
+  useEffect(() => { rereadRuntimeCommands() }, [])
   const [aboutYou, setAboutYou] = useState('')
   // Lines teammates suggested for it, waiting for the person (0.424).
   const [aboutYouSuggestions, setAboutYouSuggestions] = useState<readonly AboutYouSuggestion[]>([])
@@ -2282,6 +2294,10 @@ export default function App(): ReactElement {
          * board: a REFUSAL. Those are set where they happen.
          */
         refreshRooms()
+        return
+      }
+      if (update.kind === 'runtime-commands-changed') {
+        rereadRuntimeCommands()
         return
       }
       if (update.kind === 'memory-changed') {
@@ -6642,6 +6658,7 @@ export default function App(): ReactElement {
             workspaceMade={workspaceMade}
             onChooseFolder={chooseWorkspace}
             runtimes={runtimes}
+            runtimeCommands={runtimeCommands}
             runtimesGaveUp={runtimeState.phase === 'ready' && runtimeState.gaveUp === true}
             limitedRuntimes={limitedRuntimes}
               usageWindows={usageWindows}
