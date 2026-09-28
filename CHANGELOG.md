@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.434.0 - 2026-09-28
+<!-- big -->
+
+### Improved
+
+- **Locust is monochrome.** The lime accent is gone: buttons, switches,
+  selected options, chips and the start-up screen are drawn in the same
+  ivory as the rest of the app. Green stays only where it means something:
+  a runtime that's ready, a step that's safe, a status light. Amber still
+  means something needs you, and red that something went wrong. A teammate
+  whose colour is lime keeps it.
+
 ## 0.433.0 - 2026-09-28
 
 ### Improved

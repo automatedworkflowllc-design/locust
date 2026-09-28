@@ -10376,7 +10376,8 @@ textarea {
 
 .lc-peer__name.is-lime,
 .lc-peer__author.is-lime {
-  color: var(--lc-lime-text);
+  /* The teammate's own colour, not the accent (0.434). */
+  color: var(--lc-hue-lime);
 }
 
 .lc-peer__name.is-blue,
@@ -12410,7 +12411,8 @@ textarea {
 }
 
 .lc-ledgerfail__label.is-safe {
-  color: var(--lc-lime-text);
+  /* Green means it here: safe (0.434). */
+  color: var(--lc-green-text);
 }
 
 .lc-ledgerfail__label.is-risk {
@@ -13983,7 +13985,8 @@ textarea {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: var(--lc-lime);
+  /* A status light: green means it (0.434). */
+  background: var(--lc-green);
   display: block;
   transition: background var(--lc-motion-panel) var(--lc-ease);
 }

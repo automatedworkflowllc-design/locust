@@ -236,12 +236,22 @@
    * Blue, amber, red and violet must carry meaning -- never hierarchy or
    * delight.
    */
-  --lc-lime: #c9f04a;
-  --lc-lime-text: #dbf785;
-  --lc-lime-tint: rgba(201, 240, 74, 0.1);
-  --lc-lime-tint-strong: rgba(201, 240, 74, 0.2);
-  --lc-lime-border: rgba(201, 240, 74, 0.3);
-  --lc-lime-border-strong: rgba(201, 240, 74, 0.55);
+  /*
+   * THE ACCENT IS MONOCHROME (0.434). Colin, 2026-09-28: "switch to
+   * monochrome for most things unless green makes sense." These six were the
+   * lime accent (#c9f04a) on every primary button, switch, selection, chip
+   * and the boot screen; they keep their names, so every rule that asks for
+   * "the accent" gets the ivory the rest of the app is drawn in. Where green
+   * MEANS something -- a runtime that is ready, a safe step, a status light
+   * -- the rule asks for --lc-green by name (shell.css). A lime TEAMMATE is
+   * --lc-hue-lime, untouched.
+   */
+  --lc-lime: #f2efe9;
+  --lc-lime-text: #f2efe9;
+  --lc-lime-tint: rgba(242, 239, 233, 0.07);
+  --lc-lime-tint-strong: rgba(242, 239, 233, 0.13);
+  --lc-lime-border: rgba(242, 239, 233, 0.2);
+  --lc-lime-border-strong: rgba(242, 239, 233, 0.38);
 
   /*
    * Green is settled: allowed, passed, added, available. Lime is "happening
