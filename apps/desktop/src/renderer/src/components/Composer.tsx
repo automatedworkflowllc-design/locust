@@ -43,6 +43,7 @@ import { ATTACHMENT_DIR, attachmentLabel, MAX_ATTACHMENTS, withAttachments } fro
 import { diffNotesTile, withDiffNotes } from '../diffNotes.js'
 import type { DiffNote } from '../diffNotes.js'
 import { availableCommands, matchingCommands, runtimeSlashCommands, slashQuery } from '../slashCommands.js'
+import { atQuery, fileMatches, withoutAtQuery } from '../fileMentions.js'
 import type { SlashCommand } from '../slashCommands.js'
 import { RoutePicker } from './RoutePicker.js'
 import type { RouteChoice } from './RoutePicker.js'
@@ -494,6 +495,38 @@ export function Composer({
   const writingArguments = /\s$/.test(value) &&
     slashMatches.some((command) => command.action.kind === 'runtime' && command.name.toLowerCase() === slashing)
   const slashChoices = writingArguments ? [] : slashMatches
+  /*
+   * `@` FOR A FILE OF THE PROJECT (0.436, fileMentions.ts). The folder's
+   * files, asked of the host the first time `@` is typed and again at most
+   * every half minute; picking one attaches it as the + menu does and takes
+   * the `@word` out of the message. Escape closes the list for what is typed.
+   */
+  const [projectFiles, setProjectFiles] = useState<readonly string[] | undefined>(undefined)
+  const filesAskedAt = useRef(0)
+  const [atAt, setAtAt] = useState(0)
+  const [atDismissed, setAtDismissed] = useState<string | undefined>(undefined)
+  const typedAt = slashing === undefined ? atQuery(value) : undefined
+  const wantsFiles = typedAt !== undefined
+  useEffect(() => {
+    if (!wantsFiles || Date.now() - filesAskedAt.current < 30_000) return
+    filesAskedAt.current = Date.now()
+    void window.desktop?.workspaceFiles().then((answer) => {
+      if (answer.ok) setProjectFiles(answer.paths)
+    }).catch(() => undefined)
+  }, [wantsFiles])
+  const atChoices = typedAt === undefined || projectFiles === undefined || atDismissed === value
+    ? []
+    : fileMatches(projectFiles.filter((path) => !attached.includes(path)), typedAt)
+  const pickFile = (path: string): void => {
+    setAtAt(0)
+    setValue(withoutAtQuery(value))
+    if (attached.length >= MAX_ATTACHMENTS) {
+      setNote(`A message can carry ${String(MAX_ATTACHMENTS)} files at most.`)
+      return
+    }
+    setAttached((current) => [...new Set([...current, path])].slice(0, MAX_ATTACHMENTS))
+    requestAnimationFrame(() => field.current?.focus())
+  }
   const runSlash = (command: SlashCommand): void => {
     setSlashAt(0)
     // A runtime's own command is written into the box, where its arguments
@@ -803,6 +836,30 @@ export function Composer({
       if (keyEvent.key === 'Escape') {
         keyEvent.preventDefault()
         setValue('')
+        return
+      }
+    }
+    // The `@` list, the same way (0.436): Enter or Tab attaches the file.
+    if (atChoices.length > 0) {
+      if (keyEvent.key === 'ArrowDown') {
+        keyEvent.preventDefault()
+        setAtAt((at) => (at + 1) % atChoices.length)
+        return
+      }
+      if (keyEvent.key === 'ArrowUp') {
+        keyEvent.preventDefault()
+        setAtAt((at) => (at - 1 + atChoices.length) % atChoices.length)
+        return
+      }
+      if ((keyEvent.key === 'Enter' && !keyEvent.shiftKey) || keyEvent.key === 'Tab') {
+        keyEvent.preventDefault()
+        const chosen = atChoices[Math.min(atAt, atChoices.length - 1)]
+        if (chosen !== undefined) pickFile(chosen)
+        return
+      }
+      if (keyEvent.key === 'Escape') {
+        keyEvent.preventDefault()
+        setAtDismissed(value)
         return
       }
     }
@@ -1150,6 +1207,30 @@ export function Composer({
           * something new -- and `availableCommands` drops any command that
           * would be refused, so nothing here can be chosen and then fail.
           */}
+        {atChoices.length > 0 && (
+          <div className="lc-slash" role="listbox" aria-label="Files">
+            <div className="lc-slash__group lc-mono" role="presentation">Files in this folder</div>
+            {atChoices.map((path, index) => {
+              const cut = path.lastIndexOf('/')
+              const active = index === Math.min(atAt, atChoices.length - 1)
+              return (
+                <button
+                  key={path}
+                  type="button"
+                  role="option"
+                  aria-selected={active}
+                  className={`lc-slash__item${active ? ' is-active' : ''}`}
+                  title={path}
+                  onMouseEnter={() => setAtAt(index)}
+                  onClick={() => pickFile(path)}
+                >
+                  <span className="lc-slash__name lc-mono">{path.slice(cut + 1)}</span>
+                  <span className="lc-slash__detail">{cut < 0 ? 'the folder itself' : path.slice(0, cut)}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
         {slashChoices.length > 0 && (
           <div className="lc-slash" role="listbox" aria-label="Commands" ref={slashList}>
             {slashChoices.map((command, index) => (

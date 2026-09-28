@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.436.0 - 2026-09-28
+
+### New
+
+- **Type @ to attach a file from your project.** In the message box, @
+  lists the folder's files, narrowing as you type; Enter or Tab attaches
+  the one you pick, the same as choosing it with +. It follows your
+  project's .gitignore, so node_modules and build output stay out.
+
 ## 0.435.0 - 2026-09-28
 <!-- big -->
 

@@ -10,6 +10,7 @@ import { app, BrowserWindow, crashReporter, dialog, ipcMain, Menu, nativeImage, 
 import { createPageServer, fromPagePreview, PAGE_SCHEME } from './page-preview.js'
 import { createRuntimeCommands } from './runtime-commands.js'
 import { createCursorDefaultModel } from './cursor-default-model.js'
+import { listWorkspaceFiles } from './workspace-files.js'
 import electronUpdater from 'electron-updater'
 
 const { autoUpdater } = electronUpdater
@@ -200,6 +201,7 @@ import {
   TEAMMATE_FOLDER_CHANNEL,
   WORKSPACE_CHOOSE_CHANNEL,
   WORKSPACE_ATTACH_CHANNEL,
+  WORKSPACE_FILES_CHANNEL,
   WORKSPACE_PASTE_CHANNEL,
   WORKSPACE_IMAGE_CHANNEL,
   WORKSPACE_REVEAL_CHANNEL,
@@ -3437,6 +3439,18 @@ if (!ownsSingleInstanceLock) {
       }
     })
 
+    // The project's files for `@` in the composer (0.436): only this window's
+    // folder, listed by the host; the renderer names no folder.
+    ipcMain.handle(WORKSPACE_FILES_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      if (!workspaceChosen) return { ok: false, message: 'Choose the folder your teammates work in first.' } as const
+      try {
+        const listed = await listWorkspaceFiles(workspacePath)
+        return { ok: true, paths: listed.paths, truncated: listed.truncated } as const
+      } catch {
+        return { ok: false, message: "The folder's files could not be listed." } as const
+      }
+    })
     ipcMain.handle(WORKSPACE_ATTACH_CHANNEL, async (event) => {
       const owner = BrowserWindow.fromWebContents(event.sender)
       if (owner === null || !fromOwnWindow(event)) {

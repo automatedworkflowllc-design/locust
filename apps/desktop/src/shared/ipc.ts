@@ -696,6 +696,11 @@ export const DIAGNOSTICS_REPORT_CHANNEL = 'diagnostics:report'
  */
 export const WORKSPACE_PASTE_CHANNEL = 'workspace:paste'
 export const WORKSPACE_ATTACH_CHANNEL = 'workspace:attach'
+/** The project's files, for `@` in the composer (0.436, main/workspace-files.ts). */
+export const WORKSPACE_FILES_CHANNEL = 'workspace:files'
+export type WorkspaceFilesResponse =
+  | { readonly ok: true; readonly paths: readonly string[]; readonly truncated: boolean }
+  | { readonly ok: false; readonly message: string }
 
 /** Files chosen to attach, workspace-relative, or why none were. */
 export type AttachFilesResponse =
@@ -2610,6 +2615,8 @@ export interface DesktopApi {
   openLink(url: string): Promise<OpenLinkResponse>
   /** Open the picker for files to attach; answers workspace-relative paths. */
   attachFiles(): Promise<AttachFilesResponse>
+  /** The project's files, workspace-relative, for `@` in the composer (0.436). */
+  workspaceFiles(): Promise<WorkspaceFilesResponse>
   /**
    * Attach one thing from the clipboard. `bytes` is the file's contents; the
    * name is a suggestion the host sanitises and may change to avoid a
