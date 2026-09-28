@@ -74,6 +74,7 @@ import { MAX_LIVE_MISSIONS } from '../shared/live-missions.js'
 import { hostReadsEventsOf, runtimeDisplayName } from '../shared/runtimes.js'
 import { FREE_ONLY_REFUSAL, isFreeRoute } from './free-routes.js'
 import { attachmentsForRun } from './attachments-for-run.js'
+import { commandNamed } from './runtime-commands.js'
 
 export const MAX_PROMPT_LENGTH = 8_000
 /**
@@ -389,7 +390,7 @@ interface CodexMissionServiceOptions {
    */
   readonly askConnectors?: () => Promise<boolean>
   /** A runtime's own slash commands, as its CLI listed them this run (0.426). */
-  readonly onRuntimeCommands?: (runtime: 'claude', commands: readonly RuntimeCommandInfo[]) => void
+  readonly onRuntimeCommands?: (runtime: 'claude' | 'opencode', commands: readonly RuntimeCommandInfo[]) => void
   /** The person's opt-in for a runtime-kept todo list. Absent reads as off. */
   readonly keepATodoList?: () => Promise<boolean>
   /** Connectors a Cursor teammate can call, by name, for its briefing. */
@@ -1472,6 +1473,11 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // so their argv is built once now with the person's own words -- so a
         // builder's refusal still lands before anything durable -- and again
         // below with the prompt the runtime is actually sent.
+        // A command the person typed goes to the runtime bare (0.426). OpenCode
+        // takes it by name, `--command init` or its server's command call,
+        // and only what follows the name as the message (0.427).
+        const bare = asCommand === true && relay === undefined && startedBy === undefined
+        const openCodeCommand = bare && runtime === 'opencode' ? commandNamed(prompt) : undefined
         const buildCommand = (promptText: string): RuntimeCommandSpec => {
           const chosenEffort = route.effort
           const choice = {
@@ -1491,6 +1497,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               workspacePath: runCwd,
               sandbox: effectiveSandbox,
               prompt: promptText,
+              ...(openCodeCommand === undefined ? {} : { slashCommand: openCodeCommand }),
               // Only when this run is in a worktree, which is exactly when
               // the folder it stands in is not the repository it belongs to.
               ...(repositoryRoot === undefined ? {} : { repositoryRoot }),
@@ -1626,9 +1633,10 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // A command is sent bare, and records no brief: the session it acts
         // on may be cleared or compacted by it, so the next turn is briefed
         // whole (briefSessions.after finds nothing for this one).
-        const bare = asCommand === true && relay === undefined && startedBy === undefined
         if (bare) {
-          runtimePrompt = sentPrompt.trim()
+          runtimePrompt = openCodeCommand === undefined
+            ? sentPrompt.trim()
+            : sentPrompt.trimStart().slice(openCodeCommand.length + 1).trim()
         } else if (peer !== undefined && peerExchange !== undefined) {
           // The turn this one continues, so the brief can find the
           // conversation's group. A route switch names it in `continuation`;
@@ -1857,6 +1865,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               spawn: options.opencodeServeSpawn!,
               command,
               prompt: runtimePrompt,
+              ...(openCodeCommand === undefined ? {} : { slashCommand: openCodeCommand }),
               ...(chosenModel === undefined ? {} : { model: chosenModel }),
               ...(route.effort === undefined ? {} : { variant: route.effort }),
               ...(resumeThreadId === undefined ? {} : { resumeSessionId: resumeThreadId }),

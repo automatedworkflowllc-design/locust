@@ -483,9 +483,9 @@ export function Composer({
         modes: modesFor(route.runtime, platform),
         running,
         canSwarm: !running,
-        // The runtime's own, under its name (0.426).
-        ...(route.runtime === 'claude' && runtimeCommands?.claude !== undefined
-          ? { runtimeCommands: runtimeSlashCommands('Claude Code', runtimeCommands.claude) }
+        // The runtime's own, under its name (0.426; OpenCode's 0.427).
+        ...((route.runtime === 'claude' || route.runtime === 'opencode') && runtimeCommands?.[route.runtime] !== undefined
+          ? { runtimeCommands: runtimeSlashCommands(runtimeDisplayName(route.runtime), runtimeCommands[route.runtime]!) }
           : {})
       }))
   // A runtime's command followed by a space is complete: what comes next is

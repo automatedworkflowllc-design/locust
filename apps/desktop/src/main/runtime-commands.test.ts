@@ -63,6 +63,19 @@ describe('the commands a runtime listed', () => {
     expect(commands.isCommand(undefined, '/compact')).toBe(false)
   })
 
+  it("are kept per runtime: OpenCode's beside Claude Code's, none of OpenCode's hidden (0.427)", async () => {
+    const file = join(folder, 'runtime-commands.json')
+    const commands = createRuntimeCommands({ file })
+    const INIT = { name: 'init', description: 'guided AGENTS.md setup', argumentHint: '[arguments]' }
+    await commands.set('claude', [COMPACT, MODEL])
+    await commands.set('opencode', [INIT])
+    expect(await commands.list()).toEqual({ claude: [COMPACT], opencode: [INIT] })
+    expect(commands.isCommand('opencode', '/init keep it short')).toBe(true)
+    expect(commands.isCommand('opencode', '/compact')).toBe(false)
+    expect(commands.isCommand('claude', '/init')).toBe(false)
+    expect(await createRuntimeCommands({ file }).list()).toEqual({ claude: [COMPACT], opencode: [INIT] })
+  })
+
   it('are kept across a restart, and a list that did not change is not written again', async () => {
     const file = join(folder, 'runtime-commands.json')
     const first = createRuntimeCommands({ file })

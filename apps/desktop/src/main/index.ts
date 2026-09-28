@@ -14,6 +14,8 @@ import electronUpdater from 'electron-updater'
 const { autoUpdater } = electronUpdater
 import {
   createNodeProbeRunner,
+  createOpenCodeServeCommand,
+  readOpenCodeCommands,
   createNodeRuntimeProcessRunner,
   createPathExecutableLocator,
   cursorCanEnforceReadOnly,
@@ -3253,8 +3255,30 @@ if (!ownsSingleInstanceLock) {
     const pages = createPageServer({ roots: async () => [...(workspaceChosen ? [workspacePath] : []), ...(await teammateFolders())] })
     protocol.handle(PAGE_SCHEME, (request) => pages.handle(request.url))
     // The `/` menu's runtime half (0.426).
+    /*
+     * OpenCode lists its commands only through its server (0.427,
+     * opencode-commands.ts): asked once a session, in this folder, in the
+     * background, the first time the window reads the menu's commands. A
+     * list that changed is announced like Claude Code's.
+     */
+    let openCodeCommandsAsked = false
+    const refreshOpenCodeCommands = (): void => {
+      if (openCodeCommandsAsked) return
+      openCodeCommandsAsked = true
+      void (async () => {
+        const found = (await discoverForStart('opencode')).find((entry) => entry.id === 'opencode')
+        if (found?.availability !== 'available' || found.readiness !== 'ready' || found.executable === undefined) {
+          // Not ready yet, or not here: asked again the next time.
+          openCodeCommandsAsked = false
+          return
+        }
+        const commands = await readOpenCodeCommands({ spawn: spawnAppServer, command: createOpenCodeServeCommand(found.executable, { workspacePath }) })
+        if (await runtimeCommands.set('opencode', commands)) sendToWindow({ kind: 'runtime-commands-changed' })
+      })().catch((error: unknown) => note('runtime-commands', `could not list OpenCode's commands: ${error instanceof Error ? error.message : String(error)}`))
+    }
     ipcMain.handle(RUNTIME_COMMANDS_CHANNEL, async (event) => {
       if (!fromOwnWindow(event)) return {}
+      refreshOpenCodeCommands()
       return runtimeCommands.list().catch(() => ({}))
     })
     ipcMain.handle(WORKSPACE_PAGE_CHANNEL, async (event, requested: unknown) => {

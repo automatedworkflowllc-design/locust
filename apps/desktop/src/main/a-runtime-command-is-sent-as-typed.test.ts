@@ -117,7 +117,7 @@ describe('a command the person typed', () => {
     issues: []
   })
 
-  const setUp = () => {
+  const setUp = (discovered: RuntimeDiscovery = runtime) => {
     const recorded: string[] = []
     const ledger = {
       createMission: async (metadata: { prompt: string }) => {
@@ -147,7 +147,7 @@ describe('a command the person typed', () => {
     let nextId = 0
     const service = createCodexMissionService({
       workspacePath: process.platform === 'win32' ? 'C:\\safe-workspace' : '/safe-workspace',
-      discover: async () => [runtime],
+      discover: async () => [discovered],
       runner: { start },
       ledger,
       workroom,
@@ -161,7 +161,8 @@ describe('a command the person typed', () => {
       for (let i = 0; i < 20; i += 1) await new Promise((resolve) => setImmediate(resolve))
     }
     const sent = (call: number): string => start.mock.calls[call]?.[1] as string
-    return { service, drain, sent, recorded }
+    const argv = (call: number): readonly string[] => (start.mock.calls[call]?.[0] as { args: readonly string[] }).args
+    return { service, drain, sent, argv, recorded }
   }
 
   it('goes to the runtime alone, with no brief and no plan instruction after it', async () => {
@@ -201,5 +202,27 @@ describe('a command the person typed', () => {
     expect(sent(1)).toBe('/clear')
     expect(sent(2)).toContain(ROSTER_RULE)
     expect(sent(2).endsWith('What next?')).toBe(true)
+  })
+
+  it("goes to OpenCode by name, with only what follows the name as its message (0.427)", async () => {
+    const opencode: RuntimeDiscovery = { ...runtime, id: 'opencode', displayName: 'OpenCode', executable: { ...runtime.executable!, commandName: 'opencode' } }
+    const { service, drain, sent, argv } = setUp(opencode)
+    const typed = await service.start('/init keep it under five lines', 'opencode', 'ask', { model: 'opencode/nemotron-3-ultra-free' }, () => undefined, undefined, PEER, undefined, undefined, undefined, true)
+    expect(typed.ok).toBe(true)
+    await drain()
+    expect(argv(0)[argv(0).indexOf('--command') + 1]).toBe('init')
+    expect(sent(0)).toBe('keep it under five lines')
+    await drain()
+    // With nothing after it, nothing is the message.
+    const bareReview = await service.start('/review', 'opencode', 'ask', { model: 'opencode/nemotron-3-ultra-free' }, () => undefined, undefined, PEER, undefined, undefined, undefined, true)
+    expect(bareReview.ok, JSON.stringify(bareReview)).toBe(true)
+    await drain()
+    expect(argv(1)[argv(1).indexOf('--command') + 1]).toBe('review')
+    expect(sent(1)).toBe('')
+    await drain()
+    // Not typed as a command: an ordinary briefed run.
+    await service.start('/init', 'opencode', 'ask', { model: 'opencode/nemotron-3-ultra-free' }, () => undefined, undefined, PEER)
+    expect(argv(2)).not.toContain('--command')
+    expect(sent(2)).toContain(ROSTER_RULE)
   })
 })

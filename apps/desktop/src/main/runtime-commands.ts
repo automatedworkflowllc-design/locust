@@ -27,7 +27,16 @@ export const HIDDEN_COMMANDS: Readonly<Record<string, ReadonlySet<string>>> = {
   claude: new Set(['model', 'effort', 'fast', 'config', 'mcp', 'output-style', 'agents', 'login', 'logout', 'permissions', 'hooks', 'statusline', 'theme', 'vim', 'terminal-setup', 'privacy-settings', 'upgrade', 'install-github-app', 'ide', 'keybindings', 'exit', 'resume', 'sandbox', 'plugin', 'add-dir', 'memory'])
 }
 
-export type CommandRuntime = 'claude'
+/**
+ * The runtimes whose commands Locust can list and send (0.427 adds OpenCode:
+ * its server lists them, opencode-commands.ts, and `run --command` sends one).
+ * OpenCode's are all prompt templates -- `init`, `review`, the person's
+ * commands and skills -- so none is hidden.
+ */
+export const COMMAND_RUNTIMES = ['claude', 'opencode'] as const
+export type CommandRuntime = (typeof COMMAND_RUNTIMES)[number]
+const isCommandRuntime = (runtime: string | undefined): runtime is CommandRuntime =>
+  (COMMAND_RUNTIMES as readonly string[]).includes(runtime ?? '')
 
 export interface RuntimeCommands {
   /** What each runtime offers, hidden ones left out. */
@@ -50,10 +59,12 @@ export function createRuntimeCommands(options: { readonly file: string }): Runti
   const read = async (): Promise<void> => {
     try {
       const parsed = JSON.parse(await readFile(options.file, 'utf8')) as { byRuntime?: Record<string, unknown> }
-      const claude = parsed.byRuntime?.claude
-      if (Array.isArray(claude)) {
+      for (const runtime of COMMAND_RUNTIMES) {
+        const kept = parsed.byRuntime?.[runtime]
+        if (!Array.isArray(kept)) continue
         held = {
-          claude: claude.flatMap((entry): RuntimeCommandInfo[] =>
+          ...held,
+          [runtime]: kept.flatMap((entry): RuntimeCommandInfo[] =>
             typeof entry === 'object' && entry !== null && typeof (entry as RuntimeCommandInfo).name === 'string'
               ? [{ name: (entry as RuntimeCommandInfo).name, description: String((entry as RuntimeCommandInfo).description ?? ''), argumentHint: String((entry as RuntimeCommandInfo).argumentHint ?? '') }]
               : [])
@@ -71,7 +82,10 @@ export function createRuntimeCommands(options: { readonly file: string }): Runti
   return {
     async list() {
       await load()
-      return held.claude === undefined ? {} : { claude: visible('claude', held.claude) }
+      return Object.fromEntries(COMMAND_RUNTIMES.flatMap((runtime) => {
+        const commands = held[runtime]
+        return commands === undefined ? [] : [[runtime, visible(runtime, commands)]]
+      }))
     },
     async set(runtime, commands) {
       await load()
@@ -84,9 +98,9 @@ export function createRuntimeCommands(options: { readonly file: string }): Runti
       return true
     },
     isCommand(runtime, prompt) {
-      if (runtime !== 'claude') return false
+      if (!isCommandRuntime(runtime)) return false
       const name = commandNamed(prompt)
-      return name !== undefined && visible('claude', held.claude ?? []).some((command) => command.name === name)
+      return name !== undefined && visible(runtime, held[runtime] ?? []).some((command) => command.name === name)
     }
   }
 }

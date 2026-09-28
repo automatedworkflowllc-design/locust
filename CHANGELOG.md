@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.427.0 - 2026-09-28
+
+### New
+
+- **OpenCode's commands, in the / menu too.** With an OpenCode teammate,
+  type / and you'll find OpenCode's own commands under its name: /init,
+  /review, and your own commands and skills. Pick one, add anything it
+  takes, and send: OpenCode runs it as that command, in Approve each as
+  well, where it still stops and asks before it changes anything. The list
+  is there from the moment Locust opens, no first run needed.
+
 ## 0.426.0 - 2026-09-28
 <!-- big -->
 

@@ -56,6 +56,11 @@ function fakeServer() {
       prompted();
       return new Response(null, { status: 204 });
     }
+    // A command (0.427) answers only once its turn is over.
+    if (url.endsWith("/command")) {
+      prompted();
+      return Response.json({ info: {}, parts: [] });
+    }
     if (url.includes("/permission/")) return Response.json(true);
     return new Response(null, { status: 404 });
   }) as typeof fetch;
@@ -156,6 +161,30 @@ describe("OpenCode through its own server (A6.7)", () => {
       reply: "reject",
       message: "The person declined this, and said: use the build script",
     });
+  });
+
+  it("sends one of OpenCode's own commands as the command, its arguments beside it, and reads the turn the same way (0.427)", async () => {
+    const server = fakeServer();
+    const command = createOpenCodeServeCommand(EXECUTABLE, { workspacePath: "C:/work/pebble" });
+    const run = startOpenCodeServeRun({
+      spawn: server.spawn,
+      command,
+      prompt: "focus on the tests",
+      slashCommand: "review",
+      model: "opencode/ling-3.0-flash-fin-free",
+      fetch: server.fetcher,
+    });
+    const records: string[] = [];
+    for await (const record of run.records) records.push(record.raw);
+    const completion = await run.completion;
+    expect(server.calls.some((call) => call.url.endsWith("/prompt_async"))).toBe(false);
+    expect(server.calls.find((call) => call.url.endsWith(`/session/${SESSION}/command`))?.body).toEqual({
+      command: "review",
+      arguments: "focus on the tests",
+      model: "opencode/ling-3.0-flash-fin-free",
+    });
+    expect(records.length).toBeGreaterThan(0);
+    expect(completion.exitCode).toBe(0);
   });
 
   it("asks for every action in its config, and never announces itself on the network", () => {

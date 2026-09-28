@@ -62,6 +62,12 @@ export interface OpenCodeServeRunOptions {
   readonly model?: string;
   readonly variant?: string;
   readonly resumeSessionId?: string;
+  /**
+   * One of OpenCode's own commands, typed by the person (0.427): sent as
+   * `POST /session/{id}/command`, with `prompt` as its arguments, instead of
+   * as a message.
+   */
+  readonly slashCommand?: string;
   /** Who answers. Absent: every request is refused, never approved. */
   readonly onPermission?: (request: OpenCodePermission) => Promise<OpenCodePermissionAnswer>;
   readonly signal?: AbortSignal;
@@ -297,6 +303,22 @@ export function startOpenCodeServeRun(options: OpenCodeServeRunOptions): Runtime
       const body: unknown = await created.json().catch(() => undefined);
       sessionId = isObject(body) ? text(body.id) : undefined;
       if (!created.ok || sessionId === undefined) throw new Error("OpenCode's server would not start a session.");
+    }
+    if (options.slashCommand !== undefined) {
+      // Answered only when the command's turn is over, so it is not awaited:
+      // the turn is read from the event stream like any other, and a refusal
+      // ends the run with the server's reason.
+      prompted = true;
+      void call(`/session/${encodeURIComponent(sessionId)}/command`, {
+        command: options.slashCommand,
+        arguments: options.prompt,
+        ...(options.model === undefined ? {} : { model: options.model }),
+        ...(options.variant === undefined ? {} : { variant: options.variant }),
+      }).then(async (answered) => {
+        if (!answered.ok) lose(`OpenCode's server refused the command (${String(answered.status)}): ${(await answered.text().catch(() => "")).slice(0, 200)}`);
+      }).catch((error: unknown) => lose(error instanceof Error ? error.message : "OpenCode's server could not be reached."));
+      await stream;
+      return;
     }
     const slash = options.model?.indexOf("/") ?? -1;
     const sent = await call(`/session/${encodeURIComponent(sessionId)}/prompt_async`, {

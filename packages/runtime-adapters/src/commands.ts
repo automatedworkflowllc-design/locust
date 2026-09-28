@@ -437,7 +437,19 @@ export interface RuntimeCommandOptions {
    * there would be a question nobody is asked. Claude Code only.
    */
   readonly permissionBridge?: { readonly configPath: string; readonly toolName: string };
+  /**
+   * One of the runtime's own slash commands, typed by the person (0.427):
+   * `opencode run --command <name>`, its arguments being what arrives on
+   * stdin. MEASURED 2026-09-28 on 1.18.27 with the free Nemotron: `--command
+   * init` with "Keep it under five lines." on stdin wrote a three-line
+   * AGENTS.md; `--command review` with nothing on stdin reviewed the
+   * uncommitted change. OpenCode only; every other builder ignores it.
+   */
+  readonly slashCommand?: string;
 }
+
+/** A command name as a runtime lists it: `init`, `security-review`, `plugin:skill`. */
+export const SLASH_COMMAND_NAME = /^[A-Za-z0-9][A-Za-z0-9:._-]{0,63}$/;
 
 /** `--allowedTools` and its rules, or nothing at all when there are none. */
 function connectorRules(names: readonly string[] | undefined): readonly string[] {
@@ -1429,6 +1441,10 @@ export function createOpenCodeRunCommand(
   // the spec forwards as records (stderrRecords). ERROR only: WARN names
   // every duplicate skill on the machine.
   const args = ["run", "--format", "json", "--print-logs", "--log-level", "ERROR"];
+  if (options.slashCommand !== undefined) {
+    if (!SLASH_COMMAND_NAME.test(options.slashCommand)) throw new Error(`"${options.slashCommand}" is not a command name`);
+    args.push("--command", options.slashCommand);
+  }
   if (options.model !== undefined) {
     args.push("-m", requireText(options.model, "Model"));
   }
