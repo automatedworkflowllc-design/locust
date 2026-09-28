@@ -11,6 +11,26 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.440.0 - 2026-09-28
+<!-- big -->
+
+### New
+
+- **Land a teammate's work on your branch.** Give a teammate its own branch
+  and every turn it finishes is saved there; Review changes now has **Land
+  on main** (or whichever branch you are on). It lands the whole branch as
+  one commit of yours, under a message you can edit, and your own commit
+  hooks run. Afterwards the teammate starts from what landed.
+- **Nothing half-done.** Before the button is offered, Locust checks what
+  would stop it and says so in its place: the teammate still working, your
+  own unsaved changes in a file it would write, or a conflict with your
+  branch. If one of your hooks refuses the commit, your checkout is put back
+  exactly as it was.
+- **Conflicts go to the teammate.** When your branch changed the same lines,
+  **Ask Wren to resolve** starts the merge on the teammate's branch only
+  (yours is not touched) and asks in its conversation. When that turn ends
+  it is saved, and it can land.
+
 ## 0.439.0 - 2026-09-28
 
 ### New

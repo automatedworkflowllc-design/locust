@@ -842,6 +842,40 @@ export type BranchReviewResponse =
   | { readonly ok: true; readonly data: PublicBranchReview }
   | { readonly ok: false; readonly error: { readonly code: 'REVIEW_UNAVAILABLE'; readonly message: string } }
 
+/** Land it (0.440): preview, land, and begin resolving a conflict on the teammate's branch. */
+export const WORKTREE_LAND_PREVIEW_CHANNEL = 'worktrees:land-preview'
+export const WORKTREE_LAND_CHANNEL = 'worktrees:land'
+export const WORKTREE_RESOLVE_CHANNEL = 'worktrees:resolve'
+
+/** Why a branch cannot land now; `busy` is the host's own (a run is live for the teammate). */
+export type PublicLandBlock =
+  | { readonly kind: 'nothing' | 'detached' | 'merging' | 'busy' }
+  | { readonly kind: 'old-git'; readonly version: string | undefined }
+  | { readonly kind: 'unsaved' | 'markers' | 'your-changes' | 'conflicts'; readonly files: readonly string[] }
+
+export interface PublicLandPreview {
+  readonly branch: string
+  readonly onto: string | undefined
+  readonly files: readonly string[]
+  readonly draft: string
+  readonly block: PublicLandBlock | undefined
+}
+
+export type LandPreviewResponse =
+  | { readonly ok: true; readonly data: PublicLandPreview }
+  | { readonly ok: false; readonly error: { readonly code: 'REVIEW_UNAVAILABLE'; readonly message: string } }
+
+export type LandResponse =
+  | { readonly ok: true; readonly data:
+      | { readonly kind: 'landed'; readonly sha: string; readonly onto: string; readonly files: readonly string[]; readonly branchReset: boolean }
+      | { readonly kind: 'blocked'; readonly block: PublicLandBlock }
+      | { readonly kind: 'refused'; readonly message: string } }
+  | { readonly ok: false; readonly error: { readonly code: 'REVIEW_UNAVAILABLE'; readonly message: string } }
+
+export type ResolveResponse =
+  | { readonly ok: true; readonly data: { readonly onto: string; readonly files: readonly string[] } }
+  | { readonly ok: false; readonly error: { readonly code: 'REVIEW_UNAVAILABLE'; readonly message: string } }
+
 export type TurnDiffResponse =
   | { readonly ok: true; readonly data: { readonly diff: string } }
   | { readonly ok: false; readonly error: { readonly code: 'REVIEW_UNAVAILABLE'; readonly message: string } }
@@ -2705,6 +2739,10 @@ export interface DesktopApi {
   /** Review changes on a teammate's own branch (0.439). Reads only. */
   reviewBranch(teammateId: string): Promise<BranchReviewResponse>
   turnDiff(teammateId: string, sha: string): Promise<TurnDiffResponse>
+  /** Land it (0.440). */
+  landPreview(teammateId: string): Promise<LandPreviewResponse>
+  landBranch(teammateId: string, message: string): Promise<LandResponse>
+  startResolving(teammateId: string): Promise<ResolveResponse>
   /**
    * H3: one mission's record with its events. History sends the newest
    * missions whole and every other one as a row; opening one of those reads

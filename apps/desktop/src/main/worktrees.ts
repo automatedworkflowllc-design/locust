@@ -79,6 +79,70 @@ export interface WorktreeManager {
   review(teammateId: string): Promise<BranchReview>
   /** One turn's change, by the sha `review` listed. Reads only. */
   turnDiff(teammateId: string, sha: string): Promise<string>
+  /**
+   * LAND IT (0.440): whether the branch can land on the person's branch now,
+   * and the message a landing would carry. Reads only: every refusal a land
+   * would meet is found here, before anything is touched.
+   */
+  landPreview(teammate: { readonly teammateId: string; readonly name: string }): Promise<LandPreview>
+  /**
+   * Squash the branch onto the person's current branch, in their checkout, as
+   * one commit of theirs -- their identity, their hooks. Refuses everything
+   * `landPreview` refuses; a hook that refuses the commit puts the checkout
+   * back as it was. Afterwards the teammate's branch starts from the landing.
+   */
+  land(teammate: { readonly teammateId: string; readonly name: string }, message: string): Promise<LandResult>
+  /**
+   * Begin merging the person's branch into the teammate's, in the teammate's
+   * tree only, and name the files that conflict -- for the teammate to
+   * resolve in a turn, whose checkpoint then commits the merge.
+   */
+  startResolving(teammateId: string): Promise<readonly string[]>
+}
+
+/** Why a branch cannot land now -- each said with what would change it. */
+export type LandBlock =
+  | { readonly kind: 'nothing' }
+  | { readonly kind: 'detached' }
+  | { readonly kind: 'old-git'; readonly version: string | undefined }
+  | { readonly kind: 'unsaved'; readonly files: readonly string[] }
+  | { readonly kind: 'markers'; readonly files: readonly string[] }
+  | { readonly kind: 'your-changes'; readonly files: readonly string[] }
+  | { readonly kind: 'conflicts'; readonly files: readonly string[] }
+  | { readonly kind: 'merging' }
+
+export interface LandPreview {
+  readonly branch: string
+  readonly onto: string | undefined
+  readonly files: readonly string[]
+  /** The message the landing commit would carry; the person may edit it. */
+  readonly draft: string
+  readonly block: LandBlock | undefined
+}
+
+export type LandResult =
+  | { readonly kind: 'landed'; readonly sha: string; readonly onto: string; readonly files: readonly string[]; readonly branchReset: boolean }
+  | { readonly kind: 'blocked'; readonly block: LandBlock }
+  /** The person's own commit hook (or git itself) refused; their checkout is as it was. */
+  | { readonly kind: 'refused'; readonly message: string }
+
+/** Landing checks conflicts with `merge-tree --write-tree`, new in git 2.38. */
+export function gitVersionCanLand(version: string): boolean {
+  const [major = 0, minor = 0] = version.split('.').map((part) => Number(part))
+  return major > 2 || (major === 2 && minor >= 38)
+}
+
+/** The landing commit's message: the first ask, each turn after it, and who did the work on which route. */
+export function landingDraft(input: {
+  readonly name: string
+  readonly subjects: readonly string[]
+  readonly routes: readonly string[]
+}): string {
+  const [first = `${input.name}'s work`, ...rest] = input.subjects
+  const body = rest.length === 0 ? '' : `\n\n${[first, ...rest].map((subject) => `- ${subject}`).join('\n')}`
+  const routes = [...new Set(input.routes.map((route) => route.trim()).filter((route) => route.length > 0))]
+  const trailers = [`Locust-Teammate: ${input.name}`, ...routes.map((route) => `Locust-Route: ${route}`)].join('\n')
+  return `${first}${body}\n\n${trailers}`
 }
 
 /** GitHub warns at 50 MB and refuses at 100: a new file past this is left out of a checkpoint. */
@@ -103,6 +167,8 @@ export type CheckpointResult =
       readonly branch: string
       readonly files: readonly string[]
       readonly skipped: readonly { readonly path: string; readonly bytes: number }[]
+      /** This commit finished a merge begun to resolve a conflict (0.440): `files` are what came in with it. */
+      readonly mergeFinished?: true
     }
   /** Only files too big to commit changed. */
   | { readonly kind: 'skipped'; readonly skipped: readonly { readonly path: string; readonly bytes: number }[] }
@@ -195,7 +261,8 @@ export function defaultRunGit(args: readonly string[], cwd: string, timeoutMs = 
     const child = execFile('git', ownGitArgs(args), { cwd, windowsHide: true, maxBuffer: 4 * 1024 * 1024 }, (error, stdout, stderr) => {
       clearTimeout(timer)
       if (timedOut) reject(new Error(`git ${args[0] ?? ''}: took longer than ${String(Math.round(timeoutMs / 1000))} s and was stopped.`))
-      else if (error) reject(new Error(`git ${args[0] ?? ''}: ${String(stderr || error.message).trim().slice(0, 300)}`))
+      // With what it printed: `merge-tree` names its conflicts on stdout and exits 1 (0.440).
+      else if (error) reject(Object.assign(new Error(`git ${args[0] ?? ''}: ${String(stderr || error.message).trim().slice(0, 300)}`), { stdout: String(stdout) }))
       else resolvePromise(stdout)
     })
     const timer = setTimeout(() => {
@@ -432,7 +499,10 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
     async checkpoint(teammateId, message) {
       const path = await madeTree(teammateId)
       const entries = statusEntriesOf(await runGit(['status', '--porcelain', '-z', '--untracked-files=all'], path))
-      if (entries.length === 0) return { kind: 'clean' }
+      // A merge begun to resolve a conflict (0.440) is finished by the turn that
+      // resolved it -- even one that kept this branch's side and so changed nothing.
+      const merging = await runGit(['rev-parse', '-q', '--verify', 'MERGE_HEAD'], path).then(() => true, () => false)
+      if (entries.length === 0 && !merging) return { kind: 'clean' }
       const skipped: { path: string; bytes: number }[] = []
       for (const entry of entries) {
         if (entry.code !== '??') continue
@@ -442,7 +512,8 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
       await runGit(['add', '-A'], path, WORKTREE_CHECKOUT_TIMEOUT_MS)
       if (skipped.length > 0) await runGit(['reset', '-q', '--', ...skipped.map((file) => file.path)], path)
       const files = (await runGit(['diff', '--cached', '--name-only', '-z'], path)).split('\0').filter((file) => file.length > 0)
-      if (files.length === 0) return skipped.length > 0 ? { kind: 'skipped', skipped } : { kind: 'clean' }
+      if (files.length === 0 && !merging) return skipped.length > 0 ? { kind: 'skipped', skipped } : { kind: 'clean' }
+      // Unresolved files would be committed with their markers; Land refuses those, and says so.
       const trailers = message.trailers.map(([key, value]) => `${key}: ${value.replace(/\s+/g, ' ').trim()}`).join('\n')
       await runGit([
         '-c', `user.name=${message.author.name}`,
@@ -455,7 +526,7 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
       ], path, WORKTREE_CHECKOUT_TIMEOUT_MS)
       const sha = (await runGit(['rev-parse', 'HEAD'], path)).trim()
       const branch = (await runGit(['symbolic-ref', '--short', '-q', 'HEAD'], path).catch(() => '')).trim()
-      return { kind: 'committed', sha, branch, files, skipped }
+      return { kind: 'committed', sha, branch, files, skipped, ...(merging ? { mergeFinished: true } : {}) }
     },
 
     async review(teammateId) {
@@ -480,7 +551,96 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
       const turns = (await runGit(['rev-list', `${base}..${branch}`], root)).split(/\r?\n/).map((line) => line.trim())
       if (!turns.includes(sha)) throw new Error('That is not a turn on this branch.')
       return runGit(['show', ...PLAIN_DIFF, '--format=', sha], root)
+    },
+
+    async landPreview(teammate) {
+      return (await gatherLanding(teammate)).preview
+    },
+
+    async land(teammate, message) {
+      const { preview, path } = await gatherLanding(teammate)
+      if (preview.block !== undefined || preview.onto === undefined) return { kind: 'blocked', block: preview.block ?? { kind: 'detached' } }
+      const text = message.trim().length > 0 ? message.trim() : preview.draft
+      // Staged in the person's checkout, then committed as theirs: their
+      // identity and their hooks. Nothing of theirs is touched -- the preview
+      // refused any file they have changed that this landing writes.
+      const putBack = async (): Promise<void> => {
+        await runGit(['reset', '-q', '--merge', 'HEAD'], root).catch(() => '')
+        await rm(join(root, '.git', 'SQUASH_MSG'), { force: true }).catch(() => undefined)
+      }
+      try {
+        await runGit(['merge', '--squash', preview.branch], root, WORKTREE_CHECKOUT_TIMEOUT_MS)
+      } catch (error) {
+        await putBack()
+        return { kind: 'refused', message: `git could not stage the landing: ${error instanceof Error ? error.message : 'no reason given'}` }
+      }
+      try {
+        await runGit(['commit', '-q', '-m', text], root, WORKTREE_CHECKOUT_TIMEOUT_MS)
+      } catch (error) {
+        await putBack()
+        const said = error instanceof Error ? error.message : ''
+        return {
+          kind: 'refused',
+          message: /tell me who you are|user\.email|user\.name/i.test(said)
+            ? 'git does not know your name and email yet, so it cannot make the commit as you. Set them with git config user.name and user.email, then land again.'
+            : `Your commit hooks refused the landing commit: ${said.replace(/^git commit:\s*/, '')}`
+        }
+      }
+      const sha = (await runGit(['rev-parse', 'HEAD'], root)).trim()
+      // The teammate's next turn starts from what landed, so its next review is only what is new.
+      const branchReset = await runGit(['reset', '-q', '--keep', sha], path).then(() => true, () => false)
+      return { kind: 'landed', sha, onto: preview.onto, files: preview.files, branchReset }
+    },
+
+    async startResolving(teammateId) {
+      const path = await madeTree(teammateId)
+      const onto = (await runGit(['symbolic-ref', '--short', '-q', 'HEAD'], root)).trim()
+      // Exits non-zero when it conflicts, which is the case this exists for.
+      await runGit(['merge', '--no-ff', '--no-commit', onto], path, WORKTREE_CHECKOUT_TIMEOUT_MS).catch(() => '')
+      return (await runGit(['diff', '--name-only', '-z', '--diff-filter=U'], path)).split('\0').filter((file) => file.length > 0)
     }
+  }
+
+  /** Everything a landing needs to know, found without changing anything. */
+  async function gatherLanding(teammate: { readonly teammateId: string; readonly name: string }): Promise<{ readonly preview: LandPreview; readonly path: string }> {
+    const path = await madeTree(teammate.teammateId)
+    const branch = (await runGit(['symbolic-ref', '--short', '-q', 'HEAD'], path)).trim()
+    const ontoName = (await runGit(['symbolic-ref', '--short', '-q', 'HEAD'], root).catch(() => '')).trim()
+    const onto = ontoName.length > 0 ? ontoName : undefined
+    const base = (await runGit(['merge-base', 'HEAD', branch], root)).trim()
+    const files = (await runGit(['diff', '--name-only', '-z', base, branch], root)).split('\0').filter((file) => file.length > 0)
+    const subjects = branchTurnsOf(await runGit(['log', '--name-only', '--format=%x1e%H%x1f%s%x1f%aI', `${base}..${branch}`], root)).map((turn) => turn.subject).reverse()
+    const routes = (await runGit(['log', '--format=%(trailers:key=Locust-Route,valueonly,separator=%x0a)', `${base}..${branch}`], root).catch(() => '')).split(/\r?\n/)
+    const draft = landingDraft({ name: teammate.name, subjects, routes })
+    const preview = (block: LandBlock | undefined): { preview: LandPreview; path: string } => ({ preview: { branch, onto, files, draft, block }, path })
+
+    const version = parseGitVersion(await runGit(['--version'], root).catch(() => ''))
+    if (version === undefined || !gitVersionCanLand(version)) return preview({ kind: 'old-git', version })
+    if (onto === undefined) return preview({ kind: 'detached' })
+    const merging = await runGit(['rev-parse', '-q', '--verify', 'MERGE_HEAD'], path).then(() => true, () => false)
+    if (merging) return preview({ kind: 'merging' })
+    const unsaved = statusEntriesOf(await runGit(['status', '--porcelain', '-z', '--untracked-files=all'], path)).map((entry) => entry.path)
+    if (unsaved.length > 0) return preview({ kind: 'unsaved', files: unsaved })
+    if (files.length === 0) return preview({ kind: 'nothing' })
+    const marked = (await runGit(['grep', '-l', '-E', '-e', '^(<<<<<<<|>>>>>>>)( |$)', branch, '--', ...files], root).catch(() => ''))
+      .split(/\r?\n/)
+      .map((line) => line.trim().replace(new RegExp(`^${branch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:`), ''))
+      .filter((line) => line.length > 0)
+    if (marked.length > 0) return preview({ kind: 'markers', files: marked })
+    const touching = new Set(files)
+    const yours = statusEntriesOf(await runGit(['status', '--porcelain', '-z', '--untracked-files=all'], root)).map((entry) => entry.path).filter((file) => touching.has(file))
+    if (yours.length > 0) return preview({ kind: 'your-changes', files: yours })
+    const conflicts = await runGit(['merge-tree', '--write-tree', '--name-only', '--no-messages', 'HEAD', branch], root).then(
+      () => [] as string[],
+      (error: unknown) => {
+        const printed = (error as { stdout?: string }).stdout ?? ''
+        const named = printed.split(/\r?\n/).slice(1).map((line) => line.trim()).filter((line) => line.length > 0)
+        // No list means git failed for another reason: say so as a conflict it could not name.
+        return named.length > 0 ? [...new Set(named)] : ['(git could not check for conflicts)']
+      }
+    )
+    if (conflicts.length > 0) return preview({ kind: 'conflicts', files: conflicts })
+    return preview(undefined)
   }
 
   /** A teammate's tree that git finished making, or a refusal that says so. */

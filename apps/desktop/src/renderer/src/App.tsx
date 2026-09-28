@@ -6920,7 +6920,18 @@ export default function App(): ReactElement {
             onClose={() => setBesideId(undefined)}
           />
         ) : reviewing !== undefined && screen === 'workroom' ? (
-          <ReviewChanges key={reviewing.teammateId} teammate={reviewing} onClose={() => setReviewingId(undefined)} />
+          <ReviewChanges
+            key={reviewing.teammateId}
+            teammate={reviewing}
+            running={running}
+            // The mode the composer shows is the one that will run (see the Composer's `mode`).
+            canEdit={(() => {
+              const shown = modeRunsOn(mode, composerRoute.runtime, build?.platform) ? mode : modesFor(composerRoute.runtime, build?.platform)[0] ?? mode
+              return shown !== 'ask' && shown !== 'plan'
+            })()}
+            onAsk={startFromComposer}
+            onClose={() => setReviewingId(undefined)}
+          />
         ) : (
           inspectorOpen && liveRun !== undefined && screen === 'workroom' && (
             <Inspector

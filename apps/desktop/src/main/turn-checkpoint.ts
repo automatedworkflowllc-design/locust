@@ -67,6 +67,8 @@ export function checkpointSentence(result: CheckpointResult | { readonly kind: '
     ? ''
     : ` Left out, too big to commit: ${result.skipped.map((file) => `${file.path} (${megabytes(file.bytes)})`).join(', ')}.`
   if (result.kind === 'skipped') return `Nothing from this turn was saved on the branch.${left}`
+  // Its files are what came in with the merge, not this turn's own work (0.440).
+  if (result.mergeFinished === true) return `Saved this turn on ${result.branch} as ${result.sha.slice(0, 12)}: the merge is finished, so it can land now.${left}`
   const count = result.files.length
   return `Saved this turn on ${result.branch} as ${result.sha.slice(0, 12)}: ${String(count)} ${count === 1 ? 'file' : 'files'} (${fileList(result.files)}).${left}`
 }

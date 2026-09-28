@@ -197,6 +197,9 @@ import {
   WORKTREE_REMOVE_CHANNEL,
   WORKTREE_REVIEW_CHANNEL,
   WORKTREE_TURN_DIFF_CHANNEL,
+  WORKTREE_LAND_PREVIEW_CHANNEL,
+  WORKTREE_LAND_CHANNEL,
+  WORKTREE_RESOLVE_CHANNEL,
   WORKSPACE_SETTINGS_READ_CHANNEL,
   WORKSPACE_SETTINGS_WRITE_CHANNEL,
   CONNECTOR_LIST_CHANNEL,
@@ -4634,6 +4637,61 @@ if (!ownsSingleInstanceLock) {
         return { ok: true, data: await manager.review(teammateId as string) } as const
       } catch (error) {
         return reviewRejected(error instanceof Error ? error.message : 'The branch could not be read. Nothing on it was changed.')
+      }
+    })
+    /*
+     * LAND IT (0.440): the teammate's branch onto the person's, as one commit
+     * of theirs (worktrees.ts `land`). Never while a run of the teammate's is
+     * live: its checkpoint would race the landing.
+     */
+    const teammateBusy = async (teammateId: string): Promise<boolean> => {
+      const owners = await teammates.missionOwners()
+      return [...codexMissions.liveMissionIds(), ...antigravityMissions.liveMissionIds()].some((missionId) => owners[missionId] === teammateId)
+    }
+    const landTarget = async (teammateId: unknown) => {
+      if (typeof teammateId !== 'string') return undefined
+      const teammate = (await teammates.list()).find((entry) => entry.teammateId === teammateId)
+      const manager = await branchManagerFor(teammateId)
+      return teammate === undefined || manager === undefined ? undefined : { teammate: { teammateId: teammate.teammateId, name: teammate.name }, manager }
+    }
+    ipcMain.handle(WORKTREE_LAND_PREVIEW_CHANNEL, async (event, teammateId: unknown) => {
+      if (!fromOwnWindow(event)) return reviewRejected('The request was rejected.')
+      const target = await landTarget(teammateId).catch(() => undefined)
+      if (target === undefined) return reviewRejected('That teammate has no own branch here.')
+      try {
+        const preview = await target.manager.landPreview(target.teammate)
+        const busy = await teammateBusy(target.teammate.teammateId)
+        return { ok: true, data: busy && preview.block?.kind !== 'nothing' ? { ...preview, block: { kind: 'busy' } } : preview } as const
+      } catch (error) {
+        return reviewRejected(error instanceof Error ? error.message : 'The branch could not be read. Nothing on it was changed.')
+      }
+    })
+    ipcMain.handle(WORKTREE_LAND_CHANNEL, async (event, teammateId: unknown, message: unknown) => {
+      if (!fromOwnWindow(event)) return reviewRejected('The request was rejected.')
+      const target = await landTarget(teammateId).catch(() => undefined)
+      if (target === undefined) return reviewRejected('That teammate has no own branch here.')
+      if (await teammateBusy(target.teammate.teammateId)) return { ok: true, data: { kind: 'blocked', block: { kind: 'busy' } } } as const
+      try {
+        return { ok: true, data: await target.manager.land(target.teammate, typeof message === 'string' ? message.slice(0, 20_000) : '') } as const
+      } catch (error) {
+        return reviewRejected(`${error instanceof Error ? error.message : 'The landing could not be made.'} Your checkout is as it was.`)
+      }
+    })
+    ipcMain.handle(WORKTREE_RESOLVE_CHANNEL, async (event, teammateId: unknown) => {
+      if (!fromOwnWindow(event)) return reviewRejected('The request was rejected.')
+      const target = await landTarget(teammateId).catch(() => undefined)
+      if (target === undefined) return reviewRejected('That teammate has no own branch here.')
+      if (await teammateBusy(target.teammate.teammateId)) return reviewRejected(`${target.teammate.name} is working. Ask again when the turn ends.`)
+      try {
+        const preview = await target.manager.landPreview(target.teammate)
+        if (preview.onto === undefined) return reviewRejected('Your checkout is not on a branch, so there is nothing to merge from.')
+        // A merge already begun is not begun again: its files are still the ones to resolve.
+        const files = preview.block?.kind === 'merging' || preview.block?.kind === 'markers'
+          ? (preview.block.kind === 'markers' ? preview.block.files : preview.files)
+          : await target.manager.startResolving(target.teammate.teammateId)
+        return { ok: true, data: { onto: preview.onto, files } } as const
+      } catch (error) {
+        return reviewRejected(`${error instanceof Error ? error.message : 'The merge could not be begun.'} Your checkout was not touched.`)
       }
     })
     ipcMain.handle(WORKTREE_TURN_DIFF_CHANNEL, async (event, teammateId: unknown, sha: unknown) => {

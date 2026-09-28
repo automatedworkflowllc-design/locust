@@ -14975,6 +14975,52 @@ textarea {
   color: var(--lc-amber-text);
 }
 
+/* What a landing did: said in the page's own voice, neither a warning nor a win. */
+.lc-review__note.is-done {
+  color: var(--lc-text-secondary);
+}
+
+/*
+ * LAND IT (ReviewChanges.tsx `LandCard`, 0.440): the one thing in the panel
+ * that writes. A card of its own above the turns, so the press that changes
+ * the person's branch is never mistaken for one that only shows something.
+ */
+.lc-land {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-3);
+  padding: var(--lc-space-4);
+  border: 1px solid var(--lc-border-card);
+  border-radius: 8px;
+  background: var(--lc-bg-raised);
+}
+
+.lc-land__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--lc-space-3);
+}
+
+.lc-land__label {
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+}
+
+.lc-land__message {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  padding: 8px 10px;
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-button);
+  background: var(--lc-bg-chrome);
+  color: var(--lc-text-primary);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  line-height: 1.5;
+}
+
 .lc-review__turns {
   display: flex;
   flex-direction: column;

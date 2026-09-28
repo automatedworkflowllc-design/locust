@@ -103,7 +103,10 @@ import {
   WORKTREE_LIST_CHANNEL,
   WORKTREE_REMOVE_CHANNEL,
   WORKTREE_REVIEW_CHANNEL,
-  WORKTREE_TURN_DIFF_CHANNEL
+  WORKTREE_TURN_DIFF_CHANNEL,
+  WORKTREE_LAND_PREVIEW_CHANNEL,
+  WORKTREE_LAND_CHANNEL,
+  WORKTREE_RESOLVE_CHANNEL
 } from '../shared/ipc.js'
 import type {
   CodexMissionCancelRequest,
@@ -182,6 +185,9 @@ import type {
   WorktreeListResponse,
   BranchReviewResponse,
   TurnDiffResponse,
+  LandPreviewResponse,
+  LandResponse,
+  ResolveResponse,
   RuntimeInstallProgress,
   RuntimeUpdatesState,
   RuntimeInstallResponse,
@@ -386,6 +392,9 @@ const desktopApi: DesktopApi = {
   removeWorktree: (teammateId: string, discard?: readonly string[]) => ipcRenderer.invoke(WORKTREE_REMOVE_CHANNEL, teammateId, discard) as Promise<WorktreeListResponse>,
   reviewBranch: (teammateId: string) => ipcRenderer.invoke(WORKTREE_REVIEW_CHANNEL, teammateId) as Promise<BranchReviewResponse>,
   turnDiff: (teammateId: string, sha: string) => ipcRenderer.invoke(WORKTREE_TURN_DIFF_CHANNEL, teammateId, sha) as Promise<TurnDiffResponse>,
+  landPreview: (teammateId: string) => ipcRenderer.invoke(WORKTREE_LAND_PREVIEW_CHANNEL, teammateId) as Promise<LandPreviewResponse>,
+  landBranch: (teammateId: string, message: string) => ipcRenderer.invoke(WORKTREE_LAND_CHANNEL, teammateId, message) as Promise<LandResponse>,
+  startResolving: (teammateId: string) => ipcRenderer.invoke(WORKTREE_RESOLVE_CHANNEL, teammateId) as Promise<ResolveResponse>,
   addMemory: (request: MemoryAddRequest) => ipcRenderer.invoke(MEMORY_ADD_CHANNEL, request) as Promise<MemoryListResponse>,
   updateMemory: (request: MemoryUpdateRequest) => ipcRenderer.invoke(MEMORY_UPDATE_CHANNEL, request) as Promise<MemoryListResponse>,
   removeMemory: (memoryId: string) => ipcRenderer.invoke(MEMORY_REMOVE_CHANNEL, memoryId) as Promise<MemoryListResponse>,

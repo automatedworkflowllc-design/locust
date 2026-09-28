@@ -1660,8 +1660,9 @@ export function SettingsScreen({
             <p>
               A LOCUST.md at the folder&rsquo;s root is given to every teammate, on every runtime, before each
               mission. A teammate with Own branch on works in its own worktree of the folder&rsquo;s repository,
-              kept under .locust/worktrees. Each turn it finishes is saved on its branch as a commit, which
-              Review changes in its conversation shows; removing one here keeps its branch, and merging is yours to do.
+              kept under .locust/worktrees. Each turn it finishes is saved on its branch as a commit; Review
+              changes in its conversation shows them and lands them on your branch as one commit of yours.
+              Removing one here keeps its branch.
             </p>
           </More>
           <div className="lc-settingcard">

@@ -92,7 +92,7 @@ describe('the changelog that ships', () => {
     expect(all.every((entry) => entry.groups.length > 0)).toBe(true)
   })
 
-  it("gives someone arriving from 0.276 the bots, the machine, the design pass, their own model, a room that remembers, pages that run each runtime's own commands a monochrome Locust and hand-off chains; from 0.435 nothing", () => {
+  it("gives someone arriving from 0.276 the bots, the machine, the design pass, their own model, a room that remembers, pages that run each runtime's own commands a monochrome Locust, hand-off chains and landing a teammate's branch; from 0.440 nothing", () => {
     // 0.295.0 is big too: the title screen became a machine (A2). 0.350.0:
     // the first-impressions design pass -- Home leads with the team, a
     // conversation reads like Claude's (Colin, 2026-09-26). 0.357.0: Add your
@@ -103,17 +103,20 @@ describe('the changelog that ships', () => {
     // 0.426.0: Claude Code's own slash commands in the / menu (Colin, the
     // same day: "the nerdier coders live by their commands"). 0.434.0: the
     // lime accent goes monochrome (Colin, the same day).
+    // 0.440.0: a teammate's own branch lands on yours as one commit -- idea #2
+    // of the product suggestions, which Colin picked the same day.
     const newest = all[0]!.version
-    expect(splashEntries(all, '0.276.0', newest).map((entry) => entry.version)).toEqual(['0.435.0', '0.434.0', '0.426.0', '0.425.0', '0.370.0', '0.357.0', '0.350.0', '0.295.0', '0.277.0'])
-    expect(splashEntries(all, '0.280.0', newest).map((entry) => entry.version)).toEqual(['0.435.0', '0.434.0', '0.426.0', '0.425.0', '0.370.0', '0.357.0', '0.350.0', '0.295.0'])
-    expect(splashEntries(all, '0.295.0', newest).map((entry) => entry.version)).toEqual(['0.435.0', '0.434.0', '0.426.0', '0.425.0', '0.370.0', '0.357.0', '0.350.0'])
-    expect(splashEntries(all, '0.350.0', newest).map((entry) => entry.version)).toEqual(['0.435.0', '0.434.0', '0.426.0', '0.425.0', '0.370.0', '0.357.0'])
-    expect(splashEntries(all, '0.357.0', newest).map((entry) => entry.version)).toEqual(['0.435.0', '0.434.0', '0.426.0', '0.425.0', '0.370.0'])
-    expect(splashEntries(all, '0.370.0', newest).map((entry) => entry.version)).toEqual(['0.435.0', '0.434.0', '0.426.0', '0.425.0'])
-    expect(splashEntries(all, '0.425.0', newest).map((entry) => entry.version)).toEqual(['0.435.0', '0.434.0', '0.426.0'])
-    expect(splashEntries(all, '0.426.0', newest).map((entry) => entry.version)).toEqual(['0.435.0', '0.434.0'])
-    expect(splashEntries(all, '0.434.0', newest).map((entry) => entry.version)).toEqual(['0.435.0'])
-    expect(splashEntries(all, '0.435.0', newest)).toEqual([])
+    expect(splashEntries(all, '0.276.0', newest).map((entry) => entry.version)).toEqual(['0.440.0', '0.435.0', '0.434.0', '0.426.0', '0.425.0', '0.370.0', '0.357.0', '0.350.0', '0.295.0', '0.277.0'])
+    expect(splashEntries(all, '0.280.0', newest).map((entry) => entry.version)).toEqual(['0.440.0', '0.435.0', '0.434.0', '0.426.0', '0.425.0', '0.370.0', '0.357.0', '0.350.0', '0.295.0'])
+    expect(splashEntries(all, '0.295.0', newest).map((entry) => entry.version)).toEqual(['0.440.0', '0.435.0', '0.434.0', '0.426.0', '0.425.0', '0.370.0', '0.357.0', '0.350.0'])
+    expect(splashEntries(all, '0.350.0', newest).map((entry) => entry.version)).toEqual(['0.440.0', '0.435.0', '0.434.0', '0.426.0', '0.425.0', '0.370.0', '0.357.0'])
+    expect(splashEntries(all, '0.357.0', newest).map((entry) => entry.version)).toEqual(['0.440.0', '0.435.0', '0.434.0', '0.426.0', '0.425.0', '0.370.0'])
+    expect(splashEntries(all, '0.370.0', newest).map((entry) => entry.version)).toEqual(['0.440.0', '0.435.0', '0.434.0', '0.426.0', '0.425.0'])
+    expect(splashEntries(all, '0.425.0', newest).map((entry) => entry.version)).toEqual(['0.440.0', '0.435.0', '0.434.0', '0.426.0'])
+    expect(splashEntries(all, '0.426.0', newest).map((entry) => entry.version)).toEqual(['0.440.0', '0.435.0', '0.434.0'])
+    expect(splashEntries(all, '0.434.0', newest).map((entry) => entry.version)).toEqual(['0.440.0', '0.435.0'])
+    expect(splashEntries(all, '0.435.0', newest).map((entry) => entry.version)).toEqual(['0.440.0'])
+    expect(splashEntries(all, '0.440.0', newest)).toEqual([])
   })
 })
 
