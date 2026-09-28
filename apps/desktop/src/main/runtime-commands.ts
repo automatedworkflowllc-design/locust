@@ -24,7 +24,7 @@ import type { RuntimeCommandInfo } from '@teammate/runtime-adapters'
  * output-style, agents and fast would rewrite the person's settings.
  */
 export const HIDDEN_COMMANDS: Readonly<Record<string, ReadonlySet<string>>> = {
-  claude: new Set(['model', 'effort', 'fast', 'config', 'mcp', 'output-style', 'agents', 'login', 'logout', 'permissions', 'hooks', 'statusline', 'theme', 'vim', 'terminal-setup', 'privacy-settings', 'upgrade', 'install-github-app', 'ide', 'keybindings', 'exit', 'resume', 'sandbox', 'plugin', 'add-dir', 'memory'])
+  claude: new Set(['model', 'effort', 'fast', 'config', 'mcp', 'output-style', 'agents', 'login', 'logout', 'permissions', 'hooks', 'statusline', 'theme', 'vim', 'terminal-setup', 'privacy-settings', 'upgrade', 'install-github-app', 'ide', 'keybindings', 'exit', 'resume', 'sandbox', 'plugin', 'add-dir', 'memory', 'auto-mode-setup'])
 }
 
 /**

@@ -9678,9 +9678,21 @@ textarea {
   background: var(--lc-hover-surface-strong);
 }
 
+/*
+ * The name never gives way; what it takes (the hint) does, and the whole row
+ * is one line, the way Claude Code's own menu is. Colin, 2026-09-28, of a
+ * command whose hint ran eighty characters: "some of these bugged" -- the
+ * name column had no limit, so the description was squeezed to one word per
+ * line. The full text is the row's title.
+ */
 .lc-slash__name {
-  flex: none;
+  flex: 0 1 auto;
+  display: inline-flex;
+  align-items: baseline;
   min-width: 74px;
+  max-width: 55%;
+  overflow: hidden;
+  white-space: nowrap;
   font-size: var(--lc-text-control);
   color: var(--lc-text-primary);
 }
@@ -9696,7 +9708,11 @@ textarea {
 }
 
 .lc-slash__hint {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre;
   font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
 }
@@ -9704,10 +9720,12 @@ textarea {
 .lc-slash__detail {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
   line-height: 1.4;
-  text-wrap: pretty;
 }
 
 /*

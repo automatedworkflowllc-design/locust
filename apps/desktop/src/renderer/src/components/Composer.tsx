@@ -1171,6 +1171,8 @@ export function Composer({
                 className={`lc-slash__item${command.weighted === true ? ' is-weighted' : ''}${index === Math.min(slashAt, slashChoices.length - 1) ? ' is-active' : ''}`}
                 onMouseEnter={() => setSlashAt(index)}
                 onClick={() => runSlash(command)}
+                // The whole of it, where a long hint or description is cut short (0.432).
+                title={`/${command.name}${command.hint === undefined ? '' : ` ${command.hint}`} — ${command.detail}`}
               >
                 <span className="lc-slash__name lc-mono">
                   {command.weighted === true && <Icon name="shield" size={11} />}/{command.name}
