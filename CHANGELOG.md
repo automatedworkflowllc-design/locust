@@ -11,6 +11,25 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.445.0 - 2026-09-28
+<!-- big -->
+
+### New
+
+- **Compare the work, not just the answers.** In a git project, set the
+  mode to Edit while picking models to compare, and each model makes its
+  change in its own copy of your project, side by side. Your folder is not
+  touched while they work. Each column says how much it changed. Keep this
+  one brings that change into your folder, uncommitted, the same as a
+  teammate editing your folder, and the other copies are removed.
+- If you have changed the same file yourself in the meantime, Keep says so
+  and changes nothing, so your work is never overwritten.
+
+### Fixed
+
+- **A comparison's copies no longer pile up.** Emptying the trash now also
+  removes the copies a deleted comparison was still holding.
+
 ## 0.444.0 - 2026-09-28
 
 ### New

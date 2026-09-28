@@ -47,6 +47,7 @@ export interface CompareColumnView {
 
 export function CompareView({
   compare,
+  changeLines,
   prompts,
   columns,
   owner,
@@ -59,6 +60,8 @@ export function CompareView({
   onBack
 }: {
   readonly compare: PublicCompare
+  /** In a comparison that edits (0.445): what each column has changed, "+12 -3 in 2 files". */
+  readonly changeLines: Partial<Record<CompareSlotId, string>>
   /** Each ask, oldest first. */
   readonly prompts: readonly string[]
   readonly columns: readonly CompareColumnView[]
@@ -114,7 +117,11 @@ export function CompareView({
       <div className="lc-compare__bar">
         <span>
           {kept === undefined
-            ? `Comparing ${columns.map((column) => column.name).join(columns.length === 2 ? ' and ' : ', ')}. They answer without changing files.`
+            ? `Comparing ${columns.map((column) => column.name).join(columns.length === 2 ? ' and ' : ', ')}. ${
+                compare.changes === true
+                  ? 'Each changes its own copy of your project; only the one you keep comes into your folder.'
+                  : 'They answer without changing files.'
+              }`
             : `You kept ${keptName ?? 'one'}; the conversation carries on with it.`}
         </span>
         {problem !== undefined && <span className="lc-compare__problem" role="status">{problem}</span>}
@@ -210,7 +217,11 @@ export function CompareView({
       <div className="lc-compare__feet">
         {columns.map((column) => (
           <div key={`foot:${column.slot}`} className={`lc-compare__foot${railed(column.slot) ? ' is-rail' : ''}`}>
-            {!railed(column.slot) && <span className="lc-compare__numbers lc-mono">{[column.span, column.cost].filter((part) => part !== undefined && part.length > 0).join(' · ')}</span>}
+            {!railed(column.slot) && (
+              <span className="lc-compare__numbers lc-mono">
+                {[changeLines[column.slot], column.span, column.cost].filter((part) => part !== undefined && part.length > 0).join(' · ')}
+              </span>
+            )}
             {railed(column.slot) ? null : kept === undefined && column.retryable ? (
               <button
                 type="button"
@@ -226,7 +237,13 @@ export function CompareView({
                 type="button"
                 className="lc-primarybutton"
                 disabled={keeping || !column.keepable}
-                title={column.keepable ? 'Keep this one. The others stop, and the conversation carries on with it.' : column.running ? 'Still answering.' : 'Nothing to keep: its answer did not finish.'}
+                title={
+                  column.keepable
+                    ? compare.changes === true
+                      ? 'Keep this one. Its changes come into your folder, not committed; the others stop, and their copies are removed.'
+                      : 'Keep this one. The others stop, and the conversation carries on with it.'
+                    : column.running ? 'Still answering.' : 'Nothing to keep: its answer did not finish.'
+                }
                 onClick={() => onKeep(column.slot)}
               >
                 Keep this one

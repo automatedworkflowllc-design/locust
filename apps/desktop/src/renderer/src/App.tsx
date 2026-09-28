@@ -105,7 +105,7 @@ import type { ComparePick, ComparePicking, RouteChoice } from './components/Rout
 import { CompareView } from './components/CompareView.js'
 import { comparisonOf, foldComparisons } from './compareRows.js'
 import type { CompareColumnView } from './components/CompareView.js'
-import { compareMembership, compareNeedsCopy, compareRefusalOf, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../../shared/compare.js'
+import { changesLine, compareMembership, compareNeedsCopy, compareRefusalOf, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../../shared/compare.js'
 import type { CompareSlotId, PublicCompare } from '../../shared/compare.js'
 import { composerRouteFor, startAs } from '../../shared/route-at-start.js'
 import type { StartAs } from '../../shared/route-at-start.js'
@@ -1528,6 +1528,10 @@ export default function App(): ReactElement {
   const [compares, setCompares] = useState<readonly PublicCompare[]>([])
   const [comparingId, setComparingId] = useState<string>()
   const [compareOn, setCompareOn] = useState(false)
+  /** The next comparison edits: each model changes its own copy (0.445). */
+  const [compareChanges, setCompareChanges] = useState(false)
+  /** What each column of the comparison on screen has changed, when it edits. */
+  const [compareChangeLines, setCompareChangeLines] = useState<{ readonly compareId: string; readonly columns: Partial<Record<CompareSlotId, string>> }>()
   const [comparePicks, setComparePicks] = useState<readonly ComparePick[]>([])
   const [keepingCompare, setKeepingCompare] = useState(false)
   /** The column being asked again (0.444), while it starts. */
@@ -2925,6 +2929,37 @@ export default function App(): ReactElement {
   // A comparison follows the teammate it was started with (0.441).
   const comparing = compares.find((compare) => compare.compareId === comparingId && compare.teammateId === pickedTeammate?.teammateId)
   const compareMembers = useMemo(() => compareMembership(compares).byMission, [compares])
+  /*
+   * What each column of a comparison that edits has changed (0.445), read
+   * again whenever a column settles: counted in its copy, never while a
+   * model is still writing there.
+   */
+  const settledColumns = comparing?.changes === true && comparing.kept === undefined
+    ? comparing.slots
+        .map((column) => `${column.slot}:${column.missionIds.join(',')}:${column.missionIds.some((id) => [...runs.values()].some((run) => run.data?.missionId === id && liveRunIsActive(run))) ? 'live' : 'still'}`)
+        .join('|')
+    : undefined
+  useEffect(() => {
+    if (comparing === undefined || settledColumns === undefined) return
+    const compareId = comparing.compareId
+    let active = true
+    void window.desktop
+      ?.compareChanges(compareId)
+      .then((answer) => {
+        if (!active || !answer.ok) return
+        const columns: Partial<Record<CompareSlotId, string>> = {}
+        // A column still writing gets no number yet: it would be out of date as it was drawn.
+        const live = new Set(settledColumns.split('|').filter((entry) => entry.endsWith(':live')).map((entry) => entry.split(':')[0]))
+        for (const [slot, changes] of Object.entries(answer.data.columns)) {
+          if (changes !== undefined && !live.has(slot)) columns[slot as CompareSlotId] = changesLine(changes)
+        }
+        setCompareChangeLines({ compareId, columns })
+      })
+      .catch(() => undefined)
+    return () => {
+      active = false
+    }
+  }, [comparing?.compareId, settledColumns])
   // Review changes follows the teammate on screen: another conversation never shows this one's branch.
   const reviewing = pickedTeammate !== undefined && pickedTeammate.teammateId === reviewingId && pickedTeammate.worktree === true ? pickedTeammate : undefined
   const composerRoute = composerRouteFor(route, pickedTeammate, pickerRoutes)
@@ -3360,8 +3395,15 @@ export default function App(): ReactElement {
         picks: comparePicks,
         onMode: (on) => {
           setCompareOn(on)
-          if (!on) setComparePicks([])
+          if (!on) {
+            setComparePicks([])
+            setCompareChanges(false)
+          }
         },
+        changes: compareChanges,
+        onChanges: setCompareChanges,
+        // Changes need a git project, so each model can have its own copy of it.
+        ...(worktrees?.reason === undefined ? {} : { changesRefusal: `Only in a git project. ${worktrees.reason}` }),
         onToggle: (pick) =>
           setComparePicks((current) =>
             current.some((one) => samePick(one, pick))
@@ -3369,9 +3411,13 @@ export default function App(): ReactElement {
               : current.length >= MAX_COMPARE_SLOTS ? current : [...current, pick]
           ),
         // A comparison answers read-only; a model that cannot be held read-only here answers in a copy (0.443).
+        // One that edits runs in Edit, in its own copy (0.445).
         refusal: (choice) =>
           compareRefusalOf(choice.runtime)
-          ?? (modeRunsOn('ask', choice.runtime, build?.platform) || compareNeedsCopy(choice.runtime, build?.platform)
+          ?? (compareChanges
+            ? modeRunsOn('accept-edits', choice.runtime, build?.platform) ? undefined : `${modeUnavailableReason('accept-edits', choice.runtime, build?.platform) ?? 'It cannot edit here.'} So it cannot join a comparison that edits.`
+            : undefined)
+          ?? (compareChanges || modeRunsOn('ask', choice.runtime, build?.platform) || compareNeedsCopy(choice.runtime, build?.platform)
             ? undefined
             : `${modeUnavailableReason('ask', choice.runtime, build?.platform) ?? 'It cannot answer read-only here.'} A comparison answers read-only, so it cannot join one.`)
       }
@@ -3397,7 +3443,12 @@ export default function App(): ReactElement {
       if (comparePicks.length < MIN_COMPARE_SLOTS) return 'Pick one more model to compare with, or switch the picker back to One.'
       if (!bridge) return 'Locust is not ready yet. Nothing was sent.'
       const answer = await bridge
-        .startCompare({ ...(pickedTeammate === undefined ? {} : { teammateId: pickedTeammate.teammateId }), prompt, routes: comparePicks.map((pick) => ({ runtime: pick.runtime, model: pick.model, label: pick.label })) })
+        .startCompare({
+          ...(pickedTeammate === undefined ? {} : { teammateId: pickedTeammate.teammateId }),
+          prompt,
+          routes: comparePicks.map((pick) => ({ runtime: pick.runtime, model: pick.model, label: pick.label })),
+          ...(compareChanges ? { changes: true } : {})
+        })
         .catch(() => undefined)
       if (answer === undefined) return 'The comparison could not be started. Nothing was sent.'
       if (!answer.ok) return answer.error.message
@@ -3406,6 +3457,7 @@ export default function App(): ReactElement {
       setComparingId(answer.data.compare.compareId)
       setCompareOn(false)
       setComparePicks([])
+      setCompareChanges(false)
       return true
     }
     return startFromComposer(prompt)
@@ -6327,6 +6379,7 @@ export default function App(): ReactElement {
               return (
                 <CompareView
                   compare={comparing}
+                  changeLines={compareChangeLines?.compareId === comparing.compareId ? compareChangeLines.columns : {}}
                   prompts={prompts}
                   columns={columns}
                   owner={pickedTeammate}
@@ -6723,7 +6776,13 @@ export default function App(): ReactElement {
                 const others = compare.slots.filter((column) => column.slot !== compare.kept!.slot).map((column) => column.route.label ?? column.route.model)
                 return (
                   <div className="lc-compared">
-                    <span>Compared with {others.join(' and ')}.</span>
+                    <span>
+                      Compared with {others.join(' and ')}.
+                      {compare.kept.brought !== undefined &&
+                        (compare.kept.brought.length === 0
+                          ? ' It changed nothing, so nothing came into your folder.'
+                          : ` Its changes came into your folder: ${compare.kept.brought.length === 1 ? compare.kept.brought[0]! : `${String(compare.kept.brought.length)} files`}.`)}
+                    </span>
                     <button type="button" className="lc-compared__open" onClick={() => setComparingId(compare.compareId)}>
                       Open the comparison
                     </button>
@@ -7063,7 +7122,7 @@ export default function App(): ReactElement {
             pickerRequest={pickerRequest}
             {...(comparing === undefined || comparing.kept !== undefined
               ? {}
-              : { asking: { label: comparing.slots.map((column) => column.route.label ?? column.route.model).join(' vs '), columns: comparing.slots.filter((column) => column.missionIds.length > 0).length } })}
+              : { asking: { label: comparing.slots.map((column) => column.route.label ?? column.route.model).join(' vs '), columns: comparing.slots.filter((column) => column.missionIds.length > 0).length, ...(comparing.changes === true ? { changes: true } : {}) } })}
             // Tag a teammate from any conversation (0.438).
             team={teammates}
             {...(pickedTeammate === undefined ? {} : { currentTeammateId: pickedTeammate.teammateId })}

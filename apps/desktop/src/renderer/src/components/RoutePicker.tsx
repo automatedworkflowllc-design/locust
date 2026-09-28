@@ -35,6 +35,11 @@ export interface ComparePicking {
   readonly onToggle: (pick: ComparePick) => void
   /** Why a model cannot be compared (it cannot be held read-only here), or nothing. */
   readonly refusal: (choice: RouteChoice) => string | undefined
+  /** Each model changes its own copy of the project, rather than only answering (0.445). */
+  readonly changes?: boolean
+  readonly onChanges?: (changes: boolean) => void
+  /** Why this folder cannot compare changes (not a git project), or nothing. */
+  readonly changesRefusal?: string
 }
 
 const samePick = (a: RouteChoice, b: RouteChoice): boolean => a.runtime === b.runtime && a.model === b.model

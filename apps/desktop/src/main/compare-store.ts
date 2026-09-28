@@ -22,6 +22,8 @@ const MAX_PROMPT = 8_000
 const MAX_TURNS_PER_SLOT = 200
 /** Tries-again a column remembers, so their missions stay folded into it. */
 const MAX_RETRIED_PER_SLOT = 50
+/** Files a kept column's changes named; the rest are still in the folder, just not listed. */
+const MAX_BROUGHT = 200
 const UNREADABLE = 'The saved comparisons could not be read. Nothing was changed.'
 
 interface StoredFile {
@@ -34,7 +36,7 @@ export interface CompareStore {
   list(): Promise<readonly PublicCompare[]>
   get(compareId: unknown): Promise<PublicCompare | undefined>
   /** A new comparison, its columns named in order; the oldest past `MAX_COMPARES` is forgotten. */
-  create(input: { readonly teammateId?: string; readonly prompt: string; readonly routes: readonly CompareRoute[] }): Promise<PublicCompare>
+  create(input: { readonly teammateId?: string; readonly prompt: string; readonly routes: readonly CompareRoute[]; readonly changes?: boolean }): Promise<PublicCompare>
   /** A column's next turn started. */
   addTurn(compareId: string, slot: CompareSlotId, missionId: string): Promise<PublicCompare>
   /**
@@ -45,7 +47,7 @@ export interface CompareStore {
   retry(compareId: string, slot: CompareSlotId, missionId: string): Promise<PublicCompare>
   /** A column could not start, and why. */
   refuse(compareId: string, slot: CompareSlotId, why: string): Promise<PublicCompare>
-  keep(compareId: string, slot: CompareSlotId): Promise<PublicCompare>
+  keep(compareId: string, slot: CompareSlotId, brought?: readonly string[]): Promise<PublicCompare>
   remove(compareId: unknown): Promise<void>
 }
 
@@ -85,8 +87,19 @@ function parsedCompare(value: unknown): PublicCompare | undefined {
   if (slots.length < MIN_COMPARE_SLOTS || slots.length > MAX_COMPARE_SLOTS || new Set(slots.map((slot) => slot.slot)).size !== slots.length) return undefined
   const kept = typeof record.kept === 'object' && record.kept !== null ? (record.kept as Record<string, unknown>) : undefined
   const keptAt = text(kept?.at, 40)
-  const keptSlot = kept !== undefined && isSlot(kept.slot) && keptAt !== undefined && slots.some((slot) => slot.slot === kept.slot) ? { slot: kept.slot, at: keptAt } : undefined
-  return { compareId, ...(teammateId === undefined ? {} : { teammateId }), prompt, createdAt, slots, ...(keptSlot === undefined ? {} : { kept: keptSlot }) }
+  const brought = Array.isArray(kept?.brought) ? kept.brought.filter((file): file is string => typeof file === 'string' && file.length > 0 && file.length <= 500).slice(0, MAX_BROUGHT) : undefined
+  const keptSlot = kept !== undefined && isSlot(kept.slot) && keptAt !== undefined && slots.some((slot) => slot.slot === kept.slot)
+    ? { slot: kept.slot, at: keptAt, ...(brought === undefined ? {} : { brought }) }
+    : undefined
+  return {
+    compareId,
+    ...(teammateId === undefined ? {} : { teammateId }),
+    prompt,
+    createdAt,
+    slots,
+    ...(record.changes === true ? { changes: true as const } : {}),
+    ...(keptSlot === undefined ? {} : { kept: keptSlot })
+  }
 }
 
 export function parsedCompareFile(raw: string): StoredFile {
@@ -195,6 +208,7 @@ export function createCompareStore(options: {
           ...(input.teammateId === undefined ? {} : { teammateId: input.teammateId }),
           prompt,
           createdAt: now().toISOString(),
+          ...(input.changes === true ? { changes: true as const } : {}),
           slots: input.routes.map((route, index) => ({
             slot: COMPARE_SLOTS[index]!,
             route: {
@@ -229,11 +243,11 @@ export function createCompareStore(options: {
 
     refuse: (compareId, slot, why) => change(compareId, (compare) => inSlot(compare, slot, (column) => ({ ...column, refused: why.slice(0, 1_000) }))),
 
-    keep: (compareId, slot) =>
+    keep: (compareId, slot, brought) =>
       change(compareId, (compare) => {
         const column = compare.slots.find((one) => one.slot === slot)
         if (column === undefined || column.missionIds.length === 0) throw new Error('That column has nothing to keep yet.')
-        return { ...compare, kept: { slot, at: now().toISOString() } }
+        return { ...compare, kept: { slot, at: now().toISOString(), ...(brought === undefined ? {} : { brought: brought.slice(0, MAX_BROUGHT) }) } }
       }),
 
     remove: (compareId) =>

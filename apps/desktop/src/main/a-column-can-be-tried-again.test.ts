@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { compareMembership } from '../shared/compare.js'
+import { compareMembership, comparesGoneWith } from '../shared/compare.js'
 import { createCompareStore } from './compare-store.js'
 
 /**
@@ -71,6 +71,22 @@ describe('trying a column again', () => {
     expect(b?.missionIds).toEqual(['m_b1'])
     expect(b?.refused).toBeUndefined()
     expect(b?.retried).toBeUndefined()
+  })
+
+  it('goes, copies and all, only when every answer it held is gone for good (0.445)', async () => {
+    // Emptying the trash never removed a comparison or its copies: nothing
+    // called the store's remove. Tried-again answers count as its answers too.
+    const { store: compares } = await store()
+    await compares.create({ prompt: 'One.', routes: ROUTES })
+    await compares.addTurn('cmp_1', 'a', 'm_a1')
+    await compares.addTurn('cmp_1', 'b', 'm_b1')
+    const one = await compares.retry('cmp_1', 'b', 'm_b1_again')
+    await compares.create({ prompt: 'Two.', routes: ROUTES })
+    const two = await compares.addTurn('cmp_2', 'a', 'm_x')
+    const fresh = await compares.create({ prompt: 'Three, never started.', routes: ROUTES })
+    expect(comparesGoneWith([one, two, fresh], new Set(['m_a1', 'm_b1_again', 'm_b1'])).map((compare) => compare.compareId)).toEqual(['cmp_1'])
+    // A replaced answer still in the trash, or anywhere else, keeps it.
+    expect(comparesGoneWith([one], new Set(['m_a1', 'm_b1_again']))).toEqual([])
   })
 
   it('says so for a column the comparison does not have', async () => {

@@ -793,12 +793,19 @@ export const COMPARE_ASK_CHANNEL = 'compare:ask'
 export const COMPARE_KEEP_CHANNEL = 'compare:keep'
 /** Try one column's newest ask again, on the same model (0.444). */
 export const COMPARE_RETRY_CHANNEL = 'compare:retry'
+/** What each column of a comparison that edits has changed so far (0.445). */
+export const COMPARE_CHANGES_CHANNEL = 'compare:changes'
+export type CompareChangesResponse =
+  | { readonly ok: true; readonly data: { readonly columns: Partial<Record<CompareSlotId, { readonly files: number; readonly added: number; readonly removed: number }>> } }
+  | { readonly ok: false; readonly error: { readonly code: 'COMPARE_REFUSED'; readonly message: string } }
 export const COMPARE_LIST_CHANNEL = 'compare:list'
 export interface CompareStartRequest {
   /** Whose conversation; absent to compare with nobody. */
   readonly teammateId?: string
   readonly prompt: string
   readonly routes: readonly { readonly runtime: MissionRuntimeId; readonly model: string; readonly effort?: string; readonly label?: string }[]
+  /** Each model changes its own copy of the project (0.445); absent, they only answer. */
+  readonly changes?: boolean
 }
 export type CompareResponse =
   | { readonly ok: true; readonly data: { readonly compare: PublicCompare; readonly refused: readonly { readonly slot: CompareSlotId; readonly message: string }[] } }
@@ -2742,6 +2749,7 @@ export interface DesktopApi {
   askCompare(compareId: string, prompt: string): Promise<CompareResponse>
   keepCompare(compareId: string, slot: CompareSlotId): Promise<CompareResponse>
   retryCompare(compareId: string, slot: CompareSlotId): Promise<CompareResponse>
+  compareChanges(compareId: string): Promise<CompareChangesResponse>
   listCompares(): Promise<CompareListResponse>
   updateRoomTask(request: RoomTaskRequest): Promise<RoomTaskResponse>
   listMemories(): Promise<MemoryListResponse>

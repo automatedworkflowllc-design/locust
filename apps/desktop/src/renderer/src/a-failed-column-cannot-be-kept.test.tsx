@@ -44,6 +44,7 @@ describe('keeping a column', () => {
     const html = renderToStaticMarkup(
       <CompareView
         compare={compare}
+        changeLines={{}}
         prompts={[compare.prompt]}
         columns={[column('a', true, 'done'), column('b', false, 'failed')]}
         owner={undefined}

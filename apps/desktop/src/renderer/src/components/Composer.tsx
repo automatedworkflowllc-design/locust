@@ -233,7 +233,7 @@ export interface ComposerProps {
    * comparison on screen: the box then asks every column.
    */
   readonly compare?: ComparePicking
-  readonly asking?: { readonly label: string; readonly columns: number }
+  readonly asking?: { readonly label: string; readonly columns: number; readonly changes?: boolean }
   /** Opens the model picker when it changes: Home's Compare models (0.442). */
   readonly pickerRequest?: number
   /**
@@ -653,6 +653,13 @@ export function Composer({
   // message already says when it goes: the box says how to change it.
   // Compare (0.441): the ticked models, or the comparison on screen, speak for the route chip.
   const comparing = asking !== undefined || (compare?.on === true && compare.picks.length > 0)
+  /*
+   * COMPARE CHANGES (0.445): while models are being picked, the mode chip
+   * chooses between answers (Ask) and changes (Edit, each model in its own
+   * copy). Once a comparison is on screen it is that comparison's, and fixed.
+   */
+  const compareEdits = asking !== undefined ? asking.changes === true : compare?.changes === true
+  const compareModeOpen = comparing && asking === undefined && compare?.onChanges !== undefined
   const versus = asking?.label ?? versusLabel((compare?.picks ?? []).map((pick) => pick.label))
   const placeholder = asking !== undefined ? `Ask ${asking.columns === 2 ? 'both' : `all ${String(asking.columns)}`}…` : workingNow
     ? queued === undefined
@@ -1496,7 +1503,35 @@ export function Composer({
                 onChooseFolder={onChooseFolder}
               />
               <span className="lc-control__anchor" ref={modeAnchor}>
-                {modeOpen && (
+                {modeOpen && compareModeOpen && (
+                  <div className="lc-menu" role="menu" aria-label="What the comparison does">
+                    {([
+                      [false, 'Ask', 'Each model answers. Nothing in your folder changes.', undefined],
+                      [true, 'Edit', 'Each model changes its own copy of your project. Only the one you keep comes into your folder.', compare?.changesRefusal]
+                    ] as const).map(([edits, name, consequence, refusal]) => (
+                      <button
+                        key={name}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={compareEdits === edits}
+                        className="lc-menu__item"
+                        disabled={refusal !== undefined}
+                        title={refusal}
+                        onClick={() => {
+                          compare?.onChanges?.(edits)
+                          setModeOpen(false)
+                        }}
+                      >
+                        <span className="lc-menu__text">
+                          <span className="lc-menu__name">{name}</span>
+                          <span className="lc-menu__desc">{refusal ?? consequence}</span>
+                        </span>
+                        {compareEdits === edits && <Icon name="check" size={13} />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {modeOpen && !comparing && (
                   <div className="lc-menu" role="menu" aria-label="Permission mode">
                     {MODES.map((option) => {
                       const unavailable = modeUnavailableReason(option.mode, route.runtime, platform)
@@ -1569,11 +1604,17 @@ export function Composer({
                   aria-haspopup="menu"
                   aria-expanded={modeOpen}
                   aria-label="Permission mode"
-                  title={comparing ? 'A comparison answers in Ask: every model reads, and nothing in your folder changes.' : connectorsNote(route.runtime, effectiveMode, hasConnectors) ?? 'Permission mode'}
-                  disabled={running || comparing}
+                  title={
+                    comparing
+                      ? compareEdits
+                        ? 'Each model changes its own copy of your project. Only the one you keep comes into your folder.'
+                        : 'Each model answers. Nothing in your folder changes.'
+                      : connectorsNote(route.runtime, effectiveMode, hasConnectors) ?? 'Permission mode'
+                  }
+                  disabled={running || (comparing && !compareModeOpen)}
                   onClick={() => setModeOpen(!modeOpen)}
                 >
-                  {comparing ? 'Ask' : MODES.find((option) => option.mode === effectiveMode)?.chip ?? 'Ask'}
+                  {comparing ? (compareEdits ? 'Edit' : 'Ask') : MODES.find((option) => option.mode === effectiveMode)?.chip ?? 'Ask'}
                   <ChevronGlyph />
                 </button>
               </span>

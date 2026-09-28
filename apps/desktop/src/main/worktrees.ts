@@ -4,7 +4,7 @@ import { isAbsolute, join, relative, resolve } from 'node:path'
 
 import { releaseProcessTree } from '@teammate/runtime-adapters'
 
-import { branchNameFor, distinctBranchNameFor } from '../shared/worktree-name.js'
+import { BRANCH_PREFIX, branchNameFor, distinctBranchNameFor } from '../shared/worktree-name.js'
 import { ownGitArgs } from './git-guard.js'
 
 /**
@@ -98,9 +98,52 @@ export interface WorktreeManager {
    * resolve in a turn, whose checkpoint then commits the merge.
    */
   startResolving(teammateId: string): Promise<readonly string[]>
+  /**
+   * What a tree has changed since it was cut, saved or not (0.445: a
+   * comparison column's foot). Counts lines as git does; a binary file adds
+   * none.
+   */
+  changes(teammateId: string): Promise<TreeChanges>
+  /**
+   * Put a tree's changes into the person's folder, UNCOMMITTED (0.445: Keep
+   * this one, in a comparison that edits). Exactly what a teammate editing
+   * the folder directly would leave. Refused, with nothing changed, when the
+   * person has changed a file it changes, or the folder moved on in a way it
+   * no longer applies to.
+   */
+  bringIn(teammateId: string): Promise<BringInResult>
+  /** Remove a tree and its branch, whatever is in it (0.445: a comparison's columns are Locust's alone). */
+  discard(teammateId: string): Promise<void>
 }
 
 /** Why a branch cannot land now -- each said with what would change it. */
+export interface TreeChanges {
+  readonly files: number
+  readonly added: number
+  readonly removed: number
+}
+
+export type BringInResult =
+  | { readonly kind: 'brought'; readonly files: readonly string[] }
+  | { readonly kind: 'nothing' }
+  | { readonly kind: 'your-changes'; readonly files: readonly string[] }
+  | { readonly kind: 'does-not-apply'; readonly message: string }
+
+/** "+12 -3 in 2 files" from `git diff --numstat`; binary files ("-") count as a file with no lines. */
+export function treeChangesOf(numstat: string): TreeChanges {
+  let files = 0
+  let added = 0
+  let removed = 0
+  for (const line of numstat.split(/\r?\n/)) {
+    const [plus, minus, path] = line.split('\t')
+    if (path === undefined || path.length === 0) continue
+    files += 1
+    added += /^\d+$/.test(plus ?? '') ? Number(plus) : 0
+    removed += /^\d+$/.test(minus ?? '') ? Number(minus) : 0
+  }
+  return { files, added, removed }
+}
+
 export type LandBlock =
   | { readonly kind: 'nothing' }
   | { readonly kind: 'detached' }
@@ -247,6 +290,12 @@ export function changedPathsOf(porcelain: string): readonly string[] {
 
 export interface WorktreeManagerOptions {
   readonly workspacePath: string
+  /**
+   * Where under the folder its trees live: teammates' own branches in
+   * `.locust/worktrees`, a comparison's columns in `.locust/compare` (0.445),
+   * so neither list ever shows the other's.
+   */
+  readonly directory?: string
   /** Test seam: run git once; resolves stdout, rejects on a non-zero exit. */
   readonly runGit?: (args: readonly string[], cwd: string, timeoutMs?: number) => Promise<string>
 }
@@ -314,8 +363,8 @@ export function gitVersionSupportsWorktrees(version: string): boolean {
 }
 
 /** `git worktree list --porcelain`, kept to the trees Locust made under the folder. */
-export function parseWorktreeList(output: string, root: string): readonly WorktreeInfo[] {
-  const base = resolve(root, WORKTREE_DIR).replace(/\\/g, '/').toLowerCase()
+export function parseWorktreeList(output: string, root: string, directory: string = WORKTREE_DIR): readonly WorktreeInfo[] {
+  const base = resolve(root, directory).replace(/\\/g, '/').toLowerCase()
   const out: WorktreeInfo[] = []
   let path: string | undefined
   let branch: string | undefined
@@ -347,6 +396,7 @@ export function parseWorktreeList(output: string, root: string): readonly Worktr
 export function createWorktreeManager(options: WorktreeManagerOptions): WorktreeManager {
   const root = resolve(options.workspacePath)
   const runGit = options.runGit ?? defaultRunGit
+  const trees = options.directory ?? WORKTREE_DIR
 
   const probe = async (): Promise<WorktreeProbe> => {
     let gitVersion: string | undefined
@@ -430,7 +480,7 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
 
     async ensure(teammate) {
       const directory = safeTeammateDirectory(teammate.teammateId)
-      const path = join(root, WORKTREE_DIR, directory)
+      const path = join(root, trees, directory)
       // Already a worktree here (a worktree's .git is a file) -- but only one
       // git FINISHED making is used as it is (code review B4, main-stores 3).
       let made = false
@@ -451,7 +501,7 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
       }
       const ready = await probe()
       if (!ready.repository) throw new Error(ready.reason ?? 'Own branches are not available in this folder.')
-      await mkdir(join(root, WORKTREE_DIR), { recursive: true })
+      await mkdir(join(root, trees), { recursive: true })
       await excludeLocustDirectory()
       // M17: a name another teammate's tree already has checked out gets
       // this teammate's id on the end, rather than git's refusal.
@@ -481,7 +531,7 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
 
     async list() {
       try {
-        return parseWorktreeList(await runGit(['worktree', 'list', '--porcelain'], root), root)
+        return parseWorktreeList(await runGit(['worktree', 'list', '--porcelain'], root), root, trees)
       } catch {
         return []
       }
@@ -489,7 +539,7 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
 
     async remove(teammateId, options = {}) {
       const directory = safeTeammateDirectory(teammateId)
-      const path = join(root, WORKTREE_DIR, directory)
+      const path = join(root, trees, directory)
       const changes = changedPathsOf(await runGit(['status', '--porcelain', '--untracked-files=all'], path))
       if (changes.length === 0) {
         // Clean: git's own remove, which refuses anything it would lose.
@@ -605,6 +655,52 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
       // Exits non-zero when it conflicts, which is the case this exists for.
       await runGit(['merge', '--no-ff', '--no-commit', onto], path, WORKTREE_CHECKOUT_TIMEOUT_MS).catch(() => '')
       return (await runGit(['diff', '--name-only', '-z', '--diff-filter=U'], path)).split('\0').filter((file) => file.length > 0)
+    },
+
+    async changes(teammateId) {
+      const path = await madeTree(teammateId)
+      // The tree's own index, which is Locust's: staging everything is what lets new files count.
+      await runGit(['add', '-A'], path, WORKTREE_CHECKOUT_TIMEOUT_MS)
+      const base = (await runGit(['merge-base', 'HEAD', (await runGit(['symbolic-ref', '--short', '-q', 'HEAD'], path)).trim()], root)).trim()
+      return treeChangesOf(await runGit(['diff', ...PLAIN_DIFF, '--cached', '--numstat', base], path))
+    },
+
+    async bringIn(teammateId) {
+      const path = await madeTree(teammateId)
+      await runGit(['add', '-A'], path, WORKTREE_CHECKOUT_TIMEOUT_MS)
+      const branch = (await runGit(['symbolic-ref', '--short', '-q', 'HEAD'], path)).trim()
+      const base = (await runGit(['merge-base', 'HEAD', branch], root)).trim()
+      // What it changed: from where it was cut to its tree as it stands, saved or not.
+      const files = (await runGit(['diff', '--cached', '--name-only', '-z', base], path)).split('\0').filter((file) => file.length > 0)
+      if (files.length === 0) return { kind: 'nothing' }
+      const touching = new Set(files)
+      const yours = statusEntriesOf(await runGit(['status', '--porcelain', '-z', '--untracked-files=all'], root)).map((entry) => entry.path).filter((file) => touching.has(file))
+      if (yours.length > 0) return { kind: 'your-changes', files: yours }
+      // A patch file, not stdout: a big change must not meet a buffer limit.
+      const patch = join(root, '.git', `locust-bring-in-${safeTeammateDirectory(teammateId)}.patch`)
+      try {
+        await runGit(['diff', ...PLAIN_DIFF, '--cached', '--binary', `--output=${patch}`, base], path, WORKTREE_CHECKOUT_TIMEOUT_MS)
+        try {
+          await runGit(['apply', '--check', patch], root, WORKTREE_CHECKOUT_TIMEOUT_MS)
+        } catch (error) {
+          return { kind: 'does-not-apply', message: error instanceof Error ? error.message.replace(/^git apply:\s*/, '') : 'git did not say why.' }
+        }
+        await runGit(['apply', patch], root, WORKTREE_CHECKOUT_TIMEOUT_MS)
+      } finally {
+        await rm(patch, { force: true }).catch(() => undefined)
+      }
+      return { kind: 'brought', files }
+    },
+
+    async discard(teammateId) {
+      const path = join(root, trees, safeTeammateDirectory(teammateId))
+      const branch = await runGit(['symbolic-ref', '--short', '-q', 'HEAD'], path).then((out) => out.trim(), () => '')
+      await runGit(['worktree', 'remove', '--force', path], root).catch(async () => {
+        // Not a tree git knows (half-made, or already gone): its folder, then git's own record.
+        await rm(path, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(() => undefined)
+        await runGit(['worktree', 'prune'], root).catch(() => '')
+      })
+      if (branch.startsWith(BRANCH_PREFIX)) await runGit(['branch', '-D', branch], root).catch(() => '')
     }
   }
 
@@ -653,7 +749,7 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
 
   /** A teammate's tree that git finished making, or a refusal that says so. */
   async function madeTree(teammateId: string): Promise<string> {
-    const path = join(root, WORKTREE_DIR, safeTeammateDirectory(teammateId))
+    const path = join(root, trees, safeTeammateDirectory(teammateId))
     const made = await stat(join(path, '.git')).then((found) => found.isFile()).catch(() => false)
     if (!made) throw new Error('This teammate has no own branch in this folder.')
     // A half-made tree reads every file as deleted: committing it would delete the project on its branch.

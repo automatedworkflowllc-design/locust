@@ -12,7 +12,7 @@ import { createRuntimeCommands } from './runtime-commands.js'
 import { createCursorDefaultModel } from './cursor-default-model.js'
 import { listWorkspaceFiles } from './workspace-files.js'
 import { MAX_TAGGED, taggedPrompt } from '../shared/tagging.js'
-import { compareNeedsCopy, compareRefusalOf, compareSlotKey, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../shared/compare.js'
+import { COMPARE_TREES_DIRECTORY, comparesGoneWith, compareNeedsCopy, compareRefusalOf, compareSlotKey, compareTreeId, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../shared/compare.js'
 import { makeCompareCopy, removeCompareCopies } from './compare-copies.js'
 import type { CompareSlotId, PublicCompare, PublicCompareSlot } from '../shared/compare.js'
 import { createCompareStore } from './compare-store.js'
@@ -235,6 +235,7 @@ import {
   COMPARE_ASK_CHANNEL,
   COMPARE_KEEP_CHANNEL,
   COMPARE_RETRY_CHANNEL,
+  COMPARE_CHANGES_CHANNEL,
   COMPARE_LIST_CHANNEL,
   RUNTIME_DISCOVERY_EVENT_CHANNEL,
   RUNTIME_DISCOVERY_LOG_CHANNEL,
@@ -4029,14 +4030,34 @@ if (!ownsSingleInstanceLock) {
      * answers on several models at once.
      */
     const compareRefused = (message: string) => ({ ok: false, error: { code: 'COMPARE_REFUSED', message } }) as const
+    /*
+     * COMPARE CHANGES (0.445): in a git project each column can change its
+     * own copy, cut from the person's last commit, under .locust/compare --
+     * never among the teammates' own branches. Keep this one puts the kept
+     * copy's changes into the folder, uncommitted; every copy is then removed.
+     */
+    const compareTrees = () => createWorktreeManager({ workspacePath, directory: COMPARE_TREES_DIRECTORY })
+    const discardCompareTrees = async (compare: PublicCompare): Promise<void> => {
+      if (compare.changes !== true) return
+      for (const column of compare.slots) await compareTrees().discard(compareTreeId(compare.compareId, column.slot)).catch(() => undefined)
+    }
     const startCompareColumn = async (compare: PublicCompare, column: PublicCompareSlot, prompt: string, followUpOf?: string, retrying = false): Promise<string | undefined> => {
       const peer = compare.teammateId === undefined ? undefined : await peerContextFor(compare.teammateId)
       if (compare.teammateId !== undefined && peer === undefined) return 'That teammate is no longer on the team.'
       const cannot = compareRefusalOf(column.route.runtime)
       if (cannot !== undefined) return cannot
+      // A comparison that edits: the column's own copy of the project (0.445).
+      let tree: string | undefined
+      if (compare.changes === true) {
+        try {
+          tree = await compareTrees().ensure({ teammateId: compareTreeId(compare.compareId, column.slot), name: `compare ${compare.compareId} ${column.slot}` })
+        } catch (error) {
+          return error instanceof Error ? error.message : 'A copy of the project could not be made for it.'
+        }
+      }
       // A column that cannot be held read-only answers in a copy, in the mode it can run (0.443).
-      const inCopy = compareNeedsCopy(column.route.runtime, process.platform)
-      let copy: string | undefined
+      const inCopy = tree === undefined && compareNeedsCopy(column.route.runtime, process.platform)
+      let copy: string | undefined = tree
       if (inCopy) {
         try {
           copy = await makeCompareCopy({ folder: workspacePath, compareId: compare.compareId, slot: column.slot })
@@ -4047,7 +4068,7 @@ if (!ownsSingleInstanceLock) {
       const response = await codexMissions.start(
         prompt,
         column.route.runtime as MissionRuntimeId,
-        inCopy ? 'accept-edits' : 'ask',
+        copy !== undefined ? 'accept-edits' : 'ask',
         { ...(column.route.model === 'account-default' ? {} : { model: column.route.model }), ...(column.route.effort === undefined ? {} : { effort: column.route.effort }) },
         sendToWindow,
         undefined,
@@ -4103,14 +4124,19 @@ if (!ownsSingleInstanceLock) {
           ...(typeof route.label === 'string' && route.label.trim().length > 0 ? { label: route.label.trim() } : {})
         }))
         .filter((route) => route.runtime.length > 0)
+      const changes = input.changes === true
       const distinct = new Set(routes.map((route) => `${route.runtime}\n${route.model}`))
       if (prompt.length === 0) return compareRefused('There is nothing to compare yet. Write the ask first.')
       if (routes.length < MIN_COMPARE_SLOTS || routes.length > MAX_COMPARE_SLOTS || distinct.size !== routes.length) {
         return compareRefused(`Pick ${String(MIN_COMPARE_SLOTS)} or ${String(MAX_COMPARE_SLOTS)} different models to compare.`)
       }
       if (teammateId !== undefined && !(await teammates.list()).some((entry) => entry.teammateId === teammateId)) return compareRefused('That teammate is no longer on the team.')
+      if (changes) {
+        const probe = await compareTrees().probe()
+        if (!probe.repository) return compareRefused(`Comparing changes needs a git project, so each model can have its own copy. ${probe.reason ?? ''} Compare in Ask instead: they answer, and nothing changes.`.replace(/\s+/g, ' ').trim())
+      }
       try {
-        return await askEveryColumn(await compares.create({ ...(teammateId === undefined ? {} : { teammateId }), prompt, routes }), prompt, false)
+        return await askEveryColumn(await compares.create({ ...(teammateId === undefined ? {} : { teammateId }), prompt, routes, changes }), prompt, false)
       } catch (error) {
         return compareRefused(error instanceof Error ? error.message : 'The comparison could not be started.')
       }
@@ -4128,9 +4154,25 @@ if (!ownsSingleInstanceLock) {
       if (!fromOwnWindow(event)) return compareRefused('The request was rejected.')
       if (typeof compareId !== 'string' || typeof slot !== 'string') return compareRefused('That column is not in a comparison.')
       try {
-        const kept = await compares.keep(compareId, slot as CompareSlotId)
+        const compare = await compares.get(compareId)
+        if (compare === undefined) return compareRefused('That comparison is no longer here.')
+        let brought: readonly string[] | undefined
+        if (compare.changes === true && compare.kept === undefined) {
+          const result = await compareTrees()
+            .bringIn(compareTreeId(compareId, slot as CompareSlotId))
+            .catch((error: unknown) => ({ kind: 'does-not-apply' as const, message: error instanceof Error ? error.message : 'git did not say why.' }))
+          if (result.kind === 'your-changes') {
+            return compareRefused(`You have changed ${result.files.slice(0, 3).join(', ')}${result.files.length > 3 ? ` and ${String(result.files.length - 3)} more` : ''} yourself, and this answer changes ${result.files.length === 1 ? 'it' : 'them'} too, so nothing was put into your folder. Save or undo your change first, then keep it again.`)
+          }
+          if (result.kind === 'does-not-apply') {
+            return compareRefused(`Its changes no longer fit your folder, which has changed since the comparison began, so nothing was put in. (${result.message.slice(0, 200)})`)
+          }
+          brought = result.kind === 'brought' ? result.files : []
+        }
+        const kept = await compares.keep(compareId, slot as CompareSlotId, brought)
         // The copies were for comparing; the conversation goes on in the folder.
         await removeCompareCopies(compareId).catch(() => undefined)
+        await discardCompareTrees(kept)
         return { ok: true, data: { compare: kept, refused: [] } } as const
       } catch (error) {
         return compareRefused(error instanceof Error ? error.message : 'That column could not be kept.')
@@ -4161,6 +4203,23 @@ if (!ownsSingleInstanceLock) {
       )
       if (why !== undefined) return compareRefused(why)
       return { ok: true, data: { compare: (await compares.get(compare.compareId)) ?? compare, refused: [] } } as const
+    })
+    ipcMain.handle(COMPARE_CHANGES_CHANNEL, async (event, compareId: unknown) => {
+      if (!fromOwnWindow(event)) return compareRefused('The request was rejected.')
+      const compare = await compares.get(compareId).catch(() => undefined)
+      if (compare === undefined) return compareRefused('That comparison is no longer here.')
+      const columns: Partial<Record<CompareSlotId, { files: number; added: number; removed: number }>> = {}
+      if (compare.changes === true && compare.kept === undefined) {
+        for (const column of compare.slots) {
+          if (column.missionIds.length === 0) continue
+          try {
+            columns[column.slot] = await compareTrees().changes(compareTreeId(compare.compareId, column.slot))
+          } catch {
+            // A copy that cannot be read says nothing, rather than a number it cannot stand behind.
+          }
+        }
+      }
+      return { ok: true, data: { columns } } as const
     })
     ipcMain.handle(COMPARE_LIST_CHANNEL, async (event) => {
       if (!fromOwnWindow(event)) return compareRefused('The request was rejected.')
@@ -4998,6 +5057,13 @@ if (!ownsSingleInstanceLock) {
         const gone = await missionLedger.emptyTrash()
         for (const entry of held) {
           await teammates.unassignMission(entry.missionId).catch(() => undefined)
+        }
+        // A comparison whose every answer is gone for good goes too, with its copies (0.445).
+        const trashed = new Set(held.map((entry) => entry.missionId))
+        for (const compare of comparesGoneWith(await compares.list().catch(() => [] as readonly PublicCompare[]), trashed)) {
+          await compares.remove(compare.compareId).catch(() => undefined)
+          await removeCompareCopies(compare.compareId).catch(() => undefined)
+          await discardCompareTrees(compare)
         }
         note('trash-emptied', String(gone))
         return { ok: true, data: { count: gone } } as const

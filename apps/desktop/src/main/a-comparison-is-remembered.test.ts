@@ -81,6 +81,21 @@ describe('a comparison', () => {
     expect(compareSlotKey(undefined, 'cmp_3', 'a')).not.toBe(compareSlotKey(undefined, 'cmp_3', 'b'))
   })
 
+  it('remembers that it edits, and which files the kept one brought into the folder (0.445)', async () => {
+    const root = await folder()
+    const store = createCompareStore({ rootDirectory: root, now: () => new Date('2026-09-28T12:00:00.000Z'), createId: () => 'cmp_9' })
+    const made = await store.create({ prompt: 'Fix the cart total.', routes: ROUTES, changes: true })
+    expect(made.changes).toBe(true)
+    await store.addTurn('cmp_9', 'a', 'm_a1')
+    await store.keep('cmp_9', 'a', ['cart.py', 'notes.md'])
+    const again = await createCompareStore({ rootDirectory: root }).get('cmp_9')
+    expect(again?.changes).toBe(true)
+    expect(again?.kept).toEqual({ slot: 'a', at: '2026-09-28T12:00:00.000Z', brought: ['cart.py', 'notes.md'] })
+    // One that only answers says neither.
+    const answers = await createCompareStore({ rootDirectory: root, createId: () => 'cmp_10' }).create({ prompt: 'Why?', routes: ROUTES })
+    expect(answers.changes).toBeUndefined()
+  })
+
   it('gives each column a run slot of its own', () => {
     expect(compareSlotKey('tm_wren', 'cmp_1', 'a')).not.toBe(compareSlotKey('tm_wren', 'cmp_1', 'b'))
     expect(compareSlotKey('tm_wren', 'cmp_1', 'a')).not.toBe('tm_wren')

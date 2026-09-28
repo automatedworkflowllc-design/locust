@@ -1310,7 +1310,10 @@ export function shellCommandText(command: string): string {
  * outside the workspace keeps its full path, because there the location IS
  * the information.
  */
-const WORKTREE_PATH_PREFIX = /^\.locust\/worktrees\/[^/]+\//
+// A comparison's column works in its own copy under .locust/compare/<id>/ (0.445):
+// the same project, so its rows read as the folder's too -- and one file is one
+// row, not its copy's path and its own name counted twice.
+const WORKTREE_PATH_PREFIX = /^\.locust\/(?:worktrees|compare)\/[^/]+\//
 
 /**
  * Cursor Agent reports the file it edited from inside its OWN copy of the

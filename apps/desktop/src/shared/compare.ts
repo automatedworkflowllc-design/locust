@@ -48,13 +48,49 @@ export interface PublicCompare {
   readonly prompt: string
   readonly createdAt: string
   readonly slots: readonly PublicCompareSlot[]
-  /** The column the person kept; the conversation carries on from its newest mission. */
-  readonly kept?: { readonly slot: CompareSlotId; readonly at: string }
+  /**
+   * Each model changes its own copy of the project (0.445), rather than only
+   * answering. Only in a git project; Keep this one then puts the kept copy's
+   * changes into the folder.
+   */
+  readonly changes?: true
+  /**
+   * The column the person kept; the conversation carries on from its newest
+   * mission. `brought` names the files its changes put into the folder, in a
+   * comparison that edits.
+   */
+  readonly kept?: { readonly slot: CompareSlotId; readonly at: string; readonly brought?: readonly string[] }
 }
 
 /** The run slot a column holds, so one teammate can run on two models at once. */
 export function compareSlotKey(teammateId: string | undefined, compareId: string, slot: CompareSlotId): string {
   return `${teammateId ?? 'nobody'}#${compareId}/${slot}`
+}
+
+/** Where a comparison's copies live under the folder (0.445): never among the teammates' own branches. */
+export const COMPARE_TREES_DIRECTORY = '.locust/compare'
+
+/** The copy a column of a comparison that edits works in: `cmp_x-a`. */
+export function compareTreeId(compareId: string, slot: CompareSlotId): string {
+  return `${compareId}-${slot}`
+}
+
+/** "+12 -3 in 2 files", or what a column that changed nothing says. */
+export function changesLine(changes: { readonly files: number; readonly added: number; readonly removed: number }): string {
+  if (changes.files === 0) return 'no changes'
+  return `+${String(changes.added)} \u2212${String(changes.removed)} in ${String(changes.files)} ${changes.files === 1 ? 'file' : 'files'}`
+}
+
+/**
+ * The comparisons whose every answer is gone for good (0.445): emptying the
+ * trash takes them, and the copies they held, with it. One with any answer
+ * still kept -- in the conversation list or in the trash still -- stays.
+ */
+export function comparesGoneWith(compares: readonly PublicCompare[], gone: ReadonlySet<string>): readonly PublicCompare[] {
+  return compares.filter((compare) => {
+    const ids = compare.slots.flatMap((column) => [...column.missionIds, ...(column.retried ?? [])])
+    return ids.length > 0 && ids.every((id) => gone.has(id))
+  })
 }
 
 /** Every mission that belongs to a comparison, and the one kept (drawn as an ordinary conversation). */

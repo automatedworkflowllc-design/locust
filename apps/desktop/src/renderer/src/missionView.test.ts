@@ -170,6 +170,14 @@ describe('how a path is written in a row', () => {
     expect(relativePath('.locust/worktrees/tm_abc123/README.md', WS)).toBe('README.md')
   })
 
+  it("drops a comparison column's copy the same way (0.445)", () => {
+    // Seen in drive-compare-changes' frames: OpenCode named the file it edited
+    // as `.locust/compare/cmp_…-a/cart.py` beside the observed `cart.py`, so
+    // one changed line read as "2 files, +2 -2" under an internal path.
+    expect(relativePath('.locust/compare/cmp_f7da0ffad7e54dd8-a/cart.py', WS)).toBe('cart.py')
+    expect(relativePath(String.raw`C:\Users\x\projects\streaks\.locust\compare\cmp_1-b\src\streak.js`, WS)).toBe('src/streak.js')
+  })
+
   it('keeps the tree root itself, since there is nothing shorter that is true', () => {
     expect(relativePath(String.raw`C:\Users\x\projects\streaks\.locust\worktrees\tm_abc123`, WS)).toBe('.locust/worktrees/tm_abc123')
   })
