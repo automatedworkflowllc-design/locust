@@ -49,7 +49,8 @@ try {
     if (!button) return JSON.stringify({ button: false })
     button.click()
     await new Promise((r) => setTimeout(r, 900))
-    const on = [...document.querySelectorAll('.lc-picker__mode')].find((b) => b.getAttribute('aria-pressed') === 'true')?.textContent.trim() ?? ''
+    // Direct, Compare or Blind lives in the chat mode chip since 0.451.
+    const on = document.querySelector('.lc-control--chatmode')?.getAttribute('aria-label')?.replace('Chat mode: ', '') ?? ''
     const box = document.querySelector('.lc-picker__input')
     if (box) {
       const setInput = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set

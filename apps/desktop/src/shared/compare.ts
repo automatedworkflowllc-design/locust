@@ -24,6 +24,14 @@ export interface CompareRoute {
   readonly effort?: string
   /** The name the picker showed, so a column keeps its name after a restart. */
   readonly label?: string
+  /**
+   * A comparison that edits runs this column in Auto when it can (0.451).
+   * Colin, 2026-09-28, after a three-way comparison sat on seven approvals:
+   * "shouldnt we just have compare mode run automatically on auto, cause
+   * lowkey this is a disaster rn managing all those approvals". Each column
+   * works in its own copy, so Auto there reaches no file of the person's.
+   */
+  readonly mode?: 'auto'
 }
 
 export interface PublicCompareSlot {

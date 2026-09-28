@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import type { PublicCompare } from '../../shared/compare.js'
+import type { MissionApprovalRequest } from '../../shared/ipc.js'
 import { CompareView } from './components/CompareView.js'
 import type { CompareColumnView } from './components/CompareView.js'
 
@@ -37,6 +38,40 @@ const column = (slot: 'a' | 'b', keepable: boolean, state: string): CompareColum
   retryable: !keepable,
   answer: keepable ? 'It lets you check out a second branch in its own folder.' : '',
   state
+})
+
+describe('a column waiting on you (0.451)', () => {
+  it('shows its approval card in the column, answerable there', () => {
+    // The 0.450 three-way comparison: two Claude columns sat twenty minutes on
+    // "Using a tool..." while their approvals waited under "4 need you".
+    const request = {
+      approvalId: 'ap_1', runId: 'run_b', missionId: 'm_b', runtime: 'claude', kind: 'command',
+      summary: 'Run node --test', detail: 'node --test', cwd: 'C:\\acme-ledger', requestedAt: '2026-09-28T22:00:00.000Z', blocking: true
+    } as MissionApprovalRequest
+    const html = renderToStaticMarkup(
+      <CompareView
+        compare={compare}
+        changeLines={{}}
+        prompts={[compare.prompt]}
+        columns={[column('a', true, 'done'), { ...column('b', false, 'working'), running: true, retryable: false, approvals: [request] }]}
+        owner={undefined}
+        workspacePath={undefined}
+        keeping={false}
+        retrying={undefined}
+        onKeep={() => undefined}
+        onRetry={() => undefined}
+        onBack={undefined}
+        decidingIds={[]}
+        onDecide={() => undefined}
+        onAnswer={() => undefined}
+      />
+    )
+    const cells = html.split('class="lc-compare__cell"')
+    expect(cells).toHaveLength(3)
+    expect(cells[1]).not.toContain('node --test')
+    expect(cells[2]).toContain('node --test')
+    expect(cells[2]).toContain('Approve once')
+  })
 })
 
 describe('keeping a column', () => {

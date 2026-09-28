@@ -65,7 +65,8 @@ try {
   const started = JSON.parse(String(await drive.capture('A landing page: its words in the box, Edit, the picker on Compare', () => drive.evaluate(`(async () => {
     ;[...document.querySelectorAll('.lc-buildhead__starter')].find((b) => b.textContent.trim() === 'A landing page')?.click()
     await new Promise((r) => setTimeout(r, 900))
-    const on = [...document.querySelectorAll('.lc-picker__mode')].find((b) => b.getAttribute('aria-pressed') === 'true')?.textContent.trim() ?? ''
+    // Direct, Compare or Blind lives in the chat mode chip since 0.451.
+    const on = document.querySelector('.lc-control--chatmode')?.getAttribute('aria-label')?.replace('Chat mode: ', '') ?? ''
     const box = document.querySelector('.lc-picker__input')
     const setInput = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
     setInput.call(box, 'free')

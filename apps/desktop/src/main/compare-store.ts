@@ -63,12 +63,13 @@ function parsedSlot(value: unknown): PublicCompareSlot | undefined {
   if (!isSlot(record.slot) || runtime === undefined || model === undefined) return undefined
   const effort = text(route.effort, 40)
   const label = text(route.label, 120)
+  const mode = route.mode === 'auto' ? ('auto' as const) : undefined
   const missionIds = Array.isArray(record.missionIds) ? record.missionIds.filter((id): id is string => typeof id === 'string' && id.length > 0 && id.length <= 200).slice(-MAX_TURNS_PER_SLOT) : []
   const refused = text(record.refused, 1_000)
   const retried = Array.isArray(record.retried) ? record.retried.filter((id): id is string => typeof id === 'string' && id.length > 0 && id.length <= 200).slice(-MAX_RETRIED_PER_SLOT) : []
   return {
     slot: record.slot,
-    route: { runtime, model, ...(effort === undefined ? {} : { effort }), ...(label === undefined ? {} : { label }) },
+    route: { runtime, model, ...(effort === undefined ? {} : { effort }), ...(label === undefined ? {} : { label }), ...(mode === undefined ? {} : { mode }) },
     missionIds,
     ...(refused === undefined ? {} : { refused }),
     ...(retried.length === 0 ? {} : { retried })
@@ -219,7 +220,8 @@ export function createCompareStore(options: {
               runtime: route.runtime,
               model: route.model,
               ...(route.effort === undefined ? {} : { effort: route.effort }),
-              ...(route.label === undefined ? {} : { label: route.label.slice(0, 120) })
+              ...(route.label === undefined ? {} : { label: route.label.slice(0, 120) }),
+              ...(route.mode === 'auto' && input.changes === true ? { mode: 'auto' as const } : {})
             },
             missionIds: []
           }))

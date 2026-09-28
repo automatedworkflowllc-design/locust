@@ -6483,6 +6483,22 @@ textarea {
   background: var(--lc-hover-surface);
 }
 
+/* Direct, Compare or Blind (0.451): an icon alone for Direct, the word too once it compares. */
+.lc-control--chatmode {
+  gap: 6px;
+}
+
+.lc-control--chatmode.is-on {
+  color: var(--lc-text-primary);
+  border-color: var(--lc-lime-border);
+}
+
+/* The menu's own icon sits level with the option's name. */
+.lc-menu__item > svg:first-child {
+  flex: none;
+  margin-top: 2px;
+}
+
 .lc-control--boxed:disabled {
   border-color: var(--lc-border-hairline);
 }

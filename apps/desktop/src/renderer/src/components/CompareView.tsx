@@ -7,6 +7,8 @@ import { activityEntries } from '../missionView.js'
 import type { ThreadItem } from '../missionView.js'
 import { PinnedPagesContext } from '../pinnedPages.js'
 import { PagePreview } from './DocPreview.js'
+import { ApprovalCard } from './ApprovalCard.js'
+import type { MissionApprovalDecision, MissionApprovalRequest } from '../../../shared/ipc.js'
 import { Icon } from './Icon.js'
 import { RuntimeMark } from './RuntimeMark.js'
 import { ThreadItems } from './Thread.js'
@@ -46,6 +48,12 @@ export interface CompareColumnView {
   readonly span?: string
   /** What it cost, as its runtime reported it. */
   readonly cost?: string
+  /**
+   * What its run is waiting on the person for (0.451). The 0.450 three-way
+   * comparison sat twenty minutes on "Using a tool..." while four approvals
+   * waited under the title bar's "4 need you" -- a column never drew its card.
+   */
+  readonly approvals?: readonly MissionApprovalRequest[]
 }
 
 /** The web page a turn created, if it made one: what its column shows running at the top (0.450). */
@@ -73,7 +81,10 @@ export function CompareView({
   problem,
   onKeep,
   onRetry,
-  onBack
+  onBack,
+  decidingIds,
+  onDecide,
+  onAnswer
 }: {
   readonly compare: PublicCompare
   /** In a comparison that edits (0.445): what each column has changed, "+12 -3 in 2 files". */
@@ -91,6 +102,10 @@ export function CompareView({
   readonly problem?: string
   readonly onKeep: (slot: CompareSlotId) => void
   readonly onRetry: (slot: CompareSlotId) => void
+  /** Answering a column's approval, as the thread answers one. */
+  readonly decidingIds?: readonly string[]
+  readonly onDecide?: (approvalId: string, decision: MissionApprovalDecision, reason?: string) => void
+  readonly onAnswer?: (approvalId: string, answers: Readonly<Record<string, readonly string[]>>) => void
   /** Kept already: back to the conversation it carries on in. */
   readonly onBack: (() => void) | undefined
 }): ReactElement {
@@ -236,6 +251,17 @@ export function CompareView({
                           </PinnedPagesContext.Provider>
                         </>
                       )}
+                      {/* What this column waits on you for, where you are looking: its newest turn. */}
+                      {turn === column.turns.length - 1 && onDecide !== undefined && onAnswer !== undefined &&
+                        (column.approvals ?? []).map((request) => (
+                          <ApprovalCard
+                            key={request.approvalId}
+                            request={request}
+                            busy={(decidingIds ?? []).includes(request.approvalId)}
+                            onDecide={(decision, reason) => onDecide(request.approvalId, decision, reason)}
+                            onAnswer={(answers) => onAnswer(request.approvalId, answers)}
+                          />
+                        ))}
                     </div>
                   )
                 })}

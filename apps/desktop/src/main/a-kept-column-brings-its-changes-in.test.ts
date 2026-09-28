@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -97,6 +97,20 @@ describe('a comparison that edits', () => {
     expect(await text(join(root, 'cart.py'))).toBe('def total(items):\n    return len(items)\n')
     expect(await exists(join(root, 'notes.md'))).toBe(false)
     expect((await git(['status', '--porcelain'], root)).trim()).toBe('')
+  }, REAL_GIT_TIMEOUT_MS)
+
+  it('neither counts nor brings in what a tool made, like a Python cache (0.451)', async () => {
+    // The first Auto comparison: a column ran its code, and its __pycache__
+    // counted as a second changed file that Keep would have brought in.
+    const { root, manager, a } = await twoColumns()
+    await mkdir(join(a, '__pycache__'), { recursive: true })
+    await writeFile(join(a, '__pycache__', 'cart.cpython-314.pyc'), 'bytes', 'utf8')
+    await mkdir(join(a, 'node_modules', 'left-pad'), { recursive: true })
+    await writeFile(join(a, 'node_modules', 'left-pad', 'index.js'), 'x', 'utf8')
+    expect(await manager.changes('cmp_1-a')).toEqual({ files: 2, added: 2, removed: 1 })
+    expect(await manager.bringIn('cmp_1-a')).toEqual({ kind: 'brought', files: ['cart.py', 'notes.md'] })
+    expect(await exists(join(root, '__pycache__'))).toBe(false)
+    expect(await exists(join(root, 'node_modules'))).toBe(false)
   }, REAL_GIT_TIMEOUT_MS)
 
   it('says so when a copy changed nothing', async () => {

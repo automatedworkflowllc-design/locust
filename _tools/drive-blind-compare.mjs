@@ -64,17 +64,20 @@ try {
       labels.push(want)
       await new Promise((r) => setTimeout(r, 250))
     }
-    const blind = document.querySelector('.lc-picker__blind')
-    blind?.click()
-    await new Promise((r) => setTimeout(r, 300))
-    return JSON.stringify({ labels, blind: blind?.getAttribute('aria-pressed') ?? 'none', foot: document.querySelector('.lc-picker__foot--compare')?.innerText.replace(/\\s+/g, ' ').trim() ?? '' })
+    // Blind is a chat mode (0.451): the chip, then Blind. The picks are kept.
+    ;[...document.querySelectorAll('.lc-picker__foot--compare button')].find((b) => b.textContent.trim() === 'Done')?.click()
+    await new Promise((r) => setTimeout(r, 400))
+    document.querySelector('.lc-control--chatmode')?.click()
+    await new Promise((r) => setTimeout(r, 400))
+    ;[...document.querySelectorAll('.lc-menu[aria-label="Direct or compare"] .lc-menu__item')].find((item) => item.querySelector('.lc-menu__name')?.textContent.trim() === 'Blind')?.click()
+    await new Promise((r) => setTimeout(r, 400))
+    const mode = document.querySelector('.lc-control--chatmode')?.getAttribute('aria-label') ?? ''
+    return JSON.stringify({ labels, blind: mode === 'Chat mode: Blind' ? 'true' : mode, chip: document.querySelector('.lc-control--chatmode')?.innerText.trim() ?? '' })
   })()`))))
   say(`  picked: ${JSON.stringify(picked)}`)
-  check('two free models, and Hide the names is on', picked.labels.length === 2 && picked.blind === 'true', JSON.stringify(picked))
+  check('two free models, and the chat mode chip on Blind', picked.labels.length === 2 && picked.blind === 'true', JSON.stringify(picked))
 
   const blind = JSON.parse(String(await drive.capture('Model A and Model B: nothing names them', () => drive.evaluate(`(async () => {
-    ;[...document.querySelectorAll('.lc-picker__foot--compare button')].find((b) => b.textContent.trim() === 'Done')?.click()
-    await new Promise((r) => setTimeout(r, 500))
     const field = document.querySelector('form.command-dock textarea')
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
     setter.call(field, 'In one sentence: what is a git branch?')

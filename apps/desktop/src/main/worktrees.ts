@@ -195,6 +195,23 @@ export const REVIEW_MAX_DIFF_BYTES = 2 * 1024 * 1024
 /** Never runs a program the repository's config names to draw a diff. */
 const PLAIN_DIFF = ['--no-color', '--no-ext-diff', '--no-textconv'] as const
 
+/**
+ * What a comparison's copy counts and brings in: everything but what a TOOL
+ * made (0.451). In Auto a column runs its code, and the first Auto drive
+ * counted "+1 -1 in 2 files" for a one-line fix -- the second file was
+ * `__pycache__/cart.cpython-314.pyc`, which Keep would have put in the
+ * person's folder. Narrow on purpose: `dist/` or `build/` can be real source.
+ */
+export const NOT_BYPRODUCTS = [
+  '.',
+  ':(exclude,glob)**/__pycache__/**',
+  ':(exclude,glob)**/*.pyc',
+  ':(exclude,glob)**/.pytest_cache/**',
+  ':(exclude,glob)**/.mypy_cache/**',
+  ':(exclude,glob)**/.ruff_cache/**',
+  ':(exclude,glob)**/node_modules/**'
+] as const
+
 export interface CheckpointMessage {
   readonly subject: string
   readonly body?: string
@@ -662,7 +679,7 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
       // The tree's own index, which is Locust's: staging everything is what lets new files count.
       await runGit(['add', '-A'], path, WORKTREE_CHECKOUT_TIMEOUT_MS)
       const base = (await runGit(['merge-base', 'HEAD', (await runGit(['symbolic-ref', '--short', '-q', 'HEAD'], path)).trim()], root)).trim()
-      return treeChangesOf(await runGit(['diff', ...PLAIN_DIFF, '--cached', '--numstat', base], path))
+      return treeChangesOf(await runGit(['diff', ...PLAIN_DIFF, '--cached', '--numstat', base, '--', ...NOT_BYPRODUCTS], path))
     },
 
     async bringIn(teammateId) {
@@ -671,7 +688,7 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
       const branch = (await runGit(['symbolic-ref', '--short', '-q', 'HEAD'], path)).trim()
       const base = (await runGit(['merge-base', 'HEAD', branch], root)).trim()
       // What it changed: from where it was cut to its tree as it stands, saved or not.
-      const files = (await runGit(['diff', '--cached', '--name-only', '-z', base], path)).split('\0').filter((file) => file.length > 0)
+      const files = (await runGit(['diff', '--cached', '--name-only', '-z', base, '--', ...NOT_BYPRODUCTS], path)).split('\0').filter((file) => file.length > 0)
       if (files.length === 0) return { kind: 'nothing' }
       const touching = new Set(files)
       const yours = statusEntriesOf(await runGit(['status', '--porcelain', '-z', '--untracked-files=all'], root)).map((entry) => entry.path).filter((file) => touching.has(file))
@@ -679,7 +696,7 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
       // A patch file, not stdout: a big change must not meet a buffer limit.
       const patch = join(root, '.git', `locust-bring-in-${safeTeammateDirectory(teammateId)}.patch`)
       try {
-        await runGit(['diff', ...PLAIN_DIFF, '--cached', '--binary', `--output=${patch}`, base], path, WORKTREE_CHECKOUT_TIMEOUT_MS)
+        await runGit(['diff', ...PLAIN_DIFF, '--cached', '--binary', `--output=${patch}`, base, '--', ...NOT_BYPRODUCTS], path, WORKTREE_CHECKOUT_TIMEOUT_MS)
         try {
           await runGit(['apply', '--check', patch], root, WORKTREE_CHECKOUT_TIMEOUT_MS)
         } catch (error) {

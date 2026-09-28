@@ -68,11 +68,11 @@ try {
     await new Promise((r) => setTimeout(r, 500))
     document.querySelector('button[aria-label="Permission mode"]')?.click()
     await new Promise((r) => setTimeout(r, 400))
-    ;[...document.querySelectorAll('.lc-menu[aria-label="What the comparison does"] .lc-menu__item')].find((item) => item.querySelector('.lc-menu__name')?.textContent.trim() === 'Edit')?.click()
+    ;[...document.querySelectorAll('.lc-menu[aria-label="What the comparison does"] .lc-menu__item')].find((item) => item.querySelector('.lc-menu__name')?.textContent.trim() === 'Auto')?.click()
     await new Promise((r) => setTimeout(r, 400))
     return JSON.stringify({ labels, mode: document.querySelector('button[aria-label="Permission mode"]')?.textContent.trim() ?? '' })
   })()`)))
-  check('two free models, in Edit', picked.labels?.length === 2 && picked.mode === 'Edit', JSON.stringify(picked))
+  check('two free models, in Auto', picked.labels?.length === 2 && picked.mode === 'Auto', JSON.stringify(picked))
 
   const built = JSON.parse(String(await drive.capture('Both pages running side by side, each in its column', () => drive.evaluate(`(async () => {
     const field = document.querySelector('form.command-dock textarea')

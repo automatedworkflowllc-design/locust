@@ -93,13 +93,15 @@ try {
 
   // 1. The picker, switched to Compare, two free models ticked.
   const picked = JSON.parse(String(await drive.capture('The picker in Compare, two free models ticked', () => drive.evaluate(`(async () => {
-    const chip = [...document.querySelectorAll('.lc-control')].find((b) => b.getAttribute('aria-haspopup') === 'listbox')
-    chip?.click()
-    await new Promise((r) => setTimeout(r, 700))
-    const compare = [...document.querySelectorAll('.lc-picker__mode')].find((b) => b.textContent.trim() === 'Compare')
+    // Compare is chosen in the chat mode chip (0.451); choosing it opens the picker.
+    const modeChip = document.querySelector('.lc-control--chatmode')
+    if (!modeChip) return JSON.stringify({ switch: false })
+    modeChip.click()
+    await new Promise((r) => setTimeout(r, 400))
+    const compare = [...document.querySelectorAll('.lc-menu[aria-label="Direct or compare"] .lc-menu__item')].find((item) => item.querySelector('.lc-menu__name')?.textContent.trim() === 'Compare')
     if (!compare) return JSON.stringify({ switch: false })
     compare.click()
-    await new Promise((r) => setTimeout(r, 300))
+    await new Promise((r) => setTimeout(r, 900))
     const box = document.querySelector('.lc-picker__input')
     const setInput = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
     const labels = []

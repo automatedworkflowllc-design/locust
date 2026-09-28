@@ -11,6 +11,28 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.451.0 - 2026-09-28
+
+### New
+
+- **Direct, Compare or Blind, in the message box.** A chip beside the
+  permission mode picks how you ask: Direct (one model), Compare (two or
+  three of your choice, side by side) or Blind (the same, names hidden until
+  you keep one). It replaces the switch inside the model picker.
+- **Comparisons that change files run in Auto.** Each model works in its
+  own copy and runs what it needs, tests included, without stopping to ask.
+  Only the one you keep comes into your folder. Choosing Auto turns it on,
+  as it does in the permission menu.
+
+### Fixed
+
+- **A comparison column waiting on you shows its approval card.** Before,
+  the card only appeared under "need you" in the title bar, and the column
+  just said it was using a tool.
+- Files a tool makes while a model works, like Python's cache or
+  `node_modules`, are no longer counted as its changes or brought into your
+  folder when you keep it.
+
 ## 0.450.0 - 2026-09-28
 
 ### Improved

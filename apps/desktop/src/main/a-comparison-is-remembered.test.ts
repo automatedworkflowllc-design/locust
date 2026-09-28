@@ -96,6 +96,17 @@ describe('a comparison', () => {
     expect(answers.changes).toBeUndefined()
   })
 
+  it('keeps a column on Auto only in a comparison that edits (0.451)', async () => {
+    const root = await folder()
+    const autoRoutes = ROUTES.map((route) => ({ ...route, mode: 'auto' as const }))
+    await createCompareStore({ rootDirectory: root, createId: () => 'cmp_e' }).create({ prompt: 'Edit.', routes: autoRoutes, changes: true })
+    await createCompareStore({ rootDirectory: root, createId: () => 'cmp_q' }).create({ prompt: 'Ask.', routes: autoRoutes })
+    const store = createCompareStore({ rootDirectory: root })
+    expect((await store.get('cmp_e'))?.slots.map((column) => column.route.mode)).toEqual(['auto', 'auto'])
+    // A comparison that only answers never runs a column in Auto, whatever it was sent.
+    expect((await store.get('cmp_q'))?.slots.map((column) => column.route.mode)).toEqual([undefined, undefined])
+  })
+
   it('remembers that its names are hidden (0.449)', async () => {
     const root = await folder()
     await createCompareStore({ rootDirectory: root, createId: () => 'cmp_b' }).create({ prompt: 'Blind.', routes: ROUTES, blind: true })

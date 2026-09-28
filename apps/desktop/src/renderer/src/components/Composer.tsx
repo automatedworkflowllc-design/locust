@@ -233,7 +233,7 @@ export interface ComposerProps {
    * comparison on screen: the box then asks every column.
    */
   readonly compare?: ComparePicking
-  readonly asking?: { readonly label: string; readonly columns: number; readonly changes?: boolean }
+  readonly asking?: { readonly label: string; readonly columns: number; readonly changes?: boolean; readonly blind?: boolean }
   /** Opens the model picker when it changes: Home's Compare models (0.442). */
   readonly pickerRequest?: number
   /** Words put in the box from outside it, each time `seq` moves (0.448: a Build and compare starter). */
@@ -322,6 +322,13 @@ export function shiftTabMode<M extends string>(current: M, usable: readonly M[],
   const at = cycle.indexOf(current)
   return cycle[(at + 1) % cycle.length]
 }
+
+/** The chat mode chip's three choices, in Arena's words where they fit (0.451). */
+const CHAT_MODES: readonly { readonly id: 'direct' | 'compare' | 'blind'; readonly name: string; readonly desc: string; readonly icon: 'message' | 'columns' | 'eye-off' }[] = [
+  { id: 'direct', name: 'Direct', desc: 'Chat with one model at a time', icon: 'message' },
+  { id: 'compare', name: 'Compare', desc: 'Two or three models of your choice, side by side', icon: 'columns' },
+  { id: 'blind', name: 'Blind', desc: 'Compare with the names hidden until you keep one', icon: 'eye-off' }
+]
 
 export function Composer({
   handBack,
@@ -421,6 +428,8 @@ export function Composer({
     setRefusal(text === undefined ? undefined : { text, ...(plain ? { plain: true } : {}) })
   }
   const [modeOpen, setModeOpen] = useState(false)
+  /** Direct, Compare or Blind (0.451, as Arena draws it): the chip left of the mode. */
+  const [chatModeOpen, setChatModeOpen] = useState(false)
   /**
    * Files this message will point the runtime at, workspace-relative.
    *
@@ -488,6 +497,7 @@ export function Composer({
   const [recallAt, setRecallAt] = useState(-1)
 
   const modeAnchor = useRef<HTMLSpanElement>(null)
+  const chatModeAnchor = useRef<HTMLSpanElement>(null)
   const pickerAnchor = useRef<HTMLSpanElement>(null)
   const effortAnchor = useRef<HTMLSpanElement>(null)
   /** The chips the send's metal is cast onto -- see `reflectOnto`. */
@@ -497,6 +507,8 @@ export function Composer({
   const closePicker = useCallback(() => setPickerOpen(false), [])
   const closeEffort = useCallback(() => setEffortOpen(false), [])
   useDismissOnOutsidePress(modeOpen, closeMode, modeAnchor)
+  const closeChatMode = useCallback(() => setChatModeOpen(false), [])
+  useDismissOnOutsidePress(chatModeOpen, closeChatMode, chatModeAnchor)
   useDismissOnOutsidePress(pickerOpen, closePicker, pickerAnchor)
   useDismissOnOutsidePress(effortOpen, closeEffort, effortAnchor)
 
@@ -666,6 +678,9 @@ export function Composer({
    */
   const compareEdits = asking !== undefined ? asking.changes === true : compare?.changes === true
   const compareModeOpen = comparing && asking === undefined && compare?.onChanges !== undefined
+  // Direct, Compare or Blind: what the chat mode chip says (0.451).
+  const chatMode: 'direct' | 'compare' | 'blind' =
+    asking !== undefined ? (asking.blind === true ? 'blind' : 'compare') : compare?.on === true ? (compare.blind === true ? 'blind' : 'compare') : 'direct'
   const versus = asking?.label ?? versusLabel((compare?.picks ?? []).map((pick) => pick.label))
   const placeholder = asking !== undefined ? `Ask ${asking.columns === 2 ? 'both' : `all ${String(asking.columns)}`}…` : workingNow
     ? queued === undefined
@@ -1508,12 +1523,67 @@ export function Composer({
                 onAttach={attachFiles}
                 onChooseFolder={onChooseFolder}
               />
+              {/*
+                * DIRECT, COMPARE OR BLIND (0.451). Colin, 2026-09-28, sending
+                * Arena's menu: "maybe let's just do what they do in arena. We
+                * can have direct and compare mode." One chip, where the ask
+                * is written, instead of a One / Compare switch inside the
+                * model picker and a "Hide the names" box in its foot. Picking
+                * Compare or Blind opens the picker to tick the models.
+                */}
+              {compare !== undefined && (
+                <span className="lc-control__anchor" ref={chatModeAnchor}>
+                  {chatModeOpen && (
+                    <div className="lc-menu" role="menu" aria-label="Direct or compare">
+                      {CHAT_MODES.map((option) => (
+                        <button
+                          key={option.id}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={chatMode === option.id}
+                          className="lc-menu__item"
+                          onClick={() => {
+                            setChatModeOpen(false)
+                            compare.onMode(option.id !== 'direct')
+                            compare.onBlind?.(option.id === 'blind')
+                            if (option.id !== 'direct' && compare.picks.length < 2) {
+                              onOpenRoutePicker()
+                              setPickerOpen(true)
+                            }
+                          }}
+                        >
+                          <Icon name={option.icon} size={15} />
+                          <span className="lc-menu__text">
+                            <span className="lc-menu__name">{option.name}</span>
+                            <span className="lc-menu__desc">{option.desc}</span>
+                          </span>
+                          {chatMode === option.id && <Icon name="check" size={13} />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    className={`lc-control lc-control--boxed lc-control--chatmode${chatMode === 'direct' ? '' : ' is-on'}`}
+                    aria-haspopup="menu"
+                    aria-expanded={chatModeOpen}
+                    aria-label={`Chat mode: ${CHAT_MODES.find((option) => option.id === chatMode)?.name ?? 'Direct'}`}
+                    title={CHAT_MODES.find((option) => option.id === chatMode)?.desc}
+                    disabled={running || asking !== undefined}
+                    onClick={() => setChatModeOpen(!chatModeOpen)}
+                  >
+                    <Icon name={CHAT_MODES.find((option) => option.id === chatMode)?.icon ?? 'message'} size={14} />
+                    {chatMode !== 'direct' && <span>{CHAT_MODES.find((option) => option.id === chatMode)?.name}</span>}
+                    <ChevronGlyph />
+                  </button>
+                </span>
+              )}
               <span className="lc-control__anchor" ref={modeAnchor}>
                 {modeOpen && compareModeOpen && (
                   <div className="lc-menu" role="menu" aria-label="What the comparison does">
                     {([
                       [false, 'Ask', 'Each model answers. Nothing in your folder changes.', undefined],
-                      [true, 'Edit', 'Each model changes its own copy of your project. Only the one you keep comes into your folder.', compare?.changesRefusal]
+                      [true, 'Auto', 'Each model works in its own copy and runs what it needs without asking. Only the one you keep comes into your folder.', compare?.changesRefusal]
                     ] as const).map(([edits, name, consequence, refusal]) => (
                       <button
                         key={name}
@@ -1524,6 +1594,8 @@ export function Composer({
                         disabled={refusal !== undefined}
                         title={refusal}
                         onClick={() => {
+                          // Choosing Auto here IS switching it on, as in the mode menu (0.451).
+                          if (edits && autoMode !== true) onEnableAutoMode?.()
                           compare?.onChanges?.(edits)
                           setModeOpen(false)
                         }}
@@ -1613,14 +1685,15 @@ export function Composer({
                   title={
                     comparing
                       ? compareEdits
-                        ? 'Each model changes its own copy of your project. Only the one you keep comes into your folder.'
+                        ? 'Auto: each model works in its own copy and runs what it needs without asking. Only the one you keep comes into your folder.'
                         : 'Each model answers. Nothing in your folder changes.'
                       : connectorsNote(route.runtime, effectiveMode, hasConnectors) ?? 'Permission mode'
                   }
                   disabled={running || (comparing && !compareModeOpen)}
                   onClick={() => setModeOpen(!modeOpen)}
                 >
-                  {comparing ? (compareEdits ? 'Edit' : 'Ask') : MODES.find((option) => option.mode === effectiveMode)?.chip ?? 'Ask'}
+                  {/* Auto only when it is on: otherwise the columns run in Edit, and the chip says so. */}
+                  {comparing ? (compareEdits ? (autoMode === true ? 'Auto' : 'Edit') : 'Ask') : MODES.find((option) => option.mode === effectiveMode)?.chip ?? 'Ask'}
                   <ChevronGlyph />
                 </button>
               </span>

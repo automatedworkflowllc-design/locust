@@ -4080,7 +4080,12 @@ if (!ownsSingleInstanceLock) {
       const response = await codexMissions.start(
         prompt,
         column.route.runtime as MissionRuntimeId,
-        copy !== undefined ? 'accept-edits' : 'ask',
+        // Auto in its own copy when the person's Auto is on and the route asked for it (0.451); else Edit.
+        copy === undefined
+          ? 'ask'
+          : compare.changes === true && column.route.mode === 'auto' && (await teammates.readSettings()).autoMode === true
+            ? 'auto'
+            : 'accept-edits',
         { ...(column.route.model === 'account-default' ? {} : { model: column.route.model }), ...(column.route.effort === undefined ? {} : { effort: column.route.effort }) },
         sendToWindow,
         undefined,
@@ -4133,7 +4138,8 @@ if (!ownsSingleInstanceLock) {
           runtime: typeof route.runtime === 'string' ? route.runtime : '',
           model: typeof route.model === 'string' && route.model.length > 0 ? route.model : 'account-default',
           ...(typeof route.effort === 'string' ? { effort: route.effort } : {}),
-          ...(typeof route.label === 'string' && route.label.trim().length > 0 ? { label: route.label.trim() } : {})
+          ...(typeof route.label === 'string' && route.label.trim().length > 0 ? { label: route.label.trim() } : {}),
+          ...(route.mode === 'auto' ? { mode: 'auto' as const } : {})
         }))
         .filter((route) => route.runtime.length > 0)
       const changes = input.changes === true

@@ -82,13 +82,13 @@ try {
     chip?.click()
     await new Promise((r) => setTimeout(r, 400))
     const items = [...document.querySelectorAll('.lc-menu[aria-label="What the comparison does"] .lc-menu__item')].map((item) => item.innerText.replace(/\\s+/g, ' ').trim())
-    ;[...document.querySelectorAll('.lc-menu[aria-label="What the comparison does"] .lc-menu__item')].find((item) => item.querySelector('.lc-menu__name')?.textContent.trim() === 'Edit')?.click()
+    ;[...document.querySelectorAll('.lc-menu[aria-label="What the comparison does"] .lc-menu__item')].find((item) => item.querySelector('.lc-menu__name')?.textContent.trim() === 'Auto')?.click()
     await new Promise((r) => setTimeout(r, 400))
     return JSON.stringify({ labels, before, chipDisabled, items, after: document.querySelector('button[aria-label="Permission mode"]')?.textContent.trim() ?? '' })
   })()`))))
   say(`  picked: ${JSON.stringify(picked)}`)
   check('two free models tick', picked.labels?.length === 2, JSON.stringify(picked.labels))
-  check('the mode chip offers Ask or Edit for the comparison, and takes Edit', picked.chipDisabled === false && picked.items?.length === 2 && picked.after === 'Edit', JSON.stringify(picked))
+  check('the mode chip offers Ask or Auto for the comparison, and takes Auto', picked.chipDisabled === false && picked.items?.length === 2 && picked.after === 'Auto', JSON.stringify(picked))
 
   const worked = JSON.parse(String(await drive.capture('Both columns changed their own copies; the feet say how much', () => drive.evaluate(`(async () => {
     const field = document.querySelector('form.command-dock textarea')

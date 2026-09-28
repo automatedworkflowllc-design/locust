@@ -803,7 +803,7 @@ export interface CompareStartRequest {
   /** Whose conversation; absent to compare with nobody. */
   readonly teammateId?: string
   readonly prompt: string
-  readonly routes: readonly { readonly runtime: MissionRuntimeId; readonly model: string; readonly effort?: string; readonly label?: string }[]
+  readonly routes: readonly { readonly runtime: MissionRuntimeId; readonly model: string; readonly effort?: string; readonly label?: string; readonly mode?: 'auto' }[]
   /** Each model changes its own copy of the project (0.445); absent, they only answer. */
   readonly changes?: boolean
   /** The names hidden until one is kept (0.449). */

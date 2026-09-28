@@ -3452,7 +3452,13 @@ export default function App(): ReactElement {
         .startCompare({
           ...(pickedTeammate === undefined ? {} : { teammateId: pickedTeammate.teammateId }),
           prompt,
-          routes: comparePicks.map((pick) => ({ runtime: pick.runtime, model: pick.model, label: pick.label })),
+          // Changes run in Auto where the runtime can (0.451): each column is in its own copy.
+          routes: comparePicks.map((pick) => ({
+            runtime: pick.runtime,
+            model: pick.model,
+            label: pick.label,
+            ...(compareChanges && modeRunsOn('auto', pick.runtime, build?.platform) ? { mode: 'auto' as const } : {})
+          })),
           ...(compareChanges ? { changes: true } : {}),
           ...(compareBlind ? { blind: true } : {})
         })
@@ -3558,6 +3564,10 @@ export default function App(): ReactElement {
         ...(compareNeedsCopy(column.route.runtime, build?.platform) ? { copy: true } : {}),
         ...(column.refused === undefined ? {} : { refused: column.refused }),
         turns: cells.map((cell) => ({ missionId: cell.missionId, items: cell.items, running: cell.running })),
+        approvals: approvals.filter((request) => {
+          const missionId = runs.get(request.runId)?.data?.missionId
+          return missionId !== undefined && column.missionIds.includes(missionId)
+        }),
         running,
         keepable: !running && last?.phase === 'completed',
         retryable: compare.kept === undefined && !running && (last === undefined ? column.refused !== undefined : last.phase !== 'completed'),
@@ -6398,6 +6408,9 @@ export default function App(): ReactElement {
                   {...(compareProblem === undefined ? {} : { problem: compareProblem })}
                   onKeep={(slot) => void keepCompareColumn(comparing, slot)}
                   onRetry={(slot) => void retryCompareColumn(comparing, slot)}
+                  decidingIds={decidingIds}
+                  onDecide={decideApproval}
+                  onAnswer={answerQuestion}
                   onBack={comparing.kept === undefined ? undefined : () => setComparingId(undefined)}
                 />
               )
@@ -7139,7 +7152,7 @@ export default function App(): ReactElement {
             {...(composerFill === undefined ? {} : { fill: composerFill })}
             {...(comparing === undefined || comparing.kept !== undefined
               ? {}
-              : { asking: { label: comparing.slots.map((column) => (comparing.blind === true ? blindName(column.slot) : column.route.label ?? column.route.model)).join(' vs '), columns: comparing.slots.filter((column) => column.missionIds.length > 0).length, ...(comparing.changes === true ? { changes: true } : {}) } })}
+              : { asking: { label: comparing.slots.map((column) => (comparing.blind === true ? blindName(column.slot) : column.route.label ?? column.route.model)).join(' vs '), columns: comparing.slots.filter((column) => column.missionIds.length > 0).length, ...(comparing.changes === true ? { changes: true } : {}), ...(comparing.blind === true ? { blind: true } : {}) } })}
             // Tag a teammate from any conversation (0.438).
             team={teammates}
             {...(pickedTeammate === undefined ? {} : { currentTeammateId: pickedTeammate.teammateId })}

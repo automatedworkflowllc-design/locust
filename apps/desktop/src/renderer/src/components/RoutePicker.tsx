@@ -6,7 +6,6 @@ import type { PublicModel, PublicRuntimeStatus } from '../../../shared/ipc.js'
 import { OWN_MODELS_GROUP, ROUTE_GROUP_LIMIT, capRouteRows, integrationOf, modelFamily, orderRouteRows, recentRouteRows, routeRowStatus, routeRowTag, routeSearchText } from '../status.js'
 import type { RouteTag } from '../status.js'
 import { isOwnRoute, modelDisplayName, routeModelName } from '../routeName.js'
-import { Icon } from './Icon.js'
 import { RuntimeMark } from './RuntimeMark.js'
 import { levelsLine } from '../effortScale.js'
 import { effortName } from '../effortLevels.js'
@@ -493,16 +492,7 @@ export function RoutePicker({
           aria-label="Search runtimes and models"
           autoComplete="off"
         />
-        {compare !== undefined && (
-          <span className="lc-picker__modes" role="group" aria-label="One model or compare">
-            <button type="button" className={`lc-picker__mode${comparing ? '' : ' is-on'}`} aria-pressed={!comparing} onClick={() => compare.onMode(false)}>
-              One
-            </button>
-            <button type="button" className={`lc-picker__mode${comparing ? ' is-on' : ''}`} aria-pressed={comparing} onClick={() => compare.onMode(true)}>
-              Compare
-            </button>
-          </span>
-        )}
+        {/* Direct, Compare or Blind is chosen in the chat mode chip now (0.451), not here. */}
         {/*
           * Swarm, as a pill beside the search rather than a row of its own.
           * It is a statement about how every mission runs, so it sits with
@@ -601,18 +591,6 @@ export function RoutePicker({
               ? `Pick ${compare.picks.length === 0 ? 'two or three models' : 'one or two more'}. ${compare.changes === true ? 'Each works in its own copy of your folder.' : 'Each answers the same ask without changing files.'}`
               : `${String(compare.picks.length)} picked. Your ask runs ${compare.picks.length === 2 ? 'twice' : 'three times'}, once on each.`}
           </span>
-          {compare.onBlind !== undefined && (
-            <button
-              type="button"
-              className={`lc-picker__blind${compare.blind === true ? ' is-on' : ''}`}
-              aria-pressed={compare.blind === true}
-              title="The columns read Model A, Model B, with no runtime or cost, until you keep one. Then the names show."
-              onClick={() => compare.onBlind?.(compare.blind !== true)}
-            >
-              <span className="lc-picker__blindbox" aria-hidden="true">{compare.blind === true ? <Icon name="check" size={11} /> : null}</span>
-              Hide the names
-            </button>
-          )}
           <button type="button" className="lc-primarybutton" disabled={compare.picks.length < MIN_COMPARE_SLOTS} onClick={onClose}>
             Done
           </button>
