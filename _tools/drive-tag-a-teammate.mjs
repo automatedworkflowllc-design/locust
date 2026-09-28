@@ -117,7 +117,8 @@ try {
     })
   })()`))))
   say(`  sent: ${JSON.stringify(sent)}`)
-  check('the screen stays on Wren', sent.placeholder.startsWith('Message Wren') && sent.active === 'tm_wren', JSON.stringify(sent))
+  // While Wren runs the box says "it goes to Wren when this finishes"; idle, "Message Wren".
+  check('the screen stays on Wren', /Wren/.test(sent.placeholder) && !/Atlas/.test(sent.placeholder) && sent.active === 'tm_wren', JSON.stringify(sent))
   check('"Sent to Atlas too." as a plain report, and the chip is gone', sent.notice === 'Sent to Atlas too.' && sent.plain && sent.chips === 0, JSON.stringify(sent))
   check('Atlas has a conversation of his own, titled by the message', sent.atlasRows.length === 1 && /what single word did Wren/.test(sent.atlasRows[0]), JSON.stringify(sent.atlasRows))
 
