@@ -42,7 +42,7 @@ const drive = await startDrive({
     teammates: [
       { teammateId: 'tm_cleo', name: 'Cleo', hue: 'blue', role: 'Research & Briefs', createdAt: '2026-09-28T01:00:00.000Z', route: { runtime: 'claude', model: 'haiku', mode: 'ask' } },
       { teammateId: 'tm_ada', name: 'Ada', hue: 'violet', role: 'Code & Migrations', createdAt: '2026-09-28T01:00:00.000Z', route: { runtime: 'codex', model: MODEL, effort: 'low', mode: 'ask' } },
-      { teammateId: 'tm_bea', name: 'Bea', hue: 'lime', role: 'Docs & QA', createdAt: '2026-09-28T01:00:00.000Z', route: { runtime: 'codex', model: MODEL, effort: 'low', mode: 'accept-edits' } }
+      { teammateId: 'tm_bea', name: 'Bea', hue: 'lime', role: 'Docs & QA', createdAt: '2026-09-28T01:00:00.000Z', route: { runtime: 'codex', model: MODEL, effort: 'medium', mode: 'accept-edits' } }
     ],
     missionOwners: {},
     settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: false }
@@ -120,9 +120,9 @@ try {
   await drive.evaluate(openTeammateScript('Ada'))
   await sleep(800)
   await drive.evaluate(type('/'))
-  const ada = JSON.parse(String(await drive.capture('Ada: a bare slash', () => drive.evaluate(menuFor('Codex', ['review', 'compact', 'init'])))))
+  const ada = JSON.parse(String(await drive.capture('Ada: a bare slash', () => drive.evaluate(menuFor('Codex CLI', ['review', 'compact', 'init'])))))
   await drive.evaluate(press('Escape'))
-  check("Codex's /review, /compact and /init are listed under Codex", ada.groups.includes('Codex') && ada.has.review && ada.has.compact && ada.has.init, JSON.stringify(ada))
+  check("Codex's /review, /compact and /init are listed under Codex CLI", ada.groups.includes('Codex CLI') && ada.has.review && ada.has.compact && ada.has.init, JSON.stringify(ada))
 
   const boxedReview = await pick('/rev')
   check('Enter on /rev writes "/review "', boxedReview === '/review ', boxedReview)
@@ -150,7 +150,7 @@ try {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
-  await drive.finish({ intro: `Build: ${packaged === undefined ? 'out/' : 'the packaged build'}. Cleo on Claude Code (never sent anything); Ada (Ask) and Bea (Accept edits) on Codex / ${MODEL}, low; the folder has an uncommitted change that breaks calc.py.`, extra: `Checks failed: ${String(failures)}` })
+  await drive.finish({ intro: `Build: ${packaged === undefined ? 'out/' : 'the packaged build'}. Cleo on Claude Code (never sent anything); Ada (Ask) and Bea (Accept edits) on Codex / ${MODEL} (Ada low, Bea medium); the folder has an uncommitted change that breaks calc.py.`, extra: `Checks failed: ${String(failures)}` })
 }
 say(failures === 0 ? 'ALL CHECKS PASSED' : `${String(failures)} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)
