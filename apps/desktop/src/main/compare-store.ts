@@ -36,7 +36,7 @@ export interface CompareStore {
   list(): Promise<readonly PublicCompare[]>
   get(compareId: unknown): Promise<PublicCompare | undefined>
   /** A new comparison, its columns named in order; the oldest past `MAX_COMPARES` is forgotten. */
-  create(input: { readonly teammateId?: string; readonly prompt: string; readonly routes: readonly CompareRoute[]; readonly changes?: boolean; readonly changesIn?: 'copy' }): Promise<PublicCompare>
+  create(input: { readonly teammateId?: string; readonly prompt: string; readonly routes: readonly CompareRoute[]; readonly changes?: boolean; readonly changesIn?: 'copy'; readonly blind?: boolean }): Promise<PublicCompare>
   /** A column's next turn started. */
   addTurn(compareId: string, slot: CompareSlotId, missionId: string): Promise<PublicCompare>
   /**
@@ -99,6 +99,7 @@ function parsedCompare(value: unknown): PublicCompare | undefined {
     slots,
     ...(record.changes === true ? { changes: true as const } : {}),
     ...(record.changes === true && record.changesIn === 'copy' ? { changesIn: 'copy' as const } : {}),
+    ...(record.blind === true ? { blind: true as const } : {}),
     ...(keptSlot === undefined ? {} : { kept: keptSlot })
   }
 }
@@ -211,6 +212,7 @@ export function createCompareStore(options: {
           createdAt: now().toISOString(),
           ...(input.changes === true ? { changes: true as const } : {}),
           ...(input.changes === true && input.changesIn === 'copy' ? { changesIn: 'copy' as const } : {}),
+          ...(input.blind === true ? { blind: true as const } : {}),
           slots: input.routes.map((route, index) => ({
             slot: COMPARE_SLOTS[index]!,
             route: {

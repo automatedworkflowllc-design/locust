@@ -38,6 +38,7 @@ import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 import { spawn } from 'node:child_process'
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync, existsSync, renameSync, statSync, unlinkSync } from 'node:fs'
 import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { randomInt } from 'node:crypto'
 import { basename, dirname, join } from 'node:path'
 import { homedir, release } from 'node:os'
 import { execFile } from 'node:child_process'
@@ -4136,6 +4137,14 @@ if (!ownsSingleInstanceLock) {
         }))
         .filter((route) => route.runtime.length > 0)
       const changes = input.changes === true
+      const blind = input.blind === true
+      // Blind: the person picked the models, so which column is which must be chance, not pick order.
+      if (blind) {
+        for (let index = routes.length - 1; index > 0; index -= 1) {
+          const other = randomInt(index + 1)
+          ;[routes[index], routes[other]] = [routes[other]!, routes[index]!]
+        }
+      }
       const distinct = new Set(routes.map((route) => `${route.runtime}\n${route.model}`))
       if (prompt.length === 0) return compareRefused('There is nothing to compare yet. Write the ask first.')
       if (routes.length < MIN_COMPARE_SLOTS || routes.length > MAX_COMPARE_SLOTS || distinct.size !== routes.length) {
@@ -4145,7 +4154,7 @@ if (!ownsSingleInstanceLock) {
       // A git project gives each column a worktree; any other folder, a plain copy (0.448).
       const changesIn = changes && !(await compareTrees().probe()).repository ? ('copy' as const) : undefined
       try {
-        return await askEveryColumn(await compares.create({ ...(teammateId === undefined ? {} : { teammateId }), prompt, routes, changes, ...(changesIn === undefined ? {} : { changesIn }) }), prompt, false)
+        return await askEveryColumn(await compares.create({ ...(teammateId === undefined ? {} : { teammateId }), prompt, routes, changes, blind, ...(changesIn === undefined ? {} : { changesIn }) }), prompt, false)
       } catch (error) {
         return compareRefused(error instanceof Error ? error.message : 'The comparison could not be started.')
       }

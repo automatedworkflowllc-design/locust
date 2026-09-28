@@ -61,6 +61,11 @@ export interface PublicCompare {
    */
   readonly changesIn?: 'copy'
   /**
+   * The names are hidden until one is kept (0.449, Arena's Battle): columns
+   * read Model A, Model B, so the answer is judged and not the name.
+   */
+  readonly blind?: true
+  /**
    * The column the person kept; the conversation carries on from its newest
    * mission. `brought` names the files its changes put into the folder, in a
    * comparison that edits.
@@ -128,6 +133,34 @@ export function compareNeedsCopy(runtime: string, platform: string | undefined):
 export function compareRefusalOf(runtime: string): string | undefined {
   if (runtime === 'antigravity') return 'Antigravity answers only in the folder it has open, so it cannot answer in a comparison.'
   return undefined
+}
+
+/**
+ * YOUR OWN LEADERBOARD (0.449, after Arena's). Every Keep is a vote: for each
+ * model, how many of your DECIDED comparisons it answered in, and how many of
+ * those you kept it. Local only -- it is your record, not the world's -- and
+ * a column that never answered, or a comparison not yet decided, counts for
+ * nothing. Keyed `runtime:model`, the picker's own key.
+ */
+export function compareRecord(compares: readonly PublicCompare[]): ReadonlyMap<string, { readonly kept: number; readonly compared: number }> {
+  const record = new Map<string, { kept: number; compared: number }>()
+  for (const compare of compares) {
+    if (compare.kept === undefined) continue
+    for (const column of compare.slots) {
+      if (column.missionIds.length === 0) continue
+      const key = `${column.route.runtime}:${column.route.model}`
+      const entry = record.get(key) ?? { kept: 0, compared: 0 }
+      entry.compared += 1
+      if (column.slot === compare.kept.slot) entry.kept += 1
+      record.set(key, entry)
+    }
+  }
+  return record
+}
+
+/** A column's name while a blind comparison is undecided: "Model A". */
+export function blindName(slot: CompareSlotId): string {
+  return `Model ${slot.toUpperCase()}`
 }
 
 /** "Fable 5.1 vs GPT-6 Astra", "A vs B vs C". */

@@ -11,6 +11,23 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.449.0 - 2026-09-28
+
+### New
+
+- **Compare blind.** Tick "Hide the names" when picking models to compare.
+  The columns read Model A and Model B in a random order, with no runtime,
+  logo or cost to give them away, until you keep one. Then the names show.
+- **Your own record, while you pick.** On Compare, each model you have
+  compared before shows how often you kept it, "kept 2 of 3", in place of its
+  description. It counts only comparisons you decided, and it stays on this
+  computer.
+
+### Fixed
+
+- The picker no longer says models answer without changing files when the
+  comparison is set to Edit.
+
 ## 0.448.0 - 2026-09-28
 <!-- big -->
 

@@ -79,6 +79,8 @@ export function CompareView({
   readonly onBack: (() => void) | undefined
 }): ReactElement {
   const kept = compare.kept?.slot
+  // A blind comparison hides what would name the model -- its mark, its runtime, its cost -- until one is kept (0.449).
+  const veiled = compare.blind === true && kept === undefined
   const keptName = columns.find((column) => column.slot === kept)?.name
   /*
    * FOCUS (0.444, Arena's Expand): one column wide, the others narrowed to
@@ -117,7 +119,7 @@ export function CompareView({
       <div className="lc-compare__bar">
         <span>
           {kept === undefined
-            ? `Comparing ${columns.map((column) => column.name).join(columns.length === 2 ? ' and ' : ', ')}. ${
+            ? `Comparing ${columns.map((column) => column.name).join(columns.length === 2 ? ' and ' : ', ')}${veiled ? ', names hidden until you keep one' : ''}. ${
                 compare.changes === true
                   ? 'Each changes its own copy of your project; only the one you keep comes into your folder.'
                   : 'They answer without changing files.'
@@ -141,20 +143,22 @@ export function CompareView({
               title={`${column.name}: ${column.state}. Focus on it.`}
               onClick={() => setFocusedSlot(column.slot)}
             >
-              <RuntimeMark runtime={column.runtime} size={13} />
+              {!veiled && <RuntimeMark runtime={column.runtime} size={13} />}
               <span className="lc-compare__name">{column.name}</span>
               {column.running && <WorkingSpark />}
             </button>
           ) : (
             <div key={`head:${column.slot}`} className={`lc-compare__head${column.slot === kept ? ' is-kept' : ''}`}>
-              <RuntimeMark runtime={column.runtime} size={13} />
+              {!veiled && <RuntimeMark runtime={column.runtime} size={13} />}
               <span className="lc-compare__name">{column.name}</span>
+              {!veiled && (
               <span
                 className="lc-compare__runtime lc-mono"
                 {...(column.copy === true ? { title: `${column.runtimeName} cannot be held read-only on this computer, so it answers in a copy of your folder. Nothing in your folder changes.` } : {})}
               >
                 {column.copy === true ? `${column.runtimeName} · in a copy` : column.runtimeName}
               </span>
+              )}
               <span className="lc-compare__state lc-mono">
                 {column.running && <WorkingSpark />}
                 {column.state}
@@ -219,7 +223,7 @@ export function CompareView({
           <div key={`foot:${column.slot}`} className={`lc-compare__foot${railed(column.slot) ? ' is-rail' : ''}`}>
             {!railed(column.slot) && (
               <span className="lc-compare__numbers lc-mono">
-                {[changeLines[column.slot], column.span, column.cost].filter((part) => part !== undefined && part.length > 0).join(' · ')}
+                {[changeLines[column.slot], column.span, veiled ? undefined : column.cost].filter((part) => part !== undefined && part.length > 0).join(' · ')}
               </span>
             )}
             {railed(column.slot) ? null : kept === undefined && column.retryable ? (

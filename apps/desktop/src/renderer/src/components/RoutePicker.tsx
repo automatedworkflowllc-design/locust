@@ -6,6 +6,7 @@ import type { PublicModel, PublicRuntimeStatus } from '../../../shared/ipc.js'
 import { OWN_MODELS_GROUP, ROUTE_GROUP_LIMIT, capRouteRows, integrationOf, modelFamily, orderRouteRows, recentRouteRows, routeRowStatus, routeRowTag, routeSearchText } from '../status.js'
 import type { RouteTag } from '../status.js'
 import { isOwnRoute, modelDisplayName, routeModelName } from '../routeName.js'
+import { Icon } from './Icon.js'
 import { RuntimeMark } from './RuntimeMark.js'
 import { levelsLine } from '../effortScale.js'
 import { effortName } from '../effortLevels.js'
@@ -40,6 +41,11 @@ export interface ComparePicking {
   readonly onChanges?: (changes: boolean) => void
   /** Why this folder cannot compare changes (not a git project), or nothing. */
   readonly changesRefusal?: string
+  /** Hide the names until one is kept (0.449). */
+  readonly blind?: boolean
+  readonly onBlind?: (blind: boolean) => void
+  /** How each model has done in your decided comparisons, `runtime:model` (0.449). */
+  readonly record?: ReadonlyMap<string, { readonly kept: number; readonly compared: number }>
 }
 
 const samePick = (a: RouteChoice, b: RouteChoice): boolean => a.runtime === b.runtime && a.model === b.model
@@ -435,7 +441,15 @@ export function RoutePicker({
           {/* A shortcut row carries neither detail nor tag: the
             * canonical row below owns those, so ACTIVE appears exactly
             * once on screen. */}
-          {!recent && <span className="lc-picker__detail lc-mono">{row.detail}</span>}
+          {!recent && (
+            <span className="lc-picker__detail lc-mono">
+              {(() => {
+                // Choosing what to compare: the model's own record in your comparisons, where it has one (0.449).
+                const past = comparing ? compare?.record?.get(`${row.runtime}:${row.model}`) : undefined
+                return past === undefined ? row.detail : `kept ${String(past.kept)} of ${String(past.compared)}`
+              })()}
+            </span>
+          )}
         </span>
         {recent ? (
           pointsAt === undefined ? null : (
@@ -584,9 +598,21 @@ export function RoutePicker({
         <div className="lc-picker__foot lc-picker__foot--compare">
           <span>
             {compare.picks.length < MIN_COMPARE_SLOTS
-              ? `Pick ${compare.picks.length === 0 ? 'two or three models' : 'one or two more'}. Each answers the same ask without changing files.`
+              ? `Pick ${compare.picks.length === 0 ? 'two or three models' : 'one or two more'}. ${compare.changes === true ? 'Each works in its own copy of your folder.' : 'Each answers the same ask without changing files.'}`
               : `${String(compare.picks.length)} picked. Your ask runs ${compare.picks.length === 2 ? 'twice' : 'three times'}, once on each.`}
           </span>
+          {compare.onBlind !== undefined && (
+            <button
+              type="button"
+              className={`lc-picker__blind${compare.blind === true ? ' is-on' : ''}`}
+              aria-pressed={compare.blind === true}
+              title="The columns read Model A, Model B, with no runtime or cost, until you keep one. Then the names show."
+              onClick={() => compare.onBlind?.(compare.blind !== true)}
+            >
+              <span className="lc-picker__blindbox" aria-hidden="true">{compare.blind === true ? <Icon name="check" size={11} /> : null}</span>
+              Hide the names
+            </button>
+          )}
           <button type="button" className="lc-primarybutton" disabled={compare.picks.length < MIN_COMPARE_SLOTS} onClick={onClose}>
             Done
           </button>

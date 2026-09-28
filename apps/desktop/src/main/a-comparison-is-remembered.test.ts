@@ -96,6 +96,12 @@ describe('a comparison', () => {
     expect(answers.changes).toBeUndefined()
   })
 
+  it('remembers that its names are hidden (0.449)', async () => {
+    const root = await folder()
+    await createCompareStore({ rootDirectory: root, createId: () => 'cmp_b' }).create({ prompt: 'Blind.', routes: ROUTES, blind: true })
+    expect((await createCompareStore({ rootDirectory: root }).get('cmp_b'))?.blind).toBe(true)
+  })
+
   it('gives each column a run slot of its own', () => {
     expect(compareSlotKey('tm_wren', 'cmp_1', 'a')).not.toBe(compareSlotKey('tm_wren', 'cmp_1', 'b'))
     expect(compareSlotKey('tm_wren', 'cmp_1', 'a')).not.toBe('tm_wren')

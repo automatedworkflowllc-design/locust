@@ -10158,9 +10158,56 @@ textarea {
   gap: var(--lc-space-4);
 }
 
+/* Narrow (Home's picker): the sentence takes its own line and the switch and
+   Done sit together under it, rather than the sentence folding into three. */
+.lc-picker__foot--compare {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
 .lc-picker__foot--compare > span {
-  flex: 1;
+  flex: 1 1 260px;
   min-width: 0;
+}
+
+.lc-picker__foot--compare > .lc-picker__blind {
+  margin-left: auto;
+}
+
+/* Hide the names (0.449): a checkbox that reads as one, beside Done. */
+.lc-picker__blind {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--lc-text-secondary);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.lc-picker__blind:hover,
+.lc-picker__blind:focus-visible {
+  color: var(--lc-text-primary);
+  background: var(--lc-hover-surface);
+}
+
+.lc-picker__blindbox {
+  display: inline-grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--lc-border-card);
+  border-radius: 3px;
+  color: var(--lc-text-primary);
+}
+
+.lc-picker__blind.is-on .lc-picker__blindbox {
+  border-color: var(--lc-text-secondary);
 }
 
 .lc-control__versus {

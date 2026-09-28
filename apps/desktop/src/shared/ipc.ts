@@ -806,6 +806,8 @@ export interface CompareStartRequest {
   readonly routes: readonly { readonly runtime: MissionRuntimeId; readonly model: string; readonly effort?: string; readonly label?: string }[]
   /** Each model changes its own copy of the project (0.445); absent, they only answer. */
   readonly changes?: boolean
+  /** The names hidden until one is kept (0.449). */
+  readonly blind?: boolean
 }
 export type CompareResponse =
   | { readonly ok: true; readonly data: { readonly compare: PublicCompare; readonly refused: readonly { readonly slot: CompareSlotId; readonly message: string }[] } }

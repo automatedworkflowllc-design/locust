@@ -105,7 +105,7 @@ import type { ComparePick, ComparePicking, RouteChoice } from './components/Rout
 import { CompareView } from './components/CompareView.js'
 import { comparisonOf, foldComparisons } from './compareRows.js'
 import type { CompareColumnView } from './components/CompareView.js'
-import { changesLine, compareMembership, compareNeedsCopy, compareRefusalOf, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../../shared/compare.js'
+import { blindName, changesLine, compareMembership, compareRecord, compareNeedsCopy, compareRefusalOf, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../../shared/compare.js'
 import type { CompareSlotId, PublicCompare } from '../../shared/compare.js'
 import { composerRouteFor, startAs } from '../../shared/route-at-start.js'
 import type { StartAs } from '../../shared/route-at-start.js'
@@ -1530,6 +1530,8 @@ export default function App(): ReactElement {
   const [compareOn, setCompareOn] = useState(false)
   /** The next comparison edits: each model changes its own copy (0.445). */
   const [compareChanges, setCompareChanges] = useState(false)
+  /** The next comparison hides the names until one is kept (0.449). */
+  const [compareBlind, setCompareBlind] = useState(false)
   /** What each column of the comparison on screen has changed, when it edits. */
   const [compareChangeLines, setCompareChangeLines] = useState<{ readonly compareId: string; readonly columns: Partial<Record<CompareSlotId, string>> }>()
   const [comparePicks, setComparePicks] = useState<readonly ComparePick[]>([])
@@ -3404,6 +3406,9 @@ export default function App(): ReactElement {
         },
         changes: compareChanges,
         onChanges: setCompareChanges,
+        blind: compareBlind,
+        onBlind: setCompareBlind,
+        record: compareRecord(compares),
         // Any folder: a git project gives each model a worktree, any other a plain copy (0.448).
         onToggle: (pick) =>
           setComparePicks((current) =>
@@ -3448,7 +3453,8 @@ export default function App(): ReactElement {
           ...(pickedTeammate === undefined ? {} : { teammateId: pickedTeammate.teammateId }),
           prompt,
           routes: comparePicks.map((pick) => ({ runtime: pick.runtime, model: pick.model, label: pick.label })),
-          ...(compareChanges ? { changes: true } : {})
+          ...(compareChanges ? { changes: true } : {}),
+          ...(compareBlind ? { blind: true } : {})
         })
         .catch(() => undefined)
       if (answer === undefined) return 'The comparison could not be started. Nothing was sent.'
@@ -3459,6 +3465,7 @@ export default function App(): ReactElement {
       setCompareOn(false)
       setComparePicks([])
       setCompareChanges(false)
+      setCompareBlind(false)
       return true
     }
     return startFromComposer(prompt)
@@ -3544,7 +3551,8 @@ export default function App(): ReactElement {
         : String(last?.phase ?? '')
       return {
         slot: column.slot,
-        name: column.route.label ?? column.route.model,
+        // Blind until one is kept (0.449): Model A, Model B.
+        name: compare.blind === true && compare.kept === undefined ? blindName(column.slot) : column.route.label ?? column.route.model,
         runtime: column.route.runtime as MissionRuntimeId,
         runtimeName: runtimeNameOf(column.route.runtime),
         ...(compareNeedsCopy(column.route.runtime, build?.platform) ? { copy: true } : {}),
@@ -7131,7 +7139,7 @@ export default function App(): ReactElement {
             {...(composerFill === undefined ? {} : { fill: composerFill })}
             {...(comparing === undefined || comparing.kept !== undefined
               ? {}
-              : { asking: { label: comparing.slots.map((column) => column.route.label ?? column.route.model).join(' vs '), columns: comparing.slots.filter((column) => column.missionIds.length > 0).length, ...(comparing.changes === true ? { changes: true } : {}) } })}
+              : { asking: { label: comparing.slots.map((column) => (comparing.blind === true ? blindName(column.slot) : column.route.label ?? column.route.model)).join(' vs '), columns: comparing.slots.filter((column) => column.missionIds.length > 0).length, ...(comparing.changes === true ? { changes: true } : {}) } })}
             // Tag a teammate from any conversation (0.438).
             team={teammates}
             {...(pickedTeammate === undefined ? {} : { currentTeammateId: pickedTeammate.teammateId })}
