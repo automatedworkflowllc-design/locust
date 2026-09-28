@@ -178,6 +178,8 @@ export interface BranchTurn {
   readonly subject: string
   readonly at: string
   readonly files: readonly string[]
+  /** A merge of the person's branch, finished by a turn that resolved it (0.440). */
+  readonly merge?: true
 }
 
 export interface BranchReview {
@@ -207,7 +209,10 @@ export function statusEntriesOf(porcelainZ: string): readonly { readonly code: s
   return out
 }
 
-/** `git log --name-only --format=%x1e%H%x1f%s%x1f%aI`, newest first as git gives it. */
+/** One record per commit: sha, subject, date, parents; then its files, one per line (`--name-only`). */
+export const TURN_LOG_FORMAT = '--format=%x1e%H%x1f%s%x1f%aI%x1f%P'
+
+/** `git log --name-only` in `TURN_LOG_FORMAT`, newest first as git gives it. */
 export function branchTurnsOf(log: string): readonly BranchTurn[] {
   return log
     .split('\x1e')
@@ -215,8 +220,10 @@ export function branchTurnsOf(log: string): readonly BranchTurn[] {
     .filter((record) => record.length > 0)
     .map((record) => {
       const [head = '', ...rest] = record.split('\n')
-      const [sha = '', subject = '', at = ''] = head.split('\x1f')
-      return { sha, subject, at, files: rest.map((line) => line.trim()).filter((line) => line.length > 0) }
+      const [sha = '', subject = '', at = '', parents = ''] = head.split('\x1f')
+      // A merge names no files of its own under --name-only; it is said as a merge instead.
+      const merge = parents.trim().split(/\s+/).filter((parent) => parent.length > 0).length > 1
+      return { sha, subject, at, files: rest.map((line) => line.trim()).filter((line) => line.length > 0), ...(merge ? { merge: true as const } : {}) }
     })
     .filter((turn) => /^[0-9a-f]{40}$/.test(turn.sha))
 }
@@ -534,7 +541,7 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
       const branch = (await runGit(['symbolic-ref', '--short', '-q', 'HEAD'], path)).trim()
       const against = (await runGit(['symbolic-ref', '--short', '-q', 'HEAD'], root).catch(() => '')).trim()
       const base = (await runGit(['merge-base', 'HEAD', branch], root)).trim()
-      const turns = branchTurnsOf(await runGit(['log', '--name-only', '--format=%x1e%H%x1f%s%x1f%aI', `${base}..${branch}`], root)).slice().reverse()
+      const turns = branchTurnsOf(await runGit(['log', '--name-only', TURN_LOG_FORMAT, `${base}..${branch}`], root)).slice().reverse()
       const diff = await runGit(['diff', ...PLAIN_DIFF, base, branch], root)
         .then((text) => (Buffer.byteLength(text, 'utf8') > REVIEW_MAX_DIFF_BYTES ? undefined : text))
         .catch(() => undefined)
@@ -609,7 +616,8 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
     const onto = ontoName.length > 0 ? ontoName : undefined
     const base = (await runGit(['merge-base', 'HEAD', branch], root)).trim()
     const files = (await runGit(['diff', '--name-only', '-z', base, branch], root)).split('\0').filter((file) => file.length > 0)
-    const subjects = branchTurnsOf(await runGit(['log', '--name-only', '--format=%x1e%H%x1f%s%x1f%aI', `${base}..${branch}`], root)).map((turn) => turn.subject).reverse()
+    // The asks, not the merge a conflict needed: that is Locust's step, not the person's.
+    const subjects = branchTurnsOf(await runGit(['log', '--name-only', TURN_LOG_FORMAT, `${base}..${branch}`], root)).filter((turn) => turn.merge !== true).map((turn) => turn.subject).reverse()
     const routes = (await runGit(['log', '--format=%(trailers:key=Locust-Route,valueonly,separator=%x0a)', `${base}..${branch}`], root).catch(() => '')).split(/\r?\n/)
     const draft = landingDraft({ name: teammate.name, subjects, routes })
     const preview = (block: LandBlock | undefined): { preview: LandPreview; path: string } => ({ preview: { branch, onto, files, draft, block }, path })

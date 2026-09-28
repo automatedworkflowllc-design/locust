@@ -119,7 +119,13 @@ describe('a branch lands as one commit', () => {
     // The teammate's turn resolves it; its checkpoint commits the merge.
     await writeFile(join(tree, 'cart.py'), 'def total(items):\n    return sum(items) if items else len(items)\n', 'utf8')
     expect((await manager.checkpoint('tm_wren', turn('Resolve the conflict with main'))).kind).toBe('committed')
-    expect((await manager.landPreview(WREN)).block).toBeUndefined()
+    // Review says the merge is a merge, and the landing's message leaves it out.
+    const review = await manager.review('tm_wren')
+    expect(review.turns.find((one) => one.subject === 'Resolve the conflict with main')?.merge).toBe(true)
+    expect(review.diff).toContain('+    return sum(items) if items else len(items)')
+    const ready = await manager.landPreview(WREN)
+    expect(ready.block).toBeUndefined()
+    expect(ready.draft).not.toContain('Resolve the conflict')
     expect((await manager.land(WREN, '')).kind).toBe('landed')
     expect(await text(join(root, 'cart.py'))).toBe('def total(items):\n    return sum(items) if items else len(items)\n')
   })

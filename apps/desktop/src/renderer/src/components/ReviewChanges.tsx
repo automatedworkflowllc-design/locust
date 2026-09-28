@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import type { PublicBranchReview, PublicLandBlock, PublicLandPreview } from '../../../shared/ipc.js'
@@ -41,10 +41,36 @@ export function ReviewChanges({
   const [refreshed, setRefreshed] = useState(0)
   /** What the last landing, or the last ask to resolve, did -- kept while the card is gone. */
   const [landNote, setLandNote] = useState<string>()
-  // A turn that ends has just been saved: the branch is read again, without a press.
+  /*
+   * A turn that ends is saved on the branch, and the branch is read again
+   * without a press -- but only once the host has let the teammate go. The
+   * turn ends on screen BEFORE its checkpoint is made, and the first landing
+   * drive read the branch in that gap: the whole change still showed the
+   * diff from before the merge the turn had just finished. The host counts
+   * the teammate busy until the checkpoint is done, so that is what is waited
+   * for.
+   */
+  const mounted = useRef(false)
   useEffect(() => {
-    if (!running) setRefreshed((count) => count + 1)
-  }, [running])
+    if (!mounted.current) {
+      mounted.current = true
+      return
+    }
+    if (running) return
+    let current = true
+    void (async () => {
+      const bridge = window.desktop
+      for (let attempt = 0; attempt < 30 && current && bridge !== undefined; attempt += 1) {
+        const answer = await bridge.landPreview(teammate.teammateId).catch(() => undefined)
+        if (answer?.ok !== true || answer.data.block?.kind !== 'busy') break
+        await new Promise((resolve) => setTimeout(resolve, 500))
+      }
+      if (current) setRefreshed((count) => count + 1)
+    })()
+    return () => {
+      current = false
+    }
+  }, [running, teammate.teammateId])
 
   useEffect(() => {
     const bridge = window.desktop
@@ -78,6 +104,8 @@ export function ReviewChanges({
   const text = showing === 'whole' ? review?.diff : turnText?.sha === showing ? turnText.diff : undefined
   const files = text === undefined ? [] : parseUnifiedDiff(text)
   const turns = review?.turns ?? []
+  /** The whole change's files, from its diff when it was shown whole. */
+  const wholeFiles = review?.diff !== undefined ? parseUnifiedDiff(review.diff).length : new Set(turns.flatMap((turn) => turn.files)).size
 
   return (
     <aside className="lc-viewer" aria-label="Review changes">
@@ -101,9 +129,11 @@ export function ReviewChanges({
         {problem !== undefined && <p className="lc-review__note is-warn" role="status">{problem}</p>}
         {review !== undefined && (
           <>
+            {/* The news first: what the last press did. */}
+            {landNote !== undefined && <p className="lc-review__note is-done" role="status">{landNote}</p>}
             <p className="lc-review__note">
               {turns.length === 0
-                ? `Nothing saved on ${review.branch} yet. Each turn ${teammate.name} finishes is saved there as it ends.`
+                ? `Nothing new on ${review.branch}. Each turn ${teammate.name} finishes is saved there as it ends.`
                 : `${String(turns.length)} ${turns.length === 1 ? 'turn' : 'turns'} saved on ${review.branch} since it left ${review.against ?? 'your checkout'}. Nothing here is in your branch until you land it.`}
             </p>
             {turns.length > 0 && (
@@ -120,7 +150,6 @@ export function ReviewChanges({
                 }}
               />
             )}
-            {landNote !== undefined && <p className="lc-review__note is-done" role="status">{landNote}</p>}
             {review.uncommitted.length > 0 && (
               <p className="lc-review__note is-warn" role="status">
                 Not saved on the branch yet ({String(review.uncommitted.length)}): {review.uncommitted.slice(0, 5).join(', ')}
@@ -137,7 +166,7 @@ export function ReviewChanges({
                   onClick={() => setShowing('whole')}
                 >
                   <span className="lc-review__subject">The whole change</span>
-                  <span className="lc-review__meta lc-mono">{String(new Set(turns.flatMap((turn) => turn.files)).size)} files</span>
+                  <span className="lc-review__meta lc-mono">{fileCount(wholeFiles)}</span>
                 </button>
                 {turns.map((turn, index) => (
                   <button
@@ -153,7 +182,7 @@ export function ReviewChanges({
                       <span className="lc-review__index lc-mono">{String(index + 1)}</span> {turn.subject}
                     </span>
                     <span className="lc-review__meta lc-mono">
-                      {String(turn.files.length)} {turn.files.length === 1 ? 'file' : 'files'}
+                      {turn.merge === true ? `merge with ${review.against ?? 'your branch'}` : fileCount(turn.files.length)}
                       {agoLabel(turn.at) === undefined ? '' : ` · ${agoLabel(turn.at) ?? ''}`}
                     </span>
                   </button>
@@ -187,6 +216,8 @@ export function ReviewChanges({
     </aside>
   )
 }
+
+const fileCount = (count: number): string => `${String(count)} ${count === 1 ? 'file' : 'files'}`
 
 const listed = (files: readonly string[]): string =>
   files.length <= 3 ? files.join(', ') : `${files.slice(0, 2).join(', ')} and ${String(files.length - 2)} more`

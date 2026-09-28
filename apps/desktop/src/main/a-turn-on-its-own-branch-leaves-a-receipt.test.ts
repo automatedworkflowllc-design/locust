@@ -179,6 +179,19 @@ describe('the message and the sentence', () => {
     expect(checkpointMessage({ ...base, prompt: 'Go' }).trailers).toContainEqual(['Locust-Route', 'codex / gpt-6-luna'])
   })
 
+  it('makes a subject of the first sentence, or cuts at a word -- never mid-word', () => {
+    const base = { answer: undefined, teammate: { teammateId: 'tm_wren', name: 'Wren' }, missionId: 'm_1', runtime: 'opencode', model: 'opencode/nemotron-3-ultra-free', outcome: 'completed' as const }
+    // The first landing drive's subject: "... Change nothing el…".
+    expect(checkpointMessage({ ...base, prompt: 'In cart.py, change `return 0` to `return sum(items)`. Change nothing else and do not run anything.' }).subject)
+      .toBe('In cart.py, change `return 0` to `return sum(items)`.')
+    const long = checkpointMessage({ ...base, prompt: 'Rename every helper in the billing module so that each name says what it returns and not how' }).subject
+    expect(long.length).toBeLessThanOrEqual(72)
+    expect(long.endsWith(' …')).toBe(false)
+    expect(long).toMatch(/ [a-z]+…$/)
+    // And the route names the runtime once.
+    expect(checkpointMessage({ ...base, prompt: 'Go' }).trailers).toContainEqual(['Locust-Route', 'opencode / nemotron-3-ultra-free'])
+  })
+
   it('names what was left out for being too big', () => {
     expect(checkpointSentence({ kind: 'skipped', skipped: [{ path: 'data.bin', bytes: 80 * 1024 * 1024 }] })).toBe('Nothing from this turn was saved on the branch. Left out, too big to commit: data.bin (80 MB).')
     expect(checkpointSentence({ kind: 'committed', sha: 'a'.repeat(40), branch: 'locust/wren', files: ['a', 'b', 'c', 'd', 'e'], skipped: [] })).toBe(`Saved this turn on locust/wren as ${'a'.repeat(12)}: 5 files (a, b, c and 2 more).`)

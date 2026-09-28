@@ -823,6 +823,8 @@ export interface PublicBranchTurn {
   readonly subject: string
   readonly at: string
   readonly files: readonly string[]
+  /** It finished a merge with the person's branch (0.440): git names no files of its own for it. */
+  readonly merge?: true
 }
 
 export interface PublicBranchReview {

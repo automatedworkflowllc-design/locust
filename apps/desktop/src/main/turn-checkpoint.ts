@@ -24,9 +24,26 @@ const SUMMARY_MAX = 200
 
 export type TurnOutcome = 'completed' | 'failed' | 'stopped'
 
+/**
+ * The first line, as a commit subject: its first sentence when that fits,
+ * else cut at a word. The first landing drive's message read "Change nothing
+ * el…" -- a subject cut mid-word is the first thing the person reads in their
+ * own history.
+ */
 const firstLine = (text: string, max: number): string => {
   const line = text.split(/\r?\n/).map((part) => part.trim()).find((part) => part.length > 0) ?? ''
-  return line.length <= max ? line : `${line.slice(0, max - 1).trimEnd()}…`
+  const sentence = /^.+?[.!?](?=\s|$)/.exec(line)?.[0]
+  if (sentence !== undefined && sentence.length <= max) return sentence
+  if (line.length <= max) return line
+  const cut = line.slice(0, max - 1)
+  const space = cut.lastIndexOf(' ')
+  return `${(space > max / 2 ? cut.slice(0, space) : cut).trimEnd()}…`
+}
+
+/** "opencode / nemotron-3-ultra-free", never "opencode / opencode/nemotron-3-ultra-free". */
+export function routeLabel(runtime: string, model: string | undefined): string {
+  if (model === undefined) return runtime
+  return `${runtime} / ${model.startsWith(`${runtime}/`) ? model.slice(runtime.length + 1) : model}`
 }
 
 /** The person's ask as the subject, the teammate's first line as the body, and trailers naming the turn. */
@@ -47,7 +64,7 @@ export function checkpointMessage(input: {
     trailers: [
       ['Locust-Teammate', input.teammate.name],
       ['Locust-Mission', input.missionId],
-      ['Locust-Route', input.model === undefined ? input.runtime : `${input.runtime} / ${input.model}`],
+      ['Locust-Route', routeLabel(input.runtime, input.model)],
       ['Locust-Turn', input.outcome]
     ],
     author: { name: input.teammate.name, email: `${input.teammate.teammateId}@teammates.locust` }
