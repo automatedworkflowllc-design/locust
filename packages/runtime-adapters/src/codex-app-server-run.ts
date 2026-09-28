@@ -61,6 +61,17 @@ export interface CodexAppServerRunOptions {
   /** A prior thread to carry on, which keeps its turns. */
   readonly resumeThreadId?: string;
   /**
+   * One of Codex's own commands, typed by the person (0.428), sent as the
+   * request its own terminal sends instead of a turn: `review` is
+   * `review/start` (the prompt, when there is one, as its instructions),
+   * `compact` is `thread/compact/start`. MEASURED 2026-09-28 on 0.157.1 with
+   * gpt-6-luna: an inline review runs on the same thread and ends with its
+   * findings as an ordinary agent message; a compaction is a turn of its own
+   * with one `contextCompaction` item. Neither request takes a model, so the
+   * thread is started or resumed with it.
+   */
+  readonly slashCommand?: "review" | "compact";
+  /**
    * What answers the server when it ASKS -- the approval channel. Only a
    * policy that stops for approval (`untrusted`) ever produces a request;
    * without a handler every request is refused, which under `never` is the
@@ -297,6 +308,12 @@ export function startCodexAppServerRun(
     }
   }
 
+  /** The route on the THREAD, for a command whose request takes none (0.428). */
+  const threadRoute = (model: string | undefined, effort: string | undefined): Record<string, JsonValue> => ({
+    ...(typeof model === "string" && model.trim().length > 0 ? { model } : {}),
+    ...(typeof effort === "string" && /^[a-z]{1,16}$/.test(effort) ? { config: { model_reasoning_effort: effort } } : {}),
+  });
+
   const handshake = async (): Promise<void> => {
     await client.request("initialize", {
       clientInfo: { name: "locust", version: "0.1.0" },
@@ -311,6 +328,7 @@ export function startCodexAppServerRun(
         cwd: options.command.cwd,
         sandbox: options.sandbox,
         approvalPolicy: options.approvalPolicy,
+        ...(options.slashCommand === undefined ? {} : threadRoute(options.model, options.effort)),
       },
     );
     const record = (typeof thread === "object" && thread !== null ? thread : {}) as Record<
@@ -335,6 +353,21 @@ export function startCodexAppServerRun(
       typeof options.effort === "string" && /^[a-z]{1,16}$/.test(options.effort)
         ? options.effort
         : undefined;
+    if (options.slashCommand === "review") {
+      const instructions = options.prompt.trim();
+      const reviewing = await client.request("review/start", {
+        threadId: startedThread,
+        target: instructions.length > 0 ? { type: "custom", instructions } : { type: "uncommittedChanges" },
+        delivery: "inline",
+      });
+      turnId = turnIdOf(reviewing) ?? turnId;
+      return;
+    }
+    if (options.slashCommand === "compact") {
+      // Answered with nothing; the turn's id arrives on `turn/started`.
+      await client.request("thread/compact/start", { threadId: startedThread });
+      return;
+    }
     const started = await client.request("turn/start", {
       threadId: startedThread,
       approvalPolicy: options.approvalPolicy,

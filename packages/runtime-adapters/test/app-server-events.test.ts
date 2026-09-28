@@ -455,3 +455,20 @@ describe("Codex compacting its conversation", () => {
     expect(app.accept(note("item/started", { item: { type: "contextCompaction", id: "c1" } }))).toEqual([]);
   });
 });
+
+describe("a review Codex was asked for (0.428)", () => {
+  it("draws only the findings, once: the review-mode bookends are not steps", () => {
+    // Measured 2026-09-28, 0.157.1: enteredReviewMode, then exitedReviewMode
+    // carrying the findings, then the same findings as an agent message.
+    const app = normalizer();
+    app.accept(note("thread/started", { thread: { id: "th_1" } }));
+    app.accept(note("turn/started", { threadId: "th_1", turn: {} }));
+    const bookends = [
+      ...app.accept(note("item/started", { threadId: "th_1", item: { type: "enteredReviewMode", id: "r1", review: "current changes" } })),
+      ...app.accept(note("item/completed", { threadId: "th_1", item: { type: "enteredReviewMode", id: "r1", review: "current changes" } })),
+      ...app.accept(note("item/started", { threadId: "th_1", item: { type: "exitedReviewMode", id: "r2", review: "add subtracts" } })),
+      ...app.accept(note("item/completed", { threadId: "th_1", item: { type: "exitedReviewMode", id: "r2", review: "add subtracts" } })),
+    ];
+    expect(bookends).toEqual([]);
+  });
+});

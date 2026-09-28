@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { commandNamed, createRuntimeCommands, HIDDEN_COMMANDS } from './runtime-commands.js'
+import { CODEX_COMMANDS, commandNamed, createRuntimeCommands, HIDDEN_COMMANDS } from './runtime-commands.js'
 
 /**
  * EACH RUNTIME'S OWN SLASH COMMANDS (0.426).
@@ -48,7 +48,7 @@ describe('the commands a runtime listed', () => {
     expect(await commands.set('claude', [COMPACT, MODEL, CONTEXT, MCP])).toBe(true)
     // model is the teammate's, chosen in Locust; mcp would rewrite the person's settings.
     expect(HIDDEN_COMMANDS.claude?.has('model')).toBe(true)
-    expect(await commands.list()).toEqual({ claude: [COMPACT, CONTEXT] })
+    expect(await commands.list()).toEqual({ claude: [COMPACT, CONTEXT], codex: CODEX_COMMANDS })
   })
 
   it('say a message is a command only for the runtime that listed it, and never a hidden one', async () => {
@@ -59,7 +59,7 @@ describe('the commands a runtime listed', () => {
     expect(commands.isCommand('claude', '/model opus')).toBe(false)
     expect(commands.isCommand('claude', '/nonsense')).toBe(false)
     expect(commands.isCommand('claude', 'please /compact')).toBe(false)
-    expect(commands.isCommand('codex', '/compact')).toBe(false)
+    expect(commands.isCommand('cursor', '/compact')).toBe(false)
     expect(commands.isCommand(undefined, '/compact')).toBe(false)
   })
 
@@ -69,11 +69,11 @@ describe('the commands a runtime listed', () => {
     const INIT = { name: 'init', description: 'guided AGENTS.md setup', argumentHint: '[arguments]' }
     await commands.set('claude', [COMPACT, MODEL])
     await commands.set('opencode', [INIT])
-    expect(await commands.list()).toEqual({ claude: [COMPACT], opencode: [INIT] })
+    expect(await commands.list()).toEqual({ claude: [COMPACT], opencode: [INIT], codex: CODEX_COMMANDS })
     expect(commands.isCommand('opencode', '/init keep it short')).toBe(true)
     expect(commands.isCommand('opencode', '/compact')).toBe(false)
     expect(commands.isCommand('claude', '/init')).toBe(false)
-    expect(await createRuntimeCommands({ file }).list()).toEqual({ claude: [COMPACT], opencode: [INIT] })
+    expect(await createRuntimeCommands({ file }).list()).toEqual({ claude: [COMPACT], opencode: [INIT], codex: CODEX_COMMANDS })
   })
 
   it('are kept across a restart, and a list that did not change is not written again', async () => {
@@ -82,18 +82,29 @@ describe('the commands a runtime listed', () => {
     await first.set('claude', [COMPACT, CONTEXT])
     expect(await first.set('claude', [COMPACT, CONTEXT])).toBe(false)
     const again = createRuntimeCommands({ file })
-    expect(await again.list()).toEqual({ claude: [COMPACT, CONTEXT] })
+    expect(await again.list()).toEqual({ claude: [COMPACT, CONTEXT], codex: CODEX_COMMANDS })
     // Read at once, so the first message of a session is recognised.
     expect(again.isCommand('claude', '/context')).toBe(true)
     expect(JSON.parse(await readFile(file, 'utf8'))).toMatchObject({ schemaVersion: 1 })
   })
 
   it('are nothing, not an error, before any run listed them or when the file is unreadable', async () => {
-    expect(await createRuntimeCommands({ file: join(folder, 'none.json') }).list()).toEqual({})
+    expect(await createRuntimeCommands({ file: join(folder, 'none.json') }).list()).toEqual({ codex: CODEX_COMMANDS })
     const broken = join(folder, 'broken.json')
     await writeFile(broken, '{ not json', 'utf8')
     const commands = createRuntimeCommands({ file: broken })
-    expect(await commands.list()).toEqual({})
+    expect(await commands.list()).toEqual({ codex: CODEX_COMMANDS })
     expect(commands.isCommand('claude', '/compact')).toBe(false)
+  })
+})
+
+describe("Codex's own commands (0.428)", () => {
+  it('are the ones its terminal sends as requests, there whether or not Codex has run, and nothing else of Codex is a command', async () => {
+    const commands = createRuntimeCommands({ file: join(tmpdir(), 'locust-no-such-runtime-commands.json') })
+    expect((await commands.list()).codex?.map((command) => command.name)).toEqual(['review', 'compact', 'init'])
+    expect(commands.isCommand('codex', '/review only the tests')).toBe(true)
+    expect(commands.isCommand('codex', '/compact')).toBe(true)
+    expect(commands.isCommand('codex', '/model gpt-6-luna')).toBe(false)
+    expect(commands.isCommand('codex', '/diff')).toBe(false)
   })
 })

@@ -38,9 +38,30 @@ export type CommandRuntime = (typeof COMMAND_RUNTIMES)[number]
 const isCommandRuntime = (runtime: string | undefined): runtime is CommandRuntime =>
   (COMMAND_RUNTIMES as readonly string[]).includes(runtime ?? '')
 
+/**
+ * CODEX'S OWN COMMANDS (0.428), which Codex never lists: its terminal draws
+ * them and sends each as a request of its own. Only the ones that do work in
+ * a conversation are here, described as its terminal describes them; the
+ * rest (/model, /approvals, /new, /diff, /status) are Locust's own controls.
+ * `review` and `compact` go as the requests (codex-app-server-run.ts); `init`
+ * is a turn carrying CODEX_INIT_PROMPT.
+ */
+export const CODEX_COMMANDS: readonly RuntimeCommandInfo[] = [
+  { name: 'review', description: 'Review your current changes and find issues', argumentHint: '[what to review]' },
+  { name: 'compact', description: 'Summarize the conversation to prevent hitting the context limit', argumentHint: '' },
+  { name: 'init', description: 'Create an AGENTS.md file with instructions for Codex', argumentHint: '' }
+]
+
+/** What `/init` asks Codex to do -- Locust's words, to the same end as its terminal's. */
+export const CODEX_INIT_PROMPT =
+  'Create an AGENTS.md file at the root of this repository: a short guide for coding agents working here. ' +
+  'Look at the project first. Cover how it is laid out, how to build, test and run it, the conventions its code follows, ' +
+  'and anything a newcomer would likely get wrong. Keep it concise and specific to this repository. ' +
+  'If an AGENTS.md already exists, improve it rather than replacing it.'
+
 export interface RuntimeCommands {
   /** What each runtime offers, hidden ones left out. */
-  list(): Promise<Readonly<Partial<Record<CommandRuntime, readonly RuntimeCommandInfo[]>>>>
+  list(): Promise<Readonly<Partial<Record<CommandRuntime | 'codex', readonly RuntimeCommandInfo[]>>>>
   /** Take a runtime's list as its CLI sent it; true when it changed. */
   set(runtime: CommandRuntime, commands: readonly RuntimeCommandInfo[]): Promise<boolean>
   /** Whether a message is one of this runtime's commands, and so is sent as it is. */
@@ -82,10 +103,13 @@ export function createRuntimeCommands(options: { readonly file: string }): Runti
   return {
     async list() {
       await load()
-      return Object.fromEntries(COMMAND_RUNTIMES.flatMap((runtime) => {
-        const commands = held[runtime]
-        return commands === undefined ? [] : [[runtime, visible(runtime, commands)]]
-      }))
+      return {
+        ...Object.fromEntries(COMMAND_RUNTIMES.flatMap((runtime) => {
+          const commands = held[runtime]
+          return commands === undefined ? [] : [[runtime, visible(runtime, commands)]]
+        })),
+        codex: CODEX_COMMANDS
+      }
     },
     async set(runtime, commands) {
       await load()
@@ -98,8 +122,9 @@ export function createRuntimeCommands(options: { readonly file: string }): Runti
       return true
     },
     isCommand(runtime, prompt) {
-      if (!isCommandRuntime(runtime)) return false
       const name = commandNamed(prompt)
+      if (runtime === 'codex') return name !== undefined && CODEX_COMMANDS.some((command) => command.name === name)
+      if (!isCommandRuntime(runtime)) return false
       return name !== undefined && visible(runtime, held[runtime] ?? []).some((command) => command.name === name)
     }
   }

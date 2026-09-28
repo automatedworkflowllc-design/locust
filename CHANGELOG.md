@@ -11,6 +11,23 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.428.0 - 2026-09-28
+
+### New
+
+- **Codex's commands, in the / menu.** With a Codex teammate, / now offers
+  Codex's own /review, /compact and /init. /review reviews your current
+  changes the way Codex's own review does (add what to focus on if you
+  like), /compact summarizes the conversation so far, and /init writes an
+  AGENTS.md for the project.
+
+### Fixed
+
+- **Claude Code's commands are in the / menu from the start.** Since
+  0.426 they only appeared after your first Claude Code message following
+  the update, so the menu looked like it had none. Locust now asks Claude
+  Code for them when it opens, without sending anything or using your plan.
+
 ## 0.427.0 - 2026-09-28
 
 ### New

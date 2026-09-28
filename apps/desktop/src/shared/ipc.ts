@@ -746,7 +746,7 @@ export const WORKSPACE_PAGE_CHANNEL = 'workspace:page'
 /** Each runtime's own slash commands, for the `/` menu (0.426): main/runtime-commands.ts. */
 export const RUNTIME_COMMANDS_CHANNEL = 'runtime:commands'
 export interface RuntimeCommandRow { readonly name: string; readonly description: string; readonly argumentHint: string }
-export type RuntimeCommandsResponse = Readonly<Partial<Record<'claude' | 'opencode', readonly RuntimeCommandRow[]>>>
+export type RuntimeCommandsResponse = Readonly<Partial<Record<'claude' | 'opencode' | 'codex', readonly RuntimeCommandRow[]>>>
 export type WorkspacePageResponse = { readonly ok: true; readonly url: string } | { readonly ok: false; readonly message: string }
 
 /**

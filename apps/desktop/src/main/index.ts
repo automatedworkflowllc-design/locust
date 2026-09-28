@@ -14,7 +14,9 @@ import electronUpdater from 'electron-updater'
 const { autoUpdater } = electronUpdater
 import {
   createNodeProbeRunner,
+  createClaudeCommandListCommand,
   createOpenCodeServeCommand,
+  readClaudeCommands,
   readOpenCodeCommands,
   createNodeRuntimeProcessRunner,
   createPathExecutableLocator,
@@ -3261,24 +3263,34 @@ if (!ownsSingleInstanceLock) {
      * background, the first time the window reads the menu's commands. A
      * list that changed is announced like Claude Code's.
      */
-    let openCodeCommandsAsked = false
-    const refreshOpenCodeCommands = (): void => {
-      if (openCodeCommandsAsked) return
-      openCodeCommandsAsked = true
+    /*
+     * And Claude Code's the same way (0.428): 0.426 learned them only from a
+     * run, so an updated app showed none until the first Claude turn (Colin,
+     * 2026-09-28, looking at exactly that: "am i doing something wrong?").
+     * Claude Code lists them at start and does nothing until it is sent a
+     * message, which it never is (claude-commands.ts).
+     */
+    const commandsAsked = new Set<'claude' | 'opencode'>()
+    const refreshListedCommands = (runtime: 'claude' | 'opencode'): void => {
+      if (commandsAsked.has(runtime)) return
+      commandsAsked.add(runtime)
       void (async () => {
-        const found = (await discoverForStart('opencode')).find((entry) => entry.id === 'opencode')
+        const found = (await discoverForStart(runtime)).find((entry) => entry.id === runtime)
         if (found?.availability !== 'available' || found.readiness !== 'ready' || found.executable === undefined) {
           // Not ready yet, or not here: asked again the next time.
-          openCodeCommandsAsked = false
+          commandsAsked.delete(runtime)
           return
         }
-        const commands = await readOpenCodeCommands({ spawn: spawnAppServer, command: createOpenCodeServeCommand(found.executable, { workspacePath }) })
-        if (await runtimeCommands.set('opencode', commands)) sendToWindow({ kind: 'runtime-commands-changed' })
-      })().catch((error: unknown) => note('runtime-commands', `could not list OpenCode's commands: ${error instanceof Error ? error.message : String(error)}`))
+        const commands = runtime === 'claude'
+          ? await readClaudeCommands({ spawn: spawnAppServer, command: createClaudeCommandListCommand(found.executable, { workspacePath }) })
+          : await readOpenCodeCommands({ spawn: spawnAppServer, command: createOpenCodeServeCommand(found.executable, { workspacePath }) })
+        if (await runtimeCommands.set(runtime, commands)) sendToWindow({ kind: 'runtime-commands-changed' })
+      })().catch((error: unknown) => note('runtime-commands', `could not list ${runtime}'s commands: ${error instanceof Error ? error.message : String(error)}`))
     }
     ipcMain.handle(RUNTIME_COMMANDS_CHANNEL, async (event) => {
       if (!fromOwnWindow(event)) return {}
-      refreshOpenCodeCommands()
+      refreshListedCommands('claude')
+      refreshListedCommands('opencode')
       return runtimeCommands.list().catch(() => ({}))
     })
     ipcMain.handle(WORKSPACE_PAGE_CHANNEL, async (event, requested: unknown) => {

@@ -88,14 +88,14 @@ describe('a command the person typed', () => {
     read: async () => ({ messages: [], deliveries: [], issues: [] }),
     flush: async () => undefined
   }
-  const prior = (missionId: string) => ({
+  const prior = (missionId: string, runtimeId = 'codex') => ({
     metadata: {
       missionId,
       runId: 'run_prior',
       prompt: 'earlier',
-      runtime: 'codex',
+      runtime: runtimeId,
       model: 'account-default',
-      requestedRouteId: 'codex',
+      requestedRouteId: runtimeId,
       resolvedRouteId: 'codex-account:default',
       cliVersion: null,
       workspaceId: 'ws_test',
@@ -105,7 +105,7 @@ describe('a command the person typed', () => {
       createdAt: NOW
     },
     events: [
-      { id: 'e1', runId: 'run_prior', missionId, sequence: 1, type: 'run.started', occurredAt: NOW, sourceAdapter: 'codex', payload: { runtimeThreadId: 'thread-1', evidence: { redacted: true } } }
+      { id: 'e1', runId: 'run_prior', missionId, sequence: 1, type: 'run.started', occurredAt: NOW, sourceAdapter: runtimeId, payload: { runtimeThreadId: 'thread-1', evidence: { redacted: true } } }
     ],
     hostFailures: [],
     checkpoints: [],
@@ -135,12 +135,14 @@ describe('a command the person typed', () => {
       emptyTrash: async () => 0,
       storageReport: async () => ({ missionCount: 0, byteTotal: 0, unreadableCount: 0 }),
       pruneMissions: async () => ({ deleted: [], failed: [], unreadable: [], keptForContinuity: [], keptAsRunning: [] }),
-      getMission: async (missionId: string) => prior(missionId),
+      getMission: async (missionId: string) => prior(missionId, discovered.id),
       listMissions: async () => ({ missions: [], issues: [], unreadableCount: 0 }),
       flush: async () => undefined
     } as unknown as MissionLedger
     const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
-      records: stream([{ type: 'thread.started', thread_id: 'thread-1' }, { type: 'turn.completed' }]),
+      records: stream(discovered.id === 'claude'
+        ? [{ type: 'system', subtype: 'init', session_id: 'thread-1' }, { type: 'result', subtype: 'success', is_error: false, result: 'OK', session_id: 'thread-1' }]
+        : [{ type: 'thread.started', thread_id: 'thread-1' }, { type: 'turn.completed' }]),
       completion: Promise.resolve(completion())
     }))
     const scheduled: Array<() => void> = []
@@ -165,9 +167,12 @@ describe('a command the person typed', () => {
     return { service, drain, sent, argv, recorded }
   }
 
+  // Claude Code: a Codex command goes as its app-server's own request (0.428).
+  const claude = (): RuntimeDiscovery => ({ ...runtime, id: 'claude', displayName: 'Claude Code', executable: { ...runtime.executable!, commandName: 'claude' } })
+
   it('goes to the runtime alone, with no brief and no plan instruction after it', async () => {
-    const { service, sent, recorded } = setUp()
-    const typed = await service.start('  /compact keep the test names  ', 'codex', 'plan', {}, () => undefined, undefined, PEER, undefined, undefined, undefined, true)
+    const { service, sent, recorded } = setUp(claude())
+    const typed = await service.start('  /compact keep the test names  ', 'claude', 'plan', {}, () => undefined, undefined, PEER, undefined, undefined, undefined, true)
     expect(typed.ok).toBe(true)
     expect(sent(0)).toBe('/compact keep the test names')
     // The record keeps what the person typed, as for any message.
@@ -189,16 +194,16 @@ describe('a command the person typed', () => {
   })
 
   it('leaves the next turn briefed in full, since the command may have cleared or compacted the session', async () => {
-    const { service, drain, sent } = setUp()
-    const first = await service.start('Look around.', 'codex', 'ask', {}, () => undefined, undefined, PEER)
+    const { service, drain, sent } = setUp(claude())
+    const first = await service.start('Look around.', 'claude', 'ask', {}, () => undefined, undefined, PEER)
     expect(first.ok).toBe(true)
     if (!first.ok) return
     await drain()
-    const command = await service.start('/clear', 'codex', 'ask', {}, () => undefined, undefined, PEER, first.data.missionId, undefined, undefined, true)
-    expect(command.ok).toBe(true)
+    const command = await service.start('/clear', 'claude', 'ask', {}, () => undefined, undefined, PEER, first.data.missionId, undefined, undefined, true)
+    expect(command.ok, JSON.stringify(command)).toBe(true)
     if (!command.ok) return
     await drain()
-    await service.start('What next?', 'codex', 'ask', {}, () => undefined, undefined, PEER, command.data.missionId)
+    await service.start('What next?', 'claude', 'ask', {}, () => undefined, undefined, PEER, command.data.missionId)
     expect(sent(1)).toBe('/clear')
     expect(sent(2)).toContain(ROSTER_RULE)
     expect(sent(2).endsWith('What next?')).toBe(true)

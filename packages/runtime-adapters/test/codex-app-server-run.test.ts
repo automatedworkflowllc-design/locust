@@ -393,3 +393,49 @@ describe("a notification queue that backs up", () => {
     expect(server.killed).toBe(true);
   });
 });
+
+describe("one of Codex's own commands, typed by the person (0.428)", () => {
+  async function started(slashCommand: "review" | "compact", prompt: string) {
+    const server = fakeServer();
+    const run = startCodexAppServerRun({
+      spawn: () => server.process,
+      command: createCodexAppServerCommand(EXECUTABLE, { workspacePath: "/work", sandbox: "read-only" }),
+      prompt,
+      sandbox: "read-only",
+      approvalPolicy: "never",
+      model: "gpt-6-luna",
+      effort: "low",
+      resumeThreadId: "thread_9",
+      slashCommand,
+    });
+    await settle();
+    server.answer(server.idOf("initialize")!, { userAgent: "codex" });
+    await settle();
+    server.answer(server.idOf("thread/resume")!, { thread: { id: "thread_9" } });
+    await settle();
+    return { server, run };
+  }
+
+  it("reviews the uncommitted changes as its terminal does, on the thread's own route, and starts no ordinary turn", async () => {
+    const { server } = await started("review", "  ");
+    expect(server.paramsOf("review/start")).toEqual({ threadId: "thread_9", target: { type: "uncommittedChanges" }, delivery: "inline" });
+    expect(server.paramsOf("thread/resume")).toMatchObject({ threadId: "thread_9", model: "gpt-6-luna", config: { model_reasoning_effort: "low" } });
+    expect(server.idOf("turn/start")).toBeUndefined();
+  });
+
+  it("reviews what the person asked for, when they said", async () => {
+    const { server } = await started("review", "only the error handling");
+    expect(server.paramsOf("review/start")).toMatchObject({ target: { type: "custom", instructions: "only the error handling" } });
+  });
+
+  it("compacts the thread, and the run ends when that turn does", async () => {
+    const { server, run } = await started("compact", "");
+    expect(server.paramsOf("thread/compact/start")).toEqual({ threadId: "thread_9" });
+    expect(server.idOf("turn/start")).toBeUndefined();
+    server.answer(server.idOf("thread/compact/start")!, {});
+    server.notify("turn/started", { threadId: "thread_9", turn: { id: "turn_c" } });
+    server.notify("turn/completed", { threadId: "thread_9", turn: { id: "turn_c", status: "completed" } });
+    const completion = await run.completion;
+    expect(completion.exitCode).toBe(0);
+  });
+});

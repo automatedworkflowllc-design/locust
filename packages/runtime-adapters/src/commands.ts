@@ -451,6 +451,32 @@ export interface RuntimeCommandOptions {
 /** A command name as a runtime lists it: `init`, `security-review`, `plugin:skill`. */
 export const SLASH_COMMAND_NAME = /^[A-Za-z0-9][A-Za-z0-9:._-]{0,63}$/;
 
+/**
+ * Claude Code started only to say which commands it has (0.428).
+ *
+ * With stream-json input it lists them -- `system`/`commands_changed`, twice,
+ * within about two seconds -- before it reads anything, and it reads nothing
+ * until a message arrives. MEASURED 2026-09-28 on 2.1.283: with no message
+ * ever written, two lists (116, then 119) and no `init`, no request, no cost.
+ * `--restricted` as every run outside Auto has it, so the list is the one a
+ * run will accept; `--no-session-persistence` so no session file is left.
+ */
+export function createClaudeCommandListCommand(
+  executable: ExecutableLaunch,
+  options: { readonly workspacePath: string },
+): RuntimeCommandSpec {
+  return baseSpec("claude", executable, options.workspacePath, [
+    "--restricted",
+    "--print",
+    "--input-format",
+    "stream-json",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--no-session-persistence",
+  ], { stdin: "protocol", sandbox: "read-only" });
+}
+
 /** `--allowedTools` and its rules, or nothing at all when there are none. */
 function connectorRules(names: readonly string[] | undefined): readonly string[] {
   if (names === undefined || names.length === 0) return [];

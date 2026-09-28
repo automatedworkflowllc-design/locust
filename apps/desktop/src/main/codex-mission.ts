@@ -74,7 +74,7 @@ import { MAX_LIVE_MISSIONS } from '../shared/live-missions.js'
 import { hostReadsEventsOf, runtimeDisplayName } from '../shared/runtimes.js'
 import { FREE_ONLY_REFUSAL, isFreeRoute } from './free-routes.js'
 import { attachmentsForRun } from './attachments-for-run.js'
-import { commandNamed } from './runtime-commands.js'
+import { CODEX_INIT_PROMPT, commandNamed } from './runtime-commands.js'
 
 export const MAX_PROMPT_LENGTH = 8_000
 /**
@@ -1476,8 +1476,10 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // A command the person typed goes to the runtime bare (0.426). OpenCode
         // takes it by name, `--command init` or its server's command call,
         // and only what follows the name as the message (0.427).
-        const bare = asCommand === true && relay === undefined && startedBy === undefined
+        // Codex's go as its own requests, which only its app-server takes (0.428).
+        const bare = asCommand === true && relay === undefined && startedBy === undefined && (runtime !== 'codex' || codexStreams)
         const openCodeCommand = bare && runtime === 'opencode' ? commandNamed(prompt) : undefined
+        const codexCommand = bare && runtime === 'codex' ? commandNamed(prompt) : undefined
         const buildCommand = (promptText: string): RuntimeCommandSpec => {
           const chosenEffort = route.effort
           const choice = {
@@ -1634,9 +1636,13 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // on may be cleared or compacted by it, so the next turn is briefed
         // whole (briefSessions.after finds nothing for this one).
         if (bare) {
-          runtimePrompt = openCodeCommand === undefined
-            ? sentPrompt.trim()
-            : sentPrompt.trimStart().slice(openCodeCommand.length + 1).trim()
+          const named = openCodeCommand ?? codexCommand
+          const after = named === undefined ? sentPrompt.trim() : sentPrompt.trimStart().slice(named.length + 1).trim()
+          runtimePrompt = named === undefined
+            ? after
+            : codexCommand === 'init'
+              ? [CODEX_INIT_PROMPT, after].filter((part) => part.length > 0).join('\n\n')
+              : after
         } else if (peer !== undefined && peerExchange !== undefined) {
           // The turn this one continues, so the brief can find the
           // conversation's group. A route switch names it in `continuation`;
@@ -1852,6 +1858,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               ...(chosenModel === undefined ? {} : { model: chosenModel }),
               ...(route.effort === undefined ? {} : { effort: route.effort }),
               ...(resumeThreadId === undefined ? {} : { resumeThreadId }),
+              ...(codexCommand === 'review' || codexCommand === 'compact' ? { slashCommand: codexCommand } : {}),
               signal: controller.signal,
               now
             })

@@ -369,6 +369,13 @@ export function createAppServerEventNormalizer(
       return [];
     }
 
+    // A review's own bookends (0.428): what it reviews, and its findings --
+    // which arrive again, whole, as the agent message that follows, so
+    // drawing these too would say the review twice.
+    if (itemType === "enteredReviewMode" || itemType === "exitedReviewMode") {
+      return [];
+    }
+
     if (itemType === "contextCompaction") {
       if (!completed) return [];
       compactionItems += 1;

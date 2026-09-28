@@ -32,6 +32,8 @@ export { createCodexEventNormalizer } from "./codex-events.js";
 export { asProcessNormalizer, notificationOfRecord, startCodexAppServerRun } from "./codex-app-server-run.js";
 export { runRecordFor, startOpenCodeServeRun } from "./opencode-serve-run.js";
 export { readOpenCodeCommands } from "./opencode-commands.js";
+export { readClaudeCommands } from "./claude-commands.js";
+export type { ClaudeCommandsOptions } from "./claude-commands.js";
 export type { OpenCodeCommandsOptions } from "./opencode-commands.js";
 export { ACP_DECLINED, ACP_PROMPT_RESULT, ACP_SESSION, acpToolNaming, createAcpEventNormalizer } from "./acp-events.js";
 export type { AcpEventNormalizer, AcpInvocationContext } from "./acp-events.js";
@@ -162,6 +164,7 @@ export {
   PROMPT_FILE_PLACEHOLDER,
   createOpenCodeRunCommand,
   createOpenCodeServeCommand,
+  createClaudeCommandListCommand,
   withOpenCodeProviders,
   OPENCODE_READ_ONLY_CONFIG,
   MUSE_REQUIRED_FEATURES,
