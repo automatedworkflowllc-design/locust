@@ -36,6 +36,20 @@ export function secretIn(text: string): string | undefined {
   return SHAPES.find((shape) => shape.pattern.test(text))?.kind
 }
 
+/**
+ * ABOUT YOU, TOO (0.433). The person's note is read by every teammate on
+ * every provider, like a memory, and 0.423 left it unguarded. Colin,
+ * 2026-09-28, on what memory should refuse: "honestly agents keep personal
+ * details about the user to help understand them... maybe just passwords
+ * and api keys/stuff like that." So personal details stay welcome; keys do
+ * not. `from` names the teammate whose suggested line it was.
+ */
+export function aboutYouSecretRefusal(kind: string, from?: string): string {
+  return from === undefined
+    ? `That holds ${kind}, and About you is read by every teammate on every provider, so it was not saved. Keep keys in the runtime's own sign-in or an environment variable.`
+    : `A line ${from} suggested for About you held ${kind}, so it was not put to you: About you is read by every teammate on every provider.`
+}
+
 /** The refusal, said the way the memory notice says every other one. */
 export function secretRefusal(kind: string): string {
   return `It held ${kind}, and a memory is given to every teammate on every provider, so it was not kept. Keep keys in the runtime's own sign-in or an environment variable.`

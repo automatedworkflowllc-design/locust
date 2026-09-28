@@ -2,6 +2,7 @@ import type { MissionLedger } from '@teammate/mission-store'
 
 import type { CodexMissionUpdate, PublicTeammate, WorkspaceSettings } from '../shared/ipc.js'
 import { parseMemoryBlocks } from '../shared/memory.js'
+import { aboutYouSecretRefusal, secretIn } from '../shared/secrets.js'
 import type { MemoryStore } from './memory-store.js'
 import { createTranscriptTracker } from './peer-exchange.js'
 import { isTidyPrompt, readTidyBlocks } from '../shared/memory-tidy.js'
@@ -149,6 +150,13 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
       const aboutYouSuggested: string[] = []
       for (const op of aboutYou) {
         if (options.suggestAboutYou === undefined) break
+        // A key is refused before it can wait for the person (0.433); the notice says why.
+        const secret = secretIn(op.text)
+        if (secret !== undefined) {
+          const reason = aboutYouSecretRefusal(secret, by.name)
+          if (!refused.includes(reason)) refused.push(reason)
+          continue
+        }
         try {
           if (await options.suggestAboutYou(op.text, by.name)) aboutYouSuggested.push(op.text)
         } catch (error) {

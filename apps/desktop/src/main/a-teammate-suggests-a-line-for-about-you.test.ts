@@ -111,3 +111,25 @@ describe('the stored suggestions and the note', () => {
     expect(withSuggestion(undefined, 'Diffs, not prose.')).toBe('Diffs, not prose.')
   })
 })
+
+describe('a suggested line that holds a key (0.433)', () => {
+  // Colin, 2026-09-28: personal details help a teammate understand you;
+  // "maybe just passwords and api keys/stuff like that".
+  const KEYED = 'OK.\n<locust-memory>\nabout you :: Uses the key sk-proj-abcdefghijklmnopqrstuvwxyz0123 for the billing API.\n</locust-memory>'
+
+  it('never waits for the person, and the notice says why', async () => {
+    const h = harness(KEYED, 'off')
+    await h.reader.onRunEnded({ missionId: 'mission_1' })
+    expect(h.suggested).toEqual([])
+    const said = JSON.stringify(h.updates)
+    expect(said).toContain('an OpenAI API key')
+    expect(said).toContain('Ada')
+    expect(said).not.toContain('sk-proj-abcdefghijklmnopqrstuvwxyz0123')
+  })
+
+  it('while a personal detail is put to the person as before', async () => {
+    const h = harness('OK.\n<locust-memory>\nabout you :: Lives in [removed], has a daughter named Emma, and prefers texts at 352-555-0142.\n</locust-memory>', 'off')
+    await h.reader.onRunEnded({ missionId: 'mission_1' })
+    expect(h.suggested).toEqual([['Lives in [removed], has a daughter named Emma, and prefers texts at 352-555-0142.', 'Ada']])
+  })
+})

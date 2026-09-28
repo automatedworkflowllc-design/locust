@@ -588,6 +588,8 @@ function AboutYouCard({
   const [text, setText] = useState(saved)
   const [busy, setBusy] = useState(false)
   const [said, setSaid] = useState<string | undefined>(undefined)
+  // A refusal is not a save: it reads in the colour of what needs you (0.433).
+  const [refused, setRefused] = useState(false)
   // What was saved elsewhere (a relaunch, a second window) replaces an untouched draft.
   useEffect(() => {
     setText(saved)
@@ -598,6 +600,7 @@ function AboutYouCard({
     setBusy(true)
     const error = await onSave(text.trim())
     setBusy(false)
+    setRefused(error !== undefined)
     setSaid(error ?? (text.trim().length === 0 ? 'Removed. Teammates are no longer given a note about you.' : 'Saved. Every teammate reads this from their next run.'))
   }
   return (
@@ -618,10 +621,11 @@ function AboutYouCard({
           onChange={(event) => {
             setText(event.target.value)
             setSaid(undefined)
+            setRefused(false)
           }}
         />
         <div className="lc-memoryform__row">
-          <span className="lc-settings__note" role="status">
+          <span className={`lc-settings__note${refused ? ' lc-tone-amber' : ''}`} role="status">
             {said ?? (left < 200 ? `${String(left)} characters left` : '')}
           </span>
           <button type="button" className="lc-primarybutton" disabled={busy || !changed} onClick={() => void save()}>

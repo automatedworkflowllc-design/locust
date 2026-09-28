@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.433.0 - 2026-09-28
+
+### Improved
+
+- **About you keeps keys out, and only keys.** Your About-you note is
+  read by every teammate on every provider, so a password or an API key in
+  it is now refused, with a sentence saying why, whether you type it or a
+  teammate suggests it. Personal details are welcome: names, places, family,
+  how to reach you, how you like to work. Teammate memory already refused
+  keys the same way.
+
 ## 0.432.0 - 2026-09-28
 
 ### Fixed

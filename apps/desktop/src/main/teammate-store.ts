@@ -9,6 +9,7 @@ import { DEFAULT_RELAY_HOP_CAP, MAX_RELAY_HOP_CAP, MIN_RELAY_HOP_CAP, DEFAULT_ME
 import { isMissionRuntime } from '../shared/runtimes.js'
 import { isMonthlyLimit } from '../shared/spend.js'
 import { parsedAboutYou, parsedAboutYouSuggestions } from '../shared/about-you.js'
+import { aboutYouSecretRefusal, secretIn } from '../shared/secrets.js'
 
 /**
  * Teammates are local identity plus routing defaults: a name, an avatar hue, a
@@ -881,6 +882,12 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
 
     writeSettings(requested: unknown): Promise<WorkspaceSettings> {
       return serialize(async () => {
+        // A key in About you is refused, whoever sends it (0.433, shared/secrets.ts).
+        if (typeof requested === 'object' && requested !== null) {
+          const note = (requested as Record<string, unknown>).aboutYou
+          const secret = typeof note === 'string' ? secretIn(note) : undefined
+          if (secret !== undefined) throw new Error(aboutYouSecretRefusal(secret))
+        }
         /*
          * A write is a CHANGE, laid over what is stored. L19 (the code
          * review): it replaced the whole object, so every caller had to send

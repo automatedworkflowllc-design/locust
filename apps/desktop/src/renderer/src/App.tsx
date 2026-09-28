@@ -50,6 +50,7 @@ import type {
 } from '../../shared/ipc.js'
 import { roleLabelOf } from '../../shared/ipc.js'
 import { withSuggestion } from '../../shared/about-you.js'
+import { aboutYouSecretRefusal, secretIn } from '../../shared/secrets.js'
 import type { AboutYouSuggestion } from '../../shared/about-you.js'
 import type { Workbook } from '../../shared/sheet.js'
 import type { Spend } from '../../shared/spend.js'
@@ -1425,6 +1426,9 @@ export default function App(): ReactElement {
   const saveAboutYou = async (next: string): Promise<string | undefined> => {
     const bridge = window.desktop
     if (!bridge) return 'Locust is not ready yet. Nothing was saved.'
+    // Said here, in its own words; the store refuses it as well (0.433).
+    const secret = secretIn(next)
+    if (secret !== undefined) return aboutYouSecretRefusal(secret)
     try {
       const settings = await bridge.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, replySize, layout, tube, aboutYou: next })
       setAboutYou(settings.aboutYou ?? '')
