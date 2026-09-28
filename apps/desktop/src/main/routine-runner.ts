@@ -276,8 +276,14 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
     }
   }
 
-  const notice = (progress: RoutineProgress, message: string): void => {
-    options.notify({ kind: 'relay-notice', runId: progress.runId, missionId: progress.missionId, message })
+  /**
+   * `info` for how a routine is going -- a step started, handed on, the run
+   * finished -- and `warning` (the default) when it stopped or waits for the
+   * person. Every routine notice was amber, the colour of "this needs you",
+   * even "finished, approved by Sable" (the 0.435 hand-off drive's pictures).
+   */
+  const notice = (progress: RoutineProgress, message: string, level: 'info' | 'warning' = 'warning'): void => {
+    options.notify({ kind: 'relay-notice', runId: progress.runId, missionId: progress.missionId, message, level })
   }
 
   const startStep = async (
@@ -471,7 +477,7 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       if (!response.ok) return { ok: false, error: { message: response.error.message } }
       await options.assignOwner(peer.self.teammateId, response.data.missionId).catch(() => undefined)
       const started = announce(saved, peer, next, response)
-      if (handedFrom !== undefined) notice(started, `Routine "${saved.name}" · step ${String(next)} of ${String(saved.steps.length)}${handedTo(peer.self.name, handedFrom.name, checks(saved, next))}.`)
+      if (handedFrom !== undefined) notice(started, `Routine "${saved.name}" · step ${String(next)} of ${String(saved.steps.length)}${handedTo(peer.self.name, handedFrom.name, checks(saved, next))}.`, 'info')
       changed()
       return { ok: true }
     },
@@ -512,7 +518,7 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       await options.assignOwner(peer.self.teammateId, response.data.missionId).catch(() => undefined)
       const progress = announce(routine, peer, 1, response)
       if (routine.steps.length > 1) {
-        notice(progress, `Routine "${routine.name}" · step 1 of ${String(routine.steps.length)}. Each next step starts when this one completes.`)
+        notice(progress, `Routine "${routine.name}" · step 1 of ${String(routine.steps.length)}. Each next step starts when this one completes.`, 'info')
       }
       return { ok: true, data: { missionId: response.data.missionId, runId: response.data.runId } }
     },
@@ -574,7 +580,7 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       }
       if (progress.step >= progress.of) {
         await complete(progress.routineId, execution)
-        notice(progress, `Routine "${progress.name}" finished: ${String(progress.of)} step${progress.of === 1 ? '' : 's'} completed${approval}.`)
+        notice(progress, `Routine "${progress.name}" finished: ${String(progress.of)} step${progress.of === 1 ? '' : 's'} completed${approval}.`, 'info')
         return
       }
       // The routine may have been edited or removed while it ran; the steps
@@ -618,7 +624,7 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       }
       await options.assignOwner(peer.self.teammateId, response.data.missionId).catch(() => undefined)
       const started = announce(routine, peer, next, response)
-      notice(started, `Routine "${routine.name}" · step ${String(next)} of ${String(routine.steps.length)}${handedTo(peer.self.name, handedFrom?.name, checks(routine, next))}.`)
+      notice(started, `Routine "${routine.name}" · step ${String(next)} of ${String(routine.steps.length)}${handedTo(peer.self.name, handedFrom?.name, checks(routine, next))}.`, 'info')
     },
 
     running() {

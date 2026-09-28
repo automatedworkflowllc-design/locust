@@ -4524,10 +4524,14 @@ export default function App(): ReactElement {
      * the next turn should start on. Effort is not recorded per mission, so
      * it follows the teammate's remembered route, which now keeps it.
      */
-    const recorded = run.restoredMission?.mode
-    if (recorded !== undefined && modeRunsOn(recorded, run.data.runtime, build?.platform)) setMode(recorded)
     const ownerId = run.teammateId ?? (run.data.missionId === undefined ? undefined : missionOwnersRef.current[run.data.missionId])
     const own = ownerId === undefined ? undefined : teammates.find((teammate) => teammate.teammateId === ownerId)?.route
+    // A run of THIS session has no record read back yet; its teammate's route
+    // is remembered at every start, mode included, so it names the mode that
+    // run used. Without it a routine step opened fresh -- Sable, Codex, Ask --
+    // showed whatever the last screen left: "Edit" (0.435 hand-off drive).
+    const recorded = run.restoredMission?.mode ?? (own !== undefined && own.runtime === run.data.runtime ? own.mode : undefined)
+    if (recorded !== undefined && modeRunsOn(recorded, run.data.runtime, build?.platform)) setMode(recorded)
     if (own !== undefined && own.runtime === run.data.runtime) setEffort(own.effort)
   }
 

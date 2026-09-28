@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.437.0 - 2026-09-28
+
+### Fixed
+
+- **A routine's updates aren't drawn as warnings any more.** "Step 2 of 3"
+  and "finished, approved by Sable" read as ordinary notes; only a routine
+  that stopped or is waiting for you is in amber.
+- **Opening a conversation from this session shows its teammate's mode.**
+  A conversation a routine had just started could open showing Edit when
+  its teammate works in Ask.
+
 ## 0.436.0 - 2026-09-28
 
 ### New

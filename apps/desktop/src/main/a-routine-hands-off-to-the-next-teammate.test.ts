@@ -203,6 +203,36 @@ describe('a routine whose steps go to different teammates', () => {
   })
 })
 
+describe("a routine's notices", () => {
+  const levels = (updates: readonly CodexMissionUpdate[]): string[] =>
+    updates.flatMap((update) => (update.kind === 'relay-notice' ? [`${update.level ?? 'warning'}: ${update.message.replace(/^Routine "[^"]+" /, '')}`] : []))
+
+  it('are information while it goes well, a warning only when it stops or needs the person', async () => {
+    const h = harness([chain()])
+    const runner = createRoutineRunner(h.options)
+    await runner.run('rt_chain')
+    await h.finish(runner, 'mission_1', 'Found it.')
+    await h.finish(runner, 'mission_2', 'A plan.')
+    await h.finish(runner, 'mission_3', 'VERDICT: CHANGES NEEDED -- add a test')
+    expect(levels(h.updates)).toEqual([
+      'info: · step 1 of 3. Each next step starts when this one completes.',
+      "info: · step 2 of 3, handed to Atlas with Wren's answer.",
+      "info: · step 3 of 3, handed to Sable with Atlas's answer to check.",
+      'warning: stopped at step 3 of 3: Sable, the checker, asked for changes: add a test.'
+    ])
+  })
+
+  it('say a finished run as information', async () => {
+    const h = harness([chain()])
+    const runner = createRoutineRunner(h.options)
+    await runner.run('rt_chain')
+    await h.finish(runner, 'mission_1', 'Found it.')
+    await h.finish(runner, 'mission_2', 'A plan.')
+    await h.finish(runner, 'mission_3', 'VERDICT: APPROVED')
+    expect(levels(h.updates).at(-1)).toBe('info: finished: 3 steps completed, approved by Sable.')
+  })
+})
+
 describe('the words a hand-off is given', () => {
   it('fits the mission limit, cutting a long answer short and saying where the rest is', () => {
     const prompt = handOffPrompt({ step: 'Check it.', from: { name: 'Atlas', answer: 'x'.repeat(20_000) }, check: true })
