@@ -1,25 +1,32 @@
-<p align="center">
-  <img src="docs/assets/locust-logo.svg" alt="Locust" width="420">
-</p>
+# Locust
 
-<p align="center">
-  A local-first desktop app that runs AI coding agents as a team you can watch,
-  on runtimes and models you choose, with a durable record of everything they did.
-</p>
+<p align="center"><a href="https://locust.lol"><img src="docs/assets/locust-banner.png" alt="Locust: AI teammates, on the models you pick" width="100%"></a></p>
 
----
+A local-first desktop app that runs AI coding agents as a team you can watch,
+on runtimes and models you choose, with a durable record of everything they did.
 
-**Locust** puts Claude, Codex, Cursor, Gemini  and many more models side by side under one roof. You give
-a teammate a mission; it runs on your machine, under your own provider
-accounts, in a read-only sandbox unless you say otherwise. Every event is
-written to an append-only local ledger before it reaches the screen, so what
-you are shown is what was recorded, and a mission survives a restart.
+**Locust** puts Claude Code, Codex, Cursor, OpenCode, GitHub Copilot and more
+side by side under one roof. You give a teammate a mission; it runs on your
+machine, under your own provider accounts, in a read-only sandbox unless you
+say otherwise. Every event is written to an append-only local ledger before it
+reaches the screen, so what you are shown is what was recorded, and a mission
+survives a restart.
 
-![The Locust shell running a real Codex mission](docs/assets/shell.png)
+<table>
+<tr>
+<td><img src="docs/assets/shots/01-home.png" alt="Home screen with six teammates, each on its own AI"><br><sub>Your team. Each teammate keeps its own AI and model.</sub></td>
+<td><img src="docs/assets/shots/02-model-picker.png" alt="The model picker with Claude Code and Codex models"><br><sub>One picker for the models your own accounts offer.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/assets/shots/04-approval.png" alt="An approval card before a command runs"><br><sub>In Approve each, nothing runs until you have seen the exact command and where it runs.</sub></td>
+<td><img src="docs/assets/shots/06-finished.png" alt="The finished change with its diff and a new test"><br><sub>The change, the diff and the new test, right in the thread.</sub></td>
+</tr>
+<tr>
+<td colspan="2"><img src="docs/assets/shots/05-hand-off.png" alt="A checker on Codex reads the files and approves an OpenCode teammate's diagnosis"><br><sub>A hand-off chain: Wren (OpenCode) diagnoses, Atlas (Codex) checks the code himself and approves.</sub></td>
+</tr>
+</table>
 
-A real read-only Codex mission in the built app: four teammates in the roster,
-Wren's mission filed under Wren, and the thread as it was recorded. Captured by
-`_tools/capture-shell.mjs`, which runs the mission rather than mocking it.
+<sub>Screenshots from the packaged app on a demo profile (0.437; the hand-off from 0.438). The models in the picker are what that account offers; yours come from your own accounts. Taken by `_tools/drive-promo-shots.mjs`, which runs the missions rather than mocking them.</sub>
 
 ## Why this exists
 
@@ -44,6 +51,13 @@ Mission control plane
 - `docs` — product, architecture, model-routing, Codex wire contract, and cross-task context.
 
 ## What works now
+
+**Recently (0.43x):** each runtime's own `/` commands in the menu (Claude
+Code, OpenCode, Codex); `@` attaches a project file or tags a teammate from
+any conversation, who is sent the message in a conversation of their own;
+**hand-off chains**, routines whose steps go to different teammates on their
+own runtimes, with a checker that must approve before the run counts; and up
+to eight runs at once. `CHANGELOG.md` has every release.
 
 Everything in this section is running in the built app and verified by a live
 smoke against the real CLIs, not by tests alone. The smokes live in `_smoke/`
@@ -80,7 +94,7 @@ under a runtime it does not belong to.
 **Teammates, and missions that run at once.** A teammate is local identity
 and routing defaults: a name, a role, a hue and a generated pixel face seeded
 from its immutable id. Missions are started by messaging a teammate; up to
-four run at once, one per teammate, each with its own process and ledger
+eight run at once, one per teammate, each with its own process and ledger
 writer. A face animates only while its teammate is actually working, which
 makes motion a status signal rather than decoration.
 
@@ -121,7 +135,7 @@ also the honest list of what is still open.
 Requirements: Node.js 22.22+ and pnpm 11.
 
 ```powershell
-cd C:\Users\<home>\Documents\Codex\ai-teammate-platform
+cd Locust
 pnpm install
 pnpm dev
 ```
@@ -134,13 +148,13 @@ Run all checks:
 pnpm check
 ```
 
-This builds every workspace package, runs TypeScript checks, and runs the complete test suite: 449 tests as of 2026-09-02.
+This builds every workspace package, runs TypeScript checks, and runs the complete test suite.
 
 Green tests are not the evidence here. Each package carries a mutation
 control (`test/mutation-control.mjs`) that breaks one behaviour at a time and
 requires the NAMED test to fail, rejecting any mutation that stops the file
 running -- a red suite caused by a broken file proves nothing about any test
-in it. 133 mutations, all caught. Run them with `node test/mutation-control.mjs`
+in it. Run them with `node test/mutation-control.mjs`
 from a package directory.
 
 ## Working on it from another agent session
