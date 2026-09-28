@@ -2491,6 +2491,16 @@ if (!ownsSingleInstanceLock) {
         const live = [...codexMissions.liveMissionIds(), ...antigravityMissions.liveMissionIds()]
         return live.some((missionId) => owners[missionId] === teammateId)
       },
+      // A hand-off chain (0.435): the teammate a step is handed to runs it on
+      // their own route, and is given the step before's final answer.
+      routeOf: async (teammateId) => (await teammates.list()).find((teammate) => teammate.teammateId === teammateId)?.route,
+      replyOf: async (missionId) => {
+        const recovered = await missionLedger.getMission(missionId)
+        if (recovered === undefined) return undefined
+        const tracker = createTranscriptTracker()
+        tracker.track(recovered.events)
+        return tracker.latestFinal
+      },
       notify: sendToWindow
     })
     // Scheduled routines: one tick a minute, the first after the runtimes
@@ -4122,7 +4132,9 @@ if (!ownsSingleInstanceLock) {
           learnedFrom: input.learnedFrom,
           ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
           // M15: the folder it is made in, so a schedule runs it only there.
-          ...(workspaceChosen ? { workspaceId: memoryWorkspaceId } : {})
+          ...(workspaceChosen ? { workspaceId: memoryWorkspaceId } : {}),
+          // Who takes each step (0.435); the store checks it.
+          ...(input.handOffs === undefined ? {} : { handOffs: input.handOffs })
         })
         return { ok: true, data: { routine } } as const
       } catch (error) {
@@ -4138,7 +4150,8 @@ if (!ownsSingleInstanceLock) {
           routineId: input.routineId,
           name: input.name,
           steps: input.steps,
-          ...(input.schedule === undefined ? {} : { schedule: input.schedule })
+          ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
+          ...(input.handOffs === undefined ? {} : { handOffs: input.handOffs })
         })
         return { ok: true, data: { routine } } as const
       } catch (error) {

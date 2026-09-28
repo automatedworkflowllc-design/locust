@@ -36,6 +36,7 @@ import type {
   PublicRoutine,
   PublicTeammate,
   TeammateRoute, PublicRoom, RoomTaskRequest,
+  RoutineHandOff,
   RoutineSchedule,
   MemoryListResponse,
   MemoryMode,
@@ -1504,6 +1505,8 @@ export default function App(): ReactElement {
     readonly truncated: boolean
     readonly route?: TeammateRoute
     readonly schedule?: RoutineSchedule
+    /** Who takes each step (0.435), when a saved routine is edited. */
+    readonly handOffs?: readonly RoutineHandOff[]
     readonly busy: boolean
     readonly error?: string
   }>()
@@ -4154,6 +4157,8 @@ export default function App(): ReactElement {
     readonly name: string
     readonly steps: readonly string[]
     readonly schedule: RoutineSchedule | undefined
+    /** Who takes each step (0.435); absent when the dialog offered no choice. */
+    readonly handOffs?: readonly RoutineHandOff[]
     /** Who runs it, when the conversation had no owner to inherit. */
     readonly teammateId?: string
   }): void => {
@@ -4188,10 +4193,11 @@ export default function App(): ReactElement {
             route,
             steps: input.steps,
             learnedFrom: dialog.learnedFrom,
-            ...(input.schedule === undefined ? {} : { schedule: input.schedule })
+            ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
+            ...(input.handOffs === undefined ? {} : { handOffs: input.handOffs })
           })
         : // null clears a schedule the routine had; the store leaves an absent one alone.
-          bridge.updateRoutine({ routineId: dialog.routineId, name: input.name, steps: input.steps, schedule: input.schedule ?? null })
+          bridge.updateRoutine({ routineId: dialog.routineId, name: input.name, steps: input.steps, schedule: input.schedule ?? null, ...(input.handOffs === undefined ? {} : { handOffs: input.handOffs }) })
     void request
       .then(async (response) => {
         if (!response.ok) {
@@ -4218,6 +4224,7 @@ export default function App(): ReactElement {
       learnedFrom: routine.learnedFrom,
       truncated: false,
       ...(routine.schedule === undefined ? {} : { schedule: routine.schedule }),
+      ...(routine.handOffs === undefined ? {} : { handOffs: routine.handOffs }),
       busy: false
     })
   }
@@ -7082,6 +7089,9 @@ export default function App(): ReactElement {
           initialName={routineDialog.name}
           initialSteps={routineDialog.steps}
           initialSchedule={routineDialog.schedule}
+          // A hand-off chain (0.435): who takes each step, from the whole team.
+          team={teammates}
+          {...(routineDialog.handOffs === undefined ? {} : { initialHandOffs: routineDialog.handOffs })}
           truncated={routineDialog.truncated}
           routeLabel={
             routineDialog.route === undefined

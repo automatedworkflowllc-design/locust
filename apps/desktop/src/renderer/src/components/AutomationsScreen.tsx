@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 
 import type { PublicRoutine, PublicTeammate } from '../../../shared/ipc.js'
 import { shortAgo } from '../railFlyout.js'
-import { routineRunSummary, routineScheduleSummary, routineStepLabel } from '../routines.js'
+import { routineChain, routineRunSummary, routineScheduleSummary, routineStepLabel } from '../routines.js'
 import { NOTHING_TO_SAVE_YET, savableConversations, turnsLabel } from '../savableConversations.js'
 import type { SavableConversation } from '../savableConversations.js'
 import { Icon } from './Icon.js'
@@ -223,7 +223,8 @@ export function AutomationsScreen({
                         2026-09-22 -- the measurements said nothing about it
                         because a separator has a size and a colour like any
                         other text. */}
-                    {owner?.name ?? 'teammate removed'}
+                    {/* A hand-off chain names every teammate in step order (0.435). */}
+                    {routineChain(routine, teammates) ?? owner?.name ?? 'teammate removed'}
                     {' · '}
                     {/* The step count comes from `routineRunSummary`, which
                         opens with it. Naming it here as well is why every card

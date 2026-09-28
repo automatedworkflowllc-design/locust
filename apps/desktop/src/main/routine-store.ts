@@ -3,7 +3,7 @@ import { constants as fsConstants } from 'node:fs'
 import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
-import type { PublicRoutine, TeammateRoute } from '../shared/ipc.js'
+import type { PublicRoutine, RoutineHandOff, TeammateRoute } from '../shared/ipc.js'
 import { validSchedule } from '../shared/routine-schedule.js'
 import { isTeammateRoute, safeId } from './teammate-store.js'
 import type { RoutineExecution } from '../shared/routine-recovery.js'
@@ -56,9 +56,11 @@ export interface RoutineStore {
     readonly schedule?: unknown
     /** The folder it is made in (M15). */
     readonly workspaceId?: unknown
+    /** Who takes each step (0.435). */
+    readonly handOffs?: unknown
   }): Promise<PublicRoutine>
-  /** Corrections: the name, the steps, and the schedule (`null` clears it). The teammate, route and provenance stay. */
-  update(input: { readonly routineId: unknown; readonly name: unknown; readonly steps: unknown; readonly schedule?: unknown }): Promise<PublicRoutine>
+  /** Corrections: the name, the steps, who takes them, and the schedule (`null` clears it). The teammate, route and provenance stay. */
+  update(input: { readonly routineId: unknown; readonly name: unknown; readonly steps: unknown; readonly schedule?: unknown; readonly handOffs?: unknown }): Promise<PublicRoutine>
   remove(routineId: unknown): Promise<void>
   /** Count reconciled final completion and clear its matching progress in one write. */
   recordRun(routineId: unknown, attemptId: string): Promise<void>
@@ -116,6 +118,28 @@ function validLearnedFrom(value: unknown): value is readonly string[] {
   return Array.isArray(value) && value.length <= MAX_LEARNED_FROM && value.every((id) => safeId(id))
 }
 
+/**
+ * Who takes each step (0.435): one entry per step, each naming a teammate or
+ * nobody (the routine's own), and at most marking it a checker. An entry list
+ * that does not line up with the steps is not one this can read.
+ */
+export function validHandOffs(value: unknown, steps: number): value is readonly RoutineHandOff[] {
+  return Array.isArray(value) && value.length === steps && value.every((entry) =>
+    typeof entry === 'object' && entry !== null && !Array.isArray(entry)
+    && Object.keys(entry).every((key) => key === 'teammateId' || key === 'check')
+    && ((entry as RoutineHandOff).teammateId === undefined || safeId((entry as RoutineHandOff).teammateId))
+    && ((entry as RoutineHandOff).check === undefined || (entry as RoutineHandOff).check === true))
+}
+
+/** Stored only when some step goes to another teammate or checks. */
+const keptHandOffs = (handOffs: readonly RoutineHandOff[], owner: string): readonly RoutineHandOff[] | undefined => {
+  const cleaned = handOffs.map((entry) => ({
+    ...(entry.teammateId === undefined || entry.teammateId === owner ? {} : { teammateId: entry.teammateId }),
+    ...(entry.check === true ? { check: true as const } : {})
+  }))
+  return cleaned.some((entry) => entry.teammateId !== undefined || entry.check === true) ? cleaned : undefined
+}
+
 export function parsedRoutine(value: unknown): PublicRoutine | undefined {
   if (typeof value !== 'object' || value === null) return undefined
   const record = value as Record<string, unknown>
@@ -153,7 +177,9 @@ export function parsedRoutine(value: unknown): PublicRoutine | undefined {
     ...(schedule === undefined ? {} : { schedule }),
     ...(record.execution === undefined ? {} : { execution: parsedExecution(record.execution, record.steps, route) }),
     // Named, like every field here: this object is rebuilt field by field (M15).
-    ...(validWorkspaceId(record.workspaceId) ? { workspaceId: record.workspaceId } : {})
+    ...(validWorkspaceId(record.workspaceId) ? { workspaceId: record.workspaceId } : {}),
+    // Hand-offs that do not read are dropped, not the routine (0.435).
+    ...(validHandOffs(record.handOffs, record.steps.length) ? { handOffs: record.handOffs.map((entry) => ({ ...entry })) } : {})
   }
 }
 
@@ -169,6 +195,11 @@ function parsedExecution(value: unknown, steps: readonly string[], route: Teamma
     && (item.canContinue === undefined || typeof item.canContinue === 'boolean')
     && (item.recovered === undefined || typeof item.recovered === 'boolean')
     && (item.settledAtDispatch === undefined || typeof item.settledAtDispatch === 'boolean')) {
+    // A receipt's hand-offs that do not read are dropped, never the receipt (0.435).
+    if (item.handOffs !== undefined && !validHandOffs(item.handOffs, (item.steps as readonly string[]).length)) {
+      const { handOffs: _dropped, ...rest } = item
+      return rest as unknown as RoutineExecution
+    }
     return item as unknown as RoutineExecution
   }
   // Losing an invalid receipt must never turn uncertain side effects into a
@@ -278,6 +309,8 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
         if (input.schedule !== undefined && !validSchedule(input.schedule)) {
           throw new Error('The schedule is not one Locust can keep: every 1 to 168 hours, or daily at HH:MM.')
         }
+        if (input.handOffs !== undefined && !validHandOffs(input.handOffs, input.steps.length)) throw new Error('Who takes each step does not line up with the steps')
+        const handOffs = input.handOffs === undefined ? undefined : keptHandOffs(input.handOffs, input.teammateId)
         const file = await read()
         if (file.routines.length >= MAX_ROUTINES) throw new Error('Too many routines')
         const routine: PublicRoutine = {
@@ -295,7 +328,8 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
           createdAt: new Date().toISOString(),
           runs: 0,
           ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
-          ...(validWorkspaceId(input.workspaceId) ? { workspaceId: input.workspaceId } : {})
+          ...(validWorkspaceId(input.workspaceId) ? { workspaceId: input.workspaceId } : {}),
+          ...(handOffs === undefined ? {} : { handOffs })
         }
         await write({ ...file, routines: [...file.routines, routine] })
         return routine
@@ -315,11 +349,17 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
         if (input.schedule !== undefined && input.schedule !== null && !validSchedule(input.schedule)) {
           throw new Error('The schedule is not one Locust can keep: every 1 to 168 hours, or daily at HH:MM.')
         }
-        const { schedule: _held, ...rest } = held
+        if (input.handOffs !== undefined && !validHandOffs(input.handOffs, input.steps.length)) throw new Error('Who takes each step does not line up with the steps')
+        const { schedule: _held, handOffs: heldHandOffs, ...rest } = held
+        // Given: as given. Not given: kept only while the steps still line up.
+        const handOffs = input.handOffs !== undefined
+          ? keptHandOffs(input.handOffs, held.teammateId)
+          : heldHandOffs !== undefined && heldHandOffs.length === input.steps.length ? heldHandOffs : undefined
         const next: PublicRoutine = {
           ...rest,
           name: input.name.trim(),
           steps: [...input.steps],
+          ...(handOffs === undefined ? {} : { handOffs }),
           ...(input.schedule === null
             ? {}
             : input.schedule === undefined

@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import { useModal } from '../useModal.js'
 
-import type { PublicTeammate, RoutineSchedule } from '../../../shared/ipc.js'
+import type { PublicTeammate, RoutineHandOff, RoutineSchedule } from '../../../shared/ipc.js'
 import { EVERY_HOURS_CHOICES } from '../../../shared/routine-schedule.js'
 import { stepTooLongNotice } from '../../../shared/step-budget.js'
 import { MAX_ROUTINE_STEPS } from '../routines.js'
@@ -23,6 +23,8 @@ export function RoutineDialog({
   initialName,
   initialSteps,
   initialSchedule,
+  team,
+  initialHandOffs,
   truncated,
   routeLabel,
   busy,
@@ -45,6 +47,13 @@ export function RoutineDialog({
   readonly initialSteps: readonly string[]
   /** When it runs on its own, if it does. Undefined: only when a person presses Run. */
   readonly initialSchedule: RoutineSchedule | undefined
+  /**
+   * The whole team, so a step can be handed to another teammate (0.435, a
+   * hand-off chain). Absent, or one teammate: no choice is drawn.
+   */
+  readonly team?: readonly PublicTeammate[]
+  /** Who takes each step of a saved routine, in step order. */
+  readonly initialHandOffs?: readonly RoutineHandOff[]
   /** The conversation had more turns than a routine may hold, and the draft was cut. */
   readonly truncated: boolean
   /** The route this will replay on, in the words the picker uses. */
@@ -56,12 +65,18 @@ export function RoutineDialog({
     readonly steps: readonly string[]
     readonly schedule: RoutineSchedule | undefined
     readonly teammateId?: string
+    /** Who takes each step, in step order; absent when no choice was offered. */
+    readonly handOffs?: readonly RoutineHandOff[]
   }) => void
   readonly onCancel: () => void
 }): ReactElement {
   const editing = initialSteps.length > 0 && routeLabel === undefined
   const [name, setName] = useState(initialName)
   const [steps, setSteps] = useState<readonly string[]>(initialSteps)
+  // One entry per step, kept in step with every add and remove (0.435).
+  const [handOffs, setHandOffs] = useState<readonly RoutineHandOff[]>(
+    initialSteps.map((_, index) => initialHandOffs?.[index] ?? {})
+  )
   const [schedule, setSchedule] = useState<RoutineSchedule | undefined>(initialSchedule)
   // Nobody is picked to begin with: a default here would put a teammate's
   // name on work they were never part of, which is the one thing the whole
@@ -69,6 +84,13 @@ export function RoutineDialog({
   const [runner, setRunner] = useState<string>('')
   const mustPick = chooseFrom !== undefined && chooseFrom.length > 0 && teammate === undefined
   const scheduleKind = schedule?.kind ?? 'off'
+  // Who runs the routine, and so who takes a step nobody else is named for.
+  const ownerId = teammate?.teammateId ?? (runner.length > 0 ? runner : undefined)
+  const ownerName = teammate?.name ?? chooseFrom?.find((entry) => entry.teammateId === runner)?.name
+  const canHandOff = team !== undefined && team.length > 1
+  const setHandOff = (index: number, change: RoutineHandOff): void => {
+    setHandOffs(steps.map((_, at) => (at === index ? change : handOffs[at] ?? {})))
+  }
 
   const kept = steps.filter((step) => step.trim().length > 0)
   // The first step too long to send, by its number on screen (A5.1).
@@ -197,10 +219,51 @@ export function RoutineDialog({
                     type="button"
                     className="lc-ghostbutton lc-routinestep__drop"
                     aria-label={`Remove step ${String(index + 1)}`}
-                    onClick={() => setSteps(steps.filter((_, at) => at !== index))}
+                    onClick={() => {
+                      setSteps(steps.filter((_, at) => at !== index))
+                      setHandOffs(handOffs.filter((_, at) => at !== index))
+                    }}
                   >
                     Remove
                   </button>
+                  {/*
+                    * WHO TAKES IT (0.435). A step can go to another teammate,
+                    * who is given the answer of the step before; a checker's
+                    * approval is what makes a run count as done.
+                    */}
+                  {canHandOff && (
+                    <div className="lc-routinestep__who">
+                      <select
+                        className="lc-input lc-routinestep__pick"
+                        aria-label={`Who takes step ${String(index + 1)}`}
+                        value={handOffs[index]?.teammateId ?? ''}
+                        onChange={(event) => {
+                          const { teammateId: _was, ...rest } = handOffs[index] ?? {}
+                          setHandOff(index, event.target.value === '' ? rest : { ...rest, teammateId: event.target.value })
+                        }}
+                      >
+                        <option value="">{ownerName === undefined ? 'The teammate who runs it' : `${ownerName} (runs it)`}</option>
+                        {team
+                          .filter((entry) => entry.teammateId !== ownerId)
+                          .map((entry) => (
+                            <option key={entry.teammateId} value={entry.teammateId}>
+                              {entry.name}
+                            </option>
+                          ))}
+                      </select>
+                      <label className="lc-routinestep__check lc-mono">
+                        <input
+                          type="checkbox"
+                          checked={handOffs[index]?.check === true}
+                          onChange={(event) => {
+                            const { check: _was, ...rest } = handOffs[index] ?? {}
+                            setHandOff(index, event.target.checked ? { ...rest, check: true } : rest)
+                          }}
+                        />
+                        Checker: must approve
+                      </label>
+                    </div>
+                  )}
                   {tooLong !== undefined && (
                     <p className="lc-routinestep__over lc-tone-amber" id={`step-too-long-${String(index)}`}>
                       {tooLong}
@@ -219,7 +282,10 @@ export function RoutineDialog({
               className="lc-ghostbutton"
               disabled={steps.length >= MAX_ROUTINE_STEPS}
               title={steps.length >= MAX_ROUTINE_STEPS ? `A routine holds ${String(MAX_ROUTINE_STEPS)} steps at most` : undefined}
-              onClick={() => setSteps([...steps, ''])}
+              onClick={() => {
+                setSteps([...steps, ''])
+                setHandOffs([...steps.map((_, at) => handOffs[at] ?? {}), {}])
+              }}
             >
               Add a step
             </button>
@@ -305,6 +371,9 @@ export function RoutineDialog({
           )}
           <p className="lc-dialog__note lc-mono">
             Each step runs only after the one before it finishes. A step that fails ends the routine there.
+            {canHandOff
+              ? ' A step handed to another teammate is given the answer of the step before it; a checker must approve for the run to count as done.'
+              : ''}
           </p>
           {error !== undefined && <p className="lc-dialog__error">{error}</p>}
           {tooLongAt >= 0 && <p className="lc-dialog__error">Shorten step {tooLongAt + 1} to save this routine.</p>}
@@ -323,7 +392,9 @@ export function RoutineDialog({
                 name: name.trim(),
                 steps: kept.map((step) => step.trim()),
                 schedule,
-                ...(runner.length === 0 ? {} : { teammateId: runner })
+                ...(runner.length === 0 ? {} : { teammateId: runner }),
+                // Lined up with the steps that are kept (0.435).
+                ...(canHandOff ? { handOffs: steps.flatMap((step, at) => (step.trim().length > 0 ? [handOffs[at] ?? {}] : [])) } : {})
               })
             }
           >

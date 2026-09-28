@@ -1,7 +1,8 @@
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import type { RecoveredMissionPhase } from '@teammate/mission-store'
 
-import type { CodexMissionStartResponse, CodexMissionUpdate, MissionMode, PublicRoutine, RoutineRunResponse } from '../shared/ipc.js'
+import type { CodexMissionStartResponse, CodexMissionUpdate, MissionMode, PublicRoutine, RoutineHandOff, RoutineRunResponse, TeammateRoute } from '../shared/ipc.js'
+import { handOffPrompt, verdictOf } from '../shared/hand-off.js'
 import { isDue } from '../shared/routine-schedule.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 import { randomUUID } from 'node:crypto'
@@ -81,6 +82,10 @@ export interface RoutineRunnerOptions {
    * Counting an unreadable answer as completion would bypass recovery policy.
    */
   readonly askedAQuestion?: (missionId: string) => Promise<boolean>
+  /** A teammate's route now, for a step handed to them (0.435). Absent: only the routine's own teammate can take a step. */
+  readonly routeOf?: (teammateId: string) => Promise<TeammateRoute | undefined>
+  /** A finished step's answer, for the teammate the next step goes to and for a checker's verdict (0.435). */
+  readonly replyOf?: (missionId: string) => Promise<string | undefined>
   readonly notify: (update: CodexMissionUpdate) => void
 }
 
@@ -151,6 +156,13 @@ function phaseWords(phase: RecoveredMissionPhase | undefined): string {
   }
 }
 
+/** Who takes a step of a hand-off chain (0.435): its named teammate, or the routine's own. */
+const ownerOf = (routine: { readonly teammateId: string; readonly handOffs?: readonly RoutineHandOff[] }, step: number): string =>
+  routine.handOffs?.[step - 1]?.teammateId ?? routine.teammateId
+/** Whether that step is the checker, whose approval the run needs. */
+const checks = (routine: { readonly handOffs?: readonly RoutineHandOff[] }, step: number): boolean =>
+  routine.handOffs?.[step - 1]?.check === true
+
 export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunner {
   const active = new Map<string, RoutineProgress>()
   /** routineId -> epoch ms before which a scheduled start is not tried again. */
@@ -172,6 +184,26 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
     )
     active.delete(routine.routineId)
     changed()
+  }
+
+  const nameOf = async (teammateId: string): Promise<string | undefined> =>
+    (await options.peerContextFor(teammateId).catch(() => undefined))?.self.name
+
+  /**
+   * Whether a CHECKER step's answer approves (0.435). Anything but a clear
+   * approval -- changes asked for, no verdict, an answer that cannot be read
+   * -- is not one, and says which.
+   */
+  const checkerSaid = async (missionId: string, teammateId: string): Promise<{ readonly approved: boolean; readonly why: string }> => {
+    const verdict = verdictOf(await options.replyOf?.(missionId).catch(() => undefined))
+    const name = (await nameOf(teammateId)) ?? 'The checker'
+    if (verdict?.approved === true) return { approved: true, why: `approved by ${name}` }
+    return {
+      approved: false,
+      why: verdict === undefined
+        ? `${name}, the checker, gave no verdict`
+        : `${name}, the checker, asked for changes${verdict.changes.length > 0 ? `: ${verdict.changes}` : ''}`
+    }
   }
 
   const complete = async (routineId: string, execution: RoutineExecution): Promise<void> => {
@@ -219,7 +251,14 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       const question = execution.missionId === undefined || options.askedAQuestion === undefined
         ? true : await options.askedAQuestion(execution.missionId).catch(() => true)
       const confirmed = phase === 'completed' && !question
-      if (confirmed && execution.step === execution.of) {
+      // A checker that finished while the app was closed is read like one
+      // that finished while it was open: only an approval lets it count (0.435).
+      const verdict = confirmed && execution.missionId !== undefined && checks(execution, execution.step)
+        ? await checkerSaid(execution.missionId, ownerOf({ teammateId: routine.teammateId, ...(execution.handOffs === undefined ? {} : { handOffs: execution.handOffs }) }, execution.step))
+        : undefined
+      if (verdict !== undefined && !verdict.approved) {
+        await hold(routine, execution, `${verdict.why}. The run does not count as done. Review the work, then run the routine again.`, false, true)
+      } else if (confirmed && execution.step === execution.of) {
         await complete(routine.routineId, execution)
       } else {
         await hold(routine, execution, confirmed
@@ -239,7 +278,9 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
     routine: PublicRoutine,
     peer: MissionPeerContext,
     step: number,
-    followUpOf: string | undefined
+    followUpOf: string | undefined,
+    /** The step before, when this one goes to another teammate or checks it (0.435). */
+    handedFrom?: { readonly missionId: string; readonly name: string }
   ): Promise<CodexMissionStartResponse> => {
     const prompt = routine.steps[step - 1]
     if (prompt === undefined) {
@@ -280,10 +321,35 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
      * action and waits for the person, which is what the teammate was saved
      * to do.
      */
+    /*
+     * A STEP HANDED TO ANOTHER TEAMMATE (0.435) runs on THEIR route -- their
+     * runtime, model and mode, as a message to them would -- and is given the
+     * answer of the step before, quoted above the step's own words. Refused
+     * here, before anything is recorded, when that teammate has no route this
+     * host can run.
+     */
+    const owner = ownerOf(routine, step)
+    const route = owner === routine.teammateId ? routine.route : await options.routeOf?.(owner).catch(() => undefined)
+    if (route === undefined || !canStartRoutine(route.runtime)) {
+      const message = route === undefined
+        ? `Step ${String(step)} goes to ${peer.self.name}, whose route could not be read. Nothing was started.`
+        : `Step ${String(step)} goes to ${peer.self.name}, whose runtime routines cannot run on yet. Nothing was started.`
+      const held = routine.execution
+      if (step > 1 && held !== undefined && held.status !== 'abandoned') await hold(routine, held, message, false, true)
+      return { ok: false, error: { code: 'INVALID_PROMPT', message } }
+    }
+    const sent = handedFrom === undefined && !checks(routine, step)
+      ? prompt
+      : handOffPrompt({
+          step: prompt,
+          ...(handedFrom === undefined ? {} : { from: { name: handedFrom.name, answer: await options.replyOf?.(handedFrom.missionId).catch(() => undefined) } }),
+          check: checks(routine, step)
+        })
     const prior = routine.execution
     const intent: RoutineExecution = {
       attemptId: prior?.status === 'abandoned' || prior === undefined ? randomUUID() : prior.attemptId,
       status: 'dispatching', step, of: routine.steps.length, steps: routine.steps, route: routine.route,
+      ...(routine.handOffs === undefined ? {} : { handOffs: routine.handOffs }),
       workspaceId: options.workspaceId,
       ...(prior?.recovered === true ? { recovered: true } : {}),
       startedAt: prior?.status === 'abandoned' || prior === undefined ? new Date().toISOString() : prior.startedAt,
@@ -295,14 +361,14 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
     let response: CodexMissionStartResponse
     try {
       response = await options.start({
-        prompt,
-        runtime: routine.route.runtime,
-        mode: routine.route.mode,
-        model: routine.route.model === 'account-default' ? undefined : routine.route.model,
+        prompt: sent,
+        runtime: route.runtime,
+        mode: route.mode,
+        model: route.model === 'account-default' ? undefined : route.model,
         // A routine replays the turns you typed, and how hard the model was
         // asked to think is part of how it ran: one saved at `high` that
         // replays at the runtime's default is not the same routine.
-        effort: routine.route.effort,
+        effort: route.effort,
         peer,
         followUpOf,
         startedBy: { kind: 'routine', routineId: routine.routineId, step }
@@ -382,12 +448,18 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
         return { ok: true }
       }
       if (!execution.canContinue || execution.missionId === undefined) return { ok: false, error: { message: 'The saved step is not confirmed complete. Review its mission and external work; it cannot be safely continued.' } }
-      if (options.teammateBusy !== undefined && await options.teammateBusy(routine.teammateId)) return { ok: false, error: { message: 'This teammate is busy. Wait for its current mission to finish.' } }
-      const peer = await options.peerContextFor(routine.teammateId)
+      // Recovery uses the saved definition, not edits made four days later --
+      // who takes each step included (0.435).
+      const { handOffs: _current, ...base } = routine
+      const saved = { ...base, steps: execution.steps, route: execution.route, ...(execution.handOffs === undefined ? {} : { handOffs: execution.handOffs }), execution: { ...execution, recovered: true } }
+      const next = execution.step + 1
+      const owner = ownerOf(saved, next)
+      const before = ownerOf(saved, execution.step)
+      if (options.teammateBusy !== undefined && await options.teammateBusy(owner)) return { ok: false, error: { message: `${(await nameOf(owner)) ?? 'This teammate'} is busy. Wait for their current mission to finish.` } }
+      const peer = await options.peerContextFor(owner)
       if (peer === undefined) return { ok: false, error: { message: 'The teammate no longer exists.' } }
-      // Recovery uses the saved definition, not edits made four days later.
-      const saved = { ...routine, steps: execution.steps, route: execution.route, execution: { ...execution, recovered: true } }
-      const response = await startStep(saved, peer, execution.step + 1, execution.missionId)
+      const handedFrom = owner !== before || checks(saved, next) ? { missionId: execution.missionId, name: (await nameOf(before)) ?? 'The teammate before' } : undefined
+      const response = await startStep(saved, peer, next, owner === before ? execution.missionId : undefined, handedFrom)
       if (!response.ok) return { ok: false, error: { message: response.error.message } }
       await options.assignOwner(peer.self.teammateId, response.data.missionId).catch(() => undefined)
       announce(saved, peer, execution.step + 1, response)
@@ -409,7 +481,8 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
           error: { code: 'ROUTINE_REJECTED', message: `Routines cannot run on ${routine.route.runtime} yet.` }
         }
       }
-      const already = [...active.values()].find((progress) => progress.teammateId === routine.teammateId)
+      const first = ownerOf(routine, 1)
+      const already = [...active.values()].find((progress) => progress.teammateId === first)
       if (already !== undefined) {
         return {
           ok: false,
@@ -419,7 +492,7 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
           }
         }
       }
-      const peer = await options.peerContextFor(routine.teammateId)
+      const peer = await options.peerContextFor(first)
       if (peer === undefined) {
         return { ok: false, error: { code: 'ROUTINE_REJECTED', message: 'The teammate this routine belongs to no longer exists.' } }
       }
@@ -478,24 +551,57 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
         )
         return
       }
+      // A CHECKER step counts only if it approves (0.435); the hold is final,
+      // so a restart cannot re-decide it into a completed run.
+      let approval = ''
+      if (checks(execution, progress.step)) {
+        const verdict = await checkerSaid(mission.missionId, progress.teammateId)
+        if (!verdict.approved) {
+          await hold(stored, execution, `${verdict.why}. The run does not count as done. Review the work, then run the routine again.`, false, true)
+          notice(progress, `Routine "${progress.name}" stopped at step ${String(progress.step)} of ${String(progress.of)}: ${verdict.why}.`)
+          return
+        }
+        approval = `, ${verdict.why}`
+      }
       if (progress.step >= progress.of) {
         await complete(progress.routineId, execution)
-        notice(progress, `Routine "${progress.name}" finished: ${String(progress.of)} step${progress.of === 1 ? '' : 's'} completed.`)
+        notice(progress, `Routine "${progress.name}" finished: ${String(progress.of)} step${progress.of === 1 ? '' : 's'} completed${approval}.`)
         return
       }
       // The routine may have been edited or removed while it ran; the steps
       // that run are the ones on file NOW, so a correction lands next time.
       const current = await options.routines.get(progress.routineId)
-      const routine = current === undefined ? undefined : execution.recovered === true
-        ? { ...current, steps: execution.steps, route: execution.route } : current
-      const peer = routine === undefined ? undefined : await options.peerContextFor(routine.teammateId)
+      const recoveredPlan = (held: PublicRoutine): PublicRoutine => {
+        const { handOffs: _now, ...base } = held
+        return { ...base, steps: execution.steps, route: execution.route, ...(execution.handOffs === undefined ? {} : { handOffs: execution.handOffs }) }
+      }
+      const routine = current === undefined ? undefined : execution.recovered === true ? recoveredPlan(current) : current
+      const next = progress.step + 1
+      const owner = routine === undefined ? undefined : ownerOf(routine, next)
+      /*
+       * HANDED TO A TEAMMATE WHO IS BUSY (0.435): held, not queued and not
+       * refused -- the person continues it from the routine card once they
+       * are free. Final, so a restart does not re-decide the reason away.
+       */
+      if (routine !== undefined && owner !== undefined && owner !== progress.teammateId && options.teammateBusy !== undefined
+        && (await options.teammateBusy(owner).catch(() => true))) {
+        const who = (await nameOf(owner)) ?? 'The next teammate'
+        await hold(stored, execution, `Step ${String(next)} is ${who}'s, and ${who} is busy. Continue it here when they are free.`, true, true)
+        notice(progress, `Routine "${progress.name}" is waiting after step ${String(progress.step)} of ${String(progress.of)}: step ${String(next)} is ${who}'s, who is busy. Continue it under Routines when they are free.`)
+        return
+      }
+      const peer = routine === undefined || owner === undefined ? undefined : await options.peerContextFor(owner)
       if (routine === undefined || peer === undefined || progress.step >= routine.steps.length) {
         await hold(stored, execution, 'The routine or teammate changed while it was running.')
         notice(progress, `Routine "${progress.name}" stopped after step ${String(progress.step)}: the routine changed while it was running.`)
         return
       }
-      const next = progress.step + 1
-      const response = await startStep(routine, peer, next, mission.missionId)
+      // Another teammate's step starts a conversation of its own, given what
+      // the step before answered; the same teammate's continues its own.
+      const handedFrom = owner !== progress.teammateId || checks(routine, next)
+        ? { missionId: mission.missionId, name: (await nameOf(progress.teammateId)) ?? 'The teammate before' }
+        : undefined
+      const response = await startStep(routine, peer, next, owner === progress.teammateId ? mission.missionId : undefined, handedFrom)
       if (!response.ok) {
         active.delete(progress.routineId)
         notice(progress, `Routine "${progress.name}" stopped before step ${String(next)} of ${String(routine.steps.length)}: ${response.error.message}`)
@@ -536,8 +642,9 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
         if (until !== undefined && until > now.getTime()) continue
         heldOff.delete(routine.routineId)
         // Busy is a wait, not a failure: tried again next tick, no hold-off.
-        if ([...active.values()].some((progress) => progress.teammateId === routine.teammateId)) continue
-        if (options.teammateBusy !== undefined && (await options.teammateBusy(routine.teammateId).catch(() => true))) continue
+        const first = ownerOf(routine, 1)
+        if ([...active.values()].some((progress) => progress.teammateId === first)) continue
+        if (options.teammateBusy !== undefined && (await options.teammateBusy(first).catch(() => true))) continue
         const response = await this.run(routine.routineId)
         if (response.ok) {
           started.push(routine.routineId)

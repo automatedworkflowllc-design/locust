@@ -1059,6 +1059,20 @@ export type TeammateFolderResponse =
     }
 
 /**
+ * Who takes one step of a routine (0.435): a HAND-OFF CHAIN. From OpenRig's
+ * "conveyor" (mvschwarz/openrig, Apache-2.0, read 2026-09-27 at Colin's
+ * "anything worth yoinking"): steps go to different teammates in order, each
+ * given the step before's answer, and a CHECKER step must approve before the
+ * run counts as done. An empty entry is the routine's own teammate.
+ */
+export interface RoutineHandOff {
+  /** The teammate who takes this step; absent, the routine's own. */
+  readonly teammateId?: string
+  /** This step checks the work: the run is done only if it approves. */
+  readonly check?: true
+}
+
+/**
  * A routine: a conversation a person saved as steps a teammate can replay.
  * The teammate cannot watch a person work outside the app; what it can learn
  * from is work it did WITH them, which every mission already records. So a
@@ -1091,6 +1105,8 @@ export interface PublicRoutine {
    * routine saved before this was recorded.
    */
   readonly workspaceId?: string
+  /** Who takes each step, in step order (0.435). Absent: every step is the routine's own teammate's. */
+  readonly handOffs?: readonly RoutineHandOff[]
 }
 
 export interface RoutineCreateRequest {
@@ -1100,12 +1116,15 @@ export interface RoutineCreateRequest {
   readonly steps: readonly string[]
   readonly learnedFrom: readonly string[]
   readonly schedule?: RoutineSchedule
+  readonly handOffs?: readonly RoutineHandOff[]
 }
 
 export interface RoutineUpdateRequest {
   readonly routineId: string
   readonly name: string
   readonly steps: readonly string[]
+  /** One per step; absent keeps them only while the steps still line up. */
+  readonly handOffs?: readonly RoutineHandOff[]
   /** `null` clears a schedule; absent leaves it as it was. */
   readonly schedule?: RoutineSchedule | null
 }

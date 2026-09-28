@@ -11811,6 +11811,30 @@ textarea {
   padding-inline: 0.5rem;
 }
 
+/* Who takes the step, and whether it checks (0.435): under its text. */
+.lc-routinestep__who {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+  flex-wrap: wrap;
+}
+
+.lc-routinestep__pick {
+  width: auto;
+  min-width: 12rem;
+  padding-block: 0.3rem;
+}
+
+.lc-routinestep__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-secondary);
+  cursor: pointer;
+}
+
 /* Routines under a teammate on the Team screen. */
 .lc-routinelist {
   display: flex;

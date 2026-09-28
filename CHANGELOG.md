@@ -11,6 +11,19 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.435.0 - 2026-09-28
+<!-- big -->
+
+### New
+
+- **Hand-off chains.** A routine's steps can now go to different
+  teammates: Wren finds the bug, Atlas plans the fix, Sable checks it. Each
+  teammate is given what the step before them answered. Mark a step as the
+  checker and the run only counts as done if it approves; if it asks for
+  changes, the routine stops and says what they are. Set it up in a
+  routine's editor: each step has "Who takes it" and "Checker". The card
+  shows the chain, like "Wren → Atlas → Sable (checks)".
+
 ## 0.434.0 - 2026-09-28
 <!-- big -->
 

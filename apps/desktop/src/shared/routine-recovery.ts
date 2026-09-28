@@ -1,4 +1,4 @@
-import type { TeammateRoute } from './ipc.js'
+import type { RoutineHandOff, TeammateRoute } from './ipc.js'
 
 /** A dispatch receipt, not a claim that the runtime did (or did not) do work. */
 /**
@@ -20,6 +20,8 @@ export interface RoutineExecution {
   readonly updatedAt: string
   readonly steps: readonly string[]
   readonly route: TeammateRoute
+  /** Who took each step, as the attempt started with it (0.435). */
+  readonly handOffs?: readonly RoutineHandOff[]
   readonly workspaceId: string
   readonly recovered?: boolean
   readonly missionId?: string

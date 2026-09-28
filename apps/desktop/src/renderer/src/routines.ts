@@ -111,6 +111,31 @@ export function routineStepPhrase(
 }
 
 /**
+ * Who does a hand-off chain's steps, in order (0.435): "Wren → Atlas → Sable
+ * (checks)". Consecutive steps of one teammate read once; a checker always
+ * reads, marked. Undefined for a routine one teammate runs throughout, whose
+ * card names that teammate as it always has.
+ */
+export function routineChain(
+  routine: Pick<PublicRoutine, 'teammateId' | 'handOffs' | 'steps'>,
+  team: readonly { readonly teammateId: string; readonly name: string }[]
+): string | undefined {
+  const handOffs = routine.handOffs
+  if (handOffs === undefined || !handOffs.some((entry) => entry.teammateId !== undefined || entry.check === true)) return undefined
+  const nameOf = (id: string): string => team.find((teammate) => teammate.teammateId === id)?.name ?? 'someone removed'
+  const links: string[] = []
+  let last: string | undefined
+  routine.steps.forEach((_, index) => {
+    const entry = handOffs[index] ?? {}
+    const owner = entry.teammateId ?? routine.teammateId
+    if (owner === last && entry.check !== true) return
+    links.push(entry.check === true ? `${nameOf(owner)} (checks)` : nameOf(owner))
+    last = owner
+  })
+  return links.join(' → ')
+}
+
+/**
  * What a routine's card says about its last run. Never "never run" dressed up
  * as a time: a routine that has not run says so.
  */
