@@ -41,7 +41,8 @@ async function aFolderAndACopy() {
   return { folder, root, copy }
 }
 
-describe('a column that edits a copy', () => {
+// Real files, hashed and copied: a busy machine takes longer than the 5 s default (it timed out under ship's full run).
+describe('a column that edits a copy', { timeout: 60_000 }, () => {
   it('knows what it changed and what it deleted, and nothing else', async () => {
     const { root } = await aFolderAndACopy()
     expect(await copyChanges({ compareId: 'cmp_1', slot: 'a', root })).toEqual({ changed: ['index.html', 'site/style.css'], deleted: ['old.txt'] })
