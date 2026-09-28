@@ -16,6 +16,7 @@
 // FIRST, for its side effect: it points tmpdir() outside AppData, which is
 // where `~/.cursorignore` makes every Cursor run blind. See the file.
 import './scratch-root.mjs'
+import { holdCursorDefault } from './cursor-default-hold.mjs'
 
 import { spawn, execFile, execFileSync } from 'node:child_process'
 import { readFileSync, rmSync } from 'node:fs'
@@ -252,6 +253,16 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
   const appEnv = { ...process.env, PATH: `${NPM_DIR};${process.env.PATH ?? ''}`, ...env }
   if (process.env.LOCUST_SPEND === '1') delete appEnv.LOCUST_FREE_ONLY
   else appEnv.LOCUST_FREE_ONLY = '1'
+  /*
+   * The person's Cursor default, held from before the launch and put back
+   * after the app is gone (see cursor-default-hold.mjs). The app's own guard
+   * cannot do it here: the drive ends the app before a Cursor run's process
+   * ends, and deletes the profile that holds its note (0.443's drive left
+   * Colin on Grok 4.6 High). An exit hook covers a drive that throws; a
+   * drive killed outright is put right by the next one to start.
+   */
+  const cursorDefault = holdCursorDefault({ say })
+  process.once('exit', () => { if (!cursorDefault.done) cursorDefault.putBack() })
   // Held until `ready()` returns (or `finish`, for a drive that never asks).
   await takeLaunchTurn(name)
   /*
@@ -554,6 +565,10 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
     try { socket.close() } catch { /* gone */ }
     endTree(child)
     await sleep(1500)
+    if (last) {
+      const line = cursorDefault.putBack()
+      await writeFile(session, `${(await readFile(session, 'utf8')).replace(/\n*$/, '\n')}\n${line}\n`, 'utf8').catch(() => undefined)
+    }
     // LOCUST_DRIVE_KEEP=1 keeps any drive's profile, to read its ledger after.
     const kept = keep || process.env.LOCUST_DRIVE_KEEP === '1'
     if (!kept && last) await rm(profile, { recursive: true, force: true }).catch(() => undefined)
