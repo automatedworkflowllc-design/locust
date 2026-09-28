@@ -21,7 +21,7 @@ import type { MissionPeerContext } from './workroom-briefing.js'
  */
 const NOW = '2026-09-28T15:00:00.000Z'
 const WREN: MissionPeerContext = { self: { teammateId: 'tm_wren', name: 'Wren', role: 'Code & Migrations' }, others: [] }
-const slotOf = (slot: 'a' | 'b', teammateId: string | undefined = 'tm_wren'): string => compareSlotKey(teammateId, 'cmp_1', slot)
+const slotOf = (slot: 'a' | 'b', teammateId: string | undefined = 'tm_wren'): { key: string } => ({ key: compareSlotKey(teammateId, 'cmp_1', slot) })
 
 describe('a comparison', () => {
   let folder: string

@@ -65,6 +65,23 @@ export function compareMembership(compares: readonly PublicCompare[]): {
   return { byMission }
 }
 
+/**
+ * Whether a column answers in a copy of the folder rather than the folder
+ * itself (0.443). A comparison answers read-only, and Cursor cannot be held
+ * read-only on Windows -- which kept Grok and Gemini, reached through Cursor,
+ * out of every comparison (Colin, 2026-09-28: "gemini/grok not selectable on
+ * compare?"). In a copy it runs as it can, and the folder is untouched.
+ */
+export function compareNeedsCopy(runtime: string, platform: string | undefined): boolean {
+  return runtime === 'cursor' && platform === 'win32'
+}
+
+/** A runtime that cannot join a comparison at all, and why; undefined when it can. */
+export function compareRefusalOf(runtime: string): string | undefined {
+  if (runtime === 'antigravity') return 'Antigravity answers only in the folder it has open, so it cannot answer in a comparison.'
+  return undefined
+}
+
 /** "Fable 5.1 vs GPT-6 Astra", "A vs B vs C". */
 export function versusLabel(names: readonly string[]): string {
   return names.join(' vs ')

@@ -23,6 +23,8 @@ export interface CompareColumnView {
   readonly name: string
   readonly runtime: MissionRuntimeId
   readonly runtimeName: string
+  /** It answers in a copy of the folder, because it cannot be held read-only here (0.443). */
+  readonly copy?: true
   /** Why it could not start, when it could not. */
   readonly refused?: string
   /** One cell per ask, oldest first; a column that could not take an ask has none for it. */
@@ -87,7 +89,12 @@ export function CompareView({
             <div key={`head:${column.slot}`} className={`lc-compare__head${column.slot === kept ? ' is-kept' : ''}`}>
               <RuntimeMark runtime={column.runtime} size={13} />
               <span className="lc-compare__name">{column.name}</span>
-              <span className="lc-compare__runtime lc-mono">{column.runtimeName}</span>
+              <span
+                className="lc-compare__runtime lc-mono"
+                {...(column.copy === true ? { title: `${column.runtimeName} cannot be held read-only on this computer, so it answers in a copy of your folder. Nothing in your folder changes.` } : {})}
+              >
+                {column.copy === true ? `${column.runtimeName} · in a copy` : column.runtimeName}
+              </span>
               <span className="lc-compare__state lc-mono">
                 {column.running && <WorkingSpark />}
                 {column.state}

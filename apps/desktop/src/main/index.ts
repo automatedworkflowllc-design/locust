@@ -12,7 +12,8 @@ import { createRuntimeCommands } from './runtime-commands.js'
 import { createCursorDefaultModel } from './cursor-default-model.js'
 import { listWorkspaceFiles } from './workspace-files.js'
 import { MAX_TAGGED, taggedPrompt } from '../shared/tagging.js'
-import { compareSlotKey, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../shared/compare.js'
+import { compareNeedsCopy, compareRefusalOf, compareSlotKey, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../shared/compare.js'
+import { makeCompareCopy, removeCompareCopies } from './compare-copies.js'
 import type { CompareSlotId, PublicCompare, PublicCompareSlot } from '../shared/compare.js'
 import { createCompareStore } from './compare-store.js'
 import electronUpdater from 'electron-updater'
@@ -4030,11 +4031,22 @@ if (!ownsSingleInstanceLock) {
     const startCompareColumn = async (compare: PublicCompare, column: PublicCompareSlot, prompt: string, followUpOf?: string): Promise<string | undefined> => {
       const peer = compare.teammateId === undefined ? undefined : await peerContextFor(compare.teammateId)
       if (compare.teammateId !== undefined && peer === undefined) return 'That teammate is no longer on the team.'
-      if (column.route.runtime === 'antigravity') return 'Antigravity cannot be compared yet: it answers only in the folder it has open.'
+      const cannot = compareRefusalOf(column.route.runtime)
+      if (cannot !== undefined) return cannot
+      // A column that cannot be held read-only answers in a copy, in the mode it can run (0.443).
+      const inCopy = compareNeedsCopy(column.route.runtime, process.platform)
+      let copy: string | undefined
+      if (inCopy) {
+        try {
+          copy = await makeCompareCopy({ folder: workspacePath, compareId: compare.compareId, slot: column.slot })
+        } catch (error) {
+          return error instanceof Error ? error.message : 'A copy of the folder could not be made for it.'
+        }
+      }
       const response = await codexMissions.start(
         prompt,
         column.route.runtime as MissionRuntimeId,
-        'ask',
+        inCopy ? 'accept-edits' : 'ask',
         { ...(column.route.model === 'account-default' ? {} : { model: column.route.model }), ...(column.route.effort === undefined ? {} : { effort: column.route.effort }) },
         sendToWindow,
         undefined,
@@ -4043,7 +4055,7 @@ if (!ownsSingleInstanceLock) {
         undefined,
         undefined,
         undefined,
-        compareSlotKey(compare.teammateId, compare.compareId, column.slot)
+        { key: compareSlotKey(compare.teammateId, compare.compareId, column.slot), ...(copy === undefined ? {} : { cwd: copy }) }
       )
       if (!response.ok) return response.error.code === 'RUN_ALREADY_ACTIVE' ? 'This column is still answering. Ask again when it has finished.' : response.error.message
       if (compare.teammateId !== undefined) await assignOwner(compare.teammateId, response.data.missionId)
@@ -4115,7 +4127,10 @@ if (!ownsSingleInstanceLock) {
       if (!fromOwnWindow(event)) return compareRefused('The request was rejected.')
       if (typeof compareId !== 'string' || typeof slot !== 'string') return compareRefused('That column is not in a comparison.')
       try {
-        return { ok: true, data: { compare: await compares.keep(compareId, slot as CompareSlotId), refused: [] } } as const
+        const kept = await compares.keep(compareId, slot as CompareSlotId)
+        // The copies were for comparing; the conversation goes on in the folder.
+        await removeCompareCopies(compareId).catch(() => undefined)
+        return { ok: true, data: { compare: kept, refused: [] } } as const
       } catch (error) {
         return compareRefused(error instanceof Error ? error.message : 'That column could not be kept.')
       }

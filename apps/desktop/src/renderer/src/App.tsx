@@ -105,7 +105,7 @@ import type { ComparePick, ComparePicking, RouteChoice } from './components/Rout
 import { CompareView } from './components/CompareView.js'
 import { comparisonOf, foldComparisons } from './compareRows.js'
 import type { CompareColumnView } from './components/CompareView.js'
-import { compareMembership, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../../shared/compare.js'
+import { compareMembership, compareNeedsCopy, compareRefusalOf, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../../shared/compare.js'
 import type { CompareSlotId, PublicCompare } from '../../shared/compare.js'
 import { composerRouteFor, startAs } from '../../shared/route-at-start.js'
 import type { StartAs } from '../../shared/route-at-start.js'
@@ -3366,11 +3366,12 @@ export default function App(): ReactElement {
               ? current.filter((one) => !samePick(one, pick))
               : current.length >= MAX_COMPARE_SLOTS ? current : [...current, pick]
           ),
-        // A comparison answers read-only: a model that cannot be held read-only here cannot join one.
+        // A comparison answers read-only; a model that cannot be held read-only here answers in a copy (0.443).
         refusal: (choice) =>
-          modeRunsOn('ask', choice.runtime, build?.platform)
+          compareRefusalOf(choice.runtime)
+          ?? (modeRunsOn('ask', choice.runtime, build?.platform) || compareNeedsCopy(choice.runtime, build?.platform)
             ? undefined
-            : `${modeUnavailableReason('ask', choice.runtime, build?.platform) ?? 'It cannot answer read-only here.'} A comparison answers read-only, so it cannot join one.`
+            : `${modeUnavailableReason('ask', choice.runtime, build?.platform) ?? 'It cannot answer read-only here.'} A comparison answers read-only, so it cannot join one.`)
       }
   const replaceCompare = (next: PublicCompare): void =>
     setCompares((current) => [...current.filter((one) => one.compareId !== next.compareId), next])
@@ -3473,6 +3474,7 @@ export default function App(): ReactElement {
         name: column.route.label ?? column.route.model,
         runtime: column.route.runtime as MissionRuntimeId,
         runtimeName: runtimeNameOf(column.route.runtime),
+        ...(compareNeedsCopy(column.route.runtime, build?.platform) ? { copy: true } : {}),
         ...(column.refused === undefined ? {} : { refused: column.refused }),
         turns: cells.map((cell) => ({ missionId: cell.missionId, items: cell.items, running: cell.running })),
         running,

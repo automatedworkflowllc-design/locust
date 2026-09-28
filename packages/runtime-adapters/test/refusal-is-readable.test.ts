@@ -81,4 +81,15 @@ describe("what a refusal says", () => {
     // Mixed: the command sentence, because it is the one that still applies.
     expect(whyRefused([{ tool: "Bash" }, { tool: "mcp__x__y" }])).toContain("before running commands");
   });
+
+  it("says a refused read reached outside the folder, and never claims a mode it does not know (0.443)", () => {
+    // Colin's first real comparison: a read-only Claude column, a refused Grep,
+    // and a sentence saying "this route allows edits".
+    const read = whyRefused([{ tool: "Grep" }]);
+    expect(read).toBe("Claude Code asks before reading outside this folder, and a printed run has no way to answer. Auto lets it read anywhere.");
+    expect(whyRefused([{ tool: "Read" }, { tool: "Glob" }])).toBe(read);
+    for (const tools of [[{ tool: "Grep" }], [{ tool: "Bash" }], [{ tool: "Bash" }, { tool: "Read" }]]) {
+      expect(whyRefused(tools)).not.toContain("allows edits");
+    }
+  });
 });

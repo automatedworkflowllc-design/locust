@@ -11,6 +11,25 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.443.0 - 2026-09-28
+
+### Improved
+
+- **Grok and Gemini can join a comparison.** They reach Windows through
+  Cursor, which cannot be held read-only here, so the picker used to refuse
+  them. Now such a column answers in a copy of your folder and says so in
+  its heading; nothing in your folder changes, and the copy is removed when
+  you keep one.
+- **A comparison you can read at a glance.** Each column is ruled off from
+  the next, from its heading down to its Keep button, and the question sits
+  centred over all of them instead of over the last column.
+
+### Fixed
+
+- **Claude's refusal notes say what happened.** A read Claude Code refused
+  was one reaching outside your folder, and the note now says that; it used
+  to say "this route allows edits" even in Ask.
+
 ## 0.442.0 - 2026-09-28
 
 ### Improved

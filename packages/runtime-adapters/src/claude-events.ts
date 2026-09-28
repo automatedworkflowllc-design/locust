@@ -429,9 +429,20 @@ export function namedTool(name: string): string {
  * it was, so the sentence names both.
  */
 export function whyRefused(refused: readonly { readonly tool: string }[]): string {
-  return refused.every((entry) => entry.tool.startsWith("mcp__"))
-    ? "Claude Code asks before using a connector, and this one was not allowed: either you said no when it asked, or it is not one of this teammate's connectors. Give this teammate the connector in its card, or run it in Auto."
-    : "This route allows edits but asks for approval before running commands, and a printed run has no way to give it.";
+  if (refused.every((entry) => entry.tool.startsWith("mcp__"))) {
+    return "Claude Code asks before using a connector, and this one was not allowed: either you said no when it asked, or it is not one of this teammate's connectors. Give this teammate the connector in its card, or run it in Auto.";
+  }
+  /*
+   * A READ that was refused was reaching outside this folder (0.443).
+   * Reading inside it needs no approval in any mode; outside it Claude Code
+   * asks. The sentence used to say "this route allows edits" whatever the
+   * mode, and a read-only comparison showed it under a refused Grep (Colin's
+   * first real comparison, 2026-09-28).
+   */
+  if (refused.every((entry) => entry.tool === "Read" || entry.tool === "Glob" || entry.tool === "Grep")) {
+    return "Claude Code asks before reading outside this folder, and a printed run has no way to answer. Auto lets it read anywhere.";
+  }
+  return "Claude Code asks for approval before running commands in this mode, and a printed run has no way to give it.";
 }
 
 export function createClaudeEventNormalizer(

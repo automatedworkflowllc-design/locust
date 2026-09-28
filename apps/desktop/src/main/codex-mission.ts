@@ -212,7 +212,7 @@ export interface CodexMissionService {
      * in place of its owner's, so one teammate -- or nobody -- answers on two
      * models at once. Only the compare handler supplies it.
      */
-    slot?: string
+    slot?: { readonly key: string; readonly cwd?: string }
   ): Promise<CodexMissionStartResponse>
   cancel(runId: unknown): CodexMissionCancelResponse
   /**
@@ -1090,7 +1090,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       relay?: RelayOrigin,
       startedBy?: MissionStarter,
       asCommand?: boolean,
-      slot?: string
+      slot?: { readonly key: string; readonly cwd?: string }
     ): Promise<CodexMissionStartResponse> {
       // `account-default` is the shell's word for "send no --model", not a
       // model id. Passing it through would make the CLI look for a model that
@@ -1147,7 +1147,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         resolveStartOperation = resolve
       })
       startOperations.add(startOperation)
-      const owner = ownerKeyOf(peer, slot)
+      const owner = ownerKeyOf(peer, slot?.key)
       let claimed = false
       try {
         if (disposed) {
@@ -1482,7 +1482,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         const executable = chosen.executable
         // The teammate's own worktree when it has one, else the folder. The
         // ledger's workspace id stays the FOLDER's: history is per folder.
-        const runCwd = peer?.cwd ?? options.workspacePath
+        // A comparison's column may answer in a copy of the folder (0.443, compare-copies.ts).
+        const runCwd = slot?.cwd ?? peer?.cwd ?? options.workspacePath
         // Named by whoever made the worktree, not inferred from this folder:
         // a teammate with its own folder is in a worktree of a repository
         // that is not this one. Absent unless the run really is in a
@@ -2014,7 +2015,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           prompt,
           runtime,
           peer,
-          ...(slot === undefined ? {} : { slot }),
+          ...(slot === undefined ? {} : { slot: slot.key }),
           transcript: createTranscriptTracker(),
           sandbox: effectiveSandbox,
           model: chosenModel,

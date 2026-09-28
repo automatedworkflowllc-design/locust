@@ -10181,17 +10181,39 @@ textarea {
   overflow: auto;
 }
 
+/*
+ * COLUMNS YOU CAN TELL APART (0.443). Colin, on the first real comparison
+ * (GPT-6 Sol vs Opus 5.5): "layout structure needs help" -- one column's state
+ * sat against the next one's name, one column's Keep against the next one's
+ * cost, and the shared ask, a right-hand bubble, read as the right column's.
+ * Now every cell of a column shares its edges: no gap between columns, a
+ * hairline between them, the same inner padding in head, cells and foot, and
+ * the ask centred across all of them.
+ */
 .lc-compare__grid,
 .lc-compare__cells,
 .lc-compare__feet {
   display: grid;
   grid-template-columns: repeat(var(--lc-compare-columns), minmax(var(--lc-compare-min), 1fr));
-  gap: var(--lc-space-4);
+  column-gap: 0;
 }
 
 .lc-compare__grid {
-  padding: 0 var(--lc-space-6) var(--lc-space-6);
-  align-items: start;
+  padding: 0 var(--lc-space-5) var(--lc-space-6);
+  align-items: stretch;
+}
+
+.lc-compare__head,
+.lc-compare__cell,
+.lc-compare__foot {
+  padding-inline: var(--lc-space-5);
+  min-width: 0;
+}
+
+.lc-compare__head + .lc-compare__head,
+.lc-compare__cell + .lc-compare__cell,
+.lc-compare__foot + .lc-compare__foot {
+  border-left: 1px solid var(--lc-border-card);
 }
 
 .lc-compare__head {
@@ -10201,10 +10223,9 @@ textarea {
   display: flex;
   align-items: center;
   gap: var(--lc-space-3);
-  padding: 12px 0 10px;
+  padding-block: 12px 10px;
   border-bottom: 1px solid var(--lc-border-card);
   background: var(--lc-bg-window);
-  min-width: 0;
 }
 
 .lc-compare__head.is-kept {
@@ -10230,6 +10251,9 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  padding: 1px 8px;
+  border: 1px solid var(--lc-border-card);
+  border-radius: 999px;
   font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-muted);
   white-space: nowrap;
@@ -10240,12 +10264,13 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: var(--lc-space-4);
-  padding-top: var(--lc-space-5);
+  padding-top: var(--lc-space-6);
 }
 
+/* Asked of every column, so it sits over all of them. */
 .lc-compare__ask {
-  align-self: flex-end;
-  max-width: min(78%, 640px);
+  align-self: center;
+  max-width: min(720px, 90%);
   padding: var(--lc-space-4) var(--lc-space-5);
   border-radius: var(--lc-radius-card);
   background: var(--lc-bg-bubble-user);
@@ -10255,10 +10280,19 @@ textarea {
 }
 
 .lc-compare__cell {
-  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--lc-space-4);
+  padding-bottom: var(--lc-space-4);
+}
+
+/* A column has no faces, so it has no face gutter: its cards and its words start at one edge. */
+.lc-compare__cell .lc-agentline {
+  gap: 0;
+}
+
+.lc-compare__cell .lc-agentline__gutter {
+  display: none;
 }
 
 .lc-compare__quiet {
@@ -10267,17 +10301,22 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+/* The feet keep the scrolling area's gutter, so each sits under its own column. */
+.lc-compare__scroll,
 .lc-compare__feet {
-  padding: 10px var(--lc-space-6);
+  scrollbar-gutter: stable;
+}
+
+.lc-compare__feet {
+  padding: 10px var(--lc-space-5);
   border-top: 1px solid var(--lc-border-hairline);
-  overflow-x: auto;
+  overflow: hidden;
 }
 
 .lc-compare__foot {
   display: flex;
   align-items: center;
   gap: var(--lc-space-3);
-  min-width: 0;
 }
 
 .lc-compare__numbers {
