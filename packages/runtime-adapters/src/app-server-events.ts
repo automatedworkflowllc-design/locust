@@ -250,6 +250,13 @@ export function limitFromSnapshot(
 /** Said when the runtime summarizes its conversation to fit its context (A2.5). */
 export const APP_SERVER_COMPACTED =
   "The conversation outgrew the model's context, so Codex summarized it and carried on from the summary.";
+/**
+ * And when the person asked, with /compact (0.428): that turn is the
+ * compaction alone, with no message of theirs in it (measured 2026-09-28,
+ * 0.157.1), where one that outgrew the context happens inside a turn that has.
+ */
+export const APP_SERVER_COMPACTED_ON_REQUEST =
+  "Codex summarized the conversation so far, as asked, and carries on from the summary.";
 
 export function createAppServerEventNormalizer(
   context: AppServerInvocationContext,
@@ -301,6 +308,8 @@ export function createAppServerEventNormalizer(
   let compactionItems = 0;
   let compactionNotices = 0;
   let compactionsSaid = 0;
+  // Whether this turn carried a message of the person's (0.428).
+  let askedSomething = false;
   const compacted = (notification: AppServerNotification, seen: number): readonly NormalizedRuntimeEvent[] => {
     if (seen <= compactionsSaid) return [];
     compactionsSaid = seen;
@@ -308,7 +317,7 @@ export function createAppServerEventNormalizer(
       emit("adapter.diagnostic", {
         level: "info",
         code: `${runtime}.context_compacted`,
-        message: APP_SERVER_COMPACTED,
+        message: askedSomething ? APP_SERVER_COMPACTED : APP_SERVER_COMPACTED_ON_REQUEST,
         terminal: false,
         evidence: evidence(notification),
       }),
@@ -345,6 +354,7 @@ export function createAppServerEventNormalizer(
     if (item === undefined) return [];
     const itemType = stringValue(item.type) ?? "";
     const itemId = identityValue(item.id) ?? `item_${normalizedSequence + 1}`;
+    if (itemType === "userMessage") askedSomething = true;
 
     if (itemType === "agentMessage") {
       if (!completed) return [];

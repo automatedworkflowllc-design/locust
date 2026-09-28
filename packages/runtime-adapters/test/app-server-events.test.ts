@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   APP_SERVER_COMPACTED,
+  APP_SERVER_COMPACTED_ON_REQUEST,
   createAppServerEventNormalizer,
   limitFromSnapshot,
   usageWindowFromSnapshot,
@@ -436,13 +437,21 @@ describe("Codex compacting its conversation", () => {
     events.filter((event) => event.type === "adapter.diagnostic"
       && (event.payload as { code: string }).code === "codex.context_compacted");
 
+  const asked = note("item/completed", { item: { type: "userMessage", id: "u1", content: [] } });
+
   it("is one line for one compaction, however it is reported", () => {
     for (const order of [[item, notice], [notice, item], [item], [notice]]) {
       const app = normalizer();
-      const said = lines(order.flatMap((entry) => app.accept(entry)));
+      const said = lines([asked, ...order].flatMap((entry) => app.accept(entry)));
       expect(said).toHaveLength(1);
       expect(said[0]?.payload).toMatchObject({ level: "info", message: APP_SERVER_COMPACTED });
     }
+  });
+
+  it("says it was asked for when the turn was the compaction alone: /compact (0.428)", () => {
+    const app = normalizer();
+    const said = lines([item, notice].flatMap((entry) => app.accept(entry)));
+    expect(said[0]?.payload).toMatchObject({ message: APP_SERVER_COMPACTED_ON_REQUEST });
   });
 
   it("is a line for each compaction when there are two", () => {
