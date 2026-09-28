@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.424.0 - 2026-09-28
+
+### New
+
+- **Teammates can suggest lines for About you.** When a teammate learns
+  something lasting about how you work, it can suggest one sentence for
+  your About-you note. The suggestion waits under "Waiting for you" on the
+  Memory screen, with Add to About you and Dismiss. Nothing is added
+  without you, and suggestions reach you even when teammate memory is off.
+
 ## 0.423.0 - 2026-09-28
 
 ### New

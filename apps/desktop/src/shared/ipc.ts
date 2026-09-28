@@ -8,6 +8,7 @@ import type { MemoryScope } from './memory.js'
 export type { MemoryScope } from './memory.js'
 import type { Spend } from './spend.js'
 import type { Workbook } from './sheet.js'
+import type { AboutYouSuggestion } from './about-you.js'
 
 /**
  * How a teammate's memory is treated: kept at once and shown (the Claude
@@ -1746,6 +1747,8 @@ export interface WorkspaceSettings {
    * writes it, on the Memory screen.
    */
   readonly aboutYou?: string
+  /** Lines teammates suggested for it, waiting for the person (0.424). */
+  readonly aboutYouSuggestions?: readonly AboutYouSuggestion[]
 }
 
 /*
@@ -2237,6 +2240,8 @@ export type CodexMissionUpdate =
       /** A tidy pass's suggestions made proposals, and the ones refused with why (A1.2). */
       readonly proposedTidy?: number
       readonly tidyRefused?: readonly string[]
+      /** Lines suggested for the person's About-you note, now waiting for them (0.424). */
+      readonly aboutYouSuggested?: readonly string[]
     }
   /** Why a teammate did NOT reply on their own, said in the thread that shared. */
   | {

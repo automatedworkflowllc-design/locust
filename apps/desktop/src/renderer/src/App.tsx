@@ -49,6 +49,8 @@ import type {
   PublicConnector
 } from '../../shared/ipc.js'
 import { roleLabelOf } from '../../shared/ipc.js'
+import { withSuggestion } from '../../shared/about-you.js'
+import type { AboutYouSuggestion } from '../../shared/about-you.js'
 import type { Workbook } from '../../shared/sheet.js'
 import type { Spend } from '../../shared/spend.js'
 import { routineDraft, routineStepPhrase } from './routines.js'
@@ -1380,6 +1382,34 @@ export default function App(): ReactElement {
    * sentence or undefined, as the Memory screen's other writes do.
    */
   const [aboutYou, setAboutYou] = useState('')
+  // Lines teammates suggested for it, waiting for the person (0.424).
+  const [aboutYouSuggestions, setAboutYouSuggestions] = useState<readonly AboutYouSuggestion[]>([])
+  const rereadAboutYou = (): void => {
+    void window.desktop?.readWorkspaceSettings().then((settings) => {
+      setAboutYou(settings.aboutYou ?? '')
+      setAboutYouSuggestions(settings.aboutYouSuggestions ?? [])
+    }).catch(() => undefined)
+  }
+  /** Add a suggested line to the note, or let it go. Either way it stops waiting. */
+  const answerAboutYou = async (id: string, add: boolean): Promise<string | undefined> => {
+    const bridge = window.desktop
+    if (!bridge) return 'Locust is not ready yet. Nothing was changed.'
+    const suggestion = aboutYouSuggestions.find((entry) => entry.id === id)
+    if (suggestion === undefined) return undefined
+    const rest = aboutYouSuggestions.filter((entry) => entry.id !== id)
+    try {
+      const settings = await bridge.writeWorkspaceSettings({
+        swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, replySize, layout, tube,
+        ...(add ? { aboutYou: withSuggestion(aboutYou, suggestion.text) } : {}),
+        aboutYouSuggestions: rest
+      })
+      setAboutYou(settings.aboutYou ?? '')
+      setAboutYouSuggestions(settings.aboutYouSuggestions ?? [])
+      return undefined
+    } catch {
+      return 'That could not be saved. Your note is unchanged.'
+    }
+  }
   const saveAboutYou = async (next: string): Promise<string | undefined> => {
     const bridge = window.desktop
     if (!bridge) return 'Locust is not ready yet. Nothing was saved.'
@@ -2247,6 +2277,7 @@ export default function App(): ReactElement {
       }
       if (update.kind === 'memory-changed') {
         refreshMemories()
+        if ((update.aboutYouSuggested ?? []).length > 0) rereadAboutYou()
         setMemoryNotice(memoryChangedNotice(update))
         setMemoryNoticeWaits(noticeWaits(update))
         return
@@ -2564,6 +2595,7 @@ export default function App(): ReactElement {
           setKeepATodoList(settings.keepATodoList === true)
           setCheckCommand(settings.checkCommand ?? '')
           setAboutYou(settings.aboutYou ?? '')
+          setAboutYouSuggestions(settings.aboutYouSuggestions ?? [])
           setRelayHopCap(settings.relayHopCap)
           setInterrupt(settings.interrupt)
           setMemoryMode(settings.memoryMode)
@@ -5168,7 +5200,8 @@ export default function App(): ReactElement {
           return recorded === undefined || recorded.events.length === 0 ? undefined : recorded.events
         },
         nameOf: (teammateId) => teammates.find((entry) => entry.teammateId === teammateId)?.name,
-        memoryWaiting: memories.filter((memory) => memory.status === 'proposed').length
+        // A line suggested for About you waits on the same screen (0.424).
+        memoryWaiting: memories.filter((memory) => memory.status === 'proposed').length + aboutYouSuggestions.length
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [approvals, runs, sidebarMissions, missionOwners, historyById, teammates, memories]
@@ -5831,6 +5864,8 @@ export default function App(): ReactElement {
               onTidy={openTidyMenu}
               aboutYou={aboutYou}
               onSaveAboutYou={saveAboutYou}
+              aboutYouSuggestions={aboutYouSuggestions}
+              onAnswerAboutYou={answerAboutYou}
               // `openMission`, like every other opener. This had its own two
               // lines, and `setShownKey` wants a RUN key -- `runs` is keyed by
               // `run_...` -- so a `mission_...` id matched nothing and the

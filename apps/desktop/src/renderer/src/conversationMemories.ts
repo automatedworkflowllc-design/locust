@@ -133,6 +133,7 @@ export function memoryChangedNotice(update: {
   readonly proposedForgets?: readonly string[]
   readonly proposedTidy?: number
   readonly tidyRefused?: readonly string[]
+  readonly aboutYouSuggested?: readonly string[]
 }): string | undefined {
   const quoted = (texts: readonly string[]): string => texts.map((text) => `"${text}"`).join('; ')
   const said: string[] = []
@@ -150,6 +151,8 @@ export function memoryChangedNotice(update: {
   if (tidy > 0) said.push(`${update.by} suggested ${String(tidy)} change${tidy === 1 ? '' : 's'} to memory, waiting below`)
   const refused = update.tidyRefused ?? []
   if (refused.length > 0) said.push(`${String(refused.length)} could not be made: ${refused.join(' ')}`)
+  // A line for the person's own note, waiting for them whatever the mode (0.424).
+  if ((update.aboutYouSuggested ?? []).length > 0) said.push(`${update.by} suggests adding to About you: ${quoted(update.aboutYouSuggested ?? [])}`)
   if (said.length === 0) return undefined
   return said.map((clause) => (/[.!?]"?$/.test(clause) ? clause : `${clause}.`)).join(' ')
 }
@@ -164,5 +167,5 @@ export function memoryChangedNotice(update: {
  * what was forgotten is under Recently forgotten.
  */
 export function noticeWaits(update: Parameters<typeof memoryChangedNotice>[0]): boolean {
-  return update.proposed.length + (update.proposedChanges ?? []).length + (update.proposedForgets ?? []).length + (update.proposedTidy ?? 0) > 0
+  return update.proposed.length + (update.proposedChanges ?? []).length + (update.proposedForgets ?? []).length + (update.proposedTidy ?? 0) + (update.aboutYouSuggested ?? []).length > 0
 }

@@ -28,6 +28,11 @@ export interface MemoryReaderOptions {
   /** The folder's name, as the Memory screen shows it. */
   readonly workspaceName: string
   readonly notify: (update: CodexMissionUpdate) => void
+  /**
+   * Put a line for the person's About-you note to them (0.424): true when it
+   * now waits, false when it was already there or already waiting.
+   */
+  readonly suggestAboutYou?: (text: string, by: string) => Promise<boolean>
 }
 
 export interface MemoryReader {
@@ -45,7 +50,8 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
       } catch {
         return
       }
-      if (mode === 'off') return
+      // Off no longer ends here (0.424): a line suggested for the person's
+      // About-you note is theirs to see whatever teammate memory is set to.
 
       let recovered
       try {
@@ -58,11 +64,15 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
       tracker.track(recovered.events)
       const text = tracker.latestFinal
       if (text === undefined) return
-      const ops = parseMemoryBlocks(text)
+      const parsed = parseMemoryBlocks(text)
+      // About you (0.424): put to the person in every mode; the rest only when memory is on.
+      const aboutYou = parsed.filter((op) => op.kind === 'about-you')
+      const ops = mode === 'off' ? [] : parsed.filter((op) => op.kind !== 'about-you')
       // A tidy pass's suggestions (A1.2): proposals whatever the mode, because
       // the pass was asked to suggest, not to change.
-      const { suggestions: tidy, unread: tidyUnread } = readTidyBlocks(text)
-      if (ops.length === 0 && tidy.length === 0 && tidyUnread === 0) {
+      const read = mode === 'off' ? { suggestions: [], unread: 0 } : readTidyBlocks(text)
+      const { suggestions: tidy, unread: tidyUnread } = read
+      if (ops.length === 0 && tidy.length === 0 && tidyUnread === 0 && aboutYou.length === 0) {
         /*
          * A tidy pass that put nothing to the person says so, quietly (0.372).
          * Its reply may say there was nothing to tidy -- or describe changes
@@ -71,7 +81,7 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
          * the Memory screen, and the person, sent there by the button they
          * pressed, is told so rather than left to look.
          */
-        if (isTidyPrompt(recovered.metadata.prompt)) {
+        if (mode !== 'off' && isTidyPrompt(recovered.metadata.prompt)) {
           options.notify({
             kind: 'relay-notice',
             runId: recovered.metadata.runId,
@@ -135,6 +145,17 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
       // Changes to kept memories that wait for the person, in ask mode (0.315).
       const proposedChanges: string[] = []
       const proposedForgets: string[] = []
+      // Lines for the person's About-you note that now wait for them (0.424).
+      const aboutYouSuggested: string[] = []
+      for (const op of aboutYou) {
+        if (options.suggestAboutYou === undefined) break
+        try {
+          if (await options.suggestAboutYou(op.text, by.name)) aboutYouSuggested.push(op.text)
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : 'It could not be put to you.'
+          if (!refused.includes(reason)) refused.push(reason)
+        }
+      }
       for (const op of ops) {
         try {
           if (op.kind === 'forget') {
@@ -212,7 +233,10 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
         refused.length === 0 &&
         proposedChanges.length === 0 &&
         proposedForgets.length === 0 &&
-        tidyUnread === 0
+        tidyUnread === 0 &&
+        // A suggestion alone is news too (0.424): without this the window
+        // never heard of one, measured on the drive with memory off.
+        aboutYouSuggested.length === 0
       ) {
         return
       }
@@ -241,7 +265,8 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
         ...(proposedChanges.length === 0 ? {} : { proposedChanges }),
         ...(proposedForgets.length === 0 ? {} : { proposedForgets }),
         ...(tidied === undefined || tidied.proposed === 0 ? {} : { proposedTidy: tidied.proposed }),
-        ...(tidied === undefined || tidied.refused.length === 0 ? {} : { tidyRefused: tidied.refused })
+        ...(tidied === undefined || tidied.refused.length === 0 ? {} : { tidyRefused: tidied.refused }),
+        ...(aboutYouSuggested.length === 0 ? {} : { aboutYouSuggested })
       })
       if (refused.length > 0) {
         // Amber, like a forget that failed: the person may need to act --

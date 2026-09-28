@@ -1,5 +1,6 @@
 // H1: first, before any import can spawn -- no bare name is found in its working folder.
 import './no-planted-executables.js'
+import { randomUUID } from 'node:crypto'
 import { startAppServerProcess } from './app-server-process.js'
 import { ownGitArgs } from './git-guard.js'
 import { APP_USER_MODEL_ID, DEVELOPMENT_APP_USER_MODEL_ID, mayShowToasts, repairStartMenuShortcut, sweepStaleElectronShortcuts } from './stale-shortcut.js'
@@ -53,7 +54,7 @@ import { MAX_ATTACHMENTS } from '../shared/attachments.js'
 import { ATTACHMENT_DIR, attachmentDestination, excludeWith } from './attach-outside.js'
 import { imageMediaType, MAX_PREVIEW_BYTES } from '../shared/image-files.js'
 import { extensionOf, isViewableText, MAX_TEXT_BYTES, viewerMode } from '../shared/text-files.js'
-import { aboutYouSection } from '../shared/about-you.js'
+import { aboutYouSection, MAX_ABOUT_YOU_SUGGESTIONS } from '../shared/about-you.js'
 import { SHEET_EXTENSIONS, csvWorkbook } from '../shared/sheet.js'
 import { WorkbookUnreadable, readXlsx } from './xlsx.js'
 
@@ -2491,7 +2492,18 @@ if (!ownsSingleInstanceLock) {
       ledger: missionLedger,
       teammates,
       workspaceName: memoryWorkspaceName,
-      notify: sendToWindow
+      notify: sendToWindow,
+      // About you (0.424): a teammate's line waits for the person, once --
+      // not again while it is waiting, and not if the note already says it.
+      suggestAboutYou: async (text, by) => {
+        const settings = await teammates.readSettings()
+        const waiting = settings.aboutYouSuggestions ?? []
+        const said = (line: string): string => line.trim().toLowerCase()
+        if ((settings.aboutYou ?? '').toLowerCase().includes(said(text)) || waiting.some((entry) => said(entry.text) === said(text))) return false
+        const next = [...waiting, { id: `ays_${randomUUID()}`, text, by, at: new Date().toISOString() }]
+        await teammates.writeSettings({ aboutYouSuggestions: next.slice(-MAX_ABOUT_YOU_SUGGESTIONS) })
+        return true
+      }
     })
     roomTasks = createRoomTasks({
       rooms,

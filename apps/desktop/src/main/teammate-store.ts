@@ -8,7 +8,7 @@ import type { PublicTeammate, TeammateHue, TeammateRole, TeammateRoute, Workspac
 import { DEFAULT_RELAY_HOP_CAP, MAX_RELAY_HOP_CAP, MIN_RELAY_HOP_CAP, DEFAULT_MEMORY_MODE } from '../shared/ipc.js'
 import { isMissionRuntime } from '../shared/runtimes.js'
 import { isMonthlyLimit } from '../shared/spend.js'
-import { parsedAboutYou } from '../shared/about-you.js'
+import { parsedAboutYou, parsedAboutYouSuggestions } from '../shared/about-you.js'
 
 /**
  * Teammates are local identity plus routing defaults: a name, an avatar hue, a
@@ -556,6 +556,12 @@ function parsedFile(text: string): StoredFile {
         ? parsedAboutYou((rawSettings as Record<string, unknown>).aboutYou)
         : undefined
       return aboutYou === undefined ? {} : { aboutYou }
+    })(),
+    ...(() => {
+      const aboutYouSuggestions = typeof rawSettings === 'object' && rawSettings !== null
+        ? parsedAboutYouSuggestions((rawSettings as Record<string, unknown>).aboutYouSuggestions)
+        : undefined
+      return aboutYouSuggestions === undefined ? {} : { aboutYouSuggestions }
     })()
   }
 
@@ -940,6 +946,11 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           ...(() => {
             const aboutYou = parsedAboutYou((settings as Record<string, unknown>).aboutYou)
             return aboutYou === undefined ? {} : { aboutYou }
+          })(),
+          // Waiting suggestions (0.424); [] clears them.
+          ...(() => {
+            const aboutYouSuggestions = parsedAboutYouSuggestions((settings as Record<string, unknown>).aboutYouSuggestions)
+            return aboutYouSuggestions === undefined ? {} : { aboutYouSuggestions }
           })()
         }
         await write({ ...stored, settings: next })

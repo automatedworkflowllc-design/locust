@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import type { MemoryMode, MemoryScope, MemoryUpdateRequest, PublicForgottenMemory, PublicMemory, PublicTeammate } from '../../../shared/ipc.js'
 import { daysUnused, lastWritten, outOfDate } from '../../../shared/memory.js'
 import { MAX_ABOUT_YOU } from '../../../shared/about-you.js'
+import type { AboutYouSuggestion } from '../../../shared/about-you.js'
 import { TIDY_NUDGE_AT, readableReason } from '../../../shared/memory-tidy.js'
 import { Icon } from './Icon.js'
 import { TeammateBot } from './TeammateBot.js'
@@ -64,7 +65,9 @@ export function MemoryScreen({
   noticeWaits = false,
   onDismissNotice,
   aboutYou,
-  onSaveAboutYou
+  onSaveAboutYou,
+  aboutYouSuggestions = [],
+  onAnswerAboutYou
 }: {
   readonly memories: readonly PublicMemory[]
   readonly workspaceId: string
@@ -99,6 +102,9 @@ export function MemoryScreen({
   /** About you (0.423): the person's standing note, as saved. Absent hides the card. */
   readonly aboutYou?: string
   readonly onSaveAboutYou?: (text: string) => Promise<string | undefined>
+  /** Lines teammates suggested for it, and the person's answer to each (0.424). */
+  readonly aboutYouSuggestions?: readonly AboutYouSuggestion[]
+  readonly onAnswerAboutYou?: (id: string, add: boolean) => Promise<string | undefined>
 }): ReactElement {
   const [draft, setDraft] = useState('')
   const [draftScope, setDraftScope] = useState<MemoryScope>('workspace')
@@ -315,6 +321,36 @@ export function MemoryScreen({
     )
   }
 
+  /*
+   * A line for the person's own About-you note (0.424): the same register as
+   * a suggested memory, and two answers -- add it to the note, or let it go.
+   */
+  const suggestionRow = (suggestion: AboutYouSuggestion): ReactElement => (
+    <div key={suggestion.id} className="lc-memory is-proposed">
+      <span className="lc-memory__suggested" aria-hidden="true">
+        <Icon name="spark" size={14} />
+      </span>
+      <div className="lc-memory__body">
+        <p className="lc-memory__text">
+          <span className="lc-memory__change">Suggested for About you: </span>
+          {suggestion.text}
+        </p>
+        <p className="lc-memory__meta lc-mono">
+          <span>{suggestion.by}</span>
+          <span> · {when(suggestion.at)}</span>
+        </p>
+      </div>
+      <span className="lc-memory__actions">
+        <button type="button" className="lc-button is-active" disabled={busy || onAnswerAboutYou === undefined} onClick={() => void act(() => onAnswerAboutYou!(suggestion.id, true))}>
+          Add to About you
+        </button>
+        <button type="button" className="lc-ghostbutton" disabled={busy || onAnswerAboutYou === undefined} onClick={() => void act(() => onAnswerAboutYou!(suggestion.id, false))}>
+          Dismiss
+        </button>
+      </span>
+    </div>
+  )
+
   const kept = here.length + everywhere.length + elsewhere.length
 
   return (
@@ -323,12 +359,12 @@ export function MemoryScreen({
         <span className="lc-screen__title">Memory</span>
         <span className="lc-screen__meta lc-mono">
           {kept === 0 ? 'nothing remembered yet' : `${String(kept)} remembered`}
-          {proposed.length > 0 ? ` · ${String(proposed.length)} waiting for you` : ''}
+          {proposed.length + aboutYouSuggestions.length > 0 ? ` · ${String(proposed.length + aboutYouSuggestions.length)} waiting for you` : ''}
           {mode === 'off' ? ' · off' : ''}
         </span>
       </div>
       <div className="lc-screen__scroll">
-        {notice !== undefined && notice.length > 0 && !(noticeWaits && proposed.length === 0) && (
+        {notice !== undefined && notice.length > 0 && !(noticeWaits && proposed.length === 0 && aboutYouSuggestions.length === 0) && (
           <p className="lc-settings__note lc-memory__notice">
             {notice}{' '}
             <button type="button" className="lc-ghostbutton" onClick={onDismissNotice}>
@@ -344,7 +380,7 @@ export function MemoryScreen({
           * it on the Memory screen" arrived at the explanation and scrolled
           * for the thing they came to do (drive-memory-tidy, 0.371).
           */}
-        {proposed.length > 0 && (
+        {(proposed.length > 0 || aboutYouSuggestions.length > 0) && (
           <section className="lc-settings__section">
             <h2 className="lc-settings__heading">Waiting for you</h2>
             {proposed.length >= 2 && (
@@ -355,7 +391,10 @@ export function MemoryScreen({
                 </button>
               </div>
             )}
-            <div className="lc-memorylist">{proposed.map(row)}</div>
+            <div className="lc-memorylist">
+              {aboutYouSuggestions.map(suggestionRow)}
+              {proposed.map(row)}
+            </div>
           </section>
         )}
 

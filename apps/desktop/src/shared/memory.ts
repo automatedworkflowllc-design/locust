@@ -1,5 +1,6 @@
 import { BLOCK_PLACEMENT } from './trailer.js'
 import { blocksOutsideCode, defangProtocolBlocks } from './protocolTags.js'
+import { ABOUT_YOU_OP } from './about-you.js'
 /**
  * Team memory: what every teammate remembers, shared across the team and
  * kept per project folder, with a smaller set that goes everywhere.
@@ -53,7 +54,7 @@ export const TIDY_BLOCK = /<locust-tidy\s*>([\s\S]*?)<\/locust-tidy>/g
  * by the writer, never inferred. Inferring it is how a store starts deleting
  * things nobody agreed to lose.
  */
-const LINE = /^\s*(remember(?:\s+everywhere)?|forget)(?:\s+as\s+([A-Za-z0-9][A-Za-z0-9-]{0,63}))?\s*::\s*(.+?)\s*$/i
+const LINE = /^\s*(remember(?:\s+everywhere)?|forget|about\s+you)(?:\s+as\s+([A-Za-z0-9][A-Za-z0-9-]{0,63}))?\s*::\s*(.+?)\s*$/i
 
 export type MemoryScope = 'workspace' | 'global'
 
@@ -71,6 +72,8 @@ export type MemoryOp =
       readonly name?: string
     }
   | { readonly kind: 'forget'; readonly text: string }
+  /** A line suggested for the person's own About-you note (0.424); always put to them. */
+  | { readonly kind: 'about-you'; readonly text: string }
 
 /** A memory slug as the store keeps it: lower case, bounded, no stray marks. */
 export function memoryName(raw: string): string | undefined {
@@ -172,7 +175,9 @@ export function parseMemoryBlocks(text: string): readonly MemoryOp[] {
       const verb = line[1]!.toLowerCase().replace(/\s+/g, ' ')
       const memoryText = boundedMemoryText(line[3] ?? '')
       if (memoryText.length === 0) continue
-      if (verb === 'forget') {
+      if (verb === 'about you') {
+        ops.push({ kind: 'about-you', text: memoryText })
+      } else if (verb === 'forget') {
         // `forget` names a QUOTE, not a slug. A name here is a misunderstanding
         // of the form, and dropping it is kinder than filing the quote under it.
         ops.push({ kind: 'forget', text: memoryText })
@@ -525,6 +530,7 @@ export function memorySection(input: {
     'remember as <name> :: the same, for a fact that will change -- a status, a version, a current owner',
     'remember everywhere :: only for something true in every project, like how the person likes to work',
     'forget :: quote a remembered line that is now wrong',
+    ABOUT_YOU_OP,
     `</${MEMORY_TAG}>`,
     'Never remember file contents, secrets, credentials, or anything you can re-read from the workspace -- a value a file holds (a status, a colour, a version in README.md) is the file\'s to say. Do not remember what CLAUDE.md, AGENTS.md or a rules file already says.',
     // The instruction that stops the store filling with near-copies. Measured
