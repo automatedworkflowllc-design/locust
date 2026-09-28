@@ -11,6 +11,14 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.447.0 - 2026-09-28
+
+### Fixed
+
+- **A conversation's header names the model the way the model chip does.**
+  A Sonnet conversation's header said just "Sonnet" while the chip below it
+  said "Sonnet 5.5"; both now say Sonnet 5.5.
+
 ## 0.446.0 - 2026-09-28
 
 ### New

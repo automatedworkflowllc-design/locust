@@ -160,7 +160,7 @@ import { splitAttachments, withAttachments } from '../../shared/attachments.js'
 // different question from who owns a recorded mission.
 import { heldFor, routineOf } from './conversationList.js'
 import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, modeUnavailableReason, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, nextFreeModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
-import { homeRouteOf, isOwnRoute, modelDisplayName, rememberOwnModels, routeChrome } from './routeName.js'
+import { homeRouteOf, isOwnRoute, modelDisplayName, rememberOwnModels, routeChrome, routeModelName } from './routeName.js'
 import { FeedbackDialog } from './components/FeedbackDialog.js'
 import { conversationText } from './feedback.js'
 import { withMessageDelta } from '../../shared/messageFragments.js'
@@ -6638,7 +6638,8 @@ export default function App(): ReactElement {
                         : `${
                             liveRun.data.model === undefined
                               ? 'Account default'
-                              : modelDisplayName(liveRun.data.runtime, liveRun.data.model)
+                              : // The same name the chip gives it: "Sonnet 5.5", not the alias's bare "Sonnet" (0.447).
+                                routeModelName(liveRun.data.runtime, liveRun.data.model, resolvedModels.get(`${liveRun.data.runtime}:${liveRun.data.model}`))
                           }${
                             running
                               ? // A routine's step says which one it is on.

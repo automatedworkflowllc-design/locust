@@ -55,7 +55,9 @@ describe('1 · the mission strip carries one scope and one tense', () => {
     // read on every screen -- and a conversation that finished normally no
     // longer says "restored from the local ledger" or "completed". Running,
     // failed, cancelled and interrupted still say so; the model always does.
-    expect(strip).toContain('modelDisplayName')
+    // By the name the chip gives it (0.447): an alias that has run, or that
+    // Claude Code's table resolves, reads "Sonnet 5.5", not "Sonnet".
+    expect(strip).toContain('routeModelName(liveRun.data.runtime, liveRun.data.model')
     expect(strip).not.toContain('shortMissionId')
     expect(strip).not.toContain('restored from the local ledger')
     expect(strip).toContain("liveRun.phase === 'completed'")
