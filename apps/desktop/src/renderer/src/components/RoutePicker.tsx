@@ -405,7 +405,8 @@ export function RoutePicker({
         title={refused ?? (full ? `Three at most. Untick one to pick ${row.label}.` : `${row.label} · ${row.fullDetail}`)}
         onClick={() => {
           if (comparing && compare !== undefined) {
-            compare.onToggle({ ...choice, label: row.label })
+            // Named the way the chip names a route: "Nemotron 3 Ultra Free", not its id.
+            compare.onToggle({ ...choice, label: routeModelName(row.runtime, row.model, resolvedModels.get(`${row.runtime}:${row.model}`)) })
             return
           }
           onSelect(choice)

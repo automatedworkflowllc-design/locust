@@ -3472,6 +3472,7 @@ export default function App(): ReactElement {
         ...(column.refused === undefined ? {} : { refused: column.refused }),
         turns: cells.map((cell) => ({ missionId: cell.missionId, items: cell.items, running: cell.running })),
         running,
+        keepable: !running && last?.phase === 'completed',
         state,
         ...(spanMs > 0 ? { span: durationText(spanMs) } : {}),
         ...(cost === undefined ? {} : { cost })

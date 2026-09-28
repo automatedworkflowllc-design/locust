@@ -1839,7 +1839,7 @@ export function Composer({
                 * the runtime, which is the same fact the route chip beside it
                 * is there to give.
                 */}
-              {effortIsGenuinelyFixed && (
+              {effortIsGenuinelyFixed && !comparing && (
                 <span
                   className="lc-control lc-control--boxed is-static"
                   title="This runtime does not let the effort be chosen; it uses its own."

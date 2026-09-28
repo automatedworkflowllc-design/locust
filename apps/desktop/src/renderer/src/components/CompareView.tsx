@@ -28,6 +28,8 @@ export interface CompareColumnView {
   /** One cell per ask, oldest first; a column that could not take an ask has none for it. */
   readonly turns: readonly { readonly missionId: string; readonly items: readonly ThreadItem[]; readonly running: boolean }[]
   readonly running: boolean
+  /** Its newest answer finished: a failed or empty column has nothing to keep. */
+  readonly keepable: boolean
   /** "done", "working", "stopped", "failed" -- what the head says. */
   readonly state: string
   /** "41s", summed over its turns, when known. */
@@ -130,8 +132,8 @@ export function CompareView({
               <button
                 type="button"
                 className="lc-primarybutton"
-                disabled={keeping || column.turns.length === 0}
-                title="Keep this one. The others stop, and the conversation carries on with it."
+                disabled={keeping || !column.keepable}
+                title={column.keepable ? 'Keep this one. The others stop, and the conversation carries on with it.' : column.running ? 'Still answering.' : 'Nothing to keep: its answer did not finish.'}
                 onClick={() => onKeep(column.slot)}
               >
                 Keep this one
