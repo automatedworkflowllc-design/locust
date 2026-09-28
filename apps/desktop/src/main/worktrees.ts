@@ -68,6 +68,91 @@ export interface WorktreeManager {
    * made after they were shown the list is refused again.
    */
   remove(teammateId: string, options?: { readonly discard?: readonly string[] }): Promise<void>
+  /**
+   * Commit what a turn left in the teammate's tree to its branch (0.439).
+   * Locust's checkpoint, not the person's commit: `--no-verify`, unsigned,
+   * authored by the teammate. New files over `CHECKPOINT_MAX_FILE_BYTES` stay
+   * in the tree uncommitted and are named.
+   */
+  checkpoint(teammateId: string, message: CheckpointMessage): Promise<CheckpointResult>
+  /** The branch against where it left the person's branch, and each turn on it (0.439). Reads only. */
+  review(teammateId: string): Promise<BranchReview>
+  /** One turn's change, by the sha `review` listed. Reads only. */
+  turnDiff(teammateId: string, sha: string): Promise<string>
+}
+
+/** GitHub warns at 50 MB and refuses at 100: a new file past this is left out of a checkpoint. */
+export const CHECKPOINT_MAX_FILE_BYTES = 50 * 1024 * 1024
+/** A review's whole diff is shown up to this; past it, turn by turn. */
+export const REVIEW_MAX_DIFF_BYTES = 2 * 1024 * 1024
+/** Never runs a program the repository's config names to draw a diff. */
+const PLAIN_DIFF = ['--no-color', '--no-ext-diff', '--no-textconv'] as const
+
+export interface CheckpointMessage {
+  readonly subject: string
+  readonly body?: string
+  readonly trailers: readonly (readonly [string, string])[]
+  readonly author: { readonly name: string; readonly email: string }
+}
+
+export type CheckpointResult =
+  | { readonly kind: 'clean' }
+  | {
+      readonly kind: 'committed'
+      readonly sha: string
+      readonly branch: string
+      readonly files: readonly string[]
+      readonly skipped: readonly { readonly path: string; readonly bytes: number }[]
+    }
+  /** Only files too big to commit changed. */
+  | { readonly kind: 'skipped'; readonly skipped: readonly { readonly path: string; readonly bytes: number }[] }
+
+export interface BranchTurn {
+  readonly sha: string
+  readonly subject: string
+  readonly at: string
+  readonly files: readonly string[]
+}
+
+export interface BranchReview {
+  readonly branch: string
+  /** The person's branch the teammate's is measured against, or undefined when their checkout is detached. */
+  readonly against: string | undefined
+  readonly base: string
+  /** Oldest first. */
+  readonly turns: readonly BranchTurn[]
+  /** The whole change, base to branch; undefined past `REVIEW_MAX_DIFF_BYTES`. */
+  readonly diff: string | undefined
+  /** Changes in the tree no checkpoint holds yet: a turn running, or the person's own edits. */
+  readonly uncommitted: readonly string[]
+}
+
+/** `git status --porcelain -z`, as `{ code, path }`; a rename's old name is skipped. */
+export function statusEntriesOf(porcelainZ: string): readonly { readonly code: string; readonly path: string }[] {
+  const parts = porcelainZ.split('\0')
+  const out: { code: string; path: string }[] = []
+  for (let i = 0; i < parts.length; i += 1) {
+    const entry = parts[i] ?? ''
+    if (entry.length < 4) continue
+    const code = entry.slice(0, 2)
+    out.push({ code, path: entry.slice(3) })
+    if (code[0] === 'R' || code[0] === 'C') i += 1
+  }
+  return out
+}
+
+/** `git log --name-only --format=%x1e%H%x1f%s%x1f%aI`, newest first as git gives it. */
+export function branchTurnsOf(log: string): readonly BranchTurn[] {
+  return log
+    .split('\x1e')
+    .map((record) => record.replace(/\r/g, '').trim())
+    .filter((record) => record.length > 0)
+    .map((record) => {
+      const [head = '', ...rest] = record.split('\n')
+      const [sha = '', subject = '', at = ''] = head.split('\x1f')
+      return { sha, subject, at, files: rest.map((line) => line.trim()).filter((line) => line.length > 0) }
+    })
+    .filter((turn) => /^[0-9a-f]{40}$/.test(turn.sha))
 }
 
 /** A teammate's copy still has uncommitted changes, so removing it would delete them. */
@@ -342,6 +427,73 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
         throw new WorktreeHasChangesError(changes)
       }
       await runGit(['worktree', 'remove', '--force', path], root)
+    },
+
+    async checkpoint(teammateId, message) {
+      const path = await madeTree(teammateId)
+      const entries = statusEntriesOf(await runGit(['status', '--porcelain', '-z', '--untracked-files=all'], path))
+      if (entries.length === 0) return { kind: 'clean' }
+      const skipped: { path: string; bytes: number }[] = []
+      for (const entry of entries) {
+        if (entry.code !== '??') continue
+        const bytes = await stat(join(path, entry.path)).then((found) => found.size).catch(() => 0)
+        if (bytes > CHECKPOINT_MAX_FILE_BYTES) skipped.push({ path: entry.path, bytes })
+      }
+      await runGit(['add', '-A'], path, WORKTREE_CHECKOUT_TIMEOUT_MS)
+      if (skipped.length > 0) await runGit(['reset', '-q', '--', ...skipped.map((file) => file.path)], path)
+      const files = (await runGit(['diff', '--cached', '--name-only', '-z'], path)).split('\0').filter((file) => file.length > 0)
+      if (files.length === 0) return skipped.length > 0 ? { kind: 'skipped', skipped } : { kind: 'clean' }
+      const trailers = message.trailers.map(([key, value]) => `${key}: ${value.replace(/\s+/g, ' ').trim()}`).join('\n')
+      await runGit([
+        '-c', `user.name=${message.author.name}`,
+        '-c', `user.email=${message.author.email}`,
+        '-c', 'commit.gpgsign=false',
+        'commit', '--no-verify', '-q',
+        '-m', message.subject,
+        ...(message.body === undefined || message.body.trim().length === 0 ? [] : ['-m', message.body]),
+        ...(trailers.length === 0 ? [] : ['-m', trailers])
+      ], path, WORKTREE_CHECKOUT_TIMEOUT_MS)
+      const sha = (await runGit(['rev-parse', 'HEAD'], path)).trim()
+      const branch = (await runGit(['symbolic-ref', '--short', '-q', 'HEAD'], path).catch(() => '')).trim()
+      return { kind: 'committed', sha, branch, files, skipped }
+    },
+
+    async review(teammateId) {
+      const path = await madeTree(teammateId)
+      const branch = (await runGit(['symbolic-ref', '--short', '-q', 'HEAD'], path)).trim()
+      const against = (await runGit(['symbolic-ref', '--short', '-q', 'HEAD'], root).catch(() => '')).trim()
+      const base = (await runGit(['merge-base', 'HEAD', branch], root)).trim()
+      const turns = branchTurnsOf(await runGit(['log', '--name-only', '--format=%x1e%H%x1f%s%x1f%aI', `${base}..${branch}`], root)).slice().reverse()
+      const diff = await runGit(['diff', ...PLAIN_DIFF, base, branch], root)
+        .then((text) => (Buffer.byteLength(text, 'utf8') > REVIEW_MAX_DIFF_BYTES ? undefined : text))
+        .catch(() => undefined)
+      const uncommitted = statusEntriesOf(await runGit(['status', '--porcelain', '-z', '--untracked-files=all'], path)).map((entry) => entry.path)
+      return { branch, against: against.length > 0 ? against : undefined, base, turns, diff, uncommitted }
+    },
+
+    async turnDiff(teammateId, sha) {
+      if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error('That is not a turn on this branch.')
+      const path = await madeTree(teammateId)
+      const branch = (await runGit(['symbolic-ref', '--short', '-q', 'HEAD'], path)).trim()
+      // Only a turn of the teammate's -- after where it left the person's branch -- never another object.
+      const base = (await runGit(['merge-base', 'HEAD', branch], root)).trim()
+      const turns = (await runGit(['rev-list', `${base}..${branch}`], root)).split(/\r?\n/).map((line) => line.trim())
+      if (!turns.includes(sha)) throw new Error('That is not a turn on this branch.')
+      return runGit(['show', ...PLAIN_DIFF, '--format=', sha], root)
     }
+  }
+
+  /** A teammate's tree that git finished making, or a refusal that says so. */
+  async function madeTree(teammateId: string): Promise<string> {
+    const path = join(root, WORKTREE_DIR, safeTeammateDirectory(teammateId))
+    const made = await stat(join(path, '.git')).then((found) => found.isFile()).catch(() => false)
+    if (!made) throw new Error('This teammate has no own branch in this folder.')
+    // A half-made tree reads every file as deleted: committing it would delete the project on its branch.
+    const admin = await adminDirectoryOf(join(path, '.git'), root)
+    const lock = admin === undefined ? undefined : await readFile(join(admin, 'locked'), 'utf8').catch(() => undefined)
+    if (admin === undefined || lock?.trim() === 'initializing' || making.has(path)) {
+      throw new Error('This teammate\'s own branch is not finished being made.')
+    }
+    return path
   }
 }

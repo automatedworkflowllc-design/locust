@@ -58,15 +58,17 @@ describe('where it opens', () => {
     expect(APP).toContain("{ label: 'Open beside', shortcut: 'b', onSelect: () => setBesideId(missionId) }")
   })
 
-  it('shares the file panel: an open file wins, then the conversation beside, then the inspector', () => {
+  it('shares the file panel: an open file wins, then the conversation beside, then Review changes (0.439), then the inspector', () => {
     const file = APP.indexOf('{viewingFile !== undefined && screen === \'workroom\' ? (')
     const beside = APP.indexOf(") : besideRun !== undefined && screen === 'workroom' ? (")
+    const review = APP.indexOf(") : reviewing !== undefined && screen === 'workroom' ? (")
     const inspector = APP.indexOf("inspectorOpen && liveRun !== undefined && screen === 'workroom' && (\n            <Inspector")
     expect(file).toBeGreaterThan(-1)
     expect(beside).toBeGreaterThan(file)
-    expect(inspector).toBeGreaterThan(beside)
-    // And the middle makes room for it the way it does for a file.
-    expect(APP).toContain("besideRun !== undefined) && screen === 'workroom' ? ' has-viewer'")
+    expect(review).toBeGreaterThan(beside)
+    expect(inspector).toBeGreaterThan(review)
+    // And the middle makes room for each the way it does for a file.
+    expect(APP).toContain("besideRun !== undefined || reviewing !== undefined) && screen === 'workroom' ? ' has-viewer'")
   })
 
   it('never draws the conversation already in the middle a second time', () => {

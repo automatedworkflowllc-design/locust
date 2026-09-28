@@ -76,6 +76,9 @@ import { FREE_ONLY_REFUSAL, isFreeRoute } from './free-routes.js'
 import { attachmentsForRun } from './attachments-for-run.js'
 import { CODEX_INIT_PROMPT, commandNamed } from './runtime-commands.js'
 import type { CursorDefaultModel } from './cursor-default-model.js'
+import { checkpointMessage, checkpointNotice, checkpointSentence } from './turn-checkpoint.js'
+import type { TurnOutcome } from './turn-checkpoint.js'
+import type { CheckpointMessage, CheckpointResult } from './worktrees.js'
 
 export const MAX_PROMPT_LENGTH = 8_000
 /**
@@ -322,6 +325,17 @@ interface CodexMissionServiceOptions {
    * is sent to the teammate from here.
    */
   readonly afterEdits?: (cwd: string) => Promise<EditCheckResult | undefined>
+  /**
+   * 0.439: commit what a turn in a teammate's own worktree changed, to its
+   * branch (turn-checkpoint.ts). Called for runs in a worktree only, however
+   * the turn ended, before the slot is released so the next turn never
+   * starts mid-commit.
+   */
+  readonly checkpointTurn?: (input: {
+    readonly repositoryRoot: string
+    readonly teammateId: string
+    readonly message: CheckpointMessage
+  }) => Promise<CheckpointResult>
   /**
    * Where the host writes a line nobody sees on screen. A ledger write
    * that fails mid-run used to be reported as a card that named no cause
@@ -938,6 +952,29 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             .catch((error: unknown) => options.note?.('edit-check-write-failed', `${mission.missionId}: ${error instanceof Error ? error.message : 'no message'}`))
         })
         .catch(() => undefined)
+    }
+    // 0.439: a turn in the teammate's own worktree is committed to its branch,
+    // however it ended, with a receipt in its stream. Best effort: a commit
+    // that cannot be made says so, and the files stay in the tree.
+    if (mission.peer?.repositoryRoot !== undefined && options.checkpointTurn !== undefined) {
+      const ended = terminalEvents.find((event) => event.type === 'run.completed' || event.type === 'run.failed' || event.type === 'run.cancelled')?.type
+      const outcome: TurnOutcome = ended === 'run.completed' ? 'completed' : ended === 'run.cancelled' ? 'stopped' : 'failed'
+      const teammate = { teammateId: mission.peer.self.teammateId, name: mission.peer.self.name }
+      const result = await options
+        .checkpointTurn({
+          repositoryRoot: mission.peer.repositoryRoot,
+          teammateId: teammate.teammateId,
+          message: checkpointMessage({ prompt: mission.prompt, answer: mission.transcript.latestFinal, teammate, missionId: mission.missionId, runtime: mission.runtime, model: mission.model, outcome })
+        })
+        .catch((error: unknown) => ({ kind: 'failed' as const, message: error instanceof Error ? error.message : 'git did not say why.' }))
+      const sentence = checkpointSentence(result)
+      if (sentence !== undefined) {
+        await persistAndEmit(
+          mission,
+          options.ledger,
+          [checkpointNotice({ runId: mission.runId, missionId: mission.missionId, sourceAdapter: mission.runtime, nextSequence: mission.lastSequence + 1, at: now().toISOString(), sentence, failed: result.kind === 'failed' })] as ReturnType<CodexEventNormalizer['accept']>
+        ).catch(() => undefined)
+      }
     }
     clearActive(mission)
   }

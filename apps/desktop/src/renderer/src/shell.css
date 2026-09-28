@@ -14946,6 +14946,107 @@ textarea {
   flex-direction: column;
 }
 
+/*
+ * REVIEW CHANGES (ReviewChanges.tsx, 0.439): the viewer's panel, holding a
+ * teammate's branch -- a note on what it is, the turns as a list to pick
+ * from (the whole change first), then each file's diff under its path.
+ */
+.lc-review__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-4);
+  padding: var(--lc-space-5);
+}
+
+.lc-review__note {
+  margin: 0;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+}
+
+.lc-review__note.is-warn {
+  padding: var(--lc-space-3) var(--lc-space-4);
+  border: 1px solid var(--lc-amber-border);
+  border-radius: 8px;
+  background: var(--lc-amber-tint);
+  color: var(--lc-amber-text);
+}
+
+.lc-review__turns {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lc-review__turn {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--lc-space-3);
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--lc-text-secondary);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  text-align: left;
+  cursor: pointer;
+}
+
+.lc-review__turn:hover {
+  background: var(--lc-hover-surface);
+}
+
+.lc-review__turn.is-active {
+  background: var(--lc-hover-surface-strong);
+  color: var(--lc-text-primary);
+}
+
+.lc-review__subject {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-review__index,
+.lc-review__meta {
+  flex: none;
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+}
+
+.lc-review__files {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-4);
+}
+
+.lc-review__path {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lc-space-2);
+  margin-bottom: var(--lc-space-2);
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-secondary);
+}
+
+.lc-review__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--lc-text-primary);
+}
+
+.lc-review__status {
+  color: var(--lc-text-muted);
+}
+
 .lc-beside__thread .lc-thread {
   padding: var(--lc-space-6) var(--lc-space-5);
 }

@@ -814,6 +814,37 @@ export const TEAMMATE_CONNECTORS_CHANNEL = 'teammates:connectors'
 export const TEAMMATE_FOLDER_CHANNEL = 'teammates:folder'
 export const WORKTREE_LIST_CHANNEL = 'worktrees:list'
 export const WORKTREE_REMOVE_CHANNEL = 'worktrees:remove'
+/** Review changes (0.439): a teammate's own branch against where it left the person's, and one turn of it. */
+export const WORKTREE_REVIEW_CHANNEL = 'worktrees:review'
+export const WORKTREE_TURN_DIFF_CHANNEL = 'worktrees:turn-diff'
+
+export interface PublicBranchTurn {
+  readonly sha: string
+  readonly subject: string
+  readonly at: string
+  readonly files: readonly string[]
+}
+
+export interface PublicBranchReview {
+  readonly branch: string
+  /** The person's branch it is measured against; undefined when their checkout is detached. */
+  readonly against: string | undefined
+  readonly base: string
+  /** Oldest first: one per turn that changed something. */
+  readonly turns: readonly PublicBranchTurn[]
+  /** The whole change as a unified diff; undefined when too large to show at once. */
+  readonly diff: string | undefined
+  /** Changes in the tree no turn has saved yet. */
+  readonly uncommitted: readonly string[]
+}
+
+export type BranchReviewResponse =
+  | { readonly ok: true; readonly data: PublicBranchReview }
+  | { readonly ok: false; readonly error: { readonly code: 'REVIEW_UNAVAILABLE'; readonly message: string } }
+
+export type TurnDiffResponse =
+  | { readonly ok: true; readonly data: { readonly diff: string } }
+  | { readonly ok: false; readonly error: { readonly code: 'REVIEW_UNAVAILABLE'; readonly message: string } }
 export const MISSION_APPROVAL_CHANNEL = 'mission-approval:request'
 export const MISSION_APPROVAL_DECIDE_CHANNEL = 'mission-approval:decide'
 /** An approval answered somewhere else -- a question answered in Antigravity's own window. */
@@ -2671,6 +2702,9 @@ export interface DesktopApi {
    * exactly those (C1).
    */
   removeWorktree(teammateId: string, discard?: readonly string[]): Promise<WorktreeListResponse>
+  /** Review changes on a teammate's own branch (0.439). Reads only. */
+  reviewBranch(teammateId: string): Promise<BranchReviewResponse>
+  turnDiff(teammateId: string, sha: string): Promise<TurnDiffResponse>
   /**
    * H3: one mission's record with its events. History sends the newest
    * missions whole and every other one as a row; opening one of those reads

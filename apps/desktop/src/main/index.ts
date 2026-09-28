@@ -195,6 +195,8 @@ import {
   RUNTIME_SETUP_CHANNEL,
   WORKTREE_LIST_CHANNEL,
   WORKTREE_REMOVE_CHANNEL,
+  WORKTREE_REVIEW_CHANNEL,
+  WORKTREE_TURN_DIFF_CHANNEL,
   WORKSPACE_SETTINGS_READ_CHANNEL,
   WORKSPACE_SETTINGS_WRITE_CHANNEL,
   CONNECTOR_LIST_CHANNEL,
@@ -1648,6 +1650,8 @@ if (!ownsSingleInstanceLock) {
       acpSpawn: (executablePath, args, env, cwd) => spawnAppServer(executablePath, args, env, cwd),
       // A3.3: the person's check for THIS folder, after a turn that changed files.
       afterEdits: (cwd) => editCheck.after(cwd),
+      // 0.439: a commit per turn on the teammate's own branch (turn-checkpoint.ts).
+      checkpointTurn: ({ repositoryRoot, teammateId, message }) => createWorktreeManager({ workspacePath: repositoryRoot }).checkpoint(teammateId, message),
       /*
        * Asked at the start of every run, never captured: a connector signed
        * into after launch reaches the next mission without a restart.
@@ -4606,6 +4610,40 @@ if (!ownsSingleInstanceLock) {
           return { ok: false, error: { code: 'WORKTREE_HAS_CHANGES', message: error.message, changes: error.changes } } as const
         }
         return worktreesRejected(error instanceof Error ? error.message : 'That worktree could not be removed.')
+      }
+    })
+
+    /*
+     * REVIEW CHANGES (0.439): a teammate's own branch against where it left
+     * the person's branch, whole or turn by turn. Reads only. The repository
+     * is the one its tree was cut from: its own folder's, else the project's.
+     */
+    const reviewRejected = (message: string) => ({ ok: false, error: { code: 'REVIEW_UNAVAILABLE', message } }) as const
+    const branchManagerFor = async (teammateId: unknown) => {
+      if (typeof teammateId !== 'string') return undefined
+      const teammate = (await teammates.list()).find((entry) => entry.teammateId === teammateId)
+      if (teammate === undefined) return undefined
+      if (teammate.folder !== undefined) return createWorktreeManager({ workspacePath: teammate.folder })
+      return worktrees
+    }
+    ipcMain.handle(WORKTREE_REVIEW_CHANNEL, async (event, teammateId: unknown) => {
+      if (!fromOwnWindow(event)) return reviewRejected('The request was rejected.')
+      const manager = await branchManagerFor(teammateId).catch(() => undefined)
+      if (manager === undefined) return reviewRejected('That teammate has no own branch here.')
+      try {
+        return { ok: true, data: await manager.review(teammateId as string) } as const
+      } catch (error) {
+        return reviewRejected(error instanceof Error ? error.message : 'The branch could not be read. Nothing on it was changed.')
+      }
+    })
+    ipcMain.handle(WORKTREE_TURN_DIFF_CHANNEL, async (event, teammateId: unknown, sha: unknown) => {
+      if (!fromOwnWindow(event)) return reviewRejected('The request was rejected.')
+      const manager = await branchManagerFor(teammateId).catch(() => undefined)
+      if (manager === undefined || typeof sha !== 'string') return reviewRejected('That teammate has no own branch here.')
+      try {
+        return { ok: true, data: { diff: await manager.turnDiff(teammateId as string, sha) } } as const
+      } catch (error) {
+        return reviewRejected(error instanceof Error ? error.message : 'That turn could not be read. The branch is as it was.')
       }
     })
 

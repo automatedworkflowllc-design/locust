@@ -114,6 +114,7 @@ import type { TeamTemplate } from '../../shared/team-templates.js'
 import { GroupSettingsDialog } from './components/GroupSettingsDialog.js'
 import { TeammateBot } from './components/TeammateBot.js'
 import { BesideConversation } from './components/BesideConversation.js'
+import { ReviewChanges } from './components/ReviewChanges.js'
 import { ShareTeamDialog } from './components/TeamCard.js'
 import { RuntimeMark } from './components/RuntimeMark.js'
 import { OpenInTerminalButton, terminalOffer } from './components/OpenInTerminal.js'
@@ -1515,6 +1516,8 @@ export default function App(): ReactElement {
   /** Why a folder request for one teammate did nothing. */
   const [folderNotice, setFolderNotice] = useState<string>()
   const [inspectorOpen, setInspectorOpen] = useState(false)
+  /** Review changes (0.439): the teammate whose own branch is open beside the thread. */
+  const [reviewingId, setReviewingId] = useState<string>()
   /*
    * The file open beside the conversation, if any.
    *
@@ -2894,6 +2897,8 @@ export default function App(): ReactElement {
    * mission already is one, a teammate is a saved route with a face).
    */
   const pickedTeammate = addressedTeammate(teammates, selectedTeammateId)
+  // Review changes follows the teammate on screen: another conversation never shows this one's branch.
+  const reviewing = pickedTeammate !== undefined && pickedTeammate.teammateId === reviewingId && pickedTeammate.worktree === true ? pickedTeammate : undefined
   const composerRoute = composerRouteFor(route, pickedTeammate, pickerRoutes)
 
   /** Who a run belongs to: what it was started with, or what the host recorded. */
@@ -5727,7 +5732,7 @@ export default function App(): ReactElement {
    * rule, whichever of the two is occupying the space.
    */
   return (
-    <div className={`lc-shell${layoutMode === 'compact' ? ' is-compact' : ''}${(viewingFile !== undefined || viewerRefusal !== undefined || besideRun !== undefined) && screen === 'workroom' ? ' has-viewer' : inspectorOpen && liveRun !== undefined && screen === 'workroom' ? ' has-inspector' : ''}`}>
+    <div className={`lc-shell${layoutMode === 'compact' ? ' is-compact' : ''}${(viewingFile !== undefined || viewerRefusal !== undefined || besideRun !== undefined || reviewing !== undefined) && screen === 'workroom' ? ' has-viewer' :inspectorOpen && liveRun !== undefined && screen === 'workroom' ? ' has-inspector' : ''}`}>
       <TitleBar
         // With no folder the composer chip already says so; the bar shows the
         // build instead (Colin, 2026-09-05).
@@ -6438,11 +6443,26 @@ export default function App(): ReactElement {
                       <Icon name="dots" size={13} />
                     </button>
                   )}
+                  {/* Review changes (0.439): only a teammate on its own branch has one to review. */}
+                  {pickedTeammate?.worktree === true && (
+                    <button
+                      type="button"
+                      className={`lc-button${reviewingId === pickedTeammate.teammateId ? ' is-active' : ''}`}
+                      aria-pressed={reviewingId === pickedTeammate.teammateId}
+                      title={`What ${pickedTeammate.name} has saved on its own branch, whole or turn by turn`}
+                      onClick={() => setReviewingId(reviewingId === pickedTeammate.teammateId ? undefined : pickedTeammate.teammateId)}
+                    >
+                      <Icon name="diff" size={13} /> Review changes
+                    </button>
+                  )}
                   <button
                     type="button"
                     className={`lc-button${inspectorOpen ? ' is-active' : ''}`}
                     aria-pressed={inspectorOpen}
-                    onClick={() => setInspectorOpen(!inspectorOpen)}
+                    onClick={() => {
+                      setReviewingId(undefined)
+                      setInspectorOpen(!inspectorOpen)
+                    }}
                   >
                     <Icon name="activity" size={13} /> Activity
                   </button>
@@ -6899,6 +6919,8 @@ export default function App(): ReactElement {
             }}
             onClose={() => setBesideId(undefined)}
           />
+        ) : reviewing !== undefined && screen === 'workroom' ? (
+          <ReviewChanges key={reviewing.teammateId} teammate={reviewing} onClose={() => setReviewingId(undefined)} />
         ) : (
           inspectorOpen && liveRun !== undefined && screen === 'workroom' && (
             <Inspector

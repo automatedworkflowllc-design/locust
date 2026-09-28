@@ -11,6 +11,20 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.439.0 - 2026-09-28
+
+### New
+
+- **Each turn on Own branch is saved as a commit.** When a turn ends for a
+  teammate working on its own branch, whatever it changed is committed to
+  that branch (`locust/<name>`), with your ask as the message and the
+  teammate, route and outcome as trailers. The thread says what was saved.
+  Your own branch is never touched, your pre-commit hooks are not run for
+  these, nothing is pushed, and a new file over 50 MB is left out and named.
+- **Review changes.** A teammate on its own branch has a Review changes
+  button beside Activity: the branch against where it left yours, as one
+  change or turn by turn. It only reads; merging is still yours to do.
+
 ## 0.438.0 - 2026-09-28
 
 ### New
