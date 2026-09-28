@@ -23,6 +23,11 @@ const packaged = arg('--packaged')
 const SHOTS = arg('--out')
 if (SHOTS === undefined) throw new Error('--out <folder for the frames> is required')
 const FREE = process.env.LOCUST_FREE_MODEL ?? 'opencode/nemotron-3-ultra-free'
+// The window's size and pixel density: Colin's own window is about 1200x780,
+// which fills without dead space; at 2x the frames stay crisp on the site.
+const WIDTH = Number(arg('--width') ?? 1920)
+const HEIGHT = Number(arg('--height') ?? 1080)
+const SCALE = Number(arg('--scale') ?? 1)
 await mkdir(SHOTS, { recursive: true })
 
 const workspace = 'C:/acme-storefront'
@@ -52,7 +57,10 @@ const drive = await startDrive({
       { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: at, route: { runtime: 'opencode', model: FREE, mode: 'accept-edits' } },
       { teammateId: 'tm_atlas', name: 'Atlas', hue: 'blue', role: 'Research & Briefs', createdAt: at, route: { runtime: 'codex', model: 'gpt-6-luna', effort: 'low', mode: 'ask' } },
       { teammateId: 'tm_sable', name: 'Sable', hue: 'clay', role: 'Docs & QA', createdAt: at, route: { runtime: 'opencode', model: FREE, mode: 'approve-each' } },
-      { teammateId: 'tm_quill', name: 'Quill', hue: 'violet', role: 'Ops & Scheduling', createdAt: at, route: { runtime: 'claude', model: 'sonnet', mode: 'ask' } }
+      { teammateId: 'tm_quill', name: 'Quill', hue: 'violet', role: 'Ops & Scheduling', createdAt: at, route: { runtime: 'claude', model: 'opus', mode: 'ask' } },
+      // Never run: they fill the team grid, each chip naming a real model.
+      { teammateId: 'tm_marlow', name: 'Marlow', hue: 'blue', role: 'Code & Migrations', createdAt: at, route: { runtime: 'cursor', model: 'composer-2.5', mode: 'accept-edits' } },
+      { teammateId: 'tm_juniper', name: 'Juniper', hue: 'violet', role: 'Data & Reporting', createdAt: at, route: { runtime: 'claude', model: 'sonnet', mode: 'ask' } }
     ],
     missionOwners: {},
     settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: false, keepATodoList: true }
@@ -104,13 +112,16 @@ const waitEnd = `(async () => {
 
 try {
   await drive.ready()
-  await drive.resize(1920, 1080)
+  await drive.send('Emulation.setDeviceMetricsOverride', { width: WIDTH, height: HEIGHT, deviceScaleFactor: SCALE, mobile: false })
   await sleep(3000)
 
-  // 1. Home: the cover with the team.
+  // 1. Home: the cover with the team. Quill picked first, so the composer's
+  // chip names a model ("Claude / Opus 5.5"), never "Account Default".
+  await drive.evaluate(openTeammateScript('Quill'))
+  await sleep(1000)
   await drive.evaluate(`document.querySelector('button.lc-brand__lockup')?.click()`)
   await sleep(4000)
-  await shoot('01-home.png', 'Home with four teammates on four runtimes')
+  await shoot('01-home.png', 'Home with six teammates on four runtimes')
 
   // 2. The model picker, from Quill's composer (Claude Code), searched to show Claude and Codex.
   await drive.evaluate(openTeammateScript('Quill'))
