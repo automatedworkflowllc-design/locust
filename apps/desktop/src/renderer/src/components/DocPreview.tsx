@@ -41,12 +41,12 @@ function isPageFile(path: string): boolean {
  * uses (main/page-preview.ts), sized to the card. Colin, 2026-09-28: "full
  * functionality, sacrifice nothing."
  */
-export function PagePreview({ path, name }: { readonly path: string; readonly name: string }): ReactElement {
+export function PagePreview({ path, name, column }: { readonly path: string; readonly name: string; readonly column?: { readonly compareId: string; readonly slot: string } }): ReactElement {
   const [url, setUrl] = useState<string>()
   const [refused, setRefused] = useState<string>()
   useEffect(() => {
     let live = true
-    void window.desktop?.pageUrlFor(path).then((answer) => {
+    void window.desktop?.pageUrlFor(path, column).then((answer) => {
       if (!live) return
       if (answer.ok) setUrl(answer.url)
       else setRefused(answer.message)
@@ -54,7 +54,7 @@ export function PagePreview({ path, name }: { readonly path: string; readonly na
     return () => {
       live = false
     }
-  }, [path])
+  }, [path, column?.compareId, column?.slot])
   return url === undefined ? (
     <p className="lc-docpreview__framewait">{refused ?? 'Opening the page…'}</p>
   ) : (

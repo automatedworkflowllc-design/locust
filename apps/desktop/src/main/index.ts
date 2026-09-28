@@ -12,7 +12,7 @@ import { createRuntimeCommands } from './runtime-commands.js'
 import { createCursorDefaultModel } from './cursor-default-model.js'
 import { listWorkspaceFiles } from './workspace-files.js'
 import { MAX_TAGGED, taggedPrompt } from '../shared/tagging.js'
-import { COMPARE_TREES_DIRECTORY, comparesGoneWith, compareNeedsCopy, compareRefusalOf, compareSlotKey, compareTreeId, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../shared/compare.js'
+import { COMPARE_SLOTS, COMPARE_TREES_DIRECTORY, comparesGoneWith, compareNeedsCopy, compareRefusalOf, compareSlotKey, compareTreeId, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../shared/compare.js'
 import { bringInCopy, COPY_ROOT, copyLineChanges, makeCompareCopy, removeCompareCopies } from './compare-copies.js'
 import type { CompareSlotId, PublicCompare, PublicCompareSlot } from '../shared/compare.js'
 import { createCompareStore } from './compare-store.js'
@@ -39,7 +39,7 @@ import { spawn } from 'node:child_process'
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync, existsSync, renameSync, statSync, unlinkSync } from 'node:fs'
 import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { randomInt } from 'node:crypto'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, isAbsolute, join } from 'node:path'
 import { homedir, release } from 'node:os'
 import { execFile } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -3340,9 +3340,28 @@ if (!ownsSingleInstanceLock) {
       refreshListedCommands('opencode')
       return runtimeCommands.list().catch(() => ({}))
     })
-    ipcMain.handle(WORKSPACE_PAGE_CHANNEL, async (event, requested: unknown) => {
+    ipcMain.handle(WORKSPACE_PAGE_CHANNEL, async (event, requested: unknown, column: unknown) => {
       if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
       if (typeof requested !== 'string' || requested.length === 0) return { ok: false, message: 'There is no page to open.' } as const
+      /*
+       * A COMPARISON COLUMN'S PAGE, FROM ITS OWN COPY (0.452). Claude Code and
+       * Codex name the page they wrote relative to where they ran -- the
+       * column's copy -- and it was read from the folder: all three columns of
+       * the 0.451 three-way design comparison said "That page is not there"
+       * over pages that were there. OpenCode names it from the folder, which
+       * is why the free-model drives never saw it. Kept, the copy is gone and
+       * the page is the folder's own, so the folder is the fallback.
+       */
+      const place = typeof column === 'object' && column !== null ? (column as { compareId?: unknown; slot?: unknown }) : undefined
+      if (place !== undefined && !isAbsolute(requested) && typeof place.compareId === 'string' && (COMPARE_SLOTS as readonly unknown[]).includes(place.slot)) {
+        const compare = await compares.get(place.compareId).catch(() => undefined)
+        if (compare !== undefined) {
+          const name = compareTreeId(compare.compareId, place.slot as CompareSlotId)
+          const copy = compare.changesIn === 'copy' ? join(COPY_ROOT, name) : join(workspacePath, COMPARE_TREES_DIRECTORY, name)
+          const inCopy = join(copy, requested)
+          if (await stat(inCopy).then((found) => found.isFile(), () => false)) return pages.urlFor(inCopy)
+        }
+      }
       return pages.urlFor(requested)
     })
 

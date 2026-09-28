@@ -236,7 +236,7 @@ export function CompareView({
                         <>
                           {page !== undefined && (
                             <div className="lc-compare__page" aria-label={`The page ${column.name} made, running`}>
-                              <PagePreview path={page} name={page.replace(/\\/g, '/').split('/').pop() ?? page} />
+                              <PagePreview path={page} name={page.replace(/\\/g, '/').split('/').pop() ?? page} column={{ compareId: compare.compareId, slot: column.slot }} />
                             </div>
                           )}
                           <PinnedPagesContext.Provider value={page === undefined ? NO_PAGES : new Set([page])}>

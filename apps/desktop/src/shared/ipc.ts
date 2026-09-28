@@ -2716,7 +2716,8 @@ export interface DesktopApi {
   /** Read a workspace text file for the viewer. */
   readTextFile(path: string): Promise<WorkspaceTextResponse>
   /** Where a web page in the folder is served for the preview frame (0.425). */
-  pageUrlFor(path: string): Promise<WorkspacePageResponse>
+  /** `column`: a comparison column whose copy a relative path is read from first (0.452). */
+  pageUrlFor(path: string, column?: { readonly compareId: string; readonly slot: string }): Promise<WorkspacePageResponse>
   /** Each runtime's own slash commands, as its CLI last listed them (0.426). */
   runtimeCommands(): Promise<RuntimeCommandsResponse>
   /** Show the diagnostics log in the file manager. Names no path. */

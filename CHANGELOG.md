@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.452.0 - 2026-09-28
+
+### Fixed
+
+- **Pages built in a comparison show for every model.** When Claude Code
+  or Codex built the page, its column said "That page is not there" even
+  though the page was there. Each column now finds its page in its own
+  copy.
+
 ## 0.451.0 - 2026-09-28
 
 ### New
