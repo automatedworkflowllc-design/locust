@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.431.0 - 2026-09-28
+
+### Fixed
+
+- **A Cursor teammate no longer changes your own Cursor's model.** Cursor
+  saves whatever model a run asks for as your default, so after a Cursor
+  teammate ran, your own Cursor opened on the teammate's model. Locust now
+  puts your default back when the run ends. If you switched models yourself
+  in the meantime, your choice stays. Only the model settings are touched.
+
 ## 0.430.0 - 2026-09-28
 
 ### Improved

@@ -75,6 +75,7 @@ import { hostReadsEventsOf, runtimeDisplayName } from '../shared/runtimes.js'
 import { FREE_ONLY_REFUSAL, isFreeRoute } from './free-routes.js'
 import { attachmentsForRun } from './attachments-for-run.js'
 import { CODEX_INIT_PROMPT, commandNamed } from './runtime-commands.js'
+import type { CursorDefaultModel } from './cursor-default-model.js'
 
 export const MAX_PROMPT_LENGTH = 8_000
 /**
@@ -389,6 +390,11 @@ interface CodexMissionServiceOptions {
    * LOCUST_ASK_CONNECTORS=1 does the same for the drives.
    */
   readonly askConnectors?: () => Promise<boolean>
+  /**
+   * Puts the person's own Cursor default back after a Cursor run that named
+   * a model, which Cursor saves as the default (0.431, cursor-default-model.ts).
+   */
+  readonly cursorDefaultModel?: CursorDefaultModel
   /** A runtime's own slash commands, as its CLI listed them this run (0.426). */
   readonly onRuntimeCommands?: (runtime: 'claude' | 'opencode', commands: readonly RuntimeCommandInfo[]) => void
   /** The person's opt-in for a runtime-kept todo list. Absent reads as off. */
@@ -1905,7 +1911,20 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             process = acp
             steer = acp.steer
           } else {
-            process = options.runner.start(command, runtimePrompt, { signal: controller.signal })
+            // A model named to Cursor becomes the person's Cursor default;
+            // it is put back when the run ends (0.431).
+            const cursorGuard = runtime === 'cursor' && chosenModel !== undefined ? options.cursorDefaultModel : undefined
+            if (cursorGuard !== undefined) await cursorGuard.before(chosenModel!)
+            try {
+              process = options.runner.start(command, runtimePrompt, { signal: controller.signal })
+            } catch (startError) {
+              if (cursorGuard !== undefined) void cursorGuard.after().catch(() => undefined)
+              throw startError
+            }
+            if (cursorGuard !== undefined) {
+              const release = (): void => void cursorGuard.after().catch(() => undefined)
+              process.completion.then(release, release)
+            }
             // A2.10: Claude Code's input stays open while its turn runs, so a
             // message can be handed to it there too.
             const send = process.send

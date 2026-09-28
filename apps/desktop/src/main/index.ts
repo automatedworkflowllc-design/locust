@@ -9,6 +9,7 @@ import type { SavedWindow } from './window-bounds.js'
 import { app, BrowserWindow, crashReporter, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, powerSaveBlocker, protocol, safeStorage, screen, session, shell, Tray } from 'electron'
 import { createPageServer, fromPagePreview, PAGE_SCHEME } from './page-preview.js'
 import { createRuntimeCommands } from './runtime-commands.js'
+import { createCursorDefaultModel } from './cursor-default-model.js'
 import electronUpdater from 'electron-updater'
 
 const { autoUpdater } = electronUpdater
@@ -1609,6 +1610,13 @@ if (!ownsSingleInstanceLock) {
     })
     // Each runtime's own slash commands, as its CLI last listed them (0.426).
     const runtimeCommands = createRuntimeCommands({ file: join(app.getPath('userData'), 'runtime-commands.json') })
+    // Cursor saves a run's --model as the person's own default; put back after (0.431).
+    const cursorDefaultModel = createCursorDefaultModel({
+      file: join(homedir(), '.cursor', 'cli-config.json'),
+      keptFile: join(app.getPath('userData'), 'cursor-default-model.json'),
+      note: (what) => note('cursor-default-model', what)
+    })
+    void cursorDefaultModel.recover().catch(() => undefined)
     const codexMissions = createCodexMissionService({
       workspacePath,
       catchUpTerminal: catchUp,
@@ -1673,6 +1681,7 @@ if (!ownsSingleInstanceLock) {
       keepATodoList: async () => (await teammates.readSettings()).keepATodoList === true,
       readyConnectors: cursorReadyConnectors,
       // Each runtime's own slash commands (0.426, runtime-commands.ts).
+      cursorDefaultModel,
       onRuntimeCommands: (runtime, commands) => {
         void runtimeCommands.set(runtime, commands).then((changed) => {
           if (changed) sendToWindow({ kind: 'runtime-commands-changed' })
