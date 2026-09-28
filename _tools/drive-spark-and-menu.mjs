@@ -83,6 +83,19 @@ try {
   const hex = spark.primary?.replace('#', '') ?? ''
   const primaryRgb = hex.length === 6 ? `rgb(${parseInt(hex.slice(0, 2), 16)}, ${parseInt(hex.slice(2, 4), 16)}, ${parseInt(hex.slice(4, 6), 16)})` : ''
   check('the working spark is drawn in the primary text colour, not lime', spark.found && spark.colour === primaryRgb, JSON.stringify({ ...spark, primaryRgb }))
+  // 0.430: the face's working dot and the title bar's running dot too.
+  const dots = JSON.parse(String(await drive.evaluate(`(async () => {
+    for (let i = 0; i < 40 && !document.querySelector('.lc-presence'); i += 1) await new Promise((r) => setTimeout(r, 250))
+    const face = document.querySelector('.lc-bot .lc-presence, .lc-face .lc-presence')
+    const running = document.querySelector('.lc-runstate .lc-dot')
+    return JSON.stringify({
+      face: face ? getComputedStyle(face).backgroundColor : null,
+      running: running ? getComputedStyle(running).backgroundColor : null
+    })
+  })()`)))
+  say(`  dots: ${JSON.stringify(dots)}`)
+  check("the working dot on Ada's face is the primary text colour", dots.face === primaryRgb, JSON.stringify(dots))
+  check('the dot beside "running" in the title bar is the primary text colour', dots.running === primaryRgb, JSON.stringify(dots))
 
   await drive.evaluate(`(async () => {
     for (let i = 0; i < 600; i += 1) {
