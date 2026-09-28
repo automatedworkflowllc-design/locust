@@ -136,7 +136,7 @@ import { cappedLiveEvents, LIVE_EVENT_CAP,
   rootMission,
   startedLabel,
   stitchedHandoff,
-  runtimeNeverStarted, typedPrompt, buildThread, lastActivityAt, relativePath, fileTurns, shellCommandText, turnText, groupBoundary, groupJoins, groupLeavings, latestSetupNotes } from './missionView.js'
+  runtimeNeverStarted, shownPrompt, typedPrompt, buildThread, lastActivityAt, relativePath, fileTurns, shellCommandText, turnText, groupBoundary, groupJoins, groupLeavings, latestSetupNotes } from './missionView.js'
 import type { LiveStarter, TurnSwitch } from './missionView.js'
 import { finishedToast } from './finishedToast.js'
 import { folderName, ranOnLine } from './ranOn.js'
@@ -5135,7 +5135,7 @@ export default function App(): ReactElement {
         // A run's thread already shows the root's words for a continuation.
         // A relayed run's prompt is the host's briefing to a runtime, never a
         // sentence to name a conversation with.
-        title: missionTitle(relayedTitle({ ...run, peerMessages: run.peerMessages ?? [] }) ?? run.prompt),
+        title: missionTitle(relayedTitle({ ...run, peerMessages: run.peerMessages ?? [] }) ?? shownPrompt(run)),
         phase: liveRunIsActive(run) ? 'running' : isTerminal(run.phase) ? (run.phase as 'completed' | 'failed' | 'cancelled') : 'interrupted',
         ...(run.data?.runtime === undefined ? {} : { runtime: run.data.runtime }),
         integrityIssueCount: run.restoredMission?.integrityIssueCount ?? 0
@@ -5153,7 +5153,7 @@ export default function App(): ReactElement {
         // A continuation's own prompt is the briefing; name it by the words
         // the person typed at the start of the chain.
         title: missionTitle(
-          relayedTitle(rootMission(mission, historyById)) ?? rootMission(mission, historyById).prompt
+          relayedTitle(rootMission(mission, historyById)) ?? shownPrompt(rootMission(mission, historyById))
         ),
         rootId: rootMission(mission, historyById).missionId,
         // What this turn said, for search: a follow-up's words are not in the title (0.414).
@@ -6236,7 +6236,7 @@ export default function App(): ReactElement {
                   <div style={{ minWidth: 0 }}>
                     <div className="lc-workroom__titleline">
                       <span className="lc-workroom__name">
-                        {missionOwner?.name ?? missionTitle(liveRun.prompt)}
+                        {missionOwner?.name ?? missionTitle(shownPrompt(liveRun))}
                       </span>
                       <span className="lc-workroom__role">
                         {missionOwner === undefined ? '' : `${roleLabelOf(missionOwner)} · `}

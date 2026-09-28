@@ -74,3 +74,16 @@ describe('a handed-off step, read back from the record', () => {
     expect(typedPrompt(mission, new Map())).toBe('Check the plan.')
   })
 })
+
+describe("a handed-off step's title and bubble", () => {
+  it('are the step, not the answer quoted above it', async () => {
+    const { shownPrompt, turnPromptLine } = await import('./missionView.js')
+    const { handOffPrompt } = await import('../../shared/hand-off.js')
+    const prompt = handOffPrompt({ step: 'Write a plan to fix it.', from: { name: 'Wren', answer: 'The total is summed twice.' } })
+    const startedBy = { kind: 'routine' as const, routineId: 'rt_1', step: 2 }
+    expect(shownPrompt({ prompt, startedBy })).toBe('Write a plan to fix it.')
+    expect(turnPromptLine({ prompt, startedBy })).toBe('Write a plan to fix it.')
+    // A person's own message is theirs, whatever it contains.
+    expect(shownPrompt({ prompt })).toBe(prompt)
+  })
+})

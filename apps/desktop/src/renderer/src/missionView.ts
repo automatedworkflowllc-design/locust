@@ -4166,6 +4166,16 @@ export function handoffInstruction(prompt: string): string | undefined {
   return asked.length === 0 ? undefined : asked
 }
 
+/**
+ * What a turn is CALLED, from its prompt: a routine step handed to another
+ * teammate is named by the step, never by the answer quoted above it (0.435).
+ * The first packaged drive found the sidebar titled "Wren did the step before
+ * this one and answered:" after a restart.
+ */
+export function shownPrompt(mission: { readonly prompt: string; readonly startedBy?: { readonly kind: string } }): string {
+  return mission.startedBy?.kind === 'routine' ? stepWordsOf(mission.prompt) : mission.prompt
+}
+
 export function typedPrompt(
   mission: PublicRecoveredMission,
   byId: ReadonlyMap<string, PublicRecoveredMission>
@@ -4299,7 +4309,8 @@ export function turnPromptLine(turn: {
   // is the person's own words too, said to several at once, and so is what
   // they typed in the runtime's own terminal (0.391).
   if (turn.startedBy.kind === 'routine' || turn.startedBy.kind === 'room' || turn.startedBy.kind === 'terminal') {
-    return splitAttachments(turn.prompt).text
+    // A handed-off routine step carries the answer before it; the bubble is the step (0.435).
+    return splitAttachments(turn.startedBy.kind === 'routine' ? stepWordsOf(turn.prompt) : turn.prompt).text
   }
   // A relayed turn's prompt IS the message that started it, and the thread
   // already draws that message as a peer card, in time, before the work. The
