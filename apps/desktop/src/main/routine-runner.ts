@@ -159,6 +159,12 @@ function phaseWords(phase: RecoveredMissionPhase | undefined): string {
 /** Who takes a step of a hand-off chain (0.435): its named teammate, or the routine's own. */
 const ownerOf = (routine: { readonly teammateId: string; readonly handOffs?: readonly RoutineHandOff[] }, step: number): string =>
   routine.handOffs?.[step - 1]?.teammateId ?? routine.teammateId
+/** What a step's notice adds when it was handed on (0.435): who has it, with whose answer, and whether they check. */
+const handedTo = (to: string, from: string | undefined, check: boolean): string =>
+  from === undefined
+    ? check ? `, ${to} checks it` : ''
+    : check ? `, handed to ${to} with ${from}'s answer to check` : `, handed to ${to} with ${from}'s answer`
+
 /** Whether that step is the checker, whose approval the run needs. */
 const checks = (routine: { readonly handOffs?: readonly RoutineHandOff[] }, step: number): boolean =>
   routine.handOffs?.[step - 1]?.check === true
@@ -462,7 +468,8 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       const response = await startStep(saved, peer, next, owner === before ? execution.missionId : undefined, handedFrom)
       if (!response.ok) return { ok: false, error: { message: response.error.message } }
       await options.assignOwner(peer.self.teammateId, response.data.missionId).catch(() => undefined)
-      announce(saved, peer, execution.step + 1, response)
+      const started = announce(saved, peer, next, response)
+      if (handedFrom !== undefined) notice(started, `Routine "${saved.name}" · step ${String(next)} of ${String(saved.steps.length)}${handedTo(peer.self.name, handedFrom.name, checks(saved, next))}.`)
       changed()
       return { ok: true }
     },
@@ -609,7 +616,7 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       }
       await options.assignOwner(peer.self.teammateId, response.data.missionId).catch(() => undefined)
       const started = announce(routine, peer, next, response)
-      notice(started, `Routine "${routine.name}" · step ${String(next)} of ${String(routine.steps.length)}.`)
+      notice(started, `Routine "${routine.name}" · step ${String(next)} of ${String(routine.steps.length)}${handedTo(peer.self.name, handedFrom?.name, checks(routine, next))}.`)
     },
 
     running() {

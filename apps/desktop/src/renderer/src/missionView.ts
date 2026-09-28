@@ -19,6 +19,7 @@ import { parseFileBlocks, stripFileBlocks } from '../../shared/handover.js'
 import type { HandedFile } from '../../shared/handover.js'
 import type { DecisionRequest } from '../../shared/decision.js'
 import { isTidyPrompt } from '../../shared/memory-tidy.js'
+import { stepWordsOf } from '../../shared/hand-off.js'
 
 /**
  * Turns the normalized event stream into the thread the workroom renders.
@@ -4175,6 +4176,9 @@ export function typedPrompt(
   for (;;) {
     const relayed = relayedTitle(current)
     if (relayed !== undefined) return relayed
+    // A routine step handed to another teammate carries the answer before it
+    // and, for a checker, the rule; the person's step is what follows the mark (0.435).
+    if (current.startedBy?.kind === 'routine') return stepWordsOf(current.prompt)
     // Only where the host wrote the prompt. A mission a PERSON typed is their
     // words already, whatever sentences it happens to contain.
     if (current.continuesFrom?.reason !== 'route-switch') return current.prompt

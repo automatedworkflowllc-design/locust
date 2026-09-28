@@ -19,6 +19,13 @@ export const CHECK_RULE =
 /** Room for the quoted answer: the prompt must fit the mission's own limit with the step's words and the rule. */
 const OVERHEAD = 200
 
+/**
+ * Where the step's own words begin. The record keeps the whole prompt -- it
+ * is what the runtime was given -- and a person reading the conversation is
+ * shown the words after this, the way a relay's briefing is never a title.
+ */
+export const STEP_MARK = 'Your step: '
+
 export function handOffPrompt(input: {
   /** The step's own words, as the person wrote them. */
   readonly step: string
@@ -39,8 +46,18 @@ export function handOffPrompt(input: {
     parts.push(`${input.from.name} did the step before this one and answered:\n\n${quoted}`)
   }
   if (rule.length > 0) parts.push(rule)
-  parts.push(input.step)
+  parts.push(`${STEP_MARK}${input.step}`)
   return parts.join('\n\n')
+}
+
+/**
+ * The step's own words out of a hand-off prompt: the text after the LAST mark,
+ * so a quoted answer that happens to contain one cannot move it. A prompt with
+ * no mark is returned as it is -- a step that was not handed anything.
+ */
+export function stepWordsOf(prompt: string): string {
+  const at = prompt.lastIndexOf(`\n\n${STEP_MARK}`)
+  return at < 0 ? prompt : prompt.slice(at + 2 + STEP_MARK.length)
 }
 
 export type Verdict = { readonly approved: true } | { readonly approved: false; readonly changes: string }

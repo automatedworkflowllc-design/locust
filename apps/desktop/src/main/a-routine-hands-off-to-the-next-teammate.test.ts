@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { CHECK_RULE, handOffPrompt, verdictOf } from '../shared/hand-off.js'
+import { CHECK_RULE, handOffPrompt, STEP_MARK, stepWordsOf, verdictOf } from '../shared/hand-off.js'
 import type { CodexMissionStartResponse, CodexMissionUpdate, PublicRoutine, TeammateRoute } from '../shared/ipc.js'
 import { STEP_BUDGET } from '../shared/step-budget.js'
 import { createRoutineRunner } from './routine-runner.js'
@@ -104,15 +104,19 @@ describe('a routine whose steps go to different teammates', () => {
     expect(h.starts[1]).toMatchObject({ runtime: 'opencode', model: 'opencode/nemotron-3-ultra-free', mode: 'ask', followUpOf: undefined, peer: PEOPLE.tm_atlas })
     expect(h.starts[1]!.prompt).toContain('Wren did the step before this one and answered:')
     expect(h.starts[1]!.prompt).toContain('The total is summed twice in cart.ts line 12.')
-    expect(h.starts[1]!.prompt.endsWith('Write a plan to fix it.')).toBe(true)
+    expect(h.starts[1]!.prompt.endsWith(`${STEP_MARK}Write a plan to fix it.`)).toBe(true)
     expect(h.starts[1]!.prompt).not.toContain('VERDICT')
+    // What a person reading the conversation is shown: the step's own words.
+    expect(stepWordsOf(h.starts[1]!.prompt)).toBe('Write a plan to fix it.')
+    expect(h.notices().at(-1)).toBe("Routine \"Intake to review\" · step 2 of 3, handed to Atlas with Wren's answer.")
 
     await h.finish(runner, 'mission_2', 'Plan: remove the second sum.')
     // Sable checks: Atlas's answer, the rule, and her own step's words.
     expect(h.starts[2]).toMatchObject({ runtime: 'claude', model: 'haiku', effort: 'low', peer: PEOPLE.tm_sable })
     expect(h.starts[2]!.prompt).toContain('Atlas did the step before this one and answered:')
     expect(h.starts[2]!.prompt).toContain(CHECK_RULE)
-    expect(h.starts[2]!.prompt.endsWith('Check the plan.')).toBe(true)
+    expect(h.starts[2]!.prompt.endsWith(`${STEP_MARK}Check the plan.`)).toBe(true)
+    expect(h.notices().at(-1)).toBe("Routine \"Intake to review\" · step 3 of 3, handed to Sable with Atlas's answer to check.")
 
     await h.finish(runner, 'mission_3', 'The plan is right.\nVERDICT: APPROVED')
     expect(h.runs).toEqual(['rt_chain'])
@@ -202,6 +206,14 @@ describe('the words a hand-off is given', () => {
     expect(prompt.length).toBeLessThanOrEqual(STEP_BUDGET)
     expect(prompt).toContain("cut short here; Atlas's conversation has the rest")
     expect(prompt.endsWith('Check it.')).toBe(true)
+  })
+
+  it("gives back the step's own words, even when the quoted answer carries the mark itself", () => {
+    const tricky = handOffPrompt({ step: 'Ship it.', from: { name: 'Atlas', answer: `I was asked:
+
+${STEP_MARK}something else` } })
+    expect(stepWordsOf(tricky)).toBe('Ship it.')
+    expect(stepWordsOf('A step nobody handed anything.')).toBe('A step nobody handed anything.')
   })
 
   it('says so when the answer could not be read', () => {

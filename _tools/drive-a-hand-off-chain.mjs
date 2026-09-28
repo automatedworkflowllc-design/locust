@@ -46,8 +46,8 @@ const ROUTINE = {
   createdAt: '2026-09-28T01:00:00.000Z',
   runs: 0
 }
-const drive = await startDrive({
-  name: `hand-off-chain-${tag}`, port: 9771, workspace, outPath: OUT, spends: true,
+let drive = await startDrive({
+  name: `hand-off-chain-${tag}`, port: 9771, workspace, outPath: OUT, spends: true, keep: true,
   ...(packaged === undefined ? {} : { packaged }),
   seed: {
     schemaVersion: 1,
@@ -94,9 +94,9 @@ try {
     if (!box) return JSON.stringify({ open: false })
     const pickers = [...box.querySelectorAll('select[aria-label^="Who takes step"]')]
     const options = pickers[0] ? [...pickers[0].options].map((o) => o.innerText) : []
-    ${pick(`box.querySelector('select[aria-label="Who takes step 2"]')`, 'tm_atlas')}
+    ;${pick(`box.querySelector('select[aria-label="Who takes step 2"]')`, 'tm_atlas')}
     await new Promise((r) => setTimeout(r, 200))
-    ${pick(`document.querySelector('.lc-dialog select[aria-label="Who takes step 3"]')`, 'tm_sable')}
+    ;${pick(`document.querySelector('.lc-dialog select[aria-label="Who takes step 3"]')`, 'tm_sable')}
     await new Promise((r) => setTimeout(r, 200))
     const checks = [...document.querySelectorAll('.lc-dialog .lc-routinestep__check input')]
     checks[2]?.click()
@@ -145,9 +145,10 @@ try {
   steps.forEach((step, index) => say(`  step ${index + 1}: ${step.head} || ${step.tail.slice(-220)}`))
   await drive.capture("The checker's step", () => drive.evaluate(`document.querySelector('.lc-thread')?.innerText.replace(/\\s+/g, ' ').slice(-600) ?? ''`))
   check("step 1 was Wren's, step 2 Atlas's, step 3 Sable's", /Wren/.test(steps[0]?.head ?? '') && /Atlas/.test(steps[1]?.head ?? '') && /Sable/.test(steps[2]?.head ?? ''), steps.map((s) => s.head).join(' | '))
-  check("Atlas was given Wren's answer", /Wren did the step before this one and answered/.test(steps[1]?.thread ?? ''), (steps[1]?.thread ?? '').slice(0, 200))
-  check("Sable was given Atlas's answer and the checker's rule", /Atlas did the step before this one and answered/.test(steps[2]?.thread ?? '') && /VERDICT: APPROVED/.test(steps[2]?.thread ?? ''), (steps[2]?.thread ?? '').slice(0, 200))
   const all = steps.map((s) => s.thread).join(' ')
+  check("the thread says step 2 was handed to Atlas with Wren's answer", /handed to Atlas with Wren's answer/.test(all), all.slice(-300))
+  check("and step 3 to Sable with Atlas's answer, to check -- and she gave a verdict", /handed to Sable with Atlas's answer to check/.test(all) && /VERDICT: (APPROVED|CHANGES NEEDED)/.test(steps[2]?.thread ?? ''), (steps[2]?.tail ?? '').slice(-200))
+  check('each conversation shows the step as its first message, not the host\'s hand-off text', steps.every((s) => !/did the step before this one|You are the checker/.test(s.thread.slice(0, 160))), steps.map((s) => s.thread.slice(0, 80)).join(' | '))
   const verdict = /finished: 3 steps completed, approved by Sable/.test(all) ? 'approved' : /Sable, the checker, (asked for changes|gave no verdict)/.test(all) ? 'not approved' : 'none said'
   check('the thread says whether the checker approved, and the card agrees', verdict !== 'none said', verdict)
   const after = String(await drive.capture('Routines, after the run', () => drive.evaluate(openRoutines)))
@@ -158,6 +159,22 @@ try {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
   await drive.finish({ intro: `Build: ${packaged === undefined ? 'out/' : 'the packaged build'}. Wren and Atlas on OpenCode / ${FREE}, Sable (checker) on Codex / gpt-6-luna low; a three-step routine of Wren's, handed off in the editor.`, extra: `Checks failed: ${String(failures)}` })
+}
+// Relaunched on the same profile: what the record shows, not what the live run did.
+const profilePath = drive.profile
+await mkdir(join(OUT, 'after-relaunch'), { recursive: true })
+drive = await startDrive({ name: `hand-off-chain-${tag}-again`, port: 9771, workspace, outPath: join(OUT, 'after-relaunch'), profilePath, stepFrom: 5, ...(packaged === undefined ? {} : { packaged }) })
+try {
+  await drive.ready()
+  await sleep(2500)
+  const titles = JSON.parse(String(await drive.capture('After a relaunch: the sidebar', () => drive.evaluate(`JSON.stringify([...document.querySelectorAll('.lc-convrow .lc-conv')].map((row) => row.innerText.replace(/\\s+/g, ' ').trim()).slice(0, 3))`))))
+  say(`  after relaunch: ${JSON.stringify(titles)}`)
+  check("after a relaunch, each conversation is still titled by its step's own words", titles.length === 3 && titles.every((title) => !/did the step before|You are the checker|Your step/.test(title)) && /Check that the plan/.test(titles[0] ?? ''), JSON.stringify(titles))
+} catch (error) {
+  failures += 1
+  say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
+} finally {
+  await drive.finish({ intro: 'Relaunched on the same profile.', extra: `Checks failed: ${String(failures)}` })
 }
 say(failures === 0 ? 'ALL CHECKS PASSED' : `${String(failures)} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)

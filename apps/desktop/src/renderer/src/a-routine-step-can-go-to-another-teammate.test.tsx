@@ -64,3 +64,13 @@ describe('a routine card', () => {
     expect(routineChain({ ...routine, handOffs: [{}, {}, {}, {}] }, [WREN])).toBeUndefined()
   })
 })
+
+describe('a handed-off step, read back from the record', () => {
+  it("is shown as the step's own words, not the answer and rule it was given", async () => {
+    const { typedPrompt } = await import('./missionView.js')
+    const { handOffPrompt } = await import('../../shared/hand-off.js')
+    const prompt = handOffPrompt({ step: 'Check the plan.', from: { name: 'Atlas', answer: 'Plan: remove the second sum.' }, check: true })
+    const mission = { missionId: 'mission_3', prompt, startedBy: { kind: 'routine', routineId: 'rt_1', step: 3 } } as never
+    expect(typedPrompt(mission, new Map())).toBe('Check the plan.')
+  })
+})
