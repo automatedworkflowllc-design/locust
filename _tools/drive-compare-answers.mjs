@@ -23,13 +23,18 @@ const packaged = arg('--packaged')
 const tag = arg('--tag') ?? 'local'
 const MODEL = process.env.LOCUST_FREE_MODEL ?? 'opencode/nemotron-3-ultra-free'
 // Two free models, by the picker's row names; the first run's second pick (Ling) had its provider down.
-const PICKS = (process.env.LOCUST_COMPARE_PICKS ?? 'nemotron-3-ultra-free,mimo-v2.6-flash-free').split(',')
+// Each pick is `search=>row label`, or `search=>*Group` for the first enabled row under that runtime (0.443: Cursor's Grok).
+const PICKS = (process.env.LOCUST_COMPARE_PICKS ?? 'free=>nemotron-3-ultra-free,free=>mimo-v2.6-flash-free').split(',').map((spec) => {
+  const [search, label] = spec.includes('=>') ? spec.split('=>') : ['free', spec]
+  return { search, label }
+})
+const SPENDS = PICKS.some((pick) => pick.search !== 'free')
 const OUT = join(recordRoot('compare-answers-2026-09-28'), `compare-answers-${tag}`)
 await mkdir(OUT, { recursive: true })
 
 const workspace = await scratchRepository('locust-drive-compare-ws-')
 const drive = await startDrive({
-  name: `compare-answers-${tag}`, port: 9776, workspace, outPath: OUT,
+  name: `compare-answers-${tag}`, port: 9776, workspace, outPath: OUT, spends: SPENDS,
   ...(packaged === undefined ? {} : { packaged }),
   seed: {
     schemaVersion: 1,
@@ -97,15 +102,25 @@ try {
     await new Promise((r) => setTimeout(r, 300))
     const box = document.querySelector('.lc-picker__input')
     const setInput = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
-    setInput.call(box, 'free')
-    box.dispatchEvent(new Event('input', { bubbles: true }))
-    await new Promise((r) => setTimeout(r, 700))
     const labels = []
-    for (const want of ${JSON.stringify(PICKS)}) {
-      const row = [...document.querySelectorAll('.lc-picker__row:not(.is-recent)')].find((one) => !one.disabled && one.querySelector('.lc-picker__label')?.textContent.trim() === want)
+    for (const pick of ${JSON.stringify(PICKS)}) {
+      setInput.call(box, pick.search)
+      box.dispatchEvent(new Event('input', { bubbles: true }))
+      await new Promise((r) => setTimeout(r, 700))
+      let group = ''
+      let row
+      for (const node of document.querySelector('.lc-picker__list').children) {
+        const header = node.querySelector('.lc-picker__group')
+        if (header) group = header.innerText.trim()
+        const candidate = node.querySelector('.lc-picker__row:not(.is-recent)')
+        if (!candidate || candidate.disabled) continue
+        const label = candidate.querySelector('.lc-picker__label')?.textContent.trim() ?? ''
+        const wanted = pick.label.startsWith('*') ? new RegExp(pick.label.slice(1), 'i').test(group) : label === pick.label
+        if (wanted && !labels.includes(label)) { row = candidate; break }
+      }
       if (!row) continue
+      labels.push(row.querySelector('.lc-picker__label')?.textContent.trim() ?? '')
       row.click()
-      labels.push(want)
       await new Promise((r) => setTimeout(r, 250))
     }
     const foot = document.querySelector('.lc-picker__foot--compare')?.innerText.replace(/\\s+/g, ' ').trim() ?? ''
