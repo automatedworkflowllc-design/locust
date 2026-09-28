@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { baseModelId, createCursorDefaultModel } from './cursor-default-model.js'
+import { baseModelId, createCursorDefaultModel, namedModel } from './cursor-default-model.js'
 
 /**
  * A CURSOR RUN LEAVES THE PERSON'S OWN CURSOR AS IT FOUND IT (0.431).
@@ -105,6 +105,26 @@ describe("the person's Cursor default, around a Cursor run", () => {
     await guard.before('grok-4.7')
     await guard.after()
     expect(await readFile(file, 'utf8')).toBe(text)
+  })
+
+  it('is put back when the run named a list id Cursor saves as its base id: composer-2.5-fast is composer-2.5 (measured)', async () => {
+    await write({ ...SIGN_IN, ...GROK })
+    const guard = createCursorDefaultModel({ file, keptFile })
+    await guard.before('composer-2.5-fast')
+    await write({ ...SIGN_IN, ...COMPOSER, selectedModel: { modelId: 'composer-2.5', parameters: [{ id: 'fast', value: 'true' }] } })
+    await guard.after()
+    expect(await config()).toEqual({ ...SIGN_IN, ...GROK })
+  })
+
+  it('matches a model to the id it is saved under, and nothing else', () => {
+    expect(namedModel('composer-2.5-fast', 'composer-2.5')).toBe(true)
+    expect(namedModel('grok-4.7-256k-medium', 'grok-4.7')).toBe(true)
+    expect(namedModel('composer-2.5[fast=true]', 'composer-2.5')).toBe(true)
+    expect(namedModel('composer-2.5', 'composer-2.5')).toBe(true)
+    expect(namedModel('composer-2.5', 'gpt-6-sol')).toBe(false)
+    expect(namedModel('grok-4.7', 'grok-4.6')).toBe(false)
+    expect(namedModel('gpt-6', 'gpt-6-sol')).toBe(true)
+    expect(namedModel('composer-2.5', undefined)).toBe(false)
   })
 
   it('reads a model with bracketed options as its plain id', () => {

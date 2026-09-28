@@ -37,6 +37,20 @@ export interface CursorDefaultModel {
 /** The model id a run names, without its bracketed options: `composer-2.5[fast=true]` is `composer-2.5`. */
 export const baseModelId = (model: string): string => model.replace(/\[.*$/, '').trim()
 
+/**
+ * Whether the id Cursor saved is the model a run named. Cursor saves the
+ * BASE id with the rest as parameters: MEASURED 2026-09-28, a run named
+ * `composer-2.5-fast` (its --list-models id) was saved as `composer-2.5`
+ * with `fast=true` -- and 0.431's first build, comparing whole ids, took
+ * that for the person's own change and left it.
+ */
+export function namedModel(runModel: string, savedId: string | undefined): boolean {
+  if (savedId === undefined) return false
+  const ran = baseModelId(runModel).toLowerCase()
+  const saved = savedId.toLowerCase()
+  return ran === saved || ran.startsWith(`${saved}-`) || saved.startsWith(`${ran}-`)
+}
+
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
 const idOf = (value: unknown): string | undefined =>
   typeof value === 'object' && value !== null && typeof (value as { modelId?: unknown }).modelId === 'string'
@@ -68,8 +82,7 @@ export function createCursorDefaultModel(options: {
     if (now === undefined) return
     const current = fieldsOf(now.config)
     if (FIELDS.every((field) => same(current[field], record.fields[field]))) return
-    const ran = baseModelId(record.runModel)
-    if (idOf(current.model) !== ran && idOf(current.selectedModel) !== ran) {
+    if (!namedModel(record.runModel, idOf(current.model)) && !namedModel(record.runModel, idOf(current.selectedModel))) {
       options.note?.('the Cursor default changed to a model this run did not name; left as the person set it')
       return
     }
