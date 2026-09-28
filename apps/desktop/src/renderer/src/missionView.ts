@@ -2868,7 +2868,10 @@ export function buildThread(
         // tool_progress" (Colin, 2026-09-22: "?"). It goes to the fold's foot
         // with the turn's other remarks -- still readable, out of the thread.
         const unknownRecord = /\.unknown_event$/.test(event.payload.code)
-        if (unknownRecord || (!workBegan && !/\.(runtime_error|notification)$/.test(event.payload.code))) {
+        // A compaction is let through too: after a `/compact` the person sent
+        // (0.426) it is the whole of the turn's answer, and in the fold it
+        // left the thread saying the turn "ended without a reply".
+        if (unknownRecord || (!workBegan && !/\.(runtime_error|notification|context_compacted)$/.test(event.payload.code))) {
           /*
            * Not shown in the thread -- and, until now, not shown anywhere.
            *
@@ -3248,6 +3251,8 @@ export function buildThread(
       options.spokeToPeers === true
       || items.some((item) => item.type === 'agent-message' || item.type === 'activity' || item.type === 'plan' || item.type === 'files' || item.type === 'decision')
       || events.some((event) => event.type === 'message.delta' && event.payload.text.replace(/<locust-share[^>]*>[^]*?<\/locust-share>/g, '').trim().length > 0)
+      // A summarized conversation is what `/compact` answers with (0.426).
+      || events.some((event) => event.type === 'adapter.diagnostic' && /\.context_compacted$/.test(event.payload.code))
     if (!saidSomething) {
       items.push({
         key: 'silent_turn',

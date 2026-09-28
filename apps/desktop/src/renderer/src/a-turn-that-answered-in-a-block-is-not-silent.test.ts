@@ -51,6 +51,21 @@ describe('a turn that answered only in a block', () => {
     expect(warned([plan, finished], true)).toBe(false)
   })
 
+  it('is not said to have ended without a reply when the answer was a summarized conversation (0.426)', () => {
+    // `/compact` sent as the command: Claude Code writes no text, only the
+    // boundary. Packaged 0.426, first drive: the notice went to the fold and
+    // the thread said "Sending it again usually works."
+    const compacted = event('adapter.diagnostic', {
+      code: 'claude.context_compacted',
+      level: 'info',
+      terminal: false,
+      message: 'Claude Code summarized the conversation so far, as asked, and carries on from the summary.'
+    })
+    expect(warned([compacted, finished], true)).toBe(false)
+    const shown = buildThread([compacted, finished], { running: false, latestTurn: true })
+    expect(shown.some((item) => item.type === 'diagnostic' && /summarized the conversation so far, as asked/.test(item.message))).toBe(true)
+  })
+
   it('still is when nothing came back at all', () => {
     expect(warned([finished], true)).toBe(true)
     expect(warned([reply('   '), finished], true)).toBe(true)
