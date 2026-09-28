@@ -80,7 +80,7 @@ const FACE_VARIABLE: Readonly<Record<PixelFaceHue, string>> = {
 }
 
 export const PRESENCE_TONE: Readonly<Record<FacePresence, string | undefined>> = {
-  working: 'lime',
+  working: 'live',
   approval: 'amber',
   blocked: 'red',
   none: undefined

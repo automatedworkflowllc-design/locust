@@ -80,7 +80,8 @@ describe('what the home screen draws', () => {
     expect(before).not.toContain('lc-bot__ring')
     // Then Wren floats, lit; Atlas waits on you -- Locust's amber ring and
     // dot -- and Sable sleeps, unmarked.
-    expect(after).toContain('lc-presence--lime')
+    // Working is monochrome since 0.430 (Colin: "we don't really use any lime accents").
+    expect(after).toContain('lc-presence--live')
     expect(after).toContain('lc-presence--amber')
     expect(after.match(/lc-bot__ring/g) ?? []).toHaveLength(1)
   })

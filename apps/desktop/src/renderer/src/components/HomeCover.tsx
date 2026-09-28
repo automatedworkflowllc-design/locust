@@ -128,7 +128,7 @@ interface CoverBot {
   /** Floats instead of hopping: a slow bob, no idle jumps. */
   readonly floats?: boolean
   /** Locust's own marks: the presence dot, and the ring of a teammate waiting on you. */
-  readonly dot?: 'lime' | 'amber'
+  readonly dot?: 'live' | 'amber'
   readonly waiting?: boolean
   /** Top-left on the cover's canvas, where a bot is 120 across. */
   readonly x: number
@@ -142,7 +142,7 @@ interface CoverBot {
  * library's idle look-around with no jumps, carried on a slow bob.
  */
 export const COVER_CAST: readonly CoverBot[] = [
-  { key: 'wren', type: 'ghost', state: 'default', floats: true, dot: 'lime', x: 245, y: -10 },
+  { key: 'wren', type: 'ghost', state: 'default', floats: true, dot: 'live', x: 245, y: -10 },
   { key: 'atlas', type: 'droid', hue: 'blue', state: 'default', dot: 'amber', waiting: true, x: 432, y: 0 },
   { key: 'sable', type: 'hopper', hue: 'lime', state: 'sleeping', x: 619, y: -2 }
 ]

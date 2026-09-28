@@ -306,7 +306,7 @@ export interface TeammateStatusView {
   readonly activity: FaceActivity
   readonly label: string
   /** Semantic token name, never a literal color. */
-  readonly tone: 'lime' | 'amber' | 'muted' | 'red'
+  readonly tone: 'live' | 'amber' | 'muted' | 'red'
   readonly pulse: boolean
 }
 
@@ -433,14 +433,14 @@ export function teammateStatusView(input: {
   }
   // Copy follows state: the word beside the face is the face's own word.
   if (input.hasRunningMission) {
-    return { status: 'working', activity, label: `${input.roleLabel} · ${faceLabel(activity)}`, tone: 'lime', pulse: true }
+    return { status: 'working', activity, label: `${input.roleLabel} · ${faceLabel(activity)}`, tone: 'live', pulse: true }
   }
   return { status: 'idle', activity, label: `${input.roleLabel} · ${faceLabel(activity)}`, tone: 'muted', pulse: false }
 }
 
 export interface MissionPhaseView {
   readonly label: string
-  readonly tone: 'lime' | 'blue' | 'amber' | 'red' | 'muted'
+  readonly tone: 'live' | 'blue' | 'amber' | 'red' | 'muted'
   /** Uppercase tag for the missions table. */
   readonly tag: string
 }
@@ -449,7 +449,7 @@ export function missionPhaseView(
   phase: PublicRecoveredMission['phase'] | 'running',
   hasIntegrityIssues = false
 ): MissionPhaseView {
-  if (phase === 'running') return { label: 'Running', tone: 'lime', tag: 'RUNNING' }
+  if (phase === 'running') return { label: 'Running', tone: 'live', tag: 'RUNNING' }
   if (phase === 'interrupted') {
     return { label: 'Interrupted', tone: 'red', tag: 'INTERRUPTED' }
   }

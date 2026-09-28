@@ -20,7 +20,7 @@ import type { TeammateStatusView } from './status.js'
 const wren = { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: '2026-09-23T05:00:00.000Z', avatar: seedAvatar('tm_wren') } as PublicTeammate
 const sable = { teammateId: 'tm_sable', name: 'Sable', hue: 'clay', role: 'Ops & Scheduling', createdAt: '2026-09-23T05:00:01.000Z', avatar: seedAvatar('tm_sable') } as PublicTeammate
 
-const working: TeammateStatusView = { status: 'working', activity: 'working', label: 'Code & Migrations · working', tone: 'lime', pulse: true }
+const working: TeammateStatusView = { status: 'working', activity: 'working', label: 'Code & Migrations · working', tone: 'live', pulse: true }
 const waiting: TeammateStatusView = { status: 'approval-needed', activity: 'waiting', label: 'Code & Migrations · waiting on you', tone: 'amber', pulse: false }
 const signedOut: TeammateStatusView = { status: 'blocked', activity: 'blocked', label: 'Runtime sign-in required', tone: 'red', pulse: false }
 

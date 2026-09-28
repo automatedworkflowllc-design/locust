@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.430.0 - 2026-09-28
+
+### Improved
+
+- **"Working" is monochrome everywhere.** The dot on a working teammate's
+  face, the dot beside "running" at the top of the window, and the Running
+  marks on the Missions screen are now white, like the sidebar's spinner.
+  Colour is kept for what needs you (amber) and what went wrong (red); the
+  dot beside "runtimes connected" stays green.
+
 ## 0.429.0 - 2026-09-28
 
 ### Improved

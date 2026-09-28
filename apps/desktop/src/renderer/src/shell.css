@@ -2205,6 +2205,12 @@ textarea {
   color: var(--lc-lime-text);
 }
 
+/* RUNNING, monochrome (0.430): see .lc-presence--live. */
+.lc-tag.is-live {
+  border-color: var(--lc-border-strong);
+  color: var(--lc-text-primary);
+}
+
 /* Green is "available"; lime is "happening right now". A first launch has
    nothing happening on it, so its READY tags are green (design pass,
    objection 5). Added because the class did not exist -- an undefined one
@@ -10553,6 +10559,18 @@ textarea {
   background: var(--lc-lime);
 }
 
+/*
+ * WORKING IS MONOCHROME (0.430). Colin, 2026-09-28, of the sidebar's spark:
+ * "since we don't really use any lime accents just make the working/thinking
+ * sidebar notifier monochrome to match the rest of the ui" -- and then, of
+ * the face's working dot and the title bar's running dot, the same. Motion
+ * and the word say it is working; colour is kept for what needs you (amber)
+ * and what went wrong (red).
+ */
+.lc-presence--live {
+  background: var(--lc-text-primary);
+}
+
 .lc-presence--amber {
   background: var(--lc-amber);
 }
@@ -13217,6 +13235,11 @@ textarea {
  */
 .lc-tone-lime.lc-tone-lime {
   color: var(--lc-lime-text);
+}
+
+/* Working and running (0.430): monochrome, see .lc-presence--live. */
+.lc-tone-live.lc-tone-live {
+  color: var(--lc-text-primary);
 }
 
 .lc-tone-green.lc-tone-green {

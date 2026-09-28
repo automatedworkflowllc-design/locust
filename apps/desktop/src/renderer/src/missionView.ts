@@ -3330,7 +3330,7 @@ export function cancellationSummary(
 }
 
 /** Colour class for a Signal Rail row, by what the event means. */
-export type SignalTone = 'lime' | 'blue' | 'violet' | 'amber' | 'red' | 'muted'
+export type SignalTone = 'live' | 'blue' | 'violet' | 'amber' | 'red' | 'muted'
 
 export interface SignalRow {
   readonly key: string
@@ -3459,7 +3459,7 @@ export function buildSignalRail(
             key: event.id,
             name: railToolName(event.payload),
             meta: `${clock} · ${options.running ? 'running' : 'did not finish'}`,
-            tone: options.running ? 'lime' : 'muted',
+            tone: options.running ? 'live' : 'muted',
             live: options.running
           })
         } else {

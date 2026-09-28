@@ -40,7 +40,7 @@ export function TitleBar({
         )}
         {runningCount > 0 && (
           <span className="lc-runstate">
-            <span className="lc-dot is-pulsing lc-tone-lime" />
+            <span className="lc-dot is-pulsing lc-tone-live" />
             {runningCount} running
           </span>
         )}
