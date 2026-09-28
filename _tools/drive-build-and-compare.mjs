@@ -108,7 +108,7 @@ try {
       waits: [...document.querySelectorAll('.lc-docpreview__framewait')].map((el) => el.textContent.trim()),
       feet: [...document.querySelectorAll('.lc-compare__numbers')].map((el) => el.textContent.trim()),
       // The file names Locust shows. A model's own command is drawn as it ran it, copy path and all.
-      internal: [...document.querySelectorAll('.lc-compare .lc-filerow__path')].some((el) => el.innerText.includes('.locust'))
+      internal: [...document.querySelectorAll('.lc-compare .lc-filerow:not(.is-shell) .lc-filerow__path')].some((el) => el.innerText.includes('.locust'))
     })
   })()`))))
   say(`  built: ${JSON.stringify(built)}`)
