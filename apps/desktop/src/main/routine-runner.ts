@@ -349,7 +349,9 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       : handOffPrompt({
           step: prompt,
           ...(handedFrom === undefined ? {} : { from: { name: handedFrom.name, answer: await options.replyOf?.(handedFrom.missionId).catch(() => undefined) } }),
-          check: checks(routine, step)
+          check: checks(routine, step),
+          // A checker is told what the chain was for, not only what came last.
+          ...(step > 1 && routine.steps[0] !== undefined ? { task: routine.steps[0] } : {})
         })
     const prior = routine.execution
     const intent: RoutineExecution = {

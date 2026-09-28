@@ -32,11 +32,22 @@ export function handOffPrompt(input: {
   /** Who did the step before, and what they answered; absent when this step follows its own teammate. */
   readonly from?: { readonly name: string; readonly answer: string | undefined }
   readonly check?: boolean
+  /**
+   * What the chain was for: the routine's first step, for a checker. The
+   * packaged drive's first checker refused to approve a correct plan because
+   * "no issue description is included" -- it was shown the plan and not the
+   * problem the plan was for.
+   */
+  readonly task?: string
 }): string {
   const rule = input.check === true ? CHECK_RULE : ''
+  const task = input.check === true && input.task !== undefined && input.task.trim().length > 0
+    ? `The routine's task, as its first step asked: ${input.task.trim().slice(0, 1500)}`
+    : ''
   const parts: string[] = []
+  if (task.length > 0) parts.push(task)
   if (input.from !== undefined) {
-    const room = Math.max(0, STEP_BUDGET - input.step.length - rule.length - OVERHEAD)
+    const room = Math.max(0, STEP_BUDGET - input.step.length - rule.length - task.length - OVERHEAD)
     const answer = (input.from.answer ?? '').trim()
     const quoted = answer.length === 0
       ? `(${input.from.name}'s answer could not be read; their conversation has it.)`

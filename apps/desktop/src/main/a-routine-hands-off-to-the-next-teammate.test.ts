@@ -115,6 +115,9 @@ describe('a routine whose steps go to different teammates', () => {
     expect(h.starts[2]).toMatchObject({ runtime: 'claude', model: 'haiku', effort: 'low', peer: PEOPLE.tm_sable })
     expect(h.starts[2]!.prompt).toContain('Atlas did the step before this one and answered:')
     expect(h.starts[2]!.prompt).toContain(CHECK_RULE)
+    // And what the chain was for: step 1's words (the first drive's checker had only the plan).
+    expect(h.starts[2]!.prompt).toContain("The routine's task, as its first step asked: Read the bug report in issue.md and say what is wrong.")
+    expect(h.starts[1]!.prompt).not.toContain("The routine's task")
     expect(h.starts[2]!.prompt.endsWith(`${STEP_MARK}Check the plan.`)).toBe(true)
     expect(h.notices().at(-1)).toBe("Routine \"Intake to review\" · step 3 of 3, handed to Sable with Atlas's answer to check.")
 
