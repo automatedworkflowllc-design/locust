@@ -418,8 +418,13 @@ export function Sidebar({
    * and the list you actually scan stays at the top of the column.
    */
   const [foldedGroups, setFoldedGroups] = useState<ReadonlySet<string>>(new Set())
-  /** Project sections folded shut (0.458). */
+  /*
+   * Project sections (0.458): the window's folder open unless folded, every
+   * other folder folded unless opened -- a heading and a count say nothing is
+   * lost without a list of weeks-old conversations under each.
+   */
   const [foldedFolders, setFoldedFolders] = useState<ReadonlySet<string>>(new Set())
+  const [openedFolders, setOpenedFolders] = useState<ReadonlySet<string>>(new Set())
   /*
    * A new group is named before it exists.
    *
@@ -1600,7 +1605,8 @@ export function Sidebar({
               const sections = folderSectionsOf(shownConversations, currentFolderId)
               if (sections.length <= 1) return conversationList(shownConversations, true)
               return sections.map((section) => {
-                const open = !foldedFolders.has(section.id)
+                const isCurrent = section.id === currentFolderId
+                const open = isCurrent ? !foldedFolders.has(section.id) : openedFolders.has(section.id)
                 const name = folders.find((folder) => folder.id === section.id)?.name ?? 'Unknown folder'
                 return (
                   <div className="lc-project" key={section.id}>
@@ -1610,7 +1616,7 @@ export function Sidebar({
                       aria-expanded={open}
                       title={section.id === currentFolderId ? `${name}: new conversations start here` : folders.find((folder) => folder.id === section.id)?.installFolder === true ? `${name}: Locust's own install folder, where early builds ran. These can be read, not continued.` : folders.some((folder) => folder.id === section.id) ? name : 'Locust does not know which folder these ran in.'}
                       onClick={() =>
-                        setFoldedFolders((current) => {
+                        (isCurrent ? setFoldedFolders : setOpenedFolders)((current) => {
                           const next = new Set(current)
                           if (next.has(section.id)) next.delete(section.id)
                           else next.add(section.id)

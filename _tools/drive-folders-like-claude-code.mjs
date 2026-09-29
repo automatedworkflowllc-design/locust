@@ -84,14 +84,19 @@ try {
     return JSON.stringify([...document.querySelectorAll('.lc-project')].map((project) => ({
       name: project.querySelector('.lc-project__name')?.textContent ?? '',
       current: project.querySelector('.lc-project__head')?.classList.contains('is-current') ?? false,
-      rows: project.querySelectorAll('.lc-convrow').length
+      rows: project.querySelectorAll('.lc-convrow').length,
+      count: Number(project.querySelector('.lc-sectionlabel__count')?.textContent ?? '0'),
+      open: project.querySelector('.lc-project__head')?.getAttribute('aria-expanded') === 'true'
     })))
   })()`))))
   const names = sidebar.map((project) => project.name)
-  check('the sidebar lists both projects, Beta (the window\'s) first, a conversation each', names[0] === basename(beta) && names.includes(basename(alpha)) && sidebar[0].current === true && sidebar.every((project) => project.rows >= 1), JSON.stringify(sidebar))
+  check('the sidebar lists both projects: Beta (the window\'s) first and open, Alpha folded with its count', names[0] === basename(beta) && names.includes(basename(alpha)) && sidebar[0].current === true && sidebar[0].open === true && sidebar[0].rows === 1 && sidebar[1]?.open === false && sidebar[1]?.count === 1, JSON.stringify(sidebar))
 
   const reopened = String(await drive.capture('open Alpha\'s conversation from the sidebar', () => drive.evaluate(`(async () => {
     const project = [...document.querySelectorAll('.lc-project')].find((one) => one.querySelector('.lc-project__name')?.textContent === ${JSON.stringify(basename(alpha))})
+    // Another folder starts folded: unfold it, as a person would.
+    project?.querySelector('.lc-project__head')?.click()
+    await new Promise((r) => setTimeout(r, 400))
     const row = project?.querySelector('.lc-convrow button.lc-conv')
     row?.click()
     await new Promise((r) => setTimeout(r, 1500))
