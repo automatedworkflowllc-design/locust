@@ -5461,21 +5461,115 @@ textarea {
   margin-right: 4px;
 }
 
-.lc-buildhead__starter {
-  padding: 3px 10px;
+/*
+ * The starters as Arena's "Get started" cards (0.460): an icon tile, what it
+ * makes, and a quieter line under it. Three across, in the room the pills had
+ * beside the label, so Home keeps its height.
+ */
+.lc-buildhead__cards {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.lc-buildcard {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 5px 10px;
   border: 1px solid var(--lc-border-card);
-  border-radius: 999px;
+  border-radius: var(--lc-radius-control);
   background: transparent;
   color: var(--lc-text-secondary);
   font: inherit;
-  font-size: var(--lc-text-description);
+  text-align: left;
   cursor: pointer;
+  transition: background var(--lc-motion-hover) var(--lc-ease);
 }
 
-.lc-buildhead__starter:hover,
-.lc-buildhead__starter:focus-visible {
-  color: var(--lc-text-primary);
+.lc-buildcard:hover,
+.lc-buildcard:focus-visible {
   background: var(--lc-hover-surface);
+  color: var(--lc-text-primary);
+}
+
+.lc-buildcard__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-control);
+  color: var(--lc-text-secondary);
+}
+
+.lc-buildcard__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.lc-buildcard__name,
+.lc-buildcard__line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-buildcard__name {
+  font-size: var(--lc-text-control);
+  color: var(--lc-text-primary);
+}
+
+.lc-buildcard__line {
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+}
+
+/* A short window keeps the cards to one line: Home already has no height to
+   spare at 1366x768 (measured 2026-09-29: 33px over before the cards), and
+   the name and icon say enough there. */
+@media (max-height: 820px) {
+  .lc-buildcard {
+    padding: 2px 10px 2px 3px;
+  }
+
+  .lc-buildcard__icon {
+    width: 20px;
+    height: 20px;
+    border: 0;
+  }
+
+  .lc-buildcard__line {
+    display: none;
+  }
+}
+
+/* The composer's chip per compared model (0.460): the route chip's own look,
+   capped so two or three and the + fit the row. */
+.lc-compare-slots {
+  gap: 8px;
+  min-width: 0;
+}
+
+.lc-control--slot {
+  max-width: 190px;
+}
+
+.lc-control--slot .lc-control__model {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-control--addslot {
+  padding: 0 10px;
 }
 
 .lc-agenthead.is-folded {
@@ -9291,7 +9385,9 @@ textarea {
    flex item keeps its content's width unless told otherwise, and without this
    the name ran under the model chip beside it. */
 .lc-control__anchor--folder {
-  min-width: 0;
+  /* Never to nothing: with a comparison's model chips on the row the name
+     gives way and the folder's icon stays, its path on hover (0.460). */
+  min-width: 30px;
   flex-shrink: 1;
 }
 

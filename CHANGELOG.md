@@ -11,6 +11,22 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.460.0 - 2026-09-29
+
+### Improved
+
+- **Compare picks its models like Arena.** Switching the message box to
+  Compare starts on two models already chosen, each in its own dropdown:
+  press one to change that model alone, or + to add a third. It was one
+  "A vs B" button opening a checklist.
+- **Build and compare starts in one press.** The three starters on Home are
+  cards now, each with a line about what it makes. Pressing one puts its
+  words in the box and two models beside them; Send starts both.
+- **Folders are how conversations are sorted.** Since folders appear in
+  the sidebar by project, groups did the same job twice, so new groups are
+  no longer made. The groups you have stay, inside their folder, and Move to
+  group still takes a conversation out of one.
+
 ## 0.459.0 - 2026-09-29
 
 ### Improved

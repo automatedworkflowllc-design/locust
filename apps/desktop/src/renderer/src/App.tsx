@@ -109,6 +109,7 @@ import type { CompareColumnView } from './components/CompareView.js'
 import { blindName, changesLine, compareMembership, compareRecord, compareNeedsCopy, compareRefusalOf, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../../shared/compare.js'
 import type { CompareSlotId, PublicCompare } from '../../shared/compare.js'
 import { folderLabels } from '../../shared/folder-sections.js'
+import { defaultComparePicks } from './compareDefaults.js'
 import { composerRouteFor, startAs } from '../../shared/route-at-start.js'
 import type { StartAs } from '../../shared/route-at-start.js'
 import type { Screen } from './components/Screens.js'
@@ -792,19 +793,14 @@ export default function App(): ReactElement {
       anchor,
       items: [
         { label: 'New teammate', shortcut: 't', onSelect: startNewTeammate },
-        { label: 'New room', shortcut: 'r', onSelect: openRoomsScreen },
-        // Not in the rail, which draws no groups: it named nothing there (M35).
-        ...(layoutMode === 'compact'
-          ? []
-          : [{
-              label: 'New group',
-              shortcut: 'g',
-              onSelect: () => {
-                // From the `+`, the new group takes no conversation with it.
-                setNewGroupFor(undefined)
-                setNamingGroup(true)
-              }
-            }])
+        { label: 'New room', shortcut: 'r', onSelect: openRoomsScreen }
+        /*
+         * No New group (0.460). Folders are the sorting now, as in Claude
+         * Code (0.458): a project gets its own folder. Colin, 2026-09-29:
+         * "groups can just be the folders, no?" -- they could; groups were
+         * how he sorted while Locust was stuck in one folder. Groups already
+         * made stay, inside their folder, until they are emptied or removed.
+         */
       ]
     })
   }
@@ -980,7 +976,8 @@ export default function App(): ReactElement {
          * one was the `+` beside the logo, which is the Rooms
          * discoverability problem with a different noun.
          */
-        ...[
+        // Only while groups exist (0.460): moving among them, or out, to empty them.
+        ...(groupsRef.current.length === 0 ? [] : [
               {
                 label: 'Move to group',
                 dividerAbove: true,
@@ -1009,25 +1006,10 @@ export default function App(): ReactElement {
                     onSelect: () => {
                       void window.desktop?.assignGroup(conversationKeyOf(missionId), undefined).then(refreshGroups)
                     }
-                  },
-                  // Not in the rail, which draws no groups to name one in (M35).
-                  ...(layoutMode === 'compact' ? [] : [{
-                    /*
-                     * Makes the group AND puts this conversation in it,
-                     * which is the only reading of choosing it from here.
-                     * The name is asked for in the sidebar, where a new
-                     * group is named anyway -- one naming affordance, not
-                     * two that drift.
-                     */
-                    label: 'New group…',
-                    onSelect: () => {
-                      setNewGroupFor(conversationKeyOf(missionId))
-                      setNamingGroup(true)
-                    }
-                  }])
+                  }
                 ]
               }
-            ],
+            ]),
         /*
          * Hand a conversation to a teammate after the fact: ONE row opening
          * the roster, the shape `Move to group` already has.
@@ -3413,6 +3395,30 @@ export default function App(): ReactElement {
    */
   const samePick = (a: RouteChoice, b: RouteChoice): boolean => a.runtime === b.runtime && a.model === b.model
   // Anywhere: no teammate is needed to compare (Colin, 2026-09-28), so a new person can try it first thing.
+  // Above the comparison's default picks, which read both while rendering (0.460).
+  // What each route's model turned out to be, from missions that already ran.
+  const resolvedModels = useMemo(() => resolvedModelNames(history), [history])
+  const recentRoutes = useMemo(() => recentlyUsedRoutes(history), [history])
+  // A comparison answers read-only; a model that cannot be held read-only here answers in a copy (0.443).
+  // One that edits runs in Edit, in its own copy (0.445).
+  const compareChoiceRefusal = (choice: { readonly runtime: ComparePick['runtime'] }, changes: boolean = compareChanges): string | undefined =>
+    compareRefusalOf(choice.runtime)
+    ?? (changes
+      ? modeRunsOn('accept-edits', choice.runtime, build?.platform) ? undefined : `${modeUnavailableReason('accept-edits', choice.runtime, build?.platform) ?? 'It cannot edit here.'} So it cannot join a comparison that edits.`
+      : undefined)
+    ?? (changes || modeRunsOn('ask', choice.runtime, build?.platform) || compareNeedsCopy(choice.runtime, build?.platform)
+      ? undefined
+      : `${modeUnavailableReason('ask', choice.runtime, build?.platform) ?? 'It cannot answer read-only here.'} A comparison answers read-only, so it cannot join one.`)
+  /** The two a new comparison starts on (compareDefaults.ts), as Arena opens Side by Side (0.460). */
+  const startingPicks = (changes: boolean = compareChanges): readonly ComparePick[] =>
+    defaultComparePicks({
+      current: composerRoute,
+      recent: recentRoutes,
+      models,
+      ready: (runtime) => runtimes.some((status) => status.id === runtime && status.ready),
+      refusal: (choice) => compareChoiceRefusal(choice, changes),
+      label: (choice) => routeModelName(choice.runtime, choice.model, resolvedModels.get(`${choice.runtime}:${choice.model}`))
+    })
   const comparePicking: ComparePicking | undefined = runtimes.length === 0
     ? undefined
     : {
@@ -3423,8 +3429,14 @@ export default function App(): ReactElement {
           if (!on) {
             setComparePicks([])
             setCompareChanges(false)
+          } else if (comparePicks.length < MIN_COMPARE_SLOTS) {
+            const starting = startingPicks()
+            if (starting.length >= MIN_COMPARE_SLOTS) setComparePicks(starting)
           }
         },
+        prefills: comparePicks.length >= MIN_COMPARE_SLOTS || startingPicks().length >= MIN_COMPARE_SLOTS,
+        onReplace: (index, pick) =>
+          setComparePicks((current) => current.map((one, at) => (at === index ? pick : one))),
         changes: compareChanges,
         onChanges: setCompareChanges,
         ...(compareChangesRefusal === undefined ? {} : { changesRefusal: compareChangesRefusal }),
@@ -3440,14 +3452,7 @@ export default function App(): ReactElement {
           ),
         // A comparison answers read-only; a model that cannot be held read-only here answers in a copy (0.443).
         // One that edits runs in Edit, in its own copy (0.445).
-        refusal: (choice) =>
-          compareRefusalOf(choice.runtime)
-          ?? (compareChanges
-            ? modeRunsOn('accept-edits', choice.runtime, build?.platform) ? undefined : `${modeUnavailableReason('accept-edits', choice.runtime, build?.platform) ?? 'It cannot edit here.'} So it cannot join a comparison that edits.`
-            : undefined)
-          ?? (compareChanges || modeRunsOn('ask', choice.runtime, build?.platform) || compareNeedsCopy(choice.runtime, build?.platform)
-            ? undefined
-            : `${modeUnavailableReason('ask', choice.runtime, build?.platform) ?? 'It cannot answer read-only here.'} A comparison answers read-only, so it cannot join one.`)
+        refusal: (choice) => compareChoiceRefusal(choice)
       }
   const replaceCompare = (next: PublicCompare): void =>
     setCompares((current) => [...current.filter((one) => one.compareId !== next.compareId), next])
@@ -4698,9 +4703,6 @@ export default function App(): ReactElement {
     () => new Map(history.map((mission) => [mission.missionId, mission] as const)),
     [history]
   )
-  // What each route's model turned out to be, from missions that already ran.
-  const resolvedModels = useMemo(() => resolvedModelNames(history), [history])
-  const recentRoutes = useMemo(() => recentlyUsedRoutes(history), [history])
 
   // Re-read history whenever ANY run settles, so a finished mission stays in
   // the sidebar after the next one starts instead of vanishing until restart.
@@ -6625,7 +6627,13 @@ export default function App(): ReactElement {
                   setCompareOn(true)
                   setCompareChanges(true)
                   setComposerFill((current) => ({ text: prompt, seq: (current?.seq ?? 0) + 1 }))
-                  setPickerRequest((count) => count + 1)
+                  // Two models already chosen, each its own dropdown (0.460, as
+                  // Arena): the words and the models are in the box, and Send
+                  // is the next press. Only with fewer than two to offer does
+                  // the picker open.
+                  const starting = comparePicks.length >= MIN_COMPARE_SLOTS ? comparePicks : startingPicks(true)
+                  if (starting.length >= MIN_COMPARE_SLOTS) setComparePicks(starting)
+                  else setPickerRequest((count) => count + 1)
                 }}
                 onCheckAgain={() => {
                   // The repair the app can actually perform: ask again, from

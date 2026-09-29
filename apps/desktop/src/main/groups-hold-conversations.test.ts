@@ -303,13 +303,18 @@ describe('moving a conversation is one row, not one row per group', () => {
    */
   const APP = readFileSync(fileURLToPath(new URL('../renderer/src/App.tsx', import.meta.url)), 'utf8')
 
-  it('offers the row even when no group exists yet', () => {
-    // `New group...` lives inside it, so the empty case is the one that
-    // needs it most. Suppressing the row until a group existed left the `+`
-    // beside the logo as the only way in -- the Rooms discoverability
-    // problem with a different noun.
-    expect(APP).not.toContain('groupsRef.current.length === 0 && groupMembersRef.current')
+  /*
+   * 0.460: FOLDERS ARE THE SORTING. Colin, 2026-09-29: "groups can just be the
+   * folders, no?" -- since 0.458 the sidebar sorts every conversation by its
+   * folder, as Claude Code does, and groups were how he sorted while Locust
+   * was stuck in one. No group is made any more; the ones he has stay, and
+   * this row is how they are emptied.
+   */
+  it('is offered only while groups exist, and makes none', () => {
+    expect(APP).toContain('...(groupsRef.current.length === 0 ? [] : [')
     expect(APP).toContain("label: 'Move to group'")
+    expect(APP).not.toContain("label: 'New group…'")
+    expect(APP).not.toContain('setNewGroupFor(conversationKeyOf(missionId))')
   })
 
   it('ticks the one it is already in, so the list also answers where it is', () => {
@@ -325,13 +330,6 @@ describe('moving a conversation is one row, not one row per group', () => {
   it('offers Ungrouped as a destination rather than a separate verb', () => {
     const submenu = APP.slice(APP.indexOf("label: 'Move to group'"))
     expect(submenu.slice(0, 2400)).toContain("label: 'Ungrouped'")
-  })
-
-  it('makes the group AND puts the conversation in it', () => {
-    // Creating a group from a conversation's own menu and not moving that
-    // conversation into it would be an item doing half of what it says.
-    expect(APP).toContain('setNewGroupFor(conversationKeyOf(missionId))')
-    expect(APP).toContain('assignGroup(waiting, mine.groupId)')
   })
 
   it('picks the newest match when two groups share a name', () => {

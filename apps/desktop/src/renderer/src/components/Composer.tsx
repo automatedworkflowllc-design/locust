@@ -47,7 +47,7 @@ import { atQuery, fileMatches, withoutAtQuery } from '../fileMentions.js'
 import type { SlashCommand } from '../slashCommands.js'
 import { RoutePicker } from './RoutePicker.js'
 import type { ComparePicking } from './RoutePicker.js'
-import { versusLabel } from '../../../shared/compare.js'
+import { MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS, versusLabel } from '../../../shared/compare.js'
 import type { RouteChoice } from './RoutePicker.js'
 import { RuntimeMark } from './RuntimeMark.js'
 
@@ -467,6 +467,8 @@ export function Composer({
   const [chatModeOpen, setChatModeOpen] = useState(false)
   /** The folder chip's menu (0.458). */
   const [folderOpen, setFolderOpen] = useState(false)
+  /** Which comparison column's picker is open, or the + for a third (0.460). */
+  const [slotPicker, setSlotPicker] = useState<number | 'add' | undefined>(undefined)
   /**
    * Files this message will point the runtime at, workspace-relative.
    *
@@ -536,6 +538,9 @@ export function Composer({
   const modeAnchor = useRef<HTMLSpanElement>(null)
   const chatModeAnchor = useRef<HTMLSpanElement>(null)
   const folderAnchor = useRef<HTMLSpanElement>(null)
+  const slotsAnchor = useRef<HTMLSpanElement>(null)
+  const closeSlots = useCallback(() => setSlotPicker(undefined), [])
+  useDismissOnOutsidePress(slotPicker !== undefined, closeSlots, slotsAnchor)
   const closeFolder = useCallback(() => setFolderOpen(false), [])
   useDismissOnOutsidePress(folderOpen, closeFolder, folderAnchor)
   const pickerAnchor = useRef<HTMLSpanElement>(null)
@@ -711,6 +716,8 @@ export function Composer({
   // message already says when it goes: the box says how to change it.
   // Compare (0.441): the ticked models, or the comparison on screen, speak for the route chip.
   const comparing = asking !== undefined || (compare?.on === true && compare.picks.length > 0)
+  /** Setting up a comparison (not asking one on screen): a chip per model, as Arena (0.460). */
+  const slotsShown = asking === undefined && compare?.on === true && compare.picks.length > 0 && !running
   /*
    * COMPARE CHANGES (0.445): while models are being picked, the mode chip
    * chooses between answers (Ask) and changes (Edit, each model in its own
@@ -1586,7 +1593,9 @@ export function Composer({
                             setChatModeOpen(false)
                             compare.onMode(option.id !== 'direct')
                             compare.onBlind?.(option.id === 'blind')
-                            if (option.id !== 'direct' && compare.picks.length < 2) {
+                            // Two models already chosen, as Arena opens Side by Side (0.460);
+                            // only when there are not two to choose does the picker open.
+                            if (option.id !== 'direct' && compare.picks.length < 2 && compare.prefills !== true) {
                               onOpenRoutePicker()
                               setPickerOpen(true)
                             }
@@ -1823,6 +1832,69 @@ export function Composer({
                   <ContextRing reading={context} {...(conversationCost === undefined ? {} : { conversationCost })} />
                 </span>
               ) : null}
+              {slotsShown && compare !== undefined ? (
+                /*
+                 * A DROPDOWN PER MODEL (0.460), as Arena draws Side by Side:
+                 * each chip names one column's model and opens the picker for
+                 * that column alone. It was one "A vs B" chip opening a
+                 * checklist -- Colin, 2026-09-29: "select the models with two
+                 * dropdowns ... will help with clarity". A third column is one
+                 * press on the +; a column is removed from its own picker.
+                 */
+                <span className="lc-control__anchor lc-compare-slots" ref={slotsAnchor}>
+                  {slotPicker !== undefined && (
+                    <RoutePicker
+                      runtimes={runtimes}
+                      limitedRuntimes={limitedRuntimes}
+                      models={models}
+                      resolvedModels={resolvedModels}
+                      recentRoutes={recentRoutes}
+                      active={slotPicker === 'add' ? route : compare.picks[slotPicker] ?? route}
+                      onSelect={(choice) => {
+                        const pick = { ...choice, label: routeModelName(choice.runtime, choice.model, resolvedModels.get(`${choice.runtime}:${choice.model}`)) }
+                        if (slotPicker === 'add') compare.onToggle(pick)
+                        else compare.onReplace?.(slotPicker, pick)
+                        setSlotPicker(undefined)
+                      }}
+                      onClose={() => setSlotPicker(undefined)}
+                      slot={{
+                        refusal: compare.refusal,
+                        taken: compare.picks.filter((_, index) => index !== slotPicker),
+                        ...(slotPicker !== 'add' && compare.picks.length > MIN_COMPARE_SLOTS
+                          ? { onRemove: () => compare.onToggle(compare.picks[slotPicker as number]!) }
+                          : {})
+                      }}
+                    />
+                  )}
+                  {compare.picks.map((pick, index) => (
+                    <button
+                      key={`${pick.runtime}:${pick.model}`}
+                      type="button"
+                      className="lc-control lc-control--boxed lc-control--slot"
+                      aria-haspopup="listbox"
+                      aria-expanded={slotPicker === index}
+                      aria-label={`Model ${String.fromCharCode(65 + index)}: ${pick.label}`}
+                      title={`${runtimeDisplayName(pick.runtime)} / ${pick.label}`}
+                      onClick={() => setSlotPicker(slotPicker === index ? undefined : index)}
+                    >
+                      <RuntimeMark runtime={pick.runtime} size={13} />
+                      <span className="lc-control__model">{pick.label}</span>
+                      <ChevronGlyph />
+                    </button>
+                  ))}
+                  {compare.picks.length < MAX_COMPARE_SLOTS && (
+                    <button
+                      type="button"
+                      className="lc-control lc-control--boxed lc-control--addslot"
+                      aria-label="Add a third model"
+                      title="Add a third model"
+                      onClick={() => setSlotPicker(slotPicker === 'add' ? undefined : 'add')}
+                    >
+                      <Icon name="plus" size={13} />
+                    </button>
+                  )}
+                </span>
+              ) : (
               <span className="lc-control__anchor" ref={pickerAnchor}>
                 {pickerOpen && (
                   <RoutePicker
@@ -1950,6 +2022,7 @@ export function Composer({
                   <ChevronGlyph />
                 </button>
               </span>
+              )}
               {/*
                 * Effort, as its own control again.
                 *

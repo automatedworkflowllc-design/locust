@@ -53,11 +53,11 @@ describe('the add menu', () => {
     expect(rule('.lc-context {')).toContain('position: fixed')
   })
 
-  it('offers the three things the + adds, each with its key', () => {
+  it('offers what the + adds, each with its key -- and no New group since folders sort (0.460)', () => {
     const menu = APP.slice(APP.indexOf('const openAddMenu'), APP.indexOf('const assignMissionTo'))
     expect(menu).toContain("{ label: 'New teammate', shortcut: 't'")
     expect(menu).toContain("{ label: 'New room', shortcut: 'r'")
-    expect(menu).toContain("label: 'New group',")
+    expect(menu).not.toContain("label: 'New group',")
   })
 
   it('leaves its own button alone, so a second press closes it instead of reopening it', () => {

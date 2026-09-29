@@ -33,6 +33,10 @@ export interface ComparePicking {
   readonly picks: readonly ComparePick[]
   readonly onMode: (on: boolean) => void
   readonly onToggle: (pick: ComparePick) => void
+  /** Whether switching to Compare starts on two models already chosen (0.460); if not, the picker opens. */
+  readonly prefills?: boolean
+  /** Put this model in that column instead, keeping the others where they are (0.460). */
+  readonly onReplace?: (index: number, pick: ComparePick) => void
   /** Why a model cannot be compared (it cannot be held read-only here), or nothing. */
   readonly refusal: (choice: RouteChoice) => string | undefined
   /** Each model changes its own copy of the project, rather than only answering (0.445). */
@@ -296,7 +300,8 @@ export function RoutePicker({
   onClose,
   notice,
   limitedRuntimes,
-  compare
+  compare,
+  slot
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
   /** Runtimes whose last run ended on the account's usage limit, with its own words. */
@@ -315,6 +320,17 @@ export function RoutePicker({
    * moving a live run, so the difference has to be stated, not implied.
    */
   readonly notice?: string
+  /**
+   * ONE COLUMN OF A COMPARISON (0.460, as Arena draws it: a dropdown per
+   * model). The picker chooses the model for that column alone: a model that
+   * cannot join, or is already in another column, cannot be picked, and with
+   * three columns this one can be removed.
+   */
+  readonly slot?: {
+    readonly refusal: (choice: RouteChoice) => string | undefined
+    readonly taken: readonly RouteChoice[]
+    readonly onRemove?: () => void
+  }
   /**
    * Effort and swarm live here now, not on the composer.
    *
@@ -397,7 +413,11 @@ export function RoutePicker({
     const recent = row.group === 'Recent'
     const choice = { runtime: row.runtime, model: row.model }
     const picked = comparing && (compare?.picks ?? []).some((pick) => samePick(pick, choice))
-    const refused = comparing ? compare?.refusal(choice) : undefined
+    const refused = comparing
+      ? compare?.refusal(choice)
+      : slot === undefined
+        ? undefined
+        : slot.refusal(choice) ?? (slot.taken.some((other) => samePick(other, choice)) ? 'Already in this comparison.' : undefined)
     const full = comparing && !picked && (compare?.picks.length ?? 0) >= MAX_COMPARE_SLOTS
     // Which runtime the canonical row below sits under, so a recent row can
     // say why it appears twice.
@@ -593,6 +613,13 @@ export function RoutePicker({
           </span>
           <button type="button" className="lc-primarybutton" disabled={compare.picks.length < MIN_COMPARE_SLOTS} onClick={onClose}>
             Done
+          </button>
+        </div>
+      ) : slot?.onRemove !== undefined ? (
+        <div className="lc-picker__foot lc-picker__foot--compare">
+          <span>Compare two instead of three.</span>
+          <button type="button" className="lc-button" onClick={() => { slot.onRemove?.(); onClose() }}>
+            Remove this model
           </button>
         </div>
       ) : (

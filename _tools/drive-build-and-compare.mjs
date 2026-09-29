@@ -54,7 +54,7 @@ try {
     for (let i = 0; i < 40 && !document.querySelector('.lc-buildhead'); i += 1) await new Promise((r) => setTimeout(r, 500))
     const scroller = document.querySelector('.lc-home, .lc-firstlaunch, main') ?? document.scrollingElement
     return JSON.stringify({
-      starters: [...document.querySelectorAll('.lc-buildhead__starter')].map((b) => b.textContent.trim()),
+      starters: [...document.querySelectorAll('.lc-buildcard .lc-buildcard__name')].map((b) => b.textContent.trim()),
       fits: document.scrollingElement.scrollHeight <= window.innerHeight + 1,
       overflow: [...document.querySelectorAll('*')].filter((el) => el.scrollHeight > el.clientHeight + 1 && getComputedStyle(el).overflowY === 'auto').map((el) => el.className.toString().split(' ')[0] + ':' + (el.scrollHeight - el.clientHeight)).slice(0, 4)
     })
@@ -62,35 +62,46 @@ try {
   say(`  home: ${JSON.stringify(home)}`)
   check('Home offers three things to build and compare', home.starters?.join('|') === 'A landing page|A dashboard|A small game', JSON.stringify(home))
 
-  const started = JSON.parse(String(await drive.capture('A landing page: its words in the box, Edit, the picker on Compare', () => drive.evaluate(`(async () => {
-    ;[...document.querySelectorAll('.lc-buildhead__starter')].find((b) => b.textContent.trim() === 'A landing page')?.click()
+  // 0.460, as Arena: the card puts the words in the box and TWO models beside
+  // them, each its own dropdown; each is set to a free model from its own.
+  const started = JSON.parse(String(await drive.capture('A landing page: its words in the box, Edit, two model dropdowns', () => drive.evaluate(`(async () => {
+    ;[...document.querySelectorAll('.lc-buildcard')].find((b) => b.querySelector('.lc-buildcard__name')?.textContent.trim() === 'A landing page')?.click()
     await new Promise((r) => setTimeout(r, 900))
     // Direct, Compare or Blind lives in the chat mode chip since 0.451.
     const on = document.querySelector('.lc-control--chatmode')?.getAttribute('aria-label')?.replace('Chat mode: ', '') ?? ''
-    const box = document.querySelector('.lc-picker__input')
-    const setInput = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
-    setInput.call(box, 'free')
-    box.dispatchEvent(new Event('input', { bubbles: true }))
-    await new Promise((r) => setTimeout(r, 700))
+    const defaults = [...document.querySelectorAll('.lc-control--slot .lc-control__model')].map((el) => el.textContent.trim())
+    const pickerOpenedByItself = document.querySelector('.lc-picker') !== null
     const labels = []
-    for (const want of ${JSON.stringify(PICKS)}) {
-      const row = [...document.querySelectorAll('.lc-picker__row:not(.is-recent)')].find((one) => !one.disabled && one.querySelector('.lc-picker__label')?.textContent.trim() === want)
-      if (!row) continue
-      row.click()
-      labels.push(want)
-      await new Promise((r) => setTimeout(r, 250))
+    const wants = ${JSON.stringify(PICKS)}
+    for (let index = 0; index < wants.length; index += 1) {
+      const chip = document.querySelectorAll('.lc-control--slot')[index]
+      chip?.click()
+      await new Promise((r) => setTimeout(r, 600))
+      const box = document.querySelector('.lc-picker__input')
+      const setInput = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+      setInput.call(box, 'free')
+      box.dispatchEvent(new Event('input', { bubbles: true }))
+      await new Promise((r) => setTimeout(r, 700))
+      const row = [...document.querySelectorAll('.lc-picker__row:not(.is-recent)')].find((one) => !one.disabled && one.querySelector('.lc-picker__label')?.textContent.trim() === wants[index])
+      row?.click()
+      await new Promise((r) => setTimeout(r, 400))
+      labels.push(document.querySelectorAll('.lc-control--slot .lc-control__model')[index]?.textContent.trim() ?? '')
     }
-    ;[...document.querySelectorAll('.lc-picker__foot--compare button')].find((b) => b.textContent.trim() === 'Done')?.click()
-    await new Promise((r) => setTimeout(r, 500))
     return JSON.stringify({
       on,
+      defaults,
+      pickerOpenedByItself,
       labels,
+      plus: document.querySelector('.lc-control--addslot') !== null,
       text: document.querySelector('form.command-dock textarea')?.value ?? '',
       mode: document.querySelector('button[aria-label="Permission mode"]')?.textContent.trim() ?? ''
     })
   })()`))))
   say(`  started: ${JSON.stringify(started)}`)
-  check('the starter puts its words in the box, sets Edit, and opens the picker on Compare', /^Make index\.html: a one-page landing page/.test(started.text) && started.mode === 'Edit' && started.on === 'Compare' && started.labels.length === 2, JSON.stringify(started))
+  check('the card puts its words in the box, sets Edit, and starts on two models, each its own dropdown', /^Make index\.html: a one-page landing page/.test(started.text) && started.mode === 'Edit' && started.on === 'Compare' && started.defaults.length === 2 && started.defaults[0] !== started.defaults[1] && !started.pickerOpenedByItself && started.plus === true, JSON.stringify(started))
+  // The chip names a model as the route chip does ("Nemotron 3 Ultra Free"); the picker row by its id.
+  const asId = (label) => label.toLowerCase().replace(/\s+/g, '-')
+  check('each dropdown sets its own column: the two free models', started.labels.map(asId).join('|') === PICKS.join('|'), JSON.stringify(started.labels))
 
   const built = JSON.parse(String(await drive.capture('Both pages running side by side, each built in its own copy', () => drive.evaluate(`(async () => {
     document.querySelector('button[aria-label="Start mission"]')?.click()

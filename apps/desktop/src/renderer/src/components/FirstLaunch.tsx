@@ -63,10 +63,10 @@ function vendorUrl(runtime: string): string | undefined {
 }
 
 /** What Build and compare offers on Home: one file each, so every column can show it running. */
-export const COMPARE_STARTERS: readonly { readonly label: string; readonly prompt: string }[] = [
-  { label: 'A landing page', prompt: 'Make index.html: a one-page landing page for a small coffee shop, with a headline, three menu items with prices, and opening hours. One file, all CSS inside it.' },
-  { label: 'A dashboard', prompt: 'Make dashboard.html: a one-page sales dashboard with four headline numbers and a bar chart of the last six months, drawn with plain HTML and CSS. One file, made-up numbers, no libraries.' },
-  { label: 'A small game', prompt: 'Make game.html: a small game playable with the keyboard, with a score and a way to restart. One file, all CSS and JavaScript inside it, no libraries.' }
+export const COMPARE_STARTERS: readonly { readonly label: string; readonly line: string; readonly icon: 'file' | 'grid' | 'play'; readonly prompt: string }[] = [
+  { label: 'A landing page', line: 'For a coffee shop', icon: 'file', prompt: 'Make index.html: a one-page landing page for a small coffee shop, with a headline, three menu items with prices, and opening hours. One file, all CSS inside it.' },
+  { label: 'A dashboard', line: 'Sales and a chart', icon: 'grid', prompt: 'Make dashboard.html: a one-page sales dashboard with four headline numbers and a bar chart of the last six months, drawn with plain HTML and CSS. One file, made-up numbers, no libraries.' },
+  { label: 'A small game', line: 'Keyboard controls', icon: 'play', prompt: 'Make game.html: a small game playable with the keyboard, with a score and a way to restart. One file, all CSS and JavaScript inside it, no libraries.' }
 ]
 
 export function FirstLaunch({
@@ -638,17 +638,31 @@ export function FirstLaunch({
               {onCompareStarter !== undefined && (
                 <div className="lc-buildhead">
                   <span className="lc-agenthead__label">Build and compare</span>
-                  {COMPARE_STARTERS.map((starter) => (
-                    <button
-                      key={starter.label}
-                      type="button"
-                      className="lc-buildhead__starter"
-                      title={`${starter.prompt} Pick two or three models; each builds it in its own copy, and you keep one.`}
-                      onClick={() => onCompareStarter(starter.prompt)}
-                    >
-                      {starter.label}
-                    </button>
-                  ))}
+                  {/*
+                    * As Arena's "Get started" (0.460): a card each, what it
+                    * makes and a line about it. One press puts the words in
+                    * the box and two models beside them, each its own
+                    * dropdown; Send starts both.
+                    */}
+                  <div className="lc-buildhead__cards">
+                    {COMPARE_STARTERS.map((starter) => (
+                      <button
+                        key={starter.label}
+                        type="button"
+                        className="lc-buildcard"
+                        title={`${starter.prompt} Two models each build it in their own copy; you keep one.`}
+                        onClick={() => onCompareStarter(starter.prompt)}
+                      >
+                        <span className="lc-buildcard__icon" aria-hidden="true">
+                          <Icon name={starter.icon} size={15} />
+                        </span>
+                        <span className="lc-buildcard__text">
+                          <span className="lc-buildcard__name">{starter.label}</span>
+                          <span className="lc-buildcard__line">{starter.line}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
               </>
