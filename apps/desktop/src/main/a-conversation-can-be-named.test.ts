@@ -31,7 +31,7 @@ import { createTeammateStore, MAX_MISSION_TITLE_LENGTH, MAX_MISSION_TITLES } fro
 
 const roots: string[] = []
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
+  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })))
 })
 
 const store = async () => {
