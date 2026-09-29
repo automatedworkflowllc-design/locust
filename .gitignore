@@ -24,6 +24,8 @@ smoke-results.json
 
 # Staged by _tools/vendor-npm.mjs before packaging; not source.
 apps/desktop/resources/npm/
+# Staged by _tools/vendor-recall.mjs: the recall model, 37 MB of binaries.
+apps/desktop/resources/recall/
 
 # orb sample build output
 _tools/orb-samples/bundle.js

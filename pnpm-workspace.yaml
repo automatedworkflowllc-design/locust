@@ -8,6 +8,9 @@ allowBuilds:
   # refused rather than run: nothing here needs it.
   electron-winstaller: false
   esbuild: true
+  # Pulled in by onnxruntime-web (a build-time dependency of memory recall).
+  # Its install script only warns about version ranges; nothing needs it.
+  protobufjs: false
 
 minimumReleaseAgeExclude:
   - bot-avatars@0.1.1

@@ -97,6 +97,7 @@ import type { AttentionReader } from './attention-reader.js'
 import type { MemoryReader } from './memory-reader.js'
 import type { MemoryBriefing } from './peer-exchange.js'
 import { briefedMemories, byLastWritten, daysUnused, lastWritten, memorySection } from '../shared/memory.js'
+import { createMemoryRecall } from './memory-recall.js'
 import { MEMORY_FILE, retireMemoryFile, writeMemoryFile } from './memory-file.js'
 import { changedSince } from './memory-provenance.js'
 
@@ -1406,6 +1407,22 @@ if (!ownsSingleInstanceLock) {
         return sections.length === 0 ? undefined : sections.join('\n\n')
       }
     }
+    /*
+     * Memory recall by meaning (memory-recall.ts): the model beside app.asar
+     * once packaged, in resources/recall in development (staged by
+     * _tools/vendor-recall.mjs). Loaded on the first brief that has a
+     * question to rank by, never at launch.
+     */
+    const memoryRecall = createMemoryRecall({
+      directory: app.isPackaged ? join(process.resourcesPath, 'recall') : join(__dirname, '../../resources/recall'),
+      cacheFile: join(app.getPath('userData'), 'memory-recall-cache.json'),
+      note: (message) => note('memory-recall', message)
+    })
+    async function recallSimilarity(query: string | undefined, texts: readonly string[]): Promise<{ similarity?: readonly number[] }> {
+      if (query === undefined) return {}
+      const similarity = await memoryRecall.similarity(query, texts)
+      return similarity === undefined ? {} : { similarity }
+    }
     async function memoryPart(peer: MissionPeerContext | undefined, query: string | undefined): Promise<string> {
         const settings = await teammates.readSettings()
         // An unreadable memory file refuses to be read now rather than
@@ -1476,7 +1493,10 @@ if (!ownsSingleInstanceLock) {
             // has been sitting there since August.
             at: lastWritten(memory)
           })),
-          askFirst: settings.memoryMode === 'ask'
+          askFirst: settings.memoryMode === 'ask',
+          // By meaning when this machine's recall answers in time; the
+          // keyword order otherwise (memory-recall.ts).
+          ...(await recallSimilarity(query, listed.map((memory) => memory.text)))
         }
         /*
          * A1.4: what this teammate is GIVEN is exactly what the section

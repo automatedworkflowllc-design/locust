@@ -55,6 +55,17 @@ extraResources:
   # the bytes cannot disagree, and saying so needs no network.
   - from: ../../CHANGELOG.md
     to: CHANGELOG.md
+  # Memory recall's model and the WebAssembly that runs it (memory-recall.ts),
+  # staged by _tools/vendor-recall.mjs. Real files: onnxruntime imports its
+  # loader by URL, which cannot point inside an archive. tokenizer.json stays
+  # behind -- vocab.txt is the part of it the app reads.
+  - from: resources/recall
+    to: recall
+    filter:
+      - model.onnx
+      - vocab.txt
+      - ort-wasm-simd-threaded.mjs
+      - ort-wasm-simd-threaded.wasm
 
 # Never ship the caller's mission ledger, smoke profiles, or source maps.
 asar: true

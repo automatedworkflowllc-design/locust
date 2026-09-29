@@ -11,6 +11,19 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.454.0 - 2026-09-28
+
+### Improved
+
+- **Memory finds notes by meaning.** When a teammate starts, the notes it
+  is handed are the ones closest in meaning to what you asked, not just the
+  ones that share a word with it: "how do I publish the website?" now finds
+  "the site deploys from the gh-pages branch". Checked against 136 notes
+  picked by hand for real questions, the brief now carries 84 of them where
+  it carried 70. It runs on your computer with a small model that ships
+  with Locust (about 20 MB more to download), and nothing is sent anywhere.
+  If it cannot answer quickly, the brief is chosen the old way.
+
 ## 0.453.0 - 2026-09-28
 
 ### Fixed

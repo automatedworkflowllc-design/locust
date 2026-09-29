@@ -189,6 +189,8 @@ console.log('\nBuilding and packaging')
 // which is the failure that would otherwise reach a person as a broken
 // button instead of an honest "you need Node".
 if (!run('node', ['_tools/vendor-npm.mjs'], 'stage the npm this app ships')) process.exit(1)
+// Memory recall's model and runtime, checked against their pinned hashes.
+if (!run('node', ['_tools/vendor-recall.mjs'], 'stage the memory-recall model')) process.exit(1)
 if (!run('pnpm', ['build'], 'pnpm build')) process.exit(1)
 if (!run('pnpm', ['--filter', '@teammate/desktop', 'package'], 'electron-builder package')) process.exit(1)
 
@@ -234,6 +236,20 @@ if (!existsSync(asarPath)) {
     const source = join(DESKTOP, from)
     if (!existsSync(shipped)) {
       bad(`beside the asar: ${to}`, 'named in extraResources and not laid down')
+    } else if (statSync(shipped).isDirectory()) {
+      // A folder (recall/): every file its filter names, each as staged.
+      const after = builderConfig.slice(builderConfig.indexOf(`from: ${from}`)).split('\n').slice(1)
+      const filter = /^\s+to:/.test(after[0] ?? '') && /^\s+filter:\s*$/.test(after[1] ?? '') ? after.slice(2) : []
+      const named = []
+      for (const line of filter) {
+        const match = /^\s+-\s+(\S+)\s*$/.exec(line)
+        if (match === null) break
+        named.push(match[1])
+      }
+      const wrong = named.filter((name) => !existsSync(join(shipped, name)) || !readFileSync(join(shipped, name)).equals(readFileSync(join(source, name))))
+      if (named.length === 0) bad(`beside the asar: ${to}/`, 'a folder with no filter naming what it must hold')
+      else if (wrong.length > 0) bad(`beside the asar: ${to}/`, `missing or different: ${wrong.join(', ')}`)
+      else ok(`beside the asar: ${to}/ (${named.join(', ')})`)
     } else if (!existsSync(source) || !readFileSync(shipped).equals(readFileSync(source))) {
       bad(`beside the asar: ${to}`, 'differs from its source')
     } else {

@@ -1,6 +1,6 @@
 {
   "name": "@teammate/desktop",
-  "version": "0.453.0",
+  "version": "0.454.0",
   "private": true,
   "description": "Run AI coding agents as a team you can watch, on runtimes and models you choose.",
   "author": "Automated Workflow",
@@ -39,6 +39,7 @@
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
     "npm": "^12.0.2",
+    "onnxruntime-web": "1.30.0",
     "vite": "7.3.6"
   }
 }

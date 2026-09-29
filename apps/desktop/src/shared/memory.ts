@@ -360,8 +360,9 @@ export function byLastWritten<T extends { readonly createdAt: string; readonly u
 }
 
 /**
- * Which memories a brief pastes, and in what order: the ones that share
- * words with what was asked first, then the newest.
+ * Which memories a brief pastes, and in what order: the ones closest in
+ * meaning to what was asked, when this machine's recall answered in time
+ * (0.454); otherwise the ones that share words with it first, then the newest.
  *
  * MEASURED on Colin's store, 2026-09-21: 76 memories, of which a turn pasted
  * the newest 8 -- chosen by DATE alone. A memory from 13 September that
@@ -394,7 +395,12 @@ export function byLastWritten<T extends { readonly createdAt: string; readonly u
  * fill, found 60: a note about how the work is done bears on most questions
  * without sharing a word with them.
  */
-export function memoriesForBrief(memories: readonly MemoryLine[], query: string | undefined, maxLines: number): readonly MemoryLine[] {
+export function memoriesForBrief(
+  memories: readonly MemoryLine[],
+  query: string | undefined,
+  maxLines: number,
+  similarity?: readonly number[]
+): readonly MemoryLine[] {
   const here = memories.filter((memory) => memory.scope !== 'global')
   const everywhere = memories.filter((memory) => memory.scope === 'global')
   /*
@@ -406,6 +412,19 @@ export function memoriesForBrief(memories: readonly MemoryLine[], query: string 
    */
   const newestFirst = (list: readonly MemoryLine[]): readonly MemoryLine[] => [...list].reverse().slice(0, maxLines)
   const byDate = [...newestFirst(here), ...newestFirst(everywhere)]
+  /*
+   * BY MEANING, when the recall on this machine answered (main/memory-recall.ts):
+   * every note in order of how close it is to what was asked, the newer first
+   * on a tie. It replaces the shared-word order rather than joining it --
+   * fusing the two, measured on the same 136 notes, pasted fewer than
+   * meaning alone at both sizes.
+   */
+  if (query !== undefined && similarity !== undefined && similarity.length === memories.length) {
+    return memories
+      .map((memory, index) => ({ memory, index, score: similarity[index]! }))
+      .sort((left, right) => right.score - left.score || right.index - left.index)
+      .map((entry) => entry.memory)
+  }
   const wanted = query === undefined ? new Set<string>() : topicWords(query)
   if (wanted.size === 0) return byDate
   const words = memories.map((memory) => topicWords(memory.text))
@@ -461,6 +480,8 @@ export function memorySection(input: {
   readonly now?: Date
   /** What was asked, so the memories that bear on it are the ones pasted. */
   readonly query?: string
+  /** How close each memory is in meaning to `query`, when recall answered (see briefedMemories). */
+  readonly similarity?: readonly number[]
 }): string {
   /*
    * BOUNDED, and it was not.
@@ -588,10 +609,16 @@ export function outOfDate(files: readonly string[]): string {
  * asked moved to the front (see `memoriesForBrief`), bounded by lines and
  * characters.
  */
-export function briefedMemories(input: { readonly memories: readonly MemoryLine[]; readonly query?: string; readonly file?: string }): readonly MemoryLine[] {
+export function briefedMemories(input: {
+  readonly memories: readonly MemoryLine[]
+  readonly query?: string
+  readonly file?: string
+  /** How close each memory is in meaning to `query`, in `memories`' order, when recall answered. */
+  readonly similarity?: readonly number[]
+}): readonly MemoryLine[] {
   const maxLines = input.file === undefined ? MEMORY_BRIEF_LINES : MEMORY_BRIEF_LINES_WITH_FILE
   const budget = input.file === undefined ? MEMORY_BRIEF_BUDGET : MEMORY_BRIEF_BUDGET_WITH_FILE
-  const candidates = memoriesForBrief(input.memories, input.query, maxLines)
+  const candidates = memoriesForBrief(input.memories, input.query, maxLines, input.similarity)
   const briefed: MemoryLine[] = []
   let spent = 0
   // From the FRONT: `candidates` is already folder-first, newest-within-group,
