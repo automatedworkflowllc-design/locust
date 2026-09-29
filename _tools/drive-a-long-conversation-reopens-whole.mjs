@@ -88,7 +88,8 @@ try {
   const unique = [...new Set(shown)].sort((a, b) => a - b)
   const missing = Array.from({ length: TURNS }, (_, i) => i + 1).filter((n) => !unique.includes(n))
   check(`all ${String(TURNS)} replies are shown`, missing.length === 0, missing.length === 0 ? `${String(unique.length)} replies` : `missing ${missing.join(', ')}`)
-  await drive.evaluate(`document.querySelector('.lc-thread')?.closest('[class*="scroll"]')?.scrollTo(0, 0)`)
+  // The thread's own scrolling box: the nearest one taller inside than out.
+  await drive.evaluate(`(() => { let box = document.querySelector('.lc-thread'); while (box && box.scrollHeight <= box.clientHeight + 1) box = box.parentElement; box?.scrollTo(0, 0) })()`)
   await sleep(500)
   await drive.capture('the top of the conversation', () => drive.evaluate(repliesShown))
 } finally {

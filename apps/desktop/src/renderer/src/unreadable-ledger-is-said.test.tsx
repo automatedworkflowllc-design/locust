@@ -58,13 +58,15 @@ const mission = (missionId: string, integrityIssueCount: number): PublicRecovere
 const header = (
   missions: readonly PublicRecoveredMission[],
   unreadableLedgers: number,
-  ledgerUnreadable = false
+  ledgerUnreadable = false,
+  counts?: { readonly totalMissions: number; readonly listedMissions: number }
 ): string => {
   const html = renderToStaticMarkup(
     <MissionsScreen
       missions={missions}
       unreadableLedgers={unreadableLedgers}
       ledgerUnreadable={ledgerUnreadable}
+      {...(counts ?? {})}
       workspaceId="ws_here"
       teammates={[]}
       missionOwners={{}}
@@ -152,3 +154,14 @@ describe('what the Missions header says about a damaged ledger', () => {
  * throughout, so only the typecheck caught it. That separation is the point of
  * having two configs.
  */
+
+// QA-2026-09-29 round 2, R28: a count that is not the total says so.
+describe('what the Missions header says about a list cut short', () => {
+  it('names how many are listed of how many are kept', () => {
+    expect(header([mission('a', 0)], 0, false, { totalMissions: 2_412, listedMissions: 2_000 })).toContain('only the newest 2,000 of 2,412 turns are listed')
+  })
+
+  it('says nothing of it when everything is listed', () => {
+    expect(header([mission('a', 0)], 0)).not.toContain('newest')
+  })
+})
