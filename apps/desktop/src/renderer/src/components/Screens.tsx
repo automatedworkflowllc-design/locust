@@ -1108,7 +1108,11 @@ function UpdateControl({
   const phase = update?.phase ?? 'idle'
   const line =
     phase === 'unsupported'
-      ? 'This build cannot update itself. Installed copies check on their own.'
+      // macOS updates only a signed app, and the first Mac builds are not
+      // signed yet: said, with the way to the next build.
+      ? typeof navigator !== 'undefined' && /Macintosh|Mac OS X/.test(navigator.userAgent)
+        ? 'On a Mac this build cannot update itself yet. Download the newest from the releases page and replace it.'
+        : 'This build cannot update itself. Installed copies check on their own.'
       : phase === 'checking'
         ? 'Checking…'
         : phase === 'current'

@@ -41,6 +41,7 @@ import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/pro
 import { randomInt } from 'node:crypto'
 import { basename, dirname, isAbsolute, join, resolve as resolvePath } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { macPath } from './mac-path.js'
 import { homedir, release } from 'node:os'
 import { execFile } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -366,6 +367,8 @@ const bundledNpmFound = findBundledNpm({
  * told to install there, and the locator is told to look there -- from one
  * value, so the two cannot disagree.
  */
+// macOS: the PATH a terminal has, before anything looks for a CLI (mac-path.ts).
+if (process.platform === 'darwin') process.env.PATH = macPath('darwin', process.env.PATH, { shell: process.env.SHELL })
 const bundledNpmPrefixPath = bundledNpmPrefix(app.getPath('userData'))
 const bundledNpm = bundledNpmFound === undefined ? undefined : { ...bundledNpmFound, prefix: bundledNpmPrefixPath }
 const executableLocator = process.env.LOCUST_HIDE_RUNTIMES === '1'
@@ -4991,7 +4994,8 @@ if (!ownsSingleInstanceLock) {
       updater: autoUpdater,
       everyBuild: lane.everyBuild,
       currentVersion: app.getVersion(),
-      supported: app.isPackaged,
+      // Not on macOS until the build is signed: its updater refuses an unsigned app.
+      supported: app.isPackaged && process.platform !== 'darwin',
       liveMissionCount: () =>
         codexMissions.liveMissionIds().length + antigravityMissions.liveMissionIds().length,
       requestQuit: (finalise) => {
@@ -5724,7 +5728,13 @@ if (!ownsSingleInstanceLock) {
         window.focus()
       }
       if (tray === undefined) {
-        tray = new Tray(nativeImage.createFromPath(app.isPackaged ? join(process.resourcesPath, 'icon.ico') : join(__dirname, '../../resources/icon-512.png')))
+        // macOS draws a menu-bar icon from a small PNG and cannot read an .ico
+        // at all: handed one, the icon is empty and a closed Locust has no
+        // way back but the Dock (the first macOS build, 2026-09-29).
+        const trayImage = process.platform === 'darwin'
+          ? nativeImage.createFromPath(app.isPackaged ? join(process.resourcesPath, 'icon-32.png') : join(__dirname, '../../resources/icon-32.png')).resize({ width: 18, height: 18 })
+          : nativeImage.createFromPath(app.isPackaged ? join(process.resourcesPath, 'icon.ico') : join(__dirname, '../../resources/icon-512.png'))
+        tray = new Tray(trayImage)
         tray.on('click', reopen)
         tray.setContextMenu(Menu.buildFromTemplate([
           { label: 'Open Locust', click: reopen },
@@ -5809,6 +5819,14 @@ if (!ownsSingleInstanceLock) {
     })
 
     app.on('activate', () => {
+      // The Dock icon brings back a window kept working in the background
+      // (macOS): it is hidden, not gone, so "no windows" was never true of it.
+      const hidden = BrowserWindow.getAllWindows().find((one) => !one.isDestroyed() && !one.isVisible())
+      if (hidden !== undefined) {
+        hidden.show()
+        hidden.focus()
+        return
+      }
       if (BrowserWindow.getAllWindows().length === 0) {
         createWindow(codexMissions, (window) => {
           approvalWindow = window

@@ -47,6 +47,9 @@ asarUnpack:
 extraResources:
   - from: resources/icon.ico
     to: icon.ico
+  # The macOS menu-bar icon: a small PNG, which macOS can read (an .ico it cannot).
+  - from: resources/icon-32.png
+    to: icon-32.png
   # Claude Code spawns this as a stdio MCP server, so it has to be a real
   # file on disk, never a path inside the archive (permission-host.ts).
   - from: resources/locust-permission-bridge.mjs
@@ -100,3 +103,17 @@ linux:
 mac:
   icon: resources/icon-512.png
   category: public.app-category.developer-tools
+  # Not signed with a Developer ID yet (that needs an Apple Developer
+  # account). The builder's own signing is skipped, and scripts/adhoc-sign.cjs
+  # signs the app ad hoc instead: unsigned, Apple silicon reports a
+  # downloaded app as "damaged"; ad hoc, it asks once and Open Anyway works.
+  identity: null
+  hardenedRuntime: false
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+  artifactName: Locust-${version}-mac-${arch}.${ext}
+
+afterSign: scripts/adhoc-sign.cjs

@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.473.0 - 2026-09-29
+
+### New
+
+- **A first build for Mac, for testing.** Locust now builds for macOS, on
+  Apple silicon and Intel. It is not signed by Apple yet, so the first time it
+  opens macOS asks: choose Open Anyway in System Settings, Privacy &
+  Security. A Mac copy does not update itself yet; each new build is
+  downloaded and replaces the old one. On a Mac, Locust finds the coding
+  tools your Terminal finds, and clicking it in the Dock brings back a
+  window that was closed to keep working.
+
 ## 0.472.0 - 2026-09-29
 
 ### Improved
