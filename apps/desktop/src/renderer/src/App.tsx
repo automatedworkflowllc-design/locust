@@ -108,6 +108,7 @@ import { comparisonOf, foldComparisons } from './compareRows.js'
 import type { CompareColumnView } from './components/CompareView.js'
 import { blindName, changesLine, compareMembership, compareRecord, compareNeedsCopy, compareRefusalOf, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../../shared/compare.js'
 import type { CompareSlotId, PublicCompare } from '../../shared/compare.js'
+import { folderLabels } from '../../shared/folder-sections.js'
 import { composerRouteFor, startAs } from '../../shared/route-at-start.js'
 import type { StartAs } from '../../shared/route-at-start.js'
 import type { Screen } from './components/Screens.js'
@@ -4865,7 +4866,7 @@ export default function App(): ReactElement {
    */
   const [folders, setFolders] = useState<readonly PublicFolder[]>([])
   const refreshFolders = (): void => {
-    void window.desktop?.listFolders().then((listed) => setFolders(listed.folders)).catch(() => undefined)
+    void window.desktop?.listFolders().then((listed) => setFolders(folderLabels(listed.folders))).catch(() => undefined)
   }
   useEffect(() => { refreshFolders() }, [history.length])
   const refreshForFolder = (): void => {

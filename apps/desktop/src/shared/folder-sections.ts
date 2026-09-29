@@ -24,3 +24,21 @@ export function folderSectionsOf<Row extends { readonly folderId?: string; reado
     .sort(([a, left], [b, right]) => (a === current ? -1 : b === current ? 1 : newest(right).localeCompare(newest(left))))
     .map(([id, missions]) => ({ id, missions }))
 }
+
+/**
+ * What each folder is called on screen: its own name, and where two share one
+ * -- Colin's history holds two called "Locust" -- the folder above it too,
+ * "Locust (Documents)". A path that says nothing more keeps the bare name.
+ */
+export function folderLabels<Folder extends { readonly id: string; readonly path: string; readonly name: string }>(
+  folders: readonly Folder[]
+): readonly Folder[] {
+  const count = new Map<string, number>()
+  for (const folder of folders) count.set(folder.name.toLowerCase(), (count.get(folder.name.toLowerCase()) ?? 0) + 1)
+  return folders.map((folder) => {
+    if ((count.get(folder.name.toLowerCase()) ?? 0) < 2) return folder
+    const parts = folder.path.split(/[\\/]+/).filter((part) => part.length > 0)
+    const above = parts.length >= 2 ? parts[parts.length - 2] : undefined
+    return above === undefined ? folder : { ...folder, name: `${folder.name} (${above})` }
+  })
+}

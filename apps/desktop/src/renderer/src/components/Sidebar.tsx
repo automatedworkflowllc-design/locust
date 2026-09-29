@@ -561,6 +561,8 @@ export function Sidebar({
     || (keepsEmpty && !shownConversations.some((mission) => heldFor(mission, groupMembers)?.groupId === groupId))
   const conversationList = (inFolder: readonly SidebarMission[], keepsEmpty: boolean): ReactElement => {
     const folderUngrouped = withRoomsFolded(inFolder.filter((mission) => heldFor(mission, groupMembers) === undefined), rooms)
+    // "Ungrouped" only where a group is drawn beside it: in a folder with none it names the only thing there.
+    const groupsShown = groups.some((group) => showsGroup(group.groupId, inFolder, keepsEmpty))
     return (
           <>
             {groups.filter((group) => showsGroup(group.groupId, inFolder, keepsEmpty)).map((group) => {
@@ -651,7 +653,7 @@ export function Sidebar({
               * ungrouped FROM. With no groups at all this is the whole
               * sidebar and a label over it would name the only thing there.
               */}
-            {groups.length > 0 && folderUngrouped.length > 0 && (
+            {groupsShown && folderUngrouped.length > 0 && (
               <div className="lc-sectionlabel lc-sectionlabel--plain">
                 <span>Ungrouped</span>
                 <span className="lc-sectionlabel__count">{String(folderUngrouped.length)}</span>
@@ -1599,14 +1601,14 @@ export function Sidebar({
               if (sections.length <= 1) return conversationList(shownConversations, true)
               return sections.map((section) => {
                 const open = !foldedFolders.has(section.id)
-                const name = folders.find((folder) => folder.id === section.id)?.name ?? 'Another folder'
+                const name = folders.find((folder) => folder.id === section.id)?.name ?? 'Unknown folder'
                 return (
                   <div className="lc-project" key={section.id}>
                     <button
                       type="button"
                       className={`lc-project__head${open ? ' is-open' : ''}${section.id === currentFolderId ? ' is-current' : ''}`}
                       aria-expanded={open}
-                      title={section.id === currentFolderId ? `${name}: new conversations start here` : name}
+                      title={section.id === currentFolderId ? `${name}: new conversations start here` : folders.some((folder) => folder.id === section.id) ? name : 'Locust does not know which folder these ran in.'}
                       onClick={() =>
                         setFoldedFolders((current) => {
                           const next = new Set(current)

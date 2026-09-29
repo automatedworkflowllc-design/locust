@@ -3136,13 +3136,16 @@ if (!ownsSingleInstanceLock) {
     // Every folder worked in, newest first, and the one the window is in (0.458).
     ipcMain.handle(FOLDER_LIST_CHANNEL, async (event) => {
       if (!fromOwnWindow(event)) return { folders: [], currentId: undefined }
-      return { folders: await folders.list(), currentId: workspaceChosen ? workspaceIdFor(workspacePath) : undefined }
+      // Never Locust's own install folder: early builds ran conversations there, and no teammate should work in it.
+      const listed = (await folders.list()).filter((folder) => !isInsideDirectory(folder.path, installDirectory, process.platform))
+      return { folders: listed, currentId: workspaceChosen ? workspaceIdFor(workspacePath) : undefined }
     })
     // Switch to a folder already worked in -- by id, never a path the window names (0.458).
     ipcMain.handle(FOLDER_SWITCH_CHANNEL, async (event, id: unknown) => {
       if (!fromOwnWindow(event) || typeof id !== 'string') return { ok: false, message: 'That folder could not be opened.' }
       const path = await folders.pathOf(id)
       if (path === undefined) return { ok: false, message: 'Locust does not know where that folder is.' }
+      if (isInsideDirectory(path, installDirectory, process.platform)) return { ok: false, message: 'That is where Locust itself is installed. Pick a project folder instead.' }
       if (!existsSync(path)) return { ok: false, message: `${path} is not there any more.` }
       const now = await switchFolder(path)
       return { ok: true, folder: now }

@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { folderSectionsOf } from '../shared/folder-sections.js'
+import { folderLabels, folderSectionsOf } from '../shared/folder-sections.js'
 import { createFolderRegistry, recoverFolderPath } from './folders.js'
 import { workspaceIdFor } from './workspace.js'
 
@@ -90,5 +90,16 @@ describe('the sidebar, by project', () => {
   it('keeps the window\'s folder even with nothing in it yet: a folder just switched to', () => {
     const sections = folderSectionsOf([row('m1', 'ws_old', '2026-09-01')], 'ws_new')
     expect(sections.map((section) => [section.id, section.missions.length])).toEqual([['ws_new', 0], ['ws_old', 1]])
+  })
+})
+
+describe('two folders with one name', () => {
+  it('are told apart by the folder above each; a name nobody shares stays bare', () => {
+    const labels = folderLabels([
+      { id: 'a', path: 'C:/Users/someone/Documents/Locust', name: 'Locust' },
+      { id: 'b', path: 'C:/Users/someone/work/locust', name: 'locust' },
+      { id: 'c', path: '/Users/someone/site', name: 'site' }
+    ]).map((folder) => folder.name)
+    expect(labels).toEqual(['Locust (Documents)', 'locust (work)', 'site'])
   })
 })
