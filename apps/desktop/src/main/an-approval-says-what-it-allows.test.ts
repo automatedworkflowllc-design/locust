@@ -23,7 +23,7 @@ describe('an approval card', () => {
       summary: 'Fetch a web page',
       detail: 'https://example.com/',
       dataSentSays: 'The address above is requested from this machine, and the page it returns goes to the model.',
-      alwaysCovers: 'every webfetch request, whatever it is'
+      alwaysCovers: 'every web page it asks to fetch'
     })
   })
 

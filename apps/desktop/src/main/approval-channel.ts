@@ -251,7 +251,13 @@ export function openCodePermissionRequest(
   const alwaysCovers = always.length === 0
     ? undefined
     : always.length === 1 && always[0] === '*'
-      ? `every ${permission.permission} request, whatever it is`
+      // Measured on a real server (0.467 drive): an edit suggests `*`.
+      ? ({
+          edit: 'every file change it asks for',
+          bash: 'every command it asks to run',
+          webfetch: 'every web page it asks to fetch',
+          external_directory: 'every place outside the project it asks to reach'
+        } as Readonly<Record<string, string>>)[permission.permission] ?? `every “${permission.permission}” it asks for`
       : `anything matching ${always.map((pattern) => `“${pattern}”`).join(' or ')}`
   // A subagent's request says so (R36): the person asked the teammate, not it.
   const by = permission.bySubagent === true ? ', asked by a subagent it started' : ''
