@@ -21,6 +21,7 @@ import type {
 } from '../shared/ipc.js'
 import { approvalPatchFrom } from './approval-patch.js'
 import { relativeToFolder } from '../shared/approval-patch.js'
+import { wholeDetail } from '../shared/approval-detail.js'
 import type { FileChangeRecord } from './approval-patch.js'
 
 /**
@@ -40,7 +41,6 @@ import type { FileChangeRecord } from './approval-patch.js'
  * the file changes it has announced, and it hands back a request handler.
  */
 
-const MAX_APPROVAL_DETAIL = 4_000
 const MAX_PENDING_APPROVALS = 16
 
 /** What the protocol's approval methods mean in the product's own words. */
@@ -51,10 +51,9 @@ export function approvalKindFor(method: string): MissionApprovalKind | undefined
   return undefined
 }
 
+// Whole, line breaks kept, and anything past the cap counted (R14; approval-detail.ts).
 function bounded(value: unknown): string {
-  if (typeof value !== 'string') return ''
-  const single = value.replace(/\s+/g, ' ').trim()
-  return single.length > MAX_APPROVAL_DETAIL ? `${single.slice(0, MAX_APPROVAL_DETAIL - 1)}…` : single
+  return typeof value === 'string' ? wholeDetail(value) : ''
 }
 
 /**

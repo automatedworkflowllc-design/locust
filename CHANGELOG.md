@@ -11,6 +11,34 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.464.0 - 2026-09-29
+
+### Fixed
+
+- **An approval shows the whole action.** A card showed the first 600
+  characters of what a teammate wanted to do, on one line, so a mail's
+  recipient written after a long body never appeared on it. It now shows
+  all of it, one field to a line, with a command's line breaks kept.
+- **A new file is drawn as itself.** A new file whose first lines looked like
+  a change to another file was drawn as that change, and its own lines were
+  not shown. An edit that removed a `-- comment` line in SQL could not be
+  drawn at all, and the +N −M counts skipped such lines. All three are right
+  now.
+- **A checker's approval has to be a plain one.** In a routine with a checker,
+  "VERDICT: APPROVED, but the tests fail" counted as approved. Only a plain
+  approval passes now; anything added to it counts as changes needed, in the
+  checker's own words.
+- **A connector named like a file tool is not a file edit.** A connector
+  called `write_file` or similar was shown as a change to a file in this
+  folder.
+- **A teammate that cannot start says why.** Every failure read "The Codex
+  process transport ended unexpectedly", for Claude and OpenCode too. It now
+  names the runtime and says whether its program is missing, was not
+  allowed to run, or the folder it works in is gone, and that failure no
+  longer brings up an error box of its own.
+- **A page cannot read a hidden file through a link.** A file in the page's
+  folder linked to `.env` or `.git` was served under its innocent name.
+
 ## 0.463.0 - 2026-09-29
 
 ### Improved

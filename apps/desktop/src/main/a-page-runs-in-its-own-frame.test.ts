@@ -121,6 +121,17 @@ describe('the page server', () => {
     expect(answer.status).not.toBe(200)
   })
 
+  // QA-2026-09-29 round 2, R34: an innocent name linked to a hidden file was
+  // served, the rule having looked only at the name asked for.
+  it('judges the file a link resolves to, not only the name asked for', async () => {
+    const { server, url, root } = await site()
+    await mkdir(join(root, 'site', '.git'), { recursive: true })
+    await writeFile(join(root, 'site', '.git', 'config'), '[remote] url = secret', 'utf8')
+    const linked = await symlink(join(root, 'site', '.git'), join(root, 'site', 'gitstuff'), 'junction').then(() => true, () => false)
+    if (!linked) return
+    expect((await server.handle(url.replace('index.html', 'gitstuff/config'))).status).toBe(403)
+  })
+
   it('answers nothing for a host it did not hand out', async () => {
     const { server } = await site()
     expect((await server.handle(`${PAGE_SCHEME}://000000000000000000000000/site/index.html`)).status).toBe(404)

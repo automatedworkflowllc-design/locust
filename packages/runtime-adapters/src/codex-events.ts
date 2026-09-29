@@ -621,13 +621,48 @@ const MAX_PATCH_TEXT_LENGTH = 64 * 1024;
  * Turn a runtime's unified diff into the ledger's patch record. The counts
  * come from the WHOLE text, then the text is bounded, in that order, so the
  * numbers describe the change and not the excerpt.
+ *
+ * COUNTED BY THE HUNKS (QA-2026-09-29 round 2, R32), the way the viewer reads
+ * them: inside a hunk that still expects lines, a line is a row whatever it
+ * begins with. Every line starting `---` or `+++` used to be skipped as a
+ * header, so a removed `-- comment` (sent as `--- comment`) or an added
+ * `++ x` counted as nothing, and a SQL edit read +0 -0.
  */
 export function toolPatchFrom(unified: string): ToolPatch | undefined {
   if (unified.length === 0) return undefined;
   let added = 0;
   let removed = 0;
-  for (const line of unified.split("\n")) {
-    if (line.startsWith("+++") || line.startsWith("---")) continue;
+  let oldLeft = 0;
+  let newLeft = 0;
+  // A `@@` line without counts (some runtimes write a bare one): its rows run
+  // to the next file header, a `---` line followed by a `+++` line.
+  let open = false;
+  const lines = unified.split("\n");
+  // No hunk at all: every +/- line is a row, as before, headers aside.
+  if (!lines.some((line) => line.startsWith("@@"))) {
+    for (const line of lines) {
+      if (line.startsWith("+++") || line.startsWith("---")) continue;
+      if (line.startsWith("+")) added += 1;
+      else if (line.startsWith("-")) removed += 1;
+    }
+  }
+  for (let at = 0; at < lines.length; at += 1) {
+    const line = lines[at]!;
+    if (oldLeft > 0 || newLeft > 0) {
+      if (line.startsWith("+") && newLeft > 0) { added += 1; newLeft -= 1; continue; }
+      if (line.startsWith("-") && oldLeft > 0) { removed += 1; oldLeft -= 1; continue; }
+      if (line.startsWith(" ") && oldLeft > 0 && newLeft > 0) { oldLeft -= 1; newLeft -= 1; continue; }
+    }
+    const hunk = /^@@ -\d+(?:,(\d+))? \+\d+(?:,(\d+))? @@/.exec(line);
+    if (hunk !== null) {
+      oldLeft = Number(hunk[1] ?? "1");
+      newLeft = Number(hunk[2] ?? "1");
+      open = false;
+      continue;
+    }
+    if (line.startsWith("@@")) { oldLeft = 0; newLeft = 0; open = true; continue; }
+    if (line.startsWith("--- ") && (lines[at + 1] ?? "").startsWith("+++ ")) { open = false; at += 1; continue; }
+    if (!open) continue;
     if (line.startsWith("+")) added += 1;
     else if (line.startsWith("-")) removed += 1;
   }

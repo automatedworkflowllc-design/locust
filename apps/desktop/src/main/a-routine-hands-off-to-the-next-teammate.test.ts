@@ -277,6 +277,22 @@ ${STEP_MARK}something else` } })
     expect(verdictOf('Looks fine.')).toBeUndefined()
     expect(verdictOf(undefined)).toBeUndefined()
   })
+
+  /*
+   * QA-2026-09-29 round 2, R11: each of these passed the gate as done. Only a
+   * plain approval approves; a hedge is changes needed, in the checker's words.
+   */
+  it('approves only a plain approval, never a hedged one or an example in a fence', () => {
+    expect(verdictOf('VERDICT: APPROVED.')).toEqual({ approved: true })
+    expect(verdictOf('VERDICT: APPROVED WITH CHANGES')).toEqual({ approved: false, changes: 'APPROVED WITH CHANGES' })
+    expect(verdictOf('VERDICT: APPROVED, but the tests fail')).toEqual({ approved: false, changes: 'APPROVED, but the tests fail' })
+    expect(verdictOf('VERDICT: APPROVED -- although the build is red')).toEqual({ approved: false, changes: 'APPROVED -- although the build is red' })
+    expect(verdictOf('VERDICT: NOT APPROVED')).toEqual({ approved: false, changes: 'NOT APPROVED' })
+    // An example in a fence is not the verdict, and cannot stand in for a missing one.
+    expect(verdictOf('End with this:\n```\nVERDICT: APPROVED\n```\nI have not decided.')).toBeUndefined()
+    // Nor does a real one earlier in the reply get overruled by an example after it.
+    expect(verdictOf('VERDICT: CHANGES NEEDED -- tests\n```\nVERDICT: APPROVED\n```')).toEqual({ approved: false, changes: 'tests' })
+  })
 })
 
 describe('who takes each step, as the store keeps it', () => {

@@ -535,6 +535,15 @@ export function createNodeRuntimeProcessRunner(
         completionResolve = resolve;
         completionReject = reject;
       });
+      /*
+       * A start that fails (the program is gone, not executable, or its
+       * folder is) rejects this before the mission has awaited it, and Node
+       * called that an unhandled rejection -- which the app answered with a
+       * blocking error dialog that froze every run until OK was pressed
+       * (QA-2026-09-29 round 2, R25). Marked handled here; whoever awaits it
+       * still gets the rejection.
+       */
+      completion.catch(() => undefined);
 
       /*
        * THE PROMPT, IN A FILE, for a runtime that reads neither stdin nor a
@@ -849,7 +858,9 @@ export function createNodeRuntimeProcessRunner(
         }
         if (stderrRemainder.length > MAX_STDERR_RECORD_CHARS) stderrRemainder = "";
       });
-      child.once("error", () => fail("Runtime process failed to start"));
+      // With the system's own code (ENOENT, EACCES), so the app can say which
+      // failure it was -- program gone, not allowed to run, folder gone (R25).
+      child.once("error", (error: NodeJS.ErrnoException) => fail(typeof error?.code === "string" && /^[A-Z0-9_]{2,32}$/.test(error.code) ? `Runtime process failed to start (${error.code})` : "Runtime process failed to start"));
       child.once("close", finish);
       child.stdin.once("error", () => {
         if (settled) return;

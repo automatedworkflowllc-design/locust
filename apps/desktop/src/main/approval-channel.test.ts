@@ -93,13 +93,13 @@ describe('approval descriptions', () => {
     expect(described?.detail).toBe('update config')
   })
 
-  it('bounds a very long command', () => {
-    const described = describeApproval({
-      id: 1,
-      method: 'item/commandExecution/requestApproval',
-      params: { command: 'x'.repeat(9_000) }
-    })
-    expect((described?.detail ?? '').length).toBeLessThanOrEqual(4_000)
+  // Whole up to a size no real command reaches, then the rest COUNTED (R14):
+  // a 9,000-character command was cut at 4,000 with nothing saying so.
+  it('shows a long command whole, and counts what is past the cap', () => {
+    const long = describeApproval({ id: 1, method: 'item/commandExecution/requestApproval', params: { command: 'x'.repeat(9_000) } })
+    expect(long?.detail).toBe('x'.repeat(9_000))
+    const huge = describeApproval({ id: 2, method: 'item/commandExecution/requestApproval', params: { command: 'x'.repeat(25_000) } })
+    expect(huge?.detail).toMatch(/\[5,000 more characters not shown here/)
   })
 
   it('drops a question with no id, because an answer would have nowhere to go', () => {

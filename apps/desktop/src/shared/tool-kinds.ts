@@ -99,6 +99,16 @@ export function editToolName(name: string): boolean {
   const trimmed = name.trim()
   if (trimmed.length === 0) return false
   if (NOT_EDIT_TOOLS.test(trimmed)) return false
+  /*
+   * A CONNECTOR'S TOOL IS NEVER A FILE CHANGE (QA-2026-09-29 round 2, R13).
+   * `mcp__github__create_issue` read as an edit because it says "create",
+   * and so did 17 of 18 real connector tools -- create and delete are their
+   * commonest verbs -- so a GitHub issue showed as "1 file", "Changed a
+   * file" and a phantom file in Artifacts. Connector tools are named
+   * `server__tool` (with or without `mcp__`); no tool that edits this
+   * machine's files is.
+   */
+  if (trimmed.includes('__')) return false
   const words = trimmed
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .split(/[^A-Za-z]+/)

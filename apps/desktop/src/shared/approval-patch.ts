@@ -20,8 +20,15 @@ export interface FileChangeRecord {
   readonly diff: string
 }
 
-const hasHeaders = (diff: string): boolean => /^(---|\+\+\+) /m.test(diff)
-const hasHunks = (diff: string): boolean => /^@@ /m.test(diff)
+/**
+ * What the body STARTS with (QA-2026-09-29 round 2, R32). Both used to be
+ * asked of the whole body, so an edit removing a `-- comment` line (sent as
+ * `--- comment`) was taken for headers and lost its file. A diff's headers or
+ * its first hunk come first; anything later is the change's own lines.
+ */
+const firstLine = (diff: string): string => diff.split('\n').find((line) => line.trim().length > 0) ?? ''
+const hasHeaders = (diff: string): boolean => /^(---|\+\+\+) /.test(firstLine(diff))
+const hasHunks = (diff: string): boolean => /^@@ /.test(firstLine(diff))
 
 /** A path under the folder, as the folder sees it; anything else unchanged. */
 export function relativeToFolder(path: string, workspacePath: string | undefined): string {
@@ -52,7 +59,12 @@ export function unifiedPatchText(changes: readonly FileChangeRecord[], workspace
   const parts: string[] = []
   for (const change of changes) {
     const body = change.diff.replace(/\r\n?/g, '\n').trimEnd()
-    if (hasHeaders(body)) {
+    // An add or a delete is whole-file CONTENT, whatever it looks like (R32):
+    // a new run-me.sh whose first lines were `--- a/README.md`, `+++ b/...`
+    // and a hunk was drawn as "README.md MODIFIED", its own curl line nowhere
+    // on the card. Its hunk is always built here, never read out of it.
+    const whole = change.kind === 'add' || change.kind === 'delete'
+    if (!whole && hasHeaders(body)) {
       parts.push(body)
       continue
     }
@@ -60,7 +72,7 @@ export function unifiedPatchText(changes: readonly FileChangeRecord[], workspace
     const moved = change.movePath === undefined ? undefined : relativeToFolder(change.movePath, workspacePath)
     const oldPath = change.kind === 'add' ? '/dev/null' : `a/${path}`
     const newPath = change.kind === 'delete' ? '/dev/null' : `b/${moved ?? path}`
-    const hunks = hasHunks(body)
+    const hunks = !whole && hasHunks(body)
       ? body
       : change.kind === 'add'
         ? contentHunk(change.diff, '+')

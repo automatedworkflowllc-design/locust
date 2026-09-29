@@ -158,6 +158,10 @@ export function createPageServer(options: {
         measured = await stat(real).catch(() => undefined)
       }
       if (measured === undefined || !measured.isFile()) return refuse(404, 'Not found.')
+      // The file it RESOLVES to is judged too (QA-2026-09-29 round 2, R34):
+      // `dotenv.txt -> .env` and `gitconfig.txt -> .git/config` were served,
+      // the rule having seen only the innocent name asked for.
+      if (neverServed(relative(root, real))) return refuse(403, 'Hidden files and keys are never served to a page.')
       if (measured.size > MAX_PAGE_FILE_BYTES) return refuse(413, 'Too large to serve here.')
       const body = await readFile(real)
       const type = TYPES[extname(real).slice(1).toLowerCase()] ?? 'application/octet-stream'

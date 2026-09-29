@@ -424,6 +424,29 @@ describe("controlled runtime JSONL process runner", () => {
     expect(spawnProcess).not.toHaveBeenCalled();
   });
 
+  /*
+   * QA-2026-09-29 round 2, R25: a program that is gone rejected `completion`
+   * before anyone awaited it; Node called it unhandled and the app answered
+   * with a blocking dialog that froze every run. It must reject for whoever
+   * awaits it, and never as unhandled -- and say which failure it was.
+   */
+  it("a failed start is never an unhandled rejection, and names the system's code", async () => {
+    const unhandled: unknown[] = [];
+    const listen = (reason: unknown) => unhandled.push(reason);
+    process.on("unhandledRejection", listen);
+    try {
+      const child = fakeChild();
+      const run = createNodeRuntimeProcessRunner({ spawnProcess: () => child.process }).start(spec, prompt);
+      child.fail(Object.assign(new Error("spawn C:\\tools\\claude.exe ENOENT"), { code: "ENOENT" }));
+      // Nobody awaits it for a while, as the mission code does not.
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(unhandled).toEqual([]);
+      await expect(run.completion).rejects.toThrow("Runtime process failed to start (ENOENT)");
+    } finally {
+      process.off("unhandledRejection", listen);
+    }
+  });
+
   it("sanitizes asynchronous launch errors and does not retry", async () => {
     const child = fakeChild();
     let spawnCount = 0;

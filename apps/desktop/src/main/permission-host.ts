@@ -7,6 +7,7 @@ import { join } from 'node:path'
 
 import type { MissionApprovalAnswer, MissionApprovalRequest } from '../shared/ipc.js'
 import { relativeToFolder } from '../shared/approval-patch.js'
+import { wholeDetail, wholeInput } from '../shared/approval-detail.js'
 import { deniedSaying } from './approval-channel.js'
 
 /**
@@ -144,7 +145,8 @@ export function builtInOrConnector(
   const fields = typeof input === 'object' && input !== null ? (input as Record<string, unknown>) : {}
   const text = (value: unknown): string => (typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, 600) : '')
   if (toolName === 'Bash') {
-    const command = text(fields.command)
+    // Whole, line breaks kept: a heredoc or a long command is read as written (R14).
+    const command = typeof fields.command === 'string' ? wholeDetail(fields.command) : ''
     return { kind: 'command', summary: command.length > 0 ? 'Run a command' : 'Run a command it did not describe', detail: command }
   }
   if (toolName === 'Edit' || toolName === 'Write' || toolName === 'MultiEdit' || toolName === 'NotebookEdit') {
@@ -152,11 +154,12 @@ export function builtInOrConnector(
     return { kind: 'file-change', summary: 'Change 1 file', detail: file.length > 0 ? relativeToFolder(file, cwd) : '' }
   }
   if (!toolName.startsWith('mcp__')) {
-    return { kind: 'command', summary: `Use ${toolName}`, detail: JSON.stringify(input).slice(0, 600) }
+    return { kind: 'command', summary: `Use ${toolName}`, detail: wholeInput(input) }
   }
-  // The input the connector would be called with, bounded. It is the one
-  // thing a person can judge a connector call by.
-  return { kind: 'connector', summary: connectorSummary(toolName), detail: JSON.stringify(input).slice(0, 600) }
+  // The input the connector would be called with, WHOLE and one field to a
+  // line (R14): it is the one thing a person can judge a connector call by,
+  // and a recipient written last was past the old 600-character cut.
+  return { kind: 'connector', summary: connectorSummary(toolName), detail: wholeInput(input) }
 }
 
 export function createPermissionHost(options: {

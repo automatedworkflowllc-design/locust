@@ -1104,22 +1104,33 @@ const note = (label: string, detail: string): void => {
 }
 
 let toldAboutTrouble = false
-const noteTrouble = (label: string, error: unknown): void => {
+/*
+ * NEVER A BLOCKING DIALOG (QA-2026-09-29 round 2, R25). This was
+ * `dialog.showErrorBox`, which is synchronous: it stopped the main process --
+ * every teammate's stream, every ledger write -- until OK was pressed, so a
+ * foreseeable failure (a CLI that was uninstalled, a folder that was moved)
+ * read as the app crashing and froze the rest with it. A rejection the app
+ * carries on from is written to the log and nothing more; a real crash is
+ * said once, in a dialog that holds nothing up.
+ */
+const noteTrouble = (label: string, error: unknown, tell: boolean): void => {
   const detail = error instanceof Error ? (error.stack ?? error.message) : String(error)
   note(label, detail)
-  if (toldAboutTrouble) return
+  if (!tell || toldAboutTrouble) return
   toldAboutTrouble = true
   try {
-    dialog.showErrorBox(
-      'Locust hit a problem',
-      `Something went wrong inside Locust. Your mission records are safe on disk.\n\n${detail.split('\n')[0] ?? ''}\n\nDetails were written to ${errorLog()}.`
-    )
+    void dialog.showMessageBox({
+      type: 'error',
+      title: 'Locust hit a problem',
+      message: 'Something went wrong inside Locust. Your mission records are safe on disk.',
+      detail: `${detail.split('\n')[0] ?? ''}\n\nDetails were written to ${errorLog()}.`
+    }).catch(() => undefined)
   } catch {
     // Before the app is ready a dialog cannot show; the log has it.
   }
 }
-process.on('uncaughtException', (error) => noteTrouble('uncaughtException', error))
-process.on('unhandledRejection', (reason) => noteTrouble('unhandledRejection', reason))
+process.on('uncaughtException', (error) => noteTrouble('uncaughtException', error, true))
+process.on('unhandledRejection', (reason) => noteTrouble('unhandledRejection', reason, false))
 
 /*
  * THE CRASHES THE TWO LINES ABOVE CANNOT SEE.

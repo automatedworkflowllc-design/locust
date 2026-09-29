@@ -76,4 +76,14 @@ describe('the tool vocabulary every runtime actually speaks', () => {
       expect(editToolName(name), name).toBe(true)
     }
   })
+
+  // QA-2026-09-29 round 2, R13: a connector's create/delete is not a change to a file here.
+  it('never calls a connector tool a file change, whatever its verb', () => {
+    for (const name of [
+      'mcp__github__create_issue', 'mcp__github__create_pull_request', 'mcp__github__delete_file', 'mcp__github__push_files',
+      'mcp__claude_ai_Gmail__create_draft', 'mcp__claude_ai_Google_Drive__create_file', 'Google_Drive__create_file', 'mcp__linear__create_issue'
+    ]) {
+      expect(editToolName(name), name).toBe(false)
+    }
+  })
 })

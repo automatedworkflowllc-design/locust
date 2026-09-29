@@ -536,14 +536,31 @@ function persistenceFailure(active: ActiveCodexMission, reason?: string): void {
   })
 }
 
-function transportFailure(active: ActiveCodexMission): void {
+/**
+ * What went wrong with the runtime's process, in its own name (R25). It said
+ * "The Codex process transport ended unexpectedly" for every runtime, and
+ * nothing about a program that was never started: one that was uninstalled or
+ * moved, one the machine would not run, or a conversation's folder that is
+ * gone -- since 0.458 every folder's conversations are one click away.
+ */
+export function transportSentence(active: { readonly runtime: MissionRuntimeId; readonly cwd: string }, why: unknown): string {
+  const name = runtimeDisplayName(active.runtime)
+  const said = why instanceof Error ? why.message : typeof why === 'string' ? why : ''
+  if (!/failed to start/.test(said)) return `${name} stopped unexpectedly, before it said it had finished.`
+  if (!existsSync(active.cwd)) return `${name} could not start: the folder it works in, ${active.cwd}, is not there any more.`
+  if (/\(ENOENT\)/.test(said)) return `${name} could not be started: its program was not found. It may have been moved or uninstalled; Settings can install it again.`
+  if (/\((EACCES|EPERM)\)/.test(said)) return `${name} could not be started: this computer did not allow its program to run.`
+  return `${name} could not be started.`
+}
+
+function transportFailure(active: ActiveCodexMission, message: string): void {
   safelyEmit(active, {
     kind: 'transport-error',
     runId: active.runId,
     missionId: active.missionId,
     error: {
       code: 'RUNTIME_TRANSPORT_FAILED',
-      message: 'The Codex process transport ended unexpectedly.'
+      message
     }
   })
 }
@@ -551,15 +568,17 @@ function transportFailure(active: ActiveCodexMission): void {
 async function persistTransportFailure(
   mission: ActiveCodexMission,
   ledger: MissionLedger,
-  occurredAt: string
+  occurredAt: string,
+  why?: unknown
 ): Promise<void> {
+  const message = transportSentence(mission, why)
   try {
     await ledger.appendHostFailure(mission.missionId, {
       code: 'runtime-transport-failed',
-      message: 'The Codex process transport ended unexpectedly.',
+      message,
       occurredAt
     })
-    transportFailure(mission)
+    transportFailure(mission, message)
   } catch {
     persistenceFailure(mission)
   }
@@ -838,9 +857,9 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
     let completion
     try {
       completion = await mission.process.completion
-    } catch {
+    } catch (error) {
       mission.settled = true
-      await persistTransportFailure(mission, options.ledger, now().toISOString())
+      await persistTransportFailure(mission, options.ledger, now().toISOString(), error)
       clearActive(mission)
       return
     }

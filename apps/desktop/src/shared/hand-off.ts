@@ -81,15 +81,37 @@ export type Verdict = { readonly approved: true } | { readonly approved: false; 
  * The checker's verdict: the LAST line that says one, so a verdict quoted
  * earlier in the reply is not taken for this one. Undefined when there is
  * none -- which the runner treats as not approved.
+ *
+ * ONLY A PLAIN APPROVAL APPROVES (QA-2026-09-29 round 2, R11). The gate
+ * promises the run counts as done only if the checker approves, and a line
+ * that merely STARTED "VERDICT: APPROVED" passed it: "APPROVED WITH CHANGES",
+ * "APPROVED, but the tests fail", "APPROVED -- although the build is red", and
+ * a verdict shown as an example inside a code fence. Now the last verdict line
+ * decides; it approves only when nothing but closing punctuation follows
+ * APPROVED, and anything else is changes needed, in the checker's own words.
+ * Lines inside a code fence are examples, never the verdict.
  */
 export function verdictOf(reply: string | undefined): Verdict | undefined {
   if (reply === undefined) return undefined
-  const lines = reply.split(/\r?\n/).map((line) => line.replace(/^[\s>*_`#-]+|[\s*_`]+$/g, '').trim())
+  const raw = reply.split(/\r?\n/)
+  let fenced = false
+  const lines: string[] = []
+  for (const line of raw) {
+    if (/^\s*(```|~~~)/.test(line)) {
+      fenced = !fenced
+      continue
+    }
+    lines.push(fenced ? '' : line.replace(/^[\s>*_`#-]+|[\s*_`]+$/g, '').trim())
+  }
   for (let at = lines.length - 1; at >= 0; at -= 1) {
-    const match = /^VERDICT:\s*(APPROVED|CHANGES NEEDED)\b\s*(?:[-—–:]+\s*)?(.*)$/i.exec(lines[at] ?? '')
+    const match = /^VERDICT:\s*(.*)$/i.exec(lines[at] ?? '')
     if (match === null) continue
-    if (match[1]!.toUpperCase() === 'APPROVED') return { approved: true }
-    return { approved: false, changes: (match[2] ?? '').trim() }
+    const said = (match[1] ?? '').trim()
+    if (/^APPROVED[.!]?$/i.test(said)) return { approved: true }
+    const needed = /^CHANGES NEEDED\b\s*(?:[-—–:]+\s*)?(.*)$/i.exec(said)
+    if (needed !== null) return { approved: false, changes: (needed[1] ?? '').trim() }
+    // Hedged, qualified or anything else: not an approval, and said as it was.
+    return { approved: false, changes: said }
   }
   return undefined
 }

@@ -79,7 +79,7 @@ describe('the permission host', () => {
     await new Promise((r) => setTimeout(r, 30))
     expect(cards).toHaveLength(1)
     expect(cards[0]).toMatchObject({ runId: 'run1', missionId: 'm1', kind: 'connector', summary: 'Use get_watchlists on Robinhood', cwd: 'C:/work' })
-    expect(cards[0]!.detail).toContain('"limit":5')
+    expect(cards[0]!.detail).toContain('"limit": 5')
 
     expect(host.decide({ approvalId: cards[0]!.approvalId, decision: 'approve-once' })).toBe(true)
     const answer = await asked
