@@ -1748,6 +1748,17 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+/* How long a finished command took (0.459): quiet, at the row's end, in the
+   mono of the command beside it -- a fact to glance at, not a result. */
+.lc-filerow__took {
+  flex: none;
+  margin-left: auto;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-label);
+  font-variant-numeric: tabular-nums;
+  color: var(--lc-text-muted);
+}
+
 /* --- The diff itself --------------------------------------------------
  * Unified, never side by side: the thread column caps at 760px and two
  * panes would leave forty mono characters each. Content scrolls per row

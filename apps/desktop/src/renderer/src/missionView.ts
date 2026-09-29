@@ -67,7 +67,7 @@ export interface ActivityDetail {
   readonly patch?: ToolPatch
   /** The runtime's own status word for the call; a subagent's type, for its launcher. */
   readonly status?: string
-  /** How long a reasoning step took, when both ends were seen. Drawn as "Thought for 12s". */
+  /** How long a reasoning step or a command took, when both ends were seen. Drawn as "Thought for 12s", or a command's "12s". */
   readonly durationMs?: number
   /** What the tool returned, when the runtime reported it in words; a subagent's summary. */
   readonly output?: string
@@ -222,6 +222,13 @@ export type ActivityEntry =
       readonly failed: boolean
       readonly exitCode: number | undefined
       /**
+       * How long it ran, start to finish as the runtime reported them (0.459,
+       * as Devin's worklog shows it). Drawn only when it is a second or more
+       * and the command was waited on: a runtime that reports both ends at
+       * once would otherwise claim every command took no time at all.
+       */
+      readonly durationMs?: number
+      /**
        * The runtime refused it before it ran, with its reason ('' when it gave
        * none). Not a failure: nothing ran (see `refusedCalls` in the Claude
        * adapter).
@@ -367,6 +374,7 @@ export function activityEntries(
         settled: detail.settled,
         failed,
         exitCode: detail.exitCode,
+        ...(detail.durationMs === undefined ? {} : { durationMs: detail.durationMs }),
         ...(detail.status === 'refused' || detail.status === 'declined' ? { refused: detail.output ?? '' } : {}),
         ...(detail.status === 'declined' ? { declined: true } : {}),
         /*
@@ -1406,6 +1414,12 @@ export function traceOutcome(events: readonly NormalizedRuntimeEvent[], running:
 }
 
 /** "41s", "4m 20s", "1h 06m". */
+/** What a finished command's row says about its time, or nothing (see the shell entry's `durationMs`). */
+export function commandTook(entry: { readonly durationMs?: number; readonly settled: boolean; readonly background?: boolean; readonly refused?: string }): string | undefined {
+  if (!entry.settled || entry.background === true || entry.refused !== undefined || entry.durationMs === undefined || entry.durationMs < 1000) return undefined
+  return durationText(entry.durationMs)
+}
+
 export function durationText(ms: number): string {
   const seconds = Math.max(0, Math.round(ms / 1000))
   if (seconds < 60) return `${String(seconds)}s`
@@ -2611,10 +2625,19 @@ export function buildThread(
         if (open !== undefined) {
           const index = activity.indexOf(open)
           const patch = event.payload.patch
+          // How long it took (0.459): as the runtime timed it when it says
+          // (OpenCode), else from its start to its end as they arrived.
+          const began = Date.parse(openToolAt.get(event.payload.itemId)?.at ?? '')
+          const ended = Date.parse(event.occurredAt)
+          const timed = (event.payload as { readonly durationMs?: unknown }).durationMs
+          const tookMs = typeof timed === 'number' && Number.isFinite(timed) && timed >= 0
+            ? timed
+            : Number.isNaN(began) || Number.isNaN(ended) ? undefined : Math.max(0, ended - began)
           if (index >= 0) {
             activity[index] = {
               ...open,
               settled: true,
+              ...(tookMs === undefined ? {} : { durationMs: tookMs }),
               failed: event.type === 'tool.failed',
               ...(event.payload.exitCode === undefined ? {} : { exitCode: event.payload.exitCode }),
               ...(event.payload.status === undefined ? {} : { status: event.payload.status }),

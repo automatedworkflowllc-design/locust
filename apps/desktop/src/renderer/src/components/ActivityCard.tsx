@@ -19,7 +19,7 @@ export function thoughtLine(durationMs: number | undefined): string {
 }
 import type { ReactElement } from 'react'
 
-import { activityCounts, activityEntries, boundedShellOutput, defaultOpenEntry, foldedToolsText, relativePath, durationText } from '../missionView.js'
+import { activityCounts, activityEntries, boundedShellOutput, commandTook, defaultOpenEntry, foldedToolsText, relativePath, durationText } from '../missionView.js'
 import type { TraceSegment, ActivityDetail, ActivityEntry, PlanStep } from '../missionView.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { DiffView } from './DiffView.js'
@@ -482,6 +482,7 @@ export function ActivityCard({
                     {entry.output !== undefined && entry.settled && (
                       <span className="lc-filerow__result is-muted">no output</span>
                     )}
+                    {commandTook(entry) !== undefined && <span className="lc-filerow__took">{commandTook(entry)}</span>}
                   </div>
                 ) : (
                   <>
@@ -527,6 +528,7 @@ export function ActivityCard({
                       {entry.output !== undefined && entry.output.trim() === '' && entry.settled && (
                         <span className="lc-filerow__result is-muted">no output</span>
                       )}
+                      {commandTook(entry) !== undefined && <span className="lc-filerow__took">{commandTook(entry)}</span>}
                       <span className="lc-activity__chev" aria-hidden="true">
                         <Icon name={isOpen(entry) ? 'chevron-down' : 'chevron-right'} size={12} />
                       </span>

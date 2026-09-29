@@ -607,3 +607,31 @@ describe("an OpenCode run the provider refused as too long, which recovered", ()
     expect((events.at(-1)?.payload as { message: string }).message).toMatch(/Upstream went away/);
   });
 });
+
+/*
+ * 0.459: OpenCode prints a tool call only once it is done, so its start and
+ * end arrive together -- but the part carries the call's own clock, and a
+ * finished command's row says how long it ran from that.
+ */
+describe("an OpenCode tool call's own clock", () => {
+  const started = JSON.stringify({ type: "step_start", sessionID: "ses_1", part: { type: "step-start" } });
+  const timed = (time: unknown) => JSON.stringify({
+    type: "tool_use",
+    sessionID: "ses_1",
+    part: { type: "tool", tool: "bash", callID: "call_1", state: { status: "completed", input: { command: "npm test" }, output: "ok", time } },
+  });
+
+  it("rides on the completion, in milliseconds", () => {
+    const { events } = run([started, timed({ start: 1790312294609, end: 1790312298809 })]);
+    const done = events.find((event) => event.type === "tool.completed");
+    expect((done?.payload as { durationMs?: number }).durationMs).toBe(4200);
+  });
+
+  it("is left out when the part says nothing usable", () => {
+    for (const time of [undefined, { start: 5 }, { start: 9, end: 3 }, { start: "a", end: "b" }]) {
+      const { events } = run([started, timed(time)]);
+      const done = events.find((event) => event.type === "tool.completed");
+      expect((done?.payload as { durationMs?: number }).durationMs).toBeUndefined();
+    }
+  });
+});

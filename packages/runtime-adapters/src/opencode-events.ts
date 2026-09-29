@@ -482,6 +482,7 @@ export function createOpenCodeEventNormalizer(
           ...common,
           ...(verdict.status === undefined ? {} : { status: verdict.status }),
           ...(patch === undefined ? {} : { patch }),
+          ...(openCodeToolDuration(state) === undefined ? {} : { durationMs: openCodeToolDuration(state)! }),
           phase: "completed",
           evidence,
         }),
@@ -688,4 +689,14 @@ export function createOpenCodeEventNormalizer(
       return [emit("run.completed", { ...thread, ...(usage === undefined ? {} : { usage }), process })];
     },
   };
+}
+
+/** How long OpenCode says a tool call ran: its part's own `state.time`, in milliseconds (0.459). */
+function openCodeToolDuration(state: unknown): number | undefined {
+  if (typeof state !== "object" || state === null) return undefined;
+  const time = (state as { readonly time?: unknown }).time;
+  if (typeof time !== "object" || time === null) return undefined;
+  const { start, end } = time as { readonly start?: unknown; readonly end?: unknown };
+  if (typeof start !== "number" || typeof end !== "number" || !Number.isFinite(start) || !Number.isFinite(end) || end < start) return undefined;
+  return end - start;
 }

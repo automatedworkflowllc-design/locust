@@ -163,6 +163,14 @@ export interface ToolPayload {
   readonly exitCode?: number;
   readonly status?: string;
   readonly patch?: ToolPatch;
+  /**
+   * How long the call ran, as the RUNTIME timed it, in milliseconds (0.459).
+   * OpenCode's `run` prints a tool call only once it is done -- start and end
+   * arrive together, so the arrival times say nothing -- but the part carries
+   * its own `state.time.start` and `end`. Absent where the runtime gives none;
+   * the desktop then times the call by when its start and end arrived.
+   */
+  readonly durationMs?: number;
   readonly phase: "started" | "updated" | "completed";
   readonly evidence: CodexEventEvidence;
 }

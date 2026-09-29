@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.459.0 - 2026-09-29
+
+### Improved
+
+- **A finished command says how long it took.** A command a teammate ran
+  now shows its time at the end of its row -- "4s", "1m 35s" -- so a slow
+  test run or build stands out. Commands under a second, ones sent to the
+  background, and ones that never ran say nothing.
+
 ## 0.458.0 - 2026-09-29
 <!-- big -->
 
