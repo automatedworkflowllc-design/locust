@@ -11,6 +11,21 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.474.0 - 2026-09-29
+<!-- big -->
+
+### New
+
+- **Projects, like Claude's.** The groups you filed conversations under are
+  back, as projects, drawn with the folder look: a folder icon, the project's
+  name, and its count. A project can hold conversations from any folder.
+  Make one from the + menu (New project), or file a conversation from its
+  menu (Move to project). The folder a conversation works in is still the
+  one in the chat box, where you switch it.
+- **Math is drawn.** Equations in a reply, written `$...$` inside a sentence
+  or `$$...$$` on their own line, are drawn as math instead of showing the
+  raw LaTeX. Prices like "$5 and $10" stay as they are.
+
 ## 0.473.0 - 2026-09-29
 
 ### New

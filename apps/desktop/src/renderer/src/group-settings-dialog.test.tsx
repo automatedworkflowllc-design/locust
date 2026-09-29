@@ -20,7 +20,7 @@ const html = (group: PublicGroup): string =>
 describe('the group settings dialog', () => {
   it('is titled for the group, not for one of its two properties', () => {
     const page = html(trading)
-    expect(page).toContain('Group settings')
+    expect(page).toContain('Project settings')
     expect(page).toContain('Trading')
     expect(page).toContain('Standing instructions')
     expect(page).toContain('Default route')

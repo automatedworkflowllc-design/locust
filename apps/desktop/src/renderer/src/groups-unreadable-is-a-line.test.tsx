@@ -101,8 +101,7 @@ describe('the groups file that would not read', () => {
   it('is not said when the groups read fine', () => {
     const html = sidebar({ groups: [group] })
     expect(html).not.toContain('Groups could not be read')
-    // Groups are retired and no longer drawn (Colin, 2026-09-29): the
-    // folder is the heading, and a group's name is not on the sidebar.
-    expect(html).not.toContain('State control')
+    // A project (a group, under Claude's name for it: Colin, 2026-09-29) is drawn.
+    expect(html).toContain('State control')
   })
 })

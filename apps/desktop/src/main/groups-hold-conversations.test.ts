@@ -310,11 +310,11 @@ describe('moving a conversation is one row, not one row per group', () => {
    * was stuck in one. No group is made any more; the ones he has stay, and
    * this row is how they are emptied.
    */
-  it('is offered only while groups exist, and makes none', () => {
-    expect(APP).toContain('...(groupsRef.current.length === 0 ? [] : [')
-    expect(APP).toContain("label: 'Move to group'")
-    expect(APP).not.toContain("label: 'New group…'")
-    expect(APP).not.toContain('setNewGroupFor(conversationKeyOf(missionId))')
+  // Projects are back (Colin, 2026-09-29): the menu is always there, and it can make one.
+  it('is offered always, as Move to project, and can make a new project', () => {
+    expect(APP).toContain("label: 'Move to project'")
+    expect(APP).toContain("label: 'New project…'")
+    expect(APP).toContain('setNewGroupFor(conversationKeyOf(missionId))')
   })
 
   it('ticks the one it is already in, so the list also answers where it is', () => {
@@ -327,9 +327,9 @@ describe('moving a conversation is one row, not one row per group', () => {
     expect(APP).toContain('checked: groupOfConversation(missionId)?.groupId === group.groupId')
   })
 
-  it('offers Ungrouped as a destination rather than a separate verb', () => {
-    const submenu = APP.slice(APP.indexOf("label: 'Move to group'"))
-    expect(submenu.slice(0, 2400)).toContain("label: 'Ungrouped'")
+  it('offers Not in a project as a destination rather than a separate verb', () => {
+    const submenu = APP.slice(APP.indexOf("label: 'Move to project'"))
+    expect(submenu.slice(0, 2400)).toContain("label: 'Not in a project'")
   })
 
   it('picks the newest match when two groups share a name', () => {

@@ -29,7 +29,6 @@ import { Icon } from './Icon.js'
 import { WorkingSpark } from './WorkingSpark.js'
 import { teammateTooltip } from '../teammateTooltip.js'
 import { railCountBadge, shortAgo } from '../railFlyout.js'
-import { folderSectionsOf } from '../../../shared/folder-sections.js'
 import { conversationRows, heldFor, narrowingLine, ownerOf, roomLastAt, unreadableSentence, withRoomsFolded } from '../conversationList.js'
 import { RailFlyout } from './RailFlyout.js'
 import { routineStepLabel } from '../routines.js'
@@ -219,9 +218,7 @@ export function Sidebar({
   onOpenRooms,
   onOpenAutomations,
   onHome,
-  compact = false,
-  folders = [],
-  currentFolderId
+  compact = false
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
   readonly missions: readonly SidebarMission[]
@@ -439,13 +436,6 @@ export function Sidebar({
    */
   const [foldedGroups, setFoldedGroups] = useState<ReadonlySet<string>>(new Set())
   /*
-   * Project sections (0.458): the window's folder open unless folded, every
-   * other folder folded unless opened -- a heading and a count say nothing is
-   * lost without a list of weeks-old conversations under each.
-   */
-  const [foldedFolders, setFoldedFolders] = useState<ReadonlySet<string>>(new Set())
-  const [openedFolders, setOpenedFolders] = useState<ReadonlySet<string>>(new Set())
-  /*
    * A new group is named before it exists.
    *
    * The alternative is creating "Untitled group" and making someone rename
@@ -609,14 +599,16 @@ export function Sidebar({
   const conversationList = (allInFolder: readonly SidebarMission[], keepsEmpty: boolean): ReactElement => {
     const inFolder = allInFolder.filter((mission) => !isNestedChild(mission))
     /*
-     * GROUPS ARE NOT DRAWN (Colin, 2026-09-29: "groups can just be the
-     * folders"). 0.460 stopped making them but still drew the old ones, so a
-     * person whose conversations were all in one folder saw the retired
-     * group headings and no folder at all. Their memberships stay in
-     * groups.json, untouched; the folder is the heading now.
+     * PROJECTS, AS CLAUDE HAS THEM (Colin, 2026-09-29: "claude has
+     * projects/and workspace folders, like they arent the same thing so
+     * just use that setup"). A project is what the person files a
+     * conversation under -- the groups they made while Locust was held to
+     * one folder -- drawn with the folder look he chose ("its beautiful").
+     * The folder a conversation WORKS in is the chat box's chip, and a
+     * project holds conversations from any folder.
      */
-    const drawnGroups: typeof groups = []
-    const folderUngrouped = withRoomsFolded(inFolder, rooms)
+    const drawnGroups = groups
+    const folderUngrouped = withRoomsFolded(inFolder.filter((mission) => heldFor(mission, groupMembers) === undefined), rooms)
     // "Ungrouped" only where a group is drawn beside it: in a folder with none it names the only thing there.
     const groupsShown = drawnGroups.some((group) => showsGroup(group.groupId, inFolder, keepsEmpty))
     return (
@@ -636,7 +628,7 @@ export function Sidebar({
                         className="lc-input lc-convgroup__rename"
                         defaultValue={group.name}
                         maxLength={60}
-                        aria-label="Group name"
+                        aria-label="Project name"
                         autoFocus
                         onKeyDown={(event) => {
                           if (event.key === 'Escape') onGroupRenameDone?.()
@@ -659,8 +651,9 @@ export function Sidebar({
                     ) : (
                     <button
                       type="button"
-                      className={`lc-sectionlabel lc-sectionlabel--fold${open ? ' is-open' : ''}`}
+                      className={`lc-project__head${open ? ' is-open' : ''}`}
                       aria-expanded={open}
+                      title={`${group.name}: a project. Click to fold or unfold it.`}
                       onClick={() =>
                         setFoldedGroups((current) => {
                           const next = new Set(current)
@@ -670,8 +663,8 @@ export function Sidebar({
                         })
                       }
                     >
-                      <Icon name={open ? 'chevron-down' : 'chevron-right'} size={11} />
-                      <span>{group.name}</span>
+                      <Icon name="folder" size={12} />
+                      <span className="lc-project__name">{group.name}</span>
                       <span className="lc-sectionlabel__count">{String(theirs.length)}</span>
                     </button>
                     )}
@@ -680,7 +673,7 @@ export function Sidebar({
                         type="button"
                         className="lc-convgroup__menu"
                         aria-label={`Actions for ${group.name}`}
-                        title="Rename or remove this group"
+                        title="Rename or remove this project"
                         onClick={(event) => {
                           event.stopPropagation()
                           const box = event.currentTarget.getBoundingClientRect()
@@ -710,8 +703,8 @@ export function Sidebar({
               * sidebar and a label over it would name the only thing there.
               */}
             {groupsShown && folderUngrouped.length > 0 && (
-              <div className="lc-sectionlabel lc-sectionlabel--plain">
-                <span>Ungrouped</span>
+              <div className="lc-project__head is-plain">
+                <span className="lc-project__name">Not in a project</span>
                 <span className="lc-sectionlabel__count">{String(folderUngrouped.length)}</span>
               </div>
             )}
@@ -1594,8 +1587,8 @@ export function Sidebar({
             {namingGroup && (
               <input
                 className="lc-input lc-convgroup__rename"
-                placeholder="Name this group"
-                aria-label="Name this group"
+                placeholder="Name this project"
+                aria-label="Name this project"
                 maxLength={60}
                 autoFocus
                 onKeyDown={(event) => {
@@ -1646,47 +1639,13 @@ export function Sidebar({
                 <span className="lc-sidebar__unreadable-safe lc-mono">Nothing is written over them. All missions names the files.</span>
               </div>
             )}
-            {(() => {
-              /*
-               * PROJECTS, like Claude Code (0.458): every folder's
-               * conversations, each under its folder's name -- the window's
-               * own folder first, then the rest by their newest. One folder
-               * draws no heading at all.
-               */
-              const sections = folderSectionsOf(shownConversations, currentFolderId)
-              // One folder is headed too (Colin, 2026-09-29): the folder's
-              // name is where the retired groups' headings used to be.
-              if (sections.length === 0) return conversationList(shownConversations, true)
-              return sections.map((section) => {
-                // The only folder there is starts open, as the window's own does.
-                const isCurrent = section.id === currentFolderId || sections.length === 1
-                const open = isCurrent ? !foldedFolders.has(section.id) : openedFolders.has(section.id)
-                const name = folders.find((folder) => folder.id === section.id)?.name ?? 'Unknown folder'
-                return (
-                  <div className="lc-project" key={section.id}>
-                    <button
-                      type="button"
-                      className={`lc-project__head${open ? ' is-open' : ''}${section.id === currentFolderId ? ' is-current' : ''}`}
-                      aria-expanded={open}
-                      title={section.id === currentFolderId ? `${name}: new conversations start here` : folders.find((folder) => folder.id === section.id)?.installFolder === true ? `${name}: Locust's own install folder, where early builds ran. These can be read, not continued.` : folders.some((folder) => folder.id === section.id) ? name : 'Locust does not know which folder these ran in.'}
-                      onClick={() =>
-                        (isCurrent ? setFoldedFolders : setOpenedFolders)((current) => {
-                          const next = new Set(current)
-                          if (next.has(section.id)) next.delete(section.id)
-                          else next.add(section.id)
-                          return next
-                        })
-                      }
-                    >
-                      <Icon name="folder" size={12} />
-                      <span className="lc-project__name">{name}</span>
-                      <span className="lc-sectionlabel__count">{String(section.missions.length)}</span>
-                    </button>
-                    {open && conversationList(section.missions, section.id === currentFolderId)}
-                  </div>
-                )
-              })
-            })()}
+            {/*
+              * PROJECTS, then the rest (Colin, 2026-09-29). Every folder's
+              * conversations in one list: a project holds conversations from
+              * any folder, and the folder a conversation works in is the
+              * chat box's chip, where it is switched.
+              */}
+            {conversationList(shownConversations, true)}
           </div>
         )}
 

@@ -798,14 +798,25 @@ export default function App(): ReactElement {
       anchor,
       items: [
         { label: 'New teammate', shortcut: 't', onSelect: startNewTeammate },
-        { label: 'New room', shortcut: 'r', onSelect: openRoomsScreen }
+        { label: 'New room', shortcut: 'r', onSelect: openRoomsScreen },
         /*
-         * No New group (0.460). Folders are the sorting now, as in Claude
-         * Code (0.458): a project gets its own folder. Colin, 2026-09-29:
-         * "groups can just be the folders, no?" -- they could; groups were
-         * how he sorted while Locust was stuck in one folder. Groups already
-         * made stay, inside their folder, until they are emptied or removed.
+         * PROJECTS ARE BACK (Colin, 2026-09-29): "claude has projects/and
+         * workspace folders, like they arent the same thing so just use that
+         * setup". A project is what the person files conversations under --
+         * the groups 0.460 retired, under Claude's name for them; the folder
+         * a conversation works in is the chat box's chip. Not in the rail,
+         * which draws no projects to name one in (M35).
          */
+        ...(layoutMode === 'compact'
+          ? []
+          : [{
+              label: 'New project',
+              shortcut: 'p',
+              onSelect: () => {
+                setNewGroupFor(undefined)
+                setNamingGroup(true)
+              }
+            }])
       ]
     })
   }
@@ -900,10 +911,10 @@ export default function App(): ReactElement {
          * (there is a default / here it is / replace it / with this). Design
          * agent, 2026-09-16: 556px -> 208px, widest item 94px of ink.
          */
-        { label: 'Group settings…', shortcut: 's', onSelect: () => setInstructingGroupId(groupId) },
+        { label: 'Project settings…', shortcut: 's', onSelect: () => setInstructingGroupId(groupId) },
         { label: 'Rename', shortcut: 'r', onSelect: () => setRenamingGroupId(groupId) },
         {
-          label: 'Remove group',
+          label: 'Remove project',
           confirmLabel: 'Remove for good?',
           danger: true,
           dividerAbove: true,
@@ -981,10 +992,9 @@ export default function App(): ReactElement {
          * one was the `+` beside the logo, which is the Rooms
          * discoverability problem with a different noun.
          */
-        // Only while groups exist (0.460): moving among them, or out, to empty them.
-        ...(groupsRef.current.length === 0 ? [] : [
+        ...[
               {
-                label: 'Move to group',
+                label: 'Move to project',
                 dividerAbove: true,
                 submenu: [
                   ...groupsRef.current.map((group) => ({
@@ -1006,15 +1016,23 @@ export default function App(): ReactElement {
                     }
                   })),
                   {
-                    label: 'Ungrouped',
+                    label: 'Not in a project',
                     checked: groupMembersRef.current[conversationKeyOf(missionId)] === undefined,
                     onSelect: () => {
                       void window.desktop?.assignGroup(conversationKeyOf(missionId), undefined).then(refreshGroups)
                     }
-                  }
+                  },
+                  // Makes the project AND files this conversation in it; named in the sidebar (M35: not in the rail).
+                  ...(layoutMode === 'compact' ? [] : [{
+                    label: 'New project…',
+                    onSelect: () => {
+                      setNewGroupFor(conversationKeyOf(missionId))
+                      setNamingGroup(true)
+                    }
+                  }])
                 ]
               }
-            ]),
+            ],
         /*
          * Hand a conversation to a teammate after the fact: ONE row opening
          * the roster, the shape `Move to group` already has.

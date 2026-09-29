@@ -16836,3 +16836,17 @@ textarea {
 .lc-memorycount.is-full {
   color: var(--lc-amber);
 }
+
+/* Math, drawn by KaTeX (MathTex.tsx): a displayed equation is its own line and
+   scrolls itself, like a table, rather than make the thread scroll sideways. */
+.lc-math--display {
+  margin: 6px 0 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  color: var(--lc-text-primary);
+}
+
+.lc-math .katex {
+  font-size: 1.08em;
+}

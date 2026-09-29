@@ -79,26 +79,17 @@ try {
   const second = String(await drive.capture('in Beta: Ash writes beta.txt, in a new conversation', () => drive.evaluate(sendAndWaitScript('Create a file named beta.txt in this folder containing exactly the word BETA. Then reply with the single word DONE.'))))
   check('Beta\'s conversation wrote beta.txt in Beta', existsSync(join(beta, 'beta.txt')) && !existsSync(join(alpha, 'beta.txt')), second.slice(-80))
 
-  const sidebar = JSON.parse(String(await drive.capture('the sidebar: both projects, each with its conversation', () => drive.evaluate(`(async () => {
+  // 0.474: the sidebar is by PROJECT, as Claude's is (Colin, 2026-09-29), so
+  // both folders' conversations are in one list; the folder is the chip's.
+  const sidebar = JSON.parse(String(await drive.capture('the sidebar: both folders’ conversations, in one list', () => drive.evaluate(`(async () => {
     await new Promise((r) => setTimeout(r, 1200))
-    return JSON.stringify([...document.querySelectorAll('.lc-project')].map((project) => ({
-      name: project.querySelector('.lc-project__name')?.textContent ?? '',
-      current: project.querySelector('.lc-project__head')?.classList.contains('is-current') ?? false,
-      rows: project.querySelectorAll('.lc-convrow').length,
-      count: Number(project.querySelector('.lc-sectionlabel__count')?.textContent ?? '0'),
-      open: project.querySelector('.lc-project__head')?.getAttribute('aria-expanded') === 'true'
-    })))
+    return JSON.stringify([...document.querySelectorAll('.lc-convrow')].filter((row) => row.getBoundingClientRect().height > 0).map((row) => row.innerText.replace(/\\s+/g, ' ').trim()))
   })()`))))
-  const names = sidebar.map((project) => project.name)
-  check('the sidebar lists both projects: Beta (the window\'s) first and open, Alpha folded with its count', names[0] === basename(beta) && names.includes(basename(alpha)) && sidebar[0].current === true && sidebar[0].open === true && sidebar[0].rows === 1 && sidebar[1]?.open === false && sidebar[1]?.count === 1, JSON.stringify(sidebar))
+  check('the sidebar lists both conversations, the one in Beta and the one in Alpha', sidebar.some((row) => /beta\.txt/i.test(row)) && sidebar.some((row) => /alpha\.txt/i.test(row)), JSON.stringify(sidebar))
 
-  const reopened = String(await drive.capture('open Alpha\'s conversation from the sidebar', () => drive.evaluate(`(async () => {
-    const project = [...document.querySelectorAll('.lc-project')].find((one) => one.querySelector('.lc-project__name')?.textContent === ${JSON.stringify(basename(alpha))})
-    // Another folder starts folded: unfold it, as a person would.
-    project?.querySelector('.lc-project__head')?.click()
-    await new Promise((r) => setTimeout(r, 400))
-    const row = project?.querySelector('.lc-convrow button.lc-conv')
-    row?.click()
+  const reopened = String(await drive.capture('open Alpha’s conversation from the sidebar', () => drive.evaluate(`(async () => {
+    const row = [...document.querySelectorAll('.lc-convrow')].find((one) => /alpha\\.txt/i.test(one.innerText))
+    row?.querySelector('button.lc-conv')?.click()
     await new Promise((r) => setTimeout(r, 1500))
     return document.querySelector('.lc-control--folder .lc-control__folder')?.textContent ?? ''
   })()`)))

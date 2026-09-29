@@ -10,6 +10,7 @@ import { splitSettled } from '../settledText.js'
 import { linkHost } from '../../../shared/outbound-links.js'
 import type { OrbState, PlanStep } from '../missionView.js'
 import { TeammateBot } from './TeammateBot.js'
+import { MathTex } from './MathTex.js'
 import type { FaceActivity } from '../faceState.js'
 import { Icon } from './Icon.js'
 
@@ -232,6 +233,9 @@ function inline(text: string): ReactElement {
         if (span.kind === 'em') {
           return <em key={`s${String(index)}`}>{nested(span.text)}</em>
         }
+        if (span.kind === 'math') {
+          return <MathTex key={`s${String(index)}`} tex={span.text} display={false} />
+        }
         return <span key={`s${String(index)}`}>{span.text}</span>
       })}
     </>
@@ -383,6 +387,9 @@ export function AgentText({
         }
         if (block.kind === 'rule') {
           return <hr className="lc-hr" key={`b${String(index)}`} />
+        }
+        if (block.kind === 'math') {
+          return <MathTex key={`b${String(index)}`} tex={block.tex} display />
         }
         // Line breaks inside a paragraph are kept (`lc-para` is pre-line):
         // asked for "every file, one per line", Composer answered

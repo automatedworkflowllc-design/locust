@@ -58,9 +58,9 @@ export function GroupSettingsDialog({
   useModal(box, onCancel)
   return (
     <div className="lc-scrim">
-      <div ref={box} className="lc-dialog lc-groupsettings" role="dialog" aria-modal="true" aria-label={`Group settings for ${group.name}`}>
+      <div ref={box} className="lc-dialog lc-groupsettings" role="dialog" aria-modal="true" aria-label={`Project settings for ${group.name}`}>
         <div className="lc-dialog__head">
-          <span className="lc-dialog__title">Group settings</span>
+          <span className="lc-dialog__title">Project settings</span>
           <span className="lc-dialog__sub lc-mono">{group.name}</span>
           <button type="button" className="lc-dialog__close" aria-label="Close" onClick={onCancel}>
             ×
@@ -98,7 +98,7 @@ export function GroupSettingsDialog({
               <span className="lc-groupsettings__label">Default route</span>
             </div>
             <p className="lc-groupsettings__claim">
-              Selected in the composer when a conversation joins this group. Each conversation owns its route after that.
+              Selected in the composer when a conversation joins this project. Each conversation owns its route after that.
             </p>
             <div className="lc-groupsettings__route">
               <span className={`lc-groupsettings__dot${route === undefined ? '' : ' is-set'}`} aria-hidden="true" />

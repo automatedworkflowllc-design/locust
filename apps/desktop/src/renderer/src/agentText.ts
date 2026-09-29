@@ -23,6 +23,12 @@
 export type AgentBlock =
   | { readonly kind: 'text'; readonly text: string }
   /**
+   * A displayed equation: `$$...$$` or `\[...\]` (a tester's math homework,
+   * 2026-09-29, came out as raw LaTeX). `source` is the lines as written, so
+   * the coverage check can see nothing was dropped.
+   */
+  | { readonly kind: 'math'; readonly tex: string; readonly source: string }
+  /**
    * A markdown table, drawn as columns.
    *
    * Teammates write these constantly -- a quarter against a quarter, one
@@ -73,6 +79,8 @@ export type InlineSpan =
   | { readonly kind: 'link'; readonly text: string; readonly href: string }
   | { readonly kind: 'strong'; readonly text: string }
   | { readonly kind: 'em'; readonly text: string }
+  /** Inline math: `$...$` or `\(...\)`, drawn by KaTeX. */
+  | { readonly kind: 'math'; readonly text: string }
 
 /** `- item`, `* item`, `+ item`. */
 /**
@@ -239,6 +247,37 @@ export function parseAgentText(text: string): readonly AgentBlock[] {
         blocks.push({ kind: 'table', header, align, rows })
         index = at - 1
         continue
+      }
+      // A displayed equation (the 'math' block): a line opening with `$$` or
+      // `\[`, to its closing mark on this line or a later one. Only when
+      // nothing but punctuation follows the close, so no words are lost.
+      const opening = /^\s*(\$\$|\\\[)/.exec(line)
+      if (opening !== null) {
+        const close = opening[1] === '$$' ? '$$' : '\\]'
+        const gathered: string[] = []
+        let at = index
+        let rest = line.slice(line.indexOf(opening[1]!) + 2)
+        let found = -1
+        for (;;) {
+          const end = rest.indexOf(close)
+          if (end >= 0) {
+            if (/^[\s.,;:]*$/.test(rest.slice(end + 2))) found = at
+            gathered.push(rest.slice(0, end))
+            break
+          }
+          gathered.push(rest)
+          at += 1
+          if (at >= prose.length) break
+          rest = prose[at] ?? ''
+        }
+        const tex = gathered.join('\n').trim()
+        if (found >= 0 && tex.length > 0) {
+          flushList()
+          flushParagraph()
+          blocks.push({ kind: 'math', tex, source: prose.slice(index, found + 1).join('\n') })
+          index = found
+          continue
+        }
       }
       if (RULE.test(line)) {
         flushList()
@@ -501,6 +540,16 @@ export const TEX_SYMBOLS: Readonly<Record<string, string>> = {
   Omega: 'Ω'
 }
 
+/**
+ * Inline math (a tester's math homework, 2026-09-29): `$...$` or `\(...\)`.
+ *
+ * A dollar is also money, so the pandoc rule: the opening `$` is followed by
+ * a non-space and is not `$$`, the closing `$` follows a non-space and is not
+ * followed by a digit, and an escaped `\$` is never one. "$5 and $10" stays
+ * prose; "$x^2$" and "$c_1=y$" are math. Groups 9 and 10.
+ */
+const INLINE_MATH = /(?<![\\$])\$(?![\s$])([^$\n]*?[^\s\\$])\$(?![\d$])|\\\(([^\n]+?)\\\)/.source
+
 /** `$\name$`, spaces allowed inside the dollars, for a name in the table and nothing else. */
 const TEX_MACRO = `\\$[ \\t]*\\\\(${Object.keys(TEX_SYMBOLS)
   .sort((a, b) => b.length - a.length)
@@ -543,7 +592,7 @@ const INLINE = new RegExp(
   `${
     /`([^`\n]+)`|\[([^\]\n]+)\]\(([^)\s]+)\)|(?:\*\*|__|\*|_)\[([^\]\n]+)\]\(([^)\s]+)\)(?:\*\*|__|\*|_)|(?:\*\*|(?<![A-Za-z0-9_])__)(?=\S)([^\n]+?\S)(?:\*\*|__(?![A-Za-z0-9_]))|(?<![A-Za-z0-9*_])(?:\*|_)(?=\S)([^\n*_]+?\S)(?:\*|_)(?![A-Za-z0-9*_])/
       .source
-  }|${TEX_MACRO}`,
+  }|${TEX_MACRO}|${INLINE_MATH}`,
   'g'
 )
 
@@ -571,6 +620,8 @@ export function splitInlineCode(text: string): readonly InlineSpan[] {
       spans.push({ kind: 'strong', text: match[6] })
     } else if (match[7] !== undefined) {
       spans.push({ kind: 'em', text: match[7] })
+    } else if (match[9] !== undefined || match[10] !== undefined) {
+      spans.push({ kind: 'math', text: (match[9] ?? match[10]!).trim() })
     } else {
       spans.push({ kind: 'plain', text: TEX_SYMBOLS[match[8]!] ?? match[0] })
     }
@@ -590,6 +641,8 @@ export function segmentsCoverInput(text: string, blocks: readonly AgentBlock[]):
     .map((block) =>
       block.kind === 'text' || block.kind === 'heading' || block.kind === 'quote'
         ? block.text
+        : block.kind === 'math'
+          ? block.source
         : block.kind === 'code'
           ? block.code
           : block.kind === 'rule'

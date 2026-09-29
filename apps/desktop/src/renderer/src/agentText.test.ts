@@ -169,9 +169,13 @@ describe('a lone TeX macro', () => {
     expect(shown('a $\\times$ b $\\le$ c, and $ \\to $ d')).toBe('a × b ≤ c, and → d')
   })
 
-  it('leaves money, a whole formula, an unknown macro and code as they were written', () => {
-    for (const text of ['$5 and $10', 'costs $\\,5', 'so $x \\to y$ holds', 'use $\\frac$ here', '$\\toolong$']) {
+  it('leaves money and code as they were written, and a whole formula is math (2026-09-29)', () => {
+    for (const text of ['$5 and $10', 'costs $\\,5']) {
       expect(shown(text)).toBe(text)
+    }
+    // A formula was left raw before math was drawn; KaTeX draws it now (MathTex.tsx).
+    for (const text of ['so $x \\to y$ holds', 'use $\\frac$ here', '$\\toolong$']) {
+      expect(splitInlineCode(text).some((span) => span.kind === 'math')).toBe(true)
     }
     expect(splitInlineCode('write `$\\to$` for an arrow')).toEqual([
       { kind: 'plain', text: 'write ' },

@@ -918,7 +918,7 @@ onResume,
         {open && (
           <blockquote className="lc-thread__groupwords">
             {boundary.instructions}
-            <span className="lc-thread__groupedit lc-mono">edit in Group settings</span>
+            <span className="lc-thread__groupedit lc-mono">edit in Project settings</span>
           </blockquote>
         )}
       </div>
