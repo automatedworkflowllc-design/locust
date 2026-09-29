@@ -11,6 +11,20 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.483.0 - 2026-09-29
+
+### Fixed
+
+- **The model picker names OpenCode's models.** Its rows showed ids like
+  `ling-3.0-flash-fin-free`, while the chip beside it said "Ling 3.0 Flash
+  Fin". Now the picker uses the names too.
+- **The folder chip keeps its icon.** When the chat box row was tight, the
+  folder icon shrank to a dot. Now the folder name shortens instead.
+- **The narrow sidebar's buttons stack.** In a narrow window, Missions, Rooms
+  and Routines were three small icons squeezed into one row, and Settings sat
+  alone at the edge. Now each has a row of its own, centred like the
+  teammates above it, and is easier to click.
+
 ## 0.482.0 - 2026-09-29
 
 ### Changed

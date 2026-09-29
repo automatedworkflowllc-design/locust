@@ -2724,6 +2724,16 @@ textarea {
   gap: var(--lc-space-2);
 }
 
+/*
+ * An icon in a control keeps its size; the words give way. In a tight chat
+ * box row the folder chip's icon was squeezed to a few pixels while its name
+ * kept its ellipsis (seen on the packaged 0.482 at 1440, a conversation with
+ * a long route name). The name is what truncates.
+ */
+.lc-control > svg {
+  flex: none;
+}
+
 /* No folder yet reads in the usual soft gray: the chip says it, and the
    amber pulled the eye harder than the fact deserved (Colin, 2026-09-05). */
 .lc-control--folder.is-missing {
@@ -6979,6 +6989,26 @@ textarea {
      */
     overflow: visible;
   }
+
+/*
+ * THE FOOTER, STACKED TOO. The full sidebar's equal thirds survived into the
+ * 63px rail: Missions, Rooms and Routines became three 12px icons in one row
+ * with gaps of a few pixels and a hit area to match, and Settings sat alone at
+ * the left edge under them (seen on the packaged 0.482 at 1120). In the rail
+ * each is a row of its own, centred like the faces above, the whole width to
+ * press.
+ */
+.lc-shell.is-compact .lc-sidebar__footer {
+  padding: var(--lc-space-2) var(--lc-space-2) var(--lc-space-3);
+}
+
+.lc-shell.is-compact .lc-sidebar__nav {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.lc-shell.is-compact .lc-sidebar__footer button {
+  padding: var(--lc-space-2) 0;
+}
 
 /* STACKED in the rail, because two things do not fit across 64px.
  *

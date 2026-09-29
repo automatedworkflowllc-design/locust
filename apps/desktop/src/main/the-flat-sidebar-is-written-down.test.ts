@@ -191,7 +191,9 @@ describe('nothing loses its way in', () => {
      * edge. Two rows of equal thirds is what lets five labels fit; a cell
      * that sizes itself would reopen it.
      */
-    expect(rule('.lc-sidebar__nav {')).toContain('repeat(3, minmax(0, 1fr))')
+    // At a line start: the rail's own `.lc-shell.is-compact .lc-sidebar__nav`
+    // stacks the same buttons in one column (0.483) and comes first in the file.
+    expect(rule('\n.lc-sidebar__nav {')).toContain('repeat(3, minmax(0, 1fr))')
     expect(rule('.lc-sidebar__nav .lc-connected {')).toContain('min-width: 0')
   })
 })

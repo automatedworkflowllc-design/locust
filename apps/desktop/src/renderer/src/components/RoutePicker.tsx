@@ -151,8 +151,13 @@ function buildRows(
               label:
                 runtime.id === 'claude'
                   ? routeModelName(runtime.id, model.id, name)
-                  : model.displayName === model.id
-                    ? modelDisplayName(runtime.id, model.id)
+                  : model.displayName === model.id || model.id.endsWith(`/${model.displayName}`)
+                    ? // OpenCode's catalogue names a model by its id without
+                      // the provider: `ling-3.0-flash-fin-free` for
+                      // `opencode/ling-3.0-flash-fin-free`, which the picker
+                      // drew raw while the chip said "Ling 3.0 Flash Fin"
+                      // (seen on the packaged 0.482).
+                      modelDisplayName(runtime.id, model.id)
                     : model.displayName,
               /*
                * ONE LINE PER MODEL, the way Claude Code's and Codex's own
