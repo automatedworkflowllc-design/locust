@@ -156,7 +156,9 @@ try {
   check('denied: hello.txt is untouched', kept.trim() === 'hi', JSON.stringify(kept))
   // 0.410: in the person's own word -- "declined" -- never the mode's word
   // "refused" (a denial with a reason was drawn "1 refused ... edit refused").
-  check('and the steps say the person declined it, not that a mode refused it', /1 declined/.test(after) && !/refused/.test(after), after.slice(-240))
+  // Any count: a model may ask again after the denial (0.467 run: "2 declined",
+  // a git status the drive also denied). The wording is what this guards.
+  check('and the steps say the person declined it, not that a mode refused it', /\d+ declined/.test(after) && !/refused/.test(after), after.slice(-240))
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
