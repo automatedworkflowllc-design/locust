@@ -1649,7 +1649,7 @@ export function Sidebar({
                         })
                       }
                     >
-                      <Icon name="folder" size={12} />
+                      <Icon name={open ? 'chevron-down' : 'chevron-right'} size={11} />
                       <span className="lc-project__name">{name}</span>
                       <span className="lc-sectionlabel__count">{String(section.missions.length)}</span>
                     </button>

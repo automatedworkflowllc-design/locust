@@ -13,6 +13,12 @@ heading: the home screen then shows it once, as a splash.
 
 ## 0.465.0 - 2026-09-29
 
+### Improved
+
+- **Folder headings look like the old group headings.** Each folder in the
+  sidebar now has a chevron and its name in the small uppercase label, with
+  its count at the end.
+
 ### Fixed
 
 - **A memory for every folder waits for you.** A teammate's "remember

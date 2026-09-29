@@ -15167,10 +15167,9 @@ textarea {
 
 /*
  * PROJECTS (0.458, like Claude Code): each folder's conversations under the
- * folder's own name. A step above a group's mono label -- a folder is where
- * the work is, a group is how the person filed it -- in the folder's own
- * casing, because it is a name on disk. The window's current folder reads
- * brightest: new conversations start there.
+ * folder's own name. Groups are gone (0.460), and since 0.465 a folder's
+ * heading wears the label groups had. The window's current folder reads
+ * brighter: new conversations start there.
  */
 .lc-project {
   display: flex;
@@ -15181,10 +15180,13 @@ textarea {
   margin-top: var(--lc-space-4);
 }
 
+/* Drawn the way groups were (Colin, 2026-09-29: folders took their place,
+   and he preferred their look): a chevron, the name in the uppercase mono
+   label, the count at the end. */
 .lc-project__head {
   display: flex;
   align-items: center;
-  gap: var(--lc-space-3);
+  gap: var(--lc-space-2);
   width: 100%;
   padding: var(--lc-space-4) var(--lc-space-6) var(--lc-space-2);
   border: 0;
@@ -15192,7 +15194,10 @@ textarea {
   cursor: pointer;
   text-align: left;
   color: var(--lc-text-muted);
-  font-size: var(--lc-text-control);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-label);
+  letter-spacing: var(--lc-tracking-label-wide);
+  text-transform: uppercase;
 }
 
 .lc-project__head:hover {
@@ -15208,11 +15213,6 @@ textarea {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 500;
-}
-
-.lc-project__head.is-current .lc-project__name {
-  color: var(--lc-text-primary);
 }
 
 /* The folder chip's menu: its paths are long, so it is wider than a mode menu
