@@ -130,6 +130,7 @@ export function FirstLaunch({
   onChooseFolder,
   onNewTeammate,
   onAddTeamFromCard,
+  rosterUnreadable = false,
   onInstall,
   installing,
   installLine,
@@ -175,6 +176,12 @@ export function FirstLaunch({
   readonly onNewTeammate?: () => void
   /** Add the team on a Locust team card (0.398). */
   readonly onAddTeamFromCard?: () => void
+  /**
+   * The teammates file exists and would not read (QA-2026-09-29 round 2,
+   * R26). It looked exactly like a first launch -- "Start with a team" --
+   * and the person read their team as gone.
+   */
+  readonly rosterUnreadable?: boolean
   /** Makes a whole team from a template (TeamTemplates); resolves with why it could not. */
   readonly onUseTemplate?: (templateId: TeamTemplate['templateId']) => Promise<string | undefined>
   /** Run the install for a runtime. Absent means the panel offers none. */
@@ -288,7 +295,7 @@ export function FirstLaunch({
    * teammate, the home screen offers one, with the sentence that says what it
    * is -- which sat at the foot of the form, below the fold.
    */
-  const offerFirstTeammate = teammateCount === 0 && onNewTeammate !== undefined && discoveryPhase === 'ready'
+  const offerFirstTeammate = !rosterUnreadable && teammateCount === 0 && onNewTeammate !== undefined && discoveryPhase === 'ready'
   // A build stamp with a commit hash is a fact for a changelog, not a
   // status panel: "2026.09.02-c22c1a3" reads as its date.
   const shortVersion = (version: string | null | undefined): string => (version === undefined || version === null ? '' : version.replace(/-[0-9a-f]{6,}$/i, ''))
@@ -433,6 +440,13 @@ export function FirstLaunch({
 
         {discoveryPhase === 'ready' && team.length > 0 && onMessageTeammate !== undefined && (
           <HomeTeam team={team} onMessage={onMessageTeammate} {...(onNewTeammate === undefined ? {} : { onNewTeammate })} />
+        )}
+
+        {rosterUnreadable && (
+          <div className="lc-rosternotice" role="status">
+            <p className="lc-rosternotice__happened">Your teammates file could not be read, so your team is not shown.</p>
+            <p className="lc-rosternotice__safe lc-mono">Nothing was changed. The file is kept as it is and nothing is saved over it until it reads again.</p>
+          </div>
         )}
 
         {offerFirstTeammate && onUseTemplate !== undefined && onNewTeammate !== undefined && (

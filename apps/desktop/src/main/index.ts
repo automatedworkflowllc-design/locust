@@ -3844,6 +3844,10 @@ if (!ownsSingleInstanceLock) {
         // name another teammate has (A2.18), which the window already knows
         // and which is the one refusal a person can fix from the sentence.
         if (error instanceof TeammateNameTakenError) return teammateRejected(error.message)
+        // The real cause, when it is the file (R26): "Check the name, hue and
+        // role" was said for a roster that would not read at all.
+        const rosterReads = await teammates.list().then(() => true, () => false)
+        if (!rosterReads) return teammateRejected('Your teammates file could not be read, so no teammate can be added until it reads again. Nothing was changed.')
         return teammateRejected('That teammate could not be created. Check the name, hue and role.')
       }
     })

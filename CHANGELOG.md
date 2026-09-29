@@ -11,6 +11,24 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.469.0 - 2026-09-29
+
+### Fixed
+
+- **A teammates file that will not read is said, not hidden.** Home showed the
+  first-launch "Start with a team", so the team looked gone. It now says the
+  file could not be read and that nothing was changed, and adding a teammate
+  names that as the reason rather than "check the name, hue and role".
+- **A routine whose checker was removed is refused before it spends.** It
+  used to run its first steps and then stop, naming nobody. It now refuses
+  at the start and says which step lost its teammate.
+- **A long task can follow a teammate to another runtime.** A task and a
+  reply that together passed about 7,700 characters were refused. The start
+  of the original task is kept, the briefing says how much of it was left
+  out, and your new message is carried whole.
+- **No "Try again" for a folder too big to copy.** A comparison in a folder
+  too big to copy offered Try again, which could only give the same answer.
+
 ## 0.468.0 - 2026-09-29
 
 ### Fixed

@@ -93,6 +93,15 @@ function harness(routines: readonly PublicRoutine[], busy: Set<string> = new Set
 }
 
 describe('a routine whose steps go to different teammates', () => {
+  // QA-2026-09-29 round 2, R12: a removed checker stopped the chain only
+  // after its first steps had run, and spent.
+  it("refuses before any step runs when a later step's teammate was removed, naming the step", async () => {
+    const h = harness([chain({ handOffs: [{}, { teammateId: 'tm_atlas' }, { teammateId: 'tm_removed', check: true }] })])
+    const answer = await createRoutineRunner(h.options).run('rt_chain')
+    expect(answer).toEqual({ ok: false, error: { code: 'ROUTINE_REJECTED', message: 'Step 3 of 3, the step that checks the work, was handed to a teammate who has since been removed, so nothing was started. Edit the routine to choose who takes it.' } })
+    expect(h.starts).toHaveLength(0)
+  })
+
   it('gives each step to its teammate, on that teammate\'s route, with the answer of the step before', async () => {
     const h = harness([chain()])
     const runner = createRoutineRunner(h.options)

@@ -15458,6 +15458,34 @@ textarea {
   text-wrap: pretty;
 }
 
+/* Home's word for an unreadable teammates file (R26): the sidebar notice's
+   shape, at Home's width, where "Start with a team" would otherwise be. */
+.lc-rosternotice {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 4px 0 4px 12px;
+  border-left: 2px solid var(--lc-amber-border);
+}
+
+.lc-rosternotice p {
+  margin: 0;
+  text-wrap: pretty;
+}
+
+.lc-rosternotice__happened {
+  color: var(--lc-text-secondary);
+  font-size: var(--lc-text-control);
+}
+
+.lc-rosternotice__safe {
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-mono-label);
+}
+
 .lc-convgroup__rename {
   width: calc(100% - var(--lc-space-3) * 2);
   margin: var(--lc-space-2) var(--lc-space-3);

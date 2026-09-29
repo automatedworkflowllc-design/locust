@@ -155,7 +155,8 @@ export function unreadableSentence(stores: readonly string[]): { readonly happen
    * first line just named it.
    */
   return named.length === 1
-    ? { happened: `${subject} could not be read — everything is listed ungrouped.`, safe: 'Nothing is saved over the file until it reads again.' }
+    // "Listed ungrouped" is true of groups alone (R26 found it said of teammates).
+    ? { happened: named[0] === 'groups' ? `${subject} could not be read — everything is listed ungrouped.` : `${subject} could not be read.`, safe: 'Nothing is saved over the file until it reads again.' }
     : { happened: `${subject} could not be read.`, safe: 'Nothing is saved over them until they read again.' }
 }
 

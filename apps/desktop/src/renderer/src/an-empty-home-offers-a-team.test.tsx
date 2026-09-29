@@ -15,7 +15,7 @@ import type { HomeTeammate } from './components/HomeTeam.js'
  */
 const ready = (id: LocalRuntimeId, name: string): PublicRuntimeStatus => ({ id, displayName: name, installed: true, version: '1.0.0', auth: 'authenticated', ready: true, status: 'ready' })
 
-function home(team: readonly HomeTeammate[], templates = true): string {
+function home(team: readonly HomeTeammate[], templates = true, rosterUnreadable = false): string {
   return renderToStaticMarkup(
     <FirstLaunch
       runtimes={[ready('codex', 'Codex CLI')]}
@@ -29,6 +29,7 @@ function home(team: readonly HomeTeammate[], templates = true): string {
       {...(templates ? { onUseTemplate: async () => undefined } : {})}
       onChooseFolder={() => undefined}
       onInstall={() => undefined}
+      rosterUnreadable={rosterUnreadable}
     />
   )
 }
@@ -53,6 +54,17 @@ describe('an empty Home', () => {
   it('is the team itself once there is one', () => {
     const html = home([{ teammateId: 'tm_wren', name: 'Wren', hue: 'lime', avatar: seedAvatar('tm_wren'), role: 'Code & Migrations', working: false }])
     expect(html).toContain('Your team')
+    expect(html).not.toContain('Start with a team')
+  }, 10_000)
+})
+
+// QA-2026-09-29 round 2, R26: a teammates file that would not read looked
+// exactly like this first launch, and the team read as gone.
+describe('a Home whose teammates file would not read', () => {
+  it('says so, and offers no team to start over with', () => {
+    const html = home([], true, true)
+    expect(html).toContain('Your teammates file could not be read, so your team is not shown.')
+    expect(html).toContain('Nothing was changed.')
     expect(html).not.toContain('Start with a team')
   }, 10_000)
 })

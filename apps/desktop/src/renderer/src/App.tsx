@@ -3610,7 +3610,8 @@ export default function App(): ReactElement {
         }),
         running,
         keepable: !running && last?.phase === 'completed',
-        retryable: compare.kept === undefined && !running && (last === undefined ? column.refused !== undefined : last.phase !== 'completed'),
+        // Not for a folder too big to copy (R9): asking again gives the same answer.
+        retryable: compare.kept === undefined && !running && !/too big to copy/.test(column.refused ?? '') && (last === undefined ? column.refused !== undefined : last.phase !== 'completed'),
         answer: (last?.items ?? [])
           .flatMap((item) => (item.type === 'agent-message' && item.text.trim().length > 0 ? [item.text.trim()] : []))
           .join('\n\n'),
@@ -6645,6 +6646,7 @@ export default function App(): ReactElement {
 
               <FirstLaunch
                 onAddTeamFromCard={() => addTeamFromCard(true)}
+                rosterUnreadable={unreadableStores.includes('teammates')}
                 runtimes={runtimes}
                 freeStart={freeStartStillFree(runtimes, models)}
                 limitedRuntimes={limitedRuntimes}

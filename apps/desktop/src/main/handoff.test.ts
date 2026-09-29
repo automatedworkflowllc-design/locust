@@ -52,4 +52,18 @@ describe('the briefing a continuation starts with', () => {
     const impossible = composeHandoffPrompt('short task', checkpoint(), 'Codex CLI', huge)
     expect(impossible).toBeUndefined()
   })
+
+  // QA-2026-09-29 round 2, R18: 3,900 + 3,900 was refused, when the person
+  // was switching runtimes because of a limit.
+  it('clips a long original task to carry the new words whole, and says how much it cut', () => {
+    const task = `Spec start. ${'a'.repeat(3_900)} Spec end.`
+    const reply = `Now do this. ${'b'.repeat(3_900)} The end.`
+    const carried = composeHandoffPrompt(task, checkpoint(), 'Codex CLI', reply)
+    expect(carried).toBeDefined()
+    expect(carried!.prompt.length).toBeLessThanOrEqual(MAX_HANDOFF_PROMPT_LENGTH)
+    expect(carried!.prompt).toContain(reply)
+    expect(carried!.prompt).toContain('Spec start.')
+    expect(carried!.prompt).not.toContain('Spec end.')
+    expect(carried!.prompt).toMatch(/\[The original task continues for \d+ more characters that did not fit here\. Ask the person if the part above is not enough\.\]/)
+  })
 })

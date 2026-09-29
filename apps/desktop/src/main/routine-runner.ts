@@ -165,6 +165,12 @@ const handedTo = (to: string, from: string | undefined, check: boolean): string 
     ? check ? `, ${to} checks it` : ''
     : check ? `, handed to ${to} with ${from}'s answer to check` : `, handed to ${to} with ${from}'s answer`
 
+/** Why a step cannot run: its teammate was removed (R12). Nothing has started when this is said. */
+function removedStepSaying(routine: { readonly steps: readonly unknown[]; readonly handOffs?: readonly RoutineHandOff[] }, step: number): string {
+  const role = routine.handOffs?.[step - 1]?.check === true ? ', the step that checks the work,' : ''
+  return `Step ${String(step)} of ${String(routine.steps.length)}${role} was handed to a teammate who has since been removed, so nothing was started. Edit the routine to choose who takes it.`
+}
+
 /** Whether that step is the checker, whose approval the run needs. */
 const checks = (routine: { readonly handOffs?: readonly RoutineHandOff[] }, step: number): boolean =>
   routine.handOffs?.[step - 1]?.check === true
@@ -472,7 +478,7 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       const before = ownerOf(saved, execution.step)
       if (options.teammateBusy !== undefined && await options.teammateBusy(owner)) return { ok: false, error: { message: `${(await nameOf(owner)) ?? 'This teammate'} is busy. Wait for their current mission to finish.` } }
       const peer = await options.peerContextFor(owner)
-      if (peer === undefined) return { ok: false, error: { message: 'The teammate no longer exists.' } }
+      if (peer === undefined) return { ok: false, error: { message: removedStepSaying(saved, next) } }
       const handedFrom = owner !== before || checks(saved, next) ? { missionId: execution.missionId, name: (await nameOf(before)) ?? 'The teammate before' } : undefined
       const response = await startStep(saved, peer, next, owner === before ? execution.missionId : undefined, handedFrom)
       if (!response.ok) return { ok: false, error: { message: response.error.message } }
@@ -511,6 +517,17 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       const peer = await options.peerContextFor(first)
       if (peer === undefined) {
         return { ok: false, error: { code: 'ROUTINE_REJECTED', message: 'The teammate this routine belongs to no longer exists.' } }
+      }
+      /*
+       * EVERY STEP'S TEAMMATE, BEFORE ANY STEP RUNS (QA-2026-09-29 round 2,
+       * R12). A chain whose checker had been removed ran its first steps --
+       * real spend -- then held with "Review the remaining steps", naming
+       * nobody. It is refused before anything starts, saying which step.
+       */
+      for (let step = 2; step <= routine.steps.length; step += 1) {
+        const owner = ownerOf(routine, step)
+        if (owner === first || await options.peerContextFor(owner) !== undefined) continue
+        return { ok: false, error: { code: 'ROUTINE_REJECTED', message: removedStepSaying(routine, step) } }
       }
       const response = await startStep(routine, peer, 1, undefined)
       if (!response.ok) {

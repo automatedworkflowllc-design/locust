@@ -151,7 +151,7 @@ export function composeHandoffPrompt(
   /** The conversation's turns before the one handed over, oldest first (A2.11). */
   earlier: readonly EarlierTurn[] = []
 ): HandoffBriefing | undefined {
-  const sections = sectionsFor(originalPrompt, checkpoint, fromRuntime, next, earlier)
+  const sections = [...sectionsFor(originalPrompt, checkpoint, fromRuntime, next, earlier)]
   // Reserve room for the omission notice UP FRONT whenever a section could be
   // dropped. Charging for it only at the first drop is too late: by then the
   // mandatory task section has already claimed the space, and it cannot be
@@ -163,9 +163,31 @@ export function composeHandoffPrompt(
   // optional, and a section added ahead of them in the reading order (the
   // earlier turns) must never be what squeezes them out. Then the optional
   // ones, most important first -- the earlier turns are the first to go.
-  const mandatory = sections.filter((section) => section.name === 'task' || section.name === 'next')
+  let mandatory = sections.filter((section) => section.name === 'task' || section.name === 'next')
   let used = mandatory.reduce((sum, section, index) => sum + section.text.length + (index === 0 ? 0 : 2), 0)
-  if (used > budget) return undefined
+  /*
+   * A LONG TASK IS CLIPPED, NOT REFUSED (QA-2026-09-29 round 2, R18). A task
+   * and a reply that each fit the composer -- 3,900 and 3,900 -- were
+   * refused together, exactly when the person was switching runtimes
+   * because of a limit. The person's new words are kept whole; the ORIGINAL
+   * task gives up its end, and the briefing says how much.
+   */
+  if (used > budget) {
+    const task = mandatory.find((section) => section.name === 'task')
+    const over = used - budget
+    // Only beside the person's new words: a rescue with no reply has the task
+    // as its only instruction, and half a task is a run on the wrong one.
+    if (task === undefined || !mandatory.some((section) => section.name === 'next')) return undefined
+    const clipNotice = (cut: number): string => `\n\n[The original task continues for ${String(cut)} more characters that did not fit here. Ask the person if the part above is not enough.]`
+    const room = task.text.length - over - clipNotice(task.text.length).length
+    if (room < 200) return undefined
+    const clipped = { ...task, text: `${task.text.slice(0, room).trimEnd()}${clipNotice(task.text.length - room)}` }
+    const index = sections.indexOf(task)
+    sections.splice(index, 1, clipped)
+    mandatory = mandatory.map((section) => (section === task ? clipped : section))
+    used = mandatory.reduce((sum, section, at) => sum + section.text.length + (at === 0 ? 0 : 2), 0)
+    if (used > budget) return undefined
+  }
   const keptNames = new Set(mandatory.map((section) => section.name))
   const omitted: string[] = []
   for (const name of KEEP_ORDER) {
