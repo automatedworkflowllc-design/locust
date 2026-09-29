@@ -20,6 +20,9 @@ heading: the home screen then shows it once, as a splash.
   choosing Auto in Compare started both models and both came back "could
   not start". Now Auto is greyed out in the Compare menu with the reason,
   and the comparison answers instead.
+- **An option you cannot choose looks it.** In the permission and Compare
+  menus, an option that is not available here now shows dimmed, with its
+  reason underneath, instead of looking like any other.
 
 ## 0.456.0 - 2026-09-29
 

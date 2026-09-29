@@ -9307,6 +9307,22 @@ textarea {
   background: var(--lc-hover-surface-strong);
 }
 
+/* An option that cannot be chosen here (a mode this runtime lacks, Auto in a
+   folder too big to copy) looked exactly like one that can: nothing styled a
+   disabled item (0.457). Its name dims and it takes no hover; its line still
+   reads in full, because that line is the reason. */
+.lc-menu__item:disabled {
+  cursor: default;
+}
+
+.lc-menu__item:disabled:hover {
+  background: transparent;
+}
+
+.lc-menu__item:disabled .lc-menu__name {
+  color: var(--lc-text-muted);
+}
+
 .lc-menu__text {
   flex: 1;
   min-width: 0;
