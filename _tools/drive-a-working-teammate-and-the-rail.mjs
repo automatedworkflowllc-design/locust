@@ -2,7 +2,7 @@
 //
 //   node _tools/drive-a-working-teammate-and-the-rail.mjs [--packaged <exe>] [--tag <name>]
 //
-// R27: at 1280 wide the sidebar is the compact rail. A teammate's card pinned
+// R27: at 1120 wide (compact is 1,199 and under) the sidebar is the rail. A teammate's card pinned
 // by a click must close when Ctrl+1 opens Missions -- and a click on a face
 // FROM Missions must still open the conversation with its card.
 // R22: removing a teammate while it runs says so in the menu, and stops the run.
@@ -11,7 +11,7 @@
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { FREE_ROUTE, openTeammateScript, recordRoot, say, scratchRepository, sendAndWaitScript, sleep, startDrive } from './drive-lib.mjs'
+import { FREE_ROUTE, recordRoot, say, scratchRepository, sendAndWaitScript, sleep, startDrive } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
@@ -38,7 +38,8 @@ const check = (what, ok, detail) => {
   if (!ok) failures += 1
   say(`  [${ok ? 'PASS' : 'FAIL'}] ${what}${detail === undefined ? '' : ` -- ${detail}`}`)
 }
-const face = (name) => `[...document.querySelectorAll('.lc-railslot button')].find((b) => ((b.getAttribute('aria-label') ?? b.title ?? '')).startsWith(${JSON.stringify(name)}))`
+// The rail's face is labelled "Message Ash · Custom · ...".
+const face = (name) => `[...document.querySelectorAll('.lc-railslot button')].find((b) => (b.getAttribute('aria-label') ?? b.title ?? '').startsWith(${JSON.stringify(`Message ${name} `)}))`
 const cardOpen = `!!document.querySelector('.lc-railflyout')`
 const ctrl = async (key) => {
   await drive.send('Input.dispatchKeyEvent', { type: 'keyDown', key, code: `Digit${key}`, modifiers: 2, windowsVirtualKeyCode: 48 + Number(key) })
@@ -48,7 +49,7 @@ const ctrl = async (key) => {
 
 try {
   await drive.ready()
-  await drive.resize(1280, 800)
+  await drive.resize(1120, 720)
   await sleep(1500)
 
   // R27
@@ -65,7 +66,8 @@ try {
   await sleep(400)
 
   // R22
-  await drive.evaluate(openTeammateScript('Ash'))
+  // Ash's face opens Ash's conversation (and card; a second click closes the card).
+  await drive.evaluate(`(async () => { ${face('Ash')}?.click(); await new Promise((r) => setTimeout(r, 600)); ${face('Ash')}?.click() })()`)
   await sleep(600)
   await drive.evaluate(sendAndWaitScript('Run this exact shell command once: ping -n 60 127.0.0.1 . Then reply with the single word FINISHED.', { settle: false }))
   let running = false
