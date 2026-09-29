@@ -52,6 +52,16 @@ import type { RouteChoice } from './RoutePicker.js'
 import { RuntimeMark } from './RuntimeMark.js'
 
 const MAX_PROMPT_LENGTH = 8_000
+/*
+ * What Auto in a comparison does, said once for the menu and the chip's title.
+ * "Its own copy" read as a wall, and it is not one: a model running without
+ * asking can still write outside its copy -- by an absolute path, or through a
+ * link in the project that points elsewhere (QA-2026-09-29, Q5). Keep is still
+ * exactly what it says; the sentence now says the rest.
+ */
+const AUTO_COMPARE_CONSEQUENCE = 'Each model works in its own copy and runs what it needs without asking; only the one you keep comes into your folder. A copy is not a wall: like Auto anywhere, a model can still change files outside it.'
+/** How long after a run starts a Stop press is taken as the second click of a double-click on Start (Q6). */
+const STOP_SETTLE_MS = 600
 
 /**
  * Each mode states its consequence, not just its name. There are two because
@@ -393,6 +403,21 @@ export function Composer({
   queuedElsewhere
 }: ComposerProps): ReactElement {
   const [value, setValue] = useState('')
+  /*
+   * Start and Stop are one button in one place, so the second click of a
+   * double-click on Start landed on Stop: "You stopped this run", and nothing
+   * had run (QA-2026-09-29, Q6). A Stop pressed within STOP_SETTLE_MS of the
+   * run starting is taken as that second click and ignored; a person who
+   * means Stop presses it again a moment later.
+   */
+  const runningSince = useRef<number | undefined>(undefined)
+  useEffect(() => {
+    runningSince.current = running ? Date.now() : undefined
+  }, [running])
+  const stopClicked = (): void => {
+    if (runningSince.current !== undefined && Date.now() - runningSince.current < STOP_SETTLE_MS) return
+    onCancel()
+  }
   /*
    * The box's words came off the queue by Edit. Claude Code does the same --
    * a queued message pulled back into the box is no longer queued -- but it
@@ -1583,7 +1608,7 @@ export function Composer({
                   <div className="lc-menu" role="menu" aria-label="What the comparison does">
                     {([
                       [false, 'Ask', 'Each model answers. Nothing in your folder changes.', undefined],
-                      [true, 'Auto', 'Each model works in its own copy and runs what it needs without asking. Only the one you keep comes into your folder.', compare?.changesRefusal]
+                      [true, 'Auto', AUTO_COMPARE_CONSEQUENCE, compare?.changesRefusal]
                     ] as const).map(([edits, name, consequence, refusal]) => (
                       <button
                         key={name}
@@ -1685,7 +1710,7 @@ export function Composer({
                   title={
                     comparing
                       ? compareEdits
-                        ? 'Auto: each model works in its own copy and runs what it needs without asking. Only the one you keep comes into your folder.'
+                        ? `Auto: ${AUTO_COMPARE_CONSEQUENCE}`
                         : 'Each model answers. Nothing in your folder changes.'
                       : connectorsNote(route.runtime, effectiveMode, hasConnectors) ?? 'Permission mode'
                   }
@@ -1984,7 +2009,7 @@ export function Composer({
                   <button
                     type="button"
                     className="send-button lc-send is-stop"
-                    onClick={onCancel}
+                    onClick={stopClicked}
                     disabled={cancelling}
                     aria-label="Stop the running mission"
                   >

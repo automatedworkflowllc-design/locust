@@ -11,6 +11,21 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.456.0 - 2026-09-29
+
+### Fixed
+
+- **A very long Claude answer ends properly.** An answer over about 250 KB
+  kept the run going after it had finished, until you pressed Stop. It ends
+  by itself now.
+- **Double-clicking Start no longer stops the run.** Start and Stop are the
+  same button, so the second click of a double-click stopped the run
+  before anything happened. A Stop pressed in the first moment after
+  Start is now ignored; press it again to stop.
+- **Compare in Auto says what a copy does not do.** Each model still works
+  in its own copy and only the one you keep comes in, but in Auto a model
+  can still change files outside its copy, and the menu now says so.
+
 ## 0.455.0 - 2026-09-29
 
 ### Fixed

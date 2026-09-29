@@ -37,6 +37,20 @@ function isTurnResult(raw: string): boolean {
 }
 
 /**
+ * Whether a line, from its first bytes alone, is a turn's `result` record.
+ *
+ * Read from the START because the line may be too long to hold whole: Claude
+ * Code's `result` carries the entire final answer AGAIN, and a stand-in QA
+ * session (QA-2026-09-29, Q2) measured a 300 KB answer whose result line went
+ * past the 256 KB record cap. It was dropped, input was never closed, and
+ * the CLI sat waiting for another turn until the person pressed Stop.
+ * Claude Code writes `type` first, so its first bytes are enough.
+ */
+function startsAsTurnResult(line: string): boolean {
+  return /^\s*\{\s*"type"\s*:\s*"result"\s*[,}]/.test(line.slice(0, 64));
+}
+
+/**
  * Remove the prompt file, whatever happened to the run.
  *
  * Never throws: a temp file that cannot be deleted is a housekeeping problem,
@@ -156,6 +170,8 @@ export interface RuntimeProcessStartOptions {
 export interface NodeRuntimeProcessRunnerOptions {
   readonly maxStderrBytes?: number;
   readonly maxRecordBytes?: number;
+  /** The cap for a turn's `result` record, which repeats the whole answer. Default 8 MB. */
+  readonly maxResultRecordBytes?: number;
   readonly maxQueuedRecords?: number;
   readonly cancellationGraceMs?: number;
   readonly terminationConfirmationMs?: number;
@@ -413,6 +429,17 @@ export function createNodeRuntimeProcessRunner(
     "maxRecordBytes",
   );
   /*
+   * A turn's `result` record gets its own, larger cap: its text is a copy of
+   * an answer that already streamed, and dropping it loses the turn's end,
+   * its usage and its session id (see startsAsTurnResult). Never below the
+   * ordinary cap.
+   */
+  const maxResultRecordBytes = Math.max(
+    maxRecordBytes,
+    positiveInteger(options.maxResultRecordBytes, 8 * 1024 * 1024, "maxResultRecordBytes"),
+  );
+  const capFor = (line: string): number => (startsAsTurnResult(line) ? maxResultRecordBytes : maxRecordBytes);
+  /*
    * How many records may sit unread before the run is stopped.
    *
    * This was 64, and 64 is not enough. The consumer already batches -- it
@@ -596,8 +623,10 @@ export function createNodeRuntimeProcessRunner(
 
       const emitRecord = (raw: string): void => {
         if (!raw || outputLimitExceeded) return;
-        if (Buffer.byteLength(raw, "utf8") > maxRecordBytes) {
+        if (Buffer.byteLength(raw, "utf8") > capFor(raw)) {
           dropOversizedRecord();
+          // Even past its own cap, a result still ends the turn.
+          if (inputOpen && startsAsTurnResult(raw)) closeInput();
           return;
         }
         const nextSequence = recordCount + 1;
@@ -637,11 +666,13 @@ export function createNodeRuntimeProcessRunner(
         // being assembled can never be carried, so what is held is thrown away
         // and the rest of it is skipped as it arrives. Counted once, at the
         // moment the decision is made, not once per chunk that follows.
-        if (Buffer.byteLength(stdoutRemainder, "utf8") > maxRecordBytes) {
+        if (Buffer.byteLength(stdoutRemainder, "utf8") > capFor(stdoutRemainder)) {
+          const endsTheTurn = startsAsTurnResult(stdoutRemainder);
           stdoutRemainder = "";
           if (!skippingOversizedLine) {
             skippingOversizedLine = true;
             dropOversizedRecord();
+            if (inputOpen && endsTheTurn) closeInput();
           }
         }
       };

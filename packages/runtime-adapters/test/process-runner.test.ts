@@ -603,6 +603,46 @@ describe("a stream-json run", () => {
     await run.completion;
   });
 
+  /*
+   * QA-2026-09-29, Q2: the result record repeats the whole answer, so a
+   * 300 KB answer made a result line past the 256 KB record cap. It was
+   * dropped, input stayed open, and the CLI waited for a next turn forever.
+   */
+  it("keeps a result line past the ordinary cap, and ends the turn on it, arriving in pieces", async () => {
+    const child = fakeChild();
+    const run = createNodeRuntimeProcessRunner({ maxRecordBytes: 64, spawnProcess: () => child.process }).start(streamSpec, prompt);
+    const iterator = run.records[Symbol.asyncIterator]();
+    const answer = "x".repeat(300);
+    const line = JSON.stringify({ type: "result", subtype: "success", result: answer, session_id: "s1" });
+    child.stdout.emit("data", line.slice(0, 100));
+    child.stdout.emit("data", line.slice(100, 250));
+    child.stdout.emit("data", `${line.slice(250)}\n`);
+    expect(child.stdin.ended).toBe(true);
+    child.close(0);
+    await expect(iterator.next()).resolves.toEqual({ done: false, value: { sequence: 1, raw: line } });
+    await expect(run.completion).resolves.toMatchObject({ oversizedRecordsDropped: 0, recordCount: 1 });
+  });
+
+  it("still ends the turn on a result line too large even for its own cap", async () => {
+    const child = fakeChild();
+    const run = createNodeRuntimeProcessRunner({ maxRecordBytes: 32, maxResultRecordBytes: 64, spawnProcess: () => child.process }).start(streamSpec, prompt);
+    const line = JSON.stringify({ type: "result", subtype: "success", result: "y".repeat(200) });
+    child.stdout.emit("data", line.slice(0, 120));
+    expect(child.stdin.ended).toBe(true);
+    child.stdout.emit("data", `${line.slice(120)}\n`);
+    child.close(0);
+    await expect(run.completion).resolves.toMatchObject({ oversizedRecordsDropped: 1, recordCount: 0 });
+  });
+
+  it("gives an ordinary line no larger cap, whatever it says", async () => {
+    const child = fakeChild();
+    const run = createNodeRuntimeProcessRunner({ maxRecordBytes: 64, spawnProcess: () => child.process }).start(streamSpec, prompt);
+    child.stdout.emit("data", `${JSON.stringify({ type: "assistant", text: `"type":"result" ${"z".repeat(200)}` })}\n`);
+    expect(child.stdin.ended).toBe(false);
+    child.close(0);
+    await expect(run.completion).resolves.toMatchObject({ oversizedRecordsDropped: 1, recordCount: 0 });
+  });
+
   it("offers no send on any other transport", () => {
     const child = fakeChild();
     const run = createNodeRuntimeProcessRunner({ spawnProcess: () => child.process }).start(spec, prompt);
