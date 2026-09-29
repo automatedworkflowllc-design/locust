@@ -166,7 +166,12 @@ const MAX_TEXT_LENGTH = 16_384
 const MAX_RECORD_BYTES = 512 * 1024
 const MAX_APPEND_BYTES = 2 * 1024 * 1024
 const MAX_LEDGER_BYTES = 64 * 1024 * 1024
-const MAX_MISSION_FILES = 500
+/*
+ * 2,000 since QA-2026-09-29 round 2, R28: a turn is a mission, and at 500 a
+ * few weeks of steady use pushed older conversations out of the list.
+ * Every file is stat'ed either way; the cap bounds what is READ.
+ */
+const MAX_MISSION_FILES = 2_000
 
 /**
  * How many ledgers to hold open at once. Opening every file concurrently
@@ -490,6 +495,8 @@ export interface MissionFileListing {
   readonly files: readonly MissionFileStamp[]
   /** Past the cap: said once, the way `listMissions` says it. */
   readonly issues: readonly MissionLedgerIssue[]
+  /** Every ledger file found, before the cap. */
+  readonly totalFiles?: number
 }
 
 export interface MissionFileRead {
@@ -2242,6 +2249,7 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
       const over = stamped.length > MAX_MISSION_FILES
       return {
         files: over ? stamped.slice(0, MAX_MISSION_FILES) : stamped,
+        totalFiles: stamped.length,
         issues: over
           ? [publicIssue('file-limit-exceeded', `Only the ${MAX_MISSION_FILES} most recently updated local mission ledgers were inspected.`)]
           : []

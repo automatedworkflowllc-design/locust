@@ -1193,6 +1193,7 @@ export default function App(): ReactElement {
   }, [history])
   /** Ledger files that raised an issue and yielded no mission. See the history read. */
   const [unreadableLedgers, setUnreadableLedgers] = useState(0)
+  const [totalMissions, setTotalMissions] = useState<{ readonly total: number; readonly listed: number } | undefined>(undefined)
   /** The ledger could not be read AT ALL -- not the same as having no missions. */
   const [ledgerUnreadable, setLedgerUnreadable] = useState(false)
 
@@ -1225,6 +1226,7 @@ export default function App(): ReactElement {
     // objects, so nothing built from them is built again.
     setHistory((current) => mergeHistory(current, response.data.missions))
     setUnreadableLedgers(response.data.unreadableCount)
+    setTotalMissions(response.data.totalMissions === undefined || response.data.listedMissions === undefined ? undefined : { total: response.data.totalMissions, listed: response.data.listedMissions })
   }
   const [teammates, setTeammates] = useState<readonly PublicTeammate[]>([])
   const [missionOwners, setMissionOwners] = useState<Readonly<Record<string, string>>>({})
@@ -4915,6 +4917,41 @@ export default function App(): ReactElement {
     }).catch(() => undefined)
   }
 
+  /*
+   * H3: AN OLDER CONVERSATION IS READ WHEN IT IS OPENED. History sends the
+   * newest missions whole and the rest as rows, and this is where the rows
+   * of a conversation -- every turn of it -- are fetched, then the thread is
+   * built again from the whole records. It used to open on the person's
+   * words and no replies, with "Events: 41 recorded" beside them.
+   *
+   * Its own function since QA-2026-09-29 round 2, R1: the conversation
+   * adopted at launch was already among the runs, so opening it took the
+   * early return above and never came here -- a 30-turn conversation
+   * reopened after a restart with turns 1 to 10 unanswered.
+   */
+  const readTurnsOf = (mission: PublicRecoveredMission): void => {
+    const missing = missingTranscripts([mission.missionId, ...conversationTurns(mission, historyById).map((turn) => turn.missionId)], historyById)
+    const bridge = window.desktop
+    if (missing.length === 0 || bridge?.readMission === undefined) return
+    void Promise.all(missing.map((id) => bridge.readMission(id).catch(() => undefined))).then((answers) => {
+      const read = new Map(
+        answers.flatMap((answer) => (answer !== undefined && answer.ok ? [[answer.data.mission.missionId, answer.data.mission] as const] : []))
+      )
+      if (read.size === 0) return
+      setHistory((current) => current.map((entry) => read.get(entry.missionId) ?? entry))
+      const whole = new Map(historyById)
+      for (const [id, entry] of read) whole.set(id, entry)
+      const now = whole.get(mission.missionId)
+      if (now === undefined) return
+      // Only a thread that is still the reopened record is rebuilt: a turn
+      // started meanwhile is live, and its own events are the truth.
+      setRuns((current) => {
+        const shown = current.get(mission.runId)
+        return shown === undefined || !isTerminal(shown.phase) ? current : withNewRun(current, mission.runId, reopenedRun(now, whole))
+      })
+    })
+  }
+
   const openMission = (missionId: string): void => {
     // Opening a conversation leaves any comparison on screen (0.441).
     setComparingId(undefined)
@@ -4953,6 +4990,9 @@ export default function App(): ReactElement {
     if (known !== undefined) {
       setShownKey(known[0])
       followRouteOf(known[1])
+      // A finished one may be a record adopted without its older turns (R1).
+      const held = historyById.get(missionId)
+      if (held !== undefined && isTerminal(known[1].phase)) readTurnsOf(held)
       return
     }
     const mission = historyById.get(missionId)
@@ -4962,33 +5002,7 @@ export default function App(): ReactElement {
     setRuns((current) => withNewRun(current, mission.runId, reopened))
     setShownKey(mission.runId)
     followRouteOf(reopened)
-    /*
-     * H3: AN OLDER CONVERSATION IS READ WHEN IT IS OPENED. History sends the
-     * newest missions whole and the rest as rows, and this is where the rows
-     * of THIS conversation -- every turn of it -- are fetched, then the
-     * thread is built again from the whole records. It used to open on the
-     * person's words and no replies, with "Events: 41 recorded" beside them.
-     */
-    const missing = missingTranscripts([mission.missionId, ...conversationTurns(mission, historyById).map((turn) => turn.missionId)], historyById)
-    const bridge = window.desktop
-    if (missing.length === 0 || bridge?.readMission === undefined) return
-    void Promise.all(missing.map((id) => bridge.readMission(id).catch(() => undefined))).then((answers) => {
-      const read = new Map(
-        answers.flatMap((answer) => (answer !== undefined && answer.ok ? [[answer.data.mission.missionId, answer.data.mission] as const] : []))
-      )
-      if (read.size === 0) return
-      setHistory((current) => current.map((entry) => read.get(entry.missionId) ?? entry))
-      const whole = new Map(historyById)
-      for (const [id, entry] of read) whole.set(id, entry)
-      const now = whole.get(mission.missionId)
-      if (now === undefined) return
-      // Only a thread that is still the reopened record is rebuilt: a turn
-      // started meanwhile is live, and its own events are the truth.
-      setRuns((current) => {
-        const shown = current.get(mission.runId)
-        return shown === undefined || !isTerminal(shown.phase) ? current : withNewRun(current, mission.runId, reopenedRun(now, whole))
-      })
-    })
+    readTurnsOf(mission)
   }
 
   /*
@@ -6267,6 +6281,7 @@ export default function App(): ReactElement {
             <MissionsScreen
               missions={missionsToList}
               unreadableLedgers={unreadableLedgers}
+              {...(totalMissions === undefined ? {} : { totalMissions: totalMissions.total, listedMissions: totalMissions.listed })}
               ledgerUnreadable={ledgerUnreadable}
               workspaceId={workspaceId}
               runningMissionIds={runningMissionIds}

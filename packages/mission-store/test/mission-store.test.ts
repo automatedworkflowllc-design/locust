@@ -310,7 +310,7 @@ describe('recency-aware scanning past the file cap', () => {
     const root = await temporaryRoot()
     const { utimes, writeFile } = await import('node:fs/promises')
 
-    // 501 files against a cap of 500, so the selection path actually runs --
+    // 2,001 files against a cap of 2,000 (500 until QA round 2, R28), so the selection path actually runs --
     // a handful of files would leave it unexercised and this test unable to
     // fail. Names are chosen so name order and recency order DISAGREE: the
     // wanted mission sorts LAST by name and is the newest by mtime.
@@ -330,7 +330,7 @@ describe('recency-aware scanning past the file cap', () => {
     }
 
     await Promise.all(
-      Array.from({ length: 500 }, (_, index) =>
+      Array.from({ length: 2_000 }, (_, index) =>
         write(`mission_a${String(index).padStart(4, '0')}`, base - 10_000)
       )
     )

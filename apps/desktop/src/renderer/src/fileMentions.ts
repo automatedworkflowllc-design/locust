@@ -37,7 +37,8 @@ function inOrder(text: string, query: string): boolean {
  */
 export function fileMatches(paths: readonly string[], query: string, max = 8): readonly string[] {
   const q = query.toLowerCase().replace(/\\/g, '/')
-  const ranked: { readonly path: string; readonly rank: number }[] = []
+  // Depth counted once per path, not in every comparison: 50,000 paths (R16).
+  const ranked: { readonly path: string; readonly rank: number; readonly depth: number }[] = []
   for (const path of paths) {
     const lower = path.toLowerCase()
     const base = baseOf(lower)
@@ -48,8 +49,8 @@ export function fileMatches(paths: readonly string[], query: string, max = 8): r
             : lower.includes(q) ? 3
               : inOrder(lower, q) ? 4
                 : -1
-    if (rank >= 0) ranked.push({ path, rank })
+    if (rank >= 0) ranked.push({ path, rank, depth: path.split('/').length })
   }
-  ranked.sort((a, b) => a.rank - b.rank || a.path.split('/').length - b.path.split('/').length || a.path.length - b.path.length || a.path.localeCompare(b.path))
+  ranked.sort((a, b) => a.rank - b.rank || a.depth - b.depth || a.path.length - b.path.length || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
   return ranked.slice(0, max).map((entry) => entry.path)
 }

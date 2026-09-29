@@ -16,7 +16,14 @@ import { join } from 'node:path'
  * skips the folders nobody attaches from. Paths are the folder's own,
  * forward-slashed, and never leave it: the renderer names no folder.
  */
-export const MAX_LISTED_FILES = 5_000
+/*
+ * 50,000 since QA-2026-09-29 round 2, R16: at 5,000, and git listing
+ * alphabetically, a clone of Locust itself (17,197 files, most under docs/)
+ * offered nothing under packages/ -- `@commands.ts` found a namesake and not
+ * the file -- and nothing said the list was partial. Git lists all 17,197 in
+ * 0.04 s. Past this the composer says the list is the first ones found.
+ */
+export const MAX_LISTED_FILES = 50_000
 const SKIPPED = new Set(['.git', 'node_modules', 'dist', 'out', 'build', 'release', '.next', 'target', '__pycache__', '.venv', 'venv', '.locust', '.cache', 'coverage'])
 const MAX_DEPTH = 8
 

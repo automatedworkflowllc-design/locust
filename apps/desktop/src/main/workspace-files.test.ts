@@ -38,4 +38,14 @@ describe("the folder's files", () => {
     expect(listed.paths).toHaveLength(MAX_LISTED_FILES)
     expect(listed.truncated).toBe(true)
   })
+
+  // QA-2026-09-29 round 2, R16: a clone of Locust itself, 17,197 files, most
+  // under docs/ -- at 5,000 nothing under packages/ was listed.
+  it('reach past docs/ in a repository the size of Locust', async () => {
+    const docs = Array.from({ length: 15_575 }, (_, i) => `docs/record-${String(i)}.md`)
+    const rest = ['apps/desktop/src/main/runtime-commands.ts', 'packages/runtime-adapters/src/commands.ts', 'tsconfig.base.json']
+    const listed = await listWorkspaceFiles('C:/work/locust', { git: async () => [...rest.slice(0, 1), ...docs, ...rest.slice(1)] })
+    expect(listed.truncated).toBe(false)
+    expect(listed.paths).toEqual(expect.arrayContaining(rest))
+  })
 })

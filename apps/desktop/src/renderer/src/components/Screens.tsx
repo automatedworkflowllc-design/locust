@@ -166,6 +166,8 @@ export function MissionsScreen({
   onOpen,
   unreadableLedgers = 0,
   ledgerUnreadable = false,
+  totalMissions,
+  listedMissions,
   onDeleteMissions,
   ownerId,
   onShowEveryone
@@ -213,6 +215,12 @@ export function MissionsScreen({
    * directory replaced by a plain file (2026-09-08).
    */
   readonly ledgerUnreadable?: boolean
+  /**
+   * The ledger holds more turns than were listed (R28): said, so the count
+   * is never read as a total and an older conversation is known to exist.
+   */
+  readonly totalMissions?: number
+  readonly listedMissions?: number
   /**
    * Delete these records for good. Absent means the screen offers no
    * selection at all -- a list with checkboxes and nowhere to take them is
@@ -310,7 +318,9 @@ export function MissionsScreen({
             : damaged === 0
               ? 'ledger verified'
               : ledgerDamageWords(withIssues, unreadableLedgers)
-        }${total === undefined || total.word !== 'priced' ? '' : ` · ${total.line} across ${String(total.runs)} priced`}`}
+        }${total === undefined || total.word !== 'priced' ? '' : ` · ${total.line} across ${String(total.runs)} priced`}${
+          totalMissions === undefined || listedMissions === undefined ? '' : ` · only the newest ${listedMissions.toLocaleString('en-US')} of ${totalMissions.toLocaleString('en-US')} turns are listed`
+        }`}
       />
       {owner !== undefined && (
         <div className="lc-filters" role="status">

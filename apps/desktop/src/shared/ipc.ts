@@ -2605,6 +2605,13 @@ export type MissionHistoryResponse =
          */
         readonly unreadableCount: number
         /**
+         * How many missions the ledger holds, when that is more than were
+         * listed (QA-2026-09-29 round 2, R28). Absent when all were listed.
+         */
+        readonly totalMissions?: number
+        /** How many of them were listed, when `totalMissions` is said. */
+        readonly listedMissions?: number
+        /**
          * Runtimes whose most recent word, across every mission in the
          * ledger, was that the account is out of quota -- with that word.
          * Derived here rather than remembered by the window, because the

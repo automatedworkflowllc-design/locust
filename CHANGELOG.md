@@ -11,6 +11,22 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.466.0 - 2026-09-29
+
+### Fixed
+
+- **A long conversation reopens with every reply.** After a restart, a
+  conversation of more than 20 turns showed its early questions with no
+  answers under them. Every turn's reply is read back now.
+- **Older conversations stay listed.** Past a few hundred turns, older
+  conversations dropped out of the sidebar, Missions, Ctrl K and a
+  teammate's card, and nothing said so. The list now reaches the newest 2,000
+  turns, and past that the Missions header says how many are listed of how
+  many are kept.
+- **`@` finds files in a big project.** It listed only the first 5,000 files,
+  so in a large repository many files could not be found. It now lists up to
+  50,000, and says so when a folder has even more.
+
 ## 0.465.0 - 2026-09-29
 
 ### Improved

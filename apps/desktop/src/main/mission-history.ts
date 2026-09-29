@@ -34,7 +34,14 @@ const MAX_HISTORY_MISSIONS = 20
  * They are now two. The newest `MAX_HISTORY_MISSIONS` come with their events;
  * everything up to here comes with `events: []`. One ledger read either way.
  */
-const MAX_LISTED_MISSIONS = 300
+/*
+ * 2,000 since QA-2026-09-29 round 2, R28: at 300 -- a turn is a mission, so a
+ * few weeks of steady use -- older conversations vanished from the list, from
+ * Ctrl K and from a teammate's card, and the header read like a total. The
+ * cliff has moved again, so it is SAID now: past it, the history names how
+ * many the ledger holds and the Missions header says "the newest N of M".
+ */
+const MAX_LISTED_MISSIONS = 2_000
 const MAX_HISTORY_EVENTS = 500
 const MAX_HISTORY_CHECKPOINTS = 25
 /**
@@ -477,6 +484,8 @@ interface HistoryPage {
     readonly money?: RunMoney
   }[]
   readonly issueCount: number
+  /** Every mission the ledger could read, before the page was cut. */
+  readonly totalCount?: number
   readonly unreadableCount: number
 }
 
@@ -504,6 +513,8 @@ async function refreshedLedger(ledger: MissionLedger): Promise<{
   readonly entries: readonly CachedLedgerFile[]
   readonly listingIssues: number
   readonly readMission: NonNullable<MissionLedger['readMission']>
+  /** Every ledger file, before the store's cap (R28). */
+  readonly totalFiles: number
 } | undefined> {
   if (ledger.missionFiles === undefined || ledger.readMission === undefined) return undefined
   const readMission = ledger.readMission.bind(ledger)
@@ -540,7 +551,7 @@ async function refreshedLedger(ledger: MissionLedger): Promise<{
     const entry = cache.get(file.missionId)
     return entry === undefined ? [] : [entry]
   })
-  return { cache, entries, listingIssues: listing.issues.length, readMission }
+  return { cache, entries, listingIssues: listing.issues.length, readMission, totalFiles: listing.totalFiles ?? listing.files.length }
 }
 
 /**
@@ -581,7 +592,9 @@ async function cachedHistoryPage(ledger: MissionLedger, limit: number): Promise<
   const readable = entries
     .filter((entry): entry is CachedLedgerFile & { readonly light: RecoveredMission } => entry.light !== undefined)
     .sort((left, right) => Date.parse(right.light.lastUpdatedAt) - Date.parse(left.light.lastUpdatedAt))
-    .slice(0, limit)
+  // What the store listed may itself be cut short: its count of files wins.
+  const totalCount = Math.max(readable.length, refreshed.totalFiles)
+  readable.splice(limit)
   // Whole records for the newest, and only for them.
   const newest = new Set(readable.slice(0, MAX_HISTORY_MISSIONS).map((entry) => entry.light.metadata.missionId))
   for (const entry of entries) {
@@ -609,7 +622,8 @@ async function cachedHistoryPage(ledger: MissionLedger, limit: number): Promise<
           }
     ),
     issueCount: refreshed.listingIssues + entries.reduce((total, entry) => total + entry.issues, 0),
-    unreadableCount: entries.filter((entry) => entry.light === undefined).length
+    unreadableCount: entries.filter((entry) => entry.light === undefined).length,
+    totalCount
   }
 }
 
@@ -748,6 +762,7 @@ export async function readMissionHistory(
         // that list is a page rather than the whole ledger -- see
         // `unreadableFileCount` for what that cost.
         unreadableCount: page.unreadableCount,
+        ...(page.totalCount !== undefined && page.totalCount > page.missions.length ? { totalMissions: page.totalCount, listedMissions: page.missions.length } : {}),
         // These two read EVENTS, so they see the missions that came with
         // events. Widening the list did not widen them: the answer is about
         // recent runs either way, and scanning three hundred transcripts to

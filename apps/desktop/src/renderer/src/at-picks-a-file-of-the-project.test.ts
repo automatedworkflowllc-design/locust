@@ -57,3 +57,19 @@ describe('the files offered', () => {
     expect(fileMatches(FILES, 'zzzz')).toEqual([])
   })
 })
+
+// QA-2026-09-29 round 2, R16: the list may hold 50,000 paths now.
+describe('@ in a very large folder', () => {
+  const many = Array.from({ length: 50_000 }, (_, i) => `docs/part-${String(i % 97)}/record-${String(i)}.md`)
+  many.push('packages/runtime-adapters/src/commands.ts')
+
+  it('finds a file past the old 5,000 cap, first', () => {
+    expect(fileMatches(many, 'commands.ts')[0]).toBe('packages/runtime-adapters/src/commands.ts')
+  })
+
+  it('answers a bare @ over 50,000 paths in well under a keystroke', () => {
+    const started = performance.now()
+    expect(fileMatches(many, '')).toHaveLength(8)
+    expect(performance.now() - started).toBeLessThan(250)
+  })
+})

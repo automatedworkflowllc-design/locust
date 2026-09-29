@@ -595,6 +595,8 @@ export function Composer({
    * the `@word` out of the message. Escape closes the list for what is typed.
    */
   const [projectFiles, setProjectFiles] = useState<readonly string[] | undefined>(undefined)
+  // The host listed only the first files it found (R16): the menu says so.
+  const [filesPartial, setFilesPartial] = useState(false)
   const filesAskedAt = useRef(0)
   const [atAt, setAtAt] = useState(0)
   const [atDismissed, setAtDismissed] = useState<string | undefined>(undefined)
@@ -604,12 +606,23 @@ export function Composer({
     if (!wantsFiles || Date.now() - filesAskedAt.current < 30_000) return
     filesAskedAt.current = Date.now()
     void window.desktop?.workspaceFiles().then((answer) => {
-      if (answer.ok) setProjectFiles(answer.paths)
+      if (!answer.ok) return
+      setProjectFiles(answer.paths)
+      setFilesPartial(answer.truncated)
     }).catch(() => undefined)
   }, [wantsFiles])
-  const fileChoices = typedAt === undefined || projectFiles === undefined || atDismissed === value
-    ? []
-    : fileMatches(projectFiles.filter((path) => !attached.includes(path)), typedAt)
+  // Memoized: a folder can list 50,000 files, and this ran on every render.
+  const fileChoices = useMemo(
+    () => typedAt === undefined || projectFiles === undefined || atDismissed === value
+      ? []
+      : fileMatches(projectFiles.filter((path) => !attached.includes(path)), typedAt),
+    [typedAt, projectFiles, atDismissed, value, attached]
+  )
+  const filesHeading = filesPartial && projectFiles !== undefined
+    ? `Files in this folder, the first ${projectFiles.length.toLocaleString('en-US')} found`
+    : 'Files in this folder'
+  // Nothing found in a partial list is not "not there" (R16): said, with the way on.
+  const noMatchInPartial = filesPartial && projectFiles !== undefined && typedAt !== undefined && typedAt.length > 0 && atDismissed !== value && fileChoices.length === 0
   // Teammates first, by the start of their name; never the one on screen, never one tagged already.
   const [tagged, setTagged] = useState<readonly string[]>([])
   const teammateChoices = typedAt === undefined || atDismissed === value || team === undefined || onTag === undefined
@@ -1378,7 +1391,7 @@ export function Composer({
               const cut = path.lastIndexOf('/')
               return (
                 <Fragment key={`file:${path}`}>
-                {heading && <div className="lc-slash__group lc-mono" role="presentation">Files in this folder</div>}
+                {heading && <div className="lc-slash__group lc-mono" role="presentation">{filesHeading}</div>}
                 <button
                   key={path}
                   type="button"
@@ -1395,6 +1408,12 @@ export function Composer({
                 </Fragment>
               )
             })}
+          </div>
+        )}
+        {atChoices.length === 0 && noMatchInPartial && (
+          <div className="lc-slash" role="status">
+            <div className="lc-slash__group lc-mono">{filesHeading}</div>
+            <p className="lc-slash__detail lc-slash__empty">No match among these. This folder has more files than @ lists; + attaches any of them.</p>
           </div>
         )}
         {slashChoices.length > 0 && (

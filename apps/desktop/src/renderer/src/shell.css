@@ -9958,6 +9958,13 @@ textarea {
   line-height: 1.4;
 }
 
+/* A partial file list with no match says so, in words that wrap (R16). */
+.lc-slash__empty {
+  margin: 0;
+  padding: 2px 10px 8px;
+  white-space: normal;
+}
+
 /*
  * ASK ONE TEAMMATE IN A ROOM (0.371).
  *
