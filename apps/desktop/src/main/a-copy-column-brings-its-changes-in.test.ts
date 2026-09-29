@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { bringInCopy, copyChanges, copyLineChanges, makeCompareCopy, removeCompareCopies } from './compare-copies.js'
+import { bringInCopy, copyChanges, copyLineChanges, copyRefusal, makeCompareCopy, MAX_COPY_FILES, removeCompareCopies } from './compare-copies.js'
 import { defaultRunGit } from './worktrees.js'
 
 /**
@@ -90,4 +90,22 @@ describe('a column that edits a copy', { timeout: 60_000 }, () => {
     await makeCompareCopy({ folder, compareId: 'cmp_2', slot: 'b', root })
     expect(await bringInCopy({ folder, compareId: 'cmp_2', slot: 'b', root })).toEqual({ kind: 'nothing' })
   })
+})
+
+/*
+ * 0.457: a folder too big to copy says so BEFORE a comparison starts. Colin's
+ * `.claude` took Auto, and both columns came back "could not start".
+ */
+describe('a folder too big to copy', () => {
+  it('is refused up front, with the reason; one that fits is not; what is left out does not count', async () => {
+    const small = await made('locust-copy-small-')
+    await mkdir(join(small, 'node_modules', 'dep'), { recursive: true })
+    for (let index = 0; index <= MAX_COPY_FILES; index += 1) await writeFile(join(small, 'node_modules', 'dep', `${String(index)}.js`), '', 'utf8')
+    await writeFile(join(small, 'index.html'), '<p>x</p>', 'utf8')
+    expect(await copyRefusal(small)).toBeUndefined()
+
+    const big = await made('locust-copy-big-')
+    for (let index = 0; index <= MAX_COPY_FILES; index += 1) await writeFile(join(big, `${String(index)}.txt`), '', 'utf8')
+    expect(await copyRefusal(big)).toMatch(/^This folder is too big to copy \(more than 5,000 files or 250 MB\), so a comparison here can answer but not change files\.$/)
+  }, 120_000)
 })

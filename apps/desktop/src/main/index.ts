@@ -13,7 +13,7 @@ import { createCursorDefaultModel } from './cursor-default-model.js'
 import { listWorkspaceFiles } from './workspace-files.js'
 import { MAX_TAGGED, taggedPrompt } from '../shared/tagging.js'
 import { COMPARE_SLOTS, COMPARE_TREES_DIRECTORY, comparesGoneWith, compareNeedsCopy, compareRefusalOf, compareSlotKey, compareTreeId, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../shared/compare.js'
-import { bringInCopy, COPY_ROOT, copyLineChanges, makeCompareCopy, removeCompareCopies } from './compare-copies.js'
+import { bringInCopy, COPY_ROOT, copyLineChanges, copyRefusal, makeCompareCopy, removeCompareCopies } from './compare-copies.js'
 import type { CompareSlotId, PublicCompare, PublicCompareSlot } from '../shared/compare.js'
 import { createCompareStore } from './compare-store.js'
 import electronUpdater from 'electron-updater'
@@ -238,6 +238,7 @@ import {
   COMPARE_KEEP_CHANNEL,
   COMPARE_RETRY_CHANNEL,
   COMPARE_CHANGES_CHANNEL,
+  COMPARE_CHANGES_REFUSAL_CHANNEL,
   COMPARE_LIST_CHANNEL,
   RUNTIME_DISCOVERY_EVENT_CHANNEL,
   RUNTIME_DISCOVERY_LOG_CHANNEL,
@@ -4198,6 +4199,9 @@ if (!ownsSingleInstanceLock) {
       if (teammateId !== undefined && !(await teammates.list()).some((entry) => entry.teammateId === teammateId)) return compareRefused('That teammate is no longer on the team.')
       // A git project gives each column a worktree; any other folder, a plain copy (0.448).
       const changesIn = changes && !(await compareTrees().probe()).repository ? ('copy' as const) : undefined
+      // Said before anything starts, never as two failed columns (0.457).
+      const cannotCopy = changesIn === 'copy' ? await copyRefusal(workspacePath) : undefined
+      if (cannotCopy !== undefined) return compareRefused(`${cannotCopy} Switch Compare to Ask and send it again.`)
       try {
         return await askEveryColumn(await compares.create({ ...(teammateId === undefined ? {} : { teammateId }), prompt, routes, changes, blind, ...(changesIn === undefined ? {} : { changesIn }) }), prompt, false)
       } catch (error) {
@@ -4267,6 +4271,12 @@ if (!ownsSingleInstanceLock) {
       )
       if (why !== undefined) return compareRefused(why)
       return { ok: true, data: { compare: (await compares.get(compare.compareId)) ?? compare, refused: [] } } as const
+    })
+    // A git project gives each column a worktree, so only a plain folder can be too big (0.457).
+    ipcMain.handle(COMPARE_CHANGES_REFUSAL_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return undefined
+      if ((await compareTrees().probe()).repository) return undefined
+      return copyRefusal(workspacePath)
     })
     ipcMain.handle(COMPARE_CHANGES_CHANNEL, async (event, compareId: unknown) => {
       if (!fromOwnWindow(event)) return compareRefused('The request was rejected.')

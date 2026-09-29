@@ -57,6 +57,21 @@ async function measure(folder: string): Promise<{ files: number; bytes: number; 
   return { files, bytes, over: !within }
 }
 
+/**
+ * Why a comparison here cannot change files, BEFORE anything is sent -- or
+ * undefined when the folder can be copied (0.457). The Compare menu was drawn
+ * to grey Auto out with a reason and nothing ever gave it one, so a folder too
+ * big to copy (Colin's `.claude`, 2026-09-29) took Auto, started two columns,
+ * and both came back "could not start" with a Try again that could only fail
+ * the same way.
+ */
+export async function copyRefusal(folder: string): Promise<string | undefined> {
+  const size = await measure(resolve(folder)).catch(() => ({ over: true }))
+  return size.over
+    ? `This folder is too big to copy (more than ${MAX_COPY_FILES.toLocaleString('en-US')} files or ${String(Math.round(MAX_COPY_BYTES / (1024 * 1024)))} MB), so a comparison here can answer but not change files.`
+    : undefined
+}
+
 /** The column's copy, made the first time and reused for its follow-ups. */
 export async function makeCompareCopy(input: {
   readonly folder: string

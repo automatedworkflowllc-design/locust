@@ -1530,6 +1530,25 @@ export default function App(): ReactElement {
   const [compareOn, setCompareOn] = useState(false)
   /** The next comparison edits: each model changes its own copy (0.445). */
   const [compareChanges, setCompareChanges] = useState(false)
+  /**
+   * Why a comparison in this folder cannot change files -- a plain folder too
+   * big to copy -- asked of the host when Compare opens (0.457). Auto is then
+   * greyed out in the Compare menu with this as its reason, and a comparison
+   * already set to change files goes back to answering.
+   */
+  const [compareChangesRefusal, setCompareChangesRefusal] = useState<string>()
+  useEffect(() => {
+    if (!compareOn) return
+    let current = true
+    void window.desktop?.compareChangesRefusal().then((refusal) => {
+      if (!current) return
+      setCompareChangesRefusal(refusal)
+      if (refusal !== undefined) setCompareChanges(false)
+    }).catch(() => undefined)
+    return () => {
+      current = false
+    }
+  }, [compareOn])
   /** The next comparison hides the names until one is kept (0.449). */
   const [compareBlind, setCompareBlind] = useState(false)
   /** What each column of the comparison on screen has changed, when it edits. */
@@ -3406,6 +3425,7 @@ export default function App(): ReactElement {
         },
         changes: compareChanges,
         onChanges: setCompareChanges,
+        ...(compareChangesRefusal === undefined ? {} : { changesRefusal: compareChangesRefusal }),
         blind: compareBlind,
         onBlind: setCompareBlind,
         record: compareRecord(compares),

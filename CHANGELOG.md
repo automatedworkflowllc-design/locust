@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.457.0 - 2026-09-29
+
+### Fixed
+
+- **Compare says up front when a folder is too big to copy.** In a folder
+  that is not a git project and holds more than 5,000 files or 250 MB,
+  choosing Auto in Compare started both models and both came back "could
+  not start". Now Auto is greyed out in the Compare menu with the reason,
+  and the comparison answers instead.
+
 ## 0.456.0 - 2026-09-29
 
 ### Fixed
