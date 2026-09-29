@@ -1201,6 +1201,12 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: var(--lc-space-4);
+  /* A 300-character URL, a hash or a JWT ran off the right edge and made the
+     thread scroll sideways (QA-2026-09-29, Q4). Inherited by paragraphs,
+     lists, quotes and inline code; `break-word`, not `anywhere`, so a table
+     keeps its columns and scrolls in its own box as before, and a fenced
+     block (white-space: pre) is untouched. */
+  overflow-wrap: break-word;
 }
 
 /*

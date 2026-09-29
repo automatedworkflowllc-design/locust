@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { readFile, realpath, stat } from 'node:fs/promises'
-import { extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 
 /**
  * A WEB PAGE A TEAMMATE MADE, SHOWN WORKING, INSIDE LOCUST (0.425).
@@ -19,6 +19,8 @@ import { extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
  *   - no preload in a sub-frame, so no `window.desktop`;
  *   - files served from inside the folder it came from, checked on the REAL
  *     path, so a link or junction inside the folder cannot serve one outside;
+ *   - that folder is the PAGE'S OWN, and nothing hidden or key-like in it is
+ *     served at all (0.455, below);
  *   - the session still refuses every device permission.
  * A token is random per root and per launch: the address says nothing about
  * the disk, and one from last week opens nothing.
@@ -36,6 +38,32 @@ const TYPES: Readonly<Record<string, string>> = {
   avif: 'image/avif', ico: 'image/x-icon', woff: 'font/woff', woff2: 'font/woff2', ttf: 'font/ttf', otf: 'font/otf',
   mp4: 'video/mp4', webm: 'video/webm', mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg', txt: 'text/plain; charset=utf-8',
   md: 'text/plain; charset=utf-8', csv: 'text/plain; charset=utf-8', xml: 'application/xml', wasm: 'application/wasm', pdf: 'application/pdf'
+}
+
+/**
+ * WHAT A PAGE MAY NEVER READ (0.455).
+ *
+ * A page runs by itself, and may load from the web as a browser page does --
+ * so what it can READ is what it could send away. A stand-in QA session
+ * (QA-2026-09-29, Q1) had a model write a landing page that fetched `/.env`,
+ * `/.git/config` and `/secrets/token.txt` from its own origin and posted them
+ * to a listener: the page was served from the WHOLE project, when it only
+ * ever needed its own folder. A prompt injection in a README the model read
+ * is all it would take, and in Auto nothing is asked.
+ *
+ * So a page is served from the folder it sits in (and what is under it),
+ * never the project around it; and nothing hidden (any part of the path
+ * starting with a dot: .env, .git, .ssh, .npmrc, .locust) and nothing
+ * shaped like a key or a secrets store is served even there. What a page
+ * links to -- its CSS, scripts, images, fonts, data -- is none of those.
+ * The cost: a page that reaches UP a folder (`../css/site.css`) loses that
+ * file in the preview; opened in a browser it still has it.
+ */
+const KEY_FILE = /\.(pem|key|p12|pfx|jks|keystore|kdbx|ppk|asc|gpg)$|^id_(rsa|dsa|ecdsa|ed25519)|^(credentials|secrets?|service-account[^/]*)\.(json|ya?ml|toml|txt)$/i
+const SECRET_FOLDER = /^(secrets?|credentials|private|keys)$/i
+export function neverServed(inside: string): boolean {
+  const parts = inside.split(/[\\/]+/).filter((part) => part !== '')
+  return parts.some((part, index) => part.startsWith('.') || (index < parts.length - 1 ? SECRET_FOLDER.test(part) : KEY_FILE.test(part)))
 }
 
 export function isPagePath(path: string): boolean {
@@ -97,10 +125,10 @@ export function createPageServer(options: {
         kept?.[1] !== undefined && from !== undefined ? realpath(join(from, kept[1])).catch(() => undefined) : undefined
       )
       if (real === undefined) return { ok: false, message: 'That page is not there. The teammate named it but did not write it.' }
-      const root = (await realRoots()).find((candidate) => within(real, candidate, platform))
-      if (root === undefined) return { ok: false, message: 'That page is outside the folder your teammates work in, so Locust will not open it.' }
-      const inside = relative(root, real).split(sep).map(encodeURIComponent).join('/')
-      return { ok: true, url: `${PAGE_SCHEME}://${tokenFor(root)}/${inside}` }
+      const project = (await realRoots()).find((candidate) => within(real, candidate, platform))
+      if (project === undefined) return { ok: false, message: 'That page is outside the folder your teammates work in, so Locust will not open it.' }
+      // The page's own folder, never the project around it (0.455).
+      return { ok: true, url: `${PAGE_SCHEME}://${tokenFor(dirname(real))}/${encodeURIComponent(basename(real))}` }
     },
     async handle(requestUrl) {
       const refuse = (status: number, text: string): Response => new Response(text, { status, headers: { 'content-type': 'text/plain; charset=utf-8' } })
@@ -120,6 +148,7 @@ export function createPageServer(options: {
       }
       const wanted = resolve(join(root, inside))
       if (!within(wanted, root, platform)) return refuse(403, 'Outside the page\'s folder.')
+      if (neverServed(relative(root, wanted))) return refuse(403, 'Hidden files and keys are never served to a page.')
       let real = await realpath(wanted).catch(() => undefined)
       if (real === undefined || !within(real, root, platform)) return refuse(404, 'Not found.')
       let measured = await stat(real).catch(() => undefined)

@@ -11,6 +11,21 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.455.0 - 2026-09-29
+
+### Fixed
+
+- **A page a teammate makes can no longer read your secrets.** A web page
+  runs by itself in Locust, and it could read any file in your project --
+  a `.env` with keys in it, say -- and send it anywhere. Now a page is
+  served only its own folder, and never a hidden file (`.env`, `.git`) or
+  anything shaped like a key, even there. Its styles, scripts, images and
+  data still load as before. A page that reaches up a folder
+  (`../css/site.css`) loses that file in the preview; in a browser it
+  still has it.
+- **Long links wrap.** A long URL, hash or path in a reply ran off the
+  right edge and made the conversation scroll sideways. It wraps now.
+
 ## 0.454.0 - 2026-09-28
 
 ### Improved

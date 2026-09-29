@@ -88,6 +88,8 @@ try {
   await mkdir(join(workspace, 'js'), { recursive: true })
   await writeFile(join(workspace, 'css', 'probe.css'), 'h1 { color: rgb(12, 34, 56); }\n', 'utf8')
   await writeFile(join(workspace, 'data.json'), '{ "ok": true }\n', 'utf8')
+  await writeFile(join(workspace, '.env'), 'API_KEY=not-for-the-page\n', 'utf8')
+  await writeFile(join(workspace, 'deploy.key'), 'not for the page\n', 'utf8')
   await writeFile(join(workspace, 'js', 'probe.js'), [
     '(async () => {',
     "  const report = { js: true, color: getComputedStyle(document.querySelector('h1')).color }",
@@ -96,6 +98,8 @@ try {
     '  report.bridge = typeof window.desktop',
     "  try { localStorage.setItem('probe', 'kept'); report.storage = localStorage.getItem('probe') } catch { report.storage = 'refused' }",
     "  try { await fetch('https://example.com/', { mode: 'no-cors' }); report.web = 'reached' } catch { report.web = 'blocked' }",
+    // 0.455 (QA-2026-09-29, Q1): what it could read is what it could send.
+    "  for (const [key, path] of [['env', '.env'], ['git', '.git/config'], ['key', 'deploy.key']]) { try { report[key] = (await fetch(path)).status } catch { report[key] = 'failed' } }",
     "  parent.postMessage({ locustProbe: report }, '*')",
     '})()',
     ''
@@ -118,6 +122,7 @@ try {
   const report = probe.report ?? {}
   check('Open index.html runs the page in the viewer, at its own address', probe.open && probe.frame && /^locust-page:\/\//.test(probe.src), JSON.stringify({ open: probe.open, frame: probe.frame, src: probe.src }))
   check('its script runs, its own CSS applies, it reads its own data and keeps its own storage', report.js === true && report.color === 'rgb(12, 34, 56)' && report.data === true && report.storage === 'kept', JSON.stringify(report))
+  check('it cannot read the project’s secrets beside it: .env, .git/config, a key file', [report.env, report.git, report.key].every((status) => status === 403), JSON.stringify({ env: report.env, git: report.git, key: report.key }))
   check('it cannot reach Locust: not the window it sits in, not the bridge', report.parentDocument === 'refused' && report.bridge === 'undefined', JSON.stringify({ parentDocument: report.parentDocument, bridge: report.bridge }))
   if (packaged !== undefined) {
     check('on the packaged build it may reach the web, and Locust’s own window still may not', report.web === 'reached' && probe.appWeb === 'blocked', JSON.stringify({ page: report.web, app: probe.appWeb }))
@@ -128,6 +133,24 @@ try {
     return document.querySelector('.lc-viewer__code')?.innerText ?? ''
   })()`)))
   check('Source shows the page’s own text', /<h1>Corner Shop<\/h1>/.test(source), source.slice(0, 120))
+  // 0.455 (QA-2026-09-29, Q4): a long unbroken token in a reply wraps. One is
+  // put into a real reply paragraph and a real list item, and the thread
+  // must not scroll sideways.
+  const wide = JSON.parse(String(await drive.capture('a reply holding a 300-character URL', () => drive.evaluate(`(async () => {
+    document.querySelector('.lc-viewer__close, button[aria-label="Close the file"]')?.click()
+    await new Promise((r) => setTimeout(r, 400))
+    const token = 'https://storage.example.com/signed/' + 'a1b2c3d4e5'.repeat(27)
+    const para = [...document.querySelectorAll('.lc-agentline__body p')].pop()
+    const item = [...document.querySelectorAll('.lc-agentline__body li')].pop()
+    if (para) para.textContent += ' ' + token
+    if (item) item.textContent += ' ' + token
+    para?.scrollIntoView({ block: 'center' })
+    await new Promise((r) => setTimeout(r, 300))
+    const thread = document.querySelector('.lc-thread')
+    const bodies = [...document.querySelectorAll('.lc-agentline__body')]
+    return JSON.stringify({ para: !!para, item: !!item, thread: thread ? thread.scrollWidth - thread.clientWidth : -1, over: bodies.filter((b) => b.scrollWidth > b.clientWidth + 1).length })
+  })()`))))
+  check('a 300-character URL in a reply wraps: the thread never scrolls sideways', wide.para && wide.thread <= 1 && wide.over === 0, JSON.stringify(wide))
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

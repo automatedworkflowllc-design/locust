@@ -56,7 +56,8 @@ describe('the page server', () => {
 
   it('gives a page inside the folder its own address, on its own scheme, with a random host', async () => {
     const { url } = await site()
-    expect(url).toMatch(new RegExp(`^${PAGE_SCHEME}://[0-9a-f]{24}/site/index\\.html$`))
+    // Rooted at the page's own folder (0.455): the address names the page, not where it sits.
+    expect(url).toMatch(new RegExp(`^${PAGE_SCHEME}://[0-9a-f]{24}/index\\.html$`))
   })
 
   it('serves the page and what it links to, typed', async () => {
@@ -78,9 +79,38 @@ describe('the page server', () => {
     const { server, url, outside } = await site()
     const name = outside.split(/[\\/]/).pop()!
     for (const escape of [`../../${name}/secret.txt`, `..%2F..%2F${name}%2Fsecret.txt`, `%2e%2e/%2e%2e/${name}/secret.txt`]) {
-      const answer = await server.handle(url.replace('site/index.html', escape))
+      const answer = await server.handle(url.replace('index.html', escape))
       expect(answer.status, escape).not.toBe(200)
     }
+  })
+
+  /*
+   * QA-2026-09-29, Q1: a page a model wrote fetched /.env, /.git/config and
+   * /secrets/token.txt from the project and posted them out. A page is served
+   * its own folder, and nothing hidden or key-like even there.
+   */
+  it('never serves the project around the page, only the page\'s own folder', async () => {
+    const { server, url, root } = await site()
+    await writeFile(join(root, 'README.md'), 'the project', 'utf8')
+    await writeFile(join(root, '.env'), 'API_KEY=sk-live', 'utf8')
+    for (const reach of ['../README.md', '../.env', '..%2F.env', '%2e%2e/.env']) {
+      expect((await server.handle(url.replace('index.html', reach))).status, reach).not.toBe(200)
+    }
+  })
+
+  it('never serves a hidden file or a key, even beside the page', async () => {
+    const { server, url, root } = await site()
+    const beside = join(root, 'site')
+    await mkdir(join(beside, '.git'), { recursive: true })
+    await mkdir(join(beside, 'secrets'), { recursive: true })
+    await mkdir(join(beside, 'data'), { recursive: true })
+    const refused = ['.env', '.env.local', '.git/config', '.npmrc', 'secrets/token.txt', 'server.pem', 'deploy.key', 'id_rsa', 'id_ed25519.pub', 'credentials.json', 'service-account-prod.json']
+    for (const name of refused) await writeFile(join(beside, name), 'secret', 'utf8')
+    // What a page actually links to is still served, whatever it is called.
+    const served = ['data/prices.json', 'tokens.css', 'keyboard.js', 'monkey.png']
+    for (const name of served) await writeFile(join(beside, name), 'fine', 'utf8')
+    for (const name of refused) expect((await server.handle(url.replace('index.html', name))).status, name).toBe(403)
+    for (const name of served) expect((await server.handle(url.replace('index.html', name))).status, name).toBe(200)
   })
 
   it('never serves through a link inside the folder that points outside it', async () => {
