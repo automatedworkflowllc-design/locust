@@ -3315,6 +3315,18 @@ export function buildThread(
   }
 
   items.push(...receipts)
+  /*
+   * "TRYING AGAIN" ONLY WHILE IT IS TRUE (QA-2026-09-29 round 2, R17). The
+   * busy provider's note -- "OpenCode is trying again on its own. To go on
+   * now, press Stop and pick another model." -- stayed above the red card of
+   * a run that had ended, and above the answer of a run whose model came
+   * back on the third try: advice about a run with nothing left to stop.
+   */
+  const busyAt = events.findIndex((event) => event.type === 'adapter.diagnostic' && /\.provider_busy\.runtime_error$/.test(event.payload.code))
+  const recovered = busyAt >= 0 && events.slice(busyAt + 1).some((event) => (event.type === 'message.delta' && event.payload.text.trim().length > 0) || event.type === 'tool.started')
+  if (busyAt >= 0 && (options.running !== true || recovered)) {
+    return items.filter((item) => !(item.type === 'diagnostic' && item.busy === true))
+  }
   return items
 }
 
@@ -4104,6 +4116,34 @@ function lastStderrLine(stderr: string | undefined): string | undefined {
 }
 
 /**
+ * A structured log line, said as its message (QA-2026-09-29 round 2, R17).
+ * OpenCode's `--print-logs` lines ended a failure card as `timestamp=...
+ * level=ERROR run=... message="stream error" providerID=... error.error=
+ * "AI_APICallError: Rate limit exceeded..."`. The error, else the message,
+ * is what a person needs; anything that is not such a line is kept as it is.
+ */
+export function messageOfLogLine(line: string): string {
+  if (!/\blevel=[A-Z]+\b/.test(line) || !/\b[a-zA-Z.]+="/.test(line)) return line
+  const quoted = (key: string): string | undefined => {
+    const at = line.indexOf(`${key}="`)
+    if (at < 0) return undefined
+    let text = ''
+    for (let index = at + key.length + 2; index < line.length; index += 1) {
+      const character = line[index]!
+      if (character === '\\' && index + 1 < line.length) {
+        text += line[index + 1]
+        index += 1
+        continue
+      }
+      if (character === '"') return text.trim()
+      text += character
+    }
+    return text.trim()
+  }
+  return quoted('error.error') ?? quoted('error') ?? quoted('message') ?? line
+}
+
+/**
  * What to put on a failure card.
  *
  * The host's own sentence names the SHAPE of the failure ("Codex invocation
@@ -4119,8 +4159,9 @@ export function failureMessage(payload: {
   readonly message: string
   readonly process?: { readonly stderr?: string; readonly exitCode?: number | null }
 }): string {
-  const said = lastStderrLine(payload.process?.stderr)
-  if (said === undefined) return payload.message
+  const line = lastStderrLine(payload.process?.stderr)
+  if (line === undefined) return payload.message
+  const said = messageOfLogLine(line)
   if (EXHAUSTION_PATTERNS.some((pattern) => pattern.test(said))) {
     return `${payload.message} The runtime reported that it is out of capacity right now — its own limit, not this machine's: ${said}`
   }

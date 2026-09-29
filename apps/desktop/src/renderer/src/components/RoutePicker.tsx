@@ -624,7 +624,7 @@ export function RoutePicker({
         </div>
       ) : (
         <div className="lc-picker__foot">
-          Fallback chain, privacy and permissions live in Settings.
+          Privacy and permissions live in Settings.
         </div>
       )}
     </div>

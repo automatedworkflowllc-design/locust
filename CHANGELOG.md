@@ -11,6 +11,20 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.470.0 - 2026-09-29
+
+### Fixed
+
+- **"Trying again" leaves when it stops being true.** The amber note that
+  OpenCode was retrying a busy model stayed above the error after the run
+  ended, and above the answer when the model came back. It now goes once the
+  run ends or the model answers.
+- **A failure card ends in words, not a log line.** When OpenCode stopped on a
+  busy model, the card ended in its raw log line. It now says the error itself.
+- **The model picker no longer points to a fallback setting that does not
+  exist.** Its footer said "Fallback chain, privacy and permissions live in
+  Settings"; Settings has no fallback chain yet.
+
 ## 0.469.0 - 2026-09-29
 
 ### Fixed
