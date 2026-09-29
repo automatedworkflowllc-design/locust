@@ -141,6 +141,7 @@ import { TitleBar } from './components/TitleBar.js'
 import { cappedLiveEvents, LIVE_EVENT_CAP,
   conversationTurns,
   failureMessage,
+  failedOnItsLimit,
   recentlyUsedRoutes,
   resolvedModelNames,
   resumableSessionOf,
@@ -4297,6 +4298,31 @@ export default function App(): ReactElement {
     }
   })()
 
+  /*
+   * AND WHEN IT GAVE UP (QA-2026-09-29 round 2, R17). The busy note and its
+   * button leave when the run ends, and the red card said to pick another
+   * model with nothing to press. The same offer, on the ended run: the chat
+   * box goes to the next free model with the message back in it. Nothing is
+   * sent for the person, as above. Only for the free models, where the next
+   * one is known to cost nothing; a paid runtime's limit is the person's call.
+   */
+  const limitOffer = ((): { readonly label: string; readonly onPress: () => void } | undefined => {
+    const shown = liveRun
+    if (shown === undefined || shown.phase !== 'failed' || shown.data === undefined) return undefined
+    const failed = [...shown.events].reverse().find((event) => event.type === 'run.failed')
+    if (failed === undefined || failed.type !== 'run.failed' || !failedOnItsLimit(failed.payload)) return undefined
+    const next = nextFreeModel(shown.data.runtime, shown.data.model, models)
+    if (next === undefined) return undefined
+    return {
+      label: `Switch to ${modelDisplayName(next.runtime, next.id)}`,
+      onPress: () => {
+        const split = splitAttachments(shown.prompt)
+        changeRoute({ runtime: next.runtime, model: next.id })
+        setHandBack({ text: split.text, attachments: split.attachments })
+      }
+    }
+  })()
+
   // Returns the save, so the dialog can hold its button until it lands (L22).
   const createTeammate = ({ monthlyLimitUsd, ...input }: TeammateDraft): Promise<void> => {
     const bridge = window.desktop
@@ -7150,6 +7176,16 @@ export default function App(): ReactElement {
                 events={liveRun.events}
                 running={running}
                 {...(busyOffer === undefined ? {} : { busyModel: busyOffer })}
+                {...(limitOffer === undefined ? {} : { limitModel: limitOffer })}
+                onSendAgain={
+                  // R29: a run stopped before it used any tool, most often
+                  // by the second click of a double click on Send. Thread
+                  // offers it only on that card; sending again cannot repeat
+                  // anything, because nothing ran.
+                  !running && liveRun.phase === 'cancelled' && liveRun.prompt.trim().length > 0
+                    ? () => void startMission(liveRun.prompt)
+                    : undefined
+                }
                 restoredMission={liveRun.restored === true ? liveRun.restoredMission : undefined}
                 {...(liveRun.data?.missionId === undefined ? {} : { shownMissionId: liveRun.data.missionId })}
                 error={liveRun.error}

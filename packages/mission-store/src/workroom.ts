@@ -21,7 +21,7 @@ import { isAbsolute, join } from 'node:path'
  * shown, and it is always shown as a claim.
  *
  * Same discipline as the ledger: schema version fixed by the first record,
- * contiguous sequence, fsync per append, byte-offset tamper detection, strict
+ * contiguous sequence, fsync per append, a file changed between appends noticed, strict
  * revalidation on read, and a truncated tail tolerated rather than fatal.
  */
 

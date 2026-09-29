@@ -2,6 +2,11 @@ import type { ReactElement } from 'react'
 
 import type { CancellationSummary } from '../missionView.js'
 
+/** No tool call settled, none was cut off, none was planned: what "nothing happened" means on this card. */
+export function stoppedBeforeAnyTool(summary: CancellationSummary): boolean {
+  return summary.settled.length === 0 && summary.interrupted.length === 0 && summary.neverStarted === 0
+}
+
 /**
  * What a stopped run actually left behind.
  *
@@ -29,8 +34,7 @@ export function CancellationCard({
    */
   readonly byPerson?: boolean
 }): ReactElement {
-  const nothingHappened =
-    summary.settled.length === 0 && summary.interrupted.length === 0 && summary.neverStarted === 0
+  const nothingHappened = stoppedBeforeAnyTool(summary)
 
   // Standing, not amber: this reports a run that already stopped and asks for
   // nothing. Amber is reserved for a card that holds a control.

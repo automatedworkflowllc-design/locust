@@ -482,12 +482,17 @@ export function missionPhaseView(
  * and it says nothing at all about whether the work was any good. A green
  * `verified` under a finished turn invites exactly the other reading.
  *
- * The Missions header has always said `ledger verified` for the same fact
+ * The Missions header has always said the same words for the same fact
  * (`Screens.tsx`), so this is also two surfaces agreeing on their own words
  * rather than a new phrase.
+ *
+ * `ledger readable`, not `ledger verified` (QA-2026-09-29 round 2, R24): the
+ * check is that every file parses and its sequence has no gap. A reply edited
+ * at rest, or a whole mission file deleted, reads back clean, so "verified"
+ * promised tamper evidence the check does not give.
  */
-export function ledgerVerificationLabel(integrityIssueCount: number): 'ledger verified' | 'ledger incomplete' {
-  return integrityIssueCount === 0 ? 'ledger verified' : 'ledger incomplete'
+export function ledgerVerificationLabel(integrityIssueCount: number): 'ledger readable' | 'ledger incomplete' {
+  return integrityIssueCount === 0 ? 'ledger readable' : 'ledger incomplete'
 }
 
 /** Short mission id for mono provenance: real UUID prefix, never a fake counter. */

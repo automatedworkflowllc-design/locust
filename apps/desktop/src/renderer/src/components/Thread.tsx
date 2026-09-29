@@ -32,7 +32,7 @@ import { AttachedImage } from './AttachedImage.js'
 import { isImagePath } from '../../../shared/image-files.js'
 import { Icon } from './Icon.js'
 import { ApprovalCard } from './ApprovalCard.js'
-import { CancellationCard } from './CancellationCard.js'
+import { CancellationCard, stoppedBeforeAnyTool } from './CancellationCard.js'
 import { AgentAvatar, AgentText, DiagnosticLine, LiveStepCard, PlanSteps } from './ThreadItems.js'
 import { DecisionCard } from './DecisionCard.js'
 import { ResumeCard } from './ResumeCard.js'
@@ -468,7 +468,7 @@ function ReceiptCard({
    * run that failed or was cut off, a ledger that could not be verified, an
    * action that never reported back -- keeps the card, at rest, as before.
    */
-  const routine = view.tone === 'blue' && verification === 'ledger verified' && unsettled.length === 0
+  const routine = view.tone === 'blue' && verification === 'ledger readable' && unsettled.length === 0
   if (routine && !open) {
     return (
       <div className="lc-receipt__quiet">
@@ -511,7 +511,7 @@ function ReceiptCard({
           <span className="lc-separator">·</span>
           {checkpoints.length === 0 ? 'no checkpoints' : `${String(checkpoints.length)} checkpoints`}
           <span className="lc-separator">·</span>
-          <span className={verification === 'ledger verified' ? 'lc-tone-green' : 'lc-tone-amber'}>{verification}</span>
+          <span className={verification === 'ledger readable' ? 'lc-tone-green' : 'lc-tone-amber'}>{verification}</span>
           {unsettled.length > 0 && (
             <>
               <span className="lc-separator">·</span>
@@ -580,7 +580,7 @@ function ReceiptCard({
         <dt>{costLabel(runCostOf(mission.events))}</dt>
         <dd className="lc-mono">{costLineOrWhyNot(runCostOf(mission.events))}</dd>
         <dt>Ledger</dt>
-        <dd className={verification === 'ledger verified' ? 'lc-tone-green' : 'lc-tone-amber'}>{verification}</dd>
+        <dd className={verification === 'ledger readable' ? 'lc-tone-green' : 'lc-tone-amber'}>{verification}</dd>
       </dl>
       )}
     </div>
@@ -609,6 +609,10 @@ export interface ThreadProps {
   readonly onRunWithEdits?: () => void
   /** Offered only where the runtime never started, so nothing can repeat. */
   readonly onRunAgain?: () => void
+  /** A stopped run's message, sent again; drawn only when no tool had run. */
+  readonly onSendAgain?: () => void
+  /** A free model that gave up on its limit: the next one, with the message handed back. */
+  readonly limitModel?: { readonly label: string; readonly onPress: () => void }
   /** Open the conversation a received message was written in. */
   readonly onOpenSenderRun?: (missionId: string) => () => void
   /** Whether that run was asked to PLAN rather than do; the offer then reads as the build step. */
@@ -760,6 +764,8 @@ export function Thread({
   coldStart = false,
   onRunWithEdits,
   onRunAgain,
+  onSendAgain,
+  limitModel,
   onOpenSenderRun,
   wasPlan,
   onAnswer,
@@ -1203,6 +1209,14 @@ onResume,
         ))}
 
         {stopped !== undefined && <CancellationCard summary={stopped} stoppedAt={stoppedAt} byPerson={stoppedByPerson} />}
+        {stopped !== undefined && stoppedBeforeAnyTool(stopped) && onSendAgain !== undefined && (
+          <div className="lc-rerun">
+            <span>No tool had run, so sending it again cannot repeat anything.</span>
+            <button type="button" className="lc-button" onClick={onSendAgain}>
+              <Icon name="play" size={13} /> Send again
+            </button>
+          </div>
+        )}
 
         {/*
           * A MODE REFUSAL IS ONE CARD, NOT TWO (beta review of 0.255.0, #8).
@@ -1335,6 +1349,15 @@ onResume,
           * repeat anything") is a button admitting it does nothing. The
           * offer that belongs there is the mode switch above.
           */}
+        {limitModel !== undefined && error !== undefined && (
+          <div className="lc-rerun">
+            <span>This model is at its limit. Switching puts your message back in the chat box, to send there.</span>
+            <button type="button" className="lc-button" onClick={limitModel.onPress}>
+              {limitModel.label}
+            </button>
+          </div>
+        )}
+
         {onRunAgain !== undefined && !refusedByMode && (
           /*
            * One press, where retyping was the only way forward.

@@ -316,7 +316,7 @@ export function MissionsScreen({
           ledgerUnreadable
             ? 'the ledger could not be read'
             : damaged === 0
-              ? 'ledger verified'
+              ? 'ledger readable'
               : ledgerDamageWords(withIssues, unreadableLedgers)
         }${total === undefined || total.word !== 'priced' ? '' : ` · ${total.line} across ${String(total.runs)} priced`}${
           totalMissions === undefined || listedMissions === undefined ? '' : ` · only the newest ${listedMissions.toLocaleString('en-US')} of ${totalMissions.toLocaleString('en-US')} turns are listed`

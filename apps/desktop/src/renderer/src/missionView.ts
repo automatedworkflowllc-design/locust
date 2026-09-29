@@ -4144,6 +4144,18 @@ export function messageOfLogLine(line: string): string {
 }
 
 /**
+ * Whether a failure was the runtime's own limit (QA-2026-09-29 round 2, R17):
+ * the same reading `failureMessage` puts into words, for a control that
+ * offers the way on.
+ */
+export function failedOnItsLimit(payload: {
+  readonly process?: { readonly stderr?: string }
+}): boolean {
+  const line = lastStderrLine(payload.process?.stderr)
+  return line !== undefined && EXHAUSTION_PATTERNS.some((pattern) => pattern.test(messageOfLogLine(line)))
+}
+
+/**
  * What to put on a failure card.
  *
  * The host's own sentence names the SHAPE of the failure ("Codex invocation

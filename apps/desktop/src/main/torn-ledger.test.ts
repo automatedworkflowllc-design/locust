@@ -178,17 +178,17 @@ describe('physical torn ledger: reader → history → preload → rendered Miss
     expect(result.data.missions.map((mission) => mission.missionId)).toEqual(['mission_clean'])
     expect(result.data.missions.map((mission) => mission.integrityIssueCount)).toEqual([0])
     expect(result.html).toContain('1 conversation, 0 in this folder · 1 file could not be read')
-    expect(result.html).not.toContain('ledger verified')
+    expect(result.html).not.toContain('ledger readable')
     expect(result.html).not.toContain('with an incomplete receipt')
   })
 
-  it('clean control: zero issues across the boundary and ledger verified on screen', async () => {
+  it('clean control: zero issues across the boundary and ledger readable on screen', async () => {
     const result = await displayed(clean)
     expect(result.snapshot.issues).toEqual([])
     expect(result.data.issueCount).toBe(0)
     expect(result.data.unreadableCount).toBe(0)
     expect(result.data.missions.map((mission) => mission.integrityIssueCount)).toEqual([0])
-    expect(result.html).toContain('1 conversation, 0 in this folder · ledger verified')
+    expect(result.html).toContain('1 conversation, 0 in this folder · ledger readable')
     expect(result.html).not.toContain('with an incomplete receipt')
     expect(result.html).not.toContain('could not be read')
   })
@@ -201,7 +201,7 @@ describe('physical torn ledger: reader → history → preload → rendered Miss
     expect(result.data.missions.map((mission) => mission.integrityIssueCount)).toEqual([shape.codes.length])
     expect(result.data.missions[0]?.events).toEqual(events.slice(0, shape.surviving!))
     expect(result.html).toContain('1 conversation, 0 in this folder · 1 with an incomplete receipt')
-    expect(result.html).not.toContain('ledger verified')
+    expect(result.html).not.toContain('ledger readable')
   })
 
   // Former KNOWN DEFECT cases now require the fixed contract. A truncated
@@ -213,7 +213,7 @@ describe('physical torn ledger: reader → history → preload → rendered Miss
     expect(result.data.unreadableCount).toBe(1)
     expect(result.data.missions).toEqual([])
     expect(result.html).toContain('0 conversations · 1 file could not be read')
-    expect(result.html).not.toContain('ledger verified')
+    expect(result.html).not.toContain('ledger readable')
     expect(result.html).not.toContain('with an incomplete receipt')
   })
 
@@ -231,7 +231,7 @@ describe('physical torn ledger: reader → history → preload → rendered Miss
     } })
     const html = renderHistory(response)
     expect(html).toContain('0 conversations · the ledger could not be read')
-    expect(html).not.toContain('ledger verified')
+    expect(html).not.toContain('ledger readable')
     expect(html).not.toContain('with an incomplete receipt')
     expect((await stat(ledgerPath)).isFile()).toBe(true)
     expect(await readFile(ledgerPath, 'utf8')).toBe('blocking file, not a directory')
@@ -254,7 +254,7 @@ describe('physical torn ledger: reader → history → preload → rendered Miss
     expect(response.data.missions.map((mission) => mission.integrityIssueCount)).toEqual([1, 1])
     const html = renderHistory(response)
     expect(html).toContain('2 with an incomplete receipt · 1 file could not be read')
-    expect(html).not.toContain('ledger verified')
+    expect(html).not.toContain('ledger readable')
   })
 
   /*
@@ -329,7 +329,7 @@ describe('physical torn ledger: reader → history → preload → rendered Miss
      * defect this test was written for, pointed the other way.
      */
     expect(said).not.toContain('could not be read')
-    expect(said).not.toContain('ledger verified')
+    expect(said).not.toContain('ledger readable')
     expect(said).toContain('with an incomplete receipt')
   })
 })

@@ -11,6 +11,24 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.479.0 - 2026-09-29
+
+### Fixed
+
+- **A run you stopped before it did anything offers Send again.** The card
+  said nothing was half-done and left the chat box empty, so the message had
+  to be typed again. Now one press sends it as it was. It is offered only when
+  no tool had run, so it cannot repeat anything.
+- **A free model that gives up on its limit offers the next one.** The note
+  and its button left when the run ended, and the red card said to pick
+  another model with nothing to press. Now the card has a Switch to <model>
+  button, which puts your message back in the chat box to send there.
+  Claude's limit and the other paid runtimes still leave the choice to you.
+- **"ledger verified" now says "ledger readable".** The check is that every
+  file reads and none has a gap in it. An edit made while the app was closed,
+  or a whole file deleted, passes that check, so "verified" promised more than
+  it checks.
+
 ## 0.478.0 - 2026-09-29
 
 ### Fixed

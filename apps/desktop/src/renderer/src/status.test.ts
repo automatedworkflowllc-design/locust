@@ -319,7 +319,7 @@ describe('mission phase and receipt truth', () => {
     // about; the Missions header has always said "ledger verified" for the
     // same fact (Astra's 0.87.1 audit).
     expect(ledgerVerificationLabel(1)).toBe('ledger incomplete')
-    expect(ledgerVerificationLabel(0)).toBe('ledger verified')
+    expect(ledgerVerificationLabel(0)).toBe('ledger readable')
     expect(ledgerVerificationLabel(0)).not.toBe('verified')
   })
 })

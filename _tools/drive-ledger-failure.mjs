@@ -115,7 +115,7 @@ try {
       document.querySelector('button[title="All missions (Ctrl 1)"]')?.click()
       await new Promise(r => setTimeout(r, 1500))
       const meta = (document.querySelector('.lc-screen__meta')?.textContent ?? '').trim()
-      return JSON.stringify({ meta, claimsVerified: /ledger verified/i.test(meta) })
+      return JSON.stringify({ meta, claimsVerified: /ledger (verified|readable)/i.test(meta) })
     })()`)
   })
 
