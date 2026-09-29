@@ -80,8 +80,8 @@ export function FeedbackDialog({
           />
           <p className="lc-feedback__claim">
             {conversation === undefined
-              ? 'This report will include your description and your Locust and Windows versions. It opens on GitHub, where you send it.'
-              : 'This report will include your description, your Locust and Windows versions, and this conversation. It opens on GitHub, where you send it.'}
+              ? `This report will include your description and your Locust and ${typeof navigator !== 'undefined' && /Macintosh|Mac OS X/.test(navigator.userAgent) ? 'macOS' : 'Windows'} versions. It opens on GitHub, where you send it.`
+              : `This report will include your description, your Locust and ${typeof navigator !== 'undefined' && /Macintosh|Mac OS X/.test(navigator.userAgent) ? 'macOS' : 'Windows'} versions, and this conversation. It opens on GitHub, where you send it.`}
           </p>
           {refused !== undefined && <p className="lc-feedback__claim lc-tone-amber">{refused}</p>}
         </div>

@@ -39,6 +39,15 @@ export interface ReportFacts {
   readonly release: string
   /** `process.arch`. */
   readonly arch: string
+  /** `process.platform`; absent reads as Windows, which it was until the first macOS build. */
+  readonly platform?: NodeJS.Platform
+}
+
+/** The system in words, on each platform Locust runs on (the first macOS build, 2026-09-29). */
+export function systemName(facts: Pick<ReportFacts, 'release' | 'arch' | 'platform'>): string {
+  if (facts.platform === 'darwin') return `macOS (Darwin ${facts.release.trim()}, ${facts.arch})`
+  if (facts.platform !== undefined && facts.platform !== 'win32') return `${facts.platform} ${facts.release.trim()} (${facts.arch})`
+  return windowsName(facts.release, facts.arch)
 }
 
 /** Windows 10 and 11 both say "10.0"; 11 is build 22000 and later. */
@@ -52,7 +61,7 @@ const FENCE = '`'.repeat(4)
 const NEWLINE = String.fromCharCode(10)
 
 function body(facts: ReportFacts, description: string, conversation: string | undefined, trimmed: boolean): string {
-  const lines = [description, '', '---', `Locust ${facts.version} on ${windowsName(facts.release, facts.arch)}`]
+  const lines = [description, '', '---', `Locust ${facts.version} on ${systemName(facts)}`]
   if (conversation !== undefined && conversation.length > 0) {
     lines.push(
       '',

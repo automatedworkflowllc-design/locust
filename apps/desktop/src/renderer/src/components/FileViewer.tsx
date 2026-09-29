@@ -226,7 +226,7 @@ export function FileViewer({
       <p className="lc-viewer__register">
         {running
           ? 'This page runs here, in a frame of its own: it cannot reach Locust, your files or your accounts.'
-          : "Locust does not open files — a teammate chose this file's name and contents. Reveal hands it to Windows."}
+          : `Locust does not open files — a teammate chose this file's name and contents. Reveal hands it to ${typeof navigator !== 'undefined' && /Macintosh|Mac OS X/.test(navigator.userAgent) ? 'the Finder' : 'Windows'}.`}
       </p>
     </aside>
   )

@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.478.0 - 2026-09-29
+
+### Fixed
+
+- **Signing in works on a Mac.** Sign in, in Settings, opens Terminal with
+  the runtime's own sign-in, as it opens a window on Windows.
+- **A Mac says it is a Mac.** Feedback from a Mac named it as Windows, and a
+  file's Reveal said it would hand the file to Windows. Both now say macOS
+  and the Finder there.
+
 ## 0.477.0 - 2026-09-29
 
 ### New

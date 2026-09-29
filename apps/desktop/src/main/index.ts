@@ -3346,7 +3346,7 @@ if (!ownsSingleInstanceLock) {
       try {
         await shell.openExternal(
           feedbackUrl(
-            { version: app.getVersion(), release: release(), arch: process.arch },
+            { version: app.getVersion(), release: release(), arch: process.arch, platform: process.platform },
             { description, ...(conversation === undefined ? {} : { conversation }) }
           )
         )

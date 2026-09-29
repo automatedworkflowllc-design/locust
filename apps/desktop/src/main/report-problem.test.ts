@@ -3,7 +3,7 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { MAX_REPORT_URL, REPORT_DESTINATION, feedbackUrl, windowsName } from './report-problem.js'
+import { MAX_REPORT_URL, REPORT_DESTINATION, feedbackUrl, windowsName, systemName } from './report-problem.js'
 
 /**
  * FEEDBACK HAS SOMEWHERE TO GO, AND TAKES ONLY WHAT THE BOX SAYS IT TAKES.
@@ -66,5 +66,14 @@ describe('the renderer names no address for it', () => {
   it('hands over the words, never a URL', () => {
     const line = preload.split('\n').find((text) => text.includes('sendFeedback:')) ?? ''
     expect(line).toMatch(/sendFeedback: \(report: FeedbackReport\) => ipcRenderer\.invoke\(FEEDBACK_CHANNEL, report\)/)
+  })
+})
+
+// The first macOS build, 2026-09-29: a Mac read "Windows 24.1.0" in its report.
+describe('the system a report names', () => {
+  it('is macOS on a Mac, and Windows as before', () => {
+    expect(systemName({ platform: 'darwin', release: '24.1.0', arch: 'arm64' })).toBe('macOS (Darwin 24.1.0, arm64)')
+    expect(systemName({ platform: 'win32', release: '10.0.26200', arch: 'x64' })).toBe('Windows 11, build 26200 (x64)')
+    expect(systemName({ release: '10.0.19045', arch: 'x64' })).toBe('Windows 10, build 19045 (x64)')
   })
 })
