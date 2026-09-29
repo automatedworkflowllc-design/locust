@@ -1319,6 +1319,18 @@ if (!ownsSingleInstanceLock) {
      * conversation from another folder is listed, opened and continued there.
      */
     const folders = createFolderRegistry({ file: join(app.getPath('userData'), 'folders.json') })
+    /*
+     * A Locust install is never a folder to work in (0.458): this one's, or any
+     * other copy's (it holds resources/app.asar). Early builds ran conversations
+     * in the install folder, so Colin's history names one.
+     */
+    const isInstallFolder = (path: string): boolean =>
+      isInsideDirectory(path, installDirectory, process.platform) || existsSync(join(path, 'resources', 'app.asar'))
+    /** A folder's path by id, never an install folder's: a reply there is refused, not run inside Locust. */
+    const workableFolderOf = async (id: string): Promise<string | undefined> => {
+      const path = await folders.pathOf(id)
+      return path === undefined || isInstallFolder(path) ? undefined : path
+    }
     if (workspaceChosen) void folders.use(workspacePath).catch(() => undefined)
     /*
      * SWITCH FOLDERS WITHOUT A RESTART (0.458). It was `app.relaunch()`: the
@@ -1719,7 +1731,7 @@ if (!ownsSingleInstanceLock) {
       workspacePath,
       // 0.458: the window's folder now, and a conversation's own folder by id.
       currentFolder: () => workspacePath,
-      folderOf: (id) => folders.pathOf(id),
+      folderOf: workableFolderOf,
       peerIn: (peer, folder) => peerContextFor(peer.self.teammateId, folder),
       catchUpTerminal: catchUp,
       // A2.9: the overlap note -- who else changed the files a teammate did, lately.
@@ -3137,7 +3149,7 @@ if (!ownsSingleInstanceLock) {
     ipcMain.handle(FOLDER_LIST_CHANNEL, async (event) => {
       if (!fromOwnWindow(event)) return { folders: [], currentId: undefined }
       // Never Locust's own install folder: early builds ran conversations there, and no teammate should work in it.
-      const listed = (await folders.list()).filter((folder) => !isInsideDirectory(folder.path, installDirectory, process.platform))
+      const listed = (await folders.list()).map((folder) => (isInstallFolder(folder.path) ? { ...folder, installFolder: true as const } : folder))
       return { folders: listed, currentId: workspaceChosen ? workspaceIdFor(workspacePath) : undefined }
     })
     // Switch to a folder already worked in -- by id, never a path the window names (0.458).
@@ -3145,7 +3157,7 @@ if (!ownsSingleInstanceLock) {
       if (!fromOwnWindow(event) || typeof id !== 'string') return { ok: false, message: 'That folder could not be opened.' }
       const path = await folders.pathOf(id)
       if (path === undefined) return { ok: false, message: 'Locust does not know where that folder is.' }
-      if (isInsideDirectory(path, installDirectory, process.platform)) return { ok: false, message: 'That is where Locust itself is installed. Pick a project folder instead.' }
+      if (isInstallFolder(path)) return { ok: false, message: 'That is where Locust itself is installed. Pick a project folder instead.' }
       if (!existsSync(path)) return { ok: false, message: `${path} is not there any more.` }
       const now = await switchFolder(path)
       return { ok: true, folder: now }

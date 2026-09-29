@@ -627,6 +627,8 @@ export interface PublicFolder {
   readonly path: string
   readonly name: string
   readonly lastUsedAt?: string
+  /** A Locust install (early builds ran there): listed so its old conversations are named, never offered to work in. */
+  readonly installFolder?: true
 }
 export interface FolderListResponse {
   readonly folders: readonly PublicFolder[]

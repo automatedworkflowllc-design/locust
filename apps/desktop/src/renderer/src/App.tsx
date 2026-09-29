@@ -4911,7 +4911,9 @@ export default function App(): ReactElement {
     // A conversation from another folder takes the window there, as Claude
     // Code's sessions do (0.458): the folder chip, @ files and pages are its.
     const itsFolder = historyById.get(missionId)?.workspaceId
-    if (itsFolder !== undefined && workspaceId !== undefined && itsFolder !== workspaceId) switchToFolder(itsFolder)
+    // Not into a Locust install, where early builds ran: that one is only read.
+    const readOnly = folders.find((folder) => folder.id === itsFolder)?.installFolder === true
+    if (itsFolder !== undefined && workspaceId !== undefined && itsFolder !== workspaceId && !readOnly) switchToFolder(itsFolder)
     // Opening a conversation SHOWS it. Every caller but one used to have to
     // remember `setScreen('workroom')` first, and the sidebar did not -- so
     // from the Missions screen a click lit the row and left you looking at
@@ -7138,7 +7140,7 @@ export default function App(): ReactElement {
             workspacePath={workspacePath}
             workspaceMade={workspaceMade}
             onChooseFolder={chooseWorkspace}
-            folders={folders}
+            folders={folders.filter((folder) => folder.installFolder !== true)}
             {...(workspaceId === undefined ? {} : { currentFolderId: workspaceId })}
             // Another folder from the chip starts a new conversation there, as in Claude Code (0.458).
             onSwitchFolder={(id) => {

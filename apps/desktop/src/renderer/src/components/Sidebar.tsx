@@ -330,7 +330,7 @@ export function Sidebar({
    */
   readonly compact?: boolean
   /** Every folder worked in, for the project headings (0.458). */
-  readonly folders?: readonly { readonly id: string; readonly name: string }[]
+  readonly folders?: readonly { readonly id: string; readonly name: string; readonly installFolder?: true }[]
   /** The folder new conversations start in: its section comes first. */
   readonly currentFolderId?: string
 }): ReactElement {
@@ -1608,7 +1608,7 @@ export function Sidebar({
                       type="button"
                       className={`lc-project__head${open ? ' is-open' : ''}${section.id === currentFolderId ? ' is-current' : ''}`}
                       aria-expanded={open}
-                      title={section.id === currentFolderId ? `${name}: new conversations start here` : folders.some((folder) => folder.id === section.id) ? name : 'Locust does not know which folder these ran in.'}
+                      title={section.id === currentFolderId ? `${name}: new conversations start here` : folders.find((folder) => folder.id === section.id)?.installFolder === true ? `${name}: Locust's own install folder, where early builds ran. These can be read, not continued.` : folders.some((folder) => folder.id === section.id) ? name : 'Locust does not know which folder these ran in.'}
                       onClick={() =>
                         setFoldedFolders((current) => {
                           const next = new Set(current)
