@@ -71,6 +71,8 @@ const MACHINE: AppServerProcessDeps = {
       // full pipe nobody drains stalls a chatty CLI (L4), and a server that
       // dies says why there.
       stdio: ['pipe', 'pipe', 'pipe'],
+      // Its own process group off Windows, so ending it ends what it started (releaseProcessTree).
+      ...(process.platform === 'win32' ? {} : { detached: true }),
       ...(cwd === undefined ? {} : { cwd }),
       ...(shape.windowsVerbatimArguments === true ? { windowsVerbatimArguments: true } : {}),
       ...(env === undefined ? {} : { env: { ...process.env, ...env } })
@@ -113,7 +115,8 @@ export function startAppServerProcess(
     kill: () => {
       if (stopping) return
       stopping = true
-      if (deps.platform === 'win32' && child.pid !== undefined) {
+      // The tree on every platform: taskkill on Windows, the process group elsewhere.
+      if (child.pid !== undefined) {
         void deps.releaseTree(child.pid).then((released) => {
           if (!released) killChild()
         })

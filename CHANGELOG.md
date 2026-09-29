@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.476.0 - 2026-09-29
+
+### Fixed
+
+- **Stop ends everything on a Mac.** On macOS, Stop ended the coding tool
+  but could leave what it had started running, a dev server or a long
+  command. Each run now stops together with everything it started, as it
+  does on Windows.
+- **A switch of runtime is described as it happened.** Replying on another
+  runtime after a finished turn told the new one that the last agent
+  "stopped partway through". It now says it is taking over the conversation.
+
 ## 0.475.0 - 2026-09-29
 
 ### New

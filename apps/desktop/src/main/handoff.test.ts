@@ -67,3 +67,17 @@ describe('the briefing a continuation starts with', () => {
     expect(carried!.prompt).toMatch(/\[The original task continues for \d+ more characters that did not fit here\. Ask the person if the part above is not enough\.\]/)
   })
 })
+
+// QA-2026-09-29 round 2, N4: a clean switch is not a rescue.
+describe('what the brief says happened', () => {
+  it('after a clean finish and a reply, says the conversation was taken over, not stopped partway', () => {
+    const clean = composeHandoffPrompt('Add a chart', checkpoint(), 'Claude Code', 'Now make it blue')
+    expect(clean?.prompt).toContain('taking over this conversation from another agent (Claude Code), which finished its last turn. The last thing it was asked was:')
+    expect(clean?.prompt).not.toContain('stopped partway')
+  })
+
+  it('after a stop with work in flight, still says it stopped partway', () => {
+    const stopped = composeHandoffPrompt('Add a chart', checkpoint({ unsettledActions: [{ toolKind: 'shell', name: 'npm test' }] as never }), 'Claude Code', 'Carry on')
+    expect(stopped?.prompt).toContain('started and stopped partway through')
+  })
+})

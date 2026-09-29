@@ -377,9 +377,25 @@ export function windowsTaskkillPath(): string {
   return `${root}\\System32\\taskkill.exe`;
 }
 
-/** Kill a process and everything it started. Windows needs help with this. */
-export function killProcessTree(pid: number | undefined): void {
-  if (process.platform !== "win32" || pid === undefined) return;
+/**
+ * Kill a process and everything it started. Windows needs help with this.
+ *
+ * AND macOS / Linux (the first macOS build, 2026-09-29): a run is spawned as
+ * the leader of its own process group there (`detached`), so the group -- the
+ * CLI and every command it started -- takes the signal together. `kill` on
+ * the child alone left a dev server or a long command running after Stop.
+ * `signal` is POSIX's; Windows always ends the tree outright.
+ */
+export function killProcessTree(pid: number | undefined, signal: NodeJS.Signals = "SIGKILL"): void {
+  if (pid === undefined) return;
+  if (process.platform !== "win32") {
+    try {
+      process.kill(-pid, signal);
+    } catch {
+      // No group (already gone, or not its own group): `child.kill` still runs.
+    }
+    return;
+  }
   try {
     // Hidden, or a console window flashes on every Stop (L2).
     execFileSync(windowsTaskkillPath(), ["/F", "/T", "/PID", String(pid)], { stdio: "ignore", windowsHide: true });
@@ -405,7 +421,16 @@ export function killProcessTree(pid: number | undefined): void {
  * to its own kill when it did not.
  */
 export function releaseProcessTree(pid: number | undefined): Promise<boolean> {
-  if (process.platform !== "win32" || pid === undefined) return Promise.resolve(false);
+  if (pid === undefined) return Promise.resolve(false);
+  if (process.platform !== "win32") {
+    // The process group, as killProcessTree: false when there is none to end.
+    try {
+      process.kill(-pid, "SIGTERM");
+      return Promise.resolve(true);
+    } catch {
+      return Promise.resolve(false);
+    }
+  }
   return new Promise((resolve) => {
     try {
       execFile(windowsTaskkillPath(), ["/F", "/T", "/PID", String(pid)], { windowsHide: true }, (error) => resolve(error === null));
@@ -598,6 +623,8 @@ export function createNodeRuntimeProcessRunner(
           env: { ...environment, ...(spec.env ?? {}) },
           shell: false,
           windowsHide: true,
+          // Its own process group off Windows, so Stop reaches what it started (killProcessTree).
+          ...(process.platform === "win32" ? {} : { detached: true }),
           stdio: ["pipe", "pipe", "pipe"],
         });
       } catch {
@@ -764,7 +791,8 @@ export function createNodeRuntimeProcessRunner(
          * Windows, so POSIX still gets its SIGINT and its grace period, and
          * on Windows there was never a graceful stop to give up.
          */
-        killProcessTree(child.pid);
+        // Off Windows, the group's INTERRUPT first: the grace period is for it.
+        killProcessTree(child.pid, "SIGINT");
         try {
           child.kill("SIGINT");
         } catch {

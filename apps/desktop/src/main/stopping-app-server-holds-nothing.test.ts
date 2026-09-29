@@ -73,9 +73,9 @@ describe('stopping an app-server', () => {
     expect(kills).toEqual([1])
   })
 
-  it('off Windows, and without a pid, is the ordinary kill, once', () => {
-    for (const [platform, pid] of [['linux', 4242], ['win32', undefined]] as const) {
-      const { child, kills } = fakeChild(pid)
+  it('without a pid, is the ordinary kill, once', () => {
+    for (const platform of ['linux', 'win32'] as const) {
+      const { child, kills } = fakeChild(undefined)
       const { machine, walks } = deps(child, platform)
       const server = startAppServerProcess('codex', ['app-server'], machine)
       server.kill()
@@ -83,6 +83,17 @@ describe('stopping an app-server', () => {
       expect(walks).toEqual([])
       expect(kills).toEqual([1])
     }
+  })
+
+  // The first macOS build, 2026-09-29: off Windows the server is its own
+  // process group, and ending it ends what it started -- the tree, as on Windows.
+  it('off Windows, ends the process group, and kills the process only when that could not be done', async () => {
+    const { child, kills } = fakeChild(4242)
+    const { machine, walks } = deps(child, 'darwin', Promise.resolve(false))
+    startAppServerProcess('codex', ['app-server'], machine).kill()
+    expect(walks).toEqual([4242])
+    await new Promise((settle) => setTimeout(settle, 0))
+    expect(kills).toEqual([1])
   })
 })
 

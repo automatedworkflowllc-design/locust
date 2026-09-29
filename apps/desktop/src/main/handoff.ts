@@ -60,10 +60,20 @@ function sectionsFor(
   next?: string,
   earlier: readonly EarlierTurn[] = []
 ): readonly { readonly name: string; readonly text: string }[] {
+  /*
+   * SAID AS IT HAPPENED (QA-2026-09-29 round 2, N4). A person who replied on
+   * another runtime after a clean finish -- nothing in flight -- got "another
+   * agent started and stopped partway through. The original task was:" over
+   * the LATEST turn's words. A capable model reads past it; a small free one
+   * may redo "the original task". A stop mid-work keeps the old words.
+   */
+  const clean = next !== undefined && next.trim().length > 0 && checkpoint.unsettledActions.length === 0
   const sections: { readonly name: string; readonly text: string }[] = [
     {
       name: 'task',
-      text: `You are continuing work that another agent (${fromRuntime}) started and stopped partway through. The original task was:\n\n${originalPrompt}`
+      text: clean
+        ? `You are taking over this conversation from another agent (${fromRuntime}), which finished its last turn. The last thing it was asked was:\n\n${originalPrompt}`
+        : `You are continuing work that another agent (${fromRuntime}) started and stopped partway through. The original task was:\n\n${originalPrompt}`
     }
   ]
 
