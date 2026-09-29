@@ -743,6 +743,8 @@ export default function App(): ReactElement {
     const teammate = teammatesRef.current.find((entry) => entry.teammateId === teammateId)
     if (teammate === undefined) return
     const theirRoutines = routinesRef.current.filter((routine) => routine.teammateId === teammateId).length
+    // Working right now (R22): removing them stops it, and the menu says so.
+    const working = [...runsRef.current.values()].some((run) => liveRunIsActive(run) && ownerOf(run) === teammateId)
     setRowMenuArmed(undefined)
     setRowMenu({
       x: at.x,
@@ -754,8 +756,9 @@ export default function App(): ReactElement {
         {
           label: 'Remove teammate',
           dividerAbove: true,
-          confirmLabel:
-            theirRoutines === 0
+          confirmLabel: working
+            ? 'Remove, and stop what they are running?'
+            : theirRoutines === 0
               ? 'Remove for good?'
               : `Remove, with ${String(theirRoutines)} routine${theirRoutines === 1 ? '' : 's'}?`,
           danger: true,
@@ -4633,6 +4636,17 @@ export default function App(): ReactElement {
   const removeTeammate = (teammateId: string): void => {
     const bridge = window.desktop
     if (!bridge) return
+    /*
+     * A TEAMMATE REMOVED MID-RUN STOPS (QA-2026-09-29 round 2, R22). Their
+     * run carried on with nobody's name on it, writing to the folder for a
+     * teammate that no longer existed. Stopped first, as their own Stop would.
+     */
+    for (const [key, run] of runsRef.current) {
+      if (!liveRunIsActive(run) || ownerOf(run) !== teammateId) continue
+      const runId = run.data?.runId ?? key
+      setRuns((all) => withRun(all, key, markedCancelling))
+      void bridge.cancelCodexMission({ runId }).catch(() => undefined)
+    }
     void bridge
       .removeTeammate(teammateId)
       .then(() => bridge.listTeammates())
@@ -6249,6 +6263,7 @@ export default function App(): ReactElement {
           onTeammateMenu={openTeammateMenu}
           rooms={rooms}
           currentRoomId={screen === 'rooms' ? currentRoomId : undefined}
+          screenKey={screen}
           onOpenRoom={(roomId) => {
             setRoomNotice(undefined)
             setCurrentRoomId(roomId)

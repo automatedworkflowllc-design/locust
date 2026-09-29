@@ -2724,6 +2724,9 @@ export function buildThread(
         // an item for is it using something. Read off the item type, which is
         // the same fact the detail is suppressed for.
         const writingNow = itemType !== undefined && /message$/i.test(itemType)
+        // A reasoning ITEM is thought, not a tool (QA-2026-09-29 round 2,
+        // R31): a Codex run only thinking read "Using a tool..." throughout.
+        const thinkingNow = itemType !== undefined && /reasoning/i.test(itemType)
         runningStep = {
           label: message ?? (event.payload.stepKind === 'turn' ? 'Working' : 'Thinking'),
           // The item type is gone from the line. It was there to name the
@@ -2734,7 +2737,7 @@ export function buildThread(
           startedAt: event.occurredAt,
           kind: event.payload.stepKind,
           register:
-            event.payload.stepKind === 'reasoning'
+            event.payload.stepKind === 'reasoning' || thinkingNow
               ? 'thinking'
               : event.payload.stepKind === 'turn'
                 ? 'working'

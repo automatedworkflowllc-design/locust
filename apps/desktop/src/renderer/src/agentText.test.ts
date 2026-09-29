@@ -326,3 +326,18 @@ describe('the shapes a teammate writes that were drawn as punctuation', () => {
     expect(segmentsCoverInput(text, parseAgentText(text))).toBe(true)
   })
 })
+
+// QA-2026-09-29 round 2, R21: a name with double underscores is a name.
+describe('double underscores inside a word', () => {
+  it('are not bold: a connector tool keeps its name', () => {
+    expect(splitInlineCode('Called mcp__github__create_issue twice.')).toEqual([{ kind: 'plain', text: 'Called mcp__github__create_issue twice.' }])
+  })
+
+  it('still make bold at a word edge', () => {
+    expect(splitInlineCode('This is __important__ now.')).toEqual([
+      { kind: 'plain', text: 'This is ' },
+      { kind: 'strong', text: 'important' },
+      { kind: 'plain', text: ' now.' }
+    ])
+  })
+})

@@ -643,6 +643,19 @@ export function Composer({
     if (choice.kind === 'teammate') pickTeammate(choice.mate.teammateId)
     else pickFile(choice.path)
   }
+  /*
+   * Attached, deduplicated and capped -- and the cap SAID (QA-2026-09-29
+   * round 2, R19): ten files chosen kept eight, and nothing said two were
+   * left out.
+   */
+  const attachPaths = (paths: readonly string[]): void => {
+    setAttached((current) => {
+      const all = [...new Set([...current, ...paths])]
+      const left = all.length - MAX_ATTACHMENTS
+      if (left > 0) setNote(`A message carries ${String(MAX_ATTACHMENTS)} files at most, so ${left === 1 ? 'one was' : `${String(left)} were`} not attached: ${all.slice(MAX_ATTACHMENTS).map((path) => path.slice(path.lastIndexOf('/') + 1)).join(', ')}.`)
+      return all.slice(0, MAX_ATTACHMENTS)
+    })
+  }
   const pickFile = (path: string): void => {
     setAtAt(0)
     setValue(withoutAtQuery(value))
@@ -949,7 +962,7 @@ export function Composer({
         const named = file.name.length > 0 ? file.name : `pasted-${String(Date.now())}.png`
         const answer = await bridge.attachPasted(named, bytes)
         if (answer.ok) {
-          setAttached((current) => [...new Set([...current, ...answer.paths])].slice(0, MAX_ATTACHMENTS))
+          attachPaths(answer.paths)
           if (answer.copied !== undefined && answer.copied.length > 0) {
             setCopiedIn((current) => new Set([...current, ...(answer.copied ?? [])]))
           }
@@ -1213,7 +1226,7 @@ export function Composer({
           // Deduplicated and capped: the same file twice is one
           // reference, and the cap is what keeps a stray
           // multi-select out of the prompt budget.
-          setAttached((current) => [...new Set([...current, ...answer.paths])].slice(0, MAX_ATTACHMENTS))
+          attachPaths(answer.paths)
           /*
            * The "copied in" fact goes on the TILE, not in a note.
            *

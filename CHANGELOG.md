@@ -11,6 +11,27 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.468.0 - 2026-09-29
+
+### Fixed
+
+- **Codex thinking reads "Thinking".** A Codex run that was only thinking said
+  "Using a tool…" the whole time.
+- **Tool names keep their underscores.** `mcp__github__create_issue` in a
+  reply was drawn as mcp**github**create_issue.
+- **Removing a working teammate stops their run.** Their run used to carry on
+  with no owner. The menu now says "Remove, and stop what they are running?"
+  and stops it.
+- **A teammate's card closes when you change screens.** A card pinned from the
+  narrow sidebar stayed open over Missions, Settings and the rest, and could
+  catch a click meant for the screen.
+- **Files past the limit are named.** A message carries 8 files; choosing 10
+  kept 8 and said nothing. It now says which were not attached.
+- **A file name cannot add a line to the brief.** A name with a line break in
+  it (possible on macOS and Linux) is quoted in the list of attached files.
+- **The spellchecker downloads nothing.** Where the window spellchecks with a
+  downloaded dictionary, it no longer fetches one from the internet.
+
 ## 0.467.0 - 2026-09-29
 
 ### Fixed

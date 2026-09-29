@@ -40,6 +40,7 @@ import { appendFileSync, mkdirSync, readFileSync, writeFileSync, existsSync, ren
 import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { randomInt } from 'node:crypto'
 import { basename, dirname, isAbsolute, join, resolve as resolvePath } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { homedir, release } from 'node:os'
 import { execFile } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -1262,6 +1263,15 @@ if (!ownsSingleInstanceLock) {
       callback(false)
     })
     session.defaultSession.setPermissionCheckHandler(() => false)
+    /*
+     * THE SPELLCHECKER FETCHES NOTHING (QA-2026-09-29 round 2, R23). Where
+     * Electron spellchecks with Hunspell (Linux) it downloads a dictionary
+     * from Google on first launch, while Settings says the window makes no
+     * requests of its own. Pointed at a folder on this machine instead: a
+     * dictionary put there is used, and none is fetched. Windows and macOS
+     * spellcheck with the system's own and never download one.
+     */
+    session.defaultSession.setSpellCheckerDictionaryDownloadURL(`${pathToFileURL(join(app.getPath('userData'), 'dictionaries')).href}/`)
     if (app.isPackaged) {
       session.defaultSession.webRequest.onBeforeRequest(
         { urls: ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*'] },

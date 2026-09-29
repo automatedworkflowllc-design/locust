@@ -37,7 +37,11 @@ export const MAX_ATTACHMENTS = 8
  */
 export function attachmentPreamble(paths: readonly string[]): string | undefined {
   if (paths.length === 0) return undefined
-  const listed = paths.map((path) => `- ${path}`).join('\n')
+  // A name holding a line break (legal on macOS and Linux) wrote a line of
+  // its own into the brief (QA-2026-09-29 round 2, R20). Such a name is
+  // quoted, its breaks escaped, so it stays one item and says exactly what
+  // the file is called.
+  const listed = paths.map((path) => `- ${/[\u0000-\u001f\u007f]/.test(path) ? JSON.stringify(path) : path}`).join('\n')
   return paths.length === 1
     ? `Read this file in the workspace before you answer:\n${listed}`
     : `Read these ${String(paths.length)} files in the workspace before you answer:\n${listed}`

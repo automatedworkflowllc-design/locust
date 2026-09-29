@@ -214,6 +214,7 @@ export function Sidebar({
   rooms,
   routines,
   currentRoomId,
+  screenKey,
   onOpenRoom,
   onOpenRooms,
   onOpenAutomations,
@@ -318,6 +319,8 @@ export function Sidebar({
   /** Saved routines, listed under Routines. */
   readonly routines: readonly PublicRoutine[]
   readonly currentRoomId: string | undefined
+  /** The screen the window shows; a new one closes a pinned teammate card (R27). */
+  readonly screenKey?: string
   readonly onOpenRoom: (roomId: string) => void
   readonly onOpenRooms: () => void
   readonly onOpenAutomations: () => void
@@ -413,6 +416,21 @@ export function Sidebar({
     setRailPinned(undefined)
     setRailHovered(undefined)
   }
+  /*
+   * ANOTHER SCREEN CLOSES THE CARD (QA-2026-09-29 round 2, R27). A card
+   * pinned by a click in the rail stayed open over whatever Ctrl+1 to Ctrl+5
+   * or the palette opened next, and on Settings a click meant for
+   * "Appearance" landed on it and opened All missions.
+   */
+  // Not for the conversation view: a face opens its teammate's conversation
+  // AND its card in one press, so that change is the card's own.
+  useEffect(() => {
+    if (screenKey === undefined || screenKey === 'workroom') return
+    window.clearTimeout(railOpenTimer.current)
+    window.clearTimeout(railCloseTimer.current)
+    setRailPinned(undefined)
+    setRailHovered(undefined)
+  }, [screenKey])
   /*
    * Which groups are folded. Named groups start FOLDED and Ungrouped starts
    * open, which is the design's order and is also right: a group is

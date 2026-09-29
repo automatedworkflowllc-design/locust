@@ -1,6 +1,6 @@
 {
   "name": "@teammate/desktop",
-  "version": "0.467.0",
+  "version": "0.468.0",
   "private": true,
   "description": "Run AI coding agents as a team you can watch, on runtimes and models you choose.",
   "author": "Automated Workflow",
