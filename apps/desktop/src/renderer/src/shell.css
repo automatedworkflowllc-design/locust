@@ -1201,12 +1201,6 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: var(--lc-space-4);
-  /* A 300-character URL, a hash or a JWT ran off the right edge and made the
-     thread scroll sideways (QA-2026-09-29, Q4). Inherited by paragraphs,
-     lists, quotes and inline code; `break-word`, not `anywhere`, so a table
-     keeps its columns and scrolls in its own box as before, and a fenced
-     block (white-space: pre) is untouched. */
-  overflow-wrap: break-word;
 }
 
 /*
@@ -12232,6 +12226,17 @@ textarea {
    collapse, so wrapped Markdown reads as prose, not as a code block. */
 .lc-para {
   white-space: pre-line;
+}
+
+/* A 300-character URL, a hash or a JWT ran off the right edge and made the
+   thread scroll sideways (QA-2026-09-29, Q4). On what AgentText draws, so a
+   reply, a file card and the Activity panel all wrap it; inherited by inline
+   code inside. `break-word`, not `anywhere`: a table keeps its columns and
+   scrolls in its own box as before, and a fenced block is untouched. */
+.lc-para,
+.lc-heading,
+.lc-list {
+  overflow-wrap: break-word;
 }
 
 /* Headings inside a reply. A step above the prose, never a screen title:

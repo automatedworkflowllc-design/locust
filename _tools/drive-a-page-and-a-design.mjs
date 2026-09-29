@@ -133,24 +133,31 @@ try {
     return document.querySelector('.lc-viewer__code')?.innerText ?? ''
   })()`)))
   check('Source shows the page’s own text', /<h1>Corner Shop<\/h1>/.test(source), source.slice(0, 120))
-  // 0.455 (QA-2026-09-29, Q4): a long unbroken token in a reply wraps. One is
-  // put into a real reply paragraph and a real list item, and the thread
+  // 0.455 (QA-2026-09-29, Q4): a long unbroken token wraps. One is put into
+  // a real paragraph and list item the thread drew (about.md's card), and the thread
   // must not scroll sideways.
   const wide = JSON.parse(String(await drive.capture('a reply holding a 300-character URL', () => drive.evaluate(`(async () => {
     document.querySelector('.lc-viewer__close, button[aria-label="Close the file"]')?.click()
     await new Promise((r) => setTimeout(r, 400))
     const token = 'https://storage.example.com/signed/' + 'a1b2c3d4e5'.repeat(27)
-    const para = [...document.querySelectorAll('.lc-agentline__body p')].pop()
-    const item = [...document.querySelectorAll('.lc-agentline__body li')].pop()
+    const para = [...document.querySelectorAll('.lc-thread .lc-para')].pop()
+    const item = [...document.querySelectorAll('.lc-thread .lc-list li')].pop()
     if (para) para.textContent += ' ' + token
     if (item) item.textContent += ' ' + token
     para?.scrollIntoView({ block: 'center' })
     await new Promise((r) => setTimeout(r, 300))
     const thread = document.querySelector('.lc-thread')
-    const bodies = [...document.querySelectorAll('.lc-agentline__body')]
-    return JSON.stringify({ para: !!para, item: !!item, thread: thread ? thread.scrollWidth - thread.clientWidth : -1, over: bodies.filter((b) => b.scrollWidth > b.clientWidth + 1).length })
+    const bodies = [para?.parentElement, item?.closest('.lc-list')?.parentElement].filter(Boolean)
+    const measured = { para: !!para, item: !!item, thread: thread ? thread.scrollWidth - thread.clientWidth : -1, over: bodies.filter((b) => b.scrollWidth > b.clientWidth + 1).length }
+    // The control: the same elements with the wrap switched off must overflow,
+    // or this check could pass with the fix gone.
+    for (const el of [para, item]) el?.style.setProperty('overflow-wrap', 'normal', 'important')
+    await new Promise((r) => setTimeout(r, 100))
+    measured.overWithout = bodies.filter((b) => b.scrollWidth > b.clientWidth + 1).length
+    for (const el of [para, item]) el?.style.removeProperty('overflow-wrap')
+    return JSON.stringify(measured)
   })()`))))
-  check('a 300-character URL in a reply wraps: the thread never scrolls sideways', wide.para && wide.thread <= 1 && wide.over === 0, JSON.stringify(wide))
+  check('a 300-character URL in a reply wraps: the thread never scrolls sideways', wide.para && wide.item && wide.thread <= 1 && wide.over === 0 && wide.overWithout > 0, JSON.stringify(wide))
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
