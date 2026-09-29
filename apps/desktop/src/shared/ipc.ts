@@ -631,7 +631,7 @@ export interface TerminalCatchUpResponse {
 }
 
 export type OpenInTerminalResponse =
-  | { readonly ok: true; readonly where: 'Windows Terminal' | 'a console window' }
+  | { readonly ok: true; readonly where: 'Windows Terminal' | 'a console window' | 'Terminal' }
   | { readonly ok: false; readonly message: string }
 export const WORKSPACE_SETTINGS_READ_CHANNEL = 'workspace-settings:read'
 export const WORKSPACE_SETTINGS_WRITE_CHANNEL = 'workspace-settings:write'

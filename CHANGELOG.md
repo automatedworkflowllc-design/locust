@@ -11,6 +11,21 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.477.0 - 2026-09-29
+
+### New
+
+- **Open in terminal works on a Mac.** The `</>` button in a conversation's
+  header opens Terminal in the conversation's folder, carrying on the same
+  session, as it opens Windows Terminal on Windows.
+
+### Fixed
+
+- **A damaged record says so in the conversation.** When part of a turn's
+  record could not be read, the reply stopped mid-sentence with nothing to
+  say why. The conversation now says what is missing and that the file is
+  kept as it is.
+
 ## 0.476.0 - 2026-09-29
 
 ### Fixed

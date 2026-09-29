@@ -1363,6 +1363,17 @@ onResume,
           now, offered no way to. The offer sits ABOVE the receipt: the receipt
           is the record, this is the thing to do about it.
         */}
+        {/*
+          A DAMAGED RECORD SAYS SO WHERE IT IS READ (QA-2026-09-29 round 2,
+          N7). A bad line in the middle of a mission's file cuts off what
+          follows it, and the reply above stopped mid-sentence with nothing
+          here to say why -- only the Missions screen's count hinted at it.
+        */}
+        {restoredMission !== undefined && restoredMission.integrityIssueCount > 0 && (
+          <div className="lc-thread__note" role="note">
+            Part of this turn&apos;s record could not be read, so what came after it is missing here. The file is kept as it is.
+          </div>
+        )}
         {restoredMission !== undefined && onResume !== undefined && (
           <ResumeCard offer={resumeOffer(restoredMission)} onResume={onResume} busy={running} {...(resumeRefusal === undefined ? {} : { refusal: resumeRefusal })} />
         )}

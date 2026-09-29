@@ -167,9 +167,52 @@ function started(child: ReturnType<typeof spawn>): Promise<true | Error> {
   })
 }
 
+/**
+ * THE MAC'S TERMINAL (the first macOS build, 2026-09-29). A `.command` file is
+ * what Terminal opens and runs: this one goes to the conversation's folder,
+ * carries the environment the launch needs, removes itself, and becomes the
+ * runtime's resume. Every word single-quoted for the shell, so a path with a
+ * space or a quote arrives as it is.
+ */
+export function macCommandScript(program: { readonly file: string; readonly args: readonly string[] }, cwd: string, env?: Readonly<Record<string, string>>): string {
+  const quoted = (value: string): string => `'${value.split("'").join(`'"'"'`)}'`
+  return [
+    '#!/bin/zsh -l',
+    'rm -f -- "$0"',
+    `cd ${quoted(cwd)} || exit 1`,
+    ...Object.entries(env ?? {}).filter(([name]) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(name)).map(([name, value]) => `export ${name}=${quoted(value)}`),
+    `exec ${[program.file, ...program.args].map(quoted).join(' ')}`,
+    ''
+  ].join('\n')
+}
+
+async function openInMacTerminal(request: TerminalRequest, program: { readonly file: string; readonly args: readonly string[] }, run: typeof spawn): Promise<OpenInTerminalResponse> {
+  const { chmod, writeFile } = await import('node:fs/promises')
+  const { tmpdir } = await import('node:os')
+  const { randomUUID } = await import('node:crypto')
+  const script = join(tmpdir(), `locust-terminal-${randomUUID()}.command`)
+  try {
+    await writeFile(script, macCommandScript(program, request.cwd, request.launch.env), 'utf8')
+    await chmod(script, 0o700)
+    const child = run('open', ['-a', 'Terminal', script], { detached: true, stdio: 'ignore' })
+    const result = await started(child)
+    if (result !== true) return { ok: false, message: `Terminal could not be opened (${result.message}). The conversation is here, as it was.` }
+    child.unref()
+    return { ok: true, where: 'Terminal' }
+  } catch (error) {
+    return { ok: false, message: `Terminal could not be opened (${error instanceof Error ? error.message : String(error)}). The conversation is here, as it was.` }
+  }
+}
+
 export async function openInTerminal(request: TerminalRequest, options: OpenInTerminalOptions = {}): Promise<OpenInTerminalResponse> {
-  if ((options.platform ?? process.platform) !== 'win32') {
-    return { ok: false, message: 'Opening a conversation in a terminal only works on Windows so far.' }
+  const platform = options.platform ?? process.platform
+  if (platform === 'darwin') {
+    const resumeOnMac = resumeArgsFor(request.runtime, request.sessionId)
+    if (resumeOnMac === undefined) return { ok: false, message: 'This conversation has no session its runtime can resume in a terminal.' }
+    return openInMacTerminal(request, terminalProgram(request.launch, resumeOnMac), options.spawn ?? spawn)
+  }
+  if (platform !== 'win32') {
+    return { ok: false, message: 'Opening a conversation in a terminal works on Windows and macOS so far.' }
   }
   const resume = resumeArgsFor(request.runtime, request.sessionId)
   if (resume === undefined) return { ok: false, message: 'This conversation has no session its runtime can resume in a terminal.' }

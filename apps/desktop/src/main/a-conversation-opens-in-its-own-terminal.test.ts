@@ -143,10 +143,10 @@ describe('opening it', () => {
     expect((fake.calls[0]!.options.env as Record<string, string>).ELECTRON_RUN_AS_NODE).toBe('1')
   })
 
-  it('starts nothing for a session id that is not a plain token, or off Windows', async () => {
+  it('starts nothing for a session id that is not a plain token, or on Linux (macOS opens Terminal: a-mac-opens-its-own-terminal.test.ts)', async () => {
     const fake = fakeSpawn(['start', 'start'])
     expect((await openInTerminal({ ...REQUEST, sessionId: 'a & calc' }, { platform: 'win32', spawn: fake.spawn })).ok).toBe(false)
-    expect((await openInTerminal(REQUEST, { platform: 'darwin', spawn: fake.spawn })).ok).toBe(false)
+    expect((await openInTerminal(REQUEST, { platform: 'linux', spawn: fake.spawn })).ok).toBe(false)
     expect(fake.calls).toHaveLength(0)
   })
 })
