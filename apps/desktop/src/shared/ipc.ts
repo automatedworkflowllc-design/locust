@@ -2001,6 +2001,19 @@ export interface MissionApprovalRequest {
   readonly answerIn?: string
   /** A question the person may decline, as Antigravity's own card offers. */
   readonly skippable?: boolean
+  /**
+   * What "Always allow this session" lets through without asking again, in
+   * words (QA-2026-09-29 round 2, R35): "list_issues on github, and no other
+   * tool", "any command matching echo *". Absent: said generally.
+   */
+  readonly alwaysCovers?: string
+  /**
+   * The card's Data sent and Reversible lines, when the asking route knows
+   * better than the kind does (R15, R37): a fetch is not a command, and a
+   * file outside the folder is not under its version control.
+   */
+  readonly dataSentSays?: string
+  readonly reversibleSays?: string
 }
 
 export interface ApprovalPatch {

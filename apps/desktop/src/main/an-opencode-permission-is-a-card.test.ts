@@ -45,7 +45,17 @@ describe("an OpenCode server's permission request", () => {
     expect(openCodePermissionRequest({ permission: 'edit', patterns: ['a.txt'], metadata: { filepath: 'C:/work/a.txt' } }, 'C:/work'))
       .toMatchObject({ method: 'item/fileChange/requestApproval', params: { summary: 'a.txt' } })
     expect(openCodePermissionRequest({ permission: 'external_directory', patterns: ['C:/other/*'], metadata: {} }, 'C:/work'))
-      .toMatchObject({ method: 'item/commandExecution/requestApproval', params: { command: 'Reach outside its folder: C:/other/*' } })
+      .toMatchObject({ method: 'item/commandExecution/requestApproval', params: { command: 'C:/other/*', locustCard: { summary: 'Reach files outside your project folder' } } })
+  })
+
+  // QA-2026-09-29 round 2, R37 and R35: a fetch is not a command, and Always says what it allows.
+  it('says a fetch is a fetch, a write outside the folder is outside it, and what Always allows', () => {
+    expect(openCodePermissionRequest({ permission: 'webfetch', patterns: ['https://example.com/'], metadata: { url: 'https://example.com/' } }, 'C:/work'))
+      .toMatchObject({ params: { command: 'https://example.com/', locustCard: { summary: 'Fetch a web page', reversibleSays: 'Nothing on this machine is changed by fetching.' } } })
+    expect(openCodePermissionRequest({ permission: 'edit', patterns: ['C:/Windows/hosts'], metadata: { filepath: 'C:/Windows/hosts' } }, 'C:/work'))
+      .toMatchObject({ params: { locustCard: { summary: 'Change 1 file outside your project folder' } } })
+    expect(openCodePermissionRequest({ permission: 'bash', patterns: ['echo SERVED'], always: ['echo *'], metadata: { command: 'echo SERVED' } }, 'C:/work'))
+      .toMatchObject({ params: { command: 'echo SERVED', locustCard: { alwaysCovers: 'anything matching “echo *”' } } })
   })
 
   it('reads "for the rest of the run" as always, and anything unclear as a refusal', () => {

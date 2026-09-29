@@ -3,6 +3,8 @@ import type { ReactElement } from 'react'
 
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
+import type { MissionApprovalDecision, MissionApprovalRequest } from '../../../shared/ipc.js'
+
 import { Icon } from './Icon.js'
 import { Thread } from './Thread.js'
 
@@ -34,7 +36,12 @@ export function SideChat({
   model,
   workspacePath,
   onAsk,
-  onClose
+  onClose,
+  approvals,
+  decidingIds,
+  onDecide,
+  onAnswerQuestion,
+  onStop
 }: {
   readonly turns: readonly SideTurn[]
   /** What answers here: the conversation's own model, by name. */
@@ -42,7 +49,21 @@ export function SideChat({
   readonly workspacePath: string | undefined
   /** Ask; resolves to why it could not be asked, or nothing when it was. */
   readonly onAsk: (question: string) => Promise<string | undefined>
+  /** Closing stops an answer still going: the panel is where it was being read (R33). */
   readonly onClose: () => void
+  /*
+   * WHAT THE SIDE RUN ASKS IS ASKED HERE (QA-2026-09-29 round 2, R33). The
+   * panel was a thread with no approvals and no Stop: a side run that asked
+   * about a connector said "1 needs you" in the title bar, while the panel
+   * showed "Answering..." with nothing to answer, and a run that never ended
+   * could not be stopped from it.
+   */
+  readonly approvals: readonly MissionApprovalRequest[]
+  readonly decidingIds: readonly string[]
+  readonly onDecide: (approvalId: string, decision: MissionApprovalDecision, reason?: string) => void
+  readonly onAnswerQuestion: (approvalId: string, answers: Readonly<Record<string, readonly string[]>>) => void
+  /** Stop the answer that is still going. */
+  readonly onStop: (key: string) => void
 }): ReactElement {
   const [draft, setDraft] = useState('')
   const [problem, setProblem] = useState<string>()
@@ -97,10 +118,10 @@ export function SideChat({
             errorIsPersistence={false}
             startedAt={undefined}
             {...(latest.startedAtIso === undefined ? {} : { startedAtIso: latest.startedAtIso })}
-            approvals={[]}
-            onDecide={() => undefined}
-            onAnswerQuestion={() => undefined}
-            decidingIds={[]}
+            approvals={approvals}
+            onDecide={onDecide}
+            onAnswerQuestion={onAnswerQuestion}
+            decidingIds={decidingIds}
             cancelled={latest.phase === 'cancelled'}
             handoff={undefined}
             peers={{ self: undefined, teammates: [], messages: [], notices: [] }}
@@ -130,9 +151,22 @@ export function SideChat({
             }
           }}
         />
-        <button type="submit" className="lc-send lc-sidechat__send" aria-label="Ask on the side" disabled={draft.trim().length === 0 || asking || answering}>
-          <Icon name="arrow-up" size={14} />
-        </button>
+        {answering && latest !== undefined ? (
+          <button
+            type="button"
+            className="lc-send is-stop lc-sidechat__send"
+            aria-label="Stop this answer"
+            title="Stop this answer"
+            disabled={latest.phase === 'cancelling'}
+            onClick={() => onStop(latest.key)}
+          >
+            <span className="lc-stopsquare" />
+          </button>
+        ) : (
+          <button type="submit" className="lc-send lc-sidechat__send" aria-label="Ask on the side" disabled={draft.trim().length === 0 || asking || answering}>
+            <Icon name="arrow-up" size={14} />
+          </button>
+        )}
       </form>
     </aside>
   )

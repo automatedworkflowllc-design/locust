@@ -4194,6 +4194,17 @@ export default function App(): ReactElement {
       })
   }
 
+  /** A side question's answer, stopped from its panel (R33): the same cancel a conversation's Stop sends. */
+  const stopSideRun = (runId: string): void => {
+    const bridge = window.desktop
+    if (bridge === undefined) return
+    setRuns((all) => withRun(all, runId, markedCancelling))
+    void bridge.cancelCodexMission({ runId }).then((response) => {
+      if (response.ok) return
+      setRuns((all) => withRun(all, runId, (run) => (liveRunIsActive(run) ? { ...run, phase: 'running', error: response.error.message } : run)))
+    }).catch(() => undefined)
+  }
+
   /**
    * The person choosing a route: from the picker, or from a busy model's
    * notice (C9). One path, so the teammate's own pick and the effort move with
@@ -6002,6 +6013,8 @@ export default function App(): ReactElement {
     for (const run of runs.values()) {
       const data = run.data
       if (data === undefined || !liveRunIsActive(run) || recorded.has(data.missionId)) continue
+      // A side question lives in its panel, not in the list (R33), as in the sidebar.
+      if (run.startedBy?.kind === 'side') continue
       const startedAt = run.startedAtIso ?? run.events[0]?.occurredAt ?? new Date().toISOString()
       live.push({
         missionId: data.missionId,
@@ -6037,7 +6050,8 @@ export default function App(): ReactElement {
     // and the reason it is their dashboard's sort key.
     return [
       ...live.sort((a, b) => lastActivityAt(b).localeCompare(lastActivityAt(a))),
-      ...history
+      // Side questions (R33): "2 conversations" counted a question asked in a panel as one.
+      ...history.filter((mission) => mission.startedBy?.kind !== 'side')
     ]
   }, [history, runs, workspaceId])
 
@@ -7429,7 +7443,19 @@ export default function App(): ReactElement {
               setSideChat((current) => (current === undefined ? current : { ...current, runIds: [...current.runIds, answer.data.runId] }))
               return undefined
             }}
-            onClose={() => setSideChat(undefined)}
+            approvals={approvals.filter((request) => sideChat.runIds.includes(request.runId))}
+            decidingIds={decidingIds}
+            onDecide={decideApproval}
+            onAnswerQuestion={answerQuestion}
+            onStop={stopSideRun}
+            onClose={() => {
+              // An answer still going is stopped with the panel (R33): nobody is left reading it.
+              for (const runId of sideChat.runIds) {
+                const run = runs.get(runId)
+                if (run !== undefined && liveRunIsActive(run)) stopSideRun(runId)
+              }
+              setSideChat(undefined)
+            }}
           />
         ) : besideRun !== undefined && screen === 'workroom' ? (
           <BesideConversation

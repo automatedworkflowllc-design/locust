@@ -107,26 +107,36 @@ describe('the permission host', () => {
     expect(answer).toEqual({ behavior: 'deny', message: 'Denied in Locust. The person declined this, and said: draft it instead of sending' })
   })
 
-  it('remembers "always" for that connector on that run, and still asks about another', async () => {
+  // QA-2026-09-29 round 2, R35: Always is the TOOL, not the connector. It was
+  // the connector, and "list_issues" let "delete_file" through with no card.
+  it('remembers "always" for that tool on that run, and still asks about another tool, even on the same connector', async () => {
     const { host, cards } = await hostWithCards()
     const { configPath } = await host.register({ runId: 'run1', missionId: 'm1', cwd: null })
     const token = tokenOf(configPath)
 
     const first = post(host.port, { token, toolName: 'mcp__claude_ai_Robinhood__get_watchlists' })
     await new Promise((r) => setTimeout(r, 30))
+    expect(cards[0]!.alwaysCovers).toBe('get_watchlists on Robinhood again, and no other tool')
     host.decide({ approvalId: cards[0]!.approvalId, decision: 'approve-always' })
     expect((await first).behavior).toBe('allow')
 
-    // Same connector, different tool: answered without a card.
-    const second = await post(host.port, { token, toolName: 'mcp__claude_ai_Robinhood__get_accounts' })
-    expect(second.behavior).toBe('allow')
+    // The same tool again: answered without a card.
+    const again = await post(host.port, { token, toolName: 'mcp__claude_ai_Robinhood__get_watchlists' })
+    expect(again.behavior).toBe('allow')
     expect(cards).toHaveLength(1)
+
+    // Same connector, a different tool: asks.
+    const other = post(host.port, { token, toolName: 'mcp__claude_ai_Robinhood__get_accounts' })
+    await new Promise((r) => setTimeout(r, 30))
+    expect(cards).toHaveLength(2)
+    host.decide({ approvalId: cards[1]!.approvalId, decision: 'deny' })
+    expect((await other).behavior).toBe('deny')
 
     // A different connector still asks. Robinhood is not Gmail.
     const third = post(host.port, { token, toolName: 'mcp__claude_ai_Gmail__list_labels' })
     await new Promise((r) => setTimeout(r, 30))
-    expect(cards).toHaveLength(2)
-    host.decide({ approvalId: cards[1]!.approvalId, decision: 'deny' })
+    expect(cards).toHaveLength(3)
+    host.decide({ approvalId: cards[2]!.approvalId, decision: 'deny' })
     expect((await third).behavior).toBe('deny')
   })
 

@@ -7,6 +7,7 @@ import { join } from 'node:path'
 
 import type { MissionApprovalAnswer, MissionApprovalRequest } from '../shared/ipc.js'
 import { relativeToFolder } from '../shared/approval-patch.js'
+import { OUTSIDE_NOT_UNDOABLE, outsideFolder } from '../shared/approval-data.js'
 import { wholeDetail, wholeInput } from '../shared/approval-detail.js'
 import { deniedSaying } from './approval-channel.js'
 
@@ -66,14 +67,14 @@ interface Registered {
   readonly missionId: string
   readonly cwd: string | null
   readonly configDir: string
-  /** Servers the person said "always" to, by tool prefix, for this run. */
+  /** Tools the person said "always" to, by name (R35), for this run. */
   readonly always: Set<string>
 }
 
 interface Pending {
   readonly runId: string
   readonly missionId: string
-  /** The server prefix of the tool that asked, so "always" knows what to remember. */
+  /** The tool that asked (see alwaysKeyOf), so "always" knows what to remember. */
   readonly prefix: string
   readonly input: unknown
   readonly resolve: (answer: BridgeAnswer) => void
@@ -141,7 +142,7 @@ export function builtInOrConnector(
   toolName: string,
   input: unknown,
   cwd: string
-): { readonly kind: 'command' | 'file-change' | 'connector'; readonly summary: string; readonly detail: string } {
+): { readonly kind: 'command' | 'file-change' | 'connector'; readonly summary: string; readonly detail: string; readonly reversibleSays?: string } {
   const fields = typeof input === 'object' && input !== null ? (input as Record<string, unknown>) : {}
   const text = (value: unknown): string => (typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, 600) : '')
   if (toolName === 'Bash') {
@@ -151,6 +152,12 @@ export function builtInOrConnector(
   }
   if (toolName === 'Edit' || toolName === 'Write' || toolName === 'MultiEdit' || toolName === 'NotebookEdit') {
     const file = text(fields.file_path) || text(fields.notebook_path)
+    // Outside the folder, said as such (QA-2026-09-29 round 2, R15): a write
+    // to /etc/cron.d read "Change 1 file ... Yes for tracked files", in the
+    // words of one inside it, when no version control of the project holds it.
+    if (file.length > 0 && outsideFolder(file, cwd)) {
+      return { kind: 'file-change', summary: 'Change 1 file outside your project folder', detail: file, reversibleSays: OUTSIDE_NOT_UNDOABLE }
+    }
     return { kind: 'file-change', summary: 'Change 1 file', detail: file.length > 0 ? relativeToFolder(file, cwd) : '' }
   }
   if (!toolName.startsWith('mcp__')) {
@@ -160,6 +167,26 @@ export function builtInOrConnector(
   // line (R14): it is the one thing a person can judge a connector call by,
   // and a recipient written last was past the old 600-character cut.
   return { kind: 'connector', summary: connectorSummary(toolName), detail: wholeInput(input) }
+}
+
+/**
+ * WHAT "ALWAYS" LETS THROUGH, SAID (QA-2026-09-29 round 2, R35).
+ *
+ * Always was remembered per CONNECTOR: pressed on "Use list_issues on
+ * github", it let the next call of the reply -- delete_file on the same
+ * connector -- through with no card. It is remembered per TOOL now, as
+ * Claude Code's own "don't ask again" is, and the card says what it covers.
+ */
+export function alwaysKeyOf(toolName: string): string {
+  return toolName
+}
+
+export function alwaysCoversFor(toolName: string): string {
+  if (toolName === 'Bash') return 'every command it runs'
+  const match = /^mcp__([A-Za-z0-9_]+?)__(.+)$/.exec(toolName)
+  if (match === null) return `every use of ${toolName}`
+  const server = match[1]!.replace(/^claude_ai_/, '').replace(/_/g, ' ')
+  return `${match[2]!} on ${server} again, and no other tool`
 }
 
 export function createPermissionHost(options: {
@@ -190,7 +217,7 @@ export function createPermissionHost(options: {
     const registered = typeof asked.token === 'string' ? tokens.get(asked.token) : undefined
     if (registered === undefined) return deny('this request did not come from a Locust run.')
     const toolName = typeof asked.toolName === 'string' && asked.toolName.length > 0 ? asked.toolName : 'a tool'
-    const prefix = serverPrefixOf(toolName)
+    const prefix = alwaysKeyOf(toolName)
     const input = asked.input ?? {}
     if (registered.always.has(prefix)) return { behavior: 'allow', updatedInput: input }
     const approvalId = createId()
@@ -202,6 +229,7 @@ export function createPermissionHost(options: {
       runId: registered.runId,
       missionId: registered.missionId,
       ...builtInOrConnector(toolName, input, registered.cwd ?? ''),
+      alwaysCovers: alwaysCoversFor(toolName),
       runtime: 'claude',
       cwd: registered.cwd,
       requestedAt: now().toISOString()
@@ -295,8 +323,8 @@ export function createPermissionHost(options: {
         return true
       }
       if (answer.decision === 'approve-always') {
-        // Remembered for THIS run and this connector. The next call from the
-        // same connector answers itself; a different connector still asks.
+        // Remembered for THIS run and this TOOL (R35): the same tool answers
+        // itself; any other tool, on this connector or another, still asks.
         const token = byRun.get(waiting.runId)
         const registered = token === undefined ? undefined : tokens.get(token)
         registered?.always.add(waiting.prefix)

@@ -18,7 +18,7 @@ const EVENTS = readFileSync(new URL("./fixtures/opencode/serve-events.jsonl", im
 const SESSION = "ses_f27b5f958ffea6iVnmfRjD2imJ";
 const EXECUTABLE = { executablePath: "C:/tools/opencode.exe", prefixArgs: [] as readonly string[] };
 
-function fakeServer() {
+function fakeServer(events: readonly string[] = EVENTS) {
   const calls: { url: string; auth: string | undefined; body: unknown }[] = [];
   let spawnedEnv: Readonly<Record<string, string>> | undefined;
   let spawnedArgs: readonly string[] = [];
@@ -46,7 +46,7 @@ function fakeServer() {
       const body = new ReadableStream<Uint8Array>({
         async start(controller) {
           await promptSent;
-          for (const line of EVENTS) controller.enqueue(encoder.encode(`data: ${line}\n\n`));
+          for (const line of events) controller.enqueue(encoder.encode(`data: ${line}\n\n`));
         },
       });
       return new Response(body, { status: 200 });
@@ -131,6 +131,30 @@ describe("OpenCode through its own server (A6.7)", () => {
     const said = events.filter((event) => event.type === "message.delta").map((event) => (event.payload as { text: string }).text).join("");
     expect(said).toContain("First line of the readme");
     expect(events.at(-1)?.type).toBe("run.completed");
+  });
+
+  // QA-2026-09-29 round 2, R36: a subagent (the `task` tool) is a child
+  // session, and its request came on this stream under the child's id --
+  // neither shown nor answered, and the run waited on it.
+  it("asks the person a subagent's request too, marked as the subagent's, and answers it", async () => {
+    const CHILD = "ses_child_of_the_run";
+    const GRANDCHILD = "ses_grandchild_of_the_run";
+    const events = [
+      JSON.stringify({ type: "session.created", properties: { info: { id: CHILD, parentID: SESSION } } }),
+      JSON.stringify({ type: "session.created", properties: { info: { id: GRANDCHILD, parentID: CHILD } } }),
+      JSON.stringify({ type: "permission.asked", properties: { id: "per_child", sessionID: GRANDCHILD, permission: "bash", patterns: ["echo FROM-SUBAGENT"], metadata: { command: "echo FROM-SUBAGENT" }, always: ["echo *"] } }),
+      // Another session's request -- not the run's, nor a child of it -- is not ours.
+      JSON.stringify({ type: "permission.asked", properties: { id: "per_stranger", sessionID: "ses_someone_else", permission: "bash", patterns: ["rm -rf /"], metadata: { command: "rm -rf /" }, always: [] } }),
+      ...EVENTS,
+    ];
+    const server = fakeServer(events);
+    const asked: OpenCodePermission[] = [];
+    const command = createOpenCodeServeCommand(EXECUTABLE, { workspacePath: "C:/work/pebble" });
+    const run = startOpenCodeServeRun({ spawn: server.spawn, command, prompt: "hi", fetch: server.fetcher, onPermission: async (request) => { asked.push(request); return "once"; } });
+    for await (const record of run.records) void record;
+    await run.completion;
+    expect(asked.map((one) => [one.metadata.command, one.bySubagent === true])).toEqual([["echo FROM-SUBAGENT", true], ["echo SERVED", false]]);
+    expect(server.calls.filter((call) => call.url.includes("/permission/")).map((call) => call.url.split("/permission/")[1])).toEqual(["per_child/reply", "per_0d84a14d3001uIu5oHyC0O5Ij8/reply"]);
   });
 
   it("refuses what nobody is there to answer", async () => {

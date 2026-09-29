@@ -36,6 +36,8 @@ export interface OpenCodePermission {
   /** What OpenCode would remember on "always". */
   readonly always: readonly string[];
   readonly metadata: Readonly<Record<string, unknown>>;
+  /** Asked by a subagent the run started (its `task` tool), not the run itself (R36). */
+  readonly bySubagent?: boolean;
 }
 
 export type OpenCodePermissionReply = "once" | "always" | "reject";
@@ -198,6 +200,7 @@ export function startOpenCodeServeRun(options: OpenCodeServeRunOptions): Runtime
       patterns: Array.isArray(asked.patterns) ? asked.patterns.filter((entry): entry is string => typeof entry === "string") : [],
       always: Array.isArray(asked.always) ? asked.always.filter((entry): entry is string => typeof entry === "string") : [],
       metadata: isObject(asked.metadata) ? asked.metadata : {},
+      ...(text(asked.sessionID) !== undefined && text(asked.sessionID) !== sessionId ? { bySubagent: true } : {}),
     };
     let reply: OpenCodePermissionReply = "reject";
     let message = "The person declined this in Locust.";
@@ -218,12 +221,34 @@ export function startOpenCodeServeRun(options: OpenCodeServeRunOptions): Runtime
       : { reply }).catch(() => undefined);
   };
 
+  const children = new Set<string>();
   const accept = (event: JsonObject): void => {
     const type = text(event.type);
     const props = isObject(event.properties) ? event.properties : {};
     const about = text(props.sessionID) ?? (isObject(props.info) ? text(props.info.sessionID) : undefined)
       ?? (isObject(props.part) ? text(props.part.sessionID) : undefined);
-    if (sessionId === undefined || about !== sessionId) return;
+    if (sessionId === undefined) return;
+    /*
+     * A SUBAGENT'S REQUEST IS THE RUN'S (QA-2026-09-29 round 2, R36). The
+     * `task` tool runs a subagent as a CHILD session of this server, and its
+     * requests come on this stream with the child's id. Only the run's own id
+     * was read, so a subagent's `bash` was neither shown nor answered and the
+     * run sat on "Working..." waiting for it. Children are followed from
+     * `session.created` (its `parentID`), grandchildren too; their requests
+     * are asked like the run's own, and nothing else of theirs is read.
+     */
+    if (type === "session.created" || type === "session.updated") {
+      const info = isObject(props.info) ? props.info : {};
+      const child = text(info.id);
+      const parent = text(info.parentID);
+      if (child !== undefined && parent !== undefined && (parent === sessionId || children.has(parent))) children.add(child);
+      if (about !== sessionId) return;
+    }
+    if (about === undefined) return;
+    if (about !== sessionId) {
+      if (children.has(about) && type === "permission.asked") void answer(props);
+      return;
+    }
     if (type === "message.updated" && isObject(props.info)) {
       const id = text(props.info.id);
       const role = text(props.info.role);

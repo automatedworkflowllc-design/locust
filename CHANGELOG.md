@@ -11,6 +11,32 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.467.0 - 2026-09-29
+
+### Fixed
+
+- **"Always allow" says what it allows, and allows less.** On Claude, Always
+  on one connector tool used to let every tool of that connector through for
+  the rest of the reply, deleting ones included. It now covers the one tool,
+  and every card says what Always would let through: the tool, every command,
+  or OpenCode's own pattern such as "echo *".
+- **A question on the side can be answered and stopped from its panel.** An
+  approval its answer waited on showed only in the title bar; it is in the
+  panel now, with a Stop while it answers. Closing the panel stops it, and a
+  side question no longer appears in Missions as a conversation of its own.
+- **A subagent's request is asked.** When an OpenCode teammate in Approve
+  each handed work to a subagent, the subagent's request was never shown and
+  the run waited on it forever. It is asked like the teammate's own, and says
+  it came from a subagent.
+- **A fetch is a fetch.** OpenCode's web fetches and reads outside the folder
+  were asked as "Run a command". Each now says what it is and what it sends.
+- **A change outside your project folder says so.** A write outside the folder
+  read like one inside it, "reversible if under version control". It now says
+  it is outside the folder and cannot be undone from here.
+- **A Codex file approval shows its change.** When Codex asked to change a file
+  at the same moment it described the change, the card could arrive without
+  the file or the diff.
+
 ## 0.466.0 - 2026-09-29
 
 ### Fixed

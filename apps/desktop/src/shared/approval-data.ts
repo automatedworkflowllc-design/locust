@@ -95,3 +95,20 @@ export function dataSentLine(kind: string, command: string): string | undefined 
     ? 'This command can reach the network. Locust cannot see what it would send — read it above.'
     : 'Unknown. Locust cannot tell what a command sends; a script can do anything the sandbox allows.'
 }
+
+/**
+ * A FILE OUTSIDE THE PROJECT FOLDER (QA-2026-09-29 round 2, R15).
+ *
+ * Absolute and not under the folder, or relative and climbing out of it.
+ * Compared the way Windows compares paths: separators either way, case aside.
+ */
+export function outsideFolder(file: string, folder: string): boolean {
+  if (folder.length === 0) return false
+  const normal = (value: string): string => value.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+  const path = normal(file)
+  if (!/^(?:[a-z]:)?\//.test(path)) return path.split('/').includes('..')
+  const root = normal(folder)
+  return path !== root && !path.startsWith(`${root}/`)
+}
+
+export const OUTSIDE_NOT_UNDOABLE = 'Not from here — it is outside your project folder, so the project’s version control does not hold it.'

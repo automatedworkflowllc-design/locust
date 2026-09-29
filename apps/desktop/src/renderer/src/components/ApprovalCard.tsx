@@ -219,15 +219,16 @@ export function ApprovalCard({
   // the only one of the four a person cannot work out for themselves. Claimed
   // as "nothing" for a file change, where that is provable, and never for a
   // command, where it is not. See shared/approval-data.ts.
-  const dataSent = dataSentLine(request.kind, request.detail)
-  const reversible =
+  // The asking route's own words first, when it knows better than the kind (R15, R37).
+  const dataSent = request.dataSentSays ?? dataSentLine(request.kind, request.detail)
+  const reversible = request.reversibleSays ?? (
     request.kind === 'command'
       ? 'Unknown — a command can do anything the workspace sandbox allows.'
       : request.kind === 'file-change'
         ? 'Yes for tracked files, if the workspace is under version control.'
         : request.kind === 'connector'
           ? 'Unknown — a connector acts on the service it reaches, and Locust cannot undo what happens there.'
-          : 'Nothing is changed by answering.'
+          : 'Nothing is changed by answering.')
 
   // A card that waits on the person is brought into view when it appears.
   // Its buttons sat below the fold while the run said "waiting on you"
@@ -409,7 +410,10 @@ export function ApprovalCard({
               "Always" is scoped to this session on purpose, and says so. A grant
               that outlives the run is a Settings decision, not one to take here.
             */}
-            Nothing has happened yet. “Always” lasts until this mission ends.
+            {/* What Always lets through, when the route can say (R35). */}
+            {request.alwaysCovers === undefined
+              ? 'Nothing has happened yet. “Always” lasts until this mission ends.'
+              : `Nothing has happened yet. “Always” allows ${request.alwaysCovers}, until this mission ends.`}
           </p>
         </>
       )}

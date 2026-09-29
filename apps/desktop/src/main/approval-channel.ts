@@ -22,6 +22,7 @@ import type {
 import { approvalPatchFrom } from './approval-patch.js'
 import { relativeToFolder } from '../shared/approval-patch.js'
 import { wholeDetail } from '../shared/approval-detail.js'
+import { OUTSIDE_NOT_UNDOABLE, outsideFolder } from '../shared/approval-data.js'
 import type { FileChangeRecord } from './approval-patch.js'
 
 /**
@@ -225,19 +226,48 @@ export function deniedSaying(reason: string): string {
  * cannot say what would happen is not an approval.
  */
 export function openCodePermissionRequest(
-  permission: { readonly permission: string; readonly patterns: readonly string[]; readonly metadata: Readonly<Record<string, unknown>> },
+  permission: {
+    readonly permission: string
+    readonly patterns: readonly string[]
+    /** What OpenCode itself remembers on "always" (R35): said on the card. */
+    readonly always?: readonly string[]
+    readonly metadata: Readonly<Record<string, unknown>>
+    /** Asked by a subagent the run started (R36): said in the card's action. */
+    readonly bySubagent?: boolean
+  },
   cwd: string
 ): AppServerRequest {
   const said = (key: string): string | undefined => {
     const value = permission.metadata[key]
     return typeof value === 'string' && value.length > 0 ? value : undefined
   }
+  /*
+   * WHAT "ALWAYS" LETS THROUGH (QA-2026-09-29 round 2, R35). OpenCode applies
+   * its answer `always` to the patterns in its own request -- `echo *` for
+   * `echo SERVED` -- and the card showed one command beside a button that
+   * allowed every `echo` for the run. Its patterns are on the card now.
+   */
+  const always = (permission.always ?? []).filter((pattern) => pattern.length > 0)
+  const alwaysCovers = always.length === 0
+    ? undefined
+    : always.length === 1 && always[0] === '*'
+      ? `every ${permission.permission} request, whatever it is`
+      : `anything matching ${always.map((pattern) => `“${pattern}”`).join(' or ')}`
+  // A subagent's request says so (R36): the person asked the teammate, not it.
+  const by = permission.bySubagent === true ? ', asked by a subagent it started' : ''
+  const card = (words: { readonly summary?: string; readonly dataSentSays?: string; readonly reversibleSays?: string }, plain: string): Record<string, string> => {
+    const out: Record<string, string> = {}
+    const summary = words.summary ?? (by.length > 0 ? plain : undefined)
+    for (const [key, value] of Object.entries({ ...words, summary: summary === undefined ? undefined : `${summary}${by}`, alwaysCovers })) if (value !== undefined) out[key] = value
+    return out
+  }
   if (permission.permission === 'bash') {
-    return { id: 0, method: 'item/commandExecution/requestApproval', params: { command: said('command') ?? permission.patterns.join(' '), cwd } }
+    return { id: 0, method: 'item/commandExecution/requestApproval', params: { command: said('command') ?? permission.patterns.join(' '), cwd, locustCard: card({}, 'Run a command') } }
   }
   if (permission.permission === 'edit') {
     const file = said('filepath') ?? said('filePath') ?? permission.patterns.join(', ')
     const diff = said('diff')
+    const outside = outsideFolder(file, cwd)
     // The file relative to the folder, and the change itself: a fresh-profile
     // beta report of 0.345 found the card naming a long absolute path and
     // "Change files" with nothing to judge -- while OpenCode's request
@@ -245,14 +275,62 @@ export function openCodePermissionRequest(
     return {
       id: 0,
       method: 'item/fileChange/requestApproval',
-      params: { summary: relativeToFolder(file, cwd), cwd, ...(diff === undefined ? {} : { unifiedDiff: diff }) }
+      params: {
+        summary: relativeToFolder(file, cwd),
+        cwd,
+        ...(diff === undefined ? {} : { unifiedDiff: diff }),
+        locustCard: card(outside ? { summary: 'Change 1 file outside your project folder', reversibleSays: OUTSIDE_NOT_UNDOABLE } : {}, 'Change 1 file')
+      }
     }
   }
-  const what = permission.permission === 'external_directory' ? 'Reach outside its folder' : `Use ${permission.permission}`
+  /*
+   * NOT EVERYTHING IS A COMMAND (R37). A read outside the folder and a web
+   * fetch both drew "Run a command", with a command's "a script can do
+   * anything" beneath. Each is said as what it is.
+   */
+  if (permission.permission === 'external_directory') {
+    return {
+      id: 0,
+      method: 'item/commandExecution/requestApproval',
+      params: {
+        command: permission.patterns.join('\n'),
+        cwd,
+        locustCard: card({
+          summary: 'Reach files outside your project folder',
+          dataSentSays: 'Nothing by this alone: it lets the teammate’s tools read or change these paths on this machine.',
+          reversibleSays: 'Reading changes nothing. A change there is outside the project’s version control.'
+        }, '')
+      }
+    }
+  }
+  if (permission.permission === 'webfetch') {
+    const address = said('url') ?? permission.patterns.join('\n')
+    return {
+      id: 0,
+      method: 'item/commandExecution/requestApproval',
+      params: {
+        command: address,
+        cwd,
+        locustCard: card({
+          summary: 'Fetch a web page',
+          dataSentSays: 'The address above is requested from this machine, and the page it returns goes to the model.',
+          reversibleSays: 'Nothing on this machine is changed by fetching.'
+        }, '')
+      }
+    }
+  }
   return {
     id: 0,
     method: 'item/commandExecution/requestApproval',
-    params: { command: `${what}: ${permission.patterns.join(', ')}`, cwd }
+    params: {
+      command: permission.patterns.join('\n'),
+      cwd,
+      locustCard: card({
+        summary: `Use ${permission.permission}`,
+        dataSentSays: `Unknown. OpenCode names this “${permission.permission}”, and Locust cannot tell what it sends.`,
+        reversibleSays: `Unknown — Locust cannot tell what “${permission.permission}” does.`
+      }, '')
+    }
   }
 }
 
@@ -526,7 +604,30 @@ export function createApprovalChannel(options: ApprovalChannelOptions): Approval
         const approvalId = `ap_${createId()}`
         const requestParams = (typeof request.params === 'object' && request.params !== null ? request.params : {}) as Record<string, unknown>
         const itemId = typeof requestParams.itemId === 'string' ? requestParams.itemId : undefined
-        const changes = described.kind === 'file-change' && itemId !== undefined ? run.changesByItem.get(itemId) : undefined
+        let changes = described.kind === 'file-change' && itemId !== undefined ? run.changesByItem.get(itemId) : undefined
+        /*
+         * THE CHANGE, WAITED FOR (QA-2026-09-29 round 2, R30). Codex sends a
+         * file item's changes on `item/started` and then the approval, which
+         * names only the item. The changes are recorded when the mission loop
+         * READS that record, behind a durable ledger write, so an approval
+         * arriving within a few milliseconds of its item was drawn first: a
+         * card with no file and no diff. Bounded: a quarter second, then the
+         * card says what it was told.
+         */
+        // Codex only: the one runtime whose approval names an item announced before it.
+        const codex = run.runtime === undefined || run.runtime === 'codex'
+        if (codex && described.kind === 'file-change' && itemId !== undefined && changes === undefined && typeof requestParams.unifiedDiff !== 'string') {
+          for (let waited = 0; waited < 250 && changes === undefined; waited += 25) {
+            await new Promise((settle) => setTimeout(settle, 25))
+            changes = run.changesByItem.get(itemId)
+          }
+        }
+        // Words the asking route put on the request for its card (R35, R37): see openCodePermissionRequest.
+        const said = (key: string): string | undefined => {
+          const card = requestParams.locustCard
+          const value = typeof card === 'object' && card !== null ? (card as Record<string, unknown>)[key] : undefined
+          return typeof value === 'string' && value.length > 0 ? value : undefined
+        }
         const offered = typeof requestParams.unifiedDiff === 'string' ? diffPatchFrom(requestParams.unifiedDiff, run.cwd) : undefined
         const patch = approvalPatchFrom(changes, run.cwd) ?? offered
         return await new Promise<JsonValue>((resolve) => {
@@ -543,10 +644,13 @@ export function createApprovalChannel(options: ApprovalChannelOptions): Approval
             ...(requestParams.isBlocking === false ? { blocking: false } : {}),
             summary: changes !== undefined && changes.length > 0
               ? `Change ${String(changes.length)} file${changes.length === 1 ? '' : 's'}`
-              : offered !== undefined ? 'Change 1 file' : described.summary,
+              : said('summary') ?? (offered !== undefined ? 'Change 1 file' : described.summary),
             detail: described.detail,
             cwd: described.cwd,
             requestedAt: now().toISOString(),
+            ...(said('alwaysCovers') === undefined ? {} : { alwaysCovers: said('alwaysCovers')! }),
+            ...(said('dataSentSays') === undefined ? {} : { dataSentSays: said('dataSentSays')! }),
+            ...(said('reversibleSays') === undefined ? {} : { reversibleSays: said('reversibleSays')! }),
             ...(patch === undefined ? {} : { patch: { text: patch.text, added: patch.added, removed: patch.removed, truncated: patch.truncated } })
           })
         })
