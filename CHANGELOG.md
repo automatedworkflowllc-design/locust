@@ -11,6 +11,26 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.482.0 - 2026-09-29
+
+### Changed
+
+- **A web page a teammate made can no longer send your files anywhere.** A
+  page opened in Locust can read its folder, which is what lets a page chart
+  your `data.csv`. It could also send what it read to any site. Now it can
+  only load libraries, stylesheets and fonts from the common public hosts
+  (cdnjs, jsDelivr, unpkg, Google Fonts and a few others), the way Claude's
+  own artifacts work, and can reach no other site. When a page opens a
+  website in your browser, Locust shows you the address and asks first. A
+  page that calls a live web service, or embeds a video, will no longer
+  load that part.
+- **Feedback says it is public.** A report opens as a public issue on
+  GitHub, and the form now says so. Your conversation goes with it only if
+  you tick "Include this conversation", which starts unticked.
+- **The message box shows focus a little more clearly.** Its edge is still
+  a single thin line with no colour, now bright enough for the
+  accessibility minimum.
+
 ## 0.481.0 - 2026-09-29
 
 ### Fixed

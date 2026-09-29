@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { createPageServer, fromPagePreview, isPagePath, PAGE_SCHEME } from './page-preview.js'
+import { createPageServer, fromPagePreview, isPagePath, PAGE_SCHEME, pageMayReach } from './page-preview.js'
 
 /**
  * A WEB PAGE RUNS IN LOCUST, IN A FRAME OF ITS OWN (0.425).
@@ -155,5 +155,39 @@ describe('which requests a page may make', () => {
     expect(fromPagePreview(embedded)).toBe(true)
     expect(fromPagePreview(app)).toBe(false)
     expect(fromPagePreview(undefined)).toBe(false)
+  })
+})
+
+/**
+ * WHAT A PAGE MAY REACH (QA-2026-09-29 round 2, R34 b/c). A page reads its
+ * folder, so it may load libraries and fonts and send nothing anywhere.
+ */
+describe('a page on the web', () => {
+  it('loads a library, a stylesheet and a font from the common hosts', () => {
+    expect(pageMayReach('https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js', 'GET')).toBe(true)
+    expect(pageMayReach('https://cdn.jsdelivr.net/npm/chart.js@4', 'GET')).toBe(true)
+    expect(pageMayReach('https://fonts.googleapis.com/css2?family=Inter', 'GET')).toBe(true)
+    expect(pageMayReach('https://fonts.gstatic.com/s/inter/v1/a.woff2', 'HEAD')).toBe(true)
+    expect(pageMayReach('https://CDN.JSDELIVR.NET/npm/x', 'GET')).toBe(true)
+  })
+
+  it('reaches no other site: what it read cannot leave', () => {
+    expect(pageMayReach('https://example.com/', 'GET')).toBe(false)
+    expect(pageMayReach('http://127.0.0.1:8123/collect?secret=1', 'GET')).toBe(false)
+    expect(pageMayReach('https://www.youtube.com/embed/x', 'GET')).toBe(false)
+    expect(pageMayReach('wss://cdn.jsdelivr.net/socket', 'GET')).toBe(false)
+  })
+
+  it('never sends, even to a host it may load from', () => {
+    expect(pageMayReach('https://cdn.jsdelivr.net/npm/x', 'POST')).toBe(false)
+    expect(pageMayReach('https://cdn.jsdelivr.net/npm/x', 'PUT')).toBe(false)
+  })
+
+  it('and a look-alike address is not the host', () => {
+    expect(pageMayReach('http://cdn.jsdelivr.net/npm/x', 'GET')).toBe(false)
+    expect(pageMayReach('https://cdn.jsdelivr.net.evil.example/npm/x', 'GET')).toBe(false)
+    expect(pageMayReach('https://user:pass@cdn.jsdelivr.net/npm/x', 'GET')).toBe(false)
+    expect(pageMayReach('https://cdn.jsdelivr.net:8443/npm/x', 'GET')).toBe(false)
+    expect(pageMayReach('not an address', 'GET')).toBe(false)
   })
 })

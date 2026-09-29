@@ -7,7 +7,7 @@ import { APP_USER_MODEL_ID, DEVELOPMENT_APP_USER_MODEL_ID, mayShowToasts, repair
 import { openingPlacement, readSavedWindow } from './window-bounds.js'
 import type { SavedWindow } from './window-bounds.js'
 import { app, BrowserWindow, crashReporter, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, powerSaveBlocker, protocol, safeStorage, screen, session, shell, Tray } from 'electron'
-import { createPageServer, fromPagePreview, PAGE_SCHEME } from './page-preview.js'
+import { createPageServer, fromPagePreview, pageMayReach, PAGE_SCHEME } from './page-preview.js'
 import { createRuntimeCommands } from './runtime-commands.js'
 import { createCursorDefaultModel } from './cursor-default-model.js'
 import { listWorkspaceFiles } from './workspace-files.js'
@@ -1041,8 +1041,36 @@ const createWindow = (
 
   // A link a previewed page opens in a new window goes to the person's
   // browser (0.425); nothing else ever opens a window.
+  //
+  // ASKED FIRST (0.482, R34). A page reads its folder and may send nothing
+  // (pageMayReach); an address it opens could carry what it read, and a page
+  // can open one on load, unasked. So the person sees the address and
+  // chooses, as Claude asks before an artifact's link leaves it. One question
+  // at a time: a page that keeps opening windows gets one.
+  let askingToOpen = false
   window.webContents.setWindowOpenHandler(({ url, referrer }) => {
-    if (referrer.url.startsWith(`${PAGE_SCHEME}://`) && /^https?:\/\//i.test(url)) void shell.openExternal(url)
+    if (!referrer.url.startsWith(`${PAGE_SCHEME}://`) || !/^https?:\/\//i.test(url) || askingToOpen) return { action: 'deny' }
+    askingToOpen = true
+    void (async () => {
+      // A drive's answer, labelled as such: a native dialog cannot be pressed
+      // through the page a drive talks to. Read nowhere else.
+      const seam = ({ open: 0, cancel: 1 } as Record<string, number>)[process.env.LOCUST_OPEN_LINK_ANSWER ?? '']
+      const shown = url.length <= 300 ? url : `${url.slice(0, 300)}… (${String(url.length - 300)} more characters)`
+      const response = seam ?? (await dialog.showMessageBox(window, {
+        type: 'question',
+        buttons: ['Open in your browser', 'Cancel'],
+        defaultId: 1,
+        cancelId: 1,
+        noLink: true,
+        title: 'Locust',
+        message: 'This page wants to open a website in your browser.',
+        detail: `${shown}\n\nAn address can carry what the page read in your folder. Open it only if you expected this link.`
+      })).response
+      askingToOpen = false
+      if (response === 0) await shell.openExternal(url)
+    })().catch(() => {
+      askingToOpen = false
+    })
     return { action: 'deny' }
   })
 
@@ -1283,9 +1311,11 @@ if (!ownsSingleInstanceLock) {
       session.defaultSession.webRequest.onBeforeRequest(
         { urls: ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*'] },
         (details, respond) => {
-          // A web page shown in the preview may load what it links to, as in
-          // a browser; Locust's own window still loads nothing (0.425).
-          respond({ cancel: !fromPagePreview(details.frame) })
+          // A web page shown in the preview may load libraries and fonts from
+          // the common public hosts and reach nowhere else (0.482, R34), so
+          // what it reads of the folder stays here; Locust's own window still
+          // loads nothing (0.425).
+          respond({ cancel: !(fromPagePreview(details.frame) && pageMayReach(details.url, details.method)) })
         }
       )
     }

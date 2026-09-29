@@ -171,6 +171,45 @@ export function createPageServer(options: {
 }
 
 /**
+ * WHERE A PAGE MAY REACH ON THE WEB (QA-2026-09-29 round 2, R34 b/c).
+ *
+ * A page at the project's root reads the project -- that is what a page that
+ * charts `data.csv` is for -- and it could post what it read anywhere: the
+ * QA stand-in's page read `config.json`, `prod.env`, `data/customers.csv` and
+ * sent them to a listener. No list of file names can say which files are
+ * secret. So the other half closes instead, the way Claude's own artifacts
+ * work: a page may LOAD libraries, stylesheets and fonts from the common
+ * public hosts, and reach nowhere else, so what it reads stays on this
+ * machine. Colin, 2026-09-29: run with the suggestion.
+ *
+ * GET and HEAD only, over https: loading, never sending. Everything else a
+ * page asks of the web -- fetch, a beacon, an image or a frame from another
+ * site, a form post, a socket -- is refused by the packaged app's one filter.
+ */
+export const PAGE_LIBRARY_HOSTS: readonly string[] = [
+  'cdnjs.cloudflare.com',
+  'cdn.jsdelivr.net',
+  'unpkg.com',
+  'esm.sh',
+  'cdn.tailwindcss.com',
+  'code.jquery.com',
+  'fonts.googleapis.com',
+  'fonts.gstatic.com'
+]
+
+export function pageMayReach(requestUrl: string, method: string): boolean {
+  let url: URL
+  try {
+    url = new URL(requestUrl)
+  } catch {
+    return false
+  }
+  if (url.protocol !== 'https:' || url.username !== '' || url.password !== '' || url.port !== '') return false
+  if (method !== 'GET' && method !== 'HEAD') return false
+  return PAGE_LIBRARY_HOSTS.includes(url.hostname.toLowerCase())
+}
+
+/**
  * Whether a request comes from a page shown in the preview, or from inside
  * one -- a frame the page itself embedded (0.425). Packaged Locust refuses
  * every web request its own window makes; a page is allowed its own, as it

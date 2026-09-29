@@ -2657,7 +2657,8 @@ export function SettingsScreen({
             <dd>
               The window makes no requests of its own. Locust checks for and downloads its own updates, and
               new Codex CLI and Copilot CLI versions; each coding agent talks to its own provider. A web page a
-              teammate made runs in a frame of its own and loads what it links to, as it would in a browser.
+              teammate made runs in a frame of its own. It may load libraries and fonts from the common public
+              hosts and reach no other site, so what it reads in your folder cannot be sent anywhere.
             </dd>
           </dl>
           <More>

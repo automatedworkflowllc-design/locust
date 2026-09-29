@@ -687,6 +687,14 @@
    */
   --lc-focus-glow: rgba(255, 255, 255, 0.05);
   --lc-focus-edge: rgba(255, 255, 255, 0.22);
+  /*
+   * The message box's edge alone, a step up (QA-2026-09-29 round 2, R8): at
+   * 0.22 it was about 2:1 against the page, under the 3:1 a focus indicator
+   * needs. At 0.4 it is 3.8:1 outside the box and 3.5:1 against the box's own
+   * ground -- still one pixel, no hue, no wider glow. Colin, 2026-09-29: run
+   * with the suggestion.
+   */
+  --lc-focus-edge-box: rgba(255, 255, 255, 0.4);
 }
 
 /*

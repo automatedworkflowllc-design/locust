@@ -98,6 +98,9 @@ try {
     '  report.bridge = typeof window.desktop',
     "  try { localStorage.setItem('probe', 'kept'); report.storage = localStorage.getItem('probe') } catch { report.storage = 'refused' }",
     "  try { await fetch('https://example.com/', { mode: 'no-cors' }); report.web = 'reached' } catch { report.web = 'blocked' }",
+    // 0.482 (R34 b/c): a library host is reached; sending to it is not.
+    "  try { await fetch('https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js', { mode: 'no-cors' }); report.library = 'reached' } catch { report.library = 'blocked' }",
+    "  try { await fetch('https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js', { method: 'POST', mode: 'no-cors', body: 'secret' }); report.sent = 'reached' } catch { report.sent = 'blocked' }",
     // 0.455 (QA-2026-09-29, Q1): what it could read is what it could send.
     "  for (const [key, path] of [['env', '.env'], ['git', '.git/config'], ['key', 'deploy.key']]) { try { report[key] = (await fetch(path)).status } catch { report[key] = 'failed' } }",
     "  parent.postMessage({ locustProbe: report }, '*')",
@@ -125,7 +128,9 @@ try {
   check('it cannot read the project’s secrets beside it: .env, .git/config, a key file', [report.env, report.git, report.key].every((status) => status === 403), JSON.stringify({ env: report.env, git: report.git, key: report.key }))
   check('it cannot reach Locust: not the window it sits in, not the bridge', report.parentDocument === 'refused' && report.bridge === 'undefined', JSON.stringify({ parentDocument: report.parentDocument, bridge: report.bridge }))
   if (packaged !== undefined) {
-    check('on the packaged build it may reach the web, and Locust’s own window still may not', report.web === 'reached' && probe.appWeb === 'blocked', JSON.stringify({ page: report.web, app: probe.appWeb }))
+    // 0.482 (R34 b/c): a page loads libraries and reaches no other site.
+    check('on the packaged build it loads a library but reaches no other site, and sends nothing', report.library === 'reached' && report.web === 'blocked' && report.sent === 'blocked', JSON.stringify({ library: report.library, web: report.web, sent: report.sent }))
+    check('and Locust’s own window still reaches nothing', probe.appWeb === 'blocked', JSON.stringify({ app: probe.appWeb }))
   }
   const source = String(await drive.capture('the Source tab', () => drive.evaluate(`(async () => {
     ;[...document.querySelectorAll('.lc-viewer__pagetabs button')].find((b) => b.innerText.trim() === 'Source')?.click()

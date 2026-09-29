@@ -17,6 +17,11 @@ const MOST = 2_000
  * service; Locust has none, and no telemetry. So Send opens the finished
  * report on GitHub in the person's browser, and they send it there -- which
  * the line says, so nobody thinks it has already gone.
+ *
+ * AND IT IS PUBLIC. The issue lands on the public releases repository, where
+ * anyone can read it, and the conversation it was opened from went with it
+ * unasked. Colin, 2026-09-29, ran with the suggestion: keep GitHub, say it
+ * is public before it opens, and send the conversation only when ticked.
  */
 export function FeedbackDialog({
   conversation,
@@ -27,6 +32,7 @@ export function FeedbackDialog({
   readonly onClose: () => void
 }): ReactElement {
   const [text, setText] = useState('')
+  const [withConversation, setWithConversation] = useState(false)
   const [sending, setSending] = useState(false)
   const [refused, setRefused] = useState<string>()
   const box = useRef<HTMLDivElement>(null)
@@ -42,7 +48,7 @@ export function FeedbackDialog({
     setSending(true)
     setRefused(undefined)
     void bridge
-      .sendFeedback({ description: text.trim(), ...(conversation === undefined ? {} : { conversation }) })
+      .sendFeedback({ description: text.trim(), ...(conversation === undefined || !withConversation ? {} : { conversation }) })
       .then((opened) => {
         if (opened.ok) {
           onClose()
@@ -78,10 +84,14 @@ export function FeedbackDialog({
               }
             }}
           />
+          {conversation !== undefined && (
+            <label className="lc-feedback__with">
+              <input type="checkbox" checked={withConversation} onChange={(event) => setWithConversation(event.target.checked)} />
+              <span>Include this conversation</span>
+            </label>
+          )}
           <p className="lc-feedback__claim">
-            {conversation === undefined
-              ? `This report will include your description and your Locust and ${typeof navigator !== 'undefined' && /Macintosh|Mac OS X/.test(navigator.userAgent) ? 'macOS' : 'Windows'} versions. It opens on GitHub, where you send it.`
-              : `This report will include your description, your Locust and ${typeof navigator !== 'undefined' && /Macintosh|Mac OS X/.test(navigator.userAgent) ? 'macOS' : 'Windows'} versions, and this conversation. It opens on GitHub, where you send it.`}
+            {`This report will include your description${withConversation && conversation !== undefined ? ', this conversation,' : ''} and your Locust and ${typeof navigator !== 'undefined' && /Macintosh|Mac OS X/.test(navigator.userAgent) ? 'macOS' : 'Windows'} versions. It opens on GitHub as a public issue that anyone can read, and you send it from there.`}
           </p>
           {refused !== undefined && <p className="lc-feedback__claim lc-tone-amber">{refused}</p>}
         </div>

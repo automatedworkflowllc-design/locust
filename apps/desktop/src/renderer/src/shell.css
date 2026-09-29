@@ -6281,7 +6281,7 @@ textarea {
    * they tie on specificity and source order decides -- a focused box under
    * the pointer must show focus, not hover.
    */
-  box-shadow: 0 0 0 1px var(--lc-focus-edge), 0 0 0 3px var(--lc-focus-glow);
+  box-shadow: 0 0 0 1px var(--lc-focus-edge-box), 0 0 0 3px var(--lc-focus-glow);
 }
 
 /* The newline hint, beside the send control and only while there is something
@@ -15307,6 +15307,18 @@ textarea {
   resize: vertical;
   font-family: inherit;
   line-height: 1.6;
+}
+
+.lc-feedback__with {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+  color: var(--lc-text-secondary);
+  font-size: var(--lc-text-description);
+}
+
+.lc-feedback__with > input {
+  margin: 0;
 }
 
 .lc-feedback__claim {

@@ -123,7 +123,8 @@ try {
   check('nothing was sent by itself', !after.said.some((line) => line.includes(TOKEN)), JSON.stringify(after.said.slice(-2)))
   check('the box still holds the words, and now says Enter sends them', after.box?.includes(TOKEN) === true && after.editing === 'Off the queue — Enter sends it', JSON.stringify(after.editing))
 
-  // Send feedback from the conversation's own menu: it says it takes this conversation.
+  // Send feedback from the conversation's own menu: the conversation is offered,
+  // unticked, and goes only when ticked (0.482: the issue is public).
   const fromMenu = await drive.capture("Send feedback from the conversation's menu", () => drive.evaluate(`(async () => {
     document.querySelector('button[aria-label="More actions"]')?.click()
     await new Promise((r) => setTimeout(r, 500))
@@ -136,12 +137,20 @@ try {
       title: dialog?.querySelector('.lc-dialog__title')?.textContent ?? null,
       placeholder: dialog?.querySelector('textarea')?.getAttribute('placeholder') ?? null,
       claim: dialog?.querySelector('.lc-feedback__claim')?.textContent ?? null,
+      offered: dialog?.querySelector('.lc-feedback__with')?.textContent ?? null,
+      ticked: dialog?.querySelector('.lc-feedback__with input')?.checked ?? null,
       sendDisabled: [...(dialog?.querySelectorAll('button') ?? [])].find((b) => b.textContent.trim() === 'Send')?.disabled ?? null
     })
   })()`))
   const box = JSON.parse(String(fromMenu))
   check('the Send feedback box opens from the menu, as Claude Code draws it', box.open && box.title === 'Send feedback' && box.placeholder === 'Describe the issue' && box.sendDisabled === true, String(fromMenu))
-  check('and says it includes this conversation, and opens on GitHub', /and this conversation\. It opens on GitHub, where you send it\.$/.test(box.claim ?? ''), JSON.stringify(box.claim))
+  check('it offers this conversation, unticked, and says the issue is public', box.offered === 'Include this conversation' && box.ticked === false && !/this conversation/.test(box.claim ?? '') && /as a public issue that anyone can read/.test(box.claim ?? ''), JSON.stringify({ offered: box.offered, ticked: box.ticked, claim: box.claim }))
+  const tickedClaim = String(await drive.evaluate(`(async () => {
+    document.querySelector('.lc-feedback__with input')?.click()
+    await new Promise((r) => setTimeout(r, 300))
+    return document.querySelector('.lc-feedback__claim')?.textContent ?? ''
+  })()`))
+  check('ticked, it says the conversation goes with it', /your description, this conversation, and your Locust/.test(tickedClaim), JSON.stringify(tickedClaim))
   await drive.evaluate(`(() => { [...document.querySelectorAll('.lc-feedback button')].find((b) => b.textContent.trim() === 'Cancel')?.click() })()`)
   await sleep(400)
   check('Cancel closes it', (await drive.evaluate(`document.querySelector('.lc-feedback') === null`)) === true)

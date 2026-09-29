@@ -22,11 +22,22 @@ describe('the box', () => {
     expect(html).toMatch(/<button type="button" class="lc-primarybutton" disabled="">Send<\/button>/)
   })
 
-  it('says what goes with it, and that the person sends it on GitHub', () => {
+  it('says what goes with it, that it is public, and that the person sends it on GitHub', () => {
     const alone = renderToStaticMarkup(<FeedbackDialog onClose={() => undefined} />)
-    expect(alone).toContain('This report will include your description and your Locust and Windows versions. It opens on GitHub, where you send it.')
+    expect(alone).toContain('This report will include your description and your Locust and Windows versions. It opens on GitHub as a public issue that anyone can read, and you send it from there.')
+    expect(alone).not.toContain('Include this conversation')
+  })
+
+  /*
+   * The issue is public, and the conversation used to go with it unasked
+   * (Colin, 2026-09-29: keep GitHub, say it is public, send the conversation
+   * only when ticked).
+   */
+  it('offers the conversation it was opened from, unticked, and does not claim to send it', () => {
     const withThread = renderToStaticMarkup(<FeedbackDialog conversation="You: hi" onClose={() => undefined} />)
-    expect(withThread).toContain('your Locust and Windows versions, and this conversation. It opens on GitHub, where you send it.')
+    expect(withThread).toMatch(/<input type="checkbox"\/><span>Include this conversation<\/span>/)
+    expect(withThread).toContain('This report will include your description and your Locust and Windows versions.')
+    expect(withThread).not.toContain('this conversation,')
   })
 })
 
