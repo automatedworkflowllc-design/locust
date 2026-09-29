@@ -160,7 +160,8 @@ export function startOpenCodeServeRun(options: OpenCodeServeRunOptions): Runtime
     settleCompletion({
       exitCode: cancelled ? null : errored || why.length > 0 ? 1 : 0,
       signal: null,
-      stderr: why,
+      // The server's own last words after ours (N10), when it ended on a reason.
+      stderr: why.length > 0 && (child.stderrTail?.().trim() ?? "").length > 0 ? `${why}${String.fromCharCode(10)}${child.stderrTail!().trim()}` : why,
       stderrTruncated: false,
       recordCount,
       cancelled,

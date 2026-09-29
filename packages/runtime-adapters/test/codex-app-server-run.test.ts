@@ -211,6 +211,18 @@ describe("a turn over app-server", () => {
     expect(completion.stderr).toContain("exited");
   });
 
+  // QA-2026-09-29 round 2, N10: the server's own reason was thrown away, and
+  // the card quoted the app's sentence back as "the runtime's last word".
+  it("keeps what a dying server wrote to stderr, as its last line", async () => {
+    const { server, run } = await handshaken();
+    (server.process as { stderrTail?: () => string }).stderrTail = () => "thread 'main' panicked\nError: sandbox could not start: seatbelt denied\n";
+    server.exit();
+    const completion = await run.completion;
+    const lines = completion.stderr.trim().split("\n");
+    expect(lines[0]).toContain("exited");
+    expect(lines.at(-1)).toBe("Error: sandbox could not start: seatbelt denied");
+  });
+
   it("ends the run when the mission is cancelled", async () => {
     const controller = new AbortController();
     const { run } = await handshaken({ signal: controller.signal });

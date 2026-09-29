@@ -42,6 +42,12 @@ export interface AppServerRunProcess {
   kill(): void;
   onData(listener: (chunk: string) => void): void;
   onExit(listener: () => void): void;
+  /**
+   * The end of what the server wrote to stderr, when it is kept (QA-2026-09-29
+   * round 2, N10): a server that dies says why there, and the card showed the
+   * app's own sentence quoted back as "the runtime's last word".
+   */
+  stderrTail?(): string;
 }
 
 export interface CodexAppServerRunOptions {
@@ -247,7 +253,10 @@ export function startCodexAppServerRun(
   const lose = (why: string): void => {
     if (settled) return;
     transportFailed = true;
-    stderr = stderr.length > 0 ? stderr : why;
+    // The server's own last words after ours, so the card's "last word" is its (N10).
+    const said = child.stderrTail?.().trim() ?? "";
+    stderr = stderr.length > 0 ? stderr : said.length > 0 ? `${why}
+${said}` : why;
     finish();
   };
 

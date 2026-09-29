@@ -30,6 +30,8 @@ export interface AppServerProcess {
   readonly kill: () => void
   readonly onData: (listener: (chunk: string) => void) => void
   readonly onExit: (listener: () => void) => void
+  /** The end of the server's stderr (N10): kept small, and always drained. */
+  readonly stderrTail: () => string
 }
 
 /** What the process needs from the machine, so a test can stand in for it. */
@@ -50,9 +52,13 @@ export interface AppServerChild {
   readonly pid?: number
   readonly stdin: { write(line: string): unknown; on?(event: 'error', listener: () => void): unknown }
   readonly stdout: { on(event: 'data', listener: (chunk: Buffer | string) => void): unknown }
+  readonly stderr?: { on(event: 'data', listener: (chunk: Buffer | string) => void): unknown } | null
   on(event: 'exit' | 'error', listener: () => void): unknown
   kill(): unknown
 }
+
+/** How much of a server's stderr is kept: its last lines, never the stream. */
+const STDERR_TAIL_CHARS = 4_096
 
 const MACHINE: AppServerProcessDeps = {
   // H7: the launch's own environment over the host's -- a CLI under the
@@ -61,9 +67,10 @@ const MACHINE: AppServerProcessDeps = {
   spawn: (executablePath, args, env, cwd) => {
     const shape = spawnShape(executablePath, args)
     return spawn(executablePath, [...shape.args], {
-      // Stderr is never read, so it is not piped: a full pipe nobody drains
-      // stalls a chatty CLI (L4).
-      stdio: ['pipe', 'pipe', 'ignore'],
+      // Stderr is piped and ALWAYS drained, keeping only its end (N10): a
+      // full pipe nobody drains stalls a chatty CLI (L4), and a server that
+      // dies says why there.
+      stdio: ['pipe', 'pipe', 'pipe'],
       ...(cwd === undefined ? {} : { cwd }),
       ...(shape.windowsVerbatimArguments === true ? { windowsVerbatimArguments: true } : {}),
       ...(env === undefined ? {} : { env: { ...process.env, ...env } })
@@ -86,6 +93,10 @@ export function startAppServerProcess(
   child.stdin.on?.('error', () => undefined)
   // And the spawn's own failure is handled even before anyone asks onExit.
   child.on('error', () => undefined)
+  let tail = ''
+  child.stderr?.on('data', (chunk) => {
+    tail = `${tail}${String(chunk)}`.slice(-STDERR_TAIL_CHARS)
+  })
   let stopping = false
   const killChild = (): void => {
     try {
@@ -95,6 +106,7 @@ export function startAppServerProcess(
     }
   }
   return {
+    stderrTail: () => tail,
     write: (line) => {
       child.stdin.write(line)
     },
