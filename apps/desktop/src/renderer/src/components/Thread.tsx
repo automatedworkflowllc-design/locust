@@ -33,6 +33,7 @@ import { isImagePath } from '../../../shared/image-files.js'
 import { Icon } from './Icon.js'
 import { ApprovalCard } from './ApprovalCard.js'
 import { CancellationCard, stoppedBeforeAnyTool } from './CancellationCard.js'
+import { SignInButton } from './SignInButton.js'
 import { AgentAvatar, AgentText, DiagnosticLine, LiveStepCard, PlanSteps } from './ThreadItems.js'
 import { DecisionCard } from './DecisionCard.js'
 import { ResumeCard } from './ResumeCard.js'
@@ -613,6 +614,8 @@ export interface ThreadProps {
   readonly onSendAgain?: () => void
   /** A free model that gave up on its limit: the next one, with the message handed back. */
   readonly limitModel?: { readonly label: string; readonly onPress: () => void }
+  /** A run that failed because its runtime is signed out: that runtime's sign-in. */
+  readonly signInRuntime?: MissionRuntimeId
   /** Open the conversation a received message was written in. */
   readonly onOpenSenderRun?: (missionId: string) => () => void
   /** Whether that run was asked to PLAN rather than do; the offer then reads as the build step. */
@@ -766,6 +769,7 @@ export function Thread({
   onRunAgain,
   onSendAgain,
   limitModel,
+  signInRuntime,
   onOpenSenderRun,
   wasPlan,
   onAnswer,
@@ -1355,6 +1359,13 @@ onResume,
             <button type="button" className="lc-button" onClick={limitModel.onPress}>
               {limitModel.label}
             </button>
+          </div>
+        )}
+
+        {signInRuntime !== undefined && error !== undefined && (
+          <div className="lc-rerun">
+            <span>{runtimeDisplayName(signInRuntime)} is signed out. Sign in again, then send your message.</span>
+            <SignInButton runtime={signInRuntime} />
           </div>
         )}
 

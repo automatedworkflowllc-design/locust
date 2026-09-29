@@ -331,6 +331,9 @@ const AUTHENTICATION_PATTERNS = [
   /\bunauthorized\b/i,
   /\binvalid api key\b/i,
   /\blogin (?:required|expired)\b/i,
+  // Codex's own words when the saved sign-in has expired (QA-2026-09-29 round 2, N11).
+  /\baccess token could not be refreshed\b/i,
+  /\bsign in again\b/i,
 ] as const;
 
 const SAFETY_PATTERNS = [

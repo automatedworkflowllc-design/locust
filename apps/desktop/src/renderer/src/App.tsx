@@ -4323,6 +4323,20 @@ export default function App(): ReactElement {
     }
   })()
 
+  /*
+   * A SIGN-IN THAT EXPIRED (QA-2026-09-29 round 2, N11). Codex's `login
+   * status` only reads that a sign-in is saved, so Settings kept saying READY
+   * after "Your access token could not be refreshed", and the card had nothing
+   * to press. The runtime says why it failed; the card offers its sign-in.
+   */
+  const signInOffer = ((): MissionRuntimeId | undefined => {
+    const shown = liveRun
+    if (shown === undefined || shown.phase !== 'failed' || shown.data === undefined) return undefined
+    const failed = [...shown.events].reverse().find((event) => event.type === 'run.failed')
+    if (failed === undefined || failed.type !== 'run.failed' || failed.payload.kind !== 'authentication-failed') return undefined
+    return signInCommand(shown.data.runtime) === undefined ? undefined : shown.data.runtime
+  })()
+
   // Returns the save, so the dialog can hold its button until it lands (L22).
   const createTeammate = ({ monthlyLimitUsd, ...input }: TeammateDraft): Promise<void> => {
     const bridge = window.desktop
@@ -7177,6 +7191,7 @@ export default function App(): ReactElement {
                 running={running}
                 {...(busyOffer === undefined ? {} : { busyModel: busyOffer })}
                 {...(limitOffer === undefined ? {} : { limitModel: limitOffer })}
+                {...(signInOffer === undefined ? {} : { signInRuntime: signInOffer })}
                 onSendAgain={
                   // R29: a run stopped before it used any tool, most often
                   // by the second click of a double click on Send. Thread

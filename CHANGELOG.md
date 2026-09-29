@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.481.0 - 2026-09-29
+
+### Fixed
+
+- **A run that fails because you are signed out offers Sign in.** When
+  Codex's saved sign-in expired, the card said to log out and sign in again
+  but had nothing to press. Settings still said ready, because Codex's own
+  check only looks for a saved sign-in. Now the card has the same Sign in
+  button as Settings, for Codex, Copilot and any runtime that reports it.
+
 ## 0.480.0 - 2026-09-29
 
 ### Fixed

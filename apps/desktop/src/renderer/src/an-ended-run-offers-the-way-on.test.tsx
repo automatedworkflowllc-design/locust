@@ -61,6 +61,21 @@ describe('a run stopped before any tool ran', () => {
   })
 })
 
+describe('a run whose runtime is signed out (N11)', () => {
+  it('offers that runtime\'s sign-in on the failure card', () => {
+    const html = thread({
+      error: 'Your access token could not be refreshed. Please log out and sign in again.',
+      signInRuntime: 'codex'
+    })
+    expect(html).toContain('is signed out. Sign in again, then send your message.')
+    expect(html).toContain('>Sign in</button>')
+  })
+
+  it('offers nothing of the kind otherwise', () => {
+    expect(thread({ error: 'The model returned an unexpected response.' })).not.toContain('is signed out')
+  })
+})
+
 describe('a free model that gave up on its limit', () => {
   const said =
     'timestamp=2026-09-29T03:40:47.596Z level=ERROR message="stream error" error.error="AI_APICallError: Rate limit exceeded"'
