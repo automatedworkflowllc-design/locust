@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.462.0 - 2026-09-29
+<!-- big -->
+
+### New
+
+- **Ask on the side.** From a conversation's ... menu, ask about it while
+  it works -- why it chose something, what it has done so far. The answer
+  comes from a copy of the conversation on the same model, read-only, in a
+  panel beside it; the conversation keeps working and never sees the
+  question. Follow-up questions in the panel remember the ones before.
+  Works with Claude Code, Codex and OpenCode.
+
 ## 0.461.0 - 2026-09-29
 
 ### Improved

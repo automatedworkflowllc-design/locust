@@ -387,6 +387,15 @@ export interface RuntimeCommandOptions {
    */
   readonly resumeThreadId?: string;
   /**
+   * Continue a COPY of that session, leaving the session itself as it was
+   * (0.461, a question asked on the side). Claude Code takes
+   * `--fork-session` beside `--resume`, OpenCode `--fork` beside `-s`, and
+   * Codex's app-server has `thread/fork` (codex-app-server-run.ts). MEASURED
+   * 2026-09-29 on OpenCode's free model: the fork answered from the earlier
+   * turns and the original session never held the question.
+   */
+  readonly forkSession?: boolean;
+  /**
    * The mission's prompt, for the runtimes that take it as a positional
    * argument instead of on stdin. Every other builder ignores it: the runner
    * still owns delivery there, and a prompt in two places is a prompt that
@@ -895,6 +904,7 @@ export function createClaudePrintCommand(
   }
   if (options.resumeThreadId !== undefined) {
     args.push("--resume", requireText(options.resumeThreadId, "Session id"));
+    if (options.forkSession === true) args.push("--fork-session");
   }
   return baseSpec("claude", executable, options.workspacePath, args, {
     stdin: "stream-json",
@@ -1486,6 +1496,7 @@ export function createOpenCodeRunCommand(
   }
   if (options.resumeThreadId !== undefined) {
     args.push("-s", requireText(options.resumeThreadId, "Session id"));
+    if (options.forkSession === true) args.push("--fork");
   } else {
     // A6.3: a new session names itself with a second model call -- the
     // `title` agent, on the same model -- unless it is given a title (read

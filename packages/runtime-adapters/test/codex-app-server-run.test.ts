@@ -86,7 +86,7 @@ async function handshaken(overrides: Record<string, unknown> = {}) {
   await settle();
   server.answer(server.idOf("initialize")!, { userAgent: "codex" });
   await settle();
-  server.answer(server.idOf("thread/start") ?? server.idOf("thread/resume")!, {
+  server.answer(server.idOf("thread/start") ?? server.idOf("thread/resume") ?? server.idOf("thread/fork")!, {
     thread: { id: "thread_9" },
   });
   await settle();
@@ -169,6 +169,14 @@ describe("a turn over app-server", () => {
       threadId: "thread_earlier",
       cwd: "/work",
     });
+  });
+
+  it("forks the thread for a question on the side, a copy the side can fork again (0.461)", async () => {
+    const { server } = await handshaken({ resumeThreadId: "thread_earlier", forkThread: true, sandbox: "read-only" });
+    expect(server.idOf("thread/resume")).toBeUndefined();
+    expect(server.idOf("thread/start")).toBeUndefined();
+    expect(server.paramsOf("thread/fork")).toMatchObject({ threadId: "thread_earlier", sandbox: "read-only", cwd: "/work" });
+    expect(server.paramsOf("thread/fork")).not.toHaveProperty("ephemeral");
   });
 
   it("streams every notification as a record and ends when the turn does", async () => {

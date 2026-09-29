@@ -259,7 +259,9 @@ export function publicRecoveredMission(
             }
           : mission.metadata.startedBy.kind === 'terminal'
             ? { startedBy: { kind: 'terminal' as const, exchange: mission.metadata.startedBy.exchange } }
-            : { startedBy: { kind: 'resume' as const, epoch: mission.metadata.startedBy.epoch } })
+            : mission.metadata.startedBy.kind === 'side'
+              ? { startedBy: { kind: 'side' as const, of: mission.metadata.startedBy.of, question: mission.metadata.startedBy.question } }
+              : { startedBy: { kind: 'resume' as const, epoch: mission.metadata.startedBy.epoch } })
   }
 }
 

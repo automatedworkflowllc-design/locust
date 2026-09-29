@@ -26,7 +26,7 @@ import type { CheckpointReason, ReconciledCheckpoint } from './checkpoint.js'
  */
 export type MissionRecordedMode = "ask" | "plan" | "accept-edits" | "approve-each" | "auto";
 
-export const MISSION_LEDGER_SCHEMA_VERSION = 18 as const
+export const MISSION_LEDGER_SCHEMA_VERSION = 19 as const
 
 /**
  * Versions this reader accepts, each a strict subset of the next, so all are
@@ -132,8 +132,15 @@ export const MISSION_LEDGER_SCHEMA_VERSION = 18 as const
  * mode it chose -- and a v17 reader would refuse a starter it does not know
  * rather than draw it as a run Locust made, so the number moves for the
  * reason it moved at v11 and v13.
+ *
+ * v18 -> v19: `startedBy.kind` gains `side`, a question asked ON THE SIDE of
+ * a conversation (docs/PLAN-2026-09-29-FOLDERS-LIKE-CLAUDE-CODE.md, Devin's
+ * side chats): a read-only run on a FORK of that conversation's session, which
+ * the conversation never sees. `of` names the conversation's turn it forked
+ * from, `question` counts them from 1. A v18 reader would draw it as a turn of
+ * no conversation, so the number moves for the reason it moved at v18.
  */
-export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18] as const
+export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19] as const
 
 export type MissionLedgerSchemaVersion =
   (typeof SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS)[number]
@@ -269,6 +276,17 @@ export type MissionStarter =
       readonly kind: 'terminal'
       /** Which exchange of that terminal session this is, counting from 1. */
       readonly exchange: number
+    }
+  | {
+      /**
+       * A question asked on the side of a conversation (v19): a read-only run
+       * on a fork of its session. The conversation itself never sees it.
+       */
+      readonly kind: 'side'
+      /** The conversation's turn whose session was forked. */
+      readonly of: string
+      /** Which side question on that conversation this is, counting from 1. */
+      readonly question: number
     }
 
 /**
@@ -757,9 +775,11 @@ function validateMetadata(metadata: MissionLedgerMetadata): MissionLedgerMetadat
             ? starter.step
             : starter.kind === 'terminal'
               ? starter.exchange
-              : undefined
+              : starter.kind === 'side'
+                ? starter.question
+                : undefined
     if (
-      (starter.kind !== 'relay' && starter.kind !== 'resume' && starter.kind !== 'routine' && starter.kind !== 'terminal')
+      (starter.kind !== 'relay' && starter.kind !== 'resume' && starter.kind !== 'routine' && starter.kind !== 'terminal' && starter.kind !== 'side')
       || counter === undefined
       || !Number.isSafeInteger(counter)
       || counter < 1
@@ -767,6 +787,7 @@ function validateMetadata(metadata: MissionLedgerMetadata): MissionLedgerMetadat
       throw new Error('Mission starter is invalid')
     }
     if (starter.kind === 'routine') requireText(starter.routineId, 'startedBy.routineId', 200)
+    if (starter.kind === 'side') requireSafeId(starter.of, 'startedBy.of')
   }
   return metadata
 }
@@ -949,6 +970,10 @@ function parsedMetadata(
   }
   // And no writer before v18 brought a terminal's turns back.
   if (schemaVersion < 18 && candidate.startedBy?.kind === 'terminal') {
+    return undefined
+  }
+  // And no writer before v19 asked anything on the side.
+  if (schemaVersion < 19 && candidate.startedBy?.kind === 'side') {
     return undefined
   }
   // And no writer before v7 knew Cursor Agent or Gemini CLI.

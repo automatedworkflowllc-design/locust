@@ -61,6 +61,13 @@ export interface CodexAppServerRunOptions {
   /** A prior thread to carry on, which keeps its turns. */
   readonly resumeThreadId?: string;
   /**
+   * Carry on a COPY of that thread (0.461, a question asked on the side):
+   * `thread/fork`, and the thread itself never sees the question. The copy is
+   * kept (not `ephemeral`): a follow-up on the side forks it in turn, and an
+   * ephemeral thread is never on disk to be forked.
+   */
+  readonly forkThread?: boolean;
+  /**
    * One of Codex's own commands, typed by the person (0.428), sent as the
    * request its own terminal sends instead of a turn: `review` is
    * `review/start` (the prompt, when there is one, as its instructions),
@@ -319,8 +326,9 @@ export function startCodexAppServerRun(
       clientInfo: { name: "locust", version: "0.1.0" },
     });
     client.notify("initialized");
+    const forking = options.resumeThreadId !== undefined && options.forkThread === true;
     const thread = await client.request(
-      options.resumeThreadId === undefined ? "thread/start" : "thread/resume",
+      options.resumeThreadId === undefined ? "thread/start" : forking ? "thread/fork" : "thread/resume",
       {
         ...(options.resumeThreadId === undefined
           ? {}

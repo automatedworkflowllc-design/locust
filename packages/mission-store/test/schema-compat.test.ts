@@ -125,10 +125,11 @@ describe('ledger schema versions', () => {
 
     // v17 added the person's check result after a turn (mission.edit_check);
     // v18 the terminal starter, a turn brought back from the runtime's own
-    // terminal (0.391).
-    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(18)
-    expect(header.schemaVersion).toBe(18)
-    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18])
+    // terminal (0.391); v19 the side starter, a question asked on a fork of
+    // a conversation's session (0.461).
+    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(19)
+    expect(header.schemaVersion).toBe(19)
+    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19])
     /*
      * THE PAIR THAT DRIFTED, checked as a pair.
      *
@@ -506,6 +507,37 @@ describe('ledger schema versions', () => {
     expect(await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')).toBeUndefined()
   })
 
+  it('round-trips a side starter at the current version (v19)', async () => {
+    // A question asked on a fork of a conversation's session (0.461).
+    const root = await temporaryRoot()
+    await createFileMissionLedger({ rootDirectory: root }).createMission(
+      v1Metadata({ startedBy: { kind: 'side', of: 'mission_main', question: 2 } }) as unknown as MissionLedgerMetadata
+    )
+
+    const recovered = await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')
+
+    expect(recovered?.issues).toEqual([])
+    expect(recovered?.metadata.startedBy).toEqual({ kind: 'side', of: 'mission_main', question: 2 })
+  })
+
+  it('refuses a side starter with no conversation, or a question below 1', async () => {
+    const ledger = createFileMissionLedger({ rootDirectory: await temporaryRoot() })
+    await expect(ledger.createMission(v1Metadata({ startedBy: { kind: 'side', of: '', question: 1 } }) as unknown as MissionLedgerMetadata)).rejects.toThrow()
+    await expect(ledger.createMission(v1Metadata({ startedBy: { kind: 'side', of: 'mission_main', question: 0 } }) as unknown as MissionLedgerMetadata)).rejects.toThrow()
+  })
+
+  it('refuses a side starter in a file written before version 19', async () => {
+    const root = await temporaryRoot()
+    const metadata = v1Metadata({ startedBy: { kind: 'side', of: 'mission_main', question: 1 } })
+    await writeFile(
+      join(root, 'mission_1.jsonl'),
+      `${JSON.stringify({ schemaVersion: 18, recordType: 'mission.created', ledgerSequence: 1, occurredAt: metadata.createdAt, metadata })}\n`,
+      'utf8'
+    )
+
+    expect(await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')).toBeUndefined()
+  })
+
   it('refuses a routine starter with no routine id or a step below 1', async () => {
     const root = await temporaryRoot()
     const ledger = createFileMissionLedger({ rootDirectory: root })
@@ -773,7 +805,7 @@ describe('ledger schema versions', () => {
       join(root, 'mission_1.jsonl'),
       `${JSON.stringify({
         // One past the newest this reader knows. Bump when the schema does.
-        schemaVersion: 19,
+        schemaVersion: 20,
         recordType: 'mission.created',
         ledgerSequence: 1,
         occurredAt: metadata.createdAt,

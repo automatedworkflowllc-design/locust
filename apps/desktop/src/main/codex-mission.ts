@@ -171,6 +171,14 @@ interface ActiveCodexMission {
   readonly persisted: NormalizedRuntimeEvent[]
 }
 
+/**
+ * What a question asked ON THE SIDE is told (0.461): it is a copy of the
+ * conversation, the conversation carries on without it, and nothing is to
+ * change. Short, because the forked session already holds everything else.
+ */
+export const SIDE_QUESTION_PREFACE =
+  'This is a side question from the person, asked on a copy of this conversation while the conversation itself carries on. Answer it from what you already know and what you can read. Change nothing and start nothing.'
+
 export interface CodexMissionService {
   start(
     prompt: unknown,
@@ -213,7 +221,14 @@ export interface CodexMissionService {
      * in place of its owner's, so one teammate -- or nobody -- answers on two
      * models at once. Only the compare handler supplies it.
      */
-    slot?: { readonly key: string; readonly cwd?: string }
+    slot?: { readonly key: string; readonly cwd?: string },
+    /**
+     * A question ON THE SIDE of a conversation (0.461, Devin's side chats):
+     * read-only, on a FORK of the session of `of` -- the conversation's
+     * latest turn -- which the conversation itself never sees. The caller
+     * gives it a slot of its own, so it runs while the conversation does.
+     */
+    side?: { readonly of: string; readonly question: number }
   ): Promise<CodexMissionStartResponse>
   cancel(runId: unknown): CodexMissionCancelResponse
   /**
@@ -1097,7 +1112,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       relay?: RelayOrigin,
       startedBy?: MissionStarter,
       asCommand?: boolean,
-      slot?: { readonly key: string; readonly cwd?: string }
+      slot?: { readonly key: string; readonly cwd?: string },
+      side?: { readonly of: string; readonly question: number }
     ): Promise<CodexMissionStartResponse> {
       // `account-default` is the shell's word for "send no --model", not a
       // model id. Passing it through would make the CLI look for a model that
@@ -1119,7 +1135,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
        * One whose folder is not known, or is gone, is refused rather than
        * run somewhere it never was.
        */
-      const continues = continuation?.missionId ?? followUpOf ?? relay?.rootMissionId
+      const continues = continuation?.missionId ?? followUpOf ?? relay?.rootMissionId ?? side?.of
       const current = options.currentFolder?.() ?? options.workspacePath
       let runFolder = current
       if (continues !== undefined && options.folderOf !== undefined) {
@@ -1277,6 +1293,46 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // the renderer names a mission, and the host decides what that means.
         let resumeThreadId: string | undefined
         let resumedMissionId: string | undefined
+        /*
+         * A SIDE QUESTION forks the conversation's latest session, read-only,
+         * on the conversation's own runtime -- the three that can fork one:
+         * Claude Code (--fork-session), Codex (thread/fork, ephemeral) and
+         * OpenCode (--fork). It is not the conversation's next turn: no
+         * continuation is recorded, and the brief that session already holds
+         * is not sent again.
+         */
+        if (side !== undefined) {
+          // Codex copies a thread only through its app-server; its `exec resume`
+          // would carry the question into the conversation itself.
+          if ((runtime !== 'claude' && runtime !== 'codex' && runtime !== 'opencode') || (runtime === 'codex' && options.appServerSpawn === undefined)) {
+            return error('RUNTIME_START_FAILED', `${runtimeDisplayName(runtime)} cannot answer on the side of a conversation: it has no way to copy one.`) as CodexMissionStartResponse
+          }
+          if (mode !== 'ask') {
+            return error('RUNTIME_START_FAILED', 'A question on the side is only ever asked read-only.') as CodexMissionStartResponse
+          }
+          const forked = await options.ledger.getMission(side.of).catch(() => undefined)
+          if (forked === undefined || forked.metadata.runtime !== runtime) {
+            return error('RUNTIME_START_FAILED', 'That conversation cannot be asked about on the side.') as CodexMissionStartResponse
+          }
+          /*
+           * The session to copy: the turn's own, or -- for a turn still
+           * running, which has not said its session yet -- the one it
+           * resumed, back through the conversation (drive-side-chat, 0.461:
+           * asked mid-turn, the running turn named none).
+           */
+          let forkedThread: string | undefined
+          let at: typeof forked | undefined = forked
+          for (let hops = 0; at !== undefined && forkedThread === undefined && hops < 8; hops += 1) {
+            forkedThread = runtimeThreadIdOf(at) ?? at.metadata.continuesFrom?.runtimeThreadId
+            const earlier: string | undefined = at.metadata.continuesFrom?.missionId
+            at = forkedThread !== undefined || earlier === undefined ? undefined : await options.ledger.getMission(earlier).catch(() => undefined)
+            if (at !== undefined && at.metadata.runtime !== runtime) at = undefined
+          }
+          if (forkedThread === undefined) {
+            return error('RUNTIME_START_FAILED', 'This conversation has no session to ask about yet. Ask again once its reply has started.') as CodexMissionStartResponse
+          }
+          resumeThreadId = forkedThread
+        }
         // Whether the session being resumed compacted during that turn: then
         // it holds a summary, not the brief, and this turn is briefed in full.
         let resumedCompacted = false
@@ -1575,7 +1631,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           const choice = {
             ...(chosenModel === undefined ? {} : { model: chosenModel }),
             ...(chosenEffort === undefined ? {} : { effort: chosenEffort }),
-            ...(resumeThreadId === undefined ? {} : { resumeThreadId })
+            ...(resumeThreadId === undefined ? {} : { resumeThreadId }),
+            ...(side === undefined ? {} : { forkSession: true })
           }
           if (runtime === 'opencode' && opencodeServes) {
             return createOpenCodeServeCommand(executable, {
@@ -1725,7 +1782,13 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // A command is sent bare, and records no brief: the session it acts
         // on may be cleared or compacted by it, so the next turn is briefed
         // whole (briefSessions.after finds nothing for this one).
-        if (bare) {
+        if (side !== undefined) {
+          // The forked session already holds the brief and the whole
+          // conversation; it is told only what this is.
+          runtimePrompt = `${SIDE_QUESTION_PREFACE}
+
+${sentPrompt.trim()}`
+        } else if (bare) {
           const named = openCodeCommand ?? codexCommand
           const after = named === undefined ? sentPrompt.trim() : sentPrompt.trimStart().slice(named.length + 1).trim()
           runtimePrompt = named === undefined
@@ -1835,6 +1898,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             // presented both the same way.
             ...(relay !== undefined
               ? { startedBy: { kind: 'relay' as const, hop: relay.hop } }
+              : side !== undefined
+                ? { startedBy: { kind: 'side' as const, of: side.of, question: side.question } }
               : startedBy === undefined
                 ? {}
                 : { startedBy }),
@@ -1950,6 +2015,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               ...(chosenModel === undefined ? {} : { model: chosenModel }),
               ...(route.effort === undefined ? {} : { effort: route.effort }),
               ...(resumeThreadId === undefined ? {} : { resumeThreadId }),
+              ...(side === undefined ? {} : { forkThread: true }),
               ...(codexCommand === 'review' || codexCommand === 'compact' ? { slashCommand: codexCommand } : {}),
               signal: controller.signal,
               now

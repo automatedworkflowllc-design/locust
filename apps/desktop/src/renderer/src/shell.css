@@ -15779,6 +15779,66 @@ textarea {
   padding: var(--lc-space-6) var(--lc-space-5);
 }
 
+/*
+ * ASK ON THE SIDE (0.461, SideChat.tsx): the beside panel with a box of its
+ * own at the foot. The box is plainer than the composer's -- no route, no
+ * mode -- because a side question has only one of each: the conversation's
+ * model, read-only.
+ */
+/* The thread scrolls between the head and the box, which stays at the foot. */
+.lc-sidechat .lc-beside__thread {
+  overflow-y: auto;
+}
+
+.lc-sidechat__empty {
+  margin: 0;
+  padding: var(--lc-space-6) var(--lc-space-5);
+  max-width: 44ch;
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
+  line-height: 1.5;
+}
+
+.lc-sidechat__ask {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--lc-space-3);
+  padding: var(--lc-space-4) var(--lc-space-5) var(--lc-space-5);
+  border-top: 1px solid var(--lc-border-hairline);
+}
+
+.lc-sidechat__problem {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--lc-text-secondary);
+  font-size: var(--lc-text-description);
+}
+
+.lc-sidechat__box {
+  min-height: 40px;
+  max-height: 160px;
+  resize: vertical;
+  padding: 9px 12px;
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-raised);
+  color: var(--lc-text-primary);
+  font: inherit;
+  font-size: var(--lc-text-control);
+  line-height: 1.4;
+}
+
+.lc-sidechat__box:focus-visible {
+  outline: none;
+  border-color: var(--lc-border-strong);
+}
+
+.lc-sidechat__send:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .lc-viewer__head {
   display: flex;
   align-items: center;

@@ -620,6 +620,11 @@ export const WORKSPACE_SETTINGS_WRITE_CHANNEL = 'workspace-settings:write'
 export const WORKSPACE_CHOOSE_CHANNEL = 'workspace:choose'
 /** Every folder worked in, and the window's (0.458). */
 export const FOLDER_LIST_CHANNEL = 'folder:list'
+/** Ask a question on the side of a conversation: read-only, on a copy of its session (0.461). */
+export const SIDE_ASK_CHANNEL = 'side:ask'
+export type SideAskResponse =
+  | { readonly ok: true; readonly data: { readonly runId: string; readonly missionId: string } }
+  | { readonly ok: false; readonly message: string }
 /** Switch the window to a folder already worked in, by id -- no restart (0.458). */
 export const FOLDER_SWITCH_CHANNEL = 'folder:switch'
 export interface PublicFolder {
@@ -2349,6 +2354,8 @@ export type CodexMissionUpdate =
         | { readonly kind: 'tag' }
         /** A comparison's column (0.441): drawn in the comparison, never focused on its own. */
         | { readonly kind: 'compare'; readonly compareId: string; readonly slot: CompareSlotId }
+        /** A question on the side of a conversation (0.461): drawn in the side panel, never in the sidebar. */
+        | { readonly kind: 'side'; readonly of: string; readonly question: number }
       /**
        * Present when this run is the newest turn of the teammate's hub (see
        * `PublicTeammate.hubMissionId`), so the roster on screen learns it
@@ -2561,6 +2568,16 @@ export interface PublicRecoveredMission {
         readonly kind: 'terminal'
         readonly exchange: number
       }
+    | {
+        /**
+         * A question asked on the side of a conversation (0.461): read-only,
+         * on a fork of the session of `of`. It is not a turn of that
+         * conversation, and the sidebar never lists it as one.
+         */
+        readonly kind: 'side'
+        readonly of: string
+        readonly question: number
+      }
 }
 
 /** H3: one mission, projected as history projects the newest ones. */
@@ -2728,6 +2745,8 @@ export interface DesktopApi {
   /** Pick the folder the teammates work in. Reopens the app there on success. */
   chooseWorkspace(): Promise<WorkspaceChooseResponse>
   listFolders(): Promise<FolderListResponse>
+  /** `of` is the conversation's (or the side chat's) latest turn; `question` counts from 1. */
+  askOnTheSide(of: string, question: string, count: number): Promise<SideAskResponse>
   switchFolder(id: string): Promise<FolderSwitchResponse>
   /**
    * Show a file in the file manager. Answers whether it was shown, so the

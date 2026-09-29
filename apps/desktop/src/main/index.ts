@@ -215,6 +215,7 @@ import {
   TEAMMATE_FOLDER_CHANNEL,
   WORKSPACE_CHOOSE_CHANNEL,
   FOLDER_LIST_CHANNEL,
+  SIDE_ASK_CHANNEL,
   FOLDER_SWITCH_CHANNEL,
   WORKSPACE_ATTACH_CHANNEL,
   WORKSPACE_FILES_CHANNEL,
@@ -3143,6 +3144,51 @@ if (!ownsSingleInstanceLock) {
           error: { code: 'INTERNAL_ERROR', message: 'The chosen folder could not be saved.' }
         } as const
       }
+    })
+
+    /*
+     * A QUESTION ON THE SIDE (0.461, Devin's side chats): asked of a COPY of
+     * the conversation's session -- read-only, on the conversation's own
+     * runtime and model, in a run slot of its own so it answers while the
+     * conversation keeps going. The conversation never sees it
+     * (codex-mission.ts, `side`).
+     */
+    ipcMain.handle(SIDE_ASK_CHANNEL, async (event, of: unknown, question: unknown, count: unknown) => {
+      const refuse = (message: string) => ({ ok: false, message }) as const
+      if (!fromOwnWindow(event)) return refuse('That request was rejected.')
+      if (typeof of !== 'string' || typeof question !== 'string' || question.trim().length === 0) return refuse('Write the question first.')
+      const asked = typeof count === 'number' && Number.isSafeInteger(count) && count >= 1 ? count : 1
+      const turn = await missionLedger.getMission(of).catch(() => undefined)
+      if (turn === undefined) return refuse('That conversation is not in the record.')
+      const owner = (await teammates.missionOwners().catch(() => ({} as Record<string, string>)))[of]
+      const peer = owner === undefined ? undefined : await peerContextFor(owner)
+      const effort = (turn.metadata as { readonly effort?: unknown }).effort
+      const response = await codexMissions.start(
+        question.trim(),
+        turn.metadata.runtime,
+        'ask',
+        { ...(turn.metadata.model === 'account-default' ? {} : { model: turn.metadata.model }), ...(typeof effort === 'string' ? { effort } : {}) },
+        sendToWindow,
+        undefined,
+        peer,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { key: `side:${of}` },
+        { of, question: asked }
+      )
+      if (!response.ok) return refuse(response.error.message)
+      sendToWindow({
+        kind: 'mission-started',
+        runId: response.data.runId,
+        missionId: response.data.missionId,
+        // No owner: the teammate is not busy with it, and its face does not say so.
+        prompt: question.trim(),
+        data: response.data,
+        startedBy: { kind: 'side', of, question: asked }
+      })
+      return { ok: true, data: { runId: response.data.runId, missionId: response.data.missionId } } as const
     })
 
     // Every folder worked in, newest first, and the one the window is in (0.458).

@@ -122,6 +122,7 @@ import type { TeamTemplate } from '../../shared/team-templates.js'
 import { GroupSettingsDialog } from './components/GroupSettingsDialog.js'
 import { TeammateBot } from './components/TeammateBot.js'
 import { BesideConversation } from './components/BesideConversation.js'
+import { SideChat } from './components/SideChat.js'
 import { ReviewChanges } from './components/ReviewChanges.js'
 import { ShareTeamDialog } from './components/TeamCard.js'
 import { RuntimeMark } from './components/RuntimeMark.js'
@@ -1572,6 +1573,12 @@ export default function App(): ReactElement {
    * what is drawn.
    */
   const [besideId, setBesideId] = useState<string>()
+  /**
+   * Ask on the side (0.461, SideChat.tsx): the conversation turn it asks
+   * about, the side runs asked so far (by run id, oldest first), and the
+   * model that answers -- the conversation's own.
+   */
+  const [sideChat, setSideChat] = useState<{ readonly of: string; readonly runIds: readonly string[]; readonly model: string }>()
   const [viewingFile, setViewingFile] = useState<{
     readonly path: string
     /** The file's text, or a `data:` URL when the mode is `image`. */
@@ -4910,6 +4917,8 @@ export default function App(): ReactElement {
   const openMission = (missionId: string): void => {
     // Opening a conversation leaves any comparison on screen (0.441).
     setComparingId(undefined)
+    // And a side chat, which was about the conversation it was opened on (0.461).
+    setSideChat((current) => (current === undefined || current.of === missionId ? current : undefined))
     // A conversation from another folder takes the window there, as Claude
     // Code's sessions do (0.458): the folder chip, @ files and pages are its.
     const itsFolder = historyById.get(missionId)?.workspaceId
@@ -5457,6 +5466,8 @@ export default function App(): ReactElement {
       // shows in the thread, which is where a person is looking when it
       // happens; what it must not do is accumulate.
       if (!listedAsMission({ missionId: run.data?.missionId, active: liveRunIsActive(run) })) continue
+      // A question on the side is drawn in its panel, never as a conversation (0.461).
+      if (run.startedBy?.kind === 'side') continue
       // A run that is still starting has no missionId yet; it is listed under
       // its pending key so the teammate reads as working from the first
       // moment, not from the first receipt.
@@ -5538,6 +5549,7 @@ export default function App(): ReactElement {
     }
     for (const mission of history) {
       if (rows.some((row) => row.missionId === mission.missionId)) continue
+      if (mission.startedBy?.kind === 'side') continue
       // Every folder's conversations, each under its own project (0.458, like
       // Claude Code). This used to drop every other folder's, so a folder
       // switch emptied the sidebar and read as the team being reset (Colin,
@@ -5780,6 +5792,16 @@ export default function App(): ReactElement {
     const id = terminalMissionId
     const offer = shownTerminal
     headerActions.push({ label: `Open in terminal (${shownTerminal.runtimeName})`, onSelect: () => openConversationInTerminal(id, offer) })
+  }
+  /*
+   * Ask on the side (0.461): where the conversation's runtime can copy its
+   * session -- Claude Code, Codex, OpenCode -- and there is a turn to copy.
+   */
+  const sideRuntime = liveRun === undefined ? undefined : liveRun.data?.runtime ?? liveRun.runtime
+  if (terminalMissionId !== undefined && (sideRuntime === 'claude' || sideRuntime === 'codex' || sideRuntime === 'opencode')) {
+    const of = terminalMissionId
+    const model = liveRun === undefined ? 'this model' : routeModelName(sideRuntime, liveRun.data?.model ?? 'account-default', resolvedModels.get(`${sideRuntime}:${liveRun.data?.model ?? 'account-default'}`))
+    headerActions.push({ label: 'Ask on the side', onSelect: () => setSideChat((current) => (current?.of === of ? current : { of, runIds: [], model })) })
   }
   if (liveRun !== undefined && !running) {
     for (const reviewer of reviewersFor(liveRun)) {
@@ -7348,6 +7370,38 @@ export default function App(): ReactElement {
               if (bridge === undefined || workspacePath === undefined) return
               void bridge.saveCopy(viewingFile.path).catch(() => undefined)
             }}
+          />
+        ) : sideChat !== undefined && screen === 'workroom' ? (
+          <SideChat
+            turns={sideChat.runIds.flatMap((runId) => {
+              const run = runs.get(runId)
+              return run === undefined
+                ? []
+                : [{
+                    key: runId,
+                    prompt: run.prompt,
+                    events: run.events,
+                    phase: run.phase,
+                    ...(run.data?.missionId === undefined ? {} : { missionId: run.data.missionId }),
+                    ...(run.error === undefined ? {} : { error: run.error }),
+                    ...(run.startedAtIso === undefined ? {} : { startedAtIso: run.startedAtIso })
+                  }]
+            })}
+            model={sideChat.model}
+            workspacePath={workspacePath}
+            onAsk={async (question) => {
+              const bridge = window.desktop
+              if (bridge === undefined) return 'Locust is not ready yet. Nothing was asked.'
+              // Each follow-up is asked of the side chat's own latest answer, so it remembers itself.
+              const last = sideChat.runIds.at(-1)
+              const of = (last === undefined ? undefined : runs.get(last)?.data?.missionId) ?? sideChat.of
+              const answer = await bridge.askOnTheSide(of, question, sideChat.runIds.length + 1).catch(() => undefined)
+              if (answer === undefined) return 'The question could not be asked. The conversation is unchanged, and nothing was sent.'
+              if (!answer.ok) return answer.message
+              setSideChat((current) => (current === undefined ? current : { ...current, runIds: [...current.runIds, answer.data.runId] }))
+              return undefined
+            }}
+            onClose={() => setSideChat(undefined)}
           />
         ) : besideRun !== undefined && screen === 'workroom' ? (
           <BesideConversation
