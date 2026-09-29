@@ -145,6 +145,13 @@ try {
     return 'composer: ' + placeholder + ' || teammate lit: ' + litName + ' || header: ' + header
       + ' || underlined links: ' + links + ' || title: ' + title
   })()`))
+  // 0.463: Booty's conversation, started by Wren's message, sits under Wren's in the sidebar.
+  await drive.capture("the sidebar: Booty's conversation under Wren's", () => drive.evaluate(`(async () => {
+    await new Promise(r => setTimeout(r, 1500))
+    const nests = [...document.querySelectorAll('.lc-convnest')]
+    const said = nests.map((nest) => 'NESTED ' + nest.innerText.replace(/\\s+/g, ' ').slice(0, 50) + ' UNDER ' + (nest.previousElementSibling?.innerText.replace(/\\s+/g, ' ').slice(0, 50) ?? '?'))
+    return (nests.length === 1 ? 'PASS ' : 'FAIL ') + nests.length + ' nested || ' + said.join(' | ') + ' || top rows: ' + document.querySelectorAll('.lc-convlist > .lc-convrow').length
+  })()`))
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {

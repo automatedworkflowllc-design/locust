@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 
 import type { GroupMembership, PublicGroup, PublicRecoveredMission, PublicRoutine, PublicRuntimeStatus, PublicTeammate, PublicRoom } from '../../../shared/ipc.js'
@@ -90,6 +90,8 @@ export interface SidebarMission {
   readonly compareId?: string
   /** The folder this conversation belongs to (0.458): the sidebar lists it under that project. */
   readonly folderId?: string
+  /** The conversation that sent this one, when a teammate started it for another (0.463): drawn under it. */
+  readonly nestedUnder?: string
 }
 
 
@@ -564,7 +566,30 @@ export function Sidebar({
   const showsGroup = (groupId: string, inFolder: readonly SidebarMission[], keepsEmpty: boolean): boolean =>
     inFolder.some((mission) => heldFor(mission, groupMembers)?.groupId === groupId)
     || (keepsEmpty && !shownConversations.some((mission) => heldFor(mission, groupMembers)?.groupId === groupId))
-  const conversationList = (inFolder: readonly SidebarMission[], keepsEmpty: boolean): ReactElement => {
+  /*
+   * Conversations a teammate started for another, drawn under the one they
+   * came from (0.463) -- only while that one is listed too; otherwise where
+   * they always were.
+   */
+  const shownIds = new Set(shownConversations.map((mission) => mission.missionId))
+  const childrenOf = new Map<string, SidebarMission[]>()
+  for (const mission of shownConversations) {
+    if (mission.nestedUnder === undefined || !shownIds.has(mission.nestedUnder)) continue
+    childrenOf.set(mission.nestedUnder, [...(childrenOf.get(mission.nestedUnder) ?? []), mission])
+  }
+  const isNestedChild = (mission: SidebarMission): boolean => mission.nestedUnder !== undefined && shownIds.has(mission.nestedUnder)
+  const rowAndChildren = (mission: SidebarMission): ReactElement => (
+    <Fragment key={mission.missionId}>
+      {conversationRow(mission)}
+      {(childrenOf.get(mission.missionId) ?? []).map((child) => (
+        <div className="lc-convnest" key={child.missionId}>
+          {conversationRow(child)}
+        </div>
+      ))}
+    </Fragment>
+  )
+  const conversationList = (allInFolder: readonly SidebarMission[], keepsEmpty: boolean): ReactElement => {
+    const inFolder = allInFolder.filter((mission) => !isNestedChild(mission))
     const folderUngrouped = withRoomsFolded(inFolder.filter((mission) => heldFor(mission, groupMembers) === undefined), rooms)
     // "Ungrouped" only where a group is drawn beside it: in a folder with none it names the only thing there.
     const groupsShown = groups.some((group) => showsGroup(group.groupId, inFolder, keepsEmpty))
@@ -649,7 +674,7 @@ export function Sidebar({
                   {open && theirs.length === 0 && (
                     <p className="lc-convgroup__empty lc-row__meta">Nothing in here yet.</p>
                   )}
-                  {open && theirs.map(conversationRow)}
+                  {open && theirs.map(rowAndChildren)}
                 </div>
               )
             })}
@@ -664,7 +689,7 @@ export function Sidebar({
                 <span className="lc-sectionlabel__count">{String(folderUngrouped.length)}</span>
               </div>
             )}
-            {folderUngrouped.map((entry) => (entry.kind === 'room' ? roomRow(entry.room, entry.missions) : conversationRow(entry.mission)))}
+            {folderUngrouped.map((entry) => (entry.kind === 'room' ? roomRow(entry.room, entry.missions) : rowAndChildren(entry.mission)))}
           </>
     )
   }

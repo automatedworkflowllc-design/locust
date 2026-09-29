@@ -72,7 +72,14 @@ export function publicPeerMessages(
     return {
       messageId: message.messageId,
       direction: link.direction,
-      from: { teammateId: message.from.teammateId, name: message.from.name },
+      // With the conversation it was sent from (0.463): a reopened conversation
+      // links back to it, and the sidebar draws it underneath. The live path
+      // always carried it; the record's projection dropped it.
+      from: {
+        teammateId: message.from.teammateId,
+        name: message.from.name,
+        ...(message.from.missionId === undefined ? {} : { missionId: message.from.missionId })
+      },
       to: { teammateId: message.to.teammateId, name: message.to.name },
       text: message.text,
       at: message.postedAt

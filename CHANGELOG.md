@@ -11,6 +11,21 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.463.0 - 2026-09-29
+
+### Improved
+
+- **A teammate's reply sits under the conversation that asked for it.** When
+  one teammate messages another, the reply's conversation is drawn in the
+  sidebar right under the one it came from, instead of as a stranger beside
+  it.
+
+### Fixed
+
+- **"Open Wren's conversation" works after a restart.** A reopened
+  conversation lost its link back to the teammate's conversation that sent
+  it; the link now survives.
+
 ## 0.462.0 - 2026-09-29
 <!-- big -->
 

@@ -214,7 +214,8 @@ describe('peer messages in history', () => {
       {
         messageId: 'wm_1',
         direction: 'received',
-        from: { teammateId: 'tm_atlas', name: 'Atlas' },
+        // With the conversation it was sent from (0.463), as the live path always had it.
+        from: { teammateId: 'tm_atlas', name: 'Atlas', missionId: 'mission_a' },
         to: { teammateId: 'tm_wren', name: 'Wren' },
         text: 'pnpm check runs everything.',
         at: NOW

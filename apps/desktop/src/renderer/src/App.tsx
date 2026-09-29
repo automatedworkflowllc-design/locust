@@ -109,6 +109,7 @@ import type { CompareColumnView } from './components/CompareView.js'
 import { blindName, changesLine, compareMembership, compareRecord, compareNeedsCopy, compareRefusalOf, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../../shared/compare.js'
 import type { CompareSlotId, PublicCompare } from '../../shared/compare.js'
 import { folderLabels } from '../../shared/folder-sections.js'
+import { nestedUnder } from '../../shared/nested-conversations.js'
 import { defaultComparePicks } from './compareDefaults.js'
 import { composerRouteFor, startAs } from '../../shared/route-at-start.js'
 import type { StartAs } from '../../shared/route-at-start.js'
@@ -5589,13 +5590,25 @@ export default function App(): ReactElement {
      * same string.
      */
     // A comparison is one row until a column is kept (0.441, compareRows.ts).
-    return foldComparisons(collapseConversations(rows), compares).map((row) => {
+    const named = foldComparisons(collapseConversations(rows), compares).map((row) => {
       // Asked for under every id this conversation has worn, not only its
       // root -- a name typed while the row was keyed by a live turn was
       // stored against that turn and is otherwise never found again.
       const chosen = heldFor(row, missionTitles)
       return chosen === undefined ? row : { ...row, title: chosen }
     })
+    /*
+     * A conversation a teammate started for another sits under the one it
+     * came from (0.463, nested-conversations.ts): its first turn's received
+     * message names the conversation that sent it.
+     */
+    const sentFrom = (row: SidebarMission): string | undefined => {
+      const root = historyById.get(row.rootId ?? row.missionId)
+      if (root?.startedBy?.kind !== 'relay') return undefined
+      return root.peerMessages.find((message) => message.direction === 'received')?.from.missionId
+    }
+    const parents = nestedUnder(named, sentFrom)
+    return named.map((row) => (parents.has(row.missionId) ? { ...row, nestedUnder: parents.get(row.missionId)! } : row))
   }, [history, historyById, runs, workspaceId, missionTitles, compares])
   const besideRow = besideId === undefined ? undefined : sidebarMissions.find((entry) => (entry.memberIds ?? [entry.missionId]).includes(besideId))
   const besideRun = ((): LiveRunState | undefined => {

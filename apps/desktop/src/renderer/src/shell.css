@@ -15155,6 +15155,17 @@ textarea {
 }
 
 /*
+ * A conversation a teammate started for another, under the one it came from
+ * (0.463): stepped in, with a hairline down its left edge -- a thread, not a
+ * folder, so no chevron and nothing to open.
+ */
+.lc-convnest {
+  margin-left: 14px;
+  padding-left: 6px;
+  border-left: 1px solid var(--lc-border-hairline);
+}
+
+/*
  * PROJECTS (0.458, like Claude Code): each folder's conversations under the
  * folder's own name. A step above a group's mono label -- a folder is where
  * the work is, a group is how the person filed it -- in the folder's own
