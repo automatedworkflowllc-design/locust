@@ -188,6 +188,7 @@ export function MemoryScreen({
         )}
         <div className="lc-memory__body">
           {isEditing ? (
+            <>
             <textarea
               className="lc-input lc-memory__edit"
               aria-label="Memory text"
@@ -203,6 +204,8 @@ export function MemoryScreen({
                 if (event.key === 'Escape') setEditing(undefined)
               }}
             />
+            <LengthLeft length={editing.text.length} />
+            </>
           ) : memory.merges !== undefined ? (
             // A proposal to MERGE kept memories into one, and each as it is now (A1.2).
             <>
@@ -510,6 +513,7 @@ export function MemoryScreen({
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
             />
+            <LengthLeft length={draft.length} />
             <div className="lc-memoryform__row">
               <div className="lc-segmented" role="radiogroup" aria-label="Where it applies">
                 {(
@@ -634,5 +638,19 @@ function AboutYouCard({
         </div>
       </div>
     </section>
+  )
+}
+
+/*
+ * THE LIMIT, SHOWN NEAR IT (QA-2026-09-29 round 2, N6). A memory stops at
+ * 300 characters, and the box simply stopped taking keys with nothing to say
+ * why. Shown from 240, where it starts to matter.
+ */
+function LengthLeft({ length }: { readonly length: number }): ReactElement | null {
+  if (length < 240) return null
+  return (
+    <span className={`lc-memorycount lc-mono${length >= 300 ? ' is-full' : ''}`} aria-live="polite">
+      {length >= 300 ? '300 of 300: a memory is one or two sentences' : `${String(length)} of 300`}
+    </span>
   )
 }

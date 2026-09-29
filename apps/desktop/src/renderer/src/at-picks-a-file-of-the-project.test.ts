@@ -73,3 +73,13 @@ describe('@ in a very large folder', () => {
     expect(performance.now() - started).toBeLessThan(250)
   })
 })
+
+// QA-2026-09-29 round 2, N5.
+describe('@ and accents', () => {
+  it('finds a name with accents from one typed without them, and the other way round', () => {
+    const files = ['docs/résumé.md', 'docs/resume-old.md', 'src/café.ts']
+    expect(fileMatches(files, 'resume')).toEqual(['docs/résumé.md', 'docs/resume-old.md'])
+    expect(fileMatches(files, 'café')).toEqual(['src/café.ts'])
+    expect(fileMatches(files, 'cafe')).toEqual(['src/café.ts'])
+  })
+})

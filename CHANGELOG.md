@@ -11,6 +11,20 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.471.0 - 2026-09-29
+
+### Fixed
+
+- **A double click approves one card, not two.** When a teammate asked again
+  right after an approval, the second click of a double click approved the
+  new card unread. A card now takes no approval in its first half second.
+- **`@` finds a file whatever its accents.** `@resume` now finds `résumé.md`.
+- **A memory says how long it can be.** The memory box stopped taking
+  keys at 300 characters with nothing saying why; it shows a count as it
+  nears the limit.
+- **The side panel says what a side question can do.** It said nothing
+  there changes a file; it now also says your connectors still work in it.
+
 ## 0.470.0 - 2026-09-29
 
 ### Fixed

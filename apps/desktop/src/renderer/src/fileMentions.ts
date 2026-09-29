@@ -20,6 +20,12 @@ export function withoutAtQuery(text: string): string {
 
 const baseOf = (path: string): string => path.slice(path.lastIndexOf('/') + 1)
 
+/**
+ * Accents aside, as case is (QA-2026-09-29 round 2, N5): `@resume` did not
+ * find résumé.md. Only strings that hold a non-ASCII character are touched.
+ */
+const folded = (text: string): string => (/[^\u0000-\u007f]/.test(text) ? text.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : text)
+
 /** Whether every character of `query` appears in `text`, in order. */
 function inOrder(text: string, query: string): boolean {
   let at = 0
@@ -36,11 +42,11 @@ function inOrder(text: string, query: string): boolean {
  * path that has its letters in order. Shorter paths first within each.
  */
 export function fileMatches(paths: readonly string[], query: string, max = 8): readonly string[] {
-  const q = query.toLowerCase().replace(/\\/g, '/')
+  const q = folded(query.toLowerCase().replace(/\\/g, '/'))
   // Depth counted once per path, not in every comparison: 50,000 paths (R16).
   const ranked: { readonly path: string; readonly rank: number; readonly depth: number }[] = []
   for (const path of paths) {
-    const lower = path.toLowerCase()
+    const lower = folded(path.toLowerCase())
     const base = baseOf(lower)
     const rank = q.length === 0 ? 0
       : base === q ? 0

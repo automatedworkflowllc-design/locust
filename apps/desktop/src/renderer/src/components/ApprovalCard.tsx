@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import type { MissionApprovalDecision, MissionApprovalRequest, MissionQuestion } from '../../../shared/ipc.js'
@@ -9,6 +9,9 @@ import { RuntimeMark } from './RuntimeMark.js'
 import { DiffView } from './DiffView.js'
 import { DiffNotesContext } from './DiffNotes.js'
 import { fileCounts, parseUnifiedDiff } from '../diff.js'
+
+/** How long a card that has just appeared takes no approval (N9): a double click's second half. */
+export const FRESH_CARD_MS = 500
 
 
 /**
@@ -201,6 +204,18 @@ export function ApprovalCard({
    * and an explained one no extra click. The reason reaches the teammate with
    * the denial on Claude and OpenCode, and as its next input on Codex.
    */
+  /*
+   * A NEW CARD IGNORES A CLICK MEANT FOR THE LAST ONE (QA-2026-09-29 round 2,
+   * N9). A double click on "Approve once" also approved the NEXT card when
+   * the run asked again within about 150 ms: the second click of the pair
+   * landed on a card the person had not read. For its first half second a
+   * card takes no approval.
+   */
+  const shownAt = useRef(Date.now())
+  const approve = (decision: MissionApprovalDecision): void => {
+    if (Date.now() - shownAt.current < FRESH_CARD_MS) return
+    onDecide(decision)
+  }
   const [denying, setDenying] = useState(false)
   const [reason, setReason] = useState('')
   const stopDenying = (): void => {
@@ -393,11 +408,11 @@ export function ApprovalCard({
                 type="button"
                 className="lc-primarybutton"
                 disabled={busy}
-                onClick={() => onDecide('approve-once')}
+                onClick={() => approve('approve-once')}
               >
                 {isQuestion ? 'Allow once' : 'Approve once'}
               </button>
-              <button type="button" className="lc-ghostbutton" disabled={busy} onClick={() => onDecide('approve-always')}>
+              <button type="button" className="lc-ghostbutton" disabled={busy} onClick={() => approve('approve-always')}>
                 Always allow this session
               </button>
               <button type="button" className="lc-denybutton" disabled={busy} onClick={() => setDenying(true)}>

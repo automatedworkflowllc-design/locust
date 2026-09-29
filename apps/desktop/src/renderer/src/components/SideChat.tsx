@@ -101,7 +101,9 @@ export function SideChat({
         {latest === undefined ? (
           <p className="lc-sidechat__empty">
             Ask anything about this conversation: why it chose something, or what it has done so far. It keeps working while you ask.
-            Nothing asked here reaches it, and nothing here changes a file.
+            {/* Connectors are allowed in every mode (a stated decision), so "nothing here changes a file" was not the whole truth (QA round 2, N12). */}
+            Nothing asked here reaches it. The answer comes from a read-only copy, which changes no file here; your connectors still
+            work in it, as they do everywhere.
           </p>
         ) : (
           <Thread

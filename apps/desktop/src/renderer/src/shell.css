@@ -16823,3 +16823,16 @@ textarea {
 .lc-teamtemplates__image + .lc-chipbutton {
   margin-left: var(--lc-space-3);
 }
+
+/* A memory's length, near its limit (N6): quiet, and amber only when full. */
+.lc-memorycount {
+  display: block;
+  margin-top: 4px;
+  text-align: right;
+  font-size: var(--lc-text-mono-label);
+  color: var(--lc-text-muted);
+}
+
+.lc-memorycount.is-full {
+  color: var(--lc-amber);
+}
