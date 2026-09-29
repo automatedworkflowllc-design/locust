@@ -608,12 +608,20 @@ export function Sidebar({
   )
   const conversationList = (allInFolder: readonly SidebarMission[], keepsEmpty: boolean): ReactElement => {
     const inFolder = allInFolder.filter((mission) => !isNestedChild(mission))
-    const folderUngrouped = withRoomsFolded(inFolder.filter((mission) => heldFor(mission, groupMembers) === undefined), rooms)
+    /*
+     * GROUPS ARE NOT DRAWN (Colin, 2026-09-29: "groups can just be the
+     * folders"). 0.460 stopped making them but still drew the old ones, so a
+     * person whose conversations were all in one folder saw the retired
+     * group headings and no folder at all. Their memberships stay in
+     * groups.json, untouched; the folder is the heading now.
+     */
+    const drawnGroups: typeof groups = []
+    const folderUngrouped = withRoomsFolded(inFolder, rooms)
     // "Ungrouped" only where a group is drawn beside it: in a folder with none it names the only thing there.
-    const groupsShown = groups.some((group) => showsGroup(group.groupId, inFolder, keepsEmpty))
+    const groupsShown = drawnGroups.some((group) => showsGroup(group.groupId, inFolder, keepsEmpty))
     return (
           <>
-            {groups.filter((group) => showsGroup(group.groupId, inFolder, keepsEmpty)).map((group) => {
+            {drawnGroups.filter((group) => showsGroup(group.groupId, inFolder, keepsEmpty)).map((group) => {
               const theirs = inFolder.filter(
                 (mission) => heldFor(mission, groupMembers)?.groupId === group.groupId
               )
@@ -1646,9 +1654,12 @@ export function Sidebar({
                * draws no heading at all.
                */
               const sections = folderSectionsOf(shownConversations, currentFolderId)
-              if (sections.length <= 1) return conversationList(shownConversations, true)
+              // One folder is headed too (Colin, 2026-09-29): the folder's
+              // name is where the retired groups' headings used to be.
+              if (sections.length === 0) return conversationList(shownConversations, true)
               return sections.map((section) => {
-                const isCurrent = section.id === currentFolderId
+                // The only folder there is starts open, as the window's own does.
+                const isCurrent = section.id === currentFolderId || sections.length === 1
                 const open = isCurrent ? !foldedFolders.has(section.id) : openedFolders.has(section.id)
                 const name = folders.find((folder) => folder.id === section.id)?.name ?? 'Unknown folder'
                 return (
@@ -1667,7 +1678,7 @@ export function Sidebar({
                         })
                       }
                     >
-                      <Icon name={open ? 'chevron-down' : 'chevron-right'} size={11} />
+                      <Icon name="folder" size={12} />
                       <span className="lc-project__name">{name}</span>
                       <span className="lc-sectionlabel__count">{String(section.missions.length)}</span>
                     </button>
