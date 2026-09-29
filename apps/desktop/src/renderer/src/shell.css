@@ -773,6 +773,7 @@ textarea {
 .lc-bubble {
   align-self: flex-end;
   max-width: 78%;
+  font-size: var(--lc-text-said);
   padding: var(--lc-space-5) var(--lc-space-6);
   border-radius: var(--lc-radius-card);
   background: var(--lc-bg-bubble-user);
@@ -1348,7 +1349,7 @@ textarea {
 .lc-decision__question {
   margin: 0;
   color: var(--lc-text-secondary);
-  font-size: var(--lc-text-description);
+  font-size: var(--lc-text-ask);
   text-wrap: pretty;
 }
 
@@ -1404,18 +1405,19 @@ textarea {
 }
 
 .lc-decision__label {
+  font-size: var(--lc-text-said);
   font-weight: 600;
   color: var(--lc-text-primary);
 }
 
 .lc-decision__note {
   color: var(--lc-text-muted);
-  font-size: var(--lc-text-description);
+  font-size: var(--lc-text-ask);
 }
 
 .lc-decision__foot {
   color: var(--lc-text-muted);
-  font-size: 10.5px;
+  font-size: var(--lc-text-ask-foot);
   letter-spacing: 0.04em;
 }
 

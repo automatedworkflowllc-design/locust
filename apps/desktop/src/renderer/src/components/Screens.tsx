@@ -2341,8 +2341,8 @@ export function SettingsScreen({
           <More>
             <p>
               A teammate's reply is the one thing on this screen you read rather than scan, so it is set
-              in a serif and sized on its own — the app's own chrome stays where it is whatever you pick
-              here.
+              in a serif and sized on its own. Your own messages and a teammate's question cards grow
+              with it; the rest of the app stays where it is whatever you pick here.
             </p>
             <p>
               The line length follows the size rather than staying put, so a bigger reply gets a wider

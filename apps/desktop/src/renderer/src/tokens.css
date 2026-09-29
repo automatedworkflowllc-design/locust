@@ -484,6 +484,15 @@
    * mine to impose. `docs/PROSE-MEASURE-2026-09-19.md` has every number.
    */
   --lc-text-prose: 15px;
+  /*
+   * What the person reads in a conversation beside the reply: their own
+   * message and an ask card (QA-2026-09-29 round 2, N8). At Largest the reply
+   * grew and the card a person must read to decide stayed at 12px. These grow
+   * with the reply size below; the rest of the app's chrome does not.
+   */
+  --lc-text-said: 13.5px;
+  --lc-text-ask: 12px;
+  --lc-text-ask-foot: 10.5px;
   --lc-text-control: 13px;
   --lc-text-description: 12px;
 
@@ -697,10 +706,16 @@
  */
 :root[data-replysize='large'] {
   --lc-text-prose: 17px;
+  --lc-text-said: 15px;
+  --lc-text-ask: 13.5px;
+  --lc-text-ask-foot: 11.5px;
 }
 
 :root[data-replysize='largest'] {
   --lc-text-prose: 19px;
+  --lc-text-said: 17px;
+  --lc-text-ask: 15px;
+  --lc-text-ask-foot: 12.5px;
 }
 
 /*

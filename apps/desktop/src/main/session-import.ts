@@ -295,6 +295,8 @@ export interface ImportFacts {
   readonly ledger: Pick<MissionLedger, 'createMission' | 'appendEvents'>
   readonly imports: TerminalImports
   readonly workspaceIdFor: (cwd: string) => string
+  /** The known folder a session's folder is on disk, however the session spelled it (N13). */
+  readonly sameFolder?: (cwd: string) => Promise<string>
   readonly learnFolder: (id: string, path: string) => Promise<void>
   readonly nameConversation: (missionId: string, title: string) => Promise<void>
   readonly pathOf: (runtime: ImportRuntime, sessionId: string) => Promise<string | undefined>
@@ -322,8 +324,9 @@ export async function importSession(session: Pick<ImportableSession, 'runtime' |
   if (all.length === 0) return { ok: false, message: 'It has no finished exchange to bring in yet.' }
   const exchanges = all.slice(-MAX_IMPORTED_EXCHANGES)
   const createId = facts.createId ?? randomUUID
-  const workspaceId = facts.workspaceIdFor(session.cwd)
-  await facts.learnFolder(workspaceId, session.cwd).catch(() => undefined)
+  const cwd = facts.sameFolder === undefined ? session.cwd : await facts.sameFolder(session.cwd).catch(() => session.cwd)
+  const workspaceId = facts.workspaceIdFor(cwd)
+  await facts.learnFolder(workspaceId, cwd).catch(() => undefined)
   const runtime = session.runtime
   const route = runtime === 'claude'
     ? { model: 'account-default', requestedRouteId: 'claude', resolvedRouteId: 'claude-account:default' }

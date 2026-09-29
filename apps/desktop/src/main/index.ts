@@ -116,7 +116,7 @@ import { changelogPaths, entries as changelogEntries, readChangelog, splashEntri
 import type { ChangelogEntry } from './changelog.js'
 import type { CodexMissionService } from './codex-mission.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
-import { createFolderRegistry, recoverFolderPath } from './folders.js'
+import { createFolderRegistry, recoverFolderPath, sameFolderAtStart } from './folders.js'
 import type { FolderContext } from './folders.js'
 import { createConnectorReader } from './connector-reader.js'
 import { createRelay } from './relay.js'
@@ -1360,7 +1360,10 @@ if (!ownsSingleInstanceLock) {
       const path = await folders.pathOf(id)
       return path === undefined || isInstallFolder(path) ? undefined : path
     }
-    if (workspaceChosen) void folders.use(workspacePath).catch(() => undefined)
+    if (workspaceChosen) {
+      workspacePath = sameFolderAtStart(join(app.getPath('userData'), 'folders.json'), workspacePath)
+      void folders.use(workspacePath).catch(() => undefined)
+    }
     /*
      * SWITCH FOLDERS WITHOUT A RESTART (0.458). It was `app.relaunch()`: the
      * window vanished and a new one opened, which read as a crash (9/11,
@@ -1370,7 +1373,7 @@ if (!ownsSingleInstanceLock) {
      * its own folder (codex-mission.ts, runFolder).
      */
     const switchFolder = async (next: string): Promise<FolderContext> => {
-      const full = resolvePath(next)
+      const full = await folders.sameAs(resolvePath(next)).catch(() => resolvePath(next))
       await writeRememberedWorkspace(rememberedWorkspaceFile, full)
       workspacePath = full
       workspaceChosen = true
@@ -3145,6 +3148,7 @@ if (!ownsSingleInstanceLock) {
         ledger: missionLedger,
         imports: terminalImports,
         workspaceIdFor,
+        sameFolder: (cwd) => folders.sameAs(cwd),
         learnFolder: (id, path) => folders.learn([{ id, path }]),
         nameConversation: (missionId, title) => teammates.renameMission(missionId, title),
         pathOf: (runtime, sessionId) => transcriptPathFor(runtime, sessionId, sessionPlaces)

@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.480.0 - 2026-09-29
+
+### Fixed
+
+- **A folder is one folder however you reach it.** Opening a project as
+  `c:\work` after `C:\work`, or through a link or junction to it, made it a
+  second folder with none of its conversations, so your history looked gone.
+  Now Locust knows it is the same folder and keeps it as it was first known.
+- **Question cards grow with the reply text size.** At Large and Largest the
+  reply grew, but a teammate's question card and your own messages stayed
+  small. Now they grow with it. The rest of the app stays as it is.
+
 ## 0.479.0 - 2026-09-29
 
 ### Fixed
