@@ -166,6 +166,11 @@ export interface ComposerProps {
    * sends it there. A new object hands it back again.
    */
   readonly handBack?: { readonly text: string; readonly attachments: readonly string[] }
+  /**
+   * A part of a reply to ask about (SelectionAsk): quoted at the top of the
+   * box, above whatever is typed there. A new object quotes again.
+   */
+  readonly quoteIn?: { readonly quote: string }
   /** Each runtime's own slash commands, as its CLI last listed them (0.426). */
   readonly runtimeCommands?: RuntimeCommandsResponse
   /**
@@ -349,6 +354,7 @@ const CHAT_MODES: readonly { readonly id: 'direct' | 'compare' | 'blind'; readon
 
 export function Composer({
   handBack,
+  quoteIn,
   runtimeCommands,
   hasConnectors = false,
   continuationNote,
@@ -933,6 +939,17 @@ export function Composer({
     setAttached(handBack.attachments)
     field.current?.focus()
   }, [handBack])
+  // A quoted part of a reply: above what is typed, the caret after it all.
+  useEffect(() => {
+    if (quoteIn === undefined) return
+    setValue((current) => (current.trim().length === 0 ? `${quoteIn.quote}\n\n` : `${quoteIn.quote}\n\n${current}`))
+    requestAnimationFrame(() => {
+      const input = field.current
+      if (input === null) return
+      input.focus()
+      input.setSelectionRange(input.value.length, input.value.length)
+    })
+  }, [quoteIn])
   const pressBox = (event: MouseEvent<HTMLDivElement>): void => {
     if (event.button !== 0) return
     const target = event.target as HTMLElement

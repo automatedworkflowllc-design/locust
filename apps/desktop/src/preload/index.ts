@@ -33,6 +33,8 @@ import {
   RUNTIME_SIGN_IN_CHANNEL,
   OPEN_IN_TERMINAL_CHANNEL,
   TERMINAL_CATCH_UP_CHANNEL,
+  SESSION_IMPORT_LIST_CHANNEL,
+  SESSION_IMPORT_CHANNEL,
   TEAM_CARD_SAVE_CHANNEL,
   TEAM_CARD_ADD_CHANNEL,
   RUNTIME_INSTALL_PROGRESS_CHANNEL,
@@ -212,6 +214,8 @@ import type {
   RuntimeSignInResponse,
   OpenInTerminalResponse,
   TerminalCatchUpResponse,
+  SessionImportListResponse,
+  SessionImportResponse,
   TeamCardRect,
   TeamCardSaveResponse,
   TeamCardAddResponse
@@ -351,6 +355,9 @@ const desktopApi: DesktopApi = {
     ipcRenderer.invoke(OPEN_IN_TERMINAL_CHANNEL, missionId) as Promise<OpenInTerminalResponse>,
   catchUpTerminal: (missionId: string) =>
     ipcRenderer.invoke(TERMINAL_CATCH_UP_CHANNEL, missionId) as Promise<TerminalCatchUpResponse>,
+  listImportableSessions: () => ipcRenderer.invoke(SESSION_IMPORT_LIST_CHANNEL) as Promise<SessionImportListResponse>,
+  importSession: (runtime: 'claude' | 'codex', sessionId: string) =>
+    ipcRenderer.invoke(SESSION_IMPORT_CHANNEL, { runtime, sessionId }) as Promise<SessionImportResponse>,
   saveTeamCard: (rect: TeamCardRect) => ipcRenderer.invoke(TEAM_CARD_SAVE_CHANNEL, rect) as Promise<TeamCardSaveResponse>,
   addTeamFromCard: () => ipcRenderer.invoke(TEAM_CARD_ADD_CHANNEL) as Promise<TeamCardAddResponse>,
   onRuntimeInstallProgress: (listener: (progress: RuntimeInstallProgress) => void) => {

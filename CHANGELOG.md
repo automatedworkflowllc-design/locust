@@ -11,6 +11,21 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.475.0 - 2026-09-29
+
+### New
+
+- **Import a conversation from Claude Code or Codex.** From the + menu,
+  Import a conversation lists the sessions you had in Claude Code (terminal
+  or its app) and Codex over the last 30 days, with their folders. Choose
+  one and its exchanges come in as a Locust conversation; your next message
+  continues that same session, in its own folder. A session still open in a
+  terminal says so. Only the words come in; the steps it took stay in the
+  session.
+- **Ask about a part of a reply.** Select words in a teammate's reply and
+  choose Ask about this: they are quoted into the message box, so your next
+  message is about that part.
+
 ## 0.474.0 - 2026-09-29
 <!-- big -->
 

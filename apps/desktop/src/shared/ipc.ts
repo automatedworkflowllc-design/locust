@@ -590,6 +590,24 @@ export const OPEN_IN_TERMINAL_CHANNEL = 'mission:open-in-terminal'
  * and which turn is newest now.
  */
 export const TERMINAL_CATCH_UP_CHANNEL = 'mission:terminal-catch-up'
+/**
+ * Import a conversation from Claude Code or Codex (main/session-import.ts):
+ * the sessions a person could bring in, and bringing one in by its id.
+ */
+export const SESSION_IMPORT_LIST_CHANNEL = 'session-import:list'
+export const SESSION_IMPORT_CHANNEL = 'session-import:import'
+export interface ImportableSessionView {
+  readonly runtime: 'claude' | 'codex'
+  readonly sessionId: string
+  readonly title: string
+  readonly cwd: string
+  readonly folderName: string
+  readonly updatedAt: string
+  readonly bytes: number
+  readonly openNow: boolean
+}
+export type SessionImportListResponse = { readonly ok: true; readonly sessions: readonly ImportableSessionView[] } | { readonly ok: false; readonly message: string }
+export type SessionImportResponse = { readonly ok: true; readonly missionId: string; readonly turns: number; readonly skipped: number } | { readonly ok: false; readonly message: string }
 /** The team as a picture of itself (shared/team-card.ts, 0.398). */
 export const TEAM_CARD_SAVE_CHANNEL = 'team-card:save'
 export const TEAM_CARD_ADD_CHANNEL = 'team-card:add'
@@ -2759,6 +2777,9 @@ export interface DesktopApi {
   openInTerminal(missionId: string): Promise<OpenInTerminalResponse>
   /** Bring what was done in the terminal on this conversation into it (0.391). */
   catchUpTerminal(missionId: string): Promise<TerminalCatchUpResponse>
+  /** Sessions a person had in Claude Code or Codex, to bring in (session-import.ts). */
+  listImportableSessions(): Promise<SessionImportListResponse>
+  importSession(runtime: 'claude' | 'codex', sessionId: string): Promise<SessionImportResponse>
   saveTeamCard(rect: TeamCardRect): Promise<TeamCardSaveResponse>
   addTeamFromCard(): Promise<TeamCardAddResponse>
   readWorkspaceSettings(): Promise<WorkspaceSettings>

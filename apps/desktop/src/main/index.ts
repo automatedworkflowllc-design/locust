@@ -47,7 +47,9 @@ import { execFile } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
 import { MAX_PROMPT_LENGTH, createCodexMissionService, runtimeThreadIdOf } from './codex-mission.js'
 import { openInTerminal, terminalRequestFor } from './open-in-terminal.js'
-import { createTerminalCatchUp, createTerminalImports, createTranscriptReader } from './terminal-catch-up.js'
+import { createTerminalCatchUp, createTerminalImports, createTranscriptReader, transcriptPathFor } from './terminal-catch-up.js'
+import { importSession, listImportableSessions } from './session-import.js'
+import type { ImportableSession } from './session-import.js'
 import { readTextChunk, withTextChunk } from './png-text.js'
 import { TEAM_CARD_KEYWORD, freeName, readTeamCard, teamCardOf } from '../shared/team-card.js'
 import { approvalAnswerFrom, createApprovalChannel } from './approval-channel.js'
@@ -180,6 +182,8 @@ import {
   RUNTIME_SIGN_IN_CHANNEL,
   OPEN_IN_TERMINAL_CHANNEL,
   TERMINAL_CATCH_UP_CHANNEL,
+  SESSION_IMPORT_LIST_CHANNEL,
+  SESSION_IMPORT_CHANNEL,
   TEAM_CARD_SAVE_CHANNEL,
   TEAM_CARD_ADD_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
@@ -1729,7 +1733,12 @@ if (!ownsSingleInstanceLock) {
      * the roster it asks are made further down, and it is only ever called
      * after they exist.
      */
-    const terminalImports = createTerminalImports(join(app.getPath('userData'), 'terminal-imports.json'))
+    const terminalImportsFile = join(app.getPath('userData'), 'terminal-imports.json')
+    const terminalImports = createTerminalImports(terminalImportsFile)
+    const sessionPlaces = {
+      claudeHome: process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.claude'),
+      codexHome: process.env.CODEX_HOME ?? join(homedir(), '.codex')
+    }
     const catchUp = createTerminalCatchUp({
       ledger: missionLedger,
       newestTurnOf: (missionId) => newestTurnOf(missionLedger, missionId),
@@ -3104,6 +3113,46 @@ if (!ownsSingleInstanceLock) {
         return { imported: 0 }
       }
       const result = await catchUp(requested).catch(() => ({ imported: 0, latestMissionId: requested }))
+      return result
+    })
+
+    /*
+     * IMPORT A CONVERSATION (session-import.ts). The list is the host's, and
+     * an import names a session from it by runtime and id: the folder and the
+     * title are taken from the file, never from the window.
+     */
+    let lastListing: readonly ImportableSession[] = []
+    ipcMain.handle(SESSION_IMPORT_LIST_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      try {
+        // Sessions Locust already holds: every one read through before.
+        const held = await readFile(terminalImportsFile, 'utf8').then((text) => Object.keys(JSON.parse(text) as Record<string, unknown>), () => [] as string[])
+        lastListing = await listImportableSessions(sessionPlaces, { skip: new Set(held) })
+        return {
+          ok: true,
+          sessions: lastListing.map((session) => ({ ...session, folderName: basename(session.cwd) || session.cwd }))
+        } as const
+      } catch {
+        return { ok: false, message: 'The sessions could not be listed. Nothing was changed; close this and open it again.' } as const
+      }
+    })
+    ipcMain.handle(SESSION_IMPORT_CHANNEL, async (event, requested: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      const asked = (typeof requested === 'object' && requested !== null ? requested : {}) as Record<string, unknown>
+      const session = lastListing.find((one) => one.runtime === asked.runtime && one.sessionId === asked.sessionId)
+      if (session === undefined) return { ok: false, message: 'That session is not in the list any more. Open the list again.' } as const
+      const result = await importSession(session, {
+        ledger: missionLedger,
+        imports: terminalImports,
+        workspaceIdFor,
+        learnFolder: (id, path) => folders.learn([{ id, path }]),
+        nameConversation: (missionId, title) => teammates.renameMission(missionId, title),
+        pathOf: (runtime, sessionId) => transcriptPathFor(runtime, sessionId, sessionPlaces)
+      }).catch((error: unknown) => ({ ok: false, message: error instanceof Error ? `It could not be brought in: ${error.message}` : 'It could not be brought in.' }) as const)
+      if (result.ok) {
+        lastListing = lastListing.filter((one) => one !== session)
+        note('session-imported', `${session.runtime} ${String(result.turns)} turns`)
+      }
       return result
     })
 

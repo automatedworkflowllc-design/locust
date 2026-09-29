@@ -120,6 +120,8 @@ import type { TeammateDraft } from './components/NewTeammateDialog.js'
 import { templateAvatar } from './components/TeamTemplates.js'
 import { TEAM_TEMPLATES } from '../../shared/team-templates.js'
 import type { TeamTemplate } from '../../shared/team-templates.js'
+import { ImportDialog } from './components/ImportDialog.js'
+import { SelectionAsk } from './components/SelectionAsk.js'
 import { GroupSettingsDialog } from './components/GroupSettingsDialog.js'
 import { TeammateBot } from './components/TeammateBot.js'
 import { BesideConversation } from './components/BesideConversation.js'
@@ -799,6 +801,8 @@ export default function App(): ReactElement {
       items: [
         { label: 'New teammate', shortcut: 't', onSelect: startNewTeammate },
         { label: 'New room', shortcut: 'r', onSelect: openRoomsScreen },
+        // Colin, 2026-09-29: "look into how claude code and codex allow you to import conversations".
+        { label: 'Import a conversation…', shortcut: 'i', onSelect: () => setImportOpen(true) },
         /*
          * PROJECTS ARE BACK (Colin, 2026-09-29): "claude has projects/and
          * workspace folders, like they arent the same thing so just use that
@@ -1316,6 +1320,10 @@ export default function App(): ReactElement {
   const [newTeammateOpen, setNewTeammateOpen] = useState(false)
   /** The group whose settings -- instructions and default route -- are open, if any. */
   const [instructingGroupId, setInstructingGroupId] = useState<string>()
+  // Import a conversation from Claude Code or Codex (ImportDialog, session-import.ts).
+  const [importOpen, setImportOpen] = useState(false)
+  // The conversation just imported, opened once the history holds it.
+  const openAfterImport = useRef<string | undefined>(undefined)
   const [routines, setRoutines] = useState<readonly PublicRoutine[]>([])
   /** Rooms: a named set of teammates a person writes to at once (vision #2). */
   const [rooms, setRooms] = useState<readonly PublicRoom[]>([])
@@ -1738,6 +1746,8 @@ export default function App(): ReactElement {
   const [route, setRoute] = useState<RouteChoice>({ runtime: 'codex', model: 'account-default' })
   /** Words going back into the chat box (C9): a busy model's message, to send on another. */
   const [handBack, setHandBack] = useState<{ readonly text: string; readonly attachments: readonly string[] }>()
+  // A part of a reply the person asked about (SelectionAsk): quoted into the box.
+  const [quoteIn, setQuoteIn] = useState<{ readonly quote: string }>()
   // Intent belongs to the addressed teammate, not to discovery or the last
   // thread visited. Session-only state deliberately clears on app restart.
   const [pickerRoutes, setPickerRoutes] = useState<ReadonlyMap<string, RouteChoice>>(new Map())
@@ -2249,6 +2259,13 @@ export default function App(): ReactElement {
       })
       .catch(() => undefined)
   }
+
+  useEffect(() => {
+    const wanted = openAfterImport.current
+    if (wanted === undefined || !history.some((mission) => mission.missionId === wanted)) return
+    openAfterImport.current = undefined
+    openMission(wanted)
+  }, [history])
 
   /**
    * One commit for every update held in a frame, in the order they came.
@@ -7290,6 +7307,7 @@ export default function App(): ReactElement {
             route={composerRoute}
             onRouteChange={changeRoute}
             {...(handBack === undefined ? {} : { handBack })}
+            {...(quoteIn === undefined ? {} : { quoteIn })}
             models={models}
             diffNotes={shownNotes}
             onClearDiffNotes={() => changeShownNotes(() => [])}
@@ -7659,6 +7677,23 @@ export default function App(): ReactElement {
                 })
             ] satisfies PaletteAction[]
           }
+        />
+      )}
+      {screen === 'workroom' && <SelectionAsk onAsk={(quote) => setQuoteIn({ quote })} />}
+      {importOpen && window.desktop !== undefined && (
+        <ImportDialog
+          onList={() => window.desktop!.listImportableSessions()}
+          onImport={(session) => window.desktop!.importSession(session.runtime, session.sessionId)}
+          onImported={(missionId) => {
+            setImportOpen(false)
+            openAfterImport.current = missionId
+            refreshHistory()
+            // Its title is the session's, kept with the roster's titles.
+            void window.desktop?.listTeammates().then((listed) => {
+              if (listed.ok) setMissionTitles(listed.data.missionTitles)
+            }).catch(() => undefined)
+          }}
+          onCancel={() => setImportOpen(false)}
         />
       )}
       {(() => {
