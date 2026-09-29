@@ -5479,39 +5479,47 @@ textarea {
   align-items: center;
   gap: 10px;
   min-width: 0;
-  padding: 5px 10px;
+  padding: 6px 12px 6px 6px;
   border: 1px solid var(--lc-border-card);
-  border-radius: var(--lc-radius-control);
-  background: transparent;
+  border-radius: 10px;
+  background: var(--lc-bg-raised);
   color: var(--lc-text-secondary);
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background var(--lc-motion-hover) var(--lc-ease);
+  transition: background var(--lc-motion-hover) var(--lc-ease), border-color var(--lc-motion-hover) var(--lc-ease);
 }
 
 .lc-buildcard:hover,
 .lc-buildcard:focus-visible {
-  background: var(--lc-hover-surface);
+  background: var(--lc-hover-surface-strong);
+  border-color: var(--lc-border-strong);
   color: var(--lc-text-primary);
 }
 
+/* The thing it makes, drawn (BuildIcon), on a filled tile: an object to
+   pick, as Arena's cards have, not a glyph beside a word (0.461). */
 .lc-buildcard__icon {
   flex: none;
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
-  border: 1px solid var(--lc-border-card);
-  border-radius: var(--lc-radius-control);
-  color: var(--lc-text-secondary);
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--lc-hover-surface-strong);
+  color: var(--lc-text-primary);
+}
+
+.lc-buildcard:hover .lc-buildcard__icon,
+.lc-buildcard:focus-visible .lc-buildcard__icon {
+  background: var(--lc-border-strong);
 }
 
 .lc-buildcard__text {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
 }
 
 .lc-buildcard__name,
@@ -5523,6 +5531,7 @@ textarea {
 
 .lc-buildcard__name {
   font-size: var(--lc-text-control);
+  font-weight: 500;
   color: var(--lc-text-primary);
 }
 
@@ -5532,17 +5541,22 @@ textarea {
 }
 
 /* A short window keeps the cards to one line: Home already has no height to
-   spare at 1366x768 (measured 2026-09-29: 33px over before the cards), and
-   the name and icon say enough there. */
+   spare at 1366x768 (measured 2026-09-29: 33px over before the cards). The
+   drawn icon and the name stay; the line under it goes. */
 @media (max-height: 820px) {
   .lc-buildcard {
-    padding: 2px 10px 2px 3px;
+    padding: 2px 12px 2px 2px;
   }
 
   .lc-buildcard__icon {
-    width: 20px;
-    height: 20px;
-    border: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+  }
+
+  .lc-buildcard__icon svg {
+    width: 15px;
+    height: 15px;
   }
 
   .lc-buildcard__line {

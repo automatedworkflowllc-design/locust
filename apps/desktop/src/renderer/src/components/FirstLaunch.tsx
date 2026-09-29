@@ -62,12 +62,60 @@ function vendorUrl(runtime: string): string | undefined {
   return facts !== undefined && facts.install.kind === 'vendor' ? facts.install.url : undefined
 }
 
-/** What Build and compare offers on Home: one file each, so every column can show it running. */
-export const COMPARE_STARTERS: readonly { readonly label: string; readonly line: string; readonly icon: 'file' | 'grid' | 'play'; readonly prompt: string }[] = [
-  { label: 'A landing page', line: 'For a coffee shop', icon: 'file', prompt: 'Make index.html: a one-page landing page for a small coffee shop, with a headline, three menu items with prices, and opening hours. One file, all CSS inside it.' },
-  { label: 'A dashboard', line: 'Sales and a chart', icon: 'grid', prompt: 'Make dashboard.html: a one-page sales dashboard with four headline numbers and a bar chart of the last six months, drawn with plain HTML and CSS. One file, made-up numbers, no libraries.' },
-  { label: 'A small game', line: 'Keyboard controls', icon: 'play', prompt: 'Make game.html: a small game playable with the keyboard, with a score and a way to restart. One file, all CSS and JavaScript inside it, no libraries.' }
+/**
+ * What Build and compare offers on Home: one file each, so every column can
+ * show it running -- and each something two models make VISIBLY differently,
+ * which is the point of putting them side by side (0.461: Colin, "get a bit
+ * more creative with the options/icons? this is a bit lazy/sloppy no?").
+ */
+export const COMPARE_STARTERS: readonly { readonly label: string; readonly line: string; readonly icon: BuildIconName; readonly prompt: string }[] = [
+  { label: 'Landing page', line: 'For a coffee shop', icon: 'page', prompt: 'Make index.html: a one-page landing page for a small coffee shop, with a headline, three menu items with prices, and opening hours. One file, all CSS inside it.' },
+  { label: 'Sales dashboard', line: 'Live numbers, charts', icon: 'chart', prompt: 'Make dashboard.html: a one-page sales dashboard with four headline numbers and a bar chart of the last six months, drawn with plain HTML and CSS. One file, made-up numbers, no libraries.' },
+  { label: 'Arcade game', line: 'Snake, in neon', icon: 'game', prompt: 'Make game.html: a neon-styled Snake game played with the arrow keys, with a score, a best score, and a way to restart. One file, all CSS and JavaScript inside it, no libraries.' }
 ]
+
+type BuildIconName = 'page' | 'chart' | 'game'
+
+/**
+ * Each starter drawn as the thing it makes (0.461): a browser window with a
+ * headline, a chart with a trend over its bars, a gamepad. The app's general
+ * icons (a file, a grid, a play mark) said nothing about what would come back.
+ */
+function BuildIcon({ name }: { readonly name: BuildIconName }): ReactElement {
+  const common = { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true }
+  if (name === 'page') {
+    return (
+      <svg {...common}>
+        <rect x="3" y="4" width="18" height="16" rx="2.5" />
+        <path d="M3 8.5h18" />
+        <circle cx="6" cy="6.3" r="0.4" fill="currentColor" />
+        <circle cx="8" cy="6.3" r="0.4" fill="currentColor" />
+        <path d="M7 12.5h10" />
+        <path d="M7 15.5h6" />
+      </svg>
+    )
+  }
+  if (name === 'chart') {
+    return (
+      <svg {...common}>
+        <path d="M4 4v16h16" />
+        <path d="M8 16v-3" />
+        <path d="M12 16v-6" />
+        <path d="M16 16v-4" />
+        <path d="M7 10l4-3.5 3 2L19 5" />
+      </svg>
+    )
+  }
+  return (
+    <svg {...common}>
+      <path d="M7.5 7h9a4.5 4.5 0 0 1 4.3 5.8l-1.2 4a2.3 2.3 0 0 1-3.9 1l-2-2.3h-3.4l-2 2.3a2.3 2.3 0 0 1-3.9-1l-1.2-4A4.5 4.5 0 0 1 7.5 7z" />
+      <path d="M8 10v3" />
+      <path d="M6.5 11.5h3" />
+      <circle cx="15.5" cy="10.8" r="0.5" fill="currentColor" />
+      <circle cx="17" cy="12.8" r="0.5" fill="currentColor" />
+    </svg>
+  )
+}
 
 export function FirstLaunch({
   runtimes,
@@ -637,7 +685,14 @@ export function FirstLaunch({
                 */}
               {onCompareStarter !== undefined && (
                 <div className="lc-buildhead">
-                  <span className="lc-agenthead__label">Build and compare</span>
+                  {/*
+                    * What happens, not what the feature is called (0.461).
+                    * Colin: "for 'build and compare' i feel like theres
+                    * something better to let the user know whats happening".
+                    * The row reads as one sentence: try two models on a
+                    * landing page.
+                    */}
+                  <span className="lc-agenthead__label">Try two models on</span>
                   {/*
                     * As Arena's "Get started" (0.460): a card each, what it
                     * makes and a line about it. One press puts the words in
@@ -650,11 +705,11 @@ export function FirstLaunch({
                         key={starter.label}
                         type="button"
                         className="lc-buildcard"
-                        title={`${starter.prompt} Two models each build it in their own copy; you keep one.`}
+                        title={`Two models build this side by side, each in its own copy; you keep the one you like. The ask: ${starter.prompt}`}
                         onClick={() => onCompareStarter(starter.prompt)}
                       >
                         <span className="lc-buildcard__icon" aria-hidden="true">
-                          <Icon name={starter.icon} size={15} />
+                          <BuildIcon name={starter.icon} />
                         </span>
                         <span className="lc-buildcard__text">
                           <span className="lc-buildcard__name">{starter.label}</span>

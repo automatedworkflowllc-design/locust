@@ -12,7 +12,7 @@ import { COMPARE_STARTERS } from './components/FirstLaunch.js'
  */
 describe('the Home starters', () => {
   it('each ask for one named .html file with everything inside it', () => {
-    expect(COMPARE_STARTERS.map((starter) => starter.label)).toEqual(['A landing page', 'A dashboard', 'A small game'])
+    expect(COMPARE_STARTERS.map((starter) => starter.label)).toEqual(['Landing page', 'Sales dashboard', 'Arcade game'])
     for (const starter of COMPARE_STARTERS) {
       expect(starter.prompt).toMatch(/^Make [a-z]+\.html: /)
       expect(starter.prompt).toMatch(/One file/)

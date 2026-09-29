@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.461.0 - 2026-09-29
+
+### Improved
+
+- **Build and compare, drawn properly.** Each starter on Home now shows
+  what it makes -- a browser window, a chart, a gamepad -- on its own tile,
+  and the three are more fun to watch two models attempt: a coffee shop's
+  landing page, a sales dashboard, and a neon Snake game. The row now says
+  what it does: "Try two models on" a landing page, a dashboard or a game.
+
 ## 0.460.0 - 2026-09-29
 
 ### Improved

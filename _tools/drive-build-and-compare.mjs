@@ -60,12 +60,12 @@ try {
     })
   })()`))))
   say(`  home: ${JSON.stringify(home)}`)
-  check('Home offers three things to build and compare', home.starters?.join('|') === 'A landing page|A dashboard|A small game', JSON.stringify(home))
+  check('Home offers three things to build and compare', home.starters?.join('|') === 'Landing page|Sales dashboard|Arcade game', JSON.stringify(home))
 
   // 0.460, as Arena: the card puts the words in the box and TWO models beside
   // them, each its own dropdown; each is set to a free model from its own.
   const started = JSON.parse(String(await drive.capture('A landing page: its words in the box, Edit, two model dropdowns', () => drive.evaluate(`(async () => {
-    ;[...document.querySelectorAll('.lc-buildcard')].find((b) => b.querySelector('.lc-buildcard__name')?.textContent.trim() === 'A landing page')?.click()
+    ;[...document.querySelectorAll('.lc-buildcard')].find((b) => b.querySelector('.lc-buildcard__name')?.textContent.trim() === 'Landing page')?.click()
     await new Promise((r) => setTimeout(r, 900))
     // Direct, Compare or Blind lives in the chat mode chip since 0.451.
     const on = document.querySelector('.lc-control--chatmode')?.getAttribute('aria-label')?.replace('Chat mode: ', '') ?? ''
