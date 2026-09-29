@@ -28,12 +28,66 @@ const SHAPES: readonly { readonly kind: string; readonly pattern: RegExp }[] = [
   // A value written straight after its name: `password=hunter2hunter2`,
   // `api_key: 9f2c...`. Eight characters or more, so a line that only NAMES
   // the setting ("set the password in .env") is not taken for one.
-  { kind: 'a password or key', pattern: /\b(?:password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token)\s*[:=]\s*["']?[^\s"'<>]{8,}/i }
+  { kind: 'a password or key', pattern: /\b(?:password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token)\s*[:=]\s*["']?[^\s"'<>]{8,}/i },
+  /*
+   * QA-2026-09-29 round 2, R2: what the shapes above let through, found by
+   * writing secrets the way people say them.
+   */
+  // `postgres://admin:hunter2@db.internal/app` -- a login inside an address.
+  { kind: 'a login inside an address', pattern: /\b[a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:[^\s@/]+@/i },
+  // An AWS secret access key: 40 characters of base64 near the word that names it.
+  { kind: 'an AWS secret key', pattern: /\b(?:secret|aws)\b[^\n]{0,60}?(?<![A-Za-z0-9/+])(?=[A-Za-z0-9/+]*[0-9/+])(?=[A-Za-z0-9/+]*[a-z])(?=[A-Za-z0-9/+]*[A-Z])[A-Za-z0-9/+]{40}(?![A-Za-z0-9/+=])/i },
+  // A passphrase said, whatever it is: "the ssh key passphrase is correct horse battery staple".
+  { kind: 'a passphrase', pattern: /\bpassphrase\b[^.\n]{0,30}?\b(?:is|was)\s*[:=]?\s*\S{3,}|\bpassphrase\s*[:=]\s*\S{3,}/i }
 ]
+
+/**
+ * Said in words, a password is only one when its value looks like one: "the
+ * password is hunter2hunter2" and "the admin login is admin / P@ssw0rd-2026!"
+ * are refused, "the password is stored in the vault" is not (R2). A value
+ * that looks like one holds a digit or a symbol and is six characters or more.
+ */
+const LOOKS_LIKE_A_PASSWORD = (value: string): boolean => value.length >= 6 && /[0-9!@#$%^&*_+=?~-]/.test(value) && !/^\.[A-Za-z]+$/.test(value)
+function passwordSaid(text: string): boolean {
+  for (const said of text.matchAll(/\b(?:password|passwd|pwd|pin)\b[^.\n]{0,30}?\b(?:is|was)\s+["'`]?([^\s"'`]+)/gi)) {
+    if (LOOKS_LIKE_A_PASSWORD((said[1] ?? '').replace(/[.,;)]+$/, ''))) return true
+  }
+  for (const said of text.matchAll(/\b(?:login|logins|credentials?|username)\b[^\n]{0,40}?\S+\s*[/:]\s*([^\s"'`]+)/gi)) {
+    if (LOOKS_LIKE_A_PASSWORD((said[1] ?? '').replace(/[.,;)]+$/, ''))) return true
+  }
+  return false
+}
+
+/**
+ * A payment card number: 13 to 19 digits, spaced or not, that pass the Luhn
+ * check every card number carries (R10). Personal details stay welcome --
+ * Colin, 2026-09-28, scoped this refusal to "passwords and api keys/stuff
+ * like that" -- so a phone number is kept; a card number is a key to money.
+ */
+function cardNumberIn(text: string): boolean {
+  for (const run of text.matchAll(/(?<![0-9])[0-9](?:[ -]?[0-9]){12,18}(?![0-9])/g)) {
+    const digits = run[0].replace(/[^0-9]/g, '')
+    let sum = 0
+    for (let at = 0; at < digits.length; at += 1) {
+      let digit = Number(digits[digits.length - 1 - at])
+      if (at % 2 === 1) digit = digit * 2 > 9 ? digit * 2 - 9 : digit * 2
+      sum += digit
+    }
+    // Luhn alone passes one long number in ten -- an order id, a timestamp --
+    // so the number must also open the way a card network's do.
+    const network = /^(?:4|5[1-5]|2[2-7]|3[47]|6(?:011|5))/.test(digits)
+    if (sum % 10 === 0 && network && !/^(\d)\1+$/.test(digits)) return true
+  }
+  return false
+}
 
 /** What kind of secret the text holds, if it holds one. */
 export function secretIn(text: string): string | undefined {
-  return SHAPES.find((shape) => shape.pattern.test(text))?.kind
+  const shape = SHAPES.find((candidate) => candidate.pattern.test(text))?.kind
+  if (shape !== undefined) return shape
+  if (passwordSaid(text)) return 'a password'
+  if (cardNumberIn(text)) return 'a card number'
+  return undefined
 }
 
 /**

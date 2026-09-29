@@ -50,7 +50,10 @@ export function nextRunAfter(schedule: RoutineSchedule, lastRunAt: string, now: 
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0)
   // Already ran today at or after the slot: tomorrow.
   if (last.getTime() >= today.getTime()) {
-    return new Date(today.getTime() + 24 * 3_600_000)
+    // Tomorrow's slot on the calendar, not today's plus 24 hours: on the day
+    // the clocks change a day is 23 or 25 hours, and "daily at 09:00" ran at
+    // 10:00 or 08:00 (QA-2026-09-29 round 2, R7).
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, hours, minutes, 0, 0)
   }
   // The slot is still ahead today, or passed without a run: today's slot
   // (which, if passed, is "now" to the runner).

@@ -229,7 +229,32 @@ function readBlock(body: string): DecisionRequest | undefined {
  * thing twice, once in a form that cannot be answered.
  */
 export function stripDecisionBlocks(text: string): string {
-  return text.replace(BLOCK, '').replace(/\n{3,}/gu, '\n\n').trimEnd()
+  /*
+   * ONLY THE ONE THAT BECAME A CARD (QA-2026-09-29 round 2, R4 and R5).
+   * Every block was taken out, so a question the card rules refused -- one
+   * option, five, "Yes"/"No", two the same -- and a second question after
+   * the first vanished from the reply: "I need a decision." and nothing
+   * under it, no card, and a model waiting on an answer nobody could give.
+   * A block that is not the card is left as the plain words it holds. One
+   * inside a code fence is an example, and stays as written.
+   */
+  const outside = blocksOutsideCode(text, BLOCK)
+  const card = outside.find((match) => readBlock(match[1] ?? '') !== undefined)?.index
+  const asWords = new Set(outside.map((match) => match.index).filter((at) => at !== card))
+  return text
+    .replace(BLOCK, (whole: string, body: string, at: number) => (at === card ? '' : asWords.has(at) ? plainQuestion(body) : whole))
+    .replace(/\n{3,}/gu, '\n\n')
+    .trimEnd()
+}
+
+/** An ask block's own words, without the form: `- A :: what it costs` reads `- A — what it costs`. */
+function plainQuestion(body: string): string {
+  return body
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => (OPTION_LINE.test(line) ? line.replace(/\s*::\s*/, ' — ') : line))
+    .join('\n')
 }
 
 /**

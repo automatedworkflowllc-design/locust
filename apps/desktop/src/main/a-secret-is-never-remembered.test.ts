@@ -46,6 +46,38 @@ describe('a secret, by its shape', () => {
   ])('an ordinary note is not taken for one: %s', (note) => {
     expect(secretIn(note)).toBeUndefined()
   })
+
+  // QA-2026-09-29 round 2, R2 and R10: secrets as people say them, all kept before.
+  it.each([
+    ['a login inside an address', 'postgres://admin:hunter2@db.internal:5432/app is the dev database'],
+    ['an AWS secret key', 'AWS key [redacted] and secret wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'],
+    ['a password', 'The admin login is admin / P@ssw0rd-2026!'],
+    ['a password', 'The database password is hunter2hunter2 and the admin login is admin@example.com'],
+    ['a passphrase', 'ssh key passphrase is correct horse battery staple'],
+    ['a card number', "The person's card number is 4111 1111 1111 1111 exp 12/29"],
+    ['a card number', 'Billing uses 4242-4242-4242-4242.']
+  ])('%s is recognised when said in words: %s', (kind, note) => {
+    expect(secretIn(note)).toBe(kind)
+  })
+
+  it.each([
+    'The password is stored in the vault.',
+    'The password is required on every deploy.',
+    'Login is at /login; the form posts to /api/session.',
+    'The login page is admin / settings in the menu.',
+    'Credentials live in the runtime sign-in, never here.',
+    'The passphrase prompt appears on first run.',
+    'Postgres runs at postgres://db.internal:5432/app for the tests.',
+    'The AWS region is us-east-1 and the bucket is shop-assets.',
+    'Order 1234 5678 9012 3456 shipped on Tuesday.',
+    'Call the shop at 352-555-0142 or +1 703 939 1174.',
+    'The build number was 20260929104512.',
+    // Passes Luhn, opens like no card network: a millisecond timestamp.
+    'The run started at 1727600000001.',
+    'Its secret sauce is caching: see src/cache/index.ts.'
+  ])('an ordinary note is still kept: %s', (note) => {
+    expect(secretIn(note)).toBeUndefined()
+  })
 })
 
 let root: string | undefined

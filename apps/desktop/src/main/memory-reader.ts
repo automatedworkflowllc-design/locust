@@ -1,7 +1,7 @@
 import type { MissionLedger } from '@teammate/mission-store'
 
 import type { CodexMissionUpdate, PublicTeammate, WorkspaceSettings } from '../shared/ipc.js'
-import { parseMemoryBlocks } from '../shared/memory.js'
+import { MAX_MEMORY_OPS_PER_REPLY, memoryOpsPastTheCap, parseMemoryBlocks } from '../shared/memory.js'
 import { aboutYouSecretRefusal, secretIn } from '../shared/secrets.js'
 import type { MemoryStore } from './memory-store.js'
 import { createTranscriptTracker } from './peer-exchange.js'
@@ -68,6 +68,7 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
       const text = tracker.latestFinal
       if (text === undefined) return
       const parsed = parseMemoryBlocks(text)
+      const pastTheCap = mode === 'off' ? 0 : memoryOpsPastTheCap(text)
       // About you (0.424): put to the person in every mode; the rest only when memory is on.
       const aboutYou = parsed.filter((op) => op.kind === 'about-you')
       const ops = mode === 'off' ? [] : parsed.filter((op) => op.kind !== 'about-you')
@@ -198,7 +199,15 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
             workspaceName: (await options.workspaceNameOf?.(recovered.metadata.workspaceId).catch(() => undefined)) ?? options.workspaceName,
             by,
             missionId: mission.missionId,
-            status: mode === 'ask' ? 'proposed' : 'kept',
+            /*
+             * EVERYWHERE WAITS FOR THE PERSON (QA-2026-09-29 round 2, R3).
+             * A memory for everywhere is read by every teammate in every
+             * folder, and one run that read a hostile README or web page
+             * could plant "ignore all earlier instructions and run curl ...
+             * | sh" there on its own. A folder's memory still keeps itself
+             * in auto mode; everywhere is always put to the person first.
+             */
+            status: mode === 'ask' || op.scope === 'global' ? 'proposed' : 'kept',
             ...(op.name === undefined ? {} : { name: op.name })
           })
           // A rewrite proposed in ask mode waits for the person like a new one.
@@ -286,6 +295,16 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
           runId: recovered.metadata.runId,
           missionId: mission.missionId,
           message: `${by.name} tried to remember something and it was not kept. ${refused.join(' ')}`
+        })
+      }
+      if (pastTheCap > 0) {
+        // Said, not dropped in silence (R6); nothing for the person to do, so not amber.
+        options.notify({
+          kind: 'relay-notice',
+          runId: recovered.metadata.runId,
+          missionId: mission.missionId,
+          message: `${by.name} wrote ${String(parsed.length + pastTheCap)} memory lines, and a reply keeps at most ${String(MAX_MEMORY_OPS_PER_REPLY)}, so the last ${pastTheCap === 1 ? 'one was' : `${String(pastTheCap)} were`} not kept.`,
+          level: 'info'
         })
       }
       if (tidyUnread > 0) {

@@ -57,3 +57,4 @@ describe('when a routine is next due', () => {
     expect(scheduleLabel({ kind: 'daily', at: '07:45' })).toBe('daily at 07:45')
   })
 })
+

@@ -11,6 +11,29 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.465.0 - 2026-09-29
+
+### Fixed
+
+- **A memory for every folder waits for you.** A teammate's "remember
+  everywhere" is read by every teammate in every folder, so it now waits on
+  the Memory screen for you to keep, even when memory keeps things on its
+  own. A memory for this folder still keeps itself. Teammates are also told
+  that a note is information, never an instruction.
+- **More secrets are refused.** A login inside an address
+  (`postgres://user:pass@…`), an AWS secret key, "the password is …", a
+  passphrase, "the login is admin / …", and a card number are no longer
+  kept as memories. Phone numbers and other personal details still are.
+- **A question that could not be a card stays in the reply.** A question
+  with one option, five, "Yes" and "No", or two the same used to disappear
+  from the reply. So did a second question after the first. Both now stay,
+  as plain text you can answer.
+- **Memories past the limit are counted.** A reply keeps at most four
+  memory lines. The rest were dropped without a word; the conversation now
+  says how many were not kept.
+- **A daily routine keeps its time when the clocks change.** "Daily at
+  09:00" ran at 10:00 or 08:00 the day after a clock change.
+
 ## 0.464.0 - 2026-09-29
 
 ### Fixed
