@@ -11,6 +11,23 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.458.0 - 2026-09-29
+<!-- big -->
+
+### New
+
+- **Folders work like Claude Code.** Switching folders no longer restarts
+  Locust: nothing closes, and runs keep going where they are.
+- **Every folder's conversations in the sidebar, by project.** Each
+  conversation is listed under the folder it belongs to, the one you're in
+  first. With a single folder the sidebar looks as it always did. Your
+  groups stay inside their folder.
+- **A conversation stays in its folder.** Opening one from another folder
+  takes you there, and a reply runs in that conversation's folder, whichever
+  folder you were in before.
+- **The folder button is a menu.** It lists the folders you've worked in, plus
+  "Choose a folder...". Picking one starts a new conversation there.
+
 ## 0.457.0 - 2026-09-29
 
 ### Fixed

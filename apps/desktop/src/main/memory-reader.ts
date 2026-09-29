@@ -28,6 +28,8 @@ export interface MemoryReaderOptions {
   }
   /** The folder's name, as the Memory screen shows it. */
   readonly workspaceName: string
+  /** Another folder's name by its id, for a reply from a conversation there (0.458). */
+  readonly workspaceNameOf?: (workspaceId: string) => Promise<string | undefined>
   readonly notify: (update: CodexMissionUpdate) => void
   /**
    * Put a line for the person's About-you note to them (0.424): true when it
@@ -193,7 +195,7 @@ export function createMemoryReader(options: MemoryReaderOptions): MemoryReader {
             text: op.text,
             scope: op.scope,
             workspaceId: recovered.metadata.workspaceId,
-            workspaceName: options.workspaceName,
+            workspaceName: (await options.workspaceNameOf?.(recovered.metadata.workspaceId).catch(() => undefined)) ?? options.workspaceName,
             by,
             missionId: mission.missionId,
             status: mode === 'ask' ? 'proposed' : 'kept',

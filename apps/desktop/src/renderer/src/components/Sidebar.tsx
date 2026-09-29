@@ -29,6 +29,7 @@ import { Icon } from './Icon.js'
 import { WorkingSpark } from './WorkingSpark.js'
 import { teammateTooltip } from '../teammateTooltip.js'
 import { railCountBadge, shortAgo } from '../railFlyout.js'
+import { folderSectionsOf } from '../../../shared/folder-sections.js'
 import { conversationRows, heldFor, narrowingLine, ownerOf, roomLastAt, unreadableSentence, withRoomsFolded } from '../conversationList.js'
 import { RailFlyout } from './RailFlyout.js'
 import { routineStepLabel } from '../routines.js'
@@ -87,7 +88,10 @@ export interface SidebarMission {
   readonly routineId?: string
   /** This row stands for a comparison not yet decided (0.441, compareRows.ts): it opens the comparison. */
   readonly compareId?: string
+  /** The folder this conversation belongs to (0.458): the sidebar lists it under that project. */
+  readonly folderId?: string
 }
+
 
 /** Whether a row is the conversation the workroom is showing. */
 function isShown(mission: SidebarMission, selectedMissionId: string | undefined): boolean {
@@ -212,7 +216,9 @@ export function Sidebar({
   onOpenRooms,
   onOpenAutomations,
   onHome,
-  compact = false
+  compact = false,
+  folders = [],
+  currentFolderId
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
   readonly missions: readonly SidebarMission[]
@@ -323,6 +329,10 @@ export function Sidebar({
    * the rows are already drawn.
    */
   readonly compact?: boolean
+  /** Every folder worked in, for the project headings (0.458). */
+  readonly folders?: readonly { readonly id: string; readonly name: string }[]
+  /** The folder new conversations start in: its section comes first. */
+  readonly currentFolderId?: string
 }): ReactElement {
   const [query, setQuery] = useState('')
   // The rail flyout: who it is open for, whether a click pinned it, and where
@@ -408,6 +418,8 @@ export function Sidebar({
    * and the list you actually scan stays at the top of the column.
    */
   const [foldedGroups, setFoldedGroups] = useState<ReadonlySet<string>>(new Set())
+  /** Project sections folded shut (0.458). */
+  const [foldedFolders, setFoldedFolders] = useState<ReadonlySet<string>>(new Set())
   /*
    * A new group is named before it exists.
    *
@@ -540,11 +552,115 @@ export function Sidebar({
   const stripGlances = glancesAmong(shownFaces.map((teammate) => teammate.teammateId), handoffs, 'row')
   const rosterGlances = glancesAmong(teammates.map((teammate) => teammate.teammateId), handoffs, 'column')
 
-  const ungroupedConversations = shownConversations.filter(
-    (mission) => heldFor(mission, groupMembers) === undefined
-  )
-  // A room's answers, drawn as the room. See `withRoomsFolded`.
-  const ungroupedEntries = withRoomsFolded(ungroupedConversations, rooms)
+  /*
+   * The list of conversations for one folder: its groups, then Ungrouped
+   * (0.458). With one folder this is the whole list, drawn as it always was.
+   */
+  const showsGroup = (groupId: string, inFolder: readonly SidebarMission[], keepsEmpty: boolean): boolean =>
+    inFolder.some((mission) => heldFor(mission, groupMembers)?.groupId === groupId)
+    || (keepsEmpty && !shownConversations.some((mission) => heldFor(mission, groupMembers)?.groupId === groupId))
+  const conversationList = (inFolder: readonly SidebarMission[], keepsEmpty: boolean): ReactElement => {
+    const folderUngrouped = withRoomsFolded(inFolder.filter((mission) => heldFor(mission, groupMembers) === undefined), rooms)
+    return (
+          <>
+            {groups.filter((group) => showsGroup(group.groupId, inFolder, keepsEmpty)).map((group) => {
+              const theirs = inFolder.filter(
+                (mission) => heldFor(mission, groupMembers)?.groupId === group.groupId
+              )
+              const open = !foldedGroups.has(group.groupId)
+              return (
+                <div className="lc-convgroup" key={group.groupId}>
+                  <div className="lc-convgroup__head">
+                    {renamingGroupId === group.groupId ? (
+                      /* The same shape a conversation rename uses: Enter
+                         commits, Escape abandons, blur commits too. */
+                      <input
+                        className="lc-input lc-convgroup__rename"
+                        defaultValue={group.name}
+                        maxLength={60}
+                        aria-label="Group name"
+                        autoFocus
+                        onKeyDown={(event) => {
+                          if (event.key === 'Escape') onGroupRenameDone?.()
+                          if (event.key === 'Enter') {
+                            const next = event.currentTarget.value
+                            onGroupRenameDone?.()
+                            if (next.trim().length > 0 && next.trim() !== group.name) {
+                              onRenameGroup?.(group.groupId, next)
+                            }
+                          }
+                        }}
+                        onBlur={(event) => {
+                          const next = event.currentTarget.value
+                          onGroupRenameDone?.()
+                          if (next.trim().length > 0 && next.trim() !== group.name) {
+                            onRenameGroup?.(group.groupId, next)
+                          }
+                        }}
+                      />
+                    ) : (
+                    <button
+                      type="button"
+                      className={`lc-sectionlabel lc-sectionlabel--fold${open ? ' is-open' : ''}`}
+                      aria-expanded={open}
+                      onClick={() =>
+                        setFoldedGroups((current) => {
+                          const next = new Set(current)
+                          if (next.has(group.groupId)) next.delete(group.groupId)
+                          else next.add(group.groupId)
+                          return next
+                        })
+                      }
+                    >
+                      <Icon name={open ? 'chevron-down' : 'chevron-right'} size={11} />
+                      <span>{group.name}</span>
+                      <span className="lc-sectionlabel__count">{String(theirs.length)}</span>
+                    </button>
+                    )}
+                    {onGroupMenu !== undefined && renamingGroupId !== group.groupId && (
+                      <button
+                        type="button"
+                        className="lc-convgroup__menu"
+                        aria-label={`Actions for ${group.name}`}
+                        title="Rename or remove this group"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          const box = event.currentTarget.getBoundingClientRect()
+                          onGroupMenu(group.groupId, { x: box.right, y: box.bottom })
+                        }}
+                      >
+                        <Icon name="dots" size={13} />
+                      </button>
+                    )}
+                  </div>
+                  {/*
+                    * An empty group says what to do with it. It is the one
+                    * container in this app worth drawing empty, because the
+                    * person made it deliberately a moment ago and an empty
+                    * fold would read as a mistake.
+                    */}
+                  {open && theirs.length === 0 && (
+                    <p className="lc-convgroup__empty lc-row__meta">Nothing in here yet.</p>
+                  )}
+                  {open && theirs.map(conversationRow)}
+                </div>
+              )
+            })}
+            {/*
+              * Ungrouped carries a heading only when a group exists to be
+              * ungrouped FROM. With no groups at all this is the whole
+              * sidebar and a label over it would name the only thing there.
+              */}
+            {groups.length > 0 && folderUngrouped.length > 0 && (
+              <div className="lc-sectionlabel lc-sectionlabel--plain">
+                <span>Ungrouped</span>
+                <span className="lc-sectionlabel__count">{String(folderUngrouped.length)}</span>
+              </div>
+            )}
+            {folderUngrouped.map((entry) => (entry.kind === 'room' ? roomRow(entry.room, entry.missions) : conversationRow(entry.mission)))}
+          </>
+    )
+  }
   const unowned = missions.filter((mission) => (mission.ownerId ?? missionOwners[mission.missionId]) === undefined)
   const shownUnowned = missionsMatching(unowned, query)
   /*
@@ -1472,101 +1588,43 @@ export function Sidebar({
                 <span className="lc-sidebar__unreadable-safe lc-mono">Nothing is written over them. All missions names the files.</span>
               </div>
             )}
-            {groups.map((group) => {
-              const theirs = shownConversations.filter(
-                (mission) => heldFor(mission, groupMembers)?.groupId === group.groupId
-              )
-              const open = !foldedGroups.has(group.groupId)
-              return (
-                <div className="lc-convgroup" key={group.groupId}>
-                  <div className="lc-convgroup__head">
-                    {renamingGroupId === group.groupId ? (
-                      /* The same shape a conversation rename uses: Enter
-                         commits, Escape abandons, blur commits too. */
-                      <input
-                        className="lc-input lc-convgroup__rename"
-                        defaultValue={group.name}
-                        maxLength={60}
-                        aria-label="Group name"
-                        autoFocus
-                        onKeyDown={(event) => {
-                          if (event.key === 'Escape') onGroupRenameDone?.()
-                          if (event.key === 'Enter') {
-                            const next = event.currentTarget.value
-                            onGroupRenameDone?.()
-                            if (next.trim().length > 0 && next.trim() !== group.name) {
-                              onRenameGroup?.(group.groupId, next)
-                            }
-                          }
-                        }}
-                        onBlur={(event) => {
-                          const next = event.currentTarget.value
-                          onGroupRenameDone?.()
-                          if (next.trim().length > 0 && next.trim() !== group.name) {
-                            onRenameGroup?.(group.groupId, next)
-                          }
-                        }}
-                      />
-                    ) : (
+            {(() => {
+              /*
+               * PROJECTS, like Claude Code (0.458): every folder's
+               * conversations, each under its folder's name -- the window's
+               * own folder first, then the rest by their newest. One folder
+               * draws no heading at all.
+               */
+              const sections = folderSectionsOf(shownConversations, currentFolderId)
+              if (sections.length <= 1) return conversationList(shownConversations, true)
+              return sections.map((section) => {
+                const open = !foldedFolders.has(section.id)
+                const name = folders.find((folder) => folder.id === section.id)?.name ?? 'Another folder'
+                return (
+                  <div className="lc-project" key={section.id}>
                     <button
                       type="button"
-                      className={`lc-sectionlabel lc-sectionlabel--fold${open ? ' is-open' : ''}`}
+                      className={`lc-project__head${open ? ' is-open' : ''}${section.id === currentFolderId ? ' is-current' : ''}`}
                       aria-expanded={open}
+                      title={section.id === currentFolderId ? `${name}: new conversations start here` : name}
                       onClick={() =>
-                        setFoldedGroups((current) => {
+                        setFoldedFolders((current) => {
                           const next = new Set(current)
-                          if (next.has(group.groupId)) next.delete(group.groupId)
-                          else next.add(group.groupId)
+                          if (next.has(section.id)) next.delete(section.id)
+                          else next.add(section.id)
                           return next
                         })
                       }
                     >
-                      <Icon name={open ? 'chevron-down' : 'chevron-right'} size={11} />
-                      <span>{group.name}</span>
-                      <span className="lc-sectionlabel__count">{String(theirs.length)}</span>
+                      <Icon name="folder" size={12} />
+                      <span className="lc-project__name">{name}</span>
+                      <span className="lc-sectionlabel__count">{String(section.missions.length)}</span>
                     </button>
-                    )}
-                    {onGroupMenu !== undefined && renamingGroupId !== group.groupId && (
-                      <button
-                        type="button"
-                        className="lc-convgroup__menu"
-                        aria-label={`Actions for ${group.name}`}
-                        title="Rename or remove this group"
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          const box = event.currentTarget.getBoundingClientRect()
-                          onGroupMenu(group.groupId, { x: box.right, y: box.bottom })
-                        }}
-                      >
-                        <Icon name="dots" size={13} />
-                      </button>
-                    )}
+                    {open && conversationList(section.missions, section.id === currentFolderId)}
                   </div>
-                  {/*
-                    * An empty group says what to do with it. It is the one
-                    * container in this app worth drawing empty, because the
-                    * person made it deliberately a moment ago and an empty
-                    * fold would read as a mistake.
-                    */}
-                  {open && theirs.length === 0 && (
-                    <p className="lc-convgroup__empty lc-row__meta">Nothing in here yet.</p>
-                  )}
-                  {open && theirs.map(conversationRow)}
-                </div>
-              )
-            })}
-            {/*
-              * Ungrouped carries a heading only when a group exists to be
-              * ungrouped FROM. With no groups at all this is the whole
-              * sidebar and a label over it would name the only thing there.
-              */}
-            {groups.length > 0 && ungroupedEntries.length > 0 && (
-              <div className="lc-sectionlabel lc-sectionlabel--plain">
-                <span>Ungrouped</span>
-                <span className="lc-sectionlabel__count">{String(ungroupedEntries.length)}</span>
-              </div>
-            )}
-            {ungroupedEntries.map((entry) => (entry.kind === 'room' ? roomRow(entry.room, entry.missions) : conversationRow(entry.mission)))}
+                )
+              })
+            })()}
           </div>
         )}
 

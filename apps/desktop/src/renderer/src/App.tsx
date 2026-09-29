@@ -4,6 +4,7 @@ import type { ReactElement } from 'react'
 import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
 import type {
+  PublicFolder,
   RuntimeUpdatesState,
   LayoutPreference,
   TubePreference,
@@ -4679,16 +4680,16 @@ export default function App(): ReactElement {
   const chooseWorkspace = (): void => {
     const bridge = window.desktop
     if (bridge === undefined) return
-    if (runningCount > 0) {
-      setWorkspaceNotice('Stop the running missions first. Changing folder reopens Locust.')
-      return
-    }
     setWorkspaceNotice(undefined)
+    // In place (0.458): runs keep going in their own folders, nothing restarts.
     void bridge
       .chooseWorkspace()
       .then((response) => {
-        if (response.ok) setWorkspaceNotice(`Reopening in ${response.data.path}...`)
-        else if (response.error.code !== 'CANCELLED') setWorkspaceNotice(response.error.message)
+        if (response.ok) {
+          // A folder chosen is where the next conversation starts (0.458).
+          setShownKey(undefined)
+          refreshForFolder()
+        } else if (response.error.code !== 'CANCELLED') setWorkspaceNotice(response.error.message)
       })
       .catch(() => setWorkspaceNotice('The folder could not be chosen. The workspace is unchanged.'))
   }
@@ -4855,9 +4856,61 @@ export default function App(): ReactElement {
     if (own !== undefined && own.runtime === run.data.runtime) setEffort(own.effort)
   }
 
+  /*
+   * FOLDERS LIKE CLAUDE CODE (0.458, docs/PLAN-2026-09-29-FOLDERS-LIKE-CLAUDE-CODE.md).
+   * Everything the window holds about ITS folder, read again after a switch:
+   * the name and path, this folder's check command, LOCUST.md and the
+   * runtimes' setup, the / commands, memory, routines, the worktrees, and the
+   * history's idea of which folder is current. Nothing restarts.
+   */
+  const [folders, setFolders] = useState<readonly PublicFolder[]>([])
+  const refreshFolders = (): void => {
+    void window.desktop?.listFolders().then((listed) => setFolders(listed.folders)).catch(() => undefined)
+  }
+  useEffect(() => { refreshFolders() }, [history.length])
+  const refreshForFolder = (): void => {
+    const bridge = window.desktop
+    if (bridge === undefined) return
+    void bridge.getAppInfo().then((info) => {
+      setWorkspaceName(info.workspaceName)
+      setWorkspacePath(info.workspacePath.length === 0 ? undefined : info.workspacePath)
+      setWorkspaceMade(info.workspaceMade === true)
+    }).catch(() => undefined)
+    void bridge.readWorkspaceSettings().then((settings) => setCheckCommand(settings.checkCommand ?? '')).catch(() => undefined)
+    refreshRuntimeSetup()
+    rereadRuntimeCommands()
+    refreshMemories()
+    void bridge.listRoutines().then((response) => {
+      if (response.ok) setRoutines(response.data.routines)
+    }).catch(() => undefined)
+    if (worktrees !== undefined) refreshWorktrees()
+    refreshFolders()
+    void bridge.getMissionHistory(heldDigests(historyRef.current)).then((response) => {
+      seedLimitsFrom(response)
+      applyHistory(response)
+      if (response.ok) setWorkspaceId(response.data.currentWorkspaceId)
+    }).catch(() => undefined)
+  }
+  /** Put the window in a folder already worked in, by its id. */
+  const switchToFolder = (id: string): void => {
+    void window.desktop?.switchFolder(id).then((answer) => {
+      if (!answer.ok) {
+        setWorkspaceNotice(answer.message)
+        return
+      }
+      setWorkspaceNotice(undefined)
+      setWorkspaceId(answer.folder.id)
+      refreshForFolder()
+    }).catch(() => undefined)
+  }
+
   const openMission = (missionId: string): void => {
     // Opening a conversation leaves any comparison on screen (0.441).
     setComparingId(undefined)
+    // A conversation from another folder takes the window there, as Claude
+    // Code's sessions do (0.458): the folder chip, @ files and pages are its.
+    const itsFolder = historyById.get(missionId)?.workspaceId
+    if (itsFolder !== undefined && workspaceId !== undefined && itsFolder !== workspaceId) switchToFolder(itsFolder)
     // Opening a conversation SHOWS it. Every caller but one used to have to
     // remember `setScreen('workroom')` first, and the sidebar did not -- so
     // from the Missions screen a click lit the row and left you looking at
@@ -5381,6 +5434,8 @@ export default function App(): ReactElement {
   }
 
   const sidebarMissionsRef = useRef<readonly SidebarMission[]>([])
+  /** Which folder each live run's row was first drawn in (0.458). */
+  const runFolders = useRef(new Map<string, string>())
   // The right-click menus are built outside render, so they read the roster
   // and the routines through refs the same way they read the rows.
   const teammatesRef = useRef<readonly PublicTeammate[]>([])
@@ -5437,8 +5492,17 @@ export default function App(): ReactElement {
       // A routine's own step says so; a person's reply inside a routine's
       // conversation is known by the conversation's first turn.
       const routineId = routineOf(run.startedBy) ?? routineOf(rootId === undefined ? undefined : historyById.get(rootId)?.startedBy)
+      /*
+       * Its folder (0.458): the record's when there is one; otherwise the
+       * window's folder when this row was first drawn, which is where it was
+       * started -- kept, so a switch mid-run does not move it.
+       */
+      const rootFolder = rootId === undefined ? undefined : historyById.get(rootId)?.workspaceId
+      const folderId = recorded?.workspaceId ?? rootFolder ?? runFolders.current.get(missionId) ?? workspaceId
+      if (folderId !== undefined && !runFolders.current.has(missionId)) runFolders.current.set(missionId, folderId)
       rows.push({
         missionId,
+        ...(folderId === undefined ? {} : { folderId }),
         ...(rootId === undefined ? {} : { rootId }),
         ...(parentId === undefined ? {} : { parentId }),
         ...(routineId === undefined ? {} : { routineId }),
@@ -5469,13 +5533,13 @@ export default function App(): ReactElement {
     }
     for (const mission of history) {
       if (rows.some((row) => row.missionId === mission.missionId)) continue
-      // The sidebar is this folder's work. Missions from other folders stay in
-      // the ledger and on the Missions screen, which is the whole archive --
-      // listing them here put another project's conversations in the sidebar
-      // of this one. Measured 2026-09-03 by opening a second project.
-      if (workspaceId !== undefined && mission.workspaceId !== workspaceId) continue
+      // Every folder's conversations, each under its own project (0.458, like
+      // Claude Code). This used to drop every other folder's, so a folder
+      // switch emptied the sidebar and read as the team being reset (Colin,
+      // 2026-09-29).
       rows.push({
         missionId: mission.missionId,
+        folderId: mission.workspaceId,
         // A continuation's own prompt is the briefing; name it by the words
         // the person typed at the start of the chain.
         title: missionTitle(
@@ -6051,6 +6115,8 @@ export default function App(): ReactElement {
           routines={routines}
           onOpenAutomations={() => setScreen('automations')}
           missions={sidebarMissions}
+          folders={folders}
+          {...(workspaceId === undefined ? {} : { currentFolderId: workspaceId })}
           compact={layoutMode === 'compact'}
           teammates={teammates}
           routineStepByTeammate={routineStepByTeammate}
@@ -7071,6 +7137,13 @@ export default function App(): ReactElement {
             workspacePath={workspacePath}
             workspaceMade={workspaceMade}
             onChooseFolder={chooseWorkspace}
+            folders={folders}
+            {...(workspaceId === undefined ? {} : { currentFolderId: workspaceId })}
+            // Another folder from the chip starts a new conversation there, as in Claude Code (0.458).
+            onSwitchFolder={(id) => {
+              setShownKey(undefined)
+              switchToFolder(id)
+            }}
             runtimes={runtimes}
             runtimeCommands={runtimeCommands}
             runtimesGaveUp={runtimeState.phase === 'ready' && runtimeState.gaveUp === true}

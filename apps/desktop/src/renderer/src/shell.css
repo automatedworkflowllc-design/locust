@@ -9276,6 +9276,18 @@ textarea {
   align-items: center;
 }
 
+/* The folder chip's anchor (0.458) gives ground like the chip inside it: a
+   flex item keeps its content's width unless told otherwise, and without this
+   the name ran under the model chip beside it. */
+.lc-control__anchor--folder {
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.lc-control__anchor--folder > .lc-control--folder {
+  max-width: 100%;
+}
+
 .lc-menu {
   position: absolute;
   bottom: calc(100% + var(--lc-space-4));
@@ -15019,6 +15031,68 @@ textarea {
 .lc-convgroup {
   display: flex;
   flex-direction: column;
+}
+
+/*
+ * PROJECTS (0.458, like Claude Code): each folder's conversations under the
+ * folder's own name. A step above a group's mono label -- a folder is where
+ * the work is, a group is how the person filed it -- in the folder's own
+ * casing, because it is a name on disk. The window's current folder reads
+ * brightest: new conversations start there.
+ */
+.lc-project {
+  display: flex;
+  flex-direction: column;
+}
+
+.lc-project + .lc-project {
+  margin-top: var(--lc-space-4);
+}
+
+.lc-project__head {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+  width: 100%;
+  padding: var(--lc-space-4) var(--lc-space-6) var(--lc-space-2);
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-control);
+}
+
+.lc-project__head:hover {
+  color: var(--lc-text-secondary);
+}
+
+.lc-project__head.is-current {
+  color: var(--lc-text-secondary);
+}
+
+.lc-project__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.lc-project__head.is-current .lc-project__name {
+  color: var(--lc-text-primary);
+}
+
+/* The folder chip's menu: its paths are long, so it is wider than a mode menu
+   and each path is cut rather than wrapped. */
+.lc-menu--folders {
+  width: 360px;
+}
+
+.lc-menu--folders .lc-menu__desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .lc-convgroup__head {

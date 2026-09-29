@@ -37,6 +37,7 @@ import { workspaceIdFor } from './workspace.js'
 import type { MissionContinuation, MissionLedger, RecoveredMission, Workroom, WorkroomMessage } from '@teammate/mission-store'
 import type { MissionSandbox, OpenCodeProvider, RuntimeCommandInfo, RuntimeCommandSpec } from '@teammate/runtime-adapters'
 import { createHash, randomUUID } from 'node:crypto'
+import { existsSync } from 'node:fs'
 import { isAbsolute } from 'node:path'
 import type {
   CodexMissionCancelResponse,
@@ -273,7 +274,14 @@ export interface CodexMissionService {
 }
 
 interface CodexMissionServiceOptions {
+  /** The folder the service was started in; `currentFolder` wins when given. */
   readonly workspacePath: string
+  /** The folder the window is in NOW, for a turn that starts a conversation (0.458). */
+  readonly currentFolder?: () => string
+  /** A folder's path by its id, for a turn that continues a conversation from another folder (0.458). */
+  readonly folderOf?: (workspaceId: string) => Promise<string | undefined>
+  /** The teammate's context rebuilt for another folder: its own-branch worktree is that folder's (0.458). */
+  readonly peerIn?: (peer: MissionPeerContext, folder: string) => Promise<MissionPeerContext | undefined>
   /** Test seam. Which platform's containment rules apply. */
   readonly platform?: NodeJS.Platform
   /**
@@ -631,7 +639,6 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
   }
 
   const createId = options.createId ?? randomUUID
-  const workspaceId = workspaceIdFor(options.workspacePath)
   const now = options.now ?? (() => new Date())
   const schedule = options.schedule ?? ((task: () => void) => {
     setImmediate(task)
@@ -1102,6 +1109,35 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       if (options.freeRoutesOnly === true && !isFreeRoute(runtime, chosenModel)) {
         return error('RUNTIME_START_FAILED', FREE_ONLY_REFUSAL) as CodexMissionStartResponse
       }
+      /*
+       * THE RUN'S OWN FOLDER (0.458, docs/PLAN-2026-09-29-FOLDERS-LIKE-CLAUDE-CODE.md).
+       *
+       * A conversation belongs to the folder it began in, and the window can
+       * now be in another one without a restart. So a turn that continues a
+       * conversation -- a follow-up, a route switch, a relayed reply -- runs
+       * where that conversation ran, never where the window happens to be.
+       * One whose folder is not known, or is gone, is refused rather than
+       * run somewhere it never was.
+       */
+      const continues = continuation?.missionId ?? followUpOf ?? relay?.rootMissionId
+      const current = options.currentFolder?.() ?? options.workspacePath
+      let runFolder = current
+      if (continues !== undefined && options.folderOf !== undefined) {
+        const earlierFolder = (await options.ledger.getMission(continues).catch(() => undefined))?.metadata.workspaceId
+        if (earlierFolder !== undefined && earlierFolder !== workspaceIdFor(current)) {
+          const path = await options.folderOf(earlierFolder).catch(() => undefined)
+          if (path === undefined) {
+            return error('RUNTIME_START_FAILED', 'Locust does not know which folder this conversation ran in, so it will not continue it somewhere else. Start a new conversation instead.') as CodexMissionStartResponse
+          }
+          if (!existsSync(path)) {
+            return error('RUNTIME_START_FAILED', `This conversation ran in ${path}, and that folder is not there any more.`) as CodexMissionStartResponse
+          }
+          runFolder = path
+          // The teammate's own-branch worktree is cut from THAT folder's repository.
+          if (peer !== undefined && options.peerIn !== undefined) peer = (await options.peerIn(peer, runFolder)) ?? peer
+        }
+      }
+      const workspaceId = workspaceIdFor(runFolder)
       // M11: Own branch on and the branch could not be made. Refused HERE,
       // on the path every start shares -- a direct message, a room post, a
       // relayed share, a routine step, a resume -- because the context falls
@@ -1483,7 +1519,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // The teammate's own worktree when it has one, else the folder. The
         // ledger's workspace id stays the FOLDER's: history is per folder.
         // A comparison's column may answer in a copy of the folder (0.443, compare-copies.ts).
-        const runCwd = slot?.cwd ?? peer?.cwd ?? options.workspacePath
+        const runCwd = slot?.cwd ?? peer?.cwd ?? runFolder
         // Named by whoever made the worktree, not inferred from this folder:
         // a teammate with its own folder is in a worktree of a repository
         // that is not this one. Absent unless the run really is in a
@@ -1670,7 +1706,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // deterministic over those.
         // M16: attached files placed where this run reads, when it runs
         // anywhere but the project folder. Only what is sent changes.
-        const sentPrompt = await attachmentsForRun(prompt, options.workspacePath, runCwd).catch(() => prompt)
+        const sentPrompt = await attachmentsForRun(prompt, runFolder, runCwd).catch(() => prompt)
         let runtimePrompt = sentPrompt
         let delivered: readonly WorkroomMessage[] = []
         let peerDeliveryFailed = false
@@ -1702,6 +1738,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           // conversation's group. A route switch names it in `continuation`;
           // a follow-up in `resumedMissionId`; a first turn has none.
           const prepared = await peerExchange.prepare(sentPrompt, peer, runtime, {
+            folder: runFolder,
             ...((continuation?.missionId ?? resumedMissionId ?? followUpOf) === undefined
               ? {}
               : { previousMissionId: continuation?.missionId ?? resumedMissionId ?? followUpOf }),
@@ -1727,6 +1764,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
            * memory file anywhere). Nothing here needs a roster.
            */
           const solo = await peerExchange.briefSolo(sentPrompt, runtime, {
+            folder: runFolder,
             ...((continuation?.missionId ?? resumedMissionId ?? followUpOf) === undefined
               ? {}
               : { previousMissionId: continuation?.missionId ?? resumedMissionId ?? followUpOf }),

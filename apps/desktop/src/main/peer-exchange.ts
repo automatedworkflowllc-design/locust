@@ -138,6 +138,8 @@ export function createTranscriptTracker(): TranscriptTracker {
  */
 export interface ConversationHint {
   readonly previousMissionId?: string
+  /** The folder the run stands in: its conversation's, which may not be the window's (0.458). */
+  readonly folder?: string
   /**
    * The paragraphs of the brief the resumed CLI session already holds, by
    * key (A2.5). Absent for a turn that must be briefed in full.

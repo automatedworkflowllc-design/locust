@@ -439,7 +439,7 @@ export interface AppInfo {
  * mission list is scoped by it, so a running window cannot simply switch.
  */
 export type WorkspaceChooseResponse =
-  | { readonly ok: true; readonly data: { readonly path: string; readonly reopening: true } }
+  | { readonly ok: true; readonly data: { readonly path: string; readonly id: string; readonly name: string } }
   | {
       readonly ok: false
       readonly error: {
@@ -618,6 +618,23 @@ export type OpenInTerminalResponse =
 export const WORKSPACE_SETTINGS_READ_CHANNEL = 'workspace-settings:read'
 export const WORKSPACE_SETTINGS_WRITE_CHANNEL = 'workspace-settings:write'
 export const WORKSPACE_CHOOSE_CHANNEL = 'workspace:choose'
+/** Every folder worked in, and the window's (0.458). */
+export const FOLDER_LIST_CHANNEL = 'folder:list'
+/** Switch the window to a folder already worked in, by id -- no restart (0.458). */
+export const FOLDER_SWITCH_CHANNEL = 'folder:switch'
+export interface PublicFolder {
+  readonly id: string
+  readonly path: string
+  readonly name: string
+  readonly lastUsedAt?: string
+}
+export interface FolderListResponse {
+  readonly folders: readonly PublicFolder[]
+  readonly currentId: string | undefined
+}
+export type FolderSwitchResponse =
+  | { readonly ok: true; readonly folder: { readonly id: string; readonly path: string; readonly name: string } }
+  | { readonly ok: false; readonly message: string }
 /**
  * Show a file a teammate wrote, in the operating system's file manager.
  *
@@ -2708,6 +2725,8 @@ export interface DesktopApi {
   readWorkspaceSettings(): Promise<WorkspaceSettings>
   /** Pick the folder the teammates work in. Reopens the app there on success. */
   chooseWorkspace(): Promise<WorkspaceChooseResponse>
+  listFolders(): Promise<FolderListResponse>
+  switchFolder(id: string): Promise<FolderSwitchResponse>
   /**
    * Show a file in the file manager. Answers whether it was shown, so the
    * card can say something rather than appear to do nothing.

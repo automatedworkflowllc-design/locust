@@ -273,6 +273,13 @@ export interface ComposerProps {
   readonly workspacePath: string | undefined
   readonly workspaceMade?: boolean
   readonly onChooseFolder: () => void
+  /**
+   * Folders already worked in, newest first, for the chip's menu (0.458, as
+   * Claude Code's folder picker): one press starts a new conversation there.
+   */
+  readonly folders?: readonly { readonly id: string; readonly name: string; readonly path: string }[]
+  readonly currentFolderId?: string
+  readonly onSwitchFolder?: (id: string) => void
   /** Who the next mission is messaged to; the placeholder says so. */
   readonly teammateName: string | undefined
   /**
@@ -349,6 +356,9 @@ export function Composer({
   workspacePath,
   workspaceMade = false,
   onChooseFolder,
+  folders = [],
+  currentFolderId,
+  onSwitchFolder,
   runtimes,
   runtimesGaveUp = false,
   limitedRuntimes,
@@ -455,6 +465,8 @@ export function Composer({
   const [modeOpen, setModeOpen] = useState(false)
   /** Direct, Compare or Blind (0.451, as Arena draws it): the chip left of the mode. */
   const [chatModeOpen, setChatModeOpen] = useState(false)
+  /** The folder chip's menu (0.458). */
+  const [folderOpen, setFolderOpen] = useState(false)
   /**
    * Files this message will point the runtime at, workspace-relative.
    *
@@ -523,6 +535,9 @@ export function Composer({
 
   const modeAnchor = useRef<HTMLSpanElement>(null)
   const chatModeAnchor = useRef<HTMLSpanElement>(null)
+  const folderAnchor = useRef<HTMLSpanElement>(null)
+  const closeFolder = useCallback(() => setFolderOpen(false), [])
+  useDismissOnOutsidePress(folderOpen, closeFolder, folderAnchor)
   const pickerAnchor = useRef<HTMLSpanElement>(null)
   const effortAnchor = useRef<HTMLSpanElement>(null)
   /** The chips the send's metal is cast onto -- see `reflectOnto`. */
@@ -1745,22 +1760,62 @@ export function Composer({
                 * Colin: "our workspace folder asset is gone ... we just can
                 * use what we used to have until we find a better idea".
                 */}
+              <span className="lc-control__anchor lc-control__anchor--folder" ref={folderAnchor}>
+                {folderOpen && (
+                  <div className="lc-menu lc-menu--folders" role="menu" aria-label="Work in folder">
+                    {folders.slice(0, 8).map((folder) => (
+                      <button
+                        key={folder.id}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={folder.id === currentFolderId}
+                        className="lc-menu__item"
+                        title={folder.path}
+                        onClick={() => {
+                          setFolderOpen(false)
+                          if (folder.id !== currentFolderId) onSwitchFolder?.(folder.id)
+                        }}
+                      >
+                        <span className="lc-menu__text">
+                          <span className="lc-menu__name">{folder.name}</span>
+                          <span className="lc-menu__desc lc-mono">{folder.path}</span>
+                        </span>
+                        {folder.id === currentFolderId && <Icon name="check" size={13} />}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="lc-menu__item"
+                      onClick={() => {
+                        setFolderOpen(false)
+                        onChooseFolder()
+                      }}
+                    >
+                      <span className="lc-menu__text">
+                        <span className="lc-menu__name">Choose a folder...</span>
+                      </span>
+                    </button>
+                  </div>
+                )}
               <button
                 type="button"
                 className={`lc-control lc-control--folder${workspacePath === undefined ? ' is-missing' : ''}`}
-                disabled={running}
+                aria-haspopup="menu"
+                aria-expanded={folderOpen}
                 title={
                   workspacePath === undefined
                     ? 'No folder chosen. Every teammate works inside one project folder.'
                     : workspaceMade
                       ? `Teammates work in ${workspacePath}. Locust made this folder; pick any other to work there instead.`
-                      : `Teammates work in ${workspacePath}`
+                      : `New conversations work in ${workspacePath}`
                 }
-                onClick={onChooseFolder}
+                onClick={() => (folders.length === 0 ? onChooseFolder() : setFolderOpen(!folderOpen))}
               >
                 <Icon name="folder" size={13} />
                 <span className="lc-control__folder">{workspaceName ?? 'No folder'}</span>
               </button>
+              </span>
             </div>
             <div className="lc-composer__group">
               {context !== undefined ? (

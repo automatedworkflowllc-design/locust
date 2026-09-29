@@ -39,7 +39,7 @@ import { spawn } from 'node:child_process'
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync, existsSync, renameSync, statSync, unlinkSync } from 'node:fs'
 import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { randomInt } from 'node:crypto'
-import { basename, dirname, isAbsolute, join } from 'node:path'
+import { basename, dirname, isAbsolute, join, resolve as resolvePath } from 'node:path'
 import { homedir, release } from 'node:os'
 import { execFile } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -112,6 +112,8 @@ import { changelogPaths, entries as changelogEntries, readChangelog, splashEntri
 import type { ChangelogEntry } from './changelog.js'
 import type { CodexMissionService } from './codex-mission.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
+import { createFolderRegistry, recoverFolderPath } from './folders.js'
+import type { FolderContext } from './folders.js'
 import { createConnectorReader } from './connector-reader.js'
 import { createRelay } from './relay.js'
 import { createAttention, finishFrom } from './attention.js'
@@ -212,6 +214,8 @@ import {
   TEAMMATE_CONNECTORS_CHANNEL,
   TEAMMATE_FOLDER_CHANNEL,
   WORKSPACE_CHOOSE_CHANNEL,
+  FOLDER_LIST_CHANNEL,
+  FOLDER_SWITCH_CHANNEL,
   WORKSPACE_ATTACH_CHANNEL,
   WORKSPACE_FILES_CHANNEL,
   WORKSPACE_PASTE_CHANNEL,
@@ -1296,9 +1300,10 @@ if (!ownsSingleInstanceLock) {
         return { path: undefined, source: 'none' }
       }
     })()
-    const workspaceChosen = workspace.path !== undefined
+    // Changeable while the app runs (0.458): a folder switch no longer restarts it. See switchFolder.
+    let workspaceChosen = workspace.path !== undefined
     const workspaceMade = workspace.source === 'default'
-    const workspacePath = workspace.path ?? process.cwd()
+    let workspacePath = workspace.path ?? process.cwd()
     const NO_WORKSPACE_MESSAGE =
       'Choose the folder your teammates work in first. Locust was opened from its own install folder, and no teammate should work in there.'
     const noWorkspaceRefusal = () =>
@@ -1309,6 +1314,54 @@ if (!ownsSingleInstanceLock) {
     // A person told "Locust cannot write its ledger" and given no way to go
     // and look at the folder has been informed and not helped.
     const groups = createGroupStore({ rootDirectory: app.getPath('userData') })
+    /*
+     * Every folder worked in, by id and path (0.458, folders.ts): a
+     * conversation from another folder is listed, opened and continued there.
+     */
+    const folders = createFolderRegistry({ file: join(app.getPath('userData'), 'folders.json') })
+    if (workspaceChosen) void folders.use(workspacePath).catch(() => undefined)
+    /*
+     * SWITCH FOLDERS WITHOUT A RESTART (0.458). It was `app.relaunch()`: the
+     * window vanished and a new one opened, which read as a crash (9/11,
+     * 9/29), and the new window listed only that folder's conversations, which
+     * read as the team being reset. Now the folder is simply the window's
+     * current one: new conversations start there; every conversation keeps
+     * its own folder (codex-mission.ts, runFolder).
+     */
+    const switchFolder = async (next: string): Promise<FolderContext> => {
+      const full = resolvePath(next)
+      await writeRememberedWorkspace(rememberedWorkspaceFile, full)
+      workspacePath = full
+      workspaceChosen = true
+      memoryWorkspaceId = workspaceIdFor(full)
+      memoryWorkspaceName = basename(full) || full
+      await folders.use(full)
+      return { path: full, id: memoryWorkspaceId, name: memoryWorkspaceName }
+    }
+    /*
+     * A folder id with no known path, from before folders were kept: found in
+     * the conversation's own record (recoverFolderPath). Tried once per id per
+     * launch, whatever the answer.
+     */
+    const triedFolderIds = new Set<string>()
+    const recoverFolders = async (missions: readonly { readonly missionId: string; readonly workspaceId: string }[]): Promise<void> => {
+      const known = new Set((await folders.list()).map((folder) => folder.id))
+      const found: { id: string; path: string }[] = []
+      for (const mission of missions) {
+        if (known.has(mission.workspaceId) || triedFolderIds.has(mission.workspaceId) || !/^ws_[0-9a-f]{32}$/.test(mission.workspaceId)) continue
+        if (!/^mission_[A-Za-z0-9-]{1,80}$/.test(mission.missionId)) continue
+        const text = await readFile(join(ledgerDirectory, `${mission.missionId}.jsonl`), 'utf8').catch(() => '')
+        const path = recoverFolderPath(mission.workspaceId, text)
+        if (path !== undefined) {
+          found.push({ id: mission.workspaceId, path })
+          known.add(mission.workspaceId)
+          triedFolderIds.add(mission.workspaceId)
+        }
+      }
+      // An id whose conversations all failed to say is not tried again this launch.
+      for (const mission of missions) if (!known.has(mission.workspaceId)) triedFolderIds.add(mission.workspaceId)
+      await folders.learn(found)
+    }
     const ledgerDirectory = join(app.getPath('userData'), 'mission-ledger')
     const missionLedger = createFileMissionLedger({ rootDirectory: ledgerDirectory })
     /** From a turn back to its conversation's root, one ledger read per hop, remembered. */
@@ -1333,21 +1386,25 @@ if (!ownsSingleInstanceLock) {
         decrypt: (cipher) => safeStorage.decryptString(cipher)
       }
     })
-    const memoryWorkspaceId = workspaceChosen ? workspaceIdFor(workspacePath) : 'ws_none'
-    const memoryWorkspaceName = workspaceChosen ? basename(workspacePath) || workspacePath : 'no folder'
+    let memoryWorkspaceId = workspaceChosen ? workspaceIdFor(workspacePath) : 'ws_none'
+    let memoryWorkspaceName = workspaceChosen ? basename(workspacePath) || workspacePath : 'no folder'
+    /** A folder by path, with the id and name memory and the brief know it by (0.458). */
+    const folderContext = (path: string): FolderContext => ({ path, id: workspaceIdFor(path), name: basename(path) || path })
     // The folder's own LOCUST.md rides in the same slot, first: read fresh at
     // every start so an edit lands on the next mission (parity row 45).
     const memoryBriefing: MemoryBriefing = {
       section: async (peer, conversation, query, runtime) => {
-        if (!workspaceChosen) return undefined
+        if (!workspaceChosen && conversation?.folder === undefined) return undefined
+        // The run's own folder: its conversation's, which may not be the window's (0.458).
+        const here = folderContext(conversation?.folder ?? workspacePath)
         const sections: string[] = []
-        const brief = await readWorkspaceBrief(workspacePath, undefined, runtime).catch(() => undefined)
+        const brief = await readWorkspaceBrief(here.path, undefined, runtime).catch(() => undefined)
         // A teammate with a worktree is not standing in the folder that
         // name belongs to, and saying otherwise sends it looking.
         // `peer` is absent for a run that belongs to nobody. It stands in the
         // project folder, like any run with no worktree, so every branch
         // below reads an absent peer as "no worktree of its own".
-        if (brief !== undefined) sections.push(briefSection(brief, peer?.cwd === undefined ? memoryWorkspaceName : undefined))
+        if (brief !== undefined) sections.push(briefSection(brief, peer?.cwd === undefined ? here.name : undefined))
         // And it is told so even when there is no LOCUST.md.
         //
         // 0.36.4 fixed worktree runs dying on a directory refusal partly with
@@ -1375,7 +1432,7 @@ if (!ownsSingleInstanceLock) {
          * right one from memory.
          */
         if (peer?.cwd === undefined && brief === undefined) {
-          sections.push(whereSection(memoryWorkspaceName))
+          sections.push(whereSection(here.name))
         }
         /*
          * The group's standing instructions, after the folder's and before
@@ -1397,12 +1454,12 @@ if (!ownsSingleInstanceLock) {
         // does not silence the person (shared/about-you.ts).
         if (settings.aboutYou !== undefined) sections.push(aboutYouSection(settings.aboutYou))
         if (settings.memoryMode !== 'off') {
-          sections.push(await memoryPart(peer, query))
+          sections.push(await memoryPart(peer, query, here))
         } else {
           // Off: the file a run could still read says so, rather than
           // holding the last memories (A1.7).
-          await retireMemoryFile(peer?.cwd ?? workspacePath).catch((error: unknown) => {
-            note('memory-file', `could not retire ${MEMORY_FILE} under ${peer?.cwd ?? workspacePath}: ${error instanceof Error ? error.message : String(error)}`)
+          await retireMemoryFile(peer?.cwd ?? here.path).catch((error: unknown) => {
+            note('memory-file', `could not retire ${MEMORY_FILE} under ${peer?.cwd ?? here.path}: ${error instanceof Error ? error.message : String(error)}`)
           })
         }
         return sections.length === 0 ? undefined : sections.join('\n\n')
@@ -1424,7 +1481,7 @@ if (!ownsSingleInstanceLock) {
       const similarity = await memoryRecall.similarity(query, texts)
       return similarity === undefined ? {} : { similarity }
     }
-    async function memoryPart(peer: MissionPeerContext | undefined, query: string | undefined): Promise<string> {
+    async function memoryPart(peer: MissionPeerContext | undefined, query: string | undefined, here: FolderContext): Promise<string> {
         const settings = await teammates.readSettings()
         // An unreadable memory file refuses to be read now rather than
         // passing for empty (memory-store.ts); the run still starts, told
@@ -1432,14 +1489,14 @@ if (!ownsSingleInstanceLock) {
         let listed: Awaited<ReturnType<typeof memories.briefed>>
         try {
           // Ordered and dated by the last write: a rewritten named memory is today's (shared/memory.ts lastWritten).
-          listed = byLastWritten(await memories.briefed(memoryWorkspaceId))
+          listed = byLastWritten(await memories.briefed(here.id))
         } catch (error) {
           note('memory', `the memory file could not be read for a brief: ${error instanceof Error ? error.message : String(error)}`)
           return 'TEAM MEMORY could not be read for this run. Nothing in it was changed; do not assume it is empty.'
         }
         // A1.3: which named files moved on since each memory was written,
         // checked in the folder the run stands in.
-        const standsIn = peer?.cwd ?? workspacePath
+        const standsIn = peer?.cwd ?? here.path
         const changed = await Promise.all(listed.map((memory) => changedSince(standsIn, memory.text, lastWritten(memory)).catch(() => [])))
         // A1.4: which have gone a month without being given to anyone.
         const trackingSince = await memories.briefTrackingSince().catch(() => undefined)
@@ -1452,7 +1509,7 @@ if (!ownsSingleInstanceLock) {
           scope: memory.scope,
           // Whoever wrote the words the teammate will read (A1.6).
           by: (memory.updatedBy ?? memory.by).name,
-          where: memory.scope === 'global' && memory.workspaceId !== memoryWorkspaceId ? memory.workspaceName : undefined,
+          where: memory.scope === 'global' && memory.workspaceId !== here.id ? memory.workspaceName : undefined,
           at: lastWritten(memory)
         }))
         // The whole list as a file where the run stands, so the brief can
@@ -1461,8 +1518,8 @@ if (!ownsSingleInstanceLock) {
         // a line typed on the Memory screen, no .locust/memory.md, and no
         // record anywhere of why. The brief still pastes the lines; the
         // failure goes to the error log so the next report can name it.
-        const file = await writeMemoryFile(peer?.cwd ?? workspacePath, lines, new Date()).catch((error: unknown) => {
-          note('memory-file', `could not write ${MEMORY_FILE} under ${peer?.cwd ?? workspacePath}: ${error instanceof Error ? error.message : String(error)}`)
+        const file = await writeMemoryFile(peer?.cwd ?? here.path, lines, new Date()).catch((error: unknown) => {
+          note('memory-file', `could not write ${MEMORY_FILE} under ${peer?.cwd ?? here.path}: ${error instanceof Error ? error.message : String(error)}`)
           return undefined
         })
         // `writeMemoryFile` answers undefined for a failed write rather than
@@ -1470,7 +1527,7 @@ if (!ownsSingleInstanceLock) {
         // line could not be written (Fable, pass 1, from reading). Logged on
         // the answer, which is the one signal the write gives.
         if (file === undefined) {
-          note('memory-file', `could not write ${MEMORY_FILE} under ${peer?.cwd ?? workspacePath}: the write did not complete (see memory-file.ts)`)
+          note('memory-file', `could not write ${MEMORY_FILE} under ${peer?.cwd ?? here.path}: the write did not complete (see memory-file.ts)`)
         }
         const sectionInput = {
           ...(file === undefined ? {} : { file }),
@@ -1482,14 +1539,14 @@ if (!ownsSingleInstanceLock) {
           // run is NOT standing in -- the exact invitation 0.36.4 removed
           // from the other section and left here (QA, 2026-09-06). Memory is
           // the project's either way; only the pointer at a folder goes.
-          workspaceName: peer?.cwd === undefined ? memoryWorkspaceName : undefined,
+          workspaceName: peer?.cwd === undefined ? here.name : undefined,
           memories: listed.map((memory, index) => ({
             id: memory.memoryId,
             text: memory.text,
             ...(changed[index]!.length === 0 ? {} : { changedSince: changed[index]! }),
             scope: memory.scope,
             by: (memory.updatedBy ?? memory.by).name,
-            where: memory.scope === 'global' && memory.workspaceId !== memoryWorkspaceId ? memory.workspaceName : undefined,
+            where: memory.scope === 'global' && memory.workspaceId !== here.id ? memory.workspaceName : undefined,
             // So a teammate can tell a note from this morning from one that
             // has been sitting there since August.
             at: lastWritten(memory)
@@ -1660,6 +1717,10 @@ if (!ownsSingleInstanceLock) {
     void cursorDefaultModel.recover().catch(() => undefined)
     const codexMissions = createCodexMissionService({
       workspacePath,
+      // 0.458: the window's folder now, and a conversation's own folder by id.
+      currentFolder: () => workspacePath,
+      folderOf: (id) => folders.pathOf(id),
+      peerIn: (peer, folder) => peerContextFor(peer.self.teammateId, folder),
       catchUpTerminal: catchUp,
       // A2.9: the overlap note -- who else changed the files a teammate did, lately.
       recentEdits: createRecentEdits(),
@@ -1780,7 +1841,10 @@ if (!ownsSingleInstanceLock) {
     // through its transcript. Its own service, so its heuristics cannot leak
     // into the transports that read a process.
     const antigravityMissions = createAntigravityMissionService({
-      workspacePath,
+      // Read live (0.458): Antigravity works in whichever folder the window is in.
+      get workspacePath() {
+        return workspacePath
+      },
       freeRoutesOnly: freeRoutesOnly(process.argv, process.env),
       spendRefusal,
       ledger: missionLedger,
@@ -2177,8 +2241,13 @@ if (!ownsSingleInstanceLock) {
     // folder's repository. Resolved here, once per start, because every
     // start for a teammate -- a person's message, a relay, a routine, a room
     // post -- builds its peer context through this one function.
-    const worktrees = workspaceChosen ? createWorktreeManager({ workspacePath }) : undefined
-    const peerContextFor = async (teammateId: unknown): Promise<MissionPeerContext | undefined> => {
+    /*
+     * `folder` is the conversation's own when it is not the window's (0.458):
+     * an own-branch worktree is cut from THAT folder's repository.
+     */
+    const peerContextFor = async (teammateId: unknown, folder?: string): Promise<MissionPeerContext | undefined> => {
+      const project = folder ?? (workspaceChosen ? workspacePath : undefined)
+      const worktrees = project === undefined ? undefined : createWorktreeManager({ workspacePath: project })
       if (typeof teammateId !== 'string' || teammateId.length === 0) return undefined
       let roster
       try {
@@ -2224,7 +2293,7 @@ if (!ownsSingleInstanceLock) {
         if (manager !== undefined) {
           try {
             cwd = await manager.ensure(self)
-            repositoryRoot = home ?? workspacePath
+            repositoryRoot = home ?? project
           } catch (error) {
             // Joined mid-sentence: "but the project folder is not...", not "but The".
             const why = error instanceof Error ? error.message : 'the worktree could not be made.'
@@ -2249,6 +2318,14 @@ if (!ownsSingleInstanceLock) {
      * openable, and an unreadable roster is an empty list rather than a
      * thrown reveal.
      */
+    /*
+     * The window's folder and every other folder worked in (0.458): a file a
+     * conversation from another folder showed you opens like one from this.
+     */
+    const workedInFolders = async (): Promise<readonly string[]> => [
+      ...(workspaceChosen ? [workspacePath] : []),
+      ...(await folders.list().catch(() => [])).map((folder) => folder.path).filter((path) => path !== workspacePath)
+    ]
     const teammateFolders = async (): Promise<readonly string[]> => {
       try {
         return (await teammates.list()).flatMap((teammate) => (teammate.folder === undefined ? [] : [teammate.folder]))
@@ -2473,7 +2550,10 @@ if (!ownsSingleInstanceLock) {
     // Comparisons (0.441, shared/compare.ts), kept beside the rooms, outside the ledger.
     const compares = createCompareStore({ rootDirectory: app.getPath('userData') })
     routineRunner = createRoutineRunner({
-      workspaceId: memoryWorkspaceId,
+      // Read live (0.458): the folder the window is in now.
+      get workspaceId() {
+        return memoryWorkspaceId
+      },
       // M15: where a routine was made; for an older one, where it was learned.
       homeOf: async (routine) => {
         if (routine.workspaceId !== undefined) return routine.workspaceId
@@ -2588,7 +2668,11 @@ if (!ownsSingleInstanceLock) {
       memories,
       ledger: missionLedger,
       teammates,
-      workspaceName: memoryWorkspaceName,
+      get workspaceName() {
+        return memoryWorkspaceName
+      },
+      // A reply from a conversation in another folder names THAT folder (0.458).
+      workspaceNameOf: async (id: string) => (await folders.list()).find((folder) => folder.id === id)?.name,
       notify: sendToWindow,
       // About you (0.424): a teammate's line waits for the person, once --
       // not again while it is waiting, and not if the note already says it.
@@ -2755,8 +2839,8 @@ if (!ownsSingleInstanceLock) {
      * and the window only ever sees and sets this folder's. No folder, no
      * command: a check runs in a project, and there is none open.
      */
-    const checkFolderId = workspaceChosen ? workspaceIdFor(workspacePath) : undefined
     const forThisFolder = (settings: WorkspaceSettings): WorkspaceSettings => {
+      const checkFolderId = workspaceChosen ? workspaceIdFor(workspacePath) : undefined
       const { checkCommands, ...rest } = settings
       const command = checkFolderId === undefined ? undefined : checkCommands?.[checkFolderId]
       return command === undefined ? rest : { ...rest, checkCommand: command }
@@ -2764,6 +2848,7 @@ if (!ownsSingleInstanceLock) {
     const withThisFolder = async (requested: unknown): Promise<unknown> => {
       if (typeof requested !== 'object' || requested === null || !('checkCommand' in requested)) return requested
       const { checkCommand, ...rest } = requested as Record<string, unknown>
+      const checkFolderId = workspaceChosen ? workspaceIdFor(workspacePath) : undefined
       if (checkFolderId === undefined) return rest
       const stored = { ...((await teammates.readSettings()).checkCommands ?? {}) }
       const command = parsedCheckCommand(checkCommand)
@@ -3036,30 +3121,31 @@ if (!ownsSingleInstanceLock) {
           }
         } as const
       }
+      // In place, never a restart (0.458): the window's folder simply changes.
       try {
-        await writeRememberedWorkspace(rememberedWorkspaceFile, next)
+        const now = await switchFolder(next)
+        return { ok: true, data: { path: now.path, id: now.id, name: now.name } } as const
       } catch {
         return {
           ok: false,
           error: { code: 'INTERNAL_ERROR', message: 'The chosen folder could not be saved.' }
         } as const
       }
-      // Reopen there. Every service bound its folder at start-up and the
-      // mission list is scoped by it, so the honest switch is a fresh start;
-      // before-quit still runs, so live runs are stopped and the ledger is
-      // flushed on the way out. And a downloaded update is NOT installed on
-      // this quit: that install is silent, starts nothing, and stops the
-      // relaunched app with the rest (M19).
-      updates.holdInstallForRelaunch()
-      app.relaunch({
-        args: [...process.argv.slice(1).filter((entry) => !entry.startsWith(WORKSPACE_ARGUMENT)), `${WORKSPACE_ARGUMENT}${next}`]
-      })
-      // Long enough for "Reopening in <folder>" to be READ. At 150ms the
-      // window vanished before the sentence explaining it could be seen, so
-      // the honest restart was indistinguishable from a crash -- reported as
-      // one twice (Colin, 2026-09-11).
-      setTimeout(() => app.quit(), 900)
-      return { ok: true, data: { path: next, reopening: true } } as const
+    })
+
+    // Every folder worked in, newest first, and the one the window is in (0.458).
+    ipcMain.handle(FOLDER_LIST_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return { folders: [], currentId: undefined }
+      return { folders: await folders.list(), currentId: workspaceChosen ? workspaceIdFor(workspacePath) : undefined }
+    })
+    // Switch to a folder already worked in -- by id, never a path the window names (0.458).
+    ipcMain.handle(FOLDER_SWITCH_CHANNEL, async (event, id: unknown) => {
+      if (!fromOwnWindow(event) || typeof id !== 'string') return { ok: false, message: 'That folder could not be opened.' }
+      const path = await folders.pathOf(id)
+      if (path === undefined) return { ok: false, message: 'Locust does not know where that folder is.' }
+      if (!existsSync(path)) return { ok: false, message: `${path} is not there any more.` }
+      const now = await switchFolder(path)
+      return { ok: true, folder: now }
     })
 
     /*
@@ -3156,7 +3242,7 @@ if (!ownsSingleInstanceLock) {
       // disowning its own work. All of them are the HOST's paths; the
       // renderer still names nothing it was not already shown.
       const decision = decideReveal(requested, [
-        ...(workspaceChosen ? [workspacePath] : []),
+        ...(await workedInFolders()),
         ...(await teammateFolders()),
         ledgerDirectory
       ])
@@ -3217,7 +3303,7 @@ if (!ownsSingleInstanceLock) {
     ipcMain.handle(WORKSPACE_SAVE_COPY_CHANNEL, async (event, requested: unknown) => {
       if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
       const decision = decideReveal(requested, [
-        ...(workspaceChosen ? [workspacePath] : []),
+        ...(await workedInFolders()),
         ...(await teammateFolders()),
         ledgerDirectory
       ])
@@ -3320,7 +3406,7 @@ if (!ownsSingleInstanceLock) {
      */
     const pages = createPageServer({
       // And a comparison's plain copies (0.448), whose pages each column runs.
-      roots: async () => [...(workspaceChosen ? [workspacePath] : []), ...(await teammateFolders()), COPY_ROOT],
+      roots: async () => [...(await workedInFolders()), ...(await teammateFolders()), COPY_ROOT],
       base: () => (workspaceChosen ? workspacePath : undefined)
     })
     protocol.handle(PAGE_SCHEME, (request) => pages.handle(request.url))
@@ -3400,7 +3486,7 @@ if (!ownsSingleInstanceLock) {
        */
       const sheetKind = extensionOf(requested)
       if (SHEET_EXTENSIONS.has(sheetKind)) {
-        const decision = decideReveal(requested, [...(workspaceChosen ? [workspacePath] : []), ...(await teammateFolders()), ledgerDirectory])
+        const decision = decideReveal(requested, [...(await workedInFolders()), ...(await teammateFolders()), ledgerDirectory])
         if (!decision.ok) {
           return { ok: false, message: 'That file is outside the folder your teammates work in, so Locust will not open it.' } as const
         }
@@ -3426,7 +3512,7 @@ if (!ownsSingleInstanceLock) {
         return { ok: false, message: 'Locust does not open that kind of file here.' } as const
       }
       const decision = decideReveal(requested, [
-        ...(workspaceChosen ? [workspacePath] : []),
+        ...(await workedInFolders()),
         ...(await teammateFolders()),
         ledgerDirectory
       ])
@@ -4674,6 +4760,8 @@ if (!ownsSingleInstanceLock) {
       // The window's own folder decides which conversation it opens on; what
       // it already holds decides which records come without their events.
       const history = await readMissionHistory(missionLedger, workroom, workspacePath, knownDigests(known))
+      // Every folder listed needs a path to open in (0.458): recovered once, for those from before folders were kept.
+      if (history.ok) await recoverFolders(history.data.missions).catch(() => undefined)
       /*
        * DID A DELETED MISSION COME BACK?
        *
@@ -4868,7 +4956,10 @@ if (!ownsSingleInstanceLock) {
     // The teammates' own worktrees: listed from git, removed on request when
     // no run is live in them. The branch stays either way.
     const worktreesRejected = (message: string) => ({ ok: false, error: { code: 'WORKTREES_UNAVAILABLE', message } }) as const
+    // The window's folder's, read live (0.458).
+    const currentWorktrees = () => (workspaceChosen ? createWorktreeManager({ workspacePath }) : undefined)
     const worktreeList = async () => {
+      const worktrees = currentWorktrees()
       if (worktrees === undefined) return { ok: true, data: { worktrees: [], reason: 'No project folder is chosen.' } } as const
       const probe = await worktrees.probe()
       const [roster, owners] = await Promise.all([teammates.list(), teammates.missionOwners()])
@@ -4896,6 +4987,7 @@ if (!ownsSingleInstanceLock) {
     })
     ipcMain.handle(WORKTREE_REMOVE_CHANNEL, async (event, teammateId: unknown, discard: unknown) => {
       if (!fromOwnWindow(event)) return worktreesRejected('The request was rejected.')
+      const worktrees = currentWorktrees()
       if (typeof teammateId !== 'string' || worktrees === undefined) return worktreesRejected('That worktree could not be removed.')
       try {
         const current = await worktreeList()
@@ -4924,7 +5016,7 @@ if (!ownsSingleInstanceLock) {
       const teammate = (await teammates.list()).find((entry) => entry.teammateId === teammateId)
       if (teammate === undefined) return undefined
       if (teammate.folder !== undefined) return createWorktreeManager({ workspacePath: teammate.folder })
-      return worktrees
+      return currentWorktrees()
     }
     ipcMain.handle(WORKTREE_REVIEW_CHANNEL, async (event, teammateId: unknown) => {
       if (!fromOwnWindow(event)) return reviewRejected('The request was rejected.')
