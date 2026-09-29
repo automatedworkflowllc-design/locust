@@ -26,6 +26,10 @@ heading: the home screen then shows it once, as a splash.
   or `$$...$$` on their own line, are drawn as math instead of showing the
   raw LaTeX. Prices like "$5 and $10" stay as they are.
 
+### Fixed
+
+- **A one-letter emphasis is italic.** "Column *j*" showed its asterisks.
+
 ## 0.473.0 - 2026-09-29
 
 ### New

@@ -53,3 +53,21 @@ describe('math in a reply', () => {
     expect(renderToStaticMarkup(<MathTex tex="\\href{https://evil.example}{x}" display={false} />)).not.toContain('<a ')
   })
 })
+
+// The same reply, 2026-09-29: "Column *j* of" showed its asterisks -- a
+// one-letter emphasis did not count as one.
+describe('one-letter emphasis', () => {
+  it('is italic, like a longer one', () => {
+    expect(splitInlineCode('Column *j* of the *j*-th vector')).toEqual([
+      { kind: 'plain', text: 'Column ' },
+      { kind: 'em', text: 'j' },
+      { kind: 'plain', text: ' of the ' },
+      { kind: 'em', text: 'j' },
+      { kind: 'plain', text: '-th vector' }
+    ])
+  })
+
+  it('still leaves arithmetic alone', () => {
+    expect(splitInlineCode('2 * 3 * 4').every((span) => span.kind === 'plain')).toBe(true)
+  })
+})
