@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { folderOnGitHub, githubRepoOf, refusalFor, startAnswer, statusAnswer } from './cloud-tasks.js'
+import { environmentAnswer, folderOnGitHub, githubRepoOf, refusalFor, startAnswer, statusAnswer } from './cloud-tasks.js'
 import type { Ran, Runner } from './cloud-tasks.js'
 
 /**
@@ -48,6 +48,18 @@ describe('starting a cloud task', () => {
   it('passes on anything else in Codex\'s own last words, never its config warnings', () => {
     const other = startAnswer(ran('', 1, 'Error: rate limited, try later\nwarning: `computer_use.windows.always_allowed_app_ids` is ignored.'), 'acme/widgets')
     expect(other).toEqual({ ok: false, problem: { kind: 'other', said: 'Error: rate limited, try later' } })
+  })
+})
+
+describe('whether a repository has a cloud environment (0.505)', () => {
+  it('reads what `codex cloud list --env` answered on 2026-09-30', () => {
+    expect(environmentAnswer(ran('https://chatgpt.com/codex/tasks/task_e_1\n  [READY] Add farewell function to greet.js\n'))).toBe('ready')
+    expect(environmentAnswer(ran('', 1, "Error: environment 'automatedworkflowllc-design/ai-teammate-platform' not found; run `codex cloud` to list available environments"))).toBe('missing')
+    expect(environmentAnswer(ran('', 1, 'Error: no cloud environments are available for this workspace'))).toBe('missing')
+  })
+
+  it('says unknown, not missing, for anything else -- a network failure is not a missing environment', () => {
+    expect(environmentAnswer(ran('', 1, 'Error: request timed out'))).toBe('unknown')
   })
 })
 

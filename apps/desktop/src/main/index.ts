@@ -16,7 +16,7 @@ import { MAX_TAGGED, taggedPrompt } from '../shared/tagging.js'
 import { COMPARE_SLOTS, COMPARE_TREES_DIRECTORY, comparesGoneWith, compareNeedsCopy, compareRefusalOf, compareSlotKey, compareTreeId, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../shared/compare.js'
 import { reverseChanges } from '../shared/reverse-diff.js'
 import { createCloudTaskService, launchRunner } from './cloud-task-service.js'
-import { githubRepoOf } from './cloud-tasks.js'
+import { environmentOf, githubRepoOf } from './cloud-tasks.js'
 import type { Runner } from './cloud-tasks.js'
 import type { ReverseChange } from '../shared/reverse-diff.js'
 import { FINANCES_FOLDER, FINANCES_README, FINANCES_ROUTE, FINANCES_TEAMMATE } from './places.js'
@@ -3452,6 +3452,8 @@ if (!ownsSingleInstanceLock) {
         resolve({ code: error === null ? 0 : typeof (error as { code?: unknown }).code === 'number' ? (error as { code: number }).code : 1, stdout: String(stdout), stderr: String(stderr) })
       })
     })
+    // For quick read-only questions: whether an environment exists (0.505).
+    const cloudAsk = launchRunner(codexLaunch, 45_000)
     const cloudTasks = createCloudTaskService({
       file: join(app.getPath('userData'), 'cloud-tasks.json'),
       codex: launchRunner(codexLaunch, 180_000),
@@ -3464,7 +3466,9 @@ if (!ownsSingleInstanceLock) {
     ipcMain.handle(CLOUD_WHERE_CHANNEL, async (event) => {
       if (!fromOwnWindow(event)) return { repo: undefined, branch: undefined, unpushed: undefined, dirty: false, codexReady: false }
       const where = await cloudTasks.where(workspacePath)
-      return { ...where, codexReady: (await codexLaunch()) !== undefined, folderName: basename(workspacePath) }
+      const codexReady = (await codexLaunch()) !== undefined
+      const environment = where.repo !== undefined && codexReady ? await environmentOf(cloudAsk, where.repo, workspacePath) : undefined
+      return { ...where, codexReady, folderName: basename(workspacePath), ...(environment === undefined ? {} : { environment }) }
     })
     ipcMain.handle(CLOUD_START_CHANNEL, async (event, prompt: unknown, teammateId: unknown) => {
       if (!fromOwnWindow(event) || typeof prompt !== 'string') return { ok: false, message: 'That cloud task could not be started.' }
@@ -3487,7 +3491,11 @@ if (!ownsSingleInstanceLock) {
         const repo = remote.code === 0 ? githubRepoOf(remote.stdout) : undefined
         return repo === undefined ? undefined : { id: folder.id, name: folder.name, path: folder.path, repo }
       }))
-      return found.filter((entry): entry is { id: string; name: string; path: string; repo: string } => entry !== undefined)
+      const onGitHub = found.filter((entry): entry is { id: string; name: string; path: string; repo: string } => entry !== undefined).slice(0, 12)
+      // Each asked whether Codex Cloud has an environment for it; those that do come first (0.505).
+      const withEnvironments = await Promise.all(onGitHub.map(async (entry) => ({ ...entry, environment: await environmentOf(cloudAsk, entry.repo, entry.path) })))
+      const rank = { ready: 0, unknown: 1, missing: 2 } as const
+      return withEnvironments.sort((left, right) => rank[left.environment] - rank[right.environment])
     })
     ipcMain.handle(CLOUD_LIST_CHANNEL, async (event) => (fromOwnWindow(event) ? (await cloudTasks.list(workspacePath)).map(publicTask) : []))
     ipcMain.handle(CLOUD_REFRESH_CHANNEL, async (event, taskId: unknown) => {

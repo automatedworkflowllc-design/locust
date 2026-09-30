@@ -38,10 +38,12 @@ export function CloudTasks({
   readonly onOpen: (url: string) => void
   readonly onClose: () => void
   /** The person's folders that ARE on GitHub, offered when this one is not (0.504). */
-  readonly folders: readonly PublicCloudFolder[]
+  /** Undefined while Locust is still asking which of them have a cloud environment. */
+  readonly folders: readonly PublicCloudFolder[] | undefined
   readonly onOpenFolder: (id: string) => void
   readonly onChooseFolder: () => void
 }): ReactElement {
+  const known = folders ?? []
   const [open, setOpen] = useState<{ readonly taskId: string; readonly diff: string | undefined; readonly loading: boolean }>()
   const newestFirst = [...tasks].sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))
   const show = (taskId: string): void => {
@@ -81,14 +83,16 @@ export function CloudTasks({
               <strong>{where.folderName ?? 'This folder'}</strong> is not on GitHub. A cloud task runs on a copy of a GitHub
               repository in Codex Cloud, not on this computer, so it needs a folder that is on GitHub.
             </p>
-            {folders.length > 0 ? (
+            {folders === undefined ? (
+              <p className="lc-cloudtasks__note">Checking your other folders…</p>
+            ) : known.length > 0 ? (
               <>
                 <p className="lc-cloudtasks__note">Your folders that are:</p>
                 <ul className="lc-cloudtasks__folders">
-                  {folders.map((folder) => (
+                  {known.map((folder) => (
                     <li key={folder.id}>
                       <span className="lc-cloudtasks__foldername">{folder.name}</span>
-                      <span className="lc-cloudtasks__repo lc-mono">{folder.repo}</span>
+                      <span className="lc-cloudtasks__repo lc-mono">{folder.environment === 'ready' ? folder.repo : `${folder.repo} · no cloud environment`}</span>
                       <button type="button" className="lc-button" onClick={() => onOpenFolder(folder.id)}>Open</button>
                     </li>
                   ))}
@@ -105,7 +109,39 @@ export function CloudTasks({
         {notes.map((note) => (
           <p key={note} className="lc-cloudtasks__note">{note}</p>
         ))}
-        {newestFirst.length === 0 && where?.repo !== undefined && (
+        {/*
+          * ON GITHUB, BUT NO CLOUD ENVIRONMENT (0.505). Colin's brief went
+          * to Codex Cloud from his Locust folder and came back refused: the
+          * repository was right, it had no environment. Said before a send,
+          * with how to make one, and the folders that have one.
+          */}
+        {where?.repo !== undefined && where.environment === 'missing' && (
+          <div className="lc-cloudtasks__elsewhere">
+            <p className="lc-cloudtasks__note">
+              <strong>{where.repo}</strong> has no Codex Cloud environment yet, so a task sent from here would be refused. Make
+              one in the Codex app: Settings &gt; Legacy Codex Cloud, pick this repository, then Save and publish.
+            </p>
+            {folders === undefined && <p className="lc-cloudtasks__note">Checking your other folders for one that has an environment…</p>}
+            {known.some((folder) => folder.environment === 'ready') && (
+              <>
+                <p className="lc-cloudtasks__note">Or use a folder that has one:</p>
+                <ul className="lc-cloudtasks__folders">
+                  {known.filter((folder) => folder.environment === 'ready').map((folder) => (
+                    <li key={folder.id}>
+                      <span className="lc-cloudtasks__foldername">{folder.name}</span>
+                      <span className="lc-cloudtasks__repo lc-mono">{folder.repo}</span>
+                      <button type="button" className="lc-button" onClick={() => onOpenFolder(folder.id)}>Open</button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            <button type="button" className="lc-button" onClick={onChooseFolder}>
+              <Icon name="folder" size={13} /> Choose a folder…
+            </button>
+          </div>
+        )}
+        {newestFirst.length === 0 && where?.repo !== undefined && where.environment !== 'missing' && (
           <p className="lc-cloudtasks__empty">
             Pick Cloud in the chat-type menu and describe a task. It runs in Codex Cloud on this repository, as GitHub has
             it; its change stays there until you apply it here.

@@ -663,6 +663,7 @@ export interface PublicCloudFolder {
   readonly name: string
   readonly path: string
   readonly repo: string
+  readonly environment: 'ready' | 'missing' | 'unknown'
 }
 export interface PublicCloudTask {
   readonly taskId: string
@@ -692,6 +693,8 @@ export interface PublicCloudWhere {
   readonly codexReady: boolean
   /** The folder's own name, so a refusal can say which folder (0.504). */
   readonly folderName?: string
+  /** Whether Codex Cloud has an environment for its repository, asked before a send (0.505). */
+  readonly environment?: 'ready' | 'missing' | 'unknown'
 }
 export type CloudStartResponse =
   | { readonly ok: true; readonly task: PublicCloudTask; readonly notes: readonly string[] }

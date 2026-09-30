@@ -11,6 +11,20 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.505.0 - 2026-09-30
+
+### Improved
+
+- **Cloud is one message's choice.** Picking Cloud used to stay picked, so
+  the next ordinary message in another conversation went to Codex Cloud
+  instead. The box now goes back to Direct when you switch conversation or
+  teammate, and after a cloud task is sent.
+- **A repository with no cloud environment is said before you send.**
+  The Cloud tasks panel checks whether Codex Cloud has an environment for
+  this folder's repository. If it does not, it says so, says how to make
+  one, and lists your folders that have one, instead of refusing after you
+  press send.
+
 ## 0.504.0 - 2026-09-30
 
 ### Improved

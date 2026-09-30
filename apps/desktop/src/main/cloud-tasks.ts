@@ -137,6 +137,24 @@ export async function folderOnGitHub(folder: string, git: Runner): Promise<Folde
   }
 }
 
+/**
+ * Whether Codex Cloud has an environment for `repo` -- asked before a task is
+ * sent, not learned from its refusal (0.505). `codex cloud list --env <repo>`
+ * is read-only: it lists that environment's tasks, or says it is not found.
+ * MEASURED 2026-09-30: `automatedworkflowllc-design/locust-cloud-test` listed
+ * its tasks (exit 0); `.../ai-teammate-platform` answered "environment ... not
+ * found" (exit 1).
+ */
+export type CloudEnvironment = 'ready' | 'missing' | 'unknown'
+export function environmentAnswer(ran: Ran): CloudEnvironment {
+  if (ran.code === 0) return 'ready'
+  return /environment '.*' not found|no cloud environments are available/i.test(`${ran.stderr}\n${ran.stdout}`) ? 'missing' : 'unknown'
+}
+export async function environmentOf(codex: Runner, repo: string, cwd: string): Promise<CloudEnvironment> {
+  const ran = await codex(['cloud', 'list', '--env', repo, '--limit', '1'], cwd).catch(() => undefined)
+  return ran === undefined ? 'unknown' : environmentAnswer(ran)
+}
+
 /** Said to the person when a cloud task cannot start, in their terms. */
 export function refusalFor(problem: CloudStartProblem): string {
   return problem.kind === 'no-environment'

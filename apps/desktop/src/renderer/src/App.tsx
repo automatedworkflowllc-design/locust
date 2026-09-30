@@ -1656,7 +1656,8 @@ export default function App(): ReactElement {
   const [cloudNotes, setCloudNotes] = useState<readonly string[]>([])
   const [cloudProblem, setCloudProblem] = useState<string>()
   const [cloudApplying, setCloudApplying] = useState<string>()
-  const [cloudFolders, setCloudFolders] = useState<readonly PublicCloudFolder[]>([])
+  // Undefined while they are being looked for: each is asked whether it has a cloud environment.
+  const [cloudFolders, setCloudFolders] = useState<readonly PublicCloudFolder[] | undefined>([])
   const [viewingFile, setViewingFile] = useState<{
     readonly path: string
     /** The file's text, or a `data:` URL when the mode is `image`. */
@@ -2143,8 +2144,9 @@ export default function App(): ReactElement {
   }, [workspaceId])
   // The folders to offer when this one is not on GitHub, asked only when the panel would show them.
   useEffect(() => {
-    if (!cloudPanel || cloudWhere === undefined || cloudWhere.repo !== undefined) return
-    void window.desktop?.cloudFolders().then(setCloudFolders).catch(() => undefined)
+    if (!cloudPanel || cloudWhere === undefined || (cloudWhere.repo !== undefined && cloudWhere.environment !== 'missing')) return
+    setCloudFolders(undefined)
+    void window.desktop?.cloudFolders().then(setCloudFolders).catch(() => setCloudFolders([]))
   }, [cloudPanel, cloudWhere])
   // And followed while one is in the cloud and the panel is open: Codex is asked every 15 s.
   const cloudPending = cloudTasks.some((task) => task.status.state === 'pending')
@@ -3057,6 +3059,16 @@ export default function App(): ReactElement {
    * mission already is one, a teammate is a saved route with a face).
    */
   const pickedTeammate = addressedTeammate(teammates, selectedTeammateId)
+  /*
+   * CLOUD IS ONE MESSAGE'S CHOICE, NOT A STATE THE BOX STAYS IN (0.505).
+   * Colin, 2026-09-30: picked Cloud to look at it, moved to another
+   * conversation, and his next message -- a brief for Sol -- went to Codex
+   * Cloud instead of the chat. Another conversation or teammate sets the box
+   * back to Direct; so does a cloud task once it has gone.
+   */
+  useEffect(() => {
+    setCloudOn(false)
+  }, [shownKey, pickedTeammate?.teammateId])
   // A comparison follows the teammate it was started with (0.441).
   const comparing = compares.find((compare) => compare.compareId === comparingId && compare.teammateId === pickedTeammate?.teammateId)
   const compareMembers = useMemo(() => compareMembership(compares).byMission, [compares])
@@ -3596,6 +3608,7 @@ export default function App(): ReactElement {
       setCloudNotes(started.notes)
       setCloudProblem(undefined)
       setCloudPanel(true)
+      setCloudOn(false)
       return true
     }
     if (comparing !== undefined && comparing.kept === undefined) {
