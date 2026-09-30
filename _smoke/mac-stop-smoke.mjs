@@ -124,9 +124,29 @@ try {
       await new Promise((r) => setTimeout(r, 1000))
       if (document.querySelector('button[aria-label="Stop the running mission"]') && document.querySelector('.lc-livestep')) return 'running'
     }
-    return 'never ran: ' + (document.querySelector('.lc-thread')?.innerText ?? '').slice(-300)
+    const start = document.querySelector('button[aria-label="Start mission"]')
+    return 'never ran: start ' + (start === null ? 'missing' : start.disabled ? 'disabled (' + (start.getAttribute('title') ?? '') + ')' : 'enabled')
+      + ' | notice: ' + ([...document.querySelectorAll('.lc-notice')].map((el) => el.innerText).join(' / ') || 'none')
+      + ' | runtimes: ' + (document.querySelector('.lc-sidebar__status, .lc-status')?.innerText ?? '?')
+      + ' | thread: ' + (document.querySelector('.lc-thread')?.innerText ?? '').replace(/\\s+/g, ' ').slice(-400)
   })()`)
   check('a turn on the free model starts running', sent === 'running', String(sent))
+  if (sent !== 'running') {
+    // What the window showed, as a picture the workflow keeps.
+    const id = nextId++
+    const shot = await new Promise((resolve) => {
+      waiting.set(id, { resolve: () => undefined, reject: () => undefined })
+      const listener = (event) => {
+        const message = JSON.parse(String(event.data))
+        if (message.id !== id) return
+        socket.removeEventListener('message', listener)
+        resolve(message.result?.data)
+      }
+      socket.addEventListener('message', listener)
+      socket.send(JSON.stringify({ id, method: 'Page.captureScreenshot', params: { format: 'png' } }))
+    })
+    if (typeof shot === 'string') await writeFile('mac-smoke.png', Buffer.from(shot, 'base64'))
+  }
   // Let the runtime get going: the Stop that matters ends a process tree already doing work.
   await sleep(12_000)
   const during = opencodes().filter((pid) => !before.has(pid))
