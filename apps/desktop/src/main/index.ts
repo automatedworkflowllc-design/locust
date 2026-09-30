@@ -5359,7 +5359,17 @@ if (!ownsSingleInstanceLock) {
       everyBuild: lane.everyBuild,
       currentVersion: app.getVersion(),
       // Not on macOS until the build is signed: its updater refuses an unsigned app.
-      supported: app.isPackaged && process.platform !== 'darwin',
+      /*
+       * AND ONLY THE INSTALLED COPY (0.507). Every copy of Locust shares one
+       * update cache (%LOCALAPPDATA%\@teammatedesktop-updater), and the
+       * installer it holds writes into the INSTALLED folder and closes the
+       * Locust running there. A test copy -- a beta tester's in %TEMP%, a
+       * drive's win-unpacked -- that quit with an update pending ran that
+       * installer: on 2026-09-30 it closed Colin's own Locust twice, at 15:48
+       * and 15:56, each time in the middle of the run that was testing it.
+       * The installed copy has its uninstaller beside it; a copy does not.
+       */
+      supported: app.isPackaged && process.platform !== 'darwin' && existsSync(join(dirname(process.execPath), 'Uninstall Locust.exe')),
       liveMissionCount: () =>
         codexMissions.liveMissionIds().length + antigravityMissions.liveMissionIds().length,
       requestQuit: (finalise) => {

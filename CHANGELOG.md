@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.507.0 - 2026-09-30
+
+### Fixed
+
+- **A second copy of Locust no longer closes yours.** Every copy of Locust
+  shares one update download, and a copy that was not the installed one (a
+  tester's copy, or one run for testing) installed that update when it quit.
+  The installer closes the Locust running from the installed folder, so your
+  own Locust shut down mid-run with no error, and sometimes reopened on its
+  own. Now only the installed Locust checks for, downloads and installs
+  updates; other copies say they cannot update themselves.
+
 ## 0.506.0 - 2026-09-30
 <!-- big -->
 

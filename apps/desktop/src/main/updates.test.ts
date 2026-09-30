@@ -216,6 +216,15 @@ describe('what the app does about a new version', () => {
     expect(updater.checkForUpdates).not.toHaveBeenCalled()
   })
 
+  it('never installs anything at quit from a copy that is not the installed one (0.507)', () => {
+    // A test copy that quit with an update pending in the shared cache ran the
+    // installer, which closed the person's own Locust (2026-09-30, twice).
+    const updater = fakeUpdater()
+    createUpdateService({ updater, currentVersion: '0.504.0', supported: false, liveMissionCount: () => 0, requestQuit: () => undefined })
+    expect(updater.autoInstallOnAppQuit).toBe(false)
+    expect(updater.autoDownload).toBe(false)
+  })
+
   it('never shows the provider its own error text', () => {
     const updater = fakeUpdater()
     const seen: string[] = []
