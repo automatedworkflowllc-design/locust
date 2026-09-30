@@ -542,6 +542,20 @@ describe('Codex mission service', () => {
     expect(launched?.sandbox).toBe('full-access')
   })
 
+  it("says a runtime whose own service did not answer could not be reached, not that it is signed out (0.495)", async () => {
+    // Colin, 2026-09-30: Cursor's servers were resetting connections and the
+    // refusal told him to install or sign in.
+    const service = createCodexMissionService({
+      workspacePath: WORKSPACE,
+      discover: async () => [codexRuntime('unhealthy')],
+      runner: { start: vi.fn() },
+      ledger: fakeLedger()
+    })
+    const response = await service.start('Do safe work.', 'codex', 'ask', {}, () => undefined)
+    expect(response.ok ? '' : response.error.message).toContain('could not be reached just now')
+    expect(response.ok ? '' : response.error.message).not.toContain('sign in')
+  })
+
   it('returns an actionable generic error when Codex is not ready', async () => {
     const start = vi.fn() satisfies RuntimeProcessRunner['start']
     const service = createCodexMissionService({
@@ -555,7 +569,7 @@ describe('Codex mission service', () => {
       ok: false,
       error: {
         code: 'CODEX_UNAVAILABLE',
-        message: 'Codex CLI is not ready. Install or sign in to it, then retry discovery.'
+        message: 'Codex CLI is signed out. Sign in to it, then retry discovery.'
       }
     })
     expect(start).not.toHaveBeenCalled()
@@ -1604,7 +1618,7 @@ describe('mid-mission handoff', () => {
   // Cursor read-only on Windows left this list in 0.485: its ask mode holds.
   it.each([
     ['a runtime whose events Locust cannot read', 'antigravity', 'accept-edits', /cannot read its event stream/],
-    ['a runtime that is signed out', 'claude', 'ask', /not ready/]
+    ['a runtime that is signed out', 'claude', 'ask', /is signed out/]
   ] as const)('refuses a handoff to %s before stopping anything', async (_what, runtime, mode, reason) => {
     const createCheckpoint = vi.fn<MissionLedger['createCheckpoint']>(async () => checkpoint())
     const runtimes = [
@@ -2311,6 +2325,24 @@ describe('continuing a conversation', () => {
     expect(spec.args).not.toContain('thread-prior')
     // And the run it did start is the one the chip promised.
     expect(created[0]?.sandbox).toBe('workspace-write')
+  })
+
+  it('tells a reply it cannot resume what was said before (0.495)', async () => {
+    // Grok's 0.489 pass: a cold reply's thread said "Started without the
+    // earlier messages", and the runtime was told nothing of them. It is now
+    // given the conversation so far, the way a runtime switch is.
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([{ type: 'turn.completed' }]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const { service } = scheduledService({ start }, fakeLedger({
+      getMission: async () => finished({ mode: 'ask' }) as never
+    }))
+    await service.start('now actually write it', 'codex', 'accept-edits', {}, () => undefined, undefined, undefined, 'mission_prior')
+    const sent = String(start.mock.calls[0]?.[1] ?? '')
+    expect(sent).toContain('This conversation has earlier turns, but not in your session')
+    expect(sent).toContain('The person now asks:')
+    expect(sent.trimEnd().endsWith('now actually write it')).toBe(true)
   })
 
   it('still resumes when the mode is the same one the conversation started in', async () => {

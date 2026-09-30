@@ -52,7 +52,7 @@ import type { EditCheckResult } from './edit-check.js'
 import type { ApprovalChannel } from './approval-channel.js'
 import { fileChangesOf, itemOf } from './approval-patch.js'
 import type { FileChangeRecord } from './approval-patch.js'
-import { composeHandoffPrompt } from './handoff.js'
+import { composeColdFollowUp, composeHandoffPrompt } from './handoff.js'
 import type { EarlierTurn } from './handoff.js'
 import { changedPaths, observedEditEvents, observedPatches, sharedTreeNotice, snapshotWorkspace, unreportedPaths } from './disk-observation.js'
 import type { RecentEdits } from './recent-edits.js'
@@ -659,8 +659,20 @@ const CURSOR_READ_ONLY_REFUSAL = 'Cursor Agent cannot be held read-only on this 
 const AUTO_OFF_REFUSAL = 'Auto mode is switched off for this workspace. Turn it on in Settings to let a run work outside the workspace folder. Nothing was recorded.'
 const unreadableRuntimeRefusal = (runtime: MissionRuntimeId): string =>
   `${runtimeDisplayName(runtime)} is installed and signed in, but Locust cannot read its event stream yet. Choose Codex CLI or Claude Code for this mission.`
-const notReadyRefusal = (runtime: MissionRuntimeId): string =>
-  `${runtimeDisplayName(runtime)} is not ready. Install or sign in to it, then retry discovery.`
+/*
+ * WHICH KIND OF NOT READY (0.495). One sentence -- "Install or sign in" --
+ * covered a runtime that is not installed, one signed out, and one whose own
+ * service did not answer. The last sent people to sign in again when Cursor's
+ * servers were resetting connections (Colin, 2026-09-30: "is this a cursor
+ * problem or an us problem"). Discovery already knows which.
+ */
+const notReadyRefusal = (runtime: MissionRuntimeId, found?: RuntimeDiscovery): string => {
+  const name = runtimeDisplayName(runtime)
+  if (found === undefined || found.availability !== 'available' || found.executable === undefined) return `${name} is not installed on this machine. Install it, then retry discovery.`
+  if (found.readiness === 'authentication-required') return `${name} is signed out. Sign in to it, then retry discovery.`
+  if (found.readiness === 'unhealthy') return `${name} could not be reached just now: it did not answer when Locust checked on it, which usually means its own service is down. Try again in a minute, or pick another model.`
+  return `${name} is not ready. Install or sign in to it, then retry discovery.`
+}
 
 export function createCodexMissionService(options: CodexMissionServiceOptions): CodexMissionService {
   // Resolved here, not inside `start`: that scope declares its own `process`
@@ -1112,7 +1124,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
     }
     const chosen = runtimes.find((entry) => entry.id === runtime)
     if (chosen?.availability !== 'available' || chosen.readiness !== 'ready' || chosen.executable === undefined) {
-      return notReadyRefusal(runtime)
+      return notReadyRefusal(runtime, chosen)
     }
     if (!hostReadsEventsOf(runtime)) return unreadableRuntimeRefusal(runtime)
     return undefined
@@ -1297,7 +1309,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         ) {
           return error(
             'CODEX_UNAVAILABLE',
-            notReadyRefusal(runtime)
+            notReadyRefusal(runtime, chosen)
           ) as CodexMissionStartResponse
         }
         if (!hostReadsEventsOf(runtime)) {
@@ -1355,6 +1367,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // Whether the session being resumed compacted during that turn: then
         // it holds a summary, not the brief, and this turn is briefed in full.
         let resumedCompacted = false
+        /** A reply this runtime cannot resume: the conversation so far goes with it (0.495). */
+        let coldEarlier: readonly EarlierTurn[] | undefined
         // What the person did in the runtime's own terminal on this
         // conversation lands first (0.391), so this turn continues from the
         // last of it. After the busy check above, which knows the settled
@@ -1468,6 +1482,11 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           resumeThreadId = modeChanged ? undefined : priorThread
           resumedMissionId = prior.metadata.missionId
           resumedCompacted = compactedDuring(prior.events)
+          if (resumeThreadId === undefined) {
+            const said = createTranscriptTracker()
+            said.track(prior.events)
+            coldEarlier = [...(await earlierTurnsOf(prior)), { asked: prior.metadata.prompt, answered: said.latestFinal }]
+          }
         }
 
         const runId = `run_${createId()}`
@@ -1783,7 +1802,9 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // deterministic over those.
         // M16: attached files placed where this run reads, when it runs
         // anywhere but the project folder. Only what is sent changes.
-        const sentPrompt = await attachmentsForRun(prompt, runFolder, runCwd).catch(() => prompt)
+        const attached = await attachmentsForRun(prompt, runFolder, runCwd).catch(() => prompt)
+        // Cold, not a command and not a side question: told what was said before (0.495).
+        const sentPrompt = coldEarlier === undefined || bare || side !== undefined ? attached : composeColdFollowUp(coldEarlier, attached)
         let runtimePrompt = sentPrompt
         let delivered: readonly WorkroomMessage[] = []
         let peerDeliveryFailed = false

@@ -11,6 +11,34 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.495.0 - 2026-09-30
+
+### Improved
+
+- **A reply that cannot pick up its session is told the conversation so
+  far.** When the turn before stopped too early to be continued, or you
+  changed the mode, the teammate used to start with no idea of what came
+  before, and the thread said "Started without the earlier messages", which
+  read as if your history was gone. The teammate is now given what was asked
+  and answered, and the thread says so.
+- **"Could not be reached" is told apart from "signed out".** When a
+  runtime's own service does not answer, as Cursor's did for a while, Locust
+  now says it could not be reached and to try again, instead of telling you
+  to install or sign in.
+- **Enter picks the one model left** when you search the model list down to
+  a single row.
+- **Model rows read cleanly**: a free OpenCode model says "Free · no sign-in"
+  and others "Through OpenCode", and a screen reader hears the model's name
+  and state once, not every word on the row.
+- **About 48 MB less on disk.** Locust no longer installs Chromium's
+  interface text in 53 languages it does not use.
+
+### Fixed
+
+- **An example file is no longer drawn as a file handed over.** A model that
+  copied the example from its instructions left a `path/relative/to/the/folder.md`
+  button under its reply, pointing at nothing.
+
 ## 0.494.0 - 2026-09-30
 
 ### Fixed

@@ -1231,7 +1231,9 @@ onResume,
            * time marker that opens the turn, above the work it describes.
            */
           <div className="lc-thread__note">
-            Started without the earlier messages — the turn before this one left no session to resume
+            {/* 0.495: said as what happens. "Started without the earlier messages" read
+                as the history gone (Grok's 0.489 pass); the teammate is now told it. */}
+            A fresh session: the turn before could not be picked up again, so the teammate was given the conversation so far
           </div>
         )}
 

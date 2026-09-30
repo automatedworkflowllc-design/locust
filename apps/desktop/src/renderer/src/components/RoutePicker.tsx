@@ -413,6 +413,20 @@ export function RoutePicker({
     if (event.key === 'Escape') {
       event.preventDefault()
       onClose()
+      return
+    }
+    /*
+     * ENTER TAKES THE ONE MODEL LEFT (0.495, Boss's review). Typing a name
+     * down to a single row and pressing Enter did nothing. The row pressed is
+     * the one on screen, so it follows every rule the row itself does --
+     * refused, full or unselectable rows are not buttons that can be pressed.
+     */
+    if (event.key === 'Enter' && searching) {
+      const left = [...(listRef.current?.querySelectorAll<HTMLButtonElement>('.lc-picker__row:not(.is-recent):not(:disabled)') ?? [])]
+      if (left.length === 1) {
+        event.preventDefault()
+        left[0]!.click()
+      }
     }
   }
 
@@ -440,6 +454,9 @@ export function RoutePicker({
         disabled={!row.selectable || refused !== undefined || full}
         aria-current={isActive}
         {...(comparing ? { 'aria-pressed': picked } : {})}
+        // Its name and its state, and nothing twice (0.495): a screen reader read the
+        // row's every word -- "Nemotron 3.5 Lightning Free Free · no sign-in ... READY" (Grok).
+        aria-label={`${row.label}${isActive ? ', in use' : row.tag === 'READY' || row.tag === undefined ? '' : `, ${String(row.tag).toLowerCase()}`}${refused !== undefined ? `. ${refused}` : ''}`}
         // The whole of it, on hover: the row itself is one line.
         title={refused ?? (full ? `Three at most. Untick one to pick ${row.label}.` : `${row.label} · ${row.fullDetail}`)}
         onClick={() => {

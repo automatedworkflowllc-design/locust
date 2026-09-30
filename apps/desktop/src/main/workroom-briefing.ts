@@ -8,7 +8,7 @@ import { sanitizeInbound, SHARE_TAG } from '../shared/peer-share.js'
 import { ASK_TAG } from '../shared/decision.js'
 import type { TeammateRole } from '../shared/ipc.js'
 import { BLOCK_PLACEMENT } from '../shared/trailer.js'
-import { FILE_TAG } from '../shared/handover.js'
+import { FILE_BLOCK_EXAMPLE_PATH, FILE_TAG } from '../shared/handover.js'
 import { MEMORY_HEADING, MEMORY_RULES, MEMORY_TAG } from '../shared/memory.js'
 import { ABOUT_YOU_HEADING } from '../shared/about-you.js'
 import { roomHistorySection } from '../shared/room-history.js'
@@ -407,7 +407,7 @@ function filesSection(): string {
   return [
     `To give the person a file, write it in the workspace, then hand it over with this block, and ${BLOCK_PLACEMENT}:`,
     `<${FILE_TAG}>`,
-    'path/relative/to/the/folder.md :: what it is, in a few words',
+    `${FILE_BLOCK_EXAMPLE_PATH} :: what it is, in a few words`,
     `</${FILE_TAG}>`,
     'One line per file, up to four, each one you already wrote; the person gets a button that shows it in their file manager. Naming a path in your reply does not hand it over.'
   ].join('\n')

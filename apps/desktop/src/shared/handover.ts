@@ -64,8 +64,16 @@ export interface HandedFile {
  * A dropped line is simply not drawn -- no card, no error to the model -- the
  * same way `parseShareBlocks` drops a block with no recipient.
  */
+/**
+ * The example path the briefing shows a teammate (0.495). A small model copied
+ * the example block itself, and the thread drew a file that never existed
+ * (Grok's 0.489 pass). The example is never a file.
+ */
+export const FILE_BLOCK_EXAMPLE_PATH = 'path/relative/to/the/folder.md'
+
 function acceptable(path: string): boolean {
   if (path.length === 0 || path.length > 400) return false
+  if (path.replace(/\\/g, '/').toLowerCase() === FILE_BLOCK_EXAMPLE_PATH) return false
   // A control character in a path is never a real path and is exactly what a
   // terminal-escape trick looks like; the store refuses them too.
   if (/[\u0000-\u001f\u007f]/.test(path)) return false

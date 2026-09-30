@@ -147,6 +147,30 @@ function sectionsFor(
   return sections
 }
 
+/**
+ * THE CONVERSATION SO FAR, for a reply its runtime cannot resume (0.495).
+ *
+ * A turn stopped before its session was recorded, or a mode that changed,
+ * starts the same runtime cold -- and it knew nothing of the turns above,
+ * while the thread said "Started without the earlier messages" (Grok's 0.489
+ * pass: easy to read as the history being gone). The same summary a runtime
+ * switch carries -- each ask and the start of its answer -- goes with the
+ * reply, so the teammate is not a stranger to its own conversation. Bounded:
+ * the newest turns are kept when they do not all fit.
+ */
+export function composeColdFollowUp(earlier: readonly EarlierTurn[], next: string): string {
+  // A turn with no words of its own on record is not quoted as if it had some.
+  const lines = earlier.filter((turn) => typeof turn.asked === 'string' && turn.asked.trim().length > 0).map((turn) => `Asked: "${clipped(turn.asked, ASKED_CHARS)}"${turn.answered === undefined || turn.answered.trim().length === 0 ? ' -- no reply was recorded.' : ` -- answered: "${clipped(turn.answered, ANSWERED_CHARS)}"`}`)
+  const room = MAX_HANDOFF_PROMPT_LENGTH - next.length - 400
+  while (lines.length > 0 && lines.join('\n').length > room) lines.shift()
+  if (lines.length === 0) return next
+  return [
+    'This conversation has earlier turns, but not in your session: it could not be resumed. What was said, oldest first:',
+    bullets(lines),
+    `The person now asks:\n\n${next}`
+  ].join('\n\n')
+}
+
 export function composeHandoffPrompt(
   originalPrompt: string,
   checkpoint: ReconciledCheckpoint,

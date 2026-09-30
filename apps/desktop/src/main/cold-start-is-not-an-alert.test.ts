@@ -28,7 +28,7 @@ import { describe, expect, it } from 'vitest'
 
 const THREAD = fileURLToPath(new URL('../renderer/src/components/Thread.tsx', import.meta.url))
 
-const COLD = 'Started without the earlier messages'
+const COLD = 'A fresh session: the turn before could not be picked up again'
 
 describe('where the cold-start marker is drawn', () => {
   const source = readFileSync(THREAD, 'utf8')
@@ -79,7 +79,8 @@ describe('where the cold-start marker is drawn', () => {
   })
 
   it('still says the thing worth saying', () => {
-    expect(source).toContain('left no session to resume')
+    // Why, and what was done about it (0.495): the teammate was given the conversation so far.
+    expect(source).toContain('so the teammate was given the conversation so far')
   })
 
   it('is a real control: it catches the placement that shipped', () => {

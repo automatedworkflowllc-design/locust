@@ -25,6 +25,14 @@ directories:
   output: release
   buildResources: resources
 
+# Chromium's own interface text, in the languages Locust is written in (0.495).
+# Electron ships 55 of these `.pak` files, 49 MB on disk; Locust's interface is
+# English, and Chromium falls back to en-US for any other system language. The
+# spelling dictionaries and dates are not these files.
+electronLanguages:
+  - en-US
+  - en-GB
+
 # `out` is what electron-vite produced; the workspace packages are already
 # bundled into it, so nothing from node_modules needs to ship.
 files:
