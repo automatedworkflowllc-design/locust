@@ -1,4 +1,5 @@
-// A run stopped before any tool ran offers Send again (0.479, QA-2026-09-29 round 2, R29).
+// A run stopped before any tool ran offers Send again (0.479, QA-2026-09-29 round 2, R29),
+// and the message sent again is drawn once (0.496).
 //
 //   node _tools/drive-stopped-send-again.mjs [--packaged <exe>]
 //
@@ -69,7 +70,10 @@ const pressSendAgain = `(async () => {
   const still = [...document.querySelectorAll('.lc-rerun button')].some((b) => /Send again/.test(b.innerText))
   // The prompt carries the word too, so only a REPLY counts.
   const replies = [...document.querySelectorAll('.lc-agentline__body')].map((el) => el.innerText.trim())
-  return JSON.stringify({ pressed: true, stillOffered: still, reply: replies.at(-1) ?? '', replies: replies.length })
+  // 0.496: the message is drawn once, and no "fresh session" is claimed over a turn that said nothing.
+  const bubbles = [...document.querySelectorAll('.lc-thread .lc-bubble')].filter((el) => /HERON/.test(el.innerText)).length
+  const fresh = /A fresh session/.test(${threadText})
+  return JSON.stringify({ pressed: true, stillOffered: still, reply: replies.at(-1) ?? '', replies: replies.length, bubbles, fresh })
 })()`
 
 try {
@@ -83,6 +87,8 @@ try {
   const again = JSON.parse(String(await drive.capture('Send again pressed', () => drive.evaluate(pressSendAgain))))
   check('Send again sent the message and the reply came back', again.pressed && /HERON/i.test(again.reply ?? ""), JSON.stringify({ replies: again.replies, reply: (again.reply ?? "").slice(0, 80) }))
   check('and the offer is gone once the message went again', again.pressed && !again.stillOffered)
+  check('the message is drawn once, not once per try (0.496)', again.bubbles === 1, String(again.bubbles))
+  check('and no "fresh session" is claimed: nothing before it was lost (0.496)', again.fresh === false)
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

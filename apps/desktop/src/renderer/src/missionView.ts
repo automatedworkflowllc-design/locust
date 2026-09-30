@@ -4513,6 +4513,25 @@ export function errorAlreadyShown(items: readonly ThreadItem[], error: string): 
   )
 }
 
+/**
+ * SENT AGAIN (0.496): a turn stopped before it said or did anything, whose
+ * same words were sent as the next turn. The thread drew the message twice
+ * with nothing between -- a double-clicked Send, then Send again -- so this
+ * one is not drawn: the next turn is the same message, answered.
+ */
+export function sentAgainBy(
+  turn: { readonly prompt: string; readonly events: readonly NormalizedRuntimeEvent[] },
+  nextPrompt: string | undefined
+): boolean {
+  if (nextPrompt === undefined || turn.prompt.trim().length === 0 || turn.prompt.trim() !== nextPrompt.trim()) return false
+  let stopped = false
+  for (const event of turn.events) {
+    if (event.type === 'run.cancelled') stopped = true
+    if (event.type === 'message.delta' || event.type === 'tool.started' || event.type === 'plan.updated') return false
+  }
+  return stopped
+}
+
 export function resumableSessionOf(
   events: readonly NormalizedRuntimeEvent[]
 ): string | undefined {

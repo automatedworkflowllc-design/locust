@@ -3977,6 +3977,12 @@ export default function App(): ReactElement {
           data: response.data,
           phase: 'running',
           peerMessages: response.data.peerMessages,
+          // Whether it started cold is the host's to say (0.496): it resumes a
+          // session the window cannot see -- the one a turn stopped before
+          // naming its own was resuming.
+          ...(response.data.followsUp === undefined || switched !== undefined
+            ? {}
+            : { coldStart: response.data.followsUp.runtimeThreadId === undefined }),
           ...(switched === undefined
             ? {}
             : {

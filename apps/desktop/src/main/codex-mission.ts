@@ -1479,13 +1479,24 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           // guarantee that the mode on screen is the mode being run.
           const priorMode = prior.metadata.mode
           const modeChanged = priorMode !== undefined && priorMode !== mode
-          resumeThreadId = modeChanged ? undefined : priorThread
+          /*
+           * A TURN STOPPED BEFORE IT NAMED ITS SESSION (0.496) was itself a
+           * resume of the turn before it, so that session is still the
+           * conversation: the reply picks it up, as Claude Code does after an
+           * interrupt. It used to start cold -- "A fresh session" in the
+           * thread -- over a Stop pressed half a second into a reply. The
+           * same walk the side question makes; recorded only when the stopped
+           * turn really did resume one.
+           */
+          resumeThreadId = modeChanged ? undefined : priorThread ?? prior.metadata.continuesFrom?.runtimeThreadId
           resumedMissionId = prior.metadata.missionId
           resumedCompacted = compactedDuring(prior.events)
           if (resumeThreadId === undefined) {
             const said = createTranscriptTracker()
             said.track(prior.events)
-            coldEarlier = [...(await earlierTurnsOf(prior)), { asked: prior.metadata.prompt, answered: said.latestFinal }]
+            // Send again: the same words, unanswered, are this turn -- not an earlier one to quote back.
+            const again = (said.latestFinal ?? '').trim().length === 0 && typeof prior.metadata.prompt === 'string' && prior.metadata.prompt.trim() === prompt.trim()
+            coldEarlier = [...(await earlierTurnsOf(prior)), ...(again ? [] : [{ asked: prior.metadata.prompt, answered: said.latestFinal }])]
           }
         }
 

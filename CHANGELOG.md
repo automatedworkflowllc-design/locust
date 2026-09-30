@@ -11,6 +11,24 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.496.0 - 2026-09-30
+
+### Improved
+
+- **Send again reads as one message.** Stop a reply before it does anything,
+  press Send again, and the thread now shows your message once, answered,
+  instead of twice with "A fresh session" between them. The teammate is no
+  longer told about an "earlier turn" that was the same words with no reply.
+- **A reply after an early Stop keeps the conversation.** When you stopped a
+  reply before it got going, the next message started the teammate from
+  scratch. It now picks up the same session, the way Claude Code does after
+  an interrupt.
+- **A card for a stop before any tool ran is shorter.** It no longer says
+  that undoing changes is up to you, since no change was made.
+- **The Mac build is started on a real Mac before it is handed out.** Each
+  Mac build now runs one reply on a free model and presses Stop, and checks
+  that nothing it started is left running.
+
 ## 0.495.0 - 2026-09-30
 
 ### Improved

@@ -139,10 +139,17 @@ export function CancellationCard({
         </dl>
       )}
 
-      <p className="lc-approval__note">
-        Everything up to this point is in the durable record. Nothing is rolled back — this build
-        does not snapshot the workspace, so undoing a change is yours to do.
-      </p>
+      {/*
+        * Not on a run stopped before any tool (0.496): "undoing a change is
+        * yours to do" under "nothing is half-done" names changes that were
+        * never made, on the card a double-clicked Send leaves most often.
+        */}
+      {!nothingHappened && (
+        <p className="lc-approval__note">
+          Everything up to this point is in the durable record. Nothing is rolled back — this build
+          does not snapshot the workspace, so undoing a change is yours to do.
+        </p>
+      )}
       {/*
         * The one thing a stop cannot promise, said once rather than implied
         * by silence. MEASURED 2026-09-14: a stopped run's own command kept

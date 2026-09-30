@@ -59,6 +59,41 @@ describe('a run stopped before any tool ran', () => {
   it('does not, when the run was not stopped', () => {
     expect(thread({ onSendAgain: () => undefined })).not.toContain('Send again')
   })
+
+  it('says nothing of undoing changes that were never made (0.496)', () => {
+    const html = thread({ cancelled: true, onSendAgain: () => undefined })
+    expect(html).not.toContain('undoing a change is yours to do')
+    // A run that did something still says it.
+    expect(thread({
+      cancelled: true,
+      events: [{ type: 'tool.started', payload: { callId: 'c1', name: 'Read', input: { file_path: 'a.txt' } } }]
+    })).toContain('undoing a change is yours to do')
+  })
+})
+
+describe('sent again (0.496)', () => {
+  const stoppedEarly = { missionId: 'mission_a', prompt: 'Summarize the turns', events: [{ type: 'run.cancelled', payload: {} }] }
+  const count = (html: string, text: string): number => html.split(text).length - 1
+
+  it('draws the message once: the stopped copy gives way to the one sent again', () => {
+    const html = thread({ earlierTurns: [stoppedEarly], events: [{ type: 'message.delta', payload: { text: 'Two turns.' } }] })
+    expect(count(html, '>Summarize the turns<')).toBe(1)
+  })
+
+  it('and says no fresh session began when nothing before it is lost', () => {
+    const html = thread({ earlierTurns: [stoppedEarly], coldStart: true })
+    expect(html).not.toContain('A fresh session')
+    // It still says so when a turn before it is on screen.
+    const answered = { missionId: 'mission_b', prompt: 'Start here', events: [{ type: 'message.delta', payload: { text: 'Started.' } }] }
+    expect(thread({ earlierTurns: [answered, stoppedEarly], coldStart: true })).toContain('A fresh session')
+  })
+
+  it('keeps a stopped turn that said something, or that was followed by other words', () => {
+    const spoke = { ...stoppedEarly, events: [{ type: 'message.delta', payload: { text: 'Starting' } }, { type: 'run.cancelled', payload: {} }] }
+    expect(count(thread({ earlierTurns: [spoke] }), '>Summarize the turns<')).toBe(2)
+    expect(count(thread({ earlierTurns: [stoppedEarly], prompt: 'Something else' }), '>Summarize the turns<')).toBe(1)
+    expect(thread({ earlierTurns: [stoppedEarly], prompt: 'Something else' })).toContain('>Something else<')
+  })
 })
 
 describe('a run whose runtime is signed out (N11)', () => {

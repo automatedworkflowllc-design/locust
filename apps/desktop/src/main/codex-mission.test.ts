@@ -2400,6 +2400,52 @@ describe('continuing a conversation', () => {
     expect(spec.args).not.toContain('resume')
   })
 
+  it('picks up the session a turn stopped before naming its own was resuming (0.496)', async () => {
+    // Stop pressed half a second into a reply: the turn resumed thread-older
+    // and was stopped before it said so. The next reply is still that
+    // conversation, not "A fresh session".
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([{ type: 'turn.completed' }]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const created: Record<string, unknown>[] = []
+    const { service } = scheduledService({ start }, fakeLedger({
+      getMission: async () => ({
+        ...(finished({ continuesFrom: { missionId: 'mission_older', checkpointEpoch: 1, reason: 'follow-up', runtimeThreadId: 'thread-older' } }) as never as Record<string, unknown>),
+        events: []
+      }) as never,
+      createMission: async (metadata) => {
+        created.push(metadata as unknown as Record<string, unknown>)
+      }
+    }))
+
+    await service.start('go on', 'codex', 'ask', {}, () => undefined, undefined, undefined, 'mission_prior')
+
+    const spec = start.mock.calls[0]?.[0] as { args: readonly string[] }
+    expect(spec.args.slice(0, 3)).toEqual(['exec', 'resume', 'thread-older'])
+    expect(String(start.mock.calls[0]?.[1] ?? '')).not.toContain('not in your session')
+    expect(created.at(-1)?.continuesFrom).toMatchObject({ missionId: 'mission_prior', runtimeThreadId: 'thread-older' })
+  })
+
+  it('sends again as the same words, not as an earlier turn quoted back (0.496)', async () => {
+    // The first turn of a conversation, stopped before any reply, then Send
+    // again: there is no session to resume, and "Asked: <the same words> --
+    // no reply was recorded" above those same words told the model nothing.
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([{ type: 'turn.completed' }]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const { service } = scheduledService({ start }, fakeLedger({
+      getMission: async () => ({ ...(finished() as never as Record<string, unknown>), events: [] }) as never
+    }))
+
+    await service.start('check the google stock price', 'codex', 'ask', {}, () => undefined, undefined, undefined, 'mission_prior')
+
+    const sent = String(start.mock.calls[0]?.[1] ?? '')
+    expect(sent).not.toContain('This conversation has earlier turns')
+    expect(sent).toContain('check the google stock price')
+  })
+
   /*
    * H6: Resume from checkpoint resumed as NOBODY -- in the project folder
    * rather than the teammate's own branch, outside their one-run guard, and

@@ -12,7 +12,7 @@ import type {
   PublicRecoveredMission,
   PublicTeammate
 } from '../../../shared/ipc.js'
-import { activityEntries, buildThread, cancellationSummary, editedFiles, decisionStanding, errorAlreadyShown, foldNoticeKeys, lastPlanOf, modeRefusedATool, readPlan, relativePath, stepsLine, terminalSeamBefore, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
+import { activityEntries, buildThread, cancellationSummary, editedFiles, decisionStanding, errorAlreadyShown, foldNoticeKeys, lastPlanOf, modeRefusedATool, readPlan, relativePath, sentAgainBy, stepsLine, terminalSeamBefore, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
 import type { GroupBoundary, GroupLeaving, LiveStarter, TurnSwitch } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
 import { folderName, ranOnLine } from '../ranOn.js'
@@ -1189,6 +1189,8 @@ onResume,
         {earlierTurns.map((turn, index) => {
           const marker = markers.find((candidate) => candidate.beforeTurn === index)
           const seam = terminalSeamBefore(earlierTurns[index - 1]?.inTerminal, turn.inTerminal)
+          // Stopped before it said anything, then sent again: one message (0.496).
+          const again = sentAgainBy(turn, earlierTurns[index + 1]?.prompt ?? prompt)
           return (
             <Fragment key={turn.missionId}>
               {marker !== undefined && (
@@ -1198,9 +1200,9 @@ onResume,
               {joinNotes((beforeTurn) => beforeTurn === index)}
               {turn.switchedFrom !== undefined && <HandoffDivider {...turn.switchedFrom} />}
               {seam !== undefined && <TerminalDivider seam={seam} />}
-              {userTurn(turnPromptLine(turn), turnAttachments(turn), () => editedFiles(turn.events, workspacePath))}
+              {!again && userTurn(turnPromptLine(turn), turnAttachments(turn), () => editedFiles(turn.events, workspacePath))}
               {cardsFor(index, 'before-work').map(peerCard)}
-              {earlierWork[index]}
+              {!again && earlierWork[index]}
               {cardsFor(index, 'after-work').map(peerCard)}
               {/* What that turn taught the team, under that turn. */}
               <MemoryCard lines={memoriesOfTurn(peers.memories ?? [], turn.missionId)} />
@@ -1213,7 +1215,7 @@ onResume,
         )}
         {leavingNotes((beforeTurn) => beforeTurn === earlierTurns.length)}
         {joinNotes((beforeTurn) => beforeTurn === earlierTurns.length)}
-        {coldStart && (
+        {coldStart && earlierTurns.some((turn, index) => !sentAgainBy(turn, earlierTurns[index + 1]?.prompt ?? prompt)) && (
           /*
            * WHERE THIS TURN BEGAN, said where the turn begins.
            *
