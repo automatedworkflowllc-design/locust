@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.504.0 - 2026-09-30
+
+### Improved
+
+- **Cloud says where it can go.** Cloud could not be picked in a folder that
+  is not on GitHub, and the menu said only that. Now Cloud can always be
+  picked on a Codex model, and the Cloud tasks panel names the folder, says
+  what the cloud needs, and lists your folders that are on GitHub, each with
+  **Open**. **Choose a folder…** is there for one Locust has not opened yet.
+
 ## 0.503.0 - 2026-09-30
 <!-- big -->
 

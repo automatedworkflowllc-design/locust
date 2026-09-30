@@ -16,6 +16,7 @@ import { MAX_TAGGED, taggedPrompt } from '../shared/tagging.js'
 import { COMPARE_SLOTS, COMPARE_TREES_DIRECTORY, comparesGoneWith, compareNeedsCopy, compareRefusalOf, compareSlotKey, compareTreeId, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../shared/compare.js'
 import { reverseChanges } from '../shared/reverse-diff.js'
 import { createCloudTaskService, launchRunner } from './cloud-task-service.js'
+import { githubRepoOf } from './cloud-tasks.js'
 import type { Runner } from './cloud-tasks.js'
 import type { ReverseChange } from '../shared/reverse-diff.js'
 import { FINANCES_FOLDER, FINANCES_README, FINANCES_ROUTE, FINANCES_TEAMMATE } from './places.js'
@@ -237,6 +238,7 @@ import {
   CLOUD_REFRESH_CHANNEL,
   CLOUD_DIFF_CHANNEL,
   CLOUD_APPLY_CHANNEL,
+  CLOUD_FOLDERS_CHANNEL,
   REWIND_PUT_BACK_CHANNEL,
   WORKSPACE_ATTACH_CHANNEL,
   WORKSPACE_FILES_CHANNEL,
@@ -3462,7 +3464,7 @@ if (!ownsSingleInstanceLock) {
     ipcMain.handle(CLOUD_WHERE_CHANNEL, async (event) => {
       if (!fromOwnWindow(event)) return { repo: undefined, branch: undefined, unpushed: undefined, dirty: false, codexReady: false }
       const where = await cloudTasks.where(workspacePath)
-      return { ...where, codexReady: (await codexLaunch()) !== undefined }
+      return { ...where, codexReady: (await codexLaunch()) !== undefined, folderName: basename(workspacePath) }
     })
     ipcMain.handle(CLOUD_START_CHANNEL, async (event, prompt: unknown, teammateId: unknown) => {
       if (!fromOwnWindow(event) || typeof prompt !== 'string') return { ok: false, message: 'That cloud task could not be started.' }
@@ -3470,6 +3472,22 @@ if (!ownsSingleInstanceLock) {
       if ((await codexLaunch()) === undefined) return { ok: false, message: 'Cloud tasks run through Codex CLI, which is not installed or not signed in here. Settings > Runtimes shows how.' }
       const started = await cloudTasks.start({ folder: workspacePath, prompt: prompt.slice(0, 20_000), ...(typeof teammateId === 'string' ? { teammateId } : {}) })
       return started.ok ? { ok: true, task: publicTask(started.task), notes: started.notes } : started
+    })
+    /*
+     * Where a cloud task CAN go, when this folder is not on GitHub (0.504).
+     * Colin, 2026-09-30, at "This folder is not on GitHub": "i have no idea
+     * what folder the cloud is in". The folders Locust already knows, each
+     * asked for its GitHub remote -- read-only, and only those still there.
+     */
+    ipcMain.handle(CLOUD_FOLDERS_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return []
+      const known = (await folders.list().catch(() => [])).filter((folder) => existsSync(folder.path) && !isInstallFolder(folder.path)).slice(0, 40)
+      const found = await Promise.all(known.map(async (folder) => {
+        const remote = await gitRunner(['remote', 'get-url', 'origin'], folder.path)
+        const repo = remote.code === 0 ? githubRepoOf(remote.stdout) : undefined
+        return repo === undefined ? undefined : { id: folder.id, name: folder.name, path: folder.path, repo }
+      }))
+      return found.filter((entry): entry is { id: string; name: string; path: string; repo: string } => entry !== undefined)
     })
     ipcMain.handle(CLOUD_LIST_CHANNEL, async (event) => (fromOwnWindow(event) ? (await cloudTasks.list(workspacePath)).map(publicTask) : []))
     ipcMain.handle(CLOUD_REFRESH_CHANNEL, async (event, taskId: unknown) => {

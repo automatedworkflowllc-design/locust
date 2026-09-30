@@ -80,7 +80,7 @@ import { imageMediaType } from '../../shared/image-files.js'
 import { signInCommand } from '../../shared/runtime-install.js'
 import { SIGN_IN_OPENED_EVENT } from './signInEvents.js'
 import { DEFAULT_RELAY_HOP_CAP, DEFAULT_MEMORY_MODE } from '../../shared/ipc.js'
-import type { PublicCloudTask, PublicCloudWhere, RewindPutBackResponse, RuntimeCommandsResponse } from '../../shared/ipc.js'
+import type { PublicCloudFolder, PublicCloudTask, PublicCloudWhere, RewindPutBackResponse, RuntimeCommandsResponse } from '../../shared/ipc.js'
 import { stripTaskBlocks } from '../../shared/room-task.js'
 import { stripMemoryBlocks } from '../../shared/memory.js'
 import { stripDecisionBlocks } from '../../shared/decision.js'
@@ -1656,6 +1656,7 @@ export default function App(): ReactElement {
   const [cloudNotes, setCloudNotes] = useState<readonly string[]>([])
   const [cloudProblem, setCloudProblem] = useState<string>()
   const [cloudApplying, setCloudApplying] = useState<string>()
+  const [cloudFolders, setCloudFolders] = useState<readonly PublicCloudFolder[]>([])
   const [viewingFile, setViewingFile] = useState<{
     readonly path: string
     /** The file's text, or a `data:` URL when the mode is `image`. */
@@ -2140,6 +2141,11 @@ export default function App(): ReactElement {
     void bridge.listCloudTasks().then(setCloudTasks).catch(() => undefined)
     void bridge.cloudWhere().then(setCloudWhere).catch(() => undefined)
   }, [workspaceId])
+  // The folders to offer when this one is not on GitHub, asked only when the panel would show them.
+  useEffect(() => {
+    if (!cloudPanel || cloudWhere === undefined || cloudWhere.repo !== undefined) return
+    void window.desktop?.cloudFolders().then(setCloudFolders).catch(() => undefined)
+  }, [cloudPanel, cloudWhere])
   // And followed while one is in the cloud and the panel is open: Codex is asked every 15 s.
   const cloudPending = cloudTasks.some((task) => task.status.state === 'pending')
   useEffect(() => {
@@ -7651,9 +7657,8 @@ export default function App(): ReactElement {
                 ? { refusal: 'Cloud runs on Codex: pick a Codex model first.' }
                 : cloudWhere?.codexReady === false
                   ? { refusal: 'Codex CLI is not installed or not signed in here.' }
-                  : cloudWhere !== undefined && cloudWhere.repo === undefined
-                    ? { refusal: 'This folder is not on GitHub, so the cloud has nothing to work on.' }
-                    : {})
+                  // Not on GitHub is not refused here (0.504): the panel says so, with the folders that are.
+                  : {})
             }}
             pickerRequest={pickerRequest}
             {...(composerFill === undefined ? {} : { fill: composerFill })}
@@ -7815,6 +7820,9 @@ export default function App(): ReactElement {
             }}
             onOpen={(url) => void window.desktop?.openLink(url).catch(() => undefined)}
             onClose={() => setCloudPanel(false)}
+            folders={cloudFolders}
+            onOpenFolder={(id) => switchToFolder(id)}
+            onChooseFolder={() => void chooseWorkspace()}
           />
         ) : sideChat !== undefined && screen === 'workroom' ? (
           <SideChat

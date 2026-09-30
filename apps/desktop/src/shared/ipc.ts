@@ -656,6 +656,14 @@ export const CLOUD_LIST_CHANNEL = 'cloud:list'
 export const CLOUD_REFRESH_CHANNEL = 'cloud:refresh'
 export const CLOUD_DIFF_CHANNEL = 'cloud:diff'
 export const CLOUD_APPLY_CHANNEL = 'cloud:apply'
+/** The person's folders that are on GitHub, for a cloud task from a folder that is not (0.504). */
+export const CLOUD_FOLDERS_CHANNEL = 'cloud:folders'
+export interface PublicCloudFolder {
+  readonly id: string
+  readonly name: string
+  readonly path: string
+  readonly repo: string
+}
 export interface PublicCloudTask {
   readonly taskId: string
   readonly url: string
@@ -682,6 +690,8 @@ export interface PublicCloudWhere {
   readonly dirty: boolean
   /** Codex CLI is here and signed in: the cloud is reached through it. */
   readonly codexReady: boolean
+  /** The folder's own name, so a refusal can say which folder (0.504). */
+  readonly folderName?: string
 }
 export type CloudStartResponse =
   | { readonly ok: true; readonly task: PublicCloudTask; readonly notes: readonly string[] }
@@ -2899,6 +2909,7 @@ export interface DesktopApi {
   refreshCloudTask(taskId: string): Promise<PublicCloudTask | undefined>
   cloudTaskDiff(taskId: string): Promise<string | undefined>
   applyCloudTask(taskId: string): Promise<CloudApplyResponse>
+  cloudFolders(): Promise<readonly PublicCloudFolder[]>
   /** Undo the later turns' file changes before an edited message goes (0.502). */
   putBackFiles(request: RewindPutBackRequest): Promise<RewindPutBackResponse>
   /**

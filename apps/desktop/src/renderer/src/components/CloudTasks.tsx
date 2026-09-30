@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ReactElement } from 'react'
 
-import type { PublicCloudTask, PublicCloudWhere } from '../../../shared/ipc.js'
+import type { PublicCloudFolder, PublicCloudTask, PublicCloudWhere } from '../../../shared/ipc.js'
 import { fileCounts, parseUnifiedDiff } from '../diff.js'
 import { agoLabel } from '../teammateWork.js'
 import { DiffView } from './DiffView.js'
@@ -22,7 +22,10 @@ export function CloudTasks({
   onShowChange,
   onApply,
   onOpen,
-  onClose
+  onClose,
+  folders,
+  onOpenFolder,
+  onChooseFolder
 }: {
   readonly tasks: readonly PublicCloudTask[]
   readonly where: PublicCloudWhere | undefined
@@ -34,6 +37,10 @@ export function CloudTasks({
   readonly onApply: (taskId: string) => void
   readonly onOpen: (url: string) => void
   readonly onClose: () => void
+  /** The person's folders that ARE on GitHub, offered when this one is not (0.504). */
+  readonly folders: readonly PublicCloudFolder[]
+  readonly onOpenFolder: (id: string) => void
+  readonly onChooseFolder: () => void
 }): ReactElement {
   const [open, setOpen] = useState<{ readonly taskId: string; readonly diff: string | undefined; readonly loading: boolean }>()
   const newestFirst = [...tasks].sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))
@@ -62,10 +69,43 @@ export function CloudTasks({
       </div>
       <div className="lc-beside__thread lc-cloudtasks__list">
         {problem !== undefined && <p className="lc-cloudtasks__problem" role="alert">{problem}</p>}
+        {/*
+          * NOT ON GITHUB, SAID WITH THE WAY ON (0.504). Colin, at the old
+          * refusal: "i have no idea what folder the cloud is in". The folder
+          * is named, what the cloud needs is said, and the person's folders
+          * that are on GitHub are one click away.
+          */}
+        {where !== undefined && where.repo === undefined && (
+          <div className="lc-cloudtasks__elsewhere">
+            <p className="lc-cloudtasks__note">
+              <strong>{where.folderName ?? 'This folder'}</strong> is not on GitHub. A cloud task runs on a copy of a GitHub
+              repository in Codex Cloud, not on this computer, so it needs a folder that is on GitHub.
+            </p>
+            {folders.length > 0 ? (
+              <>
+                <p className="lc-cloudtasks__note">Your folders that are:</p>
+                <ul className="lc-cloudtasks__folders">
+                  {folders.map((folder) => (
+                    <li key={folder.id}>
+                      <span className="lc-cloudtasks__foldername">{folder.name}</span>
+                      <span className="lc-cloudtasks__repo lc-mono">{folder.repo}</span>
+                      <button type="button" className="lc-button" onClick={() => onOpenFolder(folder.id)}>Open</button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p className="lc-cloudtasks__note">None of the folders Locust knows is on GitHub yet. Push this project to GitHub, or open one that is.</p>
+            )}
+            <button type="button" className="lc-button" onClick={onChooseFolder}>
+              <Icon name="folder" size={13} /> Choose a folder…
+            </button>
+          </div>
+        )}
         {notes.map((note) => (
           <p key={note} className="lc-cloudtasks__note">{note}</p>
         ))}
-        {newestFirst.length === 0 && (
+        {newestFirst.length === 0 && where?.repo !== undefined && (
           <p className="lc-cloudtasks__empty">
             Pick Cloud in the chat-type menu and describe a task. It runs in Codex Cloud on this repository, as GitHub has
             it; its change stays there until you apply it here.
