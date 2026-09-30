@@ -143,12 +143,21 @@ describe('nothing loses its way in', () => {
    *
    * A feature with no way in is not a smaller feature. It is an absent one.
    */
-  for (const name of ['Missions', 'Rooms', 'Routines', 'Settings']) {
-    it(`${name} has a button in the footer`, () => {
-      const footer = SIDEBAR.slice(SIDEBAR.indexOf('lc-sidebar__footer'))
-      expect(footer).toContain(`<span>${name}</span>`)
+  // 0.486: Missions, Rooms and Routines moved to the places list at the top,
+  // Claude's sidebar from Colin's screenshot; Settings stays in the footer.
+  // Reachability is the rule, so each is asserted where it now lives, drawn
+  // whatever the width (the list is not behind `compact`).
+  for (const name of ['Missions', 'Rooms', 'Routines']) {
+    it(`${name} has a button in the places list at the top`, () => {
+      const at = SIDEBAR.indexOf('<div className="lc-sidebar__nav lc-sidebar__places">')
+      expect(at).toBeGreaterThan(-1)
+      expect(SIDEBAR.slice(at, SIDEBAR.indexOf('</div>', at))).toContain(`<span>${name}</span>`)
     })
   }
+  it('Settings has a button in the footer', () => {
+    const footer = SIDEBAR.slice(SIDEBAR.indexOf('lc-sidebar__footer'))
+    expect(footer).toContain('<span>Settings</span>')
+  })
 
   it('the roster is reachable too, from the faces row rather than the footer', () => {
     /*

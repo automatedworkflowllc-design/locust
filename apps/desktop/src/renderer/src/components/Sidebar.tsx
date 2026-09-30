@@ -28,8 +28,8 @@ import type { TeammateStatusView } from '../status.js'
 import { Icon } from './Icon.js'
 import { WorkingSpark } from './WorkingSpark.js'
 import { teammateTooltip } from '../teammateTooltip.js'
-import { railCountBadge, shortAgo } from '../railFlyout.js'
-import { conversationRows, heldFor, narrowingLine, ownerOf, roomLastAt, unreadableSentence, withRoomsFolded } from '../conversationList.js'
+import { railCountBadge } from '../railFlyout.js'
+import { conversationRows, heldFor, narrowingLine, ownerOf, unreadableSentence, withRoomsFolded } from '../conversationList.js'
 import { RailFlyout } from './RailFlyout.js'
 import { routineStepLabel } from '../routines.js'
 
@@ -445,16 +445,6 @@ export function Sidebar({
    */
 
   const [faceFilter, setFaceFilter] = useState<string>()
-  /*
-   * The age column has to move on its own. `2m` that stays `2m` for an hour
-   * is worse than no age at all, because most-recent-first is only legible
-   * if the numbers agree with the order they claim.
-   */
-  const [now, setNow] = useState(() => new Date())
-  useEffect(() => {
-    const tick = window.setInterval(() => setNow(new Date()), 30_000)
-    return () => window.clearInterval(tick)
-  }, [])
   const railOpenFor = railPinned ?? railHovered
   /*
    * M35 (the code review): in the rail, Rename and New group did nothing --
@@ -663,9 +653,10 @@ export function Sidebar({
                         })
                       }
                     >
-                      <Icon name="folder" size={12} />
+                      {/* A name, no icon, no count: Claude's sidebar, from Colin's screenshot of it
+                          (2026-09-30: "remove the random numbers, literally set it up exactly how
+                          claude code has their sidebar"). */}
                       <span className="lc-project__name">{group.name}</span>
-                      <span className="lc-sectionlabel__count">{String(theirs.length)}</span>
                     </button>
                     )}
                     {onGroupMenu !== undefined && renamingGroupId !== group.groupId && (
@@ -704,8 +695,7 @@ export function Sidebar({
               */}
             {groupsShown && folderUngrouped.length > 0 && (
               <div className="lc-project__head is-plain">
-                <span className="lc-project__name">Not in a project</span>
-                <span className="lc-sectionlabel__count">{String(folderUngrouped.length)}</span>
+                <span className="lc-project__name">Ungrouped</span>
               </div>
             )}
             {folderUngrouped.map((entry) => (entry.kind === 'room' ? roomRow(entry.room, entry.missions) : rowAndChildren(entry.mission)))}
@@ -730,8 +720,6 @@ export function Sidebar({
    */
   const roomRow = (room: PublicRoom, answers: readonly SidebarMission[]): ReactElement => {
     const running = answers.some((mission) => mission.phase === 'running')
-    // Its newest answer or post; a room nobody has posted to is as old as its making.
-    const age = shortAgo(roomLastAt(room, answers), now)
     const members = room.teammateIds
       .map((id) => teammates.find((entry) => entry.teammateId === id)?.name)
       .filter((name): name is string => name !== undefined)
@@ -750,7 +738,6 @@ export function Sidebar({
             <Icon name="users" size={13} />
           </span>
           <span className="lc-conv__title">{room.name}</span>
-          {age !== undefined && <span className="lc-conv__age lc-mono">{age}</span>}
         </button>
       </div>
     )
@@ -759,7 +746,6 @@ export function Sidebar({
   const conversationRow = (mission: SidebarMission): ReactElement => {
               const owner = ownerOf(mission, missionOwners)
               const by = owner === undefined ? undefined : teammates.find((entry) => entry.teammateId === owner)
-              const age = shortAgo(mission.lastAt, now)
               /*
                * WHOSE, AND WHETHER A ROUTINE STARTED IT.
                *
@@ -926,9 +912,7 @@ export function Sidebar({
                       <span className="lc-conv__age lc-mono" title={`${runningStep.name}: step ${String(runningStep.step)} of ${String(runningStep.of)}`}>
                         step {runningStep.step} of {runningStep.of}
                       </span>
-                    ) : (
-                      age !== undefined && <span className="lc-conv__age lc-mono">{age}</span>
-                    )}
+                    ) : null}
                   </button>
                   )}
                   <button
@@ -1017,6 +1001,28 @@ export function Sidebar({
           }}
           autoComplete="off"
         />
+      </div>
+
+      {/*
+        * THE PLACES, AT THE TOP, one to a line -- Claude's sidebar, from
+        * Colin's screenshot of it (2026-09-30): New, Artifacts, Routines,
+        * Customize stacked under its switcher, the conversations below. They
+        * were a row of thirds in the footer. `lc-sidebar__nav` stays on the
+        * list for everything that finds these buttons by it.
+        */}
+      <div className="lc-sidebar__nav lc-sidebar__places">
+        <button type="button" onClick={() => { railClose(); onOpenMissions() }} title="All missions (Ctrl 1)">
+          <Icon name="inbox" size={14} />
+          <span>Missions</span>
+        </button>
+        <button type="button" onClick={() => { railClose(); onOpenRooms() }} title="Rooms — ask several teammates at once (Ctrl 4)">
+          <Icon name="users" size={14} />
+          <span>Rooms</span>
+        </button>
+        <button type="button" onClick={() => { railClose(); onOpenAutomations() }} title="Routines — work that repeats">
+          <Icon name="clock" size={14} />
+          <span>Routines</span>
+        </button>
       </div>
 
       {/*
@@ -1809,26 +1815,6 @@ export function Sidebar({
           * beats a fold under 300px of roster; no button at all beats
           * nothing.
           */}
-        <div className="lc-sidebar__nav">
-          {/*
-            * Each of these closes the rail's pinned flyout first. A face
-            * pinned, then Rooms opened, left the flyout floating over the
-            * room's answers (Grok, pass 13, at 1120x720). Leaving the rail's
-            * own list is leaving the flyout.
-            */}
-          <button type="button" onClick={() => { railClose(); onOpenMissions() }} title="All missions (Ctrl 1)">
-            <Icon name="inbox" size={14} />
-            <span>Missions</span>
-          </button>
-          <button type="button" onClick={() => { railClose(); onOpenRooms() }} title="Rooms — ask several teammates at once (Ctrl 4)">
-            <Icon name="users" size={14} />
-            <span>Rooms</span>
-          </button>
-          <button type="button" onClick={() => { railClose(); onOpenAutomations() }} title="Routines — work that repeats">
-            <Icon name="clock" size={14} />
-            <span>Routines</span>
-          </button>
-        </div>
         {/*
           * The second row is Settings and the status, and no Teammates.
           *

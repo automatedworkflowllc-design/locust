@@ -20,7 +20,14 @@ import { blocksOutsideCode, defangProtocolBlocks } from './protocolTags.js'
  */
 
 export const SHARE_TAG = 'locust-share'
-export const MAX_SHARE_TEXT_LENGTH = 1_200
+/*
+ * 6,000, from 1,200 (0.486). Colin, 2026-09-30, a Boss brief to Ghost cut at
+ * "prepare an optimi…" -- Ghost itself said the message was cut. 1,200 is two
+ * paragraphs, and the briefing asks for a brief a senior colleague can act on.
+ * 6,000 (about 1,000 words) still fits whole beside the briefing inside
+ * MAX_RUNTIME_PROMPT_LENGTH, and the store takes the same (workroom.ts).
+ */
+export const MAX_SHARE_TEXT_LENGTH = 6_000
 export const MAX_SHARES_PER_MISSION = 4
 
 /**

@@ -327,9 +327,9 @@ describe('moving a conversation is one row, not one row per group', () => {
     expect(APP).toContain('checked: groupOfConversation(missionId)?.groupId === group.groupId')
   })
 
-  it('offers Not in a project as a destination rather than a separate verb', () => {
+  it('offers Ungrouped as a destination rather than a separate verb', () => {
     const submenu = APP.slice(APP.indexOf("label: 'Move to project'"))
-    expect(submenu.slice(0, 2400)).toContain("label: 'Not in a project'")
+    expect(submenu.slice(0, 2400)).toContain("label: 'Ungrouped'")
   })
 
   it('picks the newest match when two groups share a name', () => {

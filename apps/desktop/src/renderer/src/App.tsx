@@ -1021,7 +1021,7 @@ export default function App(): ReactElement {
                     }
                   })),
                   {
-                    label: 'Not in a project',
+                    label: 'Ungrouped',
                     checked: groupMembersRef.current[conversationKeyOf(missionId)] === undefined,
                     onSelect: () => {
                       void window.desktop?.assignGroup(conversationKeyOf(missionId), undefined).then(refreshGroups)

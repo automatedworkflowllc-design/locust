@@ -26,7 +26,7 @@ import { isAbsolute, join } from 'node:path'
  */
 
 export const WORKROOM_SCHEMA_VERSION = 1 as const
-export const MAX_WORKROOM_MESSAGE_LENGTH = 1_200
+export const MAX_WORKROOM_MESSAGE_LENGTH = 6_000 // 0.486: the share cap, peer-share.ts MAX_SHARE_TEXT_LENGTH
 export const MAX_WORKROOM_NAME_LENGTH = 40
 const MAX_WORKROOM_BYTES = 16 * 1024 * 1024
 const MAX_RECORD_BYTES = 64 * 1024

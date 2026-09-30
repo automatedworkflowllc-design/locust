@@ -6999,6 +6999,54 @@ textarea {
   }
 
 /*
+ * THE PLACES LIST (0.486), Claude's: one place to a line, an icon and its
+ * name, full width to press, at the top of the sidebar. More specific than
+ * `.lc-sidebar__nav`, whose equal thirds are the footer's.
+ */
+.lc-sidebar__nav.lc-sidebar__places {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--lc-space-2) var(--lc-space-4) var(--lc-space-3);
+}
+
+.lc-sidebar__places button {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-4);
+  width: 100%;
+  min-width: 0;
+  padding: 6px var(--lc-space-4);
+  border: 0;
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  color: var(--lc-text-secondary);
+  font: inherit;
+  font-size: var(--lc-text-control);
+  text-align: left;
+  cursor: pointer;
+}
+
+.lc-sidebar__places button:hover {
+  background: var(--lc-bg-control);
+  color: var(--lc-text-primary);
+}
+
+.lc-shell.is-compact .lc-sidebar__places {
+  align-items: center;
+  padding: var(--lc-space-2) var(--lc-space-2);
+}
+
+.lc-shell.is-compact .lc-sidebar__places button {
+  justify-content: center;
+  padding: var(--lc-space-3) 0;
+}
+
+.lc-shell.is-compact .lc-sidebar__places button span {
+  display: none;
+}
+
+/*
  * THE FOOTER, STACKED TOO. The full sidebar's equal thirds survived into the
  * 63px rail: Missions, Rooms and Routines became three 12px icons in one row
  * with gaps of a few pixels and a hit area to match, and Settings sat alone at
@@ -15266,7 +15314,8 @@ textarea {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 500;
+  /* A quiet label over its rows, as Claude's sidebar sets its group names. */
+  font-weight: 400;
 }
 
 .lc-project__head.is-current .lc-project__name {

@@ -11,6 +11,24 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.486.0 - 2026-09-30
+
+### Changed
+
+- **The sidebar is set out like Claude's.** Missions, Rooms and Routines are
+  now a list at the top, one to a line. Project names are plain headings,
+  with no folder icon and no count. Conversations outside a project sit
+  under "Ungrouped", and rows no longer show how long ago each one moved.
+  Settings stays at the bottom.
+
+### Fixed
+
+- **A brief from one teammate to another arrives whole.** Messages between
+  teammates were cut at 1,200 characters, about two paragraphs, so a real
+  brief arrived ending mid-word, and the teammate who got it said so. They
+  now carry up to 6,000 characters, about 1,000 words, and teammates are
+  told that limit.
+
 ## 0.485.0 - 2026-09-30
 
 ### New
