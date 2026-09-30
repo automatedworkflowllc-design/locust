@@ -61,7 +61,9 @@ try {
   check('while it worked, its steps were lines among what it said', both !== undefined, JSON.stringify(live.at(-1) ?? []).slice(0, 240))
   const saidFinal = final.filter((line) => line.startsWith('SAID'))
   const stepsFinal = final.filter((line) => line.startsWith('STEPS'))
-  check('the finished turn reads said, steps, said, steps ...', stepsFinal.length >= 2 && saidFinal.length >= 3 && final[0]?.startsWith('SAID') === true, JSON.stringify(final).slice(0, 300))
+  // A thought before the first sentence is its own line, and right: it happened first.
+  const work = final.filter((line) => !/^STEPS Thought( for|$)/.test(line))
+  check('the finished turn reads said, steps, said, steps ...', stepsFinal.length >= 2 && saidFinal.length >= 3 && work[0]?.startsWith('SAID') === true, JSON.stringify(final).slice(0, 300))
   // Nothing moved: what was said, in the order it was drawn live, is the order it ends in.
   const lastLive = (live.at(-1) ?? []).filter((line) => line.startsWith('SAID')).map((line) => line.slice(0, 30))
   const finalSaid = saidFinal.map((line) => line.slice(0, 30))
