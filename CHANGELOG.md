@@ -11,6 +11,14 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.488.0 - 2026-09-30
+
+### Changed
+
+- **Missions, Rooms and Routines sit in one row** at the top of the sidebar,
+  with a thin line between them, instead of three lines with empty space
+  beside each.
+
 ## 0.487.0 - 2026-09-30
 
 ### Fixed

@@ -7004,19 +7004,30 @@ textarea {
  * `.lc-sidebar__nav`, whose equal thirds are the footer's.
  */
 .lc-sidebar__nav.lc-sidebar__places {
+  /* One row, not three (0.488). Colin, 2026-09-30, on the stacked list: "too
+     much dead space on the right of it" -- three short words, each with a
+     whole line to itself. A menu bar, the places side by side, a thin rule
+     between them. The narrow rail below keeps them stacked. */
   display: flex;
-  flex-direction: column;
-  gap: 1px;
+  flex-direction: row;
+  align-items: center;
+  gap: 0;
   padding: var(--lc-space-2) var(--lc-space-4) var(--lc-space-3);
+}
+
+.lc-sidebar__places button + button {
+  border-left: 1px solid var(--lc-border-hairline);
+  border-radius: 0;
 }
 
 .lc-sidebar__places button {
   display: flex;
+  flex: 1 1 0;
+  justify-content: center;
   align-items: center;
-  gap: var(--lc-space-4);
-  width: 100%;
+  gap: var(--lc-space-3);
   min-width: 0;
-  padding: 6px var(--lc-space-4);
+  padding: 6px var(--lc-space-2);
   border: 0;
   border-radius: var(--lc-radius-control);
   background: transparent;
@@ -7028,13 +7039,17 @@ textarea {
 }
 
 .lc-sidebar__places button:hover {
-  background: var(--lc-bg-control);
   color: var(--lc-text-primary);
 }
 
 .lc-shell.is-compact .lc-sidebar__places {
+  flex-direction: column;
   align-items: center;
   padding: var(--lc-space-2) var(--lc-space-2);
+}
+
+.lc-shell.is-compact .lc-sidebar__places button + button {
+  border-left: 0;
 }
 
 .lc-shell.is-compact .lc-sidebar__places button {
