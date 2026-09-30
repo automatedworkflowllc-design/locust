@@ -114,32 +114,34 @@ describe('the changelog that ships', () => {
     // conversations by project (Colin, 2026-09-29: "Just make it work exactly like Claude code").
     // 0.462.0: ask on the side -- a question on a copy of a conversation (Devin's side chats).
     // 0.474.0: projects like Claude's, and math drawn (Colin, 2026-09-29: "claude has projects/and workspace folders").
+    // 0.506.0: the Finances dashboard, from dropped statements.
     // 0.503.0: cloud tasks from the chat-type menu (Codex Cloud).
     // 0.501.0: the Finances place (a tester's ask: Codex's Finances, inside Locust).
     // 0.498.0: edit an earlier message and start again from there (Claude Code's rewind).
     // 0.491.0: a turn reads like Claude Code's, its steps as lines between what was said (Colin, 2026-09-30: "ALL of our commands ... get rolled into the bar").
     const newest = all[0]!.version
-    expect(splashEntries(all, '0.276.0', newest).map((entry) => entry.version)).toEqual(['0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0', '0.448.0', '0.445.0', '0.441.0', '0.440.0', '0.435.0', '0.434.0', '0.426.0', '0.425.0', '0.370.0', '0.357.0', '0.350.0', '0.295.0', '0.277.0'])
-    expect(splashEntries(all, '0.280.0', newest).map((entry) => entry.version)).toEqual(['0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0', '0.448.0', '0.445.0', '0.441.0', '0.440.0', '0.435.0', '0.434.0', '0.426.0', '0.425.0', '0.370.0', '0.357.0', '0.350.0', '0.295.0'])
-    expect(splashEntries(all, '0.295.0', newest).map((entry) => entry.version)).toEqual(['0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0', '0.448.0', '0.445.0', '0.441.0', '0.440.0', '0.435.0', '0.434.0', '0.426.0', '0.425.0', '0.370.0', '0.357.0', '0.350.0'])
-    expect(splashEntries(all, '0.350.0', newest).map((entry) => entry.version)).toEqual(['0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0', '0.448.0', '0.445.0', '0.441.0', '0.440.0', '0.435.0', '0.434.0', '0.426.0', '0.425.0', '0.370.0', '0.357.0'])
-    expect(splashEntries(all, '0.357.0', newest).map((entry) => entry.version)).toEqual(['0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0', '0.448.0', '0.445.0', '0.441.0', '0.440.0', '0.435.0', '0.434.0', '0.426.0', '0.425.0', '0.370.0'])
-    expect(splashEntries(all, '0.370.0', newest).map((entry) => entry.version)).toEqual(['0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0', '0.448.0', '0.445.0', '0.441.0', '0.440.0', '0.435.0', '0.434.0', '0.426.0', '0.425.0'])
-    expect(splashEntries(all, '0.425.0', newest).map((entry) => entry.version)).toEqual(['0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0', '0.448.0', '0.445.0', '0.441.0', '0.440.0', '0.435.0', '0.434.0', '0.426.0'])
-    expect(splashEntries(all, '0.426.0', newest).map((entry) => entry.version)).toEqual(['0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0', '0.448.0', '0.445.0', '0.441.0', '0.440.0', '0.435.0', '0.434.0'])
-    expect(splashEntries(all, '0.434.0', newest).map((entry) => entry.version)).toEqual(['0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0', '0.448.0', '0.445.0', '0.441.0', '0.440.0', '0.435.0'])
-    expect(splashEntries(all, '0.435.0', newest).map((entry) => entry.version)).toEqual(['0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0', '0.448.0', '0.445.0', '0.441.0', '0.440.0'])
-    expect(splashEntries(all, '0.440.0', newest).map((entry) => entry.version)).toEqual(['0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0', '0.448.0', '0.445.0', '0.441.0'])
-    expect(splashEntries(all, '0.441.0', newest).map((entry) => entry.version)).toEqual(['0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0', '0.448.0', '0.445.0'])
-    expect(splashEntries(all, '0.445.0', newest).map((entry) => entry.version)).toEqual(['0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0', '0.448.0'])
-    expect(splashEntries(all, '0.448.0', newest).map((entry) => entry.version)).toEqual(['0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0'])
-    expect(splashEntries(all, '0.458.0', newest).map((entry) => entry.version)).toEqual(['0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0'])
-    expect(splashEntries(all, '0.462.0', newest).map((entry) => entry.version)).toEqual(['0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0'])
-    expect(splashEntries(all, '0.474.0', newest).map((entry) => entry.version)).toEqual(['0.503.0', '0.501.0', '0.498.0', '0.491.0'])
-    expect(splashEntries(all, '0.491.0', newest).map((entry) => entry.version)).toEqual(['0.503.0', '0.501.0', '0.498.0'])
-    expect(splashEntries(all, '0.498.0', newest).map((entry) => entry.version)).toEqual(['0.503.0', '0.501.0'])
-    expect(splashEntries(all, '0.501.0', newest).map((entry) => entry.version)).toEqual(['0.503.0'])
-    expect(splashEntries(all, '0.503.0', newest)).toEqual([])
+    expect(splashEntries(all, '0.276.0', newest).map((entry) => entry.version)).toEqual(['0.506.0', '0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0', '0.448.0', '0.445.0', '0.441.0', '0.440.0', '0.435.0', '0.434.0', '0.426.0', '0.425.0', '0.370.0', '0.357.0', '0.350.0', '0.295.0', '0.277.0'])
+    expect(splashEntries(all, '0.280.0', newest).map((entry) => entry.version)).toEqual(['0.506.0', '0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0', '0.448.0', '0.445.0', '0.441.0', '0.440.0', '0.435.0', '0.434.0', '0.426.0', '0.425.0', '0.370.0', '0.357.0', '0.350.0', '0.295.0'])
+    expect(splashEntries(all, '0.295.0', newest).map((entry) => entry.version)).toEqual(['0.506.0', '0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0', '0.448.0', '0.445.0', '0.441.0', '0.440.0', '0.435.0', '0.434.0', '0.426.0', '0.425.0', '0.370.0', '0.357.0', '0.350.0'])
+    expect(splashEntries(all, '0.350.0', newest).map((entry) => entry.version)).toEqual(['0.506.0', '0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0', '0.448.0', '0.445.0', '0.441.0', '0.440.0', '0.435.0', '0.434.0', '0.426.0', '0.425.0', '0.370.0', '0.357.0'])
+    expect(splashEntries(all, '0.357.0', newest).map((entry) => entry.version)).toEqual(['0.506.0', '0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0', '0.448.0', '0.445.0', '0.441.0', '0.440.0', '0.435.0', '0.434.0', '0.426.0', '0.425.0', '0.370.0'])
+    expect(splashEntries(all, '0.370.0', newest).map((entry) => entry.version)).toEqual(['0.506.0', '0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0', '0.448.0', '0.445.0', '0.441.0', '0.440.0', '0.435.0', '0.434.0', '0.426.0', '0.425.0'])
+    expect(splashEntries(all, '0.425.0', newest).map((entry) => entry.version)).toEqual(['0.506.0', '0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0', '0.448.0', '0.445.0', '0.441.0', '0.440.0', '0.435.0', '0.434.0', '0.426.0'])
+    expect(splashEntries(all, '0.426.0', newest).map((entry) => entry.version)).toEqual(['0.506.0', '0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0', '0.448.0', '0.445.0', '0.441.0', '0.440.0', '0.435.0', '0.434.0'])
+    expect(splashEntries(all, '0.434.0', newest).map((entry) => entry.version)).toEqual(['0.506.0', '0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0', '0.448.0', '0.445.0', '0.441.0', '0.440.0', '0.435.0'])
+    expect(splashEntries(all, '0.435.0', newest).map((entry) => entry.version)).toEqual(['0.506.0', '0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0', '0.448.0', '0.445.0', '0.441.0', '0.440.0'])
+    expect(splashEntries(all, '0.440.0', newest).map((entry) => entry.version)).toEqual(['0.506.0', '0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0', '0.448.0', '0.445.0', '0.441.0'])
+    expect(splashEntries(all, '0.441.0', newest).map((entry) => entry.version)).toEqual(['0.506.0', '0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0', '0.448.0', '0.445.0'])
+    expect(splashEntries(all, '0.445.0', newest).map((entry) => entry.version)).toEqual(['0.506.0', '0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0', '0.448.0'])
+    expect(splashEntries(all, '0.448.0', newest).map((entry) => entry.version)).toEqual(['0.506.0', '0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0', '0.458.0'])
+    expect(splashEntries(all, '0.458.0', newest).map((entry) => entry.version)).toEqual(['0.506.0', '0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0', '0.462.0'])
+    expect(splashEntries(all, '0.462.0', newest).map((entry) => entry.version)).toEqual(['0.506.0', '0.503.0', '0.501.0', '0.498.0', '0.491.0', '0.474.0'])
+    expect(splashEntries(all, '0.474.0', newest).map((entry) => entry.version)).toEqual(['0.506.0', '0.503.0', '0.501.0', '0.498.0', '0.491.0'])
+    expect(splashEntries(all, '0.491.0', newest).map((entry) => entry.version)).toEqual(['0.506.0', '0.503.0', '0.501.0', '0.498.0'])
+    expect(splashEntries(all, '0.498.0', newest).map((entry) => entry.version)).toEqual(['0.506.0', '0.503.0', '0.501.0'])
+    expect(splashEntries(all, '0.501.0', newest).map((entry) => entry.version)).toEqual(['0.506.0', '0.503.0'])
+    expect(splashEntries(all, '0.503.0', newest).map((entry) => entry.version)).toEqual(['0.506.0'])
+    expect(splashEntries(all, '0.506.0', newest)).toEqual([])
   })
 })
 

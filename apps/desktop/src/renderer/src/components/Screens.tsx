@@ -62,7 +62,7 @@ import { ArmedButton } from './ArmedButton.js'
 import { OwnModels } from './OwnModels.js'
 import { routineAwaitsReview } from '../../../shared/routine-recovery.js'
 
-export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings' | 'rooms' | 'memory' | 'automations'
+export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings' | 'rooms' | 'memory' | 'automations' | 'finances'
 
 /**
  * THE header for a list screen. Exported since 2026-09-22 because Routines

@@ -25,6 +25,8 @@ const workspace = await scratchRepository('locust-drive-finances-ws-')
 // A made-up month: groceries are the biggest category, at 312.40.
 const STATEMENT = [
   'date,description,category,amount',
+  '2026-08-12,STREAMFLIX,Subscriptions,-15.99',
+  '2026-08-21,GYMCO,Subscriptions,-39.00',
   '2026-09-02,FRESH MARKET,Groceries,-84.15',
   '2026-09-05,CITY POWER,Utilities,-96.00',
   '2026-09-09,FRESH MARKET,Groceries,-121.30',
@@ -72,26 +74,57 @@ try {
   check('Settings > Connectors has a Finances switch, and it turns on', switched.found && switched.on === 'true', JSON.stringify(switched))
   check('switched on, Finances is in the sidebar', (await drive.evaluate(sidebarHasFinances)) === true)
 
-  const opened = JSON.parse(String(await drive.capture('Finances opened from the sidebar', () => drive.evaluate(`(async () => {
+  const dash = `JSON.stringify({
+    open: !!document.querySelector('.lc-finances'),
+    empty: document.querySelector('.lc-finances__empty h2')?.innerText.trim() ?? null,
+    total: document.querySelector('.lc-fincard__total')?.innerText.trim() ?? null,
+    categories: [...document.querySelectorAll('.lc-fincats li')].map((li) => li.innerText.replace(/\\s+/g, ' ').trim()),
+    recurring: [...document.querySelectorAll('[aria-label="Subscriptions and what is due"] .lc-finlist li')].map((li) => li.innerText.replace(/\\s+/g, ' ').trim()),
+    rows: document.querySelectorAll('.lc-fintable tbody tr').length,
+    trend: document.querySelector('.lc-finances__trend')?.innerText.trim() ?? null
+  })`
+  const opened = JSON.parse(String(await drive.capture('Finances opened from the sidebar: the dashboard', () => drive.evaluate(`(async () => {
     ;[...document.querySelectorAll('.lc-sidebar__places button')].find((b) => /Finances/.test(b.innerText))?.click()
     await new Promise((r) => setTimeout(r, 2500))
-    return JSON.stringify({
-      placeholder: document.querySelector('form.command-dock textarea')?.getAttribute('placeholder') ?? '',
-      route: document.querySelector('form.command-dock .lc-control__model')?.closest('.lc-control')?.innerText.replace(/\\s+/g, ' ').trim() ?? '',
-      folder: document.querySelector('form.command-dock .lc-control--folder, form.command-dock [aria-label*="folder" i]')?.innerText.trim() ?? '',
-      starters: [...document.querySelectorAll('.lc-starter, .lc-starters button, .lc-home__starter')].map((b) => b.innerText.trim()).slice(0, 3),
-      body: document.querySelector('.lc-thread, main')?.innerText.replace(/\\s+/g, ' ').slice(0, 400) ?? ''
-    })
+    return ${dash}
   })()`))))
-  check('it opens on the Finances teammate', /Message Finances/.test(opened.placeholder), opened.placeholder)
-  check('on Codex', /Codex/.test(opened.route), opened.route)
-  check('with starters about money', /money|subscriptions|month/i.test(opened.body), opened.body)
+  check('it opens on the dashboard, asking for a statement', opened.open && /Add a statement/.test(opened.empty ?? ''), JSON.stringify(opened))
   const note = await readFile(join(places, 'finances', 'README.md'), 'utf8').catch(() => '')
   check('its folder was made, with a note saying what it is for', /Finances place in Locust/.test(note))
 
   await writeFile(join(places, 'finances', 'september.csv'), STATEMENT, 'utf8')
-  const answer = String(await drive.capture('asked about the statement', () => drive.evaluate(sendAndWaitScript('Look at september.csv. What did I spend the most on in September? Reply with the category and its total only.', { waitSeconds: 300 }))))
-  check('the answer names the biggest category and its total', /Groceries/i.test(answer) && /312\.40/.test(answer), answer.slice(-200))
+  const filled = JSON.parse(String(await drive.capture('a statement dropped in, read again', () => drive.evaluate(`(async () => {
+    document.querySelector('button[aria-label="Read the statements again"]')?.click()
+    for (let i = 0; i < 40 && !document.querySelector('.lc-fincard__total'); i += 1) await new Promise((r) => setTimeout(r, 250))
+    await new Promise((r) => setTimeout(r, 500))
+    return ${dash}
+  })()`))))
+  check('the spending for September, by category, biggest first', filled.total === '$485.79' && /^Groceries \$312\.40/.test(filled.categories[0] ?? ''), JSON.stringify(filled))
+  check('no comparison against a month the statements barely cover (August holds two rows)', filled.trend === null, filled.trend)
+  check('what repeats is found, with its next date', filled.recurring.some((row) => /STREAMFLIX/.test(row) && /next around/.test(row)), JSON.stringify(filled.recurring))
+  const table = JSON.parse(String(await drive.capture('the Transactions tab', () => drive.evaluate(`(async () => {
+    ;[...document.querySelectorAll('.lc-finances__tabs button')].find((b) => /Transactions/.test(b.innerText))?.click()
+    await new Promise((r) => setTimeout(r, 500))
+    return ${dash}
+  })()`))))
+  check('every transaction is listed', table.rows === 10, String(table.rows))
+
+  const answer = String(await drive.capture('asked from the dashboard', () => drive.evaluate(`(async () => {
+    const input = document.querySelector('.lc-finances__ask input')
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+    setter.call(input, 'Look at september.csv. What did I spend the most on in September 2026? Reply with the category and its total only.')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    await new Promise((r) => setTimeout(r, 300))
+    document.querySelector('.lc-finances__ask button[type="submit"]')?.click()
+    await new Promise((r) => setTimeout(r, 3000))
+    for (let i = 0; i < 600; i += 1) {
+      await new Promise((r) => setTimeout(r, 500))
+      if (!document.querySelector('button[aria-label^="Stop the running"]')) break
+    }
+    await new Promise((r) => setTimeout(r, 800))
+    return document.querySelector('.lc-thread')?.innerText.replace(/\\s+/g, ' ').slice(-400) ?? 'no thread'
+  })()`)))
+  check('Ask goes to the Finances teammate, and the answer is right', /Groceries/i.test(answer) && /312\.40/.test(answer), answer.slice(-200))
   const after = await readFile(join(places, 'finances', 'september.csv'), 'utf8')
   check('the statement is exactly as it was: Ask changed nothing', after === STATEMENT)
 } catch (error) {

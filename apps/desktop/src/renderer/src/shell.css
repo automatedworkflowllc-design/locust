@@ -17494,3 +17494,329 @@ textarea {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/*
+ * THE FINANCES DASHBOARD (0.506). A page of cards, as ChatGPT's Finances
+ * reads, in Locust's own monochrome: the category bar is one tone stepping
+ * down, money in is the one green, and every figure lines up in tabular
+ * numerals. Width is capped so a wide window reads as a page, not a spreadsheet.
+ */
+.lc-finances {
+  overflow-y: auto;
+  padding: var(--lc-space-8) var(--lc-space-7) var(--lc-space-8);
+  gap: var(--lc-space-5);
+}
+.lc-finances > * {
+  width: 100%;
+  max-width: 980px;
+  margin-inline: auto;
+}
+.lc-finances__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lc-space-5);
+}
+.lc-finances__title {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-4);
+  color: var(--lc-text-primary);
+}
+.lc-finances__title h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.lc-finances__actions {
+  display: flex;
+  gap: var(--lc-space-3);
+}
+.lc-finances__ask {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--lc-space-3);
+  padding: var(--lc-space-3);
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-raised);
+}
+.lc-finances__ask input {
+  min-width: 0;
+  padding: var(--lc-space-3) var(--lc-space-4);
+  border: 0;
+  background: transparent;
+  color: var(--lc-text-primary);
+  font: inherit;
+  font-size: var(--lc-text-said);
+  outline: none;
+}
+.lc-finances__ask:focus-within {
+  border-color: var(--lc-border-strong);
+}
+.lc-finances__fine {
+  margin: calc(var(--lc-space-2) * -1) auto 0;
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
+}
+.lc-finances__note {
+  margin: 0;
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
+}
+.lc-finances__tabs {
+  display: flex;
+  gap: var(--lc-space-2);
+  border-bottom: 1px solid var(--lc-border-hairline);
+}
+.lc-finances__tabs button {
+  padding: var(--lc-space-3) var(--lc-space-4);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--lc-text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+.lc-finances__tabs button:hover {
+  color: var(--lc-text-primary);
+}
+.lc-finances__tabs button.is-on {
+  border-bottom-color: var(--lc-text-primary);
+  color: var(--lc-text-primary);
+}
+.lc-finances__empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-4);
+  padding: var(--lc-space-8) var(--lc-space-7);
+  border: 1px dashed var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+}
+.lc-finances__empty h2 {
+  margin: 0;
+  color: var(--lc-text-primary);
+  font-size: 17px;
+  font-weight: 600;
+}
+.lc-finances__empty p {
+  max-width: 62ch;
+  margin: 0;
+  color: var(--lc-text-secondary);
+  line-height: 1.55;
+}
+.lc-finances__starters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lc-space-3);
+}
+.lc-finances__files {
+  margin: 0;
+  padding-left: var(--lc-space-6);
+  color: var(--lc-amber-text);
+  font-size: var(--lc-text-description);
+}
+.lc-finances__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--lc-space-5);
+}
+.lc-fincard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-4);
+  min-width: 0;
+  padding: var(--lc-space-6);
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-raised);
+}
+.lc-fincard--wide {
+  grid-column: 1 / -1;
+}
+.lc-fincard h2 {
+  margin: 0;
+  color: var(--lc-text-primary);
+  font-size: 15px;
+  font-weight: 600;
+}
+.lc-fincard__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--lc-space-4);
+}
+.lc-fincard__total {
+  color: var(--lc-text-primary);
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.lc-finances__month select {
+  margin-top: var(--lc-space-2);
+  padding: 2px var(--lc-space-2);
+  border: 0;
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  color: var(--lc-text-secondary);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  cursor: pointer;
+}
+.lc-finances__month select:hover {
+  background: var(--lc-hover-surface);
+}
+.lc-finbar {
+  display: flex;
+  gap: 2px;
+  height: 14px;
+  overflow: hidden;
+  border-radius: 5px;
+}
+.lc-finbar__part {
+  min-width: 3px;
+}
+.lc-finbar__part.is-0, .lc-fincats__dot.is-0 { background: color-mix(in srgb, var(--lc-text-primary) 92%, transparent); }
+.lc-finbar__part.is-1, .lc-fincats__dot.is-1 { background: color-mix(in srgb, var(--lc-text-primary) 70%, transparent); }
+.lc-finbar__part.is-2, .lc-fincats__dot.is-2 { background: color-mix(in srgb, var(--lc-text-primary) 52%, transparent); }
+.lc-finbar__part.is-3, .lc-fincats__dot.is-3 { background: color-mix(in srgb, var(--lc-text-primary) 38%, transparent); }
+.lc-finbar__part.is-4, .lc-fincats__dot.is-4 { background: color-mix(in srgb, var(--lc-text-primary) 26%, transparent); }
+.lc-finbar__part.is-5, .lc-fincats__dot.is-5 { background: color-mix(in srgb, var(--lc-text-primary) 16%, transparent); }
+.lc-fincats {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lc-fincats button {
+  display: grid;
+  grid-template-columns: 10px minmax(110px, 180px) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--lc-space-4);
+  width: 100%;
+  padding: var(--lc-space-3) var(--lc-space-2);
+  border: 0;
+  border-top: 1px solid var(--lc-border-hairline);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.lc-fincats li:first-child button {
+  border-top: 0;
+}
+.lc-fincats button:hover {
+  background: var(--lc-hover-surface);
+}
+.lc-fincats__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.lc-fincats__name {
+  color: var(--lc-text-primary);
+}
+.lc-fincats__track {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--lc-border-hairline);
+}
+.lc-fincats__track > span {
+  display: block;
+  height: 100%;
+  background: color-mix(in srgb, var(--lc-text-primary) 55%, transparent);
+}
+.lc-fincats__amount,
+.lc-finlist__amount,
+.lc-finfigure__value {
+  color: var(--lc-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.lc-finfigure {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--lc-space-4);
+}
+.lc-finfigure__label {
+  color: var(--lc-text-secondary);
+}
+.lc-finfigure__value {
+  font-size: 18px;
+  font-weight: 600;
+}
+.lc-finfigure__value.is-in,
+.lc-fintable .is-in {
+  color: var(--lc-green-text);
+}
+.lc-finances__trend {
+  margin: 0;
+  color: var(--lc-text-secondary);
+  font-size: var(--lc-text-description);
+}
+.lc-finances__trend.is-up {
+  color: var(--lc-amber-text);
+}
+.lc-finlist {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lc-finlist li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  gap: var(--lc-space-4);
+  padding: var(--lc-space-3) 0;
+  border-top: 1px solid var(--lc-border-hairline);
+}
+.lc-finlist li:first-child {
+  border-top: 0;
+}
+.lc-finlist__name {
+  overflow: hidden;
+  color: var(--lc-text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lc-finlist__meta {
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
+}
+.lc-fintable-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+}
+.lc-fintable {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.lc-fintable th {
+  padding: var(--lc-space-3) var(--lc-space-4);
+  background: var(--lc-bg-raised);
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
+  font-weight: 500;
+  text-align: left;
+}
+.lc-fintable td {
+  padding: var(--lc-space-3) var(--lc-space-4);
+  border-top: 1px solid var(--lc-border-hairline);
+  color: var(--lc-text-primary);
+}
+.lc-fintable .is-num {
+  text-align: right;
+}
+@media (max-width: 900px) {
+  .lc-finances__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -738,6 +738,20 @@ export interface RewindPutBackResponse {
   readonly putBack: readonly string[]
   readonly leftAlone: readonly { readonly path: string; readonly why: string }[]
 }
+/** The Finances dashboard's data (0.506): every CSV statement in the place's folder, read (shared/statements.ts). */
+export const FINANCES_READ_CHANNEL = 'finances:read'
+export interface FinancesReadResponse {
+  readonly transactions: readonly {
+    readonly date: string
+    readonly description: string
+    readonly amount: number
+    readonly category: string
+    readonly source: string
+  }[]
+  readonly files: readonly { readonly name: string; readonly count: number; readonly skipped: number; readonly problem?: string }[]
+  /** Other files in the folder the dashboard does not read (PDFs): the teammate can. */
+  readonly unread: readonly string[]
+}
 /** Open the Finances place (0.501, main/places.ts): its folder, and the teammate who works there. */
 export const PLACE_FINANCES_CHANNEL = 'places:finances'
 export type PlaceOpenResponse =
@@ -2905,6 +2919,8 @@ export interface DesktopApi {
   switchFolder(id: string): Promise<FolderSwitchResponse>
   /** The Finances place: its folder made if need be, and its teammate (0.501). */
   openFinancesPlace(): Promise<PlaceOpenResponse>
+  /** The Finances dashboard: the statements in its folder, read (0.506). */
+  readFinances(): Promise<FinancesReadResponse>
   /** Cloud tasks (0.503): this folder's standing, start, follow, show, apply. */
   cloudWhere(): Promise<PublicCloudWhere>
   startCloudTask(prompt: string, teammateId?: string): Promise<CloudStartResponse>

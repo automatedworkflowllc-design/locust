@@ -11,6 +11,29 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.506.0 - 2026-09-30
+<!-- big -->
+
+### New
+
+- **A Finances dashboard.** Finances in the sidebar now opens a page, the
+  way ChatGPT's own Finances does:
+  - spend by category for any month, as a bar and a list, with the total;
+  - money out and money in, compared with the months before;
+  - subscriptions and bills, with roughly when each is next due;
+  - fees and interest;
+  - every transaction on its own tab.
+
+  Ask a question at the top, or press a category, and the Finances teammate
+  answers. It reads every CSV statement you put in the Finances folder,
+  whatever shape your bank exports. Net worth, holdings and a credit score
+  need linked accounts, which Locust does not have, so they are not shown.
+
+### Fixed
+
+- **Cloud mode no longer shows the "continues from checkpoint" hint**, which
+  is about switching models and does not apply to a cloud task.
+
 ## 0.505.0 - 2026-09-30
 
 ### Improved

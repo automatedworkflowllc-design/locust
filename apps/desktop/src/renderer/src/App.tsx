@@ -62,6 +62,7 @@ import type { QueuedRow } from './steering.js'
 import type { RoutineDraft } from './routines.js'
 import { RoutineDialog } from './components/RoutineDialog.js'
 import { AutomationsScreen } from './components/AutomationsScreen.js'
+import { FinancesScreen } from './components/FinancesScreen.js'
 import { TIDY_PROMPT } from '../../shared/memory-tidy.js'
 import { needsYou, needsYouLabel } from './needsYou.js'
 import { withNote } from './diffNotes.js'
@@ -80,7 +81,7 @@ import { imageMediaType } from '../../shared/image-files.js'
 import { signInCommand } from '../../shared/runtime-install.js'
 import { SIGN_IN_OPENED_EVENT } from './signInEvents.js'
 import { DEFAULT_RELAY_HOP_CAP, DEFAULT_MEMORY_MODE } from '../../shared/ipc.js'
-import type { PublicCloudFolder, PublicCloudTask, PublicCloudWhere, RewindPutBackResponse, RuntimeCommandsResponse } from '../../shared/ipc.js'
+import type { FinancesReadResponse, PublicCloudFolder, PublicCloudTask, PublicCloudWhere, RewindPutBackResponse, RuntimeCommandsResponse } from '../../shared/ipc.js'
 import { stripTaskBlocks } from '../../shared/room-task.js'
 import { stripMemoryBlocks } from '../../shared/memory.js'
 import { stripDecisionBlocks } from '../../shared/decision.js'
@@ -2101,6 +2102,13 @@ export default function App(): ReactElement {
   const [askConnectors, setAskConnectors] = useState(false)
   /** The Finances place in the sidebar (0.501). */
   const [financesPlace, setFinancesPlace] = useState(false)
+  /** The Finances dashboard's statements (0.506), read when the page opens. */
+  const [financesData, setFinancesData] = useState<FinancesReadResponse>()
+  const [financesLoading, setFinancesLoading] = useState(false)
+  const readFinances = (): void => {
+    setFinancesLoading(true)
+    void window.desktop?.readFinances().then(setFinancesData).catch(() => undefined).finally(() => setFinancesLoading(false))
+  }
   /** Ask teammates that can to keep a todo list. See WorkspaceSettings.keepATodoList. */
   const [keepATodoList, setKeepATodoList] = useState(false)
 
@@ -5219,7 +5227,9 @@ export default function App(): ReactElement {
     if (listed?.ok === true) setTeammates(listed.data.teammates)
     const own = roster.find((teammate) => teammate.teammateId === answer.teammateId)
     setSelectedTeammateId(answer.teammateId)
-    setScreen('workroom')
+    // The dashboard first, as ChatGPT's Finances opens (0.506); its Chats and Ask go to the teammate.
+    setScreen('finances')
+    readFinances()
     if (own?.route !== undefined) {
       setRoute({ runtime: own.route.runtime, model: own.route.model })
       setMode(own.route.mode)
@@ -6696,6 +6706,22 @@ export default function App(): ReactElement {
               notice={memoryNotice}
               noticeWaits={memoryNoticeWaits}
               onDismissNotice={() => setMemoryNotice(undefined)}
+            />
+          ) : screen === 'finances' ? (
+            <FinancesScreen
+              data={financesData}
+              loading={financesLoading}
+              onAsk={(question) => {
+                setScreen('workroom')
+                setShownKey(undefined)
+                void startMission(question)
+              }}
+              onOpenChat={() => setScreen('workroom')}
+              onOpenFolder={() => {
+                if (workspacePath === undefined) return
+                void window.desktop?.revealFile(`${workspacePath}/README.md`).catch(() => undefined)
+              }}
+              onRefresh={readFinances}
             />
           ) : screen === 'automations' ? (
             <AutomationsScreen
