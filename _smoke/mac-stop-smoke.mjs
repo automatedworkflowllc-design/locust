@@ -16,9 +16,10 @@
 import { execFileSync, spawn } from 'node:child_process'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 
-const app = process.argv[2]
+// Absolute: the app is started from its profile folder, not from here.
+const app = process.argv[2] === undefined ? undefined : resolve(process.argv[2])
 if (app === undefined) {
   console.log('usage: node _smoke/mac-stop-smoke.mjs <Locust.app/Contents/MacOS/Locust>')
   process.exit(2)
