@@ -77,8 +77,10 @@ describe('a copy for a column', () => {
 })
 
 describe('who answers in a copy', () => {
-  it('is Cursor on Windows; Antigravity cannot join at all; everyone else answers in the folder', () => {
-    expect(compareNeedsCopy('cursor', 'win32')).toBe(true)
+  it('is nobody now; Antigravity cannot join at all; everyone else answers in the folder', () => {
+    // Cursor answers read-only in its own ask mode on Windows too (0.485),
+    // so its copy -- "could not start" in any big folder -- is gone.
+    expect(compareNeedsCopy('cursor', 'win32')).toBe(false)
     expect(compareNeedsCopy('cursor', 'darwin')).toBe(false)
     expect(compareNeedsCopy('claude', 'win32')).toBe(false)
     expect(compareRefusalOf('antigravity')).toMatch(/only in the folder it has open/)

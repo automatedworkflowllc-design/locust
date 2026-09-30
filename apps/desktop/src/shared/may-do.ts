@@ -118,8 +118,7 @@ export function whatItMayDo(runtime: MissionRuntimeId, sandbox: MissionSandbox, 
       return { rows: [READ, CHANGES_HERE, { verdict: 'allow', text: "run commands inside Muse's sandbox" }, THE_WEB], rest }
     case 'cursor':
       // Only Auto says anything about commands (`--force`). Read-only is
-      // plan mode inside Cursor's sandbox, which Windows cannot run, so such
-      // a run is refused before it starts there.
+      // Cursor's own ask mode, with its sandbox where one runs (macOS, Linux).
       return sandbox === 'full-access' ? rows(ANY_COMMAND) : rows()
     case 'antigravity':
     case 'gemini':

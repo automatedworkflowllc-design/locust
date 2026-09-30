@@ -312,7 +312,10 @@ export interface ComposerProps {
   /** Why a queued message has not gone yet, when it is not simply still running. */
   readonly queuedNote: string | undefined
   /** With the files attached to it, which ride on the row and go when it goes (L20). */
-  readonly onQueue: (text: string, attachments: readonly string[]) => void
+  /** `now`: Ctrl+Enter -- stop the run on screen and send this at once (0.485). */
+  readonly onQueue: (text: string, attachments: readonly string[], now?: boolean) => void
+  /** Stop the run on screen and send the queued message now; absent where that is not the run on screen. */
+  readonly onSendQueuedNow?: () => void
   readonly onUnqueue: () => void
   readonly onSendQueued: () => void
   /** The queued message belongs to a conversation that is NOT the one on screen. */
@@ -416,6 +419,7 @@ export function Composer({
   onQueue,
   onUnqueue,
   onSendQueued,
+  onSendQueuedNow,
   queuedElsewhere
 }: ComposerProps): ReactElement {
   const [value, setValue] = useState('')
@@ -761,7 +765,8 @@ export function Composer({
   const chatMode: 'direct' | 'compare' | 'blind' =
     asking !== undefined ? (asking.blind === true ? 'blind' : 'compare') : compare?.on === true ? (compare.blind === true ? 'blind' : 'compare') : 'direct'
   const versus = asking?.label ?? versusLabel((compare?.picks ?? []).map((pick) => pick.label))
-  const placeholder = asking !== undefined ? `Ask ${asking.columns === 2 ? 'both' : `all ${String(asking.columns)}`}…` : workingNow
+  // One column left answering (the others could not start) is asked as one.
+  const placeholder = asking !== undefined ? (asking.columns <= 1 ? 'Ask a follow-up…' : `Ask ${asking.columns === 2 ? 'both' : `all ${String(asking.columns)}`}…`) : workingNow
     ? queued === undefined
       ? `Say what is next — it goes to ${workingName} when this finishes…`
       : 'Edit the queued message to change it…'
@@ -831,8 +836,12 @@ export function Composer({
                       'Checking the coding agents on this machine…'
                   : 'Install a coding agent to start a mission…'
 
+  /** Set by Ctrl+Enter for the submit it starts: stop the run and send this now (0.485). */
+  const sendNow = useRef(false)
   const submit = (submitEvent: FormEvent<HTMLFormElement>): void => {
     submitEvent.preventDefault()
+    const now = sendNow.current
+    sendNow.current = false
     const typed = value.trim()
     // Notes alone are a message: the person may have nothing to add to them.
     const notes = diffNotes ?? []
@@ -857,7 +866,7 @@ export function Composer({
       // With its files, and the tiles cleared, as a send does. L20 (the code
       // review): the queued row dropped them, and the tiles then rode along
       // on the next, unrelated message.
-      onQueue(prompt, attached)
+      onQueue(prompt, attached, now && onSendQueuedNow !== undefined)
       setValue('')
       setAttached([])
       if (notes.length > 0) onClearDiffNotes?.()
@@ -1118,6 +1127,9 @@ export function Composer({
     }
     if (keyEvent.key === 'Enter' && !keyEvent.shiftKey) {
       keyEvent.preventDefault()
+      // Ctrl+Enter while a teammate works: Claude Code's send-now. It queues
+      // like Enter, then stops the run and sends at once (0.485).
+      sendNow.current = (keyEvent.ctrlKey || keyEvent.metaKey) && canQueue && onSendQueuedNow !== undefined
       keyEvent.currentTarget.form?.requestSubmit()
     }
   }
@@ -1349,6 +1361,13 @@ export function Composer({
                   ? `Sends when ${workingName} finishes`
                   : `${queuedNote.charAt(0).toUpperCase()}${queuedNote.slice(1)}`}
               </span>
+              {workingNow && onSendQueuedNow !== undefined && (
+                /* Claude Code's ctrl+enter, as a button: the run stops and
+                   this goes now, rather than when it finishes (0.485). */
+                <button type="button" className="lc-queued__action" title={`Stops ${workingName} and sends this now (Ctrl+Enter while typing)`} onClick={onSendQueuedNow}>
+                  Stop and send now
+                </button>
+              )}
               {!workingNow && (
                 <button type="button" className="lc-queued__action" onClick={onSendQueued}>
                   {/* It always goes into the conversation ON SCREEN, so where

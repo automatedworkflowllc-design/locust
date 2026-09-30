@@ -417,28 +417,21 @@
   --lc-font-symbol: 'Segoe UI Symbol', 'Apple Symbols', 'Noto Sans Symbols 2', 'DejaVu Sans', sans-serif;
   /* The teammate's voice. Only the reply prose wears it; everything the app says stays in Geist. */
   /*
-   * THE BASE TEXT IS GEIST NOW, and the swap is one token wide.
+   * THE REPLY'S FACE, and the swap is one token wide.
    *
    * Colin, 2026-09-13: "whatever font claude code uses... lets just switch to
    * that for the main chat text", then "we can keep all the geist mono and
    * weird sidebar text, but the actual base text should be whatever claude
    * code font youre using".
    *
-   * That face is Anthropic Sans, and it is NOT shipped here: it is a
-   * proprietary licensed typeface sitting inside another company's installed
-   * app, and lifting the file into an installer Colin ships -- and intends to
-   * open source -- is the one kind of copying that lands on him. Geist is the
-   * nearest thing already in this repo under a licence that allows it (SIL
-   * OFL 1.1), it is what the rest of the app is set in, and it is the look he
-   * has been reading all week.
-   *
-   * It is a SUBSTITUTE, not a match, and it overrides a deliberate decision:
-   * the design agent chose Plex for the teammate's voice on 2026-09-10 --
-   * humanist, narrower, a rhythm to follow over nine lines, a real 500 and a
-   * real italic. That reasoning still stands and the files are still bundled,
-   * so putting `'IBM Plex Sans'` back in front is the whole revert.
+   * That face is Anthropic Sans. It ships here now, beside Anthropic Serif,
+   * under the MIT licence in assets/fonts/ANTHROPIC-FONTS-LICENSE.txt; the
+   * serif was the reply's face from 3c3f2e2f until Colin, 2026-09-30, with
+   * the Claude app beside him: "can we switch to anthropic sans". Plex stays
+   * the fallback the design agent chose for the teammate's voice (2026-09-10),
+   * so a missing file still reads as a humanist sans, not as Georgia.
    */
-  --lc-font-prose: 'Anthropic Serif', 'IBM Plex Sans', Georgia, serif;
+  --lc-font-prose: 'Anthropic Sans', 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
 
   /*
    * Two display moments only. Everything was <= 15px before, which read as

@@ -11,6 +11,31 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.485.0 - 2026-09-30
+
+### New
+
+- **Stop and send now.** A message you type while a teammate is working
+  waits until they finish. It now has a Stop and send now button, which stops
+  the work in progress and sends your message at once in the same
+  conversation. Ctrl+Enter does the same as you type, like Claude Code's.
+
+### Fixed
+
+- **Grok and other Cursor models work in Compare on Windows.** An
+  answers-only comparison made Cursor work in a copy of the folder, so in
+  any big folder its column said "could not start". Cursor now runs in its
+  own read-only ask mode, in the folder itself. When pushed to write, it
+  refused every time we tried. The same makes Ask and Plan available for
+  Cursor on Windows.
+- **Replies are set in Anthropic Sans**, the face of the Claude app, instead
+  of the serif.
+- **A long tool name no longer covers "Using a tool".** In a narrow column
+  the name of what was running, such as a whole PowerShell path, was drawn
+  over the words beside it. Now the name shortens instead.
+- **A comparison with one column still answering says "Ask a follow-up",**
+  not "Ask all 1".
+
 ## 0.484.0 - 2026-09-30
 
 ### New

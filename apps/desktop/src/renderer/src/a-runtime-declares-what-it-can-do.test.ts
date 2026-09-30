@@ -62,6 +62,11 @@ describe('a runtime declares what it can do', () => {
     // flagged when the table was written, and this is the commit it was
     // flagged for.
     gemini: [],
+    // Cursor read-only on Windows too (0.485): its own `--mode ask` held
+    // against three pushed writes there on 2026-09-30, where plan mode had
+    // written files (2026-09-02). The sandbox is still asked for wherever it
+    // runs.
+    cursor: ['ask', 'accept-edits', 'plan', 'auto'],
     // OpenCode gained Approve-each on 2026-09-25 (A6.7): it rides
     // `opencode serve`, which stops and asks -- measured, and driven
     // (drive-opencode-approve-each: an approved command ran, a declined one
@@ -164,11 +169,10 @@ describe('a runtime declares what it can do', () => {
     expect(modeUnavailableReason('auto', 'muse', 'win32')).toContain('Muse Code')
   })
 
-  it('platform bars only the platform named', () => {
-    // Cursor's read-only mode is real on macOS and not on Windows, and the
-    // bar must not leak to a platform nobody measured.
-    expect(modeRunsOn('ask', 'cursor', 'win32')).toBe(false)
-    expect(modeRunsOn('ask', 'cursor', 'darwin')).toBe(true)
-    expect(modeRunsOn('ask', 'cursor', undefined)).toBe(true)
+  it('bars nothing by platform now: Cursor answers read-only everywhere (0.485)', () => {
+    // Its Windows bar was the only one; ask mode lifted it.
+    for (const platform of ['win32', 'darwin', 'linux', undefined]) {
+      expect(modeRunsOn('ask', 'cursor', platform)).toBe(true)
+    }
   })
 })

@@ -7420,7 +7420,18 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: var(--lc-space-3);
-  min-width: 0;
+  /*
+   * The words keep their width; the note beside them gives way. The label
+   * could shrink under its own words (they never wrap), and in a narrow
+   * Compare column a long tool name -- a whole PowerShell path -- was painted
+   * straight over "Using a tool" (Colin, 2026-09-30, screenshot). The note is
+   * the part with the ellipsis.
+   */
+  flex: none;
+}
+
+.lc-livestep__meta {
+  flex: 1 1 auto;
 }
 
 /*

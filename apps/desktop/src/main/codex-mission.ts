@@ -1736,6 +1736,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               ? createCursorPrintCommand(executable, {
                   workspacePath: runCwd,
                   sandbox: effectiveSandbox,
+                  platform: hostPlatform,
                   ...choice
                 })
               : codexStreams

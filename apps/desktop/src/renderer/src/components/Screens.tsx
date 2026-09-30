@@ -2341,7 +2341,7 @@ export function SettingsScreen({
           <More>
             <p>
               A teammate's reply is the one thing on this screen you read rather than scan, so it is set
-              in a serif and sized on its own. Your own messages and a teammate's question cards grow
+              in its own face and sized on its own. Your own messages and a teammate's question cards grow
               with it; the rest of the app stays where it is whatever you pick here.
             </p>
             <p>

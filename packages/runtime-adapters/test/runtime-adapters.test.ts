@@ -733,16 +733,20 @@ describe("installed runtime discovery", () => {
 describe("Cursor Agent and Gemini CLI commands", () => {
   const workspacePath = "C:\\work\\repo";
 
-  it("runs a read-only Cursor mission in plan mode and never forces commands", () => {
+  it("runs a read-only Cursor mission in ask mode, with the sandbox where it runs, and never forces commands", () => {
     const spec = createCursorPrintCommand(nativeExecutable, { workspacePath });
     expect(spec.runtime).toBe("cursor");
     expect(spec.stdin).toBe("prompt");
-    // Plan mode is the instruction and the sandbox is the enforcement; a
-    // read-only mission asks for both, because plan mode alone was measured
-    // letting a run edit files.
+    // Ask mode, not plan mode: plan mode wrote files when pushed (2026-09-02),
+    // ask mode refused three pushed writes (2026-09-30). The sandbox too
+    // wherever Cursor can run one: macOS and Linux, never Windows.
+    const withSandbox = process.platform === "darwin" || process.platform === "linux";
     expect(spec.args).toEqual([
-      "--print", "--output-format", "stream-json", "--stream-partial-output", "--trust", "--approve-mcps", "--workspace", workspacePath, "--mode", "plan", "--sandbox", "enabled",
+      "--print", "--output-format", "stream-json", "--stream-partial-output", "--trust", "--approve-mcps", "--workspace", workspacePath, "--mode", "ask",
+      ...(withSandbox ? ["--sandbox", "enabled"] : []),
     ]);
+    expect(spec.args).not.toContain("plan");
+    expect(spec.args).not.toContain("--force");
   });
 
   it("approves the connectors the person already configured, because nobody is here to be asked", () => {

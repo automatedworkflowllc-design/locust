@@ -1219,7 +1219,7 @@ describe('runtime selection', () => {
     expect(response).toMatchObject({ ok: true, data: { runtime: 'cursor', sandbox: 'read-only' } })
     const spec = start.mock.calls[0]?.[0]
     expect(spec?.runtime).toBe('cursor')
-    expect(spec?.args).toEqual(expect.arrayContaining(['--print', '--trust', '--mode', 'plan', '--sandbox', 'enabled']))
+    expect(spec?.args).toEqual(expect.arrayContaining(['--print', '--trust', '--mode', 'ask', '--sandbox', 'enabled']))
     expect(spec?.args).not.toContain('--force')
     expect(createMission).toHaveBeenCalledWith(expect.objectContaining({ runtime: 'cursor' }))
 
@@ -1265,26 +1265,29 @@ describe('runtime selection', () => {
     expect(appendHostFailure).not.toHaveBeenCalled()
   })
 
-  it('refuses a read-only Cursor mission where its sandbox cannot run, rather than mislabelling it', async () => {
-    // Measured 2026-09-02 on Windows: `--mode plan` did not stop a Cursor run
-    // from creating files, and `--sandbox enabled` is refused outright there.
-    // Recording such a run as read-only would be a claim nothing upholds.
-    const createMission = vi.fn<MissionLedger['createMission']>(async () => undefined)
-    const start = vi.fn() satisfies RuntimeProcessRunner['start']
+  it('runs a read-only Cursor mission on Windows in its ask mode, without the sandbox Windows cannot run', async () => {
+    // 0.485: ask mode held against three pushed writes on Windows (2026-09-30),
+    // where plan mode had not (2026-09-02). Refused until then.
+    // `--sandbox enabled` is still refused outright on Windows, so it is not asked for.
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
     const service = createCodexMissionService({
       workspacePath: WORKSPACE,
       platform: 'win32',
       discover: async () => [{ ...codexRuntime(), id: 'cursor', displayName: 'Cursor Agent', optional: true }],
       runner: { start },
-      ledger: fakeLedger({ createMission })
+      ledger: fakeLedger(),
+      createId: (() => { let n = 0; return () => String(++n) })(),
+      now: () => new Date(NOW),
+      schedule: () => undefined
     })
 
-    await expect(service.start('Do work.', 'cursor', 'ask', {}, () => undefined)).resolves.toMatchObject({
-      ok: false,
-      error: { code: 'RUNTIME_START_FAILED', message: expect.stringContaining('read-only') }
-    })
-    expect(start).not.toHaveBeenCalled()
-    expect(createMission).not.toHaveBeenCalled()
+    await expect(service.start('Do work.', 'cursor', 'ask', {}, () => undefined)).resolves.toMatchObject({ ok: true })
+    expect(start.mock.calls[0]?.[0]?.args).toEqual(expect.arrayContaining(['--mode', 'ask']))
+    expect(start.mock.calls[0]?.[0]?.args).not.toContain('--sandbox')
+    expect(start.mock.calls[0]?.[0]?.args).not.toContain('plan')
   })
 
   it('runs a read-only Cursor mission where the sandbox is real, and asks for it', async () => {
@@ -1304,7 +1307,7 @@ describe('runtime selection', () => {
     })
 
     await expect(service.start('Do work.', 'cursor', 'ask', {}, () => undefined)).resolves.toMatchObject({ ok: true })
-    expect(start.mock.calls[0]?.[0]?.args).toEqual(expect.arrayContaining(['--mode', 'plan', '--sandbox', 'enabled']))
+    expect(start.mock.calls[0]?.[0]?.args).toEqual(expect.arrayContaining(['--mode', 'ask', '--sandbox', 'enabled']))
   })
 
   it('names the runtime the user actually chose when it is unavailable', async () => {
@@ -1598,9 +1601,8 @@ describe('mid-mission handoff', () => {
     }
   }
 
+  // Cursor read-only on Windows left this list in 0.485: its ask mode holds.
   it.each([
-    ['Cursor read-only on Windows', 'cursor', 'ask', /cannot be held read-only/],
-    ['Cursor in Plan on Windows', 'cursor', 'plan', /cannot be held read-only/],
     ['a runtime whose events Locust cannot read', 'antigravity', 'accept-edits', /cannot read its event stream/],
     ['a runtime that is signed out', 'claude', 'ask', /not ready/]
   ] as const)('refuses a handoff to %s before stopping anything', async (_what, runtime, mode, reason) => {
@@ -1633,6 +1635,16 @@ describe('mid-mission handoff', () => {
     expect(createCheckpoint).not.toHaveBeenCalled()
     expect(service.liveMissionIds()).toEqual(['mission_2'])
     release()
+  })
+
+  it.each(['ask', 'plan'] as const)('hands off to Cursor read-only on Windows too, in %s (0.485: its ask mode holds)', async (mode) => {
+    const createCheckpoint = vi.fn<MissionLedger['createCheckpoint']>(async () => checkpoint())
+    const { service } = liveService(fakeLedger({ createCheckpoint }), [codexRuntime(), handoffRuntime('cursor', 'Cursor Agent')], { platform: 'win32' })
+
+    await service.start('Refactor the parser.', 'codex', 'ask', {}, () => undefined)
+    const response = await service.handOff('run_1', 'cursor', mode, {}, () => undefined)
+
+    expect(response).toMatchObject({ ok: true, data: { runtime: 'cursor' } })
   })
 
   it('still hands off to Cursor on Windows when the run may edit', async () => {

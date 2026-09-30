@@ -732,7 +732,9 @@ export const RUNTIME_CAPABILITIES: Readonly<Record<MissionRuntimeId, RuntimeCapa
    * it cannot keep -- so offering the mode there would be offering a refusal,
    * and every message sent under it came back as an error.
    */
-  cursor: { modes: [...EVERY_ORDINARY_MODE], notOn: { win32: ['ask'] }, evidence: 'measured' },
+  // Ask on Windows too (0.485): Cursor's own `--mode ask` held against three
+  // pushed writes, measured 2026-09-30 (commands.ts cursorCanEnforceReadOnly).
+  cursor: { modes: [...EVERY_ORDINARY_MODE], evidence: 'measured' },
   /*
    * NOTHING, AND IT TOOK A SEPARATE COMMIT TO SAY SO.
    *

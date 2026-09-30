@@ -375,6 +375,11 @@ export interface RuntimeCommandOptions {
    * the folder the person pointed the app at.
    */
   readonly repositoryRoot?: string;
+  /**
+   * The platform the command will run on, where it changes the command (Cursor
+   * asks for its sandbox only where one exists). The host's own when absent.
+   */
+  readonly platform?: NodeJS.Platform;
   readonly model?: string;
   /** A reasoning effort the runtime reported supporting for that model. */
   readonly effort?: string;
@@ -559,15 +564,29 @@ export function parseClaudeModelHints(helpText: string): RuntimeModelHints | und
  * Nothing is listed that the CLI did not print.
  */
 /**
- * Whether Cursor can actually hold a mission read-only on this platform.
- *
- * Its sandbox is the only thing that enforces it, and the CLI refuses to
- * enable one anywhere but macOS and Linux -- measured on Windows, where the
- * command exits 1 with that message. Where this is false, a read-only Cursor
- * mission must be refused rather than run under a label nothing upholds.
+ * Whether Cursor's SANDBOX runs on this platform: macOS and Linux only. On
+ * Windows the CLI exits 1 saying so (measured 2026-09-02).
  */
-export function cursorCanEnforceReadOnly(platform: NodeJS.Platform): boolean {
+export function cursorSandboxAvailable(platform: NodeJS.Platform): boolean {
   return platform === "darwin" || platform === "linux";
+}
+
+/**
+ * Whether Cursor can hold a mission read-only on this platform. Everywhere
+ * now: its `--mode ask` ("read-only", cursor-agent --help, 2026.09.26).
+ *
+ * MEASURED 2026-09-30 on Windows, three turns on Grok 4.7 told firmly to
+ * write -- with its edit tool, with a shell `echo hi > file`, and with a
+ * write dressed up as a "read-only diagnostic" (`python -c open(...,'w')`,
+ * `cmd /c type nul > touched.txt`). All three refused, naming ask mode, and
+ * the folder held only what it had. Plan mode had written two files under
+ * the same kind of push (2026-09-02), which is why Windows was refused until
+ * now. Where Cursor's sandbox runs it is asked for too; on Windows ask mode
+ * stands alone, and the host's own watch of the folder still shows a file
+ * that changes.
+ */
+export function cursorCanEnforceReadOnly(_platform: NodeJS.Platform): boolean {
+  return true;
 }
 
 export function parseCursorModelList(text: string): RuntimeModelHints | undefined {
@@ -974,10 +993,11 @@ export function createCursorPrintCommand(
     options.workspacePath,
   ];
   if (sandboxArgument(options.sandbox) === "read-only") {
-    // Plan mode is the instruction; the sandbox is the enforcement. Asking
-    // for the instruction alone would put a read-only label on a run that can
-    // still edit files.
-    args.push("--mode", "plan", "--sandbox", "enabled");
+    // Ask mode, not plan mode: plan mode wrote files when pushed, ask mode
+    // refused every write it was pushed to make (cursorCanEnforceReadOnly).
+    // The sandbox as well wherever it runs.
+    args.push("--mode", "ask");
+    if (cursorSandboxAvailable(options.platform ?? process.platform)) args.push("--sandbox", "enabled");
   }
   if (options.model !== undefined) {
     args.push("--model", requireText(options.model, "Model"));

@@ -133,8 +133,16 @@ export function compareMembership(compares: readonly PublicCompare[]): {
  * out of every comparison (Colin, 2026-09-28: "gemini/grok not selectable on
  * compare?"). In a copy it runs as it can, and the folder is untouched.
  */
-export function compareNeedsCopy(runtime: string, platform: string | undefined): boolean {
-  return runtime === 'cursor' && platform === 'win32'
+export function compareNeedsCopy(_runtime: string, _platform: string | undefined): boolean {
+  /*
+   * NONE NOW (0.485). Cursor answers read-only on Windows in its own ask mode
+   * (commands.ts cursorCanEnforceReadOnly), so an answers-only comparison runs
+   * it in the folder itself, like every other column. The copy it needed made
+   * Grok "could not start" in any folder over 5,000 files or 250 MB (Colin,
+   * 2026-09-30, comparing in his .claude folder). Kept as the one place to say
+   * so if a runtime ever needs a copy again.
+   */
+  return false
 }
 
 /** A runtime that cannot join a comparison at all, and why; undefined when it can. */

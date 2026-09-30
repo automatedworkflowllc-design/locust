@@ -4881,6 +4881,27 @@ export default function App(): ReactElement {
     return undefined
   }, [queued, front, shownKey, verdict?.kind, queueClock])
 
+  /*
+   * STOP AND SEND NOW (0.485), Claude Code's ctrl+enter: the queued message
+   * goes at once instead of when the teammate finishes. The stop lands first;
+   * then, if the run ended stopped (or failed), the queue's next message goes
+   * into that conversation. A run that happened to finish normally in the
+   * meantime is left to the queue above, which sends it the usual way -- so it
+   * is never sent twice.
+   */
+  const [sendAfterStop, setSendAfterStop] = useState<string>()
+  useEffect(() => {
+    if (sendAfterStop === undefined) return
+    const run = runs.get(sendAfterStop)
+    if (run !== undefined && liveRunIsActive(run)) return
+    setSendAfterStop(undefined)
+    if (run === undefined || run.phase === 'completed') return
+    const { going, rest } = takeNext(queued, sendAfterStop)
+    if (going === undefined) return
+    setQueued(rest)
+    void startMission(withAttachments(going.text, going.attachments ?? []), undefined, { requeue: going })
+  }, [sendAfterStop, runs, queued])
+
   /** The addressed teammate's live run, if they have one: they cannot be given a second. */
   const busyRun = [...runs.values()].find(
     (run) => liveRunIsActive(run) && pickedTeammate !== undefined && ownerOf(run) === pickedTeammate.teammateId
@@ -7446,7 +7467,7 @@ export default function App(): ReactElement {
             queuedCount={waitingHere.length}
             queuedNote={queuedNote}
             queuedElsewhere={queueKey !== shownKey}
-            onQueue={(text, attachments) => {
+            onQueue={(text, attachments, now) => {
               // Into the conversation the box shows the queue of (queueKey):
               // the live run on screen, else the addressed teammate's busy run.
               const key = queueKey
@@ -7455,8 +7476,21 @@ export default function App(): ReactElement {
                   ...rows,
                   { id: `q_${String(rows.length)}_${key}`, key, text, origin: 'person' as const, ...(attachments.length === 0 ? {} : { attachments }), ...(waitForKey === undefined ? {} : { waitFor: waitForKey }) }
                 ])
+                // Ctrl+Enter: stop the run on screen and send this at once.
+                if (now === true && key === liveOnScreen) {
+                  setSendAfterStop(key)
+                  cancelMission()
+                }
               }
             }}
+            {...(queueKey !== undefined && queueKey === liveOnScreen
+              ? {
+                  onSendQueuedNow: () => {
+                    setSendAfterStop(queueKey)
+                    cancelMission()
+                  }
+                }
+              : {})}
             onUnqueue={() => setQueued((rows) => withoutQueueOf(rows, queueKey))}
             onSendQueued={() => {
               if (queueKey === undefined) return

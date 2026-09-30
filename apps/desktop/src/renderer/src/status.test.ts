@@ -580,19 +580,18 @@ describe('a teammate with no work of their own', () => {
   })
 })
 
-describe('a route whose read-only mode is not real here', () => {
-  it('does not offer Cursor a read-only mode on Windows, where nothing enforces it', () => {
-    // Measured: Cursor's sandbox needs macOS or Linux, and plan mode alone
-    // did not stop a run editing files. The host refuses such a mission, so
-    // offering the mode meant every message came back an error -- and a run
-    // that never started leaves no conversation to reply to, which read as
-    // "it starts a new chat every time".
-    expect(modeRunsOn('ask', 'cursor', 'win32')).toBe(false)
-    expect(modesFor('cursor', 'win32')).toEqual(['accept-edits', 'auto'])
+describe('a read-only mode, where it is real', () => {
+  it('offers Cursor Ask and Plan on Windows too (0.485: its own ask mode holds)', () => {
+    // It was refused on Windows: plan mode wrote files when pushed and the
+    // sandbox cannot run there. Ask mode refused three pushed writes
+    // (2026-09-30), so the mode is real on Windows now.
+    expect(modeRunsOn('ask', 'cursor', 'win32')).toBe(true)
+    expect(modeRunsOn('plan', 'cursor', 'win32')).toBe(true)
+    expect(modesFor('cursor', 'win32')).toEqual(['ask', 'plan', 'accept-edits', 'auto'])
+    expect(modeUnavailableReason('ask', 'cursor', 'win32')).toBeUndefined()
   })
 
-  it('offers it where the sandbox exists', () => {
-    expect(modeRunsOn('ask', 'cursor', 'darwin')).toBe(true)
+  it('and where the sandbox exists', () => {
     expect(modesFor('cursor', 'darwin')).toEqual(['ask', 'plan', 'accept-edits', 'auto'])
   })
 
@@ -601,21 +600,11 @@ describe('a route whose read-only mode is not real here', () => {
     expect(modesFor('claude', 'win32')).toEqual(['ask', 'plan', 'accept-edits', 'auto'])
   })
 
-  it('withholds Plan wherever read-only is not real, for the same reason as Ask', () => {
+  it('offers Plan exactly where Ask is', () => {
     // Plan became the fourth MODE rather than a switch beside one (design
-    // pass, 2026-09-05): a switch that can only ever be on together with a
-    // read-only mode asks the same question twice and can disagree with the
-    // answer next to it. So Plan is offered exactly where Ask is.
-    expect(modeRunsOn('plan', 'cursor', 'win32')).toBe(false)
-    expect(modesFor('cursor', 'win32')).toEqual(['accept-edits', 'auto'])
-    expect(modeRunsOn('plan', 'cursor', 'darwin')).toBe(true)
+    // pass, 2026-09-05), so it is offered exactly where Ask is.
     expect(modeRunsOn('plan', 'antigravity')).toBe(false)
-    // And it reads as what it is on a roster card.
     expect(modeLabel('plan')).toBe('plan · read-only')
-  })
-
-  it('says why, in the words a person needs to act on', () => {
-    expect(modeUnavailableReason('ask', 'cursor', 'win32')).toContain('macOS or Linux')
   })
 })
 
