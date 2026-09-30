@@ -22,7 +22,7 @@ if (repo === undefined) {
   process.exit(2)
 }
 const git = (...args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' })
-git('checkout', '--', '.')
+git('reset', '-q', '--hard', 'HEAD')
 const before = await readFile(join(repo, 'greet.js'), 'utf8')
 
 const drive = await startDrive({
@@ -112,7 +112,8 @@ try {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
   await drive.finish({ intro: `Build: ${packaged ?? 'out/'}. Coda on Codex, in ${repo}.`, extra: `Checks failed: ${String(failures)}` })
-  // The clone as it was: the applied change is left uncommitted by design, and removed here.
-  try { git('checkout', '--', '.'); git('clean', '-fd', '--exclude=error.log') } catch { /* left for a person */ }
+  // The clone as it was. `codex cloud apply` STAGES its change (uncommitted, but in the index),
+  // so a checkout alone leaves it; the throwaway clone is reset to its commit.
+  try { git('reset', '-q', '--hard', 'HEAD'); git('clean', '-fd', '--exclude=error.log') } catch { /* left for a person */ }
 }
 if (failures > 0) process.exitCode = 1
