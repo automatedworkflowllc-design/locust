@@ -12,7 +12,7 @@ import type {
   PublicRecoveredMission,
   PublicTeammate
 } from '../../../shared/ipc.js'
-import { buildThread, cancellationSummary, editedFiles, decisionStanding, errorAlreadyShown, foldNoticeKeys, lastPlanOf, modeRefusedATool, readPlan, terminalSeamBefore, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
+import { activityEntries, buildThread, cancellationSummary, editedFiles, decisionStanding, errorAlreadyShown, foldNoticeKeys, lastPlanOf, modeRefusedATool, readPlan, relativePath, stepsLine, terminalSeamBefore, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
 import type { GroupBoundary, GroupLeaving, LiveStarter, TurnSwitch } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
 import { folderName, ranOnLine } from '../ranOn.js'
@@ -222,9 +222,18 @@ export function ThreadItems({
    * SAID share the face of the first; anything between them -- a tool fold,
    * a plan with outcomes, the live line -- starts a new run.
    */
+  /*
+   * A turn's steps do not start a new run (0.491): they sit between the
+   * things said, as Claude Code draws them, so one face heads the turn's
+   * speech however many groups of steps come between.
+   */
   const continuesSpeech = (index: number): boolean => {
-    const before = items[index - 1]
-    return before !== undefined && (before.type === 'agent-message' || before.type === 'plan')
+    for (let at = index - 1; at >= 0; at -= 1) {
+      const before = items[at]!
+      if (before.type === 'agent-message' || before.type === 'plan') return true
+      if (before.type !== 'steps' && before.type !== 'files') return false
+    }
+    return false
   }
   const face = (index: number): ReactElement =>
     !faces || continuesSpeech(index) ? <span className="lc-agentline__gutter" /> : <AgentAvatar teammate={owner} />
@@ -352,21 +361,35 @@ export function ThreadItems({
             </div>
           )
         }
-        if (item.type === 'activity') {
+        if (item.type === 'steps') {
+          // Under the words, at their indent: the steps are part of the reply.
           return (
-            <ActivityCard
+            <div className="lc-agentline" key={item.key}>
+              <span className="lc-agentline__gutter" />
+              <div className="lc-agentline__body">
+                <ActivityCard
+                  variant="steps"
+                  summary=""
+                  trace={stepsLine(item.details, item.finished, workspacePath).segments}
+                  finished={item.finished}
+                  details={item.details}
+                  runtimeName={undefined}
+                  workspacePath={workspacePath}
+                  {...(onOpenFile === undefined ? {} : { onOpenFile })}
+                />
+              </div>
+            </div>
+          )
+        }
+        if (item.type === 'activity') {
+          // The foot is what the turn came to; a turn still going has not come to it.
+          if (!item.finished) return null
+          return (
+            <TurnFoot
               key={item.key}
-              summary={item.summary}
-              trace={item.trace}
-              finished={item.finished}
-              details={item.details}
-              runtimeName={item.reportedBy === undefined ? undefined : runtimeDisplayName(item.reportedBy)}
+              item={item}
               workspacePath={workspacePath}
-              openByDefault={item.openByDefault === true}
               {...(onOpenFile === undefined ? {} : { onOpenFile })}
-              planUnderway={runningOrb !== undefined}
-              {...(item.plan === undefined ? {} : { plan: item.plan })}
-              {...(item.notices === undefined ? {} : { notices: item.notices })}
             />
           )
         }
@@ -432,6 +455,90 @@ export function ThreadItems({
         )
       })}
     </>
+  )
+}
+
+/**
+ * THE FOOT OF A FINISHED TURN (0.491): the files it changed, as Claude Code
+ * closes a turn with "Edited 2 files", and the line of totals that used to
+ * head the fold -- how long, what ran, what went wrong. The steps themselves
+ * are in the groups above it, where they happened.
+ */
+function TurnFoot({
+  item,
+  workspacePath,
+  onOpenFile
+}: {
+  readonly item: Extract<ThreadItem, { type: 'activity' }>
+  readonly workspacePath: string | undefined
+  readonly onOpenFile?: (path: string) => void
+}): ReactElement {
+  // What changed on disk, not every edit call: one refused was no change.
+  const edits = item.details.filter((detail) => detail.kind === 'edit' && detail.failed !== true)
+  const entries = activityEntries(edits, workspacePath)
+  const pathsOf = (seen: boolean): number => new Set(
+    entries.flatMap((entry) =>
+      entry.kind === 'file' && (entry.observed === true) === seen ? [relativePath(entry.file.path, workspacePath).toLowerCase()]
+      : entry.kind === 'unreported' && (entry.observed === true) === seen ? [relativePath(entry.name, workspacePath).toLowerCase()]
+      : []
+    )
+  ).size
+  /*
+   * WHAT THE RUN SAID IT CHANGED, apart from what only changed while it ran.
+   *
+   * The host looks at the folder after a run, and a file the runtime never
+   * named is "seen on disk". In a folder another program also writes -- Colin
+   * works in his `.claude`, where Claude Code keeps backups and file history
+   * -- that was twenty files headed "Edited 20 files", as if the teammate had
+   * written them (0.491).
+   */
+  const edited = pathsOf(false)
+  const seen = pathsOf(true)
+  const heading = edited > 0
+    ? `Edited ${edited === 1 ? '1 file' : `${String(edited)} files`}${seen > 0 ? ` · ${String(seen)} more changed in the folder` : ''}`
+    : `${seen === 1 ? '1 file' : `${String(seen)} files`} changed in the folder while it ran`
+  const changed = edited + seen
+  // The files card says how many; the line need not say it again.
+  const trace = changed > 0 ? item.trace.filter((seg) => seg.key !== 'files') : item.trace
+  const notices = item.notices ?? []
+  return (
+    <div className="lc-turnfoot">
+      {changed > 0 && (
+        <ActivityCard
+          summary=""
+          variant="files"
+          trace={[{ key: 'edited', text: heading }]}
+          finished
+          details={edits}
+          runtimeName={item.reportedBy === undefined ? undefined : runtimeDisplayName(item.reportedBy)}
+          workspacePath={workspacePath}
+          openByDefault
+          {...(onOpenFile === undefined ? {} : { onOpenFile })}
+        />
+      )}
+      <div className="lc-turnfoot__trace lc-trace">
+        {trace.map((seg) => (
+          <span className={`lc-trace__seg${seg.tone === undefined ? '' : ` is-${seg.tone}`}`} key={seg.key}>
+            {seg.text}
+          </span>
+        ))}
+      </div>
+      {/*
+        * What the runtime said about this turn before its work began, under
+        * the totals, each naming who said it. Muted whatever level the runtime
+        * sent: nothing here asks the reader to act (RULINGS 2026-09-10).
+        */}
+      {notices.map((notice, index) => (
+        <p
+          key={`notice_${String(index)}`}
+          className="lc-shellnotice lc-tone-muted"
+          title={`${runtimeDisplayName(notice.source)} called this ${notice.level === 'info' ? 'a note' : `a ${notice.level}`}`}
+        >
+          <span className="lc-shellnotice__source lc-mono">{runtimeDisplayName(notice.source)}</span>
+          {notice.message}
+        </p>
+      ))}
+    </div>
   )
 }
 

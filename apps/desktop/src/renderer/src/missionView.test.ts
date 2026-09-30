@@ -2781,42 +2781,24 @@ describe('"no files changed" is a claim, not a default', () => {
  * disappear after an agent is done ... we want that to stay so they can see
  * after the fact or if they missed it").
  */
-describe('whether a finished fold opens itself', () => {
+describe('where a turn’s steps are drawn (0.491)', () => {
+  /*
+   * The fold that opened itself when a turn ended is gone: a turn's steps are
+   * lines among the things said, the same while it runs and after, so there
+   * is nothing to open and nothing that closes behind the person. The foot --
+   * files and totals -- is drawn once the turn has ended.
+   */
   const withTool = [
     event('tool.started', { itemId: 't1', toolKind: 'read', name: 'read', command: 'notes.md', phase: 'started' }),
     event('tool.completed', { itemId: 't1', toolKind: 'read', name: 'read', command: 'notes.md', phase: 'completed' })
   ]
-  const activity = (options: { running: boolean; latestTurn?: boolean }) => {
-    const item = buildThread(withTool, options).find((entry) => entry.type === 'activity')
-    return item?.type === 'activity' ? item : undefined
-  }
+  const kinds = (options: { running: boolean; latestTurn?: boolean }) =>
+    buildThread(withTool, options).flatMap((entry) => (entry.type === 'steps' ? [`steps:${String(entry.finished)}`] : entry.type === 'activity' ? [`foot:${String(entry.finished)}`] : []))
 
-  it('opens a turn once it has finished', () => {
-    expect(activity({ running: false, latestTurn: true })?.openByDefault).toBe(true)
-  })
-
-  it('leaves it closed while the run is still going', () => {
-    // The live step is narrating it; a fold opening underneath that would say
-    // the same thing twice.
-    expect(activity({ running: true, latestTurn: true })?.openByDefault).toBeUndefined()
-  })
-
-  it('keeps an EARLIER turn open too, rather than closing it behind the person', () => {
-    /*
-     * This assertion was the opposite until 2026-09-08, on the reasoning that
-     * every finished fold opening makes a long conversation a wall. That was a
-     * fair worry and it lost to a measured one: `ActivityCard` remounts when a
-     * turn stops being the current one, so the old rule did not merely fail to
-     * open an earlier fold -- it CLOSED one that was open and being read, the
-     * moment the next message was sent. Driven, six rows to zero, nothing
-     * pressed.
-     *
-     * Colin asked for the work to stay; Claude Code's transcript keeps its
-     * tool calls the same way. Closing one by hand still sticks, so the wall
-     * remains something a person can take down and the app cannot impose.
-     */
-    expect(activity({ running: false })?.openByDefault).toBe(true)
-    expect(activity({ running: false, latestTurn: false })?.openByDefault).toBe(true)
+  it('draws the step as a group, finished or not, earlier turn or latest', () => {
+    expect(kinds({ running: false, latestTurn: true })).toEqual(['steps:true', 'foot:true'])
+    expect(kinds({ running: false, latestTurn: false })).toEqual(['steps:true', 'foot:true'])
+    expect(kinds({ running: true, latestTurn: true })).toEqual(['steps:false', 'foot:false'])
   })
 })
 

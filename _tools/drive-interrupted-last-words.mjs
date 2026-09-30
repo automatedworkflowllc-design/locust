@@ -9,8 +9,9 @@
 // opened again on the same profile. The run now has no end: interrupted.
 //
 // Before 0.400 the sentence said before the read was drawn BELOW the fold,
-// where the answer goes ("Let me check..." on a recovered routine run). Now it
-// is in the fold, in its place, and nothing below poses as the answer.
+// where the answer goes ("Let me check..." on a recovered routine run). Since
+// 0.491 a turn is drawn in the order it happened: the sentence, then the read
+// as its step line, and nothing after the read poses as the answer.
 
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -38,12 +39,15 @@ const READ = `(async () => {
   const row = ${teammateRows()}.find((r) => /Wren/.test(r.innerText))
   row?.conversation?.click()
   await new Promise((r) => setTimeout(r, 1200))
-  const toggle = document.querySelector('.lc-activity[aria-expanded="false"]')
-  toggle?.click()
-  await new Promise((r) => setTimeout(r, 500))
+  // The turn as read, top to bottom: each thing said, and each step line.
+  const order = [...document.querySelectorAll('.lc-agentline__body')]
+    .map((body) => (body.querySelector('.lc-steps') !== null ? 'steps: ' : '') + body.innerText.replace(/\\s+/g, ' ').trim())
+    .filter((text) => text.length > 0 && !/^steps: $/.test(text))
+  const lastSteps = order.map((text) => text.startsWith('steps: ')).lastIndexOf(true)
   return JSON.stringify({
-    said: [...document.querySelectorAll('.lc-filerow--said')].map((row) => row.innerText.replace(/\\s+/g, ' ').trim()),
-    below: [...document.querySelectorAll('.lc-agentline__body')].filter((body) => body.querySelector('.lc-card, .lc-activity, .lc-plan') === null).map((body) => body.innerText.replace(/\\s+/g, ' ').trim()).filter(Boolean),
+    order,
+    said: order.slice(0, Math.max(0, lastSteps)).filter((text) => !text.startsWith('steps: ')),
+    below: lastSteps < 0 ? order : order.slice(lastSteps + 1),
     header: document.querySelector('.lc-workroom__header')?.innerText.replace(/\\s+/g, ' ').slice(0, 160) ?? ''
   })
 })()`
@@ -101,9 +105,9 @@ try {
   await drive.ready()
   await drive.resize(1300, 860)
   const shown = JSON.parse(String(await drive.capture('opened again: the turn was cut off mid-read', () => drive.evaluate(READ))))
-  check('the sentence said before the read is in the fold', shown.said.some((text) => /Let me check the readme first/.test(text)), JSON.stringify(shown.said).slice(0, 200))
+  check('the sentence said before the read stands above the read', shown.said.some((text) => /Let me check the readme first/.test(text)), JSON.stringify(shown.order).slice(0, 300))
   check('the conversation reads interrupted', /interrupted/.test(shown.header), shown.header)
-  check('and nothing below the fold poses as the answer', shown.below.length === 0, JSON.stringify(shown.below).slice(0, 200))
+  check('and nothing after the read poses as the answer', shown.below.length === 0, JSON.stringify(shown.below).slice(0, 200))
 } catch (error) {
   failures += 1
   say(`second half failed: ${error instanceof Error ? error.message : String(error)}`)

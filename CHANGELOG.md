@@ -11,6 +11,32 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.491.0 - 2026-09-30
+<!-- big -->
+
+### Improved
+
+- **A teammate's turn reads the way Claude Code's does.** What the teammate
+  says and the steps it takes now appear in the order they happened. After
+  each thing it says, the steps it took before saying the next thing sit on
+  one quiet line, such as "Read 2 files, ran npm test" or "Created
+  report.md". Press the line to see each step, with its command and output
+  or its change. Until now, every step of a turn went into one bar of counts
+  above everything it said. The bar stayed closed while the teammate worked,
+  and its words piled up underneath, cut off from the steps they described.
+  Nothing moves when a turn ends: it reads the same while it runs and after.
+  A step that failed says so in amber on its line, and a single described
+  command that failed reads "Failed to ..." as it does in Claude Code.
+- **A finished turn ends with what it changed.** The files it edited are
+  listed in one "Edited N files" card, each closed until you open it, with
+  the turn's totals (how long, what ran, what went wrong) on a quiet line
+  under it.
+- **Files that only changed around a teammate are no longer counted as its
+  edits.** In a folder another program writes to, such as your `.claude`
+  folder, where Claude Code keeps its own backups, the card now reads
+  "Edited 1 file · 12 more changed in the folder" instead of "Edited 13
+  files".
+
 ## 0.490.0 - 2026-09-30
 
 ### New

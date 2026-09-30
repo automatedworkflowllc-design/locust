@@ -16,7 +16,9 @@ const NOTE = 'Found the bug. In `cart.js:3`, the discount is subtracted as a fla
 
 describe('the note between steps', () => {
   it('is drawn by the reply’s renderer', () => {
-    expect(CARD).toContain('<AgentText text={entry.text} streaming={false} />')
+    // Since 0.491 a note between steps is not a row of the fold at all: it is
+    // a message in the thread, between the step groups, drawn as the reply is.
+    expect(CARD).not.toContain('lc-filerow--said')
     expect(CARD).not.toContain('splitInlineCode(entry.text)')
   })
 

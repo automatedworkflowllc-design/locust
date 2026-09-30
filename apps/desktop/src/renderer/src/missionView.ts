@@ -160,15 +160,6 @@ export function foldedToolsText(names: readonly string[], verb: string | undefin
 
 export type ActivityEntry =
   | {
-      /**
-       * What the teammate SAID between its steps, put back where it said it
-       * (`narrationOf`). Never a tool, and never folded into a run of them.
-       */
-      readonly kind: 'said'
-      readonly key: string
-      readonly text: string
-    }
-  | {
       /** What a model thought, when its runtime reported it. Never a tool. */
       readonly kind: 'thought'
       readonly key: string
@@ -184,6 +175,8 @@ export type ActivityEntry =
       /** The runtime's own total, when the recorded text was cut short. */
       readonly reported: DiffCounts | undefined
       readonly large: boolean
+      /** Seen changed on disk by the host, and never named by the runtime (0.491). */
+      readonly observed?: true
     }
   | {
       readonly kind: 'shell'
@@ -350,10 +343,6 @@ export function activityEntries(
      * Thinking sits between tool calls constantly, so left foldable it would
      * also BREAK those runs in two and stop them collapsing at all.
      */
-    if (detail.kind === 'said') {
-      entries.push({ kind: 'said', key: `said_${String(index)}`, text: detail.output ?? '' })
-      return
-    }
     if (detail.kind === 'reasoning') {
       entries.push({
         kind: 'thought',
@@ -482,7 +471,8 @@ export function activityEntries(
           patch !== undefined && patch.truncated && files.length === 1
             ? { added: patch.added, removed: patch.removed }
             : undefined,
-        large: counts.added + counts.removed > LARGE_FILE_LINES
+        large: counts.added + counts.removed > LARGE_FILE_LINES,
+        ...(detail.status === 'observed on disk' ? { observed: true as const } : {})
       })
     })
   })
@@ -953,23 +943,24 @@ export interface PlanStep {
 export type ThreadItem =
   | { readonly key: string; readonly type: 'agent-message'; readonly text: string; readonly streaming: boolean }
   | {
+      /**
+       * THE STEPS TAKEN BETWEEN TWO THINGS SAID, as one line (0.491).
+       *
+       * Claude Code's turn, copied: what the teammate said, then the steps it
+       * took before it next said anything, folded to one line that opens
+       * onto them (`stepsLine`). Every step of the turn is in exactly one of
+       * these, in the order it happened. While the turn runs, a step still
+       * going is not in one yet -- the live line below names it -- and joins
+       * its group the moment it ends.
+       */
+      readonly key: string
+      readonly type: 'steps'
+      readonly details: readonly ActivityDetail[]
+      readonly finished: boolean
+    }
+  | {
       readonly key: string
       readonly type: 'activity'
-      /**
-       * Open this fold without being asked.
-       *
-       * True for the NEWEST turn once it has finished. While a run is going
-       * the live step narrates it -- "Thinking", then each tool as it is
-       * called -- and the moment it ended all of that was replaced by one
-       * collapsed line, so the work vanished at exactly the moment a person
-       * turns back to look at it (Colin, 2026-09-08: "the thoughts and tool
-       * calls disappear after an agent is done ... we want that to stay so
-       * they can see after the fact or if they missed it").
-       *
-       * Newest turn only. Every finished fold opening would make a long
-       * conversation a wall of tool rows, which is what the fold is for.
-       */
-      readonly openByDefault?: boolean
       /**
        * Notices about this turn's work, drawn at the FOOT of the fold.
        *
@@ -1556,8 +1547,7 @@ export function activityTrace(
   // a thought said `3 tool calls`; a run that only thought said `1 tool
   // call`. Two functions, one fact, and the visible one was the unfixed
   // one; the summary's green test is how a one-hour regression came back.
-  // Nor is what the teammate said between its steps (`narrationOf`).
-  const calls = details.filter((detail) => detail.kind !== 'helper' && detail.kind !== 'edit' && detail.kind !== 'shell' && detail.kind !== 'reasoning' && detail.kind !== 'said').length
+  const calls = details.filter((detail) => detail.kind !== 'helper' && detail.kind !== 'edit' && detail.kind !== 'shell' && detail.kind !== 'reasoning').length
     + details.filter((detail) => detail.kind === 'edit' && detail.failed === true).length
   const diagnostics = events.filter(
     (event): event is Extract<NormalizedRuntimeEvent, { type: 'adapter.diagnostic' }> => event.type === 'adapter.diagnostic' && !/\.usage_window$/.test(event.payload.code)
@@ -1720,6 +1710,176 @@ export function activityTrace(
   return segments
 }
 
+/**
+ * What one group of steps did, as the single line that stands for it (0.491).
+ *
+ * Colin, 2026-09-30, beside a frame of Claude Code's app: "ALL of our commands
+ * and stuff that would appear batched on screen seem to all get rolled into
+ * the bar". Claude Code draws a turn as what was said, then the steps taken
+ * before the next thing said, as one line -- "Read 2 files, ran a command",
+ * "Created ce3.py, ran 3 commands +150 -0", in red "Failed to add the effort
+ * chip" -- and a press opens the steps. A group of one step reads as that
+ * step. This is that line, from the rows the group holds.
+ */
+export interface StepsLine {
+  /** The sentence first, then anything that went wrong, in amber. */
+  readonly segments: readonly TraceSegment[]
+}
+
+type Looked = 'read' | 'search' | 'list' | 'web' | 'fetch' | 'plan' | 'wait'
+
+/**
+ * What a command only LOOKS at, from its first word: the Codex app's
+ * "Explored" -- a `sed -n`, an `rg`, an `ls` is reading, not doing. Anything
+ * else is a command. A command that edits never reaches this: it is an edit.
+ */
+export function commandLooksAt(command: string): 'read' | 'search' | 'list' | undefined {
+  const head = commandHead(command).toLowerCase().replace(/\.exe$/, '')
+  if (/^(cat|head|tail|less|more|type|get-content|gc|bat|nl|sed)$/.test(head)) return 'read'
+  if (/^(rg|grep|egrep|fgrep|findstr|select-string|sls|ag|ack)$/.test(head)) return 'search'
+  if (/^(ls|dir|tree|find|fd|get-childitem|gci|ll|la)$/.test(head)) return 'list'
+  return undefined
+}
+
+/** What a tool other than a command did, by the runtime's own name for it. */
+function toolLooksAt(tool: string | undefined): Looked | undefined {
+  const name = (tool ?? '').toLowerCase()
+  if (/web_?search|search_?web/.test(name)) return 'web'
+  if (/fetch|read_?url|url_?content|browser/.test(name)) return 'fetch'
+  if (/todo|update_?plan|manage_?task|task_?boundary/.test(name)) return 'plan'
+  // Cursor's wait on a command it sent away.
+  if (/^(await|wait|await_?shell)$/.test(name)) return 'wait'
+  if (/^(ls|list|list_?dir|list_?directory|listdir|dir)$/.test(name)) return 'list'
+  if (/grep|glob|search|find|codebase|semsearch|ripgrep/.test(name)) return 'search'
+  if (/^(read|read_?file|readfile|view|view_?file|open_?file|notebook_?read|cat|readtoolcall)$/.test(name)) return 'read'
+  return undefined
+}
+
+/** The last path-looking word of a command, as its file name: `sed -n 1,80p src/a.ts` is `a.ts`. */
+function commandTarget(command: string): string | undefined {
+  // The first command only: `Get-Content a.log -Tail 80; Write-Output "--"` reads a.log.
+  const first = shellCommandText(command).split('\n')[0]?.split(/\|\||&&|;|\|/)[0] ?? ''
+  const words = first.trim().split(/\s+/).slice(1)
+  const paths = words
+    .map((word) => word.replace(/^["']+|["',;]+$/g, ''))
+    .filter((word) => word.length > 1 && !word.startsWith('-') && /[./\\]/.test(word) && !/^\d+,\d+p?$/.test(word))
+  const last = paths.at(-1)?.split(/[\\/]/).filter((part) => part.length > 0).at(-1)
+  return last === undefined || last.length === 0 ? undefined : last
+}
+
+/** "Run the tests" -> "run the tests", keeping a word that is capitalised on its own (`README`). */
+function lowerFirst(text: string): string {
+  return /^[A-Z][a-z]/.test(text) ? `${text.charAt(0).toLowerCase()}${text.slice(1)}` : text
+}
+
+export function stepsLine(details: readonly ActivityDetail[], finished: boolean, workspacePath?: string): StepsLine {
+  const phrases = new Map<string, { count: number; names: string[] }>()
+  const note = (kind: string, name: string | undefined): void => {
+    const held = phrases.get(kind) ?? { count: 0, names: [] }
+    held.count += 1
+    if (name !== undefined && name.length > 0 && !held.names.includes(name)) held.names.push(name)
+    phrases.set(kind, held)
+  }
+  let failed = 0
+  let refused = 0
+  let declined = 0
+  let silent = 0
+  let thoughtMs = 0
+  let thoughts = 0
+  /*
+   * A file's own name, and only when what the runtime gave IS a path:
+   * Antigravity names its reads by the model's phrase ("Listing orb user
+   * session d..."), which is no file name.
+   */
+  const fileName = (path: string): string | undefined => {
+    const bare = relativePath(path, workspacePath).trim().replace(/^["']+|["']+$/g, '')
+    if (bare.length === 0 || /\s/.test(bare) && !/[\\/]/.test(bare)) return undefined
+    if (!/[./\\]/.test(bare)) return undefined
+    return bare.split(/[\\/]/).filter((part) => part.length > 0).at(-1)
+  }
+  for (const detail of details) {
+    if (detail.status === 'refused') { refused += 1; continue }
+    if (detail.status === 'declined') { declined += 1; continue }
+    if (finished && !detail.settled && detail.failed !== true) silent += 1
+    if (detail.kind === 'reasoning') {
+      thoughts += 1
+      thoughtMs += detail.durationMs ?? 0
+      continue
+    }
+    if (detail.kind === 'shell') {
+      if (detail.failed === true || (detail.exitCode !== undefined && detail.exitCode !== 0)) failed += 1
+      const looked = commandLooksAt(detail.name)
+      if (looked !== undefined) note(looked, looked === 'read' ? commandTarget(detail.name) : undefined)
+      else note('command', detail.title ?? commandHead(detail.name))
+      continue
+    }
+    if (detail.kind === 'helper') {
+      if (detail.failed === true) failed += 1
+      note('helper', detail.name)
+      continue
+    }
+    if (detail.kind === 'edit') {
+      if (detail.failed === true) { failed += 1; continue }
+      const entries = activityEntries([detail], workspacePath)
+      for (const entry of entries) {
+        if (entry.kind === 'file') note(entry.file.status === 'ADDED' ? 'created' : entry.file.status === 'DELETED' ? 'deleted' : 'edited', fileName(entry.file.path) ?? entry.file.path)
+        else if (entry.kind === 'unreported') note('edited', fileName(entry.name) ?? entry.name)
+      }
+      continue
+    }
+    if (detail.failed === true) failed += 1
+    const looked = toolLooksAt(detail.tool)
+    if (looked !== undefined) note(looked, looked === 'read' || looked === 'list' ? fileName(detail.name) : looked === 'search' && !/\s{2}|^[A-Z][a-z]+ing\b/.test(detail.name) ? detail.name : undefined)
+    else note('tool', detail.tool ?? detail.name)
+  }
+  const one = (held: { count: number; names: string[] }): string | undefined => (held.count === 1 ? held.names[0] : undefined)
+  const clip = (text: string, max = 48): string => (text.length > max ? `${text.slice(0, max - 1)}…` : text)
+  const times = (count: number, one: string, many: string): string => `${String(count)} ${count === 1 ? one : many}`
+  const words: string[] = []
+  for (const [kind, held] of phrases) {
+    const named = one(held)
+    switch (kind) {
+      case 'read': words.push(named !== undefined ? `read ${named}` : held.names.length > 1 ? `read ${pluralize(held.names.length, 'file')}` : held.count === 1 ? 'read a file' : `read ${pluralize(held.count, 'file')}`); break
+      case 'search': words.push(held.count === 1 ? (named !== undefined ? `searched for ${clip(named, 32)}` : 'searched the files') : `ran ${times(held.count, 'search', 'searches')}`); break
+      case 'wait': words.push(held.count === 1 ? 'waited for a command' : `waited ${String(held.count)} times`); break
+      case 'list': words.push(held.count === 1 ? (named !== undefined ? `listed ${named}` : 'listed a folder') : `listed ${pluralize(held.count, 'folder')}`); break
+      case 'web': words.push(held.count === 1 ? 'searched the web' : `searched the web ${String(held.count)} times`); break
+      case 'fetch': words.push(held.count === 1 ? 'fetched a page' : `fetched ${pluralize(held.count, 'page')}`); break
+      case 'plan': words.push('updated the plan'); break
+      case 'helper': words.push(held.count === 1 ? `asked a helper${named === undefined ? '' : `: ${clip(named)}`}` : `asked ${pluralize(held.count, 'helper')}`); break
+      case 'created':
+      case 'edited':
+      case 'deleted': words.push(held.names.length === 1 ? `${kind} ${held.names[0]!}` : `${kind} ${pluralize(Math.max(held.names.length, 1), 'file')}`); break
+      case 'tool': words.push(held.names.length === 1 ? (held.count === 1 ? `used ${held.names[0]!}` : `used ${held.names[0]!} ${String(held.count)} times`) : pluralize(held.count, 'other tool call')); break
+      case 'command': {
+        const titled = details.filter((detail) => detail.kind === 'shell' && commandLooksAt(detail.name) === undefined)
+        const only = titled.length === 1 ? titled[0] : undefined
+        words.push(held.count > 1 ? `ran ${pluralize(held.count, 'command')}` : only?.title !== undefined ? lowerFirst(only.title) : `ran ${clip(shellCommandText(only?.name ?? '').split('\n')[0]?.trim() ?? 'a command', 40)}`)
+        break
+      }
+    }
+  }
+  if (thoughts > 0) words.unshift(thoughtMs >= 1_000 ? `thought for ${durationText(thoughtMs)}` : 'thought')
+  /*
+   * ONE TITLED COMMAND THAT FAILED is said the way Claude Code says it:
+   * "Failed to add the effort chip". Its description is an instruction to
+   * itself, so the failure is the instruction not carried out.
+   */
+  const lone = details.length === 1 ? details[0] : undefined
+  const loneFailed = lone?.kind === 'shell' && lone.title !== undefined && failed === 1 && refused === 0 && declined === 0
+  const sentence = loneFailed
+    ? `Failed to ${lowerFirst(lone.title!)}`
+    : words.length === 0
+      ? pluralize(details.length, 'step')
+      : words.join(', ')
+  const segments: TraceSegment[] = [{ key: 'what', text: `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}`, ...(loneFailed ? { tone: 'amber' as const } : {}) }]
+  if (failed > 0 && !loneFailed) segments.push({ key: 'failed', text: `${String(failed)} failed`, tone: 'amber' })
+  if (silent > 0) segments.push({ key: 'silent', text: `${String(silent)} did not report`, tone: 'amber' })
+  if (refused > 0) segments.push({ key: 'refused', text: `${String(refused)} refused`, tone: 'amber' })
+  if (declined > 0) segments.push({ key: 'declined', text: `${String(declined)} declined`, tone: 'amber' })
+  return { segments }
+}
+
 export function activitySummary(details: readonly ActivityDetail[]): string {
   // Files, not edit calls: one Codex file_change can touch several files, and
   // "Edited 1 file" over a two-file change is the wrong number.
@@ -1745,9 +1905,7 @@ export function activitySummary(details: readonly ActivityDetail[]): string {
    * once too often.
    */
   const thinking = details.filter((detail) => detail.kind === 'reasoning').length
-  // What the teammate said between its steps is not a tool call either.
-  const said = details.filter((detail) => detail.kind === 'said').length
-  const other = details.length - edits - commands - helpers - thinking - said
+  const other = details.length - edits - commands - helpers - thinking
   const parts: string[] = []
   if (edits > 0) parts.push(`Edited ${pluralize(edits, 'file')}`)
   if (commands > 0) parts.push(`ran ${pluralize(commands, 'command')}`)
@@ -2305,73 +2463,6 @@ export function turnText(events: readonly NormalizedRuntimeEvent[]): string {
 /** A blank line between two things that were said separately. */
 const PARAGRAPH_GAP = String.fromCharCode(10, 10)
 
-/** A message the thread moves into the fold, and the row it goes before. */
-export interface Narration {
-  readonly itemId: string
-  /** An index into the fold's rows; the row count when it goes last. */
-  readonly beforeRow: number
-}
-
-/**
- * WHAT A TEAMMATE SAID WHILE IT WORKED goes where it said it.
- *
- * Yurt's beta report (#15): a free model's finished answer read "Creating
- * your HELLO file and lining up verification. File write is underway -- then
- * I'll print it back to confirm. DONE", under a fold that already showed the
- * file written and printed. The model said those lines BEFORE its tool calls,
- * as messages of their own (Muse Spark, walkthrough 06), and the thread drew
- * every message after the fold -- so narration of work still to come read as
- * if it came after the work. Claude Code keeps them in the order they
- * happened, between the tool calls.
- *
- * So a message said entirely before the last row the runtime drew goes into
- * the fold, before the first row that came after it began; what follows the
- * last row is the reply. Nothing said is lost -- Colin's rule since
- * 2026-09-13, "a turn is what was said, all of it, in order" -- it is put back
- * in its order. A finished turn's reply is never taken: when nothing was said
- * after the last row, the last thing said stays below the fold. Rows the host adds after
- * the run has ended (its look at the disk) do not count as the runtime's.
- *
- * `born` is the event each fold row came from, in row order; `candidates` the
- * messages that may move, in the order they were said.
- */
-export function narrationOf(
-  events: readonly NormalizedRuntimeEvent[],
-  born: readonly number[],
-  candidates: readonly string[]
-): readonly Narration[] {
-  const terminal = events.findIndex(
-    (event) => event.type === 'run.completed' || event.type === 'run.failed' || event.type === 'run.cancelled'
-  )
-  const end = terminal === -1 ? events.length : terminal
-  const lastRow = born.reduce((latest, at) => (at < end && at > latest ? at : latest), -1)
-  if (lastRow === -1) return []
-  const first = new Map<string, number>()
-  const last = new Map<string, number>()
-  events.forEach((event, index) => {
-    if (event.type !== 'message.delta') return
-    const itemId = event.payload.itemId
-    if (!first.has(itemId)) first.set(itemId, index)
-    last.set(itemId, index)
-  })
-  const said = candidates.filter((itemId) => (last.get(itemId) ?? Number.POSITIVE_INFINITY) < lastRow)
-  const reply = candidates.at(-1)
-  /*
-   * The reply is kept below only for a turn that FINISHED. One that failed,
-   * was stopped, or was interrupted (no end at all: Locust closed under it,
-   * as the routine runner reads it) has no reply -- its last words were said
-   * before its last step ("Let me check..." on a recovered routine run, B15),
-   * and drawn below the fold they read as the answer.
-   */
-  const finished = terminal !== -1 && events[terminal]?.type === 'run.completed'
-  const moving = finished && said.length === candidates.length && reply !== undefined ? said.filter((itemId) => itemId !== reply) : said
-  return moving.map((itemId) => {
-    const began = first.get(itemId) ?? 0
-    const row = born.findIndex((at) => at > began)
-    return { itemId, beforeRow: row === -1 ? born.length : row }
-  })
-}
-
 export interface MissionThreadOptions {
   /** While a run is live the last message shows a streaming caret. */
   readonly running: boolean
@@ -2519,7 +2610,7 @@ export function buildThread(
   /**
    * The event each row of `activity` came from, kept in step with it, so
    * what the teammate SAID between its steps can be put back among them
-   * (see `narrationOf`). A row replaced in place keeps its origin; a row
+   * (see the walk at the end). A row replaced in place keeps its origin; a row
    * removed takes its entry with it.
    */
   const activityBorn: number[] = []
@@ -3024,79 +3115,58 @@ export function buildThread(
   const shownText = (text: string): string =>
     unwrapProtocolTags(stripFileBlocks(stripMemoryBlocks(stripTaskBlocks(stripDecisionBlocks(stripShareBlocks(text))))))
   const messages = assistantMessages(events)
-  // Only a finished turn: see `narrationOf`. A message that handed over
-  // files keeps its place, with the files drawn under it.
-  const narration = options.running || activity.length === 0
-    ? []
-    : narrationOf(
-        events,
-        activityBorn,
-        messages
-          .filter((message) => shownText(message.text).length > 0 && parseFileBlocks(message.text).length === 0)
-          .map((message) => message.itemId)
-      )
-  const narrated = new Set(narration.map((said) => said.itemId))
-  const saidRow = (itemId: string): ActivityDetail => ({
-    kind: 'said',
-    name: 'said',
-    settled: true,
-    output: shownText(messages.find((message) => message.itemId === itemId)?.text ?? '')
+
+  /*
+   * A TURN IS DRAWN IN THE ORDER IT HAPPENED (0.491): what the teammate said,
+   * then the steps it took before it next said anything, as one line, then
+   * what it said next -- Claude Code's turn. Colin, 2026-09-30: "compared to
+   * claude code, ALL of our commands and stuff that would appear batched on
+   * screen seem to all get rolled into the bar".
+   *
+   * It was one fold above everything said: closed while the turn ran, so a
+   * forty-step run read as one bar of counts with its narration stacked
+   * under it, cut off from the steps it came between; then the narration
+   * moved into the fold as grey rows when the turn ended. Now nothing moves.
+   * A message stands where it BEGAN, which is also where Claude Code's
+   * narration belongs: its full record restates a message after the tool
+   * call that followed it, and placing by the last word put narration said
+   * before the last step under it (DISPLAY-COVERAGE gap 9).
+   *
+   * Rows the host adds after the run has ended (its look at the disk) are no
+   * step the runtime took: they are in the turn's files at its foot.
+   */
+  const terminalAt = events.findIndex(
+    (event) => event.type === 'run.completed' || event.type === 'run.failed' || event.type === 'run.cancelled'
+  )
+  const endAt = terminalAt === -1 ? events.length : terminalAt
+  const beganAt = new Map<string, number>()
+  events.forEach((event, index) => {
+    if (event.type === 'message.delta' && !beganAt.has(event.payload.itemId)) beganAt.set(event.payload.itemId, index)
   })
-  const fold: readonly ActivityDetail[] = narration.length === 0
-    ? activity
-    : [
-        ...activity.flatMap((row, index) => [
-          ...narration.filter((said) => said.beforeRow === index).map((said) => saidRow(said.itemId)),
-          row
-        ]),
-        ...narration.filter((said) => said.beforeRow >= activity.length).map((said) => saidRow(said.itemId))
-      ]
-
-  if (activity.length > 0) {
-    items.push({
-      key: 'activity',
-      type: 'activity',
-      summary: activitySummary(fold),
-      trace: activityTrace(
-        fold,
-        events,
-        traceOutcome(events, options.running),
-        planSteps,
-        options.mayEdit,
-        options.workspacePath
-      ),
-      finished: !options.running,
-      /*
-       * ANY finished turn keeps its work on screen, not only the newest.
-       *
-       * It used to be the newest alone, so that a long conversation was not a
-       * wall of tool rows. The cost of that turned out to be worse than the
-       * wall: `ActivityCard` remounts when a turn stops being the current one
-       * -- proven, because a fold opened BY HAND survives a later message and
-       * a defaulted one does not -- so sending a follow-up took a fold the
-       * person was reading and closed it. Measured in
-       * `docs/user-session/2026-09-08T14-07-32-earlier-turn-work`: six rows on
-       * screen, then `expanded: false, rowsVisible: 0`, with nothing pressed.
-       *
-       * Colin, 2026-09-08: "the thoughts and tool calls disappear after an
-       * agent is done ... we want that to stay so they can see after the fact
-       * or if they missed it." This is also what Claude Code does -- a
-       * transcript keeps its tool calls, they do not fold away behind you --
-       * and his standing rule is to match it where we have no better reason.
-       *
-       * Closing one still sticks, because a press is remembered where a
-       * default is not.
-       */
-      ...(options.running ? {} : { openByDefault: true }),
-      details: fold,
-      ...(foldNotices.length === 0 ? {} : { notices: foldNotices }),
-      reportedBy: events.find((event) => event.type.startsWith('tool.'))?.sourceAdapter
-    })
+  type Piece = { readonly at: number; readonly row: number } | { readonly at: number; readonly message: (typeof messages)[number] }
+  const pieces: Piece[] = [
+    ...activity.flatMap((_, row): Piece[] => {
+      const at = activityBorn[row] ?? endAt
+      return at < endAt ? [{ at, row }] : []
+    }),
+    ...messages.map((message): Piece => ({ at: beganAt.get(message.itemId) ?? endAt, message }))
+  ].sort((a, b) => a.at - b.at)
+  let group: number[] = []
+  const flush = (): void => {
+    if (group.length === 0) return
+    const rows = group.map((row) => activity[row]!)
+    // A step still going is the live line's, until it ends.
+    const shown = options.running ? rows.filter((detail) => detail.settled) : rows
+    // Keyed by where the group began, so it keeps its place and its state as it grows.
+    if (shown.length > 0) items.push({ key: `steps_${String(activityBorn[group[0]!] ?? 0)}`, type: 'steps', details: shown, finished: !options.running })
+    group = []
   }
-
-  for (const message of messages) {
-    // Said while the work went on: it is in the fold, where it was said.
-    if (narrated.has(message.itemId)) continue
+  for (const piece of pieces) {
+    if ('row' in piece) {
+      group.push(piece.row)
+      continue
+    }
+    const message = piece.message
     // A share block is shown in the peer card, attributed and labelled; left
     // in the bubble it would present the same claim twice, once unlabelled.
     //
@@ -3116,11 +3186,15 @@ export function buildThread(
      * file is already on disk and the card is a pointer to it.
      *
      * A reply may be nothing but a block -- "here you go" is often said in
-     * the note -- so the files item is pushed even when the text is empty,
-     * which is why this sits ahead of the `continue` below rather than after
-     * the message item.
+     * the note -- so the files item is pushed even when the text is empty.
+     * Not while the message is still arriving: half a block is not a file,
+     * and a button appearing and vanishing mid-stream is worse than a late one.
      */
     const handed = parseFileBlocks(message.text)
+    const handedNow = handed.length > 0 && (message.final || !options.running)
+    // Nothing on screen: it does not split the steps around it.
+    if (text.length === 0 && !handedNow) continue
+    flush()
     if (text.length > 0) {
       items.push({
         key: `msg_${message.itemId}`,
@@ -3131,11 +3205,34 @@ export function buildThread(
         streaming: options.running && !message.final
       })
     }
-    // Not while the message is still arriving: half a block is not a file,
-    // and a button appearing and vanishing mid-stream is worse than a late one.
-    if (handed.length > 0 && (message.final || !options.running)) {
-      items.push({ key: `files_${message.itemId}`, type: 'files', files: handed })
-    }
+    if (handedNow) items.push({ key: `files_${message.itemId}`, type: 'files', files: handed })
+  }
+  flush()
+
+  /*
+   * THE TURN'S FOOT: what it came to, once it has ended -- its files, and the
+   * line of totals that used to head the fold (duration, commands, what went
+   * wrong). The same rows as every group above, all of them, which is what
+   * the review, the viewer's history and the artifacts list read.
+   */
+  if (activity.length > 0) {
+    items.push({
+      key: 'activity',
+      type: 'activity',
+      summary: activitySummary(activity),
+      trace: activityTrace(
+        activity,
+        events,
+        traceOutcome(events, options.running),
+        planSteps,
+        options.mayEdit,
+        options.workspacePath
+      ),
+      finished: !options.running,
+      details: activity,
+      ...(foldNotices.length === 0 ? {} : { notices: foldNotices }),
+      reportedBy: events.find((event) => event.type.startsWith('tool.'))?.sourceAdapter
+    })
   }
 
   if (options.running) {
@@ -3311,7 +3408,7 @@ export function buildThread(
     // that reached nobody is still a turn that told nobody anything.
     const saidSomething =
       options.spokeToPeers === true
-      || items.some((item) => item.type === 'agent-message' || item.type === 'activity' || item.type === 'plan' || item.type === 'files' || item.type === 'decision')
+      || items.some((item) => item.type === 'agent-message' || item.type === 'activity' || item.type === 'steps' || item.type === 'plan' || item.type === 'files' || item.type === 'decision')
       || events.some((event) => event.type === 'message.delta' && event.payload.text.replace(/<locust-share[^>]*>[^]*?<\/locust-share>/g, '').trim().length > 0)
       // A summarized conversation is what `/compact` answers with (0.426).
       || events.some((event) => event.type === 'adapter.diagnostic' && /\.context_compacted$/.test(event.payload.code))

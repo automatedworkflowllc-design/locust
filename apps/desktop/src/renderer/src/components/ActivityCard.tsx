@@ -26,7 +26,7 @@ import { DiffView } from './DiffView.js'
 import { DocPreview, isNewDocument } from './DocPreview.js'
 import { InComparisonCell, PinnedPagesContext } from '../pinnedPages.js'
 import { Icon } from './Icon.js'
-import { AgentText, PlanSteps } from './ThreadItems.js'
+import { PlanSteps } from './ThreadItems.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 
 /**
@@ -161,8 +161,18 @@ export function ActivityCard({
   notices = [],
   onOpenFile,
   planUnderway = false,
-  openByDefault = false
+  openByDefault = false,
+  variant = 'card'
 }: {
+  /**
+   * `steps`: one group of a turn's steps, drawn as Claude Code draws one --
+   * a plain line saying what was done, opening onto the steps (0.491). The
+   * `trace` is that line (`stepsLine`). No box, no cap, nothing open inside
+   * until asked. `card`: the boxed fold. `files`: the box as a finished
+   * turn's files use it, every file closed until pressed, as Claude Code
+   * closes a turn with "Edited 2 files".
+   */
+  readonly variant?: 'card' | 'steps' | 'files'
   /** Whether the turn is still running, so the plan's step gets its orb. */
   readonly planUnderway?: boolean
   readonly summary: string
@@ -267,7 +277,8 @@ export function ActivityCard({
   // A page shown running above, in a comparison's cell, stays folded here (0.450).
   const pinned = useContext(PinnedPagesContext)
   const inComparison = useContext(InComparisonCell)
-  const firstOpen = defaultOpenEntry(entries)
+  const steps = variant === 'steps'
+  const firstOpen = variant === 'card' ? defaultOpenEntry(entries) : undefined
   const initiallyOpen = entries.some((entry) => entry.key === firstOpen && entry.kind === 'file' && pinned.has(entry.file.path)) ? undefined : firstOpen
   const isOpen = (entry: ActivityEntry): boolean => toggled.get(entry.key) ?? entry.key === initiallyOpen
   const decide = (next: boolean): void => {
@@ -292,11 +303,31 @@ export function ActivityCard({
    * that is the work happening.
    */
   const [showAll, setShowAll] = useState(false)
-  const capped = finished && !showAll && entries.length > FOLD_ROWS_SHOWN + 2
+  const capped = !steps && finished && !showAll && entries.length > FOLD_ROWS_SHOWN + 2
   const shown = capped ? entries.slice(0, FOLD_ROWS_SHOWN) : entries
 
   return (
-    <div className="lc-card">
+    <div className={steps ? 'lc-steps' : 'lc-card'}>
+      {steps ? (
+        <button type="button" className="lc-steps__line" onClick={() => decide(!open)} aria-expanded={open}>
+          {/* The words may be cut to fit; what went wrong never is. */}
+          <span className={`lc-steps__text${trace?.[0]?.tone === undefined ? '' : ` is-${trace[0].tone}`}`}>{trace?.[0]?.text ?? summary}</span>
+          {(trace ?? []).slice(1).map((seg) => (
+            <span className={`lc-steps__extra${seg.tone === undefined ? '' : ` is-${seg.tone}`}`} key={seg.key}>
+              {seg.text}
+            </span>
+          ))}
+          {anyPatch && !inComparison && (
+            <span className="lc-steps__counts lc-mono">
+              <span className="lc-diff__addmark">+{counts.added}</span>
+              <span className="lc-diff__delmark">−{counts.removed}</span>
+            </span>
+          )}
+          <span className="lc-steps__chev" aria-hidden="true">
+            <Icon name={open ? 'chevron-down' : 'chevron-right'} size={12} />
+          </span>
+        </button>
+      ) : (
       <button type="button" className="lc-activity" onClick={() => decide(!open)} aria-expanded={open}>
         <Icon name="diff" size={14} />
         {trace === undefined || trace.length === 0 ? (
@@ -320,8 +351,9 @@ export function ActivityCard({
           <Icon name={open ? 'chevron-down' : 'chevron-right'} size={12} />
         </span>
       </button>
+      )}
       {open && (
-        <div className="lc-activity__list">
+        <div className={steps ? 'lc-steps__list' : 'lc-activity__list'}>
           {plan !== undefined && (
             <div className="lc-activity__plan">
               {/* The same component the thread uses for a Plan-mode answer,
@@ -543,24 +575,6 @@ export function ActivityCard({
                     )}
                   </>
                 )
-              ) : entry.kind === 'said' ? (
-                /*
-                 * What the teammate said between its steps, where it said
-                 * it (missionView's `narrationOf`, Yurt's #15): "File write
-                 * is underway" read as stale under the finished work. In
-                 * the teammate's own voice, the reply's face, and quieter
-                 * than the reply -- it is the running commentary, not the
-                 * answer. Not a tool: no verb, no outcome.
-                 */
-                <div className="lc-filerow is-static lc-filerow--said">
-                  <Icon name="message" size={14} />
-                  {/* The reply's own renderer (0.421): this drew inline code
-                      only, so a note with a fenced block showed its
-                      ```javascript fences as text (fresh-eyes area 23). */}
-                  <div className="lc-filerow__said">
-                    <AgentText text={entry.text} streaming={false} />
-                  </div>
-                </div>
               ) : entry.kind === 'thought' ? (
                 /*
                  * What the model thought, in the fold with the rest of the
