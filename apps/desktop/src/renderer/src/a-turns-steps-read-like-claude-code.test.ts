@@ -77,6 +77,12 @@ describe('a group of steps, in one line', () => {
     // Short enough to read: the command itself.
     expect(line([shell('node -e "console.log(6*7)"')])).toBe('Ran node -e "console.log(6*7)"')
     expect(line([shell('rg C:\\Users\\me\\AppData\\Local\\Temp\\run -n')])).toBe('Searched run')
+    // Codex's JavaScript tool (Colin's frame, 2026-09-30: "used node_repl.js").
+    expect(line([tool('node_repl', 'node_repl.js'), tool('node_repl', 'node_repl.js')])).toBe('Ran JavaScript 2 times')
+    expect(line([tool('python_repl', 'x')])).toBe('Ran Python')
+    // Finding files by name lists them (Sol, 0.491: "Searched for **/*").
+    expect(line([tool('glob', '**/*')])).toBe('Listed every file')
+    expect(line([tool('Glob', 'src/**/*.ts')])).toBe('Listed files matching src/**/*.ts')
     // One command reading two files read two files.
     expect(line([shell('cat README.md LOCUST.md')])).toBe('Read 2 files')
     // A thought alone, with words and no headline (Cursor), says what it was about.

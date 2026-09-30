@@ -3668,7 +3668,8 @@ if (!ownsSingleInstanceLock) {
         const compare = await compares.get(place.compareId).catch(() => undefined)
         if (compare !== undefined) {
           const name = compareTreeId(compare.compareId, place.slot as CompareSlotId)
-          const copy = compare.changesIn === 'copy' ? join(COPY_ROOT, name) : join(workspacePath, COMPARE_TREES_DIRECTORY, name)
+          // Both kinds of column live under ~/.locust/compare (0.493); an older git column, under the folder.
+          const copy = compare.changesIn === 'copy' || await stat(join(COPY_ROOT, name)).then(() => true, () => false) ? join(COPY_ROOT, name) : join(workspacePath, COMPARE_TREES_DIRECTORY, name)
           const inCopy = join(copy, requested)
           if (await stat(inCopy).then((found) => found.isFile(), () => false)) return pages.urlFor(inCopy)
         }
@@ -4375,7 +4376,16 @@ if (!ownsSingleInstanceLock) {
      * never among the teammates' own branches. Keep this one puts the kept
      * copy's changes into the folder, uncommitted; every copy is then removed.
      */
-    const compareTrees = () => createWorktreeManager({ workspacePath, directory: COMPARE_TREES_DIRECTORY })
+    /*
+     * OUTSIDE THE FOLDER (0.493). The columns' worktrees were made under
+     * `<folder>/.locust/compare/`, so a column's own path named the real
+     * project around it -- and a free model in Auto, told to "work only in
+     * this folder", edited the project it could see above instead of its own
+     * copy (Sol's 0.491 pass: the original `index.html` changed before anything
+     * was kept, and Keep then refused). Beside the plain copies, where no
+     * path leads back.
+     */
+    const compareTrees = () => createWorktreeManager({ workspacePath, directory: COPY_ROOT })
     const discardCompareTrees = async (compare: PublicCompare): Promise<void> => {
       if (compare.changes !== true || compare.changesIn === 'copy') return
       for (const column of compare.slots) await compareTrees().discard(compareTreeId(compare.compareId, column.slot)).catch(() => undefined)

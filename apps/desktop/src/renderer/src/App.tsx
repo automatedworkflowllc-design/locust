@@ -168,7 +168,7 @@ import { splitAttachments, withAttachments } from '../../shared/attachments.js'
 // Only `heldFor`: this file has its own `ownerOf` for live runs, which is a
 // different question from who owns a recorded mission.
 import { heldFor, routineOf } from './conversationList.js'
-import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeRunsOn, modesFor, modeUnavailableReason, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, nextFreeModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
+import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeFacts, modeRunsOn, modesFor, modeUnavailableReason, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, nextFreeModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
 import { homeRouteOf, isOwnRoute, modelDisplayName, rememberOwnModels, routeChrome, routeModelName } from './routeName.js'
 import { FeedbackDialog } from './components/FeedbackDialog.js'
 import { conversationText } from './feedback.js'
@@ -1532,6 +1532,9 @@ export default function App(): ReactElement {
     readonly schedule?: RoutineSchedule
     /** Who takes each step (0.435), when a saved routine is edited. */
     readonly handOffs?: readonly RoutineHandOff[]
+    /** A saved routine's own mode, and whether a run of it is going (0.493). */
+    readonly savedMode?: MissionMode
+    readonly running?: boolean
     readonly busy: boolean
     readonly error?: string
   }>()
@@ -3534,13 +3537,19 @@ export default function App(): ReactElement {
           // Changes run in Auto where the runtime can (0.451): each column is in its own copy.
           routes: comparePicks.map((pick) => {
             // A column's own effort (0.490), turned into what the runtime takes: Cursor's is in the id.
-            const started = startRoute(models, pick.runtime, pick.model, pick.effort)
+            // The level its chip SHOWED (0.493): the one chosen, else the one its id names, else the
+            // model's default. Sol's 0.491 pass: Medium, a default, went unnamed beside a chosen High.
+            const family = modelFamily(models, pick.runtime, pick.model)
+            const levels = family?.supportedEfforts ?? []
+            const idLevel = Object.entries(family?.variants ?? {}).find(([, id]) => id === pick.model)?.[0]
+            const level = levels.length === 0 ? undefined : pick.effort ?? idLevel ?? defaultEffort(levels, family?.defaultEffort)
+            const started = startRoute(models, pick.runtime, pick.model, level)
             return {
               runtime: pick.runtime,
               model: started.model,
               ...(started.effort === undefined ? {} : { effort: started.effort }),
-              // The column is named with its level when one was chosen, so two levels of one model read apart.
-              label: pick.effort === undefined ? pick.label : `${pick.label} · ${effortName(pick.effort)}`,
+              // Every column is named with its level, so two levels of one model read apart.
+              label: level === undefined ? pick.label : `${pick.label} · ${effortName(level)}`,
               ...(compareChanges && modeRunsOn('auto', pick.runtime, build?.platform) ? { mode: 'auto' as const } : {})
             }
           }),
@@ -4661,6 +4670,8 @@ export default function App(): ReactElement {
       truncated: false,
       ...(routine.schedule === undefined ? {} : { schedule: routine.schedule }),
       ...(routine.handOffs === undefined ? {} : { handOffs: routine.handOffs }),
+      savedMode: routine.route.mode,
+      running: routine.execution?.status === 'running' || routine.execution?.status === 'dispatching',
       busy: false
     })
   }
@@ -7886,9 +7897,21 @@ export default function App(): ReactElement {
           team={teammates}
           {...(routineDialog.handOffs === undefined ? {} : { initialHandOffs: routineDialog.handOffs })}
           truncated={routineDialog.truncated}
+          editing={routineDialog.routineId !== undefined}
+          running={routineDialog.running === true}
+          {...(() => {
+            const mode = routineDialog.savedMode ?? routineDialog.route?.mode
+            return mode === undefined ? {} : { modeName: modeFacts(mode).name }
+          })()}
           routeLabel={
             routineDialog.route === undefined
-              ? undefined
+              ? (() => {
+                  // A saved routine runs on its teammate's route NOW (0.493): say that one.
+                  const now = teammates.find((entry) => entry.teammateId === routineDialog.teammateId)?.route
+                  return now === undefined || routineDialog.routineId === undefined
+                    ? undefined
+                    : routeChrome(now.runtime, now.model, now.model === 'account-default' ? 'default' : modelDisplayName(now.runtime, now.model))
+                })()
               : // The composer's spelling, as a room answer has it -- not the raw
                 // id: "OpenCode / opencode/nemotron-3-ultra-free" (0.417).
                 routeChrome(

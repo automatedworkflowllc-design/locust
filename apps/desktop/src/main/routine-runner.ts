@@ -348,7 +348,18 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
      * host can run.
      */
     const owner = ownerOf(routine, step)
-    const route = owner === routine.teammateId ? routine.route : await options.routeOf?.(owner).catch(() => undefined)
+    /*
+     * THE ROUTINE'S OWN TEAMMATE ON THEIR ROUTE NOW (0.493), as every other
+     * step's teammate already was. Colin, 2026-09-30: Robin's routine ran Grok
+     * 4.6 "even tho robin is assigned to 4.7, prob because 4.6 was assigned
+     * when i made the routine". Runtime, model and effort are the teammate's
+     * current ones; the MODE stays the one it was saved with -- a routine
+     * saved read-only stays read-only, whatever the teammate is set to later.
+     */
+    const current = owner === routine.teammateId ? await options.routeOf?.(owner).catch(() => undefined) : undefined
+    const route = owner === routine.teammateId
+      ? current === undefined ? routine.route : { ...current, mode: routine.route.mode }
+      : await options.routeOf?.(owner).catch(() => undefined)
     if (route === undefined || !canStartRoutine(route.runtime)) {
       const message = route === undefined
         ? `Step ${String(step)} goes to ${peer.self.name}, whose route could not be read. Nothing was started.`
@@ -601,14 +612,20 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
         notice(progress, `Routine "${progress.name}" finished: ${String(progress.of)} step${progress.of === 1 ? '' : 's'} completed${approval}.`, 'info')
         return
       }
-      // The routine may have been edited or removed while it ran; the steps
-      // that run are the ones on file NOW, so a correction lands next time.
+      /*
+       * A RUN KEEPS THE STEPS IT STARTED WITH (0.493). This read the routine
+       * as it stood NOW, so an edit made while a run was going changed steps
+       * that had not started: Grok's 0.489 pass loosened a checker mid-run and
+       * the run ended "APPROVED" on the new wording, with nothing saying so.
+       * The attempt saved its plan when it began, as recovery already uses;
+       * an edit applies from the next run, and the edit dialog says so.
+       */
       const current = await options.routines.get(progress.routineId)
-      const recoveredPlan = (held: PublicRoutine): PublicRoutine => {
+      const startedPlan = (held: PublicRoutine): PublicRoutine => {
         const { handOffs: _now, ...base } = held
         return { ...base, steps: execution.steps, route: execution.route, ...(execution.handOffs === undefined ? {} : { handOffs: execution.handOffs }) }
       }
-      const routine = current === undefined ? undefined : execution.recovered === true ? recoveredPlan(current) : current
+      const routine = current === undefined ? undefined : startedPlan(current)
       const next = progress.step + 1
       const owner = routine === undefined ? undefined : ownerOf(routine, next)
       /*

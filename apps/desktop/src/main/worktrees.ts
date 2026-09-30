@@ -497,7 +497,7 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
 
     async ensure(teammate) {
       const directory = safeTeammateDirectory(teammate.teammateId)
-      const path = join(root, trees, directory)
+      const path = resolve(root, trees, directory)
       // Already a worktree here (a worktree's .git is a file) -- but only one
       // git FINISHED making is used as it is (code review B4, main-stores 3).
       let made = false
@@ -518,7 +518,7 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
       }
       const ready = await probe()
       if (!ready.repository) throw new Error(ready.reason ?? 'Own branches are not available in this folder.')
-      await mkdir(join(root, trees), { recursive: true })
+      await mkdir(resolve(root, trees), { recursive: true })
       await excludeLocustDirectory()
       // M17: a name another teammate's tree already has checked out gets
       // this teammate's id on the end, rather than git's refusal.
@@ -556,7 +556,7 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
 
     async remove(teammateId, options = {}) {
       const directory = safeTeammateDirectory(teammateId)
-      const path = join(root, trees, directory)
+      const path = resolve(root, trees, directory)
       const changes = changedPathsOf(await runGit(['status', '--porcelain', '--untracked-files=all'], path))
       if (changes.length === 0) {
         // Clean: git's own remove, which refuses anything it would lose.
@@ -710,7 +710,7 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
     },
 
     async discard(teammateId) {
-      const path = join(root, trees, safeTeammateDirectory(teammateId))
+      const path = resolve(root, trees, safeTeammateDirectory(teammateId))
       const branch = await runGit(['symbolic-ref', '--short', '-q', 'HEAD'], path).then((out) => out.trim(), () => '')
       await runGit(['worktree', 'remove', '--force', path], root).catch(async () => {
         // Not a tree git knows (half-made, or already gone): its folder, then git's own record.
@@ -766,7 +766,7 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
 
   /** A teammate's tree that git finished making, or a refusal that says so. */
   async function madeTree(teammateId: string): Promise<string> {
-    const path = join(root, trees, safeTeammateDirectory(teammateId))
+    const path = resolve(root, trees, safeTeammateDirectory(teammateId))
     const made = await stat(join(path, '.git')).then((found) => found.isFile()).catch(() => false)
     if (!made) throw new Error('This teammate has no own branch in this folder.')
     // A half-made tree reads every file as deleted: committing it would delete the project on its branch.

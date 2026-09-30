@@ -224,7 +224,7 @@ export function AutomationsScreen({
                         because a separator has a size and a colour like any
                         other text. */}
                     {/* A hand-off chain names every teammate in step order (0.435). */}
-                    {routineChain(routine, teammates) ?? owner?.name ?? 'teammate removed'}
+                    {owner === undefined && routine.handOffs === undefined ? 'teammate removed' : routineChain(routine, teammates, true)}
                     {' · '}
                     {/* The step count comes from `routineRunSummary`, which
                         opens with it. Naming it here as well is why every card

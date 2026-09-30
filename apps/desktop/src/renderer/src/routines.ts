@@ -1,7 +1,10 @@
 import type { PublicRecoveredMission, PublicRoutine } from '../../shared/ipc.js'
+import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { splitAttachments } from '../../shared/attachments.js'
 import { nextRunAfter, scheduleLabel } from '../../shared/routine-schedule.js'
 import { conversationTurns, typedPrompt } from './missionView.js'
+import { routeModelName } from './routeName.js'
+import { runtimeDisplayName } from '../../shared/runtimes.js'
 
 /**
  * Turning a finished conversation into a routine a teammate can replay.
@@ -118,11 +121,20 @@ export function routineStepPhrase(
  */
 export function routineChain(
   routine: Pick<PublicRoutine, 'teammateId' | 'handOffs' | 'steps'>,
-  team: readonly { readonly teammateId: string; readonly name: string }[]
+  team: readonly { readonly teammateId: string; readonly name: string; readonly route?: { readonly runtime: string; readonly model: string } }[],
+  /**
+   * Each teammate with the model their steps run on (0.493): a step runs on
+   * its teammate's route at the time, and Grok's 0.489 pass could not tell
+   * which model a routine would use from its card.
+   */
+  withModels = false
 ): string | undefined {
   const handOffs = routine.handOffs
-  if (handOffs === undefined || !handOffs.some((entry) => entry.teammateId !== undefined || entry.check === true)) return undefined
-  const nameOf = (id: string): string => team.find((teammate) => teammate.teammateId === id)?.name ?? 'someone removed'
+  if (handOffs === undefined || !handOffs.some((entry) => entry.teammateId !== undefined || entry.check === true)) {
+    if (!withModels) return undefined
+    return routineRunner(routine.teammateId, team)
+  }
+  const nameOf = (id: string): string => (withModels ? routineRunner(id, team) : team.find((teammate) => teammate.teammateId === id)?.name ?? 'someone removed')
   const links: string[] = []
   let last: string | undefined
   routine.steps.forEach((_, index) => {
@@ -133,6 +145,17 @@ export function routineChain(
     last = owner
   })
   return links.join(' → ')
+}
+
+/** A teammate and the model their routine steps run on now: "Wren (Grok 4.7)". */
+export function routineRunner(
+  teammateId: string,
+  team: readonly { readonly teammateId: string; readonly name: string; readonly route?: { readonly runtime: string; readonly model: string } }[]
+): string {
+  const teammate = team.find((entry) => entry.teammateId === teammateId)
+  if (teammate === undefined) return 'someone removed'
+  const route = teammate.route
+  return route === undefined ? teammate.name : `${teammate.name} (${route.model === 'account-default' ? `${runtimeDisplayName(route.runtime as MissionRuntimeId)} default` : routeModelName(route.runtime, route.model)})`
 }
 
 /**

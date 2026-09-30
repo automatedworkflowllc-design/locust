@@ -352,7 +352,17 @@ export function ActivityCard({
         </span>
       </button>
       )}
-      {open && (
+      {/*
+        * A LINE THAT IS ONE THOUGHT opens straight onto its words (0.493), as
+        * Claude Code's thinking does. It opened onto a row repeating the line
+        * ("Thought for 7s · Considering fallback options"), which opened in
+        * turn onto the headline a third time (Colin's frame, 2026-09-30).
+        */}
+      {open && steps && entries.length === 1 && entries[0]?.kind === 'thought' && entries[0].text.trim().length > 0 ? (
+        <div className="lc-steps__list lc-steps__thought">
+          <AgentText text={withoutHeadline(entries[0].text)} streaming={false} />
+        </div>
+      ) : open && (
         <div className={steps ? 'lc-steps__list' : 'lc-activity__list'}>
           {plan !== undefined && (
             <div className="lc-activity__plan">
@@ -784,6 +794,11 @@ export function ActivityCard({
  * app claiming a report nobody had made. It works in the background, saying
  * what it is doing, until the runtime says it came back.
  */
+/** A thought's words without the headline its line already shows (0.493). */
+export function withoutHeadline(text: string): string {
+  return thoughtHeadline(text) === undefined ? text : text.replace(/^\s*\*\*[^*\n]{2,80}\*\*\s*/, '')
+}
+
 export function helperResult(entry: Extract<ActivityEntry, { kind: 'helper' }>, finished: boolean): string {
   if (!entry.settled) return finished ? 'did not report' : 'working on it'
   if (entry.failed) return 'failed'

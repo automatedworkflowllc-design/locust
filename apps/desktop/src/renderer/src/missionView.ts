@@ -1736,7 +1736,7 @@ export interface StepsLine {
   readonly segments: readonly TraceSegment[]
 }
 
-type Looked = 'read' | 'search' | 'list' | 'web' | 'fetch' | 'plan' | 'wait'
+type Looked = 'read' | 'search' | 'list' | 'web' | 'fetch' | 'plan' | 'wait' | 'glob' | 'code'
 
 /**
  * What a command only LOOKS at, from its first word: the Codex app's
@@ -1757,9 +1757,13 @@ function toolLooksAt(tool: string | undefined): Looked | undefined {
   if (/web_?search|search_?web/.test(name)) return 'web'
   if (/fetch|read_?url|url_?content|browser/.test(name)) return 'fetch'
   if (/todo|update_?plan|manage_?task|task_?boundary/.test(name)) return 'plan'
+  // Code run in a runtime's own interpreter tool: Codex's `node_repl` (0.493).
+  if (/repl/.test(name)) return 'code'
   // Cursor's wait on a command it sent away.
   if (/^(await|wait|await_?shell)$/.test(name)) return 'wait'
   if (/^(ls|list|list_?dir|list_?directory|listdir|dir)$/.test(name)) return 'list'
+  // Finding files by name is listing them, not searching their text (Sol, 0.491: "Searched for **/*").
+  if (/^glob$|glob_?tool|find_?by_?name|file_?search/.test(name)) return 'glob'
   if (/grep|glob|search|find|codebase|semsearch|ripgrep/.test(name)) return 'search'
   if (/^(read|read_?file|readfile|view|view_?file|open_?file|notebook_?read|cat|readtoolcall)$/.test(name)) return 'read'
   return undefined
@@ -1883,7 +1887,7 @@ export function stepsLine(details: readonly ActivityDetail[], finished: boolean,
     const looked = toolLooksAt(detail.tool)
     // A search tool may name its pattern or the folder it searched (Cursor's grep names the folder).
     const searchedIn = looked === 'search' && /[\\/]/.test(detail.name) ? fileName(detail.name) : undefined
-    if (looked !== undefined) note(searchedIn !== undefined ? 'searchedIn' : looked, looked === 'read' || looked === 'list' ? fileName(detail.name) : searchedIn ?? (looked === 'search' && !/\s{2}|^[A-Z][a-z]+ing\b/.test(detail.name) ? detail.name : undefined))
+    if (looked !== undefined) note(searchedIn !== undefined ? 'searchedIn' : looked, looked === 'read' || looked === 'list' ? fileName(detail.name) : looked === 'glob' ? detail.name : looked === 'code' ? detail.tool ?? detail.name : searchedIn ?? (looked === 'search' && !/\s{2}|^[A-Z][a-z]+ing\b/.test(detail.name) ? detail.name : undefined))
     else note('tool', detail.tool ?? detail.name)
   }
   const one = (held: { count: number; names: string[] }): string | undefined => (held.count === 1 ? held.names[0] : undefined)
@@ -1895,6 +1899,12 @@ export function stepsLine(details: readonly ActivityDetail[], finished: boolean,
     switch (kind) {
       case 'read': words.push(named !== undefined ? `read ${named}` : held.names.length > 1 ? `read ${pluralize(held.names.length, 'file')}` : held.count === 1 ? 'read a file' : `read ${pluralize(held.count, 'file')}`); break
       case 'search': words.push(held.count === 1 ? (named !== undefined ? `searched for ${clip(named, 32)}` : 'searched the files') : `ran ${times(held.count, 'search', 'searches')}`); break
+      case 'code': {
+        const language = held.names.every((name) => /node|js/i.test(name)) ? 'JavaScript' : /python|py/i.test(held.names.join(' ')) ? 'Python' : 'code'
+        words.push(held.count === 1 ? `ran ${language}` : `ran ${language} ${String(held.count)} times`)
+        break
+      }
+      case 'glob': words.push(held.count > 1 ? `listed files ${String(held.count)} times` : named === undefined || /^(\*\*[\\/])?\*(\.\*)?$/.test(named) ? 'listed every file' : `listed files matching ${clip(named, 28)}`); break
       case 'searchedIn': words.push(held.count === 1 && named !== undefined ? `searched ${named}` : `ran ${times(held.count, 'search', 'searches')}`); break
       case 'wait': words.push(held.count === 1 ? 'waited for a command' : `waited ${String(held.count)} times`); break
       case 'list': words.push(held.count === 1 ? (named !== undefined ? `listed ${named}` : 'listed a folder') : `listed ${pluralize(held.count, 'folder')}`); break
@@ -3362,6 +3372,18 @@ export function buildThread(
   if (options.running) {
     const streaming = items.some((item) => item.type === 'agent-message' && item.streaming)
     /*
+     * WHICH STEP OF ITS PLAN, on the live line (0.493). Colin, 2026-09-30,
+     * on a 58-minute Codex run: the plan "didn't initiate ... and just showed
+     * it as completed after". Codex had sent it before its first command; the
+     * card sat at the top of the turn, scrolled off, and nothing at the bottom
+     * said where the run was in it. Claude Code keeps the current to-do in
+     * view; this says it where the eye is.
+     */
+    const underway = planSteps?.steps.findIndex((step) => step.state === 'running') ?? -1
+    const planAside = planSteps === undefined || underway < 0
+      ? undefined
+      : `step ${String(underway + 1)} of ${String(planSteps.steps.length)}`
+    /*
      * A TOOL STILL OPEN outranks everything, because it is the most specific
      * true thing about the run: more specific than the turn around it, and
      * the one register a person most wants told apart from the reply.
@@ -3411,7 +3433,7 @@ export function buildThread(
         // suite" says more over eight minutes than `npm test`, and far more
         // than "Bash". The command is on its row below.
         label: openTool.title ?? openTool.name,
-        detail: openToolMeta.connector,
+        detail: openToolMeta.connector ?? planAside,
         startedAt: turnStartedAt ?? openToolMeta.at,
         kind: 'item',
         orb: orbStateFor(openTool, options.planMode === true, openToolMeta.viaConnector ? 'connector' : 'tool'),
@@ -3422,7 +3444,7 @@ export function buildThread(
         key: 'live-step',
         type: 'live-step',
         label: runningStep.label,
-        detail: runningStep.detail,
+        detail: runningStep.detail ?? planAside,
         startedAt: turnStartedAt ?? runningStep.startedAt,
         kind: runningStep.kind,
         register: runningStep.register,
@@ -3482,7 +3504,7 @@ export function buildThread(
           type: 'live-step',
           label: spoken ? 'Working' : 'Starting',
           register: spoken ? ('working' as const) : ('starting' as const),
-          detail: undefined,
+          detail: planAside,
           startedAt: since,
           kind: 'turn',
           waiting: true,

@@ -30,8 +30,17 @@ export function RoutineDialog({
   busy,
   error,
   onSave,
-  onCancel
+  onCancel,
+  editing: editingSaved,
+  modeName,
+  running = false
 }: {
+  /** A saved routine is being corrected (0.493); absent, read off the other props as before. */
+  readonly editing?: boolean
+  /** The mode it runs in, saved with it, in the picker's word: "Ask", "Edit", "Auto". */
+  readonly modeName?: string
+  /** A run of it is going now: that run keeps the steps it started with. */
+  readonly running?: boolean
   readonly teammate: PublicTeammate | undefined
   /**
    * Who could run it, when the conversation had no owner to inherit.
@@ -70,7 +79,7 @@ export function RoutineDialog({
   }) => void
   readonly onCancel: () => void
 }): ReactElement {
-  const editing = initialSteps.length > 0 && routeLabel === undefined
+  const editing = editingSaved ?? (initialSteps.length > 0 && routeLabel === undefined)
   const [name, setName] = useState(initialName)
   const [steps, setSteps] = useState<readonly string[]>(initialSteps)
   // One entry per step, kept in step with every add and remove (0.435).
@@ -129,7 +138,19 @@ export function RoutineDialog({
           {teammate !== undefined && (
             <p className="lc-dialog__note lc-mono">
               <TeammateBot hue={teammate.hue} avatar={teammate.avatar} size={16} /> {teammate.name} runs it
-              {routeLabel === undefined ? '' : ` on ${routeLabel}`}. A routine saved read-only stays read-only.
+              {routeLabel === undefined ? '' : ` on ${routeLabel}`}
+              {modeName === undefined ? '' : `, in ${modeName}`}.
+              {/*
+                * What a later run uses (0.493), said instead of "A routine saved
+                * read-only stays read-only" -- which sat on every routine, the
+                * ones that write included (Grok's 0.489 pass).
+                */}
+              {` Each run uses ${teammate.name}'s model at the time${modeName === undefined ? '' : `, and always ${modeName}`}.`}
+            </p>
+          )}
+          {running && (
+            <p className="lc-dialog__note">
+              It is running now. That run keeps the steps it started with; your changes apply from the next run.
             </p>
           )}
 

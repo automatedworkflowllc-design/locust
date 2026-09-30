@@ -11,6 +11,42 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.493.0 - 2026-09-30
+
+### Fixed
+
+- **A comparison that changes files can no longer change your folder before
+  you keep anything.** In a git project each model worked in a copy kept
+  inside your folder, so the copy's own path led back to your project, and a
+  model working in Auto edited your real file instead of its copy. Keep
+  then refused. The copies now live outside your folder entirely.
+- **A routine that is running keeps the steps it started with.** Editing a
+  routine while it ran used to change steps that had not started yet, a
+  checker included. Your changes now apply from the next run, and the edit
+  window says so.
+- **A routine runs on its teammate's model as it is now.** A routine kept
+  the model its teammate had when the routine was made, so a teammate moved
+  to Grok 4.7 still ran its routine on 4.6. It now uses the teammate's
+  current model, in the mode the routine was saved with.
+- **In Compare, the model chips no longer lie over the other controls** at
+  some window sizes, where pressing Ask opened the model picker instead.
+- **Every Compare column is named with its effort level**, the default one
+  included. A level you left alone used to go unnamed.
+
+### Improved
+
+- **The routine list names the model each teammate's steps run on**, and
+  the edit window says the model and the mode it runs in, instead of the
+  same line about read-only on every routine.
+- **While a teammate works through a plan, the live line says which step
+  it is on** ("step 2 of 3"), so a long run's plan is not only at the top of
+  the turn, scrolled out of view.
+- **A thought on its own line opens straight onto its words**, without a
+  second row repeating its headline.
+- **Clearer step lines**: listing files reads "Listed every file" instead
+  of "Searched for **/*", and Codex running JavaScript reads "Ran
+  JavaScript".
+
 ## 0.492.0 - 2026-09-30
 
 ### Improved

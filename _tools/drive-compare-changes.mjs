@@ -34,7 +34,12 @@ await git(['commit', '-q', '-m', 'a cart that totals nothing'], workspace)
 const inFolder = () => readFileSync(join(workspace, 'cart.py'), 'utf8').replace(/\r\n/g, '\n')
 const status = () => execFileSync('git', ['status', '--porcelain'], { cwd: workspace, encoding: 'utf8' }).split(/\r?\n/).filter(Boolean)
 const branches = () => execFileSync('git', ['branch', '--list', '--format=%(refname:short)'], { cwd: workspace, encoding: 'utf8' }).split(/\r?\n/).filter(Boolean)
-const copies = () => (existsSync(join(workspace, '.locust', 'compare')) ? readdirSync(join(workspace, '.locust', 'compare')) : [])
+// The columns' worktrees, wherever they are: since 0.493 outside the folder (a path under it led a model back to it).
+const flat = (path) => path.replace(/\\/g, '/').toLowerCase()
+const copies = () => execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: workspace, encoding: 'utf8' })
+  .split(/\r?\n/).filter((line) => line.startsWith('worktree ')).map((line) => line.slice('worktree '.length).trim())
+  .filter((path) => flat(path) !== flat(workspace))
+const insideFolder = () => copies().filter((path) => flat(path).startsWith(`${flat(workspace)}/`))
 
 const drive = await startDrive({
   name: `compare-changes-${tag}`, port: 9779, workspace, outPath: OUT,
@@ -122,6 +127,7 @@ try {
   check('each foot says what its model changed', worked.feet.length === 2 && worked.feet.every((foot) => /^\+\d+ −\d+ in 1 file/.test(foot)), JSON.stringify(worked.feet))
   check("the folder's own cart.py is untouched while they compare, and nothing in it changed", inFolder() === CART && status().length === 0, JSON.stringify({ status: status() }))
   check('each column has its own copy, on its own branch', copies().length === 2 && branches().filter((branch) => branch.startsWith('locust/compare-')).length === 2, JSON.stringify({ copies: copies(), branches: branches() }))
+  check('no column works inside the folder: its path does not lead back to it (Sol, 0.491)', insideFolder().length === 0, JSON.stringify({ inside: insideFolder() }))
   check("no row shows a copy's own path: each file reads as the folder's", worked.internal === false, JSON.stringify({ internal: worked.internal }))
   check("a column's summary does not repeat a running tally beside the foot (0.453)", worked.tallies === 0, JSON.stringify({ tallies: worked.tallies }))
   check('Keep says where the changes go', /Its changes come into your folder, not committed/.test(worked.keepTitle), worked.keepTitle)

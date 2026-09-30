@@ -182,20 +182,40 @@ describe('running a routine', () => {
     expect(notices(h).at(-1)).toContain('the record of that run could not be read')
   })
 
-  it('a correction made while it runs is what the next step uses', async () => {
+  it('a run keeps the steps it started with; an edit made while it runs applies from the next run (0.493)', async () => {
+    // Grok's 0.489 pass: an edit made mid-run loosened a checker that had not
+    // started, and the run ended APPROVED on the new wording.
     const edited = routine({ steps: ['Read status.ts.', 'Now list only .ts files.'] })
     const h = harness({ routines: [routine()] })
     const runner = createRoutineRunner(h.options)
     await runner.run('rt_1')
+    const planned = (await h.options.routines.get('rt_1'))?.steps[1]
     // The store now holds the edited routine.
     const read = h.options.routines.get
     h.options.routines.get = async (id) => ({ ...edited, ...((await read(id))?.execution === undefined ? {} : { execution: (await read(id))!.execution! }) })
     h.phases.set('mission_1', 'completed')
     await runner.onRunEnded({ missionId: 'mission_1' })
-    expect(h.starts[1]?.prompt).toBe('Now list only .ts files.')
+    expect(h.starts[1]?.prompt).toBe(planned)
+    expect(h.starts[1]?.prompt).not.toBe('Now list only .ts files.')
+    // The edit cut the routine to two steps; this run still has its three.
     h.phases.set('mission_2', 'completed')
     await runner.onRunEnded({ missionId: 'mission_2' })
-    expect(notices(h).at(-1)).toBe('Routine "Nightly tidy" finished: 2 steps completed.')
+    expect(h.starts).toHaveLength(3)
+    expect(notices(h).at(-1)).toBe('Routine "Nightly tidy" · step 3 of 3.')
+  })
+
+  it("runs on the teammate's model NOW, in the mode it was saved with (0.493)", async () => {
+    // Colin, 2026-09-30: Robin's routine ran Grok 4.6 though Robin was on 4.7.
+    const h = harness({ routines: [routine({ route: { runtime: 'cursor', model: 'cursor-grok-4.6-high', mode: 'ask' } })] })
+    Object.assign(h.options, { routeOf: async () => ({ runtime: 'cursor', model: 'grok-4.7-high', mode: 'accept-edits' }) })
+    const runner = createRoutineRunner(h.options)
+    await runner.run('rt_1')
+    expect(h.starts[0]).toMatchObject({ runtime: 'cursor', model: 'grok-4.7-high', mode: 'ask' })
+    // A teammate with no route read falls back to the one it was saved with.
+    const saved = harness({ routines: [routine({ route: { runtime: 'cursor', model: 'cursor-grok-4.6-high', mode: 'ask' } })] })
+    Object.assign(saved.options, { routeOf: async () => undefined })
+    await createRoutineRunner(saved.options).run('rt_1')
+    expect(saved.starts[0]).toMatchObject({ model: 'cursor-grok-4.6-high', mode: 'ask' })
   })
 
   it('refuses what it cannot honestly run, with the reason', async () => {
