@@ -11,6 +11,23 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.484.0 - 2026-09-30
+
+### New
+
+- **Point at part of a page and ask about it.** When a teammate makes a web
+  page, open it and press the target button above it, then click any part of
+  the page. The chat box gets a quote naming the file, where that part is and
+  its code, with a picture of it attached. Nothing is sent until you send it.
+  The click never reaches the page itself, and Esc or the button again stops
+  pointing.
+
+### Fixed
+
+- **The chat box grows with what you write.** It was always one line tall,
+  so a pasted paragraph or a quoted part of a reply sat behind a small
+  scroll arrow. Now it grows up to a few lines, then scrolls.
+
 ## 0.483.0 - 2026-09-29
 
 ### Fixed

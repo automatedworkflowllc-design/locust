@@ -8,6 +8,7 @@ import { openingPlacement, readSavedWindow } from './window-bounds.js'
 import type { SavedWindow } from './window-bounds.js'
 import { app, BrowserWindow, crashReporter, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, powerSaveBlocker, protocol, safeStorage, screen, session, shell, Tray } from 'electron'
 import { createPageServer, fromPagePreview, pageMayReach, PAGE_SCHEME } from './page-preview.js'
+import { CANCEL_SCRIPT, captureRectOf, pageFrameOf, pickInFrame } from './page-pick.js'
 import { createRuntimeCommands } from './runtime-commands.js'
 import { createCursorDefaultModel } from './cursor-default-model.js'
 import { listWorkspaceFiles } from './workspace-files.js'
@@ -231,6 +232,8 @@ import {
   WORKSPACE_SAVE_COPY_CHANNEL,
   WORKSPACE_TEXT_CHANNEL,
   WORKSPACE_PAGE_CHANNEL,
+  PAGE_PICK_CHANNEL,
+  PAGE_PICK_CANCEL_CHANNEL,
   RUNTIME_COMMANDS_CHANNEL,
   DIAGNOSTICS_REVEAL_CHANNEL,
   FEEDBACK_CHANNEL,
@@ -3614,6 +3617,39 @@ if (!ownsSingleInstanceLock) {
       refreshListedCommands('claude')
       refreshListedCommands('opencode')
       return runtimeCommands.list().catch(() => ({}))
+    })
+    /*
+     * POINT AT A PART OF A PAGE (0.484). The picker runs in the page's own
+     * frame and answers with what was clicked; the part is photographed from
+     * this window, never the screen, and handed back as bytes for the chat
+     * box to attach the way a pasted picture is. One pick at a time.
+     */
+    let picking = false
+    ipcMain.handle(PAGE_PICK_CHANNEL, async (event, requested: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      const asked = typeof requested === 'object' && requested !== null ? (requested as Record<string, unknown>) : {}
+      const box = typeof asked.frame === 'object' && asked.frame !== null ? (asked.frame as Record<string, unknown>) : {}
+      const frameBox = { x: Number(box.x), y: Number(box.y), width: Number(box.width), height: Number(box.height) }
+      if (typeof asked.pageUrl !== 'string' || !Object.values(frameBox).every(Number.isFinite)) return { ok: false, message: 'There is no page to point at.' } as const
+      const frame = pageFrameOf(event.sender.mainFrame.framesInSubtree, asked.pageUrl)
+      if (frame === undefined) return { ok: false, message: 'The page is not showing. Open it on the Page tab first.' } as const
+      if (picking) return { ok: false, message: 'Already pointing at the page.' } as const
+      picking = true
+      try {
+        const pick = await pickInFrame(frame)
+        if (pick === undefined) return { ok: true } as const
+        const where = captureRectOf(frameBox, pick.rect, event.sender.getZoomFactor())
+        const image = where === undefined ? undefined : await event.sender.capturePage(where).catch(() => undefined)
+        const png = image === undefined || image.isEmpty() ? undefined : new Uint8Array(image.toPNG())
+        return { ok: true, picked: { selector: pick.selector, html: pick.html, htmlLength: pick.htmlLength }, ...(png === undefined ? {} : { png }) } as const
+      } finally {
+        picking = false
+      }
+    })
+    ipcMain.handle(PAGE_PICK_CANCEL_CHANNEL, async (event, pageUrl: unknown) => {
+      if (!fromOwnWindow(event) || typeof pageUrl !== 'string') return
+      const frame = pageFrameOf(event.sender.mainFrame.framesInSubtree, pageUrl)
+      await frame?.executeJavaScript(CANCEL_SCRIPT).catch(() => undefined)
     })
     ipcMain.handle(WORKSPACE_PAGE_CHANNEL, async (event, requested: unknown, column: unknown) => {
       if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const

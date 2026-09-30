@@ -1748,7 +1748,7 @@ export default function App(): ReactElement {
   /** Words going back into the chat box (C9): a busy model's message, to send on another. */
   const [handBack, setHandBack] = useState<{ readonly text: string; readonly attachments: readonly string[] }>()
   // A part of a reply the person asked about (SelectionAsk): quoted into the box.
-  const [quoteIn, setQuoteIn] = useState<{ readonly quote: string }>()
+  const [quoteIn, setQuoteIn] = useState<{ readonly quote: string; readonly attachments?: readonly string[] }>()
   // Intent belongs to the addressed teammate, not to discovery or the last
   // thread visited. Session-only state deliberately clears on app restart.
   const [pickerRoutes, setPickerRoutes] = useState<ReadonlyMap<string, RouteChoice>>(new Map())
@@ -7504,6 +7504,16 @@ export default function App(): ReactElement {
             mode={viewingFile.mode}
             {...(viewingFile.workbook === undefined ? {} : { workbook: viewingFile.workbook })}
             {...(viewingFile.pageUrl === undefined ? {} : { pageUrl: viewingFile.pageUrl })}
+            onPointAt={(pick) => {
+              // The picture goes the way a pasted one does (attachPasted), then
+              // the quote and the picture land in the chat box together.
+              const bridge = window.desktop
+              void (async () => {
+                const named = `page-part-${String(Date.now())}.png`
+                const answer = pick.png === undefined || bridge === undefined ? undefined : await bridge.attachPasted(named, pick.png).catch(() => undefined)
+                setQuoteIn({ quote: pick.quote, ...(answer?.ok === true ? { attachments: answer.paths } : {}) })
+              })()
+            }}
             turns={viewingFileTurns}
             onClose={() => setViewingFile(undefined)}
             onReveal={() => {

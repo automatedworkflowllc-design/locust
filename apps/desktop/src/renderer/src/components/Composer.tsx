@@ -170,7 +170,7 @@ export interface ComposerProps {
    * A part of a reply to ask about (SelectionAsk): quoted at the top of the
    * box, above whatever is typed there. A new object quotes again.
    */
-  readonly quoteIn?: { readonly quote: string }
+  readonly quoteIn?: { readonly quote: string; readonly attachments?: readonly string[] }
   /** Each runtime's own slash commands, as its CLI last listed them (0.426). */
   readonly runtimeCommands?: RuntimeCommandsResponse
   /**
@@ -943,6 +943,8 @@ export function Composer({
   useEffect(() => {
     if (quoteIn === undefined) return
     setValue((current) => (current.trim().length === 0 ? `${quoteIn.quote}\n\n` : `${quoteIn.quote}\n\n${current}`))
+    // A part of a page comes with its picture (0.484).
+    if (quoteIn.attachments !== undefined && quoteIn.attachments.length > 0) attachPaths(quoteIn.attachments)
     requestAnimationFrame(() => {
       const input = field.current
       if (input === null) return

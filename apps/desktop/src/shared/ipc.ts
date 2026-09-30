@@ -791,6 +791,23 @@ export type WorkspaceTextResponse =
 export const WORKSPACE_TEXT_CHANNEL = 'workspace:text'
 /** A web page's address in the preview (0.425): main/page-preview.ts. */
 export const WORKSPACE_PAGE_CHANNEL = 'workspace:page'
+/** Point at a part of a running page (0.484): main/page-pick.ts. */
+export const PAGE_PICK_CHANNEL = 'workspace:page-pick'
+export const PAGE_PICK_CANCEL_CHANNEL = 'workspace:page-pick-cancel'
+export interface PagePickRequest {
+  readonly pageUrl: string
+  /** The page's frame on screen, in the window's CSS pixels. */
+  readonly frame: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }
+}
+export type PagePickResponse =
+  | {
+      readonly ok: true
+      /** Undefined when the person cancelled, or nothing was picked. */
+      readonly picked?: { readonly selector: string; readonly html: string; readonly htmlLength: number }
+      /** A picture of the part, as PNG, when any of it was in view. */
+      readonly png?: Uint8Array
+    }
+  | { readonly ok: false; readonly message: string }
 /** Each runtime's own slash commands, for the `/` menu (0.426): main/runtime-commands.ts. */
 export const RUNTIME_COMMANDS_CHANNEL = 'runtime:commands'
 export interface RuntimeCommandRow { readonly name: string; readonly description: string; readonly argumentHint: string }
@@ -2821,6 +2838,9 @@ export interface DesktopApi {
    * collision.
    */
   attachPasted(name: string, bytes: Uint8Array): Promise<AttachFilesResponse>
+  /** Point at a part of the running page; answers when it is clicked, or cancelled (0.484). */
+  pickInPage(request: PagePickRequest): Promise<PagePickResponse>
+  cancelPagePick(pageUrl: string): Promise<void>
   readWorkspaceImage(path: string): Promise<WorkspaceImageResponse>
   listRooms(): Promise<RoomListResponse>
   createRoom(request: RoomCreateRequest): Promise<RoomMutationResponse>

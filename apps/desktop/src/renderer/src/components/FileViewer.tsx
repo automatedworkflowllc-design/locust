@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import type { FileTurn } from '../missionView.js'
@@ -7,6 +7,7 @@ import { DiffView } from './DiffView.js'
 import { Icon } from './Icon.js'
 import { SheetView } from './SheetView.js'
 import type { Workbook } from '../../../shared/sheet.js'
+import { quoteOfPagePick, VIEWER_FRAME_NAME } from '../../../shared/page-pick.js'
 
 /**
  * A file a teammate wrote, open beside the conversation.
@@ -38,7 +39,8 @@ export function FileViewer({
   onReveal,
   onSave,
   workbook,
-  pageUrl
+  pageUrl,
+  onPointAt
 }: {
   readonly path: string
   /** The file's text, or a `data:` URL when the mode is `image`. */
@@ -62,12 +64,49 @@ export function FileViewer({
    * with its own origin (main/page-preview.ts), its source one tab away.
    */
   readonly pageUrl?: string
+  /**
+   * A part of the running page, pointed at (0.484): its quote for the chat
+   * box and a picture of it. Absent where there is no chat box to take it.
+   */
+  readonly onPointAt?: (pick: { readonly quote: string; readonly png?: Uint8Array }) => void
 }): ReactElement {
   /** Which turn's change is being read, or undefined for the file as it is. */
   const [showing, setShowing] = useState<number>()
   const [asSource, setAsSource] = useState(false)
   const [reloads, setReloads] = useState(0)
+  const [pointing, setPointing] = useState<'idle' | 'pointing' | { readonly said: string }>('idle')
+  const frame = useRef<HTMLIFrameElement>(null)
   const running = pageUrl !== undefined && !asSource
+  const fileName = path.replace(/\\/g, '/').split('/').pop() ?? path
+  // A pick left open when the viewer goes (another file, closed) is let go.
+  useEffect(() => {
+    if (pointing !== 'pointing' || pageUrl === undefined) return
+    return () => {
+      void window.desktop?.cancelPagePick(pageUrl).catch(() => undefined)
+    }
+  }, [pointing, pageUrl])
+  const point = (): void => {
+    const bridge = window.desktop
+    const box = frame.current?.getBoundingClientRect()
+    if (bridge === undefined || pageUrl === undefined || box === undefined || onPointAt === undefined) return
+    if (pointing === 'pointing') {
+      void bridge.cancelPagePick(pageUrl).catch(() => undefined)
+      return
+    }
+    setPointing('pointing')
+    frame.current?.focus()
+    void bridge
+      .pickInPage({ pageUrl, frame: { x: box.left, y: box.top, width: box.width, height: box.height } })
+      .then((answer) => {
+        if (!answer.ok) {
+          setPointing({ said: answer.message })
+          return
+        }
+        setPointing('idle')
+        if (answer.picked !== undefined) onPointAt({ quote: quoteOfPagePick(fileName, answer.picked), ...(answer.png === undefined ? {} : { png: answer.png }) })
+      })
+      .catch(() => setPointing({ said: 'The page could not be pointed at. Reload it and try again.' }))
+  }
   const version = showing === undefined ? undefined : turns[showing]
   return (
     <aside className="lc-viewer" aria-label={`Viewing ${path}`}>
@@ -92,6 +131,18 @@ export function FileViewer({
                 Source
               </button>
             </div>
+            {running && onPointAt !== undefined && (
+              <button
+                type="button"
+                className={`lc-viewer__action${pointing === 'pointing' ? ' is-active' : ''}`}
+                title={pointing === 'pointing' ? 'Stop pointing' : 'Point at a part of the page to ask about it'}
+                aria-label={pointing === 'pointing' ? 'Stop pointing' : 'Point at a part of the page to ask about it'}
+                aria-pressed={pointing === 'pointing'}
+                onClick={point}
+              >
+                <Icon name="target" size={13} />
+              </button>
+            )}
             {running && (
               <button type="button" className="lc-viewer__action" title="Reload the page" aria-label="Reload the page" onClick={() => setReloads((count) => count + 1)}>
                 <Icon name="refresh" size={13} />
@@ -167,13 +218,23 @@ export function FileViewer({
          * nothing of Locust's; the host answers IPC from the top frame only,
          * and a sub-frame gets no preload. docs/DECISION-2026-09-28-PAGE-PREVIEW.md.
          */
+        <div className="lc-viewer__pagewrap">
+        {pointing === 'pointing' && (
+          <p className="lc-viewer__pointhint" role="status">Click a part of the page to ask about it. Esc stops.</p>
+        )}
+        {typeof pointing === 'object' && (
+          <p className="lc-viewer__pointhint is-said" role="status">{pointing.said}</p>
+        )}
         <iframe
+          ref={frame}
+          name={VIEWER_FRAME_NAME}
           key={reloads}
           className="lc-viewer__page"
           src={pageUrl}
           title={`${path.replace(/\\/g, '/').split('/').pop() ?? 'page'}, running`}
           sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads"
         />
+        </div>
       ) : (
       <div className="lc-viewer__scroll">
         {mode === 'image' ? (

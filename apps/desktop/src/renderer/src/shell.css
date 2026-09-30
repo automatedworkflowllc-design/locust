@@ -6317,6 +6317,14 @@ textarea {
   flex: none;
   width: 100%;
   min-width: 0;
+  /*
+   * THE BOX GROWS WITH WHAT IS IN IT, as Claude Code's does, to the height
+   * below and then scrolls. It was one row always (a single row and nothing to
+   * grow it), so a pasted paragraph or a quoted part of a reply sat behind a
+   * one-line window with a scroll arrow -- seen on 0.483 when a quote landed
+   * in it. The max was here all along, with nothing reaching for it.
+   */
+  field-sizing: content;
   min-height: 16px;
   max-height: 180px;
   margin: 0 0 16px;
@@ -15978,6 +15986,46 @@ textarea {
 
 /* A web page, running (0.425): the whole pane, edge to edge, on white --
    a page that sets no background expects a browser's. */
+/*
+ * POINT AT A PART OF THE PAGE (0.484). The frame sits in a box of its own so
+ * the hint can float over the page's top edge without the page moving; the
+ * hint takes no pointer, so every point of the page stays pointable.
+ */
+.lc-viewer__pagewrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.lc-viewer__pointhint {
+  position: absolute;
+  top: var(--lc-space-4);
+  left: 50%;
+  z-index: 1;
+  max-width: calc(100% - 32px);
+  margin: 0;
+  padding: var(--lc-space-2) var(--lc-space-4);
+  transform: translateX(-50%);
+  border: 1px solid var(--lc-border-control);
+  border-radius: var(--lc-radius-control);
+  background: var(--lc-bg-control);
+  box-shadow: var(--lc-shadow-pending);
+  color: var(--lc-text-primary);
+  font-size: var(--lc-text-description);
+  pointer-events: none;
+}
+
+.lc-viewer__pointhint.is-said {
+  color: var(--lc-amber-text);
+}
+
+.lc-viewer__action.is-active {
+  color: var(--lc-text-primary);
+  background: var(--lc-bg-control);
+}
+
 .lc-viewer__page {
   flex: 1;
   min-height: 0;

@@ -21,6 +21,12 @@ describe('what keeps its size', () => {
     expect(block('.lc-control > svg')).toMatch(/flex:\s*none/)
   })
 
+  it('the chat box grows with what is in it, to its most, then scrolls (0.484)', () => {
+    const box = block('.lc-composer textarea')
+    expect(box).toMatch(/field-sizing:\s*content/)
+    expect(box).toMatch(/max-height:\s*180px/)
+  })
+
   it('the rail stacks its footer, one centred row each', () => {
     expect(block('.lc-shell.is-compact .lc-sidebar__nav')).toMatch(/grid-template-columns:\s*minmax\(0, 1fr\)/)
   })
