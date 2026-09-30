@@ -552,7 +552,15 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
         // It spoke, so the next silence is a new one worth naming.
         run.saidItMightBeAsking = false
       }
-      if (run.normalizer.latestFinal) {
+      /*
+       * NOT WHILE ITS BACKGROUND WORK IS OUT (0.487). An answer with no tool
+       * calls ended the turn -- and Antigravity's agent, having said "Waiting
+       * for task completion", was woken by its own task's notice and went on:
+       * one of Colin's runs worked 18 more minutes, 88 tool calls and 5 file
+       * edits, all of it undrawn under a turn that said "no files changed".
+       * The idle limit below still ends a run whose task never reports.
+       */
+      if (run.normalizer.latestFinal && run.normalizer.pendingBackground === 0) {
         await end(run, {})
         return
       }

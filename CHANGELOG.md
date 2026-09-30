@@ -11,6 +11,25 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.487.0 - 2026-09-30
+
+### Fixed
+
+- **Antigravity turns no longer end while the agent is still working.** When
+  Antigravity's agent put a command or a timer in the background and said
+  "waiting for it", Locust called the turn finished. The agent then carried
+  on in Antigravity's window, and none of that work showed in Locust. A turn
+  now stays open until its background work has ended. On your own Boss
+  conversation, this took the turns wrongly marked finished from 15 to none.
+- **Antigravity's background commands and timers say how they ended.** They
+  used to read "did not report". Now each shows as running in the
+  background, then done, failed (with its exit code), stopped, or, for a
+  timer, gone off. On the same conversation, tool calls left open went from
+  55 to 7.
+- **Antigravity command rows show the command.** They showed the agent's
+  summary of it, such as "Checking commit 8b104218". The summary is now the
+  row's title, and the command itself is shown.
+
 ## 0.486.0 - 2026-09-30
 
 ### Changed

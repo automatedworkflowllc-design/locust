@@ -119,6 +119,13 @@ export interface AntigravityEventNormalizer {
    * so instead (see `docs/FINDING-antigravity-ask-question.md`).
    */
   readonly pendingToolName: string | undefined;
+  /**
+   * Background tasks started and not yet reported ended (0.487). While any is
+   * pending, an answer with no tool calls does NOT end the turn: the agent is
+   * woken by the task's notice and goes on (one of Colin's runs worked 18 more
+   * minutes, 88 tool calls and 5 edits, after Locust had called it done).
+   */
+  readonly pendingBackground: number;
   accept(record: RuntimeJsonlRecord): readonly NormalizedRuntimeEvent[];
   finish(completion: RuntimeProcessCompletion): readonly NormalizedRuntimeEvent[];
 }
@@ -167,13 +174,68 @@ function oneLine(value: string): string {
  * build has never seen carries no path.
  */
 export function antigravityToolCommand(args: unknown): string | undefined {
-  const target = decodedString(args, "TargetFile")
+  // The command itself first (0.487): a run_command row read the model's own
+  // phrase -- "Checking commit 8b104218" -- where Antigravity's window shows
+  // the command line. The phrase rides as the row's title instead.
+  const target = decodedString(args, "CommandLine")
+    ?? decodedString(args, "TargetFile")
+    ?? decodedString(args, "AbsolutePath")
     ?? decodedString(args, "toolAction")
     ?? decodedString(args, "toolSummary")
     ?? decodedString(args, "Description");
   if (target === undefined) return undefined;
   const line = oneLine(target);
   return line.length === 0 ? undefined : redactText(line);
+}
+
+/** The model's own phrase for a call, when the row leads with something else. */
+export function antigravityToolTitle(args: unknown, command: string | undefined): string | undefined {
+  const phrase = decodedString(args, "toolAction") ?? decodedString(args, "toolSummary");
+  if (phrase === undefined) return undefined;
+  const line = oneLine(phrase);
+  return line.length === 0 || line === command ? undefined : redactText(line);
+}
+
+/**
+ * The task a result line put in the background, if it did (0.487).
+ *
+ * MEASURED 2026-09-30 on Colin's transcripts: a command run with a wait
+ * before going async writes its result line with `status: RUNNING` and the
+ * text "Tool is running as a background task with task id: <conv>/task-N" --
+ * where N is that line's own step index -- and the line is NEVER rewritten as
+ * DONE (0 of 48). The outcome comes later as a SYSTEM_MESSAGE from
+ * `sender=<conv>/task-N`. Reading only DONE lines left all of them saying
+ * "did not report".
+ */
+export function antigravityBackgroundTask(content: string | undefined): { readonly taskId: string; readonly doing?: string } | undefined {
+  if (content === undefined) return undefined;
+  const found = /running as a background task with task id:\s*(\S+\/task-\d+)/.exec(content);
+  if (found === null) return undefined;
+  const doing = /Task Description:\s*(.+)/.exec(content)?.[1];
+  return { taskId: found[1]!, ...(doing === undefined ? {} : { doing: oneLine(doing) }) };
+}
+
+/** The task a SYSTEM_MESSAGE came from (`sender=<conv>/task-N`), if it names one. */
+export function antigravityMessageSender(content: string | undefined): string | undefined {
+  if (content === undefined) return undefined;
+  return /sender=(\S+\/task-\d+)/.exec(content)?.[1];
+}
+
+/**
+ * How a background task ended, from the SYSTEM_MESSAGE Antigravity sends when
+ * it does: "Task id \"<id>\" finished with result: ... The command exited
+ * with code 0." or "... was canceled with result: ...". Undefined for any other
+ * system message.
+ */
+export function antigravityTaskEnding(content: string | undefined): { readonly taskId: string; readonly ended: "completed" | "failed" | "stopped"; readonly exitCode?: number } | undefined {
+  if (content === undefined) return undefined;
+  const task = /Task id "([^"]+\/task-\d+)" (finished|was canceled|failed)/.exec(content);
+  if (task === null) return undefined;
+  if (task[2] === "was canceled") return { taskId: task[1]!, ended: "stopped" };
+  const code = /The command exited with code (-?\d+)/.exec(content);
+  const exitCode = code === null ? undefined : Number(code[1]);
+  const failed = task[2] === "failed" || (exitCode !== undefined && exitCode !== 0);
+  return { taskId: task[1]!, ended: failed ? "failed" : "completed", ...(exitCode === undefined ? {} : { exitCode }) };
 }
 
 /**
@@ -227,6 +289,7 @@ interface OpenTool {
   readonly toolKind: string;
   readonly name: string;
   readonly command?: string;
+  readonly title?: string;
 }
 
 export function createAntigravityEventNormalizer(
@@ -280,16 +343,81 @@ export function createAntigravityEventNormalizer(
       evidence,
     );
 
-  const closeTool = (open: OpenTool, parsed: JsonObject, evidence: CodexEventEvidence): NormalizedRuntimeEvent => {
+  /** Work Antigravity put in the background, by its task id: the call it came from. */
+  const background = new Map<string, OpenTool>();
+  /**
+   * TIMERS (0.487). The `schedule` tool is backgrounded the same way, and ends
+   * one of two ways, both measured on Colin's transcript (14 timers): it FIRES
+   * -- a SYSTEM_MESSAGE from its own task id carrying its prompt ("Check if
+   * task-1694 finished"), 8 of them -- or the task it was set to watch
+   * (`TimerCondition`) finishes first, and Antigravity drops it without a
+   * word, the other 6. So a timer's own message settles it, and so does the
+   * end of the task it waited on; otherwise it would hold the turn open until
+   * the idle limit.
+   */
+  const timerWaitsOn = new Map<string, string>();
+  /** A schedule call's condition, by its item id, until its task id is known. */
+  const timerConditions = new Map<string, string>();
+  const settle = (taskId: string, ended: "completed" | "failed" | "stopped", message: string | undefined, evidence: CodexEventEvidence): NormalizedRuntimeEvent[] => {
+    const from = background.get(taskId);
+    if (from === undefined) return [];
+    background.delete(taskId);
+    const events: NormalizedRuntimeEvent[] = [
+      emit(ended === "failed" ? "step.failed" : "step.completed", {
+        stepKind: "item",
+        itemId: from.itemId,
+        itemType: "background",
+        status: ended,
+        ...(message === undefined ? {} : { message }),
+        evidence,
+      }),
+    ];
+    // Timers that were only waiting on this task will never fire now.
+    for (const [timer, watched] of [...timerWaitsOn]) {
+      if (watched !== taskId) continue;
+      timerWaitsOn.delete(timer);
+      events.push(...settle(timer, "completed", "no longer needed: what it waited on finished", evidence));
+    }
+    return events;
+  };
+
+  const closeTool = (open: OpenTool, parsed: JsonObject, evidence: CodexEventEvidence): readonly NormalizedRuntimeEvent[] => {
     const at = openTools.indexOf(open);
     if (at >= 0) openTools.splice(at, 1);
     const content = stringValue(parsed.content);
-    return emit("tool.completed", {
-      ...open,
-      ...(content === undefined ? {} : { output: redactText(content) }),
-      phase: "completed",
-      evidence,
-    });
+    const task = antigravityBackgroundTask(content);
+    if (task !== undefined) {
+      // The call is over -- it handed its work to the background -- and the
+      // work is a step of its own until its task says how it ended. The same
+      // two events Claude's backgrounded commands make, so the same row
+      // draws them: "in the background", then done / failed / stopped.
+      background.set(task.taskId, open);
+      const watched = timerConditions.get(open.itemId);
+      if (watched !== undefined) {
+        timerConditions.delete(open.itemId);
+        // Already over? Then this timer will never fire either.
+        if (background.has(watched)) timerWaitsOn.set(task.taskId, watched);
+      }
+      return [
+        emit("tool.completed", { ...open, background: true, phase: "completed", evidence }),
+        emit("step.started", {
+          stepKind: "item",
+          itemId: open.itemId,
+          itemType: "background",
+          status: "running",
+          ...(task.doing === undefined ? {} : { message: boundedMessageText(task.doing) }),
+          evidence,
+        }),
+      ];
+    }
+    return [
+      emit("tool.completed", {
+        ...open,
+        ...(content === undefined ? {} : { output: redactText(content) }),
+        phase: "completed",
+        evidence,
+      }),
+    ];
   };
 
   const emit = <TType extends NormalizedRuntimeEventType>(
@@ -417,11 +545,17 @@ export function createAntigravityEventNormalizer(
               ? asked.question
               : `${asked.question} — ${asked.options.join(" / ")}`,
           );
+      const title = asked === undefined ? antigravityToolTitle(args, command) : undefined;
+      if (name === "schedule") {
+        const watched = decodedString(args, "TimerCondition");
+        if (watched !== undefined && watched.length > 0) timerConditions.set(itemId, watched);
+      }
       const open: OpenTool = {
         itemId,
         toolKind: name,
         name,
         ...(command === undefined ? {} : { command }),
+        ...(title === undefined ? {} : { title }),
       };
       openTools.push(open);
       awaiting.set(stepIndex + 1 + index, open);
@@ -443,7 +577,7 @@ export function createAntigravityEventNormalizer(
       if (open !== undefined) {
         early.delete(resultStep);
         awaiting.delete(resultStep);
-        events.push(closeTool(open, held.parsed, held.evidence));
+        events.push(...closeTool(open, held.parsed, held.evidence));
       } else if (resultStep < stepIndex) {
         early.delete(resultStep);
         events.push(unattached(held.evidence));
@@ -485,14 +619,31 @@ export function createAntigravityEventNormalizer(
     if (seen.has(stepIndex)) return [];
     // A step that has not finished will be appended again with its result; the
     // index stays unseen so the settled version is the one that is normalized.
-    if (stringValue(parsed.status) !== "DONE") return [];
+    // Except a result that handed its work to the background: that line is
+    // never rewritten (0 of 48), so it is read as it stands (0.487).
+    const handedOff = type === "GENERIC"
+      && stringValue(parsed.status) === "RUNNING"
+      && antigravityBackgroundTask(stringValue(parsed.content)) !== undefined;
+    if (stringValue(parsed.status) !== "DONE" && !handedOff) return [];
     seen.add(stepIndex);
 
     if (SILENT_TYPES.has(type)) {
       // A new user or system turn means the previous final answer no longer
       // ends the conversation.
       latestFinal = false;
-      return [];
+      // A background task reporting how it ended settles its row (0.487).
+      if (type !== "SYSTEM_MESSAGE") return [];
+      const said = stringValue(parsed.content);
+      const evidence = evidenceFor(record, parsed, type);
+      const ending = antigravityTaskEnding(said);
+      if (ending !== undefined) {
+        return settle(ending.taskId, ending.ended, ending.exitCode === undefined ? undefined : `exited with code ${String(ending.exitCode)}`, evidence);
+      }
+      // Any other message from a background task is a timer firing.
+      const sender = antigravityMessageSender(said);
+      if (sender === undefined || !background.has(sender)) return [];
+      timerWaitsOn.delete(sender);
+      return settle(sender, "completed", "timer went off", evidence);
     }
 
     if (type === "PLANNER_RESPONSE") return plannerEvents(record, parsed, stepIndex);
@@ -507,7 +658,7 @@ export function createAntigravityEventNormalizer(
         return [];
       }
       awaiting.delete(stepIndex);
-      return [closeTool(open, parsed, evidence)];
+      return closeTool(open, parsed, evidence);
     }
 
     latestFinal = false;
@@ -533,6 +684,9 @@ export function createAntigravityEventNormalizer(
     },
     get pendingToolName() {
       return openTools[openTools.length - 1]?.name;
+    },
+    get pendingBackground() {
+      return background.size;
     },
 
     accept(record: RuntimeJsonlRecord): readonly NormalizedRuntimeEvent[] {
