@@ -578,14 +578,25 @@ export function ActivityCard({
                     * its current state it takes up so much real estate."
                     * The duration is the line; the words are under it.
                     */}
-                  <button type="button" className="lc-filerow lc-filerow--thought" onClick={() => toggle(entry)} aria-expanded={isOpen(entry)}>
-                    <Icon name="thought" size={14} />
-                    <span className="lc-filerow__path">{thoughtLine(entry.durationMs)}</span>
-                    <span className="lc-activity__chev" aria-hidden="true">
-                      <Icon name={isOpen(entry) ? 'chevron-down' : 'chevron-right'} size={12} />
-                    </span>
-                  </button>
-                  {isOpen(entry) && <div className="lc-filerow__thought">{entry.text}</div>}
+                  {entry.text.trim().length === 0 ? (
+                    // The length alone (0.489): nothing to open, so no chevron
+                    // promising something it does not have.
+                    <div className="lc-filerow is-static lc-filerow--thought">
+                      <Icon name="thought" size={14} />
+                      <span className="lc-filerow__path">{thoughtLine(entry.durationMs)}</span>
+                    </div>
+                  ) : (
+                    <>
+                      <button type="button" className="lc-filerow lc-filerow--thought" onClick={() => toggle(entry)} aria-expanded={isOpen(entry)}>
+                        <Icon name="thought" size={14} />
+                        <span className="lc-filerow__path">{thoughtLine(entry.durationMs)}</span>
+                        <span className="lc-activity__chev" aria-hidden="true">
+                          <Icon name={isOpen(entry) ? 'chevron-down' : 'chevron-right'} size={12} />
+                        </span>
+                      </button>
+                      {isOpen(entry) && <div className="lc-filerow__thought">{entry.text}</div>}
+                    </>
+                  )}
                 </>
               ) : entry.kind === 'tools' ? (
                 /*

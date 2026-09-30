@@ -196,6 +196,34 @@ export function backgroundEnding(
 }
 
 /**
+ * WHAT A STEP PRINTED, where Claude Code shows it (0.489).
+ *
+ * Measured 2026-09-30 (docs/DISPLAY-COVERAGE-2026-09-30.md, gap 5): a
+ * tool_result's content was never carried, so a command's row in Locust had
+ * nothing to open onto while Claude Code shows what it printed under every
+ * command. Carried for the tools whose output Claude Code shows -- commands,
+ * searches, web reads, connector calls -- and not for Read, Write or Edit,
+ * which it shows as a line count or a diff, never the file's text.
+ */
+export function claudeShowsOutput(name: string | undefined): boolean {
+  if (name === undefined) return false;
+  if (name.startsWith("mcp__")) return true;
+  return ["Bash", "BashOutput", "PowerShell", "Grep", "Glob", "WebFetch", "WebSearch", "LS"].includes(name);
+}
+
+/** A tool_result's text: its string content, or its text blocks joined. */
+export function claudeToolResultText(block: Record<string, unknown>): string | undefined {
+  const content = block.content;
+  if (typeof content === "string") return content.length === 0 ? undefined : content;
+  if (!Array.isArray(content)) return undefined;
+  const text = content
+    .map((part) => (isObject(part) && stringValue(part.type) === "text" ? stringValue(part.text) : undefined))
+    .filter((value): value is string => value !== undefined)
+    .join("\n");
+  return text.length === 0 ? undefined : text;
+}
+
+/**
  * What a Claude tool acted on, for the activity row to name.
  *
  * MEASURED 2026-09-03 by reading the card after a real run: every row said
@@ -531,6 +559,14 @@ export function createClaudeEventNormalizer(
    * `m<ordinal>_block_<index>` now: one item per message, in order.
    */
   let messageOrdinal = 0;
+  /**
+   * THINKING, TIMED AND NOT KEPT (0.489). Claude Code shows "Thought for Ns"
+   * over every thinking block; Locust showed nothing. The block's start and
+   * stop are a step of their own, with no text: AGENTS.md forbids keeping
+   * hidden chain-of-thought, and the length of it is not the thought.
+   * Keyed by the block's index within its message.
+   */
+  const openThinking = new Map<number, string>();
   let streamingMessageId: string | undefined;
 
   const emit = <TType extends NormalizedRuntimeEventType>(
@@ -817,7 +853,14 @@ export function createClaudeEventNormalizer(
       }
       if (innerType === "content_block_start") {
         const block = isObject(inner.content_block) ? inner.content_block : {};
-        if (stringValue(block.type) === "tool_use") {
+        const blockType = stringValue(block.type);
+        if ((blockType === "thinking" || blockType === "redacted_thinking") && !fromSubagent(parsed)) {
+          const index = typeof inner.index === "number" ? inner.index : 0;
+          const itemId = `m${String(messageOrdinal)}_thinking_${String(index)}`;
+          openThinking.set(index, itemId);
+          return [emit("step.started", { stepKind: "reasoning", itemId, evidence })];
+        }
+        if (blockType === "tool_use") {
           const itemId = identityValue(block.id) ?? `block_${String(inner.index ?? 0)}`;
           const name = identityValue(block.name) ?? "tool";
           openTools.set(itemId, { name });
@@ -850,7 +893,15 @@ export function createClaudeEventNormalizer(
           }),
         ];
       }
+      if (innerType === "content_block_stop") {
+        const index = typeof inner.index === "number" ? inner.index : 0;
+        const itemId = openThinking.get(index);
+        if (itemId === undefined) return [];
+        openThinking.delete(index);
+        return [emit("step.completed", { stepKind: "reasoning", itemId, evidence })];
+      }
       if (innerType === "message_stop") {
+        openThinking.clear();
         return [emit("step.completed", { stepKind: "turn", evidence })];
       }
       return [];
@@ -988,6 +1039,12 @@ export function createClaudeEventNormalizer(
             // What the subagent came back with, in its own words: the row
             // reads "reported back · 3" instead of only "reported back".
             ...(subagentSummary === undefined ? {} : { output: boundedMessageText(subagentSummary) }),
+            // What the step printed, bounded and scrubbed like a message (0.489).
+            ...(() => {
+              if (refusedFor !== undefined || subagentSummary !== undefined || !claudeShowsOutput(open?.name)) return {};
+              const printed = claudeToolResultText(block);
+              return printed === undefined ? {} : { output: boundedMessageText(printed) };
+            })(),
             evidence,
           }),
         );

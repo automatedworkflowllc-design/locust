@@ -11,6 +11,32 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.489.0 - 2026-09-30
+
+### Security
+
+- **Locust no longer shows or keeps files that hold credentials.** After
+  each run, Locust shows the files that changed in the folder, with what
+  changed in them. When a teammate worked in a folder that also holds login
+  files, such as your `.claude` folder, a login file refreshed during the
+  run was shown with its tokens and kept in Locust's history. Files that
+  look like credentials (login and key files, anything named for auth,
+  tokens, secrets or sessions, and dotfiles) are now listed by name only and
+  never opened. Anything else shown is scrubbed of keys and tokens first. If
+  you ran a teammate in a folder like that, sign out of the tool whose login
+  was shown and sign back in.
+
+### Fixed
+
+- **A command's output shows under it, for Claude and Codex.** As in their
+  own apps, opening a command's row now shows what it printed. It showed
+  only for Antigravity before.
+- **"Thought for 12s" shows even when a runtime keeps its thinking
+  private.** Claude and Codex now leave a thinking line, as Claude Code
+  does. The thinking itself is never kept.
+- **Codex's live line no longer says "Thinking" through the whole answer**,
+  or "writing" when it is your own message arriving.
+
 ## 0.488.0 - 2026-09-30
 
 ### Changed

@@ -393,16 +393,21 @@ export function createAppServerEventNormalizer(
     }
 
     if (!TOOL_ITEM_TYPES.has(itemType)) {
-      return completed
-        ? []
-        : [
-            emit("step.started", {
-              stepKind: "item",
-              itemId,
-              itemType,
-              evidence: evidence(notification),
-            }),
-          ];
+      /*
+       * The person's own message is not the teammate "writing" (0.489,
+       * DISPLAY-COVERAGE gap 11): it made the live line say so. And a step
+       * that opens must close -- a reasoning item never did, so "Thinking"
+       * stayed on the live line while the answer streamed under it.
+       */
+      if (itemType === "userMessage") return [];
+      return [
+        emit(completed ? "step.completed" : "step.started", {
+          stepKind: "item",
+          itemId,
+          itemType,
+          evidence: evidence(notification),
+        }),
+      ];
     }
 
     const name = toolNameOf(item);
@@ -428,12 +433,16 @@ export function createAppServerEventNormalizer(
     // "declined", what Codex reports for a call the person refused in
     // Approve-each. It was recorded as completed, as though it had run (M2).
     const failed = (status !== undefined && status !== "completed") || (exitCode !== undefined && exitCode !== 0);
+    // What the command printed, as Codex's own window shows it (0.489,
+    // DISPLAY-COVERAGE gap 5): the app-server sends it and it was dropped.
+    const printed = stringValue(item.aggregatedOutput);
     return [
       emit(failed ? "tool.failed" : "tool.completed", {
         itemId,
         toolKind: itemType,
         name,
         ...(command === undefined ? {} : { command }),
+        ...(printed === undefined || printed.length === 0 ? {} : { output: boundedMessageText(printed) }),
         ...(exitCode === undefined ? {} : { exitCode }),
         ...(status === undefined ? {} : { status }),
         phase: "completed",

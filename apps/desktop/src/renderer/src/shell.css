@@ -3728,7 +3728,9 @@ textarea {
  * command is not a substitute for the command.
  */
 .lc-shellcommand {
-  margin: 0;
+  /* In line with the output under it (.lc-shellout's 34px), not flush with
+     the card's edge -- seen once Claude's output reached the row (0.489). */
+  margin: 0 0 var(--lc-space-2) 34px;
   padding: var(--lc-space-2) var(--lc-space-3);
   border-left: 2px solid var(--lc-border-card);
   font-size: var(--lc-text-mono-caption);

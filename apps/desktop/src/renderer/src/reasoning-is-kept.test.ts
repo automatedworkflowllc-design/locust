@@ -41,22 +41,40 @@ describe('reasoning in the fold', () => {
     expect(said).toContain('Reading README.md')
   })
 
-  it('draws no row when the runtime sent no text', () => {
-    // Most runtimes send none, and a row reading "thought" with nothing in
-    // it would promise something it does not have.
+  /*
+   * 0.489: WITH NO TEXT, THE LENGTH ALONE. It drew no row -- "a row reading
+   * 'thought' with nothing in it would promise something it does not have" --
+   * so a minute of thinking left no mark, where Claude Code and Antigravity
+   * show "Thought for Ns" (DISPLAY-COVERAGE gap 6). The row now IS the length,
+   * with nothing to open, so it promises nothing more than it has.
+   */
+  it('draws "thought for" with no text when the runtime sent none', () => {
     const item = fold([
       event('step.started', { stepKind: 'reasoning' }),
       event('step.completed', { stepKind: 'reasoning' }, '2026-09-16T10:00:20.000Z')
     ])
-    expect(JSON.stringify(item ?? {})).not.toContain('"reasoning"')
+    const details = (item as unknown as { details?: readonly { kind: string; output?: string; durationMs?: number }[] } | undefined)?.details ?? []
+    const thought = details.find((row) => row.kind === 'reasoning')
+    expect(thought?.durationMs).toBe(20_000)
+    expect(thought?.output ?? '').toBe('')
   })
 
-  it('ignores whitespace-only reasoning', () => {
-    const item = fold([
+  it('and none for a thought under a second, or whitespace that never had a length', () => {
+    const blink = fold([
       event('step.started', { stepKind: 'reasoning' }),
-      event('step.completed', { stepKind: 'reasoning', message: '   ' }, '2026-09-16T10:00:20.000Z')
+      event('step.completed', { stepKind: 'reasoning', message: '   ' }, '2026-09-16T10:00:00.400Z')
     ])
-    expect(JSON.stringify(item ?? {})).not.toContain('"reasoning"')
+    expect(JSON.stringify(blink ?? {})).not.toContain('"reasoning"')
+  })
+
+  it("draws Codex's reasoning item the same way", () => {
+    const item = fold([
+      event('step.started', { stepKind: 'item', itemType: 'reasoning', itemId: 'rs_1' }),
+      event('step.completed', { stepKind: 'item', itemType: 'reasoning', itemId: 'rs_1' }, '2026-09-16T10:00:07.000Z')
+    ])
+    const details = (item as unknown as { details?: readonly { kind: string; durationMs?: number }[] } | undefined)?.details ?? []
+    const thought = details.find((row) => row.kind === 'reasoning')
+    expect(thought?.durationMs).toBe(7_000)
   })
 
   it('still reports how long it thought', () => {

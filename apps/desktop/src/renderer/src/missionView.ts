@@ -2787,18 +2787,30 @@ export function buildThread(
          * reading `thought` with nothing in it would be a row that promises
          * something it does not have.
          */
-        if (event.payload.stepKind === 'reasoning') {
+        // Codex opens its thinking as a `reasoning` ITEM rather than a
+        // reasoning step (0.489): the same thought, the same row.
+        const reasoningItem = typeof event.payload.itemType === 'string' && /reasoning/i.test(event.payload.itemType)
+        if (event.payload.stepKind === 'reasoning' || reasoningItem) {
           const said = typeof event.payload.message === 'string' ? event.payload.message.trim() : ''
-          if (said.length > 0) {
+          // How long, from the step that opened it. The row reads
+          // "Thought for 12s" and folds the text under it -- the shape
+          // Claude Code used, which Colin asked for on 2026-09-17: "it
+          // would say how long they thought for ... and then you could
+          // just hit a dropdown". Absent when the start was never seen.
+          const began = runningStep?.register === 'thinking' ? Date.parse(runningStep.startedAt) : NaN
+          const ended = Date.parse(event.occurredAt)
+          const durationMs = Number.isNaN(began) || Number.isNaN(ended) ? undefined : Math.max(0, ended - began)
+          /*
+           * THE LENGTH ALONE, when there are no words (0.489,
+           * DISPLAY-COVERAGE gap 6). Claude Code and Antigravity show
+           * "Thought for 12s" over every thinking block; Locust showed a row
+           * only when the runtime sent text, which most never do, so a
+           * minute of thinking left no mark in the thread. The row is the
+           * duration and opens onto nothing. Under a second is not worth a
+           * line.
+           */
+          if (said.length > 0 || (durationMs !== undefined && durationMs >= 1_000)) {
             workBegan = true
-            // How long, from the step that opened it. The row reads
-            // "Thought for 12s" and folds the text under it -- the shape
-            // Claude Code used, which Colin asked for on 2026-09-17: "it
-            // would say how long they thought for ... and then you could
-            // just hit a dropdown". Absent when the start was never seen.
-            const began = runningStep?.kind === 'reasoning' ? Date.parse(runningStep.startedAt) : NaN
-            const ended = Date.parse(event.occurredAt)
-            const durationMs = Number.isNaN(began) || Number.isNaN(ended) ? undefined : Math.max(0, ended - began)
             activity.push({ kind: 'reasoning', name: 'thought', settled: true, output: said, ...(durationMs === undefined ? {} : { durationMs }) })
             activityBorn.push(eventIndex)
           }

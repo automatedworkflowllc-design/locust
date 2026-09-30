@@ -437,9 +437,13 @@ export function redactSecrets(value: string): string {
     .replace(/\b(?:sk|pk)-[A-Za-z0-9_-]{12,}\b/g, "[redacted]")
     .replace(/\b(?:gh[opusr]_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AKIA[A-Z0-9]{16})\b/g, "[redacted]")
     .replace(
-      /((?:api[_-]?key|access[_-]?token|refresh[_-]?token|authorization|password|secret|cookie|credential)\s*[=:]\s*["']?)([^\s,"';}]+)/gi,
+      // `["']?` before the colon (0.489): the JSON shape of a key,
+      // `"accessToken": "..."`, put a quote between the name and the colon.
+      /((?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|authorization|password|secret|cookie|credential)["']?\s*[=:]\s*["']?)([^\s,"';}]+)/gi,
       "$1[redacted]",
-    );
+    )
+    // Anthropic's OAuth tokens, whatever they sit beside (0.489).
+    .replace(/\bsk-ant-[A-Za-z0-9_-]{12,}/g, "[redacted]");
 }
 
 /** Evidence: scrubbed AND bounded to the evidence limit. Not for message text, which has its own bound. */
@@ -453,9 +457,13 @@ export function redactText(value: string): string {
     .replace(/\b(?:sk|pk)-[A-Za-z0-9_-]{12,}\b/g, "[redacted]")
     .replace(/\b(?:gh[opusr]_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AKIA[A-Z0-9]{16})\b/g, "[redacted]")
     .replace(
-      /((?:api[_-]?key|access[_-]?token|refresh[_-]?token|authorization|password|secret|cookie|credential)\s*[=:]\s*["']?)([^\s,"';}]+)/gi,
+      // `["']?` before the colon (0.489): the JSON shape of a key,
+      // `"accessToken": "..."`, put a quote between the name and the colon.
+      /((?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|authorization|password|secret|cookie|credential)["']?\s*[=:]\s*["']?)([^\s,"';}]+)/gi,
       "$1[redacted]",
-    );
+    )
+    // Anthropic's OAuth tokens, whatever they sit beside (0.489).
+    .replace(/\bsk-ant-[A-Za-z0-9_-]{12,}/g, "[redacted]");
 }
 
 /** The longest key the ledger reads (mission-store `isRedactedJson`). */

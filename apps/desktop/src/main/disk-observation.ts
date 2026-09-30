@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process'
 import { readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { toolPatchFrom } from '@teammate/runtime-adapters'
+import { redactSecrets, toolPatchFrom } from '@teammate/runtime-adapters'
 import type { NormalizedRuntimeEvent, ToolPatch } from '@teammate/runtime-adapters'
 
 import { unifiedPatchText } from '../shared/approval-patch.js'
@@ -136,6 +136,12 @@ async function carryUntracked(snapshot: Map<string, string>, workspacePath: stri
   let textBytes = 0
   for (const [path, status] of snapshot) {
     if (status !== UNTRACKED) continue
+    // Never read (holdsSecrets): its size and time say it changed.
+    if (holdsSecrets(path)) {
+      const seen = await statOf(join(workspacePath, path))
+      if (seen !== undefined) snapshot.set(path, UNTRACKED + STAMP_MARK + `${String(seen.size)}:${String(Math.round(seen.mtimeMs))}`)
+      continue
+    }
     if (lookedAt >= MAX_UNTRACKED_LOOKED_AT) break
     lookedAt += 1
     const absolute = join(workspacePath, path)
@@ -236,6 +242,31 @@ export async function snapshotFolder(workspacePath: string, options: DiskObserva
   const snapshot = new Map<string, string>(found.map((path) => [path, UNTRACKED]))
   await carryUntracked(snapshot, workspacePath, options)
   return partial ? Object.assign(snapshot, { partial: true as const }) : snapshot
+}
+
+/**
+ * FILES THAT HOLD CREDENTIALS ARE NEVER READ (0.489).
+ *
+ * Colin, 2026-09-30, a Cursor teammate working in his `.claude` folder: Claude
+ * Code refreshed its login during the run, and the thread showed
+ * `.credentials.json` -- the access and refresh tokens, in full -- as a
+ * change "seen on disk", and the ledger kept it; `mcp-needs-auth-cache.json`
+ * and a `sessions/*.key` with it. The watch reads a changed file to draw its
+ * change, and nothing asked what the file was.
+ *
+ * A path is refused when any part of it is a dotfile or dot-folder, or names
+ * credentials, secrets, tokens, keys, auth, cookies or sessions, or ends in a
+ * key or certificate extension. Such a file is still listed as changed, by
+ * name; its text is never read, drawn or stored.
+ */
+export function holdsSecrets(path: string): boolean {
+  const parts = path.split(/[\\/]+/).filter((part) => part.length > 0)
+  return parts.some((part) =>
+    part.startsWith('.')
+    || /credential|secret|token|auth|cookie|session|password|passwd|private[-_]?key|keychain|keystore|wallet/i.test(part)
+    || /\.(key|pem|p12|pfx|jks|kdbx|gpg|asc|crt|cer|der|ovpn|ppk)$/i.test(part)
+    || /^id_(rsa|dsa|ecdsa|ed25519)/i.test(part)
+  )
 }
 
 const UNTRACKED = '??'
@@ -376,13 +407,18 @@ export async function observedPatches(
   const readText = options.readText ?? defaultReadText
   const patches = new Map<string, ToolPatch>()
   for (const path of paths) {
+    // Listed by name, never opened (holdsSecrets).
+    if (holdsSecrets(path)) continue
     const entry = after.get(path)
     const status = statusOf(entry)
     try {
       if (status === UNTRACKED) {
-        const text = textOf(entry) ?? (await readText(join(workspacePath, path)))
-        if (text === undefined || text.length === 0) continue
-        const earlier = textOf(before?.get(path))
+        const read = textOf(entry) ?? (await readText(join(workspacePath, path)))
+        if (read === undefined || read.length === 0) continue
+        // Scrubbed before it is drawn or kept, as a reply is (0.489).
+        const text = redactSecrets(read)
+        const found = textOf(before?.get(path))
+        const earlier = found === undefined ? undefined : redactSecrets(found)
         // There before too, but without its text (past the bounds): what
         // changed in it is unknown, and it is not an add. The row keeps its path.
         if (earlier === undefined && statusOf(before?.get(path)) === UNTRACKED) continue
@@ -399,7 +435,7 @@ export async function observedPatches(
       // HEAD, so a change a runtime staged still shows.
       let unified = await runGit(['diff', '--no-color', '--no-ext-diff', '--no-textconv', '--', path], workspacePath)
       if (unified.trim().length === 0) unified = await runGit(['diff', '--no-color', '--no-ext-diff', '--no-textconv', '--cached', '--', path], workspacePath)
-      const patch = toolPatchFrom(unified)
+      const patch = toolPatchFrom(redactSecrets(unified))
       if (patch !== undefined) patches.set(path, patch)
     } catch {
       // No patch for this one; the row keeps its path.
