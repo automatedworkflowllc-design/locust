@@ -755,7 +755,8 @@ export function Composer({
   // teammate -- has no busy teammate, and the first version of this could
   // not be used at all on a fresh profile (steering smoke, 2026-09-05).
   const workingNow = running || busyWith !== undefined
-  const canQueue = workingNow && queued === undefined && value.trim().length > 0
+  // An edited earlier message is never queued (0.500): the queue sends a plain reply, at the end.
+  const canQueue = workingNow && queued === undefined && value.trim().length > 0 && editingEarlier === undefined
   const workingName = busyWith ?? 'this mission'
 
   // With a message queued the box is shut, and the caption under that
@@ -871,6 +872,10 @@ export function Composer({
         if (notes.length > 0) onClearDiffNotes?.()
         return
       }
+    }
+    if (editingEarlier !== undefined && workingNow) {
+      setNote(`Not sent: ${workingName === 'this mission' ? 'this teammate' : workingName} is still working. Your edit stays in the box -- send it once they finish.`)
+      return
     }
     if (canQueue) {
       // With its files, and the tiles cleared, as a send does. L20 (the code

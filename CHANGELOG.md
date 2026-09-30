@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.500.0 - 2026-09-30
+
+### Fixed
+
+- **An edited message is never queued.** If the teammate was busy in
+  another conversation when you sent an edit, it was queued like a reply
+  and would have gone out at the end of the conversation, not where you
+  edited it. It now stays in the box and says the teammate is still
+  working; send it once they finish.
+
 ## 0.499.0 - 2026-09-30
 
 ### Improved

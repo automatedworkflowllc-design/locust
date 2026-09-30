@@ -3939,6 +3939,12 @@ export default function App(): ReactElement {
             startRefusal.current = 'Stopped before it was sent. Your message is back in the box.'
             return false
           }
+          // An edited earlier message is never queued (0.500): the queue sends plain replies,
+          // and this one would go out at the END of the conversation instead of where it was edited.
+          if (rewind !== undefined) {
+            startRefusal.current = 'Not sent: this teammate is busy with another conversation. Your edited message is still in the box -- send it once they finish.'
+            return false
+          }
           if (inFront !== undefined) {
             setQueued((rows) => [...rows, { id: `q_${String(rows.length)}_${inFront}`, key: inFront, text: prompt, origin: 'person' as const }])
             return true
