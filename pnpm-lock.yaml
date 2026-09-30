@@ -20,40 +20,16 @@ importers:
 
   apps/desktop:
     dependencies:
+      electron-updater:
+        specifier: ^6.8.9
+        version: 6.8.9(supports-color@7.2.0)
+    devDependencies:
       '@teammate/mission-store':
         specifier: workspace:*
         version: link:../../packages/mission-store
       '@teammate/runtime-adapters':
         specifier: workspace:*
         version: link:../../packages/runtime-adapters
-      border-beam:
-        specifier: 1.3.0
-        version: 1.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      bot-avatars:
-        specifier: 0.1.1
-        version: 0.1.1(react@19.2.8)
-      electron-updater:
-        specifier: ^6.8.9
-        version: 6.8.9(supports-color@7.2.0)
-      katex:
-        specifier: ~0.16.47
-        version: 0.16.47
-      liquid-gooey:
-        specifier: 0.2.1
-        version: 0.2.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      metal-fx:
-        specifier: ^2.0.10
-        version: 2.0.10(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      react:
-        specifier: ^19.2.0
-        version: 19.2.8
-      react-dom:
-        specifier: ^19.2.0
-        version: 19.2.8(react@19.2.8)
-      thinking-orbs:
-        specifier: ^0.3.1
-        version: 0.3.1(react@19.2.8)
-    devDependencies:
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.3
@@ -66,6 +42,12 @@ importers:
       '@vitejs/plugin-react':
         specifier: 5.2.0
         version: 5.2.0(supports-color@7.2.0)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.33.0))
+      border-beam:
+        specifier: 1.3.0
+        version: 1.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      bot-avatars:
+        specifier: 0.1.1
+        version: 0.1.1(react@19.2.8)
       electron:
         specifier: ^44.0.0
         version: 44.0.0(supports-color@7.2.0)
@@ -75,12 +57,30 @@ importers:
       electron-vite:
         specifier: ^5.0.0
         version: 5.0.0(supports-color@7.2.0)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.33.0))
+      katex:
+        specifier: ~0.16.47
+        version: 0.16.47
+      liquid-gooey:
+        specifier: 0.2.1
+        version: 0.2.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      metal-fx:
+        specifier: ^2.0.10
+        version: 2.0.10(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       npm:
         specifier: ^12.0.2
         version: 12.0.2
       onnxruntime-web:
         specifier: 1.30.0
         version: 1.30.0
+      react:
+        specifier: ^19.2.0
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.0
+        version: 19.2.8(react@19.2.8)
+      thinking-orbs:
+        specifier: ^0.3.1
+        version: 0.3.1(react@19.2.8)
       vite:
         specifier: 7.3.6
         version: 7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.33.0)

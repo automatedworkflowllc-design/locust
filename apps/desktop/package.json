@@ -1,6 +1,6 @@
 {
   "name": "@teammate/desktop",
-  "version": "0.496.0",
+  "version": "0.497.0",
   "private": true,
   "description": "Run AI coding agents as a team you can watch, on runtimes and models you choose.",
   "author": "Automated Workflow",
@@ -19,28 +19,28 @@
     "prune:releases": "node scripts/prune-releases.mjs"
   },
   "dependencies": {
-    "@teammate/mission-store": "workspace:*",
-    "@teammate/runtime-adapters": "workspace:*",
-    "border-beam": "1.3.0",
-    "bot-avatars": "0.1.1",
-    "electron-updater": "^6.8.9",
-    "katex": "~0.16.47",
-    "liquid-gooey": "0.2.1",
-    "metal-fx": "^2.0.10",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "thinking-orbs": "^0.3.1"
+    "electron-updater": "^6.8.9"
   },
   "devDependencies": {
+    "@teammate/mission-store": "workspace:*",
+    "@teammate/runtime-adapters": "workspace:*",
     "@types/node": "^24.0.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "5.2.0",
+    "border-beam": "1.3.0",
+    "bot-avatars": "0.1.1",
     "electron": "^44.0.0",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
+    "katex": "~0.16.47",
+    "liquid-gooey": "0.2.1",
+    "metal-fx": "^2.0.10",
     "npm": "^12.0.2",
     "onnxruntime-web": "1.30.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "thinking-orbs": "^0.3.1",
     "vite": "7.3.6"
   }
 }

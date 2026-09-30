@@ -11,6 +11,14 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.497.0 - 2026-09-30
+
+### Improved
+
+- **Smaller again.** Locust carried a second copy of the libraries its
+  window is already built from, and nothing ever read it. About 15 MB less on disk,
+  and nothing you use changes.
+
 ## 0.496.0 - 2026-09-30
 
 ### Improved
