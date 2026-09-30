@@ -248,6 +248,11 @@ export interface ComposerProps {
    * comparison on screen: the box then asks every column.
    */
   readonly compare?: ComparePicking
+  /**
+   * CLOUD (0.503): the chat-type menu's fourth choice, a task for Codex Cloud.
+   * `refusal` says why it cannot be picked here (not a Codex route, no GitHub).
+   */
+  readonly cloud?: { readonly on: boolean; readonly onMode: (on: boolean) => void; readonly refusal?: string }
   readonly asking?: { readonly label: string; readonly columns: number; readonly changes?: boolean; readonly blind?: boolean }
   /** Opens the model picker when it changes: Home's Compare models (0.442). */
   readonly pickerRequest?: number
@@ -358,10 +363,12 @@ export function shiftTabMode<M extends string>(current: M, usable: readonly M[],
 }
 
 /** The chat mode chip's three choices, in Arena's words where they fit (0.451). */
-const CHAT_MODES: readonly { readonly id: 'direct' | 'compare' | 'blind'; readonly name: string; readonly desc: string; readonly icon: 'message' | 'columns' | 'eye-off' }[] = [
+const CHAT_MODES: readonly { readonly id: 'direct' | 'compare' | 'blind' | 'cloud'; readonly name: string; readonly desc: string; readonly icon: 'message' | 'columns' | 'eye-off' | 'cloud' }[] = [
   { id: 'direct', name: 'Direct', desc: 'Chat with one model at a time', icon: 'message' },
   { id: 'compare', name: 'Compare', desc: 'Two or three models of your choice, side by side', icon: 'columns' },
-  { id: 'blind', name: 'Blind', desc: 'Compare with the names hidden until you keep one', icon: 'eye-off' }
+  { id: 'blind', name: 'Blind', desc: 'Compare with the names hidden until you keep one', icon: 'eye-off' },
+  // 0.503: offered only where the window passes `cloud` (main/cloud-tasks.ts).
+  { id: 'cloud', name: 'Cloud', desc: 'Runs in Codex Cloud on this repository; bring the change home when it is done', icon: 'cloud' }
 ]
 
 export function Composer({
@@ -415,6 +422,7 @@ export function Composer({
   pickerRequest,
   fill,
   editingEarlier,
+  cloud,
   diffNotes,
   onClearDiffNotes,
   onCancel,
@@ -777,11 +785,11 @@ export function Composer({
   const compareEdits = asking !== undefined ? asking.changes === true : compare?.changes === true
   const compareModeOpen = comparing && asking === undefined && compare?.onChanges !== undefined
   // Direct, Compare or Blind: what the chat mode chip says (0.451).
-  const chatMode: 'direct' | 'compare' | 'blind' =
-    asking !== undefined ? (asking.blind === true ? 'blind' : 'compare') : compare?.on === true ? (compare.blind === true ? 'blind' : 'compare') : 'direct'
+  const chatMode: 'direct' | 'compare' | 'blind' | 'cloud' =
+    asking !== undefined ? (asking.blind === true ? 'blind' : 'compare') : cloud?.on === true ? 'cloud' : compare?.on === true ? (compare.blind === true ? 'blind' : 'compare') : 'direct'
   const versus = asking?.label ?? versusLabel((compare?.picks ?? []).map((pick) => pick.label))
   // One column left answering (the others could not start) is asked as one.
-  const placeholder = asking !== undefined ? (asking.columns <= 1 ? 'Ask a follow-up…' : `Ask ${asking.columns === 2 ? 'both' : `all ${String(asking.columns)}`}…`) : workingNow
+  const placeholder = cloud?.on === true && asking === undefined ? 'Describe a task for Codex Cloud…' : asking !== undefined ? (asking.columns <= 1 ? 'Ask a follow-up…' : `Ask ${asking.columns === 2 ? 'both' : `all ${String(asking.columns)}`}…`) : workingNow
     ? queued === undefined
       ? `Say what is next — it goes to ${workingName} when this finishes…`
       : 'Edit the queued message to change it…'
@@ -1692,15 +1700,28 @@ export function Composer({
                 <span className="lc-control__anchor" ref={chatModeAnchor}>
                   {chatModeOpen && (
                     <div className="lc-menu" role="menu" aria-label="Direct or compare">
-                      {CHAT_MODES.map((option) => (
+                      {CHAT_MODES.filter((option) => option.id !== 'cloud' || cloud !== undefined).map((option) => (
                         <button
                           key={option.id}
                           type="button"
                           role="menuitemradio"
                           aria-checked={chatMode === option.id}
                           className="lc-menu__item"
+                          {...(option.id === 'cloud' && cloud?.refusal !== undefined ? { 'aria-disabled': true, title: cloud.refusal } : {})}
                           onClick={() => {
                             setChatModeOpen(false)
+                            if (option.id === 'cloud') {
+                              // Said, not silently refused: why Cloud cannot be picked here.
+                              if (cloud?.refusal !== undefined) {
+                                setNote(cloud.refusal)
+                                return
+                              }
+                              compare.onMode(false)
+                              compare.onBlind?.(false)
+                              cloud?.onMode(true)
+                              return
+                            }
+                            cloud?.onMode(false)
                             compare.onMode(option.id !== 'direct')
                             compare.onBlind?.(option.id === 'blind')
                             // Two models already chosen, as Arena opens Side by Side (0.460);
@@ -1714,7 +1735,7 @@ export function Composer({
                           <Icon name={option.icon} size={15} />
                           <span className="lc-menu__text">
                             <span className="lc-menu__name">{option.name}</span>
-                            <span className="lc-menu__desc">{option.desc}</span>
+                            <span className="lc-menu__desc">{option.id === 'cloud' && cloud?.refusal !== undefined ? cloud.refusal : option.desc}</span>
                           </span>
                           {chatMode === option.id && <Icon name="check" size={13} />}
                         </button>

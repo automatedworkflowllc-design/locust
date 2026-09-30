@@ -15,6 +15,8 @@ import { listWorkspaceFiles } from './workspace-files.js'
 import { MAX_TAGGED, taggedPrompt } from '../shared/tagging.js'
 import { COMPARE_SLOTS, COMPARE_TREES_DIRECTORY, comparesGoneWith, compareNeedsCopy, compareRefusalOf, compareSlotKey, compareTreeId, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../shared/compare.js'
 import { reverseChanges } from '../shared/reverse-diff.js'
+import { createCloudTaskService, launchRunner } from './cloud-task-service.js'
+import type { Runner } from './cloud-tasks.js'
 import type { ReverseChange } from '../shared/reverse-diff.js'
 import { FINANCES_FOLDER, FINANCES_README, FINANCES_ROUTE, FINANCES_TEAMMATE } from './places.js'
 import { bringInCopy, COPY_ROOT, copyLineChanges, copyRefusal, makeCompareCopy, removeCompareCopies } from './compare-copies.js'
@@ -136,7 +138,7 @@ import { bootOutcome, createDiscoveryLog } from './discovery-log.js'
 import { createRuntimeFactsStore } from './runtime-facts.js'
 import { createRuntimeInstaller } from './runtime-installer.js'
 import { openSignIn } from './runtime-sign-in.js'
-import { freeRoutesOnly } from './free-routes.js'
+import { FREE_ONLY_REFUSAL, freeRoutesOnly } from './free-routes.js'
 import {
   FIRST_LOOK_AFTER_MS,
   createRuntimeUpdates,
@@ -229,6 +231,12 @@ import {
   SIDE_ASK_CHANNEL,
   FOLDER_SWITCH_CHANNEL,
   PLACE_FINANCES_CHANNEL,
+  CLOUD_WHERE_CHANNEL,
+  CLOUD_START_CHANNEL,
+  CLOUD_LIST_CHANNEL,
+  CLOUD_REFRESH_CHANNEL,
+  CLOUD_DIFF_CHANNEL,
+  CLOUD_APPLY_CHANNEL,
   REWIND_PUT_BACK_CHANNEL,
   WORKSPACE_ATTACH_CHANNEL,
   WORKSPACE_FILES_CHANNEL,
@@ -3426,6 +3434,54 @@ if (!ownsSingleInstanceLock) {
         }
       }
       return { putBack, leftAlone }
+    })
+
+    /*
+     * CLOUD TASKS (0.503, main/cloud-tasks.ts). Codex Cloud, reached through
+     * the Codex CLI the person already signed in to; the task's folder is the
+     * one open now. A drive's window spends nothing, so it never starts one.
+     */
+    const codexLaunch = async () => {
+      const codex = (await discoverForWork().catch(() => [])).find((entry) => entry.id === 'codex')
+      return codex?.availability === 'available' && codex.readiness === 'ready' ? codex.executable : undefined
+    }
+    const gitRunner: Runner = (args, cwd) => new Promise((resolve) => {
+      execFile('git', ownGitArgs(args), { cwd, windowsHide: true, maxBuffer: 4 * 1024 * 1024, timeout: 20_000 }, (error, stdout, stderr) => {
+        resolve({ code: error === null ? 0 : typeof (error as { code?: unknown }).code === 'number' ? (error as { code: number }).code : 1, stdout: String(stdout), stderr: String(stderr) })
+      })
+    })
+    const cloudTasks = createCloudTaskService({
+      file: join(app.getPath('userData'), 'cloud-tasks.json'),
+      codex: launchRunner(codexLaunch, 180_000),
+      git: gitRunner
+    })
+    const publicTask = <T extends { folder: string }>(task: T): Omit<T, 'folder'> => {
+      const { folder: _folder, ...rest } = task
+      return rest
+    }
+    ipcMain.handle(CLOUD_WHERE_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return { repo: undefined, branch: undefined, unpushed: undefined, dirty: false, codexReady: false }
+      const where = await cloudTasks.where(workspacePath)
+      return { ...where, codexReady: (await codexLaunch()) !== undefined }
+    })
+    ipcMain.handle(CLOUD_START_CHANNEL, async (event, prompt: unknown, teammateId: unknown) => {
+      if (!fromOwnWindow(event) || typeof prompt !== 'string') return { ok: false, message: 'That cloud task could not be started.' }
+      if (freeRoutesOnly(process.argv, process.env)) return { ok: false, message: FREE_ONLY_REFUSAL }
+      if ((await codexLaunch()) === undefined) return { ok: false, message: 'Cloud tasks run through Codex CLI, which is not installed or not signed in here. Settings > Runtimes shows how.' }
+      const started = await cloudTasks.start({ folder: workspacePath, prompt: prompt.slice(0, 20_000), ...(typeof teammateId === 'string' ? { teammateId } : {}) })
+      return started.ok ? { ok: true, task: publicTask(started.task), notes: started.notes } : started
+    })
+    ipcMain.handle(CLOUD_LIST_CHANNEL, async (event) => (fromOwnWindow(event) ? (await cloudTasks.list(workspacePath)).map(publicTask) : []))
+    ipcMain.handle(CLOUD_REFRESH_CHANNEL, async (event, taskId: unknown) => {
+      if (!fromOwnWindow(event) || typeof taskId !== 'string') return undefined
+      const task = await cloudTasks.refresh(taskId)
+      return task === undefined ? undefined : publicTask(task)
+    })
+    ipcMain.handle(CLOUD_DIFF_CHANNEL, async (event, taskId: unknown) => (fromOwnWindow(event) && typeof taskId === 'string' ? cloudTasks.diff(taskId) : undefined))
+    ipcMain.handle(CLOUD_APPLY_CHANNEL, async (event, taskId: unknown) => {
+      if (!fromOwnWindow(event) || typeof taskId !== 'string') return { ok: false, message: 'That change could not be applied.' }
+      const applied = await cloudTasks.apply(taskId)
+      return applied.ok ? { ok: true, task: publicTask(applied.task) } : applied
     })
 
     ipcMain.handle(FOLDER_SWITCH_CHANNEL, async (event, id: unknown) => {

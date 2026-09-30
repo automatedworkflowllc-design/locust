@@ -80,7 +80,7 @@ import { imageMediaType } from '../../shared/image-files.js'
 import { signInCommand } from '../../shared/runtime-install.js'
 import { SIGN_IN_OPENED_EVENT } from './signInEvents.js'
 import { DEFAULT_RELAY_HOP_CAP, DEFAULT_MEMORY_MODE } from '../../shared/ipc.js'
-import type { RewindPutBackResponse, RuntimeCommandsResponse } from '../../shared/ipc.js'
+import type { PublicCloudTask, PublicCloudWhere, RewindPutBackResponse, RuntimeCommandsResponse } from '../../shared/ipc.js'
 import { stripTaskBlocks } from '../../shared/room-task.js'
 import { stripMemoryBlocks } from '../../shared/memory.js'
 import { stripDecisionBlocks } from '../../shared/decision.js'
@@ -127,6 +127,7 @@ import { GroupSettingsDialog } from './components/GroupSettingsDialog.js'
 import { TeammateBot } from './components/TeammateBot.js'
 import { BesideConversation } from './components/BesideConversation.js'
 import { SideChat } from './components/SideChat.js'
+import { CloudTasks } from './components/CloudTasks.js'
 import { ReviewChanges } from './components/ReviewChanges.js'
 import { ShareTeamDialog } from './components/TeamCard.js'
 import { RuntimeMark } from './components/RuntimeMark.js'
@@ -1644,6 +1645,17 @@ export default function App(): ReactElement {
    * model that answers -- the conversation's own.
    */
   const [sideChat, setSideChat] = useState<{ readonly of: string; readonly runIds: readonly string[]; readonly model: string }>()
+  /*
+   * CLOUD TASKS (0.503, main/cloud-tasks.ts): Cloud picked in the chat-type
+   * menu, this folder's tasks, and the panel beside the conversation.
+   */
+  const [cloudOn, setCloudOn] = useState(false)
+  const [cloudTasks, setCloudTasks] = useState<readonly PublicCloudTask[]>([])
+  const [cloudPanel, setCloudPanel] = useState(false)
+  const [cloudWhere, setCloudWhere] = useState<PublicCloudWhere>()
+  const [cloudNotes, setCloudNotes] = useState<readonly string[]>([])
+  const [cloudProblem, setCloudProblem] = useState<string>()
+  const [cloudApplying, setCloudApplying] = useState<string>()
   const [viewingFile, setViewingFile] = useState<{
     readonly path: string
     /** The file's text, or a `data:` URL when the mode is `image`. */
@@ -2121,6 +2133,28 @@ export default function App(): ReactElement {
   const [workspaceNotice, setWorkspaceNotice] = useState<string>()
   /** The folder id the host reports with history, so the sidebar can keep to it. */
   const [workspaceId, setWorkspaceId] = useState<string | undefined>(undefined)
+  // Cloud tasks (0.503): this folder's, read when the folder opens.
+  useEffect(() => {
+    const bridge = window.desktop
+    if (bridge === undefined) return
+    void bridge.listCloudTasks().then(setCloudTasks).catch(() => undefined)
+    void bridge.cloudWhere().then(setCloudWhere).catch(() => undefined)
+  }, [workspaceId])
+  // And followed while one is in the cloud and the panel is open: Codex is asked every 15 s.
+  const cloudPending = cloudTasks.some((task) => task.status.state === 'pending')
+  useEffect(() => {
+    if (!cloudPanel || !cloudPending) return
+    const timer = setInterval(() => {
+      const bridge = window.desktop
+      if (bridge === undefined) return
+      for (const task of cloudTasks.filter((entry) => entry.status.state === 'pending')) {
+        void bridge.refreshCloudTask(task.taskId).then((next) => {
+          if (next !== undefined) setCloudTasks((current) => current.map((entry) => (entry.taskId === next.taskId ? next : entry)))
+        }).catch(() => undefined)
+      }
+    }, 15_000)
+    return () => clearInterval(timer)
+  }, [cloudPanel, cloudPending, cloudTasks])
   // Faces that just finished or just heard something: a hop and a glance, each
   // for a moment, then still. Keyed by teammate; cleared by their own timers.
   const [recentlyDone, setRecentlyDone] = useState<readonly string[]>([])
@@ -3546,6 +3580,18 @@ export default function App(): ReactElement {
   /** The send, when a comparison is ticked or on screen; otherwise the ordinary one. */
   const sendOrCompare = async (prompt: string): Promise<boolean | string> => {
     const bridge = window.desktop
+    // Cloud (0.503): the task goes to Codex Cloud, and the panel follows it.
+    if (cloudOn && comparing === undefined) {
+      if (!bridge) return 'Locust is not ready yet. Nothing was sent.'
+      const started = await bridge.startCloudTask(prompt, pickedTeammate?.teammateId).catch(() => undefined)
+      if (started === undefined) return 'The cloud task could not be started. Nothing was sent.'
+      if (!started.ok) return started.message
+      setCloudTasks((current) => [...current.filter((task) => task.taskId !== started.task.taskId), started.task])
+      setCloudNotes(started.notes)
+      setCloudProblem(undefined)
+      setCloudPanel(true)
+      return true
+    }
     if (comparing !== undefined && comparing.kept === undefined) {
       if (!bridge) return 'Locust is not ready yet. Nothing was sent.'
       const answer = await bridge.askCompare(comparing.compareId, prompt).catch(() => undefined)
@@ -6086,6 +6132,9 @@ export default function App(): ReactElement {
     const model = liveRun === undefined ? 'this model' : routeModelName(sideRuntime, liveRun.data?.model ?? 'account-default', resolvedModels.get(`${sideRuntime}:${liveRun.data?.model ?? 'account-default'}`))
     headerActions.push({ label: 'Ask on the side', onSelect: () => setSideChat((current) => (current?.of === of ? current : { of, runIds: [], model })) })
   }
+  if (cloudTasks.length > 0) {
+    headerActions.push({ label: 'Cloud tasks', onSelect: () => setCloudPanel(true) })
+  }
   if (liveRun !== undefined && !running) {
     for (const reviewer of reviewersFor(liveRun)) {
       headerActions.push({
@@ -7589,6 +7638,23 @@ export default function App(): ReactElement {
             onStart={sendOrCompare}
             // Compare (0.441): the picker's switch, and a comparison on screen.
             {...(comparePicking === undefined ? {} : { compare: comparePicking })}
+            cloud={{
+              on: cloudOn,
+              onMode: (on) => {
+                setCloudOn(on)
+                if (on) {
+                  setCloudPanel(true)
+                  void window.desktop?.cloudWhere().then(setCloudWhere).catch(() => undefined)
+                }
+              },
+              ...(composerRoute.runtime !== 'codex'
+                ? { refusal: 'Cloud runs on Codex: pick a Codex model first.' }
+                : cloudWhere?.codexReady === false
+                  ? { refusal: 'Codex CLI is not installed or not signed in here.' }
+                  : cloudWhere !== undefined && cloudWhere.repo === undefined
+                    ? { refusal: 'This folder is not on GitHub, so the cloud has nothing to work on.' }
+                    : {})
+            }}
             pickerRequest={pickerRequest}
             {...(composerFill === undefined ? {} : { fill: composerFill })}
             {...(rewinding === undefined || rewinding.key !== shownKey
@@ -7727,6 +7793,28 @@ export default function App(): ReactElement {
               if (bridge === undefined || workspacePath === undefined) return
               void bridge.saveCopy(viewingFile.path).catch(() => undefined)
             }}
+          />
+        ) : cloudPanel && screen === 'workroom' ? (
+          <CloudTasks
+            tasks={cloudTasks}
+            where={cloudWhere}
+            notes={cloudNotes}
+            problem={cloudProblem}
+            applying={cloudApplying}
+            onShowChange={async (taskId) => (await window.desktop?.cloudTaskDiff(taskId).catch(() => undefined)) ?? undefined}
+            onApply={(taskId) => {
+              setCloudApplying(taskId)
+              void window.desktop?.applyCloudTask(taskId).then((answer) => {
+                if (answer.ok) {
+                  setCloudTasks((current) => current.map((task) => (task.taskId === taskId ? answer.task : task)))
+                  setCloudProblem(undefined)
+                } else {
+                  setCloudProblem(answer.message)
+                }
+              }).catch(() => setCloudProblem('The change could not be applied. Nothing in the folder was changed by Locust.')).finally(() => setCloudApplying(undefined))
+            }}
+            onOpen={(url) => void window.desktop?.openLink(url).catch(() => undefined)}
+            onClose={() => setCloudPanel(false)}
           />
         ) : sideChat !== undefined && screen === 'workroom' ? (
           <SideChat

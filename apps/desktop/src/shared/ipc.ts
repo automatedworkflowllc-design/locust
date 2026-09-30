@@ -646,6 +646,49 @@ export const WORKSPACE_CHOOSE_CHANNEL = 'workspace:choose'
 export const FOLDER_LIST_CHANNEL = 'folder:list'
 /** Ask a question on the side of a conversation: read-only, on a copy of its session (0.461). */
 export const SIDE_ASK_CHANNEL = 'side:ask'
+/**
+ * CLOUD TASKS (0.503, main/cloud-tasks.ts): work handed to Codex Cloud from
+ * the chat-type menu, followed here, and applied only when the person asks.
+ */
+export const CLOUD_WHERE_CHANNEL = 'cloud:where'
+export const CLOUD_START_CHANNEL = 'cloud:start'
+export const CLOUD_LIST_CHANNEL = 'cloud:list'
+export const CLOUD_REFRESH_CHANNEL = 'cloud:refresh'
+export const CLOUD_DIFF_CHANNEL = 'cloud:diff'
+export const CLOUD_APPLY_CHANNEL = 'cloud:apply'
+export interface PublicCloudTask {
+  readonly taskId: string
+  readonly url: string
+  readonly runtime: 'codex'
+  readonly repo: string
+  readonly branch: string | undefined
+  readonly prompt: string
+  readonly createdAt: string
+  readonly teammateId?: string
+  readonly status: {
+    readonly state: 'pending' | 'ready' | 'failed' | 'applied' | 'unknown'
+    readonly title: string | undefined
+    readonly added: number | undefined
+    readonly removed: number | undefined
+    readonly files: number | undefined
+  }
+  readonly appliedAt?: string
+}
+/** Where this folder stands for a cloud task: a GitHub repository, its branch, what GitHub lacks. */
+export interface PublicCloudWhere {
+  readonly repo: string | undefined
+  readonly branch: string | undefined
+  readonly unpushed: number | undefined
+  readonly dirty: boolean
+  /** Codex CLI is here and signed in: the cloud is reached through it. */
+  readonly codexReady: boolean
+}
+export type CloudStartResponse =
+  | { readonly ok: true; readonly task: PublicCloudTask; readonly notes: readonly string[] }
+  | { readonly ok: false; readonly message: string }
+export type CloudApplyResponse =
+  | { readonly ok: true; readonly task: PublicCloudTask }
+  | { readonly ok: false; readonly message: string }
 export type SideAskResponse =
   | { readonly ok: true; readonly data: { readonly runId: string; readonly missionId: string } }
   | { readonly ok: false; readonly message: string }
@@ -2849,6 +2892,13 @@ export interface DesktopApi {
   switchFolder(id: string): Promise<FolderSwitchResponse>
   /** The Finances place: its folder made if need be, and its teammate (0.501). */
   openFinancesPlace(): Promise<PlaceOpenResponse>
+  /** Cloud tasks (0.503): this folder's standing, start, follow, show, apply. */
+  cloudWhere(): Promise<PublicCloudWhere>
+  startCloudTask(prompt: string, teammateId?: string): Promise<CloudStartResponse>
+  listCloudTasks(): Promise<readonly PublicCloudTask[]>
+  refreshCloudTask(taskId: string): Promise<PublicCloudTask | undefined>
+  cloudTaskDiff(taskId: string): Promise<string | undefined>
+  applyCloudTask(taskId: string): Promise<CloudApplyResponse>
   /** Undo the later turns' file changes before an edited message goes (0.502). */
   putBackFiles(request: RewindPutBackRequest): Promise<RewindPutBackResponse>
   /**

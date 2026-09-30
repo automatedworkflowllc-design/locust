@@ -11,6 +11,23 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.503.0 - 2026-09-30
+<!-- big -->
+
+### New
+
+- **Cloud tasks.** Pick **Cloud** in the chat-type menu (beside Direct,
+  Compare and Blind), describe a task, and it runs in Codex Cloud on this
+  folder's GitHub repository, using your cloud credits or plan. A Cloud
+  tasks panel beside the conversation follows it until it is ready. **Show
+  the change** draws its diff, and **Apply to this folder** brings it in,
+  uncommitted, so you can look before you keep it. Nothing comes into your
+  folder before you apply.
+  Before a task starts, you are told what the cloud will not see:
+  commits not yet on GitHub, and uncommitted changes. It needs a Codex
+  model, and an environment for the repository made in the Codex app under
+  Settings > Legacy Codex Cloud; if one is missing, Locust says so.
+
 ## 0.502.0 - 2026-09-30
 
 ### New

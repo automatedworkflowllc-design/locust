@@ -17379,3 +17379,79 @@ textarea {
 .lc-importdialog__search {
   width: 100%;
 }
+
+/*
+ * CLOUD TASKS (0.503): beside the conversation, one block per task -- what it
+ * was asked, how it is going, and what can be done with it. The state is the
+ * line under the ask; a task still in the cloud carries a slow amber dot.
+ */
+/* The panel's list scrolls between its head and the window's foot, as the side chat's does. */
+.lc-cloudtasks .lc-beside__thread {
+  min-height: 0;
+}
+.lc-cloudtasks__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-5);
+  padding: var(--lc-space-5);
+  overflow-y: auto;
+}
+.lc-cloudtasks__empty,
+.lc-cloudtasks__note {
+  margin: 0;
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
+  text-wrap: pretty;
+}
+.lc-cloudtasks__problem {
+  margin: 0;
+  color: var(--lc-amber-text);
+  font-size: var(--lc-text-description);
+}
+.lc-cloudtask {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-3);
+  padding-bottom: var(--lc-space-5);
+  border-bottom: 1px solid var(--lc-border-hairline);
+}
+.lc-cloudtask__prompt {
+  color: var(--lc-text-primary);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+.lc-cloudtask__state {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+  color: var(--lc-text-secondary);
+  font-size: var(--lc-text-description);
+}
+.lc-cloudtask.is-ready .lc-cloudtask__state,
+.lc-cloudtask.is-applied .lc-cloudtask__state {
+  color: var(--lc-lime-text);
+}
+.lc-cloudtask.is-failed .lc-cloudtask__state {
+  color: var(--lc-amber-text);
+}
+.lc-cloudtask__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--lc-amber);
+  animation: lc-cloudtask-breathe 1.8s ease-in-out infinite;
+}
+@keyframes lc-cloudtask-breathe {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lc-cloudtask__dot { animation: none; }
+}
+.lc-cloudtask__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lc-space-3);
+}
