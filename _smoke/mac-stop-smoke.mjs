@@ -121,31 +121,44 @@ try {
   check("Ash's conversation opens", opened === 'opened', String(opened))
 
   const sent = await evaluate(`(async () => {
-    const field = document.querySelector('form.command-dock textarea')
-    if (!field) return 'no box'
+    const WORDS = 'Using the shell, run a command that prints the numbers 1 to 300, one per second, then tell me the last number.'
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
-    setter.call(field, 'Using the shell, run a command that prints the numbers 1 to 300, one per second, then tell me the last number.')
-    field.dispatchEvent(new Event('input', { bubbles: true }))
+    // The box is found again every time: the window can draw a new one as the
+    // conversation opens, and a held reference then reads the old, detached box
+    // (0.504's first run: "never ran: start enabled" after the re-press).
+    const box = () => document.querySelector('form.command-dock textarea')
+    const fill = () => {
+      const field = box()
+      if (field === null || field.value.length > 0) return
+      setter.call(field, WORDS)
+      field.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+    if (box() === null) return 'no box'
+    fill()
     // Pressed again if the words are still in the box: on a runner that has just
     // started, a press can land before the window is listening (0.497, run 36696510212).
     let presses = 0
-    for (let i = 0; i < 80 && presses < 3; i += 1) {
+    let sent = false
+    for (let i = 0; i < 80 && presses < 3 && !sent; i += 1) {
+      fill()
       const button = document.querySelector('button[aria-label="Start mission"]')
-      if (button && !button.disabled && field.value.length > 0) {
+      if (button && !button.disabled && (box()?.value.length ?? 0) > 0) {
         button.click()
         presses += 1
-        for (let wait = 0; wait < 16 && field.value.length > 0; wait += 1) await new Promise((r) => setTimeout(r, 500))
-        if (field.value.length === 0) break
+        for (let wait = 0; wait < 16 && (box()?.value.length ?? 0) > 0; wait += 1) await new Promise((r) => setTimeout(r, 500))
+        // Emptied, and a turn on screen: it went. Emptied with nothing on screen: the box was redrawn.
+        if ((box()?.value.length ?? 0) === 0 && document.querySelector('.lc-thread .lc-bubble')) sent = true
       }
       await new Promise((r) => setTimeout(r, 250))
     }
     window.__presses = presses
+    window.__box = box()?.value ?? '(no box)'
     for (let i = 0; i < 180; i += 1) {
       await new Promise((r) => setTimeout(r, 1000))
       if (document.querySelector('button[aria-label="Stop the running mission"]') && document.querySelector('.lc-livestep')) return window.__presses > 1 ? 'running (Start pressed ' + window.__presses + ' times)' : 'running'
     }
     const start = document.querySelector('button[aria-label="Start mission"]')
-    return 'never ran: start ' + (start === null ? 'missing' : start.disabled ? 'disabled (' + (start.getAttribute('title') ?? '') + ')' : 'enabled')
+    return 'never ran: pressed ' + window.__presses + ' times, box held "' + String(window.__box).slice(0, 40) + '" | start ' + (start === null ? 'missing' : start.disabled ? 'disabled (' + (start.getAttribute('title') ?? '') + ')' : 'enabled')
       + ' | notice: ' + ([...document.querySelectorAll('.lc-notice')].map((el) => el.innerText).join(' / ') || 'none')
       + ' | runtimes: ' + (document.querySelector('.lc-sidebar__status, .lc-status')?.innerText ?? '?')
       + ' | thread: ' + (document.querySelector('.lc-thread')?.innerText ?? '').replace(/\\s+/g, ' ').slice(-400)
