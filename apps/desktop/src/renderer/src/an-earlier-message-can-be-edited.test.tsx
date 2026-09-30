@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { Composer } from './components/Composer.js'
 import type { ComposerProps } from './components/Composer.js'
 import { Thread } from './components/Thread.js'
+import { turnVersions } from './missionView.js'
 
 /**
  * AN EARLIER MESSAGE CAN BE EDITED (0.498). Sol's 0.491 pass looked for it on
@@ -97,5 +98,49 @@ describe('the box, while an earlier message is edited', () => {
 
   it('says nothing of the kind otherwise', () => {
     expect(composer({})).not.toContain('Editing an earlier message')
+  })
+})
+
+describe('the version before an edit (0.498)', () => {
+  // one -> two -> three, then two was edited: one -> two' -> three'.
+  const at = (minute: number): string => `2026-09-30T10:${String(minute).padStart(2, '0')}:00.000Z`
+  const turn = (missionId: string, minute: number, from?: string, edited?: true) => ({
+    missionId,
+    createdAt: at(minute),
+    ...(from === undefined ? {} : { continuesFrom: { missionId: from, reason: 'follow-up', ...(edited === undefined ? {} : { edited }) } })
+  })
+  const byId = new Map([
+    turn('one', 1),
+    turn('two', 2, 'one'),
+    turn('three', 3, 'two'),
+    turn('two_edited', 4, 'one', true),
+    turn('three_edited', 5, 'two_edited')
+  ].map((mission) => [mission.missionId, mission]))
+
+  it('finds, for the edit, the newest turn of the version before it', () => {
+    expect(turnVersions('two_edited', byId)).toEqual({ before: 'three' })
+  })
+
+  it('finds, for the replaced turn, the newest turn of the edit', () => {
+    expect(turnVersions('two', byId)).toEqual({ after: 'three_edited' })
+  })
+
+  it('finds nothing for a turn no edit touched, or two follow-ups that are not an edit', () => {
+    expect(turnVersions('one', byId)).toBeUndefined()
+    expect(turnVersions('three_edited', byId)).toBeUndefined()
+    const twice = new Map([turn('a', 1), turn('b', 2, 'a'), turn('c', 3, 'a')].map((mission) => [mission.missionId, mission]))
+    expect(turnVersions('c', twice)).toBeUndefined()
+    expect(turnVersions('b', twice)).toBeUndefined()
+  })
+
+  it('says so above the message, with the way to the other version', () => {
+    const html = thread({
+      onOpenVersion: () => undefined,
+      earlierTurns: [{ missionId: 'mission_one', prompt: 'The first thing', events: said('Done one.'), versions: { before: 'mission_old' } }]
+    })
+    expect(html).toContain('Edited.')
+    expect(html).toContain('>Show the version before</button>')
+    expect(thread({ onOpenVersion: () => undefined, versions: { after: 'mission_new' } })).toContain('>Show the edited version</button>')
+    expect(thread({ onOpenVersion: () => undefined, rewound: true, versions: { before: 'mission_old' } })).toMatch(/Started again from an edited message\.[^<]*<button[^>]*>Show the version before/)
   })
 })

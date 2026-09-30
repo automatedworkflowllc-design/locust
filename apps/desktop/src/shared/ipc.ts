@@ -2590,6 +2590,8 @@ export interface PublicRecoveredMission {
     readonly checkpointEpoch: number
     /** `route-switch` is a handoff; `follow-up` is the next turn of one conversation. */
     readonly reason: 'route-switch' | 'follow-up'
+    /** An edit of an earlier message (0.498): an earlier version followed the same turn. */
+    readonly edited?: true
   }
   /**
    * Set when the HOST started this run rather than a person -- today, one

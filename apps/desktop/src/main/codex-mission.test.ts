@@ -2458,7 +2458,8 @@ describe('continuing a conversation', () => {
     expect(sent.trimEnd().endsWith('check the apple stock price instead')).toBe(true)
     // The terminal's latest turn is the branch being set aside: never jumped to.
     expect(catchUpTerminal).not.toHaveBeenCalled()
-    expect(created.at(-1)?.continuesFrom).toEqual({ missionId: 'mission_prior', checkpointEpoch: 1, reason: 'follow-up' })
+    // Marked as an edit, so the version before can be found again after a restart.
+    expect(created.at(-1)?.continuesFrom).toEqual({ missionId: 'mission_prior', checkpointEpoch: 1, reason: 'follow-up', edited: true })
   })
 
   it('sends again as the same words, not as an earlier turn quoted back (0.496)', async () => {

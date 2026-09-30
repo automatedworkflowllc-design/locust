@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.499.0 - 2026-09-30
+
+### Improved
+
+- **The version before an edit is still there.** A message you edited says
+  "Edited", with **Show the version before**, which opens the conversation
+  as it was, replies and all. That version says "This message was edited
+  later" and links back. Both stay under one conversation in the sidebar,
+  and still say so after Locust restarts.
+
 ## 0.498.0 - 2026-09-30
 <!-- big -->
 

@@ -311,6 +311,13 @@ export interface MissionContinuation {
    * rather than leaving that to be inferred.
    */
   readonly runtimeThreadId?: string
+  /**
+   * This turn is an EDIT of an earlier message (0.498): the person went back
+   * and changed the turn that first followed `missionId`, which still stands
+   * as the version before. Optional and additive -- a build that does not know
+   * it reads the turn as an ordinary follow-up -- so no schema version moves.
+   */
+  readonly edited?: true
 }
 
 export type MissionHostFailureCode = 'runtime-start-failed' | 'runtime-transport-failed'
@@ -758,6 +765,9 @@ function validateMetadata(metadata: MissionLedgerMetadata): MissionLedgerMetadat
     }
     if (metadata.continuesFrom.runtimeThreadId !== undefined) {
       requireText(metadata.continuesFrom.runtimeThreadId, 'continuesFrom.runtimeThreadId', 2_048)
+    }
+    if (metadata.continuesFrom.edited !== undefined && metadata.continuesFrom.edited !== true) {
+      throw new Error('Mission continuation is invalid')
     }
   }
   if (metadata.command !== undefined) {

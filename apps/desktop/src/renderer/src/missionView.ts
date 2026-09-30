@@ -4225,6 +4225,66 @@ export interface ConversationTurn {
   readonly switchedFrom?: TurnSwitch
   /** Set when the person had this exchange in that runtime's own terminal (0.391). */
   readonly inTerminal?: MissionRuntimeId
+  /** The other version of this turn, when a message here was edited (0.498). */
+  readonly versions?: TurnVersions
+}
+
+/**
+ * THE OTHER VERSION OF AN EDITED MESSAGE (0.498).
+ *
+ * Editing an earlier message starts a second turn after the same one; the
+ * first stays, with everything that followed it. `before` is where that
+ * earlier version got to, for a turn that IS the edit; `after` is where the
+ * edit got to, for a turn an edit replaced. Each is the newest turn of that
+ * branch -- what opening it should show. Only a turn marked `edited` makes a
+ * version: two follow-ups of one turn for any other reason are not an edit.
+ */
+export interface TurnVersions {
+  readonly before?: string
+  readonly after?: string
+}
+
+type Linked = { readonly missionId: string; readonly createdAt: string; readonly continuesFrom?: { readonly missionId: string; readonly reason: string; readonly edited?: true } }
+
+/** The newest turn reached from `start` through the turns that continue it. */
+function newestTurnFrom<T extends Linked>(start: T, children: ReadonlyMap<string, readonly T[]>): T {
+  let newest = start
+  const seen = new Set<string>()
+  const queue = [start]
+  while (queue.length > 0) {
+    const at = queue.shift()!
+    if (seen.has(at.missionId)) continue
+    seen.add(at.missionId)
+    if (Date.parse(at.createdAt) > Date.parse(newest.createdAt)) newest = at
+    queue.push(...(children.get(at.missionId) ?? []))
+  }
+  return newest
+}
+
+export function turnVersions<T extends Linked>(missionId: string, byId: ReadonlyMap<string, T>): TurnVersions | undefined {
+  const turn = byId.get(missionId)
+  const parent = turn?.continuesFrom
+  if (turn === undefined || parent === undefined || parent.reason !== 'follow-up') return undefined
+  const children = new Map<string, T[]>()
+  for (const mission of byId.values()) {
+    const from = mission.continuesFrom?.missionId
+    if (from === undefined) continue
+    const held = children.get(from)
+    if (held === undefined) children.set(from, [mission])
+    else held.push(mission)
+  }
+  const siblings = (children.get(parent.missionId) ?? [])
+    .filter((mission) => mission.continuesFrom?.reason === 'follow-up')
+    .sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt))
+  const at = siblings.findIndex((mission) => mission.missionId === missionId)
+  if (at < 0) return undefined
+  const older = turn.continuesFrom?.edited === true ? siblings[at - 1] : undefined
+  const newer = siblings.slice(at + 1).find((mission) => mission.continuesFrom?.edited === true)
+  if (older === undefined && newer === undefined) return undefined
+  return {
+    ...(older === undefined ? {} : { before: newestTurnFrom(older, children).missionId }),
+    ...(newer === undefined ? {} : { after: newestTurnFrom(newer, children).missionId })
+  }
 }
 
 /**
@@ -4307,7 +4367,9 @@ export function conversationTurns(
       head = prior
     }
     const switchedFrom = switchOf(head, byId)
+    const versions = turnVersions(head.missionId, byId)
     turns.push({
+      ...(versions === undefined ? {} : { versions }),
       missionId: latest.missionId,
       prompt: latest.prompt,
       events: latest.events,

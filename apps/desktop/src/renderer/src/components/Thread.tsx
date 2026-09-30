@@ -12,6 +12,7 @@ import type {
   PublicRecoveredMission,
   PublicTeammate
 } from '../../../shared/ipc.js'
+import type { TurnVersions } from '../missionView.js'
 import { activityEntries, buildThread, cancellationSummary, editedFiles, decisionStanding, errorAlreadyShown, foldNoticeKeys, lastPlanOf, modeRefusedATool, readPlan, relativePath, sentAgainBy, stepsLine, stoppedBeforeSaying, terminalSeamBefore, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
 import type { GroupBoundary, GroupLeaving, LiveStarter, TurnSwitch } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
@@ -720,6 +721,10 @@ export interface ThreadProps {
   readonly onEditMessage?: (missionId: string, words: string) => void
   /** This turn started again from an edited message (0.498): said above it. */
   readonly rewound?: boolean
+  /** The other version of THIS turn, when it is an edit or was replaced by one (0.498). */
+  readonly versions?: TurnVersions
+  /** Open another version of an edited message: the newest turn of that branch. */
+  readonly onOpenVersion?: (missionId: string) => void
   /** The folder missions run in; paths render relative to it. */
   readonly workspacePath?: string
   /** Present only when re-running with edits allowed is possible; see App. */
@@ -784,6 +789,8 @@ export interface ThreadProps {
     readonly switchedFrom?: TurnSwitch
     /** Set when the person had that exchange in the runtime's own terminal (0.391). */
     readonly inTerminal?: MissionRuntimeId
+    /** The other version of that turn, when a message there was edited (0.498). */
+    readonly versions?: TurnVersions
   }[]
   /**
    * Where this conversation's group began briefing it, if it is in one with
@@ -883,6 +890,8 @@ export function Thread({
   coldStart = false,
   onEditMessage,
   rewound = false,
+  versions,
+  onOpenVersion,
   onRunWithEdits,
   onRunAgain,
   onSendAgain,
@@ -1141,6 +1150,36 @@ onResume,
       </>
     )
   }
+  /*
+   * AN EDITED MESSAGE SAYS SO, AND WHERE THE OTHER VERSION IS (0.498). The
+   * version before an edit is not gone -- it is the turns the edit set aside,
+   * and a conversation reopened on either one names the other, as claude.ai
+   * does with its arrows.
+   */
+  const versionLinks = (other: TurnVersions | undefined): ReactElement[] => {
+    if (other === undefined || onOpenVersion === undefined) return []
+    return [
+      ...(other.before === undefined ? [] : [
+        <button key="before" type="button" className="lc-thread__versionlink" onClick={() => onOpenVersion(other.before!)}>
+          Show the version before
+        </button>
+      ]),
+      ...(other.after === undefined ? [] : [
+        <button key="after" type="button" className="lc-thread__versionlink" onClick={() => onOpenVersion(other.after!)}>
+          Show the edited version
+        </button>
+      ])
+    ]
+  }
+  const versionNote = (other: TurnVersions | undefined): ReactElement | null => {
+    const links = versionLinks(other)
+    if (links.length === 0) return null
+    return (
+      <div className="lc-thread__note">
+        {other?.before !== undefined ? 'Edited.' : 'This message was edited later.'} {links}
+      </div>
+    )
+  }
   const exchanges = threadPeerCards([...earlierTurns.map((turn) => turn.peerMessages ?? []), peers.messages])
   const peerCard = (card: ThreadPeerCard): ReactElement => (
     <PeerThread
@@ -1228,6 +1267,7 @@ onResume,
               {joinNotes((beforeTurn) => beforeTurn === index)}
               {turn.switchedFrom !== undefined && <HandoffDivider {...turn.switchedFrom} />}
               {seam !== undefined && <TerminalDivider seam={seam} />}
+              {!again && versionNote(turn.versions)}
               {!again && userTurn(turnPromptLine(turn), turnAttachments(turn), () => editedFiles(turn.events, workspacePath), turn.startedBy === undefined && turn.inTerminal === undefined ? turn.missionId : undefined)}
               {cardsFor(index, 'before-work').map(peerCard)}
               {!again && earlierWork[index]}
@@ -1247,9 +1287,11 @@ onResume,
         {joinNotes((beforeTurn) => beforeTurn === earlierTurns.length)}
         {rewound && (
           <div className="lc-thread__note">
-            Started again from an edited message. The replies after it were set aside; files they changed are as they left them.
+            Started again from an edited message. The replies after it were set aside; files they changed are as they left them.{' '}
+            {versionLinks(versions)}
           </div>
         )}
+        {!rewound && versionNote(versions)}
         {!rewound && coldStart && earlierTurns.some((turn, index) => !sentAgainBy(turn, earlierTurns[index + 1]?.prompt ?? prompt)) && (
           /*
            * WHERE THIS TURN BEGAN, said where the turn begins.

@@ -122,6 +122,24 @@ try {
   check('reopened, the conversation is the new branch', reopened.bubbles.some((b) => /MAPLE/.test(b)) && !reopened.bubbles.some((b) => /CEDAR/.test(b)), JSON.stringify(reopened.bubbles))
   check('still one conversation in the sidebar', reopened.rows.length === 1, JSON.stringify(reopened.rows))
 
+  // The version before is not gone: the edited turn names it, and it names the edit (0.498).
+  const link = (label) => `(async () => {
+    const button = [...document.querySelectorAll('.lc-thread .lc-thread__versionlink')].find((el) => el.innerText.trim() === ${JSON.stringify(label)})
+    if (!button) return 'no link'
+    button.click()
+    await new Promise((r) => setTimeout(r, 1500))
+    return 'pressed'
+  })()`
+  check('the edited turn says so after the reload', reopened.notes.some((note) => /^Edited\./.test(note) && /Show the version before/.test(note)), JSON.stringify(reopened.notes))
+  check('Show the version before', String(await drive.evaluate(link('Show the version before'))) === 'pressed')
+  const older = await read('the version before the edit')
+  check('it is the CEDAR branch, whole', older.bubbles.some((b) => /CEDAR/.test(b)) && !older.bubbles.some((b) => /MAPLE/.test(b)) && /CEDAR/i.test(older.replies.at(-1) ?? ''), JSON.stringify(older.bubbles))
+  check('and it names the edit', older.notes.some((note) => /edited later/.test(note) && /Show the edited version/.test(note)), JSON.stringify(older.notes))
+  check('still one conversation in the sidebar while it is open', older.rows.length === 1, JSON.stringify(older.rows))
+  check('Show the edited version', String(await drive.evaluate(link('Show the edited version'))) === 'pressed')
+  const back = await read('back on the edited version')
+  check('back on the MAPLE branch', back.bubbles.some((b) => /MAPLE/.test(b)) && !back.bubbles.some((b) => /CEDAR/.test(b)), JSON.stringify(back.bubbles))
+
   check('Edit on the first message', String(await drive.evaluate(editOn('FALCON'))) === 'pressed')
   await drive.evaluate(retype('Remember the word OTTER. Reply with just OK.'))
   await drive.evaluate(sendTheBox)

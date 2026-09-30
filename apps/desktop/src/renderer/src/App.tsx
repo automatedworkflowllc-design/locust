@@ -152,7 +152,7 @@ import { cappedLiveEvents, LIVE_EVENT_CAP,
   startedLabel,
   stitchedHandoff,
   runtimeNeverStarted, shownPrompt, typedPrompt, buildThread, durationText, runSpanMs, lastActivityAt, relativePath, fileTurns, shellCommandText, turnText, groupBoundary, groupJoins, groupLeavings, latestSetupNotes } from './missionView.js'
-import type { LiveStarter, TurnSwitch } from './missionView.js'
+import type { LiveStarter, TurnSwitch, TurnVersions } from './missionView.js'
 import { finishedToast } from './finishedToast.js'
 import { folderName, ranOnLine } from './ranOn.js'
 import { reviewBrief } from './reviewBrief.js'
@@ -246,7 +246,11 @@ interface LiveRunState {
     readonly switchedFrom?: TurnSwitch
     /** Set when the person had that exchange in the runtime's own terminal (0.391). */
     readonly inTerminal?: MissionRuntimeId
+    /** The other version of that turn, when a message there was edited (0.498). */
+    readonly versions?: TurnVersions
   }[]
+  /** The other version of THIS turn, when it is an edit or was replaced by one (0.498). */
+  readonly versions?: TurnVersions
   /**
    * Set when THIS turn is a reply sent to another runtime than the turn
    * before it: the divider drawn above the reply. From the start receipt,
@@ -432,6 +436,7 @@ function earlierTurnsOf(
         ...(live.peerMessages === undefined ? {} : { peerMessages: live.peerMessages }),
         ...(live.startedBy === undefined ? {} : { startedBy: live.startedBy }),
         ...(live.switchedFrom === undefined ? {} : { switchedFrom: live.switchedFrom }),
+        ...(live.versions === undefined ? {} : { versions: live.versions }),
         ...inTerminalOf(live)
       }
     ]
@@ -446,7 +451,8 @@ function earlierTurnsOf(
       events: turn.events,
       peerMessages: turn.peerMessages,
       ...(turn.switchedFrom === undefined ? {} : { switchedFrom: turn.switchedFrom }),
-      ...(turn.inTerminal === undefined ? {} : { inTerminal: turn.inTerminal })
+      ...(turn.inTerminal === undefined ? {} : { inTerminal: turn.inTerminal }),
+      ...(turn.versions === undefined ? {} : { versions: turn.versions })
     }
   })
 }
@@ -476,12 +482,14 @@ function reopenedRun(
               events: turn.events,
               peerMessages: turn.peerMessages,
               ...(turn.switchedFrom === undefined ? {} : { switchedFrom: turn.switchedFrom }),
-              ...(turn.inTerminal === undefined ? {} : { inTerminal: turn.inTerminal })
+              ...(turn.inTerminal === undefined ? {} : { inTerminal: turn.inTerminal }),
+              ...(turn.versions === undefined ? {} : { versions: turn.versions })
             }
           })
         }),
     ...(handoff === undefined ? {} : { handoff }),
-    ...(switchedFrom === undefined ? {} : { switchedFrom })
+    ...(switchedFrom === undefined ? {} : { switchedFrom }),
+    ...(turns.at(-1)?.versions === undefined ? {} : { versions: turns.at(-1)!.versions! })
   }
 }
 
@@ -3838,6 +3846,7 @@ export default function App(): ReactElement {
             // And where that turn itself switched runtime, so its divider
             // stays above it once the conversation moves on.
             ...(continuing.switchedFrom === undefined ? {} : { switchedFrom: continuing.switchedFrom }),
+            ...(continuing.versions === undefined ? {} : { versions: continuing.versions }),
             // And whether it was had in the terminal: without it the reply's
             // thread drew "Back in Locust" ABOVE the turn it was replying to
             // (the 0.391 drive's own text, read after its checks had passed).
@@ -3853,7 +3862,7 @@ export default function App(): ReactElement {
       ...(teammateId === undefined ? {} : { teammateId }),
       ...(earlierTurns.length === 0 ? {} : { earlierTurns }),
       ...(coldStart ? { coldStart: true } : {}),
-      ...(rewind === undefined ? {} : { rewound: true }),
+      ...(rewind === undefined ? {} : { rewound: true, ...(rewind.before === undefined ? {} : { versions: { before: rewind.tip } }) }),
       // Plan is a mode now, so the run remembers what it was asked to be
       // rather than a switch that sat beside the mode and could disagree.
       ...((modeOverride ?? runMode) === 'plan' ? { plan: true } : {})
@@ -7205,6 +7214,8 @@ export default function App(): ReactElement {
                 })()}
                 coldStart={liveRun.coldStart ?? false}
                 rewound={liveRun.rewound === true}
+                {...(liveRun.versions === undefined ? {} : { versions: liveRun.versions })}
+                onOpenVersion={openMission}
                 {...(running || liveRun.data === undefined || comparing !== undefined ? {} : { onEditMessage: editEarlierMessage })}
                 workspacePath={workspacePath}
                 {...(workspaceId === undefined ? {} : { workspaceId })}

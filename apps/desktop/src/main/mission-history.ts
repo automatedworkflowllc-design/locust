@@ -254,7 +254,8 @@ export function publicRecoveredMission(
           continuesFrom: {
             missionId: mission.metadata.continuesFrom.missionId,
             checkpointEpoch: mission.metadata.continuesFrom.checkpointEpoch,
-            reason: mission.metadata.continuesFrom.reason
+            reason: mission.metadata.continuesFrom.reason,
+            ...(mission.metadata.continuesFrom.edited === true ? { edited: true as const } : {})
           }
         }),
     // Copied by kind rather than spread: each carries a different counter, and

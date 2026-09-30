@@ -827,6 +827,26 @@ textarea {
   outline: 2px solid var(--lc-border-strong);
 }
 
+/* "Show the version before" on an edited message's note (0.498): a step
+   brighter than the note it ends, and quiet until pointed at. */
+.lc-thread__versionlink {
+  padding: 0;
+  margin-left: var(--lc-space-3);
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--lc-text-secondary);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--lc-border-strong);
+  text-underline-offset: 3px;
+}
+.lc-thread__versionlink:hover,
+.lc-thread__versionlink:focus-visible {
+  color: var(--lc-text-primary);
+  text-decoration-color: currentColor;
+}
+
 /*
  * The files a message was sent with, under the message.
  *

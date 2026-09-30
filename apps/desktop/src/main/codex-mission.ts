@@ -1961,7 +1961,9 @@ ${sentPrompt.trim()}`
                       // Absent when the turn being continued left no session:
                       // the record then says "this followed that" without
                       // claiming a resume that never happened.
-                      ...(resumeThreadId === undefined ? {} : { runtimeThreadId: resumeThreadId })
+                      ...(resumeThreadId === undefined ? {} : { runtimeThreadId: resumeThreadId }),
+                      // An edit of an earlier message (0.498): the turn it replaces stays as the version before.
+                      ...(rewind === true ? { edited: true as const } : {})
                     }
                   }
               : { continuesFrom: continuation }),
