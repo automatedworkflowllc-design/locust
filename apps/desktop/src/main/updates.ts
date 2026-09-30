@@ -250,10 +250,9 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
 
     async check(): Promise<AppUpdateResponse> {
       if (!options.supported) {
-        return {
-          ok: true,
-          data: { phase: 'unsupported', currentVersion: options.currentVersion }
-        }
+        // Said to the window too (0.507): the launch check is how Settings
+        // learns it, and a copy showed "Not checked yet" with Check now live.
+        return { ok: true, data: publish({ phase: 'unsupported', currentVersion: options.currentVersion }) }
       }
       publish({ phase: 'checking', currentVersion: options.currentVersion })
       try {
