@@ -4,6 +4,7 @@ import {
   createPathExecutableLocator,
   cursorConnectorSentence,
   cursorReadyConnectorLine,
+  killProcessTree,
   parseCursorMcpList
 } from '@teammate/runtime-adapters'
 
@@ -58,16 +59,26 @@ const runCursorMcpList: McpLister = async () => {
   const launch = await createPathExecutableLocator({}).find('cursor-agent')
   if (launch === undefined) return ''
   return await new Promise<string | undefined>((resolve) => {
-    execFile(
+    /*
+     * THE WHOLE TREE, WHEN IT TAKES TOO LONG (0.485). `execFile`'s own
+     * timeout kills only the process it started, and on Windows that is the
+     * `.cmd` shim's cmd.exe: Cursor's node.exe under it carried on alone.
+     * Measured 2026-09-30: an `mcp list` hung on a connector and outlived its
+     * app by twenty minutes, holding a debugging port it had inherited, so
+     * every later drive on that port hung. The tree goes with it now.
+     */
+    const timer = setTimeout(() => killProcessTree(child.pid), TIMEOUT_MS)
+    const child = execFile(
       launch.executablePath,
       [...launch.prefixArgs, 'mcp', 'list'],
-      { timeout: TIMEOUT_MS, windowsHide: true },
+      { windowsHide: true },
       // A failure or a timeout is NOT an empty listing: an empty one was kept
       // for five minutes, so a connector needing login went unsaid (B4 lead).
       // What it printed is kept even on a non-zero exit (a server needing
       // login may be exactly why); only an error with nothing printed is
       // "could not ask".
       (error, stdout) => {
+        clearTimeout(timer)
         const text = typeof stdout === 'string' ? stdout : ''
         resolve(text.trim().length > 0 || error === null ? text : undefined)
       }

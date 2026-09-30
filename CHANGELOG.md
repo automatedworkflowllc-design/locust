@@ -35,6 +35,10 @@ heading: the home screen then shows it once, as a splash.
   over the words beside it. Now the name shortens instead.
 - **A comparison with one column still answering says "Ask a follow-up",**
   not "Ask all 1".
+- **A stuck Cursor check no longer lingers after Locust closes.** When Locust
+  asks Cursor which connectors it has and Cursor hangs, Locust gave up
+  waiting but left Cursor's process running, sometimes long after the app
+  closed. Now it ends the whole process.
 
 ## 0.484.0 - 2026-09-30
 
