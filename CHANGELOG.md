@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.508.0 - 2026-09-30
+
+### Fixed
+
+- **The release check tests the real update feed again.** Since 0.507 a copy
+  of Locust that is not the installed one cannot update itself, and that
+  included the copy the release check runs. It now asks the update feed
+  without downloading or installing anything, so every release is still
+  checked against what was actually published.
+
 ## 0.507.0 - 2026-09-30
 
 ### Fixed

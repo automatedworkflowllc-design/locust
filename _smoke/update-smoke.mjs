@@ -112,7 +112,9 @@ class Cdp {
 // The installed copy keeps its own profile: that is the point of running it.
 const profile = INSTALLED ? undefined : await mkdtemp(join(tmpdir(), 'locust-update-smoke-'))
 if (profile !== undefined) await mkdir(profile, { recursive: true })
-const child = spawn(EXE, [`--remote-debugging-port=${PORT}`, ...(profile === undefined ? [] : [`--user-data-dir=${profile}`])], {
+// A copy is not the installed Locust, so it cannot update itself (0.507);
+// `--update-check-only` lets it ask the real feed, downloading nothing.
+const child = spawn(EXE, [`--remote-debugging-port=${PORT}`, ...(INSTALLED ? [] : ['--update-check-only']), ...(profile === undefined ? [] : [`--user-data-dir=${profile}`])], {
   cwd: APP_DIR,
   stdio: ['ignore', 'pipe', 'pipe']
 })

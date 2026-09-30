@@ -5354,6 +5354,7 @@ if (!ownsSingleInstanceLock) {
         return TESTER_LANE
       }
     })()
+    const installedCopy = existsSync(join(dirname(process.execPath), 'Uninstall Locust.exe'))
     const updates = createUpdateService({
       updater: autoUpdater,
       everyBuild: lane.everyBuild,
@@ -5368,8 +5369,11 @@ if (!ownsSingleInstanceLock) {
        * installer: on 2026-09-30 it closed Colin's own Locust twice, at 15:48
        * and 15:56, each time in the middle of the run that was testing it.
        * The installed copy has its uninstaller beside it; a copy does not.
+       * `--update-check-only` lets the update smoke's copy ask the real feed,
+       * with nothing downloaded or installed.
        */
-      supported: app.isPackaged && process.platform !== 'darwin' && existsSync(join(dirname(process.execPath), 'Uninstall Locust.exe')),
+      supported: app.isPackaged && process.platform !== 'darwin' && (installedCopy || process.argv.includes('--update-check-only')),
+      checkOnly: !installedCopy,
       liveMissionCount: () =>
         codexMissions.liveMissionIds().length + antigravityMissions.liveMissionIds().length,
       requestQuit: (finalise) => {

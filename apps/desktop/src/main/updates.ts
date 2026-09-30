@@ -57,6 +57,8 @@ export interface UpdateServiceOptions {
   readonly currentVersion: string
   /** Whether this build can update itself at all. */
   readonly supported: boolean
+  /** Ask the feed, never download or install: a copy run by the update smoke (0.507). */
+  readonly checkOnly?: boolean
   /** Missions running right now; an install waits for them. */
   readonly liveMissionCount: () => number
   /** Begin the app's own shutdown; the updater installs on the quit that follows. */
@@ -150,13 +152,16 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
     return state
   }
 
-  if (!options.supported) {
+  // A copy that only asks (the update smoke's `--update-check-only`) checks
+  // the feed like the installed one, and never downloads or installs.
+  const mayInstall = options.supported && options.checkOnly !== true
+  if (!mayInstall) {
     // Nothing downloaded, and nothing installed at quit: a copy that is not
     // the installed one must never run the installer (0.507, index.ts).
     options.updater.autoDownload = false
     options.updater.autoInstallOnAppQuit = false
   }
-  if (options.supported) {
+  if (mayInstall) {
     // Downloading is safe and quiet; installing is not, so it never happens
     // on its own -- not even at quit, which would swap the binary under a
     // person who only closed the window.

@@ -225,6 +225,16 @@ describe('what the app does about a new version', () => {
     expect(updater.autoDownload).toBe(false)
   })
 
+  it('a copy that only asks reads the feed and still never downloads or installs (0.507)', async () => {
+    const updater = fakeUpdater({ checkForUpdates: vi.fn(async () => ({ updateInfo: { version: '0.6.0' }, isUpdateAvailable: true })) })
+    const service = createUpdateService({ updater, currentVersion: '0.5.0', supported: true, checkOnly: true, liveMissionCount: () => 0, requestQuit: () => undefined })
+    await expect(service.check()).resolves.toMatchObject({ ok: true, data: { phase: 'available', availableVersion: '0.6.0' } })
+    expect(updater.checkForUpdates).toHaveBeenCalled()
+    expect(updater.autoDownload).toBe(false)
+    expect(updater.autoInstallOnAppQuit).toBe(false)
+    expect(updater.listeners.has('update-downloaded')).toBe(false)
+  })
+
   it('never shows the provider its own error text', () => {
     const updater = fakeUpdater()
     const seen: string[] = []
