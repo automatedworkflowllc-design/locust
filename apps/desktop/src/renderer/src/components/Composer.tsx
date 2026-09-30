@@ -254,6 +254,11 @@ export interface ComposerProps {
   /** Words put in the box from outside it, each time `seq` moves (0.448: a Build and compare starter). */
   readonly fill?: { readonly text: string; readonly seq: number }
   /**
+   * An earlier message is being edited (0.498): its words are in the box, and
+   * sending starts the conversation again from there. Cancel leaves it as it was.
+   */
+  readonly editingEarlier?: { readonly onCancel: () => void }
+  /**
    * Notes the person pinned to lines of a diff in this conversation
    * (diffNotes.ts, 0.376). They go with the next message, as one block after
    * its words, and are cleared once it has gone.
@@ -405,6 +410,7 @@ export function Composer({
   asking,
   pickerRequest,
   fill,
+  editingEarlier,
   diffNotes,
   onClearDiffNotes,
   onCancel,
@@ -1332,7 +1338,20 @@ export function Composer({
           * what you will see in the thread once it goes -- and one quiet line
           * under it: when it goes, or why it is held, and what can be done.
           */}
-        {queued === undefined && offTheQueue && (
+        {editingEarlier !== undefined && (
+          <div className="lc-queued is-editing" role="status" aria-live="polite">
+            <div className="lc-queued__meta">
+              <Icon name="pencil" size={12} />
+              <span className="lc-queued__note">
+                Editing an earlier message — sending starts again from there. Files stay as they are.
+              </span>
+              <button type="button" className="lc-queued__action" onClick={editingEarlier.onCancel}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+        {queued === undefined && offTheQueue && editingEarlier === undefined && (
           <div className="lc-queued is-editing" role="status" aria-live="polite">
             <div className="lc-queued__meta">
               <Icon name="clock" size={12} />

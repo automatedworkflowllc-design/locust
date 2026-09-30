@@ -2148,6 +2148,13 @@ export interface CodexMissionStartRequest {
    * cannot be resumed is refused rather than silently started blank.
    */
   readonly followUpOf?: string
+  /**
+   * Started again from an edited earlier message (0.498). `followUpOf` is
+   * then the turn BEFORE the edited one (absent when the first message was
+   * edited), and `tip` the conversation's latest turn, which the new branch
+   * replaces as the teammate's current conversation.
+   */
+  readonly rewind?: { readonly tip: string }
   /** Raw picker identity before an effort choice expands a model variant. */
   readonly modelChoice?: string
   /** Only a person's picker change this session, addressed to this teammate. */

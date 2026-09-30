@@ -228,7 +228,13 @@ export interface CodexMissionService {
      * latest turn -- which the conversation itself never sees. The caller
      * gives it a slot of its own, so it runs while the conversation does.
      */
-    side?: { readonly of: string; readonly question: number }
+    side?: { readonly of: string; readonly question: number },
+    /**
+     * Started again from an edited earlier message (0.498): `followUpOf` is
+     * the turn before it, and the run starts cold with the conversation up to
+     * there -- never that turn's session, which holds the turns set aside.
+     */
+    rewind?: boolean
   ): Promise<CodexMissionStartResponse>
   cancel(runId: unknown): CodexMissionCancelResponse
   /**
@@ -1144,7 +1150,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       startedBy?: MissionStarter,
       asCommand?: boolean,
       slot?: { readonly key: string; readonly cwd?: string },
-      side?: { readonly of: string; readonly question: number }
+      side?: { readonly of: string; readonly question: number },
+      rewind?: boolean
     ): Promise<CodexMissionStartResponse> {
       // `account-default` is the shell's word for "send no --model", not a
       // model id. Passing it through would make the CLI look for a model that
@@ -1373,7 +1380,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // conversation lands first (0.391), so this turn continues from the
         // last of it. After the busy check above, which knows the settled
         // turn by the id the window sent.
-        if (followUpOf !== undefined && options.catchUpTerminal !== undefined) {
+        if (followUpOf !== undefined && options.catchUpTerminal !== undefined && rewind !== true) {
           const named = followUpOf
           followUpOf = (await options.catchUpTerminal(named).catch(() => undefined))?.latestMissionId ?? named
         }
@@ -1386,7 +1393,20 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               'That conversation cannot be continued: its earlier mission is not in the ledger.'
             ) as CodexMissionStartResponse
           }
-          if (prior.metadata.runtime !== runtime) {
+          if (rewind === true) {
+            /*
+             * STARTED AGAIN FROM AN EDITED MESSAGE (0.498, Claude Code's
+             * Esc Esc rewind). `followUpOf` is the turn BEFORE the one the
+             * person edited, and its session also holds every turn after it,
+             * so resuming it would hand the model the very turns being set
+             * aside. Cold, then, on whichever runtime is chosen, with the
+             * conversation up to that turn as a runtime switch carries it.
+             */
+            resumedMissionId = prior.metadata.missionId
+            const said = createTranscriptTracker()
+            said.track(prior.events)
+            coldEarlier = [...(await earlierTurnsOf(prior)), { asked: prior.metadata.prompt, answered: said.latestFinal }]
+          } else if (prior.metadata.runtime !== runtime) {
             // A reply on ANOTHER runtime. This used to be refused ("switch the
             // route back, or hand the mission over"), and the person's
             // workaround was a fresh mission with the filenames and the task
@@ -1477,6 +1497,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           // already says what that costs -- "Started without the earlier
           // messages" -- and that is a smaller thing to lose than the
           // guarantee that the mode on screen is the mode being run.
+          if (rewind !== true) {
           const priorMode = prior.metadata.mode
           const modeChanged = priorMode !== undefined && priorMode !== mode
           /*
@@ -1497,6 +1518,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             // Send again: the same words, unanswered, are this turn -- not an earlier one to quote back.
             const again = (said.latestFinal ?? '').trim().length === 0 && typeof prior.metadata.prompt === 'string' && prior.metadata.prompt.trim() === prompt.trim()
             coldEarlier = [...(await earlierTurnsOf(prior)), ...(again ? [] : [{ asked: prior.metadata.prompt, answered: said.latestFinal }])]
+          }
           }
         }
 
@@ -1815,7 +1837,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // anywhere but the project folder. Only what is sent changes.
         const attached = await attachmentsForRun(prompt, runFolder, runCwd).catch(() => prompt)
         // Cold, not a command and not a side question: told what was said before (0.495).
-        const sentPrompt = coldEarlier === undefined || bare || side !== undefined ? attached : composeColdFollowUp(coldEarlier, attached)
+        const sentPrompt = coldEarlier === undefined || bare || side !== undefined ? attached : composeColdFollowUp(coldEarlier, attached, rewind === true)
         let runtimePrompt = sentPrompt
         let delivered: readonly WorkroomMessage[] = []
         let peerDeliveryFailed = false

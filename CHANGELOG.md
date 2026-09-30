@@ -11,6 +11,20 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.498.0 - 2026-09-30
+<!-- big -->
+
+### New
+
+- **Edit an earlier message.** Point at any message you sent and press the
+  pencil beside it. Its words go back in the box. Change them and send, and
+  the conversation starts again from there, as Claude Code's rewind does.
+  The teammate is given everything said before that message and nothing
+  after it. The conversation stays one row in the sidebar; editing your
+  first message starts a new one and keeps the old. Files the later replies
+  changed are left as they are. Antigravity can only rewind from the first
+  message, since it carries on only its own conversation.
+
 ## 0.497.0 - 2026-09-30
 
 ### Improved

@@ -2453,6 +2453,13 @@ if (!ownsSingleInstanceLock) {
      * beside it. Only when the follow-up IS the hub's newest turn: a
      * follow-up on some other conversation is not the hub's business.
      */
+    /** The tip of the conversation a rewind replaces, when the start is one (0.498). */
+    const rewindTip = (payload: { readonly rewind?: unknown }): string | undefined => {
+      const rewind = payload.rewind
+      if (typeof rewind !== 'object' || rewind === null) return undefined
+      const tip = (rewind as { readonly tip?: unknown }).tip
+      return typeof tip === 'string' && tip.length > 0 ? tip : undefined
+    }
     const advanceHub = async (
       teammateId: string | undefined,
       followUpOf: string | undefined,
@@ -5530,6 +5537,13 @@ if (!ownsSingleInstanceLock) {
           } as const
         }
         const followUpOf = typeof payload.followUpOf === 'string' ? payload.followUpOf : undefined
+        // Antigravity continues only its own conversation, so it cannot start again partway through one (0.498).
+        if (rewindTip(payload) !== undefined && followUpOf !== undefined) {
+          return {
+            ok: false,
+            error: { code: 'RUNTIME_START_FAILED', message: 'Antigravity cannot start again from an earlier message: it only carries on its own conversation. Pick another route for the edited message, or edit the first message to start over.' }
+          } as const
+        }
         try {
           const mission = await antigravityMissions.start(prompt, peer, {
             ...(model === undefined ? {} : { model }),
@@ -5537,7 +5551,7 @@ if (!ownsSingleInstanceLock) {
           })
           await assignOwner(peer?.self.teammateId, mission.missionId)
           await rememberRoute(peer?.self.teammateId, { runtime: 'antigravity', model: mission.model, mode })
-          await advanceHub(peer?.self.teammateId, followUpOf, mission.missionId)
+          await advanceHub(peer?.self.teammateId, rewindTip(payload) ?? followUpOf, mission.missionId)
           return { ok: true, data: antigravityStartData(mission) } as const
         } catch (error) {
           if (error instanceof PeerRecordError) {
@@ -5587,12 +5601,16 @@ if (!ownsSingleInstanceLock) {
           undefined,
           undefined,
           // The person's own message, typed as one of the runtime's commands (0.426).
-          runtimeCommands.isCommand(runtime, prompt)
+          runtimeCommands.isCommand(runtime, prompt),
+          undefined,
+          undefined,
+          rewindTip(payload) !== undefined && followUpOf !== undefined
         )
         if (response.ok) {
           await assignOwner(peer?.self.teammateId, response.data.missionId)
           await rememberRoute(peer?.self.teammateId, { runtime, model: model ?? 'account-default', mode, ...(effort === undefined ? {} : { effort }) })
-          await advanceHub(peer?.self.teammateId, followUpOf, response.data.missionId)
+          // A rewind moves the teammate's conversation from the old tip to the new branch (0.498).
+          await advanceHub(peer?.self.teammateId, rewindTip(payload) ?? followUpOf, response.data.missionId)
         }
         return response
       } catch {

@@ -712,6 +712,14 @@ export interface ThreadProps {
    * turn so the exchange reads as one, which is what it was.
    */
   readonly coldStart?: boolean
+  /**
+   * EDIT AN EARLIER MESSAGE (0.498, Claude Code's Esc Esc rewind). Offered on
+   * each message the person typed, when nothing is running: its words go back
+   * in the box, and sending starts the conversation again from there.
+   */
+  readonly onEditMessage?: (missionId: string, words: string) => void
+  /** This turn started again from an edited message (0.498): said above it. */
+  readonly rewound?: boolean
   /** The folder missions run in; paths render relative to it. */
   readonly workspacePath?: string
   /** Present only when re-running with edits allowed is possible; see App. */
@@ -873,6 +881,8 @@ export function Thread({
   pastBoundaries = [],
   groupLeavings = [],
   coldStart = false,
+  onEditMessage,
+  rewound = false,
   onRunWithEdits,
   onRunAgain,
   onSendAgain,
@@ -1081,14 +1091,32 @@ onResume,
    * only once its turn is over: the files that turn changed, which is what
    * each note is held against (SentNotes.tsx, 0.395).
    */
-  const userTurn = (line: string | undefined, attached: readonly string[], edited?: () => readonly DiffFile[]): ReactElement | undefined => {
+  const userTurn = (line: string | undefined, attached: readonly string[], edited?: () => readonly DiffFile[], editId?: string): ReactElement | undefined => {
     const split = line === undefined ? undefined : splitDiffNotes(line)
     const words = split === undefined || split.text.trim().length === 0 ? undefined : split.text
     const notes = split?.notes ?? []
     if (words === undefined && attached.length === 0 && notes.length === 0) return undefined
+    /*
+     * Inside the bubble, drawn outside its left edge (0.498): a wrapper would
+     * break the column's `> .lc-bubble` spacing rules, and an icon with no
+     * text leaves the bubble's words exactly what they were.
+     */
+    const edit = editId === undefined || onEditMessage === undefined || words === undefined || notes.length > 0 || attached.length > 0
+      ? undefined
+      : (
+          <button
+            type="button"
+            className="lc-bubble__edit"
+            aria-label="Edit this message"
+            title="Edit this message and start again from here"
+            onClick={() => onEditMessage(editId, words)}
+          >
+            <Icon name="pencil" size={13} />
+          </button>
+        )
     return (
       <>
-        {words !== undefined && <div className="lc-bubble">{words}</div>}
+        {words !== undefined && <div className="lc-bubble">{words}{edit}</div>}
         {notes.length > 0 && <SentNotes notes={notes} edited={edited?.()} />}
         {attached.length > 0 && (
           <div className="lc-sentfiles">
@@ -1200,7 +1228,7 @@ onResume,
               {joinNotes((beforeTurn) => beforeTurn === index)}
               {turn.switchedFrom !== undefined && <HandoffDivider {...turn.switchedFrom} />}
               {seam !== undefined && <TerminalDivider seam={seam} />}
-              {!again && userTurn(turnPromptLine(turn), turnAttachments(turn), () => editedFiles(turn.events, workspacePath))}
+              {!again && userTurn(turnPromptLine(turn), turnAttachments(turn), () => editedFiles(turn.events, workspacePath), turn.startedBy === undefined && turn.inTerminal === undefined ? turn.missionId : undefined)}
               {cardsFor(index, 'before-work').map(peerCard)}
               {!again && earlierWork[index]}
               {/* An earlier turn stopped before it said anything had nothing under it, as if still waiting (0.496; Claude Code: "Interrupted"). */}
@@ -1217,7 +1245,12 @@ onResume,
         )}
         {leavingNotes((beforeTurn) => beforeTurn === earlierTurns.length)}
         {joinNotes((beforeTurn) => beforeTurn === earlierTurns.length)}
-        {coldStart && earlierTurns.some((turn, index) => !sentAgainBy(turn, earlierTurns[index + 1]?.prompt ?? prompt)) && (
+        {rewound && (
+          <div className="lc-thread__note">
+            Started again from an edited message. The replies after it were set aside; files they changed are as they left them.
+          </div>
+        )}
+        {!rewound && coldStart && earlierTurns.some((turn, index) => !sentAgainBy(turn, earlierTurns[index + 1]?.prompt ?? prompt)) && (
           /*
            * WHERE THIS TURN BEGAN, said where the turn begins.
            *
@@ -1248,7 +1281,7 @@ onResume,
         */}
         {switchedFrom !== undefined && <HandoffDivider {...switchedFrom} />}
         {currentSeam !== undefined && <TerminalDivider seam={currentSeam} />}
-        {userTurn(currentLine, turnAttachments({ prompt, ...(startedBy === undefined ? {} : { startedBy }) }), running ? undefined : () => editedFiles(events, workspacePath))}
+        {userTurn(currentLine, turnAttachments({ prompt, ...(startedBy === undefined ? {} : { startedBy }) }), running ? undefined : () => editedFiles(events, workspacePath), !running && startedBy === undefined && inTerminal === undefined ? shownMissionId : undefined)}
 
         {handoff !== undefined && (
           <>

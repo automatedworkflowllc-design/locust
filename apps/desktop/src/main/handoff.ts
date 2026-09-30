@@ -158,14 +158,17 @@ function sectionsFor(
  * reply, so the teammate is not a stranger to its own conversation. Bounded:
  * the newest turns are kept when they do not all fit.
  */
-export function composeColdFollowUp(earlier: readonly EarlierTurn[], next: string): string {
+export function composeColdFollowUp(earlier: readonly EarlierTurn[], next: string, edited = false): string {
   // A turn with no words of its own on record is not quoted as if it had some.
   const lines = earlier.filter((turn) => typeof turn.asked === 'string' && turn.asked.trim().length > 0).map((turn) => `Asked: "${clipped(turn.asked, ASKED_CHARS)}"${turn.answered === undefined || turn.answered.trim().length === 0 ? ' -- no reply was recorded.' : ` -- answered: "${clipped(turn.answered, ANSWERED_CHARS)}"`}`)
   const room = MAX_HANDOFF_PROMPT_LENGTH - next.length - 400
   while (lines.length > 0 && lines.join('\n').length > room) lines.shift()
   if (lines.length === 0) return next
   return [
-    'This conversation has earlier turns, but not in your session: it could not be resumed. What was said, oldest first:',
+    edited
+      // A rewind (0.498): the person went back and changed a message; what came after it is set aside.
+      ? 'The person went back to an earlier point in this conversation and changed their message there. What was said before that point, oldest first:'
+      : 'This conversation has earlier turns, but not in your session: it could not be resumed. What was said, oldest first:',
     bullets(lines),
     `The person now asks:\n\n${next}`
   ].join('\n\n')

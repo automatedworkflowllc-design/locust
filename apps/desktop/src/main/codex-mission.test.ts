@@ -2427,6 +2427,40 @@ describe('continuing a conversation', () => {
     expect(created.at(-1)?.continuesFrom).toMatchObject({ missionId: 'mission_prior', runtimeThreadId: 'thread-older' })
   })
 
+  it('starts again from an edited message cold, never in the session that holds the turns set aside (0.498)', async () => {
+    // `mission_prior` is the turn BEFORE the edited one. Its session also
+    // holds every later turn, so resuming it would give the model exactly
+    // what the person went back to change.
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
+      records: records([{ type: 'turn.completed' }]),
+      completion: Promise.resolve(completion())
+    })) satisfies RuntimeProcessRunner['start']
+    const created: Record<string, unknown>[] = []
+    const catchUpTerminal = vi.fn(async () => ({ latestMissionId: 'mission_old_tip' }))
+    const { service } = scheduledService({ start }, fakeLedger({
+      getMission: async () => finished({ mode: 'ask' }) as never,
+      createMission: async (metadata) => {
+        created.push(metadata as unknown as Record<string, unknown>)
+      }
+    }), { catchUpTerminal } as never)
+
+    const response = await service.start(
+      'check the apple stock price instead', 'codex', 'ask', {}, () => undefined, undefined, undefined, 'mission_prior',
+      undefined, undefined, undefined, undefined, undefined, true
+    )
+
+    expect(response.ok).toBe(true)
+    const spec = start.mock.calls[0]?.[0] as { args: readonly string[] }
+    expect(spec.args).not.toContain('thread-prior')
+    const sent = String(start.mock.calls[0]?.[1] ?? '')
+    expect(sent).toContain('went back to an earlier point')
+    expect(sent).toContain('check the google stock price')
+    expect(sent.trimEnd().endsWith('check the apple stock price instead')).toBe(true)
+    // The terminal's latest turn is the branch being set aside: never jumped to.
+    expect(catchUpTerminal).not.toHaveBeenCalled()
+    expect(created.at(-1)?.continuesFrom).toEqual({ missionId: 'mission_prior', checkpointEpoch: 1, reason: 'follow-up' })
+  })
+
   it('sends again as the same words, not as an earlier turn quoted back (0.496)', async () => {
     // The first turn of a conversation, stopped before any reply, then Send
     // again: there is no session to resume, and "Asked: <the same words> --

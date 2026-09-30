@@ -781,6 +781,50 @@ textarea {
   /* Your line breaks, as you typed them -- a room's post has kept them since
      it existed; this bubble ran a list of notes into one paragraph (0.376). */
   white-space: pre-line;
+  /* The Edit beside it hangs off this box (0.498). */
+  position: relative;
+}
+
+/*
+ * Edit an earlier message (0.498). Outside the bubble's left edge, shown on
+ * hover or keyboard focus as claude.ai does; its padding bridges the gap so
+ * the pointer can travel from the words to it without it vanishing.
+ */
+.lc-bubble__edit {
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  padding: 0 var(--lc-space-3) 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--lc-text-muted);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity var(--lc-motion-hover), color var(--lc-motion-hover);
+}
+.lc-bubble__edit > svg {
+  box-sizing: content-box;
+  padding: 6px;
+  border-radius: var(--lc-radius-control);
+}
+.lc-bubble:hover .lc-bubble__edit,
+.lc-bubble__edit:focus-visible {
+  opacity: 1;
+}
+.lc-bubble__edit:hover {
+  color: var(--lc-text-primary);
+}
+.lc-bubble__edit:hover > svg {
+  background: var(--lc-hover-surface);
+}
+.lc-bubble__edit:focus-visible {
+  outline: none;
+}
+.lc-bubble__edit:focus-visible > svg {
+  outline: 2px solid var(--lc-border-strong);
 }
 
 /*

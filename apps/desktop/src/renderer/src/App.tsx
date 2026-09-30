@@ -218,6 +218,8 @@ interface LiveRunState {
    * the thread says so rather than letting a person assume it remembers.
    */
   readonly coldStart?: boolean
+  /** Started again from an edited earlier message (0.498): the thread says so above it. */
+  readonly rewound?: boolean
   readonly restored?: boolean
   readonly restoredMission?: PublicRecoveredMission
   /** Who the run was messaged to, known before the host has even assigned a missionId. */
@@ -1584,6 +1586,18 @@ export default function App(): ReactElement {
   const [pickerRequest, setPickerRequest] = useState(0)
   /** Words put in the message box from outside it (0.448: a Build and compare starter). */
   const [composerFill, setComposerFill] = useState<{ readonly text: string; readonly seq: number }>()
+  /**
+   * An earlier message being edited (0.498, Claude Code's rewind): which
+   * conversation on screen (`key`), its latest turn (`tip`), the turn before
+   * the edited one (`before`, absent for the first message) and the turns up
+   * to it, which the new branch is drawn under.
+   */
+  const [rewinding, setRewinding] = useState<{
+    readonly key: string
+    readonly tip: string
+    readonly before?: string
+    readonly earlierTurns: NonNullable<LiveRunState['earlierTurns']>
+  }>()
   useEffect(() => {
     void window.desktop?.listCompares().then((answer) => {
       if (answer.ok) setCompares(answer.data.compares)
@@ -3708,8 +3722,28 @@ export default function App(): ReactElement {
   }
   const startFromComposer = async (prompt: string): Promise<boolean | string> => {
     startRefusal.current = undefined
-    const started = await startMission(prompt, undefined, { fromComposer: true })
+    const rewind = rewinding !== undefined && rewinding.key === shownKey ? rewinding : undefined
+    const started = await startMission(prompt, undefined, { fromComposer: true, ...(rewind === undefined ? {} : { rewind }) })
+    if (started && rewind !== undefined) setRewinding(undefined)
     return started ? true : (startRefusal.current ?? false)
+  }
+  // Another conversation opened: the edit was of that one, and is let go.
+  useEffect(() => {
+    if (rewinding !== undefined && rewinding.key !== shownKey) setRewinding(undefined)
+  }, [shownKey, rewinding])
+  /** Edit on a sent message (0.498): its words back in the box, and the next send branches from before it. */
+  const editEarlierMessage = (missionId: string, words: string): void => {
+    const shown = liveRunRef.current
+    if (shown?.data === undefined || shown.phase === 'running' || shown.phase === 'starting') return
+    const turns = [
+      ...(shown.earlierTurns ?? []),
+      { missionId: shown.data.missionId, prompt: shown.prompt, events: shown.events }
+    ]
+    const index = turns.findIndex((turn) => turn.missionId === missionId)
+    if (index < 0 || shownKey === undefined) return
+    const before = turns[index - 1]?.missionId
+    setRewinding({ key: shownKey, tip: shown.data.missionId, ...(before === undefined ? {} : { before }), earlierTurns: turns.slice(0, index) })
+    setComposerFill((current) => ({ text: words, seq: (current?.seq ?? 0) + 1 }))
   }
   const startMission = async (
     prompt: string,
@@ -3725,6 +3759,8 @@ export default function App(): ReactElement {
       readonly as?: StartAs
       /** Typed in the box and sent from it: a refusal can hand the words back. */
       readonly fromComposer?: boolean
+      /** Started again from an edited earlier message (0.498). */
+      readonly rewind?: { readonly tip: string; readonly before?: string; readonly earlierTurns: NonNullable<LiveRunState['earlierTurns']> }
     }
   ): Promise<boolean> => {
     const as = options?.as
@@ -3780,10 +3816,12 @@ export default function App(): ReactElement {
      * first, and a refusal now queues the message and asks again when the run
      * in front of it ends. There is no window left in which this is wrong.
      */
+    const rewind = options?.rewind
+    // A rewind continues from the turn BEFORE the edited one, which the host resolves (0.498).
     const continuing =
-      as === undefined && shown !== undefined && shown.data !== undefined && ownerOf(shown) === teammateId ? shown : undefined
+      rewind === undefined && as === undefined && shown !== undefined && shown.data !== undefined && ownerOf(shown) === teammateId ? shown : undefined
     const coldStart = continuing !== undefined && resumableSessionOf(continuing.events) === undefined
-    const earlierTurns = continuing === undefined
+    const earlierTurns = rewind !== undefined ? rewind.earlierTurns : continuing === undefined
       ? []
       : [
           ...(continuing.earlierTurns ?? []),
@@ -3815,6 +3853,7 @@ export default function App(): ReactElement {
       ...(teammateId === undefined ? {} : { teammateId }),
       ...(earlierTurns.length === 0 ? {} : { earlierTurns }),
       ...(coldStart ? { coldStart: true } : {}),
+      ...(rewind === undefined ? {} : { rewound: true }),
       // Plan is a mode now, so the run remembers what it was asked to be
       // rather than a switch that sat beside the mode and could disagree.
       ...((modeOverride ?? runMode) === 'plan' ? { plan: true } : {})
@@ -3851,7 +3890,8 @@ export default function App(): ReactElement {
         modelChoice: route.model,
         ...(teammateId !== undefined && pickerRoutes.has(teammateId) ? { routeOverrideFor: teammateId } : {}),
         ...(teammateId === undefined ? {} : { teammateId }),
-        ...(continuing === undefined ? {} : { followUpOf: continuing.data!.missionId })
+        ...(continuing === undefined ? {} : { followUpOf: continuing.data!.missionId }),
+        ...(rewind === undefined ? {} : { ...(rewind.before === undefined ? {} : { followUpOf: rewind.before }), rewind: { tip: rewind.tip } })
       })
       if (!response.ok) {
         /*
@@ -7164,6 +7204,8 @@ export default function App(): ReactElement {
                   }
                 })()}
                 coldStart={liveRun.coldStart ?? false}
+                rewound={liveRun.rewound === true}
+                {...(running || liveRun.data === undefined || comparing !== undefined ? {} : { onEditMessage: editEarlierMessage })}
                 workspacePath={workspacePath}
                 {...(workspaceId === undefined ? {} : { workspaceId })}
                 wasPlan={liveRun.plan === true}
@@ -7469,6 +7511,16 @@ export default function App(): ReactElement {
             {...(comparePicking === undefined ? {} : { compare: comparePicking })}
             pickerRequest={pickerRequest}
             {...(composerFill === undefined ? {} : { fill: composerFill })}
+            {...(rewinding === undefined || rewinding.key !== shownKey
+              ? {}
+              : {
+                  editingEarlier: {
+                    onCancel: () => {
+                      setRewinding(undefined)
+                      setComposerFill((current) => ({ text: '', seq: (current?.seq ?? 0) + 1 }))
+                    }
+                  }
+                })}
             {...(comparing === undefined || comparing.kept !== undefined
               ? {}
               : { asking: { label: comparing.slots.map((column) => (comparing.blind === true ? blindName(column.slot) : column.route.label ?? column.route.model)).join(' vs '), columns: comparing.slots.filter((column) => column.missionIds.length > 0).length, ...(comparing.changes === true ? { changes: true } : {}), ...(comparing.blind === true ? { blind: true } : {}) } })}
