@@ -16,7 +16,9 @@ export function updateLine(view: RuntimeUpdateView | undefined, now: Date = new 
         ? `${status.version} is out.`
         : status.why === 'in use'
           ? `${status.version} is out. It can update once nothing is using it.`
-          : `${status.version} is out. It updates once it has been out 12 hours.`
+          : status.why === 'held'
+            ? `${status.version} is out, and held back: Locust's check of new versions could not read it yet. Update to try it anyway.`
+            : `${status.version} is out. It updates once it has been out 12 hours.`
     case 'updating':
       return `Updating to ${status.version}…`
     case 'updated':

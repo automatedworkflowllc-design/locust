@@ -8,6 +8,7 @@ import {
   compareVersions,
   createRuntimeUpdates,
   decide,
+  heldFrom,
   mayUpdateAgents,
   npmPackageDir,
   savedUpdatesFrom
@@ -145,7 +146,7 @@ describe('what is kept on disk', () => {
 describe('keeping current, end to end on fakes', () => {
   const AUTOMATIC: SavedUpdates = NOTHING_SAVED
   const ASKS: SavedUpdates = { ...NOTHING_SAVED, automatic: false, chosen: true }
-  const run = (setup: { saved?: SavedUpdates; inUse?: boolean; latest?: Release; installOk?: boolean; discovered?: RuntimeDiscovery }) => {
+  const run = (setup: { saved?: SavedUpdates; inUse?: boolean; latest?: Release; installOk?: boolean; discovered?: RuntimeDiscovery; held?: Readonly<Record<string, readonly string[]>> }) => {
     const calls = { latest: 0, installs: [] as string[], updated: 0, inUse: 0 }
     let saved = setup.saved
     const updates = createRuntimeUpdates({
@@ -155,6 +156,7 @@ describe('keeping current, end to end on fakes', () => {
         calls.latest += 1
         return setup.latest ?? released('0.156.1', 14)
       },
+      ...(setup.held === undefined ? {} : { heldVersions: async () => setup.held }),
       inUse: async () => {
         calls.inUse += 1
         return setup.inUse === true
@@ -175,6 +177,25 @@ describe('keeping current, end to end on fakes', () => {
     })
     return { updates, calls, saved: () => saved }
   }
+
+  it('holds back a version Locust\'s release check could not read, and installs it only when asked (0.501)', async () => {
+    const { updates, calls } = run({ held: { '@openai/codex': ['0.156.1'] } })
+    await updates.tick()
+    expect(calls.installs).toEqual([])
+    expect((await updates.state()).agents[0]?.status).toEqual({ kind: 'waiting', version: '0.156.1', why: 'held' })
+    // Update is the person's choice, and still installs it.
+    await updates.updateNow('codex')
+    expect(calls.installs).toEqual(['codex@0.156.1'])
+  })
+
+  it('holds nothing back that the check passed, or when it cannot be reached (0.501)', async () => {
+    const passed = run({ held: { '@openai/codex': ['0.155.0'] } })
+    await passed.updates.tick()
+    expect(passed.calls.installs).toEqual(['codex@0.156.1'])
+    const unreachable = run({})
+    await unreachable.updates.tick()
+    expect(unreachable.calls.installs).toEqual(['codex@0.156.1'])
+  })
 
   it('turned off, only looks: 0.156.1 is out, and nothing is downloaded until the person asks', async () => {
     const { updates, calls } = run({ saved: ASKS })
@@ -277,5 +298,23 @@ describe('a tick during a manual Update', () => {
     await pressed
     await ticked
     expect(installs).toEqual(['codex@0.156.1'])
+  })
+})
+
+describe("the release check's verdicts (0.501)", () => {
+  it('holds only the versions it ran and could not read', () => {
+    expect(heldFrom({ packages: { '@openai/codex': { '0.159.2': { ok: true }, '0.160.0': { ok: false } }, '@github/copilot': { '1.0.0': { ok: true } } } }))
+      .toEqual({ '@openai/codex': ['0.160.0'] })
+  })
+
+  it('reads anything else as nothing held', () => {
+    expect(heldFrom(undefined)).toEqual({})
+    expect(heldFrom({ packages: 'no' })).toEqual({})
+    expect(heldFrom({ packages: { '@openai/codex': { '0.160.0': { ok: 'false' } } } })).toEqual({})
+  })
+
+  it('keeps what it held across a restart', () => {
+    expect(savedUpdatesFrom({ latest: {}, last: {}, held: { '@openai/codex': ['0.160.0', 7] } })?.held).toEqual({ '@openai/codex': ['0.160.0'] })
+    expect(savedUpdatesFrom({ latest: {}, last: {} })?.held).toBeUndefined()
   })
 })

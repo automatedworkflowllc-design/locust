@@ -103,7 +103,14 @@ export function savedUpdatesFrom(value: unknown): SavedUpdates | undefined {
   // What the person chose, when they chose; the default otherwise -- 0.303
   // wrote `automatic: false` for everyone, and 0.302 its own `enabled`.
   const chosen = record.chosen === true && typeof record.automatic === 'boolean'
+  const held: Record<string, string[]> = {}
+  if (typeof record.held === 'object' && record.held !== null) {
+    for (const [name, versions] of Object.entries(record.held as Record<string, unknown>)) {
+      if (Array.isArray(versions)) held[name] = versions.filter((version): version is string => typeof version === 'string')
+    }
+  }
   return {
+    ...(Object.keys(held).length === 0 ? {} : { held }),
     automatic: chosen ? record.automatic === true : NOTHING_SAVED.automatic,
     chosen,
     checkedAt: typeof record.checkedAt === 'number' && Number.isFinite(record.checkedAt) ? record.checkedAt : undefined,
@@ -136,6 +143,12 @@ export interface SavedUpdates {
   readonly latest: Readonly<Record<string, Release>>
   /** What last happened to each agent that is worth saying again: an update, or a failed one. */
   readonly last: Readonly<Record<string, RuntimeUpdateStatus>>
+  /**
+   * Versions held back, by package (0.501): the ones Locust's release check
+   * (_tools/runtime-canary.mjs) ran through a real turn and could not read.
+   * Read with each look; absent when the check could not be reached.
+   */
+  readonly held?: Readonly<Record<string, readonly string[]>>
 }
 
 export const NOTHING_SAVED: SavedUpdates = { automatic: true, chosen: false, checkedAt: undefined, latest: {}, last: {} }
@@ -171,11 +184,15 @@ export function decide(input: {
   readonly automatic: boolean
   readonly inUse: boolean
   readonly now: number
+  /** Locust's release check could not read this version (0.501). */
+  readonly held?: boolean
 }): RuntimeUpdateStatus | { readonly kind: 'update'; readonly version: string } {
   const { installed, latest } = input
   if (installed === undefined || latest === undefined || compareVersions(latest.version, installed) <= 0) return { kind: 'current' }
   // Not automatic: it waits for the person to press Update.
   if (!input.automatic) return { kind: 'waiting', version: latest.version, why: 'ask' }
+  // A release Locust could not read is never installed on its own, however old.
+  if (input.held === true) return { kind: 'waiting', version: latest.version, why: 'held' }
   const published = latest.publishedAt === undefined ? Number.NaN : Date.parse(latest.publishedAt)
   // A release npm gives no date for is treated as brand new: it waits.
   if (!Number.isFinite(published) || input.now - published < RELEASE_AGE_MS) return { kind: 'waiting', version: latest.version, why: 'too new' }
@@ -202,6 +219,11 @@ export interface RuntimeUpdatesOptions {
   /** npm's global folder (`npm root -g`); undefined when there is no npm to ask. */
   readonly npmRoot: () => Promise<string | undefined>
   readonly latest: (packageName: string) => Promise<Release | undefined>
+  /**
+   * The versions Locust's release check could not read, by package (0.501);
+   * undefined when it could not be asked, which holds nothing back.
+   */
+  readonly heldVersions?: () => Promise<Readonly<Record<string, readonly string[]>> | undefined>
   /** Whether any process on this machine is running from inside `dir`. */
   readonly inUse: (dir: string) => Promise<boolean>
   readonly install: (runtime: string, version: string) => Promise<{ readonly ok: true } | { readonly ok: false; readonly what: string }>
@@ -288,14 +310,15 @@ export function createRuntimeUpdates(options: RuntimeUpdatesOptions): RuntimeUpd
         const release = await options.latest(agent.packageName).catch(() => undefined)
         if (release !== undefined) latest[agent.packageName] = release
       }
-      state = { ...state, checkedAt: now(), latest }
+      const held = await options.heldVersions?.().catch(() => undefined)
+      state = { ...state, checkedAt: now(), latest, ...(held === undefined ? {} : { held }) }
       await keep(state)
     }
     const next: RuntimeUpdateView[] = []
     for (const agent of agents) {
       const release = state.latest[agent.packageName]
       const ask = (inUse: boolean): ReturnType<typeof decide> =>
-        decide({ installed: agent.installed, latest: release, automatic: state.automatic, inUse, now: now() })
+        decide({ installed: agent.installed, latest: release, automatic: state.automatic, inUse, now: now(), held: release !== undefined && (state.held?.[agent.packageName] ?? []).includes(release.version) })
       // The machine's process table is read only when it is the last question:
       // an update would go ahead if nothing were using the agent.
       const provisional = ask(false)
@@ -406,6 +429,36 @@ function capture(command: string, args: readonly string[], timeoutMs: number): P
  * cmd.exe with fixed, quoted arguments -- a package name from the facts table,
  * never anything typed.
  */
+/**
+ * Where Locust's release check publishes what it found (0.501), beside the
+ * installers: `{ "packages": { "<npm package>": { "<version>": { "ok": boolean } } } }`.
+ */
+export const CANARY_VERDICTS_URL = 'https://raw.githubusercontent.com/automatedworkflowllc-design/locust-releases/main/runtime-canary.json'
+
+/** The versions the check ran and could not read, by package: a few kilobytes, asked with each look. */
+export function heldFrom(value: unknown): Readonly<Record<string, readonly string[]>> {
+  const packages = typeof value === 'object' && value !== null ? (value as { packages?: unknown }).packages : undefined
+  const held: Record<string, string[]> = {}
+  if (typeof packages !== 'object' || packages === null) return held
+  for (const [name, versions] of Object.entries(packages as Record<string, unknown>)) {
+    if (typeof versions !== 'object' || versions === null) continue
+    const failed = Object.entries(versions as Record<string, unknown>)
+      .filter(([, verdict]) => typeof verdict === 'object' && verdict !== null && (verdict as { ok?: unknown }).ok === false)
+      .map(([version]) => version)
+    if (failed.length > 0) held[name] = failed
+  }
+  return held
+}
+
+export async function canaryHeldVersions(): Promise<Readonly<Record<string, readonly string[]>> | undefined> {
+  try {
+    const answer = await fetch(CANARY_VERDICTS_URL, { signal: AbortSignal.timeout(10_000) })
+    return answer.ok ? heldFrom(await answer.json()) : undefined
+  } catch {
+    return undefined
+  }
+}
+
 export async function npmRelease(packageName: string): Promise<Release | undefined> {
   const args = ['view', packageName, 'dist-tags.latest', 'time', '--json']
   const text = process.platform === 'win32'

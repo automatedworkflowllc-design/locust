@@ -25,13 +25,15 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { execFileSync as run } from 'node:child_process'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const runtime = arg('--runtime') ?? 'codex'
 const force = process.argv.includes('--force')
 const ROOT = new URL('..', import.meta.url).pathname.slice(1)
-const SCRATCH = process.env.LOCUST_SCRATCH ?? 'C:/Users/<home>/Documents/Codex/.scratch'
+// Beside the checkout, never inside it: the scratch folder the drives already use.
+const SCRATCH = process.env.LOCUST_SCRATCH ?? join(ROOT, '..', '.scratch')
 // The agents Locust keeps current itself, by their npm package and command.
 const AGENTS = { codex: { pkg: '@openai/codex', command: 'codex' } }
 const agent = AGENTS[runtime]
@@ -103,5 +105,13 @@ const out = join(ROOT, 'docs', 'runtime-canary')
 await mkdir(out, { recursive: true })
 await writeFile(join(out, `${runtime}-${newest}.json`), `${JSON.stringify(verdict, null, 2)}\n`, 'utf8')
 for (const line of checks) console.log(`  ${line.slice(0, 160)}`)
+// --publish: beside the installers, where installed copies read it before updating (0.501).
+if (process.argv.includes('--publish') && (ok || ranOnIt)) {
+  try {
+    console.log(run(process.execPath, [join(ROOT, '_tools', 'publish-canary-verdict.mjs'), join(out, `${runtime}-${newest}.json`)], { encoding: 'utf8' }).trim())
+  } catch (error) {
+    console.log(`the verdict could not be published: ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
 console.log(ok ? `CANARY PASSED: ${runtime} ${newest}` : `CANARY FAILED: ${runtime} ${newest} -- ${verdict.why.slice(0, 300)}`)
 process.exit(ok ? 0 : 1)

@@ -140,6 +140,7 @@ import {
   mayUpdateAgents,
   npmGlobalRoot,
   npmRelease,
+  canaryHeldVersions,
   processesUsing,
   savedUpdatesFrom
 } from './runtime-updates.js'
@@ -2111,6 +2112,7 @@ if (!ownsSingleInstanceLock) {
       discover: discoverForWork,
       npmRoot: npmGlobalRoot,
       latest: npmRelease,
+      heldVersions: canaryHeldVersions,
       inUse: processesUsing,
       install: async (runtime, version) => {
         npmSeen = undefined

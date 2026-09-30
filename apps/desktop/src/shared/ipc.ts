@@ -526,7 +526,12 @@ export type RuntimeUpdateStatus =
    * own is off), for nothing to be using it, or -- updating on its own -- for
    * it to have been out long enough to trust.
    */
-  | { readonly kind: 'waiting'; readonly version: string; readonly why: 'ask' | 'in use' | 'too new' }
+  /*
+   * `held` (0.501): Locust's own check of each new release -- one real turn
+   * read by Locust -- failed on this version, so it is not installed on its
+   * own. Update still installs it: that is the person's choice to make.
+   */
+  | { readonly kind: 'waiting'; readonly version: string; readonly why: 'ask' | 'in use' | 'too new' | 'held' }
   | { readonly kind: 'updating'; readonly version: string }
   | { readonly kind: 'updated'; readonly from: string; readonly to: string; readonly at: string }
   | { readonly kind: 'failed'; readonly version: string; readonly what: string; readonly at: string }

@@ -43,3 +43,11 @@ it('the switch says what it does either way, and that the download is big', () =
   expect(keepCurrentNote(false)).toMatch(/^Updating when you press Update\./)
   expect(keepCurrentNote(false)).toMatch(/160 MB/)
 })
+
+describe('a version held back by the release check (0.501)', () => {
+  const view = { runtime: 'codex', installed: '0.159.0', latest: '0.160.0', status: { kind: 'waiting', version: '0.160.0', why: 'held' } } as const
+  it('says so, and still offers Update', () => {
+    expect(updateLine(view)).toBe("0.160.0 is out, and held back: Locust's check of new versions could not read it yet. Update to try it anyway.")
+    expect(offersUpdate(view)).toBe(true)
+  })
+})
