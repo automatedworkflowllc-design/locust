@@ -31,7 +31,7 @@ describe('a group of steps, in one line', () => {
   })
 
   it('reads a command that only looks as looking (Codex and Cursor send no descriptions)', () => {
-    expect(line([shell("sed -n '1,80p' src/app.ts"), shell('rg effort src'), shell('ls')])).toBe('Read app.ts, searched the files, listed a folder')
+    expect(line([shell("sed -n '1,80p' src/app.ts"), shell('rg effort src'), shell('ls')])).toBe('Read app.ts, searched for effort, listed a folder')
     expect(commandLooksAt('cd repo && cat README.md')).toBe('read')
     // PowerShell chains with `;`: the file is the first command's.
     expect(line([shell('Get-Content "C:\\tmp\\drive.log" -Tail 80; Write-Output "----TERMINAL----"; Get-Content "C:\\x\\"')])).toBe('Read drive.log')
@@ -63,6 +63,24 @@ describe('a group of steps, in one line', () => {
     // Antigravity names a read by the model's phrase, which is no file name.
     expect(line([tool('list_dir', 'Listing orb user session dirs')])).toBe('Listed a folder')
     expect(line([tool('view_file', '"C:/work/src/app.ts"')])).toBe('Read app.ts')
+  })
+
+  it('reads a script, a phrase-named command and a folder searched as a person would', () => {
+    // PowerShell here-string: its first line names nothing.
+    expect(line([shell("@'\nconsole.log(1)\n'@ | node -")])).toBe('Ran a script')
+    // Older Antigravity turns name the command by the model's phrase.
+    expect(line([shell('Running probe-picker-contents.mjs --dev')])).toBe('Running probe-picker-contents.mjs --dev')
+    // Cursor's grep names the folder it searched.
+    expect(line([tool('grep', 'C:\\Users\\me\\project\\src')])).toBe('Searched src')
+    // Inline code, and a search that names a folder rather than a pattern.
+    expect(line([shell('node --input-type=module -e "import { x } from \'./a.mjs\'; x()"')])).toBe('Ran a node script')
+    expect(line([shell('rg C:\\Users\\me\\AppData\\Local\\Temp\\run -n')])).toBe('Searched run')
+    // One command reading two files read two files.
+    expect(line([shell('cat README.md LOCUST.md')])).toBe('Read 2 files')
+    // A thought alone, with words and no headline (Cursor), says what it was about.
+    expect(line([{ kind: 'reasoning', name: 'thought', settled: true, output: 'I will read README.md, then run the two commands.' }])).toBe('Thought: I will read README.md, then run the two commands.')
+    // A thought with no length is not said beside the steps.
+    expect(line([{ kind: 'reasoning', name: 'thought', settled: true, output: 'x' }, tool('Read', 'a.ts')])).toBe('Read a.ts')
   })
 
   it('names a connector and a tool it does not know by their own names', () => {

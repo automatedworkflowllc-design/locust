@@ -284,4 +284,13 @@ export interface RuntimeCommandSpec {
    * from the stderr kept for the completion.
    */
   readonly stderrRecords?: boolean;
+  /**
+   * A record too large to carry leaves a stand-in in its place (0.492):
+   * `{"type":"locust.oversized","bytes":N,"recordType":"user","callIds":[...]}`,
+   * never any of its content. For a
+   * runtime whose tool results can be huge (Claude Code: an image, a whole
+   * file), so the call the dropped result belonged to can still be closed --
+   * it read "did not report" when the runtime had in fact reported, too much.
+   */
+  readonly oversizedStandIns?: boolean;
 }

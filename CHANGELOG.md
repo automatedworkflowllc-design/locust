@@ -11,6 +11,37 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.492.0 - 2026-09-30
+
+### Improved
+
+- **Long stretches of work read as the moves they were.** When a teammate
+  works a long while without saying anything, its steps no longer pile into
+  one line. A new line starts each time the model stops to plan its next
+  move, the way Codex's and Antigravity's own apps show it.
+- **Codex's thinking is shown under its own headline.** Each time Codex
+  thinks, its line leads with what it was thinking about ("Planning the
+  fix: read app.ts, ran npm test"), and opening the thought shows Codex's
+  summary. Until now a Codex thought showed only how long it took.
+- **Cursor's thinking says what it was about** when a thought is the whole
+  line, instead of the single word "Thought".
+- **Clearer step lines.** A script is "Ran a script" or "Ran a node
+  script" rather than its first cryptic line, one command reading two files
+  reads "Read 2 files", a search names what it looked for or the folder it
+  searched, and "searches" is spelled right.
+
+### Fixed
+
+- **A helper sent to the background no longer says it reported back the
+  moment it starts.** Claude Code's background helpers now read "working in
+  the background", with what they are doing, until they come back, and then
+  show what they came back with.
+- **A step whose result was too large no longer says it did not report.**
+  When Claude Code returned something over 256 KB, such as an image or a
+  whole file, Locust could not keep it, and the step read "did not report" as
+  if Claude Code had gone quiet. It now says the result was too large to keep,
+  and how large.
+
 ## 0.491.0 - 2026-09-30
 <!-- big -->
 

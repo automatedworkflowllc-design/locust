@@ -391,6 +391,16 @@ ${said}` : why;
       input: [{ type: "text", text: options.prompt }],
       ...(model === undefined ? {} : { model }),
       ...(effort === undefined ? {} : { effort }),
+      /*
+       * The thought's summary, as Codex's own app shows it ("Inspecting the
+       * config"). MEASURED 2026-09-30 on Codex 0.159 with
+       * `_tools/probe-codex-reasoning-summary.mjs`: with no summary asked
+       * for, and with `auto`, every reasoning item completed with
+       * `summary: []`; `concise` and `detailed` each sent a headline
+       * ("**Calculating products**"). `detailed`, so the thought opens onto
+       * more than its line. It covers this thread, not the person's config.
+       */
+      summary: "detailed",
     });
     turnId = turnIdOf(started) ?? turnId;
   };

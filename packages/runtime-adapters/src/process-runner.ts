@@ -657,10 +657,31 @@ export function createNodeRuntimeProcessRunner(
         }
       };
 
+      /*
+       * What stands in for a record too large to carry, for a runtime that
+       * asked (0.492): its size, its type, and the calls its first 4 KB name
+       * -- where Claude Code says which call a tool result answers. None of
+       * its content: the cap is what keeps an oversized payload out of the
+       * ledger, and this must not be another way in.
+       */
+      const standInFor = (head: string, bytes: number): void => {
+        if (spec.oversizedStandIns !== true || outputLimitExceeded) return;
+        const start = head.slice(0, 4096);
+        const recordType = /^\s*\{\s*"type"\s*:\s*"([a-z_]{1,40})"/.exec(start)?.[1];
+        const callIds = [...new Set([...start.matchAll(/"(?:tool_use_id|call_id|callId|toolCallId)"\s*:\s*"([A-Za-z0-9_.:-]{1,200})"/g)].map((match) => match[1]!))];
+        const nextSequence = recordCount + 1;
+        if (!records.push({ sequence: nextSequence, raw: JSON.stringify({ type: "locust.oversized", bytes, ...(recordType === undefined ? {} : { recordType }), callIds }) })) {
+          exceedOutputLimit();
+          return;
+        }
+        recordCount = nextSequence;
+      };
+
       const emitRecord = (raw: string): void => {
         if (!raw || outputLimitExceeded) return;
         if (Buffer.byteLength(raw, "utf8") > capFor(raw)) {
           dropOversizedRecord();
+          standInFor(raw, Buffer.byteLength(raw, "utf8"));
           // Even past its own cap, a result still ends the turn.
           if (inputOpen && startsAsTurnResult(raw)) closeInput();
           return;
@@ -704,10 +725,13 @@ export function createNodeRuntimeProcessRunner(
         // moment the decision is made, not once per chunk that follows.
         if (Buffer.byteLength(stdoutRemainder, "utf8") > capFor(stdoutRemainder)) {
           const endsTheTurn = startsAsTurnResult(stdoutRemainder);
+          const held = stdoutRemainder;
           stdoutRemainder = "";
           if (!skippingOversizedLine) {
             skippingOversizedLine = true;
             dropOversizedRecord();
+            // Its size is not known yet: at least what was held.
+            standInFor(held, Buffer.byteLength(held, "utf8"));
             if (inputOpen && endsTheTurn) closeInput();
           }
         }

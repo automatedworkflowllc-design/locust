@@ -71,6 +71,8 @@ export interface ActivityDetail {
   readonly durationMs?: number
   /** What the tool returned, when the runtime reported it in words; a subagent's summary. */
   readonly output?: string
+  /** What work sent to the background is doing now, while it runs (Claude Code's `task_progress`). */
+  readonly progress?: string
 }
 
 /**
@@ -252,6 +254,11 @@ export type ActivityEntry =
        * was asked and whether it reported back (Colin, 2026-09-05).
        */
       readonly kind: 'helper'
+      /** Sent to the background: launched and left working while the teammate went on (0.492). */
+      readonly background?: boolean
+      readonly backgroundEnded?: BackgroundEnding
+      /** What it is doing now, while it works in the background. */
+      readonly progress?: string
       /** The subagent's type when the runtime said (Claude Code's Explore, general-purpose, ...). */
       readonly subagentType?: string
       /** Its one-line summary when it reported back. */
@@ -426,6 +433,9 @@ export function activityEntries(
           // Codex's carries the call's lifecycle word, which is not a type.
           ...(detail.status === undefined || /^(error|completed|failed|in_progress|started|cancelled)$/i.test(detail.status) ? {} : { subagentType: detail.status }),
           ...(detail.output === undefined ? {} : { summary: detail.output }),
+          ...(detail.background === true ? { background: true } : {}),
+          ...(detail.backgroundEnded === undefined ? {} : { backgroundEnded: detail.backgroundEnded }),
+          ...(detail.progress === undefined ? {} : { progress: detail.progress }),
           settled: detail.settled,
           failed: detail.failed === true
         })
@@ -1755,6 +1765,16 @@ function toolLooksAt(tool: string | undefined): Looked | undefined {
   return undefined
 }
 
+/** The files a reading command names, by their own names: `cat README.md LOCUST.md` reads both. */
+function commandTargets(command: string): readonly string[] {
+  const first = shellCommandText(command).split('\n')[0]?.split(/\|\||&&|;|\|/)[0] ?? ''
+  return first.trim().split(/\s+/).slice(1)
+    .map((word) => word.replace(/^["']+|["',;]+$/g, ''))
+    .filter((word) => word.length > 1 && !word.startsWith('-') && /[./\\]/.test(word) && !/^\d+,\d+p?$/.test(word))
+    .map((word) => word.split(/[\\/]/).filter((part) => part.length > 0).at(-1) ?? '')
+    .filter((name) => name.length > 0)
+}
+
 /** The last path-looking word of a command, as its file name: `sed -n 1,80p src/a.ts` is `a.ts`. */
 function commandTarget(command: string): string | undefined {
   // The first command only: `Get-Content a.log -Tail 80; Write-Output "--"` reads a.log.
@@ -1765,6 +1785,23 @@ function commandTarget(command: string): string | undefined {
     .filter((word) => word.length > 1 && !word.startsWith('-') && /[./\\]/.test(word) && !/^\d+,\d+p?$/.test(word))
   const last = paths.at(-1)?.split(/[\\/]/).filter((part) => part.length > 0).at(-1)
   return last === undefined || last.length === 0 ? undefined : last
+}
+
+/** What a search command looked for: its first word that is not a flag, `rg port src` -> `port`. */
+function commandPattern(command: string): string | undefined {
+  const first = shellCommandText(command).split('\n')[0]?.split(/\|\||&&|;|\|/)[0] ?? ''
+  const word = first.trim().split(/\s+/).slice(1).find((part) => !part.startsWith('-'))
+  const bare = word?.replace(/^["']+|["']+$/g, '')
+  return bare === undefined || bare.length === 0 ? undefined : bare
+}
+
+/**
+ * A thought's headline, when its summary leads with one: Codex writes
+ * "**Inspecting the config**" and then the paragraph (0.492).
+ */
+export function thoughtHeadline(text: string): string | undefined {
+  const headline = /^\s*\*\*([^*\n]{2,80})\*\*/.exec(text)?.[1]?.trim()
+  return headline === undefined || headline.length === 0 ? undefined : headline
 }
 
 /** "Run the tests" -> "run the tests", keeping a word that is capitalised on its own (`README`). */
@@ -1784,8 +1821,11 @@ export function stepsLine(details: readonly ActivityDetail[], finished: boolean,
   let refused = 0
   let declined = 0
   let silent = 0
+  let working = 0
   let thoughtMs = 0
   let thoughts = 0
+  let headline: string | undefined
+  let thoughtText: string | undefined
   /*
    * A file's own name, and only when what the runtime gave IS a path:
    * Antigravity names its reads by the model's phrase ("Listing orb user
@@ -1801,15 +1841,27 @@ export function stepsLine(details: readonly ActivityDetail[], finished: boolean,
     if (detail.status === 'refused') { refused += 1; continue }
     if (detail.status === 'declined') { declined += 1; continue }
     if (finished && !detail.settled && detail.failed !== true) silent += 1
+    // Work sent to the background goes on after its call returns (0.492).
+    if (detail.background === true && detail.settled && detail.failed !== true) {
+      if (detail.backgroundEnded === 'failed') failed += 1
+      else if (detail.backgroundEnded === undefined) {
+        if (finished) silent += 1
+        else working += 1
+      }
+    }
     if (detail.kind === 'reasoning') {
       thoughts += 1
       thoughtMs += detail.durationMs ?? 0
+      headline ??= thoughtHeadline(detail.output ?? '')
+      if ((detail.output ?? '').trim().length > 0) thoughtText ??= detail.output
       continue
     }
     if (detail.kind === 'shell') {
       if (detail.failed === true || (detail.exitCode !== undefined && detail.exitCode !== 0)) failed += 1
       const looked = commandLooksAt(detail.name)
-      if (looked !== undefined) note(looked, looked === 'read' ? commandTarget(detail.name) : undefined)
+      if (looked === 'read' && commandTargets(detail.name).length > 1) for (const name of commandTargets(detail.name)) note('read', name)
+      else if (looked === 'search' && /[\\/]/.test(commandPattern(detail.name) ?? '')) note('searchedIn', commandPattern(detail.name)!.split(/[\\/]/).filter((part) => part.length > 0).at(-1))
+      else if (looked !== undefined) note(looked, looked === 'read' ? commandTarget(detail.name) : looked === 'search' ? commandPattern(detail.name) : undefined)
       else note('command', detail.title ?? commandHead(detail.name))
       continue
     }
@@ -1829,7 +1881,9 @@ export function stepsLine(details: readonly ActivityDetail[], finished: boolean,
     }
     if (detail.failed === true) failed += 1
     const looked = toolLooksAt(detail.tool)
-    if (looked !== undefined) note(looked, looked === 'read' || looked === 'list' ? fileName(detail.name) : looked === 'search' && !/\s{2}|^[A-Z][a-z]+ing\b/.test(detail.name) ? detail.name : undefined)
+    // A search tool may name its pattern or the folder it searched (Cursor's grep names the folder).
+    const searchedIn = looked === 'search' && /[\\/]/.test(detail.name) ? fileName(detail.name) : undefined
+    if (looked !== undefined) note(searchedIn !== undefined ? 'searchedIn' : looked, looked === 'read' || looked === 'list' ? fileName(detail.name) : searchedIn ?? (looked === 'search' && !/\s{2}|^[A-Z][a-z]+ing\b/.test(detail.name) ? detail.name : undefined))
     else note('tool', detail.tool ?? detail.name)
   }
   const one = (held: { count: number; names: string[] }): string | undefined => (held.count === 1 ? held.names[0] : undefined)
@@ -1841,6 +1895,7 @@ export function stepsLine(details: readonly ActivityDetail[], finished: boolean,
     switch (kind) {
       case 'read': words.push(named !== undefined ? `read ${named}` : held.names.length > 1 ? `read ${pluralize(held.names.length, 'file')}` : held.count === 1 ? 'read a file' : `read ${pluralize(held.count, 'file')}`); break
       case 'search': words.push(held.count === 1 ? (named !== undefined ? `searched for ${clip(named, 32)}` : 'searched the files') : `ran ${times(held.count, 'search', 'searches')}`); break
+      case 'searchedIn': words.push(held.count === 1 && named !== undefined ? `searched ${named}` : `ran ${times(held.count, 'search', 'searches')}`); break
       case 'wait': words.push(held.count === 1 ? 'waited for a command' : `waited ${String(held.count)} times`); break
       case 'list': words.push(held.count === 1 ? (named !== undefined ? `listed ${named}` : 'listed a folder') : `listed ${pluralize(held.count, 'folder')}`); break
       case 'web': words.push(held.count === 1 ? 'searched the web' : `searched the web ${String(held.count)} times`); break
@@ -1854,12 +1909,33 @@ export function stepsLine(details: readonly ActivityDetail[], finished: boolean,
       case 'command': {
         const titled = details.filter((detail) => detail.kind === 'shell' && commandLooksAt(detail.name) === undefined)
         const only = titled.length === 1 ? titled[0] : undefined
-        words.push(held.count > 1 ? `ran ${pluralize(held.count, 'command')}` : only?.title !== undefined ? lowerFirst(only.title) : `ran ${clip(shellCommandText(only?.name ?? '').split('\n')[0]?.trim() ?? 'a command', 40)}`)
+        const first = shellCommandText(only?.name ?? '').split('\n')[0]?.trim() ?? ''
+        words.push(
+          held.count > 1 ? `ran ${pluralize(held.count, 'command')}`
+          : only?.title !== undefined ? lowerFirst(only.title)
+          // A runtime that names its command by the model's phrase ("Running the tests").
+          : /^[A-Z][a-z]+ing\b/.test(first) ? lowerFirst(clip(first))
+          // A script's opening line (PowerShell's `@'`) names nothing.
+          : (first.match(/[A-Za-z]/g)?.length ?? 0) < 3 ? 'ran a script'
+          // Code handed to an interpreter inline: `node -e "..."`, `python -c "..."`.
+          : /\s-(?:e|c|-eval|-command|Command)\s+["'`]/.test(first) ? `ran a ${commandHead(first).replace(/\.exe$/i, '')} script`
+          : `ran ${clip(first, 40)}`
+        )
         break
       }
     }
   }
-  if (thoughts > 0) words.unshift(thoughtMs >= 1_000 ? `thought for ${durationText(thoughtMs)}` : 'thought')
+  // What it was thinking about leads, where the model said (Codex's headline).
+  if (headline !== undefined) {
+    const rest = words.splice(0, words.length).join(', ')
+    words.push(rest.length === 0 ? headline : `${headline}: ${rest}`)
+  } else if (thoughts > 0 && (thoughtMs >= 1_000 || words.length === 0)) {
+    // "Thought" with no length says nothing beside the steps; alone, it is the step.
+    const thought = thoughtMs >= 1_000 ? `thought for ${durationText(thoughtMs)}` : 'thought'
+    // Alone, and with words but no headline (Cursor's thinking): its first words say what about.
+    const said = words.length === 0 ? thoughtText?.replace(/\s+/g, ' ').trim() : undefined
+    words.unshift(said !== undefined && said.length > 0 ? `${thought}: ${clip(said, 70)}` : thought)
+  }
   /*
    * ONE TITLED COMMAND THAT FAILED is said the way Claude Code says it:
    * "Failed to add the effort chip". Its description is an instruction to
@@ -1874,6 +1950,7 @@ export function stepsLine(details: readonly ActivityDetail[], finished: boolean,
       : words.join(', ')
   const segments: TraceSegment[] = [{ key: 'what', text: `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}`, ...(loneFailed ? { tone: 'amber' as const } : {}) }]
   if (failed > 0 && !loneFailed) segments.push({ key: 'failed', text: `${String(failed)} failed`, tone: 'amber' })
+  if (working > 0) segments.push({ key: 'working', text: `${String(working)} working in the background` })
   if (silent > 0) segments.push({ key: 'silent', text: `${String(silent)} did not report`, tone: 'amber' })
   if (refused > 0) segments.push({ key: 'refused', text: `${String(refused)} refused`, tone: 'amber' })
   if (declined > 0) segments.push({ key: 'declined', text: `${String(declined)} declined`, tone: 'amber' })
@@ -2563,6 +2640,12 @@ export function buildThread(
    * became of it arrives after the row has closed.
    */
   const backgroundRows = new Map<string, ActivityDetail>()
+  /**
+   * Every row by the call it came from, once closed. Claude Code may return a
+   * helper's launch before it says the helper went to the background, and
+   * the news then has to find a row that is no longer open (0.492).
+   */
+  const closedRows = new Map<string, ActivityDetail>()
   /** The file's own name, however the runtime spelt the path to it. */
   const nameTail = (name: string): string => name.toLowerCase().replace(/\\/g, '/').split('/').at(-1) ?? name
   /*
@@ -2764,6 +2847,7 @@ export function buildThread(
               ...(event.payload.background === true ? { background: true } : {})
             }
             const closed = activity[index]
+            if (closed !== undefined) closedRows.set(event.payload.itemId, closed)
             if (closed?.background === true) backgroundRows.set(event.payload.itemId, closed)
             /*
              * The observation is the whole change to that file, so the
@@ -2800,7 +2884,24 @@ export function buildThread(
         // Background work starting is not what the teammate is doing now --
         // it sent the work away so it could do something else -- so it does
         // not take the live line. Its row already says where it went.
-        if (event.payload.itemType === 'background') break
+        if (event.payload.itemType === 'background') {
+          // What that work is doing now lands on its row (0.492): a helper in
+          // the background said "reported back" the moment it was launched.
+          const itemId = event.payload.itemId
+          const said = typeof event.payload.message === 'string' ? event.payload.message.trim() : ''
+          const row = itemId === undefined ? undefined : backgroundRows.get(itemId) ?? openTools.get(itemId) ?? closedRows.get(itemId)
+          const index = row === undefined ? -1 : activity.indexOf(row)
+          if (itemId !== undefined && row !== undefined && index >= 0) {
+            const going: ActivityDetail = { ...row, background: true, ...(said.length > 0 ? { progress: said } : {}) }
+            activity[index] = going
+            if (openTools.get(itemId) === row) openTools.set(itemId, going)
+            else {
+              backgroundRows.set(itemId, going)
+              closedRows.set(itemId, going)
+            }
+          }
+          break
+        }
         // A turn opening is not work yet: Codex raises its setup notices
         // right after it, before any tool runs, and counting the turn as work
         // put "skill descriptions were shortened" back in every thread.
@@ -2848,16 +2949,20 @@ export function buildThread(
          */
         if (event.payload.itemType === 'background') {
           const itemId = event.payload.itemId
-          const row = itemId === undefined ? undefined : backgroundRows.get(itemId) ?? openTools.get(itemId)
+          const row = itemId === undefined ? undefined : backgroundRows.get(itemId) ?? openTools.get(itemId) ?? closedRows.get(itemId)
           const index = row === undefined ? -1 : activity.indexOf(row)
           if (itemId !== undefined && row !== undefined && index >= 0) {
+            const summary = typeof event.payload.message === 'string' && event.payload.message.trim().length > 0 ? event.payload.message.trim() : undefined
             const ended: ActivityDetail = {
               ...row,
               background: true,
-              backgroundEnded: backgroundEndingOf(event.payload.status, event.type === 'step.failed')
+              backgroundEnded: backgroundEndingOf(event.payload.status, event.type === 'step.failed'),
+              // A helper's report, when it came back with one.
+              ...(summary !== undefined && row.kind === 'helper' ? { output: summary } : {})
             }
             activity[index] = ended
             backgroundRows.set(itemId, ended)
+            if (closedRows.has(itemId)) closedRows.set(itemId, ended)
             if (openTools.get(itemId) === row) openTools.set(itemId, ended)
           }
           break
@@ -3143,13 +3248,28 @@ export function buildThread(
   events.forEach((event, index) => {
     if (event.type === 'message.delta' && !beganAt.has(event.payload.itemId)) beganAt.set(event.payload.itemId, index)
   })
-  type Piece = { readonly at: number; readonly row: number } | { readonly at: number; readonly message: (typeof messages)[number] }
+  type Piece =
+    | { readonly at: number; readonly row: number }
+    | { readonly at: number; readonly message: (typeof messages)[number] }
+    | { readonly at: number; readonly thinks: true }
   const pieces: Piece[] = [
     ...activity.flatMap((_, row): Piece[] => {
       const at = activityBorn[row] ?? endAt
       return at < endAt ? [{ at, row }] : []
     }),
-    ...messages.map((message): Piece => ({ at: beganAt.get(message.itemId) ?? endAt, message }))
+    ...messages.map((message): Piece => ({ at: beganAt.get(message.itemId) ?? endAt, message })),
+    /*
+     * EACH TIME THE MODEL THINKS, A NEW LINE (0.492). A model that works a
+     * long stretch without a word -- an Antigravity run of 235 steps and one
+     * message -- was one line with everything behind it. Codex's and
+     * Antigravity's own apps start a new block each time the model plans its
+     * next move, and every runtime but Claude without thinking reports that
+     * moment, with words or without: the stretch reads as the moves it was.
+     */
+    ...events.flatMap((event, at): Piece[] =>
+      at < endAt && event.type === 'step.started' && (event.payload.stepKind === 'reasoning' || /reasoning/i.test(event.payload.itemType ?? ''))
+        ? [{ at, thinks: true }]
+        : [])
   ].sort((a, b) => a.at - b.at)
   let group: number[] = []
   const flush = (): void => {
@@ -3164,6 +3284,10 @@ export function buildThread(
   for (const piece of pieces) {
     if ('row' in piece) {
       group.push(piece.row)
+      continue
+    }
+    if ('thinks' in piece) {
+      flush()
       continue
     }
     const message = piece.message

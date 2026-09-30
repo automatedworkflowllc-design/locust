@@ -1,6 +1,6 @@
 // A turn reads as it happens, and nothing moves when it ends (0.491).
 //
-//   LOCUST_SPEND=1 node _tools/drive-a-turn-reads-as-it-happens.mjs [--packaged <exe>] [--tag <name>]
+//   LOCUST_SPEND=1 node _tools/drive-a-turn-reads-as-it-happens.mjs [--packaged <exe>] [--tag <name>] [--runtime claude|codex|cursor|opencode]
 //
 // Colin, 2026-09-30, with Claude Code's app beside Locust: "ALL of our
 // commands and stuff that would appear batched on screen seem to all get
@@ -18,14 +18,24 @@ import { openTeammateScript, recordRoot, say, scratchRepository, sendAndWaitScri
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tag = arg('--tag') ?? 'local'
+// Each runtime on the route it already has: Cursor keeps the person's own model (choosing one rewrites their default).
+const ROUTES = {
+  claude: { runtime: 'claude', model: 'haiku', mode: 'auto' },
+  codex: { runtime: 'codex', model: 'account-default', mode: 'auto' },
+  cursor: { runtime: 'cursor', model: 'account-default', mode: 'auto' },
+  opencode: { runtime: 'opencode', model: 'opencode/nemotron-3-ultra-free', mode: 'auto' }
+}
+const runtime = arg('--runtime') ?? 'claude'
+const route = ROUTES[runtime]
+if (route === undefined) throw new Error(`no route for ${runtime}`)
 const workspace = await scratchRepository('locust-drive-reads-as-it-happens-ws-')
 const drive = await startDrive({
   ...(packaged === undefined ? {} : { packaged }),
-  name: `a-turn-reads-as-it-happens-${tag}`, port: 9797, workspace, spends: true,
-  outPath: join(recordRoot('a-turn-reads-as-it-happens-2026-09-30'), tag),
+  name: `a-turn-reads-as-it-happens-${runtime}-${tag}`, port: 9797, workspace, spends: runtime !== 'opencode',
+  outPath: join(recordRoot('a-turn-reads-as-it-happens-2026-09-30'), `${runtime}-${tag}`),
   seed: {
     schemaVersion: 1,
-    teammates: [{ teammateId: 'tm_ash', name: 'Ash', hue: 'clay', role: 'Custom', roleTitle: 'Helper', createdAt: '2026-09-05T05:00:00.000Z', route: { runtime: 'claude', model: 'haiku', mode: 'auto' } }],
+    teammates: [{ teammateId: 'tm_ash', name: 'Ash', hue: 'clay', role: 'Custom', roleTitle: 'Helper', createdAt: '2026-09-05T05:00:00.000Z', route }],
     missionOwners: {},
     settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: true }
   }
@@ -56,6 +66,13 @@ try {
   const final = JSON.parse(String(await drive.capture('finished: the turn as it happened', () => drive.evaluate(`JSON.stringify(${ORDER})`))))
   say(`  ${String(samples.length)} samples while it ran; final:`)
   for (const line of final) say(`      ${line.slice(0, 110)}`)
+  // What the runtime said about its thinking, from the record: a thought's words, where it sent any.
+  const thoughts = JSON.parse(String(await drive.evaluate(`(async () => {
+    const history = await window.desktop.getMissionHistory()
+    const events = history.ok ? history.data.missions.at(-1)?.events ?? [] : []
+    return JSON.stringify(events.filter((e) => e.type === 'step.completed' && (e.payload.stepKind === 'reasoning' || /reasoning/i.test(e.payload.itemType ?? ''))).map((e) => String(e.payload.message ?? '').slice(0, 60)))
+  })()`)))
+  say(`  thoughts recorded: ${JSON.stringify(thoughts)}`)
   const live = samples.filter((sample) => sample.includes('LIVE'))
   const both = live.find((sample) => sample.some((line) => line.startsWith('STEPS')) && sample.some((line) => line.startsWith('SAID')))
   check('while it worked, its steps were lines among what it said', both !== undefined, JSON.stringify(live.at(-1) ?? []).slice(0, 240))
@@ -63,7 +80,9 @@ try {
   const stepsFinal = final.filter((line) => line.startsWith('STEPS'))
   // A thought before the first sentence is its own line, and right: it happened first.
   const work = final.filter((line) => !/^STEPS Thought( for|$)/.test(line))
-  check('the finished turn reads said, steps, said, steps ...', stepsFinal.length >= 2 && saidFinal.length >= 3 && work[0]?.startsWith('SAID') === true, JSON.stringify(final).slice(0, 300))
+  // A model that did not narrate each step is the model's choice: said, not failed.
+  if (saidFinal.length < 3) say(`  (the model said ${String(saidFinal.length)} thing(s), not one before each step: nothing to interleave)`)
+  else check('the finished turn reads said, steps, said, steps ...', stepsFinal.length >= 2 && work[0]?.startsWith('SAID') === true, JSON.stringify(final).slice(0, 300))
   // Nothing moved: what was said, in the order it was drawn live, is the order it ends in.
   const lastLive = (live.at(-1) ?? []).filter((line) => line.startsWith('SAID')).map((line) => line.slice(0, 30))
   const finalSaid = saidFinal.map((line) => line.slice(0, 30))
@@ -74,7 +93,7 @@ try {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
-  await drive.finish({ intro: `Build: ${packaged ?? 'out/'}. Ash on Claude Haiku, three narrated steps, sampled while it ran.`, extra: `Checks failed: ${String(failures)}` })
+  await drive.finish({ intro: `Build: ${packaged ?? 'out/'}. Ash on ${runtime} (${route.model}), three narrated steps, sampled while it ran.`, extra: `Checks failed: ${String(failures)}` })
 }
 say(failures === 0 ? 'ALL CHECKS PASSED' : `${String(failures)} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)

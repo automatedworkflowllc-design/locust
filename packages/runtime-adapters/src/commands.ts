@@ -313,6 +313,7 @@ interface SpecTransport {
   readonly sandbox?: MissionSandbox;
   readonly env?: Readonly<Record<string, string>>;
   readonly stderrRecords?: boolean;
+  readonly oversizedStandIns?: boolean;
 }
 
 function baseSpec(
@@ -337,6 +338,7 @@ function baseSpec(
       ? {}
       : { env: { ...executable.env, ...transport.env } }),
     ...(transport.stderrRecords === true ? { stderrRecords: true } : {}),
+    ...(transport.oversizedStandIns === true ? { oversizedStandIns: true } : {}),
   };
   assertSafeRuntimeCommand(spec, transport.sandbox);
   return spec;
@@ -928,6 +930,7 @@ export function createClaudePrintCommand(
   return baseSpec("claude", executable, options.workspacePath, args, {
     stdin: "stream-json",
     sandbox: sandboxArgument(options.sandbox),
+    oversizedStandIns: true,
   });
 }
 

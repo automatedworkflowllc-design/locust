@@ -802,6 +802,23 @@ export function pickRouteScript({ group, search, row }) {
 }
 
 /** Type a message, press send, and wait for the run to end (or not, within the bound). */
+/**
+ * Open every step line in the thread, so each step's row is on screen (0.491+).
+ *
+ * A turn's steps used to sit in ONE fold, `.lc-activity`, and drives opened it
+ * to read the rows. Since 0.491 a turn is what was said and, between, one
+ * line per group of steps (`.lc-steps__line`); `.lc-activity` is now only the
+ * turn's files card at its foot. A drive that reads rows opens these first.
+ * Resolves to how many rows are then on screen.
+ */
+export function openAllStepsScript(scope = '.lc-thread') {
+  return `(async () => {
+    for (const line of document.querySelectorAll(${JSON.stringify(`${scope} .lc-steps__line[aria-expanded="false"]`)})) line.click()
+    await new Promise((r) => setTimeout(r, 400))
+    return document.querySelectorAll(${JSON.stringify(`${scope} .lc-steps__list .lc-filerow`)}).length
+  })()`
+}
+
 export function sendAndWaitScript(text, { waitSeconds = 360, settle = true } = {}) {
   return `(async () => {
     const field = document.querySelector('form.command-dock textarea')

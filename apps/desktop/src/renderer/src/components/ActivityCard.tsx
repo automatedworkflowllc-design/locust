@@ -19,14 +19,14 @@ export function thoughtLine(durationMs: number | undefined): string {
 }
 import type { ReactElement } from 'react'
 
-import { activityCounts, activityEntries, boundedShellOutput, commandTook, defaultOpenEntry, foldedToolsText, relativePath, durationText } from '../missionView.js'
+import { activityCounts, activityEntries, boundedShellOutput, commandTook, defaultOpenEntry, foldedToolsText, relativePath, durationText, thoughtHeadline } from '../missionView.js'
 import type { TraceSegment, ActivityDetail, ActivityEntry, PlanStep } from '../missionView.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { DiffView } from './DiffView.js'
 import { DocPreview, isNewDocument } from './DocPreview.js'
 import { InComparisonCell, PinnedPagesContext } from '../pinnedPages.js'
 import { Icon } from './Icon.js'
-import { PlanSteps } from './ThreadItems.js'
+import { AgentText, PlanSteps } from './ThreadItems.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 
 /**
@@ -446,10 +446,10 @@ export function ActivityCard({
                   <span className="lc-filerow__status">{entry.subagentType === undefined ? 'subagent' : `${entry.subagentType} subagent`}</span>
                   {/* Four states, not three: a helper the run ended without settling is not working on it -- it did not report (SURFACES-0.22 §2). Amber, not red: nothing said it failed. */}
                   <span
-                    className={`lc-filerow__result ${entry.settled ? (entry.failed ? 'is-failed' : 'is-muted') : finished ? 'is-stalled' : 'is-running'}`}
+                    className={`lc-filerow__result ${helperTone(entry, finished)}`}
                     {...(entry.summary === undefined ? {} : { title: entry.summary })}
                   >
-                    {!entry.settled ? (finished ? 'did not report' : 'working on it') : entry.failed ? 'failed' : entry.summary === undefined ? 'reported back' : `reported back · ${entry.summary}`}
+                    {helperResult(entry, finished)}
                   </span>
                 </div>
               ) : entry.kind === 'shell' ? (
@@ -603,12 +603,20 @@ export function ActivityCard({
                     <>
                       <button type="button" className="lc-filerow lc-filerow--thought" onClick={() => toggle(entry)} aria-expanded={isOpen(entry)}>
                         <Icon name="thought" size={14} />
-                        <span className="lc-filerow__path">{thoughtLine(entry.durationMs)}</span>
+                        {/* Codex leads its summary with a headline: it names the thought (0.492). */}
+                        <span className="lc-filerow__path">
+                          {thoughtLine(entry.durationMs)}
+                          {thoughtHeadline(entry.text) === undefined ? '' : ` · ${thoughtHeadline(entry.text) ?? ''}`}
+                        </span>
                         <span className="lc-activity__chev" aria-hidden="true">
                           <Icon name={isOpen(entry) ? 'chevron-down' : 'chevron-right'} size={12} />
                         </span>
                       </button>
-                      {isOpen(entry) && <div className="lc-filerow__thought">{entry.text}</div>}
+                      {isOpen(entry) && (
+                        <div className="lc-filerow__thought">
+                          <AgentText text={entry.text} streaming={false} />
+                        </div>
+                      )}
                     </>
                   )}
                 </>
@@ -766,6 +774,43 @@ export function ActivityCard({
       )}
     </div>
   )
+}
+
+/**
+ * What became of a helper, in the row's words.
+ *
+ * A helper SENT TO THE BACKGROUND (0.492) returns at once -- the call's result
+ * is only the runtime saying it launched -- so "reported back" on it was the
+ * app claiming a report nobody had made. It works in the background, saying
+ * what it is doing, until the runtime says it came back.
+ */
+export function helperResult(entry: Extract<ActivityEntry, { kind: 'helper' }>, finished: boolean): string {
+  if (!entry.settled) return finished ? 'did not report' : 'working on it'
+  if (entry.failed) return 'failed'
+  const back = entry.summary === undefined ? 'reported back' : `reported back · ${entry.summary}`
+  if (entry.background !== true) return back
+  switch (entry.backgroundEnded) {
+    case 'completed':
+      return back
+    case 'failed':
+      return 'failed'
+    case 'stopped':
+      return 'stopped'
+    case 'stopped-with-run':
+      return 'stopped when the run ended'
+    case 'ended':
+      return 'ended'
+    case undefined:
+      return finished ? 'did not report' : `working in the background${entry.progress === undefined ? '' : ` · ${entry.progress}`}`
+  }
+}
+
+function helperTone(entry: Extract<ActivityEntry, { kind: 'helper' }>, finished: boolean): string {
+  if (!entry.settled) return finished ? 'is-stalled' : 'is-running'
+  if (entry.failed || entry.backgroundEnded === 'failed') return 'is-failed'
+  if (entry.background === true && entry.backgroundEnded === undefined) return finished ? 'is-stalled' : 'is-running'
+  if (entry.background === true && entry.backgroundEnded !== 'completed') return 'is-stalled'
+  return 'is-muted'
 }
 
 function shellResult(entry: Extract<ActivityEntry, { kind: 'shell' }>, finished = false): string {

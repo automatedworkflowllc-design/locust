@@ -712,7 +712,13 @@ export function createClaudeEventNormalizer(
           backgroundTasks.set(taskId, callId);
           const call = callId === undefined ? undefined : openTools.get(callId);
           if (callId !== undefined && call !== undefined) openTools.set(callId, { ...call, background: true });
-          const doing = stringValue(parsed.description);
+          // A helper sent to the background is still a helper: its type rides on its row (0.492).
+          const helperKind = stringValue(parsed.subagent_type);
+          if (callId !== undefined && helperKind !== undefined) subagentKinds.set(callId, helperKind);
+          const lastTool = stringValue(parsed.last_tool_name);
+          const doing = [stringValue(parsed.description), lastTool === undefined ? undefined : `last tool ${lastTool}`]
+            .filter((part): part is string => part !== undefined)
+            .join(" · ") || undefined;
           return [
             emit("step.started", {
               stepKind: "item",
@@ -747,12 +753,15 @@ export function createClaudeEventNormalizer(
           const callId = toolUseId ?? backgroundTasks.get(taskId);
           backgroundTasks.delete(taskId);
           const ended = backgroundEnding(stringValue(parsed.status), sawResult);
+          // What a background helper came back with, in its own words (0.492).
+          const said = stringValue(parsed.summary);
           return [
             emit(ended === "failed" ? "step.failed" : "step.completed", {
               stepKind: "item",
               itemId: callId ?? `background:${taskId}`,
               itemType: "background",
               status: ended,
+              ...(said === undefined ? {} : { message: boundedMessageText(said) }),
               evidence,
             }),
           ];
@@ -951,6 +960,10 @@ export function createClaudeEventNormalizer(
         const target = claudeToolTarget(open.name, block.input);
         const title = claudeToolTitle(open.name, block.input);
         const background = claudeToolBackgrounded(open.name, block.input);
+        // A helper's type is on its own call (0.492), so its row carries it
+        // however the launch and the runtime's notice about it are ordered.
+        const helperType = /^(Agent|Task)$/.test(open.name) && isObject(block.input) ? stringValue(block.input.subagent_type) : undefined;
+        if (helperType !== undefined && !subagentKinds.has(itemId)) subagentKinds.set(itemId, helperType);
         if (target !== undefined || title !== undefined || background) {
           openTools.set(itemId, {
             ...open,
@@ -1004,6 +1017,39 @@ export function createClaudeEventNormalizer(
           evidence,
         }),
       ];
+    }
+
+    /*
+     * A RESULT TOO LARGE TO CARRY (0.492, DISPLAY-COVERAGE gap 4). The host
+     * drops a record over its cap -- an image, a whole file -- and leaves
+     * this in its place, naming the calls its first bytes answer; each such
+     * call is closed as having answered, with the size it answered in.
+     * It read "did not report", which blamed the runtime for the host's cut.
+     */
+    if (type === "locust.oversized") {
+      if (parsed.recordType !== "user") return [];
+      const kb = typeof parsed.bytes === "number" && Number.isFinite(parsed.bytes) ? Math.round(parsed.bytes / 1024) : undefined;
+      const events: NormalizedRuntimeEvent[] = [];
+      for (const itemId of Array.isArray(parsed.callIds) ? parsed.callIds.filter((id): id is string => typeof id === "string") : []) {
+        const open = openTools.get(itemId);
+        if (open === undefined) continue;
+        openTools.delete(itemId);
+        events.push(
+          emit("tool.completed", {
+            itemId,
+            toolKind: "tool_use",
+            name: open.name,
+            ...(open.target === undefined ? {} : { command: open.target }),
+            ...(open.title === undefined ? {} : { title: open.title }),
+            ...(open.background === true ? { background: true } : {}),
+            phase: "completed",
+            status: "result too large to keep",
+            output: `The result was too large to keep${kb === undefined ? "" : ` (${String(kb)} KB)`}. The teammate read it; Locust keeps results up to 256 KB.`,
+            evidence,
+          }),
+        );
+      }
+      return events;
     }
 
     if (type === "user") {

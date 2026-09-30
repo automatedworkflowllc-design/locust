@@ -400,11 +400,20 @@ export function createAppServerEventNormalizer(
        * stayed on the live line while the answer streamed under it.
        */
       if (itemType === "userMessage") return [];
+      /*
+       * A REASONING ITEM'S SUMMARY is what Codex's own app shows while it
+       * thinks -- "Inspecting the config" -- and it was dropped (0.492). The
+       * summary only: `content` is the raw reasoning, which is not kept.
+       */
+      const summary = completed && itemType === "reasoning" && Array.isArray(item.summary)
+        ? item.summary.filter((part): part is string => typeof part === "string" && part.trim().length > 0).join("\n\n")
+        : "";
       return [
         emit(completed ? "step.completed" : "step.started", {
           stepKind: "item",
           itemId,
           itemType,
+          ...(summary.length > 0 ? { message: boundedMessageText(summary) } : {}),
           evidence: evidence(notification),
         }),
       ];
