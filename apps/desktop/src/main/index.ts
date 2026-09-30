@@ -14,6 +14,8 @@ import { createCursorDefaultModel } from './cursor-default-model.js'
 import { listWorkspaceFiles } from './workspace-files.js'
 import { MAX_TAGGED, taggedPrompt } from '../shared/tagging.js'
 import { COMPARE_SLOTS, COMPARE_TREES_DIRECTORY, comparesGoneWith, compareNeedsCopy, compareRefusalOf, compareSlotKey, compareTreeId, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../shared/compare.js'
+import { reverseChanges } from '../shared/reverse-diff.js'
+import type { ReverseChange } from '../shared/reverse-diff.js'
 import { FINANCES_FOLDER, FINANCES_README, FINANCES_ROUTE, FINANCES_TEAMMATE } from './places.js'
 import { bringInCopy, COPY_ROOT, copyLineChanges, copyRefusal, makeCompareCopy, removeCompareCopies } from './compare-copies.js'
 import type { CompareSlotId, PublicCompare, PublicCompareSlot } from '../shared/compare.js'
@@ -39,7 +41,7 @@ import type { MissionLedger, Workroom } from '@teammate/mission-store'
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 import { spawn } from 'node:child_process'
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync, existsSync, renameSync, statSync, unlinkSync } from 'node:fs'
-import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { copyFile, lstat, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { randomInt } from 'node:crypto'
 import { basename, dirname, isAbsolute, join, resolve as resolvePath } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -227,6 +229,7 @@ import {
   SIDE_ASK_CHANNEL,
   FOLDER_SWITCH_CHANNEL,
   PLACE_FINANCES_CHANNEL,
+  REWIND_PUT_BACK_CHANNEL,
   WORKSPACE_ATTACH_CHANNEL,
   WORKSPACE_FILES_CHANNEL,
   WORKSPACE_PASTE_CHANNEL,
@@ -3347,6 +3350,82 @@ if (!ownsSingleInstanceLock) {
       } catch {
         return { ok: false, message: 'The Finances place could not be opened. Nothing in it was changed.' }
       }
+    })
+
+    /*
+     * PUT BACK WHAT THE LATER REPLIES CHANGED (0.502). The window says which
+     * files and what was recorded; the host checks every piece of that, stays
+     * inside this folder, and writes nothing until each file's answer is
+     * known -- then only the files that come back exactly. A link is left
+     * alone: following one could write outside the folder.
+     */
+    ipcMain.handle(REWIND_PUT_BACK_CHANNEL, async (event, request: unknown) => {
+      const leftAlone: { path: string; why: string }[] = []
+      if (!fromOwnWindow(event)) return { putBack: [], leftAlone }
+      const files = typeof request === 'object' && request !== null ? (request as { files?: unknown }).files : undefined
+      if (!Array.isArray(files) || files.length > 500) return { putBack: [], leftAlone }
+      const rowOk = (row: unknown): boolean =>
+        typeof row === 'object' && row !== null
+        && ['context', 'add', 'del'].includes((row as { kind?: unknown }).kind as string)
+        && typeof (row as { text?: unknown }).text === 'string'
+      const hunkOk = (hunk: unknown): boolean => {
+        if (typeof hunk !== 'object' || hunk === null) return false
+        const h = hunk as Record<string, unknown>
+        return ['oldStart', 'oldCount', 'newStart', 'newCount'].every((field) => Number.isSafeInteger(h[field]) && (h[field] as number) >= 0)
+          && Array.isArray(h.rows) && h.rows.length <= 100_000 && h.rows.every(rowOk)
+      }
+      const changeOk = (change: unknown): change is ReverseChange =>
+        typeof change === 'object' && change !== null
+        && ['MODIFIED', 'ADDED', 'DELETED', 'RENAMED'].includes((change as { status?: unknown }).status as string)
+        && Array.isArray((change as { hunks?: unknown }).hunks) && ((change as { hunks: unknown[] }).hunks).every(hunkOk)
+      const folder = resolvePath(workspacePath)
+      const writes: { full: string; path: string; next: string | null }[] = []
+      for (const entry of files as unknown[]) {
+        const path = typeof entry === 'object' && entry !== null ? (entry as { path?: unknown }).path : undefined
+        if (typeof path !== 'string' || path.length === 0) continue
+        const cannot = (entry as { cannot?: unknown }).cannot
+        if (typeof cannot === 'string') {
+          leftAlone.push({ path, why: cannot })
+          continue
+        }
+        const changes = (entry as { changes?: unknown }).changes
+        if (!Array.isArray(changes) || changes.length === 0 || !changes.every(changeOk)) {
+          leftAlone.push({ path, why: 'its recorded change could not be read' })
+          continue
+        }
+        const full = resolvePath(folder, path)
+        const inside = relative(folder, full)
+        if (inside.length === 0 || inside.startsWith('..') || isAbsolute(inside)) {
+          leftAlone.push({ path, why: 'it is outside this folder' })
+          continue
+        }
+        const facts = await lstat(full).catch(() => undefined)
+        if (facts !== undefined && !facts.isFile()) {
+          leftAlone.push({ path, why: 'it is not a plain file' })
+          continue
+        }
+        const content = facts === undefined ? undefined : await readFile(full, 'utf8').catch(() => undefined)
+        const result = reverseChanges(content, changes)
+        if (!result.ok) {
+          leftAlone.push({ path, why: result.why })
+          continue
+        }
+        writes.push({ full, path, next: result.next })
+      }
+      const putBack: string[] = []
+      for (const write of writes) {
+        try {
+          if (write.next === null) await rm(write.full, { force: true })
+          else {
+            await mkdir(dirname(write.full), { recursive: true })
+            await writeFile(write.full, write.next, 'utf8')
+          }
+          putBack.push(write.path)
+        } catch {
+          leftAlone.push({ path: write.path, why: 'it could not be written' })
+        }
+      }
+      return { putBack, leftAlone }
     })
 
     ipcMain.handle(FOLDER_SWITCH_CHANNEL, async (event, id: unknown) => {

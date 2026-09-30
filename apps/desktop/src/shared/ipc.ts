@@ -1,3 +1,4 @@
+import type { ReverseChange } from './reverse-diff.js'
 import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
 import type { AvatarSpec } from './avatar.js'
@@ -665,6 +666,22 @@ export interface FolderListResponse {
 export type FolderSwitchResponse =
   | { readonly ok: true; readonly folder: { readonly id: string; readonly path: string; readonly name: string } }
   | { readonly ok: false; readonly message: string }
+/**
+ * Put back what the replies after an edited message changed (0.502,
+ * shared/reverse-diff.ts): exactly, or the file is left as it is and named.
+ */
+export const REWIND_PUT_BACK_CHANNEL = 'rewind:put-back'
+export interface RewindPutBackRequest {
+  readonly files: readonly {
+    readonly path: string
+    readonly changes: readonly ReverseChange[]
+    readonly cannot?: string
+  }[]
+}
+export interface RewindPutBackResponse {
+  readonly putBack: readonly string[]
+  readonly leftAlone: readonly { readonly path: string; readonly why: string }[]
+}
 /** Open the Finances place (0.501, main/places.ts): its folder, and the teammate who works there. */
 export const PLACE_FINANCES_CHANNEL = 'places:finances'
 export type PlaceOpenResponse =
@@ -2832,6 +2849,8 @@ export interface DesktopApi {
   switchFolder(id: string): Promise<FolderSwitchResponse>
   /** The Finances place: its folder made if need be, and its teammate (0.501). */
   openFinancesPlace(): Promise<PlaceOpenResponse>
+  /** Undo the later turns' file changes before an edited message goes (0.502). */
+  putBackFiles(request: RewindPutBackRequest): Promise<RewindPutBackResponse>
   /**
    * Show a file in the file manager. Answers whether it was shown, so the
    * card can say something rather than appear to do nothing.

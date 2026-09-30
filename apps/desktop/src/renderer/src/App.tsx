@@ -80,7 +80,7 @@ import { imageMediaType } from '../../shared/image-files.js'
 import { signInCommand } from '../../shared/runtime-install.js'
 import { SIGN_IN_OPENED_EVENT } from './signInEvents.js'
 import { DEFAULT_RELAY_HOP_CAP, DEFAULT_MEMORY_MODE } from '../../shared/ipc.js'
-import type { RuntimeCommandsResponse } from '../../shared/ipc.js'
+import type { RewindPutBackResponse, RuntimeCommandsResponse } from '../../shared/ipc.js'
 import { stripTaskBlocks } from '../../shared/room-task.js'
 import { stripMemoryBlocks } from '../../shared/memory.js'
 import { stripDecisionBlocks } from '../../shared/decision.js'
@@ -146,13 +146,14 @@ import { cappedLiveEvents, LIVE_EVENT_CAP,
   recentlyUsedRoutes,
   resolvedModelNames,
   resumableSessionOf,
+  laterFileChanges,
   relayedTitle,
   peerRunFor,
   rootMission,
   startedLabel,
   stitchedHandoff,
   runtimeNeverStarted, shownPrompt, typedPrompt, buildThread, durationText, runSpanMs, lastActivityAt, relativePath, fileTurns, shellCommandText, turnText, groupBoundary, groupJoins, groupLeavings, latestSetupNotes } from './missionView.js'
-import type { LiveStarter, TurnSwitch, TurnVersions } from './missionView.js'
+import type { FilePutBack, LiveStarter, TurnSwitch, TurnVersions } from './missionView.js'
 import { finishedToast } from './finishedToast.js'
 import { folderName, ranOnLine } from './ranOn.js'
 import { reviewBrief } from './reviewBrief.js'
@@ -220,6 +221,8 @@ interface LiveRunState {
   readonly coldStart?: boolean
   /** Started again from an edited earlier message (0.498): the thread says so above it. */
   readonly rewound?: boolean
+  /** What putting the later replies' files back did (0.502): said in the "started again" note. */
+  readonly putBack?: RewindPutBackResponse
   readonly restored?: boolean
   readonly restoredMission?: PublicRecoveredMission
   /** Who the run was messaged to, known before the host has even assigned a missionId. */
@@ -1605,6 +1608,9 @@ export default function App(): ReactElement {
     readonly tip: string
     readonly before?: string
     readonly earlierTurns: NonNullable<LiveRunState['earlierTurns']>
+    /** What the replies after it changed (0.502), and whether to put it back. Off unless ticked. */
+    readonly files: readonly FilePutBack[]
+    readonly putBack: boolean
   }>()
   useEffect(() => {
     void window.desktop?.listCompares().then((answer) => {
@@ -3734,7 +3740,14 @@ export default function App(): ReactElement {
   const startFromComposer = async (prompt: string): Promise<boolean | string> => {
     startRefusal.current = undefined
     const rewind = rewinding !== undefined && rewinding.key === shownKey ? rewinding : undefined
-    const started = await startMission(prompt, undefined, { fromComposer: true, ...(rewind === undefined ? {} : { rewind }) })
+    // Files first, so the teammate starts on the folder as it was (0.502).
+    const putBack = rewind !== undefined && rewind.putBack && rewind.files.length > 0
+      ? await window.desktop?.putBackFiles({ files: rewind.files }).catch(() => undefined)
+      : undefined
+    if (rewind !== undefined && rewind.putBack && rewind.files.length > 0 && putBack === undefined) {
+      return 'Not sent: the files could not be put back, so nothing was changed. Untick it to send the edit on its own.'
+    }
+    const started = await startMission(prompt, undefined, { fromComposer: true, ...(rewind === undefined ? {} : { rewind: { ...rewind, ...(putBack === undefined ? {} : { putBackResult: putBack }) } }) })
     if (started && rewind !== undefined) setRewinding(undefined)
     return started ? true : (startRefusal.current ?? false)
   }
@@ -3753,7 +3766,14 @@ export default function App(): ReactElement {
     const index = turns.findIndex((turn) => turn.missionId === missionId)
     if (index < 0 || shownKey === undefined) return
     const before = turns[index - 1]?.missionId
-    setRewinding({ key: shownKey, tip: shown.data.missionId, ...(before === undefined ? {} : { before }), earlierTurns: turns.slice(0, index) })
+    setRewinding({
+      key: shownKey,
+      tip: shown.data.missionId,
+      ...(before === undefined ? {} : { before }),
+      earlierTurns: turns.slice(0, index),
+      files: laterFileChanges(turns.slice(index), workspacePath),
+      putBack: false
+    })
     setComposerFill((current) => ({ text: words, seq: (current?.seq ?? 0) + 1 }))
   }
   const startMission = async (
@@ -3771,7 +3791,7 @@ export default function App(): ReactElement {
       /** Typed in the box and sent from it: a refusal can hand the words back. */
       readonly fromComposer?: boolean
       /** Started again from an edited earlier message (0.498). */
-      readonly rewind?: { readonly tip: string; readonly before?: string; readonly earlierTurns: NonNullable<LiveRunState['earlierTurns']> }
+      readonly rewind?: { readonly tip: string; readonly before?: string; readonly earlierTurns: NonNullable<LiveRunState['earlierTurns']>; readonly putBackResult?: RewindPutBackResponse }
     }
   ): Promise<boolean> => {
     const as = options?.as
@@ -3866,6 +3886,7 @@ export default function App(): ReactElement {
       ...(earlierTurns.length === 0 ? {} : { earlierTurns }),
       ...(coldStart ? { coldStart: true } : {}),
       ...(rewind === undefined ? {} : { rewound: true, ...(rewind.before === undefined ? {} : { versions: { before: rewind.tip } }) }),
+      ...(rewind?.putBackResult === undefined ? {} : { putBack: rewind.putBackResult }),
       // Plan is a mode now, so the run remembers what it was asked to be
       // rather than a switch that sat beside the mode and could disagree.
       ...((modeOverride ?? runMode) === 'plan' ? { plan: true } : {})
@@ -7261,6 +7282,7 @@ export default function App(): ReactElement {
                 })()}
                 coldStart={liveRun.coldStart ?? false}
                 rewound={liveRun.rewound === true}
+                {...(liveRun.putBack === undefined ? {} : { putBack: liveRun.putBack })}
                 {...(liveRun.versions === undefined ? {} : { versions: liveRun.versions })}
                 onOpenVersion={openMission}
                 {...(running || liveRun.data === undefined || comparing !== undefined ? {} : { onEditMessage: editEarlierMessage })}
@@ -7576,7 +7598,16 @@ export default function App(): ReactElement {
                     onCancel: () => {
                       setRewinding(undefined)
                       setComposerFill((current) => ({ text: '', seq: (current?.seq ?? 0) + 1 }))
-                    }
+                    },
+                    ...(rewinding.files.length === 0
+                      ? {}
+                      : {
+                          files: {
+                            count: rewinding.files.length,
+                            on: rewinding.putBack,
+                            onToggle: () => setRewinding((current) => (current === undefined ? current : { ...current, putBack: !current.putBack }))
+                          }
+                        })
                   }
                 })}
             {...(comparing === undefined || comparing.kept !== undefined

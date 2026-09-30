@@ -544,6 +544,50 @@ export interface FileTurn {
  * change to a file and which rows are steps inside it, chief among them. A
  * second reader of the same events would drift from the fold it sits beside.
  */
+/**
+ * What the replies after an edited message changed, file by file (0.502):
+ * each file's recorded changes, oldest first, for the host to undo exactly
+ * (shared/reverse-diff.ts) -- or the reason it cannot be, known here already:
+ * a patch that arrived cut short, or an edit reported with no diff at all.
+ */
+export interface FilePutBack {
+  readonly path: string
+  readonly changes: readonly DiffFile[]
+  /** Set when the record cannot put it back exactly; the host then leaves it alone. */
+  readonly cannot?: string
+}
+
+export function laterFileChanges(
+  turns: readonly { readonly events: readonly NormalizedRuntimeEvent[] }[],
+  workspacePath: string | undefined
+): readonly FilePutBack[] {
+  const key = (value: string): string => relativePath(value, workspacePath).replace(/[\\/]+/g, '/')
+  const plan = new Map<string, { path: string; changes: DiffFile[]; cannot?: string }>()
+  const at = (path: string): { path: string; changes: DiffFile[]; cannot?: string } => {
+    const id = key(path).toLowerCase()
+    const held = plan.get(id)
+    if (held !== undefined) return held
+    const made = { path: key(path), changes: [] as DiffFile[] }
+    plan.set(id, made)
+    return made
+  }
+  for (const turn of turns) {
+    for (const item of buildThread(turn.events, { running: false, ...(workspacePath === undefined ? {} : { workspacePath }) })) {
+      if (item.type !== 'activity') continue
+      for (const entry of netFileEntries(activityEntries(item.details, workspacePath), workspacePath)) {
+        if (entry.kind === 'file') {
+          const held = at(entry.file.path)
+          held.changes.push(entry.file)
+          if (entry.truncated) held.cannot ??= 'its recorded change was cut short'
+        } else if (entry.kind === 'unreported' && !entry.failed && entry.neverRan === undefined) {
+          at(entry.name).cannot ??= 'its change was recorded without the lines'
+        }
+      }
+    }
+  }
+  return [...plan.values()].map((entry) => ({ path: entry.path, changes: entry.changes, ...(entry.cannot === undefined ? {} : { cannot: entry.cannot }) }))
+}
+
 /** Every file one turn's run changed, as its diff (0.395: what a review note is held against). */
 export function editedFiles(events: readonly NormalizedRuntimeEvent[], workspacePath: string | undefined): readonly DiffFile[] {
   const out: DiffFile[] = []

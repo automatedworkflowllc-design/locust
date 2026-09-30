@@ -257,7 +257,11 @@ export interface ComposerProps {
    * An earlier message is being edited (0.498): its words are in the box, and
    * sending starts the conversation again from there. Cancel leaves it as it was.
    */
-  readonly editingEarlier?: { readonly onCancel: () => void }
+  readonly editingEarlier?: {
+    readonly onCancel: () => void
+    /** The files the replies after it changed (0.502): put back too, if ticked. */
+    readonly files?: { readonly count: number; readonly on: boolean; readonly onToggle: () => void }
+  }
   /**
    * Notes the person pinned to lines of a diff in this conversation
    * (diffNotes.ts, 0.376). They go with the next message, as one block after
@@ -1348,8 +1352,16 @@ export function Composer({
             <div className="lc-queued__meta">
               <Icon name="pencil" size={12} />
               <span className="lc-queued__note">
-                Editing an earlier message — sending starts again from there. Files stay as they are.
+                {editingEarlier.files === undefined
+                  ? 'Editing an earlier message — sending starts again from there. Files stay as they are.'
+                  : 'Editing an earlier message — sending starts again from there.'}
               </span>
+              {editingEarlier.files !== undefined && (
+                <label className="lc-queued__check">
+                  <input type="checkbox" checked={editingEarlier.files.on} onChange={editingEarlier.files.onToggle} />
+                  {`Also put back the ${String(editingEarlier.files.count)} ${editingEarlier.files.count === 1 ? 'file' : 'files'} the replies after it changed`}
+                </label>
+              )}
               <button type="button" className="lc-queued__action" onClick={editingEarlier.onCancel}>
                 Cancel
               </button>

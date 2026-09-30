@@ -13251,6 +13251,22 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+/* "Also put back the N files ..." on an edit (0.502): a quiet opt-in, a step
+   brighter than the caption it follows, never ticked for you. */
+.lc-queued__check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lc-space-2);
+  margin-right: var(--lc-space-3);
+  color: var(--lc-text-secondary);
+  cursor: pointer;
+}
+.lc-queued__check input {
+  margin: 0;
+  accent-color: var(--lc-text-primary);
+  cursor: pointer;
+}
+
 /* Held: the run in front stopped or failed, and the message waits on you. */
 .lc-queued__note.is-held {
   color: var(--lc-amber-text);

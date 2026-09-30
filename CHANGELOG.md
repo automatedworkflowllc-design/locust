@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.502.0 - 2026-09-30
+
+### New
+
+- **An edit can put the files back too.** When you edit an earlier message,
+  the box offers "Also put back the N files the replies after it changed".
+  It is off unless you tick it. Ticked, each of those files goes back to how
+  it was before those replies, but only where Locust's record of the
+  changes is complete and the file has not been changed since. Any other
+  file is left as it is, and the conversation names it and says why.
+
 ## 0.501.0 - 2026-09-30
 <!-- big -->
 

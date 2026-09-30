@@ -13,6 +13,7 @@ import type {
   PublicTeammate
 } from '../../../shared/ipc.js'
 import type { TurnVersions } from '../missionView.js'
+import type { RewindPutBackResponse } from '../../../shared/ipc.js'
 import { activityEntries, buildThread, cancellationSummary, editedFiles, decisionStanding, errorAlreadyShown, foldNoticeKeys, lastPlanOf, modeRefusedATool, readPlan, relativePath, sentAgainBy, stepsLine, stoppedBeforeSaying, terminalSeamBefore, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
 import type { GroupBoundary, GroupLeaving, LiveStarter, TurnSwitch } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
@@ -721,6 +722,8 @@ export interface ThreadProps {
   readonly onEditMessage?: (missionId: string, words: string) => void
   /** This turn started again from an edited message (0.498): said above it. */
   readonly rewound?: boolean
+  /** What putting the later replies' files back did (0.502). */
+  readonly putBack?: RewindPutBackResponse
   /** The other version of THIS turn, when it is an edit or was replaced by one (0.498). */
   readonly versions?: TurnVersions
   /** Open another version of an edited message: the newest turn of that branch. */
@@ -890,6 +893,7 @@ export function Thread({
   coldStart = false,
   onEditMessage,
   rewound = false,
+  putBack,
   versions,
   onOpenVersion,
   onRunWithEdits,
@@ -1287,7 +1291,12 @@ onResume,
         {joinNotes((beforeTurn) => beforeTurn === earlierTurns.length)}
         {rewound && (
           <div className="lc-thread__note">
-            Started again from an edited message. The replies after it were set aside; files they changed are as they left them.{' '}
+            {putBack === undefined
+              ? 'Started again from an edited message. The replies after it were set aside; files they changed are as they left them. '
+              : `Started again from an edited message. The replies after it were set aside${putBack.putBack.length === 0 ? '' : `, and ${putBack.putBack.length === 1 ? '1 file they changed was' : `${String(putBack.putBack.length)} files they changed were`} put back`}. `}
+            {putBack !== undefined && putBack.leftAlone.length > 0 && (
+              <>{`Left as ${putBack.leftAlone.length === 1 ? 'it is' : 'they are'}: ${putBack.leftAlone.map((file) => `${file.path} (${file.why})`).join('; ')}. `}</>
+            )}
             {versionLinks(versions)}
           </div>
         )}
