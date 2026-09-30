@@ -111,6 +111,7 @@ import type { CompareSlotId, PublicCompare } from '../../shared/compare.js'
 import { folderLabels } from '../../shared/folder-sections.js'
 import { nestedUnder } from '../../shared/nested-conversations.js'
 import { defaultComparePicks } from './compareDefaults.js'
+import { effortName } from './effortLevels.js'
 import { composerRouteFor, startAs } from '../../shared/route-at-start.js'
 import type { StartAs } from '../../shared/route-at-start.js'
 import type { Screen } from './components/Screens.js'
@@ -3486,6 +3487,8 @@ export default function App(): ReactElement {
         prefills: comparePicks.length >= MIN_COMPARE_SLOTS || startingPicks().length >= MIN_COMPARE_SLOTS,
         onReplace: (index, pick) =>
           setComparePicks((current) => current.map((one, at) => (at === index ? pick : one))),
+        onEffort: (index, effort) =>
+          setComparePicks((current) => current.map((one, at) => (at === index ? { ...one, effort } : one))),
         changes: compareChanges,
         onChanges: setCompareChanges,
         ...(compareChangesRefusal === undefined ? {} : { changesRefusal: compareChangesRefusal }),
@@ -3529,12 +3532,18 @@ export default function App(): ReactElement {
           ...(pickedTeammate === undefined ? {} : { teammateId: pickedTeammate.teammateId }),
           prompt,
           // Changes run in Auto where the runtime can (0.451): each column is in its own copy.
-          routes: comparePicks.map((pick) => ({
-            runtime: pick.runtime,
-            model: pick.model,
-            label: pick.label,
-            ...(compareChanges && modeRunsOn('auto', pick.runtime, build?.platform) ? { mode: 'auto' as const } : {})
-          })),
+          routes: comparePicks.map((pick) => {
+            // A column's own effort (0.490), turned into what the runtime takes: Cursor's is in the id.
+            const started = startRoute(models, pick.runtime, pick.model, pick.effort)
+            return {
+              runtime: pick.runtime,
+              model: started.model,
+              ...(started.effort === undefined ? {} : { effort: started.effort }),
+              // The column is named with its level when one was chosen, so two levels of one model read apart.
+              label: pick.effort === undefined ? pick.label : `${pick.label} · ${effortName(pick.effort)}`,
+              ...(compareChanges && modeRunsOn('auto', pick.runtime, build?.platform) ? { mode: 'auto' as const } : {})
+            }
+          }),
           ...(compareChanges ? { changes: true } : {}),
           ...(compareBlind ? { blind: true } : {})
         })

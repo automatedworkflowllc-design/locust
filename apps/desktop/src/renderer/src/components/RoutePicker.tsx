@@ -21,6 +21,8 @@ export interface RouteChoice {
 /** A model picked for a comparison (0.441, shared/compare.ts), with the name its row shows. */
 export interface ComparePick extends RouteChoice {
   readonly label: string
+  /** This column's effort, chosen on its own chip; absent runs the model's default (0.490). */
+  readonly effort?: string
 }
 
 /**
@@ -37,6 +39,8 @@ export interface ComparePicking {
   readonly prefills?: boolean
   /** Put this model in that column instead, keeping the others where they are (0.460). */
   readonly onReplace?: (index: number, pick: ComparePick) => void
+  /** Set one column's effort (0.490): each model is compared at the level chosen for it. */
+  readonly onEffort?: (index: number, effort: string) => void
   /** Why a model cannot be compared (it cannot be held read-only here), or nothing. */
   readonly refusal: (choice: RouteChoice) => string | undefined
   /** Each model changes its own copy of the project, rather than only answering (0.445). */

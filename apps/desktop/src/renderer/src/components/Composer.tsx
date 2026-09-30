@@ -479,6 +479,8 @@ export function Composer({
   const [folderOpen, setFolderOpen] = useState(false)
   /** Which comparison column's picker is open, or the + for a third (0.460). */
   const [slotPicker, setSlotPicker] = useState<number | 'add' | undefined>(undefined)
+  /** Which comparison column's effort panel is open (0.490). */
+  const [slotEffort, setSlotEffort] = useState<number | undefined>(undefined)
   /**
    * Files this message will point the runtime at, workspace-relative.
    *
@@ -551,6 +553,8 @@ export function Composer({
   const slotsAnchor = useRef<HTMLSpanElement>(null)
   const closeSlots = useCallback(() => setSlotPicker(undefined), [])
   useDismissOnOutsidePress(slotPicker !== undefined, closeSlots, slotsAnchor)
+  const closeSlotEffort = useCallback(() => setSlotEffort(undefined), [])
+  useDismissOnOutsidePress(slotEffort !== undefined, closeSlotEffort, slotsAnchor)
   const closeFolder = useCallback(() => setFolderOpen(false), [])
   useDismissOnOutsidePress(folderOpen, closeFolder, folderAnchor)
   const pickerAnchor = useRef<HTMLSpanElement>(null)
@@ -1936,22 +1940,85 @@ export function Composer({
                       }}
                     />
                   )}
-                  {compare.picks.map((pick, index) => (
-                    <button
-                      key={`${pick.runtime}:${pick.model}`}
-                      type="button"
-                      className="lc-control lc-control--boxed lc-control--slot"
-                      aria-haspopup="listbox"
-                      aria-expanded={slotPicker === index}
-                      aria-label={`Model ${String.fromCharCode(65 + index)}: ${pick.label}`}
-                      title={`${runtimeDisplayName(pick.runtime)} / ${pick.label}`}
-                      onClick={() => setSlotPicker(slotPicker === index ? undefined : index)}
-                    >
-                      <RuntimeMark runtime={pick.runtime} size={13} />
-                      <span className="lc-control__model">{pick.label}</span>
-                      <ChevronGlyph />
-                    </button>
-                  ))}
+                  {compare.picks.map((pick, index) => {
+                    /*
+                     * EACH COLUMN'S OWN EFFORT (0.490). Colin, 2026-09-30:
+                     * "still no effort control for compare". The one effort
+                     * chip cannot serve two or three models -- their levels
+                     * differ -- so each model's chip carries its own, joined
+                     * to it, the same slider the single chip opens. Shown the
+                     * way that chip shows it: the chosen level, else the one
+                     * the model's id already names, else its default; absent
+                     * where the model lists no levels.
+                     */
+                    const letter = String.fromCharCode(65 + index)
+                    const family = modelFamily(models, pick.runtime, pick.model)
+                    const levels = family?.supportedEfforts ?? []
+                    const idLevel = Object.entries(family?.variants ?? {}).find(([, id]) => id === pick.model)?.[0]
+                    const level = pick.effort ?? idLevel ?? defaultEffort(levels, family?.defaultEffort)
+                    const { bases, hasFast } = effortScale(levels)
+                    const { base, fast } = splitEffort(level ?? bases[0] ?? '')
+                    const effortable = level !== undefined && levels.length > 0 && compare.onEffort !== undefined
+                    return (
+                      <span key={`${pick.runtime}:${pick.model}`} className={`lc-slotgroup${effortable ? ' has-effort' : ''}`}>
+                        <button
+                          type="button"
+                          className="lc-control lc-control--boxed lc-control--slot"
+                          aria-haspopup="listbox"
+                          aria-expanded={slotPicker === index}
+                          aria-label={`Model ${letter}: ${pick.label}`}
+                          title={`${runtimeDisplayName(pick.runtime)} / ${pick.label}`}
+                          onClick={() => {
+                            setSlotEffort(undefined)
+                            setSlotPicker(slotPicker === index ? undefined : index)
+                          }}
+                        >
+                          <RuntimeMark runtime={pick.runtime} size={13} />
+                          <span className="lc-control__model">{pick.label}</span>
+                          <ChevronGlyph />
+                        </button>
+                        {effortable && (
+                          <button
+                            type="button"
+                            className="lc-control lc-control--boxed lc-control--sloteffort"
+                            aria-haspopup="menu"
+                            aria-expanded={slotEffort === index}
+                            aria-label={`Effort for model ${letter}: ${effortName(base)}${fast ? ', fast' : ''}`}
+                            title={`How hard ${pick.label} thinks`}
+                            onClick={() => {
+                              setSlotPicker(undefined)
+                              setSlotEffort(slotEffort === index ? undefined : index)
+                            }}
+                          >
+                            <span className="lc-control__effort">
+                              {effortName(base)}
+                              {fast ? ' · Fast' : ''}
+                            </span>
+                            <ChevronGlyph />
+                          </button>
+                        )}
+                        {effortable && slotEffort === index && (
+                          <div className="lc-menu lc-menu--right lc-effortpanel" role="group" aria-label={`Reasoning effort for model ${letter}`}>
+                            <EffortSlider
+                              bases={bases}
+                              index={Math.max(0, bases.indexOf(base))}
+                              fast={fast}
+                              hasFast={hasFast}
+                              footer={effortFooter(pick.runtime)}
+                              onPick={(next) => {
+                                const chosen = joinEffort(next, fast, levels)
+                                if (chosen !== undefined) compare.onEffort?.(index, chosen)
+                              }}
+                              onFast={(next) => {
+                                const chosen = joinEffort(base, next, levels)
+                                if (chosen !== undefined) compare.onEffort?.(index, chosen)
+                              }}
+                            />
+                          </div>
+                        )}
+                      </span>
+                    )
+                  })}
                   {compare.picks.length < MAX_COMPARE_SLOTS && (
                     <button
                       type="button"
@@ -2117,7 +2184,7 @@ export function Composer({
                 * refuses to send it either way; this stops the app offering a
                 * choice that does not exist.
                 */}
-              {/* A comparison runs each model at its own default: no one effort applies to all. */}
+              {/* A comparison has an effort per model, on each model's chip (0.490): no one effort applies to all. */}
               {shownEffort !== undefined && supportedEfforts.length > 0 && !comparing && (
                 <span className="lc-control__anchor" ref={effortAnchor}>
                   {effortOpen && (

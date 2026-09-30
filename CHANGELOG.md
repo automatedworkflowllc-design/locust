@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.490.0 - 2026-09-30
+
+### New
+
+- **Compare has an effort for each model.** Setting up a comparison, each
+  model's chip now carries its own effort beside the name, as one chip in
+  two parts: press the level to open the same slider the single effort chip
+  has. Two or three models are compared at the levels you choose rather than
+  each at its default, and a column is named with its level when you chose
+  one, so Opus at High and GPT at Low read apart. A model that lists no
+  levels shows none, and a Cursor model runs the id its level names.
+
 ## 0.489.0 - 2026-09-30
 
 ### Security

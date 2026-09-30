@@ -5600,6 +5600,27 @@ textarea {
   padding: 0 10px;
 }
 
+/* A column's model and its effort, one chip in two parts (0.490): the effort
+   is joined to the model it belongs to, not a separate chip beside it. */
+.lc-slotgroup {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.lc-slotgroup.has-effort > .lc-control--slot {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.lc-control--sloteffort {
+  flex: none;
+  margin-left: -1px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
 .lc-agenthead.is-folded {
   align-items: center;
   margin-top: 0;
