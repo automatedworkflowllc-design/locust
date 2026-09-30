@@ -126,14 +126,23 @@ try {
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
     setter.call(field, 'Using the shell, run a command that prints the numbers 1 to 300, one per second, then tell me the last number.')
     field.dispatchEvent(new Event('input', { bubbles: true }))
-    for (let i = 0; i < 40; i += 1) {
+    // Pressed again if the words are still in the box: on a runner that has just
+    // started, a press can land before the window is listening (0.497, run 36696510212).
+    let presses = 0
+    for (let i = 0; i < 80 && presses < 3; i += 1) {
       const button = document.querySelector('button[aria-label="Start mission"]')
-      if (button && !button.disabled) { button.click(); break }
+      if (button && !button.disabled && field.value.length > 0) {
+        button.click()
+        presses += 1
+        for (let wait = 0; wait < 16 && field.value.length > 0; wait += 1) await new Promise((r) => setTimeout(r, 500))
+        if (field.value.length === 0) break
+      }
       await new Promise((r) => setTimeout(r, 250))
     }
+    window.__presses = presses
     for (let i = 0; i < 180; i += 1) {
       await new Promise((r) => setTimeout(r, 1000))
-      if (document.querySelector('button[aria-label="Stop the running mission"]') && document.querySelector('.lc-livestep')) return 'running'
+      if (document.querySelector('button[aria-label="Stop the running mission"]') && document.querySelector('.lc-livestep')) return window.__presses > 1 ? 'running (Start pressed ' + window.__presses + ' times)' : 'running'
     }
     const start = document.querySelector('button[aria-label="Start mission"]')
     return 'never ran: start ' + (start === null ? 'missing' : start.disabled ? 'disabled (' + (start.getAttribute('title') ?? '') + ')' : 'enabled')
@@ -141,8 +150,9 @@ try {
       + ' | runtimes: ' + (document.querySelector('.lc-sidebar__status, .lc-status')?.innerText ?? '?')
       + ' | thread: ' + (document.querySelector('.lc-thread')?.innerText ?? '').replace(/\\s+/g, ' ').slice(-400)
   })()`)
-  check('a turn on the free model starts running', sent === 'running', String(sent))
-  if (sent !== 'running') {
+  const running = String(sent).startsWith('running')
+  check('a turn on the free model starts running', running, String(sent))
+  if (!running) {
     // What the window showed, as a picture the workflow keeps.
     const id = nextId++
     const shot = await new Promise((resolve) => {
@@ -174,7 +184,8 @@ try {
   check('Stop ends the run in the window', stopped === 'stopped', String(stopped))
   await sleep(5_000)
   const left = opencodes().filter((pid) => !before.has(pid) && during.includes(pid))
-  check('Stop ends the whole process group: nothing the run started is left', left.length === 0, JSON.stringify({ during, left }))
+  // With nothing running there was nothing to stop, and that proves nothing.
+  check('Stop ends the whole process group: nothing the run started is left', during.length > 0 && left.length === 0, JSON.stringify({ during, left }))
 } catch (error) {
   failures += 1
   console.log(`smoke failed: ${error instanceof Error ? error.message : String(error)}`)
