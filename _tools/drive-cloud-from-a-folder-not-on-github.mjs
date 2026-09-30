@@ -51,7 +51,7 @@ const panel = `JSON.stringify({
   head: document.querySelector('.lc-cloudtasks .lc-beside__title')?.innerText.trim() ?? null,
   elsewhere: document.querySelector('.lc-cloudtasks__elsewhere')?.innerText.replace(/\\s+/g, ' ').trim() ?? null,
   folders: [...document.querySelectorAll('.lc-cloudtasks__folders li')].map((li) => li.innerText.replace(/\\s+/g, ' ').trim()),
-  note: document.querySelector('form.command-dock .lc-notice')?.innerText.trim() ?? null
+  note: document.querySelector('.lc-composer .lc-notice')?.innerText.trim() ?? null
 })`
 
 try {

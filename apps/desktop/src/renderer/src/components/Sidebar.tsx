@@ -218,6 +218,7 @@ export function Sidebar({
   onOpenRooms,
   onOpenAutomations,
   onOpenFinances,
+  cloudTasks,
   onHome,
   compact = false
 }: {
@@ -324,6 +325,12 @@ export function Sidebar({
   readonly onOpenAutomations: () => void
   /** The Finances place (0.501): shown only while it is switched on in Settings. */
   readonly onOpenFinances?: () => void
+  /**
+   * This folder's cloud tasks (0.509), when it has any. A cloud task makes no
+   * conversation, so with its panel closed nothing else in the window said it
+   * was there.
+   */
+  readonly cloudTasks?: { readonly count: number; readonly onOpen: () => void }
   /** Back to the home screen: nothing picked, nothing open. */
   readonly onHome: () => void
   /**
@@ -1027,12 +1034,21 @@ export function Sidebar({
           <span>Routines</span>
         </button>
       </div>
-      {onOpenFinances !== undefined && (
+      {(onOpenFinances !== undefined || cloudTasks !== undefined) && (
         <div className="lc-sidebar__nav lc-sidebar__places lc-sidebar__places--pinned">
-          <button type="button" onClick={() => { railClose(); onOpenFinances() }} title="Finances -- your statements, read by a teammate on Codex">
-            <Icon name="wallet" size={14} />
-            <span>Finances</span>
-          </button>
+          {onOpenFinances !== undefined && (
+            <button type="button" onClick={() => { railClose(); onOpenFinances() }} title="Finances -- your statements, read by a teammate on Codex">
+              <Icon name="wallet" size={14} />
+              <span>Finances</span>
+            </button>
+          )}
+          {cloudTasks !== undefined && (
+            <button type="button" onClick={() => { railClose(); cloudTasks.onOpen() }} title="Cloud tasks -- what Codex Cloud is doing, or did, for this folder">
+              <Icon name="cloud" size={14} />
+              <span>Cloud tasks</span>
+              <span className="lc-sidebar__count">{String(cloudTasks.count)}</span>
+            </button>
+          )}
         </div>
       )}
 

@@ -107,6 +107,27 @@ try {
   })()`))))
   const after = await readFile(join(repo, 'greet.js'), 'utf8')
   check('Apply brings the change into the folder', applied.tasks[0]?.state === 'applied' && /farewell/.test(after), JSON.stringify({ applied, has: /farewell/.test(after) }))
+
+  // Closed, then reopened from the conversation's "..." menu (the Sol brief, 0.504).
+  const closed = JSON.parse(String(await drive.capture('the panel closed', () => drive.evaluate(`(async () => {
+    document.querySelector('.lc-cloudtasks .lc-viewer__close')?.click()
+    await new Promise((r) => setTimeout(r, 600))
+    return ${panel}
+  })()`))))
+  check('Close shuts the panel', closed.open === false, JSON.stringify(closed))
+  /*
+   * A cloud task makes no conversation, so there is no "..." menu to reopen it
+   * from: on 0.508, with the panel closed, nothing in the window said the task
+   * was there (the Sol brief, run 2026-09-30). The sidebar has a row for it.
+   */
+  const row = String(await drive.evaluate(`[...document.querySelectorAll('.lc-sidebar__places button')].find((b) => /Cloud tasks/.test(b.innerText))?.innerText.replace(/\\s+/g, ' ').trim() ?? 'no row'`))
+  check('with the panel closed, the sidebar says there is a cloud task', /^Cloud tasks 1$/.test(row), row)
+  const reopened = JSON.parse(String(await drive.capture('reopened from the sidebar', () => drive.evaluate(`(async () => {
+    ;[...document.querySelectorAll('.lc-sidebar__places button')].find((b) => /Cloud tasks/.test(b.innerText))?.click()
+    await new Promise((r) => setTimeout(r, 1500))
+    return ${panel}
+  })()`))))
+  check('and the row reopens the panel, the task still there', reopened.open === true && reopened.tasks?.[0]?.state === 'applied', JSON.stringify(reopened))
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

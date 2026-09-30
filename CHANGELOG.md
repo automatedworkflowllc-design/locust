@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.509.0 - 2026-09-30
+
+### Fixed
+
+- **A cloud task can always be found again.** A task sent to Codex Cloud
+  makes no conversation, so once its panel was closed nothing in the window
+  said it was there. The sidebar now has a Cloud tasks row, with how many
+  this folder has, whenever it has any; it opens the panel.
+
 ## 0.508.0 - 2026-09-30
 
 ### Fixed

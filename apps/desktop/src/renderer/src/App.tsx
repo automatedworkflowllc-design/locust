@@ -6508,6 +6508,7 @@ export default function App(): ReactElement {
           routines={routines}
           onOpenAutomations={() => setScreen('automations')}
           {...(financesPlace ? { onOpenFinances: () => void openFinancesPlace() } : {})}
+          {...(cloudTasks.length > 0 ? { cloudTasks: { count: cloudTasks.length, onOpen: () => { setScreen('workroom'); setCloudPanel(true) } } } : {})}
           missions={sidebarMissions}
           folders={folders}
           {...(workspaceId === undefined ? {} : { currentFolderId: workspaceId })}

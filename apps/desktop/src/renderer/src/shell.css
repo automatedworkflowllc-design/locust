@@ -7284,9 +7284,23 @@ textarea {
 .lc-sidebar__places--pinned {
   padding-top: 0;
 }
+/* Finances and Cloud tasks (0.509): list entries, one under the other. */
+.lc-sidebar__nav.lc-sidebar__places--pinned {
+  flex-direction: column;
+  align-items: stretch;
+}
 .lc-sidebar__places--pinned button {
   justify-content: flex-start;
   padding-left: var(--lc-space-3);
+}
+.lc-sidebar__places--pinned button + button {
+  border-left: 0;
+}
+.lc-sidebar__count {
+  margin-left: auto;
+  padding-right: var(--lc-space-2);
+  color: var(--lc-text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .lc-shell.is-compact .lc-sidebar__places {
