@@ -74,6 +74,8 @@ describe('a group of steps, in one line', () => {
     expect(line([tool('grep', 'C:\\Users\\me\\project\\src')])).toBe('Searched src')
     // Inline code, and a search that names a folder rather than a pattern.
     expect(line([shell('node --input-type=module -e "import { x } from \'./a.mjs\'; x()"')])).toBe('Ran a node script')
+    // Short enough to read: the command itself.
+    expect(line([shell('node -e "console.log(6*7)"')])).toBe('Ran node -e "console.log(6*7)"')
     expect(line([shell('rg C:\\Users\\me\\AppData\\Local\\Temp\\run -n')])).toBe('Searched run')
     // One command reading two files read two files.
     expect(line([shell('cat README.md LOCUST.md')])).toBe('Read 2 files')

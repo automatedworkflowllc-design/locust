@@ -1917,8 +1917,8 @@ export function stepsLine(details: readonly ActivityDetail[], finished: boolean,
           : /^[A-Z][a-z]+ing\b/.test(first) ? lowerFirst(clip(first))
           // A script's opening line (PowerShell's `@'`) names nothing.
           : (first.match(/[A-Za-z]/g)?.length ?? 0) < 3 ? 'ran a script'
-          // Code handed to an interpreter inline: `node -e "..."`, `python -c "..."`.
-          : /\s-(?:e|c|-eval|-command|Command)\s+["'`]/.test(first) ? `ran a ${commandHead(first).replace(/\.exe$/i, '')} script`
+          // Code handed to an interpreter inline, too long to show: `node -e "import ..."`.
+          : first.length > 40 && /\s-(?:e|c|-eval|-command|Command)\s+["'`]/.test(first) ? `ran a ${commandHead(first).replace(/\.exe$/i, '')} script`
           : `ran ${clip(first, 40)}`
         )
         break
