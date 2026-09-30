@@ -169,9 +169,17 @@ try {
     if (typeof shot === 'string') await writeFile('mac-smoke.png', Buffer.from(shot, 'base64'))
   }
   // Let the runtime get going: the Stop that matters ends a process tree already doing work.
-  await sleep(12_000)
-  const during = opencodes().filter((pid) => !before.has(pid))
-  console.log(`  opencode processes during the run: ${String(during.length)}`)
+  // Waited for, not assumed: on a runner just started, OpenCode can take a while to appear.
+  let during = []
+  const waitedFrom = Date.now()
+  for (let second = 0; second < 45 && during.length === 0; second += 1) {
+    await sleep(1_000)
+    during = opencodes().filter((pid) => !before.has(pid))
+  }
+  if (during.length > 0) await sleep(6_000)
+  during = opencodes().filter((pid) => !before.has(pid))
+  console.log(`  opencode processes during the run: ${String(during.length)} (first seen after ${String(Math.round((Date.now() - waitedFrom) / 1000))} s)`)
+  if (during.length === 0) console.log(`  every process now: ${execFileSync('ps', ['-axo', 'pid,command'], { encoding: 'utf8' }).split('\n').filter((line) => /opencode|Locust/i.test(line)).join(' | ').slice(0, 1200)}`)
 
   const stopped = await evaluate(`(async () => {
     document.querySelector('button[aria-label="Stop the running mission"]')?.click()
