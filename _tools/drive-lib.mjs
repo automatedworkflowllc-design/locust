@@ -250,7 +250,10 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
    * bill. Lifted only by `LOCUST_SPEND=1`, the same word `assertMaySpend`
    * already asks for -- see apps/desktop/src/main/free-routes.ts.
    */
-  const appEnv = { ...process.env, PATH: `${NPM_DIR};${process.env.PATH ?? ''}`, ...env }
+  // LOCUST_DRIVE_PATH_FIRST: a folder found before npm's own -- the runtime canary's
+  // isolated install of a new CLI release (_tools/runtime-canary.mjs).
+  const first = process.env.LOCUST_DRIVE_PATH_FIRST === undefined ? '' : `${process.env.LOCUST_DRIVE_PATH_FIRST};`
+  const appEnv = { ...process.env, PATH: `${first}${NPM_DIR};${process.env.PATH ?? ''}`, ...env }
   if (process.env.LOCUST_SPEND === '1') delete appEnv.LOCUST_FREE_ONLY
   else appEnv.LOCUST_FREE_ONLY = '1'
   /*
