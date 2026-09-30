@@ -522,6 +522,8 @@ function parsedFile(text: string): StoredFile {
     askConnectors: typeof rawSettings === 'object' && rawSettings !== null
       ? (rawSettings as Record<string, unknown>).askConnectors === true
       : false,
+    // Only a literal true shows the Finances place (0.501).
+    ...(typeof rawSettings === 'object' && rawSettings !== null && (rawSettings as Record<string, unknown>).financesPlace === true ? { financesPlace: true } : {}),
     /*
      * ON unless it was turned off.
      *
@@ -930,6 +932,7 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           askConnectors: typeof settings === 'object' && settings !== null
             ? (settings as Record<string, unknown>).askConnectors === true
             : false,
+          ...(typeof settings === 'object' && settings !== null && (settings as Record<string, unknown>).financesPlace === true ? { financesPlace: true } : {}),
           keepATodoList: parsedTodoList(
             typeof settings === 'object' && settings !== null
               ? (settings as Record<string, unknown>).keepATodoList

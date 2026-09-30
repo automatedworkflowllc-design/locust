@@ -51,6 +51,7 @@ export type IconName =
   | 'columns'
   | 'eye-off'
   | 'target'
+  | 'wallet'
 
 export function Icon({ name, size = 16 }: { name: IconName; size?: number }): ReactNode {
   const paths: Record<IconName, ReactNode> = {
@@ -114,6 +115,8 @@ export function Icon({ name, size = 16 }: { name: IconName; size?: number }): Re
      * line; the short stroke is the ferrule, which is what stops it reading
      * as an arrow at 13px.
      */
+    // The Finances place (0.501): Lucide's wallet, in this set's stroke.
+    wallet: <><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" /><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" /></>,
     pencil: <><path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17z" /><path d="m14.5 6.5 3 3" /></>,
     terminal: <><path d="m5 7 4 4-4 4" /><path d="M11 16h8" /></>,
     /*

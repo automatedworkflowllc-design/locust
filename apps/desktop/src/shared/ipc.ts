@@ -665,6 +665,11 @@ export interface FolderListResponse {
 export type FolderSwitchResponse =
   | { readonly ok: true; readonly folder: { readonly id: string; readonly path: string; readonly name: string } }
   | { readonly ok: false; readonly message: string }
+/** Open the Finances place (0.501, main/places.ts): its folder, and the teammate who works there. */
+export const PLACE_FINANCES_CHANNEL = 'places:finances'
+export type PlaceOpenResponse =
+  | { readonly ok: true; readonly folder: { readonly id: string; readonly path: string; readonly name: string }; readonly teammateId: string }
+  | { readonly ok: false; readonly message: string }
 /**
  * Show a file a teammate wrote, in the operating system's file manager.
  *
@@ -1905,6 +1910,11 @@ export interface WorkspaceSettings {
    */
   readonly askConnectors: boolean
   /**
+   * The Finances place in the sidebar (0.501, main/places.ts). Off unless
+   * switched on; optional, so every older write leaves it as it was.
+   */
+  readonly financesPlace?: boolean
+  /**
    * Ask the teammate to keep a todo list as it works, so the board fills in
    * while the mission runs.
    *
@@ -2820,6 +2830,8 @@ export interface DesktopApi {
   /** `of` is the conversation's (or the side chat's) latest turn; `question` counts from 1. */
   askOnTheSide(of: string, question: string, count: number): Promise<SideAskResponse>
   switchFolder(id: string): Promise<FolderSwitchResponse>
+  /** The Finances place: its folder made if need be, and its teammate (0.501). */
+  openFinancesPlace(): Promise<PlaceOpenResponse>
   /**
    * Show a file in the file manager. Answers whether it was shown, so the
    * card can say something rather than appear to do nothing.

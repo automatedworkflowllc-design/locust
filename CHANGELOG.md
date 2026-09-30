@@ -11,6 +11,27 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.501.0 - 2026-09-30
+<!-- big -->
+
+### New
+
+- **Finances.** Switch it on in Settings › Connectors, and Finances appears
+  in the sidebar. It is a folder of your own, outside every project, with a
+  teammate on Codex who only reads. Drop your bank or card statements in
+  (CSV or PDF exports) and ask where the money went, what you pay for every
+  month, or what changed since last month. If you linked accounts in
+  Codex's own Finances, the teammate can use those too. Locust never asks
+  for bank details, links nothing itself, and cannot move money.
+
+### Improved
+
+- **A Codex release Locust cannot read is held back.** Locust updates Codex
+  on its own, and each new Codex release is now first run through a real
+  turn and read by Locust. A release that fails that check is not installed
+  on its own; its row in Settings says so, and Update still installs it if
+  you want it.
+
 ## 0.500.0 - 2026-09-30
 
 ### Fixed

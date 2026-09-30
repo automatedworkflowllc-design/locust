@@ -7279,6 +7279,16 @@ textarea {
   color: var(--lc-text-primary);
 }
 
+/* The Finances place (0.501): its own row under the bar, left-aligned like a
+   list entry, so four places never squeeze into one bar's width. */
+.lc-sidebar__places--pinned {
+  padding-top: 0;
+}
+.lc-sidebar__places--pinned button {
+  justify-content: flex-start;
+  padding-left: var(--lc-space-3);
+}
+
 .lc-shell.is-compact .lc-sidebar__places {
   flex-direction: column;
   align-items: center;

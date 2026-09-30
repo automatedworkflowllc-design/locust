@@ -14,6 +14,7 @@ import { createCursorDefaultModel } from './cursor-default-model.js'
 import { listWorkspaceFiles } from './workspace-files.js'
 import { MAX_TAGGED, taggedPrompt } from '../shared/tagging.js'
 import { COMPARE_SLOTS, COMPARE_TREES_DIRECTORY, comparesGoneWith, compareNeedsCopy, compareRefusalOf, compareSlotKey, compareTreeId, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../shared/compare.js'
+import { FINANCES_FOLDER, FINANCES_README, FINANCES_ROUTE, FINANCES_TEAMMATE } from './places.js'
 import { bringInCopy, COPY_ROOT, copyLineChanges, copyRefusal, makeCompareCopy, removeCompareCopies } from './compare-copies.js'
 import type { CompareSlotId, PublicCompare, PublicCompareSlot } from '../shared/compare.js'
 import { createCompareStore } from './compare-store.js'
@@ -225,6 +226,7 @@ import {
   FOLDER_LIST_CHANNEL,
   SIDE_ASK_CHANNEL,
   FOLDER_SWITCH_CHANNEL,
+  PLACE_FINANCES_CHANNEL,
   WORKSPACE_ATTACH_CHANNEL,
   WORKSPACE_FILES_CHANNEL,
   WORKSPACE_PASTE_CHANNEL,
@@ -3318,6 +3320,35 @@ if (!ownsSingleInstanceLock) {
       return { folders: listed, currentId: workspaceChosen ? workspaceIdFor(workspacePath) : undefined }
     })
     // Switch to a folder already worked in -- by id, never a path the window names (0.458).
+    /*
+     * THE FINANCES PLACE (0.501, main/places.ts). Only while it is switched
+     * on in Settings: its own folder, made with a note saying what it is for,
+     * and one teammate who works there, on Codex, read-only. The teammate is
+     * found again by its folder, so renaming it keeps it the same one.
+     */
+    ipcMain.handle(PLACE_FINANCES_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'The Finances place could not be opened. Nothing in it was changed.' }
+      if ((await teammates.readSettings()).financesPlace !== true) return { ok: false, message: 'Switch the Finances place on in Settings first.' }
+      try {
+        await mkdir(FINANCES_FOLDER, { recursive: true })
+        const note = join(FINANCES_FOLDER, 'README.md')
+        if (!existsSync(note)) await writeFile(note, FINANCES_README, 'utf8')
+        const same = (left: string | undefined): boolean => left !== undefined && resolvePath(left).toLowerCase() === resolvePath(FINANCES_FOLDER).toLowerCase()
+        let teammate = (await teammates.list()).find((entry) => same(entry.folder))
+        if (teammate === undefined) {
+          const taken = new Set((await teammates.list()).map((entry) => entry.name.toLowerCase()))
+          const name = taken.has(FINANCES_TEAMMATE.name.toLowerCase()) ? 'Finances place' : FINANCES_TEAMMATE.name
+          const made = await teammates.create({ ...FINANCES_TEAMMATE, name, starters: [...FINANCES_TEAMMATE.starters] })
+          await teammates.rememberRoute(made.teammateId, FINANCES_ROUTE)
+          teammate = await teammates.setFolder(made.teammateId, FINANCES_FOLDER)
+        }
+        const now = await switchFolder(FINANCES_FOLDER)
+        return { ok: true, folder: now, teammateId: teammate.teammateId }
+      } catch {
+        return { ok: false, message: 'The Finances place could not be opened. Nothing in it was changed.' }
+      }
+    })
+
     ipcMain.handle(FOLDER_SWITCH_CHANNEL, async (event, id: unknown) => {
       if (!fromOwnWindow(event) || typeof id !== 'string') return { ok: false, message: 'That folder could not be opened.' }
       const path = await folders.pathOf(id)

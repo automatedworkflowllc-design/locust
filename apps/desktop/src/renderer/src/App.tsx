@@ -2079,6 +2079,8 @@ export default function App(): ReactElement {
   const [autoMode, setAutoMode] = useState(false)
   /** Ask before every connector call. See WorkspaceSettings.askConnectors. */
   const [askConnectors, setAskConnectors] = useState(false)
+  /** The Finances place in the sidebar (0.501). */
+  const [financesPlace, setFinancesPlace] = useState(false)
   /** Ask teammates that can to keep a todo list. See WorkspaceSettings.keepATodoList. */
   const [keepATodoList, setKeepATodoList] = useState(false)
 
@@ -2738,6 +2740,7 @@ export default function App(): ReactElement {
           setAutoMode(settings.autoMode === true)
           setAutoModeKnown(true)
           setAskConnectors(settings.askConnectors === true)
+          setFinancesPlace(settings.financesPlace === true)
           setKeepATodoList(settings.keepATodoList === true)
           setCheckCommand(settings.checkCommand ?? '')
           setAboutYou(settings.aboutYou ?? '')
@@ -5108,6 +5111,35 @@ export default function App(): ReactElement {
     }).catch(() => undefined)
   }
   /** Put the window in a folder already worked in, by its id. */
+  /*
+   * THE FINANCES PLACE (0.501, main/places.ts): its folder, and its teammate
+   * on Codex in Ask, with the teammate's starters on an empty page. The roster
+   * is read again first: the teammate may have just been made.
+   */
+  const openFinancesPlace = async (): Promise<void> => {
+    const bridge = window.desktop
+    const answer = await bridge?.openFinancesPlace().catch(() => undefined)
+    if (answer === undefined || !answer.ok) {
+      setWorkspaceNotice(answer?.message ?? 'The Finances place could not be opened. Nothing in it was changed.')
+      return
+    }
+    setWorkspaceNotice(undefined)
+    setComparingId(undefined)
+    setWorkspaceId(answer.folder.id)
+    const listed = await bridge?.listTeammates().catch(() => undefined)
+    const roster = listed?.ok === true ? listed.data.teammates : teammates
+    if (listed?.ok === true) setTeammates(listed.data.teammates)
+    const own = roster.find((teammate) => teammate.teammateId === answer.teammateId)
+    setSelectedTeammateId(answer.teammateId)
+    setScreen('workroom')
+    if (own?.route !== undefined) {
+      setRoute({ runtime: own.route.runtime, model: own.route.model })
+      setMode(own.route.mode)
+    }
+    setShownKey(undefined)
+    refreshForFolder()
+  }
+
   const switchToFolder = (id: string): void => {
     void window.desktop?.switchFolder(id).then((answer) => {
       if (!answer.ok) {
@@ -6374,6 +6406,7 @@ export default function App(): ReactElement {
           runtimes={runtimes}
           routines={routines}
           onOpenAutomations={() => setScreen('automations')}
+          {...(financesPlace ? { onOpenFinances: () => void openFinancesPlace() } : {})}
           missions={sidebarMissions}
           folders={folders}
           {...(workspaceId === undefined ? {} : { currentFolderId: workspaceId })}
@@ -6686,6 +6719,14 @@ export default function App(): ReactElement {
               }}
               askConnectors={askConnectors}
               onOwnModelsChanged={readModels}
+              financesPlace={financesPlace}
+              onFinancesPlaceChange={(next) => {
+                setFinancesPlace(next)
+                void window.desktop
+                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, replySize, layout, tube, financesPlace: next })
+                  .then((settings) => setFinancesPlace(settings.financesPlace === true))
+                  .catch(() => setFinancesPlace(!next))
+              }}
               onAskConnectorsChange={(next) => {
                 setAskConnectors(next)
                 void window.desktop

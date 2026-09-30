@@ -217,6 +217,7 @@ export function Sidebar({
   onOpenRoom,
   onOpenRooms,
   onOpenAutomations,
+  onOpenFinances,
   onHome,
   compact = false
 }: {
@@ -321,6 +322,8 @@ export function Sidebar({
   readonly onOpenRoom: (roomId: string) => void
   readonly onOpenRooms: () => void
   readonly onOpenAutomations: () => void
+  /** The Finances place (0.501): shown only while it is switched on in Settings. */
+  readonly onOpenFinances?: () => void
   /** Back to the home screen: nothing picked, nothing open. */
   readonly onHome: () => void
   /**
@@ -1024,6 +1027,14 @@ export function Sidebar({
           <span>Routines</span>
         </button>
       </div>
+      {onOpenFinances !== undefined && (
+        <div className="lc-sidebar__nav lc-sidebar__places lc-sidebar__places--pinned">
+          <button type="button" onClick={() => { railClose(); onOpenFinances() }} title="Finances -- your statements, read by a teammate on Codex">
+            <Icon name="wallet" size={14} />
+            <span>Finances</span>
+          </button>
+        </div>
+      )}
 
       {/*
         * The roster, one row tall.
