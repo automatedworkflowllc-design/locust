@@ -70,11 +70,22 @@ child.stderr.on('data', (data) => output.push(String(data)))
 let socket
 let nextId = 1
 const waiting = new Map()
-const evaluate = (expression) => new Promise((resolve, reject) => {
+const evaluateOnce = (expression) => new Promise((resolve, reject) => {
   const id = nextId++
   waiting.set(id, { resolve, reject })
   socket.send(JSON.stringify({ id, method: 'Runtime.evaluate', params: { expression, awaitPromise: true, returnByValue: true } }))
 })
+// The window may reload once as it finishes starting (a first launch does); the page is asked again.
+const evaluate = async (expression) => {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await evaluateOnce(expression)
+    } catch (error) {
+      if (attempt >= 5 || !/context was destroyed|Cannot find context/i.test(String(error?.message ?? error))) throw error
+      await sleep(1_500)
+    }
+  }
+}
 
 try {
   let page
