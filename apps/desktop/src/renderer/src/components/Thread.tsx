@@ -507,6 +507,7 @@ function TurnFoot({
         <ActivityCard
           summary=""
           variant="files"
+          oneRowPerFile
           trace={[{ key: 'edited', text: heading }]}
           finished
           details={edits}

@@ -19,7 +19,7 @@ export function thoughtLine(durationMs: number | undefined): string {
 }
 import type { ReactElement } from 'react'
 
-import { activityCounts, activityEntries, boundedShellOutput, commandTook, defaultOpenEntry, foldedToolsText, relativePath, durationText, thoughtHeadline } from '../missionView.js'
+import { activityCounts, activityEntries, netFileEntries, boundedShellOutput, commandTook, defaultOpenEntry, foldedToolsText, relativePath, durationText, thoughtHeadline } from '../missionView.js'
 import type { TraceSegment, ActivityDetail, ActivityEntry, PlanStep } from '../missionView.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { DiffView } from './DiffView.js'
@@ -162,8 +162,11 @@ export function ActivityCard({
   onOpenFile,
   planUnderway = false,
   openByDefault = false,
-  variant = 'card'
+  variant = 'card',
+  oneRowPerFile = false
 }: {
+  /** A turn's files (0.494): one row per file, its net change where the host looked. */
+  readonly oneRowPerFile?: boolean
   /**
    * `steps`: one group of a turn's steps, drawn as Claude Code draws one --
    * a plain line saying what was done, opening onto the steps (0.491). The
@@ -270,8 +273,11 @@ export function ActivityCard({
       })
       .catch(() => setRevealNotice('That file could not be shown. It is still where it was written.'))
   }
-  const entries = activityEntries(details, workspacePath)
-  const counts = activityCounts(details, workspacePath)
+  // A turn's files: one row per file, its net change where the host looked (0.494).
+  const entries = oneRowPerFile ? netFileEntries(activityEntries(details, workspacePath), workspacePath) : activityEntries(details, workspacePath)
+  const counts = oneRowPerFile
+    ? entries.reduce((sum, entry) => (entry.kind === 'file' ? { added: sum.added + entry.counts.added, removed: sum.removed + entry.counts.removed } : sum), { added: 0, removed: 0 })
+    : activityCounts(details, workspacePath)
   const anyPatch = entries.some((entry) => entry.kind === 'file')
   const [toggled, setToggled] = useState<ReadonlyMap<string, boolean>>(() => new Map())
   // A page shown running above, in a comparison's cell, stays folded here (0.450).

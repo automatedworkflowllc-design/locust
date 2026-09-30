@@ -5,7 +5,7 @@ import type { PublicPeerMessage, PublicRecoveredMission } from '../../shared/ipc
 import { describe, expect, it } from 'vitest'
 import { withAttachments } from '../../shared/attachments.js'
 
-import {
+import { netFileEntries,
   activityCounts,
   readPlan,
   activityEntries,
@@ -2197,7 +2197,9 @@ describe("the host's disk observation of a path the runtime named", () => {
     )
     const activity = thread.find((item) => item.type === 'activity')
     const details = activity?.type === 'activity' ? activity.details : []
-    expect(details.filter((detail) => /report\.md/.test(detail.name))).toHaveLength(1)
+    // Since 0.494 the step keeps its own row and the host's look is its own;
+    // the turn's files card shows the file once, as its net change.
+    expect(netFileEntries(activityEntries(details)).filter((entry) => entry.kind === 'file' && /report\.md/.test(entry.file.path))).toHaveLength(1)
     expect(activity?.type === 'activity' && activity.summary).toBe('Edited 1 file')
   })
 
@@ -2223,8 +2225,10 @@ describe("the host's disk observation of a path the runtime named", () => {
     )
     const activity = thread.find((item) => item.type === 'activity')
     const details = activity?.type === 'activity' ? activity.details : []
-    expect(details.filter((detail) => /README/.test(detail.name))).toHaveLength(1)
-    expect(activityCounts(details)).toEqual({ added: 2, removed: 2 })
+    // The card (0.494): one row for the file, its net change, counted once.
+    const card = netFileEntries(activityEntries(details, 'C:\\work'), 'C:\\work').filter((entry) => entry.kind === 'file')
+    expect(card).toHaveLength(1)
+    expect(card[0]?.kind === 'file' ? card[0].counts : undefined).toEqual({ added: 2, removed: 2 })
     expect(activity?.type === 'activity' && activity.summary).toBe('Edited 1 file')
   })
 

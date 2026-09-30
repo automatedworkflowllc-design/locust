@@ -179,6 +179,8 @@ export type ActivityEntry =
       readonly large: boolean
       /** Seen changed on disk by the host, and never named by the runtime (0.491). */
       readonly observed?: true
+      /** The host's look at the file after the run: its NET change, first state to last (0.494). */
+      readonly net?: true
     }
   | {
       readonly kind: 'shell'
@@ -482,11 +484,32 @@ export function activityEntries(
             ? { added: patch.added, removed: patch.removed }
             : undefined,
         large: counts.added + counts.removed > LARGE_FILE_LINES,
-        ...(detail.status === 'observed on disk' ? { observed: true as const } : {})
+        ...(detail.status === 'observed on disk' ? { observed: true as const } : {}),
+        ...(/on disk|from disk/.test(detail.status ?? '') ? { net: true as const } : {})
       })
     })
   })
   return foldPlainToolRuns(entries)
+}
+
+/**
+ * ONE ROW PER FILE, for a turn's files (0.494). Where the host looked at the
+ * file after the run, its net change -- first state to last -- is the file's
+ * row, and the runtime's own step diffs of it are steps, not more of it. Sol's
+ * 0.492 pass: "Edited 10 files" over twelve rows, a file edited twice counted
+ * twice and the total the sum of both. With no look (a folder too large to
+ * walk), each step's diff stays: that is all there is to show.
+ */
+export function netFileEntries(entries: readonly ActivityEntry[], workspacePath?: string): readonly ActivityEntry[] {
+  const key = (path: string): string => relativePath(path, workspacePath).replace(/[\\/]+/g, '/').toLowerCase()
+  const pathOf = (entry: ActivityEntry): string | undefined =>
+    entry.kind === 'file' ? key(entry.file.path) : entry.kind === 'unreported' ? key(entry.name) : undefined
+  const netPaths = new Set(entries.flatMap((entry) => (entry.kind === 'file' && entry.net === true ? [key(entry.file.path)] : [])))
+  return entries.filter((entry) => {
+    const path = pathOf(entry)
+    if (path === undefined || !netPaths.has(path)) return true
+    return entry.kind === 'file' && entry.net === true
+  })
 }
 
 /** One turn that changed one file, for the viewer's history strip. */
@@ -526,7 +549,7 @@ export function editedFiles(events: readonly NormalizedRuntimeEvent[], workspace
   const out: DiffFile[] = []
   for (const item of buildThread(events, { running: false, ...(workspacePath === undefined ? {} : { workspacePath }) })) {
     if (item.type !== 'activity') continue
-    for (const entry of activityEntries(item.details, workspacePath)) {
+    for (const entry of netFileEntries(activityEntries(item.details, workspacePath), workspacePath)) {
       if (entry.kind === 'file') out.push(entry.file)
     }
   }
@@ -549,7 +572,7 @@ export function fileTurns(
     const thread = buildThread(turn.events, { running: false, ...(workspacePath === undefined ? {} : { workspacePath }) })
     for (const item of thread) {
       if (item.type !== 'activity') continue
-      for (const entry of activityEntries(item.details, workspacePath)) {
+      for (const entry of netFileEntries(activityEntries(item.details, workspacePath), workspacePath)) {
         if (entry.kind !== 'file' || key(entry.file.path) !== wanted) continue
         out.push({
           missionId: turn.missionId,
@@ -1746,6 +1769,8 @@ type Looked = 'read' | 'search' | 'list' | 'web' | 'fetch' | 'plan' | 'wait' | '
 export function commandLooksAt(command: string): 'read' | 'search' | 'list' | undefined {
   const head = commandHead(command).toLowerCase().replace(/\.exe$/, '')
   if (/^(cat|head|tail|less|more|type|get-content|gc|bat|nl|sed)$/.test(head)) return 'read'
+  // `rg --files` lists files; it searches nothing (Sol, 0.492: "searched **").
+  if (head === 'rg' && /\s--files\b/.test(command)) return 'list'
   if (/^(rg|grep|egrep|fgrep|findstr|select-string|sls|ag|ack)$/.test(head)) return 'search'
   if (/^(ls|dir|tree|find|fd|get-childitem|gci|ll|la)$/.test(head)) return 'list'
   return undefined
@@ -1771,12 +1796,18 @@ function toolLooksAt(tool: string | undefined): Looked | undefined {
 
 /** The files a reading command names, by their own names: `cat README.md LOCUST.md` reads both. */
 function commandTargets(command: string): readonly string[] {
-  const first = shellCommandText(command).split('\n')[0]?.split(/\|\||&&|;|\|/)[0] ?? ''
-  return first.trim().split(/\s+/).slice(1)
+  // Every READING command of a compound line (Sol, 0.492: `Get-Content a; Get-Content b; ...`
+  // read seven files and the line said five); a pipe's later half only filters what came before.
+  const segments = shellCommandText(command).split('\n')[0]?.split(/\|\||&&|;/).map((part) => part.split('|')[0] ?? '') ?? []
+  const names = segments
+    .filter((segment) => commandLooksAt(segment.trim()) === 'read')
+    .flatMap((segment) => segment.trim().split(/\s+/).slice(1))
     .map((word) => word.replace(/^["']+|["',;]+$/g, ''))
-    .filter((word) => word.length > 1 && !word.startsWith('-') && /[./\\]/.test(word) && !/^\d+,\d+p?$/.test(word))
+    // A path ending in a separator is a folder, not a file read.
+    .filter((word) => word.length > 1 && !word.startsWith('-') && /[./\\]/.test(word) && !/[\\/]$/.test(word) && !/^\d+,\d+p?$/.test(word))
     .map((word) => word.split(/[\\/]/).filter((part) => part.length > 0).at(-1) ?? '')
     .filter((name) => name.length > 0)
+  return [...new Set(names)]
 }
 
 /** The last path-looking word of a command, as its file name: `sed -n 1,80p src/a.ts` is `a.ts`. */
@@ -1794,7 +1825,8 @@ function commandTarget(command: string): string | undefined {
 /** What a search command looked for: its first word that is not a flag, `rg port src` -> `port`. */
 function commandPattern(command: string): string | undefined {
   const first = shellCommandText(command).split('\n')[0]?.split(/\|\||&&|;|\|/)[0] ?? ''
-  const word = first.trim().split(/\s+/).slice(1).find((part) => !part.startsWith('-'))
+  // A bare glob (`-g '**'`) names nothing a person searched for: the first word that says something.
+  const word = first.trim().split(/\s+/).slice(1).find((part) => !part.startsWith('-') && /[A-Za-z0-9]/.test(part))
   const bare = word?.replace(/^["']+|["']+$/g, '')
   return bare === undefined || bare.length === 0 ? undefined : bare
 }
@@ -1973,9 +2005,19 @@ export function activitySummary(details: readonly ActivityDetail[]): string {
   // An edit that FAILED edited nothing: a read-only Claude Code run whose
   // Write was refused still read "Edited 1 file" (seen driving, 2026-09-05).
   // The refused row stays in the list, marked failed; it counts as a call.
-  const edits = details
-    .filter((detail) => detail.kind === 'edit' && detail.failed !== true)
-    .reduce((sum, detail) => sum + Math.max(1, detail.name.split('\n').filter((line) => line.length > 0).length), 0)
+  // One file once, however many rows speak of it (0.494): a step's own change
+  // and the host's look at the file after the run are one file.
+  const editRows = details.filter((detail) => detail.kind === 'edit' && detail.failed !== true)
+  // The same file however it was spelt: one path ends with the other at a folder boundary.
+  const paths: string[] = []
+  for (const path of editRows.flatMap((detail) => detail.name.split('\n').map((line) => line.trim()).filter((line) => line.length > 0))) {
+    const flat = path.replace(/\\/g, '/').replace(/^\.\//, '').toLowerCase()
+    // A name that is not a path (a tool's, `apply_patch`) says nothing of which file: each call counts.
+    const same = !/[./]/.test(flat) ? -1 : paths.findIndex((held) => held === flat || held.endsWith(`/${flat}`) || flat.endsWith(`/${held}`))
+    if (same === -1) paths.push(flat)
+    else if (flat.length > paths[same]!.length) paths[same] = flat
+  }
+  const edits = paths.length
   const commands = details.filter((detail) => detail.kind === 'shell').length
   const helpers = details.filter((detail) => detail.kind === 'helper').length
   /*
@@ -1992,7 +2034,7 @@ export function activitySummary(details: readonly ActivityDetail[]): string {
    * once too often.
    */
   const thinking = details.filter((detail) => detail.kind === 'reasoning').length
-  const other = details.length - edits - commands - helpers - thinking
+  const other = details.length - editRows.length - commands - helpers - thinking
   const parts: string[] = []
   if (edits > 0) parts.push(`Edited ${pluralize(edits, 'file')}`)
   if (commands > 0) parts.push(`ran ${pluralize(commands, 'command')}`)
@@ -2748,7 +2790,15 @@ export function buildThread(
         if (event.payload.toolKind === 'observed_edit' && /reported by the runtime/.test(event.payload.status ?? '')) {
           const path = event.payload.command ?? ''
           const own = editRowOf(path)
-          if (own !== undefined) {
+          /*
+           * ONLY ONTO A ROW WITH NO CHANGE OF ITS OWN (0.494). The observation
+           * is the file's NET change over the run; laid onto a step that had
+           * reported its own diff, it replaced that step's change with the whole
+           * run's -- a +2/-2 refinement read +81/-1 once the turn ended (Sol,
+           * 0.492). A step keeps what it did; the net change is its own row,
+           * after the run, which the turn's files card reads instead.
+           */
+          if (own !== undefined && own.patch === undefined) {
             openTools.set(event.payload.itemId, own)
             openToolAt.set(event.payload.itemId, { at: event.occurredAt, connector: undefined, viaConnector: false })
             observedNet.set(event.payload.itemId, path)

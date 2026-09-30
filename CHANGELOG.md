@@ -11,6 +11,23 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.494.0 - 2026-09-30
+
+### Fixed
+
+- **A step keeps the change it made.** After a turn, Locust looks at the
+  folder and records each file's whole change over the run. That record
+  replaced the change of the step that last edited the file, so a small
+  two-line fix read as the whole file once the turn ended. Each step now
+  keeps its own change.
+- **A turn's files card lists each file once.** A file edited twice, or
+  edited as part of a change to several files at once, could appear twice,
+  with the total counting it twice ("Edited 10 files" over twelve rows). The
+  card now has one row per file, showing its whole change over the turn.
+- **Step lines count the files a command read**, across every part of a
+  command that reads several, and a file listing no longer reads as a search
+  for `**`.
+
 ## 0.493.0 - 2026-09-30
 
 ### Fixed

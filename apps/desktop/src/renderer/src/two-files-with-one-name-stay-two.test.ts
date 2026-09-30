@@ -1,7 +1,7 @@
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { describe, expect, it } from 'vitest'
 
-import { activityCounts, buildThread } from './missionView.js'
+import { activityEntries, buildThread, netFileEntries } from './missionView.js'
 
 /**
  * H10: TWO FILES WITH ONE NAME STAY TWO. The host's observation of a changed
@@ -37,9 +37,10 @@ describe('two changed files that share a name', () => {
       const thread = buildThread(run(), { running: false, ...(workspacePath === undefined ? {} : { workspacePath }) })
       const activity = thread.find((item) => item.type === 'activity')
       const details = activity?.type === 'activity' ? activity.details : []
-      const edits = details.filter((detail) => detail.kind === 'edit')
-      expect(edits.map((detail) => detail.name.replace(/\\/g, '/').toLowerCase().split('/').slice(-3).join('/')).sort()).toEqual(['packages/a/package.json', 'packages/b/package.json'])
-      expect(activityCounts(details)).toEqual({ added: 2, removed: 2 })
+      // The turn's files card (0.494): one row per file -- two files, two rows.
+      const card = netFileEntries(activityEntries(details, workspacePath), workspacePath).filter((entry) => entry.kind === 'file')
+      expect(card.map((entry) => (entry.kind === 'file' ? entry.file.path.replace(/\\/g, '/').toLowerCase().split('/').slice(-3).join('/') : '')).sort()).toEqual(['packages/a/package.json', 'packages/b/package.json'])
+      expect(card.reduce((sum, entry) => sum + (entry.kind === 'file' ? entry.counts.added + entry.counts.removed : 0), 0)).toBe(4)
       expect(activity?.type === 'activity' && activity.summary).toBe('Edited 2 files')
     })
   }

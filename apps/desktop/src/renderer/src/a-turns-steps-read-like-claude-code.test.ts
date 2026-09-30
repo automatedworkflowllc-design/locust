@@ -83,6 +83,11 @@ describe('a group of steps, in one line', () => {
     // Finding files by name lists them (Sol, 0.491: "Searched for **/*").
     expect(line([tool('glob', '**/*')])).toBe('Listed every file')
     expect(line([tool('Glob', 'src/**/*.ts')])).toBe('Listed files matching src/**/*.ts')
+    // A compound line reads every file its reading commands name (Sol, 0.492).
+    expect(line([shell('Get-Content src/a.mjs; Get-Content src/b.mjs, src/c.mjs; Get-Content README.md | Select-Object -First 5')])).toBe('Read 4 files')
+    // `rg --files` lists; a bare glob names nothing searched.
+    expect(line([shell("rg --files -g '**'")])).toBe('Listed a folder')
+    expect(line([shell("rg -n -g '**' validateMonth src")])).toBe('Searched for validateMonth')
     // One command reading two files read two files.
     expect(line([shell('cat README.md LOCUST.md')])).toBe('Read 2 files')
     // A thought alone, with words and no headline (Cursor), says what it was about.
