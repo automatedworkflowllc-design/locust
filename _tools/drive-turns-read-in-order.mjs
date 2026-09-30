@@ -23,7 +23,7 @@ const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.i
 const packaged = arg('--packaged')
 const tag = arg('--tag') ?? 'local'
 const SCRATCH = process.env.LOCUST_SCRATCH ?? tmpdir()
-const LEDGER = join(process.env.APPDATA ?? '', '@teammate', 'desktop', 'mission-ledger')
+const LEDGER = arg('--ledger') ?? join(process.env.APPDATA ?? '', '@teammate', 'desktop', 'mission-ledger')
 const MISSIONS = (arg('--missions') ?? '79f6d728-1b1f-48af-9c1e-62b07d8fe40c,cdfab7a8-76f0-4f56-bf8c-02be653c751a,52079851-50bb-4265-a83b-db3c67569766,2f0bffe3-6b25-45c2-b851-474d9977dc01').split(',')
 const OUT = await mkdtemp(join(SCRATCH, `turns-read-in-order-${tag}-`))
 
