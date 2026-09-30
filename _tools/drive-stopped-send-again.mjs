@@ -89,6 +89,31 @@ try {
   check('and the offer is gone once the message went again', again.pressed && !again.stillOffered)
   check('the message is drawn once, not once per try (0.496)', again.bubbles === 1, String(again.bubbles))
   check('and no "fresh session" is claimed: nothing before it was lost (0.496)', again.fresh === false)
+
+  // 0.496: a reply after a turn stopped early is still the same conversation.
+  const sendAndWait = (text) => `(async () => {
+    const field = document.querySelector('form.command-dock textarea')
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+    setter.call(field, ${JSON.stringify(text)})
+    field.dispatchEvent(new Event('input', { bubbles: true }))
+    for (let i = 0; i < 120; i += 1) {
+      await new Promise((r) => setTimeout(r, 250))
+      const button = document.querySelector('button[aria-label="Start mission"]')
+      if (button && !button.disabled) { button.click(); break }
+    }
+    await new Promise((r) => setTimeout(r, 1500))
+    ${waitIdle}
+    const replies = [...document.querySelectorAll('.lc-agentline__body')].map((el) => el.innerText.trim())
+    return JSON.stringify({ reply: replies.at(-1) ?? '', fresh: /A fresh session/.test(${threadText}), stoppedNotes: document.querySelectorAll('.lc-thread .lc-thread__note').length && [...document.querySelectorAll('.lc-thread .lc-thread__note')].filter((el) => /Stopped before it replied/.test(el.innerText)).length })
+  })()`
+  const kept = JSON.parse(String(await drive.capture('asked to remember a word', () => drive.evaluate(sendAndWait('Remember the word FALCON for later. Reply with just OK.')))))
+  check('the second turn answered', kept.reply.length > 0, kept.reply.slice(0, 60))
+  const early = JSON.parse(String(await drive.capture('a turn stopped 900 ms in', () => drive.evaluate(sendThenStop('Reply with the single word MAPLE.', 900)))))
+  check('the third turn was stopped', early.pressedStop, early.thread.slice(-120))
+  const after = JSON.parse(String(await drive.capture('replied after the early stop', () => drive.evaluate(sendAndWait('Which word did I ask you to remember? Reply with that one word.')))))
+  check('the reply after the early stop still knows the conversation (0.496)', /FALCON/i.test(after.reply), after.reply.slice(0, 80))
+  check('and no "fresh session" is claimed (0.496)', after.fresh === false)
+  check('the stopped turn says it was stopped, once (0.496)', after.stoppedNotes === 1, String(after.stoppedNotes))
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

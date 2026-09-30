@@ -94,6 +94,13 @@ describe('sent again (0.496)', () => {
     expect(count(thread({ earlierTurns: [stoppedEarly], prompt: 'Something else' }), '>Summarize the turns<')).toBe(1)
     expect(thread({ earlierTurns: [stoppedEarly], prompt: 'Something else' })).toContain('>Something else<')
   })
+
+  it('says a kept turn that was stopped before it replied was stopped, and only that one', () => {
+    expect(thread({ earlierTurns: [stoppedEarly], prompt: 'Something else' })).toContain('Stopped before it replied')
+    expect(thread({ earlierTurns: [stoppedEarly] })).not.toContain('Stopped before it replied')
+    const spoke = { ...stoppedEarly, events: [{ type: 'message.delta', payload: { text: 'Starting' } }, { type: 'run.cancelled', payload: {} }] }
+    expect(thread({ earlierTurns: [spoke], prompt: 'Something else' })).not.toContain('Stopped before it replied')
+  })
 })
 
 describe('a run whose runtime is signed out (N11)', () => {

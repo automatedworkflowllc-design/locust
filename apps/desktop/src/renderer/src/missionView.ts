@@ -4524,8 +4524,13 @@ export function sentAgainBy(
   nextPrompt: string | undefined
 ): boolean {
   if (nextPrompt === undefined || turn.prompt.trim().length === 0 || turn.prompt.trim() !== nextPrompt.trim()) return false
+  return stoppedBeforeSaying(turn.events)
+}
+
+/** Stopped before it said, planned or ran anything: a turn with nothing under its message. */
+export function stoppedBeforeSaying(events: readonly NormalizedRuntimeEvent[]): boolean {
   let stopped = false
-  for (const event of turn.events) {
+  for (const event of events) {
     if (event.type === 'run.cancelled') stopped = true
     if (event.type === 'message.delta' || event.type === 'tool.started' || event.type === 'plan.updated') return false
   }

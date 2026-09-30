@@ -12,7 +12,7 @@ import type {
   PublicRecoveredMission,
   PublicTeammate
 } from '../../../shared/ipc.js'
-import { activityEntries, buildThread, cancellationSummary, editedFiles, decisionStanding, errorAlreadyShown, foldNoticeKeys, lastPlanOf, modeRefusedATool, readPlan, relativePath, sentAgainBy, stepsLine, terminalSeamBefore, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
+import { activityEntries, buildThread, cancellationSummary, editedFiles, decisionStanding, errorAlreadyShown, foldNoticeKeys, lastPlanOf, modeRefusedATool, readPlan, relativePath, sentAgainBy, stepsLine, stoppedBeforeSaying, terminalSeamBefore, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
 import type { GroupBoundary, GroupLeaving, LiveStarter, TurnSwitch } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
 import { folderName, ranOnLine } from '../ranOn.js'
@@ -1203,6 +1203,8 @@ onResume,
               {!again && userTurn(turnPromptLine(turn), turnAttachments(turn), () => editedFiles(turn.events, workspacePath))}
               {cardsFor(index, 'before-work').map(peerCard)}
               {!again && earlierWork[index]}
+              {/* An earlier turn stopped before it said anything had nothing under it, as if still waiting (0.496; Claude Code: "Interrupted"). */}
+              {!again && stoppedBeforeSaying(turn.events) && <div className="lc-thread__note">Stopped before it replied</div>}
               {cardsFor(index, 'after-work').map(peerCard)}
               {/* What that turn taught the team, under that turn. */}
               <MemoryCard lines={memoriesOfTurn(peers.memories ?? [], turn.missionId)} />

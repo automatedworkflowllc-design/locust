@@ -22,7 +22,8 @@ heading: the home screen then shows it once, as a splash.
 - **A reply after an early Stop keeps the conversation.** When you stopped a
   reply before it got going, the next message started the teammate from
   scratch. It now picks up the same session, the way Claude Code does after
-  an interrupt.
+  an interrupt, and the stopped message says "Stopped before it replied"
+  instead of sitting there as if still waiting.
 - **A card for a stop before any tool ran is shorter.** It no longer says
   that undoing changes is up to you, since no change was made.
 - **The Mac build is started on a real Mac before it is handed out.** Each
