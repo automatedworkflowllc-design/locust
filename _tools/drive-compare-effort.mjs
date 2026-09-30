@@ -7,7 +7,8 @@
 // column's effort, moves it, and checks the chip says so and the panel stays
 // in the window -- at 1120 and 1440 wide. Sends nothing.
 
-import { mkdir } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { recordRoot, say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
@@ -15,12 +16,19 @@ import { recordRoot, say, scratchRepository, sleep, startDrive } from './drive-l
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tag = arg('--tag') ?? 'local'
+// --send: two free OpenCode models that list levels, each at its own; spends nothing.
+const SEND = process.argv.includes('--send')
+const FREE = [
+  { search: 'muse', row: '/Muse Spark.*(Contributor|Free)/i', level: 'Low', effort: 'low', model: /muse-spark/ },
+  { search: 'bunny', row: '/Space Bunny/i', level: 'Max', effort: 'max', model: /space-bunny/ }
+]
 const OUT = join(recordRoot('compare-effort-2026-09-30'), `compare-effort-${tag}`)
 await mkdir(OUT, { recursive: true })
 
 const workspace = await scratchRepository('locust-drive-compare-effort-ws-')
+const PROFILE = await mkdtemp(join(process.env.LOCUST_SCRATCH ?? tmpdir(), 'locust-drive-compare-effort-profile-'))
 const drive = await startDrive({
-  name: `compare-effort-${tag}`, port: 9793, workspace, outPath: OUT, sendsNothing: true,
+  name: `compare-effort-${tag}`, port: 9793, workspace, profilePath: PROFILE, outPath: OUT, ...(SEND ? {} : { sendsNothing: true }),
   ...(packaged === undefined ? {} : { packaged }),
   seed: { schemaVersion: 1, teammates: [], missionOwners: {}, settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: false } }
 })
@@ -105,6 +113,73 @@ try {
       `${before.slots[index].effort} -> ${after.slots[index].effort} (panel ${after.panelNow})`)
     await drive.evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))`)
     await sleep(400)
+  }
+  if (SEND) {
+    /*
+     * THE ROUND TRIP, on two free models that list levels: each column is
+     * set to its own level, the ask is sent, and the ledger each run wrote is
+     * read back for the level it was started with.
+     */
+    const set = []
+    for (const [index, want] of FREE.entries()) {
+      set.push(JSON.parse(String(await drive.evaluate(`(async () => {
+        const chip = document.querySelectorAll('.lc-slotgroup')[${String(index)}]?.querySelector('.lc-control--slot')
+        if (!chip) return JSON.stringify({ picked: false, why: 'no chip' })
+        chip.click()
+        await new Promise((r) => setTimeout(r, 600))
+        const box = document.querySelector('.lc-picker__input')
+        if (box) {
+          const setInput = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+          setInput.call(box, ${JSON.stringify(want.search)})
+          box.dispatchEvent(new Event('input', { bubbles: true }))
+          await new Promise((r) => setTimeout(r, 700))
+        }
+        const row = [...document.querySelectorAll('.lc-picker__row:not(.is-recent)')].find((one) => !one.disabled && ${want.row}.test(one.querySelector('.lc-picker__label')?.textContent ?? ''))
+        if (!row) return JSON.stringify({ picked: false, why: 'no row' })
+        row.click()
+        await new Promise((r) => setTimeout(r, 600))
+        const group = document.querySelectorAll('.lc-slotgroup')[${String(index)}]
+        group.querySelector('.lc-control--sloteffort')?.click()
+        await new Promise((r) => setTimeout(r, 500))
+        const input = document.querySelector('.lc-compare-slots .lc-effortpanel__slider')
+        if (!input) return JSON.stringify({ picked: true, effort: false })
+        const stops = [...Array(Number(input.max) + 1).keys()]
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+        for (const stop of stops) {
+          setter.call(input, String(stop))
+          input.dispatchEvent(new Event('input', { bubbles: true }))
+          await new Promise((r) => setTimeout(r, 200))
+          if ((document.querySelector('.lc-compare-slots .lc-effortpanel__now')?.innerText.trim() ?? '') === ${JSON.stringify(want.level)}) break
+        }
+        document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+        await new Promise((r) => setTimeout(r, 300))
+        return JSON.stringify({ picked: true, chip: group.innerText.replace(/\\s+/g, ' ').trim() })
+      })()`))))
+    }
+    say(`  set: ${JSON.stringify(set)}`)
+    check('both free models picked, each at its own level', set.every((one, at) => one.picked && one.chip?.includes(FREE[at].level)), JSON.stringify(set))
+    const answered = JSON.parse(String(await drive.capture('Sent: each column at its own level', () => drive.evaluate(`(async () => {
+      const field = document.querySelector('form.command-dock textarea')
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+      setter.call(field, 'Reply with the single word: ok')
+      field.dispatchEvent(new Event('input', { bubbles: true }))
+      await new Promise((r) => setTimeout(r, 300))
+      document.querySelector('button[aria-label="Start mission"]')?.click()
+      for (let i = 0; i < 600; i += 1) {
+        await new Promise((r) => setTimeout(r, 500))
+        const states = [...document.querySelectorAll('.lc-compare__state')].map((el) => el.textContent.trim())
+        if (i > 6 && states.length === 2 && states.every((state) => state !== 'working' && state !== 'waiting')) break
+      }
+      return JSON.stringify({ heads: [...document.querySelectorAll('.lc-compare__head')].map((el) => el.innerText.replace(/\\s+/g, ' ').trim()) })
+    })()`))))
+    say(`  answered: ${JSON.stringify(answered)}`)
+    check('each column is named with its level', FREE.every((want) => answered.heads.some((head) => head.includes(want.level))), JSON.stringify(answered.heads))
+    // The comparison's own record is what each column is started from (the ledger keeps no effort).
+    const record = JSON.parse(await readFile(join(PROFILE, 'compares.json'), 'utf8'))
+    const slots = (record.compares ?? record).at?.(-1)?.slots ?? []
+    const started = slots.map((slot) => ({ model: slot.route.model, effort: slot.route.effort, ran: slot.missionIds.length }))
+    say(`  started with: ${JSON.stringify(started)}`)
+    check('each column was started at its own level', FREE.every((want) => started.some((run) => want.model.test(run.model) && run.effort === want.effort && run.ran > 0)), JSON.stringify(started))
   }
 } catch (error) {
   failures += 1
