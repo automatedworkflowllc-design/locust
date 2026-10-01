@@ -7,6 +7,7 @@ import { DiffView } from './DiffView.js'
 import { Icon } from './Icon.js'
 import { SheetView } from './SheetView.js'
 import { DocumentView } from './DocumentView.js'
+import { fileAsItWas } from '../fileVersions.js'
 import type { OfficeDocument } from '../../../shared/office-document.js'
 import type { Workbook } from '../../../shared/sheet.js'
 import { quoteOfPagePick, VIEWER_FRAME_NAME } from '../../../shared/page-pick.js'
@@ -77,6 +78,8 @@ export function FileViewer({
 }): ReactElement {
   /** Which turn's change is being read, or undefined for the file as it is. */
   const [showing, setShowing] = useState<number>()
+  /** An earlier turn's version read as its change rather than as the file it was (0.517). */
+  const [asChange, setAsChange] = useState(false)
   const [asSource, setAsSource] = useState(false)
   const [reloads, setReloads] = useState(0)
   const [pointing, setPointing] = useState<'idle' | 'pointing' | { readonly said: string }>('idle')
@@ -113,6 +116,9 @@ export function FileViewer({
       .catch(() => setPointing({ said: 'The page could not be pointed at. Reload it and try again.' }))
   }
   const version = showing === undefined ? undefined : turns[showing]
+  // The file as it was after that turn, when it can be rebuilt exactly (fileVersions.ts): text files only.
+  const rebuilt = version === undefined || showing === undefined || (mode !== 'markdown' && mode !== 'code') ? undefined : fileAsItWas(text, turns, showing)
+  const turnName = `turn ${String((showing ?? 0) + 1)}`
   return (
     <aside className="lc-viewer" aria-label={`Viewing ${path}`}>
       <div className="lc-viewer__head">
@@ -173,11 +179,11 @@ export function FileViewer({
         * turn that changed this file, oldest on the left, and pressing one
         * shows the change that turn made.
         *
-        * It says "changed in" and never "as it looked", because it is not
-        * that: reverse-applying the recorded patches would build a
-        * convincing document out of an incomplete record -- patches arrive
-        * truncated, and some runtimes report an edit with no diff at all.
-        * The label is the feature's honesty, not decoration on it.
+        * Pressing one shows the file AS IT WAS after that turn (0.517) --
+        * but only when the later turns' recorded changes undo exactly
+        * (fileVersions.ts). Patches arrive truncated, and some runtimes
+        * report an edit with no diff at all; then the chip shows the change
+        * that turn made and says why the version itself cannot be shown.
         */}
       {turns.length > 0 && (
         <div className="lc-viewer__versions">
@@ -193,7 +199,10 @@ export function FileViewer({
               /* The ask, so a version has a reason on it and not just a number. */
               title={turn.prompt}
               aria-pressed={showing === index}
-              onClick={() => setShowing(showing === index ? undefined : index)}
+              onClick={() => {
+                setAsChange(false)
+                setShowing(showing === index ? undefined : index)
+              }}
             >
               {index + 1}
             </button>
@@ -209,10 +218,34 @@ export function FileViewer({
           </button>
         </div>
       )}
-      {version !== undefined ? (
+      {version !== undefined && rebuilt?.ok === true && !asChange ? (
         <div className="lc-viewer__scroll">
           <p className="lc-viewer__versionnote">
-            What turn {String((showing ?? 0) + 1)} changed. The file itself is under <strong>Now</strong>.
+            {rebuilt.next === null ? `The file was not there after ${turnName}.` : `The file as it was after ${turnName}.`}{' '}
+            <button type="button" className="lc-linkbutton" onClick={() => setAsChange(true)}>
+              {`What ${turnName} changed`}
+            </button>
+          </p>
+          {rebuilt.next === null ? null : mode === 'markdown' ? (
+            <div className="lc-viewer__prose">
+              <AgentText text={rebuilt.next} streaming={false} />
+            </div>
+          ) : (
+            <pre className="lc-viewer__code">{rebuilt.next}</pre>
+          )}
+        </div>
+      ) : version !== undefined ? (
+        <div className="lc-viewer__scroll">
+          <p className="lc-viewer__versionnote">
+            {`What ${turnName} changed. `}
+            {rebuilt?.ok === true ? (
+              <button type="button" className="lc-linkbutton" onClick={() => setAsChange(false)}>
+                {`The file as it was after ${turnName}`}
+              </button>
+            ) : rebuilt !== undefined ? (
+              `It cannot be shown as it was, because ${rebuilt.why}. `
+            ) : null}
+            {rebuilt?.ok === true ? null : <>The file itself is under <strong>Now</strong>.</>}
           </p>
           <DiffView key={showing} file={version.file} truncated={version.truncated} reported={version.reported} />
         </div>
