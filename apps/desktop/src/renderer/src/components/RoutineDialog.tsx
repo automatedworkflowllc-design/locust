@@ -3,10 +3,21 @@ import type { ReactElement } from 'react'
 import { useModal } from '../useModal.js'
 
 import type { PublicTeammate, RoutineHandOff, RoutineSchedule } from '../../../shared/ipc.js'
-import { EVERY_HOURS_CHOICES } from '../../../shared/routine-schedule.js'
+import { EVERY_HOURS_CHOICES, onceMoment, WEEKDAYS_ONLY } from '../../../shared/routine-schedule.js'
 import { stepTooLongNotice } from '../../../shared/step-budget.js'
 import { MAX_ROUTINE_STEPS } from '../routines.js'
 import { TeammateBot } from './TeammateBot.js'
+
+/** Monday first, as a week reads; 0 is Sunday, as the schedule counts. */
+const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0] as const
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+
+/** What "Once" starts with: tomorrow at 09:00, in the person's clock. */
+function tomorrowAtNine(now = new Date()): string {
+  const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+  const two = (value: number): string => String(value).padStart(2, '0')
+  return `${String(day.getFullYear())}-${two(day.getMonth() + 1)}-${two(day.getDate())}T09:00`
+}
 
 /**
  * Saving a conversation as a routine, and correcting one.
@@ -325,7 +336,9 @@ export function RoutineDialog({
                   [
                     ['off', 'Only when I press Run'],
                     ['every', 'Every few hours'],
-                    ['daily', 'Daily at a time']
+                    ['daily', 'Daily at a time'],
+                    ['weekly', 'On set days'],
+                    ['once', 'Once']
                   ] as const
                 ).map(([kind, label]) => (
                   <button
@@ -340,7 +353,15 @@ export function RoutineDialog({
                       // asked for 09:00 back.
                       if (kind === scheduleKind) return
                       setSchedule(
-                        kind === 'off' ? undefined : kind === 'every' ? { kind: 'every', hours: 4 } : { kind: 'daily', at: '09:00' }
+                        kind === 'off'
+                          ? undefined
+                          : kind === 'every'
+                            ? { kind: 'every', hours: 4 }
+                            : kind === 'weekly'
+                              ? { kind: 'weekly', days: WEEKDAYS_ONLY, at: '09:00' }
+                              : kind === 'once'
+                                ? { kind: 'once', on: tomorrowAtNine() }
+                                : { kind: 'daily', at: '09:00' }
                       )
                     }}
                   >
@@ -380,6 +401,61 @@ export function RoutineDialog({
                 </label>
               )}
             </div>
+            {schedule?.kind === 'weekly' && (
+              <div className="lc-routinesched lc-routinesched__days">
+                <div className="lc-segmented" role="group" aria-label="Days it runs">
+                  {WEEK_ORDER.map((day) => {
+                    const on = schedule.days.includes(day)
+                    return (
+                      <button
+                        key={day}
+                        type="button"
+                        aria-pressed={on}
+                        className={`lc-button${on ? ' is-active' : ''}`}
+                        onClick={() => {
+                          const days = on ? schedule.days.filter((entry) => entry !== day) : [...schedule.days, day].sort((a, b) => a - b)
+                          // At least one day: the last one stays on rather than leaving a schedule that never runs.
+                          if (days.length > 0) setSchedule({ ...schedule, days })
+                        }}
+                      >
+                        {DAY_NAMES[day]}
+                      </button>
+                    )
+                  })}
+                </div>
+                <label className="lc-routinesched__detail lc-mono">
+                  at
+                  <input
+                    type="time"
+                    className="lc-input lc-routinesched__pick"
+                    aria-label="Time of day"
+                    value={schedule.at}
+                    onChange={(event) => {
+                      if (/^\d\d:\d\d$/u.test(event.target.value)) setSchedule({ ...schedule, at: event.target.value })
+                    }}
+                  />
+                </label>
+              </div>
+            )}
+            {schedule?.kind === 'once' && (
+              <div className="lc-routinesched lc-routinesched__days">
+                <label className="lc-routinesched__detail lc-mono">
+                  on
+                  <input
+                    type="datetime-local"
+                    className="lc-input lc-routinesched__pick"
+                    aria-label="Date and time"
+                    value={schedule.on}
+                    onChange={(event) => {
+                      if (onceMoment(event.target.value) !== undefined) setSchedule({ kind: 'once', on: event.target.value })
+                    }}
+                  />
+                </label>
+                {(onceMoment(schedule.on)?.getTime() ?? 0) <= Date.now() && (
+                  <span className="lc-routinesched__detail lc-mono">That time has passed, so it will not run on its own.</span>
+                )}
+              </div>
+            )}
             {schedule !== undefined && (
               <p className="lc-dialog__note lc-mono">
                 Only while Locust is open, and only when {teammate?.name ?? 'the teammate'} is free. A run missed while

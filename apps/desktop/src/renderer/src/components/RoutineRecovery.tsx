@@ -20,6 +20,8 @@ export function RoutineRecovery({ routine, recover, onOpenMission, now = new Dat
   const [error, setError] = useState<string>()
   const execution = routine.execution
   if (execution === undefined || execution.status === 'running') return null
+  // Keep starts the clock now; a once whose time has passed has no next run.
+  const nextAfterKeep = routine.schedule === undefined ? undefined : nextRunAfter(routine.schedule, now.toISOString(), now)
   const decide = async (decision: RoutineRecoveryRequest['decision']): Promise<void> => {
     if (recover === undefined || busy || !reviewed) return
     setBusy(true)
@@ -87,7 +89,7 @@ export function RoutineRecovery({ routine, recover, onOpenMission, now = new Dat
         * is what a routine held past its interval did until 0.404, shown
         * only after the click (the 0.402 beta retest).
         */}
-      <span className="lc-recovery__line">{`Keep clears this attempt and leaves the routine as it was; its next run starts from step 1 ${routine.schedule === undefined ? 'when you press Run' : `at ${nextRunAfter(routine.schedule, now.toISOString(), now).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' })}, not straight away`}. Abandon also removes the schedule. Neither stops a runtime or undoes work.`}</span>
+      <span className="lc-recovery__line">{`Keep clears this attempt and leaves the routine as it was; its next run starts from step 1 ${nextAfterKeep === undefined ? (routine.schedule === undefined ? 'when you press Run' : 'when you press Run, since its one scheduled time has passed') : `at ${nextAfterKeep.toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' })}, not straight away`}. Abandon also removes the schedule. Neither stops a runtime or undoes work.`}</span>
       <label className="lc-recovery__ack"><input type="checkbox" checked={reviewed} disabled={busy}
         onChange={(event) => setReviewed(event.target.checked)} /> I reviewed the saved mission and external work, and whether the remaining work is still wanted.</label>
       <span className="lc-recovery__actions">

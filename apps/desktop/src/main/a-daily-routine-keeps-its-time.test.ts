@@ -13,7 +13,7 @@ describe('a daily routine across a clock change', () => {
     try {
       // Only meaningful where this process follows the zone it is given.
       if (new Date('2026-03-08T12:00:00Z').getTimezoneOffset() !== 240) return
-      expect(nextRunAfter({ kind: 'daily', at: '09:00' }, lastRunAt, new Date(now)).toISOString()).toBe(new Date(next).toISOString())
+      expect(nextRunAfter({ kind: 'daily', at: '09:00' }, lastRunAt, new Date(now))?.toISOString()).toBe(new Date(next).toISOString())
     } finally {
       if (zone === undefined) delete process.env.TZ
       else process.env.TZ = zone

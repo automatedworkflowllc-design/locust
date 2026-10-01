@@ -3463,6 +3463,10 @@ textarea {
   gap: var(--lc-space-2);
 }
 
+.lc-routinesched__days {
+  margin-top: var(--lc-space-2);
+}
+
 .lc-routinesched__detail {
   display: inline-flex;
   align-items: center;
