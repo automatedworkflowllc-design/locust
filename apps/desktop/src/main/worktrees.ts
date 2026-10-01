@@ -428,7 +428,7 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
     try {
       const top = (await runGit(['rev-parse', '--show-toplevel'], root)).trim().replace(/\\/g, '/')
       if (top.toLowerCase() !== root.replace(/\\/g, '/').toLowerCase()) {
-        return { repository: false, gitVersion, reason: 'The project folder is inside a repository but is not its root. Own branches need the folder to be the repository root.' }
+        return { repository: false, gitVersion, reason: 'The project folder is inside a repository but is not its root. Own copies need the folder to be the repository root.' }
       }
     } catch {
       return { repository: false, gitVersion, reason: 'The project folder is not a git repository.' }
@@ -517,7 +517,7 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
         return path
       }
       const ready = await probe()
-      if (!ready.repository) throw new Error(ready.reason ?? 'Own branches are not available in this folder.')
+      if (!ready.repository) throw new Error(ready.reason ?? 'Own copies are not available in this folder.')
       await mkdir(resolve(root, trees), { recursive: true })
       await excludeLocustDirectory()
       // M17: a name another teammate's tree already has checked out gets

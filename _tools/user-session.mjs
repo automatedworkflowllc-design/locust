@@ -137,7 +137,7 @@ try {
     await new Promise(r => setTimeout(r, 200))
     const title = [...dialog.querySelectorAll('input')].find(i => /Release manager/.test(i.placeholder))
     if (title) { set.call(title, 'Release manager'); title.dispatchEvent(new Event('input', { bubbles: true })) }
-    const own = dialog.querySelector('[role=switch][aria-label="Own branch"]')
+    const own = dialog.querySelector('[role=switch][aria-label="Own copy"]')
     if (own) own.click()
     await new Promise(r => setTimeout(r, 200))
     return 'custom=' + !!custom + ' title=' + !!title + ' own=' + (own ? own.getAttribute('aria-checked') : 'no switch') + ' · ' + (dialog.querySelector('.lc-field--switch')?.innerText.replace(/\\s+/g, ' ').slice(0, 120) ?? '')
@@ -247,7 +247,7 @@ try {
     edit.click()
     await new Promise(r => setTimeout(r, 500))
     const dialog = document.querySelector('[role=dialog]')
-    return dialog ? 'edit dialog: own=' + dialog.querySelector('[role=switch][aria-label="Own branch"]')?.getAttribute('aria-checked') + ' title=' + ([...dialog.querySelectorAll('input')].find(i => /Release manager/.test(i.placeholder))?.value ?? '?') : 'no dialog'
+    return dialog ? 'edit dialog: own=' + dialog.querySelector('[role=switch][aria-label="Own copy"]')?.getAttribute('aria-checked') + ' title=' + ([...dialog.querySelectorAll('input')].find(i => /Release manager/.test(i.placeholder))?.value ?? '?') : 'no dialog'
   })()`))
 
   await capture('cancel the edit and read the sidebar', () => evaluate(`(async () => {

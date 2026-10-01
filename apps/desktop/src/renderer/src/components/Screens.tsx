@@ -1673,7 +1673,7 @@ export function SettingsScreen({
             <p>Changing the folder reopens Locust, so stop anything running first.</p>
             <p>
               A notes file named LOCUST.md at the folder&rsquo;s root is given to every teammate, on every AI agent, before each
-              mission. A teammate with Own branch on works in its own worktree of the folder&rsquo;s repository,
+              mission. A teammate with Own copy on works in its own copy of the folder (a git worktree of its repository),
               kept under .locust/worktrees. Each turn it finishes is saved on its branch as a commit; Review
               changes in its conversation shows them and lands them on your branch as one commit of yours.
               Removing one here keeps its branch.
@@ -1727,12 +1727,12 @@ export function SettingsScreen({
           )}
           {workspacePath !== undefined && worktrees !== undefined && (
             <div className="lc-policyrow lc-policyrow--stack">
-              <span className="lc-tag">OWN BRANCHES</span>
+              <span className="lc-tag">OWN COPIES</span>
               <span className="lc-settings__note">
                 {worktrees.reason !== undefined
-                  ? `${worktrees.reason} A teammate with Own branch on cannot start until this is fixed.`
+                  ? `${worktrees.reason} A teammate with Own copy on cannot start until this is fixed.`
                   : worktrees.list.length === 0
-                    ? 'None yet. Turn Own branch on in a teammate\'s card and its next run makes one.'
+                    ? 'None yet. Turn Own copy on in a teammate\'s card and its next run makes one.'
                     : 'Removing one keeps its branch, with what was committed on it; uncommitted changes are named before anything is deleted.'}
               </span>
               {worktrees.list.length > 0 && (

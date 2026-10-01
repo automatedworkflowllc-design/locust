@@ -521,14 +521,14 @@ export function NewTeammateDialog({
               type="button"
               role="switch"
               aria-checked={worktree}
-              aria-label="Own branch"
+              aria-label="Own copy"
               className={`lc-memory__switch${worktree ? ' is-on' : ''}`}
               onClick={() => setWorktree(!worktree)}
             >
               <span className="lc-memory__knob" />
             </button>
             <span className="lc-field__text">
-              <span className="lc-fieldlabel lc-mono">Own branch</span>
+              <span className="lc-fieldlabel lc-mono">Own copy</span>
               <span className="lc-field__hint">
                 Works in its own copy of the folder, on branch {branchNameFor(name.trim().length === 0 ? 'teammate' : name)}. Needs the folder to be a git repository.
                 Merging back is yours to do.

@@ -31,7 +31,7 @@ const settingsRows = `(async () => {
   }
   const rows = [...document.querySelectorAll('.lc-worktreerow')]
   return rows.length === 0
-    ? 'no rows: ' + ([...document.querySelectorAll('.lc-policyrow')].find(p => /OWN BRANCHES/.test(p.textContent))?.innerText.replace(/\\s+/g, ' ').slice(0, 160) ?? 'no own-branches row')
+    ? 'no rows: ' + ([...document.querySelectorAll('.lc-policyrow')].find(p => /OWN COPIES|OWN BRANCHES/.test(p.textContent))?.innerText.replace(/\\s+/g, ' ').slice(0, 160) ?? 'no own-branches row')
     : rows.map(r => r.innerText.replace(/\\s+/g, ' ') + ' [button ' + (r.querySelector('button')?.disabled ? 'disabled' : 'enabled') + ']').join(' | ')
 })()`
 
@@ -82,7 +82,7 @@ try {
     if (!button) return 'no Remove'
     button.click()
     for (let i = 0; i < 40; i += 1) { await new Promise(r => setTimeout(r, 250)); if (!document.querySelector('.lc-worktreerow')) break }
-    return ([...document.querySelectorAll('.lc-policyrow')].find(p => /OWN BRANCHES/.test(p.textContent))?.innerText.replace(/\\s+/g, ' ').slice(0, 200) ?? 'no own-branches row') + ' || sidebar: ' + document.querySelector('.lc-sidebar').innerText.replace(/\\s+/g, ' ').slice(0, 120)
+    return ([...document.querySelectorAll('.lc-policyrow')].find(p => /OWN COPIES|OWN BRANCHES/.test(p.textContent))?.innerText.replace(/\\s+/g, ' ').slice(0, 200) ?? 'no own-branches row') + ' || sidebar: ' + document.querySelector('.lc-sidebar').innerText.replace(/\\s+/g, ' ').slice(0, 120)
   })()`))
   const branches = await git(['branch', '--list', 'locust/*'], workspace).catch(() => '')
   const trees = await git(['worktree', 'list', '--porcelain'], workspace).catch(() => '')
