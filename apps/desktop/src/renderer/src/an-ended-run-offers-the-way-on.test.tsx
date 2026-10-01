@@ -138,3 +138,19 @@ describe('a free model that gave up on its limit', () => {
     expect(html).toContain('puts your message back in the chat box')
   })
 })
+
+describe('a run the provider dropped (0.511)', () => {
+  // Colin's run, 2026-09-30: 56 minutes, then this, as the ledger recorded it.
+  const said = 'Selected model is at capacity. Please try a different model.'
+
+  it('offers Continue on the failure card, saying it was the provider', () => {
+    const html = thread({ error: said, onContinueAfterBusy: () => undefined })
+    expect(html).toContain('The run could not continue')
+    expect(html).toContain("The model&#x27;s servers were busy: not your account, and nothing you did.")
+    expect(html).toContain('Continue</button>')
+  })
+
+  it('offers nothing of the kind without it', () => {
+    expect(thread({ error: said })).not.toContain('servers were busy')
+  })
+})

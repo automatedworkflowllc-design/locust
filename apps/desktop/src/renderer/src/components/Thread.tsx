@@ -738,6 +738,8 @@ export interface ThreadProps {
   readonly onSendAgain?: () => void
   /** A free model that gave up on its limit: the next one, with the message handed back. */
   readonly limitModel?: { readonly label: string; readonly onPress: () => void }
+  /** The provider's servers were busy (0.511): carry the same conversation on. */
+  readonly onContinueAfterBusy?: () => void
   /** A run that failed because its runtime is signed out: that runtime's sign-in. */
   readonly signInRuntime?: MissionRuntimeId
   /** Open the conversation a received message was written in. */
@@ -900,6 +902,7 @@ export function Thread({
   onRunAgain,
   onSendAgain,
   limitModel,
+  onContinueAfterBusy,
   signInRuntime,
   onOpenSenderRun,
   wasPlan,
@@ -1556,6 +1559,15 @@ onResume,
             <span>This model is at its limit. Switching puts your message back in the chat box, to send there.</span>
             <button type="button" className="lc-button" onClick={limitModel.onPress}>
               {limitModel.label}
+            </button>
+          </div>
+        )}
+
+        {onContinueAfterBusy !== undefined && error !== undefined && (
+          <div className="lc-rerun">
+            <span>The model's servers were busy: not your account, and nothing you did. What it finished is kept; Continue picks up where it stopped.</span>
+            <button type="button" className="lc-button" onClick={onContinueAfterBusy}>
+              <Icon name="play" size={13} /> Continue
             </button>
           </div>
         )}

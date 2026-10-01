@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.511.0 - 2026-09-30
+
+### Fixed
+
+- **When the model's servers give out, one press carries on.** A long run
+  that ended with "Selected model is at capacity" (or the servers being
+  overloaded or unavailable) left a red card with nothing to press, after
+  an hour of work. The card now says it was the provider, not your account
+  or anything you did, and offers **Continue**: it picks up the same
+  conversation where it stopped, with everything it finished kept.
+
 ## 0.510.0 - 2026-09-30
 
 ### Removed

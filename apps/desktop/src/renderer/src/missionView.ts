@@ -4567,6 +4567,35 @@ export function failedOnItsLimit(payload: {
 }
 
 /**
+ * The provider's servers were busy or dropped the turn -- not the person's
+ * account, quota or folder (0.511).
+ *
+ * Colin, 2026-09-30, on a Codex run that stopped after 56 minutes with
+ * "Selected model is at capacity. Please try a different model.": "classic
+ * openai, after an hour". The card said so and offered nothing; he typed
+ * "continue" himself, and the same conversation picked up. A limit of the
+ * person's own (EXHAUSTION_PATTERNS) is not this: waiting for it does not help.
+ */
+const PROVIDER_BUSY_PATTERNS = [
+  /\bat capacity\b/i,
+  /\boverloaded\b/i,
+  /\btemporarily unavailable\b/i,
+  /\bservice unavailable\b/i,
+  /\bhttp\s*(?:502|503|504|529)\b/i,
+  /\binternal server error\b/i,
+  /\bstream disconnected before completion\b/i
+] as const
+
+export function failedOnProviderSide(payload: {
+  readonly message?: string
+  readonly process?: { readonly stderr?: string }
+}): boolean {
+  const said = [payload.message ?? '', messageOfLogLine(lastStderrLine(payload.process?.stderr) ?? '')]
+  if (said.some((text) => EXHAUSTION_PATTERNS.some((pattern) => pattern.test(text)))) return false
+  return said.some((text) => PROVIDER_BUSY_PATTERNS.some((pattern) => pattern.test(text)))
+}
+
+/**
  * What to put on a failure card.
  *
  * The host's own sentence names the SHAPE of the failure ("Codex invocation

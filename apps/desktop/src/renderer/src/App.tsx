@@ -144,6 +144,7 @@ import { cappedLiveEvents, LIVE_EVENT_CAP,
   conversationTurns,
   failureMessage,
   failedOnItsLimit,
+  failedOnProviderSide,
   recentlyUsedRoutes,
   resolvedModelNames,
   resumableSessionOf,
@@ -4491,6 +4492,21 @@ export default function App(): ReactElement {
   })()
 
   /*
+   * THE PROVIDER WAS BUSY (0.511, missionView.failedOnProviderSide). A run
+   * that did real work and then hit "Selected model is at capacity" is
+   * carried on, not repeated: Continue sends a follow-up into the same
+   * conversation, which picks up the runtime's own session where it stopped.
+   * The press is the person's send; nothing goes without it.
+   */
+  const continueOffer = ((): (() => void) | undefined => {
+    const shown = liveRun
+    if (shown === undefined || shown.phase !== 'failed' || shown.data === undefined || limitOffer !== undefined) return undefined
+    const failed = [...shown.events].reverse().find((event) => event.type === 'run.failed')
+    if (failed === undefined || failed.type !== 'run.failed' || !failedOnProviderSide(failed.payload)) return undefined
+    return () => void startMission('Continue from where you stopped.')
+  })()
+
+  /*
    * A SIGN-IN THAT EXPIRED (QA-2026-09-29 round 2, N11). Codex's `login
    * status` only reads that a sign-in is saved, so Settings kept saying READY
    * after "Your access token could not be refreshed", and the card had nothing
@@ -7390,6 +7406,7 @@ export default function App(): ReactElement {
                 running={running}
                 {...(busyOffer === undefined ? {} : { busyModel: busyOffer })}
                 {...(limitOffer === undefined ? {} : { limitModel: limitOffer })}
+                {...(continueOffer === undefined || running ? {} : { onContinueAfterBusy: continueOffer })}
                 {...(signInOffer === undefined ? {} : { signInRuntime: signInOffer })}
                 onSendAgain={
                   // R29: a run stopped before it used any tool, most often
