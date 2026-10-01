@@ -1049,7 +1049,11 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
     // 0.439: a turn in the teammate's own worktree is committed to its branch,
     // however it ended, with a receipt in its stream. Best effort: a commit
     // that cannot be made says so, and the files stay in the tree.
-    if (mission.peer?.repositoryRoot !== undefined && options.checkpointTurn !== undefined) {
+    // Only the teammate's OWN run commits to its branch (0.532). A run in a slot of its
+    // own -- a comparison's column, a judge, a side question -- carried the teammate's
+    // context and committed its branch with the comparison's ask as the message, sweeping
+    // in whatever a direct run was half-way through there at the time.
+    if (mission.peer?.repositoryRoot !== undefined && mission.slot === undefined && options.checkpointTurn !== undefined) {
       // From every event the run WROTE, not only the batch `finish` returned (turnOutcomeOf).
       const outcome: TurnOutcome = turnOutcomeOf(mission.persisted)
       const teammate = { teammateId: mission.peer.self.teammateId, name: mission.peer.self.name }

@@ -150,6 +150,18 @@ describe('a turn on its own branch', () => {
     expect(notices()).toHaveLength(0)
   })
 
+  it('is never committed from a slot of its own -- a comparison\'s column, a judge, a side question (0.532)', async () => {
+    // A column for a teammate with Own branch carried its context, and its end
+    // committed the teammate's branch with the comparison's ask, sweeping in a
+    // direct run's half-done edits there.
+    const { service, drain, checkpointTurn, notices } = setUp(committed)
+    const started = await service.start('Which CRM?', 'codex', 'accept-edits', {}, () => undefined, undefined, ON_ITS_BRANCH, undefined, undefined, undefined, undefined, { key: 'compare:tm_wren:cmp_1:a', cwd: ROOT })
+    expect(started.ok).toBe(true)
+    await drain()
+    expect(checkpointTurn).not.toHaveBeenCalled()
+    expect(notices()).toHaveLength(0)
+  })
+
   it('says nothing when the turn changed nothing', async () => {
     const { service, drain, notices } = setUp(async () => ({ kind: 'clean' }))
     await service.start('Just look', 'codex', 'accept-edits', {}, () => undefined, undefined, ON_ITS_BRANCH)
