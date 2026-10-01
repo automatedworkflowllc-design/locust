@@ -11,6 +11,22 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.518.0 - 2026-10-01
+
+### Improved
+
+- **Before a reply goes to another AI agent, Locust says what it takes
+  along.** When your next message will continue a conversation on a
+  different AI agent, the line above the box now says what the summary
+  carries (the task, the earlier messages, the steps it finished, its last
+  reply) and, as you type a long reply, what is left out to fit. It used to
+  say this only after the switch.
+- **Plainer words.** Settings, the message box, Home and the teammate form
+  now say "AI agent" where they said "runtime", "model" where they said
+  "route", and say what a mode or a hand-over does instead of "sandbox" and
+  "checkpoint". The Settings page is now called AI agents, and the sidebar
+  says how many are ready.
+
 ## 0.517.0 - 2026-10-01
 
 ### New
