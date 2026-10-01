@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.526.0 - 2026-10-01
+
+### Improved
+
+- **Missions are called conversations now.** The sidebar and the screen
+  that lists them say Conversations, the send button is Send, and Stop
+  stops "the running reply". A teammate's card counts its runs. Settings
+  says every conversation is kept on this machine, in a record that is only
+  ever added to, and clean-up counts the turns it would delete.
+- **The sidebar shows all three places whole.** Conversations, Rooms and
+  Routines each take the width of their word, so none loses its icon.
+
 ## 0.525.0 - 2026-10-01
 
 ### Fixed
