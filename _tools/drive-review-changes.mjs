@@ -20,7 +20,9 @@ import { git, openTeammateScript, recordRoot, say, scratchRepository, sendAndWai
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tag = arg('--tag') ?? 'local'
-const MODEL = process.env.LOCUST_FREE_MODEL ?? 'opencode/nemotron-3-ultra-free'
+// LOCUST_RUNTIME=codex LOCUST_MODEL=gpt-6-luna (0.530, Sol's Workflow 3 left Codex unverified): spends, so LOCUST_SPEND=1.
+const RUNTIME = process.env.LOCUST_RUNTIME ?? 'opencode'
+const MODEL = process.env.LOCUST_MODEL ?? process.env.LOCUST_FREE_MODEL ?? 'opencode/nemotron-3-ultra-free'
 const OUT = join(recordRoot('review-changes-2026-09-28'), `review-changes-${tag}`)
 await mkdir(OUT, { recursive: true })
 
@@ -32,10 +34,11 @@ const mainBefore = (await git(['rev-parse', 'main'], workspace)).trim()
 
 const drive = await startDrive({
   name: `review-changes-${tag}`, port: 9774, workspace, outPath: OUT,
+  ...(RUNTIME === 'opencode' ? {} : { spends: true }),
   ...(packaged === undefined ? {} : { packaged }),
   seed: {
     schemaVersion: 1,
-    teammates: [{ teammateId: 'tm_wren', name: 'Wren', hue: 'violet', role: 'Code & Migrations', createdAt: '2026-09-28T01:00:00.000Z', worktree: true, route: { runtime: 'opencode', model: MODEL, mode: 'accept-edits' } }],
+    teammates: [{ teammateId: 'tm_wren', name: 'Wren', hue: 'violet', role: 'Code & Migrations', createdAt: '2026-09-28T01:00:00.000Z', worktree: true, route: { runtime: RUNTIME, model: MODEL, mode: 'accept-edits', ...(RUNTIME === 'codex' ? { effort: 'low' } : {}) } }],
     missionOwners: {},
     settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: false }
   }
@@ -102,7 +105,7 @@ try {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
-  await drive.finish({ intro: `Build: ${packaged === undefined ? 'out/' : 'the packaged build'}. Wren on OpenCode / ${MODEL}, Accept edits, Own branch on; a small repository with cart.py.`, extra: `Checks failed: ${String(failures)}` })
+  await drive.finish({ intro: `Build: ${packaged === undefined ? 'out/' : 'the packaged build'}. Wren on ${RUNTIME} / ${MODEL}, Accept edits, Own branch on; a small repository with cart.py.`, extra: `Checks failed: ${String(failures)}` })
 }
 say(failures === 0 ? 'ALL CHECKS PASSED' : `${String(failures)} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)

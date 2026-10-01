@@ -25,6 +25,22 @@ const SUMMARY_MAX = 200
 export type TurnOutcome = 'completed' | 'failed' | 'stopped'
 
 /**
+ * How a turn ended, from EVERY event it wrote, newest terminal one first
+ * (0.531). It read only the batch the process's end returned, and a Codex turn
+ * reports its completion while it streams -- so every Codex turn on Own branch
+ * was committed as "failed" (drive-review-changes, LOCUST_RUNTIME=codex).
+ */
+export function turnOutcomeOf(events: readonly { readonly type: string }[]): TurnOutcome {
+  for (let at = events.length - 1; at >= 0; at -= 1) {
+    const type = events[at]?.type
+    if (type === 'run.completed') return 'completed'
+    if (type === 'run.cancelled') return 'stopped'
+    if (type === 'run.failed') return 'failed'
+  }
+  return 'failed'
+}
+
+/**
  * The first line, as a commit subject: its first sentence when that fits,
  * else cut at a word. The first landing drive's message read "Change nothing
  * el…" -- a subject cut mid-word is the first thing the person reads in their

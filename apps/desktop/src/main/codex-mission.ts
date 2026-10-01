@@ -80,7 +80,7 @@ import { longTaskFile, longTaskFilePath } from './long-task-file.js'
 import { withAttachments } from '../shared/attachments.js'
 import { CODEX_INIT_PROMPT, commandNamed } from './runtime-commands.js'
 import type { CursorDefaultModel } from './cursor-default-model.js'
-import { checkpointMessage, checkpointNotice, checkpointSentence } from './turn-checkpoint.js'
+import { checkpointMessage, checkpointNotice, checkpointSentence, turnOutcomeOf } from './turn-checkpoint.js'
 import type { TurnOutcome } from './turn-checkpoint.js'
 import type { CheckpointMessage, CheckpointResult } from './worktrees.js'
 
@@ -1050,8 +1050,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
     // however it ended, with a receipt in its stream. Best effort: a commit
     // that cannot be made says so, and the files stay in the tree.
     if (mission.peer?.repositoryRoot !== undefined && options.checkpointTurn !== undefined) {
-      const ended = terminalEvents.find((event) => event.type === 'run.completed' || event.type === 'run.failed' || event.type === 'run.cancelled')?.type
-      const outcome: TurnOutcome = ended === 'run.completed' ? 'completed' : ended === 'run.cancelled' ? 'stopped' : 'failed'
+      // From every event the run WROTE, not only the batch `finish` returned (turnOutcomeOf).
+      const outcome: TurnOutcome = turnOutcomeOf(mission.persisted)
       const teammate = { teammateId: mission.peer.self.teammateId, name: mission.peer.self.name }
       const result = await options
         .checkpointTurn({
