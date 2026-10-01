@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.532.0 - 2026-10-01
+
+### Fixed
+
+- **A comparison never saves to a teammate's own branch.** For a teammate
+  with Own branch on, a Compare column, a judge or a side question could
+  save a turn to that teammate's branch when it finished, under the
+  comparison's question, taking along anything a conversation with the same
+  teammate was in the middle of changing there. Only the teammate's own
+  conversations save to its branch now.
+
 ## 0.531.0 - 2026-10-01
 
 ### Fixed
