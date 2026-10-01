@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.529.0 - 2026-10-01
+
+### Improved
+
+- **A reply lines up with the box you type in.** A teammate's words now
+  start where your own typing starts in the box below and run to where it
+  stops, with the teammate's face in the margin beside them, the way Claude
+  lays out a conversation. Before, a reply stopped well short of the box's
+  right edge and started a little right of it. On a very wide window the
+  conversation and the box stay a readable width.
+
 ## 0.528.0 - 2026-10-01
 
 ### Fixed
