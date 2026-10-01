@@ -139,6 +139,22 @@ const ROLES: readonly { readonly role: TeammateRole; readonly description: strin
  */
 /* `modeSummary` now lives in `status.ts` with every other mode phrasing. */
 
+/**
+ * A connector by a name a person reads (0.514). A first-hour pass on 0.512
+ * met `plugin:small-business:zoho-projects` in the editor. The id stays on
+ * hover; the button says "Zoho Projects".
+ */
+export function connectorLabel(name: string): string {
+  const bare = name.replace(/^claude\.ai /, '')
+  const plugin = /^plugin:[^:]+:(.+)$/.exec(bare)
+  if (plugin === null) return bare
+  return (plugin[1] ?? bare)
+    .split(/[-_]+/)
+    .filter((word) => word.length > 0)
+    .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
+    .join(' ')
+}
+
 export function NewTeammateDialog({
   onCancel,
   onCreate,
@@ -349,6 +365,66 @@ export function NewTeammateDialog({
           </div>
 
           {/*
+            * THE MODEL FIRST, under the name (0.514). A first-hour pass on
+            * 0.512: Create teammate was on screen while the model sat below
+            * look, role, Own branch and connectors -- so a person could make a
+            * teammate on a paid model without seeing which. What it runs on is
+            * the choice that matters; how it looks can wait.
+            */}
+          {/*
+            The reference shows a default route and approval mode here. Both are
+            stated as what they are today rather than as settings this dialog
+            can change: route selection lands with the route layer, and approval
+            modes need a write-capable sandbox to mean anything.
+          */}
+          <div className="lc-teammatemodel">
+            <span className="lc-fieldlabel lc-mono">Model</span>
+            <div className="lc-teammatemodel__row">
+              <span className="lc-teammatemodel__name">
+                {shownRoute === undefined ? 'The chat box\u2019s, when they start' : routeLabel(shownRoute)}
+                {picked === undefined && ownRoute === undefined && shownRoute !== undefined && (
+                  <span className="lc-teammatemodel__whose"> · the chat box&apos;s, until you pick one</span>
+                )}
+              </span>
+              {picker !== undefined && (
+                <button type="button" className="lc-button" aria-expanded={picking} onClick={() => setPicking((open) => !open)}>
+                  {picking ? 'Cancel' : 'Change'}
+                </button>
+              )}
+            </div>
+            {picking && picker !== undefined && (
+              <div className="lc-teammatemodel__picker">
+                <RoutePicker
+                  runtimes={picker.runtimes}
+                  limitedRuntimes={picker.limitedRuntimes}
+                  models={picker.models}
+                  resolvedModels={picker.resolvedModels}
+                  recentRoutes={picker.recentRoutes}
+                  active={shownRoute === undefined ? { runtime: 'claude', model: 'account-default' } : { runtime: shownRoute.runtime, model: shownRoute.model }}
+                  onSelect={pick}
+                  onClose={() => setPicking(false)}
+                />
+              </div>
+            )}
+            {!picking && shownRoute !== undefined && effortBases.length > 0 && (
+              <div className="lc-effortpanel lc-teammatemodel__effort" role="group" aria-label="Reasoning effort">
+                <EffortSlider
+                  bases={effortBases}
+                  index={Math.max(0, effortBases.indexOf(effortBase))}
+                  fast={effortIsFast}
+                  hasFast={effortHasFast}
+                  footer={effortFooter(shownRoute.runtime)}
+                  onPick={(base) => chooseEffort(joinEffort(base, effortIsFast, supportedEfforts))}
+                  onFast={(next) => chooseEffort(joinEffort(effortBase, next, supportedEfforts))}
+                />
+              </div>
+            )}
+            <span className="lc-teammatemodel__hint">
+              Their messages, rooms and routines run on it. Picking another model in a chat with them changes it too.
+            </span>
+          </div>
+
+          {/*
             * CHOOSE A LOOK. Colin, 2026-09-22, on the bots: "we could just
             * have a choose your avatar option or both, whatever you decide".
             * Both: Shuffle rolls a look, and the grid picks one outright --
@@ -518,7 +594,7 @@ export function NewTeammateDialog({
                 {connectors.map((connector) => {
                   const narrowed = initial?.connectors ?? []
                   const on = narrowed.length === 0 || narrowed.includes(connector.name)
-                  const label = connector.name.replace(/^claude\.ai /, '')
+                  const label = connectorLabel(connector.name)
                   return (
                     <button
                       key={connector.name}
@@ -526,7 +602,7 @@ export function NewTeammateDialog({
                       role="checkbox"
                       aria-checked={on}
                       className={`lc-connectorpick${on ? ' is-on' : ''}${connector.status === 'connected' ? '' : ' is-unready'}`}
-                      title={connector.status === 'connected' ? connector.location : `${connector.name} — ${connector.status === 'needs-auth' ? 'not signed in yet' : 'not responding'}`}
+                      title={connector.status === 'connected' ? `${connector.name} — ${connector.location}` : `${connector.name} — ${connector.status === 'needs-auth' ? 'not signed in yet' : 'not responding'}`}
                       onClick={() => {
                         // From "everything" the first untick narrows to all-but-one;
                         // unticking the last one widens back to everything.
@@ -547,59 +623,6 @@ export function NewTeammateDialog({
               </span>
             </div>
           )}
-
-          {/*
-            The reference shows a default route and approval mode here. Both are
-            stated as what they are today rather than as settings this dialog
-            can change: route selection lands with the route layer, and approval
-            modes need a write-capable sandbox to mean anything.
-          */}
-          <div className="lc-teammatemodel">
-            <span className="lc-fieldlabel lc-mono">Model</span>
-            <div className="lc-teammatemodel__row">
-              <span className="lc-teammatemodel__name">
-                {shownRoute === undefined ? 'The chat box\u2019s, when they start' : routeLabel(shownRoute)}
-                {picked === undefined && ownRoute === undefined && shownRoute !== undefined && (
-                  <span className="lc-teammatemodel__whose"> · the chat box&apos;s, until you pick one</span>
-                )}
-              </span>
-              {picker !== undefined && (
-                <button type="button" className="lc-button" aria-expanded={picking} onClick={() => setPicking((open) => !open)}>
-                  {picking ? 'Cancel' : 'Change'}
-                </button>
-              )}
-            </div>
-            {picking && picker !== undefined && (
-              <div className="lc-teammatemodel__picker">
-                <RoutePicker
-                  runtimes={picker.runtimes}
-                  limitedRuntimes={picker.limitedRuntimes}
-                  models={picker.models}
-                  resolvedModels={picker.resolvedModels}
-                  recentRoutes={picker.recentRoutes}
-                  active={shownRoute === undefined ? { runtime: 'claude', model: 'account-default' } : { runtime: shownRoute.runtime, model: shownRoute.model }}
-                  onSelect={pick}
-                  onClose={() => setPicking(false)}
-                />
-              </div>
-            )}
-            {!picking && shownRoute !== undefined && effortBases.length > 0 && (
-              <div className="lc-effortpanel lc-teammatemodel__effort" role="group" aria-label="Reasoning effort">
-                <EffortSlider
-                  bases={effortBases}
-                  index={Math.max(0, effortBases.indexOf(effortBase))}
-                  fast={effortIsFast}
-                  hasFast={effortHasFast}
-                  footer={effortFooter(shownRoute.runtime)}
-                  onPick={(base) => chooseEffort(joinEffort(base, effortIsFast, supportedEfforts))}
-                  onFast={(next) => chooseEffort(joinEffort(effortBase, next, supportedEfforts))}
-                />
-              </div>
-            )}
-            <span className="lc-teammatemodel__hint">
-              Their messages, rooms and routines run on it. Picking another model in a chat with them changes it too.
-            </span>
-          </div>
 
           <label className="lc-field lc-field--limit">
             <span className="lc-fieldlabel lc-mono">Monthly limit</span>

@@ -118,6 +118,9 @@ describe('a scripted launch', () => {
     expect(mayUpdateAgents(['locust.exe'], {})).toBe(true)
     expect(mayUpdateAgents(['locust.exe', '--remote-debugging-port=9443'], {})).toBe(false)
     expect(mayUpdateAgents(['locust.exe', '--remote-debugging-port=9443'], { LOCUST_UPDATE_AGENTS: '1' })).toBe(true)
+    // A copy that is not the installed Locust leaves the machine alone (0.514); the drive about updating still may.
+    expect(mayUpdateAgents(['locust.exe'], {}, false)).toBe(false)
+    expect(mayUpdateAgents(['locust.exe'], { LOCUST_UPDATE_AGENTS: '1' }, false)).toBe(true)
   })
 })
 

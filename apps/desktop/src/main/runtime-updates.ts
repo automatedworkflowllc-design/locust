@@ -70,10 +70,17 @@ import { runtimeInstallFacts } from '../shared/runtime-install.js'
  */
 export function mayUpdateAgents(
   argv: readonly string[],
-  environment: Readonly<Record<string, string | undefined>>
+  environment: Readonly<Record<string, string | undefined>>,
+  /**
+   * False for a packaged copy that is not the installed Locust (0.514): a
+   * tester's copy in a temp folder changes nothing on the machine, the rule
+   * 0.507 made for Locust's own updates. A first-hour pass on 0.512 found the
+   * switch on in a fresh copy's Settings.
+   */
+  installed = true
 ): boolean {
   if (environment.LOCUST_UPDATE_AGENTS === '1') return true
-  return !argv.some((argument) => argument.startsWith('--remote-debugging-port'))
+  return installed && !argv.some((argument) => argument.startsWith('--remote-debugging-port'))
 }
 
 /** What a saved file holds, checked field by field: anything else is nothing saved. */

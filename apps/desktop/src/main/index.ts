@@ -2122,6 +2122,10 @@ if (!ownsSingleInstanceLock) {
      * again and the models re-read, so the new ones are in the picker.
      */
     const updatesFile = join(app.getPath('userData'), 'runtime-updates.json')
+    // A copy that is not the installed Locust changes nothing on the machine (0.514).
+    const agentsMayUpdate = mayUpdateAgents(process.argv, process.env, !app.isPackaged || existsSync(join(dirname(process.execPath), 'Uninstall Locust.exe')))
+    // And says so, rather than showing a switch that will not do what it says.
+    const toldHere = <T extends object>(state: T): T => (agentsMayUpdate ? state : { ...state, heldHere: true })
     const runtimeUpdates = createRuntimeUpdates({
       discover: discoverForWork,
       npmRoot: npmGlobalRoot,
@@ -2141,7 +2145,7 @@ if (!ownsSingleInstanceLock) {
         modelCatalog.forget()
       },
       changed: () => {
-        void runtimeUpdates.state().then((state) => {
+        void runtimeUpdates.state().then(toldHere).then((state) => {
           for (const window of BrowserWindow.getAllWindows()) {
             if (!window.isDestroyed()) window.webContents.send(RUNTIME_UPDATES_EVENT_CHANNEL, state)
           }
@@ -2149,17 +2153,17 @@ if (!ownsSingleInstanceLock) {
       }
     })
     ipcMain.handle(RUNTIME_UPDATES_CHANNEL, (event) =>
-      fromOwnWindow(event) ? runtimeUpdates.state() : { automatic: false, checkedAt: undefined, agents: [] }
+      fromOwnWindow(event) ? runtimeUpdates.state().then(toldHere) : { automatic: false, checkedAt: undefined, agents: [] }
     )
     ipcMain.handle(RUNTIME_UPDATES_SET_CHANNEL, (event, automatic: unknown) =>
-      fromOwnWindow(event) && typeof automatic === 'boolean' ? runtimeUpdates.setAutomatic(automatic) : runtimeUpdates.state()
+      (fromOwnWindow(event) && typeof automatic === 'boolean' ? runtimeUpdates.setAutomatic(automatic) : runtimeUpdates.state()).then(toldHere)
     )
     // Update pressed on a runtime's row. Only an id crosses the bridge, and
     // only one of the agents kept current is ever updated for it.
     ipcMain.handle(RUNTIME_UPDATES_NOW_CHANNEL, (event, runtime: unknown) =>
-      fromOwnWindow(event) && typeof runtime === 'string' ? runtimeUpdates.updateNow(runtime) : runtimeUpdates.state()
+      (fromOwnWindow(event) && typeof runtime === 'string' ? runtimeUpdates.updateNow(runtime) : runtimeUpdates.state()).then(toldHere)
     )
-    if (mayUpdateAgents(process.argv, process.env)) {
+    if (agentsMayUpdate) {
       setTimeout(() => void runtimeUpdates.tick(), FIRST_LOOK_AFTER_MS)
       setInterval(() => void runtimeUpdates.tick(), 60 * 60 * 1000)
     }
@@ -5809,7 +5813,10 @@ if (!ownsSingleInstanceLock) {
         )
         if (response.ok) {
           await assignOwner(peer?.self.teammateId, response.data.missionId)
-          await rememberRoute(peer?.self.teammateId, { runtime, model: model ?? 'account-default', mode, ...(effort === undefined ? {} : { effort }) })
+          // A review's read-only run is for that run alone (0.514): the saved route stays the teammate's.
+          if ((payload as { readonly keepSavedRoute?: unknown }).keepSavedRoute !== true) {
+            await rememberRoute(peer?.self.teammateId, { runtime, model: model ?? 'account-default', mode, ...(effort === undefined ? {} : { effort }) })
+          }
           // A rewind moves the teammate's conversation from the old tip to the new branch (0.498).
           await advanceHub(peer?.self.teammateId, rewindTip(payload) ?? followUpOf, response.data.missionId)
           // Only a rewind partway through: editing the first message keeps the old conversation as it was.

@@ -125,6 +125,7 @@ export function FirstLaunch({
   tube,
   swarmCalls = 0,
   freeStart = 'unknown',
+  onUseFree,
   workspacePath,
   teammateCount,
   onChooseFolder,
@@ -159,6 +160,8 @@ export function FirstLaunch({
    * not a hedge on silence.
    */
   readonly freeStart?: 'yes' | 'no' | 'unknown'
+  /** Puts the chat box on OpenCode's free model (0.514); absent when it already is. */
+  readonly onUseFree?: () => void
   readonly discoveryPhase: 'loading' | 'ready' | 'error'
   /** The boot screen's preference; the lockup's lighting follows it. Absent reads as full. */
   readonly tube?: TubePreference
@@ -435,6 +438,21 @@ export function FirstLaunch({
               * two was told on the first line that this was not for them.
               */}
             {freeStart === 'no' ? 'Your AI agents, on your own accounts.' : 'Your AI agents, on your own accounts. OpenCode works without one.'}
+            {/*
+              * THE SENTENCE, PRESSABLE (0.514). A first-hour pass on 0.512:
+              * Home said OpenCode works without an account while the chat box
+              * sat on Claude, and nothing to press said "start free". Shown
+              * only when it would change something: OpenCode has a free model
+              * and the chat box is not already on OpenCode.
+              */}
+            {freeStart === 'yes' && onUseFree !== undefined && (
+              <>
+                {' '}
+                <button type="button" className="lc-linkbutton" onClick={onUseFree}>
+                  Use a free model
+                </button>
+              </>
+            )}
           </p>
         )}
 

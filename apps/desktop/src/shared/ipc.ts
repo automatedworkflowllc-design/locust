@@ -550,6 +550,8 @@ export interface RuntimeUpdatesState {
   /** When npm was last asked; undefined before the first look. */
   readonly checkedAt: string | undefined
   readonly agents: readonly RuntimeUpdateView[]
+  /** This launch never updates the machine's agents on its own: a copy, or a scripted run (0.514). */
+  readonly heldHere?: true
 }
 
 export type RuntimeInstallResponse =
@@ -2239,6 +2241,8 @@ export interface CodexMissionStartRequest {
    */
   /** `setAside`: the turns the edit sets aside (0.512); their unread messages are never delivered. */
   readonly rewind?: { readonly tip: string; readonly setAside?: readonly string[] }
+  /** This run's mode is for it alone (0.514, a review in Ask): the teammate's saved route is not changed. */
+  readonly keepSavedRoute?: true
   /** Raw picker identity before an effort choice expands a model variant. */
   readonly modelChoice?: string
   /** Only a person's picker change this session, addressed to this teammate. */

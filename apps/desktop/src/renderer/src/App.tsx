@@ -112,7 +112,7 @@ import { folderLabels } from '../../shared/folder-sections.js'
 import { nestedUnder } from '../../shared/nested-conversations.js'
 import { defaultComparePicks } from './compareDefaults.js'
 import { effortName } from './effortLevels.js'
-import { composerRouteFor, startAs } from '../../shared/route-at-start.js'
+import { asReviewer, composerRouteFor, startAs } from '../../shared/route-at-start.js'
 import type { StartAs } from '../../shared/route-at-start.js'
 import type { Screen } from './components/Screens.js'
 import { Icon } from './components/Icon.js'
@@ -3991,6 +3991,8 @@ export default function App(): ReactElement {
         modelChoice: route.model,
         ...(teammateId !== undefined && pickerRoutes.has(teammateId) ? { routeOverrideFor: teammateId } : {}),
         ...(teammateId === undefined ? {} : { teammateId }),
+        // A review's Ask is for that run only (0.514): the host leaves the saved route alone.
+        ...(as?.oneOff === true ? { keepSavedRoute: true } : {}),
         ...(continuing === undefined ? {} : { followUpOf: continuing.data!.missionId }),
         ...(rewind === undefined ? {} : { ...(rewind.before === undefined ? {} : { followUpOf: rewind.before }), rewind: { tip: rewind.tip, ...(rewind.setAside === undefined ? {} : { setAside: rewind.setAside }) } })
       })
@@ -5564,7 +5566,7 @@ export default function App(): ReactElement {
      * ordinary mission of the reviewer's, on their own route, as a new
      * conversation of theirs.
      */
-    void startMission(reviewBrief(material), undefined, { as: startAs(reviewer, { route, mode, effort }, pickerRoutes) })
+    void startMission(reviewBrief(material), undefined, { as: asReviewer(startAs(reviewer, { route, mode, effort }, pickerRoutes)) })
   }
   /**
    * A3.1: the same review from two teammates on DIFFERENT coding agents, at
@@ -5584,7 +5586,7 @@ export default function App(): ReactElement {
     selectTeammate(pair[0].teammateId)
     void (async () => {
       for (const reviewer of pair) {
-        await startMission(brief, undefined, { as: startAs(reviewer, { route, mode, effort }, pickerRoutes) })
+        await startMission(brief, undefined, { as: asReviewer(startAs(reviewer, { route, mode, effort }, pickerRoutes)) })
       }
     })()
   }
@@ -6968,6 +6970,12 @@ export default function App(): ReactElement {
                 rosterUnreadable={unreadableStores.includes('teammates')}
                 runtimes={runtimes}
                 freeStart={freeStartStillFree(runtimes, models)}
+                {...((() => {
+                  // The free model, by the catalogue's own first free entry (0.514).
+                  if (route.runtime === 'opencode') return {}
+                  const free = freeStartModel('opencode', models)
+                  return free === undefined ? {} : { onUseFree: () => changeRoute({ runtime: 'opencode', model: free }) }
+                })())}
                 limitedRuntimes={limitedRuntimes}
                 usageWindows={usageWindows}
                 discoveryPhase={runtimeState.phase}

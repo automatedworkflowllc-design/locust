@@ -11,6 +11,30 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.514.0 - 2026-10-01
+
+### Changed
+
+- **Starting free is one press.** Home's "OpenCode works without one" now
+  ends in **Use a free model**, which puts the chat box on OpenCode's free
+  model. It shows only when the chat box is not already on OpenCode.
+- **A new teammate's model comes first.** In the new-teammate form, and when
+  editing one, the model sits right under the name, before how the teammate
+  looks, its role and its connectors, so you see what it will run on before
+  you press Create.
+- **Connectors have readable names** in a teammate's settings ("Zoho
+  Projects", not `plugin:small-business:zoho-projects`); the full name is
+  still there on hover.
+- **A review only reads.** "Ask … for a review" now runs that review in Ask,
+  so the reviewer cannot change your files. It is for that review only: the
+  reviewer keeps the mode you gave them.
+
+### Fixed
+
+- **A copy of Locust leaves the machine's agents alone.** A copy that is not
+  the installed Locust no longer updates Codex CLI or Copilot CLI on its own,
+  and its Settings says so instead of showing a switch that would.
+
 ## 0.513.0 - 2026-10-01
 
 ### Fixed

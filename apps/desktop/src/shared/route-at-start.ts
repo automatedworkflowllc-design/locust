@@ -79,6 +79,21 @@ export interface StartAs {
   readonly route: PickerRoute
   readonly mode: MissionMode
   readonly effort: string | undefined
+  /** This run's mode is for this run only: the teammate's saved route stays as it was (0.514). */
+  readonly oneOff?: true
+}
+
+/**
+ * A REVIEW READS; IT DOES NOT EDIT (0.514). Two long passes (0.509, 0.512)
+ * found "Ask <reviewer> for a review" running in the reviewer's saved Edit
+ * mode. The reviewer contract already says "edit nothing"; Ask makes the
+ * runtime hold to it, as Claude Code's own review is read-only. For this run
+ * only -- the reviewer's saved mode is theirs. Antigravity cannot be held to
+ * Ask (it runs its own agent), so it keeps the mode it has.
+ */
+export function asReviewer(as: StartAs): StartAs {
+  if (as.route.runtime === 'antigravity' || as.mode === 'ask' || as.mode === 'plan') return as
+  return { ...as, mode: 'ask', oneOff: true }
 }
 
 export function startAs(

@@ -2003,7 +2003,17 @@ export function SettingsScreen({
             * interfering with the app". The models are read from each agent;
             * this keeps the two agents that never update themselves current.
             */}
-          {runtimeUpdates !== undefined && onKeepAgentsCurrent !== undefined && (
+          {/* A copy that is not the installed Locust leaves the machine's agents alone, and says so (0.514). */}
+          {runtimeUpdates?.heldHere === true && (
+            <div className="lc-settingrows">
+              <div className="lc-settingrow">
+                <span className="lc-settings__note">
+                  This copy is not the installed Locust, so it never updates the agents on this machine on its own. The installed Locust keeps them current.
+                </span>
+              </div>
+            </div>
+          )}
+          {runtimeUpdates !== undefined && runtimeUpdates.heldHere !== true && onKeepAgentsCurrent !== undefined && (
             <div className="lc-settingrows">
               <div className="lc-settingrow">
                 <span className="lc-settings__note">{keepCurrentNote(runtimeUpdates.automatic)}</span>
