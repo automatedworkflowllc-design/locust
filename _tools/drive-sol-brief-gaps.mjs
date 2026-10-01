@@ -28,9 +28,13 @@ const drive = await startDrive({
   outPath: join(recordRoot('sol-brief-gaps-2026-09-30'), tag),
   seed: {
     schemaVersion: 1,
-    teammates: [{ teammateId: 'tm_ash', name: 'Ash', hue: 'clay', role: 'Custom', roleTitle: 'Helper', createdAt: '2026-09-05T05:00:00.000Z', route: FREE_ROUTE }],
+    teammates: [
+      { teammateId: 'tm_ash', name: 'Ash', hue: 'clay', role: 'Custom', roleTitle: 'Helper', createdAt: '2026-09-05T05:00:00.000Z', route: FREE_ROUTE },
+      // Someone who had Finances on before 0.510: its teammate stays, an ordinary one.
+      { teammateId: 'tm_fin', name: 'Finances', hue: 'teal', role: 'Custom', roleTitle: 'Reads the statements you put in its folder', createdAt: '2026-09-30T05:00:00.000Z', route: { runtime: 'codex', model: 'account-default', mode: 'ask' } }
+    ],
     missionOwners: {},
-    settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off' }
+    settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', financesPlace: true }
   }
 })
 let failures = 0
@@ -47,8 +51,11 @@ const thread = `JSON.stringify({
   running: !!document.querySelector('button[aria-label^="Stop the running"]')
 })`
 const settingsPage = (page) => `(async () => {
-  ;[...document.querySelectorAll('button')].find((b) => b.innerText.replace(/\\s+/g, ' ').trim() === 'Settings')?.click()
-  await new Promise((r) => setTimeout(r, 700))
+  // Opened only if it is not open already: a second click on Settings closes it.
+  if (!document.querySelector('.lc-settings__navitem')) {
+    ;[...document.querySelectorAll('button')].find((b) => b.innerText.replace(/\\s+/g, ' ').trim() === 'Settings')?.click()
+    await new Promise((r) => setTimeout(r, 700))
+  }
   ;[...document.querySelectorAll('.lc-settings__navitem')].find((b) => new RegExp(${JSON.stringify(page)}).test(b.innerText))?.click()
   await new Promise((r) => setTimeout(r, 700))
 })()`
@@ -132,7 +139,9 @@ try {
     heading: [...document.querySelectorAll('.lc-settings__heading')].some((h) => /Finances/.test(h.innerText)),
     sidebar: ${sidebarHasFinances}
   })`))))
-  check('Finances is gone: no switch, no heading, no sidebar row (0.510)', !finances.switch && !finances.heading && !finances.sidebar, JSON.stringify(finances))
+  check('Finances is gone, even for someone who had it on: no switch, no heading, no sidebar row (0.510)', !finances.switch && !finances.heading && !finances.sidebar, JSON.stringify(finances))
+  const kept = JSON.parse(await readFile(join(drive.profile, 'teammates.json'), 'utf8').catch(() => '{}'))
+  check('and their Finances teammate is still there, an ordinary teammate', (kept.teammates ?? []).some((t) => t.teammateId === 'tm_fin' && t.name === 'Finances'), JSON.stringify((kept.teammates ?? []).map((t) => t.name)))
 
   // Settings > Runtimes: Codex's row, recorded for a person to read.
   await drive.evaluate(settingsPage('Runtimes'))
