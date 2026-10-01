@@ -11,6 +11,22 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.520.0 - 2026-10-01
+
+### New
+
+- **Ask a judge in Compare.** Once two answers are in, you can ask another
+  model for its view: it reads the answers without knowing which model wrote
+  which, against what you say a good answer does if you want to say, and
+  tells you what each did well, what each missed, and which it would keep.
+  It is a view, not a decision: you still keep the answer yourself.
+
+### Fixed
+
+- **In a comparison, the line above the box no longer says your message
+  goes to one AI agent with a summary.** A question asked there goes to
+  every model in the comparison.
+
 ## 0.519.0 - 2026-10-01
 
 ### New
