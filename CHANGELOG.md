@@ -11,6 +11,25 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.519.0 - 2026-10-01
+
+### New
+
+- **Compare keeps your record as a table.** Once you keep an answer, the
+  comparison shows every model you have compared: how often you kept it,
+  and how long its answers typically took and what they typically cost, so
+  the strong-and-cheap one stands out.
+
+### Improved
+
+- **"Own branch" is now "Own copy".** The switch on a teammate's card says
+  what it does: the teammate works in its own copy of the folder. The
+  branch it works on is still named under it.
+- **A switch to another AI agent still says what it left out after you
+  reopen the conversation.** The line under the divider used to disappear
+  once the conversation was closed, and it now names the parts in plain
+  words ("its last reply", "the earlier messages").
+
 ## 0.518.0 - 2026-10-01
 
 ### Improved
