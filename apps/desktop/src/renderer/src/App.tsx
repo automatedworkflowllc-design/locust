@@ -4857,6 +4857,24 @@ export default function App(): ReactElement {
     if (listed.ok) setRoutines(listed.data.routines)
   }
 
+  /**
+   * A routine written from nothing (0.530): one empty step, on the picked
+   * teammate's own route (or the dialog asks who runs it), learned from no
+   * conversation. Sol's 0.528 pass had no other way in than replaying one.
+   */
+  const openNewRoutine = (): void => {
+    const teammate = pickedTeammate ?? (teammates.length === 1 ? teammates[0] : undefined)
+    setRoutineDialog({
+      teammateId: teammate?.teammateId,
+      name: '',
+      steps: [''],
+      learnedFrom: [],
+      truncated: false,
+      busy: false,
+      ...(teammate?.route === undefined ? {} : { route: teammate.route })
+    })
+  }
+
   /** Open the dialog on a draft taken from a finished conversation. */
   const openSaveRoutine = (missionId: string): void => {
     const mission = historyByIdRef.current.get(missionId)
@@ -4946,6 +4964,8 @@ export default function App(): ReactElement {
     readonly handOffs?: readonly RoutineHandOff[]
     /** Who runs it, when the conversation had no owner to inherit. */
     readonly teammateId?: string
+    /** Set only when the person changed what a run may do (0.530). */
+    readonly readsOnly?: boolean
   }): void => {
     const bridge = window.desktop
     const dialog = routineDialog
@@ -4964,7 +4984,10 @@ export default function App(): ReactElement {
      * dialog's: the teammate's own route, else what the dialog worked out.
      */
     const named = teammates.find((entry) => entry.teammateId === owner)?.route
-    const route = named ?? dialog.route ?? { runtime: 'codex' as const, model: 'account-default', mode: 'ask' as const }
+    const inherited = named ?? dialog.route ?? { runtime: 'codex' as const, model: 'account-default', mode: 'ask' as const }
+    // "Only read" is Ask; "Change files" from a read-only mode is Edit; otherwise the mode stays as it was.
+    const chosenMode: MissionMode | undefined = input.readsOnly === undefined ? undefined : input.readsOnly ? 'ask' : 'accept-edits'
+    const route = chosenMode === undefined ? inherited : { ...inherited, mode: chosenMode }
     if (dialog.routineId === undefined && owner === undefined) {
       setRoutineDialog({ ...dialog, busy: false, error: 'Choose which teammate runs this routine.' })
       return
@@ -4982,7 +5005,7 @@ export default function App(): ReactElement {
             ...(input.handOffs === undefined ? {} : { handOffs: input.handOffs })
           })
         : // null clears a schedule the routine had; the store leaves an absent one alone.
-          bridge.updateRoutine({ routineId: dialog.routineId, name: input.name, steps: input.steps, schedule: input.schedule ?? null, ...(input.handOffs === undefined ? {} : { handOffs: input.handOffs }) })
+          bridge.updateRoutine({ routineId: dialog.routineId, name: input.name, steps: input.steps, schedule: input.schedule ?? null, ...(input.handOffs === undefined ? {} : { handOffs: input.handOffs }), ...(chosenMode === undefined ? {} : { mode: chosenMode }) })
     void request
       .then(async (response) => {
         if (!response.ok) {
@@ -6904,6 +6927,7 @@ export default function App(): ReactElement {
               missions={sidebarMissions}
               folders={folders}
               onSaveRoutine={openSaveRoutine}
+              onNewRoutine={openNewRoutine}
             />
           ) : screen === 'rooms' ? (
             <RoomScreen
@@ -8396,10 +8420,11 @@ export default function App(): ReactElement {
           {...(routineDialog.handOffs === undefined ? {} : { initialHandOffs: routineDialog.handOffs })}
           truncated={routineDialog.truncated}
           editing={routineDialog.routineId !== undefined}
+          fresh={routineDialog.routineId === undefined && routineDialog.learnedFrom.length === 0}
           running={routineDialog.running === true}
           {...(() => {
             const mode = routineDialog.savedMode ?? routineDialog.route?.mode
-            return mode === undefined ? {} : { modeName: modeFacts(mode).name }
+            return mode === undefined ? {} : { modeName: modeFacts(mode).name, modeReadsOnly: mode === 'ask' || mode === 'plan' }
           })()}
           routeLabel={
             routineDialog.route === undefined

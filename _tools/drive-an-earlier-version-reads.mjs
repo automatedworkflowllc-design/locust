@@ -79,7 +79,11 @@ const check = (what, ok, detail) => {
 const viewer = `JSON.stringify({
   note: document.querySelector('.lc-viewer .lc-viewer__versionnote')?.innerText.replace(/\\s+/g, ' ').trim() ?? '',
   prose: document.querySelector('.lc-viewer .lc-viewer__scroll .lc-viewer__prose, .lc-viewer .lc-viewer__prose')?.innerText.replace(/\\s+/g, ' ').trim() ?? '',
-  diff: !!document.querySelector('.lc-viewer .lc-diff, .lc-viewer [class*="lc-diff"]'),
+  diff: !!document.querySelector('.lc-viewer .lc-diff, .lc-viewer [class*="lc-diff"]:not([class*="lc-docchange"])'),
+  // 0.530: a document's change reads as its words, each passage as a reader sees it.
+  words: [...document.querySelectorAll('.lc-viewer .lc-docchange__passage')].map((p) => p.innerText.replace(/\\s+/g, ' ').trim()),
+  struck: [...document.querySelectorAll('.lc-viewer .lc-docchange del')].map((d) => d.innerText.trim()),
+  marked: [...document.querySelectorAll('.lc-viewer .lc-docchange ins')].map((d) => d.innerText.trim()),
   chips: [...document.querySelectorAll('.lc-viewer .lc-viewer__version')].map((b) => b.innerText.trim())
 })`
 const press = (label) => `(async () => {
@@ -104,9 +108,14 @@ try {
   const first = JSON.parse(String(await drive.capture('turn 1, as it was', () => drive.evaluate(press('1')))))
   check('turn 1 reads as the document it was: Monday, and no third line', /The file as it was after turn 1\./.test(first.note) && /Ship on Monday/.test(first.prose) && !/Tuesday|Tell the team/.test(first.prose) && !first.diff, JSON.stringify(first))
   const change = JSON.parse(String(await drive.capture('turn 1, what it changed', () => drive.evaluate(press('What turn 1 changed')))))
-  check('what that turn changed is one press away, as the change', /What turn 1 changed/.test(change.note) && change.diff, JSON.stringify(change))
+  check('what that turn changed is one press away, in the document\'s words: it added the heading and the line', /What turn 1 changed/.test(change.note) && !change.diff && JSON.stringify(change.marked) === JSON.stringify(['Plan', 'Ship on Monday']), JSON.stringify(change))
   const second = JSON.parse(String(await drive.capture('turn 2, as it was', () => drive.evaluate(press('2')))))
   check('turn 2 reads as it was: Tuesday, still no third line', /Ship on Tuesday/.test(second.prose) && !/Tell the team/.test(second.prose), JSON.stringify(second))
+  const moved = JSON.parse(String(await drive.capture('turn 2, what it changed, in words', () => drive.evaluate(press('What turn 2 changed')))))
+  check('turn 2\'s change reads "Ship on Monday Tuesday", Monday struck and Tuesday marked, no @@ in sight', JSON.stringify(moved.struck) === '["Monday"]' && JSON.stringify(moved.marked) === '["Tuesday"]' && !moved.diff, JSON.stringify(moved))
+  const lines = JSON.parse(String(await drive.capture('the lines, one press away', () => drive.evaluate(press('Show the lines that changed')))))
+  check('the lines that changed are one press away', lines.diff && lines.words.length === 0, JSON.stringify(lines))
+  await drive.evaluate(press('Show it as words'))
   const back = JSON.parse(String(await drive.capture('Now again', () => drive.evaluate(press('Now')))))
   check('Now is the file as it is', /Ship on Tuesday/.test(back.prose) && /Tell the team/.test(back.prose), JSON.stringify(back))
 } catch (error) {

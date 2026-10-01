@@ -232,7 +232,14 @@ export function NewTeammateDialog({
   const [avatar, setAvatar] = useState<AvatarSpec>(
     () => initial?.avatar ?? seedAvatar(`draft_${Date.now()}_${Math.random()}`)
   )
-  const [role, setRole] = useState<TeammateRole>(initial?.role ?? 'Code & Migrations')
+  /*
+   * A NEW TEAMMATE STARTS NEUTRAL (0.530). It started as Code & Migrations --
+   * "Repo work, refactors, test runs", and starters about "the riskiest file in
+   * this repo" -- for everyone. Sol's 0.528 pass, as an operations lead with a
+   * folder of documents, got a programmer. Research & Briefs reads whatever the
+   * folder holds; Code is one click away for the people who want it.
+   */
+  const [role, setRole] = useState<TeammateRole>(initial?.role ?? 'Research & Briefs')
   const [roleTitle, setRoleTitle] = useState(initial?.roleTitle ?? '')
   const [worktree, setWorktree] = useState(initial?.worktree === true)
   /*

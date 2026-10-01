@@ -45,12 +45,18 @@ export function RoutineDialog({
   onCancel,
   editing: editingSaved,
   modeName,
+  modeReadsOnly,
+  fresh = false,
   running = false
 }: {
+  /** Written from nothing on the Routines screen (0.530), not saved from a conversation. */
+  readonly fresh?: boolean
   /** A saved routine is being corrected (0.493); absent, read off the other props as before. */
   readonly editing?: boolean
   /** The mode it runs in, saved with it, in the picker's word: "Ask", "Edit", "Auto". */
   readonly modeName?: string
+  /** That mode only reads (Ask, Plan): what a run may do to the folder is said from this, never assumed. */
+  readonly modeReadsOnly?: boolean
   /** A run of it is going now: that run keeps the steps it started with. */
   readonly running?: boolean
   readonly teammate: PublicTeammate | undefined
@@ -87,6 +93,8 @@ export function RoutineDialog({
     readonly name: string
     readonly steps: readonly string[]
     readonly schedule: RoutineSchedule | undefined
+    /** Set only when the person changed what a run may do (0.530). */
+    readonly readsOnly?: boolean
     readonly teammateId?: string
     /** Who takes each step, in step order; absent when no choice was offered. */
     readonly handOffs?: readonly RoutineHandOff[]
@@ -94,8 +102,12 @@ export function RoutineDialog({
   readonly onCancel: () => void
 }): ReactElement {
   const editing = editingSaved ?? (initialSteps.length > 0 && routeLabel === undefined)
+  const title = editing ? 'Edit routine' : fresh ? 'New routine' : 'Save as routine'
   const [name, setName] = useState(initialName)
   const [steps, setSteps] = useState<readonly string[]>(initialSteps)
+  // What a run may do to the folder (0.530): chosen here, not inherited unseen.
+  const [readsOnly, setReadsOnly] = useState(modeReadsOnly === true)
+  const shownMode = readsOnly ? 'Ask' : modeReadsOnly === true ? 'Edit' : modeName
   // One entry per step, kept in step with every add and remove (0.435).
   const [handOffs, setHandOffs] = useState<readonly RoutineHandOff[]>(
     initialSteps.map((_, index) => initialHandOffs?.[index] ?? {})
@@ -127,9 +139,9 @@ export function RoutineDialog({
 
   return (
     <div className="lc-scrim">
-      <div ref={box} className="lc-dialog" role="dialog" aria-modal="true" aria-label={editing ? 'Edit routine' : 'Save as routine'}>
+      <div ref={box} className="lc-dialog" role="dialog" aria-modal="true" aria-label={editing ? 'Edit routine' : fresh ? 'New routine' : 'Save as routine'}>
         <div className="lc-dialog__head">
-          <span className="lc-dialog__title">{editing ? 'Edit routine' : 'Save as routine'}</span>
+          <span className="lc-dialog__title">{title}</span>
           <span className="lc-dialog__sub lc-mono">replayed step by step</span>
           <button type="button" className="lc-dialog__close" aria-label="Close" onClick={onCancel}>
             ×
@@ -155,14 +167,51 @@ export function RoutineDialog({
             <p className="lc-dialog__note lc-mono">
               <TeammateBot hue={teammate.hue} avatar={teammate.avatar} size={16} /> {teammate.name} runs it
               {routeLabel === undefined ? '' : ` on ${routeLabel}`}
-              {modeName === undefined ? '' : `, in ${modeName}`}.
+              {shownMode === undefined ? '' : `, in ${shownMode}`}.
               {/*
                 * What a later run uses (0.493), said instead of "A routine saved
                 * read-only stays read-only" -- which sat on every routine, the
                 * ones that write included (Grok's 0.489 pass).
                 */}
-              {` Each run uses ${teammate.name}'s model at the time${modeName === undefined ? '' : `, and always ${modeName}`}.`}
+              {` Each run uses ${teammate.name}'s model at the time${shownMode === undefined ? '' : `, and always ${shownMode}`}.`}
             </p>
+          )}
+          {modeName !== undefined && (
+            <div className="lc-dialog__section">
+              <span className="lc-fieldlabel lc-mono" id="routine-may-label">
+                What a run may do
+              </span>
+              {/*
+                ONE CHOICE, SAID AT SAVE (0.530). A routine ran in whatever mode its
+                conversation happened to be in, and Sol's 0.528 pass watched a file
+                routine write into the folder while its dialog promised it changed
+                nothing. Now the person picks, and every sentence below follows it.
+              */}
+              <div className="lc-segmented" role="radiogroup" aria-labelledby="routine-may-label">
+                {(
+                  [
+                    [true, 'Only read'],
+                    [false, 'Change files']
+                  ] as const
+                ).map(([only, label]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    role="radio"
+                    aria-checked={readsOnly === only}
+                    className={`lc-button${readsOnly === only ? ' is-active' : ''}`}
+                    onClick={() => setReadsOnly(only)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <span className="lc-routinesched__detail lc-mono">
+                {readsOnly
+                  ? 'It reads and answers; nothing in the folder changes.'
+                  : 'What a run changes lands in the folder straight away, with nothing to keep or undo first.'}
+              </span>
+            </div>
           )}
           {running && (
             <p className="lc-dialog__note">
@@ -462,7 +511,16 @@ export function RoutineDialog({
                 )}
                 <p className="lc-dialog__note lc-mono">
                   A file that lands there starts a run once it stops changing, up to six an hour, and the run is told its name.
-                  What is there already starts nothing. It reads the file and changes nothing, as every routine runs in Ask.
+                  What is there already starts nothing.{' '}
+                  {/*
+                    SAID FROM THE MODE IT HAS (0.530). This read "It reads the file and changes
+                    nothing, as every routine runs in Ask" under a line saying "always Edit", and
+                    Sol's 0.528 pass watched an Edit run write receipts into the folder at once.
+                    A routine runs in the mode saved with it; so does this sentence.
+                  */}
+                  {readsOnly
+                    ? 'It reads the file and changes nothing.'
+                    : 'It may change files, and what it changes lands in the folder straight away.'}
                 </p>
               </div>
             )}
@@ -522,6 +580,8 @@ export function RoutineDialog({
                 name: name.trim(),
                 steps: kept.map((step) => step.trim()),
                 schedule,
+                // Only when it moved: an unchanged choice keeps the mode exactly as saved.
+                ...(modeName === undefined || readsOnly === (modeReadsOnly === true) ? {} : { readsOnly }),
                 ...(runner.length === 0 ? {} : { teammateId: runner }),
                 // Lined up with the steps that are kept (0.435).
                 ...(canHandOff ? { handOffs: steps.flatMap((step, at) => (step.trim().length > 0 ? [handOffs[at] ?? {}] : [])) } : {})

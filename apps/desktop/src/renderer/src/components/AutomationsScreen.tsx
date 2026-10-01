@@ -42,8 +42,11 @@ export function AutomationsScreen({
   onDismissNotice,
   missions,
   onSaveRoutine,
+  onNewRoutine,
   folders = []
 }: {
+  /** A routine written here, step by step, rather than saved from a conversation (0.530). */
+  readonly onNewRoutine?: () => void
   readonly routines: readonly PublicRoutine[]
   /** The folders Locust knows, so a routine's card names the one it runs in (0.512). */
   readonly folders?: readonly PublicFolder[]
@@ -109,6 +112,23 @@ export function AutomationsScreen({
         */}
       <ScreenHeader
         title="Routines"
+        {...(onNewRoutine === undefined
+          ? {}
+          : {
+              /*
+               * NEW ROUTINE, WRITTEN HERE (0.530). The rule above said a routine
+               * "cannot be made from nothing", so the only door was a finished
+               * conversation -- and Sol's 0.528 pass, as an office user, had to
+               * finish one, save it, and delete three of its four imported turns
+               * to get one clean job. Claude's own Routines starts from a blank
+               * task; so does this, with the same dialog.
+               */
+              actions: (
+                <button type="button" className="lc-ghostbutton" onClick={onNewRoutine}>
+                  New routine
+                </button>
+              )
+            })}
         meta={
           routines.length === 0
             ? 'none saved'
@@ -150,8 +170,8 @@ export function AutomationsScreen({
          */
         <div className="lc-empty">
           <p>
-            A routine is a conversation a teammate has been taught: the turns you typed, saved so they can be
-            replayed.
+            A routine is a job a teammate does again: steps you write, or the turns of a conversation you
+            save, replayed when you press Run or on a schedule.
           </p>
           {savable.length === 0 ? (
             /*

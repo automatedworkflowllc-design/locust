@@ -73,7 +73,7 @@ export function turnsLabel(turns: number | undefined): string {
  * is the old sentence's job gone: there is no gesture to name because there
  * is nothing to name it about.
  */
-export const NOTHING_TO_SAVE_YET = 'Finish a conversation and it can be saved here as a routine.'
+export const NOTHING_TO_SAVE_YET = 'Press New routine to write one, or finish a conversation and save it here.'
 
 /**
  * Whether the conversation on screen may be saved as a routine right now.

@@ -1477,6 +1477,8 @@ export interface RoutineUpdateRequest {
   readonly handOffs?: readonly RoutineHandOff[]
   /** `null` clears a schedule; absent leaves it as it was. */
   readonly schedule?: RoutineSchedule | null
+  /** The mode its runs use (0.530: "Only read" or "Change files" in the dialog); absent keeps it. */
+  readonly mode?: MissionMode
 }
 
 export type RoutineListResponse =

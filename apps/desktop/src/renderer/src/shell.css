@@ -16868,6 +16868,64 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+/* A document's change in its own words (0.530, DocumentChange.tsx): each passage
+   as a reader sees it, old words struck, new words marked, in the diff's colours. */
+.lc-docchange {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-4);
+  margin: 0;
+  padding: 0 var(--lc-space-5) var(--lc-space-5);
+  list-style: none;
+}
+
+.lc-docchange__passage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+  padding: var(--lc-space-4) var(--lc-space-5);
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-raised);
+}
+
+.lc-docchange__what {
+  font-size: var(--lc-text-mono-label);
+  letter-spacing: var(--lc-tracking-label-wide);
+  text-transform: uppercase;
+  color: var(--lc-text-muted);
+}
+
+.lc-docchange__words {
+  font-family: var(--lc-font-prose);
+  font-size: var(--lc-text-prose);
+  line-height: 1.6;
+  color: var(--lc-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.lc-docchange__words del {
+  background: var(--lc-diff-del-word);
+  color: var(--lc-diff-del-mark);
+  text-decoration: line-through;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+.lc-docchange__words ins {
+  background: var(--lc-diff-add-word);
+  color: var(--lc-diff-add-mark);
+  text-decoration: none;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+.lc-docchange__none {
+  margin: 0;
+  padding: 0 var(--lc-space-5) var(--lc-space-5);
+  color: var(--lc-text-muted);
+}
+
 /* Fits the pane rather than filling it: a chart a teammate made is usually
    wider than tall, and scaling it up past its own pixels makes it worse. */
 .lc-viewer__image {

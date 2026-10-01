@@ -94,11 +94,16 @@ describe('the routines shelf', () => {
 
   it('says the honest sentence when a workspace has finished nothing at all', () => {
     const html = shelf({ missions: [], onSaveRoutine: () => undefined })
-    expect(html).toContain('Finish a conversation and it can be saved here as a routine.')
+    expect(html).toContain('Press New routine to write one, or finish a conversation and save it here.')
     expect(html).not.toContain('right-click')
-    // No New routine: a routine cannot be made from nothing, and a blank form
-    // would be a lie about what it is.
-    expect(html).not.toContain('New routine')
+  })
+
+  it('offers New routine, written from nothing, where the screen is given one (0.530, Sol\'s 0.528 pass)', () => {
+    // This said the opposite until 0.530 -- "a routine cannot be made from
+    // nothing" -- and an office user had to finish, save and prune a
+    // conversation to get one clean job. Claude's own Routines starts blank.
+    expect(shelf({ missions: [], onSaveRoutine: () => undefined, onNewRoutine: () => undefined })).toMatch(/<button[^>]*>New routine<\/button>/)
+    expect(shelf({ missions: [], onSaveRoutine: () => undefined })).not.toMatch(/<button[^>]*>New routine<\/button>/)
   })
 })
 

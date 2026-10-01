@@ -8,6 +8,8 @@ import { Icon } from './Icon.js'
 import { SheetView } from './SheetView.js'
 import { DocumentView } from './DocumentView.js'
 import { fileAsItWas } from '../fileVersions.js'
+import { documentChanges } from '../documentChange.js'
+import { DocumentChange } from './DocumentChange.js'
 import type { OfficeDocument } from '../../../shared/office-document.js'
 import type { Workbook } from '../../../shared/sheet.js'
 import { quoteOfPagePick, VIEWER_FRAME_NAME } from '../../../shared/page-pick.js'
@@ -80,6 +82,8 @@ export function FileViewer({
   const [showing, setShowing] = useState<number>()
   /** An earlier turn's version read as its change rather than as the file it was (0.517). */
   const [asChange, setAsChange] = useState(false)
+  // A document's change reads as its words (0.530); the lines are a click away.
+  const [asLines, setAsLines] = useState(false)
   const [asSource, setAsSource] = useState(false)
   const [reloads, setReloads] = useState(0)
   const [pointing, setPointing] = useState<'idle' | 'pointing' | { readonly said: string }>('idle')
@@ -247,7 +251,28 @@ export function FileViewer({
             ) : null}
             {rebuilt?.ok === true ? null : <>The file itself is under <strong>Now</strong>.</>}
           </p>
-          <DiffView key={showing} file={version.file} truncated={version.truncated} reported={version.reported} />
+          {mode === 'markdown' && !asLines ? (
+            <>
+              <DocumentChange passages={documentChanges(version.file)} />
+              <p className="lc-viewer__versionnote">
+                {version.truncated ? 'Part of this change was recorded cut short. ' : ''}
+                <button type="button" className="lc-linkbutton" onClick={() => setAsLines(true)}>
+                  Show the lines that changed
+                </button>
+              </p>
+            </>
+          ) : (
+            <>
+              {mode === 'markdown' && (
+                <p className="lc-viewer__versionnote">
+                  <button type="button" className="lc-linkbutton" onClick={() => setAsLines(false)}>
+                    Show it as words
+                  </button>
+                </p>
+              )}
+              <DiffView key={showing} file={version.file} truncated={version.truncated} reported={version.reported} />
+            </>
+          )}
         </div>
       ) : running ? (
         /*

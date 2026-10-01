@@ -63,7 +63,7 @@ export interface RoutineStore {
     readonly handOffs?: unknown
   }): Promise<PublicRoutine>
   /** Corrections: the name, the steps, who takes them, and the schedule (`null` clears it). The teammate, route and provenance stay. */
-  update(input: { readonly routineId: unknown; readonly name: unknown; readonly steps: unknown; readonly schedule?: unknown; readonly handOffs?: unknown }): Promise<PublicRoutine>
+  update(input: { readonly routineId: unknown; readonly name: unknown; readonly steps: unknown; readonly schedule?: unknown; readonly handOffs?: unknown; readonly mode?: unknown }): Promise<PublicRoutine>
   remove(routineId: unknown): Promise<void>
   /** Count reconciled final completion and clear its matching progress in one write. */
   recordRun(routineId: unknown, attemptId: string): Promise<void>
@@ -353,7 +353,10 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
           throw new Error(SCHEDULE_REFUSAL)
         }
         if (input.handOffs !== undefined && !validHandOffs(input.handOffs, input.steps.length)) throw new Error('Who takes each step does not line up with the steps')
-        const { schedule: _held, handOffs: heldHandOffs, ...rest } = held
+        // A new mode for its runs (0.530), checked as a whole route is on create.
+        const route = input.mode === undefined ? held.route : { ...held.route, mode: input.mode }
+        if (!isTeammateRoute(route)) throw new Error('Routine route is invalid')
+        const { schedule: _held, handOffs: heldHandOffs, ...rest } = { ...held, route }
         // Given: as given. Not given: kept only while the steps still line up.
         const handOffs = input.handOffs !== undefined
           ? keptHandOffs(input.handOffs, held.teammateId)

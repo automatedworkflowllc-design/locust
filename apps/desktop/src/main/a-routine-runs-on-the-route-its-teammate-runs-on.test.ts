@@ -39,7 +39,7 @@ describe('a routine runs on the route its teammate runs on', () => {
 
   it('saves the route of the teammate the person named in the dialog', () => {
     expect(APP).toContain("const named = teammates.find((entry) => entry.teammateId === owner)?.route")
-    expect(APP).toContain('const route = named ?? dialog.route ??')
+    expect(APP).toContain('const inherited = named ?? dialog.route ??')
     // And that is what is sent, rather than the route decided before the
     // question was asked.
     expect(APP).not.toContain("route: dialog.route ?? { runtime: 'codex', model: 'account-default', mode: 'ask' },")

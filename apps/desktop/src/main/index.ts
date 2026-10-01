@@ -61,6 +61,7 @@ import { execFile } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
 import { MAX_PROMPT_LENGTH, createCodexMissionService, runtimeThreadIdOf } from './codex-mission.js'
 import { chosenLeaveOut } from './handoff.js'
+import { officeWordsSection } from './office-words.js'
 import { openInTerminal, terminalRequestFor } from './open-in-terminal.js'
 import { createTerminalCatchUp, createTerminalImports, createTranscriptReader, transcriptPathFor } from './terminal-catch-up.js'
 import { importSession, listImportableSessions } from './session-import.js'
@@ -1544,6 +1545,9 @@ if (!ownsSingleInstanceLock) {
         if (peer?.cwd === undefined && brief === undefined) {
           sections.push(whereSection(here.name))
         }
+        // Word and PowerPoint words as text, readable in any mode (0.530, office-words.ts).
+        const officeWords = await officeWordsSection(peer?.cwd ?? here.path).catch(() => undefined)
+        if (officeWords !== undefined) sections.push(officeWords)
         /*
          * The group's standing instructions, after the folder's and before
          * memory. Only when this conversation is in a group that has some:
@@ -5335,7 +5339,8 @@ if (!ownsSingleInstanceLock) {
           name: input.name,
           steps: input.steps,
           ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
-          ...(input.handOffs === undefined ? {} : { handOffs: input.handOffs })
+          ...(input.handOffs === undefined ? {} : { handOffs: input.handOffs }),
+          ...(input.mode === undefined ? {} : { mode: input.mode })
         })
         return { ok: true, data: { routine } } as const
       } catch (error) {

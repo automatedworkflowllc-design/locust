@@ -325,6 +325,17 @@ describe('who takes each step, as the store keeps it', () => {
     await expect(routines.create({ ...base, handOffs: [{}, { teammateId: '../../x' }, {}] })).rejects.toThrow(/does not line up/)
   })
 
+  it('changes what a run may do on an edit, and refuses a mode that is not one (0.530)', async () => {
+    const routines = await store()
+    const made = await routines.create({ ...base, route: { ...base.route, mode: 'accept-edits' } })
+    const read = await routines.update({ routineId: made.routineId, name: 'Chain', steps: base.steps, mode: 'ask' })
+    expect(read.route.mode).toBe('ask')
+    expect((await routines.get(made.routineId))?.route).toEqual({ ...made.route, mode: 'ask' })
+    // Not given: kept.
+    expect((await routines.update({ routineId: made.routineId, name: 'Chain', steps: base.steps })).route.mode).toBe('ask')
+    await expect(routines.update({ routineId: made.routineId, name: 'Chain', steps: base.steps, mode: 'root' })).rejects.toThrow(/route is invalid/)
+  })
+
   it('stores nothing when every step is the routine\'s own teammate\'s', async () => {
     const routines = await store()
     expect((await routines.create({ ...base, handOffs: [{}, { teammateId: 'tm_wren' }, {}] })).handOffs).toBeUndefined()
