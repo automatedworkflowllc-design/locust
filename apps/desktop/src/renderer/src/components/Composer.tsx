@@ -266,6 +266,8 @@ export interface ComposerProps {
     readonly onCancel: () => void
     /** The files the replies after it changed (0.502): put back too, if ticked. */
     readonly files?: { readonly count: number; readonly on: boolean; readonly onToggle: () => void }
+    /** Some of those cannot go back exactly, so none are offered (0.512). */
+    readonly filesHeld?: { readonly total: number; readonly cannot: number }
   }
   /**
    * Notes the person pinned to lines of a diff in this conversation
@@ -1360,9 +1362,11 @@ export function Composer({
             <div className="lc-queued__meta">
               <Icon name="pencil" size={12} />
               <span className="lc-queued__note">
-                {editingEarlier.files === undefined
-                  ? 'Editing an earlier message — sending starts again from there. Files stay as they are.'
-                  : 'Editing an earlier message — sending starts again from there.'}
+                {editingEarlier.filesHeld !== undefined
+                  ? `Editing an earlier message — sending starts again from there. Files stay as they are: ${editingEarlier.filesHeld.cannot === 1 ? '1' : String(editingEarlier.filesHeld.cannot)} of the ${String(editingEarlier.filesHeld.total)} files the replies changed cannot be put back exactly, and putting back only the others could leave the project half changed.`
+                  : editingEarlier.files === undefined
+                    ? 'Editing an earlier message — sending starts again from there. Files stay as they are.'
+                    : 'Editing an earlier message — sending starts again from there.'}
               </span>
               {editingEarlier.files !== undefined && (
                 <label className="lc-queued__check">

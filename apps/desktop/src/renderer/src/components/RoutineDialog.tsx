@@ -21,6 +21,7 @@ export function RoutineDialog({
   teammate,
   chooseFrom,
   initialName,
+  folder,
   initialSteps,
   initialSchedule,
   team,
@@ -53,6 +54,8 @@ export function RoutineDialog({
    */
   readonly chooseFrom?: readonly PublicTeammate[]
   readonly initialName: string
+  /** The folder a schedule runs it in (0.512): its own, or the one it is being made in. */
+  readonly folder?: { readonly name: string; readonly path: string }
   readonly initialSteps: readonly string[]
   /** When it runs on its own, if it does. Undefined: only when a person presses Run. */
   readonly initialSchedule: RoutineSchedule | undefined
@@ -381,6 +384,7 @@ export function RoutineDialog({
               <p className="lc-dialog__note lc-mono">
                 Only while Locust is open, and only when {teammate?.name ?? 'the teammate'} is free. A run missed while
                 Locust was closed happens once, the next time it is open.
+                {folder !== undefined && <span title={folder.path}>{` On a schedule it runs in ${folder.name}.`}</span>}
               </p>
             )}
           </div>

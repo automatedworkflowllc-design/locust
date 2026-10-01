@@ -15,7 +15,7 @@ import { runtimeDisplayName } from '../../shared/runtimes.js'
 import { stripTaskBlocks } from '../../shared/room-task.js'
 import { stripMemoryBlocks } from '../../shared/memory.js'
 import { parseDecision, stripDecisionBlocks } from '../../shared/decision.js'
-import { parseFileBlocks, stripFileBlocks } from '../../shared/handover.js'
+import { parseFileBlocks, refusedFileLines, stripFileBlocks } from '../../shared/handover.js'
 import type { HandedFile } from '../../shared/handover.js'
 import type { DecisionRequest } from '../../shared/decision.js'
 import { isTidyPrompt } from '../../shared/memory-tidy.js'
@@ -3420,8 +3420,10 @@ export function buildThread(
      */
     const handed = parseFileBlocks(message.text)
     const handedNow = handed.length > 0 && (message.final || !options.running)
+    // A file it handed over that is not drawn says so, rather than nothing (0.512).
+    const refused = message.final || !options.running ? refusedFileLines(message.text) : []
     // Nothing on screen: it does not split the steps around it.
-    if (text.length === 0 && !handedNow) continue
+    if (text.length === 0 && !handedNow && refused.length === 0) continue
     flush()
     if (text.length > 0) {
       items.push({
@@ -3434,6 +3436,14 @@ export function buildThread(
       })
     }
     if (handedNow) items.push({ key: `files_${message.itemId}`, type: 'files', files: handed })
+    if (refused.length > 0) {
+      items.push({
+        key: `files_refused_${message.itemId}`,
+        type: 'diagnostic',
+        level: 'warning',
+        message: `Not shown as a file: ${refused.map((file) => file.path).join(', ')} -- ${refused.length === 1 ? 'it is' : 'they are'} outside the folder this conversation works in, so Locust does not open ${refused.length === 1 ? 'it' : 'them'} from here.`
+      })
+    }
   }
   flush()
 

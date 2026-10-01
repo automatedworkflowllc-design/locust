@@ -1,5 +1,5 @@
 import { BLOCK_PLACEMENT } from './trailer.js'
-import { blocksOutsideCode, defangProtocolBlocks } from './protocolTags.js'
+import { blocksOutsideCode, defangProtocolBlocks, stripBlocksOutsideCode } from './protocolTags.js'
 /**
  * The task block: how a teammate claims, finishes, hands off or adds a task
  * on a room's board, the same way a share block reaches a teammate.
@@ -105,7 +105,7 @@ export function parseTaskBlocks(text: string): readonly TaskOp[] {
 
 /** The reply without its task blocks; the board shows what they did. */
 export function stripTaskBlocks(text: string): string {
-  return text.replace(BLOCK, '').replace(/\n{3,}/g, '\n\n').trimEnd()
+  return stripBlocksOutsideCode(text, BLOCK).replace(/\n{3,}/g, '\n\n').trimEnd()
 }
 
 /** Defang the tags in text quoted into another runtime's prompt -- every protocol tag. */

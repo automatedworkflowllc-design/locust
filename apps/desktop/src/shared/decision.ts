@@ -240,9 +240,16 @@ export function stripDecisionBlocks(text: string): string {
    */
   const outside = blocksOutsideCode(text, BLOCK)
   const card = outside.find((match) => readBlock(match[1] ?? '') !== undefined)?.index
-  const asWords = new Set(outside.map((match) => match.index).filter((at) => at !== card))
-  return text
-    .replace(BLOCK, (whole: string, body: string, at: number) => (at === card ? '' : asWords.has(at) ? plainQuestion(body) : whole))
+  // Rebuilt from the blocks found, not `text.replace(BLOCK, ...)`, which began
+  // at an ask tag quoted in code and ran to the next real close (0.512).
+  let kept = ''
+  let from = 0
+  for (const match of outside) {
+    const at = match.index ?? 0
+    kept += text.slice(from, at) + (at === card ? '' : plainQuestion(match[1] ?? ''))
+    from = at + match[0].length
+  }
+  return (kept + text.slice(from))
     .replace(/\n{3,}/gu, '\n\n')
     .trimEnd()
 }

@@ -1,4 +1,4 @@
-import { blocksOutsideCode } from './protocolTags.js'
+import { blocksOutsideCode, stripBlocksOutsideCode } from './protocolTags.js'
 
 /**
  * The file block: how a teammate hands a file to the person.
@@ -125,10 +125,34 @@ export function parseFileBlocks(text: string): readonly HandedFile[] {
 }
 
 /**
+ * The lines of a file block this app would not draw a button for, and why
+ * (0.512). Colin, 2026-09-30: Ghost, working in `.claude`, handed over
+ * `../Documents/.../report.md` -- refused for leaving the folder, which is
+ * right, and said nowhere, so he asked "did you send an md? i didnt see
+ * anything". A refused path is now said under the message, as a path.
+ */
+export function refusedFileLines(text: string): readonly { readonly path: string; readonly why: string }[] {
+  const refused: { path: string; why: string }[] = []
+  for (const match of blocksOutsideCode(text, BLOCK)) {
+    for (const line of (match[1] ?? '').split('\n')) {
+      const trimmed = line.trim().replace(/^[-*]\s+/, '')
+      if (trimmed.length === 0) continue
+      const path = normalize(trimmed.split('::')[0] ?? '')
+      if (acceptable(path) || path.length === 0 || path.toLowerCase() === FILE_BLOCK_EXAMPLE_PATH) continue
+      // Said as a path, never as anything to press: a control character is not shown at all.
+      if (/[\u0000-\u001f\u007f]/.test(path) || path.length > 400) continue
+      refused.push({ path, why: 'it is outside the folder this conversation works in' })
+      if (refused.length >= MAX_FILES_PER_REPLY) return refused
+    }
+  }
+  return refused
+}
+
+/**
  * The reply without its file blocks. The files are drawn as their own row of
  * buttons under the message; leaving the raw tags in the bubble would show
  * the person the protocol instead of the answer.
  */
 export function stripFileBlocks(text: string): string {
-  return text.replace(BLOCK, '').replace(/\n{3,}/g, '\n\n').trimEnd()
+  return stripBlocksOutsideCode(text, BLOCK).replace(/\n{3,}/g, '\n\n').trimEnd()
 }

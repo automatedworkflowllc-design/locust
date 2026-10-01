@@ -737,6 +737,11 @@ export interface RewindPutBackRequest {
 export interface RewindPutBackResponse {
   readonly putBack: readonly string[]
   readonly leftAlone: readonly { readonly path: string; readonly why: string }[]
+  /**
+   * Files that could have been put back and were not, because others could
+   * not (0.512): all of them or none, so a project is never half put back.
+   */
+  readonly heldBack?: readonly string[]
 }
 /**
  * Show a file a teammate wrote, in the operating system's file manager.
@@ -2232,7 +2237,8 @@ export interface CodexMissionStartRequest {
    * edited), and `tip` the conversation's latest turn, which the new branch
    * replaces as the teammate's current conversation.
    */
-  readonly rewind?: { readonly tip: string }
+  /** `setAside`: the turns the edit sets aside (0.512); their unread messages are never delivered. */
+  readonly rewind?: { readonly tip: string; readonly setAside?: readonly string[] }
   /** Raw picker identity before an effort choice expands a model variant. */
   readonly modelChoice?: string
   /** Only a person's picker change this session, addressed to this teammate. */

@@ -1,4 +1,4 @@
-import { blocksOutsideCode, defangProtocolBlocks } from './protocolTags.js'
+import { blocksOutsideCode, defangProtocolBlocks, stripBlocksOutsideCode } from './protocolTags.js'
 
 /**
  * The share block: how a teammate's runtime says "another teammate needs this".
@@ -145,7 +145,7 @@ export function parseShareBlocks(text: string): readonly ShareBlock[] {
  * agent's bubble would present the same claim twice, once unlabelled.
  */
 export function stripShareBlocks(text: string): string {
-  return text.replace(BLOCK, '').replace(/\n{3,}/g, '\n\n').trimEnd()
+  return stripBlocksOutsideCode(text, BLOCK).replace(/\n{3,}/g, '\n\n').trimEnd()
 }
 
 /**

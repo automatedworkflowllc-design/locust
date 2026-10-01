@@ -38,6 +38,7 @@ import {
   killSpawnedTree
 } from '@teammate/runtime-adapters'
 import { createFileMissionLedger, createFileWorkroom } from '@teammate/mission-store'
+import { retireSetAsideMessages } from './set-aside-messages.js'
 import type { AppChangelog, AppChangelogEntry, WorkspaceSettings } from '../shared/ipc.js'
 import type { MissionLedger, Workroom } from '@teammate/mission-store'
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
@@ -2475,6 +2476,13 @@ if (!ownsSingleInstanceLock) {
       const tip = (rewind as { readonly tip?: unknown }).tip
       return typeof tip === 'string' && tip.length > 0 ? tip : undefined
     }
+    /** What the turns a rewind set aside sent and nobody read: never delivered (0.512, set-aside-messages.ts). */
+    const retireSetAside = async (payload: { readonly rewind?: unknown }): Promise<void> => {
+      const rewind = payload.rewind
+      const listed = typeof rewind === 'object' && rewind !== null ? (rewind as { readonly setAside?: unknown }).setAside : undefined
+      // Left waiting on a failure: a stale message delivered is recoverable, a workroom broken is not.
+      await retireSetAsideMessages(workroom, listed).catch(() => undefined)
+    }
     const advanceHub = async (
       teammateId: string | undefined,
       followUpOf: string | undefined,
@@ -3358,7 +3366,7 @@ if (!ownsSingleInstanceLock) {
         && ['MODIFIED', 'ADDED', 'DELETED', 'RENAMED'].includes((change as { status?: unknown }).status as string)
         && Array.isArray((change as { hunks?: unknown }).hunks) && ((change as { hunks: unknown[] }).hunks).every(hunkOk)
       const folder = resolvePath(workspacePath)
-      const writes: { full: string; path: string; next: string | null }[] = []
+      const writes: { full: string; path: string; next: string | null; was: string | undefined }[] = []
       for (const entry of files as unknown[]) {
         const path = typeof entry === 'object' && entry !== null ? (entry as { path?: unknown }).path : undefined
         if (typeof path !== 'string' || path.length === 0) continue
@@ -3389,9 +3397,18 @@ if (!ownsSingleInstanceLock) {
           leftAlone.push({ path, why: result.why })
           continue
         }
-        writes.push({ full, path, next: result.next })
+        writes.push({ full, path, next: result.next, was: content })
       }
-      const putBack: string[] = []
+      /*
+       * ALL OF THEM, OR NONE (0.512). Sol's long pass on 0.509: eight files
+       * offered, six put back, two left because their change was recorded
+       * without the lines -- and the six had removed `src/storage.js` that
+       * one of the two still imported, so the project's own tests failed
+       * before the new reply had done anything. Each file was exact; the set
+       * was not. A project half put back is worse than one not put back.
+       */
+      if (leftAlone.length > 0) return { putBack: [], leftAlone, heldBack: writes.map((write) => write.path) }
+      const done: typeof writes = []
       for (const write of writes) {
         try {
           if (write.next === null) await rm(write.full, { force: true })
@@ -3399,12 +3416,19 @@ if (!ownsSingleInstanceLock) {
             await mkdir(dirname(write.full), { recursive: true })
             await writeFile(write.full, write.next, 'utf8')
           }
-          putBack.push(write.path)
+          done.push(write)
         } catch {
-          leftAlone.push({ path: write.path, why: 'it could not be written' })
+          // The ones already written go back to how they were, so the folder is never half put back.
+          for (const undo of done.reverse()) {
+            try {
+              if (undo.was === undefined) await rm(undo.full, { force: true })
+              else await writeFile(undo.full, undo.was, 'utf8')
+            } catch { /* said below: the folder may not be as it was */ }
+          }
+          return { putBack: [], leftAlone: [{ path: write.path, why: 'it could not be written' }], heldBack: writes.filter((other) => other !== write).map((other) => other.path) }
         }
       }
-      return { putBack, leftAlone }
+      return { putBack: done.map((write) => write.path), leftAlone }
     })
 
     /*
@@ -5788,6 +5812,8 @@ if (!ownsSingleInstanceLock) {
           await rememberRoute(peer?.self.teammateId, { runtime, model: model ?? 'account-default', mode, ...(effort === undefined ? {} : { effort }) })
           // A rewind moves the teammate's conversation from the old tip to the new branch (0.498).
           await advanceHub(peer?.self.teammateId, rewindTip(payload) ?? followUpOf, response.data.missionId)
+          // Only a rewind partway through: editing the first message keeps the old conversation as it was.
+          if (rewindTip(payload) !== undefined && followUpOf !== undefined) await retireSetAside(payload)
         }
         return response
       } catch {

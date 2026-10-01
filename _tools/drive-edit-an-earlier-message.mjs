@@ -114,6 +114,26 @@ try {
   check('and never CEDAR: the turns after the edit were set aside', !/CEDAR/i.test(list), list)
   check('one conversation in the sidebar', after.rows.length === 1, JSON.stringify(after.rows))
 
+  /*
+   * BOTH WAYS, WITHOUT A RELOAD (0.512). Sol's pass on 0.509: the old branch,
+   * run earlier in the same session, came up without "Show the edited
+   * version" until Locust was restarted. This drive only ever went there
+   * after a reload, which rebuilt the branch from history and hid it.
+   */
+  const pressNow = (label) => `(async () => {
+    const button = [...document.querySelectorAll('.lc-thread .lc-thread__versionlink')].find((el) => el.innerText.trim() === ${JSON.stringify(label)})
+    if (!button) return 'no link'
+    button.click()
+    await new Promise((r) => setTimeout(r, 1500))
+    return 'pressed'
+  })()`
+  check('without a reload: Show the version before', String(await drive.evaluate(pressNow('Show the version before'))) === 'pressed')
+  const olderNow = await read('the version before, without a reload')
+  check('without a reload, the old branch names the edit and offers the way back', olderNow.notes.some((note) => /edited later/.test(note) && /Show the edited version/.test(note)), JSON.stringify(olderNow.notes))
+  check('and the way back goes back', String(await drive.evaluate(pressNow('Show the edited version'))) === 'pressed')
+  const backNow = await read('the edited version again, without a reload')
+  check('on the MAPLE branch again', backNow.bubbles.some((b) => /MAPLE/.test(b)) && !backNow.bubbles.some((b) => /CEDAR/.test(b)), JSON.stringify(backNow.bubbles))
+
   await drive.evaluate('location.reload()').catch(() => undefined)
   await sleep(4000)
   await drive.evaluate(openTeammateScript('Ash'))

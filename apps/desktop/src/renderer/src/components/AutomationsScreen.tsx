@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 
-import type { PublicRoutine, PublicTeammate } from '../../../shared/ipc.js'
+import type { PublicFolder, PublicRoutine, PublicTeammate } from '../../../shared/ipc.js'
 import { shortAgo } from '../railFlyout.js'
 import { routineChain, routineRunSummary, routineScheduleSummary, routineStepLabel } from '../routines.js'
 import { NOTHING_TO_SAVE_YET, savableConversations, turnsLabel } from '../savableConversations.js'
@@ -41,9 +41,12 @@ export function AutomationsScreen({
   notice,
   onDismissNotice,
   missions,
-  onSaveRoutine
+  onSaveRoutine,
+  folders = []
 }: {
   readonly routines: readonly PublicRoutine[]
+  /** The folders Locust knows, so a routine's card names the one it runs in (0.512). */
+  readonly folders?: readonly PublicFolder[]
   readonly teammates: readonly PublicTeammate[]
   /** Which routine each teammate is replaying right now, keyed by teammate. */
   readonly routineStepByTeammate: Readonly<
@@ -232,6 +235,13 @@ export function AutomationsScreen({
                         seen in a drive of the recovery card, 2026-09-08, and
                         older than that work. */}
                     {routineRunSummary(routine)}
+                    {/* Where it runs (0.512): Sol's pass on 0.509 found the
+                        time, model and mode on the card and no folder, in a
+                        profile that moved between folders. */}
+                    {(() => {
+                      const folder = routine.workspaceId === undefined ? undefined : folders.find((entry) => entry.id === routine.workspaceId)
+                      return folder === undefined ? null : <span title={folder.path}>{` · in ${folder.name}`}</span>
+                    })()}
                   </span>
                 </span>
                 {/* The schedule as a CHIP, not a third prose line. It is the

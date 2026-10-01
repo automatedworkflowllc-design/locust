@@ -11,6 +11,33 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.512.0 - 2026-09-30
+
+### Fixed
+
+- **A reply that mentioned one of Locust's tags lost words.** A teammate
+  that wrote a tag's name in passing, like `<locust-file>` in backticks, and
+  then handed over a real file had everything between the two deleted from
+  its message, and the file button never appeared. The message now keeps
+  every word, and the real block is found.
+- **A file handed over from outside the folder is said, not dropped.** A
+  teammate pointing at a file outside the folder the conversation works in
+  got no button and no word. The thread now names the path and says why it
+  is not opened from there.
+- **Putting files back is all of them or none.** Editing an earlier message
+  with "Also put back" ticked could undo some files and leave others whose
+  change was not recorded exactly, which can leave a project half changed,
+  with its own tests failing. Now, if any file cannot go back exactly,
+  nothing is put back and the thread says which file stopped it. When Locust
+  knows this before you send, it does not offer to put files back at all.
+- **"Show the edited version" is there straight away.** Going to the version
+  before an edit, in the same session as the edit, showed the old branch
+  without the way back until Locust was restarted.
+- **An edit stops what the set-aside replies had asked for.** A message a
+  teammate sent to another in the replies an edit set aside, still waiting
+  to be read, could open that teammate's next run. It is no longer delivered.
+- **A routine says which folder it runs in**, on its card and in its editor.
+
 ## 0.511.0 - 2026-09-30
 
 ### Fixed

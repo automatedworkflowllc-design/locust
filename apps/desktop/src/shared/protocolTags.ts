@@ -110,10 +110,44 @@ const CODE = /```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`/g
  */
 export function blocksOutsideCode(text: string, block: RegExp): RegExpMatchArray[] {
   const spans = [...text.matchAll(CODE)].map((span) => [span.index ?? 0, (span.index ?? 0) + span[0].length] as const)
-  return [...text.matchAll(block)].filter((match) => {
+  const inCode = (at: number): boolean => spans.some(([from, to]) => at >= from && at < to)
+  /*
+   * AN OPENING TAG IN CODE DOES NOT SWALLOW THE REAL BLOCK AFTER IT (0.512).
+   * Colin, 2026-09-30, a reply drawn as "Yes. I ended with a `": Ghost wrote
+   * "I ended with a `<locust-file>` block", then the real block. `matchAll`
+   * matched from the mention in backticks to the real block's close, this
+   * dropped that match for starting in code -- and the real block, inside it,
+   * was never matched on its own: no file button, and every stripper built on
+   * the same pattern deleted the words in between. A match that starts in
+   * code is skipped by ONE character, so the search finds the next opening.
+   */
+  const pattern = new RegExp(block.source, block.flags.includes('g') ? block.flags : `${block.flags}g`)
+  const found: RegExpMatchArray[] = []
+  for (let match = pattern.exec(text); match !== null; match = pattern.exec(text)) {
+    if (inCode(match.index)) {
+      pattern.lastIndex = match.index + 1
+      continue
+    }
+    found.push(match)
+    if (match[0].length === 0) pattern.lastIndex += 1
+  }
+  return found
+}
+
+/**
+ * The text without the blocks `blocksOutsideCode` finds -- and nothing else.
+ * Every stripper uses this (0.512): `text.replace(BLOCK, '')` started at an
+ * opening tag quoted in code and deleted everything up to the next close.
+ */
+export function stripBlocksOutsideCode(text: string, block: RegExp): string {
+  let kept = ''
+  let from = 0
+  for (const match of blocksOutsideCode(text, block)) {
     const at = match.index ?? 0
-    return !spans.some(([from, to]) => at >= from && at < to)
-  })
+    kept += text.slice(from, at)
+    from = at + match[0].length
+  }
+  return kept + text.slice(from)
 }
 
 /**

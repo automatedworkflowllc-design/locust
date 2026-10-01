@@ -1296,8 +1296,14 @@ onResume,
           <div className="lc-thread__note">
             {putBack === undefined
               ? 'Started again from an edited message. The replies after it were set aside; files they changed are as they left them. '
-              : `Started again from an edited message. The replies after it were set aside${putBack.putBack.length === 0 ? '' : `, and ${putBack.putBack.length === 1 ? '1 file they changed was' : `${String(putBack.putBack.length)} files they changed were`} put back`}. `}
-            {putBack !== undefined && putBack.leftAlone.length > 0 && (
+              : (putBack.heldBack ?? []).length > 0
+                /*
+                 * None put back, because some could not be (0.512): all of
+                 * them or none, so the project is never half put back.
+                 */
+                ? `Started again from an edited message. The replies after it were set aside; files they changed are as they left them. Nothing was put back: ${putBack.leftAlone.map((file) => `${file.path} (${file.why})`).join('; ')} could not be, and putting back only the other ${String((putBack.heldBack ?? []).length)} could leave the project half changed. `
+                : `Started again from an edited message. The replies after it were set aside${putBack.putBack.length === 0 ? '' : `, and ${putBack.putBack.length === 1 ? '1 file they changed was' : `${String(putBack.putBack.length)} files they changed were`} put back`}. `}
+            {putBack !== undefined && putBack.leftAlone.length > 0 && (putBack.heldBack ?? []).length === 0 && (
               <>{`Left as ${putBack.leftAlone.length === 1 ? 'it is' : 'they are'}: ${putBack.leftAlone.map((file) => `${file.path} (${file.why})`).join('; ')}. `}</>
             )}
             {versionLinks(versions)}

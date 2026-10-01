@@ -1612,6 +1612,7 @@ export default function App(): ReactElement {
     readonly earlierTurns: NonNullable<LiveRunState['earlierTurns']>
     /** What the replies after it changed (0.502), and whether to put it back. Off unless ticked. */
     readonly files: readonly FilePutBack[]
+    readonly setAside: readonly string[]
     readonly putBack: boolean
   }>()
   useEffect(() => {
@@ -3837,6 +3838,8 @@ export default function App(): ReactElement {
       ...(before === undefined ? {} : { before }),
       earlierTurns: turns.slice(0, index),
       files: laterFileChanges(turns.slice(index), workspacePath),
+      // The turns the edit sets aside: what they sent and nobody read yet is never delivered (0.512).
+      setAside: turns.slice(index).map((turn) => turn.missionId),
       putBack: false
     })
     setComposerFill((current) => ({ text: words, seq: (current?.seq ?? 0) + 1 }))
@@ -3856,7 +3859,7 @@ export default function App(): ReactElement {
       /** Typed in the box and sent from it: a refusal can hand the words back. */
       readonly fromComposer?: boolean
       /** Started again from an edited earlier message (0.498). */
-      readonly rewind?: { readonly tip: string; readonly before?: string; readonly earlierTurns: NonNullable<LiveRunState['earlierTurns']>; readonly putBackResult?: RewindPutBackResponse }
+      readonly rewind?: { readonly tip: string; readonly before?: string; readonly earlierTurns: NonNullable<LiveRunState['earlierTurns']>; readonly putBackResult?: RewindPutBackResponse; readonly setAside?: readonly string[] }
     }
   ): Promise<boolean> => {
     const as = options?.as
@@ -3989,7 +3992,7 @@ export default function App(): ReactElement {
         ...(teammateId !== undefined && pickerRoutes.has(teammateId) ? { routeOverrideFor: teammateId } : {}),
         ...(teammateId === undefined ? {} : { teammateId }),
         ...(continuing === undefined ? {} : { followUpOf: continuing.data!.missionId }),
-        ...(rewind === undefined ? {} : { ...(rewind.before === undefined ? {} : { followUpOf: rewind.before }), rewind: { tip: rewind.tip } })
+        ...(rewind === undefined ? {} : { ...(rewind.before === undefined ? {} : { followUpOf: rewind.before }), rewind: { tip: rewind.tip, ...(rewind.setAside === undefined ? {} : { setAside: rewind.setAside }) } })
       })
       if (!response.ok) {
         /*
@@ -5299,7 +5302,37 @@ export default function App(): ReactElement {
       followRouteOf(known[1])
       // A finished one may be a record adopted without its older turns (R1).
       const held = historyById.get(missionId)
-      if (held !== undefined && isTerminal(known[1].phase)) readTurnsOf(held)
+      if (held !== undefined && isTerminal(known[1].phase)) {
+        /*
+         * ITS VERSIONS, AS THEY ARE NOW (0.512). A run drawn earlier in this
+         * session kept the versions it had then: Sol's pass on 0.509 edited
+         * a message, carried the new branch on, pressed "Show the version
+         * before" -- and the old branch, run before the edit existed, had no
+         * "Show the edited version" until Locust was restarted and rebuilt it
+         * from history. History knows both branches; the turns are told again.
+         */
+        const told = new Map(conversationTurns(held, historyById).map((turn) => [turn.missionId, turn.versions] as const))
+        setRuns((current) => {
+          const shown = current.get(known[0])
+          if (shown === undefined || !isTerminal(shown.phase)) return current
+          const { versions: _was, ...rest } = shown
+          const last = told.get(missionId)
+          return withNewRun(current, known[0], {
+            ...rest,
+            ...(shown.earlierTurns === undefined
+              ? {}
+              : {
+                  earlierTurns: shown.earlierTurns.map((turn) => {
+                    const { versions: _old, ...plain } = turn
+                    const now = told.get(turn.missionId)
+                    return now === undefined ? plain : { ...plain, versions: now }
+                  })
+                }),
+            ...(last === undefined ? {} : { versions: last })
+          })
+        })
+        readTurnsOf(held)
+      }
       return
     }
     const mission = historyById.get(missionId)
@@ -6696,6 +6729,7 @@ export default function App(): ReactElement {
               // The same rows the sidebar draws. An empty screen offers the
               // finished ones rather than describing how to save one.
               missions={sidebarMissions}
+              folders={folders}
               onSaveRoutine={openSaveRoutine}
             />
           ) : screen === 'rooms' ? (
@@ -7664,7 +7698,10 @@ export default function App(): ReactElement {
                     },
                     ...(rewinding.files.length === 0
                       ? {}
-                      : {
+                      : rewinding.files.some((file) => file.cannot !== undefined)
+                        // Known already: some cannot go back exactly, so none are offered (0.512).
+                        ? { filesHeld: { total: rewinding.files.length, cannot: rewinding.files.filter((file) => file.cannot !== undefined).length } }
+                        : {
                           files: {
                             count: rewinding.files.length,
                             on: rewinding.putBack,
@@ -8126,6 +8163,12 @@ export default function App(): ReactElement {
             ? { chooseFrom: teammates }
             : {})}
           initialName={routineDialog.name}
+          {...(() => {
+            // Its own folder when it has one; a new one is made in the folder open now (0.512).
+            const own = routines.find((entry) => entry.routineId === routineDialog.routineId)?.workspaceId
+            const folder = folders.find((entry) => entry.id === (own ?? (routineDialog.routineId === undefined ? workspaceId : undefined)))
+            return folder === undefined ? {} : { folder: { name: folder.name, path: folder.path } }
+          })()}
           initialSteps={routineDialog.steps}
           initialSchedule={routineDialog.schedule}
           // A hand-off chain (0.435): who takes each step, from the whole team.
