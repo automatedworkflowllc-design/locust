@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.527.0 - 2026-10-01
+
+### New
+
+- **Leave part of a handoff out.** When your next message goes to another
+  AI agent, the line under the box says what it carries. The earlier
+  messages, the steps it finished and its last reply each have a small ×
+  now: press it when one is stale or would mislead, and it is not sent.
+  Put back undoes it. The task, your own words and any steps that never
+  reported back always go. After the switch, the divider says what you
+  left out, and still does when the conversation is opened again.
+
 ## 0.526.0 - 2026-10-01
 
 ### Improved
