@@ -11,6 +11,14 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.528.0 - 2026-10-01
+
+### Fixed
+
+- **A model has one name.** The model list showed Codex's "GPT-6-Luna" while
+  the chip beside the box, and a Compare column, said "GPT-6 Luna". The chip
+  now spells a model the way its AI agent does.
+
 ## 0.527.0 - 2026-10-01
 
 ### New
