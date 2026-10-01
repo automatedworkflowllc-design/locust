@@ -16563,6 +16563,66 @@ textarea {
   padding: var(--lc-space-4) var(--lc-space-5) var(--lc-space-2);
 }
 
+/*
+ * A Word or PowerPoint file, read for its words (0.517): the reply's own
+ * headings, paragraphs and tables (DocumentView.tsx), in the prose face.
+ */
+.lc-docview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+  font-family: var(--lc-font-prose);
+  font-size: var(--lc-text-prose);
+  overflow-wrap: break-word;
+}
+
+.lc-docview__note {
+  margin: 0;
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+}
+
+.lc-docview__p,
+.lc-docview__item {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.lc-docview__item {
+  position: relative;
+}
+
+.lc-docview__item::before {
+  content: '•';
+  position: absolute;
+  margin-inline-start: -12px;
+  color: var(--lc-text-muted);
+}
+
+/* A slide starts a section: its number, then its title. */
+.lc-docview__slide {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lc-space-2);
+  margin: var(--lc-space-4) 0 0;
+  padding-top: var(--lc-space-3);
+  border-top: 1px solid var(--lc-border-hairline);
+  font-size: 1.05em;
+  font-weight: 600;
+  color: var(--lc-text-primary);
+}
+
+.lc-docview__slide:first-of-type {
+  margin-top: var(--lc-space-2);
+}
+
+.lc-docview__slidenum {
+  flex: none;
+  font-size: var(--lc-text-mono-caption);
+  font-weight: 400;
+  color: var(--lc-text-muted);
+}
+
 /* Prose in the reply's own voice: it is the same kind of reading. */
 .lc-viewer__prose {
   font-family: var(--lc-font-prose);

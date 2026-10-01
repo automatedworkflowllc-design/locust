@@ -83,6 +83,8 @@ import { imageMediaType, MAX_PREVIEW_BYTES } from '../shared/image-files.js'
 import { extensionOf, isViewableText, MAX_TEXT_BYTES, viewerMode } from '../shared/text-files.js'
 import { aboutYouSection, MAX_ABOUT_YOU_SUGGESTIONS } from '../shared/about-you.js'
 import { SHEET_EXTENSIONS, csvWorkbook } from '../shared/sheet.js'
+import { MAX_OFFICE_FILE_BYTES, OFFICE_EXTENSIONS } from '../shared/office-document.js'
+import { readDocx, readPptx } from './office-text.js'
 import { WorkbookUnreadable, readXlsx } from './xlsx.js'
 
 /** A spreadsheet the viewer reads may be this big on disk; the grid it draws is bounded anyway (0.364). */
@@ -3917,6 +3919,33 @@ if (!ownsSingleInstanceLock) {
        * refusal-not-truncation rule as text; the grid is bounded instead.
        */
       const sheetKind = extensionOf(requested)
+      /*
+       * A WORD OR POWERPOINT FILE, READ FOR ITS WORDS (0.517). The same
+       * containment as a spreadsheet; the host takes the words out and the
+       * renderer draws them as text (shared/office-document.ts).
+       */
+      if (OFFICE_EXTENSIONS.has(sheetKind)) {
+        const decision = decideReveal(requested, [...(await workedInFolders()), ...(await teammateFolders()), ledgerDirectory])
+        if (!decision.ok) {
+          return { ok: false, message: 'That file is outside the folder your teammates work in, so Locust will not open it.' } as const
+        }
+        try {
+          const measured = await stat(decision.path)
+          if (!measured.isFile()) return { ok: false, message: 'That is a folder, not a file.' } as const
+          if (measured.size > MAX_OFFICE_FILE_BYTES) {
+            return {
+              ok: false,
+              message: `That file is ${String(Math.round(measured.size / (1024 * 1024)))}MB, too big to show here. Save a copy and open it in ${sheetKind === 'pptx' ? 'PowerPoint' : 'Word'}.`
+            } as const
+          }
+          const bytes = await readFile(decision.path)
+          const document = sheetKind === 'pptx' ? readPptx(bytes) : readDocx(bytes)
+          return { ok: true, path: requested, text: '', mode: 'document', document } as const
+        } catch (error) {
+          if (error instanceof WorkbookUnreadable) return { ok: false, message: error.message } as const
+          return { ok: false, message: 'That file is not there. The teammate named it but did not write it.' } as const
+        }
+      }
       if (SHEET_EXTENSIONS.has(sheetKind)) {
         const decision = decideReveal(requested, [...(await workedInFolders()), ...(await teammateFolders()), ledgerDirectory])
         if (!decision.ok) {

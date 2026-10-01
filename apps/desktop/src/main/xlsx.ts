@@ -24,17 +24,18 @@ import type { SheetCell, Workbook } from '../shared/sheet.js'
 const MAX_PART_BYTES = 24 * 1024 * 1024
 const MAX_ENTRIES = 4_000
 
+/** Thrown with a sentence for the person; also for a Word or PowerPoint file (office-text.ts), which is the same zip. */
 export class WorkbookUnreadable extends Error {}
 
-interface ZipEntry {
+export interface ZipEntry {
   readonly method: number
   readonly compressedSize: number
   readonly uncompressedSize: number
   readonly localOffset: number
 }
 
-/** The zip's directory: name -> where its bytes are. */
-function zipDirectory(bytes: Buffer): ReadonlyMap<string, ZipEntry> {
+/** The zip's directory: name -> where its bytes are. `noun` is what the person calls the file. */
+export function zipDirectory(bytes: Buffer, noun = 'workbook'): ReadonlyMap<string, ZipEntry> {
   // The end-of-directory record sits in the last 64 KB + 22 bytes.
   const floor = Math.max(0, bytes.length - 65_557)
   let end = -1
@@ -44,14 +45,14 @@ function zipDirectory(bytes: Buffer): ReadonlyMap<string, ZipEntry> {
       break
     }
   }
-  if (end < 0) throw new WorkbookUnreadable('That file is not a workbook Locust can read.')
+  if (end < 0) throw new WorkbookUnreadable(`That file is not a ${noun} Locust can read.`)
   const count = bytes.readUInt16LE(end + 10)
   const directoryOffset = bytes.readUInt32LE(end + 16)
-  if (count > MAX_ENTRIES || directoryOffset === 0xffffffff) throw new WorkbookUnreadable('That workbook is too large to show here.')
+  if (count > MAX_ENTRIES || directoryOffset === 0xffffffff) throw new WorkbookUnreadable(`That ${noun} is too large to show here.`)
   const entries = new Map<string, ZipEntry>()
   let at = directoryOffset
   for (let index = 0; index < count; index += 1) {
-    if (at + 46 > bytes.length || bytes.readUInt32LE(at) !== 0x02014b50) throw new WorkbookUnreadable('That workbook is damaged.')
+    if (at + 46 > bytes.length || bytes.readUInt32LE(at) !== 0x02014b50) throw new WorkbookUnreadable(`That ${noun} is damaged.`)
     const method = bytes.readUInt16LE(at + 10)
     const compressedSize = bytes.readUInt32LE(at + 20)
     const uncompressedSize = bytes.readUInt32LE(at + 24)
@@ -66,26 +67,26 @@ function zipDirectory(bytes: Buffer): ReadonlyMap<string, ZipEntry> {
   return entries
 }
 
-/** One part's text, or undefined when the workbook has no such part. */
-function partText(bytes: Buffer, entries: ReadonlyMap<string, ZipEntry>, name: string): string | undefined {
+/** One part's text, or undefined when the file has no such part. */
+export function partText(bytes: Buffer, entries: ReadonlyMap<string, ZipEntry>, name: string, noun = 'workbook'): string | undefined {
   const entry = entries.get(name.replace(/^\//, ''))
   if (entry === undefined) return undefined
-  if (entry.uncompressedSize > MAX_PART_BYTES) throw new WorkbookUnreadable('That workbook is too large to show here.')
+  if (entry.uncompressedSize > MAX_PART_BYTES) throw new WorkbookUnreadable(`That ${noun} is too large to show here.`)
   const local = entry.localOffset
-  if (local + 30 > bytes.length || bytes.readUInt32LE(local) !== 0x04034b50) throw new WorkbookUnreadable('That workbook is damaged.')
+  if (local + 30 > bytes.length || bytes.readUInt32LE(local) !== 0x04034b50) throw new WorkbookUnreadable(`That ${noun} is damaged.`)
   const start = local + 30 + bytes.readUInt16LE(local + 26) + bytes.readUInt16LE(local + 28)
   const data = bytes.subarray(start, start + entry.compressedSize)
   if (entry.method === 0) return data.toString('utf8')
-  if (entry.method !== 8) throw new WorkbookUnreadable('That workbook is packed in a way Locust does not read.')
+  if (entry.method !== 8) throw new WorkbookUnreadable(`That ${noun} is packed in a way Locust does not read.`)
   try {
     return inflateRawSync(data, { maxOutputLength: MAX_PART_BYTES }).toString('utf8')
   } catch {
-    throw new WorkbookUnreadable('That workbook is too large or damaged to show here.')
+    throw new WorkbookUnreadable(`That ${noun} is too large or damaged to show here.`)
   }
 }
 
 /** The five XML entities and numeric references. No DTD is ever read, so nothing expands. */
-function decodeXml(text: string): string {
+export function decodeXml(text: string): string {
   return text.replace(/&(#x[0-9a-fA-F]+|#\d+|lt|gt|amp|quot|apos);/g, (whole, name: string) => {
     if (name === 'lt') return '<'
     if (name === 'gt') return '>'
@@ -98,7 +99,7 @@ function decodeXml(text: string): string {
 }
 
 /** An attribute's value from an element's attribute text. */
-function attribute(attributes: string, name: string): string | undefined {
+export function attribute(attributes: string, name: string): string | undefined {
   const match = new RegExp(`(?:^|\\s)(?:[\\w-]+:)?${name}="([^"]*)"`).exec(attributes)
   return match?.[1] === undefined ? undefined : decodeXml(match[1])
 }

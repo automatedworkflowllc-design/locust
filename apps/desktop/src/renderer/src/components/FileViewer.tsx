@@ -6,6 +6,8 @@ import { AgentText } from './ThreadItems.js'
 import { DiffView } from './DiffView.js'
 import { Icon } from './Icon.js'
 import { SheetView } from './SheetView.js'
+import { DocumentView } from './DocumentView.js'
+import type { OfficeDocument } from '../../../shared/office-document.js'
 import type { Workbook } from '../../../shared/sheet.js'
 import { quoteOfPagePick, VIEWER_FRAME_NAME } from '../../../shared/page-pick.js'
 
@@ -39,15 +41,18 @@ export function FileViewer({
   onReveal,
   onSave,
   workbook,
+  document: officeDocument,
   pageUrl,
   onPointAt
 }: {
   readonly path: string
   /** The file's text, or a `data:` URL when the mode is `image`. */
   readonly text: string
-  readonly mode: 'markdown' | 'code' | 'image' | 'table'
+  readonly mode: 'markdown' | 'code' | 'image' | 'table' | 'document'
   /** A spreadsheet's cells, read by the host, when the mode is `table`. */
   readonly workbook?: Workbook
+  /** A Word or PowerPoint file's words, read by the host, when the mode is `document` (0.517). */
+  readonly document?: OfficeDocument
   /**
    * The turns in this conversation that changed this file, oldest first.
    *
@@ -256,6 +261,9 @@ export function FileViewer({
         ) : mode === 'table' && workbook !== undefined ? (
           // Read, never run: cells as escaped text (shared/sheet.ts).
           <SheetView workbook={workbook} />
+        ) : mode === 'document' && officeDocument !== undefined ? (
+          // Read, never run: words as escaped text (shared/office-document.ts).
+          <DocumentView document={officeDocument} />
         ) : mode === 'markdown' ? (
           <div className="lc-viewer__prose">
             <AgentText text={text} streaming={false} />

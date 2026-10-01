@@ -8,6 +8,7 @@ export type { RoutineSchedule } from './routine-schedule.js'
 import type { MemoryScope } from './memory.js'
 export type { MemoryScope } from './memory.js'
 import type { Spend } from './spend.js'
+import type { OfficeDocument } from './office-document.js'
 import type { Workbook } from './sheet.js'
 import type { AboutYouSuggestion } from './about-you.js'
 import type { CompareSlotId, PublicCompare } from './compare.js'
@@ -867,9 +868,13 @@ export type WorkspaceTextResponse =
       readonly ok: true
       readonly path: string
       readonly text: string
-      /** `table`: a spreadsheet, read for its cells (0.364), carried in `workbook`. */
-      readonly mode: 'markdown' | 'code' | 'table'
+      /**
+       * `table`: a spreadsheet, read for its cells (0.364), carried in `workbook`.
+       * `document`: a Word or PowerPoint file, read for its words (0.517), carried in `document`.
+       */
+      readonly mode: 'markdown' | 'code' | 'table' | 'document'
       readonly workbook?: Workbook
+      readonly document?: OfficeDocument
     }
   | { readonly ok: false; readonly message: string }
 

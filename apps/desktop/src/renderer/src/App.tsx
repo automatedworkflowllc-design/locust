@@ -55,6 +55,7 @@ import { withSuggestion } from '../../shared/about-you.js'
 import { aboutYouSecretRefusal, secretIn } from '../../shared/secrets.js'
 import type { AboutYouSuggestion } from '../../shared/about-you.js'
 import type { Workbook } from '../../shared/sheet.js'
+import type { OfficeDocument } from '../../shared/office-document.js'
 import type { Spend } from '../../shared/spend.js'
 import { routineDraft, routineStepPhrase } from './routines.js'
 import { queueHome, combineQueued, queuedIn, queuedVerdict, requeuedRows, retriedAfterBusy, takeNext, withoutQueueOf } from './steering.js'
@@ -1680,11 +1681,13 @@ export default function App(): ReactElement {
     readonly path: string
     /** The file's text, or a `data:` URL when the mode is `image`. */
     readonly text: string
-    readonly mode: 'markdown' | 'code' | 'image' | 'table'
+    readonly mode: 'markdown' | 'code' | 'image' | 'table' | 'document'
     /** A web page's address in the preview frame (0.425); its text stays the source. */
     readonly pageUrl?: string
     /** A spreadsheet's cells, when the mode is `table` (0.364). */
     readonly workbook?: Workbook
+    /** A Word or PowerPoint file's words, when the mode is `document` (0.517). */
+    readonly document?: OfficeDocument
   }>()
   /** What the host said when a file could not be opened. Shown where the press was. */
   const [viewerRefusal, setViewerRefusal] = useState<string>()
@@ -1744,7 +1747,13 @@ export default function App(): ReactElement {
       .readTextFile(full)
       .then((answer) => {
         if (answer.ok) {
-          setViewingFile({ path: full, text: answer.text, mode: answer.mode, ...(answer.workbook === undefined ? {} : { workbook: answer.workbook }) })
+          setViewingFile({
+            path: full,
+            text: answer.text,
+            mode: answer.mode,
+            ...(answer.workbook === undefined ? {} : { workbook: answer.workbook }),
+            ...(answer.document === undefined ? {} : { document: answer.document })
+          })
           // A web page opens WORKING (0.425, Colin: "full functionality,
           // sacrifice nothing"); its source is one tab away.
           if (/\.html?$/i.test(full)) {
@@ -7842,6 +7851,7 @@ export default function App(): ReactElement {
             text={viewingFile.text}
             mode={viewingFile.mode}
             {...(viewingFile.workbook === undefined ? {} : { workbook: viewingFile.workbook })}
+            {...(viewingFile.document === undefined ? {} : { document: viewingFile.document })}
             {...(viewingFile.pageUrl === undefined ? {} : { pageUrl: viewingFile.pageUrl })}
             onPointAt={(pick) => {
               // The picture goes the way a pasted one does (attachPasted), then
