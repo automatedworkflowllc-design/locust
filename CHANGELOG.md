@@ -11,6 +11,31 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.530.0 - 2026-10-01
+
+### New
+
+- **New routine.** The Routines screen has a New routine button: write the
+  steps yourself and pick when it runs. Saving a finished conversation as a
+  routine still works too.
+- **Choose what a routine may do.** A routine now asks whether a run may
+  only read or may change files, and everything it says follows that
+  choice. A routine that starts when a file arrives used to say it changed
+  nothing even when it could.
+
+### Improved
+
+- **A teammate in Ask can read Word and PowerPoint files.** Locust keeps a
+  text copy of the words in each one, so a teammate that may only read can
+  still answer from your documents. The copies live in Locust's own folder
+  and never change the documents.
+- **A document's change reads as the document.** "What this turn changed"
+  on a Markdown document shows each changed passage with the old words
+  struck and the new ones marked, instead of a code diff. The lines are one
+  click away.
+- **A new teammate starts as Research & Briefs**, ready to read whatever is
+  in your folder, rather than as a programmer.
+
 ## 0.529.0 - 2026-10-01
 
 ### Improved
