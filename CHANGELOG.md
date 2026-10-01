@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.531.0 - 2026-10-01
+
+### Fixed
+
+- **A Codex turn on its own branch is saved as completed.** With Own branch
+  on, each turn is saved to the teammate's branch with how it ended. On
+  Codex every turn was saved as failed, even when it finished; it now says
+  completed, or stopped when you stopped it.
+
 ## 0.530.0 - 2026-10-01
 
 ### New
