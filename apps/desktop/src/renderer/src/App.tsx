@@ -62,7 +62,6 @@ import type { QueuedRow } from './steering.js'
 import type { RoutineDraft } from './routines.js'
 import { RoutineDialog } from './components/RoutineDialog.js'
 import { AutomationsScreen } from './components/AutomationsScreen.js'
-import { FinancesScreen } from './components/FinancesScreen.js'
 import { TIDY_PROMPT } from '../../shared/memory-tidy.js'
 import { needsYou, needsYouLabel } from './needsYou.js'
 import { withNote } from './diffNotes.js'
@@ -81,7 +80,7 @@ import { imageMediaType } from '../../shared/image-files.js'
 import { signInCommand } from '../../shared/runtime-install.js'
 import { SIGN_IN_OPENED_EVENT } from './signInEvents.js'
 import { DEFAULT_RELAY_HOP_CAP, DEFAULT_MEMORY_MODE } from '../../shared/ipc.js'
-import type { FinancesReadResponse, PublicCloudFolder, PublicCloudTask, PublicCloudWhere, RewindPutBackResponse, RuntimeCommandsResponse } from '../../shared/ipc.js'
+import type { PublicCloudFolder, PublicCloudTask, PublicCloudWhere, RewindPutBackResponse, RuntimeCommandsResponse } from '../../shared/ipc.js'
 import { stripTaskBlocks } from '../../shared/room-task.js'
 import { stripMemoryBlocks } from '../../shared/memory.js'
 import { stripDecisionBlocks } from '../../shared/decision.js'
@@ -2100,15 +2099,6 @@ export default function App(): ReactElement {
   const [autoMode, setAutoMode] = useState(false)
   /** Ask before every connector call. See WorkspaceSettings.askConnectors. */
   const [askConnectors, setAskConnectors] = useState(false)
-  /** The Finances place in the sidebar (0.501). */
-  const [financesPlace, setFinancesPlace] = useState(false)
-  /** The Finances dashboard's statements (0.506), read when the page opens. */
-  const [financesData, setFinancesData] = useState<FinancesReadResponse>()
-  const [financesLoading, setFinancesLoading] = useState(false)
-  const readFinances = (): void => {
-    setFinancesLoading(true)
-    void window.desktop?.readFinances().then(setFinancesData).catch(() => undefined).finally(() => setFinancesLoading(false))
-  }
   /** Ask teammates that can to keep a todo list. See WorkspaceSettings.keepATodoList. */
   const [keepATodoList, setKeepATodoList] = useState(false)
 
@@ -2796,7 +2786,6 @@ export default function App(): ReactElement {
           setAutoMode(settings.autoMode === true)
           setAutoModeKnown(true)
           setAskConnectors(settings.askConnectors === true)
-          setFinancesPlace(settings.financesPlace === true)
           setKeepATodoList(settings.keepATodoList === true)
           setCheckCommand(settings.checkCommand ?? '')
           setAboutYou(settings.aboutYou ?? '')
@@ -5207,37 +5196,6 @@ export default function App(): ReactElement {
     }).catch(() => undefined)
   }
   /** Put the window in a folder already worked in, by its id. */
-  /*
-   * THE FINANCES PLACE (0.501, main/places.ts): its folder, and its teammate
-   * on Codex in Ask, with the teammate's starters on an empty page. The roster
-   * is read again first: the teammate may have just been made.
-   */
-  const openFinancesPlace = async (): Promise<void> => {
-    const bridge = window.desktop
-    const answer = await bridge?.openFinancesPlace().catch(() => undefined)
-    if (answer === undefined || !answer.ok) {
-      setWorkspaceNotice(answer?.message ?? 'The Finances place could not be opened. Nothing in it was changed.')
-      return
-    }
-    setWorkspaceNotice(undefined)
-    setComparingId(undefined)
-    setWorkspaceId(answer.folder.id)
-    const listed = await bridge?.listTeammates().catch(() => undefined)
-    const roster = listed?.ok === true ? listed.data.teammates : teammates
-    if (listed?.ok === true) setTeammates(listed.data.teammates)
-    const own = roster.find((teammate) => teammate.teammateId === answer.teammateId)
-    setSelectedTeammateId(answer.teammateId)
-    // The dashboard first, as ChatGPT's Finances opens (0.506); its Chats and Ask go to the teammate.
-    setScreen('finances')
-    readFinances()
-    if (own?.route !== undefined) {
-      setRoute({ runtime: own.route.runtime, model: own.route.model })
-      setMode(own.route.mode)
-    }
-    setShownKey(undefined)
-    refreshForFolder()
-  }
-
   const switchToFolder = (id: string): void => {
     void window.desktop?.switchFolder(id).then((answer) => {
       if (!answer.ok) {
@@ -6507,7 +6465,6 @@ export default function App(): ReactElement {
           runtimes={runtimes}
           routines={routines}
           onOpenAutomations={() => setScreen('automations')}
-          {...(financesPlace ? { onOpenFinances: () => void openFinancesPlace() } : {})}
           {...(cloudTasks.length > 0 ? { cloudTasks: { count: cloudTasks.length, onOpen: () => { setScreen('workroom'); setCloudPanel(true) } } } : {})}
           missions={sidebarMissions}
           folders={folders}
@@ -6708,22 +6665,6 @@ export default function App(): ReactElement {
               noticeWaits={memoryNoticeWaits}
               onDismissNotice={() => setMemoryNotice(undefined)}
             />
-          ) : screen === 'finances' ? (
-            <FinancesScreen
-              data={financesData}
-              loading={financesLoading}
-              onAsk={(question) => {
-                setScreen('workroom')
-                setShownKey(undefined)
-                void startMission(question)
-              }}
-              onOpenChat={() => setScreen('workroom')}
-              onOpenFolder={() => {
-                if (workspacePath === undefined) return
-                void window.desktop?.revealFile(`${workspacePath}/README.md`).catch(() => undefined)
-              }}
-              onRefresh={readFinances}
-            />
           ) : screen === 'automations' ? (
             <AutomationsScreen
               onOpenMission={openMission}
@@ -6837,14 +6778,6 @@ export default function App(): ReactElement {
               }}
               askConnectors={askConnectors}
               onOwnModelsChanged={readModels}
-              financesPlace={financesPlace}
-              onFinancesPlaceChange={(next) => {
-                setFinancesPlace(next)
-                void window.desktop
-                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, replySize, layout, tube, financesPlace: next })
-                  .then((settings) => setFinancesPlace(settings.financesPlace === true))
-                  .catch(() => setFinancesPlace(!next))
-              }}
               onAskConnectorsChange={(next) => {
                 setAskConnectors(next)
                 void window.desktop

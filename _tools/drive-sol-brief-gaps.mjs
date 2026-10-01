@@ -8,13 +8,11 @@
 //   - an edit cancelled halfway: the box and banner clear, nothing is sent;
 //   - an edit sent WITHOUT "Also put back": the files stay as they are;
 //   - Cloud on a model that is not Codex: the menu says why it cannot be picked;
-//   - Finances off and on again: the same teammate, not a second one;
+//   - Finances, shelved in 0.510, is gone from Settings and the sidebar;
 //   - Settings > Runtimes: how Codex's row reads (recorded for a person to read).
-// Ash is on the free OpenCode model; the Finances place is never asked
-// anything. Spends nothing.
+// Ash is on the free OpenCode model. Spends nothing.
 
-import { mkdtemp, readFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { FREE_ROUTE, openTeammateScript, recordRoot, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
 
@@ -22,13 +20,11 @@ const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.i
 const packaged = arg('--packaged')
 const tag = arg('--tag') ?? 'local'
 const workspace = await scratchRepository('locust-drive-sol-gaps-ws-')
-const places = await mkdtemp(join(process.env.LOCUST_SCRATCH ?? tmpdir(), 'locust-drive-sol-gaps-places-'))
 const drive = await startDrive({
   ...(packaged === undefined ? {} : { packaged }),
   name: `sol-brief-gaps-${tag}`,
   port: 9815,
   workspace,
-  env: { LOCUST_PLACES_ROOT: places },
   outPath: join(recordRoot('sol-brief-gaps-2026-09-30'), tag),
   seed: {
     schemaVersion: 1,
@@ -56,23 +52,7 @@ const settingsPage = (page) => `(async () => {
   ;[...document.querySelectorAll('.lc-settings__navitem')].find((b) => new RegExp(${JSON.stringify(page)}).test(b.innerText))?.click()
   await new Promise((r) => setTimeout(r, 700))
 })()`
-const financesSwitch = `(async () => {
-  const toggle = document.querySelector('button[role="switch"][aria-label="Finances"]')
-  toggle?.click()
-  await new Promise((r) => setTimeout(r, 900))
-  return toggle?.getAttribute('aria-checked') ?? 'no switch'
-})()`
 const sidebarHasFinances = `!![...document.querySelectorAll('.lc-sidebar__places button')].find((b) => /Finances/.test(b.innerText))`
-const openFinances = `(async () => {
-  ;[...document.querySelectorAll('.lc-sidebar__places button')].find((b) => /Finances/.test(b.innerText))?.click()
-  for (let i = 0; i < 40 && !document.querySelector('.lc-finances'); i += 1) await new Promise((r) => setTimeout(r, 250))
-  await new Promise((r) => setTimeout(r, 800))
-  return !!document.querySelector('.lc-finances')
-})()`
-const financesTeammates = async () => {
-  const stored = JSON.parse(await readFile(join(drive.profile, 'teammates.json'), 'utf8').catch(() => '{}'))
-  return (stored.teammates ?? []).filter((t) => /Reads the statements/.test(t.roleTitle ?? '')).map((t) => t.teammateId)
-}
 
 try {
   await drive.capture('launch', () => drive.ready())
@@ -144,20 +124,15 @@ try {
   check('sent unticked, the file stays as the replies left it', flat(await read('notes.txt')) === 'BETA', flat(await read('notes.txt')))
   check('and the edit went: the reply came back', /\bDONE\b/.test(unticked.tail) && !/was put back/.test(unticked.notes), JSON.stringify({ notes: unticked.notes, tail: unticked.tail }))
 
-  // Finances off and on again: the same teammate.
+  // Finances was shelved in 0.510: no switch in Settings, no row in the sidebar.
   await drive.evaluate(settingsPage('Connectors'))
-  const on1 = await drive.evaluate(financesSwitch)
-  const opened1 = await drive.capture('Finances opened', () => drive.evaluate(openFinances))
-  const first = await financesTeammates()
-  check('Finances on and opened: one Finances teammate', on1 === 'true' && opened1 === true && first.length === 1, JSON.stringify({ on1, opened1, first }))
-  await drive.evaluate(settingsPage('Connectors'))
-  const off = await drive.evaluate(financesSwitch)
-  const goneFromSidebar = (await drive.evaluate(sidebarHasFinances)) === false
-  check('switched off, the sidebar row goes', off === 'false' && goneFromSidebar, JSON.stringify({ off, goneFromSidebar }))
-  const on2 = await drive.evaluate(financesSwitch)
-  const opened2 = await drive.capture('Finances on again, opened', () => drive.evaluate(openFinances))
-  const second = await financesTeammates()
-  check('on again: the same teammate comes back, not a second one', on2 === 'true' && opened2 === true && second.length === 1 && second[0] === first[0], JSON.stringify({ on2, opened2, second }))
+  const finances = JSON.parse(String(await drive.capture('Settings > Connectors, after Finances was shelved', () => drive.evaluate(`JSON.stringify({
+    // Every switch on the page, read by its label: looking for one that must not exist.
+    switch: [...document.querySelectorAll('button[role="switch"]')].some((b) => b.getAttribute('aria-label') === 'Finances'),
+    heading: [...document.querySelectorAll('.lc-settings__heading')].some((h) => /Finances/.test(h.innerText)),
+    sidebar: ${sidebarHasFinances}
+  })`))))
+  check('Finances is gone: no switch, no heading, no sidebar row (0.510)', !finances.switch && !finances.heading && !finances.sidebar, JSON.stringify(finances))
 
   // Settings > Runtimes: Codex's row, recorded for a person to read.
   await drive.evaluate(settingsPage('Runtimes'))
@@ -174,6 +149,6 @@ try {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
-  await drive.finish({ intro: `Build: ${packaged ?? 'out/'}. Ash on the free OpenCode model; the Finances place in ${places}.`, extra: `Checks failed: ${String(failures)}` })
+  await drive.finish({ intro: `Build: ${packaged ?? 'out/'}. Ash on the free OpenCode model.`, extra: `Checks failed: ${String(failures)}` })
 }
 if (failures > 0) process.exitCode = 1

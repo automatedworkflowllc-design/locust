@@ -738,25 +738,6 @@ export interface RewindPutBackResponse {
   readonly putBack: readonly string[]
   readonly leftAlone: readonly { readonly path: string; readonly why: string }[]
 }
-/** The Finances dashboard's data (0.506): every CSV statement in the place's folder, read (shared/statements.ts). */
-export const FINANCES_READ_CHANNEL = 'finances:read'
-export interface FinancesReadResponse {
-  readonly transactions: readonly {
-    readonly date: string
-    readonly description: string
-    readonly amount: number
-    readonly category: string
-    readonly source: string
-  }[]
-  readonly files: readonly { readonly name: string; readonly count: number; readonly skipped: number; readonly problem?: string }[]
-  /** Other files in the folder the dashboard does not read (PDFs): the teammate can. */
-  readonly unread: readonly string[]
-}
-/** Open the Finances place (0.501, main/places.ts): its folder, and the teammate who works there. */
-export const PLACE_FINANCES_CHANNEL = 'places:finances'
-export type PlaceOpenResponse =
-  | { readonly ok: true; readonly folder: { readonly id: string; readonly path: string; readonly name: string }; readonly teammateId: string }
-  | { readonly ok: false; readonly message: string }
 /**
  * Show a file a teammate wrote, in the operating system's file manager.
  *
@@ -1997,11 +1978,6 @@ export interface WorkspaceSettings {
    */
   readonly askConnectors: boolean
   /**
-   * The Finances place in the sidebar (0.501, main/places.ts). Off unless
-   * switched on; optional, so every older write leaves it as it was.
-   */
-  readonly financesPlace?: boolean
-  /**
    * Ask the teammate to keep a todo list as it works, so the board fills in
    * while the mission runs.
    *
@@ -2917,10 +2893,6 @@ export interface DesktopApi {
   /** `of` is the conversation's (or the side chat's) latest turn; `question` counts from 1. */
   askOnTheSide(of: string, question: string, count: number): Promise<SideAskResponse>
   switchFolder(id: string): Promise<FolderSwitchResponse>
-  /** The Finances place: its folder made if need be, and its teammate (0.501). */
-  openFinancesPlace(): Promise<PlaceOpenResponse>
-  /** The Finances dashboard: the statements in its folder, read (0.506). */
-  readFinances(): Promise<FinancesReadResponse>
   /** Cloud tasks (0.503): this folder's standing, start, follow, show, apply. */
   cloudWhere(): Promise<PublicCloudWhere>
   startCloudTask(prompt: string, teammateId?: string): Promise<CloudStartResponse>

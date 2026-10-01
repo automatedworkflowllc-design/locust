@@ -19,8 +19,6 @@ import { createCloudTaskService, launchRunner } from './cloud-task-service.js'
 import { environmentOf, githubRepoOf } from './cloud-tasks.js'
 import type { Runner } from './cloud-tasks.js'
 import type { ReverseChange } from '../shared/reverse-diff.js'
-import { mergeStatements, readCsvStatement } from '../shared/statements.js'
-import { FINANCES_FOLDER, FINANCES_README, FINANCES_ROUTE, FINANCES_TEAMMATE } from './places.js'
 import { bringInCopy, COPY_ROOT, copyLineChanges, copyRefusal, makeCompareCopy, removeCompareCopies } from './compare-copies.js'
 import type { CompareSlotId, PublicCompare, PublicCompareSlot } from '../shared/compare.js'
 import { createCompareStore } from './compare-store.js'
@@ -232,8 +230,6 @@ import {
   FOLDER_LIST_CHANNEL,
   SIDE_ASK_CHANNEL,
   FOLDER_SWITCH_CHANNEL,
-  PLACE_FINANCES_CHANNEL,
-  FINANCES_READ_CHANNEL,
   CLOUD_WHERE_CHANNEL,
   CLOUD_START_CHANNEL,
   CLOUD_LIST_CHANNEL,
@@ -3336,73 +3332,12 @@ if (!ownsSingleInstanceLock) {
     })
     // Switch to a folder already worked in -- by id, never a path the window names (0.458).
     /*
-     * THE FINANCES PLACE (0.501, main/places.ts). Only while it is switched
-     * on in Settings: its own folder, made with a note saying what it is for,
-     * and one teammate who works there, on Codex, read-only. The teammate is
-     * found again by its folder, so renaming it keeps it the same one.
-     */
-    ipcMain.handle(PLACE_FINANCES_CHANNEL, async (event) => {
-      if (!fromOwnWindow(event)) return { ok: false, message: 'The Finances place could not be opened. Nothing in it was changed.' }
-      if ((await teammates.readSettings()).financesPlace !== true) return { ok: false, message: 'Switch the Finances place on in Settings first.' }
-      try {
-        await mkdir(FINANCES_FOLDER, { recursive: true })
-        const note = join(FINANCES_FOLDER, 'README.md')
-        if (!existsSync(note)) await writeFile(note, FINANCES_README, 'utf8')
-        const same = (left: string | undefined): boolean => left !== undefined && resolvePath(left).toLowerCase() === resolvePath(FINANCES_FOLDER).toLowerCase()
-        let teammate = (await teammates.list()).find((entry) => same(entry.folder))
-        if (teammate === undefined) {
-          const taken = new Set((await teammates.list()).map((entry) => entry.name.toLowerCase()))
-          const name = taken.has(FINANCES_TEAMMATE.name.toLowerCase()) ? 'Finances place' : FINANCES_TEAMMATE.name
-          const made = await teammates.create({ ...FINANCES_TEAMMATE, name, starters: [...FINANCES_TEAMMATE.starters] })
-          await teammates.rememberRoute(made.teammateId, FINANCES_ROUTE)
-          teammate = await teammates.setFolder(made.teammateId, FINANCES_FOLDER)
-        }
-        const now = await switchFolder(FINANCES_FOLDER)
-        return { ok: true, folder: now, teammateId: teammate.teammateId }
-      } catch {
-        return { ok: false, message: 'The Finances place could not be opened. Nothing in it was changed.' }
-      }
-    })
-
-    /*
      * PUT BACK WHAT THE LATER REPLIES CHANGED (0.502). The window says which
      * files and what was recorded; the host checks every piece of that, stays
      * inside this folder, and writes nothing until each file's answer is
      * known -- then only the files that come back exactly. A link is left
      * alone: following one could write outside the folder.
      */
-    /*
-     * THE FINANCES DASHBOARD'S DATA (0.506): the CSV statements in the place's
-     * folder, read on the host (shared/statements.ts) -- only while the place
-     * is switched on, only that folder, only files, nothing written.
-     */
-    ipcMain.handle(FINANCES_READ_CHANNEL, async (event) => {
-      const nothing = { transactions: [], files: [], unread: [] }
-      if (!fromOwnWindow(event)) return nothing
-      if ((await teammates.readSettings()).financesPlace !== true) return nothing
-      const names = await readdir(FINANCES_FOLDER).catch(() => [] as string[])
-      const read: ReturnType<typeof readCsvStatement>[] = []
-      const files: { name: string; count: number; skipped: number; problem?: string }[] = []
-      const unread: string[] = []
-      for (const name of names.slice(0, 200)) {
-        const full = join(FINANCES_FOLDER, name)
-        const facts = await stat(full).catch(() => undefined)
-        if (facts === undefined || !facts.isFile()) continue
-        if (!/\.csv$/i.test(name)) {
-          if (!/^readme\.md$/i.test(name)) unread.push(name)
-          continue
-        }
-        if (facts.size > 20 * 1024 * 1024) {
-          files.push({ name, count: 0, skipped: 0, problem: 'too large to read here (over 20 MB)' })
-          continue
-        }
-        const statement = readCsvStatement(await readFile(full, 'utf8').catch(() => ''), name)
-        read.push(statement)
-        files.push({ name, count: statement.transactions.length, skipped: statement.skipped, ...(statement.problem === undefined ? {} : { problem: statement.problem }) })
-      }
-      return { transactions: mergeStatements(read), files, unread }
-    })
-
     ipcMain.handle(REWIND_PUT_BACK_CHANNEL, async (event, request: unknown) => {
       const leftAlone: { path: string; why: string }[] = []
       if (!fromOwnWindow(event)) return { putBack: [], leftAlone }

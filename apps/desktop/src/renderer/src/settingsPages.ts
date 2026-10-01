@@ -186,9 +186,8 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
     label: 'Connectors',
     group: 'Agents',
     icon: 'plug',
-    headings: ['Finances', 'Connectors'],
+    headings: ['Connectors'],
     alsoKnownAs: {
-      Finances: ['money', 'bank', 'budget', 'spending', 'statements', 'finance'],
       Connectors: ['mcp', 'tools', 'server']
     }
   },

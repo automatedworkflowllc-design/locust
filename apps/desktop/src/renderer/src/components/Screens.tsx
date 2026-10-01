@@ -62,7 +62,7 @@ import { ArmedButton } from './ArmedButton.js'
 import { OwnModels } from './OwnModels.js'
 import { routineAwaitsReview } from '../../../shared/routine-recovery.js'
 
-export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings' | 'rooms' | 'memory' | 'automations' | 'finances'
+export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings' | 'rooms' | 'memory' | 'automations'
 
 /**
  * THE header for a list screen. Exported since 2026-09-22 because Routines
@@ -1394,8 +1394,6 @@ export function SettingsScreen({
   onInterruptChange,
   autoMode,
   askConnectors,
-  financesPlace = false,
-  onFinancesPlaceChange,
   keepATodoList,
   onKeepATodoListChange,
   onAskConnectorsChange,
@@ -1505,9 +1503,6 @@ export function SettingsScreen({
   readonly onAutoModeChange: (autoMode: boolean) => void
   readonly askConnectors: boolean
   readonly onAskConnectorsChange: (askConnectors: boolean) => void
-  /** The Finances place in the sidebar (0.501). */
-  readonly financesPlace?: boolean
-  readonly onFinancesPlaceChange?: (financesPlace: boolean) => void
   /** A model of the person's own was added or removed: the model list is read again. */
   readonly onOwnModelsChanged?: () => void
   readonly keepATodoList: boolean
@@ -2055,41 +2050,6 @@ export function SettingsScreen({
             </More>
             <OwnModels onChanged={onOwnModelsChanged} />
           </section>
-        )}
-        {shownPage === 'connectors' && onFinancesPlaceChange !== undefined && (
-        <section className="lc-settings__section lc-settings__section--line">
-          <div className="lc-settingline">
-            <div className="lc-settingline__text">
-              <h2 className="lc-settings__heading">Finances</h2>
-              <p className="lc-settings__lede">
-                {financesPlace
-                  ? 'On. Finances is in the sidebar: a folder for your statements, and a teammate on Codex who only reads them.'
-                  : 'Off. Switch on to add Finances to the sidebar: drop your bank or card statements in, and ask where the money went.'}
-              </p>
-            </div>
-            <button
-              type="button"
-              className={`lc-switch${financesPlace ? ' is-on' : ''}`}
-              role="switch"
-              aria-checked={financesPlace}
-              aria-label="Finances"
-              onClick={() => onFinancesPlaceChange(!financesPlace)}
-            >
-              <span className="lc-switch__knob" />
-            </button>
-          </div>
-          <More>
-            <p>
-              Finances is a folder of its own, outside every project, and one teammate who works there on Codex in
-              Ask, so it can read what you put there and change nothing. Drop CSV or PDF statements into it and
-              ask what you would ask a bookkeeper: where the money went, what repeats every month, what changed.
-            </p>
-            <p>
-              If you linked your accounts in Codex's own Finances, the teammate can use them too. Locust never asks
-              for bank details, links nothing itself, and cannot move money.
-            </p>
-          </More>
-        </section>
         )}
         {shownPage === 'connectors' && (
         <section className="lc-settings__section">

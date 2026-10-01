@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.510.0 - 2026-09-30
+
+### Removed
+
+- **Finances, for now.** It read statements you downloaded and dropped in a
+  folder, and a finances page is only worth having when it keeps itself up
+  to date. That means linking bank accounts, which Locust will not do
+  without doing it properly. The switch, the sidebar row and the page are
+  gone. Nothing of yours was deleted: if you turned it on, the Finances
+  teammate stays as an ordinary teammate, and your statements stay in their
+  folder (`.locust/places/finances` in your home folder).
+
 ## 0.509.0 - 2026-09-30
 
 ### Fixed
