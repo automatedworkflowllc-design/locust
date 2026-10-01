@@ -6,7 +6,8 @@
 // this teammate". A routine "on a new file in inbox", seeded for Wren on Codex
 // (GPT-6-Luna, low: Codex quota, which may be spent). A file already in the
 // inbox starts nothing; a new one does, once it has stopped changing, and the
-// run is told its name and reads it (a routine always runs in Ask).
+// run is told its name and reads it (this routine is saved in Ask; since 0.530 the person
+// chooses Only read or Change files, and a routine in Edit writes into the folder).
 
 import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
