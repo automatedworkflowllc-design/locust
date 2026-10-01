@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.521.0 - 2026-10-01
+
+### New
+
+- **Approval cards can remember your answer.** When a teammate asks before
+  running a command, changing a file or using a connector, "Yes, and don't
+  ask again" saves a rule for exactly that, for that teammate in that
+  folder, and beside Deny, "Never allow this" saves the opposite. The card
+  says the rule in a sentence before you press it, the conversation says
+  when a rule answered for you, and Settings > Teammates > Saved approvals
+  lists every rule with how often it was used, to remove any of them.
+
 ## 0.520.0 - 2026-10-01
 
 ### New
