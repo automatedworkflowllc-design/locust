@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.523.0 - 2026-10-01
+
+### New
+
+- **Ask another model the same question in Compare.** A comparison with one
+  question and room for a third column offers "Ask another model": pick one
+  that is not in it yet, and it is asked exactly what the others were, in a
+  new column. What you kept stays kept, and your record counts the new one.
+
 ## 0.522.0 - 2026-10-01
 
 ### New
