@@ -187,6 +187,7 @@ export function RoutineDialog({
                 routine write into the folder while its dialog promised it changed
                 nothing. Now the person picks, and every sentence below follows it.
               */}
+              <div className="lc-routinesched">
               <div className="lc-segmented" role="radiogroup" aria-labelledby="routine-may-label">
                 {(
                   [
@@ -206,11 +207,12 @@ export function RoutineDialog({
                   </button>
                 ))}
               </div>
-              <span className="lc-routinesched__detail lc-mono">
+              </div>
+              <p className="lc-dialog__note lc-mono">
                 {readsOnly
                   ? 'It reads and answers; nothing in the folder changes.'
                   : 'What a run changes lands in the folder straight away, with nothing to keep or undo first.'}
-              </span>
+              </p>
             </div>
           )}
           {running && (
