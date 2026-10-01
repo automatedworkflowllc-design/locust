@@ -22,6 +22,8 @@ export function defaultComparePicks(input: {
   readonly current: Choice | undefined
   /** Routes this person ran, newest first, as `runtime:model`. */
   readonly recent: readonly string[]
+  /** OpenCode's free models that finished a run here, newest first (0.517). */
+  readonly answered?: readonly string[]
   readonly models: readonly PublicModel[]
   readonly ready: (runtime: string) => boolean
   readonly refusal: (choice: Choice) => string | undefined
@@ -49,7 +51,9 @@ export function defaultComparePicks(input: {
    * of OpenCode's free models, the second is another free one if there is.
    */
   const free = (one: Choice): boolean => one.runtime === 'opencode' && one.model.endsWith('-free')
-  const second = (free(first) ? candidates.find((one) => one !== first && free(one)) : undefined)
+  // And one that has answered here before one that has not: the first listed can be down for a day (0.517).
+  const otherFree = candidates.filter((one) => one !== first && free(one))
+  const second = (free(first) ? otherFree.find((one) => input.answered?.includes(one.model) === true) ?? otherFree[0] : undefined)
     ?? candidates.find((one) => one.runtime !== first.runtime)
     ?? candidates[1]
   if (second === undefined) return []

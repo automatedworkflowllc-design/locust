@@ -59,6 +59,17 @@ describe('the two a comparison starts on', () => {
     expect(lone.map((pick) => pick.model)).toEqual(['opencode/mimo-v2.6-flash-free', 'gpt-6.1-sol'])
   })
 
+  it('take, as the second free one, a free model that has answered here over the first listed (0.517)', () => {
+    const models = [model('opencode', 'opencode/mimo-v2.6-flash-free'), model('opencode', 'opencode/ling-3.0-flash-fin-free'), model('opencode', 'opencode/muse-spark-1.3-contributor-free')]
+    const current = { runtime: 'opencode', model: 'opencode/mimo-v2.6-flash-free' } as const
+    // Ling was tried (and failed) most recently; Muse is the one that answered.
+    const picks = defaultComparePicks({ ...base, models, current, recent: ['opencode:opencode/ling-3.0-flash-fin-free'], answered: ['opencode/muse-spark-1.3-contributor-free'] })
+    expect(picks.map((pick) => pick.model)).toEqual(['opencode/mimo-v2.6-flash-free', 'opencode/muse-spark-1.3-contributor-free'])
+    // Nothing answered yet: the next free one, as before.
+    const fresh = defaultComparePicks({ ...base, models, current, recent: [] })
+    expect(fresh.map((pick) => pick.model)).toEqual(['opencode/mimo-v2.6-flash-free', 'opencode/ling-3.0-flash-fin-free'])
+  })
+
   it('leave out older models and the person\'s own', () => {
     const picks = defaultComparePicks({ ...base, current: undefined, recent: [], models: [model('claude', 'old', { older: true }), model('opencode', 'mine', { own: true }), model('claude', 'opus'), model('codex', 'gpt-6-sol')] })
     expect(picks.map((pick) => pick.model)).toEqual(['opus', 'gpt-6-sol'])

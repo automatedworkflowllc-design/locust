@@ -5006,6 +5006,24 @@ export function relayedTitle(mission: {
  * judgement nothing here measured. A model whose id encodes an effort is
  * counted under the id that ran, which is the one they would pick again.
  */
+/**
+ * OpenCode's free models that finished a run here, newest first (0.517):
+ * what "Use a free model" and a new person's first route prefer over the
+ * catalogue's first, which can be down for a day (`freeStartModel`).
+ */
+export function freeModelsThatAnswered(
+  missions: readonly Pick<PublicRecoveredMission, 'runtime' | 'model' | 'phase' | 'lastUpdatedAt'>[]
+): readonly string[] {
+  const seen = new Map<string, number>()
+  for (const mission of missions) {
+    if (mission.runtime !== 'opencode' || !mission.model.endsWith('-free') || mission.phase !== 'completed') continue
+    const at = Date.parse(mission.lastUpdatedAt)
+    const stamp = Number.isFinite(at) ? at : 0
+    if ((seen.get(mission.model) ?? -1) < stamp) seen.set(mission.model, stamp)
+  }
+  return [...seen.entries()].sort((left, right) => right[1] - left[1]).map(([model]) => model)
+}
+
 export function recentlyUsedRoutes(
   missions: readonly PublicRecoveredMission[]
 ): readonly string[] {

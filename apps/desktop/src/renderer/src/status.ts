@@ -1696,16 +1696,25 @@ export function keepWhatWasKnown(
  * our first-run path. Catalogue order is OpenCode's own answer to "what
  * first", and it stays right when the list changes.
  *
+ * BUT ONE THAT ANSWERED HERE FIRST (0.517). The first listed (Ling) said
+ * "Endpoint is unavailable" all of 2026-09-30 while others answered, and
+ * every "Use a free model" landed on it. `answered` is the free models that
+ * finished a run on this machine, newest first (`freeModelsThatAnswered`);
+ * the newest still listed wins, and the catalogue's first is only for a
+ * person who has not run one yet.
+ *
  * `undefined` means LEAVE IT ALONE: no free model listed, the catalogue is
  * unread, or this is not the free-start runtime. Same rule as everywhere else
  * in this file -- no answer is not a bad answer.
  */
 export function freeStartModel(
   runtime: MissionRuntimeId,
-  models: readonly PublicModel[]
+  models: readonly PublicModel[],
+  answered: readonly string[] = []
 ): string | undefined {
   if (runtime !== FREE_START_RUNTIME) return undefined
-  return models.find((model) => model.runtime === FREE_START_RUNTIME && model.id.endsWith('-free'))?.id
+  const listed = models.filter((model) => model.runtime === FREE_START_RUNTIME && model.own !== true && model.id.endsWith('-free'))
+  return answered.find((id) => listed.some((model) => model.id === id)) ?? listed[0]?.id
 }
 
 /**

@@ -146,6 +146,7 @@ import { cappedLiveEvents, LIVE_EVENT_CAP,
   failedOnItsLimit,
   failedOnProviderSide,
   recentlyUsedRoutes,
+  freeModelsThatAnswered,
   resolvedModelNames,
   resumableSessionOf,
   laterFileChanges,
@@ -2015,15 +2016,17 @@ export default function App(): ReactElement {
    * deliberately has to stay possible. This only ever fires on a profile that
    * has not picked yet, which is the profile the finding is about.
    */
+  // The free models that finished a run here, newest first: preferred over the catalogue's first (0.517).
+  const freeAnswered = useMemo(() => freeModelsThatAnswered(history), [history])
   useEffect(() => {
     if (runtimeState.phase !== 'ready' || routeChosen.current) return
     if (route.model !== ACCOUNT_DEFAULT_MODEL) return
-    const free = freeStartModel(route.runtime, models)
+    const free = freeStartModel(route.runtime, models, freeAnswered)
     if (free === undefined) return
     setRoute((current) =>
       current.model === ACCOUNT_DEFAULT_MODEL ? { ...current, model: free } : current
     )
-  }, [runtimeState.phase, route.runtime, route.model, models])
+  }, [runtimeState.phase, route.runtime, route.model, models, freeAnswered])
   // What the CLIs already have set up. Read once discovery has settled: the
   // list is gated on which runtimes are installed, so asking earlier would
   // report an empty machine.
@@ -3566,6 +3569,7 @@ export default function App(): ReactElement {
     defaultComparePicks({
       current: composerRoute,
       recent: recentRoutes,
+      answered: freeAnswered,
       models,
       ready: (runtime) => runtimes.some((status) => status.id === runtime && status.ready),
       refusal: (choice) => compareChoiceRefusal(choice, changes),
@@ -6994,9 +6998,9 @@ export default function App(): ReactElement {
                 runtimes={runtimes}
                 freeStart={freeStartStillFree(runtimes, models)}
                 {...((() => {
-                  // The free model, by the catalogue's own first free entry (0.514).
+                  // The free model that last answered here, else the catalogue's first free entry (0.514, 0.517).
                   if (route.runtime === 'opencode') return {}
-                  const free = freeStartModel('opencode', models)
+                  const free = freeStartModel('opencode', models, freeAnswered)
                   return free === undefined ? {} : { onUseFree: () => changeRoute({ runtime: 'opencode', model: free }) }
                 })())}
                 limitedRuntimes={limitedRuntimes}
