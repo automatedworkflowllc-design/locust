@@ -281,6 +281,7 @@ import {
   COMPARE_KEEP_CHANNEL,
   COMPARE_RETRY_CHANNEL,
   COMPARE_JUDGE_CHANNEL,
+  COMPARE_ADD_MODEL_CHANNEL,
   COMPARE_CHANGES_CHANNEL,
   COMPARE_CHANGES_REFUSAL_CHANNEL,
   COMPARE_LIST_CHANNEL,
@@ -4982,6 +4983,41 @@ if (!ownsSingleInstanceLock) {
      * would keep. The comparison records the run so it is never listed as a
      * conversation; the person still keeps one themselves.
      */
+    /*
+     * ANOTHER MODEL, THE SAME QUESTION (0.523), after Optima's "results on the
+     * latest models as soon as they're released": a comparison of one question
+     * takes one more column, asked what the others were asked. A decided
+     * comparison keeps what it kept; the record counts the new one.
+     */
+    ipcMain.handle(COMPARE_ADD_MODEL_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return compareRefused('The request was rejected.')
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      const compare = await compares.get(input.compareId).catch(() => undefined)
+      if (compare === undefined) return compareRefused('That comparison is no longer here.')
+      if (compare.changes === true) return compareRefused('A comparison that changes files cannot take another model after it starts. Start a new comparison instead.')
+      if (compare.slots.some((column) => column.missionIds.length > 1)) return compareRefused('This comparison went on past its first question, so another model cannot be asked the same thing. Start a new comparison instead.')
+      const route = (typeof input.route === 'object' && input.route !== null ? input.route : {}) as Record<string, unknown>
+      if (!isMissionRuntime(route.runtime) || typeof route.model !== 'string' || route.model.length === 0 || route.model.length > 200) return compareRefused('Pick a model to ask.')
+      let added: PublicCompare
+      try {
+        added = await compares.addColumn(compare.compareId, {
+          runtime: route.runtime,
+          model: route.model,
+          ...(typeof route.effort === 'string' ? { effort: route.effort } : {}),
+          ...(typeof route.label === 'string' && route.label.trim().length > 0 ? { label: route.label.trim() } : {})
+        })
+      } catch (error) {
+        return compareRefused(error instanceof Error ? error.message : 'That model could not be added. Nothing was asked.')
+      }
+      const column = added.slots.at(-1)
+      if (column === undefined) return compareRefused('That model could not be added. Nothing was asked.')
+      const why = await startCompareColumn(added, column, compare.prompt).catch((error: unknown) => (error instanceof Error ? error.message : 'It could not be started.'))
+      if (why !== undefined) {
+        await compares.refuse(compare.compareId, column.slot, why).catch(() => undefined)
+        return { ok: true, data: { compare: (await compares.get(compare.compareId)) ?? added, refused: [{ slot: column.slot, message: why }] } } as const
+      }
+      return { ok: true, data: { compare: (await compares.get(compare.compareId)) ?? added, refused: [] } } as const
+    })
     ipcMain.handle(COMPARE_JUDGE_CHANNEL, async (event, request: unknown) => {
       if (!fromOwnWindow(event)) return compareRefused('The request was rejected.')
       const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>

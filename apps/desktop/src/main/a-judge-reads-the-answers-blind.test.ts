@@ -46,6 +46,21 @@ describe('what a judge is asked', () => {
   })
 })
 
+describe('another model, asked the same question (0.523)', () => {
+  it('joins as the next column, never a model already in it, never past three', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'locust-add-model-'))
+    roots.push(root)
+    const store = createCompareStore({ rootDirectory: root })
+    const compare = await store.create({ prompt: 'Q', routes: [{ runtime: 'opencode', model: 'a-free' }, { runtime: 'opencode', model: 'b-free' }] })
+    const added = await store.addColumn(compare.compareId, { runtime: 'codex', model: 'gpt-6-luna', label: 'GPT-6 Luna' })
+    expect(added.slots.map((column) => column.slot)).toEqual(['a', 'b', 'c'])
+    expect(added.slots[2]).toEqual({ slot: 'c', route: { runtime: 'codex', model: 'gpt-6-luna', label: 'GPT-6 Luna' }, missionIds: [] })
+    await expect(store.addColumn(compare.compareId, { runtime: 'claude', model: 'opus' })).rejects.toThrow('at most 3')
+    const two = await store.create({ prompt: 'Q', routes: [{ runtime: 'opencode', model: 'a-free' }, { runtime: 'opencode', model: 'b-free' }] })
+    await expect(store.addColumn(two.compareId, { runtime: 'opencode', model: 'a-free' })).rejects.toThrow('already in this comparison')
+  })
+})
+
 describe('a judge, remembered with its comparison', () => {
   it('keeps its route, its runs newest last and the person\'s words, and its runs are never conversations', async () => {
     const root = await mkdtemp(join(tmpdir(), 'locust-judge-'))

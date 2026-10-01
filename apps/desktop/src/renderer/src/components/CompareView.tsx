@@ -91,7 +91,10 @@ export function CompareView({
   judge,
   judgeChoices = [],
   judging = false,
-  onJudge
+  onJudge,
+  addChoices = [],
+  adding = false,
+  onAddModel
 }: {
   readonly compare: PublicCompare
   /** In a comparison that edits (0.445): what each column has changed, "+12 -3 in 2 files". */
@@ -124,6 +127,10 @@ export function CompareView({
   /** A judge is being asked. */
   readonly judging?: boolean
   readonly onJudge?: (choiceKey: string, criteria: string) => void
+  /** Models not yet in it, that the same question can be put to (0.523). */
+  readonly addChoices?: readonly { readonly key: string; readonly label: string }[]
+  readonly adding?: boolean
+  readonly onAddModel?: (choiceKey: string) => void
 }): ReactElement {
   const kept = compare.kept?.slot
   // A blind comparison hides what would name the model -- its mark, its runtime, its cost -- until one is kept (0.449).
@@ -310,6 +317,9 @@ export function CompareView({
         {onJudge !== undefined && judgeChoices.length > 0 && judge?.running !== true && columns.filter((column) => column.keepable).length >= 2 && !columns.some((column) => column.running) && (
           <JudgeAsk choices={judgeChoices} again={judge !== undefined} busy={judging} onJudge={onJudge} />
         )}
+        {onAddModel !== undefined && addChoices.length > 0 && columns.length < 3 && compare.changes !== true && !columns.some((column) => column.running) && columns.every((column) => column.turns.length <= 1) && (
+          <AddModelAsk choices={addChoices} busy={adding} onAdd={onAddModel} />
+        )}
         {record !== undefined && record.length > 0 && (
           /*
            * YOUR RECORD (0.519), as Optima's results table: every model you
@@ -424,6 +434,36 @@ function JudgeAsk({ choices, again, busy, onJudge }: {
         </button>
       </div>
       <p className="lc-compare__judgenote">It reads the answers without the models&rsquo; names and says which it would keep. It keeps nothing itself.</p>
+    </div>
+  )
+}
+
+/**
+ * ANOTHER MODEL, THE SAME QUESTION (0.523): a third column, asked what the
+ * others were. After Optima, which runs a benchmark again on each new model.
+ */
+function AddModelAsk({ choices, busy, onAdd }: {
+  readonly choices: readonly { readonly key: string; readonly label: string }[]
+  readonly busy: boolean
+  readonly onAdd: (choiceKey: string) => void
+}): ReactElement {
+  const [choice, setChoice] = useState(choices[0]?.key ?? '')
+  return (
+    <div className="lc-compare__judgeask">
+      <span className="lc-compare__recordlabel lc-mono">ASK ANOTHER MODEL</span>
+      <div className="lc-compare__judgerow">
+        <select className="lc-input lc-compare__judgepick" aria-label="The model to ask too" value={choice} onChange={(event) => setChoice(event.target.value)}>
+          {choices.map((one) => (
+            <option key={one.key} value={one.key}>
+              {one.label}
+            </option>
+          ))}
+        </select>
+        <button type="button" className="lc-button" disabled={busy || choice.length === 0} onClick={() => onAdd(choice)}>
+          {busy ? 'Asking…' : 'Ask it too'}
+        </button>
+      </div>
+      <p className="lc-compare__judgenote">It is asked the same question, as a new column. What you kept stays kept.</p>
     </div>
   )
 }

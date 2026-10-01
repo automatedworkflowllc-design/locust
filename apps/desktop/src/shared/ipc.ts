@@ -989,6 +989,12 @@ export type CompareChangesResponse =
 export const COMPARE_LIST_CHANNEL = 'compare:list'
 /** Ask a judge for its view of the answers (0.520, main/compare-judge.ts). */
 export const COMPARE_JUDGE_CHANNEL = 'compare:judge'
+/** Put a comparison's question to one more model, as a new column (0.523). */
+export const COMPARE_ADD_MODEL_CHANNEL = 'compare:add-model'
+export interface CompareAddModelRequest {
+  readonly compareId: string
+  readonly route: { readonly runtime: MissionRuntimeId; readonly model: string; readonly effort?: string; readonly label?: string }
+}
 export interface CompareJudgeRequest {
   readonly compareId: string
   readonly route: { readonly runtime: MissionRuntimeId; readonly model: string; readonly effort?: string; readonly label?: string }
@@ -3052,6 +3058,8 @@ export interface DesktopApi {
   retryCompare(compareId: string, slot: CompareSlotId): Promise<CompareResponse>
   /** Ask a judge for its view of a comparison's answers (0.520). */
   judgeCompare(request: CompareJudgeRequest): Promise<CompareResponse>
+  /** Put the comparison's question to one more model (0.523). */
+  addCompareModel(request: CompareAddModelRequest): Promise<CompareResponse>
   compareChanges(compareId: string): Promise<CompareChangesResponse>
   compareChangesRefusal(): Promise<string | undefined>
   listCompares(): Promise<CompareListResponse>

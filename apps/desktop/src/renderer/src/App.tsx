@@ -1617,6 +1617,8 @@ export default function App(): ReactElement {
   const [retryingCompare, setRetryingCompare] = useState<CompareSlotId | undefined>(undefined)
   // A judge being asked, while its run is started (0.520).
   const [judgingCompare, setJudgingCompare] = useState(false)
+  // Another model being added to a comparison (0.523).
+  const [addingCompareModel, setAddingCompareModel] = useState(false)
   // Every judge's run: drawn in its comparison, never listed as a conversation (0.520).
   const judgeIds = useMemo(() => judgeMissionIds(compares), [compares])
   const isJudgeRun = (startedBy: { readonly kind: string } | undefined, missionId: string | undefined): boolean =>
@@ -3799,6 +3801,25 @@ export default function App(): ReactElement {
       replaceCompare(answer.data.compare)
     } finally {
       setJudgingCompare(false)
+    }
+  }
+  /** Put the comparison's question to one more model, as a new column (0.523). */
+  const addCompareModel = async (compare: PublicCompare, choice: { readonly runtime: MissionRuntimeId; readonly model: string; readonly label: string }): Promise<void> => {
+    const bridge = window.desktop
+    if (!bridge) return
+    setAddingCompareModel(true)
+    setCompareProblem(undefined)
+    try {
+      // The column is named by its model, as the others are; its runtime's mark sits beside it.
+      const label = routeModelName(choice.runtime, choice.model, resolvedModels.get(`${choice.runtime}:${choice.model}`))
+      const answer = await bridge.addCompareModel({ compareId: compare.compareId, route: { runtime: choice.runtime, model: choice.model, label } }).catch(() => undefined)
+      if (answer === undefined || !answer.ok) {
+        setCompareProblem(answer?.ok === false ? answer.error.message : 'That model could not be asked. Nothing was started.')
+        return
+      }
+      replaceCompare(answer.data.compare)
+    } finally {
+      setAddingCompareModel(false)
     }
   }
   const retryCompareColumn = async (compare: PublicCompare, slot: CompareSlotId): Promise<void> => {
@@ -7049,7 +7070,16 @@ export default function App(): ReactElement {
                   {...(() => {
                     const judge = judgeViewOf(comparing)
                     const choices = judgeChoicesFor(comparing)
+                    // Another model: only ones not already in it (0.523).
+                    const compared = new Set(comparing.slots.map((column) => `${column.route.runtime}:${column.route.model}`))
+                    const addable = choices.filter((one) => !compared.has(one.key))
                     return {
+                      addChoices: addable,
+                      adding: addingCompareModel,
+                      onAddModel: (key: string) => {
+                        const choice = addable.find((one) => one.key === key)
+                        if (choice !== undefined) void addCompareModel(comparing, choice)
+                      },
                       ...(judge === undefined ? {} : { judge }),
                       judgeChoices: choices,
                       judging: judgingCompare,

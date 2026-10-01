@@ -50,6 +50,8 @@ export interface CompareStore {
   /** A column could not start, and why. */
   refuse(compareId: string, slot: CompareSlotId, why: string): Promise<PublicCompare>
   keep(compareId: string, slot: CompareSlotId, brought?: readonly string[]): Promise<PublicCompare>
+  /** Another model joins (0.523): a new column, the next letter, nothing asked yet. */
+  addColumn(compareId: string, route: CompareRoute): Promise<PublicCompare>
   /** A judge was asked (0.520): its run, newest last, on this route and with these words. */
   judge(compareId: string, route: CompareRoute, missionId: string, criteria?: string): Promise<PublicCompare>
   remove(compareId: unknown): Promise<void>
@@ -266,6 +268,22 @@ export function createCompareStore(options: {
         const column = compare.slots.find((one) => one.slot === slot)
         if (column === undefined || column.missionIds.length === 0) throw new Error('That column has nothing to keep yet.')
         return { ...compare, kept: { slot, at: now().toISOString(), ...(brought === undefined ? {} : { brought: brought.slice(0, MAX_BROUGHT) }) } }
+      }),
+
+    addColumn: (compareId, route) =>
+      change(compareId, (compare) => {
+        if (compare.slots.length >= MAX_COMPARE_SLOTS) throw new Error(`A comparison is at most ${String(MAX_COMPARE_SLOTS)} models.`)
+        if (compare.slots.some((column) => column.route.runtime === route.runtime && column.route.model === route.model)) throw new Error('That model is already in this comparison.')
+        const slot = COMPARE_SLOTS.find((letter) => !compare.slots.some((column) => column.slot === letter))
+        if (slot === undefined) throw new Error(`A comparison is at most ${String(MAX_COMPARE_SLOTS)} models.`)
+        return {
+          ...compare,
+          slots: [...compare.slots, {
+            slot,
+            route: { runtime: route.runtime, model: route.model, ...(route.effort === undefined ? {} : { effort: route.effort }), ...(route.label === undefined ? {} : { label: route.label.slice(0, 120) }) },
+            missionIds: []
+          }]
+        }
       }),
 
     judge: (compareId, route, missionId, criteria) =>
