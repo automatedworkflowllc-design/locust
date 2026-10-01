@@ -73,7 +73,7 @@ try {
       })
     }
     for (let i = 0; i < 600 && !sent; i++) {
-      const button = document.querySelector('button[aria-label="Start mission"]')
+      const button = document.querySelector('button[aria-label="Send"]')
       if (button && !button.disabled) {
         before = count()
         chip = document.querySelector('form.command-dock')?.innerText

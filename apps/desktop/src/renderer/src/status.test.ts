@@ -454,19 +454,19 @@ describe('what a prune says before it happens', () => {
 
   it('states the count that would go, and names everything held back', () => {
     expect(prunePreviewSummary(preview(3, 2, 1))).toBe(
-      'Delete 3 missions for good, with 2 missions kept as part of a conversation you are keeping and 1 mission kept because they are running.'
+      'Delete 3 turns for good, with 2 turns kept as part of a conversation you are keeping and 1 turn kept because they are running.'
     )
   })
 
   it('says why nothing would go, rather than just saying nothing', () => {
     expect(prunePreviewSummary(preview(0, 2))).toBe(
-      'Nothing would be deleted: 2 missions still part of a conversation you are keeping.'
+      'Nothing would be deleted: 2 turns still part of a conversation you are keeping.'
     )
     expect(prunePreviewSummary(preview(0))).toBe('Nothing is old enough to delete.')
   })
 
   it('counts one mission as one', () => {
-    expect(prunePreviewSummary(preview(1))).toBe('Delete 1 mission for good.')
+    expect(prunePreviewSummary(preview(1))).toBe('Delete 1 turn for good.')
   })
 })
 

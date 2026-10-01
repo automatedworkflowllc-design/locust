@@ -147,7 +147,7 @@ describe('nothing loses its way in', () => {
   // Claude's sidebar from Colin's screenshot; Settings stays in the footer.
   // Reachability is the rule, so each is asserted where it now lives, drawn
   // whatever the width (the list is not behind `compact`).
-  for (const name of ['Missions', 'Rooms', 'Routines']) {
+  for (const name of ['Conversations', 'Rooms', 'Routines']) {
     it(`${name} has a button in the places list at the top`, () => {
       const at = SIDEBAR.indexOf('<div className="lc-sidebar__nav lc-sidebar__places">')
       expect(at).toBeGreaterThan(-1)

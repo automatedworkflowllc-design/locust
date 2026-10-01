@@ -50,7 +50,7 @@ try {
   await drive.evaluate(`(async () => { ${teammateFace('Wren')}?.click(); await new Promise((r) => setTimeout(r, 900)) })()`)
   const layout = JSON.parse(await drive.capture('the chat box', () => drive.evaluate(`(() => {
     const box = document.querySelector('form.command-dock .lc-composer__box')
-    const field = document.querySelector('textarea[aria-label="Mission instruction"]')
+    const field = document.querySelector('textarea[aria-label="Message"]')
     if (!box || !field) return JSON.stringify({ error: 'no chat box' })
     const b = box.getBoundingClientRect()
     const f = field.getBoundingClientRect()

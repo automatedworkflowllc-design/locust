@@ -38,7 +38,7 @@ try {
     set.call(field, 'Read README.md and LOCUST.md, then describe this project in three sentences.')
     field.dispatchEvent(new Event('input', { bubbles: true }))
     await new Promise((r) => setTimeout(r, 300))
-    document.querySelector('button[aria-label="Start mission"]')?.click()
+    document.querySelector('button[aria-label="Send"]')?.click()
     return 'sent'
   })()`)
   const seen = []

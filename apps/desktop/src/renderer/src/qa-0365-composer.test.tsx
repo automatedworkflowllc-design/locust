@@ -190,11 +190,11 @@ describe('the placeholder on a machine with nothing installed', () => {
     // 0.138; the box you type into still did, under a welcome saying
     // OpenCode needs no account.
     const bare = markup({ runtimes: [runtime('opencode', 'OpenCode', false), runtime('codex', 'Codex CLI', false)] })
-    expect(bare).toContain('Install a coding agent to start a mission…')
+    expect(bare).toContain('Install a coding agent to start…')
     expect(bare).not.toContain('sign in')
   })
   it('still says sign in when a runtime is installed but not usable', () => {
     const unsigned = { ...runtime('codex', 'Codex CLI', false), installed: true, version: '0.153.0', auth: 'unauthenticated' as const, status: 'auth-required' as const }
-    expect(markup({ runtimes: [unsigned] })).toContain('sign in to start a mission…')
+    expect(markup({ runtimes: [unsigned] })).toContain('sign in to start…')
   })
 })

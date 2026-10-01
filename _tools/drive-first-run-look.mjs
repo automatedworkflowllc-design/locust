@@ -78,7 +78,7 @@ try {
   const plus = JSON.parse(String(await drive.capture('the + menu open over the box', () => drive.evaluate(`(async () => {
     document.querySelector('.lc-plusmenu__main')?.click()
     await new Promise((r) => setTimeout(r, 700))
-    const box = document.querySelector('textarea[aria-label="Mission instruction"]')
+    const box = document.querySelector('textarea[aria-label="Message"]')
     return JSON.stringify({ open: document.querySelector('.lc-plusmenu.is-open') !== null, placeholder: box ? getComputedStyle(box, '::placeholder').color : null })
   })()`))))
   check('the + menu open, the box placeholder steps aside', plus.open === true && /rgba\(\d+, \d+, \d+, 0\)|transparent/.test(plus.placeholder ?? ''), JSON.stringify(plus))

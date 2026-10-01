@@ -62,7 +62,7 @@ try {
   })()`)))
   check('NOTES.md is attached', /NOTES/.test(tiles), tiles)
   await drive.capture('ask what it says, and send', () => drive.evaluate(`(async () => {
-    const box = document.querySelector('textarea[aria-label="Mission instruction"]')
+    const box = document.querySelector('textarea[aria-label="Message"]')
     const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set
     setter.call(box, 'What is the passphrase in the attached file? Reply with the passphrase only. Do not edit any files.')
     box.dispatchEvent(new Event('input', { bubbles: true }))

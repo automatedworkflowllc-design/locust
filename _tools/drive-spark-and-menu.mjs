@@ -69,7 +69,7 @@ try {
   await drive.evaluate(openTeammateScript('Ada'))
   await sleep(800)
   await drive.evaluate(type('Read every file in this folder and describe each in one sentence.'))
-  await drive.evaluate(`document.querySelector('button[aria-label="Start mission"]')?.click()`)
+  await drive.evaluate(`document.querySelector('button[aria-label="Send"]')?.click()`)
   const spark = JSON.parse(String(await drive.evaluate(`(async () => {
     for (let i = 0; i < 80 && !document.querySelector('.lc-conv .lc-spark, .lc-spark'); i += 1) await new Promise((r) => setTimeout(r, 250))
     const el = document.querySelector('.lc-spark')

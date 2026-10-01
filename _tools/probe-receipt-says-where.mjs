@@ -74,7 +74,7 @@ const send = `(async () => {
 
 /** After the restart: open the mission from the list and read its receipt. */
 const readReceipt = `(async () => {
-  const open = [...document.querySelectorAll('button, a')].find(n => /^Missions$/.test(n.innerText.trim()))
+  const open = [...document.querySelectorAll('button, a')].find(n => /^(Conversations|Missions)$/.test(n.innerText.trim()))
   if (open === undefined) return 'no Missions button'
   open.click()
   await new Promise(r => setTimeout(r, 800))

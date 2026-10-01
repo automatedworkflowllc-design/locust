@@ -69,7 +69,7 @@ const retype = (text) => `(async () => {
 // Send what is in the box as it stands: the edited words.
 const sendTheBox = `(async () => {
   for (let i = 0; i < 40; i += 1) {
-    const button = document.querySelector('button[aria-label="Start mission"]')
+    const button = document.querySelector('button[aria-label="Send"]')
     if (button && !button.disabled) { button.click(); break }
     await new Promise((r) => setTimeout(r, 250))
   }

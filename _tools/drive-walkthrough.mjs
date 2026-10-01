@@ -121,7 +121,7 @@ const reading = `(() => {
     title: document.title,
     version: text(document.querySelector('.lc-sidebar__version, .lc-settings__version')),
     teammates: [...document.querySelectorAll('.lc-teammate-name')].map((el) => text(el)),
-    composerPlaceholder: document.querySelector('textarea[aria-label="Mission instruction"]')?.placeholder ?? null,
+    composerPlaceholder: document.querySelector('textarea[aria-label="Message"]')?.placeholder ?? null,
     controls: [...document.querySelectorAll('button.lc-control')].map((el) => text(el)),
     suggestions: [...document.querySelectorAll('.lc-idlepad__prompt, .lc-teammate__title')].map((el) => text(el)).slice(0, 4),
     bottomLine: text(document.querySelector('.lc-sidebar__foot, .lc-statusline'))
@@ -182,7 +182,7 @@ try {
 
   await drive.capture('type a slash, to see what is possible from here', async () => {
     return drive.evaluate(`(async () => {
-      const box = document.querySelector('textarea[aria-label="Mission instruction"]')
+      const box = document.querySelector('textarea[aria-label="Message"]')
       const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set
       setter.call(box, '/')
       box.dispatchEvent(new Event('input', { bubbles: true }))
@@ -197,7 +197,7 @@ try {
 
   await drive.capture('ask it something real', async () => {
     return drive.evaluate(`(async () => {
-      const box = document.querySelector('textarea[aria-label="Mission instruction"]')
+      const box = document.querySelector('textarea[aria-label="Message"]')
       const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set
       setter.call(box, 'Create a file called hello.txt containing the single word HELLO, then run a command that prints it back, then say DONE.')
       box.dispatchEvent(new Event('input', { bubbles: true }))

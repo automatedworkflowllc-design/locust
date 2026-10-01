@@ -56,7 +56,7 @@ const check = (what, ok, detail) => {
 }
 
 const type = (text) => `(async () => {
-  const box = document.querySelector('textarea[aria-label="Mission instruction"]')
+  const box = document.querySelector('textarea[aria-label="Message"]')
   if (!box) return 'no box'
   const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set
   setter.call(box, ${JSON.stringify(text)})
@@ -146,7 +146,7 @@ try {
   const edited = await drive.capture("Gem's line edited", async () => {
     await drive.evaluate(`(() => { [...document.querySelectorAll('.lc-queued button')].find((b) => b.textContent.trim() === 'Edit')?.click() })()`)
     await sleep(500)
-    const inBox = String(await drive.evaluate(`document.querySelector('textarea[aria-label="Mission instruction"]')?.value ?? ''`))
+    const inBox = String(await drive.evaluate(`document.querySelector('textarea[aria-label="Message"]')?.value ?? ''`))
     say(`  Edit put back in the box: ${JSON.stringify(inBox)}`)
     await drive.evaluate(type(QUEUED('GEM_EDITED', 'gem-queued')))
     await sleep(800)

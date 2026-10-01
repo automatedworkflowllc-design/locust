@@ -38,10 +38,10 @@ try {
     set.call(field, 'Read README.md and LOCUST.md, list the files here, then describe this project in three sentences.')
     field.dispatchEvent(new Event('input', { bubbles: true }))
     await new Promise((r) => setTimeout(r, 400))
-    document.querySelector('button[aria-label="Start mission"]').click()
+    document.querySelector('button[aria-label="Send"]').click()
     return 'sent'
   })()`)
-  await drive.waitFor(`!!document.querySelector('.lc-stopbeam button[aria-label="Stop the running mission"]')`, { timeoutMs: 30_000, what: 'the stop button' })
+  await drive.waitFor(`!!document.querySelector('.lc-stopbeam button[aria-label="Stop the running reply"]')`, { timeoutMs: 30_000, what: 'the stop button' })
   await sleep(900)
   const box = JSON.parse(await drive.evaluate(`JSON.stringify(document.querySelector('.lc-stopbeam').getBoundingClientRect())`))
   for (let frame = 0; frame < 12; frame += 1) {

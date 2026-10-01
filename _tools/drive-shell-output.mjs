@@ -49,7 +49,7 @@ try {
   })
 
   await drive.capture('run one noisy command', () => drive.evaluate(`(async () => {
-    const box = document.querySelector('textarea[aria-label="Mission instruction"]')
+    const box = document.querySelector('textarea[aria-label="Message"]')
     const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set
     setter.call(box, 'Run exactly this shell command and nothing else: seq 1 300. Then say DONE.')
     box.dispatchEvent(new Event('input', { bubbles: true }))

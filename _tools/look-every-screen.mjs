@@ -4,7 +4,7 @@
 //
 // He finds defects by LOOKING at the packaged app. The everyday profile
 // (sixteen conversations, four teammates) at 1209x770: Home, a conversation,
-// Missions, Rooms, Routines, Team, and the Settings pages a person opens
+// Conversations, Rooms, Routines, Team, and the Settings pages a person opens
 // first. Nothing is checked here and nothing is sent: the pictures are read.
 
 import { join } from 'node:path'
@@ -49,7 +49,7 @@ try {
     await new Promise((r) => setTimeout(r, 1500))
     return 1
   })()`))
-  for (const screen of ['Missions', 'Rooms', 'Routines', 'Team']) await drive.capture(screen, () => drive.evaluate(nav(screen)))
+  for (const screen of ['Conversations', 'Rooms', 'Routines', 'Team']) await drive.capture(screen, () => drive.evaluate(nav(screen)))
   for (const page of ['General', 'AI agents', 'Teammates', 'Connectors', 'Project folder']) await drive.capture(`Settings ${page}`, () => drive.evaluate(settingsPage(page)))
   say('captured')
 } catch (error) {

@@ -305,7 +305,7 @@ export function MissionsScreen({
   return (
     <div className="lc-screen">
       <ScreenHeader
-        title="Missions"
+        title="Conversations"
         /*
          * "3 conversations", not "3 local": the count in the word a person
          * uses. And a total only when it is MONEY -- "54k in . 1.2k out across
@@ -419,8 +419,8 @@ export function MissionsScreen({
         {shown.length === 0 ? (
           <p className="lc-inspector__empty">
             {missions.length === 0
-              ? 'No missions recorded on this machine yet.'
-              : 'No missions match this filter.'}
+              ? 'No conversations on this machine yet.'
+              : 'No conversations match this filter.'}
           </p>
         ) : (
           <div className="lc-missionrows">
@@ -699,7 +699,7 @@ export function TeammatesScreen({
         </div>
         <dl className="lc-rostercard__stats">
           <div className="lc-rostercard__stat">
-            <dt>Missions</dt>
+            <dt>Runs</dt>
             <dd className={`lc-mono${owned === 0 ? ' is-unreported' : ''}`}>{owned}</dd>
           </div>
           <div className="lc-rostercard__stat">
@@ -813,7 +813,7 @@ export function TeammatesScreen({
     <button type="button" className="lc-rostercard lc-rostercard--new" onClick={onNewTeammate}>
       <span className="lc-rostercard__plus">+</span>
       <span className="lc-rostercard__name">New teammate</span>
-      <span className="lc-rostercard__role">Name, role and avatar. Missions group under them.</span>
+      <span className="lc-rostercard__role">Name, role and avatar. Their conversations group under them.</span>
     </button>
   )
   // 0.380: grouped by what each needs from the person, or the plain grid for a quiet team.
@@ -1038,14 +1038,14 @@ function RetentionControl({
     const gone = response.data.deleted.length
     setState({
       kind: 'done',
-      summary: `Deleted ${String(gone)} mission${gone === 1 ? '' : 's'}.`
+      summary: `Deleted ${String(gone)} turn${gone === 1 ? '' : 's'}.`
     })
   }
 
   return (
     <div className="lc-retention">
       <div className="lc-retention__row">
-        <span className="lc-settings__note">Delete finished missions older than</span>
+        <span className="lc-settings__note">Delete finished turns older than</span>
         {RETENTION_CHOICES.map((choice) => (
           <button
             key={choice}
@@ -1295,7 +1295,7 @@ function ProblemReport(): ReactElement {
       <More>
         <p>
           The log records what happened, never what was said. Crashes, a window that stopped answering,
-          and the version you were on — no messages, no file contents, and nothing from a mission. That is
+          and the version you were on — no messages, no file contents, and nothing from a conversation. That is
           what makes it safe to send.
         </p>
         <p>It is capped, and rolls over once. Nothing in it leaves this machine unless you send it.</p>
@@ -1674,7 +1674,7 @@ export function SettingsScreen({
             <p>Changing the folder reopens Locust, so stop anything running first.</p>
             <p>
               A notes file named LOCUST.md at the folder&rsquo;s root is given to every teammate, on every AI agent, before each
-              mission. A teammate with Own copy on works in its own copy of the folder (a git worktree of its repository),
+              run. A teammate with Own copy on works in its own copy of the folder (a git worktree of its repository),
               kept under .locust/worktrees. Each turn it finishes is saved on its branch as a commit; Review
               changes in its conversation shows them and lands them on your branch as one commit of yours.
               Removing one here keeps its branch.
@@ -1718,8 +1718,8 @@ export function SettingsScreen({
               <span className="lc-tag">LOCUST.md</span>
               <span className="lc-settings__note">
                 {workspaceBrief === null
-                  ? 'None in this folder. Add a notes file named LOCUST.md at its root and every teammate, on every AI agent, is given it before each mission.'
-                  : `${String(workspaceBrief.lines)} line${workspaceBrief.lines === 1 ? '' : 's'} briefed to every teammate before each mission${workspaceBrief.truncated ? ' — longer than 200 lines, so the rest is not loaded. Put long checklists in files of their own and name them in LOCUST.md; a teammate reads one when it applies' : ''}.`}
+                  ? 'None in this folder. Add a notes file named LOCUST.md at its root and every teammate, on every AI agent, is given it before each run.'
+                  : `${String(workspaceBrief.lines)} line${workspaceBrief.lines === 1 ? '' : 's'} briefed to every teammate before each run${workspaceBrief.truncated ? ' — longer than 200 lines, so the rest is not loaded. Put long checklists in files of their own and name them in LOCUST.md; a teammate reads one when it applies' : ''}.`}
               </span>
             </div>
           )}
@@ -1894,7 +1894,7 @@ export function SettingsScreen({
             <p>
               Locust never pools subscriptions or proxies your requests. Under each AI agent is what it has
               set up for itself — connectors (MCP servers) and hooks, read from its own files — so a tool a teammate
-              reaches for, or a script that runs mid-mission, is never a surprise. Locust changes nothing there.
+              reaches for, or a script that runs mid-run, is never a surprise. Locust changes nothing there.
             </p>
           </More>
           <div className="lc-runtimelist lc-settingcard">
@@ -2078,8 +2078,8 @@ export function SettingsScreen({
             </p>
             <p>
               Switch this on and every connector call stops the run and asks you first, with the exact
-              input it would send. Approve once, allow that connector for the rest of the mission, or deny
-              with a reason the teammate reads. It is checked when a run starts, so the next mission
+              input it would send. Approve once, allow that connector for the rest of the run, or deny
+              with a reason the teammate reads. It is checked when a run starts, so the next run
               follows the switch without a restart. Auto never asks either way.
             </p>
           </More>
@@ -2165,14 +2165,14 @@ export function SettingsScreen({
           </div>
           <More>
             <p>
-              Swarm is a statement about every mission rather than about one of them: while it is on, each
+              Swarm is a statement about every run rather than about one of them: while it is on, each
               run is given the highest effort the model it lands on reports, and the effort control says who
               is holding it. A model that reports no levels is unaffected — there is nothing to raise.
             </p>
             <p>
               The mark on the composer is the same switch seen from the other side. It is the glance; this
               is the record, and the way to take it back from a screen that has no composer on it — which
-              is every screen but the workroom, and the workroom itself while a mission is running.
+              is every screen but the workroom, and the conversation itself while a reply is running.
             </p>
           </More>
 
@@ -2599,7 +2599,7 @@ export function SettingsScreen({
           </p>
           <More>
             <p>
-              It never installs one while a mission is running: restarting then would cut the run off and
+              It never installs one while a teammate is working: restarting then would cut the run off and
               leave its record without a receipt.
             </p>
           </More>
@@ -2650,16 +2650,16 @@ export function SettingsScreen({
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Privacy &amp; local data</h2>
           <p className="lc-settings__lede">
-            Every mission is recorded to an append-only ledger on this machine. Nothing is uploaded.
+            Every conversation is kept on this machine, in a record that is only ever added to. Nothing is uploaded.
           </p>
           <dl className="lc-receipt lc-receipt--flush">
-            <dt>Ledger</dt>
+            <dt>Record</dt>
             <dd className="lc-mono">{ledgerPath ?? 'in this profile'}</dd>
             <dt>On disk</dt>
             <dd className="lc-mono">
               {storage === undefined
                 ? 'measuring…'
-                : `${String(storage.missionCount)} mission${storage.missionCount === 1 ? '' : 's'} · ${formatBytes(storage.byteTotal)}${
+                : `${String(storage.missionCount)} turn${storage.missionCount === 1 ? '' : 's'} · ${formatBytes(storage.byteTotal)}${
                     storage.oldestUpdatedAt === undefined
                       ? ''
                       : ` · oldest ${new Date(storage.oldestUpdatedAt).toLocaleDateString()}`
@@ -2680,8 +2680,8 @@ export function SettingsScreen({
           </dl>
           <More>
             <p>
-              Nothing here is ever deleted on a timer. Missions go when you ask, after you have been shown
-              exactly what would go, and a mission an ongoing conversation continues from is kept even
+              Nothing here is ever deleted on a timer. Turns go when you ask, after you have been shown
+              exactly what would go, and a turn an ongoing conversation continues from is kept even
               when it is old.
             </p>
           </More>

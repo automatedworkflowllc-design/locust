@@ -141,7 +141,7 @@ try {
     let sent = false
     for (let i = 0; i < 80 && presses < 3 && !sent; i += 1) {
       fill()
-      const button = document.querySelector('button[aria-label="Start mission"]')
+      const button = document.querySelector('button[aria-label="Send"]')
       if (button && !button.disabled && (box()?.value.length ?? 0) > 0) {
         button.click()
         presses += 1
@@ -155,9 +155,9 @@ try {
     window.__box = box()?.value ?? '(no box)'
     for (let i = 0; i < 180; i += 1) {
       await new Promise((r) => setTimeout(r, 1000))
-      if (document.querySelector('button[aria-label="Stop the running mission"]') && document.querySelector('.lc-livestep')) return window.__presses > 1 ? 'running (Start pressed ' + window.__presses + ' times)' : 'running'
+      if (document.querySelector('button[aria-label="Stop the running reply"]') && document.querySelector('.lc-livestep')) return window.__presses > 1 ? 'running (Start pressed ' + window.__presses + ' times)' : 'running'
     }
-    const start = document.querySelector('button[aria-label="Start mission"]')
+    const start = document.querySelector('button[aria-label="Send"]')
     return 'never ran: pressed ' + window.__presses + ' times, box held "' + String(window.__box).slice(0, 40) + '" | start ' + (start === null ? 'missing' : start.disabled ? 'disabled (' + (start.getAttribute('title') ?? '') + ')' : 'enabled')
       + ' | notice: ' + ([...document.querySelectorAll('.lc-notice')].map((el) => el.innerText).join(' / ') || 'none')
       + ' | runtimes: ' + (document.querySelector('.lc-sidebar__status, .lc-status')?.innerText ?? '?')
@@ -195,10 +195,10 @@ try {
   if (during.length === 0) console.log(`  every process now: ${execFileSync('ps', ['-axo', 'pid,command'], { encoding: 'utf8' }).split('\n').filter((line) => /opencode|Locust/i.test(line)).join(' | ').slice(0, 1200)}`)
 
   const stopped = await evaluate(`(async () => {
-    document.querySelector('button[aria-label="Stop the running mission"]')?.click()
+    document.querySelector('button[aria-label="Stop the running reply"]')?.click()
     for (let i = 0; i < 60; i += 1) {
       await new Promise((r) => setTimeout(r, 500))
-      if (!document.querySelector('button[aria-label="Stop the running mission"]')) return 'stopped'
+      if (!document.querySelector('button[aria-label="Stop the running reply"]')) return 'stopped'
     }
     return 'still running'
   })()`)

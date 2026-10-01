@@ -43,7 +43,7 @@ try {
   })
 
   await drive.capture('ask for a great deal of output in one turn', () => drive.evaluate(`(async () => {
-    const box = document.querySelector('textarea[aria-label="Mission instruction"]')
+    const box = document.querySelector('textarea[aria-label="Message"]')
     const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set
     // Deliberately mechanical: a model that has to THINK produces slowly, and
     // slow output is exactly what this drive cannot test.

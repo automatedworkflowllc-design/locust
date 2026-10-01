@@ -860,7 +860,7 @@ export function Composer({
                 // (Grok, pass 11). Only a runtime that has SAID it wants a
                 // sign-in earns the words.
                 runtimes.some((runtime) => runtime.status === 'auth-required' || runtime.auth === 'unauthenticated')
-                ? 'Install a coding agent and sign in to start a mission…'
+                ? 'Install a coding agent and sign in to start…'
                 : // And "install" is wrong under five rows that say installed
                   // and not answering (Fable, pass 1, finding 9): the box
                   // names what the screen above it offers, Check again.
@@ -890,7 +890,7 @@ export function Composer({
                       })()
                     : // Installed and still being asked: say that, not "install".
                       'Checking the coding agents on this machine…'
-                  : 'Install a coding agent to start a mission…'
+                  : 'Install a coding agent to start…'
 
   /** Set by Ctrl+Enter for the submit it starts: stop the run and send this now (0.485). */
   const sendNow = useRef(false)
@@ -1686,7 +1686,7 @@ export function Composer({
               onKeyDown={keyDown}
               onPaste={paste}
               placeholder={placeholder}
-              aria-label="Mission instruction"
+              aria-label="Message"
               rows={1}
               maxLength={MAX_PROMPT_LENGTH}
               disabled={workingNow && queued !== undefined}
@@ -2371,7 +2371,7 @@ export function Composer({
                     className="send-button lc-send is-stop"
                     onClick={stopClicked}
                     disabled={cancelling}
-                    aria-label="Stop the running mission"
+                    aria-label="Stop the running reply"
                   >
                     {/* A small rounded square, as drawn -- not a pause icon. */}
                     <span className="lc-stopsquare" />
@@ -2384,8 +2384,8 @@ export function Composer({
                 <button
                   type="submit"
                   className="send-button lc-send is-queue"
-                  aria-label="Send this when the mission finishes"
-                  title="Send this when the mission finishes"
+                  aria-label="Send this when the reply finishes"
+                  title="Send this when the reply finishes"
                 >
                   <ArrowUpGlyph />
                 </button>
@@ -2431,7 +2431,7 @@ export function Composer({
                   type="submit"
                   className="send-button lc-send"
                   disabled={!canStart}
-                  aria-label="Start mission"
+                  aria-label="Send"
                   /*
                     * A disabled control says why. Sol's beta finding 6: with
                     * nothing installed, Send was grey and its only word about
@@ -2445,7 +2445,7 @@ export function Composer({
                       busy: busyWith !== undefined,
                       // Notes on the diff are a message on their own.
                       empty: value.trim().length === 0 && (diffNotes ?? []).length === 0
-                    }) ?? 'Start mission — Shift+Enter for a new line'
+                    }) ?? 'Send — Shift+Enter for a new line'
                   }
                 >
                   <ArrowUpGlyph />

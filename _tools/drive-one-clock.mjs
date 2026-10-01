@@ -62,7 +62,7 @@ try {
   say(`fold line: ${fold.segments.join(' · ')}`)
 
   const row = JSON.parse(await drive.capture('the Missions screen', () => drive.evaluate(`(async () => {
-    const tab = [...document.querySelectorAll('button')].find((b) => b.innerText.trim() === 'Missions')
+    const tab = [...document.querySelectorAll('button')].find((b) => /^(Conversations|Missions)$/.test(b.innerText.trim()))
     if (!tab) return JSON.stringify({ error: 'no Missions button' })
     tab.click()
     for (let i = 0; i < 20 && !document.querySelector('.lc-missionrow__stats'); i += 1) await new Promise((r) => setTimeout(r, 250))

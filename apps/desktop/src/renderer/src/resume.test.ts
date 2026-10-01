@@ -82,7 +82,7 @@ describe('what an interrupted mission is offered', () => {
     // A missing button is indistinguishable from a broken one.
     const offer = resumeOffer(mission({ checkpoints: [] }))
     expect(offer?.kind).toBe('refused')
-    expect(offer?.kind === 'refused' && offer.note).toContain('no recorded point')
+    expect(offer?.kind === 'refused' && offer.note).toContain('no point to pick up from')
   })
 
   it.each([['completed'], ['failed']] as const)('offers nothing for a %s mission', (phase) => {

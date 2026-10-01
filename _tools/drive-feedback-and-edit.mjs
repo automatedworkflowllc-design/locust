@@ -51,7 +51,7 @@ const check = (what, ok, detail) => {
 }
 
 const type = (text, enter = true) => `(async () => {
-  const box = document.querySelector('textarea[aria-label="Mission instruction"]')
+  const box = document.querySelector('textarea[aria-label="Message"]')
   if (!box) return 'no box'
   const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set
   setter.call(box, ${JSON.stringify(text)})
@@ -69,7 +69,7 @@ const STATE = `(() => JSON.stringify({
   status: (document.querySelector('.lc-workroom__mission')?.textContent ?? '').trim(),
   queued: document.querySelector('.lc-queued:not(.is-editing) .lc-queued__text')?.textContent ?? null,
   editing: document.querySelector('.lc-queued.is-editing .lc-queued__note')?.textContent ?? null,
-  box: document.querySelector('textarea[aria-label="Mission instruction"]')?.value ?? null,
+  box: document.querySelector('textarea[aria-label="Message"]')?.value ?? null,
   folder: document.querySelector('.lc-control--folder .lc-control__folder')?.textContent ?? null,
   said: [...document.querySelectorAll('.lc-thread .lc-bubble')].map((node) => node.textContent.trim())
 }))()`

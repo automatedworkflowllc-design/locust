@@ -58,7 +58,7 @@ const drive = await startDrive({
 
 // No backticks inside these template literals.
 const open = `(async () => {
-  const missions = [...document.querySelectorAll('button, a')].find(n => /^Missions$/.test(n.innerText.trim()))
+  const missions = [...document.querySelectorAll('button, a')].find(n => /^(Conversations|Missions)$/.test(n.innerText.trim()))
   if (missions === undefined) return 'no Missions button'
   missions.click()
   await new Promise(r => setTimeout(r, 1200))

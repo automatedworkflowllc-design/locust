@@ -57,7 +57,7 @@ const ROW = `(() => {
     if (el.getAttribute('aria-label') === 'Reasoning effort' || el.classList.contains('is-static')) return 'effort'
     if (el.getAttribute('aria-label') === 'Permission mode') return 'mode'
     if (el.classList.contains('lc-plusmenu__main')) return 'plus'
-    if (el.getAttribute('aria-label') === 'Start mission') return 'send'
+    if (el.getAttribute('aria-label') === 'Send') return 'send'
     return el.getAttribute('aria-label') || el.className.split(' ').find((c) => c.startsWith('lc-')) || el.tagName
   }
   const items = [...row.querySelectorAll('button, .lc-composer__context, .lc-control.is-static')].filter((el) => el.getBoundingClientRect().width > 0 && !el.closest('.lc-menu') && !el.classList.contains('lc-plusmenu__satellite'))
@@ -151,12 +151,12 @@ try {
   say(await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'free', row: '/free/i' })))
   const route = await drive.evaluate(`[...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')?.textContent.replace(/\\s+/g, ' ').trim() ?? ''`)
   if (!/opencode/i.test(route) || !/free/i.test(route)) throw new Error(`refusing to send: the composer is on "${route}"`)
-  await drive.evaluate(`(document.querySelector('button[aria-label="Start mission"]').click(), 'sent')`)
-  await drive.waitFor(`!!document.querySelector('button[aria-label="Stop the running mission"]')`, { timeoutMs: 30_000, what: 'the stop button' })
+  await drive.evaluate(`(document.querySelector('button[aria-label="Send"]').click(), 'sent')`)
+  await drive.waitFor(`!!document.querySelector('button[aria-label="Stop the running reply"]')`, { timeoutMs: 30_000, what: 'the stop button' })
   await sleep(1200)
   await shootBox('06-running.png')
   await shootWindow('07-window-running.png')
-  await drive.waitFor(`!document.querySelector('button[aria-label="Stop the running mission"]')`, { timeoutMs: 150_000, everyMs: 1000, what: 'the run to finish' })
+  await drive.waitFor(`!document.querySelector('button[aria-label="Stop the running reply"]')`, { timeoutMs: 150_000, everyMs: 1000, what: 'the run to finish' })
   await shootWindow('08-window-after.png')
   say(failures === 0 ? '\nMETAL COMPOSER PASSED' : `\nMETAL COMPOSER: ${String(failures)} FAILED`)
 } catch (error) {

@@ -71,7 +71,7 @@ try {
     setter.call(field, 'In three short sentences: what is a git worktree, and when would you use one?')
     field.dispatchEvent(new Event('input', { bubbles: true }))
     await new Promise((r) => setTimeout(r, 300))
-    document.querySelector('button[aria-label="Start mission"]')?.click()
+    document.querySelector('button[aria-label="Send"]')?.click()
     let both = false
     for (let i = 0; i < 120 && !both; i += 1) {
       await new Promise((r) => setTimeout(r, 250))

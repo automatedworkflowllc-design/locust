@@ -124,7 +124,7 @@ try {
     const number = index + 1
     const shape = await drive.capture(`turn ${String(number)} of ${String(TURNS.length)}`, async () => {
       await drive.evaluate(`(async () => {
-        const box = document.querySelector('textarea[aria-label="Mission instruction"]')
+        const box = document.querySelector('textarea[aria-label="Message"]')
         const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set
         setter.call(box, ${JSON.stringify(text)})
         box.dispatchEvent(new Event('input', { bubbles: true }))

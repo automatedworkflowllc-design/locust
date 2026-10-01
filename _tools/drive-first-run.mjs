@@ -19,7 +19,7 @@ try {
     placeholder: document.querySelector('form.command-dock textarea')?.placeholder ?? null,
     disabled: document.querySelector('form.command-dock textarea')?.disabled ?? null,
     controls: [...document.querySelectorAll('.lc-control')].map(c => c.innerText.replace(/\\s+/g, ' ').trim()).filter(Boolean),
-    send: document.querySelector('button[aria-label="Start mission"]')?.disabled ?? 'no button',
+    send: document.querySelector('button[aria-label="Send"]')?.disabled ?? 'no button',
     footer: document.querySelector('.lc-connected')?.innerText ?? null
   })`))
   await drive.capture('try to send a message anyway', () => drive.evaluate(`(async () => {
@@ -28,7 +28,7 @@ try {
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
     setter.call(field, 'hello'); field.dispatchEvent(new Event('input', { bubbles: true }))
     await new Promise(r => setTimeout(r, 300))
-    const button = document.querySelector('button[aria-label="Start mission"]')
+    const button = document.querySelector('button[aria-label="Send"]')
     if (!button) return 'no send button'
     if (button.disabled) return 'send disabled; title: ' + (button.title || 'none')
     button.click()

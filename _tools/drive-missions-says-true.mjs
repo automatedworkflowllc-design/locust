@@ -90,7 +90,7 @@ try {
   })()`)))
   const shown = await rows()
   say(`  Missions after the card: ${shown}`)
-  check('the card opens Missions', /Missions/.test(opened), opened)
+  check('the card opens Missions', /Conversations|Missions/.test(opened), opened)
   check("it shows Wren's missions only", /WREN MISSION/.test(shown) && !/NOBODY MISSION/.test(shown), shown)
   // L25, on everyone's missions.
   await drive.evaluate(`(async () => {

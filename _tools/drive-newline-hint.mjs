@@ -29,7 +29,7 @@ const drive = await startDrive({
 
 const read = `(async () => {
   const hint = document.querySelector('.lc-composer__newline')
-  const send = [...document.querySelectorAll('form.command-dock button')].find((b) => b.getAttribute('aria-label') === 'Start mission')
+  const send = [...document.querySelectorAll('form.command-dock button')].find((b) => b.getAttribute('aria-label') === 'Send')
   return 'hint: ' + (hint ? JSON.stringify(hint.innerText.trim()) : 'ABSENT')
     + ' || send title: ' + (send ? JSON.stringify(send.getAttribute('title')) : 'no send button')
 })()`

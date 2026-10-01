@@ -42,7 +42,7 @@ describe('recovery where a person looks for routines', () => {
 
   it('review acknowledgement is unchecked and both decisions start disabled, even for a confirmed step', () => {
     const html = renderToStaticMarkup(<RoutineRecovery routine={{ ...routine, execution: { ...routine.execution!, canContinue: true } }} recover={async () => ({ ok: true })} />)
-    expect(html).toContain('I reviewed the saved mission and external work')
+    expect(html).toContain('I reviewed the saved conversation and external work')
     expect(html).not.toContain('checked=""')
     expect(html).toMatch(/disabled="">Continue remaining steps/)
     expect(html).toMatch(/disabled="">Abandon attempt and remove schedule/)

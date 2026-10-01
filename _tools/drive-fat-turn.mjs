@@ -93,7 +93,7 @@ try {
 
   await drive.capture('one turn that writes twelve files', async () => {
     await drive.evaluate(`(async () => {
-      const box = document.querySelector('textarea[aria-label="Mission instruction"]')
+      const box = document.querySelector('textarea[aria-label="Message"]')
       const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set
       setter.call(box, 'Create twelve files in a folder called batch: batch/a.txt through batch/l.txt, each containing its own letter. Use one command per file. Then reply with exactly the sentence: All twelve are written.')
       box.dispatchEvent(new Event('input', { bubbles: true }))

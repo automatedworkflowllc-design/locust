@@ -831,7 +831,7 @@ export function sendAndWaitScript(text, { waitSeconds = 360, settle = true } = {
     let sent = false
     for (let i = 0; i < 120 && !sent; i += 1) {
       await new Promise(r => setTimeout(r, 250))
-      const button = document.querySelector('button[aria-label="Start mission"]')
+      const button = document.querySelector('button[aria-label="Send"]')
       if (button && !button.disabled) { button.click(); sent = true }
     }
     if (!sent) return 'no send'

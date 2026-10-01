@@ -95,8 +95,8 @@ export function ledgerFailureRows(
        */
       text:
         checkpoints === undefined
-          ? 'Everything written before the failure. The ledger only ever appends, so what reached the disk is intact and this mission can be reopened from it. Your project files are untouched by this failure — nothing was rolled back.'
-          : `The ${String(checkpoints)} checkpoint${checkpoints === 1 ? '' : 's'} already written. The ledger only ever appends, so what reached the disk is intact and this mission can be reopened from it. Your project files are untouched by this failure — nothing was rolled back.`
+          ? 'Everything written before the failure. The ledger only ever appends, so what reached the disk is intact and this conversation can be reopened from it. Your project files are untouched by this failure — nothing was rolled back.'
+          : `The ${String(checkpoints)} checkpoint${checkpoints === 1 ? '' : 's'} already written. The ledger only ever appends, so what reached the disk is intact and this conversation can be reopened from it. Your project files are untouched by this failure — nothing was rolled back.`
     },
     {
       tone: 'risk',
@@ -127,6 +127,6 @@ export function ledgerFailureSentence(reason: string | undefined): string {
   // leaves open who stopped it and why; the app did, on purpose, and saying so
   // is the difference between a failure and a decision (design, 2026-09-08).
   return said === undefined || said.length === 0
-    ? 'Locust could not write this mission to its durable local ledger, so it stopped the run rather than continue without a durable record.'
+    ? 'Locust could not write this run to its record on this machine, so it stopped the run rather than go on without one.'
     : `${said} Locust stopped the run rather than continue without a durable record.`
 }

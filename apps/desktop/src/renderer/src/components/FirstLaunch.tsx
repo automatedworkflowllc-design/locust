@@ -497,7 +497,7 @@ export function FirstLaunch({
               <Icon name="plus" size={13} /> New teammate
             </button>
             <span className="lc-firstteammate__about">
-              A name, a face and a model of its own, and a place for its missions. It grants no new access.
+              A name, a face and a model of its own, and a place for its conversations. It grants no new access.
             </span>
           </div>
         )}
@@ -514,7 +514,7 @@ export function FirstLaunch({
             <div className="lc-folder__text">
               <div className="lc-folder__label">No folder chosen</div>
               <div className="lc-folder__path">
-                Every teammate works inside one project folder. Pick it before the first mission.
+                Every teammate works inside one project folder. Pick it before the first conversation.
               </div>
             </div>
             <button type="button" className="lc-button" onClick={onChooseFolder}>

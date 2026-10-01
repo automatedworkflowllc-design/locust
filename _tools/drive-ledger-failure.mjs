@@ -68,7 +68,7 @@ try {
     await drive.evaluate(`(async () => { ${teammateFace('Wren')}?.click(); await new Promise(r => setTimeout(r, 600)) })()`)
     await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'free', row: '/free/i' }))
     return drive.evaluate(`(async () => {
-      const box = document.querySelector('textarea[aria-label="Mission instruction"]')
+      const box = document.querySelector('textarea[aria-label="Message"]')
       const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set
       setter.call(box, 'Say the single word READY and nothing else.')
       box.dispatchEvent(new Event('input', { bubbles: true }))

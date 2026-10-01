@@ -62,7 +62,7 @@ describe('the stop button', () => {
     const html = composer(true)
     const beam = html.indexOf('class="lc-stopbeam"')
     expect(beam).toBeGreaterThan(-1)
-    expect(html.indexOf('aria-label="Stop the running mission"')).toBeGreaterThan(beam)
+    expect(html.indexOf('aria-label="Stop the running reply"')).toBeGreaterThan(beam)
   })
 
   it('has no beam when there is nothing to stop', () => {

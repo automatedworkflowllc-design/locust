@@ -134,7 +134,7 @@ const submit = (prompt) => `(async () => {
   for (let i = 0; i < 120; i += 1) {
     await new Promise(r => setTimeout(r, 250))
     const send = document.querySelector('form.command-dock .send-button')
-    if (send && !send.disabled && send.getAttribute('aria-label') === 'Start mission') {
+    if (send && !send.disabled && send.getAttribute('aria-label') === 'Send') {
       send.click()
       return 'clicked'
     }
@@ -226,7 +226,7 @@ try {
     /goes to Atlas when this finishes/.test(atlasBusy),
     atlasBusy
   )
-  const sendDisabled = await cdp.eval(`(document.querySelector('form.command-dock .send-button') || {}).disabled === true || document.querySelector('form.command-dock .send-button').getAttribute('aria-label') !== 'Start mission'`)
+  const sendDisabled = await cdp.eval(`(document.querySelector('form.command-dock .send-button') || {}).disabled === true || document.querySelector('form.command-dock .send-button').getAttribute('aria-label') !== 'Send'`)
   check('and offers no start control for it', sendDisabled === true)
   await cdp.eval(typeInto(''))
 

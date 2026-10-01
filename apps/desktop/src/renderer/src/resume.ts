@@ -94,7 +94,7 @@ export function resumeOffer(mission: {
     // missing control is indistinguishable from a broken one.
     return {
       kind: 'refused',
-      note: 'This mission stopped before any checkpoint was written, so there is no recorded point to continue from.'
+      note: 'This stopped before anything was recorded to continue from, so there is no point to pick up from.'
     }
   }
 

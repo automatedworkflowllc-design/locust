@@ -66,7 +66,7 @@ try {
   })()`))
 
   await drive.capture('type a question and send it', () => drive.evaluate(`(async () => {
-    const box = document.querySelector('textarea[aria-label="Mission instruction"]')
+    const box = document.querySelector('textarea[aria-label="Message"]')
     const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set
     setter.call(box, 'What is the passphrase?')
     box.dispatchEvent(new Event('input', { bubbles: true }))

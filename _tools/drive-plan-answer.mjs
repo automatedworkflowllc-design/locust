@@ -89,7 +89,7 @@ try {
       throw new Error(`the composer is not in Plan mode, it reads ${JSON.stringify(String(mode))} -- nothing below would mean anything`)
     }
     return drive.evaluate(`(async () => {
-      const box = document.querySelector('textarea[aria-label="Mission instruction"]')
+      const box = document.querySelector('textarea[aria-label="Message"]')
       const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set
       setter.call(box, 'How would you add a nullable currency column to invoices without downtime? Answer with numbered steps only.')
       box.dispatchEvent(new Event('input', { bubbles: true }))

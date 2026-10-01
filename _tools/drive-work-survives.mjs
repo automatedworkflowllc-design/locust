@@ -53,7 +53,7 @@ try {
   })
 
   await drive.capture('send something that needs real tool use', () => drive.evaluate(`(async () => {
-    const box = document.querySelector('textarea[aria-label="Mission instruction"]')
+    const box = document.querySelector('textarea[aria-label="Message"]')
     const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set
     setter.call(box, 'List every file in this folder, then read README.md and tell me its first heading.')
     box.dispatchEvent(new Event('input', { bubbles: true }))

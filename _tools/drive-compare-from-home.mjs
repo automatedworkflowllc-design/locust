@@ -81,7 +81,7 @@ try {
     setter.call(field, 'In one sentence: what is a pull request?')
     field.dispatchEvent(new Event('input', { bubbles: true }))
     await new Promise((r) => setTimeout(r, 300))
-    document.querySelector('button[aria-label="Start mission"]')?.click()
+    document.querySelector('button[aria-label="Send"]')?.click()
     let bothRan = false
     for (let i = 0; i < 1200; i += 1) {
       await new Promise((r) => setTimeout(r, 500))

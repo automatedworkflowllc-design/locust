@@ -887,7 +887,7 @@ export default function App(): ReactElement {
           return next
         })
       })
-      .catch(() => setDeleteError('That mission could not be assigned. It still belongs to whoever had it.'))
+      .catch(() => setDeleteError('That conversation could not be given to them. It still belongs to whoever had it.'))
   }
 
   /** Which conversation is being renamed in place, if any. */
@@ -1133,14 +1133,14 @@ export default function App(): ReactElement {
           ...(notYet !== undefined
             ? { disabledReason: notYet }
             : live
-            ? { disabledReason: 'This mission is still running. It can be saved when it finishes.' }
+            ? { disabledReason: 'This is still running. It can be saved when it finishes.' }
             : routineDraftFor(missionId) === undefined
               ? { disabledReason: 'Nothing here was typed by you, so there are no steps to replay.' }
               : {}),
           onSelect: () => openSaveRoutine(missionId)
         },
         {
-          label: 'Copy mission id',
+          label: 'Copy its record id',
           shortcut: 'c',
           onSelect: () => {
             void navigator.clipboard.writeText(missionId).catch(() => undefined)
@@ -1155,7 +1155,7 @@ export default function App(): ReactElement {
           ...(notYet !== undefined
             ? { disabledReason: notYet }
             : live
-              ? { disabledReason: 'This mission is still running. Stop it first.' }
+              ? { disabledReason: 'This is still running. Stop it first.' }
               : {}),
           // Every turn the row stands for. A sidebar row is a CONVERSATION --
           // `collapseConversations` folds its turns into one line titled by
@@ -4349,7 +4349,7 @@ export default function App(): ReactElement {
       return true
     } catch {
       setRuns((current) =>
-        withRun(current, key, (run) => ({ ...run, phase: 'failed', error: 'The mission could not be started. Nothing was run and nothing was changed.' }))
+        withRun(current, key, (run) => ({ ...run, phase: 'failed', error: 'It could not be started. Nothing was run and nothing was changed.' }))
       )
       return false
     }
@@ -5888,7 +5888,7 @@ export default function App(): ReactElement {
         void refreshStorage()
       })
       .catch(() => {
-        setDeleteError('The mission could not be deleted. Its record and events are still here.')
+        setDeleteError('That could not be deleted. Its record is still here.')
       })
   }
 
@@ -7309,13 +7309,13 @@ export default function App(): ReactElement {
                           // A start that failed has no mission id and never
                           // will. Leaving "Starting…" over a red error card
                           // said the opposite of what happened.
-                          ? `Mission · not started · ${liveRun.phase}`
+                          ? `Not started · ${liveRun.phase}`
                           // Not "Starting…": the thread already says
                           // "Starting · 3s" five hundred pixels below, and
                           // two places stating one fact is how they come to
                           // disagree. The thread's is the one that stays --
                           // it carries the clock (design agent, 2026-09-10).
-                          : 'Mission'
+                          : 'New conversation'
                         // The MODEL, not just the runtime. This app exists to
                         // put two models on the same work, and the header
                         // named only the runtime -- so two missions from
@@ -8188,7 +8188,7 @@ export default function App(): ReactElement {
                 id: 'toggle-swarm',
                 group: 'Workspace',
                 label: swarm ? 'Turn swarm off' : 'Turn swarm on',
-                hint: 'every mission at its model maximum',
+                hint: 'every run at its model maximum',
                 run: () => {
                   // Same write as the composer mark, which is the only other
                   // way in -- and it only exists on the workroom, and is
@@ -8246,7 +8246,7 @@ export default function App(): ReactElement {
                     {
                       id: 'stop',
                       group: 'Mission',
-                      label: 'Stop the running mission',
+                      label: 'Stop the running reply',
                       run: cancelMission
                     }
                   ]

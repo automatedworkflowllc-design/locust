@@ -234,7 +234,7 @@ try {
     for (let i = 0; i < 120; i += 1) {
       await new Promise(r => setTimeout(r, 250))
       const send = document.querySelector('form.command-dock .send-button')
-      if (send && !send.disabled && send.getAttribute('aria-label') === 'Start mission') { send.click(); return true }
+      if (send && !send.disabled && send.getAttribute('aria-label') === 'Send') { send.click(); return true }
     }
     return false
   })()`)

@@ -645,7 +645,7 @@ export function prunePreviewSummary(preview: {
   readonly keptForContinuity: readonly string[]
   readonly keptAsRunning: readonly string[]
 }): string {
-  const missions = (count: number): string => `${String(count)} mission${count === 1 ? '' : 's'}`
+  const missions = (count: number): string => `${String(count)} turn${count === 1 ? '' : 's'}`
   if (preview.deleted.length === 0) {
     const because: string[] = []
     if (preview.keptForContinuity.length > 0) {

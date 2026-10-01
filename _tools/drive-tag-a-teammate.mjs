@@ -99,7 +99,7 @@ try {
     setter.call(field, 'Atlas: what single word did Wren just reply with? Answer with that word only.')
     field.dispatchEvent(new Event('input', { bubbles: true }))
     await new Promise((r) => setTimeout(r, 300))
-    document.querySelector('button[aria-label="Start mission"]')?.click()
+    document.querySelector('button[aria-label="Send"]')?.click()
     let notice
     for (let i = 0; i < 40 && !notice; i += 1) {
       await new Promise((r) => setTimeout(r, 250))

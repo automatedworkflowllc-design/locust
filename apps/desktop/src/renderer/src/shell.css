@@ -7268,7 +7268,7 @@ textarea {
   flex-direction: row;
   align-items: center;
   gap: 0;
-  padding: var(--lc-space-2) var(--lc-space-4) var(--lc-space-3);
+  padding: var(--lc-space-2) var(--lc-space-3) var(--lc-space-3);
 }
 
 .lc-sidebar__places button + button {
@@ -7276,14 +7276,17 @@ textarea {
   border-radius: 0;
 }
 
+/* Each place as wide as its word, the spare room shared (0.526). Equal thirds
+   held "Missions"; "Conversations" is 84px of a 251px row, and its icon was
+   the part squeezed to nothing (measured by _tools/probe-places-widths.mjs). */
 .lc-sidebar__places button {
   display: flex;
-  flex: 1 1 0;
+  flex: 1 1 auto;
   justify-content: center;
   align-items: center;
-  gap: var(--lc-space-3);
+  gap: var(--lc-space-2);
   min-width: 0;
-  padding: 6px var(--lc-space-2);
+  padding: 6px 3px;
   border: 0;
   border-radius: var(--lc-radius-control);
   background: transparent;
@@ -7292,6 +7295,16 @@ textarea {
   font-size: var(--lc-text-control);
   text-align: left;
   cursor: pointer;
+}
+
+.lc-sidebar__places button svg {
+  flex-shrink: 0;
+}
+
+.lc-sidebar__places button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .lc-sidebar__places button:hover {

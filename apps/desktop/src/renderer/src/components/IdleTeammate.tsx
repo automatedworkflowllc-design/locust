@@ -128,7 +128,7 @@ export function IdleTeammate({
           {blocked !== undefined
             ? blocked
             : canStart
-              ? 'Pick one, or describe a mission below.'
+              ? 'Pick one, or say what you need below.'
               : 'Connect a runtime to start a mission.'}
         </p>
       </div>

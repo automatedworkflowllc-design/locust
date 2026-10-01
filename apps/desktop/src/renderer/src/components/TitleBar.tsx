@@ -30,7 +30,7 @@ export function TitleBar({
       <span className="lc-titlebar__title">{workspaceName}</span>
       <div className="lc-titlebar__right" onDoubleClick={(event) => event.stopPropagation()}>
         {/* A workspace-wide setting deserves a persistent, visible statement. */}
-        {swarm && <span className="lc-swarmchip">Swarm · every mission at max effort</span>}
+        {swarm && <span className="lc-swarmchip">Swarm · every run at max effort</span>}
         {/* What waits on the person, before what is merely running: the list is one press away. */}
         {needsYou > 0 && onNeedsYou !== undefined && (
           <button type="button" className="lc-needsyou" aria-haspopup="menu" onClick={(event) => onNeedsYou(event.currentTarget)}>

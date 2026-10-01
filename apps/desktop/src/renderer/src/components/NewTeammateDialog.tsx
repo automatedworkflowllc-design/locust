@@ -320,7 +320,7 @@ export function NewTeammateDialog({
         <div className="lc-dialog__body">
           {/* First, not at the foot below the fold (a practice tester on 0.306 found it there). */}
           <p className="lc-dialog__note lc-mono">
-            A teammate is a name, a face and a place to keep missions. It grants no new access.
+            A teammate is a name, a face and a place to keep conversations. It grants no new access.
           </p>
           <div className="lc-dialog__identity">
             {/* The preview works, so the person sees the behaviour a live
@@ -568,7 +568,7 @@ export function NewTeammateDialog({
                 )}
               </div>
               <span className="lc-field__hint">
-                Its missions run here instead of the project folder, which is also how it reaches a connector (an MCP server) set up
+                Its conversations run here instead of the project folder, which is also how it reaches a connector (an MCP server) set up
                 for that folder. History and memory stay with the project either way.
               </span>
               {folderNotice !== undefined && <span className="lc-field__hint lc-tone-amber">{folderNotice}</span>}

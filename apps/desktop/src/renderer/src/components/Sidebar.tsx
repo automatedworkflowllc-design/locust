@@ -1018,9 +1018,9 @@ export function Sidebar({
         * list for everything that finds these buttons by it.
         */}
       <div className="lc-sidebar__nav lc-sidebar__places">
-        <button type="button" onClick={() => { railClose(); onOpenMissions() }} title="All missions (Ctrl 1)">
+        <button type="button" onClick={() => { railClose(); onOpenMissions() }} title="All conversations (Ctrl 1)">
           <Icon name="inbox" size={14} />
-          <span>Missions</span>
+          <span>Conversations</span>
         </button>
         <button type="button" onClick={() => { railClose(); onOpenRooms() }} title="Rooms — ask several teammates at once (Ctrl 4)">
           <Icon name="users" size={14} />
@@ -1514,7 +1514,7 @@ export function Sidebar({
           */}
           {shownUnowned.length > 0 && (
           <SidebarSection
-            label="Missions"
+            label="Conversations"
             count={shownUnowned.length}
             open={openSections.missions}
             onToggle={() => setOpenSections((current) => ({ ...current, missions: !current.missions }))}
@@ -1658,7 +1658,7 @@ export function Sidebar({
                     ? '1 conversation could not be read and is not listed here.'
                     : `${String(unreadableConversations)} conversations could not be read and are not listed here.`}
                 </span>
-                <span className="lc-sidebar__unreadable-safe lc-mono">Nothing is written over them. All missions names the files.</span>
+                <span className="lc-sidebar__unreadable-safe lc-mono">Nothing is written over them. All conversations names the files.</span>
               </div>
             )}
             {/*
@@ -1781,9 +1781,9 @@ export function Sidebar({
                 * the screen -- spotted while touring the screens, 2026-09-03.
                 */}
               {!composerShown
-                ? 'No missions yet. They are recorded here as they run.'
+                ? 'No conversations yet. They are kept here as they happen.'
                 : teammates.length === 0
-                  ? 'No missions yet. Describe one below and it is recorded locally as it runs.'
+                  ? 'No conversations yet. Write below and it is kept on this machine as it happens.'
                   : // A message with nobody picked belongs to nobody now (0.21.6), so this
                     // must not promise the first teammate will pick it up -- the composer
                     // right under it said "Write a message…" while this said Juno would
@@ -1792,8 +1792,8 @@ export function Sidebar({
                     (() => {
                       const picked = teammates.find((teammate) => teammate.teammateId === selectedTeammateId)
                       return picked === undefined
-                        ? 'No missions yet. Pick a teammate, or write below and assign it to one later.'
-                        : `No missions yet. Describe one below and ${picked.name} picks it up.`
+                        ? 'No conversations yet. Pick a teammate, or write below and give it to one later.'
+                        : `No conversations yet. Write below and ${picked.name} picks it up.`
                     })()}
             </p>
           </>

@@ -95,7 +95,7 @@ try {
     setter.call(field, field.value + 'this file do? One sentence.')
     field.dispatchEvent(new Event('input', { bubbles: true }))
     await new Promise((r) => setTimeout(r, 300))
-    document.querySelector('button[aria-label="Start mission"]')?.click()
+    document.querySelector('button[aria-label="Send"]')?.click()
     for (let i = 0; i < 600; i += 1) {
       await new Promise((r) => setTimeout(r, 500))
       if (i > 6 && !document.querySelector('button[aria-label^="Stop the running"]')) break

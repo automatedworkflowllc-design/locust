@@ -76,7 +76,7 @@ const turn = (who, text) => `(async () => {
   if (!chip) return 'no teammate chip for ' + ${JSON.stringify(who)}
   chip.click()
   await new Promise(r => setTimeout(r, 700))
-  const box = document.querySelector('textarea[aria-label="Mission instruction"]')
+  const box = document.querySelector('textarea[aria-label="Message"]')
   const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set
   setter.call(box, ${JSON.stringify(text)})
   box.dispatchEvent(new Event('input', { bubbles: true }))

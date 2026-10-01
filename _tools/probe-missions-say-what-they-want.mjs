@@ -83,7 +83,7 @@ const sendThenWatch = (send, watch) => `(async () => {
  * able to read at some point, not what it said at one instant.
  */
 const watch = `(async () => {
-  const open = [...document.querySelectorAll('button, a')].find(n => /^Missions$/.test(n.innerText.trim()))
+  const open = [...document.querySelectorAll('button, a')].find(n => /^(Conversations|Missions)$/.test(n.innerText.trim()))
   if (open === undefined) return 'no Missions button'
   open.click()
   await new Promise(r => setTimeout(r, 150))

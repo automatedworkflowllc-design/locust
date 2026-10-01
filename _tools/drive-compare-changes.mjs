@@ -101,7 +101,7 @@ try {
     setter.call(field, 'In cart.py, make total(prices) return the sum of the prices. Change only cart.py, and keep the docstring.')
     field.dispatchEvent(new Event('input', { bubbles: true }))
     await new Promise((r) => setTimeout(r, 300))
-    document.querySelector('button[aria-label="Start mission"]')?.click()
+    document.querySelector('button[aria-label="Send"]')?.click()
     let both = false
     for (let i = 0; i < 1400; i += 1) {
       await new Promise((r) => setTimeout(r, 500))

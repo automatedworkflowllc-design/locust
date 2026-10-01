@@ -75,7 +75,7 @@ try {
     setter.call(field, 'In greet.js add an exported function farewell(name) that returns "Goodbye, <name>." and add a test for it to greet.test.js. Run npm test.')
     field.dispatchEvent(new Event('input', { bubbles: true }))
     for (let i = 0; i < 40; i += 1) {
-      const button = document.querySelector('button[aria-label="Start mission"]')
+      const button = document.querySelector('button[aria-label="Send"]')
       if (button && !button.disabled) { button.click(); break }
       await new Promise((r) => setTimeout(r, 250))
     }

@@ -57,7 +57,7 @@ try {
     await new Promise(r => setTimeout(r, 300))
 
     for (let i = 0; i < 40; i += 1) {
-      const startBtn = document.querySelector('button[aria-label="Start mission"]')
+      const startBtn = document.querySelector('button[aria-label="Send"]')
       if (startBtn && !startBtn.disabled) {
         startBtn.click()
         return 'started via button'

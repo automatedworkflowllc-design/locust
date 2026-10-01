@@ -115,7 +115,7 @@ try {
   // Missions screen must say what it is waiting FOR.
   await drive.capture('the Missions row says what it is waiting for', async () =>
     drive.evaluate(`(async () => {
-      const open = [...document.querySelectorAll('button, a')].find(n => /^Missions$/.test(n.innerText.trim()))
+      const open = [...document.querySelectorAll('button, a')].find(n => /^(Conversations|Missions)$/.test(n.innerText.trim()))
       if (open === undefined) return 'no Missions button'
       open.click()
       await new Promise(r => setTimeout(r, 900))

@@ -68,7 +68,7 @@ const reading = `(() => {
 })()`
 
 const send = (text) => `(async () => {
-  const box = document.querySelector('textarea[aria-label="Mission instruction"]')
+  const box = document.querySelector('textarea[aria-label="Message"]')
   // A missing composer used to throw inside setter.call, which surfaces as a
   // stack trace attributed to the evaluate rather than as "the screen this
   // drive expected was not there". Name it.
@@ -90,7 +90,7 @@ const send = (text) => `(async () => {
    */
   let started = false
   for (let i = 0; i < 120; i += 1) {
-    const button = document.querySelector('button[aria-label="Start mission"]')
+    const button = document.querySelector('button[aria-label="Send"]')
     if (button && !button.disabled) { button.click(); started = true; break }
     await new Promise(r => setTimeout(r, 250))
   }

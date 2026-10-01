@@ -66,7 +66,7 @@ try {
   })
 
   const ran = await drive.capture('a small job of three steps', () => drive.evaluate(`(async () => {
-    const box = document.querySelector('textarea[aria-label="Mission instruction"]')
+    const box = document.querySelector('textarea[aria-label="Message"]')
     const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set
     setter.call(box, 'In this folder: list the files, count the lines in each, then say which file has the most lines. Change nothing.')
     box.dispatchEvent(new Event('input', { bubbles: true }))

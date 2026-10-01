@@ -73,7 +73,7 @@ try {
   await drive.ready()
   await drive.resize(1215, 800)
   const opened = await drive.evaluate(`(async () => {
-    const tab = [...document.querySelectorAll('button')].find((b) => b.innerText.trim() === 'Missions')
+    const tab = [...document.querySelectorAll('button')].find((b) => /^(Conversations|Missions)$/.test(b.innerText.trim()))
     if (!tab) return 'no Missions button'
     tab.click()
     let row

@@ -48,7 +48,7 @@ const sendThenStop = (text, stopAfterMs) => `(async () => {
   let start
   for (let i = 0; i < 120 && !start; i += 1) {
     await new Promise((r) => setTimeout(r, 250))
-    const button = document.querySelector('button[aria-label="Start mission"]')
+    const button = document.querySelector('button[aria-label="Send"]')
     if (button && !button.disabled) start = button
   }
   if (!start) return JSON.stringify({ sent: false })
@@ -98,7 +98,7 @@ try {
     field.dispatchEvent(new Event('input', { bubbles: true }))
     for (let i = 0; i < 120; i += 1) {
       await new Promise((r) => setTimeout(r, 250))
-      const button = document.querySelector('button[aria-label="Start mission"]')
+      const button = document.querySelector('button[aria-label="Send"]')
       if (button && !button.disabled) { button.click(); break }
     }
     await new Promise((r) => setTimeout(r, 1500))

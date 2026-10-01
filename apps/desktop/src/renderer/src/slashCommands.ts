@@ -66,7 +66,7 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
   { name: 'edit', detail: 'May edit files inside this folder.', action: { kind: 'mode', mode: 'accept-edits' } },
   { name: 'approve', detail: 'Stops and asks before every command or file change.', action: { kind: 'mode', mode: 'approve-each' } },
   { name: 'model', detail: 'Choose the runtime and model.', action: { kind: 'route' } },
-  { name: 'swarm', detail: 'Every mission at its model maximum.', action: { kind: 'swarm' } },
+  { name: 'swarm', detail: 'Every run at its model maximum.', action: { kind: 'swarm' } },
   { name: 'stop', detail: 'Stop the running mission.', action: { kind: 'stop' } },
   { name: 'auto', detail: 'Runs without asking, and may change anything on this machine.', action: { kind: 'mode', mode: 'auto' }, weighted: true }
 ]

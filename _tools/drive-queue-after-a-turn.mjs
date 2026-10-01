@@ -60,7 +60,7 @@ const check = (what, ok, detail) => {
 }
 
 const type = (text) => `(async () => {
-  const box = document.querySelector('textarea[aria-label="Mission instruction"]')
+  const box = document.querySelector('textarea[aria-label="Message"]')
   if (!box) return 'no box'
   const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set
   setter.call(box, ${JSON.stringify(text)})

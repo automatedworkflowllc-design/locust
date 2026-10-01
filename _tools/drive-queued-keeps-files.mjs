@@ -65,7 +65,7 @@ try {
   const queued = String(await drive.capture('attach NOTES.md and queue a question about it', () => drive.evaluate(`(async () => {
     document.querySelector('button[data-satellite="attach"]')?.click()
     await new Promise(r => setTimeout(r, 900))
-    const box = document.querySelector('textarea[aria-label="Mission instruction"]')
+    const box = document.querySelector('textarea[aria-label="Message"]')
     const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set
     setter.call(box, 'What is the passphrase in the attached file? Reply with the passphrase only. Do not edit any files.')
     box.dispatchEvent(new Event('input', { bubbles: true }))

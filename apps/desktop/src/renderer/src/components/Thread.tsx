@@ -666,7 +666,7 @@ function ReceiptCard({
               : {})
           })}
         </dd>
-        <dt>Mission</dt>
+        <dt>Run</dt>
         <dd className="lc-mono">{shortMissionId(mission.missionId)}</dd>
         <dt>Checkpoints</dt>
         <dd>

@@ -104,7 +104,7 @@ try {
   check('each dropdown sets its own column: the two free models', started.labels.map(asId).join('|') === PICKS.join('|'), JSON.stringify(started.labels))
 
   const built = JSON.parse(String(await drive.capture('Both pages running side by side, each built in its own copy', () => drive.evaluate(`(async () => {
-    document.querySelector('button[aria-label="Start mission"]')?.click()
+    document.querySelector('button[aria-label="Send"]')?.click()
     for (let i = 0; i < 1600; i += 1) {
       await new Promise((r) => setTimeout(r, 500))
       const states = [...document.querySelectorAll('.lc-compare__state')].map((el) => el.textContent.trim())

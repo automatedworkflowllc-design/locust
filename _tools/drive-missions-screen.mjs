@@ -42,7 +42,7 @@ try {
   await drive.ready()
   await drive.resize(1440, 900)
   await sleep(2500)
-  await drive.evaluate(`[...document.querySelectorAll('.lc-sidebar__nav button')].find((b) => /Missions/.test(b.innerText))?.click()`)
+  await drive.evaluate(`[...document.querySelectorAll('.lc-sidebar__nav button')].find((b) => /Conversations|Missions/.test(b.innerText))?.click()`)
   await sleep(1200)
   const seen = JSON.parse(String(await drive.capture('Missions, 1440', () => drive.evaluate(read))))
   say(`  header: ${seen.meta}`)
@@ -67,7 +67,7 @@ try {
   })()`)))
   check('opening it opens the whole conversation, all three turns', /redirect loop/.test(opened) && /signup form does/.test(opened) && /ship it/i.test(opened), opened.slice(-200))
 
-  await drive.evaluate(`[...document.querySelectorAll('.lc-sidebar__nav button')].find((b) => /Missions/.test(b.innerText))?.click()`)
+  await drive.evaluate(`[...document.querySelectorAll('.lc-sidebar__nav button')].find((b) => /Conversations|Missions/.test(b.innerText))?.click()`)
   await sleep(1000)
   const picked = JSON.parse(String(await drive.capture('select two', () => drive.evaluate(`(async () => {
     const boxes = [...document.querySelectorAll('.lc-missionrow__pick')].filter((b) => !b.disabled)

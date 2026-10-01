@@ -91,7 +91,7 @@ export function RoutineRecovery({ routine, recover, onOpenMission, now = new Dat
         */}
       <span className="lc-recovery__line">{`Keep clears this attempt and leaves the routine as it was; its next run starts from step 1 ${nextAfterKeep === undefined ? (routine.schedule === undefined ? 'when you press Run' : routine.schedule.kind === 'files' ? 'when the next new file arrives' : 'when you press Run, since its one scheduled time has passed') : `at ${nextAfterKeep.toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' })}, not straight away`}. Abandon also removes the schedule. Neither stops a runtime or undoes work.`}</span>
       <label className="lc-recovery__ack"><input type="checkbox" checked={reviewed} disabled={busy}
-        onChange={(event) => setReviewed(event.target.checked)} /> I reviewed the saved mission and external work, and whether the remaining work is still wanted.</label>
+        onChange={(event) => setReviewed(event.target.checked)} /> I reviewed the saved conversation and external work, and whether the remaining work is still wanted.</label>
       <span className="lc-recovery__actions">
         {!lastStep && <button type="button" className="lc-ghostbutton" disabled={busy || !reviewed || !execution.canContinue || recover === undefined}
           onClick={() => { void decide('continue') }}>Continue remaining steps</button>}

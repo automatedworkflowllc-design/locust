@@ -201,7 +201,7 @@ export function Inspector({
             <dd title={route?.model}>{route === undefined ? 'unknown' : modelDisplayName(route.runtime, route.model)}</dd>
             <dt>Account</dt>
             <dd title={route?.resolvedRouteId}>{route === undefined ? 'unknown' : accountPhrase(route)}</dd>
-            <dt>Mission</dt>
+            <dt>Run</dt>
             <dd className="lc-mono" title={route?.missionId}>{route === undefined ? 'unknown' : shortMissionId(route.missionId)}</dd>
             <dt>Sandbox</dt>
             <dd>{route?.sandbox === undefined ? 'unknown' : sandboxPhrase(route.sandbox)}</dd>

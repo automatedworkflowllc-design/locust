@@ -55,7 +55,7 @@ const typeAndSend = (text) => `(async () => {
   setter.call(field, ${JSON.stringify(text)})
   field.dispatchEvent(new Event('input', { bubbles: true }))
   await new Promise((r) => setTimeout(r, 300))
-  const button = document.querySelector('button[aria-label="Start mission"]')
+  const button = document.querySelector('button[aria-label="Send"]')
   const could = button !== null && !button.disabled
   button?.click()
   return JSON.stringify({ placeholder, could })

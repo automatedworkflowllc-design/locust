@@ -196,7 +196,7 @@ try {
 
   say('2. start a slow-enough run, then type while it works')
   await type('Reply with exactly the word ALPHA and nothing else.')
-  check('the first mission started', (await clickSend('Start mission')) === 'clicked')
+  check('the first mission started', (await clickSend('Send')) === 'clicked')
   // While it runs the box must accept text -- that is the whole feature.
   const whileRunning = await evaluate(`(async () => {
     for (let i = 0; i < 60; i += 1) {
@@ -221,7 +221,7 @@ try {
     setter.call(field, 'Reply with exactly the word BETA and nothing else.')
     field.dispatchEvent(new Event('input', { bubbles: true }))
     await new Promise(r => setTimeout(r, 300))
-    const button = document.querySelector('button[aria-label="Send this when the mission finishes"]')
+    const button = document.querySelector('button[aria-label="Send this when the reply finishes"]')
     if (!button) return 'no queue button'
     button.click()
     await new Promise(r => setTimeout(r, 400))
@@ -308,7 +308,7 @@ try {
   check('Plan is chosen from the mode menu', /^Plan/.test(String(planned)), String(planned))
 
   await type('Add a second exported constant to status.ts called reviewed.')
-  check('the plan mission started', (await clickSend('Start mission')) === 'clicked')
+  check('the plan mission started', (await clickSend('Send')) === 'clicked')
   check('the plan run finished', (await settle(300)) === true)
 
   const offer = await evaluate(`(async () => {

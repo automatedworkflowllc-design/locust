@@ -132,7 +132,7 @@ try {
   }
   say(`route: ${route}`)
   const send = (text) => drive.evaluate(`(async () => {
-    const field = document.querySelector('textarea[aria-label="Mission instruction"]')
+    const field = document.querySelector('textarea[aria-label="Message"]')
     const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
     set.call(field, ${JSON.stringify(text)})
     field.dispatchEvent(new Event('input', { bubbles: true }))

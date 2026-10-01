@@ -195,7 +195,7 @@ try {
       setter.call(field, ${JSON.stringify(CHANGES ? 'Add one line at the very end of README.md that says: Dark mode: on. Work only in this folder.' : 'Reply with the single word: ok')})
       field.dispatchEvent(new Event('input', { bubbles: true }))
       await new Promise((r) => setTimeout(r, 300))
-      document.querySelector('button[aria-label="Start mission"]')?.click()
+      document.querySelector('button[aria-label="Send"]')?.click()
       for (let i = 0; i < 600; i += 1) {
         await new Promise((r) => setTimeout(r, 500))
         const states = [...document.querySelectorAll('.lc-compare__state')].map((el) => el.textContent.trim())

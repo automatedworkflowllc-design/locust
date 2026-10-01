@@ -36,7 +36,7 @@ export function ResumeCard({
     // is being asked: this branch has no button, so wearing the colour that
     // means "waiting for you" made it compete with cards that were.
     return (
-      <div className="lc-card is-standing" role="group" aria-label="This mission cannot be resumed">
+      <div className="lc-card is-standing" role="group" aria-label="This cannot be resumed">
         <div className="lc-card__head">
           <span>Cannot be resumed from here</span>
         </div>
@@ -47,7 +47,7 @@ export function ResumeCard({
 
   const doubted = offer.kind === 'resume-with-doubt'
   return (
-    <div className="lc-resume" role="group" aria-label="Resume this mission">
+    <div className="lc-resume" role="group" aria-label="Resume where it stopped">
       <div className="lc-resume__head">
         <span className="lc-resume__title">
           <Icon name="diff" size={13} /> Interrupted — the last checkpoint was kept

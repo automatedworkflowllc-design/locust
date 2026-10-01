@@ -321,7 +321,7 @@ export function ApprovalCard({
           </>
         )}
         <dt>Where</dt>
-        <dd className="lc-mono">{request.cwd ?? 'the mission workspace'}</dd>
+        <dd className="lc-mono">{request.cwd ?? 'the project folder'}</dd>
         {dataSent !== undefined && (
           <>
             <dt>Data sent</dt>
@@ -457,8 +457,8 @@ export function ApprovalCard({
             */}
             {/* What Always lets through, when the route can say (R35). */}
             {request.alwaysCovers === undefined
-              ? 'Nothing has happened yet. “Always” lasts until this mission ends.'
-              : `Nothing has happened yet. “Always” allows ${request.alwaysCovers}, until this mission ends.`}
+              ? 'Nothing has happened yet. “Always” lasts until this run ends.'
+              : `Nothing has happened yet. “Always” allows ${request.alwaysCovers}, until this run ends.`}
             {/* A saved rule outlives the run, so what it would save is said before it is pressed (0.521). */}
             {rule !== undefined && ` “Don’t ask again” saves a rule: ${rule.allowSentence} Settings > Teammates lists your rules.`}
           </p>

@@ -27,7 +27,7 @@ const drive = await startDrive({
 
 /** Type into the box the way React sees it: the native setter, then input. */
 const typeScript = (text) => `(async () => {
-  const box = document.querySelector('textarea[aria-label="Mission instruction"]')
+  const box = document.querySelector('textarea[aria-label="Message"]')
   if (!box) return 'no composer'
   const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set
   setter.call(box, ${JSON.stringify(text)})
@@ -50,7 +50,7 @@ const typeScript = (text) => `(async () => {
 
 /** A real key, so the composer's own handler decides what Enter means. */
 const keyScript = (key) => `(async () => {
-  const box = document.querySelector('textarea[aria-label="Mission instruction"]')
+  const box = document.querySelector('textarea[aria-label="Message"]')
   box.focus()
   box.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, bubbles: true }))
   await new Promise(r => setTimeout(r, 400))
@@ -82,7 +82,7 @@ try {
   // THE test. "run /plan on this" is a message that contains a slash. If the
   // menu opens for it, a sentence someone meant to send becomes a mode change.
   await drive.capture('a slash inside a sentence is not a command', () => drive.evaluate(`(async () => {
-    const box = document.querySelector('textarea[aria-label="Mission instruction"]')
+    const box = document.querySelector('textarea[aria-label="Message"]')
     const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set
     setter.call(box, 'run /plan on this file')
     box.dispatchEvent(new Event('input', { bubbles: true }))
@@ -99,7 +99,7 @@ try {
   // text "/plan" is the one outcome this feature exists to prevent.
   await drive.capture('Enter runs it and does not send it', () => drive.evaluate(keyScript('Enter')))
 
-  await drive.capture('the composer afterwards', () => drive.evaluate("document.querySelector('textarea[aria-label=\"Mission instruction\"]')?.value === '' ? 'box cleared' : 'box still has text'"))
+  await drive.capture('the composer afterwards', () => drive.evaluate("document.querySelector('textarea[aria-label=\"Message\"]')?.value === '' ? 'box cleared' : 'box still has text'"))
 } finally {
   await drive.finish({
     intro: 'Slash commands in the composer: whether typing `/` shows a menu, whether a slash inside a sentence is left alone, and whether Enter runs the highlighted command instead of sending it.'
