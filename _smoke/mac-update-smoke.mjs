@@ -106,15 +106,33 @@ try {
     if (held === undefined) return
     waiting.delete(message.id)
     if (message.error !== undefined) held.reject(new Error(message.error.message))
+    // A page that threw comes back as its exception: said, not parsed as an answer.
+    else if (message.result?.exceptionDetails !== undefined) held.reject(new Error(`the page threw: ${String(message.result.exceptionDetails.exception?.description ?? message.result.exceptionDetails.text)}`))
     else held.resolve(message.result?.result?.value)
   })
   await new Promise((done) => socket.addEventListener('open', done, { once: true }))
+  // The window fully up: the bridge there and the composer drawn.
+  const up = await evaluate(`(async () => {
+    for (let i = 0; i < 120; i += 1) {
+      if (window.desktop?.checkForUpdate !== undefined && document.querySelector('form.command-dock textarea')) return 'up'
+      await new Promise((r) => setTimeout(r, 500))
+    }
+    return 'not up: ' + typeof window.desktop + ' ' + (document.body?.innerText ?? '').slice(0, 200)
+  })()`)
+  check('the window is up, with the bridge', up === 'up', String(up))
 
   // 3. The update service: checked, downloaded (here: the test image staged), ready.
   const ready = await evaluate(`(async () => {
     let state = null
     for (let i = 0; i < 90; i += 1) {
-      const answer = await window.desktop.checkForUpdate()
+      let answer
+      try {
+        answer = await window.desktop.checkForUpdate()
+      } catch (error) {
+        state = { threw: String(error?.message ?? error) }
+        await new Promise((r) => setTimeout(r, 2000))
+        continue
+      }
       state = answer.ok ? answer.data : answer.error
       if (answer.ok && answer.data.phase === 'ready') break
       await new Promise((r) => setTimeout(r, 2000))
