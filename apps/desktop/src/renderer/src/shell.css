@@ -4348,11 +4348,12 @@ textarea {
   color: var(--lc-text-secondary);
 }
 
-/* A section the person may leave out (0.527): the words themselves, with a small × to drop them. */
+/* A section the person may leave out (0.527): the words themselves, with a small × to drop them.
+   Inline, not inline-flex: a flex box reads as a block to innerText, and the
+   line copied out said "its last reply ." */
 .lc-continuation__part {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
+  display: inline;
+  white-space: nowrap;
   margin: 0;
   padding: 0 4px;
   border: 1px solid var(--lc-border-button);
@@ -4362,6 +4363,11 @@ textarea {
   font: inherit;
   line-height: 1.5;
   cursor: pointer;
+}
+
+.lc-continuation__part svg {
+  margin-left: 3px;
+  vertical-align: -1px;
 }
 
 .lc-continuation__part:hover,

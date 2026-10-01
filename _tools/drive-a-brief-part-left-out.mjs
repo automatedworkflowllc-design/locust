@@ -84,7 +84,7 @@ try {
     return JSON.stringify({ note: ${NOTE}, parts })
   })()`)))
   const shown = JSON.parse(before)
-  check('it carries the task and its last reply, and only the reply may be left out', /It carries the task and its last reply ?\./.test(shown.note) && JSON.stringify(shown.parts) === '["Leave out its last reply"]', before)
+  check('it carries the task and its last reply, and only the reply may be left out', /It carries the task and its last reply\./.test(shown.note) && JSON.stringify(shown.parts) === '["Leave out its last reply"]', before)
   const dropped = String(await drive.capture('its last reply, left out', () => drive.evaluate(`(async () => {
     document.querySelector('.lc-continuation__part[aria-label="Leave out its last reply"]')?.click()
     await new Promise((r) => setTimeout(r, 900))
@@ -96,7 +96,7 @@ try {
     await new Promise((r) => setTimeout(r, 900))
     return ${NOTE}
   })()`)))
-  check('Put back carries it again', /It carries the task and its last reply ?\./.test(back) && !/leaving out/.test(back), back)
+  check('Put back carries it again', /It carries the task and its last reply\./.test(back) && !/leaving out/.test(back), back)
   await drive.evaluate(`(async () => {
     document.querySelector('.lc-continuation__part[aria-label="Leave out its last reply"]')?.click()
     await new Promise((r) => setTimeout(r, 900))
