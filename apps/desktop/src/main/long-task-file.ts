@@ -25,10 +25,16 @@ import { keepOutOfGit } from './attachments-for-run.js'
  */
 export const TASK_INLINE_LIMIT = 2_500
 
-export async function longTaskFile(task: string, projectFolder: string, missionId: string): Promise<string | undefined> {
+/** Where a long task would go, without writing it: for a preview of the brief (0.517). */
+export function longTaskFilePath(task: string, missionId: string): string | undefined {
   if (task.length <= TASK_INLINE_LIMIT) return undefined
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(missionId)) return undefined
-  const path = `${ATTACHMENT_DIR}/conversation-${missionId}.md`
+  return `${ATTACHMENT_DIR}/conversation-${missionId}.md`
+}
+
+export async function longTaskFile(task: string, projectFolder: string, missionId: string): Promise<string | undefined> {
+  const path = longTaskFilePath(task, missionId)
+  if (path === undefined) return undefined
   try {
     await mkdir(join(projectFolder, ATTACHMENT_DIR), { recursive: true })
     await writeFile(join(projectFolder, path), `${task}\n`, 'utf8')

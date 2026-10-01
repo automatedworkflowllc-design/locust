@@ -28,6 +28,10 @@ export interface HandoffBriefing {
   readonly prompt: string
   /** Section names left out to fit the bound, in the order they were dropped. */
   readonly omitted: readonly string[]
+  /** Section names carried, in reading order, the person's own words ('next') left out (0.517). */
+  readonly kept: readonly string[]
+  /** Set when the original task gave up its end to fit beside the person's words. */
+  readonly taskClipped?: true
 }
 
 function bullets(lines: readonly string[]): string {
@@ -225,6 +229,7 @@ export function composeHandoffPrompt(
    * because of a limit. The person's new words are kept whole; the ORIGINAL
    * task gives up its end, and the briefing says how much.
    */
+  let clippedTask = false
   if (used > budget) {
     const task = mandatory.find((section) => section.name === 'task')
     const over = used - budget
@@ -237,6 +242,7 @@ export function composeHandoffPrompt(
     const clipped = { ...task, text: `${task.text.slice(0, room).trimEnd()}${clipNotice(task.text.length - room)}` }
     const index = sections.indexOf(task)
     sections.splice(index, 1, clipped)
+    clippedTask = true
     mandatory = mandatory.map((section) => (section === task ? clipped : section))
     used = mandatory.reduce((sum, section, at) => sum + section.text.length + (at === 0 ? 0 : 2), 0)
     if (used > budget) return undefined
@@ -254,7 +260,8 @@ export function composeHandoffPrompt(
     keptNames.add(name)
     used += cost
   }
-  const kept = sections.filter((section) => keptNames.has(section.name)).map((section) => section.text)
+  const keptSections = sections.filter((section) => keptNames.has(section.name))
+  const kept = keptSections.map((section) => section.text)
   if (kept.length === 0) return undefined
 
   const body = omitted.length === 0
@@ -272,7 +279,12 @@ export function composeHandoffPrompt(
   // a fifth section that outgrows the reserve fails the suite instead of
   // silently refusing a handoff at runtime.
 
-  return { prompt: body, omitted }
+  return {
+    prompt: body,
+    omitted,
+    kept: keptSections.map((section) => section.name).filter((name) => name !== 'next'),
+    ...(clippedTask ? { taskClipped: true as const } : {})
+  }
 }
 
 /**

@@ -26,6 +26,7 @@ import {
 import { defaultEffort, sendBlockedReason } from '../status.js'
 import { freeTagOf, isOwnRoute, routeModelName, shortRuntimeName } from '../routeName.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
+import { handoffPreviewLine } from '../handoffPreview.js'
 import { AttachedImage } from './AttachedImage.js'
 import { MetalSend } from './MetalSend.js'
 import type { MetalMotion, MetalPreset, MetalStrength } from '../../../shared/ipc.js'
@@ -316,6 +317,12 @@ export interface ComposerProps {
    */
   readonly continuationNote: string | undefined
   /**
+   * The stopped run a reply on another runtime continues, and that runtime
+   * (0.517): the box asks the host what the brief would carry, as it is
+   * typed, and says it under the note.
+   */
+  readonly continuation?: { readonly followUpOf: string; readonly runtime: MissionRuntimeId }
+  /**
    * What is waiting to be sent when the running mission finishes, if anything.
    *
    * Already FOLDED: the strip shows the one instruction that will actually go,
@@ -379,6 +386,7 @@ export function Composer({
   runtimeCommands,
   hasConnectors = false,
   continuationNote,
+  continuation,
   workspaceName,
   workspacePath,
   workspaceMade = false,
@@ -443,6 +451,29 @@ export function Composer({
   queuedElsewhere
 }: ComposerProps): ReactElement {
   const [value, setValue] = useState('')
+  // What a reply on another runtime would carry, worked out by the host as it is typed (0.517).
+  const [carried, setCarried] = useState<string>()
+  const continuationKey = continuation === undefined ? undefined : `${continuation.followUpOf}:${continuation.runtime}`
+  useEffect(() => {
+    if (continuation === undefined || window.desktop?.previewHandoff === undefined) {
+      setCarried(undefined)
+      return
+    }
+    let live = true
+    const timer = setTimeout(() => {
+      void window.desktop
+        ?.previewHandoff({ followUpOf: continuation.followUpOf, runtime: continuation.runtime, prompt: value })
+        .then((preview) => {
+          if (live) setCarried(handoffPreviewLine(preview))
+        })
+        .catch(() => undefined)
+    }, 350)
+    return () => {
+      live = false
+      clearTimeout(timer)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the key stands for the object
+  }, [continuationKey, value])
   /*
    * Start and Stop are one button in one place, so the second click of a
    * double-click on Start landed on Stop: "You stopped this run", and nothing
@@ -1455,7 +1486,10 @@ export function Composer({
         {continuationNote !== undefined && (
           <div className="lc-continuation lc-mono" role="status">
             <Icon name="route" size={12} />
-            <span>{continuationNote}</span>
+            <span>
+              {continuationNote}
+              {carried !== undefined && <span className="lc-continuation__carried">{` ${carried}`}</span>}
+            </span>
           </div>
         )}
         {/*

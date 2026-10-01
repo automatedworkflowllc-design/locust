@@ -43,6 +43,7 @@ import type {
   CodexMissionCancelResponse,
   CodexMissionStartResponse,
   CodexMissionUpdate,
+  HandoffPreview,
   MissionApprovalAnswer,
   MissionHandoffResponse,
   MissionMode
@@ -68,14 +69,14 @@ import { briefHeld, briefPlan, compactedDuring } from './brief-sessions.js'
 import type { BriefSessions } from './brief-sessions.js'
 import type { EndedMission, RelayOrigin, SharingMission } from './relay.js'
 import type { MissionStarter } from '@teammate/mission-store'
-import { boundedEditCheck } from '@teammate/mission-store'
+import { boundedEditCheck, reconcileMission } from '@teammate/mission-store'
 import { recordableCommand } from './command-record.js'
 import { commandTooLong } from './command-length.js'
 import { MAX_LIVE_MISSIONS } from '../shared/live-missions.js'
 import { hostReadsEventsOf, runtimeDisplayName } from '../shared/runtimes.js'
 import { FREE_ONLY_REFUSAL, isFreeRoute } from './free-routes.js'
 import { attachmentsForRun } from './attachments-for-run.js'
-import { longTaskFile } from './long-task-file.js'
+import { longTaskFile, longTaskFilePath } from './long-task-file.js'
 import { withAttachments } from '../shared/attachments.js'
 import { CODEX_INIT_PROMPT, commandNamed } from './runtime-commands.js'
 import type { CursorDefaultModel } from './cursor-default-model.js'
@@ -276,6 +277,8 @@ export interface CodexMissionService {
     route: { readonly model?: string; readonly effort?: string },
     emit: (update: CodexMissionUpdate) => void
   ): Promise<MissionHandoffResponse>
+  /** What a reply on `runtime` to that mission would carry, composed as a send would and with nothing written (0.517). */
+  previewSwitch(followUpOf: string, runtime: MissionRuntimeId, prompt: string): Promise<HandoffPreview>
   /** Whether this transport owns a live run of that mission. */
   hasMission(missionId: string): boolean
   /** The missions this transport is running right now. */
@@ -2336,6 +2339,32 @@ ${sentPrompt.trim()}`
 
     decide(answer: MissionApprovalAnswer): boolean {
       return options.approvals?.decide(answer) ?? false
+    },
+
+    async previewSwitch(followUpOf: string, runtime: MissionRuntimeId, prompt: string): Promise<HandoffPreview> {
+      const prior = await options.ledger.getMission(followUpOf).catch(() => undefined)
+      if (prior === undefined) return { kind: 'refused', message: 'That conversation could not be read, so it cannot be continued on another runtime.' }
+      if (prior.metadata.runtime === runtime) return { kind: 'same' }
+      // The checkpoint a send would write, worked out and not written (reconcileMission is pure).
+      const checkpoint = reconcileMission(
+        { metadata: prior.metadata, events: prior.events, issues: prior.issues },
+        { reason: 'route-switch', epoch: prior.checkpoints.length + 1, createdAt: new Date().toISOString() }
+      )
+      if (checkpoint.resumeSafety === 'unsafe') {
+        return { kind: 'refused', message: `That conversation cannot be continued safely on another runtime: ${checkpoint.safetyReason}` }
+      }
+      const taskFile = longTaskFilePath(prior.metadata.prompt, prior.metadata.missionId)
+      const composed = composeHandoffPrompt(prior.metadata.prompt, checkpoint, runtimeDisplayName(prior.metadata.runtime), prompt, await earlierTurnsOf(prior), taskFile)
+      if (composed === undefined) return { kind: 'refused', message: 'That conversation is too long to carry to another runtime with this reply.' }
+      return {
+        kind: 'switch',
+        fromRuntime: runtimeDisplayName(prior.metadata.runtime),
+        kept: composed.kept,
+        omitted: composed.omitted,
+        unsettledCount: checkpoint.unsettledActions.length,
+        taskByFile: taskFile !== undefined,
+        taskClipped: composed.taskClipped === true
+      }
     },
 
     async handOff(

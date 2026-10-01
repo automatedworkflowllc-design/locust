@@ -259,6 +259,7 @@ import {
   DIAGNOSTICS_REPORT_CHANNEL,
   OPEN_LINK_CHANNEL,
   MAC_RELEASE_CHANNEL,
+  HANDOFF_PREVIEW_CHANNEL,
   DEFAULT_RELAY_HOP_CAP,
   DEFAULT_MEMORY_MODE,
   ROOM_LIST_CHANNEL,
@@ -3550,6 +3551,14 @@ if (!ownsSingleInstanceLock) {
      * a packaged Mac build, and nothing is downloaded here: the window offers
      * the release's own link, and the person's browser fetches it.
      */
+    // What a reply on another runtime would carry (0.517): composed as the send would, nothing written.
+    ipcMain.handle(HANDOFF_PREVIEW_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event) || typeof request !== 'object' || request === null) return undefined
+      const { followUpOf, runtime, prompt } = request as Record<string, unknown>
+      if (typeof followUpOf !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(followUpOf) || !isMissionRuntime(runtime) || typeof prompt !== 'string') return undefined
+      return codexMissions.previewSwitch(followUpOf, runtime, prompt.slice(0, 20_000)).catch(() => undefined)
+    })
+
     ipcMain.handle(MAC_RELEASE_CHANNEL, async (event) => {
       if (!fromOwnWindow(event) || process.platform !== 'darwin' || !app.isPackaged) return undefined
       // A Mac that updates itself (0.516) says so through the ordinary update banner, not this one.

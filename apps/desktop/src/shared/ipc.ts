@@ -920,6 +920,37 @@ export type RevealFileResponse =
   | { readonly ok: true }
   | { readonly ok: false; readonly message: string }
 export const OPEN_LINK_CHANNEL = 'shell:open-link'
+/**
+ * WHAT A REPLY ON ANOTHER RUNTIME WOULD CARRY, before it is sent (0.517).
+ * Product ideas, round four: the handoff brief is composed from sections and
+ * drops whole ones to fit, and nothing showed that before the send. Composed
+ * exactly as the send composes it, with nothing written: no checkpoint, no
+ * task file.
+ */
+export const HANDOFF_PREVIEW_CHANNEL = 'mission:handoff-preview'
+export interface HandoffPreviewRequest {
+  readonly followUpOf: string
+  readonly runtime: MissionRuntimeId
+  readonly prompt: string
+}
+export type HandoffPreview =
+  /** The reply stays on the same runtime: there is no brief to show. */
+  | { readonly kind: 'same' }
+  | {
+      readonly kind: 'switch'
+      readonly fromRuntime: string
+      /** Sections carried, in reading order: task, earlier, unsettled, settled, summary. */
+      readonly kept: readonly string[]
+      /** Sections left out to fit, in the order they were given up. */
+      readonly omitted: readonly string[]
+      /** Actions that started and never reported back. */
+      readonly unsettledCount: number
+      /** The task goes as a file because it is long (0.513). */
+      readonly taskByFile: boolean
+      readonly taskClipped: boolean
+    }
+  /** The send would be refused, and why. */
+  | { readonly kind: 'refused'; readonly message: string }
 /** A newer Locust for this Mac (0.515, main/mac-release.ts): its version and disk image, or nothing. */
 export const MAC_RELEASE_CHANNEL = 'updates:mac-release'
 export interface MacReleaseAnswer {
@@ -2948,6 +2979,8 @@ export interface DesktopApi {
   openLink(url: string): Promise<OpenLinkResponse>
   /** On a Mac: a newer release with this chip's disk image, when there is one (0.515). */
   macRelease(): Promise<MacReleaseAnswer | undefined>
+  /** What a reply on another runtime would carry (0.517); undefined when it could not be worked out. */
+  previewHandoff(request: HandoffPreviewRequest): Promise<HandoffPreview | undefined>
   /** Open the picker for files to attach; answers workspace-relative paths. */
   attachFiles(): Promise<AttachFilesResponse>
   /** The project's files, workspace-relative, for `@` in the composer (0.436). */

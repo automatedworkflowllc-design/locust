@@ -4343,6 +4343,11 @@ textarea {
   font-size: 11px;
 }
 
+/* What the summary carries, said after the note (0.517): a shade brighter, it is the news. */
+.lc-continuation__carried {
+  color: var(--lc-text-secondary);
+}
+
 /* A notice that carries its own control sits them side by side. */
 .lc-diagnostic--row {
   display: flex;

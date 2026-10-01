@@ -65,6 +65,20 @@ describe('the briefing a continuation starts with', () => {
     expect(carried!.prompt).toContain('Spec start.')
     expect(carried!.prompt).not.toContain('Spec end.')
     expect(carried!.prompt).toMatch(/\[The original task continues for \d+ more characters that did not fit here\. Ask the person if the part above is not enough\.\]/)
+    // And it says so, for the preview under the box (0.517).
+    expect(carried!.taskClipped).toBe(true)
+  })
+
+  // 0.517: the preview under the box reads these, so they must be the sections actually in the prompt.
+  it('names the sections it carried, in reading order, and only those', () => {
+    const whole = composeHandoffPrompt('Add a chart', checkpoint(), 'Claude Code', 'Now make it blue', [{ asked: 'Start', answered: 'Started' }])
+    expect(whole?.kept).toEqual(['task', 'earlier', 'settled', 'summary'])
+    expect(whole?.omitted).toEqual([])
+    expect(whole?.taskClipped).toBeUndefined()
+    const squeezed = composeHandoffPrompt('Add a chart', checkpoint({ assistantSummary: 's'.repeat(7_000) }), 'Claude Code', `Now ${'b'.repeat(1_500)}`)
+    expect(squeezed?.omitted).toContain('summary')
+    expect(squeezed?.kept).not.toContain('summary')
+    expect(squeezed?.prompt).not.toContain('What the previous agent said it had done')
   })
 })
 

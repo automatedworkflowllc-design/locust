@@ -3149,8 +3149,13 @@ export default function App(): ReactElement {
     && ownerOf(liveRun) === pickedTeammate?.teammateId
     // A cloud task does not continue this conversation (Sol's 0.504 pass): no hint about its checkpoint.
     && !cloudOn
-      ? `Continues on ${runtimeNameOf(composerRoute.runtime)} from ${runtimeNameOf(shownData.runtime)}'s checkpoint — briefed on what was done, not handed the memory.`
+      // Plain words (0.517): "checkpoint" and "briefed" were the app's, not the person's.
+      ? `Your next message goes to ${runtimeNameOf(composerRoute.runtime)} with a summary of this conversation, not ${runtimeNameOf(shownData.runtime)}'s memory of it.`
       : undefined
+  // What that summary carries, asked of the host as the reply is typed (0.517, Composer).
+  const continuation = continuationNote === undefined || shownData === undefined
+    ? undefined
+    : { followUpOf: shownData.missionId, runtime: composerRoute.runtime }
 
   /**
    * The exchange the shown conversation is part of, read from what the
@@ -7608,6 +7613,7 @@ export default function App(): ReactElement {
             // Said before the send: a reply on another runtime continues
             // from the stopped run's checkpoint, not from its memory.
             continuationNote={continuationNote}
+            {...(continuation === undefined ? {} : { continuation })}
             workspaceName={workspaceName.length === 0 ? undefined : workspaceName}
             workspacePath={workspacePath}
             workspaceMade={workspaceMade}
