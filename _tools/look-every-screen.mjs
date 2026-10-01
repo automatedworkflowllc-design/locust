@@ -41,7 +41,9 @@ const settingsPage = (label) => `(async () => {
 
 try {
   await drive.ready()
-  await drive.resize(1209, 770)
+  // --size WxH looks at another window size (0.529); Colin's own is the default.
+  const [width, height] = (arg('--size') ?? '1209x770').split('x').map(Number)
+  await drive.resize(width, height)
   await sleep(2500)
   await drive.capture('Home', () => drive.evaluate('1'))
   await drive.capture('a conversation', () => drive.evaluate(`(async () => {

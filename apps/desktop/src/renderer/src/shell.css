@@ -1083,6 +1083,21 @@ textarea {
 }
 
 /*
+ * THE FACE HANGS; THE WORDS LINE UP WITH THE BOX (0.529). A reply's text starts
+ * where a person's typing starts in the box below -- 16px inside the column --
+ * and the 24px face sits in the margin to its left, as a hanging gutter.
+ * Before, the face took the column's first 36px and the words began there,
+ * 21px right of the box's own text. (Compare's cells have no faces and keep
+ * their own rule below.)
+ */
+.lc-thread__column .lc-agentline {
+  gap: var(--lc-space-4);
+  margin-left: calc(var(--lc-space-6) - 24px - var(--lc-space-4));
+  /* And it stops where the box's typing stops, 16px inside its right edge. */
+  margin-right: var(--lc-space-6);
+}
+
+/*
  * THE MEASURE. A teammate's reply is prose and has to be read as prose.
  *
  * Colin, 2026-09-10, on the chat: "slightly clunky or out of place, can't put
@@ -1203,8 +1218,16 @@ textarea {
    *
    * `node _tools/prose-size-measure.mjs --at <size>` is the count. Re-run it
    * whenever the size or the face changes; the two are one decision.
+   *
+   * NO CAP OF ITS OWN NOW: THE BOX IS THE MEASURE (0.529). Colin, 2026-10-01,
+   * a Claude window beside ours: "they seem to align their chats with the
+   * chat bar". Claude's reply runs from where the typing starts in its box to
+   * the box's right edge; ours stopped at 66ch, 610px of an 823px box at his
+   * 1209 window (probe-thread-column), and the strip to the right was the dead
+   * space he kept seeing. The column's ceiling (`--lc-thread-max-width`) is
+   * what keeps a line readable on a big window now, as Claude's does.
    */
-  max-width: 66ch;
+  max-width: none;
   line-height: 1.7;
   text-wrap: pretty;
 }
@@ -2312,6 +2335,11 @@ textarea {
 .lc-receipt__quiet {
   display: flex;
   justify-content: flex-start;
+}
+
+/* Under a reply, on the reply's own edge (0.529): the words start 16px inside the column now. */
+.lc-thread__column .lc-receipt__quiet {
+  padding-left: var(--lc-space-6);
 }
 
 .lc-receipt__details {
@@ -4338,7 +4366,9 @@ textarea {
   display: flex;
   align-items: center;
   gap: var(--lc-space-2);
-  padding: 0 var(--lc-space-2) var(--lc-space-2);
+  /* Its words start where the box's typing does (0.529): the 12px icon and
+     its 4px gap fill the box's 16px inset, so the icon sits on the box's edge. */
+  padding: 0 var(--lc-space-6) var(--lc-space-2) 0;
   color: var(--lc-text-muted);
   font-size: 11px;
 }

@@ -614,7 +614,7 @@
    * side, where Claude keeps ~50-75. 68vw grows the column from ~1120px up
    * and reaches the same 980px ceiling at ~1440px; narrower is unchanged.
    */
-  --lc-thread-max-width: clamp(760px, 68vw, 980px);
+  --lc-thread-max-width: clamp(760px, 68vw, 840px);
   /*
    * Where one turn ends and the next begins: 22px before a person's message,
    * against the 12px column gap inside a turn. Named rather than left as a
@@ -630,7 +630,7 @@
    * the most dead space at the size where room matters most. 84vw keeps
    * ~50px a side there, Claude's gutter; 700px stays the floor.
    */
-  --lc-thread-max-width-compact: clamp(700px, 84vw, 980px);
+  --lc-thread-max-width-compact: clamp(700px, 84vw, 840px);
 
   /* --- Interaction ----------------------------------------------------- */
   --lc-hover-surface: rgba(255, 255, 255, 0.06);
