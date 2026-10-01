@@ -19,6 +19,9 @@ const DOWNLOAD_PREFIX = 'https://github.com/automatedworkflowllc-design/locust-r
 export interface MacRelease {
   readonly version: string
   readonly url: string
+  /** The image's size and SHA-256, as the releases API states them: what a download must match (0.516). */
+  readonly size?: number
+  readonly sha256?: string
 }
 
 /** `0.515.0` against `0.514.0`; a pre-release or anything unparsed is never newer. */
@@ -46,14 +49,16 @@ export function newerMacRelease(releases: unknown, current: string, arch: string
     if (release.draft === true || release.prerelease === true || typeof release.tag_name !== 'string') continue
     const assets = Array.isArray(release.assets) ? release.assets : []
     const image = assets
-      .map((asset) => (typeof asset === 'object' && asset !== null ? (asset as { name?: unknown; browser_download_url?: unknown }) : {}))
+      .map((asset) => (typeof asset === 'object' && asset !== null ? (asset as { name?: unknown; browser_download_url?: unknown; size?: unknown; digest?: unknown }) : {}))
       .find((asset) => typeof asset.name === 'string' && asset.name.endsWith(suffix) && typeof asset.browser_download_url === 'string')
     if (image === undefined) continue
     const url = image.browser_download_url as string
     if (!url.startsWith(DOWNLOAD_PREFIX) || !url.endsWith('.dmg')) continue
     const version = release.tag_name.replace(/^v/, '')
     // Releases come newest first: the first with an image is the one to offer, or none.
-    return newer(version, current) ? { version, url } : undefined
+    if (!newer(version, current)) return undefined
+    const sha256 = typeof image.digest === 'string' && /^sha256:[0-9a-f]{64}$/.test(image.digest) ? image.digest.slice('sha256:'.length) : undefined
+    return { version, url, ...(typeof image.size === 'number' ? { size: image.size } : {}), ...(sha256 === undefined ? {} : { sha256 }) }
   }
   return undefined
 }

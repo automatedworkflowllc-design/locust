@@ -40,6 +40,7 @@ import {
 import { createFileMissionLedger, createFileWorkroom } from '@teammate/mission-store'
 import { retireSetAsideMessages } from './set-aside-messages.js'
 import { MAC_RELEASES_API, newerMacRelease } from './mac-release.js'
+import { createMacUpdater, macSelfUpdateTarget } from './mac-self-update.js'
 import type { AppChangelog, AppChangelogEntry, WorkspaceSettings } from '../shared/ipc.js'
 import type { MissionLedger, Workroom } from '@teammate/mission-store'
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
@@ -2127,7 +2128,12 @@ if (!ownsSingleInstanceLock) {
      */
     const updatesFile = join(app.getPath('userData'), 'runtime-updates.json')
     // A copy that is not the installed Locust changes nothing on the machine (0.514).
-    const agentsMayUpdate = mayUpdateAgents(process.argv, process.env, !app.isPackaged || existsSync(join(dirname(process.execPath), 'Uninstall Locust.exe')))
+    // Installed: the Windows uninstaller beside it, or, on a Mac, an app in a folder it owns (0.516).
+    const agentsMayUpdate = mayUpdateAgents(
+      process.argv,
+      process.env,
+      !app.isPackaged || existsSync(join(dirname(process.execPath), 'Uninstall Locust.exe')) || (process.platform === 'darwin' && macSelfUpdateTarget(process.execPath) !== undefined)
+    )
     // And says so, rather than showing a switch that will not do what it says.
     const toldHere = <T extends object>(state: T): T => (agentsMayUpdate ? state : { ...state, heldHere: true })
     const runtimeUpdates = createRuntimeUpdates({
@@ -3544,6 +3550,8 @@ if (!ownsSingleInstanceLock) {
      */
     ipcMain.handle(MAC_RELEASE_CHANNEL, async (event) => {
       if (!fromOwnWindow(event) || process.platform !== 'darwin' || !app.isPackaged) return undefined
+      // A Mac that updates itself (0.516) says so through the ordinary update banner, not this one.
+      if (macSelfUpdateTarget(process.execPath) !== undefined) return undefined
       try {
         const response = await fetch(MAC_RELEASES_API, { headers: { Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(10_000) })
         if (!response.ok) return undefined
@@ -5339,8 +5347,28 @@ if (!ownsSingleInstanceLock) {
       }
     })()
     const installedCopy = existsSync(join(dirname(process.execPath), 'Uninstall Locust.exe'))
+    /*
+     * A MAC UPDATES ITSELF (0.516, mac-self-update.ts): a Locust.app in a folder
+     * it can write, replaced by Locust's own download. macOS's updater would
+     * refuse the unsigned build. `LOCUST_MAC_UPDATE_TEST_DMG` and `_VERSION`
+     * are the Mac CI's check of the swap (mac-update-smoke.mjs), never set by
+     * the app.
+     */
+    const macBundle = process.platform === 'darwin' && app.isPackaged ? macSelfUpdateTarget(process.execPath) : undefined
+    const macTestImage = process.env.LOCUST_MAC_UPDATE_TEST_DMG !== undefined && process.env.LOCUST_MAC_UPDATE_TEST_VERSION !== undefined
+      ? { path: process.env.LOCUST_MAC_UPDATE_TEST_DMG, version: process.env.LOCUST_MAC_UPDATE_TEST_VERSION }
+      : undefined
     const updates = createUpdateService({
-      updater: autoUpdater,
+      updater: macBundle === undefined
+        ? autoUpdater
+        : createMacUpdater({
+            currentVersion: app.getVersion(),
+            arch: process.arch,
+            bundle: macBundle,
+            cacheFolder: join(app.getPath('userData'), 'mac-updates'),
+            quit: () => app.quit(),
+            ...(macTestImage === undefined ? {} : { testImage: macTestImage })
+          }),
       everyBuild: lane.everyBuild,
       currentVersion: app.getVersion(),
       // Not on macOS until the build is signed: its updater refuses an unsigned app.
@@ -5356,8 +5384,8 @@ if (!ownsSingleInstanceLock) {
        * `--update-check-only` lets the update smoke's copy ask the real feed,
        * with nothing downloaded or installed.
        */
-      supported: app.isPackaged && process.platform !== 'darwin' && (installedCopy || process.argv.includes('--update-check-only')),
-      checkOnly: !installedCopy,
+      supported: app.isPackaged && (macBundle !== undefined || (process.platform !== 'darwin' && (installedCopy || process.argv.includes('--update-check-only')))),
+      checkOnly: macBundle === undefined && !installedCopy,
       liveMissionCount: () =>
         codexMissions.liveMissionIds().length + antigravityMissions.liveMissionIds().length,
       requestQuit: (finalise) => {

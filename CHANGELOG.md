@@ -11,6 +11,27 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.516.0 - 2026-10-01
+
+### Added
+
+- **Locust on a Mac updates itself, like on Windows.** A Mac copy in your
+  Applications folder now checks for new versions, downloads them quietly,
+  and offers **Restart and install**: it quits, puts the new version in place
+  (the old one is put back if anything goes wrong) and opens again. The
+  download is checked against the release before anything is installed, and
+  the new copy opens without asking you to allow it again. To get here from
+  an older Mac copy, download this version once and drag it into
+  Applications; your conversations and settings stay.
+
+### Fixed
+
+- **A file a teammate hands over from another folder you work in now gets its
+  button.** A teammate working in one folder that wrote a file in another
+  (handed over as `../other-folder/report.md`) got no button, and learned to
+  copy files into its own folder instead. It is now shown, from any folder
+  Locust works in; anywhere else is still refused when you press it.
+
 ## 0.515.0 - 2026-10-01
 
 ### Changed

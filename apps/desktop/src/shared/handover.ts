@@ -50,7 +50,7 @@ export const MAX_FILE_NOTE_LENGTH = 120
 const BLOCK = /<locust-file\s*>([\s\S]*?)<\/locust-file>/g
 
 export interface HandedFile {
-  /** Workspace-relative, forward slashes, never absolute and never `..`. */
+  /** Relative to the conversation's folder, forward slashes, never absolute; `..` allowed since 0.516, the host decides. */
   readonly path: string
   readonly note?: string
 }
@@ -58,9 +58,9 @@ export interface HandedFile {
 /**
  * Paths this app will not draw a button for.
  *
- * The rule is narrow on purpose: a handed path is joined to the workspace
- * folder and handed to the host's reveal, so anything that could ESCAPE that
- * folder is refused here rather than being resolved and argued about later.
+ * Narrow on purpose: an absolute path, a control character or the example is
+ * refused here. A path that climbs out with `..` is the host's to judge since
+ * 0.516 (see `acceptable`): it holds the folders Locust works in.
  * A dropped line is simply not drawn -- no card, no error to the model -- the
  * same way `parseShareBlocks` drops a block with no recipient.
  */
@@ -80,8 +80,17 @@ function acceptable(path: string): boolean {
   // Absolute, in either spelling, plus a Windows drive letter and a UNC
   // share. The path is relative to the workspace by definition.
   if (path.startsWith('/') || path.startsWith('\\') || /^[a-z]:/i.test(path)) return false
-  // `..` anywhere, as a whole segment. `..foo` is a legal file name.
-  if (path.split(/[\\/]/).some((segment) => segment === '..')) return false
+  /*
+   * `..` IS LET THROUGH (0.516), to the host's own rule. A teammate in one
+   * folder wrote a report in another Locust works in and handed it as
+   * `../Documents/.../report.md`; dropped here, it learned to copy the file
+   * into its own folder instead -- a teammate's memory, 2026-10-01: "A
+   * locust-file path that leaves the .claude folder with ../ does not show a
+   * file button; copy the file into .claude and hand that path." The host
+   * already decides every reveal, preview and copy against the folders it
+   * knows (reveal-file.ts `decideReveal`): a `..` path into one of them works,
+   * and one anywhere else is refused there, with its reason, when pressed.
+   */
   return true
 }
 
@@ -141,7 +150,7 @@ export function refusedFileLines(text: string): readonly { readonly path: string
       if (acceptable(path) || path.length === 0 || path.toLowerCase() === FILE_BLOCK_EXAMPLE_PATH) continue
       // Said as a path, never as anything to press: a control character is not shown at all.
       if (/[\u0000-\u001f\u007f]/.test(path) || path.length > 400) continue
-      refused.push({ path, why: 'it is outside the folder this conversation works in' })
+      refused.push({ path, why: 'it is not a path inside a folder Locust works in' })
       if (refused.length >= MAX_FILES_PER_REPLY) return refused
     }
   }

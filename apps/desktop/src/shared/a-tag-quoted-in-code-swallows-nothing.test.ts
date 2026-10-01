@@ -28,9 +28,13 @@ describe('a tag quoted in code swallows nothing', () => {
     expect(parseFileBlocks(inside)).toEqual([{ path: 'docs/report.md', note: 'the report' }])
   })
 
+  it('draws Ghost\'s file, outside its folder, and leaves the folder rule to the host (0.516)', () => {
+    expect(parseFileBlocks(GHOST)).toEqual([{ path: '../Documents/Codex/locust-ship-wt/docs/BETA-REVIEW-2026-09-30-0509-sol-long.md', note: 'Completed 0.509 workflow review with evidence' }])
+    expect(refusedFileLines(GHOST)).toEqual([])
+  })
+
   it('says a handed file it will not draw, rather than nothing', () => {
-    expect(parseFileBlocks(GHOST)).toEqual([])
-    expect(refusedFileLines(GHOST)).toEqual([{ path: '../Documents/Codex/locust-ship-wt/docs/BETA-REVIEW-2026-09-30-0509-sol-long.md', why: 'it is outside the folder this conversation works in' }])
+    expect(refusedFileLines('<locust-file>\nC:\\Users\\x\\report.md\n</locust-file>')).toEqual([{ path: 'C:/Users/x/report.md', why: 'it is not a path inside a folder Locust works in' }])
     expect(refusedFileLines('<locust-file>\ndocs/report.md\n</locust-file>')).toEqual([])
     expect(refusedFileLines('<locust-file>\npath/relative/to/the/folder.md\n</locust-file>')).toEqual([])
   })

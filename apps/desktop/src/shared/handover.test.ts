@@ -53,12 +53,13 @@ describe('reading a handover block', () => {
 describe('paths this app will not point at', () => {
   const dropped = (path: string): number => parseFileBlocks(`<locust-file>\n${path}\n</locust-file>`).length
 
-  it('drops a path that climbs out of the folder', () => {
-    expect(dropped('../secrets.env')).toBe(0)
-    expect(dropped('docs/../../secrets.env')).toBe(0)
-    // ...and keeps one that merely starts with the same two characters,
-    // because `..rc` is a legal file name and refusing it would be a bug of
-    // its own.
+  it('leaves a path that climbs out of the folder to the host, which knows the folders Locust works in (0.516)', () => {
+    // A teammate in one folder handed a report it wrote in another Locust works in. Dropped
+    // here, it learned to copy files into its own folder instead. The host's reveal, preview
+    // and copy each check the path against the folders it knows (reveal-file.ts), so a `..`
+    // path anywhere else is still refused -- there, with its reason, when pressed.
+    expect(dropped('../Documents/repo/docs/report.md')).toBe(1)
+    expect(dropped('docs/../../other/report.md')).toBe(1)
     expect(dropped('..rc')).toBe(1)
   })
 

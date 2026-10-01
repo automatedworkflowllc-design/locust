@@ -3441,7 +3441,8 @@ export function buildThread(
         key: `files_refused_${message.itemId}`,
         type: 'diagnostic',
         level: 'warning',
-        message: `Not shown as a file: ${refused.map((file) => file.path).join(', ')} -- ${refused.length === 1 ? 'it is' : 'they are'} outside the folder this conversation works in, so Locust does not open ${refused.length === 1 ? 'it' : 'them'} from here.`
+        // Since 0.516 only an absolute path (or one that is no path) is refused here: a `..` path goes to the host.
+        message: `Not shown as a file: ${refused.map((file) => file.path).join(', ')} -- a file is handed over by its path from the conversation's folder, and ${refused.length === 1 ? 'this is not one' : 'these are not'}.`
       })
     }
   }
