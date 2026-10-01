@@ -4195,7 +4195,8 @@ export function stitchedHandoff(
     to: mission.runtime,
     at: new Date(mission.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
     unsettledCount: checkpoint?.unsettledActions.length ?? 0,
-    omittedBriefing: [],
+    // Recorded since 0.519; an older switch recorded nothing, and nothing is guessed.
+    omittedBriefing: link.leftOut ?? [],
     priorEvents: prior.events
   }
 }
@@ -4381,8 +4382,8 @@ export function switchOf(
     to: mission.runtime,
     at: new Date(mission.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
     unsettledCount: checkpoint?.unsettledActions.length ?? 0,
-    // What the briefing left out was never recorded; nothing is guessed.
-    omittedBriefing: []
+    // Recorded since 0.519; an older switch recorded nothing, and nothing is guessed.
+    omittedBriefing: link.leftOut ?? []
   }
 }
 

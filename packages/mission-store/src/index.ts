@@ -318,6 +318,13 @@ export interface MissionContinuation {
    * it reads the turn as an ordinary follow-up -- so no schema version moves.
    */
   readonly edited?: true
+  /**
+   * What the handoff's brief left out to fit (0.519), by section name. The
+   * divider says it after the switch; until this was recorded it said it
+   * only while the window that made the switch was open. Optional and
+   * additive, like `edited`: no schema version moves.
+   */
+  readonly leftOut?: readonly string[]
 }
 
 export type MissionHostFailureCode = 'runtime-start-failed' | 'runtime-transport-failed'
@@ -768,6 +775,10 @@ function validateMetadata(metadata: MissionLedgerMetadata): MissionLedgerMetadat
     }
     if (metadata.continuesFrom.edited !== undefined && metadata.continuesFrom.edited !== true) {
       throw new Error('Mission continuation is invalid')
+    }
+    if (metadata.continuesFrom.leftOut !== undefined) {
+      if (!Array.isArray(metadata.continuesFrom.leftOut) || metadata.continuesFrom.leftOut.length > 8) throw new Error('Mission continuation is invalid')
+      for (const name of metadata.continuesFrom.leftOut) requireText(name, 'continuesFrom.leftOut', 40)
     }
   }
   if (metadata.command !== undefined) {

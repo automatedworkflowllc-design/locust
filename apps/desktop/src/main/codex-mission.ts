@@ -1492,7 +1492,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               mode,
               route,
               emit,
-              { missionId: prior.metadata.missionId, checkpointEpoch: checkpoint.epoch, reason: 'route-switch' },
+              { missionId: prior.metadata.missionId, checkpointEpoch: checkpoint.epoch, reason: 'route-switch', ...(briefing.omitted.length === 0 ? {} : { leftOut: briefing.omitted }) },
               peer,
               undefined,
               relay,
@@ -2451,7 +2451,9 @@ ${sentPrompt.trim()}`
       const started = await service.start(briefing.prompt, runtime, mode, route, emit, {
         missionId: fromMissionId,
         checkpointEpoch: checkpoint.epoch,
-        reason: 'route-switch'
+        reason: 'route-switch',
+        // What the brief left out, kept so the divider can say it after a reopen (0.519).
+        ...(briefing.omitted.length === 0 ? {} : { leftOut: briefing.omitted })
       }, previous.peer)
       if (!started.ok) {
         // Pass the start failure through unchanged but keep the stop visible:

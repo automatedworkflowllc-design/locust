@@ -2722,6 +2722,8 @@ export interface PublicRecoveredMission {
     readonly reason: 'route-switch' | 'follow-up'
     /** An edit of an earlier message (0.498): an earlier version followed the same turn. */
     readonly edited?: true
+    /** What a handoff's brief left out to fit (0.519), by section name. */
+    readonly leftOut?: readonly string[]
   }
   /**
    * Set when the HOST started this run rather than a person -- today, one

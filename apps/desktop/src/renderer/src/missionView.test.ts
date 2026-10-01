@@ -1202,6 +1202,12 @@ describe('reopening a handed-off mission', () => {
     expect(stitchedHandoff(first, byId)).toBeUndefined()
   })
 
+  // 0.519: what the brief left out is recorded, so the amber line survives a reopen.
+  it('says what the brief left out, as recorded with the switch', () => {
+    const squeezed = mission({ ...second, continuesFrom: { missionId: 'mission_1', checkpointEpoch: 1, reason: 'route-switch' as const, leftOut: ['summary', 'earlier'] } })
+    expect(stitchedHandoff(squeezed, new Map([['mission_1', first], ['mission_2', squeezed]]))?.omittedBriefing).toEqual(['summary', 'earlier'])
+  })
+
   it('stops walking a chain whose earlier mission is missing, and a cyclic one', () => {
     const orphan = mission({ missionId: 'mission_3', continuesFrom: { missionId: 'mission_gone', checkpointEpoch: 1, reason: 'route-switch' as const } })
     expect(rootMission(orphan, new Map([['mission_3', orphan]]))).toBe(orphan)

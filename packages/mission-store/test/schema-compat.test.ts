@@ -233,6 +233,25 @@ describe('ledger schema versions', () => {
     })
   })
 
+  // 0.519: what a handoff's brief left out, kept so the divider can say it after a reopen.
+  it('round-trips what a handoff left out, and refuses a malformed list', async () => {
+    const root = await temporaryRoot()
+    const ledger = createFileMissionLedger({ rootDirectory: root })
+    await ledger.createMission({
+      ...v1Metadata({
+        continuesFrom: { missionId: 'mission_before', checkpointEpoch: 2, reason: 'route-switch', leftOut: ['summary', 'earlier'] }
+      })
+    } as unknown as MissionLedgerMetadata)
+    const recovered = await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')
+    expect(recovered?.issues).toEqual([])
+    expect(recovered?.metadata.continuesFrom?.leftOut).toEqual(['summary', 'earlier'])
+
+    const other = createFileMissionLedger({ rootDirectory: await temporaryRoot() })
+    await expect(other.createMission({
+      ...v1Metadata({ continuesFrom: { missionId: 'mission_before', checkpointEpoch: 2, reason: 'route-switch', leftOut: ['x'.repeat(41)] } })
+    } as unknown as MissionLedgerMetadata)).rejects.toThrow()
+  })
+
   it('refuses a continuation that names an unsafe mission id', async () => {
     const root = await temporaryRoot()
     const ledger = createFileMissionLedger({ rootDirectory: root })

@@ -3,6 +3,7 @@ import type { ReactElement } from 'react'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
+import { leftOutInWords } from '../handoffPreview.js'
 
 const RUNTIME_LABEL: Readonly<Record<string, string>> = {
   codex: 'Codex',
@@ -64,7 +65,7 @@ export function HandoffDivider({
             missing part mattered.
           */
           <span className="lc-handoff__note lc-tone-amber">
-            Some detail did not fit the handoff and was left out: {omittedBriefing.join(', ')}.
+            {`Left out of the summary to fit: ${leftOutInWords(omittedBriefing)}.`}
           </span>
         )}
       </div>

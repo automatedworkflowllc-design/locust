@@ -29,6 +29,15 @@ function list(parts: readonly string[]): string {
   return `${parts.slice(0, -1).join(', ')} and ${parts.at(-1) ?? ''}`
 }
 
+/**
+ * What a brief left out, in the same words (0.519): for the divider after a
+ * switch, which named the sections ("summary, earlier") instead.
+ */
+export function leftOutInWords(names: readonly string[]): string {
+  const words = names.map((name) => (name === 'unsettled' ? 'the steps that never reported back' : name === 'task' ? 'part of the task' : PART[name] ?? name))
+  return list(words)
+}
+
 /** The line under the box, or undefined when there is nothing to add to the note above it. */
 export function handoffPreviewLine(preview: HandoffPreview | undefined): string | undefined {
   if (preview === undefined || preview.kind === 'same') return undefined
