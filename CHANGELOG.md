@@ -11,6 +11,22 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.522.0 - 2026-10-01
+
+### New
+
+- **A routine can run when a new file arrives.** Choose "On a new file"
+  under Runs on its own and name a folder inside your project (inbox to
+  begin with). A file that lands there starts the routine once it has
+  finished copying, and the teammate is told which file it is for; files
+  already there start nothing, and it runs at most six times an hour. As
+  every routine does, it reads and changes nothing.
+
+### Changed
+
+- The routine choices read a little shorter: "When I press Run" and
+  "Daily".
+
 ## 0.521.0 - 2026-10-01
 
 ### New
