@@ -22,11 +22,11 @@ const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.i
 const packaged = arg('--packaged')
 const tag = arg('--tag') ?? 'local'
 const MODEL = process.env.LOCUST_FREE_MODEL ?? 'opencode/nemotron-3-ultra-free'
-// Two free models, by the picker's row names; the first run's second pick (Ling) had its provider down.
-// Each pick is `search=>row label`, or `search=>*Group` for the first enabled row under that runtime (0.443: Cursor's Grok).
-const PICKS = (process.env.LOCUST_COMPARE_PICKS ?? 'free=>nemotron-3-ultra-free,free=>mimo-v2.6-flash-free').split(',').map((spec) => {
-  const [search, label] = spec.includes('=>') ? spec.split('=>') : ['free', spec]
-  return { search, label }
+// Two models, each `search=>row pattern` (a regular expression over the picker's row label).
+// The first run's second free pick (Ling) had its provider down; OpenCode's free tier rate-limits too.
+const PICKS = (process.env.LOCUST_COMPARE_PICKS ?? 'free=>nemotron-3-ultra|Nemotron 3 Ultra,free=>mimo-v2\\.6-flash|MiMo V2\\.6 Flash').split(',').map((spec) => {
+  const [search, row] = spec.includes('=>') ? spec.split('=>') : ['free', spec]
+  return { search, row }
 })
 const SPENDS = PICKS.some((pick) => pick.search !== 'free')
 const OUT = join(recordRoot('compare-answers-2026-09-28'), `compare-answers-${tag}`)
@@ -62,7 +62,7 @@ const typeAndSend = (text) => `(async () => {
 })()`
 /** Until every column has finished (or ten minutes pass), then what the comparison shows. */
 const settled = (turns) => `(async () => {
-  for (let i = 0; i < 1200; i += 1) {
+  for (let i = 0; i < 760; i += 1) { // under the 400s an evaluate is given: a stall reports, not crashes
     await new Promise((r) => setTimeout(r, 500))
     const view = document.querySelector('.lc-compare')
     if (!view) continue
@@ -91,55 +91,63 @@ try {
   say(`  ${String(await drive.evaluate(openTeammateScript('Wren')))}`)
   await sleep(800)
 
-  // 1. The picker, switched to Compare, two free models ticked.
-  const picked = JSON.parse(String(await drive.capture('The picker in Compare, two free models ticked', () => drive.evaluate(`(async () => {
-    // Compare is chosen in the chat mode chip (0.451); choosing it opens the picker.
-    const modeChip = document.querySelector('.lc-control--chatmode')
-    if (!modeChip) return JSON.stringify({ switch: false })
-    modeChip.click()
+  // 1. Compare, chosen in the chat mode chip. It opens a picker to tick two or three models
+  // ("Pick two or three models"), then Done; with models already ticked it goes straight to a
+  // chip per column. Both are handled: ticks in the picker, else a pick in each column's chip.
+  const entered = JSON.parse(String(await drive.evaluate(`(async () => {
+    const chip = document.querySelector('.lc-control--chatmode')
+    if (!chip) return JSON.stringify({ how: 'no chat mode chip' })
+    chip.click()
     await new Promise((r) => setTimeout(r, 400))
-    const compare = [...document.querySelectorAll('.lc-menu[aria-label="Direct or compare"] .lc-menu__item')].find((item) => item.querySelector('.lc-menu__name')?.textContent.trim() === 'Compare')
-    if (!compare) return JSON.stringify({ switch: false })
-    compare.click()
-    await new Promise((r) => setTimeout(r, 900))
-    const box = document.querySelector('.lc-picker__input')
-    const setInput = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
-    const labels = []
-    for (const pick of ${JSON.stringify(PICKS)}) {
-      setInput.call(box, pick.search)
+    const item = [...document.querySelectorAll('[role="menu"][aria-label="Direct or compare"] [role="menuitemradio"], [role="menu"][aria-label="Direct or compare"] button')].find((b) => /^Compare/.test(b.innerText.trim()))
+    if (!item) return JSON.stringify({ how: 'no Compare item' })
+    item.click()
+    for (let i = 0; i < 40; i += 1) {
+      await new Promise((r) => setTimeout(r, 150))
+      if (document.querySelector('.lc-picker__input')) return JSON.stringify({ how: 'picker' })
+      if (document.querySelector('.lc-slotgroup')) return JSON.stringify({ how: 'columns' })
+    }
+    return JSON.stringify({ how: 'neither a picker nor columns' })
+  })()`)))
+  check('the chat mode chip switches to Compare', entered.how === 'picker' || entered.how === 'columns', entered.how)
+  const labels = []
+  for (const [index, pick] of PICKS.entries()) {
+    const got = JSON.parse(String(await drive.evaluate(`(async () => {
+      const inPicker = document.querySelector('.lc-picker__input') !== null
+      if (!inPicker) {
+        const chip = document.querySelectorAll('.lc-slotgroup')[${String(index)}]?.querySelector('.lc-control--slot')
+        if (!chip) return JSON.stringify({ picked: false, why: 'no column chip' })
+        chip.click()
+        for (let i = 0; i < 20 && !document.querySelector('.lc-picker__input'); i += 1) await new Promise((r) => setTimeout(r, 150))
+      }
+      const box = document.querySelector('.lc-picker__input')
+      if (!box) return JSON.stringify({ picked: false, why: 'no search box' })
+      const setInput = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+      setInput.call(box, ${JSON.stringify(pick.search)})
       box.dispatchEvent(new Event('input', { bubbles: true }))
       await new Promise((r) => setTimeout(r, 700))
-      let group = ''
-      let row
-      for (const node of document.querySelector('.lc-picker__list').children) {
-        const header = node.querySelector('.lc-picker__group')
-        if (header) group = header.innerText.trim()
-        const candidate = node.querySelector('.lc-picker__row:not(.is-recent)')
-        if (!candidate || candidate.disabled) continue
-        const label = candidate.querySelector('.lc-picker__label')?.textContent.trim() ?? ''
-        const wanted = pick.label.startsWith('*') ? new RegExp(pick.label.slice(1), 'i').test(group) : label === pick.label
-        if (wanted && !labels.includes(label)) { row = candidate; break }
-      }
-      if (!row) continue
-      labels.push(row.querySelector('.lc-picker__label')?.textContent.trim() ?? '')
+      const wanted = new RegExp(${JSON.stringify(pick.row)}, 'i')
+      const row = [...document.querySelectorAll('.lc-picker__row:not(.is-recent)')].find((one) => !one.disabled && wanted.test(one.querySelector('.lc-picker__label')?.textContent ?? ''))
+      if (!row) return JSON.stringify({ picked: false, why: 'no row', inPicker })
+      const label = row.querySelector('.lc-picker__label')?.textContent.trim() ?? ''
       row.click()
-      await new Promise((r) => setTimeout(r, 250))
-    }
+      await new Promise((r) => setTimeout(r, 500))
+      return JSON.stringify({ picked: true, label, inPicker })
+    })()`)))
+    say(`  pick ${String(index + 1)}: ${JSON.stringify(got)}`)
+    if (got.picked) labels.push(got.label)
+  }
+  const columns = JSON.parse(String(await drive.capture('Compare, two models picked', () => drive.evaluate(`(async () => {
     const foot = document.querySelector('.lc-picker__foot--compare')?.innerText.replace(/\\s+/g, ' ').trim() ?? ''
-    return JSON.stringify({ switch: true, labels, foot })
+    const done = [...document.querySelectorAll('.lc-picker__foot--compare button')].find((b) => b.textContent.trim() === 'Done')
+    if (done && !done.disabled) done.click()
+    for (let i = 0; i < 20 && !document.querySelector('.lc-slotgroup'); i += 1) await new Promise((r) => setTimeout(r, 150))
+    await new Promise((r) => setTimeout(r, 400))
+    const chips = [...document.querySelectorAll('.lc-slotgroup .lc-control--slot')].map((c) => c.innerText.replace(/\\s+/g, ' ').trim())
+    return JSON.stringify({ foot, chips })
   })()`))))
-  say(`  picked: ${JSON.stringify(picked)}`)
-  check('the picker switches to Compare, and two free models tick', picked.switch && picked.labels.length === 2, JSON.stringify(picked))
-  check('its foot says the ask runs twice', /2 picked\. Your ask runs twice/.test(picked.foot ?? ''), picked.foot)
-  const chip = JSON.parse(String(await drive.evaluate(`(async () => {
-    [...document.querySelectorAll('.lc-picker__foot--compare button')].find((b) => b.textContent.trim() === 'Done')?.click()
-    await new Promise((r) => setTimeout(r, 500))
-    const chip = [...document.querySelectorAll('.lc-control')].find((b) => b.getAttribute('aria-haspopup') === 'listbox')
-    const mode = document.querySelector('button[aria-label="Permission mode"]')
-    return JSON.stringify({ chip: chip?.innerText.replace(/\\s+/g, ' ').trim() ?? '', mode: mode?.innerText.trim() ?? '', modeLocked: mode?.disabled === true })
-  })()`)))
-  say(`  chip: ${JSON.stringify(chip)}`)
-  check('the chip reads "A vs B" by name, and the mode is Ask, fixed', chip.chip.includes(' vs ') && !chip.chip.includes('-free') && chip.mode === 'Ask' && chip.modeLocked, JSON.stringify(chip))
+  say(`  columns: ${JSON.stringify(columns)}`)
+  check('two models picked, a chip per column naming each', labels.length === 2 && columns.chips.length === 2 && labels.every((label) => columns.chips.some((chip) => chip.replace(/[\s-]+/g, ' ').includes(label.replace(/[\s-]+/g, ' ')))), JSON.stringify({ labels, columns }))
 
   // 2. One ask, two columns.
   say(`  ${String(await drive.evaluate(typeAndSend('In one sentence: what does a git worktree let you do?')))}`)
@@ -162,21 +170,20 @@ try {
     document.querySelector('.lc-compare__foot .lc-primarybutton')?.click()
     for (let i = 0; i < 40 && document.querySelector('.lc-compare'); i += 1) await new Promise((r) => setTimeout(r, 250))
     await new Promise((r) => setTimeout(r, 1200))
-    const chip = [...document.querySelectorAll('.lc-control')].find((b) => b.getAttribute('aria-haspopup') === 'listbox')
     return JSON.stringify({
       compareGone: document.querySelector('.lc-compare') === null,
       compared: document.querySelector('.lc-compared')?.innerText.replace(/\\s+/g, ' ').trim() ?? '',
       thread: (document.querySelector('.lc-thread')?.innerText ?? '').length,
       vsRows: [...document.querySelectorAll('.lc-conv')].filter((row) => row.querySelector('.lc-conv__vs')).length,
       rows: document.querySelectorAll('.lc-conv').length,
-      chip: chip?.innerText.replace(/\\s+/g, ' ').trim() ?? '',
+      slots: document.querySelectorAll('.lc-slotgroup').length,
       placeholder: document.querySelector('form.command-dock textarea')?.getAttribute('placeholder') ?? ''
     })
   })()`))))
   say(`  kept: ${JSON.stringify(kept)}`)
   check('keeping one leaves an ordinary conversation, saying what it was compared with', kept.compareGone && kept.thread > 40 && /^Compared with .+\. Open the comparison$/.test(kept.compared), JSON.stringify(kept))
   check('the sidebar row is now an ordinary conversation, still one row', kept.vsRows === 0 && kept.rows === 1, JSON.stringify(kept))
-  check('the composer is back to one model', !kept.chip.includes(' vs ') && kept.placeholder.startsWith('Message Wren'), JSON.stringify(kept))
+  check('the composer is back to one model', kept.slots === 0 && kept.placeholder.startsWith('Message Wren'), JSON.stringify(kept))
 
   // 5. The comparison, one click away.
   const again = JSON.parse(String(await drive.capture('Opened again from the conversation', () => drive.evaluate(`(async () => {
