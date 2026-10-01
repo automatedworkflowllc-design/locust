@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.513.0 - 2026-10-01
+
+### Fixed
+
+- **A long conversation can always move to another model.** Moving a
+  conversation to another runtime, handing over a stopped run or resuming
+  one carries the task with it, and a task too long for that was cut short,
+  or refused with "too long to carry to another runtime". That is the
+  conversation most likely to have hit a limit. Now a long task is written
+  whole to a file in the project's `.locust` folder (which git ignores), and
+  the next model is told to read it first, so nothing of it is lost.
+
 ## 0.512.0 - 2026-09-30
 
 ### Fixed

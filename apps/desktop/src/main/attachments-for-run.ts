@@ -101,7 +101,7 @@ function distinctName(name: string, taken: ReadonlySet<string>): string {
  * worktree's `.git` is a file and its exclude is the project's, which
  * already has the line; a folder that is not a repository has nothing to do.
  */
-async function keepOutOfGit(folder: string): Promise<void> {
+export async function keepOutOfGit(folder: string): Promise<void> {
   try {
     if (!(await stat(join(folder, '.git'))).isDirectory()) return
     const excludePath = join(folder, '.git', 'info', 'exclude')

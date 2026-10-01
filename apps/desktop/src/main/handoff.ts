@@ -1,4 +1,5 @@
 import type { ReconciledCheckpoint } from '@teammate/mission-store'
+import { withAttachments } from '../shared/attachments.js'
 
 /**
  * The briefing a handed-off mission starts with.
@@ -44,6 +45,9 @@ export interface EarlierTurn {
   readonly answered: string | undefined
 }
 
+/** How much of a long task the brief quotes when the whole of it is in a file (0.513). */
+const TASK_QUOTED_CHARS = 1_200
+
 /** How much of each earlier turn is quoted: enough to say what it was, not to re-read it. */
 const ASKED_CHARS = 240
 const ANSWERED_CHARS = 360
@@ -58,7 +62,8 @@ function sectionsFor(
   checkpoint: ReconciledCheckpoint,
   fromRuntime: string,
   next?: string,
-  earlier: readonly EarlierTurn[] = []
+  earlier: readonly EarlierTurn[] = [],
+  taskFile?: string
 ): readonly { readonly name: string; readonly text: string }[] {
   /*
    * SAID AS IT HAPPENED (QA-2026-09-29 round 2, N4). A person who replied on
@@ -68,12 +73,19 @@ function sectionsFor(
    * may redo "the original task". A stop mid-work keeps the old words.
    */
   const clean = next !== undefined && next.trim().length > 0 && checkpoint.unsettledActions.length === 0
+  /*
+   * A long task by file (0.513, long-task-file.ts): its start here, the whole
+   * of it in the file the brief is handed, so nothing of it is cut or refused.
+   */
+  const task = taskFile === undefined
+    ? originalPrompt
+    : `${originalPrompt.slice(0, TASK_QUOTED_CHARS).trimEnd()}…\n\n[That is only its start. The whole of it, as written, is in the file \`${taskFile}\` you were handed above. Read that file before you do anything else.]`
   const sections: { readonly name: string; readonly text: string }[] = [
     {
       name: 'task',
       text: clean
-        ? `You are taking over this conversation from another agent (${fromRuntime}), which finished its last turn. The last thing it was asked was:\n\n${originalPrompt}`
-        : `You are continuing work that another agent (${fromRuntime}) started and stopped partway through. The original task was:\n\n${originalPrompt}`
+        ? `You are taking over this conversation from another agent (${fromRuntime}), which finished its last turn. The last thing it was asked was:\n\n${task}`
+        : `You are continuing work that another agent (${fromRuntime}) started and stopped partway through. The original task was:\n\n${task}`
     }
   ]
 
@@ -186,16 +198,20 @@ export function composeHandoffPrompt(
    */
   next?: string,
   /** The conversation's turns before the one handed over, oldest first (A2.11). */
-  earlier: readonly EarlierTurn[] = []
+  earlier: readonly EarlierTurn[] = [],
+  /** A long task's file, project-relative (0.513, long-task-file.ts): quoted from, never clipped. */
+  taskFile?: string
 ): HandoffBriefing | undefined {
-  const sections = [...sectionsFor(originalPrompt, checkpoint, fromRuntime, next, earlier)]
+  const sections = [...sectionsFor(originalPrompt, checkpoint, fromRuntime, next, earlier, taskFile)]
   // Reserve room for the omission notice UP FRONT whenever a section could be
   // dropped. Charging for it only at the first drop is too late: by then the
   // mandatory task section has already claimed the space, and it cannot be
   // shrunk to make room, so the assembled prompt overflows and the whole
   // handoff is refused. Under-using 120 characters when nothing is dropped is
   // the cheap side of that trade.
-  const budget = MAX_HANDOFF_PROMPT_LENGTH - (sections.length > 1 ? NOTICE_BUDGET : 0)
+  // And room for the line that hands over a long task's file (0.513), which the
+  // caller puts in front: the start bound is on the whole prompt.
+  const budget = MAX_HANDOFF_PROMPT_LENGTH - (sections.length > 1 ? NOTICE_BUDGET : 0) - (taskFile === undefined ? 0 : withAttachments('x', [taskFile]).length)
   // The task and the person's next words are charged FIRST: they are never
   // optional, and a section added ahead of them in the reading order (the
   // earlier turns) must never be what squeezes them out. Then the optional

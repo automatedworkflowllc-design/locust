@@ -75,6 +75,8 @@ import { MAX_LIVE_MISSIONS } from '../shared/live-missions.js'
 import { hostReadsEventsOf, runtimeDisplayName } from '../shared/runtimes.js'
 import { FREE_ONLY_REFUSAL, isFreeRoute } from './free-routes.js'
 import { attachmentsForRun } from './attachments-for-run.js'
+import { longTaskFile } from './long-task-file.js'
+import { withAttachments } from '../shared/attachments.js'
 import { CODEX_INIT_PROMPT, commandNamed } from './runtime-commands.js'
 import type { CursorDefaultModel } from './cursor-default-model.js'
 import { checkpointMessage, checkpointNotice, checkpointSentence } from './turn-checkpoint.js'
@@ -292,6 +294,18 @@ export interface CodexMissionService {
   steer(runId: string, text: string): Promise<boolean>
   interrupt(): void
   dispose(): Promise<void>
+}
+
+/**
+ * The project folder a mission ran in (0.513): where a long task's file is
+ * written for the run that carries it on, by the same rule `start` uses to
+ * pick a continuing turn's folder.
+ */
+async function projectFolderOf(options: CodexMissionServiceOptions, missionId: string): Promise<string> {
+  const current = options.currentFolder?.() ?? options.workspacePath
+  const earlier = (await options.ledger.getMission(missionId).catch(() => undefined))?.metadata.workspaceId
+  if (earlier === undefined || earlier === workspaceIdFor(current) || options.folderOf === undefined) return current
+  return (await options.folderOf(earlier).catch(() => undefined)) ?? current
 }
 
 interface CodexMissionServiceOptions {
@@ -1429,13 +1443,17 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
                 `That conversation cannot be continued safely on another runtime: ${checkpoint.safetyReason}`
               ) as CodexMissionStartResponse
             }
-            const briefing = composeHandoffPrompt(
+            // A long task by file, not clipped (0.513, long-task-file.ts).
+            const taskFile = await longTaskFile(prior.metadata.prompt, await projectFolderOf(options, prior.metadata.missionId), prior.metadata.missionId)
+            const composed = composeHandoffPrompt(
               prior.metadata.prompt,
               checkpoint,
               runtimeDisplayName(prior.metadata.runtime),
               prompt,
-              await earlierTurnsOf(prior)
+              await earlierTurnsOf(prior),
+              taskFile
             )
+            const briefing = composed === undefined || taskFile === undefined ? composed : { ...composed, prompt: withAttachments(composed.prompt, [taskFile]) }
             if (briefing === undefined) {
               return error(
                 'RUNTIME_START_FAILED',
@@ -2371,7 +2389,10 @@ ${sentPrompt.trim()}`
         ) as MissionHandoffResponse
       }
 
-      const briefing = composeHandoffPrompt(originalPrompt, checkpoint, fromRuntime)
+      // A long task by file, not refused (0.513, long-task-file.ts).
+      const taskFile = await longTaskFile(originalPrompt, await projectFolderOf(options, fromMissionId), fromMissionId)
+      const composed = composeHandoffPrompt(originalPrompt, checkpoint, fromRuntime, undefined, [], taskFile)
+      const briefing = composed === undefined || taskFile === undefined ? composed : { ...composed, prompt: withAttachments(composed.prompt, [taskFile]) }
       if (briefing === undefined) {
         return error(
           'HANDOFF_REFUSED',
@@ -2470,11 +2491,17 @@ ${sentPrompt.trim()}`
         ) as MissionHandoffResponse
       }
 
-      const briefing = composeHandoffPrompt(
+      // A long task by file, not refused (0.513, long-task-file.ts).
+      const taskFile = await longTaskFile(recovered.metadata.prompt, await projectFolderOf(options, missionId), missionId)
+      const composed = composeHandoffPrompt(
         recovered.metadata.prompt,
         checkpoint,
-        runtimeDisplayName(recovered.metadata.runtime)
+        runtimeDisplayName(recovered.metadata.runtime),
+        undefined,
+        [],
+        taskFile
       )
+      const briefing = composed === undefined || taskFile === undefined ? composed : { ...composed, prompt: withAttachments(composed.prompt, [taskFile]) }
       if (briefing === undefined) {
         return error(
           'HANDOFF_REFUSED',
