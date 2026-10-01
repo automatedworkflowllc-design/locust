@@ -66,7 +66,7 @@ try {
   })()`))))
   say(`  dialog: ${JSON.stringify(dialog).slice(0, 700)}`)
   check('Save opens the dialog, named and with its steps filled in', dialog.open && dialog.name.length > 0 && dialog.steps.length > 0, JSON.stringify({ name: dialog.name, steps: dialog.steps }))
-  check('it says Marlow runs it, on the model in plain words', /Marlow runs it on OpenCode \/ Nemotron 3 Ultra Free\./.test(dialog.text), dialog.text.slice(0, 160))
+  check('it says Marlow runs it, on the model in plain words', /Marlow runs it on OpenCode \/ [^,.]+ Free, in Ask\./.test(dialog.text), dialog.text.slice(0, 160))
 
   const saved = JSON.parse(String(await drive.capture('saved, daily', () => drive.evaluate(`(async () => {
     const box = document.querySelector('.lc-dialog[aria-label="Save as routine"]')
@@ -104,7 +104,7 @@ try {
   await sleep(2500)
   const opened = String(await drive.capture('the run, finished', () => drive.evaluate(`document.querySelector('.lc-thread')?.innerText.replace(/\\s+/g, ' ').slice(0, 800) ?? ''`)))
   say(`  run conversation: ${opened}`)
-  check('the run replayed the saved step and was answered', /shift schedule/i.test(opened) && !/Working…/.test(opened) && opened.length > 120, opened.slice(0, 200))
+  check('the run replayed the saved step and was answered', /shift schedule/i.test(opened) && !/Working…/.test(opened) && !/Rate limit exceeded|provider answered/i.test(opened) && opened.length > 120, opened.slice(0, 200))
 
   const done = JSON.parse(String(await drive.capture('Routines, after the run', () => drive.evaluate(`(async () => {
     ;[...document.querySelectorAll('.lc-sidebar__nav button')].find((b) => /Routines/.test(b.innerText))?.click()
