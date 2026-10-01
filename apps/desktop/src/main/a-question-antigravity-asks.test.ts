@@ -357,7 +357,9 @@ describe('what the card sends reaches the service', () => {
     const handler = source.slice(at, at + 1400)
     expect(at).toBeGreaterThan(-1)
     expect(handler).toContain('approvalAnswerFrom(answer)')
-    expect(handler).toContain('antigravityMissions.decide(decided)')
+    // Through the one funnel (0.521), which asks Antigravity too.
+    expect(handler).toContain('answerApproval(decided)')
+    expect(source).toContain('codexMissions.decide(answer) || permissionHost.decide(answer) || (await antigravityMissions.decide(answer))')
   })
 
   it('still reads anything but a recognized decision as a denial', () => {

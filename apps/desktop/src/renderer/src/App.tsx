@@ -164,6 +164,9 @@ import { reviewBrief } from './reviewBrief.js'
 import type { ReviewMaterial } from './reviewBrief.js'
 import { conversationCostLine, costLine, headerCostTail, latestContext, missionCost, runCostOf, sumCosts } from './cost.js'
 import { compareRecordRows } from './compareRecord.js'
+import { ApprovalRuleContext } from './approvalRuleContext.js'
+import type { CardRule } from './approvalRuleContext.js'
+import { ruleCandidateOf, ruledActionOf, ruleSentence } from '../../shared/approval-rules.js'
 import { sequenceOfPost } from './roomExchange.js'
 import type { LiveTurn, RoomExchange, StartingReply } from './roomExchange.js'
 import { isStoppable, stopPress } from './stopPress.js'
@@ -3047,6 +3050,38 @@ export default function App(): ReactElement {
 
   const decideApproval = (approvalId: string, decision: MissionApprovalDecision, reason?: string): void =>
     replyToApproval(approvalId, { decision, ...(reason === undefined ? {} : { reason }) })
+
+  /*
+   * WHAT A CARD CAN SAVE AS A RULE (0.521, shared/approval-rules.ts): the
+   * exact command, the one file, the one connector tool, for this teammate
+   * in this folder. Shown as the sentence it would save; saved by the HOST
+   * from the request it holds, which also answers the card.
+   */
+  const ruleOfCard = (request: MissionApprovalRequest): CardRule | undefined => {
+    const teammateId = missionOwners[request.missionId]
+    const candidate = ruleCandidateOf(ruledActionOf(request), { ...(teammateId === undefined ? {} : { teammateId }), ...(request.cwd === null ? {} : { folder: request.cwd }) })
+    if (candidate === undefined) return undefined
+    const name = teammates.find((entry) => entry.teammateId === teammateId)?.name
+    const sentence = (effect: 'allow' | 'deny'): string => ruleSentence({ ...candidate, effect, ruleId: '', createdAt: '' }, name)
+    return {
+      allowSentence: sentence('allow'),
+      denySentence: sentence('deny'),
+      save: async (effect, reason) => {
+        const bridge = window.desktop
+        if (bridge === undefined) return 'Locust is not ready yet.'
+        setDecidingIds((current) => [...current, request.approvalId])
+        try {
+          const answer = await bridge.ruleFromApprovalCard({ approvalId: request.approvalId, effect, ...(reason === undefined ? {} : { reason }) }).catch(() => undefined)
+          if (answer === undefined) return 'The rule could not be saved. Answer the card as usual.'
+          if (!answer.ok) return answer.message
+          setApprovals((current) => current.filter((entry) => entry.approvalId !== request.approvalId))
+          return undefined
+        } finally {
+          setDecidingIds((current) => current.filter((entry) => entry !== request.approvalId))
+        }
+      }
+    }
+  }
 
   /** A question's answers, keyed by question id. Never a decision -- see the card. */
   const answerQuestion = (approvalId: string, answers: Readonly<Record<string, readonly string[]>>): void =>
@@ -6595,6 +6630,7 @@ export default function App(): ReactElement {
    * rule, whichever of the two is occupying the space.
    */
   return (
+    <ApprovalRuleContext.Provider value={ruleOfCard}>
     <div className={`lc-shell${layoutMode === 'compact' ? ' is-compact' : ''}${(viewingFile !== undefined || viewerRefusal !== undefined || besideRun !== undefined || reviewing !== undefined) && screen === 'workroom' ? ' has-viewer' :inspectorOpen && liveRun !== undefined && screen === 'workroom' ? ' has-inspector' : ''}`}>
       <TitleBar
         // With no folder the composer chip already says so; the bar shows the
@@ -8350,5 +8386,6 @@ export default function App(): ReactElement {
         />
       )}
     </div>
+    </ApprovalRuleContext.Provider>
   )
 }

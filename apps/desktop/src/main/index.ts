@@ -22,6 +22,8 @@ import type { ReverseChange } from '../shared/reverse-diff.js'
 import { bringInCopy, COPY_ROOT, copyLineChanges, copyRefusal, makeCompareCopy, removeCompareCopies } from './compare-copies.js'
 import type { CompareSlotId, PublicCompare, PublicCompareSlot } from '../shared/compare.js'
 import { createCompareStore } from './compare-store.js'
+import { createApprovalRuleStore } from './approval-rule-store.js'
+import { decideByRules, ruleCandidateOf, ruledActionOf, ruleSentence } from '../shared/approval-rules.js'
 import { judgePrompt } from './compare-judge.js'
 import type { JudgedAnswer } from './compare-judge.js'
 import electronUpdater from 'electron-updater'
@@ -261,6 +263,9 @@ import {
   DIAGNOSTICS_REPORT_CHANNEL,
   OPEN_LINK_CHANNEL,
   MAC_RELEASE_CHANNEL,
+  APPROVAL_RULES_LIST_CHANNEL,
+  APPROVAL_RULES_REMOVE_CHANNEL,
+  APPROVAL_RULE_FROM_CARD_CHANNEL,
   HANDOFF_PREVIEW_CHANNEL,
   DEFAULT_RELAY_HOP_CAP,
   DEFAULT_MEMORY_MODE,
@@ -316,6 +321,7 @@ import type {
   RoomPost,
   PublicTeammate,
   MissionApprovalRequest,
+  MissionApprovalAnswer,
   MissionHandoffRequest,
   MissionResumeRequest
 } from '../shared/ipc.js'
@@ -1683,7 +1689,67 @@ if (!ownsSingleInstanceLock) {
      * looking elsewhere. Shared: Codex's app-server approvals and Claude
      * Code's permission host are the same card, answered the same way.
      */
+    /*
+     * SAVED APPROVAL RULES (0.521, shared/approval-rules.ts). Before a card
+     * reaches the person, the rules they saved are read: a deny or an allow
+     * that covers it exactly answers it through the same decide the card
+     * would have used, and the conversation says which rule did. Anything
+     * else -- no rule, a question, a compound command, a store that cannot
+     * be read -- reaches the person as before.
+     */
+    const approvalRules = createApprovalRuleStore({ rootDirectory: app.getPath('userData') })
+    /*
+     * THE ONE WAY AN APPROVAL IS ANSWERED (A2.16, widened 0.521). Whichever
+     * host holds the id answers it. Called from exactly three places, each a
+     * decision of the person's: their click on the card (the decide handler),
+     * their click on "Yes, and don't ask again" / "Never allow this" (the
+     * from-card handler), and a rule they saved answering a card it covers
+     * (answerByRule). Nothing a teammate writes reaches it; the guard test
+     * (approvals-come-only-from-the-window) holds that.
+     */
+    const answerApproval = async (answer: MissionApprovalAnswer): Promise<boolean> =>
+      codexMissions.decide(answer) || permissionHost.decide(answer) || (await antigravityMissions.decide(answer))
+    const raisedApprovals = new Map<string, { readonly request: MissionApprovalRequest; readonly teammateId?: string }>()
+    const ruleContextOf = async (request: MissionApprovalRequest): Promise<{ teammateId?: string; folder?: string }> => {
+      const owners = await teammates.missionOwners().catch(() => ({}) as Record<string, string>)
+      const teammateId = owners[request.missionId]
+      return { ...(teammateId === undefined ? {} : { teammateId }), ...(request.cwd === null ? {} : { folder: request.cwd }) }
+    }
+    const answerByRule = async (request: MissionApprovalRequest): Promise<boolean> => {
+      const rules = await approvalRules.list().catch(() => undefined)
+      if (rules === undefined || rules.length === 0) return false
+      const context = await ruleContextOf(request)
+      const verdict = decideByRules(ruledActionOf(request), rules, context)
+      if (verdict.decision === 'ask') return false
+      const roster = context.teammateId === undefined ? [] : await teammates.list().catch(() => [])
+      const sentence = ruleSentence(verdict.rule, roster.find((entry) => entry.teammateId === context.teammateId)?.name)
+      const answer = verdict.decision === 'allow'
+        ? { approvalId: request.approvalId, decision: 'approve-once' as const }
+        : { approvalId: request.approvalId, decision: 'deny' as const, reason: `A rule the person saved says no: ${sentence}` }
+      // After the runtime has finished registering the request it just raised.
+      await new Promise((settle) => setTimeout(settle, 0))
+      const answered = await answerApproval(answer)
+      if (!answered) return false
+      await approvalRules.used(verdict.rule.ruleId).catch(() => undefined)
+      sendToWindow({
+        kind: 'relay-notice',
+        runId: request.runId,
+        missionId: request.missionId,
+        // The rule's own sentence names what it covered; Settings is where it is undone.
+        message: `${verdict.decision === 'allow' ? 'Allowed' : 'Denied'} by your saved rule: ${sentence} Settings > Teammates lists your rules.`
+      })
+      return true
+    }
     const raiseApproval = (request: MissionApprovalRequest): void => {
+      void (async () => {
+        const context = await ruleContextOf(request).catch(() => ({}) as { teammateId?: string })
+        raisedApprovals.set(request.approvalId, { request, ...(context.teammateId === undefined ? {} : { teammateId: context.teammateId }) })
+        if (raisedApprovals.size > 64) raisedApprovals.delete(raisedApprovals.keys().next().value as string)
+        if (await answerByRule(request).catch(() => false)) return
+        showApproval(request)
+      })()
+    }
+    const showApproval = (request: MissionApprovalRequest): void => {
         const target = approvalWindow
         if (target && !target.isDestroyed() && !target.webContents.isDestroyed()) {
           target.webContents.send(MISSION_APPROVAL_CHANNEL, request)
@@ -2331,6 +2397,47 @@ if (!ownsSingleInstanceLock) {
       }
     })
 
+    ipcMain.handle(APPROVAL_RULES_LIST_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      try {
+        return { ok: true, rules: await approvalRules.list() } as const
+      } catch (error) {
+        return { ok: false, message: error instanceof Error ? error.message : 'The saved rules could not be read. Every card asks until they can.' } as const
+      }
+    })
+    ipcMain.handle(APPROVAL_RULES_REMOVE_CHANNEL, async (event, ruleId: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      try {
+        await approvalRules.remove(ruleId)
+        return { ok: true, rules: await approvalRules.list() } as const
+      } catch (error) {
+        return { ok: false, message: error instanceof Error ? error.message : 'That rule could not be removed. It still answers cards; try again.' } as const
+      }
+    })
+    // A card's "Yes, and don't ask again" / "No, and never": the rule is made HERE, from the request held.
+    ipcMain.handle(APPROVAL_RULE_FROM_CARD_CHANNEL, async (event, input: unknown) => {
+      if (!fromOwnWindow(event) || typeof input !== 'object' || input === null) return { ok: false, message: 'That request was rejected.' } as const
+      const { approvalId, effect, reason } = input as Record<string, unknown>
+      const raised = typeof approvalId === 'string' ? raisedApprovals.get(approvalId) : undefined
+      if (raised === undefined || (effect !== 'allow' && effect !== 'deny')) return { ok: false, message: 'That card is no longer waiting.' } as const
+      const candidate = ruleCandidateOf(ruledActionOf(raised.request), {
+        ...(raised.teammateId === undefined ? {} : { teammateId: raised.teammateId }),
+        ...(raised.request.cwd === null ? {} : { folder: raised.request.cwd })
+      })
+      if (candidate === undefined) return { ok: false, message: 'This one cannot be saved as a rule exactly, so it was not saved. Answer the card as usual.' } as const
+      const decided = effect === 'allow'
+        ? { approvalId: raised.request.approvalId, decision: 'approve-once' as const }
+        : { approvalId: raised.request.approvalId, decision: 'deny' as const, ...(typeof reason === 'string' && reason.trim().length > 0 ? { reason: reason.trim().slice(0, 1_000) } : {}) }
+      try {
+        await approvalRules.add({ ...candidate, effect })
+      } catch (error) {
+        return { ok: false, message: error instanceof Error ? error.message : 'That rule could not be saved. Answer the card as usual.' } as const
+      }
+      const answered = await answerApproval(decided)
+      if (!answered) return { ok: false, message: 'The rule was saved, but this card had already been answered.' } as const
+      return { ok: true, rules: await approvalRules.list() } as const
+    })
+
     ipcMain.handle(MISSION_APPROVAL_DECIDE_CHANNEL, async (event, answer: unknown) => {
       if (!fromOwnWindow(event)) return { ok: false } as const
       // A decision, or a question's answers -- see approvalAnswerFrom, and why
@@ -2341,7 +2448,7 @@ if (!ownsSingleInstanceLock) {
       // mission service's approval channel; a Claude Code connector permission
       // in the permission host; an Antigravity question in its mission
       // service. An id is minted by exactly one of them.
-      return { ok: codexMissions.decide(decided) || permissionHost.decide(decided) || (await antigravityMissions.decide(decided)) } as const
+      return { ok: await answerApproval(decided) } as const
     })
 
     const teammates = createTeammateStore({ rootDirectory: app.getPath('userData') })

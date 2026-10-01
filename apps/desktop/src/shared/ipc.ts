@@ -1108,6 +1108,36 @@ export type TurnDiffResponse =
   | { readonly ok: false; readonly error: { readonly code: 'REVIEW_UNAVAILABLE'; readonly message: string } }
 export const MISSION_APPROVAL_CHANNEL = 'mission-approval:request'
 export const MISSION_APPROVAL_DECIDE_CHANNEL = 'mission-approval:decide'
+/**
+ * SAVED APPROVAL RULES (0.521, shared/approval-rules.ts). The host answers a
+ * card a rule covers and says which rule did; these list the rules, remove
+ * one, and make one from a card on screen -- built by the HOST from the
+ * request it holds, so the window can never ask for more than the card showed.
+ */
+export const APPROVAL_RULES_LIST_CHANNEL = 'approval-rules:list'
+export const APPROVAL_RULES_REMOVE_CHANNEL = 'approval-rules:remove'
+export const APPROVAL_RULE_FROM_CARD_CHANNEL = 'approval-rules:from-card'
+export interface PublicApprovalRule {
+  readonly ruleId: string
+  readonly effect: 'allow' | 'deny'
+  readonly kind: 'command' | 'edit' | 'read' | 'connector'
+  readonly pattern: string
+  readonly teammateId?: string
+  readonly folder?: string
+  readonly createdAt: string
+  readonly uses?: number
+  readonly lastUsedAt?: string
+}
+export type ApprovalRulesResponse =
+  | { readonly ok: true; readonly rules: readonly PublicApprovalRule[] }
+  | { readonly ok: false; readonly message: string }
+export interface ApprovalRuleFromCardRequest {
+  readonly approvalId: string
+  /** allow: "Yes, and don't ask again"; deny: "No, and never". */
+  readonly effect: 'allow' | 'deny'
+  /** With a deny, the reason the teammate reads. */
+  readonly reason?: string
+}
 /** An approval answered somewhere else -- a question answered in Antigravity's own window. */
 export const MISSION_APPROVAL_WITHDRAWN_CHANNEL = 'mission-approval:withdrawn'
 
@@ -3070,6 +3100,11 @@ export interface DesktopApi {
   restoreMemory(memoryId: string): Promise<MemoryListResponse>
   writeWorkspaceSettings(settings: WorkspaceSettings): Promise<WorkspaceSettings>
   decideMissionApproval(answer: MissionApprovalAnswer): Promise<{ readonly ok: boolean }>
+  /** Saved approval rules (0.521). */
+  listApprovalRules(): Promise<ApprovalRulesResponse>
+  removeApprovalRule(ruleId: string): Promise<ApprovalRulesResponse>
+  /** Answer this card, and save its rule so the same is not asked again. */
+  ruleFromApprovalCard(request: ApprovalRuleFromCardRequest): Promise<ApprovalRulesResponse>
   onMissionApproval(listener: (request: MissionApprovalRequest) => void): () => void
   onMissionApprovalWithdrawn(listener: (approvalId: string) => void): () => void
   startCodexMission(request: CodexMissionStartRequest): Promise<CodexMissionStartResponse>

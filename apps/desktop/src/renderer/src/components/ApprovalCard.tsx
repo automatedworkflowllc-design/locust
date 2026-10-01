@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useContext, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import type { MissionApprovalDecision, MissionApprovalRequest, MissionQuestion } from '../../../shared/ipc.js'
@@ -9,6 +9,7 @@ import { RuntimeMark } from './RuntimeMark.js'
 import { DiffView } from './DiffView.js'
 import { DiffNotesContext } from './DiffNotes.js'
 import { fileCounts, parseUnifiedDiff } from '../diff.js'
+import { ApprovalRuleContext } from '../approvalRuleContext.js'
 
 /** How long a card that has just appeared takes no approval (N9): a double click's second half. */
 export const FRESH_CARD_MS = 500
@@ -193,6 +194,20 @@ export function ApprovalCard({
   readonly busy: boolean
 }): ReactElement {
   const isQuestion = request.kind === 'question'
+  // What this card can save as a rule, when one can hold it exactly (0.521).
+  const rule = useContext(ApprovalRuleContext)(request)
+  const [never, setNever] = useState(false)
+  const [ruleSaid, setRuleSaid] = useState<string>()
+  const [saving, setSaving] = useState(false)
+  const saveRule = (effect: 'allow' | 'deny', why?: string): void => {
+    if (rule === undefined || saving) return
+    setSaving(true)
+    setRuleSaid(undefined)
+    void rule.save(effect, why).then((problem) => {
+      setSaving(false)
+      if (problem !== undefined) setRuleSaid(problem)
+    })
+  }
   const questions = request.questions ?? []
   /*
    * DENY, AND SAY WHY (0.374).
@@ -224,6 +239,10 @@ export function ApprovalCard({
   }
   const submitDenial = (): void => {
     const said = reason.replace(/\s+/g, ' ').trim()
+    if (never && rule !== undefined) {
+      saveRule('deny', said.length === 0 ? undefined : said)
+      return
+    }
     onDecide('deny', said.length === 0 ? undefined : said)
   }
   // The change itself, when Codex sent it with the item (parity row 32).
@@ -395,9 +414,15 @@ export function ApprovalCard({
                 maxLength={500}
                 autoFocus
               />
-              <button type="submit" className="lc-denybutton" disabled={busy}>
+              <button type="submit" className="lc-denybutton" disabled={busy || saving}>
                 {reason.trim().length === 0 ? 'Deny' : 'Deny and say why'}
               </button>
+              {rule !== undefined && (
+                <label className="lc-approval__never" title={rule.denySentence}>
+                  <input type="checkbox" checked={never} onChange={(event) => setNever(event.target.checked)} />
+                  Never allow this (saves a rule)
+                </label>
+              )}
               <button type="button" className="lc-ghostbutton" disabled={busy} onClick={stopDenying}>
                 Back
               </button>
@@ -415,6 +440,11 @@ export function ApprovalCard({
               <button type="button" className="lc-ghostbutton" disabled={busy} onClick={() => approve('approve-always')}>
                 Always allow this session
               </button>
+              {rule !== undefined && (
+                <button type="button" className="lc-ghostbutton" disabled={busy || saving} title={rule.allowSentence} onClick={() => saveRule('allow')}>
+                  Yes, and don&rsquo;t ask again
+                </button>
+              )}
               <button type="button" className="lc-denybutton" disabled={busy} onClick={() => setDenying(true)}>
                 Deny…
               </button>
@@ -429,7 +459,10 @@ export function ApprovalCard({
             {request.alwaysCovers === undefined
               ? 'Nothing has happened yet. “Always” lasts until this mission ends.'
               : `Nothing has happened yet. “Always” allows ${request.alwaysCovers}, until this mission ends.`}
+            {/* A saved rule outlives the run, so what it would save is said before it is pressed (0.521). */}
+            {rule !== undefined && ` “Don’t ask again” saves a rule: ${rule.allowSentence} Settings > Teammates lists your rules.`}
           </p>
+          {ruleSaid !== undefined && <p className="lc-approval__note" role="status">{ruleSaid}</p>}
         </>
       )}
     </div>

@@ -84,7 +84,7 @@ describe('approve-each is a mode the mission loop runs, not one it falls through
     // The mission service's channel, then Claude Code's permission host. An
     // id is minted by exactly one of them, so the first to claim it wins and
     // the other is asked only if it does not.
-    expect(main).toContain('codexMissions.decide(decided) || permissionHost.decide(decided)')
+    expect(main).toContain('codexMissions.decide(answer) || permissionHost.decide(answer)')
   })
 })
 

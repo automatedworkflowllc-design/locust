@@ -11198,6 +11198,25 @@ textarea {
   cursor: default;
 }
 
+/* Saved approvals in Settings (0.521): the sentence takes the room, its count a shade quieter. */
+.lc-savedrule__text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.lc-savedrule__uses {
+  color: var(--lc-text-muted);
+}
+
+/* "Never allow this (saves a rule)", beside Deny (0.521). */
+.lc-approval__never {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--lc-text-muted);
+}
+
 .lc-approval__note {
   margin: 0;
   padding: 0 var(--lc-space-5) var(--lc-space-5);

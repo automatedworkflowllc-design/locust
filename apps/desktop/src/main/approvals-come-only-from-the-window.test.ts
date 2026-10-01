@@ -26,14 +26,37 @@ describe('who may answer an approval', () => {
       .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts'))
       .filter((name) => /\.decide\(/.test(readFileSync(join(MAIN, name), 'utf8')))
     expect(callers.filter((name) => !HOLDERS.has(name) && name !== 'index.ts')).toEqual([])
-    // In index.ts, the one handler and nothing else.
+    // In index.ts, one funnel -- `answerApproval` -- and nothing else calls decide.
     const index = readFileSync(join(MAIN, 'index.ts'), 'utf8').split('\n')
     const decides = index.map((line, at) => ({ line, at })).filter(({ line }) => /\.decide\(/.test(line))
     expect(decides).toHaveLength(1)
-    const handler = index.findIndex((line) => line.includes('ipcMain.handle(MISSION_APPROVAL_DECIDE_CHANNEL'))
-    expect(handler).toBeGreaterThan(-1)
-    expect(decides[0]!.at - handler).toBeLessThan(15)
-    expect(index[handler + 1]).toContain('fromOwnWindow(event)')
+    const funnel = index.findIndex((line) => line.includes('const answerApproval = async'))
+    expect(funnel).toBeGreaterThan(-1)
+    expect(decides[0]!.at - funnel).toBeLessThan(3)
+    /*
+     * 0.521: the funnel is called from exactly three places, each a decision
+     * of the person's -- their click (the window handler), their click on a
+     * card's "don't ask again" (the from-card handler, also window-only), and
+     * a rule they saved (answerByRule). A fourth caller fails here.
+     */
+    const calls = index.map((line, at) => ({ line, at })).filter(({ line }) => /answerApproval\(/.test(line))
+    expect(calls).toHaveLength(3)
+    const enclosing = (at: number): string => {
+      for (let line = at; line >= 0; line -= 1) {
+        const opened = /ipcMain\.handle\((\w+)|const (answerByRule) = /.exec(index[line] ?? '')
+        if (opened !== null) return opened[1] ?? opened[2] ?? ''
+      }
+      return ''
+    }
+    expect(calls.map(({ at }) => enclosing(at)).sort()).toEqual(['APPROVAL_RULE_FROM_CARD_CHANNEL', 'MISSION_APPROVAL_DECIDE_CHANNEL', 'answerByRule'])
+    for (const channel of ['MISSION_APPROVAL_DECIDE_CHANNEL', 'APPROVAL_RULE_FROM_CARD_CHANNEL']) {
+      const handler = index.findIndex((line) => line.includes(`ipcMain.handle(${channel}`))
+      expect(index[handler + 1], channel).toContain('fromOwnWindow(event)')
+    }
+    // And a rule answers only from the person's saved rules, through the evaluator.
+    const byRule = index.findIndex((line) => line.includes('const answerByRule = '))
+    expect(index.slice(byRule, byRule + 8).join('\n')).toContain('approvalRules.list()')
+    expect(index.slice(byRule, byRule + 8).join('\n')).toContain('decideByRules(')
   })
 })
 

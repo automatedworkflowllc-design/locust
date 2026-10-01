@@ -61,6 +61,7 @@ import type { WorktreeRemoval } from './WorktreeRow.js'
 import { ArmedButton } from './ArmedButton.js'
 import { OwnModels } from './OwnModels.js'
 import { routineAwaitsReview } from '../../../shared/routine-recovery.js'
+import { SavedApprovalRules } from './SavedApprovalRules.js'
 
 export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings' | 'rooms' | 'memory' | 'automations'
 
@@ -2256,6 +2257,12 @@ export function SettingsScreen({
               for a Claude Code teammate, in either position.
             </p>
           </More>
+        </section>
+        )}
+        {shownPage === 'teammates' && (
+        <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">Saved approvals</h2>
+          <SavedApprovalRules />
         </section>
         )}
         {shownPage === 'memory' && (

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { COMPOUND_REFUSAL, decideByRules, insideFolder, ruleSentence } from './approval-rules.js'
+import { COMPOUND_REFUSAL, decideByRules, diffPaths, insideFolder, ruleCandidateOf, ruledActionOf, ruleSentence, unwrappedCommand } from './approval-rules.js'
 import type { ApprovalRule, RuledAction } from './approval-rules.js'
 
 /**
@@ -100,6 +100,66 @@ describe('scope', () => {
 
   it('a question to the person is never governed', () => {
     expect(decideByRules({ kind: 'other' }, [rule('allow', 'command', 'x')], context)).toEqual({ decision: 'ask' })
+  })
+})
+
+describe('a card, read for the rules', () => {
+  it('reads the command inside a shell wrapper, only when the whole text is exactly one', () => {
+    // As Codex on Windows sent it in the 0.521 drive.
+    const wrapped = '"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe" -Command \'git status --short\''
+    expect(ruledActionOf({ kind: 'command', summary: 'Run a command', detail: wrapped })).toEqual({ kind: 'command', command: 'git status --short' })
+    expect(unwrappedCommand("pwsh -NoProfile -Command 'echo ''hi'''")).toBe("echo 'hi'")
+    expect(unwrappedCommand("/bin/bash -lc 'ls -la'")).toBe('ls -la')
+    // Not one wrapper around one command: left whole.
+    expect(unwrappedCommand("powershell -Command 'a'; rm x")).toBe("powershell -Command 'a'; rm x")
+    expect(unwrappedCommand("bash -lc 'a' && b")).toBe("bash -lc 'a' && b")
+    // And the inner command is still held to the compound rule.
+    const rules = [rule('allow', 'command', 'git status --short')]
+    expect(decideByRules(ruledActionOf({ kind: 'command', summary: 'Run a command', detail: wrapped }), rules, context).decision).toBe('allow')
+    const sneaky = '"C:\\\\x\\\\powershell.exe" -Command \'git status --short; rm -rf x\''
+    expect(decideByRules(ruledActionOf({ kind: 'command', summary: 'Run a command', detail: sneaky }), rules, context).decision).toBe('ask')
+  })
+
+  it('reads a command only when it is one', () => {
+    expect(ruledActionOf({ kind: 'command', summary: 'Run a command', detail: 'git status' })).toEqual({ kind: 'command', command: 'git status' })
+    expect(ruledActionOf({ kind: 'command', summary: 'Use WebFetch', detail: '{"url":"x"}' })).toEqual({ kind: 'other' })
+    expect(ruledActionOf({ kind: 'command', summary: 'Run a command it did not describe', detail: '' })).toEqual({ kind: 'other' })
+  })
+
+  it('reads a change\'s files from its diff, else as each runtime names them, else not at all', () => {
+    const diff = 'diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1 +1 @@\n-x\n+y\n'
+    expect(ruledActionOf({ kind: 'file-change', summary: 'Change files', detail: 'Rewrites the helper', runtime: 'codex', patch: { text: diff } })).toEqual({ kind: 'edit', paths: ['src/a.ts'] })
+    expect(ruledActionOf({ kind: 'file-change', summary: 'Change files', detail: 'Rewrites the helper', runtime: 'codex' })).toEqual({ kind: 'other' })
+    expect(ruledActionOf({ kind: 'file-change', summary: 'Change 1 file', detail: 'src/b.ts', runtime: 'claude' })).toEqual({ kind: 'edit', paths: ['src/b.ts'] })
+    expect(ruledActionOf({ kind: 'file-change', summary: 'Change 2 files', detail: 'a.ts, b.ts', runtime: 'copilot' })).toEqual({ kind: 'edit', paths: ['a.ts', 'b.ts'] })
+    expect(diffPaths('--- /dev/null\n+++ b/new.md\n')).toEqual(['new.md'])
+  })
+
+  it('reads a connector by its tool and server, and a question never', () => {
+    expect(ruledActionOf({ kind: 'connector', summary: 'Use list_issues on github', detail: '' })).toEqual({ kind: 'connector', tool: 'list_issues', server: 'github' })
+    expect(ruledActionOf({ kind: 'question', summary: 'Answer a question', detail: '' })).toEqual({ kind: 'other' })
+  })
+})
+
+describe('the rule "don\'t ask again" would save', () => {
+  it('is the exact command, the exact file inside the folder, or the one connector tool, scoped', () => {
+    expect(ruleCandidateOf(command('git  status'), context)).toEqual({ effect: 'allow', kind: 'command', pattern: 'git status', teammateId: 'tm_wren', folder: FOLDER })
+    expect(ruleCandidateOf({ kind: 'edit', paths: ['src/a.ts'] }, context)).toEqual({ effect: 'allow', kind: 'edit', pattern: 'src/a.ts', teammateId: 'tm_wren', folder: FOLDER })
+    expect(ruleCandidateOf({ kind: 'connector', server: 'github', tool: 'list_issues' }, context)?.pattern).toBe('github/list_issues')
+  })
+
+  it('is nothing for what a rule could not hold exactly', () => {
+    expect(ruleCandidateOf(command('git status && rm x'), context)).toBeUndefined()
+    expect(ruleCandidateOf({ kind: 'edit', paths: ['../other/a.ts'] }, context)).toBeUndefined()
+    expect(ruleCandidateOf({ kind: 'edit', paths: ['a.ts', 'b.ts'] }, context)).toBeUndefined()
+    expect(ruleCandidateOf({ kind: 'edit', paths: ['src/*.ts'] }, context)).toBeUndefined()
+    expect(ruleCandidateOf({ kind: 'other' }, context)).toBeUndefined()
+  })
+
+  it('a saved candidate allows exactly what it was made from, and no more', () => {
+    const saved = { ...ruleCandidateOf(command('git status'), context)!, ruleId: 'r1', createdAt: 'now' }
+    expect(decideByRules(command('git status'), [saved], context).decision).toBe('allow')
+    expect(decideByRules(command('git status --short'), [saved], context).decision).toBe('ask')
   })
 })
 

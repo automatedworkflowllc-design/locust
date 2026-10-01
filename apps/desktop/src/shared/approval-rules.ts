@@ -217,3 +217,96 @@ export function ruleSentence(rule: ApprovalRule, teammateName?: string): string 
   // An allow is about not being asked; a deny is a plain no.
   return `${who} ${verb} ${what}${where}${rule.effect === 'allow' ? ' without asking' : ''}.`
 }
+
+/**
+ * What a card's request is, for the rules (0.521) -- or 'other' when it
+ * cannot be read exactly, which always asks. Each runtime words a request
+ * its own way (main/approval-channel.ts, permission-host.ts):
+ *
+ *   - a command is "Run a command" with the command as its detail; any other
+ *     "Use <tool>" a runtime asks about is not a shell command and is not
+ *     governed;
+ *   - a file change names its files in the diff it carries, else Claude Code
+ *     names one file and Copilot a comma-separated list; Codex's summary
+ *     sentence names none, so without a diff it is not governed;
+ *   - a connector is "Use <tool> on <server>".
+ */
+/**
+ * The command inside a runtime's shell wrapper (0.521). Codex on Windows asks
+ * about `"C:\...\powershell.exe" -Command 'git status --short'`, and a rule
+ * saved from that read as the wrapper, matched only that exact path, and said
+ * so in its sentence. The wrapper is taken off only when the WHOLE text is
+ * exactly one wrapper around one single-quoted command -- PowerShell's `''`
+ * read as one quote -- so what a rule matches is still everything that runs.
+ * Anything else is left as it is.
+ */
+export function unwrappedCommand(command: string): string {
+  const text = command.trim()
+  const powershell = /^(?:"[^"]*(?:powershell|pwsh)(?:\.exe)?"|\S*(?:powershell|pwsh)(?:\.exe)?)\s+(?:-(?:NoProfile|NoLogo|NonInteractive)\s+)*-Command\s+'((?:[^']|'')*)'$/i.exec(text)
+  if (powershell !== null) return (powershell[1] as string).replace(/''/g, "'")
+  const posix = /^(?:\/(?:usr\/)?bin\/)?(?:bash|sh|zsh)\s+-l?c\s+'([^']*)'$/.exec(text)
+  if (posix !== null) return posix[1] as string
+  return text
+}
+
+export function ruledActionOf(request: {
+  readonly kind: string
+  readonly summary: string
+  readonly detail: string
+  readonly runtime?: string
+  readonly patch?: { readonly text: string }
+}): RuledAction {
+  if (request.kind === 'command') {
+    return /^Run a command$/.test(request.summary) && request.detail.trim().length > 0 ? { kind: 'command', command: unwrappedCommand(request.detail) } : { kind: 'other' }
+  }
+  if (request.kind === 'file-change') {
+    const fromDiff = request.patch === undefined ? [] : diffPaths(request.patch.text)
+    if (fromDiff.length > 0) return { kind: 'edit', paths: fromDiff }
+    const detail = request.detail.trim()
+    if (detail.length === 0) return { kind: 'other' }
+    if (request.runtime === 'claude' && /^Change 1 file/.test(request.summary)) return { kind: 'edit', paths: [detail] }
+    if (request.runtime === 'copilot') return { kind: 'edit', paths: detail.split(', ').filter((path) => path.length > 0) }
+    return { kind: 'other' }
+  }
+  if (request.kind === 'connector') {
+    const named = /^Use (\S+) on (.+)$/.exec(request.summary)
+    return named === null ? { kind: 'other' } : { kind: 'connector', tool: named[1] as string, server: named[2] as string }
+  }
+  return { kind: 'other' }
+}
+
+/** The files a unified diff names, from its headers, /dev/null left out. */
+export function diffPaths(diff: string): readonly string[] {
+  const paths = new Set<string>()
+  for (const line of diff.split(/\r?\n/)) {
+    const header = /^(?:\+\+\+|---) (?:[ab]\/)?(.+?)\s*$/.exec(line)
+    if (header !== null && header[1] !== '/dev/null') paths.add(header[1] as string)
+  }
+  return [...paths]
+}
+
+/**
+ * The rule "Yes, and don't ask again" would save for this request (0.521),
+ * or undefined when it would not be exact: a compound command, a file not
+ * inside the folder, anything 'other'. Narrow on purpose -- the exact
+ * command, the exact files, the one connector tool -- as Claude Code
+ * proposes the command it was shown.
+ */
+export function ruleCandidateOf(
+  action: RuledAction,
+  context: RuleContext
+): Omit<ApprovalRule, 'ruleId' | 'createdAt'> | undefined {
+  const scope = { ...(context.teammateId === undefined ? {} : { teammateId: context.teammateId }), ...(context.folder === undefined ? {} : { folder: context.folder }) }
+  if (action.kind === 'command') {
+    if (COMPOUND.test(action.command) || flat(action.command).length === 0 || flat(action.command).length > 400) return undefined
+    return { effect: 'allow', kind: 'command', pattern: flat(action.command), ...scope }
+  }
+  if (action.kind === 'edit' || action.kind === 'read') {
+    if (context.folder === undefined || action.paths.length !== 1) return undefined
+    const relative = insideFolder(action.paths[0] as string, context.folder)
+    if (relative === undefined || relative.length === 0 || /[*?]/.test(relative)) return undefined
+    return { effect: 'allow', kind: action.kind, pattern: relative, ...scope }
+  }
+  if (action.kind === 'connector') return { effect: 'allow', kind: 'connector', pattern: `${action.server}/${action.tool}`, ...scope }
+  return undefined
+}
