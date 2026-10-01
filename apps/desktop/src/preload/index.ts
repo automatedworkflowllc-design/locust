@@ -75,6 +75,7 @@ import {
   FEEDBACK_CHANNEL,
   DIAGNOSTICS_REPORT_CHANNEL,
   OPEN_LINK_CHANNEL,
+  MAC_RELEASE_CHANNEL,
   ROOM_LIST_CHANNEL,
   ROOM_CREATE_CHANNEL,
   ROOM_REMOVE_CHANNEL,
@@ -177,6 +178,7 @@ import type {
   PagePickResponse,
   WorkspaceFilesResponse,
   OpenLinkResponse,
+  MacReleaseAnswer,
   FeedbackReport,
   RevealFileResponse,
   WorkspaceTextResponse,
@@ -421,6 +423,7 @@ const desktopApi: DesktopApi = {
   sendFeedback: (report: FeedbackReport) => ipcRenderer.invoke(FEEDBACK_CHANNEL, report) as Promise<OpenLinkResponse>,
   diagnosticsReport: () => ipcRenderer.invoke(DIAGNOSTICS_REPORT_CHANNEL) as Promise<DiagnosticsReport>,
   openLink: (url: string) => ipcRenderer.invoke(OPEN_LINK_CHANNEL, url) as Promise<OpenLinkResponse>,
+  macRelease: () => ipcRenderer.invoke(MAC_RELEASE_CHANNEL) as Promise<MacReleaseAnswer | undefined>,
   readWorkspaceImage: (path: string) =>
     ipcRenderer.invoke(WORKSPACE_IMAGE_CHANNEL, path) as Promise<WorkspaceImageResponse>,
   attachFiles: () => ipcRenderer.invoke(WORKSPACE_ATTACH_CHANNEL) as Promise<AttachFilesResponse>,

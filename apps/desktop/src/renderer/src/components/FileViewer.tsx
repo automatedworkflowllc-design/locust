@@ -287,7 +287,12 @@ export function FileViewer({
       <p className="lc-viewer__register">
         {running
           ? 'This page runs here, in a frame of its own: it cannot reach Locust, your files or your accounts.'
-          : `Locust does not open files — a teammate chose this file's name and contents. Reveal hands it to ${typeof navigator !== 'undefined' && /Macintosh|Mac OS X/.test(navigator.userAgent) ? 'the Finder' : 'Windows'}.`}
+          /*
+            * Said as what it does (0.515). "Locust does not open files" sat
+            * under the file Locust had just shown -- read as a contradiction
+            * in a pass on 0.512. The point is that it never LAUNCHES one.
+            */
+          : `Shown here only: Locust never runs a file a teammate made, or opens it in another app. Reveal shows where it is in ${typeof navigator !== 'undefined' && /Macintosh|Mac OS X/.test(navigator.userAgent) ? 'the Finder' : 'Windows'}.`}
       </p>
     </aside>
   )

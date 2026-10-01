@@ -24,6 +24,39 @@ const runner = (result: { code: number | null; output: string }, lines: readonly
     return result
   })
 
+describe('a global folder that is the system\'s (0.515)', () => {
+  // A tester's Mac, 2026-10-01: npm's prefix was /usr/local, and every Install ended in EACCES.
+  const EACCES = "npm ERR! code EACCES\nnpm ERR! Error: EACCES: permission denied, mkdir '/usr/local/lib/node_modules/opencode-ai'"
+
+  it('off Windows, tries once more into the person\'s own folder, and says so', async () => {
+    const run = vi.fn()
+      .mockResolvedValueOnce({ code: 243, output: EACCES })
+      .mockResolvedValueOnce({ code: 0, output: 'added 1 package' })
+    const lines: string[] = []
+    const installer = createRuntimeInstaller({ run, platform: 'darwin', userPrefix: '/Users/ian/.npm-global', nowInstalled: async () => true })
+    const result = await installer.install({ runtime: 'opencode', onLine: ({ line }) => lines.push(line) })
+    expect(result).toEqual({ ok: true })
+    expect(run).toHaveBeenNthCalledWith(2, 'npm', ['install', '-g', 'opencode-ai', '--prefix', '/Users/ian/.npm-global'], expect.any(Function))
+    expect(lines).toContain("npm's global folder belongs to the system; installing into /Users/ian/.npm-global instead.")
+  })
+
+  it('not on Windows, where a permission failure is a lock or a policy, and not for any other failure', async () => {
+    const onWindows = vi.fn().mockResolvedValue({ code: 1, output: EACCES })
+    await createRuntimeInstaller({ run: onWindows, platform: 'win32', userPrefix: 'C:/x', nowInstalled: async () => true }).install({ runtime: 'opencode', onLine: () => undefined })
+    expect(onWindows).toHaveBeenCalledTimes(1)
+    const otherFailure = vi.fn().mockResolvedValue({ code: 1, output: 'npm ERR! 404 Not Found' })
+    await createRuntimeInstaller({ run: otherFailure, platform: 'darwin', userPrefix: '/Users/ian/.npm-global', nowInstalled: async () => true }).install({ runtime: 'opencode', onLine: () => undefined })
+    expect(otherFailure).toHaveBeenCalledTimes(1)
+  })
+
+  it('and when the second try fails too, it says what the first said', async () => {
+    const run = vi.fn().mockResolvedValue({ code: 243, output: EACCES })
+    const result = await createRuntimeInstaller({ run, platform: 'darwin', userPrefix: '/Users/ian/.npm-global', nowInstalled: async () => true }).install({ runtime: 'opencode', onLine: () => undefined })
+    expect(run).toHaveBeenCalledTimes(2)
+    expect(result).toMatchObject({ ok: false, what: 'npm could not write to its global folder.' })
+  })
+})
+
 describe('running the install the screen showed', () => {
   it('runs exactly the command the person read, not a reconstruction of it', async () => {
     // The line on screen and the argv spawned here come from one place. If

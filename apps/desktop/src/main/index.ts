@@ -39,6 +39,7 @@ import {
 } from '@teammate/runtime-adapters'
 import { createFileMissionLedger, createFileWorkroom } from '@teammate/mission-store'
 import { retireSetAsideMessages } from './set-aside-messages.js'
+import { MAC_RELEASES_API, newerMacRelease } from './mac-release.js'
 import type { AppChangelog, AppChangelogEntry, WorkspaceSettings } from '../shared/ipc.js'
 import type { MissionLedger, Workroom } from '@teammate/mission-store'
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
@@ -254,6 +255,7 @@ import {
   FEEDBACK_CHANNEL,
   DIAGNOSTICS_REPORT_CHANNEL,
   OPEN_LINK_CHANNEL,
+  MAC_RELEASE_CHANNEL,
   DEFAULT_RELAY_HOP_CAP,
   DEFAULT_MEMORY_MODE,
   ROOM_LIST_CHANNEL,
@@ -2098,6 +2100,8 @@ if (!ownsSingleInstanceLock) {
       // The npm this build carries, used only when the machine has none.
       ...(bundledNpm === undefined ? {} : { bundledNpm }),
       systemNpm: npmPresent,
+      // Off Windows, a global folder that is the system's is stepped round into this user's own (0.515).
+      ...(process.platform === 'win32' ? {} : { userPrefix: join(homedir(), '.npm-global') }),
       nowInstalled: async (runtime) => {
         discoveryCache = undefined
         runtimeDiscovery.invalidate()
@@ -3532,6 +3536,23 @@ if (!ownsSingleInstanceLock) {
      * host's own list, so a renderer turned against the person can still
      * reach nowhere else.
      */
+    /*
+     * A NEWER LOCUST FOR THIS MAC (0.515, mac-release.ts). A Mac copy cannot
+     * update itself until it is signed; it can say when one is out. Only on
+     * a packaged Mac build, and nothing is downloaded here: the window offers
+     * the release's own link, and the person's browser fetches it.
+     */
+    ipcMain.handle(MAC_RELEASE_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event) || process.platform !== 'darwin' || !app.isPackaged) return undefined
+      try {
+        const response = await fetch(MAC_RELEASES_API, { headers: { Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(10_000) })
+        if (!response.ok) return undefined
+        return newerMacRelease(await response.json(), app.getVersion(), process.arch)
+      } catch {
+        return undefined
+      }
+    })
+
     ipcMain.handle(OPEN_LINK_CHANNEL, async (event, requested: unknown) => {
       if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
       /*

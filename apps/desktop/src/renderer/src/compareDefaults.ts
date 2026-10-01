@@ -42,7 +42,16 @@ export function defaultComparePicks(input: {
   for (const model of input.models) if (model.older !== true && model.own !== true) add({ runtime: model.runtime, model: model.id })
   const first = candidates[0]
   if (first === undefined) return []
-  const second = candidates.find((one) => one.runtime !== first.runtime) ?? candidates[1]
+  /*
+   * FREE STAYS FREE (0.515). A pass on 0.512 opened Compare on a free
+   * teammate and found model B on GPT-6.1 Sol -- another runtime, which is
+   * the usual preference, and a paid one nobody chose. When the first is one
+   * of OpenCode's free models, the second is another free one if there is.
+   */
+  const free = (one: Choice): boolean => one.runtime === 'opencode' && one.model.endsWith('-free')
+  const second = (free(first) ? candidates.find((one) => one !== first && free(one)) : undefined)
+    ?? candidates.find((one) => one.runtime !== first.runtime)
+    ?? candidates[1]
   if (second === undefined) return []
   return [first, second].map((choice) => ({ ...choice, label: input.label(choice) }))
 }

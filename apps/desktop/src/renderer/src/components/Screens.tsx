@@ -2730,6 +2730,32 @@ export const installingLine = (version: string | undefined): string =>
   `Installing Locust${version === undefined || version === '' ? '' : ` ${version}`}. It opens again by itself in a minute or two; there is no need to open it.`
 
 /**
+ * A NEWER LOCUST FOR THIS MAC (0.515, main/mac-release.ts). A Mac copy cannot
+ * update itself until the build is signed; this says when one is out and
+ * hands over the download. A tester on a Mac, 2026-10-01: "oh no updates
+ * also, thats kind of rough".
+ */
+export function MacUpdateBanner({
+  release,
+  onDownload
+}: {
+  readonly release: { readonly version: string; readonly url: string } | undefined
+  readonly onDownload: (url: string) => void
+}): ReactElement | null {
+  if (release === undefined) return null
+  return (
+    <div className="lc-updatebanner" role="status">
+      <span className="lc-updatebanner__text">
+        {`Locust ${release.version} is out. On a Mac it is installed by hand for now: open the download and drag Locust into Applications to replace this one. Your conversations stay.`}
+      </span>
+      <button type="button" className="lc-button" onClick={() => onDownload(release.url)}>
+        Download
+      </button>
+    </div>
+  )
+}
+
+/**
  * The one line that says a new version is here. Settings knew; the person
  * did not, because nobody opens Settings to find out. It sits above the
  * composer, offers the install, and never installs on its own -- a running

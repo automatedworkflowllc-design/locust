@@ -606,7 +606,15 @@
    * what Claude Code does too -- its own prose measures about 775px at a
    * 1431px window.
    */
-  --lc-thread-max-width: clamp(760px, 46vw, 980px);
+  /*
+   * 68vw, not 46vw (0.515). Colin, 2026-10-01, beside a Claude Code window:
+   * "we seem to have a little more dead space on the side of our
+   * chats/chatbox compared to claude". 46vw only left the 760px floor above
+   * a 1650px window, so an ordinary 1100-1650px window kept ~90px of margin a
+   * side, where Claude keeps ~50-75. 68vw grows the column from ~1120px up
+   * and reaches the same 980px ceiling at ~1440px; narrower is unchanged.
+   */
+  --lc-thread-max-width: clamp(760px, 68vw, 980px);
   /*
    * Where one turn ends and the next begins: 22px before a person's message,
    * against the 12px column gap inside a turn. Named rather than left as a
@@ -616,7 +624,13 @@
    * derived and a change to the column gap cannot move it.
    */
   --lc-thread-turn-gap: 22px;
-  --lc-thread-max-width-compact: 700px;
+  /*
+   * The narrow window's column GROWS too (0.515). 700px fixed left ~130px a
+   * side in a 1024px window's 960px pane (drive-the-column-fills-the-window),
+   * the most dead space at the size where room matters most. 84vw keeps
+   * ~50px a side there, Claude's gutter; 700px stays the floor.
+   */
+  --lc-thread-max-width-compact: clamp(700px, 84vw, 980px);
 
   /* --- Interaction ----------------------------------------------------- */
   --lc-hover-surface: rgba(255, 255, 255, 0.06);

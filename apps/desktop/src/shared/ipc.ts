@@ -915,6 +915,12 @@ export type RevealFileResponse =
   | { readonly ok: true }
   | { readonly ok: false; readonly message: string }
 export const OPEN_LINK_CHANNEL = 'shell:open-link'
+/** A newer Locust for this Mac (0.515, main/mac-release.ts): its version and disk image, or nothing. */
+export const MAC_RELEASE_CHANNEL = 'updates:mac-release'
+export interface MacReleaseAnswer {
+  readonly version: string
+  readonly url: string
+}
 /**
  * What came of opening a link. A refusal names why, the same as a reveal.
  *
@@ -2935,6 +2941,8 @@ export interface DesktopApi {
   diagnosticsReport(): Promise<DiagnosticsReport>
   /** Open one of the addresses the host allows, in the person's browser. */
   openLink(url: string): Promise<OpenLinkResponse>
+  /** On a Mac: a newer release with this chip's disk image, when there is one (0.515). */
+  macRelease(): Promise<MacReleaseAnswer | undefined>
   /** Open the picker for files to attach; answers workspace-relative paths. */
   attachFiles(): Promise<AttachFilesResponse>
   /** The project's files, workspace-relative, for `@` in the composer (0.436). */

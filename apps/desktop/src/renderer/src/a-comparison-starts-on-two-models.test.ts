@@ -50,6 +50,15 @@ describe('the two a comparison starts on', () => {
     expect(defaultComparePicks({ ...base, current: undefined, recent: [], models: [model('claude', 'opus')] })).toEqual([])
   })
 
+  it('stay free when the first is free (0.515): a free teammate is not compared against a paid model nobody chose', () => {
+    const models = [model('opencode', 'opencode/mimo-v2.6-flash-free'), model('codex', 'gpt-6.1-sol'), model('opencode', 'opencode/longcat-2.5-preview-free')]
+    const picks = defaultComparePicks({ ...base, models, current: { runtime: 'opencode', model: 'opencode/mimo-v2.6-flash-free' }, recent: [] })
+    expect(picks.map((pick) => pick.model)).toEqual(['opencode/mimo-v2.6-flash-free', 'opencode/longcat-2.5-preview-free'])
+    // With no second free model, another maker as before.
+    const lone = defaultComparePicks({ ...base, models: models.slice(0, 2), current: { runtime: 'opencode', model: 'opencode/mimo-v2.6-flash-free' }, recent: [] })
+    expect(lone.map((pick) => pick.model)).toEqual(['opencode/mimo-v2.6-flash-free', 'gpt-6.1-sol'])
+  })
+
   it('leave out older models and the person\'s own', () => {
     const picks = defaultComparePicks({ ...base, current: undefined, recent: [], models: [model('claude', 'old', { older: true }), model('opencode', 'mine', { own: true }), model('claude', 'opus'), model('codex', 'gpt-6-sol')] })
     expect(picks.map((pick) => pick.model)).toEqual(['opus', 'gpt-6-sol'])

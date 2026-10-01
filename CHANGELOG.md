@@ -11,6 +11,35 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.515.0 - 2026-10-01
+
+### Changed
+
+- **The chat uses more of the window.** The conversation and the message box
+  now grow with the window from about 1,100px wide (and in the narrow layout
+  with the sidebar folded), so a mid-size window no longer keeps a wide empty
+  margin either side.
+- **A thought reads one way.** A model's thinking inside a group of steps is
+  shown as its words, quietly, the same as a thought on its own line, instead
+  of a second "Thought for 3s" row that opened onto its title again.
+
+### Fixed
+
+- **Installing a CLI on a Mac.** Where npm's global folder belongs to the
+  system, Install failed every time with "permission denied". It now installs
+  into a folder of your own (`~/.npm-global`), which Locust already looks in.
+- **A Mac says when a new Locust is out.** A Mac copy cannot update itself yet,
+  so it now shows when a newer version is available, with a Download button.
+- **Keeping a compared answer keeps its model.** The conversation now carries
+  on with the model you kept, instead of going back to the teammate's own
+  model and starting a fresh session.
+- **Comparing on a free model stays free.** A free teammate's comparison now
+  starts on two free models, instead of adding a paid one nobody chose.
+- **Ask on the side knows the turn still running.** A side question asked
+  during a run now knows what that run was asked.
+- The file preview's footnote no longer says "Locust does not open files"
+  under the file it is showing.
+
 ## 0.514.0 - 2026-10-01
 
 ### Changed

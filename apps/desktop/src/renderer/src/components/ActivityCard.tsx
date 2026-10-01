@@ -615,6 +615,19 @@ export function ActivityCard({
                       <Icon name="thought" size={14} />
                       <span className="lc-filerow__path">{thoughtLine(entry.durationMs)}</span>
                     </div>
+                  ) : steps ? (
+                    /*
+                     * ONE WAY A THOUGHT READS (0.515). Colin, 2026-10-01, with
+                     * two frames: a line that is one thought opened straight
+                     * onto its words; a line of a thought and two reads opened
+                     * onto "Thought for 3s · <headline>", which opened onto the
+                     * headline again in bold -- "i think the first is cleaner,
+                     * wanna stick with that?". Inside a step line a thought is
+                     * its words, quiet, as the one-thought line draws them.
+                     */
+                    <div className="lc-steps__thought">
+                      <AgentText text={withoutHeadline(entry.text)} streaming={false} />
+                    </div>
                   ) : (
                     <>
                       <button type="button" className="lc-filerow lc-filerow--thought" onClick={() => toggle(entry)} aria-expanded={isOpen(entry)}>

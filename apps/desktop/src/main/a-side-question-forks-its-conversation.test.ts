@@ -92,7 +92,7 @@ describe('a question on the side', () => {
           missionId === 'mission_convo'
             ? {
                 metadata: {
-                  missionId, runId: 'run_convo', runtime, model: 'account-default', mode: 'accept-edits', createdAt: NOW,
+                  missionId, runId: 'run_convo', runtime, model: 'account-default', mode: 'accept-edits', createdAt: NOW, prompt: 'Add a rename command, with tests.',
                   ...(resumed === undefined ? {} : { continuesFrom: { missionId: 'mission_before', checkpointEpoch: 1, reason: 'follow-up', runtimeThreadId: resumed } })
                 },
                 phase: 'running',
@@ -135,6 +135,17 @@ describe('a question on the side', () => {
     expect((await ask()).ok).toBe(true)
     const args = spawned[0]!.args
     expect(args.slice(args.indexOf('--resume'), args.indexOf('--resume') + 3)).toEqual(['--resume', 'sess-0', '--fork-session'])
+  })
+
+  it('is told what the running turn was asked, when its copy ends before that turn (0.515)', async () => {
+    // A pass on 0.512, asked on the side mid-rename: "this conversation itself never discussed a rename".
+    const running = service('claude', undefined, 'sess-0')
+    expect((await running.ask()).ok).toBe(true)
+    expect(running.spawned[0]!.prompt).toContain("The conversation's latest turn is still running, and your copy of the conversation ends before it. That turn was asked:\n\nAdd a rename command, with tests.")
+    // A turn with its own session: the copy holds it already, and nothing is added.
+    const settled = service('claude', 'sess-1')
+    expect((await settled.ask()).ok).toBe(true)
+    expect(settled.spawned[0]!.prompt).not.toContain('still running')
   })
 
   it('is refused, not asked of the conversation, when there is no session to copy', async () => {

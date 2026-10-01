@@ -99,7 +99,7 @@ import type { PaletteAction } from './components/CommandPalette.js'
 import { IdleTeammate } from './components/IdleTeammate.js'
 import { Inspector } from './components/Inspector.js'
 import { FileViewer } from './components/FileViewer.js'
-import { MissionsScreen, SettingsScreen, TeammatesScreen, UpdateBanner } from './components/Screens.js'
+import { MacUpdateBanner, MissionsScreen, SettingsScreen, TeammatesScreen, UpdateBanner } from './components/Screens.js'
 import { WhatsNewSplash } from './components/WhatsNew.js'
 import type { SettingsPageId } from './settingsPages.js'
 import type { ComparePick, ComparePicking, RouteChoice } from './components/RoutePicker.js'
@@ -715,6 +715,21 @@ export default function App(): ReactElement {
   const [build, setBuild] = useState<{ readonly version: string; readonly packaged: boolean; readonly platform: string }>()
   const [storage, setStorage] = useState<PublicStorageReport>()
   const [update, setUpdate] = useState<AppUpdateState>()
+  /*
+   * A newer Locust for this Mac (0.515): asked at launch and every six hours.
+   * The host answers only on a packaged Mac build; anywhere else, nothing.
+   */
+  const [macRelease, setMacRelease] = useState<{ readonly version: string; readonly url: string }>()
+  useEffect(() => {
+    const bridge = window.desktop
+    if (bridge?.macRelease === undefined || !/Macintosh|Mac OS X/.test(navigator.userAgent)) return
+    const ask = (): void => {
+      void bridge.macRelease().then(setMacRelease).catch(() => undefined)
+    }
+    ask()
+    const timer = window.setInterval(ask, 6 * 60 * 60 * 1000)
+    return () => window.clearInterval(timer)
+  }, [])
   const [rowMenu, setRowMenu] = useState<ContextMenuState>()
   const [rowMenuArmed, setRowMenuArmed] = useState<string>()
 
@@ -3690,8 +3705,16 @@ export default function App(): ReactElement {
         return
       }
       replaceCompare(answer.data.compare)
-      const newest = answer.data.compare.slots.find((column) => column.slot === slot)?.missionIds.at(-1)
+      const kept = answer.data.compare.slots.find((column) => column.slot === slot)
+      const newest = kept?.missionIds.at(-1)
       if (newest !== undefined) openMission(newest)
+      /*
+       * KEPT MEANS CARRIED ON WITH (0.515). A pass on 0.512 kept Longcat's
+       * answer: the header said Longcat, the chat box said the teammate's
+       * Mimo, and the next message went to Mimo as "a fresh session". The
+       * kept column's model is the one the conversation now continues on.
+       */
+      if (kept !== undefined) changeRoute({ runtime: kept.route.runtime as MissionRuntimeId, model: kept.route.model })
       setComparingId(undefined)
     } finally {
       setKeepingCompare(false)
@@ -7557,6 +7580,9 @@ export default function App(): ReactElement {
             * mid-run anyway. It is there again the moment the run ends.
             */}
           {screen === 'workroom' && !running && <UpdateBanner update={update} onInstall={installUpdate} />}
+          {screen === 'workroom' && !running && (
+            <MacUpdateBanner release={macRelease} onDownload={(url) => void window.desktop?.openLink(url).catch(() => undefined)} />
+          )}
           {screen === 'workroom' && (
           <Composer
             metal={metal}

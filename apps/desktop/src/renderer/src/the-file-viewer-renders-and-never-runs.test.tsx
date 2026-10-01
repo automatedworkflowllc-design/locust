@@ -92,7 +92,9 @@ describe('the file viewer', () => {
      */
     const html = viewer({ text: 'notes', mode: 'markdown' })
     expect(html).toContain('lc-viewer__register')
-    expect(html).toContain('Locust does not open files')
+    // Said as what it does (0.515): shown here, never launched -- not "does not open", under a file it opened.
+    expect(html).toContain('Shown here only: Locust never runs a file a teammate made, or opens it in another app.')
+    expect(html).not.toContain('Locust does not open files')
   })
 
   it('names the file by its own name and keeps the whole path reachable', () => {

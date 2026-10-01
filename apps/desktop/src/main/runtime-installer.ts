@@ -86,6 +86,13 @@ export interface RuntimeInstallerOptions {
    */
   readonly nowInstalled?: (runtime: string) => Promise<boolean>
   /**
+   * Off Windows: where an install goes when npm's global folder is not this
+   * user's to write (0.515) -- `~/.npm-global`, absolute.
+   */
+  readonly userPrefix?: string
+  /** Test seam: the platform the install is on. Absent: this one. */
+  readonly platform?: NodeJS.Platform
+  /**
    * The npm to use when the machine has none of its own.
    *
    * Absent means "there is nothing to fall back to", which is the state
@@ -424,7 +431,21 @@ export function createRuntimeInstaller(options: RuntimeInstallerOptions = {}): R
         // Split from the same string the screen showed, so the argv and the
         // displayed line cannot drift apart.
         const [command, ...args] = line.split(' ')
-        const { code, output } = await runInstall(command ?? 'npm', args, facts.install.packageName, (said) => onLine({ line: said }))
+        let { code, output } = await runInstall(command ?? 'npm', args, facts.install.packageName, (said) => onLine({ line: said }))
+        /*
+         * A FOLDER OF THEIR OWN, WITHOUT BEING ASKED (0.515). A tester's
+         * Mac, 2026-10-01: npm's global folder is /usr/local, which is the
+         * system's, so every Install ended in EACCES and a card of commands
+         * to type -- "it pops up everytime he tries to access the clis".
+         * Off Windows, a permission failure is tried once more into
+         * ~/.npm-global, the folder npm's own advice names and the Mac
+         * locator already searches (mac-path.ts). Said in the output.
+         */
+        const platform = options.platform ?? process.platform
+        if (code !== 0 && platform !== 'win32' && options.userPrefix !== undefined && PERMISSION.test(output) && safeToSpawn(options.userPrefix)) {
+          onLine({ line: `npm's global folder belongs to the system; installing into ${options.userPrefix} instead.` })
+          ;({ code, output } = await runInstall(command ?? 'npm', [...args, '--prefix', options.userPrefix], facts.install.packageName, (said) => onLine({ line: said })))
+        }
         const seconds = Math.max(1, Math.round((Date.now() - startedAt) / 1000))
         if (code !== 0) {
           return classifyInstallFailure({

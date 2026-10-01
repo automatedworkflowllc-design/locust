@@ -180,6 +180,8 @@ interface ActiveCodexMission {
  */
 export const SIDE_QUESTION_PREFACE =
   'This is a side question from the person, asked on a copy of this conversation while the conversation itself carries on. Answer it from what you already know and what you can read. Change nothing and start nothing.'
+/** How much of a running turn's ask a side question carries (0.515): enough to know the task. */
+export const SIDE_RUNNING_ASK_CHARS = 2_000
 
 export interface CodexMissionService {
   start(
@@ -1344,6 +1346,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // from the durable record of THAT mission, never from the renderer:
         // the renderer names a mission, and the host decides what that means.
         let resumeThreadId: string | undefined
+        /** A side question's running turn, when its copy predates it (0.515). */
+        let sideRunningAsk: string | undefined
         let resumedMissionId: string | undefined
         /*
          * A SIDE QUESTION forks the conversation's latest session, read-only,
@@ -1384,6 +1388,15 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             return error('RUNTIME_START_FAILED', 'This conversation has no session to ask about yet. Ask again once its reply has started.') as CodexMissionStartResponse
           }
           resumeThreadId = forkedThread
+          /*
+           * THE TURN STILL RUNNING IS SAID (0.515). Copied from the session
+           * it resumed, the side copy holds the conversation up to the turn
+           * BEFORE the running one -- a pass on 0.512 asked on the side
+           * during a rename and was told "this conversation itself never
+           * discussed a rename". When the turn has no session of its own yet,
+           * what it was asked goes with the question.
+           */
+          if (runtimeThreadIdOf(forked) === undefined) sideRunningAsk = forked.metadata.prompt
         }
         // Whether the session being resumed compacted during that turn: then
         // it holds a summary, not the brief, and this turn is briefed in full.
@@ -1876,8 +1889,12 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // whole (briefSessions.after finds nothing for this one).
         if (side !== undefined) {
           // The forked session already holds the brief and the whole
-          // conversation; it is told only what this is.
-          runtimePrompt = `${SIDE_QUESTION_PREFACE}
+          // conversation; it is told only what this is -- and, when the
+          // copy predates it, what the turn still running was asked (0.515).
+          const running = sideRunningAsk === undefined
+            ? ''
+            : `\n\nThe conversation's latest turn is still running, and your copy of the conversation ends before it. That turn was asked:\n\n${sideRunningAsk.trim().length > SIDE_RUNNING_ASK_CHARS ? `${sideRunningAsk.trim().slice(0, SIDE_RUNNING_ASK_CHARS)}\u2026` : sideRunningAsk.trim()}`
+          runtimePrompt = `${SIDE_QUESTION_PREFACE}${running}
 
 ${sentPrompt.trim()}`
         } else if (bare) {
