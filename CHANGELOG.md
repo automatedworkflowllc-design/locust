@@ -11,6 +11,31 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.517.0 - 2026-10-01
+
+### New
+
+- **Word and PowerPoint files open in Locust.** A `.docx` or `.pptx` a
+  teammate makes now opens in the file viewer as what it says: headings,
+  paragraphs, lists and tables, and a deck slide by slide under each title.
+  It is a reading view: pictures and layout are not shown, and nothing in the
+  file runs.
+- **Routines can run on set days, or once.** Next to "Every few hours" and
+  "Daily at a time", a routine can run on the days you pick (Monday to
+  Friday to begin with) or once, at a date and time. A day missed while
+  Locust was closed runs once the next time it is open.
+
+### Improved
+
+- **An earlier version of a document reads as the document.** In the file
+  viewer, pressing a turn's number shows the file as it was after that turn,
+  not a list of changed lines; what that turn changed is one press away.
+  When the record cannot rebuild a version exactly, it shows the change and
+  says why.
+- **"Use a free model" picks one that works here.** It, and Compare's second
+  free model, now prefer the free model that last answered on this machine.
+  The first free model in OpenCode's list can be down for a whole day.
+
 ## 0.516.0 - 2026-10-01
 
 ### Added
