@@ -5,6 +5,9 @@ import { isAbsolute, join } from 'node:path'
 
 import type { PublicRoutine, RoutineHandOff, TeammateRoute } from '../shared/ipc.js'
 import { validSchedule } from '../shared/routine-schedule.js'
+
+/** Every shape a schedule may take, said when one does not read (0.522). */
+const SCHEDULE_REFUSAL = 'The schedule is not one Locust can keep: every 1 to 168 hours, daily or on set days at HH:MM, once at a date and time, or on a new file in a folder inside the project.'
 import { isTeammateRoute, safeId } from './teammate-store.js'
 import type { RoutineExecution } from '../shared/routine-recovery.js'
 import { routineAwaitsReview } from '../shared/routine-recovery.js'
@@ -307,7 +310,7 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
         if (tooLongToSave !== undefined) throw new Error(tooLongToSave)
         if (!validLearnedFrom(input.learnedFrom)) throw new Error('Routine provenance is invalid')
         if (input.schedule !== undefined && !validSchedule(input.schedule)) {
-          throw new Error('The schedule is not one Locust can keep: every 1 to 168 hours, or daily at HH:MM.')
+          throw new Error(SCHEDULE_REFUSAL)
         }
         if (input.handOffs !== undefined && !validHandOffs(input.handOffs, input.steps.length)) throw new Error('Who takes each step does not line up with the steps')
         const handOffs = input.handOffs === undefined ? undefined : keptHandOffs(input.handOffs, input.teammateId)
@@ -347,7 +350,7 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
         const held = file.routines.find((routine) => routine.routineId === input.routineId)
         if (held === undefined) throw new Error('Routine not found')
         if (input.schedule !== undefined && input.schedule !== null && !validSchedule(input.schedule)) {
-          throw new Error('The schedule is not one Locust can keep: every 1 to 168 hours, or daily at HH:MM.')
+          throw new Error(SCHEDULE_REFUSAL)
         }
         if (input.handOffs !== undefined && !validHandOffs(input.handOffs, input.steps.length)) throw new Error('Who takes each step does not line up with the steps')
         const { schedule: _held, handOffs: heldHandOffs, ...rest } = held

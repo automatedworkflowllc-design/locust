@@ -78,7 +78,7 @@ try {
   await sleep(2500)
   check('Save opens the dialog', await drive.evaluate(openSave(0)) === true)
   const seen = JSON.parse(String(await drive.capture('the schedule choices', () => drive.evaluate(choices))))
-  check('five choices: Run, every few hours, daily, set days, once', JSON.stringify(seen.labels) === JSON.stringify(['Only when I press Run', 'Every few hours', 'Daily at a time', 'On set days', 'Once']), JSON.stringify(seen.labels))
+  check('six choices: Run, every few hours, daily, set days, once, a new file', JSON.stringify(seen.labels) === JSON.stringify(['When I press Run', 'Every few hours', 'Daily', 'On set days', 'Once', 'On a new file']), JSON.stringify(seen.labels))
   check('they fit the dialog, on one line', seen.spill <= 0 && seen.wrapped === 1, JSON.stringify(seen))
 
   await drive.evaluate(pick('On set days'))
@@ -104,6 +104,16 @@ try {
   const onceSaved = JSON.parse(String(await drive.capture('Once, saved', () => drive.evaluate(save))))
   check('saved, the row reads once, the day, and next tomorrow', !onceSaved.open && onceSaved.rows.some((row) => /once, \w{3} \w{3} \d{1,2} at 09:00 · next tomorrow 09:00/.test(row)), JSON.stringify(onceSaved.rows))
 
+  // On a new file (0.522): the folder, inbox to begin with, and what it does, said.
+  check('Edit opens it for a new file', await drive.evaluate(openEdit) === true)
+  await drive.evaluate(pick('On a new file'))
+  const watch = JSON.parse(String(await drive.capture('On a new file: the folder', () => drive.evaluate(`JSON.stringify({
+    folder: document.querySelector('.lc-dialog input[aria-label="The folder it watches"]')?.value ?? '',
+    note: document.querySelector('.lc-dialog')?.innerText.replace(/\\s+/g, ' ') ?? ''
+  })`))))
+  check('it watches inbox to begin with, and says what a file there does', watch.folder === 'inbox' && /A file that lands there starts a run once it stops changing, up to six an hour/.test(watch.note) && /It reads the file and changes nothing/.test(watch.note), JSON.stringify(watch).slice(0, 300))
+  const watched = JSON.parse(String(await drive.capture('On a new file, saved', () => drive.evaluate(save))))
+  check('saved, the row says it watches', !watched.open && watched.rows.some((row) => /when a new file arrives in inbox · watching/.test(row)), JSON.stringify(watched.rows))
   await drive.resize(1120, 760)
   await sleep(1200)
   check('Edit opens at 1120', await drive.evaluate(openEdit) === true)

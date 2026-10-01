@@ -17,6 +17,14 @@ export type RoutineSchedule =
   | { readonly kind: 'weekly'; readonly days: readonly number[]; readonly at: string }
   /** `on`: a local date and time, `YYYY-MM-DDTHH:MM`, as a datetime-local input gives it. */
   | { readonly kind: 'once'; readonly on: string }
+  /**
+   * When a new file arrives in a folder inside the project (0.522, folder
+   * watchers): `folder` is relative to the project folder ("inbox"). The
+   * host watches it (main/routine-file-watch.ts); a run starts once a new
+   * file has stopped changing, names the file to step 1, and -- a routine
+   * always runs in Ask -- reads it and changes nothing.
+   */
+  | { readonly kind: 'files'; readonly folder: string }
 
 export const EVERY_HOURS_CHOICES = [1, 2, 4, 8, 12, 24] as const
 export const MAX_EVERY_HOURS = 168
@@ -59,7 +67,21 @@ export function validSchedule(value: unknown): value is RoutineSchedule {
   if (record.kind === 'once') {
     return typeof record.on === 'string' && onceMoment(record.on) !== undefined
   }
+  if (record.kind === 'files') {
+    return typeof record.folder === 'string' && watchedFolderValid(record.folder)
+  }
   return false
+}
+
+/**
+ * A watched folder: inside the project, named relative to it, one or more
+ * plain names -- never `..`, a drive, an absolute path, or a name Windows
+ * refuses. The project folder itself is not offered: a teammate's own work
+ * there would start the routine again.
+ */
+export function watchedFolderValid(folder: string): boolean {
+  const parts = folder.replace(/\\/g, '/').split('/').filter((part) => part.length > 0)
+  return folder.length <= 200 && parts.length > 0 && parts.every((part) => part !== '.' && part !== '..' && !/[<>:"|?*\u0000-\u001f]/.test(part)) && !/^([A-Za-z]:|\/|\\)/.test(folder)
 }
 
 const slotOn = (now: Date, dayOffset: number, at: string): Date => {
@@ -91,6 +113,8 @@ export function nextRunAfter(schedule: RoutineSchedule, lastRunAt: string, now: 
     const due = new Date(last.getTime() + schedule.hours * 3_600_000)
     return due.getTime() <= now.getTime() ? now : due
   }
+  // A file arriving is not a time: the runner asks the watcher instead (0.522).
+  if (schedule.kind === 'files') return undefined
   if (schedule.kind === 'once') {
     const moment = onceMoment(schedule.on)
     if (moment === undefined || last.getTime() >= moment.getTime()) return undefined
@@ -137,6 +161,7 @@ export function scheduleLabel(schedule: RoutineSchedule | undefined): string {
   if (schedule === undefined) return 'when you press Run'
   if (schedule.kind === 'every') return schedule.hours === 1 ? 'every hour' : `every ${String(schedule.hours)} hours`
   if (schedule.kind === 'weekly') return `${daysLabel(schedule.days)} at ${schedule.at}`
+  if (schedule.kind === 'files') return `when a new file arrives in ${schedule.folder.replace(/\\/g, '/')}`
   if (schedule.kind === 'once') {
     const moment = onceMoment(schedule.on)
     if (moment === undefined) return 'once'

@@ -83,7 +83,7 @@ try {
   })()`))))
   say(`  saved: ${JSON.stringify(saved).slice(0, 600)}`)
   check('saving closes the dialog and lists the routine', !saved.dialog && saved.rows.length === 1, JSON.stringify(saved.rows))
-  check('Daily was chosen, and the row says it runs daily', /Daily at a time=true/.test(saved.chosen) && /daily|09:00/i.test(saved.rows[0] ?? ''), `${saved.chosen} || ${saved.time} || ${saved.rows[0]}`)
+  check('Daily was chosen, and the row says it runs daily', /Daily( at a time)?=true/.test(saved.chosen) && /daily|09:00/i.test(saved.rows[0] ?? ''), `${saved.chosen} || ${saved.time} || ${saved.rows[0]}`)
 
   const ran = JSON.parse(String(await drive.capture('Run now: started', () => drive.evaluate(`(async () => {
     const row = document.querySelector('.lc-routinerow:not(.lc-routineadd)')

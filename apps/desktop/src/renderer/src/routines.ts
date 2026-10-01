@@ -187,6 +187,8 @@ export function routineScheduleSummary(
   if (routine.schedule === undefined) return undefined
   if (routine.execution !== undefined && routine.execution.status !== 'abandoned') return `${scheduleLabel(routine.schedule)} · ${routine.execution.status === 'running' ? 'in progress' : 'held for review; no automatic retry'}`
   const next = nextRunAfter(routine.schedule, routine.lastRunAt ?? routine.createdAt, now)
+  // A watcher has no next time: it is waiting for a file (0.522).
+  if (routine.schedule.kind === 'files') return `${scheduleLabel(routine.schedule)} · watching`
   // A once that has run: said, so the card does not promise a run that will not come.
   if (next === undefined) return `${scheduleLabel(routine.schedule)} · done`
   const when =

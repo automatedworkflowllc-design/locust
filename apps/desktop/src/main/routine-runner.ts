@@ -4,6 +4,8 @@ import type { RecoveredMissionPhase } from '@teammate/mission-store'
 import type { CodexMissionStartResponse, CodexMissionUpdate, MissionMode, PublicRoutine, RoutineHandOff, RoutineRunResponse, TeammateRoute } from '../shared/ipc.js'
 import { handOffPrompt, verdictOf } from '../shared/hand-off.js'
 import { isDue } from '../shared/routine-schedule.js'
+import { arrivalNote } from './routine-file-watch.js'
+import type { FileArrivals } from './routine-file-watch.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 import { randomUUID } from 'node:crypto'
 import type { RoutineExecution, RoutineRecoveryRequest, RoutineRecoveryResponse } from '../shared/routine-recovery.js'
@@ -68,6 +70,8 @@ export interface RoutineRunnerOptions {
    * tell them apart.
    */
   readonly isLive?: (missionId: string) => boolean
+  /** New files for routines that run "on a new file" (0.522, routine-file-watch.ts). */
+  readonly arrivals?: Pick<FileArrivals, 'ready' | 'fired'>
   /**
    * Whether that turn ended by ASKING the person something.
    *
@@ -103,7 +107,8 @@ export interface RoutineProgress {
 export interface RoutineRunner {
   reconcile(): Promise<void>
   recover(request: RoutineRecoveryRequest): Promise<RoutineRecoveryResponse>
-  run(routineId: string): Promise<RoutineRunResponse>
+  /** `arrived`: the new files a watching routine runs for (0.522), named to step 1. */
+  run(routineId: string, arrived?: { readonly folder: string; readonly files: readonly string[] }): Promise<RoutineRunResponse>
   /** Any run ending, however it ended. Only a routine's own current step moves it. */
   onRunEnded(mission: { readonly missionId: string }): Promise<void>
   running(): readonly RoutineProgress[]
@@ -299,9 +304,12 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
     step: number,
     followUpOf: string | undefined,
     /** The step before, when this one goes to another teammate or checks it (0.435). */
-    handedFrom?: { readonly missionId: string; readonly name: string }
+    handedFrom?: { readonly missionId: string; readonly name: string },
+    /** The new files a watching routine runs for, said before step 1's own words (0.522). */
+    arrived?: { readonly folder: string; readonly files: readonly string[] }
   ): Promise<CodexMissionStartResponse> => {
-    const prompt = routine.steps[step - 1]
+    const saved = routine.steps[step - 1]
+    const prompt = saved === undefined || arrived === undefined || step !== 1 ? saved : `${arrivalNote(arrived.folder, arrived.files)}\n\n${saved}`
     if (prompt === undefined) {
       return { ok: false, error: { code: 'RUNTIME_START_FAILED', message: `Routine has no step ${String(step)}.` } }
     }
@@ -499,7 +507,7 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       changed()
       return { ok: true }
     },
-    async run(routineId) {
+    async run(routineId, arrived) {
       await reconcile()
       const routine = await options.routines.get(routineId)
       if (routine === undefined) {
@@ -540,12 +548,17 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
         if (owner === first || await options.peerContextFor(owner) !== undefined) continue
         return { ok: false, error: { code: 'ROUTINE_REJECTED', message: removedStepSaying(routine, step) } }
       }
-      const response = await startStep(routine, peer, 1, undefined)
+      const response = await startStep(routine, peer, 1, undefined, undefined, arrived)
       if (!response.ok) {
         return { ok: false, error: { code: 'ROUTINE_REJECTED', message: response.error.message } }
       }
       await options.assignOwner(peer.self.teammateId, response.data.missionId).catch(() => undefined)
       const progress = announce(routine, peer, 1, response)
+      // What started it, said: the bubble shows the saved step, not the note the run was given (0.522).
+      if (arrived !== undefined) {
+        const named = arrived.files.map((name) => `${arrived.folder.replace(/\\/g, '/')}/${name}`).join(', ')
+        notice(progress, `Started because ${arrived.files.length === 1 ? 'a new file' : `${String(arrived.files.length)} new files`} arrived: ${named}.`, 'info')
+      }
       if (routine.steps.length > 1) {
         notice(progress, `Routine "${routine.name}" · step 1 of ${String(routine.steps.length)}. Each next step starts when this one completes.`, 'info')
       }
@@ -683,7 +696,9 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       for (const routine of all) {
         if (routine.execution !== undefined && routine.execution.status !== 'abandoned') continue
         if (routine.schedule === undefined) continue
-        if (!isDue(routine.schedule, routine.lastRunAt ?? routine.createdAt, now)) continue
+        // On a new file (0.522): due when the watcher has settled files for it and its hour is not full.
+        const arrivedFiles = routine.schedule.kind === 'files' ? options.arrivals?.ready(routine.routineId, now.getTime()) ?? [] : []
+        if (routine.schedule.kind === 'files' ? arrivedFiles.length === 0 : !isDue(routine.schedule, routine.lastRunAt ?? routine.createdAt, now)) continue
         // M15: on its own, only in the folder it was made in. A routine made
         // for project A replayed its steps, in its write mode, in project B.
         const home = await (options.homeOf ?? (async (entry: PublicRoutine) => entry.workspaceId))(routine).catch(() => undefined)
@@ -695,9 +710,10 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
         const first = ownerOf(routine, 1)
         if ([...active.values()].some((progress) => progress.teammateId === first)) continue
         if (options.teammateBusy !== undefined && (await options.teammateBusy(first).catch(() => true))) continue
-        const response = await this.run(routine.routineId)
+        const response = await this.run(routine.routineId, routine.schedule.kind === 'files' ? { folder: routine.schedule.folder, files: arrivedFiles } : undefined)
         if (response.ok) {
           started.push(routine.routineId)
+          if (routine.schedule.kind === 'files') options.arrivals?.fired(routine.routineId, arrivedFiles, now.getTime())
         } else if (isAtCapacity(response.error.message)) {
           /*
            * The workspace being full is a WAIT, exactly like the teammate

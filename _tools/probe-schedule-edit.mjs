@@ -131,7 +131,7 @@ try {
   say('3. switch to daily at 07:30 and save')
   const daily = await evaluate(`(async () => {
     const dialog = document.querySelector('[role=dialog][aria-label="Edit routine"]')
-    const choice = [...dialog.querySelectorAll('[role=radio]')].find(b => /Daily at a time/.test(b.innerText))
+    const choice = [...dialog.querySelectorAll('[role=radio]')].find(b => /^Daily( at a time)?$/.test(b.innerText.trim()))
     choice.click()
     await new Promise(r => setTimeout(r, 300))
     const time = dialog.querySelector('input[aria-label="Time of day"]')
@@ -162,7 +162,7 @@ try {
   const again = await openEdit()
   const pressed = await evaluate(`(async () => {
     const dialog = document.querySelector('[role=dialog][aria-label="Edit routine"]')
-    const choice = [...dialog.querySelectorAll('[role=radio]')].find(b => /Daily at a time/.test(b.innerText))
+    const choice = [...dialog.querySelectorAll('[role=radio]')].find(b => /^Daily( at a time)?$/.test(b.innerText.trim()))
     choice.click()
     await new Promise(r => setTimeout(r, 200))
     const time = dialog.querySelector('input[aria-label="Time of day"]')
@@ -178,10 +178,10 @@ try {
   const second = await openEdit()
   let p2 = {}
   try { p2 = JSON.parse(String(second)) } catch { /* below */ }
-  check('"Daily at a time" is checked and the time reads 07:30', p2.checked?.[0] === 'Daily at a time' && p2.time === '07:30', String(second))
+  check('"Daily at a time" is checked and the time reads 07:30', /^Daily( at a time)?$/.test(p2.checked?.[0] ?? '') && p2.time === '07:30', String(second))
   const off = await evaluate(`(async () => {
     const dialog = document.querySelector('[role=dialog][aria-label="Edit routine"]')
-    const choice = [...dialog.querySelectorAll('[role=radio]')].find(b => /Only when I press Run/.test(b.innerText))
+    const choice = [...dialog.querySelectorAll('[role=radio]')].find(b => /^(Only when|When) I press Run$/.test(b.innerText.trim()))
     choice.click()
     await new Promise(r => setTimeout(r, 300))
     const note = [...dialog.querySelectorAll('p')].some(p => /Only while Locust is open/.test(p.innerText))

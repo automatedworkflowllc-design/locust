@@ -23,6 +23,7 @@ import { bringInCopy, COPY_ROOT, copyLineChanges, copyRefusal, makeCompareCopy, 
 import type { CompareSlotId, PublicCompare, PublicCompareSlot } from '../shared/compare.js'
 import { createCompareStore } from './compare-store.js'
 import { createApprovalRuleStore } from './approval-rule-store.js'
+import { createFileArrivals, POLL_MS } from './routine-file-watch.js'
 import { decideByRules, ruleCandidateOf, ruledActionOf, ruleSentence } from '../shared/approval-rules.js'
 import { judgePrompt } from './compare-judge.js'
 import type { JudgedAnswer } from './compare-judge.js'
@@ -2788,7 +2789,10 @@ if (!ownsSingleInstanceLock) {
     const rooms = createRoomStore({ rootDirectory: app.getPath('userData') })
     // Comparisons (0.441, shared/compare.ts), kept beside the rooms, outside the ledger.
     const compares = createCompareStore({ rootDirectory: app.getPath('userData') })
+    // Folder watchers (0.522): routines that run on a new file, polled, inside the project folder.
+    const fileArrivals = createFileArrivals({ get projectFolder() { return workspacePath } })
     routineRunner = createRoutineRunner({
+      arrivals: fileArrivals,
       // Read live (0.458): the folder the window is in now.
       get workspaceId() {
         return memoryWorkspaceId
@@ -2883,6 +2887,26 @@ if (!ownsSingleInstanceLock) {
     firstRoutineTick.unref()
     const routineTicks = setInterval(tickRoutines, ROUTINE_TICK_MS)
     routineTicks.unref()
+    /*
+     * The watched folders (0.522): looked at every POLL_MS; a routine with a
+     * settled new file starts on a tick at once rather than within the minute.
+     */
+    const pollWatchedFolders = (): void => {
+      if (!workspaceChosen || routineRunner === undefined) return
+      void (async () => {
+        const all = await routines.list().catch(() => [])
+        const watching = all.flatMap((routine) =>
+          routine.schedule?.kind === 'files' && (routine.workspaceId === undefined || routine.workspaceId === memoryWorkspaceId)
+            ? [{ routineId: routine.routineId, folder: routine.schedule.folder }]
+            : []
+        )
+        if (watching.length === 0) return
+        await fileArrivals.poll(watching)
+        if (watching.some((entry) => fileArrivals.ready(entry.routineId).length > 0)) tickRoutines()
+      })().catch(() => undefined)
+    }
+    const folderPolls = setInterval(pollWatchedFolders, POLL_MS)
+    folderPolls.unref()
     app.once('before-quit', () => {
       clearTimeout(firstRoutineTick)
       clearInterval(routineTicks)

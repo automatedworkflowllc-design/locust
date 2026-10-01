@@ -3,7 +3,7 @@ import type { ReactElement } from 'react'
 import { useModal } from '../useModal.js'
 
 import type { PublicTeammate, RoutineHandOff, RoutineSchedule } from '../../../shared/ipc.js'
-import { EVERY_HOURS_CHOICES, onceMoment, WEEKDAYS_ONLY } from '../../../shared/routine-schedule.js'
+import { EVERY_HOURS_CHOICES, onceMoment, watchedFolderValid, WEEKDAYS_ONLY } from '../../../shared/routine-schedule.js'
 import { stepTooLongNotice } from '../../../shared/step-budget.js'
 import { MAX_ROUTINE_STEPS } from '../routines.js'
 import { TeammateBot } from './TeammateBot.js'
@@ -101,6 +101,8 @@ export function RoutineDialog({
     initialSteps.map((_, index) => initialHandOffs?.[index] ?? {})
   )
   const [schedule, setSchedule] = useState<RoutineSchedule | undefined>(initialSchedule)
+  // The watched folder as typed, kept while it is not yet a valid one (0.522).
+  const [filesFolder, setFilesFolder] = useState(initialSchedule?.kind === 'files' ? initialSchedule.folder : 'inbox')
   // Nobody is picked to begin with: a default here would put a teammate's
   // name on work they were never part of, which is the one thing the whole
   // ownerless path exists to avoid.
@@ -334,11 +336,13 @@ export function RoutineDialog({
               <div className="lc-segmented" role="radiogroup" aria-labelledby="routine-schedule-label">
                 {(
                   [
-                    ['off', 'Only when I press Run'],
+                    // Shorter since 0.522, so seven fit on one line in the dialog.
+                    ['off', 'When I press Run'],
                     ['every', 'Every few hours'],
-                    ['daily', 'Daily at a time'],
+                    ['daily', 'Daily'],
                     ['weekly', 'On set days'],
-                    ['once', 'Once']
+                    ['once', 'Once'],
+                    ['files', 'On a new file']
                   ] as const
                 ).map(([kind, label]) => (
                   <button
@@ -361,7 +365,9 @@ export function RoutineDialog({
                               ? { kind: 'weekly', days: WEEKDAYS_ONLY, at: '09:00' }
                               : kind === 'once'
                                 ? { kind: 'once', on: tomorrowAtNine() }
-                                : { kind: 'daily', at: '09:00' }
+                                : kind === 'files'
+                                  ? { kind: 'files', folder: 'inbox' }
+                                  : { kind: 'daily', at: '09:00' }
                       )
                     }}
                   >
@@ -435,6 +441,29 @@ export function RoutineDialog({
                     }}
                   />
                 </label>
+              </div>
+            )}
+            {schedule?.kind === 'files' && (
+              <div className="lc-routinesched lc-routinesched__days">
+                <label className="lc-routinesched__detail lc-mono">
+                  in the folder
+                  <input
+                    className="lc-input lc-routinesched__pick"
+                    aria-label="The folder it watches"
+                    value={filesFolder}
+                    onChange={(event) => {
+                      setFilesFolder(event.target.value)
+                      if (watchedFolderValid(event.target.value.trim())) setSchedule({ kind: 'files', folder: event.target.value.trim() })
+                    }}
+                  />
+                </label>
+                {!watchedFolderValid(filesFolder.trim()) && (
+                  <span className="lc-routinesched__detail lc-mono">A folder inside the project, by name, such as inbox.</span>
+                )}
+                <p className="lc-dialog__note lc-mono">
+                  A file that lands there starts a run once it stops changing, up to six an hour, and the run is told its name.
+                  What is there already starts nothing. It reads the file and changes nothing, as every routine runs in Ask.
+                </p>
               </div>
             )}
             {schedule?.kind === 'once' && (
