@@ -11,6 +11,20 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.525.0 - 2026-10-01
+
+### Fixed
+
+- **A teammate's card no longer says "not run yet" beside its last run.**
+  On the Team screen a teammate without a model of its own read "not run
+  yet" right next to "last run 5 minutes ago"; it now says it runs on the
+  model you pick.
+- **Plainer words in a few more places.** The conversation list says "all
+  readable" instead of "ledger readable"; Swarm and Auto mode in Settings
+  speak of models and the project folder rather than routes and the
+  workspace; Rooms says each teammate answers on their own AI agent and
+  model.
+
 ## 0.524.0 - 2026-10-01
 
 ### Fixed
