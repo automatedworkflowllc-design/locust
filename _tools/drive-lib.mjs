@@ -498,7 +498,7 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
         const control = [...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')
         if (!control || control.disabled) return ''
         const text = control.innerText.replace(/\\s+/g, ' ').trim()
-        return /^no runtime$/i.test(text) ? '' : text
+        return /^no (runtime|ai agent)$/i.test(text) ? '' : text
       })()`)
       /*
        * The word, not the model id. The picker reads as NAMES since 0.196.0,

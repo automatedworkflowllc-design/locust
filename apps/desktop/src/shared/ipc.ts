@@ -987,6 +987,14 @@ export type CompareChangesResponse =
   | { readonly ok: true; readonly data: { readonly columns: Partial<Record<CompareSlotId, { readonly files: number; readonly added?: number; readonly removed?: number }>> } }
   | { readonly ok: false; readonly error: { readonly code: 'COMPARE_REFUSED'; readonly message: string } }
 export const COMPARE_LIST_CHANNEL = 'compare:list'
+/** Ask a judge for its view of the answers (0.520, main/compare-judge.ts). */
+export const COMPARE_JUDGE_CHANNEL = 'compare:judge'
+export interface CompareJudgeRequest {
+  readonly compareId: string
+  readonly route: { readonly runtime: MissionRuntimeId; readonly model: string; readonly effort?: string; readonly label?: string }
+  /** What the person says a good answer does; optional. */
+  readonly criteria?: string
+}
 export interface CompareStartRequest {
   /** Whose conversation; absent to compare with nobody. */
   readonly teammateId?: string
@@ -2541,6 +2549,8 @@ export type CodexMissionUpdate =
         | { readonly kind: 'compare'; readonly compareId: string; readonly slot: CompareSlotId }
         /** A question on the side of a conversation (0.461): drawn in the side panel, never in the sidebar. */
         | { readonly kind: 'side'; readonly of: string; readonly question: number }
+        /** A comparison's judge (0.520): drawn in the comparison, never as a conversation. */
+        | { readonly kind: 'judge'; readonly compareId: string }
       /**
        * Present when this run is the newest turn of the teammate's hub (see
        * `PublicTeammate.hubMissionId`), so the roster on screen learns it
@@ -3010,6 +3020,8 @@ export interface DesktopApi {
   askCompare(compareId: string, prompt: string): Promise<CompareResponse>
   keepCompare(compareId: string, slot: CompareSlotId): Promise<CompareResponse>
   retryCompare(compareId: string, slot: CompareSlotId): Promise<CompareResponse>
+  /** Ask a judge for its view of a comparison's answers (0.520). */
+  judgeCompare(request: CompareJudgeRequest): Promise<CompareResponse>
   compareChanges(compareId: string): Promise<CompareChangesResponse>
   compareChangesRefusal(): Promise<string | undefined>
   listCompares(): Promise<CompareListResponse>

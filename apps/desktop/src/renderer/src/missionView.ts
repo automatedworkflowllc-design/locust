@@ -4855,6 +4855,8 @@ export type LiveStarter =
   | { readonly kind: 'tag' }
   // A comparison's column (0.441): the person's ask, put to several models at once.
   | { readonly kind: 'compare'; readonly compareId: string; readonly slot: string }
+  // A comparison's judge (0.520): the host's question about the answers, never the person's.
+  | { readonly kind: 'judge'; readonly compareId: string }
 
 /**
  * What the person ASKED FOR, when a button sent a brief in their name (A1.2).

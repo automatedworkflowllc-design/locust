@@ -107,7 +107,7 @@ import type { ComparePick, ComparePicking, RouteChoice } from './components/Rout
 import { CompareView } from './components/CompareView.js'
 import { comparisonOf, foldComparisons } from './compareRows.js'
 import type { CompareColumnView } from './components/CompareView.js'
-import { blindName, changesLine, compareMembership, compareRecord, compareNeedsCopy, compareRefusalOf, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../../shared/compare.js'
+import { blindName, changesLine, compareMembership, compareRecord, compareNeedsCopy, compareRefusalOf, judgeMissionIds, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../../shared/compare.js'
 import type { CompareSlotId, PublicCompare } from '../../shared/compare.js'
 import { folderLabels } from '../../shared/folder-sections.js'
 import { nestedUnder } from '../../shared/nested-conversations.js'
@@ -1612,6 +1612,12 @@ export default function App(): ReactElement {
   const [keepingCompare, setKeepingCompare] = useState(false)
   /** The column being asked again (0.444), while it starts. */
   const [retryingCompare, setRetryingCompare] = useState<CompareSlotId | undefined>(undefined)
+  // A judge being asked, while its run is started (0.520).
+  const [judgingCompare, setJudgingCompare] = useState(false)
+  // Every judge's run: drawn in its comparison, never listed as a conversation (0.520).
+  const judgeIds = useMemo(() => judgeMissionIds(compares), [compares])
+  const isJudgeRun = (startedBy: { readonly kind: string } | undefined, missionId: string | undefined): boolean =>
+    startedBy?.kind === 'judge' || (missionId !== undefined && judgeIds.has(missionId))
   const [compareProblem, setCompareProblem] = useState<string>()
   /** Home's Compare models opens the composer's picker (0.442). */
   const [pickerRequest, setPickerRequest] = useState(0)
@@ -3150,6 +3156,8 @@ export default function App(): ReactElement {
     && ownerOf(liveRun) === pickedTeammate?.teammateId
     // A cloud task does not continue this conversation (Sol's 0.504 pass): no hint about its checkpoint.
     && !cloudOn
+    // Nor does an ask in an undecided comparison: it goes to every column, on its own model (0.520).
+    && !(comparing !== undefined && comparing.kept === undefined)
       // Plain words (0.517): "checkpoint" and "briefed" were the app's, not the person's.
       ? `Your next message goes to ${runtimeNameOf(composerRoute.runtime)} with a summary of this conversation, not ${runtimeNameOf(shownData.runtime)}'s memory of it.`
       : undefined
@@ -3741,6 +3749,23 @@ export default function App(): ReactElement {
   }
 
   /** Ask one column again, on the same model (0.444): a provider that was down gets another go. */
+  /** Ask a judge for its view of the answers (0.520): one read-only run on the model picked. */
+  const judgeCompare = async (compare: PublicCompare, choice: { readonly runtime: MissionRuntimeId; readonly model: string; readonly label: string }, criteria: string): Promise<void> => {
+    const bridge = window.desktop
+    if (!bridge) return
+    setJudgingCompare(true)
+    setCompareProblem(undefined)
+    try {
+      const answer = await bridge.judgeCompare({ compareId: compare.compareId, route: { runtime: choice.runtime, model: choice.model, label: choice.label }, ...(criteria.trim().length === 0 ? {} : { criteria }) }).catch(() => undefined)
+      if (answer === undefined || !answer.ok) {
+        setCompareProblem(answer?.ok === false ? answer.error.message : 'The judge could not be asked. Nothing was started.')
+        return
+      }
+      replaceCompare(answer.data.compare)
+    } finally {
+      setJudgingCompare(false)
+    }
+  }
   const retryCompareColumn = async (compare: PublicCompare, slot: CompareSlotId): Promise<void> => {
     const bridge = window.desktop
     if (!bridge) return
@@ -3759,6 +3784,44 @@ export default function App(): ReactElement {
   }
 
   /** The columns, from the live runs where they are going and the record where they are done. */
+  /** The judge's view of a comparison, from its newest run (0.520). */
+  const judgeViewOf = (compare: PublicCompare): { readonly name: string; readonly running: boolean; readonly answer: string; readonly failed?: string } | undefined => {
+    const judge = compare.judge
+    const missionId = judge?.missionIds.at(-1)
+    if (judge === undefined || missionId === undefined) return undefined
+    const live = [...runs.values()].find((run) => run.data?.missionId === missionId)
+    const recorded = historyById.get(missionId)
+    const events = live !== undefined && live.events.length > 0 ? live.events : recorded?.events ?? []
+    const running = (live !== undefined && liveRunIsActive(live)) || (live === undefined && recorded === undefined)
+    const answer = buildThread(events, { running, mayEdit: false, ...(workspacePath === undefined ? {} : { workspacePath }) })
+      .flatMap((item) => (item.type === 'agent-message' && item.text.trim().length > 0 ? [item.text.trim()] : []))
+      .join('\n\n')
+    const name = judge.route.label ?? routeModelName(judge.route.runtime as MissionRuntimeId, judge.route.model, resolvedModels.get(`${judge.route.runtime}:${judge.route.model}`))
+    if (!running && answer.length === 0) return { name, running, answer, failed: 'The judge did not answer. Ask again, or pick another model.' }
+    return { name, running, answer }
+  }
+  /**
+   * The models a judge can be (0.520): ready ones, a free model that has
+   * answered here first, then the chat box's, then the catalogue -- never
+   * one of the compared models while another can judge (Optima's judges are
+   * not the contestants).
+   */
+  const judgeChoicesFor = (compare: PublicCompare): readonly { readonly key: string; readonly label: string; readonly runtime: MissionRuntimeId; readonly model: string }[] => {
+    const compared = new Set(compare.slots.map((column) => `${column.route.runtime}:${column.route.model}`))
+    const ready = (runtime: string): boolean => runtimes.some((status) => status.id === runtime && status.ready) && compareRefusalOf(runtime) === undefined
+    const picked: { key: string; label: string; runtime: MissionRuntimeId; model: string }[] = []
+    const add = (runtime: MissionRuntimeId, model: string): void => {
+      const key = `${runtime}:${model}`
+      if (picked.some((one) => one.key === key) || !ready(runtime)) return
+      picked.push({ key, runtime, model, label: `${runtimeNameOf(runtime)} / ${routeModelName(runtime, model, resolvedModels.get(key))}` })
+    }
+    for (const model of freeAnswered) add('opencode', model)
+    add(composerRoute.runtime, composerRoute.model)
+    const catalogue = models.filter((model) => model.older !== true && model.own !== true)
+    for (const model of [...catalogue.filter((one) => one.id.endsWith('-free')), ...catalogue.filter((one) => !one.id.endsWith('-free'))]) add(model.runtime, model.id)
+    const others = picked.filter((one) => !compared.has(one.key))
+    return [...others, ...picked.filter((one) => compared.has(one.key))].slice(0, 16)
+  }
   const compareColumnsFor = (compare: PublicCompare): { readonly prompts: readonly string[]; readonly columns: readonly CompareColumnView[] } => {
     const cellOf = (missionId: string) => {
       const live = [...runs.values()].find((run) => run.data?.missionId === missionId)
@@ -5865,8 +5928,8 @@ export default function App(): ReactElement {
       // shows in the thread, which is where a person is looking when it
       // happens; what it must not do is accumulate.
       if (!listedAsMission({ missionId: run.data?.missionId, active: liveRunIsActive(run) })) continue
-      // A question on the side is drawn in its panel, never as a conversation (0.461).
-      if (run.startedBy?.kind === 'side') continue
+      // A question on the side is drawn in its panel, never as a conversation (0.461); a judge in its comparison (0.520).
+      if (run.startedBy?.kind === 'side' || isJudgeRun(run.startedBy, run.data?.missionId)) continue
       // A run that is still starting has no missionId yet; it is listed under
       // its pending key so the teammate reads as working from the first
       // moment, not from the first receipt.
@@ -5948,7 +6011,7 @@ export default function App(): ReactElement {
     }
     for (const mission of history) {
       if (rows.some((row) => row.missionId === mission.missionId)) continue
-      if (mission.startedBy?.kind === 'side') continue
+      if (mission.startedBy?.kind === 'side' || judgeIds.has(mission.missionId)) continue
       // Every folder's conversations, each under its own project (0.458, like
       // Claude Code). This used to drop every other folder's, so a folder
       // switch emptied the sidebar and read as the team being reset (Colin,
@@ -6007,7 +6070,7 @@ export default function App(): ReactElement {
     }
     const parents = nestedUnder(named, sentFrom)
     return named.map((row) => (parents.has(row.missionId) ? { ...row, nestedUnder: parents.get(row.missionId)! } : row))
-  }, [history, historyById, runs, workspaceId, missionTitles, compares])
+  }, [history, historyById, runs, workspaceId, missionTitles, compares, judgeIds])
   const besideRow = besideId === undefined ? undefined : sidebarMissions.find((entry) => (entry.memberIds ?? [entry.missionId]).includes(besideId))
   const besideRun = ((): LiveRunState | undefined => {
     if (besideId === undefined) return undefined
@@ -6389,8 +6452,8 @@ export default function App(): ReactElement {
     for (const run of runs.values()) {
       const data = run.data
       if (data === undefined || !liveRunIsActive(run) || recorded.has(data.missionId)) continue
-      // A side question lives in its panel, not in the list (R33), as in the sidebar.
-      if (run.startedBy?.kind === 'side') continue
+      // A side question lives in its panel, not in the list (R33), as in the sidebar; a judge in its comparison.
+      if (run.startedBy?.kind === 'side' || isJudgeRun(run.startedBy, data.missionId)) continue
       const startedAt = run.startedAtIso ?? run.events[0]?.occurredAt ?? new Date().toISOString()
       live.push({
         missionId: data.missionId,
@@ -6427,9 +6490,9 @@ export default function App(): ReactElement {
     return [
       ...live.sort((a, b) => lastActivityAt(b).localeCompare(lastActivityAt(a))),
       // Side questions (R33): "2 conversations" counted a question asked in a panel as one.
-      ...history.filter((mission) => mission.startedBy?.kind !== 'side')
+      ...history.filter((mission) => mission.startedBy?.kind !== 'side' && !judgeIds.has(mission.missionId))
     ]
-  }, [history, runs, workspaceId])
+  }, [history, runs, workspaceId, judgeIds])
 
   const shownApprovals = approvals.filter((request) => request.runId === shownRunId)
   const pendingApprovalsByOwner = new Map<string, number>()
@@ -6946,6 +7009,20 @@ export default function App(): ReactElement {
                   onDecide={decideApproval}
                   onAnswer={answerQuestion}
                   onBack={comparing.kept === undefined ? undefined : () => setComparingId(undefined)}
+                  // A judge's view, and the models one can be (0.520, after Optima).
+                  {...(() => {
+                    const judge = judgeViewOf(comparing)
+                    const choices = judgeChoicesFor(comparing)
+                    return {
+                      ...(judge === undefined ? {} : { judge }),
+                      judgeChoices: choices,
+                      judging: judgingCompare,
+                      onJudge: (key: string, criteria: string) => {
+                        const choice = choices.find((one) => one.key === key)
+                        if (choice !== undefined) void judgeCompare(comparing, choice, criteria)
+                      }
+                    }
+                  })()}
                   // Kept: the record across every decided comparison, as Optima's results table (0.519).
                   {...(comparing.kept === undefined ? {} : {
                     record: compareRecordRows(

@@ -13,7 +13,7 @@ import { createRuntimeCommands } from './runtime-commands.js'
 import { createCursorDefaultModel } from './cursor-default-model.js'
 import { listWorkspaceFiles } from './workspace-files.js'
 import { MAX_TAGGED, taggedPrompt } from '../shared/tagging.js'
-import { COMPARE_SLOTS, COMPARE_TREES_DIRECTORY, comparesGoneWith, compareNeedsCopy, compareRefusalOf, compareSlotKey, compareTreeId, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../shared/compare.js'
+import { COMPARE_SLOTS, COMPARE_TREES_DIRECTORY, comparesGoneWith, compareNeedsCopy, compareRefusalOf, compareSlotKey, compareTreeId, MAX_COMPARE_SLOTS, MAX_JUDGE_CRITERIA, MIN_COMPARE_SLOTS } from '../shared/compare.js'
 import { reverseChanges } from '../shared/reverse-diff.js'
 import { createCloudTaskService, launchRunner } from './cloud-task-service.js'
 import { environmentOf, githubRepoOf } from './cloud-tasks.js'
@@ -22,6 +22,8 @@ import type { ReverseChange } from '../shared/reverse-diff.js'
 import { bringInCopy, COPY_ROOT, copyLineChanges, copyRefusal, makeCompareCopy, removeCompareCopies } from './compare-copies.js'
 import type { CompareSlotId, PublicCompare, PublicCompareSlot } from '../shared/compare.js'
 import { createCompareStore } from './compare-store.js'
+import { judgePrompt } from './compare-judge.js'
+import type { JudgedAnswer } from './compare-judge.js'
 import electronUpdater from 'electron-updater'
 
 const { autoUpdater } = electronUpdater
@@ -272,6 +274,7 @@ import {
   COMPARE_ASK_CHANNEL,
   COMPARE_KEEP_CHANNEL,
   COMPARE_RETRY_CHANNEL,
+  COMPARE_JUDGE_CHANNEL,
   COMPARE_CHANGES_CHANNEL,
   COMPARE_CHANGES_REFUSAL_CHANNEL,
   COMPARE_LIST_CHANNEL,
@@ -4840,6 +4843,70 @@ if (!ownsSingleInstanceLock) {
       )
       if (why !== undefined) return compareRefused(why)
       return { ok: true, data: { compare: (await compares.get(compare.compareId)) ?? compare, refused: [] } } as const
+    })
+    /*
+     * A JUDGE'S VIEW (0.520, main/compare-judge.ts), after Optima's judge
+     * models. One run on the model the person picked, read-only, nobody's:
+     * it reads each column's newest answer under its letter and says what it
+     * would keep. The comparison records the run so it is never listed as a
+     * conversation; the person still keeps one themselves.
+     */
+    ipcMain.handle(COMPARE_JUDGE_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return compareRefused('The request was rejected.')
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      const compare = await compares.get(input.compareId).catch(() => undefined)
+      if (compare === undefined) return compareRefused('That comparison is no longer here.')
+      const route = (typeof input.route === 'object' && input.route !== null ? input.route : {}) as Record<string, unknown>
+      if (!isMissionRuntime(route.runtime) || typeof route.model !== 'string' || route.model.length === 0 || route.model.length > 200) return compareRefused('Pick a model to judge.')
+      const cannot = compareRefusalOf(route.runtime)
+      if (cannot !== undefined) return compareRefused(cannot.replace('a comparison', 'a judge'))
+      const criteria = typeof input.criteria === 'string' ? input.criteria.trim().slice(0, MAX_JUDGE_CRITERIA) : undefined
+      const answers: JudgedAnswer[] = []
+      for (const column of compare.slots) {
+        const newest = column.missionIds.at(-1)
+        if (newest === undefined) continue
+        const recorded = await missionLedger.getMission(newest).catch(() => undefined)
+        if (recorded === undefined || recorded.phase !== 'completed') continue
+        const tracker = createTranscriptTracker()
+        tracker.track(recorded.events)
+        const said = tracker.latestFinal?.trim()
+        if (said !== undefined && said.length > 0) answers.push({ letter: column.slot.toUpperCase(), text: said })
+      }
+      if (answers.length < 2) return compareRefused('A judge needs at least two finished answers to read.')
+      const newestAsk = compare.slots.flatMap((column) => column.missionIds.slice(-1))[0]
+      const ask = newestAsk === undefined ? compare.prompt : ((await missionLedger.getMission(newestAsk).catch(() => undefined))?.metadata.prompt ?? compare.prompt)
+      const runtime = route.runtime
+      const model = route.model
+      const response = await codexMissions.start(
+        judgePrompt({ ask, answers, ...(criteria === undefined || criteria.length === 0 ? {} : { criteria }) }),
+        runtime,
+        'ask',
+        { ...(model === 'account-default' ? {} : { model }), ...(typeof route.effort === 'string' ? { effort: route.effort } : {}) },
+        sendToWindow,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { key: `judge:${compare.compareId}` }
+      )
+      if (!response.ok) return compareRefused(response.error.code === 'RUN_ALREADY_ACTIVE' ? 'The judge is still reading. Ask again when it has finished.' : response.error.message)
+      const judged = await compares.judge(
+        compare.compareId,
+        { runtime, model, ...(typeof route.effort === 'string' ? { effort: route.effort } : {}), ...(typeof route.label === 'string' && route.label.trim().length > 0 ? { label: route.label.trim() } : {}) },
+        response.data.missionId,
+        criteria
+      )
+      sendToWindow({
+        kind: 'mission-started',
+        runId: response.data.runId,
+        missionId: response.data.missionId,
+        prompt: 'Judge the answers',
+        data: response.data,
+        startedBy: { kind: 'judge', compareId: compare.compareId }
+      })
+      return { ok: true, data: { compare: judged, refused: [] } } as const
     })
     // A git project gives each column a worktree, so only a plain folder can be too big (0.457).
     ipcMain.handle(COMPARE_CHANGES_REFUSAL_CHANNEL, async (event) => {

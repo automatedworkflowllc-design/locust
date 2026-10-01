@@ -10870,6 +10870,44 @@ textarea {
   white-space: nowrap;
 }
 
+/* The judge (0.520): its view, then the line to ask one, in the record's column. */
+.lc-compare__judge,
+.lc-compare__judgeask {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+  max-width: 720px;
+  padding: 0 calc(var(--lc-space-5) * 2) var(--lc-space-5);
+}
+
+.lc-compare__judgesaid {
+  font-family: var(--lc-font-prose);
+  font-size: var(--lc-text-prose);
+}
+
+.lc-compare__judgenote {
+  margin: 0;
+  font-size: 12px;
+  color: var(--lc-text-muted);
+}
+
+.lc-compare__judgerow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lc-space-2);
+}
+
+.lc-compare__judgepick {
+  width: auto;
+  max-width: 260px;
+}
+
+.lc-compare__judgecriteria {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
 .lc-compare__head,
 .lc-compare__cell,
 .lc-compare__foot {

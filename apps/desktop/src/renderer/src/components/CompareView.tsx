@@ -13,6 +13,7 @@ import { Icon } from './Icon.js'
 import { RuntimeMark } from './RuntimeMark.js'
 import { ThreadItems } from './Thread.js'
 import { WorkingSpark } from './WorkingSpark.js'
+import { AgentText } from './ThreadItems.js'
 import type { CompareRecordRow } from '../compareRecord.js'
 
 /**
@@ -86,7 +87,11 @@ export function CompareView({
   decidingIds,
   onDecide,
   onAnswer,
-  record
+  record,
+  judge,
+  judgeChoices = [],
+  judging = false,
+  onJudge
 }: {
   readonly compare: PublicCompare
   /** In a comparison that edits (0.445): what each column has changed, "+12 -3 in 2 files". */
@@ -112,6 +117,13 @@ export function CompareView({
   readonly onBack: (() => void) | undefined
   /** Once one is kept: every model's record across your decided comparisons (0.519). */
   readonly record?: readonly CompareRecordRow[]
+  /** The judge's view, when one was asked (0.520): its model, and what it said or is saying. */
+  readonly judge?: { readonly name: string; readonly running: boolean; readonly answer: string; readonly failed?: string }
+  /** The models a judge can be, the first the one offered (0.520). */
+  readonly judgeChoices?: readonly { readonly key: string; readonly label: string }[]
+  /** A judge is being asked. */
+  readonly judging?: boolean
+  readonly onJudge?: (choiceKey: string, criteria: string) => void
 }): ReactElement {
   const kept = compare.kept?.slot
   // A blind comparison hides what would name the model -- its mark, its runtime, its cost -- until one is kept (0.449).
@@ -275,6 +287,29 @@ export function CompareView({
             </div>
           ))}
         </div>
+        {judge !== undefined && (
+          /*
+           * THE JUDGE'S VIEW (0.520), after Optima's judge models: a model
+           * the person picked read the answers under their letters. Its
+           * view, marked as one; the person still keeps an answer.
+           */
+          <div className="lc-compare__judge" aria-label="The judge's view">
+            <span className="lc-compare__recordlabel lc-mono">{`THE JUDGE'S VIEW · ${judge.name}`}</span>
+            {judge.running ? (
+              <p className="lc-compare__quiet">Reading the answers…</p>
+            ) : judge.failed !== undefined ? (
+              <p className="lc-compare__quiet">{judge.failed}</p>
+            ) : (
+              <div className="lc-compare__judgesaid">
+                <AgentText text={judge.answer} streaming={false} />
+              </div>
+            )}
+            <p className="lc-compare__judgenote">It read the answers as Answer A, Answer B and so on, not by model. Its view, not a decision: you keep the answer.</p>
+          </div>
+        )}
+        {onJudge !== undefined && judgeChoices.length > 0 && judge?.running !== true && columns.filter((column) => column.keepable).length >= 2 && !columns.some((column) => column.running) && (
+          <JudgeAsk choices={judgeChoices} again={judge !== undefined} busy={judging} onJudge={onJudge} />
+        )}
         {record !== undefined && record.length > 0 && (
           /*
            * YOUR RECORD (0.519), as Optima's results table: every model you
@@ -349,5 +384,46 @@ export function CompareView({
         ))}
       </div>
     </section>
+  )
+}
+
+/**
+ * ASK A JUDGE (0.520): which model reads the answers, and what a good answer
+ * does if the person wants to say. One line under the answers, once at
+ * least two have finished; nothing runs until Judge is pressed.
+ */
+function JudgeAsk({ choices, again, busy, onJudge }: {
+  readonly choices: readonly { readonly key: string; readonly label: string }[]
+  readonly again: boolean
+  readonly busy: boolean
+  readonly onJudge: (choiceKey: string, criteria: string) => void
+}): ReactElement {
+  const [choice, setChoice] = useState(choices[0]?.key ?? '')
+  const [criteria, setCriteria] = useState('')
+  return (
+    <div className="lc-compare__judgeask">
+      <span className="lc-compare__recordlabel lc-mono">{again ? 'ASK ANOTHER JUDGE' : 'ASK A JUDGE'}</span>
+      <div className="lc-compare__judgerow">
+        <select className="lc-input lc-compare__judgepick" aria-label="The model that judges" value={choice} onChange={(event) => setChoice(event.target.value)}>
+          {choices.map((one) => (
+            <option key={one.key} value={one.key}>
+              {one.label}
+            </option>
+          ))}
+        </select>
+        <input
+          className="lc-input lc-compare__judgecriteria"
+          aria-label="What a good answer does"
+          placeholder="What a good answer does (optional)"
+          maxLength={1000}
+          value={criteria}
+          onChange={(event) => setCriteria(event.target.value)}
+        />
+        <button type="button" className="lc-button" disabled={busy || choice.length === 0} onClick={() => onJudge(choice, criteria)}>
+          {busy ? 'Asking…' : 'Judge'}
+        </button>
+      </div>
+      <p className="lc-compare__judgenote">It reads the answers without the models&rsquo; names and says which it would keep. It keeps nothing itself.</p>
+    </div>
   )
 }

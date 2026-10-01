@@ -79,6 +79,22 @@ export interface PublicCompare {
    * comparison that edits.
    */
   readonly kept?: { readonly slot: CompareSlotId; readonly at: string; readonly brought?: readonly string[] }
+  /**
+   * A judge's view, when the person asked for one (0.520, after Artificial
+   * Analysis's Optima): a model of their choosing read the answers under
+   * blind letters and said what each did and which it would keep. It never
+   * keeps one itself. `missionIds` are its runs, newest last -- the newest is
+   * shown; every one is the comparison's, never a conversation of its own.
+   */
+  readonly judge?: { readonly route: CompareRoute; readonly missionIds: readonly string[]; readonly criteria?: string }
+}
+
+/** How long "what a good answer does" may be, as the person writes it for a judge. */
+export const MAX_JUDGE_CRITERIA = 1_000
+
+/** Every judge's run, so the sidebar and the history never list one as a conversation (0.520). */
+export function judgeMissionIds(compares: readonly PublicCompare[]): ReadonlySet<string> {
+  return new Set(compares.flatMap((compare) => compare.judge?.missionIds ?? []))
 }
 
 /** The run slot a column holds, so one teammate can run on two models at once. */

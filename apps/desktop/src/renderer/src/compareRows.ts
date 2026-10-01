@@ -23,6 +23,8 @@ export function foldComparisons<T extends { readonly missionId: string; readonly
   const out: (T & { readonly compareId?: string })[] = []
   for (const row of rows) {
     const members = row.memberIds ?? [row.missionId]
+    // A judge's run (0.520) is drawn in its comparison, never as a row.
+    if (compares.some((compare) => (compare.judge?.missionIds ?? []).some((id) => members.includes(id)))) continue
     const found = compares
       .map((compare) => ({ compare, column: compare.slots.find((column) => belongs(column, members)) }))
       .find((match) => match.column !== undefined)

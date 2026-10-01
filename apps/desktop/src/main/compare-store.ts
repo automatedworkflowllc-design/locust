@@ -3,7 +3,7 @@ import { constants as fsConstants } from 'node:fs'
 import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
-import { COMPARE_SLOTS, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../shared/compare.js'
+import { COMPARE_SLOTS, MAX_COMPARE_SLOTS, MAX_JUDGE_CRITERIA, MIN_COMPARE_SLOTS } from '../shared/compare.js'
 import type { CompareRoute, CompareSlotId, PublicCompare, PublicCompareSlot } from '../shared/compare.js'
 
 /**
@@ -24,6 +24,8 @@ const MAX_TURNS_PER_SLOT = 200
 const MAX_RETRIED_PER_SLOT = 50
 /** Files a kept column's changes named; the rest are still in the folder, just not listed. */
 const MAX_BROUGHT = 200
+/** Judges a comparison remembers; older ones' runs stay the comparison's, unlisted. */
+const MAX_JUDGES = 20
 const UNREADABLE = 'The saved comparisons could not be read. Nothing was changed.'
 
 interface StoredFile {
@@ -48,6 +50,8 @@ export interface CompareStore {
   /** A column could not start, and why. */
   refuse(compareId: string, slot: CompareSlotId, why: string): Promise<PublicCompare>
   keep(compareId: string, slot: CompareSlotId, brought?: readonly string[]): Promise<PublicCompare>
+  /** A judge was asked (0.520): its run, newest last, on this route and with these words. */
+  judge(compareId: string, route: CompareRoute, missionId: string, criteria?: string): Promise<PublicCompare>
   remove(compareId: unknown): Promise<void>
 }
 
@@ -89,6 +93,13 @@ function parsedCompare(value: unknown): PublicCompare | undefined {
   const kept = typeof record.kept === 'object' && record.kept !== null ? (record.kept as Record<string, unknown>) : undefined
   const keptAt = text(kept?.at, 40)
   const brought = Array.isArray(kept?.brought) ? kept.brought.filter((file): file is string => typeof file === 'string' && file.length > 0 && file.length <= 500).slice(0, MAX_BROUGHT) : undefined
+  // A judge (0.520): its route, its runs and the person's words, each checked like a column's.
+  const judgeRecord = typeof record.judge === 'object' && record.judge !== null ? (record.judge as Record<string, unknown>) : undefined
+  const judgeRoute = judgeRecord === undefined ? undefined : parsedSlot({ slot: 'a', route: judgeRecord.route, missionIds: judgeRecord.missionIds })
+  const judgeCriteria = text(judgeRecord?.criteria, MAX_JUDGE_CRITERIA)
+  const judge = judgeRoute === undefined || judgeRoute.missionIds.length === 0
+    ? undefined
+    : { route: judgeRoute.route, missionIds: judgeRoute.missionIds.slice(-MAX_JUDGES), ...(judgeCriteria === undefined ? {} : { criteria: judgeCriteria }) }
   const keptSlot = kept !== undefined && isSlot(kept.slot) && keptAt !== undefined && slots.some((slot) => slot.slot === kept.slot)
     ? { slot: kept.slot, at: keptAt, ...(brought === undefined ? {} : { brought }) }
     : undefined
@@ -101,7 +112,8 @@ function parsedCompare(value: unknown): PublicCompare | undefined {
     ...(record.changes === true ? { changes: true as const } : {}),
     ...(record.changes === true && record.changesIn === 'copy' ? { changesIn: 'copy' as const } : {}),
     ...(record.blind === true ? { blind: true as const } : {}),
-    ...(keptSlot === undefined ? {} : { kept: keptSlot })
+    ...(keptSlot === undefined ? {} : { kept: keptSlot }),
+    ...(judge === undefined ? {} : { judge })
   }
 }
 
@@ -255,6 +267,16 @@ export function createCompareStore(options: {
         if (column === undefined || column.missionIds.length === 0) throw new Error('That column has nothing to keep yet.')
         return { ...compare, kept: { slot, at: now().toISOString(), ...(brought === undefined ? {} : { brought: brought.slice(0, MAX_BROUGHT) }) } }
       }),
+
+    judge: (compareId, route, missionId, criteria) =>
+      change(compareId, (compare) => ({
+        ...compare,
+        judge: {
+          route: { runtime: route.runtime, model: route.model, ...(route.effort === undefined ? {} : { effort: route.effort }), ...(route.label === undefined ? {} : { label: route.label.slice(0, 120) }) },
+          missionIds: [...(compare.judge?.missionIds ?? []), missionId].slice(-MAX_JUDGES),
+          ...(criteria === undefined || criteria.trim().length === 0 ? {} : { criteria: criteria.trim().slice(0, MAX_JUDGE_CRITERIA) })
+        }
+      })),
 
     remove: (compareId) =>
       serialize(async () => {
