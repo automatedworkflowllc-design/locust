@@ -75,7 +75,7 @@ describe('a teammate that has never run', () => {
       roleLabel: 'Docs & QA'
     })
     expect(view.status).toBe('blocked')
-    expect(view.label).toBe('Runtime sign-in required')
+    expect(view.label).toBe('Sign-in needed')
     expect(view.label).not.toContain('idle')
     expect(view.tone).toBe('red')
     // And the dot every surface draws from it.
@@ -142,6 +142,6 @@ describe('a teammate whose runtime has not answered yet', () => {
 
   it('still is, when the runtime says it is signed out', () => {
     const runtime = { id: 'claude', ready: false, installed: true, auth: 'unauthenticated', status: 'auth-required' } as unknown as Parameters<typeof teammateStatusView>[0]['runtime']
-    expect(teammateStatusView({ ...base, runtime }).label).toBe('Runtime sign-in required')
+    expect(teammateStatusView({ ...base, runtime }).label).toBe('Sign-in needed')
   })
 })

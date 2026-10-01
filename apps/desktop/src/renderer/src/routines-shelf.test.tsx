@@ -106,7 +106,7 @@ describe('what was configured inside a CLI', () => {
   it('is listed as a fact about that runtime, with no apology needed', () => {
     const html = renderToStaticMarkup(<CliArtifacts artifacts={[ARTIFACT]} />)
     expect(html).toContain('gig-scout')
-    expect(html).toContain('1 agent set up in this CLI')
+    expect(html).toContain('1 agent of its own')
     expect(html).toContain('it does not run them')
     // Folded, with the count on the fold (the review, P3): a closed details.
     expect(html).toMatch(/^<details class="lc-cliartifacts"><summary/)

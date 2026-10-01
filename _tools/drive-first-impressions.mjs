@@ -259,7 +259,7 @@ try {
   await drive.capture('1440 Settings (Ctrl 3)', () => screen('3'))
   // Every Settings page, not only the first (0.356: a section heading's
   // look changed on all of them at once).
-  for (const page of ['Runtimes', 'Teammates', 'Appearance', 'General', 'Changelog']) {
+  for (const page of ['AI agents', 'Teammates', 'Appearance', 'General', 'Changelog']) {
     await drive.capture(`1440 Settings: ${page}`, () => drive.evaluate(`(async () => {
       const item = [...document.querySelectorAll('.lc-settings button, .lc-settings a, nav button')].find((b) => b.textContent.trim() === ${JSON.stringify(page)})
       if (!item) return 'no ' + ${JSON.stringify(page)} + ' in the Settings list'

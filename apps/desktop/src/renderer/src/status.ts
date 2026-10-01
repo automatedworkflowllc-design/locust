@@ -250,7 +250,7 @@ function baseRouteRowStatus(
     return {
       tag: 'PREVIEW',
       selectable: true,
-      detail: `Signed in and detected. The ${runtime.displayName} adapter has not been proven against a full run, so parts of a run may not be drawn.`
+      detail: `Signed in and found. Locust's support for ${runtime.displayName} has not been tried through a whole run yet, so parts of a run may not show.`
     }
   }
   return {
@@ -400,8 +400,8 @@ export function teammateStatusView(input: {
    */
   if (input.anyRuntimeUsable === false) {
     return input.anyRuntimeInstalled === false
-      ? { status: 'blocked', activity, label: 'No runtime installed', tone: 'red', pulse: false }
-      : { status: 'blocked', activity, label: 'Runtime sign-in required', tone: 'red', pulse: false }
+      ? { status: 'blocked', activity, label: 'No AI agent installed', tone: 'red', pulse: false }
+      : { status: 'blocked', activity, label: 'Sign-in needed', tone: 'red', pulse: false }
   }
   // A teammate whose OWN runtime cannot run is blocked, even if a mission
   // looks active in the renderer -- the sign-in wall outranks optimistic
@@ -420,10 +420,10 @@ export function teammateStatusView(input: {
       status: 'blocked',
       activity,
       label: !input.runtime.installed
-        ? 'Runtime not installed'
+        ? 'AI agent not installed'
         : notAnswering
-          ? 'Runtime not answering — checking again'
-          : 'Runtime sign-in required',
+          ? 'AI agent not answering — checking again'
+          : 'Sign-in needed',
       tone: notAnswering ? 'amber' : 'red',
       pulse: false
     }
@@ -532,9 +532,9 @@ export function handoffAvailability(
 
 /** What the route control says about itself. `undefined` where a title adds nothing. */
 export function handoffTitle(availability: HandoffAvailability): string | undefined {
-  if (availability === 'available') return 'Hand this mission to another runtime'
-  if (availability === 'starting') return 'Waiting for the mission to start before it can be handed over'
-  if (availability === 'switching') return 'Handing this mission over'
+  if (availability === 'available') return 'Hand this to another AI agent'
+  if (availability === 'starting') return 'Waiting for it to start before it can be handed over'
+  if (availability === 'switching') return 'Handing it over'
   return undefined
 }
 
@@ -859,7 +859,7 @@ export const MODE_FACTS: readonly ModeFacts[] = [
     chip: 'Ask',
     scope: 'read-only',
     short: 'reads and explains, every write refused',
-    consequence: 'Reads and explains. Every write is refused by the sandbox.',
+    consequence: 'Reads and explains. It cannot change any file.',
     sentence: 'In Ask mode nothing is changed: every write is refused.'
   },
   {
@@ -1033,7 +1033,7 @@ export function modeUnavailableReason(
   if (mode === 'approve-each') return `Codex CLI, OpenCode and Copilot CLI only. ${runtimeLabel(runtime)} cannot stop and ask yet.`
   if (mode === 'auto') return `${runtimeLabel(runtime)} runs its own agent under its own permissions; Locust has no handle to widen.`
   if (runtime === 'antigravity') return "Antigravity runs its own agent with its own permissions; Locust cannot hold it read-only."
-  return 'Cursor Agent cannot be held read-only on Windows: its sandbox needs macOS or Linux, and plan mode alone does not stop it editing files.'
+  return 'Cursor Agent cannot be kept read-only on Windows: that needs macOS or Linux, and its plan mode alone does not stop it editing files.'
 }
 
 /**
@@ -1767,8 +1767,8 @@ export function sendBlockedReason(blocked: {
   readonly empty: boolean
 }): string | undefined {
   if (blocked.nothingInstalled) return 'Nothing can run yet — install a coding agent from the list above.'
-  if (!blocked.runtimeReady) return 'The route this is set to is not ready on this machine. Pick another above, or set it up in Settings.'
-  if (!blocked.routeCanRun) return 'This mode cannot run on the route this is set to. Pick another mode or route above.'
+  if (!blocked.runtimeReady) return 'The model this is set to is not ready on this machine. Pick another above, or set it up in Settings.'
+  if (!blocked.routeCanRun) return 'This mode cannot run on the model this is set to. Pick another mode or model above.'
   if (blocked.busy) return 'Something else is starting. This goes as soon as it settles.'
   if (blocked.empty) return 'Write a message first.'
   return undefined

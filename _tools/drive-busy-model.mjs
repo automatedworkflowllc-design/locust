@@ -118,7 +118,7 @@ try {
   await drive.capture('Settings > Runtimes: Your own models', () => drive.evaluate(`(async () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: '3', ctrlKey: true, bubbles: true }))
     await new Promise((r) => setTimeout(r, 900))
-    ;[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Runtimes')?.click()
+    ;[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'AI agents')?.click()
     for (let i = 0; i < 20 && !document.querySelector('.lc-ownmodel__form'); i += 1) await new Promise((r) => setTimeout(r, 150))
     return document.querySelector('.lc-ownmodel__form') ? 'found' : 'no Your own models form on the Runtimes page'
   })()`))

@@ -1860,10 +1860,10 @@ export function Sidebar({
           {/* The status spans the two cells the removed label freed. It stays
               mono and muted while the nav labels stay sentence case, so the
               row reads as one fact beside places rather than three peers. */}
-          <div className="lc-connected lc-connected--wide" title={`${connected} runtime${connected === 1 ? '' : 's'} connected`}>
+          <div className="lc-connected lc-connected--wide" title={`${connected} AI agent${connected === 1 ? '' : 's'} ready`}>
             <span className={`lc-connected__dot${connected === 0 ? ' is-none' : ''}`} />
             <span>
-              {connected} runtime{connected === 1 ? '' : 's'} connected
+              {connected} AI agent{connected === 1 ? '' : 's'} ready
             </span>
           </div>
         </div>

@@ -505,7 +505,7 @@ export function NewTeammateDialog({
                   placeholder="e.g. Release manager, or Reviews every PR for security"
                   onChange={(event) => setRoleTitle(event.target.value)}
                 />
-                <span className="lc-field__hint">Shown beside their name, and told to their runtime as their role.</span>
+                <span className="lc-field__hint">Shown beside their name, and told to their AI agent as their role.</span>
               </label>
             )}
           </div>
@@ -568,8 +568,8 @@ export function NewTeammateDialog({
                 )}
               </div>
               <span className="lc-field__hint">
-                Its missions run here instead of the project folder, which is also how it reaches an MCP server registered
-                to that folder. History and memory stay with the project either way.
+                Its missions run here instead of the project folder, which is also how it reaches a connector (an MCP server) set up
+                for that folder. History and memory stay with the project either way.
               </span>
               {folderNotice !== undefined && <span className="lc-field__hint lc-tone-amber">{folderNotice}</span>}
             </div>

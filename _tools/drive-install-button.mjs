@@ -54,7 +54,7 @@ try {
     const seen = await drive.evaluate(`(() => {
       const cell = [...document.querySelectorAll('.lc-runtimecell')].find(c => /OpenCode/.test(c.innerText))
       const button = cell?.querySelector('.lc-runtimecell__install')
-      return 'runtimes connected: ' + (document.querySelector('.lc-sidebar')?.innerText.match(/(\\d+) runtimes? connected/)?.[1] ?? '?')
+      return 'runtimes connected: ' + (document.querySelector('.lc-sidebar')?.innerText.match(/(\\d+) (?:runtimes? connected|AI agents? ready)/)?.[1] ?? '?')
         + ' || OpenCode cell: ' + (cell === undefined ? 'ABSENT' : cell.innerText.replace(/[ ]+/g, ' ').split(String.fromCharCode(10)).join(' '))
         + ' || its button: ' + (button === null || button === undefined ? 'NONE' : button.innerText.trim() + (button.disabled ? ' [disabled]' : ''))
     })()`)
@@ -95,7 +95,7 @@ try {
     const landed = await readdir(join(emptyHome, 'npm')).catch(() => [])
     const seen = await drive.evaluate(`(() => {
       const cell = [...document.querySelectorAll('.lc-runtimecell')].find(c => /OpenCode/.test(c.innerText))
-      return 'connected: ' + (document.querySelector('.lc-sidebar')?.innerText.match(/(\\d+) runtimes? connected/)?.[1] ?? '?')
+      return 'connected: ' + (document.querySelector('.lc-sidebar')?.innerText.match(/(\\d+) (?:runtimes? connected|AI agents? ready)/)?.[1] ?? '?')
         + ' || OpenCode cell: ' + (cell === undefined ? 'gone from the panel' : cell.innerText.replace(/[ ]+/g, ' ').split(String.fromCharCode(10)).join(' '))
     })()`)
     return `npm prefix holds: ${landed.join(', ') || 'nothing'} || ${String(seen)}`

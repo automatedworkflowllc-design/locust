@@ -59,8 +59,8 @@ describe('what a mode does to a connector', () => {
 
   it('says the one thing the mode cannot tell you: a connector is not this machine', () => {
     for (const mode of RESTRICTED) {
-      expect(connectorsNote('claude', mode), mode).toContain('limits is this machine')
-      expect(connectorsNote('claude', mode), mode).toContain('outside the sandbox')
+      expect(connectorsNote('claude', mode), mode).toContain('only limits what happens on this machine')
+      expect(connectorsNote('claude', mode), mode).toContain('a connector acts on the service it reaches')
     }
     // Auto has nothing to distinguish -- it covers the machine as well.
     expect(connectorsNote('claude', 'auto')).toContain('everything else on this machine')

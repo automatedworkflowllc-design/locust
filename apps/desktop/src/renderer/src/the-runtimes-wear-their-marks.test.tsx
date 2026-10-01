@@ -161,7 +161,7 @@ describe("the composer's route chip", () => {
     expect(own).not.toContain('lc-runtimemark')
     expect(own).toContain('lc-dot')
     const nothing = composerChip([signedOut('claude')], 'claude', 'sonnet')
-    expect(nothing).toContain('No runtime')
+    expect(nothing).toContain('No AI agent')
     expect(nothing).not.toContain('lc-runtimemark')
   })
 })

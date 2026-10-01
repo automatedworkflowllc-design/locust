@@ -19,7 +19,7 @@ const packaged = arg('--packaged')
 const tag = arg('--tag') ?? 'local'
 const OUT = join(recordRoot('settings-pages-2026-09-28'), `settings-pages-${tag}`)
 await mkdir(OUT, { recursive: true })
-const PRIVATE = /^(Runtimes|Connectors)$/
+const PRIVATE = /^(AI agents|Runtimes|Connectors)$/
 
 const everyday = await seedEverydayLedger('settings-pages')
 const drive = await startDrive({

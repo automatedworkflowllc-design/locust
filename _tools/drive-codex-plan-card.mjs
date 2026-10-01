@@ -115,7 +115,7 @@ try {
     const tab = [...document.querySelectorAll('button')].find((b) => (b.getAttribute('title') ?? '').startsWith('Settings'))
     tab?.click()
     await new Promise((r) => setTimeout(r, 1200))
-    const page = [...document.querySelectorAll('button, a')].find((b) => /^Runtimes$/.test((b.textContent ?? '').trim()))
+    const page = [...document.querySelectorAll('button, a')].find((b) => /^(AI agents|Runtimes)$/.test((b.textContent ?? '').trim()))
     page?.click()
     await new Promise((r) => setTimeout(r, 1200))
     const row = [...document.querySelectorAll('.lc-runtimerow')].find((r) => /Codex/.test(r.textContent ?? ''))

@@ -124,7 +124,7 @@ try {
     for (let i = 0; i < 60; i += 1) {
       await new Promise(r => setTimeout(r, 1000))
       const foot = document.querySelector('.lc-sidebar')?.innerText ?? ''
-      if (/1 runtime connected/.test(foot) || /runtimes connected/.test(foot) === false) {
+      if (/1 (?:runtime connected|AI agent ready)/.test(foot) || /runtimes connected|AI agents ready/.test(foot) === false) {
         if (/1 runtime connected/.test(foot)) return 'noticed after ' + String(i + 1) + 's: ' + foot.slice(-40).replace(/[ ]+/g, ' ')
       }
     }

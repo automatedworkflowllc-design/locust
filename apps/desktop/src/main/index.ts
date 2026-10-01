@@ -3483,7 +3483,7 @@ if (!ownsSingleInstanceLock) {
     ipcMain.handle(CLOUD_START_CHANNEL, async (event, prompt: unknown, teammateId: unknown) => {
       if (!fromOwnWindow(event) || typeof prompt !== 'string') return { ok: false, message: 'That cloud task could not be started.' }
       if (freeRoutesOnly(process.argv, process.env)) return { ok: false, message: FREE_ONLY_REFUSAL }
-      if ((await codexLaunch()) === undefined) return { ok: false, message: 'Cloud tasks run through Codex CLI, which is not installed or not signed in here. Settings > Runtimes shows how.' }
+      if ((await codexLaunch()) === undefined) return { ok: false, message: 'Cloud tasks run through Codex CLI, which is not installed or not signed in here. Settings > AI agents shows how.' }
       const started = await cloudTasks.start({ folder: workspacePath, prompt: prompt.slice(0, 20_000), ...(typeof teammateId === 'string' ? { teammateId } : {}) })
       return started.ok ? { ok: true, task: publicTask(started.task), notes: started.notes } : started
     })

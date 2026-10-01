@@ -174,7 +174,7 @@ try {
   await shoot(11, 'settings-how-teammates-work')
   say(await click('/^Appearance$/'))
   await shoot(12, 'settings-appearance')
-  say(await click('/^Runtimes$/'))
+  say(await click('/^(AI agents|Runtimes)$/'))
   await shoot(13, 'settings-runtimes')
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

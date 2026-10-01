@@ -44,7 +44,7 @@ try {
   const row = await drive.capture('Settings, the signed-out row', () => drive.evaluate(`(async () => {
     document.querySelector('button[title="Settings (Ctrl 3)"]').click()
     await new Promise(r => setTimeout(r, 900))
-    const nav = [...document.querySelectorAll('.lc-settings__navitem')].find(n => n.innerText.trim().startsWith('Runtimes'))
+    const nav = [...document.querySelectorAll('.lc-settings__navitem')].find(n => n.innerText.trim().startsWith('AI agents'))
     if (nav) nav.click()
     await new Promise(r => setTimeout(r, 700))
     const rows = [...document.querySelectorAll('.lc-runtimerow, .lc-runtimecell')]

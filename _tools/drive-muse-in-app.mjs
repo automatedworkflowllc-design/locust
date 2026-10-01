@@ -54,7 +54,7 @@ const openRuntimesPage = `(async () => {
   settings.click()
   await new Promise(r => setTimeout(r, 1200))
   // Settings is paged, and Runtimes is not the page it opens on.
-  const page = [...document.querySelectorAll('button, a, [role=tab]')].find(n => n.innerText.trim() === 'Runtimes')
+  const page = [...document.querySelectorAll('button, a, [role=tab]')].find(n => n.innerText.trim() === 'AI agents')
   if (!page) return 'no Runtimes page; pages seen: ' + [...document.querySelectorAll('button, [role=tab]')].map(n => n.innerText.trim()).filter(Boolean).join(' / ').slice(0, 300)
   page.click()
   await new Promise(r => setTimeout(r, 1200))

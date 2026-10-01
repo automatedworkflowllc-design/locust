@@ -157,7 +157,7 @@ export function connectorsNote(
   }
   return mode === 'auto'
     ? 'Your connectors work here, and so does everything else on this machine.'
-    : 'Your connectors work in this mode too. What this mode limits is this machine — a connector acts on the service it reaches, so it is outside the sandbox either way.'
+    : 'Your connectors work in this mode too. This mode only limits what happens on this machine — a connector acts on the service it reaches.'
 }
 
 export interface ComposerProps {
@@ -827,7 +827,7 @@ export function Composer({
       ? `Say what is next — it goes to ${workingName} when this finishes…`
       : 'Edit the queued message to change it…'
     : !routeCanRun
-      ? `The ${selected?.displayName ?? 'selected'} adapter is not finished — switch the route to run a mission…`
+      ? `Locust cannot run ${selected?.displayName ?? 'that AI agent'} fully yet — pick another model to start…`
       : selectedReady
         ? // Just the invitation. Three of these used to restate the
           // permission mode -- "it may edit files in this workspace" -- which
@@ -838,9 +838,9 @@ export function Composer({
           // Asking several says so; asking one is the sentence it always was.
           teammateName === undefined ? 'Write a message…' : `Message ${teammateName}…`
         : discoveryPhase === 'loading'
-          ? 'Checking local runtimes…'
+          ? 'Looking for the AI agents on this machine…'
           : discoveryPhase === 'error'
-            ? 'Runtime discovery is unavailable…'
+            ? 'Locust could not look for AI agents on this machine…'
             : // Something on this machine CAN run; it just is not the route
               // this box is pointing at. Telling the person to install a
               // coding agent when they have just installed one -- and been
@@ -849,7 +849,7 @@ export function Composer({
               // itself; this covers the case where the person has chosen one
               // deliberately and it has since stopped being usable.
               readyElsewhere !== undefined
-              ? `${readyElsewhere.displayName} is ready — switch the route to it…`
+              ? `${readyElsewhere.displayName} is ready — pick it in the model menu…`
               : // "and sign in" only when there is something to sign in to.
                 // Pass 4 took this instruction off the roster; pass 5 found
                 // it still in the box you type into, two inches under a
@@ -938,10 +938,10 @@ export function Composer({
       // the whole first run in the QA pass. Every refusal now names itself.
       setNote(
         !routeCanRun
-          ? `The ${selected?.displayName ?? 'selected'} adapter is not finished, so a mission cannot start on it. Switch the route.`
+          ? `Locust cannot run ${selected?.displayName ?? 'that AI agent'} fully yet, so it cannot start here. Pick another model.`
           : readyElsewhere !== undefined
-            ? `This message would go to ${selected?.displayName ?? 'the selected runtime'}, which is not ready. ${readyElsewhere.displayName} is — switch the route to it.`
-            : 'No runtime on this machine can run a mission yet. Settings lists what to install.'
+            ? `This message would go to ${selected?.displayName ?? 'the AI agent picked'}, which is not ready. ${readyElsewhere.displayName} is — pick it in the model menu.`
+            : 'No AI agent on this machine can start yet. Settings lists what to install.'
       )
       return
     }
@@ -2155,7 +2155,7 @@ export function Composer({
                     {...(handoff === 'available'
                       ? {
                           notice:
-                            'This mission is running. Choosing another runtime stops it, writes a checkpoint, and hands the work over — it cannot be undone.'
+                            'This is running. Choosing another AI agent stops it here and hands the work over with a summary of what was done — it cannot be undone.'
                         }
                       : {})}
                   />
@@ -2177,7 +2177,7 @@ export function Composer({
                    * the mouse says and what the eye reads are now one thing.
                    */
                   title={[
-                    nothingConnected ? 'No runtime on this machine can run a mission yet.' : exactRoute,
+                    nothingConnected ? 'No AI agent on this machine can start yet.' : exactRoute,
                     handoffTitle(handoff),
                     usageSentence
                   ]
@@ -2229,7 +2229,7 @@ export function Composer({
                     * where a person goes to see what could be installed.
                     */}
                   {comparing ? null : nothingConnected ? (
-                    <span className="lc-control__model">No runtime</span>
+                    <span className="lc-control__model">No AI agent</span>
                   ) : (
                     <>
                       {!ownModel && (
@@ -2353,7 +2353,7 @@ export function Composer({
               {effortIsGenuinelyFixed && !comparing && (
                 <span
                   className="lc-control lc-control--boxed is-static"
-                  title="This runtime does not let the effort be chosen; it uses its own."
+                  title="This AI agent does not let the effort be chosen; it uses its own."
                 >
                   <span className="lc-control__effort">Fixed</span>
                 </span>

@@ -166,7 +166,7 @@ try {
   for (const [typed, page, heading] of [
     ['memory', 'Teammates', 'What your team remembers'],
     ['worktree', 'Workspace', 'Project folder'],
-    ['node', 'Runtimes', 'Runtimes & accounts'],
+    ['node', 'AI agents', 'AI agents & accounts'],
     ['ledger', 'General', 'Privacy & local data'],
     ['recycle bin', 'General', 'Trash']
   ]) {

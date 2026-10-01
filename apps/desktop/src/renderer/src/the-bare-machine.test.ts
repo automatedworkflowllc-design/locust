@@ -46,21 +46,21 @@ describe('a teammate on a machine with no CLI is not asked to sign in', () => {
 
   it('says nothing is installed when nothing is', () => {
     const said = view({ ...base, anyRuntimeUsable: false, anyRuntimeInstalled: false })
-    expect(said.label).toBe('No runtime installed')
+    expect(said.label).toBe('No AI agent installed')
     expect(said.label).not.toContain('sign in')
   })
 
   it('still says sign in when something IS installed and merely unsigned', () => {
     // The sentence was not wrong, only over-applied. It has to survive.
     expect(view({ ...base, anyRuntimeUsable: false, anyRuntimeInstalled: true }).label)
-      .toBe('Runtime sign-in required')
+      .toBe('Sign-in needed')
   })
 
   it("makes the same distinction for the teammate's own runtime", () => {
     expect(view({ ...base, runtime: runtime({ installed: false, status: 'not-installed' }) }).label)
-      .toBe('Runtime not installed')
+      .toBe('AI agent not installed')
     expect(view({ ...base, runtime: runtime({ installed: true, status: 'auth-required' }) }).label)
-      .toBe('Runtime sign-in required')
+      .toBe('Sign-in needed')
   })
 
   it('is still blocked and still red either way, because neither can run', () => {

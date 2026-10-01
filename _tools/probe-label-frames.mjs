@@ -95,7 +95,7 @@ try {
     ['the Team screen', () => click(`${byText('button', 'Team')}?.click()`), ['.lc-rostercard__stat dt', '.lc-rostercard__recentlabel', '.lc-rostercard__facts dt']],
     ['the New teammate dialog', () => click(`${byText('button', 'New teammate')}?.click()`), ['.lc-fieldlabel']],
     ['the Rooms screen', () => click(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); ${byText('button', 'Rooms')}?.click()`), ['.lc-settings__heading--section', '.lc-roomcardform__label']],
-    ['Settings > Runtimes', () => click(`${byText('button', 'Settings')}?.click(); await new Promise((r) => setTimeout(r, 700)); ${byText('button', 'Runtimes')}?.click()`), ['.lc-cliartifacts__summary', '.lc-settings__more > summary']],
+    ['Settings > Runtimes', () => click(`${byText('button', 'Settings')}?.click(); await new Promise((r) => setTimeout(r, 700)); ${byText('button', 'AI agents')}?.click()`), ['.lc-cliartifacts__summary', '.lc-settings__more > summary']],
     ['the command palette', () => click(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))`), ['.lc-palette__group']],
     ['the model picker', () => click(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); document.querySelector('.lc-conv')?.click(); await new Promise((r) => setTimeout(r, 700)); [...document.querySelectorAll('.lc-control')].find((b) => b.getAttribute('aria-haspopup') === 'listbox')?.click()`), ['.lc-picker__group']]
   ]

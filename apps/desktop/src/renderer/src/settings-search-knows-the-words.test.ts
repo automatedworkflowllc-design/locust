@@ -29,7 +29,7 @@ import { SETTINGS_PAGES, matchedHeadings, pageMatches } from './settingsPages.js
 const THE_FOUR = [
   { typed: 'memory', page: 'memory', heading: 'What your team remembers' },
   { typed: 'worktree', page: 'workspace', heading: 'Project folder' },
-  { typed: 'node', page: 'runtimes', heading: 'Runtimes & accounts' },
+  { typed: 'node', page: 'runtimes', heading: 'AI agents & accounts' },
   { typed: 'ledger', page: 'privacy', heading: 'Privacy & local data' }
 ] as const
 

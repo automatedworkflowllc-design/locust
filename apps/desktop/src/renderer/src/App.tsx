@@ -4403,7 +4403,7 @@ export default function App(): ReactElement {
       return undefined
     } catch {
       setRuns((all) =>
-        withRun(all, runId, (run) => ({ ...run, phase: 'failed', error: 'The handoff request could not be delivered. The mission stayed on the runtime it was on.' }))
+        withRun(all, runId, (run) => ({ ...run, phase: 'failed', error: 'The handoff request could not be delivered. It stayed on the AI agent it was on.' }))
       )
     } finally {
       setHandingOff(false)
@@ -6984,10 +6984,10 @@ export default function App(): ReactElement {
                   )
                   const command = theirs === undefined ? undefined : signInCommand(theirs)
                   const named =
-                    theirs === undefined || !isMissionRuntime(theirs) ? 'Their runtime' : runtimeDisplayName(theirs)
+                    theirs === undefined || !isMissionRuntime(theirs) ? 'Their AI agent' : runtimeDisplayName(theirs)
                   return command === undefined
                     ? `${named} is not signed in, so ${who.name} cannot start yet.`
-                    : `${named} is not signed in, so ${who.name} cannot start yet. Sign in from Settings > Runtimes, or ${command} in a terminal.`
+                    : `${named} is not signed in, so ${who.name} cannot start yet. Sign in from Settings > AI agents, or ${command} in a terminal.`
                 })()}
                 mode={mode}
                 onStarter={(prompt) => {
@@ -7717,7 +7717,7 @@ export default function App(): ReactElement {
               runtimeState.runtimes.some(
                 (runtime) => runtime.installed && (runtime.status === 'auth-required' || runtime.auth === 'unauthenticated')
               )
-                ? 'No runtime can run a mission yet. Locust runs the coding-agent CLIs on this machine — Settings shows what to install, and OpenCode needs no account.'
+                ? 'No AI agent can start yet. Locust works through the AI agents installed on this machine — Settings shows what to install, and OpenCode needs no account.'
                 : undefined
             }
             onStart={sendOrCompare}

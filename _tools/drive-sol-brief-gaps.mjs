@@ -144,7 +144,7 @@ try {
   check('and their Finances teammate is still there, an ordinary teammate', (kept.teammates ?? []).some((t) => t.teammateId === 'tm_fin' && t.name === 'Finances'), JSON.stringify((kept.teammates ?? []).map((t) => t.name)))
 
   // Settings > Runtimes: Codex's row, recorded for a person to read.
-  await drive.evaluate(settingsPage('Runtimes'))
+  await drive.evaluate(settingsPage('AI agents'))
   const codexRow = String(await drive.capture('Settings > Runtimes', () => drive.evaluate(`(async () => {
     await new Promise((r) => setTimeout(r, 1500))
     const page = document.querySelector('main')?.innerText ?? document.body.innerText

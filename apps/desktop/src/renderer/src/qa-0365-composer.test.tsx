@@ -107,7 +107,7 @@ describe('the composer on a machine that just got its first runtime', () => {
     // machine with nothing on it.
     const seen = markup(justInstalledOpenCode)
     const invites = seen.includes('Write a message') || seen.includes('Message ')
-    const namesTheStep = /OpenCode/.test(seen) && /switch|route/i.test(seen)
+    const namesTheStep = /OpenCode/.test(seen) && /switch|route|pick it/i.test(seen)
     expect(invites || namesTheStep).toBe(true)
   })
 

@@ -37,7 +37,7 @@ export function CliArtifacts({
      * thing lives.
      */
     <details className="lc-cliartifacts">
-      <summary className="lc-cliartifacts__summary lc-mono">{inventorySummary(artifacts)} set up in this CLI</summary>
+      <summary className="lc-cliartifacts__summary lc-mono">{inventorySummary(artifacts)} of its own</summary>
       <div className="lc-cliartifacts__note lc-mono">Locust lists these, it does not run them</div>
       {artifacts.map((entry) => (
         <div className="lc-cliartifacts__row" key={`${entry.runtime}/${entry.kind}/${entry.path}`}>

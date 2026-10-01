@@ -414,8 +414,8 @@ export function FirstLaunch({
         {discoveryPhase !== 'ready' && (
           <p className="lc-claim">
             {discoveryPhase === 'loading'
-              ? 'checking the runtimes on this machine'
-              : 'runtime discovery could not run — no credentials were read'}
+              ? 'looking for the AI agents on this machine'
+              : 'Locust could not look for AI agents — nothing of yours was read'}
           </p>
         )}
         {/*

@@ -1242,12 +1242,12 @@ function InstallCommand({ command }: { readonly command: string }): ReactElement
 
 function RuntimeSetupLine({ setup }: { readonly setup: PublicRuntimeSetup }): ReactElement {
   const parts: string[] = []
-  if (setup.mcpServers.length > 0) parts.push(`MCP: ${setup.mcpServers.join(', ')}`)
+  if (setup.mcpServers.length > 0) parts.push(`Connectors (MCP): ${setup.mcpServers.join(', ')}`)
   if (setup.hooks.length > 0) parts.push(`Hooks: ${setup.hooks.join(', ')}`)
   if (setup.skills.length > 0) parts.push(`Skills: ${fewNames(setup.skills)}`)
   if (setup.agents.length > 0) parts.push(`Agents: ${fewNames(setup.agents)}`)
   if (setup.unreadable.length > 0) parts.push(`${String(setup.unreadable.length)} config file${setup.unreadable.length === 1 ? '' : 's'} could not be read`)
-  const text = parts.length === 0 ? 'No MCP servers, hooks, skills or agents configured' : parts.join(' · ')
+  const text = parts.length === 0 ? 'No connectors, hooks, skills or agents set up' : parts.join(' · ')
   const title = [...setup.sources.map((path) => `read: ${path}`), ...setup.unreadable.map((path) => `unreadable: ${path}`)].join('\n')
   return (
     <div className="lc-runtimerow__detail lc-runtimerow__setup" title={title.length === 0 ? 'No configuration files found' : title}>
@@ -1672,7 +1672,7 @@ export function SettingsScreen({
           <More>
             <p>Changing the folder reopens Locust, so stop anything running first.</p>
             <p>
-              A LOCUST.md at the folder&rsquo;s root is given to every teammate, on every runtime, before each
+              A notes file named LOCUST.md at the folder&rsquo;s root is given to every teammate, on every AI agent, before each
               mission. A teammate with Own branch on works in its own worktree of the folder&rsquo;s repository,
               kept under .locust/worktrees. Each turn it finishes is saved on its branch as a commit; Review
               changes in its conversation shows them and lands them on your branch as one commit of yours.
@@ -1717,7 +1717,7 @@ export function SettingsScreen({
               <span className="lc-tag">LOCUST.md</span>
               <span className="lc-settings__note">
                 {workspaceBrief === null
-                  ? 'None in this folder. Add a LOCUST.md at its root and every teammate, on every runtime, is given it before each mission.'
+                  ? 'None in this folder. Add a notes file named LOCUST.md at its root and every teammate, on every AI agent, is given it before each mission.'
                   : `${String(workspaceBrief.lines)} line${workspaceBrief.lines === 1 ? '' : 's'} briefed to every teammate before each mission${workspaceBrief.truncated ? ' — longer than 200 lines, so the rest is not loaded. Put long checklists in files of their own and name them in LOCUST.md; a teammate reads one when it applies' : ''}.`}
               </span>
             </div>
@@ -1870,9 +1870,9 @@ export function SettingsScreen({
 
         {shownPage === 'runtimes' && (
         <section className="lc-settings__section">
-          <h2 className="lc-settings__heading">Runtimes &amp; accounts</h2>
+          <h2 className="lc-settings__heading">AI agents &amp; accounts</h2>
           <p className="lc-settings__lede">
-            Each runtime uses the account already signed in on this machine. Locust adds nothing of its own.
+            Each AI agent uses the account already signed in on this machine. Locust adds nothing of its own.
           </p>
           {/*
             Only when NOTHING is installed, which is what someone who has just
@@ -1891,8 +1891,8 @@ export function SettingsScreen({
           )}
           <More>
             <p>
-              Locust never pools subscriptions or proxies your requests. Under each runtime is what it has
-              set up for itself — MCP servers and hooks, read from its own files — so a tool a teammate
+              Locust never pools subscriptions or proxies your requests. Under each AI agent is what it has
+              set up for itself — connectors (MCP servers) and hooks, read from its own files — so a tool a teammate
               reaches for, or a script that runs mid-mission, is never a surprise. Locust changes nothing there.
             </p>
           </More>
@@ -2105,9 +2105,9 @@ export function SettingsScreen({
         )}
         {shownPage === 'runtimes' && (
         <section className="lc-settings__section">
-          <h2 className="lc-settings__heading">When a route hits its limit</h2>
+          <h2 className="lc-settings__heading">When a model hits its limit</h2>
           <p className="lc-settings__lede">
-            A run that hits its account&rsquo;s limit stops at a checkpoint and waits for you. Nothing switches provider on its own.
+            A run that hits its account&rsquo;s limit stops where it is and waits for you. Nothing moves to another AI agent on its own.
           </p>
           <More>
             <p>
@@ -2118,21 +2118,21 @@ export function SettingsScreen({
           <div className="lc-policyrow">
             <span className="lc-tag">HAND OFF</span>
             <span className="lc-settings__note">
-              Pick another runtime from the composer while a mission is running. The run is stopped,
-              reconciled, and continued there.
+              Pick another AI agent from the model menu while it is running. It is stopped there and
+              carried on with a summary of what was done.
             </span>
           </div>
           <div className="lc-policyrow">
             <span className="lc-tag">CONTINUE ELSEWHERE</span>
             <span className="lc-settings__note">
-              After a run has stopped, change the route and reply. The next turn starts on the new
-              runtime from the old one&rsquo;s checkpoint, with your reply as its first instruction.
+              After a run has stopped, pick another model and reply. The next turn starts there with a
+              summary of what was done, and your reply as its first instruction.
             </span>
           </div>
           <div className="lc-policyrow">
             <span className="lc-tag">AUTOMATIC</span>
             <span className="lc-settings__note">
-              Not built. Locust will not move your work to a provider you did not choose.
+              Not built. Locust will not move your work to an AI agent you did not choose.
             </span>
           </div>
           </div>
@@ -2538,10 +2538,10 @@ export function SettingsScreen({
               <h2 className="lc-settings__heading">Boot screen</h2>
               <p className="lc-settings__lede">
                 {tube === 'off'
-                  ? 'Off. Locust goes straight to the workspace while it finds your runtimes.'
+                  ? 'Off. Locust goes straight to the workspace while it finds your AI agents.'
                   : tube === 'subtle'
                     ? 'Subtle. The screen without the flicker or the glare.'
-                    : 'Full. The whole monitor while your runtimes are found.'}
+                    : 'Full. The whole monitor while your AI agents are found.'}
               </p>
             </div>
             {/* `lc-button is-active` is what every other segmented choice
@@ -2570,7 +2570,7 @@ export function SettingsScreen({
           </div>
           <More>
             <p>
-              Finding the runtimes on this machine takes as long as it takes — each one is a real command
+              Finding the AI agents on this machine takes as long as it takes — each one is a real command
               and some of them are slow to answer. The screen shows that happening rather than a spinner
               standing in for it, and every line on it is something the app actually read.
             </p>

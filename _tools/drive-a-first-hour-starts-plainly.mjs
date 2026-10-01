@@ -63,7 +63,7 @@ try {
   const runtimes = String(await drive.capture('Settings > Runtimes, in a copy', () => drive.evaluate(`(async () => {
     ;[...document.querySelectorAll('button')].find((b) => b.innerText.replace(/\\s+/g, ' ').trim() === 'Settings')?.click()
     await new Promise((r) => setTimeout(r, 700))
-    ;[...document.querySelectorAll('.lc-settings__navitem')].find((b) => /Runtimes/.test(b.innerText))?.click()
+    ;[...document.querySelectorAll('.lc-settings__navitem')].find((b) => /AI agents|Runtimes/.test(b.innerText))?.click()
     for (let i = 0; i < 40 && !/never updates the agents|Update Codex CLI and Copilot CLI/.test(document.body.innerText + [...document.querySelectorAll('[aria-label]')].map((el) => el.getAttribute('aria-label')).join(' ')); i += 1) await new Promise((r) => setTimeout(r, 250))
     const note = [...document.querySelectorAll('.lc-settings__note')].map((el) => el.innerText.trim()).find((text) => /agents on this machine|Updating/.test(text)) ?? ''
     const sw = [...document.querySelectorAll('button[role="switch"]')].some((b) => b.getAttribute('aria-label') === 'Update Codex CLI and Copilot CLI on their own')

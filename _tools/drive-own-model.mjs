@@ -89,7 +89,7 @@ const type = (selector, value) => `(() => {
 const settingsRuntimes = `(async () => {
   window.dispatchEvent(new KeyboardEvent('keydown', { key: '3', ctrlKey: true, bubbles: true }))
   await new Promise((r) => setTimeout(r, 900))
-  ;[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Runtimes')?.click()
+  ;[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'AI agents')?.click()
   for (let i = 0; i < 20 && !document.querySelector('.lc-ownmodel__form'); i += 1) await new Promise((r) => setTimeout(r, 150))
   const form = document.querySelector('.lc-ownmodel__form')
   if (!form) return 'no Your own models form on the Runtimes page'

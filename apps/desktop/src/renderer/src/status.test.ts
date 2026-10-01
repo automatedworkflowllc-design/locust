@@ -200,7 +200,7 @@ describe('nothing is live unless discovery proved it', () => {
     // Selectable is the point -- Claude must be visibly choosable -- but the
     // row has to say what has not been established about it.
     expect(status.selectable).toBe(true)
-    expect(status.detail).toMatch(/not been proven/)
+    expect(status.detail).toMatch(/not been tried through a whole run/)
     /*
      * It used to end "so runs are not durable yet", which was written for an
      * adapter that could not record. Muse Code became the first real PREVIEW
@@ -367,7 +367,7 @@ describe('handoff availability', () => {
     // Silence on a disabled control is the failure being prevented here.
     expect(handoffTitle('starting')).toMatch(/waiting/i)
     expect(handoffTitle('switching')).toMatch(/handing/i)
-    expect(handoffTitle('available')).toMatch(/hand this mission/i)
+    expect(handoffTitle('available')).toMatch(/hand this to another/i)
     // Idle needs no explanation: the control is doing its ordinary job.
     expect(handoffTitle('idle')).toBeUndefined()
   })
