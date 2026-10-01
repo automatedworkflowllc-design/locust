@@ -1703,9 +1703,12 @@ export default function App(): ReactElement {
   }>()
   /** What the host said when a file could not be opened. Shown where the press was. */
   const [viewerRefusal, setViewerRefusal] = useState<string>()
+  // Which file it was, for the refusal's heading (0.524): "Could not open that file" named none.
+  const [refusedName, setRefusedName] = useState<string>()
   const openFileInViewer = (path: string): void => {
     const bridge = window.desktop
     setViewerRefusal(undefined)
+    setRefusedName(path.replace(/[\\/]+$/, '').split(/[\\/]/).pop())
     if (bridge === undefined || workspacePath === undefined) return
     /*
      * Two callers, two shapes of path.
@@ -7996,7 +7999,7 @@ export default function App(): ReactElement {
         {viewerRefusal !== undefined && screen === 'workroom' && viewingFile === undefined && (
           <aside className="lc-viewer lc-viewer--refused" role="status">
             <div className="lc-viewer__head">
-              <span className="lc-viewer__name">Could not open that file</span>
+              <span className="lc-viewer__name">{refusedName === undefined || refusedName.length === 0 ? 'Could not open that file' : `Could not open ${refusedName}`}</span>
               <span className="lc-viewer__spacer" />
               <button type="button" className="lc-viewer__close" aria-label="Dismiss" onClick={() => setViewerRefusal(undefined)}>
                 <Icon name="close" size={13} />

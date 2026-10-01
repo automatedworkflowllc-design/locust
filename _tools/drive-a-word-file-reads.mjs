@@ -35,7 +35,7 @@ const TEAMMATE = { teammateId: 'tm_penny0000000000000000', name: 'Penny', hue: '
 const missionId = 'mission_5e000000-0000-4000-8000-000200000000'
 const runId = 'run_5e0002'
 const at = new Date(Date.now() - 600_000).toISOString()
-const reply = 'Both are in the project folder.\n\n<locust-file>\nquarterly-report.docx :: the quarterly report\nlaunch-plan.pptx :: the launch deck\n</locust-file>'
+const reply = 'Both are in the project folder.\n\n<locust-file>\nquarterly-report.docx :: the quarterly report\nlaunch-plan.pptx :: the launch deck\nnever-written.md :: the notes\n</locust-file>'
 await ledger.createMission({
   missionId, runId, prompt: 'Write the quarterly report as a Word document and the launch plan as a deck',
   runtime: 'codex', model: 'account-default', requestedRouteId: 'codex', resolvedRouteId: 'codex-account:default', cliVersion: null,
@@ -104,6 +104,15 @@ try {
   const deck = JSON.parse(String(await drive.capture('the deck, opened', () => drive.evaluate(openFile('/launch-plan\\.pptx/')))))
   check('the deck opens as its slides, numbered and titled, in order', JSON.stringify(deck.slides) === JSON.stringify(['Slide 1 Launch Plan', 'Slide 2 What ships', 'Slide 3 Numbers']), JSON.stringify(deck.slides) + ' ' + deck.refused)
   check('with each slide\'s points and table', deck.items.join(' | ') === 'Weekday routines | Monday to Friday by default | Word and PowerPoint previews' && deck.cells.join(' ') === 'Metric Value Users 1,200', JSON.stringify({ items: deck.items, cells: deck.cells }))
+  // A file the teammate named but never wrote (0.524): the refusal says which, and why.
+  const refused = String(await drive.capture('a file never written, pressed', () => drive.evaluate(`(async () => {
+    document.querySelector('.lc-viewer .lc-viewer__close')?.click()
+    await new Promise((r) => setTimeout(r, 400))
+    ;[...document.querySelectorAll('button')].find((b) => /never-written\\.md/.test(b.innerText))?.click()
+    await new Promise((r) => setTimeout(r, 1200))
+    return document.querySelector('.lc-viewer--refused')?.innerText.replace(/\\s+/g, ' ').trim() ?? 'no refusal'
+  })()`)))
+  check('a file never written: the refusal names it, and says why', /^Could not open never-written\.md/i.test(refused) && /did not write it/.test(refused), refused)
   await drive.resize(1120, 760)
   await sleep(800)
   const narrow = JSON.parse(String(await drive.capture('the deck at 1120', () => drive.evaluate(openFile('/launch-plan\\.pptx/')))))
