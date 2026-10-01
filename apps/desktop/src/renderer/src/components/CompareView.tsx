@@ -13,6 +13,7 @@ import { Icon } from './Icon.js'
 import { RuntimeMark } from './RuntimeMark.js'
 import { ThreadItems } from './Thread.js'
 import { WorkingSpark } from './WorkingSpark.js'
+import type { CompareRecordRow } from '../compareRecord.js'
 
 /**
  * COMPARE, SIDE BY SIDE (0.441, shared/compare.ts,
@@ -84,7 +85,8 @@ export function CompareView({
   onBack,
   decidingIds,
   onDecide,
-  onAnswer
+  onAnswer,
+  record
 }: {
   readonly compare: PublicCompare
   /** In a comparison that edits (0.445): what each column has changed, "+12 -3 in 2 files". */
@@ -108,6 +110,8 @@ export function CompareView({
   readonly onAnswer?: (approvalId: string, answers: Readonly<Record<string, readonly string[]>>) => void
   /** Kept already: back to the conversation it carries on in. */
   readonly onBack: (() => void) | undefined
+  /** Once one is kept: every model's record across your decided comparisons (0.519). */
+  readonly record?: readonly CompareRecordRow[]
 }): ReactElement {
   const kept = compare.kept?.slot
   // A blind comparison hides what would name the model -- its mark, its runtime, its cost -- until one is kept (0.449).
@@ -271,6 +275,38 @@ export function CompareView({
             </div>
           ))}
         </div>
+        {record !== undefined && record.length > 0 && (
+          /*
+           * YOUR RECORD (0.519), as Optima's results table: every model you
+           * have compared, how often you kept it, and what its answers
+           * typically took. Under the answers, once one is kept.
+           */
+          <div className="lc-compare__record">
+            <span className="lc-compare__recordlabel lc-mono">YOUR RECORD</span>
+            <div className="lc-tablewrap">
+              <table className="lc-table">
+                <thead>
+                  <tr>
+                    <th>Model</th>
+                    <th>Kept</th>
+                    <th>Typical time</th>
+                    <th>Typical cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {record.map((row) => (
+                    <tr key={row.key}>
+                      <td>{row.name}</td>
+                      <td className="lc-compare__recordnum">{`${String(row.kept)} of ${String(row.compared)}`}</td>
+                      <td className="lc-compare__recordnum">{row.time ?? '—'}</td>
+                      <td className="lc-compare__recordnum">{row.cost ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
       <div className="lc-compare__feet">
         {columns.map((column) => (

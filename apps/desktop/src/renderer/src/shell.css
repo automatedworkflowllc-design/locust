@@ -10849,6 +10849,27 @@ textarea {
   align-items: stretch;
 }
 
+/* Your record (0.519): under the answers, as wide as one column, read like a reply's table. */
+.lc-compare__record {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+  max-width: 720px;
+  /* The grid's padding and a cell's: the record starts where the answers' words do. */
+  padding: 0 calc(var(--lc-space-5) * 2) var(--lc-space-6);
+}
+
+.lc-compare__recordlabel {
+  font-size: var(--lc-text-mono-label);
+  letter-spacing: 0.06em;
+  color: var(--lc-text-muted);
+}
+
+.lc-compare__recordnum {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .lc-compare__head,
 .lc-compare__cell,
 .lc-compare__foot {

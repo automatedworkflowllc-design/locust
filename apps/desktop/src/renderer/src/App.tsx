@@ -162,7 +162,8 @@ import { finishedToast } from './finishedToast.js'
 import { folderName, ranOnLine } from './ranOn.js'
 import { reviewBrief } from './reviewBrief.js'
 import type { ReviewMaterial } from './reviewBrief.js'
-import { conversationCostLine, costLine, headerCostTail, latestContext, runCostOf, sumCosts } from './cost.js'
+import { conversationCostLine, costLine, headerCostTail, latestContext, missionCost, runCostOf, sumCosts } from './cost.js'
+import { compareRecordRows } from './compareRecord.js'
 import { sequenceOfPost } from './roomExchange.js'
 import type { LiveTurn, RoomExchange, StartingReply } from './roomExchange.js'
 import { isStoppable, stopPress } from './stopPress.js'
@@ -6945,6 +6946,19 @@ export default function App(): ReactElement {
                   onDecide={decideApproval}
                   onAnswer={answerQuestion}
                   onBack={comparing.kept === undefined ? undefined : () => setComparingId(undefined)}
+                  // Kept: the record across every decided comparison, as Optima's results table (0.519).
+                  {...(comparing.kept === undefined ? {} : {
+                    record: compareRecordRows(
+                      compares,
+                      (compare, slot) => {
+                        const runs = (compare.slots.find((column) => column.slot === slot)?.missionIds ?? []).flatMap((id) => historyById.get(id) ?? [])
+                        const ms = runs.reduce((total, run) => total + (runSpanMs(run.events) ?? 0), 0)
+                        const cost = sumCosts(runs.map((run) => missionCost(run)))
+                        return { ...(ms > 0 ? { ms } : {}), ...(cost === undefined ? {} : { cost }) }
+                      },
+                      (route) => route.label ?? route.model
+                    )
+                  })}
                 />
               )
             })()
