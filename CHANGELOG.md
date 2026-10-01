@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.524.0 - 2026-10-01
+
+### Fixed
+
+- **"Ask about this" no longer covers what you are reading.** It used to sit
+  over the line above the words you selected; it now sits just after them,
+  on their own line.
+- **A file that cannot be opened is named.** The message says "Could not
+  open report.md" rather than "that file", with the reason under it.
+
 ## 0.523.0 - 2026-10-01
 
 ### New
