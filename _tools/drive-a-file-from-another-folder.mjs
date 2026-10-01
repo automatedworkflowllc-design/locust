@@ -24,7 +24,7 @@ const other = await scratchRepository('locust-drive-file-elsewhere-other-')
 await writeFile(join(other, 'report.md'), '# The other folder\n\nTHE REPORT FROM THE OTHER FOLDER.\n', 'utf8')
 // And one Locust has never heard of.
 const stranger = await mkdtemp(join(tmpdir(), 'locust-drive-file-elsewhere-stranger-'))
-await writeFile(join(stranger, 'secret.md'), 'NOT FOR LOCUST\n', 'utf8')
+await writeFile(join(stranger, 'notes.md'), 'NOT FOR LOCUST\n', 'utf8')
 const profile = await mkdtemp(join(process.env.LOCUST_SCRATCH ?? tmpdir(), 'locust-drive-file-elsewhere-profile-'))
 await writeFile(join(profile, 'folders.json'), JSON.stringify({ folders: [{ id: 'ws_other', path: resolve(other) }] }), 'utf8')
 const up = (folder) => `../${basename(folder)}`
@@ -52,12 +52,12 @@ try {
   await drive.capture('launch', () => drive.ready())
   await drive.evaluate(openTeammateScript('Ash'))
   await drive.capture('Ash hands over two files by .. paths', () => drive.evaluate(sendAndWaitScript(
-    `Do not use any tools. Reply with exactly the following lines and nothing else:\n<locust-file>\n${up(other)}/report.md :: the report\n${up(stranger)}/secret.md :: not ours\n</locust-file>`
+    `Do not use any tools. Reply with exactly the following lines and nothing else:\n<locust-file>\n${up(other)}/report.md :: the report\n${up(stranger)}/notes.md :: the notes\n</locust-file>`
   )))
   const buttons = JSON.parse(String(await drive.evaluate(`JSON.stringify([...document.querySelectorAll('.lc-handedfile')].map((b) => b.innerText.replace(/\\s+/g, ' ').trim()).filter(Boolean))`)))
   check('a button is drawn for the file in the other folder', buttons.some((text) => /report\.md/.test(text)), JSON.stringify(buttons))
   const opened = String(await drive.capture('the other folder\'s report, opened', () => drive.evaluate(`(async () => {
-    const button = [...document.querySelectorAll('button')].find((b) => /report\\.md/.test(b.innerText) && !/secret/.test(b.innerText))
+    const button = [...document.querySelectorAll('button')].find((b) => /report\\.md/.test(b.innerText) && !/notes/.test(b.innerText))
     button?.click()
     for (let i = 0; i < 20 && !document.querySelector('.lc-viewer'); i += 1) await new Promise((r) => setTimeout(r, 250))
     await new Promise((r) => setTimeout(r, 800))
@@ -67,7 +67,7 @@ try {
   const refused = String(await drive.capture('the stranger\'s file, pressed', () => drive.evaluate(`(async () => {
     document.querySelector('.lc-viewer .lc-viewer__close')?.click()
     await new Promise((r) => setTimeout(r, 400))
-    const button = [...document.querySelectorAll('button')].find((b) => /secret\\.md/.test(b.innerText))
+    const button = [...document.querySelectorAll('button')].find((b) => /notes\\.md/.test(b.innerText))
     if (!button) return 'no button'
     button.click()
     await new Promise((r) => setTimeout(r, 1200))

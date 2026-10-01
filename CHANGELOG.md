@@ -31,6 +31,10 @@ heading: the home screen then shows it once, as a splash.
   (handed over as `../other-folder/report.md`) got no button, and learned to
   copy files into its own folder instead. It is now shown, from any folder
   Locust works in; anywhere else is still refused when you press it.
+- **Home no longer shakes at some window sizes.** With a few teammates, a
+  window around 1,200 by 770 could make Home flick between two layouts many
+  times a second, most often right after removing a teammate. Home now
+  settles on one layout and holds it at every size.
 
 ## 0.515.0 - 2026-10-01
 

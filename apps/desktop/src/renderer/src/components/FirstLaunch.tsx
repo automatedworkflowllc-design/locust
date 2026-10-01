@@ -363,7 +363,27 @@ export function FirstLaunch({
       const padding = getComputedStyle(paneEl)
       const usable = paneEl.clientHeight - parseFloat(padding.paddingTop) - parseFloat(padding.paddingBottom)
       const base = COVER_HEIGHT * coverScale(cover.clientWidth)
-      const others = innerEl.offsetHeight - cover.offsetHeight
+      /*
+       * EVERYTHING ELSE, MEASURED FROM ITSELF (0.516). This was the column's
+       * height less the cover's, which also took in the space around the
+       * cover -- and that moves when the cover grows. Colin, 2026-10-01, Home
+       * at ~1200x770: "stuttering and shaking like crazy". Traced
+       * (drive-home-holds-still): "everything else" read 314px with the cover
+       * at 189 and 319px with it at 216, so each size argued for the other,
+       * 20+ times in two seconds. The other sections, their margins and the
+       * column's gaps and padding do not move with the cover.
+       */
+      const column = getComputedStyle(innerEl)
+      const gap = parseFloat(column.rowGap) || 0
+      const children = [...innerEl.children] as HTMLElement[]
+      const others = children
+        .filter((child) => child !== cover && !child.contains(cover))
+        .reduce((sum, child) => {
+          const style = getComputedStyle(child)
+          return sum + child.offsetHeight + (parseFloat(style.marginTop) || 0) + (parseFloat(style.marginBottom) || 0)
+        }, 0)
+        + gap * Math.max(0, children.length - 1)
+        + (parseFloat(column.paddingTop) || 0) + (parseFloat(column.paddingBottom) || 0)
       setCoverGrow(coverGrowFor(coverRoomFor(usable, others, base), base))
     }
     measure()

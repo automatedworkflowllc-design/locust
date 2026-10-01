@@ -2811,6 +2811,16 @@ textarea {
      space instead. */
   min-height: 0;
   overflow-y: auto;
+  /*
+   * THE SCROLLBAR'S ROOM IS KEPT, ALWAYS (0.516). Colin, 2026-10-01, three
+   * teammates on Home at 1209x770: "stuttering and shaking like crazy". The
+   * cover grows into the height left over, and its height follows its width;
+   * a scrollbar appearing took ~10px of width, the cover got shorter, the
+   * page fit, the scrollbar went, the cover grew -- 20+ flips in two seconds
+   * (drive-home-holds-still). With the gutter kept, the width never moves.
+   * Both edges, so the column stays centred.
+   */
+  scrollbar-gutter: stable both-edges;
 }
 
 /* The roster as evidence: a count you can open, not eight rows you must
