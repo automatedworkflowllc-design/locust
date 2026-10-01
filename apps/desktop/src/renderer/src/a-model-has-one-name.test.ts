@@ -32,6 +32,11 @@ describe('a model has one name', () => {
     expect(modelDisplayName('codex', 'gpt-6-luna')).toBe('GPT-6 Luna')
   })
 
+  it('leaves Locust\'s own "Account Default" as it reads everywhere (seen on the screen tour)', () => {
+    rememberOwnModels([{ id: 'account-default', displayName: 'Account default', runtime: 'codex' }])
+    expect(modelDisplayName('codex', 'account-default')).toBe('Account Default')
+  })
+
   it('never takes a different name, and keeps runtimes apart', () => {
     rememberOwnModels([
       { id: 'gpt-6-luna', displayName: 'Fast and affordable', runtime: 'codex' },

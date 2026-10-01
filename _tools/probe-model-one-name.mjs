@@ -33,6 +33,12 @@ try {
   const got = JSON.parse(String(await drive.capture('GPT-6-Luna picked: the chip beside the list', () => drive.evaluate(`(async () => {
     const chip = [...document.querySelectorAll('.lc-control')].find((b) => b.getAttribute('aria-haspopup') === 'listbox')
     if (!chip) return JSON.stringify({ why: 'no chip' })
+    // Read once the catalogs are in: the bare-id names they carry are what could leak into the chip,
+    // so a chip read before they load would pass by construction.
+    chip.click()
+    for (let i = 0; i < 100 && document.querySelectorAll('.lc-picker__row:not(.is-recent)').length < 3; i += 1) await new Promise((r) => setTimeout(r, 200))
+    chip.click()
+    await new Promise((r) => setTimeout(r, 500))
     const before = chip.innerText.replace(/\\s+/g, ' ').trim()
     chip.click()
     for (let i = 0; i < 20 && !document.querySelector('.lc-picker__input'); i += 1) await new Promise((r) => setTimeout(r, 150))
@@ -40,9 +46,13 @@ try {
     const setInput = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
     setInput.call(box, 'luna')
     box.dispatchEvent(new Event('input', { bubbles: true }))
-    await new Promise((r) => setTimeout(r, 700))
-    const row = [...document.querySelectorAll('.lc-picker__row:not(.is-recent)')].find((one) => !one.disabled && /luna/i.test(one.querySelector('.lc-picker__label')?.textContent ?? ''))
-    if (!row) return JSON.stringify({ why: 'no Luna row', rows: [...document.querySelectorAll('.lc-picker__row')].map((one) => [one.className, one.disabled, one.querySelector('.lc-picker__label')?.textContent ?? null]) })
+    // A fresh launch reads the catalogs a few seconds in: wait for the row rather than assume it.
+    let row
+    for (let i = 0; i < 100 && row === undefined; i += 1) {
+      await new Promise((r) => setTimeout(r, 200))
+      row = [...document.querySelectorAll('.lc-picker__row:not(.is-recent)')].find((one) => !one.disabled && /luna/i.test(one.querySelector('.lc-picker__label')?.textContent ?? ''))
+    }
+    if (!row) return JSON.stringify({ why: 'no Luna row', before, rows: [...document.querySelectorAll('.lc-picker__row')].map((one) => [one.className, one.disabled, one.querySelector('.lc-picker__label')?.textContent ?? null]) })
     const listed = row.querySelector('.lc-picker__label')?.textContent.trim() ?? ''
     row.click()
     await new Promise((r) => setTimeout(r, 800))

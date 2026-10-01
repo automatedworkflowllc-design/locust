@@ -137,7 +137,9 @@ export function rememberOwnModels(models: readonly { readonly id: string; readon
     if (model.own === true) ownModelNames.set(model.id, model.displayName)
     // A catalog "name" that is the id, or the id without its provider (OpenCode's
     // `nemotron-3-ultra-free`), is an identifier, not a spelling: never taken.
-    else if (model.runtime !== undefined && model.displayName !== model.id && !model.id.endsWith(`/${model.displayName}`)) catalogSpellings.set(`${model.runtime}:${model.id}`, model.displayName)
+    // Nor is `account-default`, Locust's own word for "send no model": its catalog label
+    // ("Account default") would have re-cased every list row that says "Account Default".
+    else if (model.runtime !== undefined && model.id !== 'account-default' && model.displayName !== model.id && !model.id.endsWith(`/${model.displayName}`)) catalogSpellings.set(`${model.runtime}:${model.id}`, model.displayName)
   }
 }
 
