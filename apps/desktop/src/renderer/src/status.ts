@@ -486,13 +486,13 @@ export function missionPhaseView(
  * (`Screens.tsx`), so this is also two surfaces agreeing on their own words
  * rather than a new phrase.
  *
- * `ledger readable`, not `ledger verified` (QA-2026-09-29 round 2, R24): the
+ * `record readable`, not `ledger verified` (QA-2026-09-29 round 2, R24): the
  * check is that every file parses and its sequence has no gap. A reply edited
  * at rest, or a whole mission file deleted, reads back clean, so "verified"
  * promised tamper evidence the check does not give.
  */
-export function ledgerVerificationLabel(integrityIssueCount: number): 'ledger readable' | 'ledger incomplete' {
-  return integrityIssueCount === 0 ? 'ledger readable' : 'ledger incomplete'
+export function ledgerVerificationLabel(integrityIssueCount: number): 'record readable' | 'record incomplete' {
+  return integrityIssueCount === 0 ? 'record readable' : 'record incomplete'
 }
 
 /** Short mission id for mono provenance: real UUID prefix, never a fake counter. */

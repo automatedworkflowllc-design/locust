@@ -315,9 +315,9 @@ export function MissionsScreen({
          */
         meta={`${conversations.length} ${conversations.length === 1 ? 'conversation' : 'conversations'}${elsewhere === 0 ? '' : `, ${conversations.length - elsewhere} in this folder`} · ${
           ledgerUnreadable
-            ? 'the ledger could not be read'
+            ? 'the records could not be read'
             : damaged === 0
-              ? 'ledger readable'
+              ? 'all readable'
               : ledgerDamageWords(withIssues, unreadableLedgers)
         }${total === undefined || total.word !== 'priced' ? '' : ` · ${total.line} across ${String(total.runs)} priced`}${
           totalMissions === undefined || listedMissions === undefined ? '' : ` · only the newest ${listedMissions.toLocaleString('en-US')} of ${totalMissions.toLocaleString('en-US')} turns are listed`
@@ -686,7 +686,7 @@ export function TeammatesScreen({
           */}
         <div className="lc-rostercard__route lc-mono">
           {teammate.route === undefined ? (
-            <span>not run yet · runs on the model you pick</span>
+            <span>runs on the model you pick</span>
           ) : (
             <>
               <span className="lc-rostercard__model">
@@ -2148,8 +2148,8 @@ export function SettingsScreen({
               <h2 className="lc-settings__heading">Swarm</h2>
               <p className="lc-settings__lede">
                 {swarm
-                  ? 'On. Every mission runs at its model\u2019s maximum effort.'
-                  : 'Off. Each mission runs at the effort its route is set to.'}
+                  ? 'On. Every run uses its model\u2019s maximum effort.'
+                  : 'Off. Each run uses the effort its model is set to.'}
               </p>
             </div>
             <button
@@ -2185,8 +2185,8 @@ export function SettingsScreen({
               <h2 className="lc-settings__heading">Auto mode</h2>
               <p className="lc-settings__lede">
                 {autoMode
-                  ? 'On. A mission started in Auto runs without asking and is not confined to the workspace folder.'
-                  : 'Off. Missions may edit files inside the workspace folder and nowhere else.'}
+                  ? 'On. A run started in Auto goes ahead without asking and is not kept to the project folder.'
+                  : 'Off. Teammates may change files inside the project folder and nowhere else.'}
               </p>
             </div>
             <button

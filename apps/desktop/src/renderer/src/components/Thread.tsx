@@ -579,7 +579,7 @@ function ReceiptCard({
    * run that failed or was cut off, a ledger that could not be verified, an
    * action that never reported back -- keeps the card, at rest, as before.
    */
-  const routine = view.tone === 'blue' && verification === 'ledger readable' && unsettled.length === 0
+  const routine = view.tone === 'blue' && verification === 'record readable' && unsettled.length === 0
   if (routine && !open) {
     return (
       <div className="lc-receipt__quiet">
@@ -622,7 +622,7 @@ function ReceiptCard({
           <span className="lc-separator">·</span>
           {checkpoints.length === 0 ? 'no checkpoints' : `${String(checkpoints.length)} checkpoints`}
           <span className="lc-separator">·</span>
-          <span className={verification === 'ledger readable' ? 'lc-tone-green' : 'lc-tone-amber'}>{verification}</span>
+          <span className={verification === 'record readable' ? 'lc-tone-green' : 'lc-tone-amber'}>{verification}</span>
           {unsettled.length > 0 && (
             <>
               <span className="lc-separator">·</span>
@@ -691,7 +691,7 @@ function ReceiptCard({
         <dt>{costLabel(runCostOf(mission.events))}</dt>
         <dd className="lc-mono">{costLineOrWhyNot(runCostOf(mission.events))}</dd>
         <dt>Ledger</dt>
-        <dd className={verification === 'ledger readable' ? 'lc-tone-green' : 'lc-tone-amber'}>{verification}</dd>
+        <dd className={verification === 'record readable' ? 'lc-tone-green' : 'lc-tone-amber'}>{verification}</dd>
       </dl>
       )}
     </div>

@@ -289,7 +289,7 @@ export function Inspector({
               <dt>Ledger</dt>
               <dd
                 className={
-                  ledgerVerificationLabel(restoredMission.integrityIssueCount) === 'ledger readable'
+                  ledgerVerificationLabel(restoredMission.integrityIssueCount) === 'record readable'
                     ? 'lc-tone-green'
                     : 'lc-tone-amber'
                 }

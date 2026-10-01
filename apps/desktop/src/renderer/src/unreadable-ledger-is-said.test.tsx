@@ -83,7 +83,7 @@ describe('what the Missions header says about a damaged ledger', () => {
   it('says verified only when there is genuinely nothing wrong', () => {
     // The control. Without it, a header that never says "verified" would pass
     // every assertion below while being just as wrong in the other direction.
-    expect(header([mission('m_1', 0)], 0)).toContain('ledger readable')
+    expect(header([mission('m_1', 0)], 0)).toContain('all readable')
   })
 
   it('never claims verification while a file could not be read', () => {
@@ -132,7 +132,7 @@ describe('what the Missions header says about a damaged ledger', () => {
      */
     const said = header([], 0, true)
     expect(said).not.toMatch(/verified/i)
-    expect(said).toContain('the ledger could not be read')
+    expect(said).toContain('the records could not be read')
   })
 
   it('still counts body damage on its own, as it always did', () => {

@@ -318,8 +318,8 @@ describe('mission phase and receipt truth', () => {
     // reads as an endorsement of the work, which this app knows nothing
     // about; the Missions header has always said "ledger verified" for the
     // same fact (Astra's 0.87.1 audit).
-    expect(ledgerVerificationLabel(1)).toBe('ledger incomplete')
-    expect(ledgerVerificationLabel(0)).toBe('ledger readable')
+    expect(ledgerVerificationLabel(1)).toBe('record incomplete')
+    expect(ledgerVerificationLabel(0)).toBe('record readable')
     expect(ledgerVerificationLabel(0)).not.toBe('verified')
   })
 })
