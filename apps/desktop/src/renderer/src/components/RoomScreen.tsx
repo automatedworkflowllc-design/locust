@@ -740,7 +740,7 @@ export function RoomScreen({
               >
                 <p className="lc-roomcardform__about">
                   Name it and pick who is in it. A post goes to everyone in the room at once, each on their own
-                  runtime and model; their answers land here, and each one opens the conversation it came from.
+                  AI agent and model; their answers land here, and each one opens the conversation it came from.
                 </p>
                 <div className="lc-roomcardform__fields">
                 {/*
@@ -811,7 +811,7 @@ export function RoomScreen({
                       surprises people. */}
                   <span className="lc-roomcardform__summary">
                     {`${String(draftMembers.length)} of ${String(teammates.length)} teammate${teammates.length === 1 ? '' : 's'}`}
-                    {' · each answers on its own route'}
+                    {' · each answers on its own model'}
                   </span>
                   <button
                     type="submit"
