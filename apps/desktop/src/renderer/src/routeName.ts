@@ -119,9 +119,26 @@ function spellOut(id: string): string {
 const ownModelNames = new Map<string, string>()
 const OWN_ROUTE_MODEL = /^own-[a-f0-9]{8}\/(.+)$/
 
-export function rememberOwnModels(models: readonly { readonly id: string; readonly displayName: string; readonly own?: true }[]): void {
+/**
+ * THE RUNTIME'S OWN SPELLING (0.528). The picker lists a model by the name its
+ * runtime gave it -- Codex's "GPT-6-Luna" -- and the chip spelled the id,
+ * "GPT-6 Luna": one model, two names, side by side in Compare's columns. A
+ * catalog name that is the SAME name as the spelled id (differing only in
+ * case, hyphens and spaces) is the maker's styling and is used; a different
+ * name -- an alias's version, a description -- never replaces the spelling.
+ */
+const catalogSpellings = new Map<string, string>()
+const sameName = (a: string): string => a.toLowerCase().replace(/[\s-]+/g, ' ').trim()
+
+export function rememberOwnModels(models: readonly { readonly id: string; readonly displayName: string; readonly own?: true; readonly runtime?: string }[]): void {
   ownModelNames.clear()
-  for (const model of models) if (model.own === true) ownModelNames.set(model.id, model.displayName)
+  catalogSpellings.clear()
+  for (const model of models) {
+    if (model.own === true) ownModelNames.set(model.id, model.displayName)
+    // A catalog "name" that is the id, or the id without its provider (OpenCode's
+    // `nemotron-3-ultra-free`), is an identifier, not a spelling: never taken.
+    else if (model.runtime !== undefined && model.displayName !== model.id && !model.id.endsWith(`/${model.displayName}`)) catalogSpellings.set(`${model.runtime}:${model.id}`, model.displayName)
+  }
 }
 
 /** A route on one of the person's own models: `own-<8 hex>/<model>`. */
@@ -163,7 +180,9 @@ export function modelDisplayName(runtime: string, modelId: string): string {
   const bare = named.toLowerCase().startsWith(prefix) ? named.slice(prefix.length) : named
   // An id that is ONLY the runtime's name has nothing left to show; the id
   // itself is then the honest label.
-  return bare.length === 0 ? spellOut(named) : spellOut(bare)
+  const spelled = bare.length === 0 ? spellOut(named) : spellOut(bare)
+  const theirs = catalogSpellings.get(`${runtime}:${modelId}`)
+  return theirs !== undefined && sameName(theirs) === sameName(spelled) ? theirs : spelled
 }
 
 /**
