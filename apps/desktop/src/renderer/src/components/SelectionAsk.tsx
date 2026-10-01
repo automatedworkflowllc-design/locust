@@ -6,7 +6,7 @@ import type { ReactElement } from 'react'
  * select a specific part of the chat to follow up on like I do using
  * chatgpt").
  *
- * Select words in a teammate's reply and a small button appears above them;
+ * Select words in a teammate's reply and a small button appears beside them;
  * pressing it quotes them into the message box, above whatever is typed
  * there, so the next message is about that part. As ChatGPT's and Claude's
  * own apps do. Only a reply's text counts -- not the person's own messages,
@@ -23,7 +23,7 @@ export function quoteOf(text: string): string {
 }
 
 export function SelectionAsk({ onAsk }: { readonly onAsk: (quote: string) => void }): ReactElement | null {
-  const [shown, setShown] = useState<{ readonly text: string; readonly x: number; readonly y: number }>()
+  const [shown, setShown] = useState<{ readonly text: string; readonly left: number; readonly top: number; readonly centred: boolean }>()
   useEffect(() => {
     const read = (): void => {
       const selection = window.getSelection()
@@ -41,8 +41,23 @@ export function SelectionAsk({ onAsk }: { readonly onAsk: (quote: string) => voi
         setShown(undefined)
         return
       }
+      /*
+       * WHERE IT SITS (0.523). Above the selection it covered the line above
+       * -- the one being read (Sol) -- and below it, the line after. Beside
+       * the END of the selection, on its own line, is where a reply usually
+       * has room: a sentence or a paragraph ends there. Only when the line
+       * runs to the window's edge does it go below.
+       */
+      const rects = range.getClientRects()
+      const last = rects[rects.length - 1] ?? range.getBoundingClientRect()
       const box = range.getBoundingClientRect()
-      setShown({ text, x: Math.round(box.left + box.width / 2), y: Math.round(box.top) })
+      const BUTTON_WIDTH = 130
+      const BUTTON_HEIGHT = 30
+      setShown(
+        last.right + 10 + BUTTON_WIDTH <= window.innerWidth - 16
+          ? { text, left: Math.round(last.right + 10), top: Math.round(last.top + last.height / 2 - BUTTON_HEIGHT / 2), centred: false }
+          : { text, left: Math.round(box.left + box.width / 2), top: Math.round(box.bottom + BUTTON_HEIGHT + 16 <= window.innerHeight ? box.bottom + 8 : Math.max(8, box.top - 38)), centred: true }
+      )
     }
     // After the mouse lifts (a drag in progress is not a choice yet), and after keys that select.
     const onUp = (): void => {
@@ -69,7 +84,7 @@ export function SelectionAsk({ onAsk }: { readonly onAsk: (quote: string) => voi
     <button
       type="button"
       className="lc-selectionask"
-      style={{ left: shown.x, top: Math.max(8, shown.y - 38) }}
+      style={{ left: shown.left, top: shown.top, ...(shown.centred ? {} : { transform: 'none' }) }}
       // Pressed before the selection is lost to the click.
       onMouseDown={(event) => event.preventDefault()}
       onClick={() => {
