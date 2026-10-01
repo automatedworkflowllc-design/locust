@@ -32,6 +32,25 @@ export interface HandoffBriefing {
   readonly kept: readonly string[]
   /** Set when the original task gave up its end to fit beside the person's words. */
   readonly taskClipped?: true
+  /** Sections the person chose to leave out before sending (0.527), in reading order. */
+  readonly leftOutByYou: readonly string[]
+}
+
+/**
+ * WHAT THE PERSON MAY LEAVE OUT (0.527, product ideas round four: "with a way
+ * to drop a section"). The earlier messages, the finished steps and the last
+ * reply are context, and the person may know a stale one would mislead. The
+ * task and their own words are what the run is FOR; the steps that never
+ * reported back are the warning that stops a redo (rule 1 above), so none of
+ * those can be dropped.
+ */
+export const DROPPABLE_SECTION_NAMES = ['earlier', 'settled', 'summary'] as const
+
+/** What the window sent as the person's choice, kept to the sections that may be dropped. */
+export function chosenLeaveOut(value: unknown): readonly string[] {
+  if (!Array.isArray(value)) return []
+  const sent: readonly unknown[] = value
+  return DROPPABLE_SECTION_NAMES.filter((name) => sent.includes(name))
 }
 
 function bullets(lines: readonly string[]): string {
@@ -204,9 +223,16 @@ export function composeHandoffPrompt(
   /** The conversation's turns before the one handed over, oldest first (A2.11). */
   earlier: readonly EarlierTurn[] = [],
   /** A long task's file, project-relative (0.513, long-task-file.ts): quoted from, never clipped. */
-  taskFile?: string
+  taskFile?: string,
+  /** Sections the person chose to leave out (0.527); only DROPPABLE_SECTION_NAMES are honoured. */
+  leaveOut: readonly string[] = []
 ): HandoffBriefing | undefined {
-  const sections = [...sectionsFor(originalPrompt, checkpoint, fromRuntime, next, earlier, taskFile)]
+  const composed = sectionsFor(originalPrompt, checkpoint, fromRuntime, next, earlier, taskFile)
+  const droppable: readonly string[] = DROPPABLE_SECTION_NAMES
+  const leftOutByYou = composed.filter((section) => droppable.includes(section.name) && leaveOut.includes(section.name)).map((section) => section.name)
+  const sections = composed.filter((section) => !leftOutByYou.includes(section.name))
+  // Said in the brief, as a gap that did not fit is: the new runtime is told it has less than the whole story.
+  const chosenNotice = leftOutByYou.length === 0 ? '' : `\n\n${choiceNotice(leftOutByYou)}`
   // Reserve room for the omission notice UP FRONT whenever a section could be
   // dropped. Charging for it only at the first drop is too late: by then the
   // mandatory task section has already claimed the space, and it cannot be
@@ -215,7 +241,7 @@ export function composeHandoffPrompt(
   // the cheap side of that trade.
   // And room for the line that hands over a long task's file (0.513), which the
   // caller puts in front: the start bound is on the whole prompt.
-  const budget = MAX_HANDOFF_PROMPT_LENGTH - (sections.length > 1 ? NOTICE_BUDGET : 0) - (taskFile === undefined ? 0 : withAttachments('x', [taskFile]).length)
+  const budget = MAX_HANDOFF_PROMPT_LENGTH - (sections.length > 1 ? NOTICE_BUDGET : 0) - (taskFile === undefined ? 0 : withAttachments('x', [taskFile]).length) - chosenNotice.length
   // The task and the person's next words are charged FIRST: they are never
   // optional, and a section added ahead of them in the reading order (the
   // earlier turns) must never be what squeezes them out. Then the optional
@@ -264,9 +290,9 @@ export function composeHandoffPrompt(
   const kept = keptSections.map((section) => section.text)
   if (kept.length === 0) return undefined
 
-  const body = omitted.length === 0
+  const body = (omitted.length === 0
     ? kept.join('\n\n')
-    : `${kept.join('\n\n')}\n\n${omissionNotice(omitted)}`
+    : `${kept.join('\n\n')}\n\n${omissionNotice(omitted)}`) + chosenNotice
 
   // No length check on the assembled string, and that is deliberate: it cannot
   // overflow. Every kept section was charged against `budget`, which already
@@ -283,6 +309,7 @@ export function composeHandoffPrompt(
     prompt: body,
     omitted,
     kept: keptSections.map((section) => section.name).filter((name) => name !== 'next'),
+    leftOutByYou,
     ...(clippedTask ? { taskClipped: true as const } : {})
   }
 }
@@ -298,6 +325,11 @@ export const NOTICE_BUDGET = 120
 export const OPTIONAL_SECTION_NAMES = ['unsettled', 'settled', 'summary', 'earlier'] as const
 /** The optional sections in the order they are kept: the first one given up is the last here. */
 const KEEP_ORDER = OPTIONAL_SECTION_NAMES
+
+/** The person's own choice, named as such so it is never read as a gap in the record. */
+export function choiceNotice(leftOut: readonly string[]): string {
+  return `(The person chose to leave out: ${leftOut.join(', ')}.)`
+}
 
 export function omissionNotice(omitted: readonly string[]): string {
   return `(Some handoff detail did not fit and was left out: ${omitted.join(', ')}.)`

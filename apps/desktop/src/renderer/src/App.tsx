@@ -280,6 +280,8 @@ interface LiveRunState {
     readonly at: string | undefined
     readonly unsettledCount: number
     readonly omittedBriefing: readonly string[]
+    /** What the person chose to leave out of the brief (0.527). */
+    readonly leftOutByYou?: readonly string[]
     readonly priorEvents: readonly NormalizedRuntimeEvent[]
   }
   /**
@@ -3679,7 +3681,7 @@ export default function App(): ReactElement {
     setCompares((current) => [...current.filter((one) => one.compareId !== next.compareId), next])
 
   /** The send, when a comparison is ticked or on screen; otherwise the ordinary one. */
-  const sendOrCompare = async (prompt: string): Promise<boolean | string> => {
+  const sendOrCompare = async (prompt: string, sendOptions?: { readonly leaveOut?: readonly string[] }): Promise<boolean | string> => {
     const bridge = window.desktop
     // Cloud (0.503): the task goes to Codex Cloud, and the panel follows it.
     if (cloudOn && comparing === undefined) {
@@ -3747,7 +3749,7 @@ export default function App(): ReactElement {
       setCompareBlind(false)
       return true
     }
-    return startFromComposer(prompt)
+    return startFromComposer(prompt, sendOptions?.leaveOut)
   }
 
   /** Keep one column: the others stop, and the conversation carries on from the kept one. */
@@ -3967,7 +3969,7 @@ export default function App(): ReactElement {
       return { text: 'The tagged teammates could not be sent it.', sent: false }
     }
   }
-  const startFromComposer = async (prompt: string): Promise<boolean | string> => {
+  const startFromComposer = async (prompt: string, leaveOut?: readonly string[]): Promise<boolean | string> => {
     startRefusal.current = undefined
     const rewind = rewinding !== undefined && rewinding.key === shownKey ? rewinding : undefined
     // Files first, so the teammate starts on the folder as it was (0.502).
@@ -3977,7 +3979,7 @@ export default function App(): ReactElement {
     if (rewind !== undefined && rewind.putBack && rewind.files.length > 0 && putBack === undefined) {
       return 'Not sent: the files could not be put back, so nothing was changed. Untick it to send the edit on its own.'
     }
-    const started = await startMission(prompt, undefined, { fromComposer: true, ...(rewind === undefined ? {} : { rewind: { ...rewind, ...(putBack === undefined ? {} : { putBackResult: putBack }) } }) })
+    const started = await startMission(prompt, undefined, { fromComposer: true, ...(leaveOut === undefined || leaveOut.length === 0 ? {} : { leaveOut }), ...(rewind === undefined ? {} : { rewind: { ...rewind, ...(putBack === undefined ? {} : { putBackResult: putBack }) } }) })
     if (started && rewind !== undefined) setRewinding(undefined)
     return started ? true : (startRefusal.current ?? false)
   }
@@ -4022,6 +4024,8 @@ export default function App(): ReactElement {
       readonly as?: StartAs
       /** Typed in the box and sent from it: a refusal can hand the words back. */
       readonly fromComposer?: boolean
+      /** A reply on another runtime: the brief sections the person left out (0.527). */
+      readonly leaveOut?: readonly string[]
       /** Started again from an edited earlier message (0.498). */
       readonly rewind?: { readonly tip: string; readonly before?: string; readonly earlierTurns: NonNullable<LiveRunState['earlierTurns']>; readonly putBackResult?: RewindPutBackResponse; readonly setAside?: readonly string[] }
     }
@@ -4158,6 +4162,7 @@ export default function App(): ReactElement {
         // A review's Ask is for that run only (0.514): the host leaves the saved route alone.
         ...(as?.oneOff === true ? { keepSavedRoute: true } : {}),
         ...(continuing === undefined ? {} : { followUpOf: continuing.data!.missionId }),
+        ...(continuing === undefined || options?.leaveOut === undefined ? {} : { leaveOut: options.leaveOut }),
         ...(rewind === undefined ? {} : { ...(rewind.before === undefined ? {} : { followUpOf: rewind.before }), rewind: { tip: rewind.tip, ...(rewind.setAside === undefined ? {} : { setAside: rewind.setAside }) } })
       })
       if (!response.ok) {
@@ -4304,7 +4309,8 @@ export default function App(): ReactElement {
                   to: response.data.runtime,
                   at: new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
                   unsettledCount: switched.unsettledCount,
-                  omittedBriefing: switched.omittedBriefing
+                  omittedBriefing: switched.omittedBriefing,
+                  ...(switched.leftOutByYou === undefined ? {} : { leftOutByYou: switched.leftOutByYou })
                 }
               }),
           ...(response.data.peerDeliveryFailed

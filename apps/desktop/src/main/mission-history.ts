@@ -256,7 +256,8 @@ export function publicRecoveredMission(
             checkpointEpoch: mission.metadata.continuesFrom.checkpointEpoch,
             reason: mission.metadata.continuesFrom.reason,
             ...(mission.metadata.continuesFrom.edited === true ? { edited: true as const } : {}),
-            ...(mission.metadata.continuesFrom.leftOut === undefined || mission.metadata.continuesFrom.leftOut.length === 0 ? {} : { leftOut: mission.metadata.continuesFrom.leftOut })
+            ...(mission.metadata.continuesFrom.leftOut === undefined || mission.metadata.continuesFrom.leftOut.length === 0 ? {} : { leftOut: mission.metadata.continuesFrom.leftOut }),
+            ...(mission.metadata.continuesFrom.leftOutByYou === undefined || mission.metadata.continuesFrom.leftOutByYou.length === 0 ? {} : { leftOutByYou: mission.metadata.continuesFrom.leftOutByYou })
           }
         }),
     // Copied by kind rather than spread: each carries a different counter, and

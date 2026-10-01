@@ -932,6 +932,8 @@ export interface HandoffPreviewRequest {
   readonly followUpOf: string
   readonly runtime: MissionRuntimeId
   readonly prompt: string
+  /** Sections the person has chosen to leave out (0.527): 'earlier', 'settled' or 'summary'. */
+  readonly leaveOut?: readonly string[]
 }
 export type HandoffPreview =
   /** The reply stays on the same runtime: there is no brief to show. */
@@ -948,6 +950,8 @@ export type HandoffPreview =
       /** The task goes as a file because it is long (0.513). */
       readonly taskByFile: boolean
       readonly taskClipped: boolean
+      /** Sections the person chose to leave out (0.527), in reading order. */
+      readonly leftOutByYou?: readonly string[]
     }
   /** The send would be refused, and why. */
   | { readonly kind: 'refused'; readonly message: string }
@@ -2333,6 +2337,8 @@ export interface CodexMissionStartRequest {
   readonly modelChoice?: string
   /** Only a person's picker change this session, addressed to this teammate. */
   readonly routeOverrideFor?: string
+  /** A reply on another runtime: brief sections the person chose to leave out (0.527). */
+  readonly leaveOut?: readonly string[]
 }
 
 /**
@@ -2394,6 +2400,8 @@ export interface CodexMissionStartData extends MissionRouteSummary {
     readonly unsettledCount: number
     /** Sections of the briefing dropped to fit the prompt bound, if any. */
     readonly omittedBriefing: readonly string[]
+    /** Sections the person chose to leave out (0.527). */
+    readonly leftOutByYou?: readonly string[]
   }
   /** Workroom messages quoted into this mission's prompt, oldest first. */
   readonly peerMessages: readonly PublicPeerMessage[]
@@ -2770,6 +2778,8 @@ export interface PublicRecoveredMission {
     readonly edited?: true
     /** What a handoff's brief left out to fit (0.519), by section name. */
     readonly leftOut?: readonly string[]
+    /** What the person chose to leave out of it (0.527), by section name. */
+    readonly leftOutByYou?: readonly string[]
   }
   /**
    * Set when the HOST started this run rather than a person -- today, one

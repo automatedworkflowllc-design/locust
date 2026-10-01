@@ -4348,6 +4348,40 @@ textarea {
   color: var(--lc-text-secondary);
 }
 
+/* A section the person may leave out (0.527): the words themselves, with a small × to drop them. */
+.lc-continuation__part {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 0;
+  padding: 0 4px;
+  border: 1px solid var(--lc-border-button);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.lc-continuation__part:hover,
+.lc-continuation__part:focus-visible {
+  border-color: var(--lc-border-hover);
+  color: var(--lc-text-primary);
+}
+
+.lc-continuation__putback {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--lc-text-primary);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
 /* A notice that carries its own control sits them side by side. */
 .lc-diagnostic--row {
   display: flex;

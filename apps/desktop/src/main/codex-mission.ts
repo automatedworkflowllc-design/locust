@@ -239,7 +239,13 @@ export interface CodexMissionService {
      * the turn before it, and the run starts cold with the conversation up to
      * there -- never that turn's session, which holds the turns set aside.
      */
-    rewind?: boolean
+    rewind?: boolean,
+    /**
+     * A reply on another runtime: the brief's sections the person chose to
+     * leave out (0.527, handoff.ts DROPPABLE_SECTION_NAMES). Only the
+     * direct-message handler supplies it, from what the composer showed.
+     */
+    leaveOut?: readonly string[]
   ): Promise<CodexMissionStartResponse>
   cancel(runId: unknown): CodexMissionCancelResponse
   /**
@@ -278,7 +284,7 @@ export interface CodexMissionService {
     emit: (update: CodexMissionUpdate) => void
   ): Promise<MissionHandoffResponse>
   /** What a reply on `runtime` to that mission would carry, composed as a send would and with nothing written (0.517). */
-  previewSwitch(followUpOf: string, runtime: MissionRuntimeId, prompt: string): Promise<HandoffPreview>
+  previewSwitch(followUpOf: string, runtime: MissionRuntimeId, prompt: string, leaveOut?: readonly string[]): Promise<HandoffPreview>
   /** Whether this transport owns a live run of that mission. */
   hasMission(missionId: string): boolean
   /** The missions this transport is running right now. */
@@ -1170,7 +1176,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       asCommand?: boolean,
       slot?: { readonly key: string; readonly cwd?: string },
       side?: { readonly of: string; readonly question: number },
-      rewind?: boolean
+      rewind?: boolean,
+      leaveOut?: readonly string[]
     ): Promise<CodexMissionStartResponse> {
       // `account-default` is the shell's word for "send no --model", not a
       // model id. Passing it through would make the CLI look for a model that
@@ -1467,7 +1474,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               runtimeDisplayName(prior.metadata.runtime),
               prompt,
               await earlierTurnsOf(prior),
-              taskFile
+              taskFile,
+              leaveOut
             )
             const briefing = composed === undefined || taskFile === undefined ? composed : { ...composed, prompt: withAttachments(composed.prompt, [taskFile]) }
             if (briefing === undefined) {
@@ -1492,7 +1500,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               mode,
               route,
               emit,
-              { missionId: prior.metadata.missionId, checkpointEpoch: checkpoint.epoch, reason: 'route-switch', ...(briefing.omitted.length === 0 ? {} : { leftOut: briefing.omitted }) },
+              { missionId: prior.metadata.missionId, checkpointEpoch: checkpoint.epoch, reason: 'route-switch', ...(briefing.omitted.length === 0 ? {} : { leftOut: briefing.omitted }), ...(briefing.leftOutByYou.length === 0 ? {} : { leftOutByYou: briefing.leftOutByYou }) },
               peer,
               undefined,
               relay,
@@ -1511,7 +1519,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
                   missionId: prior.metadata.missionId,
                   runtime: prior.metadata.runtime,
                   unsettledCount: checkpoint.unsettledActions.length,
-                  omittedBriefing: briefing.omitted
+                  omittedBriefing: briefing.omitted,
+                  ...(briefing.leftOutByYou.length === 0 ? {} : { leftOutByYou: briefing.leftOutByYou })
                 }
               }
             }
@@ -2341,7 +2350,7 @@ ${sentPrompt.trim()}`
       return options.approvals?.decide(answer) ?? false
     },
 
-    async previewSwitch(followUpOf: string, runtime: MissionRuntimeId, prompt: string): Promise<HandoffPreview> {
+    async previewSwitch(followUpOf: string, runtime: MissionRuntimeId, prompt: string, leaveOut?: readonly string[]): Promise<HandoffPreview> {
       const prior = await options.ledger.getMission(followUpOf).catch(() => undefined)
       if (prior === undefined) return { kind: 'refused', message: 'That conversation could not be read, so it cannot be continued on another runtime.' }
       if (prior.metadata.runtime === runtime) return { kind: 'same' }
@@ -2354,7 +2363,7 @@ ${sentPrompt.trim()}`
         return { kind: 'refused', message: `That conversation cannot be continued safely on another runtime: ${checkpoint.safetyReason}` }
       }
       const taskFile = longTaskFilePath(prior.metadata.prompt, prior.metadata.missionId)
-      const composed = composeHandoffPrompt(prior.metadata.prompt, checkpoint, runtimeDisplayName(prior.metadata.runtime), prompt, await earlierTurnsOf(prior), taskFile)
+      const composed = composeHandoffPrompt(prior.metadata.prompt, checkpoint, runtimeDisplayName(prior.metadata.runtime), prompt, await earlierTurnsOf(prior), taskFile, leaveOut)
       if (composed === undefined) return { kind: 'refused', message: 'That conversation is too long to carry to another runtime with this reply.' }
       return {
         kind: 'switch',
@@ -2363,7 +2372,8 @@ ${sentPrompt.trim()}`
         omitted: composed.omitted,
         unsettledCount: checkpoint.unsettledActions.length,
         taskByFile: taskFile !== undefined,
-        taskClipped: composed.taskClipped === true
+        taskClipped: composed.taskClipped === true,
+        leftOutByYou: composed.leftOutByYou
       }
     },
 

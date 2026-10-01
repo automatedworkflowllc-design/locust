@@ -28,13 +28,16 @@ export function HandoffDivider({
   to,
   at,
   unsettledCount,
-  omittedBriefing
+  omittedBriefing,
+  leftOutByYou = []
 }: {
   readonly from: MissionRuntimeId
   readonly to: MissionRuntimeId
   readonly at: string | undefined
   readonly unsettledCount: number
   readonly omittedBriefing: readonly string[]
+  /** What the person chose to leave out of it (0.527): their choice, so said plainly, not as a warning. */
+  readonly leftOutByYou?: readonly string[]
 }): ReactElement {
   // Every runtime by its name. Only three were listed, so a switch to
   // OpenCode read "Codex -> opencode" (drive-runtime-switch, packaged 0.309).
@@ -67,6 +70,9 @@ export function HandoffDivider({
           <span className="lc-handoff__note lc-tone-amber">
             {`Left out of the summary to fit: ${leftOutInWords(omittedBriefing)}.`}
           </span>
+        )}
+        {leftOutByYou.length > 0 && (
+          <span className="lc-handoff__note">{`You left out ${leftOutInWords(leftOutByYou)}.`}</span>
         )}
       </div>
       <span className="lc-handoff__rule lc-handoff__rule--end" />

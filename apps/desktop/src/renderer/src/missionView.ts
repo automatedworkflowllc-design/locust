@@ -4163,6 +4163,8 @@ export interface StitchedHandoff {
   readonly at: string | undefined
   readonly unsettledCount: number
   readonly omittedBriefing: readonly string[]
+  /** What the person chose to leave out of the brief (0.527). */
+  readonly leftOutByYou?: readonly string[]
   readonly priorEvents: readonly NormalizedRuntimeEvent[]
 }
 
@@ -4197,6 +4199,7 @@ export function stitchedHandoff(
     unsettledCount: checkpoint?.unsettledActions.length ?? 0,
     // Recorded since 0.519; an older switch recorded nothing, and nothing is guessed.
     omittedBriefing: link.leftOut ?? [],
+    ...(link.leftOutByYou === undefined ? {} : { leftOutByYou: link.leftOutByYou }),
     priorEvents: prior.events
   }
 }
@@ -4383,7 +4386,8 @@ export function switchOf(
     at: new Date(mission.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
     unsettledCount: checkpoint?.unsettledActions.length ?? 0,
     // Recorded since 0.519; an older switch recorded nothing, and nothing is guessed.
-    omittedBriefing: link.leftOut ?? []
+    omittedBriefing: link.leftOut ?? [],
+    ...(link.leftOutByYou === undefined ? {} : { leftOutByYou: link.leftOutByYou })
   }
 }
 

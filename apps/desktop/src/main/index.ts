@@ -60,6 +60,7 @@ import { homedir, release } from 'node:os'
 import { execFile } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
 import { MAX_PROMPT_LENGTH, createCodexMissionService, runtimeThreadIdOf } from './codex-mission.js'
+import { chosenLeaveOut } from './handoff.js'
 import { openInTerminal, terminalRequestFor } from './open-in-terminal.js'
 import { createTerminalCatchUp, createTerminalImports, createTranscriptReader, transcriptPathFor } from './terminal-catch-up.js'
 import { importSession, listImportableSessions } from './session-import.js'
@@ -3689,9 +3690,9 @@ if (!ownsSingleInstanceLock) {
     // What a reply on another runtime would carry (0.517): composed as the send would, nothing written.
     ipcMain.handle(HANDOFF_PREVIEW_CHANNEL, async (event, request: unknown) => {
       if (!fromOwnWindow(event) || typeof request !== 'object' || request === null) return undefined
-      const { followUpOf, runtime, prompt } = request as Record<string, unknown>
+      const { followUpOf, runtime, prompt, leaveOut } = request as Record<string, unknown>
       if (typeof followUpOf !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(followUpOf) || !isMissionRuntime(runtime) || typeof prompt !== 'string') return undefined
-      return codexMissions.previewSwitch(followUpOf, runtime, prompt.slice(0, 20_000)).catch(() => undefined)
+      return codexMissions.previewSwitch(followUpOf, runtime, prompt.slice(0, 20_000), chosenLeaveOut(leaveOut)).catch(() => undefined)
     })
 
     ipcMain.handle(MAC_RELEASE_CHANNEL, async (event) => {
@@ -6130,7 +6131,9 @@ if (!ownsSingleInstanceLock) {
           runtimeCommands.isCommand(runtime, prompt),
           undefined,
           undefined,
-          rewindTip(payload) !== undefined && followUpOf !== undefined
+          rewindTip(payload) !== undefined && followUpOf !== undefined,
+          // A reply on another runtime: what the person chose to leave out of its brief (0.527).
+          chosenLeaveOut((payload as { readonly leaveOut?: unknown }).leaveOut)
         )
         if (response.ok) {
           await assignOwner(peer?.self.teammateId, response.data.missionId)

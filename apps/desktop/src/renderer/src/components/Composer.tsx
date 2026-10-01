@@ -26,7 +26,8 @@ import {
 import { defaultEffort, sendBlockedReason } from '../status.js'
 import { freeTagOf, isOwnRoute, routeModelName, shortRuntimeName } from '../routeName.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
-import { handoffPreviewLine } from '../handoffPreview.js'
+import { handoffPreviewParts, joinerBefore } from '../handoffPreview.js'
+import type { HandoffPreviewParts } from '../handoffPreview.js'
 import { AttachedImage } from './AttachedImage.js'
 import { MetalSend } from './MetalSend.js'
 import type { MetalMotion, MetalPreset, MetalStrength } from '../../../shared/ipc.js'
@@ -232,7 +233,8 @@ export interface ComposerProps {
   readonly swarm: boolean
   readonly onSwarmChange: (swarm: boolean) => void
   /** True when it started; false, or the words saying why not (M27), when it did not. */
-  readonly onStart: (prompt: string) => Promise<boolean | string>
+  /** `leaveOut`: a reply on another runtime, the brief sections the person left out (0.527). */
+  readonly onStart: (prompt: string, options?: { readonly leaveOut?: readonly string[] }) => Promise<boolean | string>
   /**
    * TAG A TEAMMATE FROM ANY CONVERSATION (0.438, shared/tagging.ts): the team
    * `@` offers, who is on screen (never offered), and what happens to the
@@ -452,9 +454,19 @@ export function Composer({
 }: ComposerProps): ReactElement {
   const [value, setValue] = useState('')
   // What a reply on another runtime would carry, worked out by the host as it is typed (0.517).
-  const [carried, setCarried] = useState<string>()
+  const [carried, setCarried] = useState<HandoffPreviewParts>()
+  // What the person chose to leave out of that brief (0.527), for this conversation and runtime only.
+  const [leaveOut, setLeaveOut] = useState<readonly string[]>([])
   const continuationKey = continuation === undefined ? undefined : `${continuation.followUpOf}:${continuation.runtime}`
   useEffect(() => {
+    setLeaveOut([])
+  }, [continuationKey])
+  const leaveOutKey = leaveOut.join(',')
+  // A click answers at once; typing waits for a pause, as it always has.
+  const askedWith = useRef(leaveOutKey)
+  useEffect(() => {
+    const clicked = askedWith.current !== leaveOutKey
+    askedWith.current = leaveOutKey
     if (continuation === undefined || window.desktop?.previewHandoff === undefined) {
       setCarried(undefined)
       return
@@ -462,18 +474,18 @@ export function Composer({
     let live = true
     const timer = setTimeout(() => {
       void window.desktop
-        ?.previewHandoff({ followUpOf: continuation.followUpOf, runtime: continuation.runtime, prompt: value })
+        ?.previewHandoff({ followUpOf: continuation.followUpOf, runtime: continuation.runtime, prompt: value, ...(leaveOut.length === 0 ? {} : { leaveOut }) })
         .then((preview) => {
-          if (live) setCarried(handoffPreviewLine(preview))
+          if (live) setCarried(handoffPreviewParts(preview))
         })
         .catch(() => undefined)
-    }, 350)
+    }, clicked ? 0 : 350)
     return () => {
       live = false
       clearTimeout(timer)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the key stands for the object
-  }, [continuationKey, value])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the keys stand for the objects
+  }, [continuationKey, value, leaveOutKey])
   /*
    * Start and Stop are one button in one place, so the second click of a
    * double-click on Start landed on Stop: "You stopped this run", and nothing
@@ -959,7 +971,7 @@ export function Composer({
     setValue('')
     const sending = attached
     setAttached([])
-    void onStart(withAttachments(prompt, sending)).then((started) => {
+    void onStart(withAttachments(prompt, sending), continuation === undefined || leaveOut.length === 0 ? undefined : { leaveOut }).then((started) => {
       if (started !== true) {
         setValue(typed)
         setAttached(sending)
@@ -1488,7 +1500,49 @@ export function Composer({
             <Icon name="route" size={12} />
             <span>
               {continuationNote}
-              {carried !== undefined && <span className="lc-continuation__carried">{` ${carried}`}</span>}
+              {carried?.kind === 'refused' && <span className="lc-continuation__carried">{` ${carried.line}`}</span>}
+              {carried?.kind === 'parts' && (
+                /*
+                  A WAY TO DROP A SECTION (0.527, product ideas round four).
+                  The earlier messages, the finished steps and the last reply
+                  each carry their own × : the person may know one is stale
+                  and would mislead. The task, their own words and the steps
+                  that never reported back are not offered: those are what the
+                  run is for, and the warning that stops a redo.
+                */
+                <span className="lc-continuation__carried">
+                  {' It carries '}
+                  {carried.carried.map((entry, index) => (
+                    <Fragment key={entry.name}>
+                      {joinerBefore(index, carried.carried.length)}
+                      {entry.droppable ? (
+                        <button
+                          type="button"
+                          className="lc-continuation__part"
+                          aria-label={`Leave out ${entry.words}`}
+                          title={`Leave out ${entry.words}: it is not sent with this message`}
+                          onClick={() => setLeaveOut((current) => (current.includes(entry.name) ? current : [...current, entry.name]))}
+                        >
+                          {entry.words}
+                          <Icon name="close" size={9} />
+                        </button>
+                      ) : (
+                        entry.words
+                      )}
+                    </Fragment>
+                  ))}
+                  .
+                  {carried.leftToFit.length > 0 && ` Left out to fit: ${carried.leftToFit.map((words, index) => `${joinerBefore(index, carried.leftToFit.length)}${words}`).join('')}.`}
+                  {carried.leftByYou.length > 0 && (
+                    <>
+                      {` You are leaving out ${carried.leftByYou.map((entry, index) => `${joinerBefore(index, carried.leftByYou.length)}${entry.words}`).join('')}. `}
+                      <button type="button" className="lc-continuation__putback" onClick={() => setLeaveOut([])}>
+                        Put back
+                      </button>
+                    </>
+                  )}
+                </span>
+              )}
             </span>
           </div>
         )}

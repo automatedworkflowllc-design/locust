@@ -325,6 +325,8 @@ export interface MissionContinuation {
    * additive, like `edited`: no schema version moves.
    */
   readonly leftOut?: readonly string[]
+  /** What the person chose to leave out of the brief (0.527), by section name. Additive, like `leftOut`. */
+  readonly leftOutByYou?: readonly string[]
 }
 
 export type MissionHostFailureCode = 'runtime-start-failed' | 'runtime-transport-failed'
@@ -779,6 +781,10 @@ function validateMetadata(metadata: MissionLedgerMetadata): MissionLedgerMetadat
     if (metadata.continuesFrom.leftOut !== undefined) {
       if (!Array.isArray(metadata.continuesFrom.leftOut) || metadata.continuesFrom.leftOut.length > 8) throw new Error('Mission continuation is invalid')
       for (const name of metadata.continuesFrom.leftOut) requireText(name, 'continuesFrom.leftOut', 40)
+    }
+    if (metadata.continuesFrom.leftOutByYou !== undefined) {
+      if (!Array.isArray(metadata.continuesFrom.leftOutByYou) || metadata.continuesFrom.leftOutByYou.length > 8) throw new Error('Mission continuation is invalid')
+      for (const name of metadata.continuesFrom.leftOutByYou) requireText(name, 'continuesFrom.leftOutByYou', 40)
     }
   }
   if (metadata.command !== undefined) {

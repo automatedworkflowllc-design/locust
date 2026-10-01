@@ -856,6 +856,7 @@ export interface ThreadProps {
         readonly at: string | undefined
         readonly unsettledCount: number
         readonly omittedBriefing: readonly string[]
+        readonly leftOutByYou?: readonly string[]
         readonly priorEvents: readonly NormalizedRuntimeEvent[]
       }
     | undefined
@@ -1352,6 +1353,7 @@ onResume,
               at={handoff.at}
               unsettledCount={handoff.unsettledCount}
               omittedBriefing={handoff.omittedBriefing}
+              leftOutByYou={handoff.leftOutByYou ?? []}
             />
           </>
         )}
