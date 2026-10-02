@@ -11,6 +11,19 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.539.0 - 2026-10-02
+
+### Fixed
+
+- An answer from a comparison you have not kept yet says so above the
+  conversation, with **Open the comparison**, however you opened it. From
+  Conversations there was no way back to it.
+- After a follow-up, a comparison says why no other model can join: it would
+  be asked the first question and miss the turns since. The choice used to
+  disappear with nothing said.
+- Your record in a comparison says **Typical tokens**, not "Typical cost",
+  since what it shows is tokens in and out.
+
 ## 0.538.0 - 2026-10-02
 
 ### New

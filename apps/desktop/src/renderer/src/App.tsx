@@ -7577,9 +7577,23 @@ export default function App(): ReactElement {
               )}
               {(() => {
                 // A conversation that began as a comparison says so, and opens it (0.441).
-                const row = liveRun.data?.missionId === undefined ? undefined : sidebarMissions.find((entry) => (entry.memberIds ?? [entry.missionId]).includes(liveRun.data!.missionId))
-                const compare = row === undefined ? undefined : comparisonOf(row.memberIds ?? [row.missionId], compares)
-                if (compare?.kept === undefined) return null
+                const shownId = liveRun.data?.missionId
+                const row = shownId === undefined ? undefined : sidebarMissions.find((entry) => (entry.memberIds ?? [entry.missionId]).includes(shownId))
+                // Or found from the answer itself, however it was opened (0.539): Sol and Cursor opened
+                // a column from Conversations, before Keep, and found no way back to its comparison.
+                const compare = (row === undefined ? undefined : comparisonOf(row.memberIds ?? [row.missionId], compares))
+                  ?? (shownId === undefined ? undefined : compares.find((one) => one.slots.some((column) => column.missionIds.includes(shownId))))
+                if (compare === undefined) return null
+                if (compare.kept === undefined) {
+                  return (
+                    <div className="lc-compared">
+                      <span>This answer is one column of a comparison you have not kept an answer from yet.</span>
+                      <button type="button" className="lc-compared__open" onClick={() => setComparingId(compare.compareId)}>
+                        Open the comparison
+                      </button>
+                    </div>
+                  )
+                }
                 const others = compare.slots.filter((column) => column.slot !== compare.kept!.slot).map((column) => column.route.label ?? column.route.model)
                 return (
                   <div className="lc-compared">

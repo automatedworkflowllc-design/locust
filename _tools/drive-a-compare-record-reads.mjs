@@ -37,12 +37,14 @@ const MODELS = {
 const COMPARES = [
   ['Summarize the vendor quotes', [['mimo', 20, 400], ['ling', 40, 900]], 'a'],
   ['Draft the launch email', [['mimo', 30, 500], ['muse', 60, 1200]], 'a'],
-  ['Explain the build slowdown', [['ling', 50, 700], ['mimo', 40, 600]], 'a']
+  ['Explain the build slowdown', [['ling', 50, 700], ['mimo', 40, 600]], 'a'],
+  // Not kept, with a follow-up (0.539): opened from Conversations, it must say what it is part of.
+  ['Plan the team offsite', [['mimo', 20, 300], ['ling', 30, 400]], null, 'Make it shorter.']
 ]
 const owners = {}
 const compares = []
 let n = 0
-for (const [index, [prompt, columns, kept]] of COMPARES.entries()) {
+for (const [index, [prompt, columns, kept, followUp]] of COMPARES.entries()) {
   const createdAt = new Date(Date.now() - (COMPARES.length - index) * 3_600_000).toISOString()
   const slots = []
   for (const [at, [which, seconds, out]] of columns.entries()) {
@@ -62,9 +64,27 @@ for (const [index, [prompt, columns, kept]] of COMPARES.entries()) {
       event(2, 'run.completed', ended, { usage: { inputTokens: 2000, outputTokens: out }, process: { exitCode: 0, signal: null, stderr: '', stderrTruncated: false, recordCount: 2, inputDeliveryFailed: false, outputLimitExceeded: false, forcedTerminationAttempted: false, terminationUnconfirmed: false, startedAt: createdAt, finishedAt: ended } })
     ])
     owners[missionId] = TEAMMATE.teammateId
-    slots.push({ slot: at === 0 ? 'a' : 'b', route: { runtime: route.runtime, model: route.model, label: route.label }, missionIds: [missionId] })
+    const missionIds = [missionId]
+    if (followUp !== undefined) {
+      n += 1
+      const nextId = `mission_5e000000-0000-4000-8000-0005${String(n).padStart(8, '0')}`
+      const nextRun = `run_5e0005${String(n)}`
+      await ledger.createMission({
+        missionId: nextId, runId: nextRun, prompt: followUp,
+        runtime: route.runtime, model: route.model, requestedRouteId: 'opencode', resolvedRouteId: 'opencode-account:default', cliVersion: null,
+        workspaceId, sandbox: 'read-only', executionPolicyVersion: 1, createdAt: ended
+      })
+      const later = new Date(Date.parse(ended) + 10_000).toISOString()
+      await ledger.appendEvents(nextId, [
+        { id: `event_${String(n)}_1`, runId: nextRun, missionId: nextId, sequence: 1, occurredAt: ended, sourceAdapter: 'opencode', type: 'message.delta', payload: { itemId: 'answer', operation: 'append', text: `${route.label}, shorter.`, final: true, evidence: { redacted: true } } },
+        { id: `event_${String(n)}_2`, runId: nextRun, missionId: nextId, sequence: 2, occurredAt: later, sourceAdapter: 'opencode', type: 'run.completed', payload: { usage: { inputTokens: 2000, outputTokens: 100 }, process: { exitCode: 0, signal: null, stderr: '', stderrTruncated: false, recordCount: 2, inputDeliveryFailed: false, outputLimitExceeded: false, forcedTerminationAttempted: false, terminationUnconfirmed: false, startedAt: ended, finishedAt: later }, evidence: { redacted: true } } }
+      ])
+      owners[nextId] = TEAMMATE.teammateId
+      missionIds.push(nextId)
+    }
+    slots.push({ slot: at === 0 ? 'a' : 'b', route: { runtime: route.runtime, model: route.model, label: route.label }, missionIds })
   }
-  compares.push({ compareId: `cmp_${String(index + 1)}`, teammateId: TEAMMATE.teammateId, prompt, createdAt, slots, kept: { slot: kept, at: createdAt } })
+  compares.push({ compareId: `cmp_${String(index + 1)}`, teammateId: TEAMMATE.teammateId, prompt, createdAt, slots, ...(kept === null ? {} : { kept: { slot: kept, at: createdAt } }) })
 }
 await ledger.flush?.()
 await writeFile(join(profilePath, 'compares.json'), JSON.stringify({ schemaVersion: 1, compares }), 'utf8')
@@ -105,12 +125,29 @@ try {
       overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth
     })
   })()`))))
-  check('the comparison opens, with YOUR RECORD under the answers', opened.compare && opened.label === 'YOUR RECORD' && opened.head.join('|') === 'Model|Kept|Typical time|Typical cost', JSON.stringify(opened))
+  check('the comparison opens, with YOUR RECORD under the answers', opened.compare && opened.label === 'YOUR RECORD' && opened.head.join('|') === 'Model|Kept|Typical time|Typical tokens', JSON.stringify(opened))
   const names = opened.rows.map((row) => row[0])
   check('every model compared, the most kept first', names.join('|') === 'Mimo V2.6 Flash|Ling 3.0 Flash|Muse Spark 1.3', JSON.stringify(opened.rows))
   check('each with how often it was kept', opened.rows.map((row) => row[1]).join('|') === '2 of 3|1 of 2|0 of 1', JSON.stringify(opened.rows))
   check('and its typical time and cost', opened.rows[0]?.[2] === '30s' && /out/.test(opened.rows[0]?.[3] ?? '') && opened.rows[2]?.[2] === '1m 00s', JSON.stringify(opened.rows))
   check('nothing scrolls sideways', opened.overflow <= 0, String(opened.overflow))
+  // Not kept yet: one of its answers, opened from the Conversations screen (Sol, 0.532; Cursor, 0.537).
+  const unkept = JSON.parse(String(await drive.capture('an answer of an unkept comparison, from Conversations', () => drive.evaluate(`(async () => {
+    ;[...document.querySelectorAll('.lc-sidebar__nav button, .lc-sidebar__places button')].find((b) => /Conversations/.test(b.innerText))?.click()
+    await new Promise((r) => setTimeout(r, 1200))
+    const card = [...document.querySelectorAll('.lc-screen button, .lc-screen [role=button]')].find((b) => /team offsite|shorter/i.test(b.innerText))
+    if (!card) return JSON.stringify({ found: false, screen: document.querySelector('.lc-screen')?.innerText.slice(0, 300) ?? '' })
+    card.click()
+    await new Promise((r) => setTimeout(r, 1500))
+    const banner = document.querySelector('.lc-compared')?.innerText.replace(/\\s+/g, ' ').trim() ?? ''
+    ;[...document.querySelectorAll('.lc-compared button')].find((b) => b.innerText.trim() === 'Open the comparison')?.click()
+    for (let i = 0; i < 20 && !document.querySelector('.lc-compare'); i += 1) await new Promise((r) => setTimeout(r, 250))
+    await new Promise((r) => setTimeout(r, 800))
+    return JSON.stringify({ found: true, banner, compare: !!document.querySelector('.lc-compare'), text: document.querySelector('.lc-compare')?.innerText.replace(/\\s+/g, ' ') ?? '', addOffered: /Ask it too/.test(document.querySelector('.lc-compare')?.innerText ?? '') })
+  })()`))))
+  check('an answer of an unkept comparison says so, from Conversations', unkept.found && /one column of a comparison you have not kept an answer from yet/.test(unkept.banner), JSON.stringify(unkept).slice(0, 400))
+  check('and opens the comparison', unkept.compare === true, JSON.stringify(unkept).slice(0, 300))
+  check('after its follow-up, it says why another model cannot join', /Another model can join only before the first follow-up/.test(unkept.text ?? '') && unkept.addOffered === false, JSON.stringify({ addOffered: unkept.addOffered, text: (unkept.text ?? '').slice(0, 900) }))
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

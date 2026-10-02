@@ -320,6 +320,15 @@ export function CompareView({
         {onAddModel !== undefined && addChoices.length > 0 && columns.length < 3 && compare.changes !== true && !columns.some((column) => column.running) && columns.every((column) => column.turns.length <= 1) && (
           <AddModelAsk choices={addChoices} busy={adding} onAdd={onAddModel} />
         )}
+        {/*
+          * WHY IT WENT (0.539). Sol, on 0.532, confirmed by Cursor on 0.537:
+          * after a follow-up the block was gone with nothing said. A new
+          * column is asked the first question only, so after a follow-up it
+          * would be answering a different conversation.
+          */}
+        {onAddModel !== undefined && addChoices.length > 0 && columns.length < 3 && compare.changes !== true && !columns.some((column) => column.running) && columns.some((column) => column.turns.length > 1) && (
+          <p className="lc-compare__judgenote">Another model can join only before the first follow-up: it would be asked the first question and miss the turns since. Start a new comparison to add one.</p>
+        )}
         {record !== undefined && record.length > 0 && (
           /*
            * YOUR RECORD (0.519), as Optima's results table: every model you
@@ -335,7 +344,7 @@ export function CompareView({
                     <th>Model</th>
                     <th>Kept</th>
                     <th>Typical time</th>
-                    <th>Typical cost</th>
+                    <th>Typical tokens</th>
                   </tr>
                 </thead>
                 <tbody>
