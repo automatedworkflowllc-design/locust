@@ -99,7 +99,7 @@ const settled = async (drive, label) => {
   const workspace = await mkdtemp(join(homedir(), 'Documents', 'locust-scratch', 'locust-drive-anyfolder-big-'))
   for (let index = 0; index <= 20_000; index += 1) await writeFile(join(workspace, `note-${String(index)}.txt`), '', 'utf8')
   const drive = await startDrive({
-    name: `compare-any-folder-big-${tag}`, port: 9873, workspace, outPath: join(OUT, 'big'),
+    name: `compare-any-folder-big-${tag}`, port: 9873, workspace, outPath: join(OUT, 'big'), keep: process.env.LOCUST_DRIVE_KEEP === '1',
     ...(packaged === undefined ? {} : { packaged }),
     seed: { schemaVersion: 1, teammates: [], missionOwners: {}, settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: true } }
   })
@@ -122,7 +122,7 @@ const settled = async (drive, label) => {
   }
 }
 
-// 2. A small folder: each in its own copy, and each one's file found where it wrote it.
+if (process.env.LOCUST_DRIVE_ONLY_BIG !== '1') // 2. A small folder: each in its own copy, and each one's file found where it wrote it.
 {
   const workspace = await mkdtemp(join(homedir(), 'Documents', 'locust-scratch', 'locust-drive-anyfolder-small-'))
   await writeFile(join(workspace, 'README.md'), '# A small project\n', 'utf8')
