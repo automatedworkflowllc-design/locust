@@ -79,7 +79,9 @@ export function contains(parent: string, child: string): boolean {
 export async function insideOnDisk(path: string, roots: readonly string[]): Promise<boolean> {
   const { realpath } = await import('node:fs/promises')
   const real = await realpath(path).catch(() => undefined)
-  if (real === undefined) return false
+  // Not there at all: no link to follow, and the read says it is missing
+  // (drive-a-word-file-reads caught a never-written file called a link).
+  if (real === undefined) return true
   for (const root of roots) {
     const realRoot = await realpath(root).catch(() => undefined)
     if (realRoot !== undefined && contains(realRoot, real)) return true

@@ -105,7 +105,8 @@ describe('a file READ is inside the folder on disk, links followed (0.543, the 0
       expect(await insideOnDisk(join(project, 'linked', 'secret.txt'), [project])).toBe(false)
       expect(await insideOnDisk(join(project, 'own.txt'), [project])).toBe(true)
       expect(await insideOnDisk(join(base, 'alias', 'own.txt'), [join(base, 'alias')])).toBe(true)
-      expect(await insideOnDisk(join(project, 'missing.txt'), [project])).toBe(false)
+      // A file never written has no link to follow; the read itself says it is missing.
+      expect(await insideOnDisk(join(project, 'missing.txt'), [project])).toBe(true)
     } finally {
       await rm(base, { recursive: true, force: true })
     }
