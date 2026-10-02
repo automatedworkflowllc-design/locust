@@ -77,7 +77,9 @@ function publicStatus(runtime: RuntimeDiscovery): PublicRuntimeStatus {
     version: runtime.version?.version ?? null,
     auth,
     ready: status === 'ready',
-    status
+    status,
+    // Antigravity through its own CLI is an ordinary runtime, not the app's unpublished interface (0.541).
+    ...(runtime.id === 'antigravity' && runtime.executable?.commandName === 'agy' ? { throughCli: true as const } : {})
   }
 }
 

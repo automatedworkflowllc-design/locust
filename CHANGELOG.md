@@ -11,6 +11,22 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.541.0 - 2026-10-02
+
+### Fixed
+
+- **A conversation that began in the Antigravity app carries on through
+  Antigravity CLI.** A reply to it failed with "trajectory not found",
+  because the CLI was handed the app's own conversation. It now starts the
+  CLI fresh with the conversation so far, as a switch of model does.
+- **A command Antigravity was not allowed to run reads "refused".** In Edit,
+  its refused `git status` read "failed" and "it exited non-zero", though it
+  never ran. And since Antigravity ends its turn there, the note says it
+  stopped.
+- **Antigravity's plan updates read "Updated the plan"**, not `manage_task`.
+- **No "Experimental" tag on Antigravity** when it runs through Antigravity
+  CLI. Through the app alone, it keeps the tag.
+
 ## 0.540.0 - 2026-10-02
 
 ### New

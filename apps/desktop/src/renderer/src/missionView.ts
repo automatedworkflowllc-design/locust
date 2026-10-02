@@ -443,6 +443,12 @@ export function activityEntries(
         })
         return
       }
+      // A plan update that names nothing reads as what it did, never as the
+      // runtime's tool id: Colin saw Antigravity's bare `manage_task done` (0.541).
+      if (detail.kind !== 'edit' && toolLooksAt(detail.tool ?? detail.name) === 'plan' && (detail.tool === undefined || detail.tool === detail.name)) {
+        entries.push({ kind: 'tool', key: `item_${String(index)}`, name: 'Updated the plan', tool: undefined, settled: detail.settled, failed })
+        return
+      }
       entries.push({
         kind: detail.kind === 'edit' ? 'unreported' : 'tool',
         key: `item_${String(index)}`,

@@ -238,7 +238,8 @@ function baseRouteRowStatus(
     }
   }
   // Ready, and real, but on a surface nobody promised: selectable, and said.
-  if (integration === 'experimental') {
+  // Antigravity through its CLI is a published, measured route: no tag (0.541).
+  if (integration === 'experimental' && runtime.throughCli !== true) {
     return {
       tag: 'EXPERIMENTAL',
       selectable: true,

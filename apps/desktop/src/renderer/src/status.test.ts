@@ -256,6 +256,12 @@ describe('nothing is live unless discovery proved it', () => {
     // Antigravity completes missions today. Excluding it would understate.
     expect(connectedRuntimeCount([runtime({ id: 'antigravity' })])).toBe(1)
   })
+
+  it('Antigravity through its CLI carries no Experimental tag; through its app it still does (0.541)', () => {
+    // Colin, 2026-10-02: "its still listed as experimental in model picker".
+    expect(routeRowStatus(runtime({ id: 'antigravity', displayName: 'Antigravity', throughCli: true }), 'experimental', false).tag).toBe('READY')
+    expect(routeRowStatus(runtime({ id: 'antigravity', displayName: 'Antigravity' }), 'experimental', false).tag).toBe('EXPERIMENTAL')
+  })
 })
 
 describe('teammate status', () => {

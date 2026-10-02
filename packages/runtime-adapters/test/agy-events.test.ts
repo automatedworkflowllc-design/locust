@@ -47,7 +47,7 @@ describe("Antigravity CLI's stream", () => {
     const { events } = run("write-denied");
     expect(types(events.filter((event) => event.type.startsWith("tool.")))).toEqual(["tool.started", "tool.failed"]);
     const said = events.find((event) => event.type === "adapter.diagnostic");
-    expect(payload<{ message: string; level: string }>(said)).toMatchObject({ level: "warning", message: "Antigravity was not allowed to change files in this mode. Choose Edit or Auto to let it." });
+    expect(payload<{ message: string; level: string }>(said)).toMatchObject({ level: "warning", message: "It stopped there. Antigravity was not allowed to change files in this mode. Choose Edit or Auto to let it." });
     expect(events.at(-1)!.type).toBe("run.completed");
   });
 
@@ -57,7 +57,9 @@ describe("Antigravity CLI's stream", () => {
     expect(tools.map((event) => `${event.type}:${payload<{ name: string }>(event).name}`)).toEqual([
       "tool.started:write_to_file", "tool.completed:write_to_file", "tool.started:run_command", "tool.failed:run_command",
     ]);
-    expect(payload<{ message: string }>(events.find((event) => event.type === "adapter.diagnostic")).message).toMatch(/^Antigravity was not allowed to run a command in this mode/);
+    expect(payload<{ message: string }>(events.find((event) => event.type === "adapter.diagnostic")).message).toMatch(/^It stopped there. Antigravity was not allowed to run a command in this mode/);
+    // The command never ran: refused, with its reason, not failed (0.541).
+    expect(payload<{ status: string; output: string }>(tools.at(-1))).toMatchObject({ status: "refused", output: "Not allowed in this mode." });
   });
 
   it("an allowed command carries its command line and its output", () => {
@@ -111,5 +113,16 @@ describe("the agy command", () => {
     // Each effort a row of its own in agy: one model here, efforts in order.
     const flash = parseAgyModelList("gemini-3.8-flash-high\tGemini 3.8 Flash (High)\ngemini-3.8-flash-low\tGemini 3.8 Flash (Low)\ngemini-3.8-flash-medium\tGemini 3.8 Flash (Medium)\n");
     expect(flash?.models).toEqual([{ id: "gemini-3.8-flash", displayName: "Gemini 3.8 Flash", efforts: ["low", "medium", "high"] }]);
+  });
+
+  it("a conversation the CLI does not have ends the session and says why (0.541, a conversation the app began)", () => {
+    // Real: `agy --conversation <an app conversation id>`, 2026-10-02.
+    const { events } = run("conversation-not-found", 1);
+    const failed = events.at(-1)!;
+    expect(failed.type).toBe("run.failed");
+    expect(payload<{ sessionEnded: boolean; message: string }>(failed)).toMatchObject({
+      sessionEnded: true,
+      message: "Antigravity CLI does not have this conversation: it began in the Antigravity app. Send it again and it starts fresh, with the conversation so far.",
+    });
   });
 });

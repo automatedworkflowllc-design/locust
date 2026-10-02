@@ -162,7 +162,19 @@ export function createAgyEventNormalizer(context: AgyInvocationContext): AgyEven
         phase: "completed" as const,
         evidence,
       };
-      events.push(state === "DONE" ? emit("tool.completed", ended) : emit("tool.failed", { ...ended, status: state === "ERROR" ? "refused or failed" : (state ?? "unknown") }));
+      // A call the mode refused never ran (0.541: Colin's `git status` in Edit read
+      // "failed" and "it exited non-zero"). Said refused, with its reason, as Claude's are.
+      const errorText = isObject(info.error) ? stringValue(info.error.message) : undefined;
+      const refused = errorText !== undefined && /permission check failed|permission denied|not allowed|denied/i.test(errorText);
+      events.push(
+        state === "DONE"
+          ? emit("tool.completed", ended)
+          : emit("tool.failed", {
+              ...ended,
+              ...(errorText === undefined || output !== undefined ? {} : { output: boundedMessageText(refused ? "Not allowed in this mode." : errorText) }),
+              status: refused ? "refused" : "failed",
+            }),
+      );
       return events;
     }
     return [];
@@ -206,7 +218,9 @@ export function createAgyEventNormalizer(context: AgyInvocationContext): AgyEven
         ? result.denied_actions.flatMap((entry) => (isObject(entry) && typeof entry.action === "string" ? [entry.action] : []))
         : [];
       const said = agyDeniedSentence(denied);
-      if (said !== undefined) events.push(diagnostic("warning", "antigravity.denied_actions", said, evidence));
+      // agy ends the turn at a refusal, with no reply (0.541): say it stopped there.
+      const stopped = response === undefined || response.trim().length === 0;
+      if (said !== undefined) events.push(diagnostic("warning", "antigravity.denied_actions", stopped ? `It stopped there. ${said}` : said, evidence));
       if (turnOpen) {
         turnOpen = false;
         events.push(emit("step.completed", { stepKind: "turn", evidence }));
@@ -243,10 +257,16 @@ export function createAgyEventNormalizer(context: AgyInvocationContext): AgyEven
       if (status === "SUCCESS" && completion.exitCode === 0) {
         return [emit("run.completed", { ...thread, ...(usage === undefined ? {} : { usage }), process })];
       }
+      // A conversation Antigravity CLI does not have (one the app began, 0.541):
+      // the session is over, and the next reply starts fresh.
+      const lost = resultError !== undefined && /trajectory not found/i.test(resultError);
       return [
         emit("run.failed", {
           kind: "process-failed",
-          message: completion.outputLimitExceeded
+          ...(lost ? { sessionEnded: true as const } : {}),
+          message: lost
+            ? "Antigravity CLI does not have this conversation: it began in the Antigravity app. Send it again and it starts fresh, with the conversation so far."
+            : completion.outputLimitExceeded
             ? "Antigravity sent output faster than Locust could record it, so the run was stopped rather than leave a gap in its record. Sending it again usually works."
             : status === undefined
               ? "Antigravity ended without a record saying the run had finished."

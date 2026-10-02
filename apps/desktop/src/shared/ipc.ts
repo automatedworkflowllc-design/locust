@@ -1796,6 +1796,8 @@ export interface PublicRuntimeStatus {
   readonly auth: RuntimeAuthState
   readonly ready: boolean
   readonly status: RuntimeProbeStatus
+  /** Antigravity runs through Antigravity CLI rather than its app (0.541). */
+  readonly throughCli?: true
 }
 
 export type RuntimeDiscoveryResponse =

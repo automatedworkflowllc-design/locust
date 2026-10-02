@@ -700,6 +700,27 @@ export function runtimeThreadIdOf(mission: RecoveredMission): string | undefined
   return held
 }
 
+/**
+ * The session a reply to `prior` resumes on `runtime`, if any: its own, or,
+ * for a turn stopped before it named one, the one it resumed (0.496).
+ *
+ * None when a failure ended the session -- the fallback used to revive it --
+ * and none for a conversation Antigravity's APP held (0.541, Colin's Boss):
+ * that id is the app's, and Antigravity CLI answered "trajectory not found".
+ * The reply then starts fresh with the conversation so far.
+ */
+export function resumableThreadOf(prior: RecoveredMission, runtime: string): string | undefined {
+  if (runtime === 'antigravity' && prior.metadata.resolvedRouteId === 'antigravity:hub') return undefined
+  const ended = prior.events.some((event) => {
+    if (event.type !== 'run.failed') return false
+    const payload = event.payload as { readonly sessionEnded?: unknown; readonly message?: unknown }
+    // 0.540 recorded Antigravity's "trajectory not found" without saying the session had ended.
+    return payload.sessionEnded === true || (runtime === 'antigravity' && typeof payload.message === 'string' && /trajectory not found/i.test(payload.message))
+  })
+  if (ended) return undefined
+  return runtimeThreadIdOf(prior) ?? prior.metadata.continuesFrom?.runtimeThreadId
+}
+
 function validRunId(value: unknown): value is string {
   return typeof value === 'string'
     && value.length > 0
@@ -1458,7 +1479,6 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         }
         if (followUpOf !== undefined) {
           const prior = await options.ledger.getMission(followUpOf).catch(() => undefined)
-          const priorThread = prior === undefined ? undefined : runtimeThreadIdOf(prior)
           if (prior === undefined) {
             return error(
               'RUNTIME_START_FAILED',
@@ -1587,7 +1607,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
            * same walk the side question makes; recorded only when the stopped
            * turn really did resume one.
            */
-          resumeThreadId = modeChanged ? undefined : priorThread ?? prior.metadata.continuesFrom?.runtimeThreadId
+          resumeThreadId = modeChanged ? undefined : resumableThreadOf(prior, runtime)
           resumedMissionId = prior.metadata.missionId
           resumedCompacted = compactedDuring(prior.events)
           if (resumeThreadId === undefined) {

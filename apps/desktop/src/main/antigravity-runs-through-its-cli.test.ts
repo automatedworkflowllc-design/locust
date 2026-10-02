@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { whatItMayDo } from '../shared/may-do.js'
 import { hostReadsEventsOf } from '../shared/runtimes.js'
-import { agyRoute } from './codex-mission.js'
+import { agyRoute, resumableThreadOf } from './codex-mission.js'
 
 /**
  * ANTIGRAVITY RUNS THROUGH ITS CLI (0.540). Google moved personal accounts
@@ -23,6 +23,35 @@ describe('Antigravity through its CLI', () => {
     expect(agyRoute('gemini-3.8-flash-low', 'high')).toEqual({ model: 'gemini-3.8-flash', effort: 'high' })
     expect(agyRoute('claude-opus-4-6-thinking', undefined)).toEqual({ model: 'claude-opus-4-6-thinking' })
     expect(agyRoute(undefined, undefined)).toEqual({})
+  })
+})
+
+describe('a reply to a conversation Antigravity began elsewhere (0.541, Colin: "trajectory not found")', () => {
+  const APP_ID = '920da525-dde6-4610-9d16-9444d0422935'
+  const mission = (metadata: Record<string, unknown>, events: readonly Record<string, unknown>[]) =>
+    ({ metadata: { missionId: 'mission_1', runtime: 'antigravity', ...metadata }, events }) as never
+
+  it('starts the CLI fresh after a turn the app ran', () => {
+    const app = mission({ resolvedRouteId: 'antigravity:hub' }, [{ type: 'run.completed', payload: { runtimeThreadId: APP_ID } }])
+    expect(resumableThreadOf(app, 'antigravity')).toBeUndefined()
+  })
+
+  it('starts fresh after the 0.540 failure, which named the app id but not the ended session', () => {
+    const failed = mission({ resolvedRouteId: 'antigravity', continuesFrom: { missionId: 'mission_0', runtimeThreadId: APP_ID } }, [
+      { type: 'step.started', payload: { runtimeThreadId: APP_ID } },
+      { type: 'run.failed', payload: { runtimeThreadId: APP_ID, message: `Antigravity could not run it: failed to send message: trajectory not found: ${APP_ID}` } }
+    ])
+    expect(resumableThreadOf(failed, 'antigravity')).toBeUndefined()
+  })
+
+  it('still resumes a conversation the CLI itself holds, and a turn stopped before it named one', () => {
+    expect(resumableThreadOf(mission({ resolvedRouteId: 'antigravity' }, [{ type: 'run.completed', payload: { runtimeThreadId: 'cli-1' } }]), 'antigravity')).toBe('cli-1')
+    expect(resumableThreadOf(mission({ continuesFrom: { missionId: 'mission_0', runtimeThreadId: 'cli-1' } }, [{ type: 'run.cancelled', payload: {} }]), 'antigravity')).toBe('cli-1')
+  })
+
+  it('a failure that ended any session is not revived through what it continued', () => {
+    const ended = mission({ runtime: 'opencode', continuesFrom: { missionId: 'mission_0', runtimeThreadId: 'ses_1' } }, [{ type: 'run.failed', payload: { sessionEnded: true } }])
+    expect(resumableThreadOf(ended, 'opencode')).toBeUndefined()
   })
 })
 
