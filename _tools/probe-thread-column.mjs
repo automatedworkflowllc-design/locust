@@ -42,6 +42,7 @@ const MEASURE = `(() => {
   const replies = [...document.querySelectorAll('.lc-thread .lc-agentline__body')]
   return JSON.stringify({
     window: innerWidth,
+    scrolls: (() => { const t = document.querySelector('.lc-thread'); return t ? t.scrollHeight > t.clientHeight : null })(),
     composer: box(form),
     field: box(field),
     thread: box(document.querySelector('.lc-thread')),
@@ -54,7 +55,8 @@ const MEASURE = `(() => {
 })()`
 try {
   await drive.ready()
-  for (const [w, h] of [[1209, 770], [1440, 900], [1920, 1040]]) {
+  const sizes = process.env.PROBE_SIZES === undefined ? [[1209, 770], [1440, 900], [1920, 1040]] : process.env.PROBE_SIZES.split(',').map((size) => size.split('x').map(Number))
+  for (const [w, h] of sizes) {
     await drive.resize(w, h)
     await sleep(1500)
     await drive.evaluate(`(async () => {

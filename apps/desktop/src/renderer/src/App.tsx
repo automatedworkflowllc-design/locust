@@ -4868,6 +4868,10 @@ export default function App(): ReactElement {
    */
   const openNewRoutine = (): void => {
     const teammate = pickedTeammate ?? (teammates.length === 1 ? teammates[0] : undefined)
+    // A teammate with no conversation yet has no route of its own: it would
+    // run on what the box shows, so the dialog offers that, and "What a run
+    // may do" has a mode to start from (Sol, 0.532).
+    const route = teammate?.route ?? (teammate === undefined ? undefined : { ...composerRoute, mode })
     setRoutineDialog({
       teammateId: teammate?.teammateId,
       name: '',
@@ -4875,7 +4879,7 @@ export default function App(): ReactElement {
       learnedFrom: [],
       truncated: false,
       busy: false,
-      ...(teammate?.route === undefined ? {} : { route: teammate.route })
+      ...(route === undefined ? {} : { route })
     })
   }
 

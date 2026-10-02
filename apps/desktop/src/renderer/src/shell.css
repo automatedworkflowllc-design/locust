@@ -652,7 +652,14 @@ textarea {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--lc-space-7) var(--lc-space-6);
+  /* Less the 10px gutter kept on each side, below. */
+  padding: var(--lc-space-7) calc(var(--lc-space-6) - 10px);
+  /*
+   * A long conversation's scrollbar took 10px from one side, and the column,
+   * centred in what was left, sat 5px left of the box under it (Sol, 0.532,
+   * at 1120 and 1199). Kept on both edges, the centre never moves.
+   */
+  scrollbar-gutter: stable both-edges;
 }
 
 /*
@@ -16453,6 +16460,8 @@ textarea {
 
 .lc-beside__thread .lc-thread {
   padding: var(--lc-space-6) var(--lc-space-5);
+  /* No box under it to line up with. */
+  scrollbar-gutter: auto;
 }
 
 /*

@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.535.0 - 2026-10-02
+
+### Fixed
+
+- A new routine for a teammate that has never had a conversation now asks
+  what a run may do, like any other, and saves the choice it shows. Before,
+  the choice was missing, the dialog said changes would land straight away,
+  and the routine was saved to only read.
+- In a long conversation, replies line up with the typing box again. The
+  scrollbar had pushed them 5px to the left; on a narrow window their right
+  edge stopped 10px short.
+
 ## 0.534.0 - 2026-10-02
 
 ### New

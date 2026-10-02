@@ -25,6 +25,13 @@ describe('a reply lines up with the box', () => {
     expect(paragraph.slice(0, paragraph.indexOf('line-height: 1.7;'))).not.toMatch(/max-width: \d+ch;/)
   })
 
+  it('stays centred when a long conversation scrolls: the gutter is kept on both edges, and the padding gives it back (0.535)', () => {
+    const thread = SHELL.slice(SHELL.indexOf('.lc-thread {'), SHELL.indexOf('}', SHELL.indexOf('.lc-thread {')))
+    expect(thread).toContain('padding: var(--lc-space-7) calc(var(--lc-space-6) - 10px);')
+    expect(thread).toContain('scrollbar-gutter: stable both-edges;')
+    expect(SHELL).toMatch(/::-webkit-scrollbar \{\s*width: 10px;/)
+  })
+
   it('keeps a line readable on a big window with the column\'s ceiling', () => {
     expect(TOKENS).toContain('--lc-thread-max-width: clamp(760px, 68vw, 840px);')
     expect(TOKENS).toContain('--lc-thread-max-width-compact: clamp(700px, 84vw, 840px);')
