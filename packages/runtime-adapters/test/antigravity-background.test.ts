@@ -117,3 +117,31 @@ describe("what the pieces read", () => {
     expect(antigravityToolTitle({ toolAction: JSON.stringify("git log -1") }, "git log -1")).toBeUndefined();
   });
 });
+
+/**
+ * A FILE THAT QUOTES ANOTHER TASK IS NOT A TASK (0.537). Colin's run,
+ * 2026-10-02: the agent read its subagents' transcripts with view_file, and
+ * their text quotes other lines' "running as a background task" results. Each
+ * read was counted as background work that never ended, so the run never
+ * finished and its final answer sat under a turn still "working".
+ */
+describe("a file read that quotes a background task", () => {
+  const readsTranscript = at({
+    step_index: 20,
+    type: "PLANNER_RESPONSE",
+    tool_calls: [{ name: "view_file", args: { AbsolutePath: JSON.stringify("C:/brain/other/transcript.jsonl") } }],
+  });
+  const fileText = at({
+    step_index: 21,
+    type: "GENERIC",
+    content: `File Path: C:/brain/other/transcript.jsonl\n{"content":"Tool is running as a background task with task id: ${CONV}/task-7\nTask Description: npm test"}`,
+  });
+  const answer = at({ step_index: 22, type: "PLANNER_RESPONSE", content: "The review is done." });
+
+  it("is an ordinary finished read, nothing waits on it, and the answer ends the turn", () => {
+    const { events, states } = feed([user, readsTranscript, fileText, answer]);
+    expect(events.some((event) => event.type === "step.started" && payloadOf<{ itemType?: string }>(event).itemType === "background")).toBe(false);
+    expect(payloadOf<{ background?: boolean }>(events.find((event) => event.type === "tool.completed")).background).toBeUndefined();
+    expect(states.at(-1)).toEqual({ pending: 0, final: true });
+  });
+});

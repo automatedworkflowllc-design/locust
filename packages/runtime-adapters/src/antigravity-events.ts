@@ -215,6 +215,19 @@ export function antigravityBackgroundTask(content: string | undefined): { readon
   return { taskId: found[1]!, ...(doing === undefined ? {} : { doing: oneLine(doing) }) };
 }
 
+/**
+ * Only a line's OWN task (0.537). A real background result names the task
+ * numbered by its own step index (measured 2026-09-30, above). Colin's
+ * 2026-10-02 run read its subagents' transcripts with `view_file`, and those
+ * files quote other lines' "running as a background task" text: four reads
+ * were counted as background work that never ended, so the run never
+ * finished and its final answer sat under a working turn.
+ */
+export function ownBackgroundTask<T extends { readonly taskId: string }>(task: T | undefined, stepIndex: number | undefined): T | undefined {
+  if (task === undefined || stepIndex === undefined) return task;
+  return task.taskId.endsWith(`/task-${String(stepIndex)}`) ? task : undefined;
+}
+
 /** The task a SYSTEM_MESSAGE came from (`sender=<conv>/task-N`), if it names one. */
 export function antigravityMessageSender(content: string | undefined): string | undefined {
   if (content === undefined) return undefined;
@@ -385,7 +398,7 @@ export function createAntigravityEventNormalizer(
     const at = openTools.indexOf(open);
     if (at >= 0) openTools.splice(at, 1);
     const content = stringValue(parsed.content);
-    const task = antigravityBackgroundTask(content);
+    const task = ownBackgroundTask(antigravityBackgroundTask(content), numberValue(parsed.step_index));
     if (task !== undefined) {
       // The call is over -- it handed its work to the background -- and the
       // work is a step of its own until its task says how it ended. The same
@@ -623,7 +636,7 @@ export function createAntigravityEventNormalizer(
     // never rewritten (0 of 48), so it is read as it stands (0.487).
     const handedOff = type === "GENERIC"
       && stringValue(parsed.status) === "RUNNING"
-      && antigravityBackgroundTask(stringValue(parsed.content)) !== undefined;
+      && ownBackgroundTask(antigravityBackgroundTask(stringValue(parsed.content)), stepIndex) !== undefined;
     if (stringValue(parsed.status) !== "DONE" && !handedOff) return [];
     seen.add(stepIndex);
 

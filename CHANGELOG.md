@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.537.0 - 2026-10-02
+
+### Fixed
+
+- **An Antigravity run that reads its subagents' notes finishes when it
+  answers.** Reading a file that quoted another task's "running as a
+  background task" line was taken as background work of its own, which never
+  ended, so the turn kept saying the agent was working and its final answer
+  never showed as the reply. Only a result's own task counts now.
+
 ## 0.536.0 - 2026-10-02
 
 ### Fixed
