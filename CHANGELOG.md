@@ -11,6 +11,14 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.547.0 - 2026-10-02
+
+### Changed
+
+- **A conversation with no teammate shows its model's logo** in the sidebar
+  where a teammate's face goes, instead of an empty box. A model of your own
+  has no logo, so it keeps the box.
+
 ## 0.546.0 - 2026-10-02
 
 ### Fixed

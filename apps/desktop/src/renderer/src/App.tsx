@@ -6179,6 +6179,7 @@ export default function App(): ReactElement {
           : { routineId: routineOf(rootMission(mission, historyById).startedBy)! }),
         phase: mission.phase,
         runtime: mission.runtime,
+        model: mission.model,
         integrityIssueCount: mission.integrityIssueCount,
         lastAt: mission.lastUpdatedAt
       })

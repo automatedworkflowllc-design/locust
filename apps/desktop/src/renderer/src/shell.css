@@ -15533,6 +15533,16 @@ textarea {
   border: 1px dashed var(--lc-border-hairline);
 }
 
+/* A conversation with no teammate: its model's mark, in the face's footprint. */
+.lc-conv__runtime {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+
 /* A room's row: the people mark in the face's footprint (withRoomsFolded). */
 .lc-conv__room {
   flex: none;

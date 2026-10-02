@@ -59,6 +59,8 @@ export interface SidebarMission {
   readonly phase: PublicRecoveredMission['phase'] | 'running'
   /** Which runtime this mission is on, when it is known. */
   readonly runtime?: PublicRecoveredMission['runtime']
+  /** Its model, for the mark a conversation with no teammate wears (a model of your own has none). */
+  readonly model?: string
   readonly integrityIssueCount: number
   /**
    * The mission that began this conversation, and the turn immediately
@@ -896,8 +898,20 @@ export function Sidebar({
                       * workroom header, so it identifies rather than labels
                       * -- which is what let the route line go.
                       */}
+                    {/*
+                      * No teammate: the model's own mark in the face's place,
+                      * not an empty box (Colin, 10/02: "if a teammate isnt
+                      * assigned we can just use the logo for whatever model is
+                      * chosen"). A model of your own has no mark; it keeps the box.
+                      */}
                     {by === undefined ? (
-                      <span className="lc-conv__nobody" aria-hidden="true" />
+                      mission.runtime === undefined || mission.model === undefined || isOwnRoute(mission.model) ? (
+                        <span className="lc-conv__nobody" aria-hidden="true" />
+                      ) : (
+                        <span className="lc-conv__runtime">
+                          <RuntimeMark runtime={mission.runtime} size={13} label={runtimeDisplayName(mission.runtime)} />
+                        </span>
+                      )
                     ) : (
                       <TeammateBot hue={by.hue} avatar={by.avatar} size={16} teammateId={by.teammateId} name={by.name} />
                     )}

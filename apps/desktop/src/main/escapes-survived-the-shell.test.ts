@@ -30,7 +30,9 @@ import { describe, expect, it } from 'vitest'
  */
 
 const ROOT = fileURLToPath(new URL('../../../../', import.meta.url))
-const SKIP = new Set(['node_modules', '.git', 'dist', 'out', 'release', 'user-session'])
+// `docs` holds no source, only drive records (20,864 files on 2026-10-02): walking them
+// timed this test out under the full suite.
+const SKIP = new Set(['node_modules', '.git', 'dist', 'out', 'release', 'user-session', 'docs'])
 const SOURCE = ['.ts', '.tsx', '.mjs']
 const BACKSLASH = String.fromCharCode(92)
 
