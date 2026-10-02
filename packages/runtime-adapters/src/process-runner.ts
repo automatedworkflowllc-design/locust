@@ -14,6 +14,11 @@ import { assertSafeRuntimeCommand, PROMPT_FILE_PLACEHOLDER } from "./commands.js
 const ACCEPTED_TRANSPORTS: ReadonlySet<string> = new Set(["prompt", "none", "prompt-file", "stream-json"]);
 
 /** One user turn in Claude Code's `--input-format stream-json`. */
+/** Antigravity CLI's input line (0.540): measured shape, the only one agy 1.2.14 accepted. */
+export function agyUserLine(text: string): string {
+  return `${JSON.stringify({ event: "user", message: { role: "user", content: [{ type: "text", text }] } })}\n`;
+}
+
 function streamJsonUserLine(text: string): string {
   return `${JSON.stringify({ type: "user", message: { role: "user", content: text } })}\n`;
 }
@@ -933,6 +938,18 @@ export function createNodeRuntimeProcessRunner(
       // reading, and some CLIs treat anything on stdin as extra input.
       if (terminationRequested || spec.stdin === "none" || spec.stdin === "prompt-file") {
         child.stdin.end();
+      } else if (spec.stdin === "agy-json") {
+        try {
+          child.stdin.write(agyUserLine(prompt), (error) => {
+            if (error === undefined || error === null || settled) return;
+            inputDeliveryFailed = true;
+            requestTermination(false);
+          });
+          child.stdin.end();
+        } catch {
+          inputDeliveryFailed = true;
+          requestTermination(false);
+        }
       } else if (spec.stdin === "stream-json") {
         // The prompt as the first user turn, and input left OPEN: a message
         // written while the turn runs is taken into it (A2.10, measured

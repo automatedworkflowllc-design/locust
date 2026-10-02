@@ -184,6 +184,10 @@ export type {
   OpenCodeEventNormalizer,
   OpenCodeInvocationContext,
 } from "./opencode-events.js";
+export { createAgyPrintCommand, parseAgyModelList } from "./commands.js";
+export { agyUserLine } from "./process-runner.js";
+export { agyDeniedSentence, agyToolTarget, createAgyEventNormalizer } from "./agy-events.js";
+export type { AgyEventNormalizer, AgyInvocationContext } from "./agy-events.js";
 export {
   createMuseEventNormalizer,
   museSessionIdOf,

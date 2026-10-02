@@ -260,8 +260,12 @@ export interface RuntimeCommandSpec {
    * `stream-json` is Claude Code's `--input-format stream-json`: the prompt
    * goes as the first user turn and input stays open until the turn's result,
    * so a message can be handed to the running turn (A2.10).
+   *
+   * `agy-json` is Antigravity CLI's `--input-format stream-json` (0.540): one
+   * `{"event":"user",...}` line with the prompt as a text block, then stdin
+   * closes -- MEASURED 2026-10-02, agy 1.2.14: a closed stdin ends the turn.
    */
-  readonly stdin: "prompt" | "none" | "protocol" | "prompt-file" | "stream-json";
+  readonly stdin: "prompt" | "none" | "protocol" | "prompt-file" | "stream-json" | "agy-json";
   readonly stdout: "jsonl";
   /**
    * What this mission was allowed. Absent reads as `read-only` everywhere it

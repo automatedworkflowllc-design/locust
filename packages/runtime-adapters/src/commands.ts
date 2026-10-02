@@ -265,7 +265,9 @@ export function assertSafeRuntimeCommand(
   for (let index = 0; index < spec.args.length; index += 1) {
     const argument = spec.args[index];
     if (argument === undefined) continue;
-    const unlocked = full && FULL_ACCESS_ARGUMENTS.has(argument);
+    // Antigravity CLI has no other way to allow everything (agy 1.2.14), so
+    // its one flag is full access's -- for that runtime alone (0.540).
+    const unlocked = full && (FULL_ACCESS_ARGUMENTS.has(argument) || (spec.runtime === "antigravity" && argument === "--dangerously-skip-permissions"));
     if (FORBIDDEN_ARGUMENTS.has(argument) && !unlocked) {
       throw new Error(`Forbidden runtime argument: ${argument}`);
     }
@@ -1049,6 +1051,55 @@ export function createGeminiPrintCommand(
     args.push("--resume", requireText(options.resumeThreadId, "Session id"));
   }
   return baseSpec("gemini", executable, options.workspacePath, args);
+}
+
+/**
+ * Antigravity CLI (`agy`), headless (0.540). Google moved personal accounts
+ * off Gemini CLI to it on 2026-06-18; Colin's AI Pro sign-in was refused by
+ * Gemini CLI ("This client is no longer supported for Gemini Code Assist for
+ * individuals") and taken by `agy`. Every flag below is off `agy --help`,
+ * 1.2.14, and each behaviour MEASURED 2026-10-02 in a scratch folder:
+ *
+ * - `--output-format stream-json` prints `init`, `step_update` and `result`
+ *   events (agy-events.ts).
+ * - The prompt goes on stdin as one stream-json `user` line (`agy-json`), so
+ *   a long brief never meets the command-line limit; `-p=` asks for print
+ *   mode with no prompt in argv. Bare `-p` would swallow the next flag.
+ * - Read-only is the default mode: a write or a command is auto-denied and
+ *   named in the result's `denied_actions`. `--mode accept-edits` allows file
+ *   edits and still denies commands. `--dangerously-skip-permissions` allows
+ *   everything, and is only ever full access's.
+ * - `--conversation <id>` carries a conversation on; measured, it answered
+ *   from the turn before.
+ */
+export function createAgyPrintCommand(
+  executable: ExecutableLaunch,
+  options: RuntimeCommandOptions,
+): RuntimeCommandSpec {
+  const sandbox = sandboxArgument(options.sandbox);
+  const args = ["--output-format", "stream-json", "--input-format", "stream-json"];
+  if (sandbox === "workspace-write") args.push("--mode", "accept-edits");
+  if (sandbox === "full-access") args.push("--dangerously-skip-permissions");
+  if (options.model !== undefined) args.push("--model", requireText(options.model, "Model"));
+  if (options.effort !== undefined) args.push("--effort", requireText(options.effort, "Effort"));
+  if (options.resumeThreadId !== undefined) args.push("--conversation", requireText(options.resumeThreadId, "Conversation id"));
+  args.push("-p=");
+  return baseSpec("antigravity", executable, options.workspacePath, args, { stdin: "agy-json", sandbox });
+}
+
+/**
+ * Read `agy models` as it prints (1.2.14): a "Fetching" line, then one
+ * `id<TAB>Display name` per line.
+ */
+export function parseAgyModelList(text: string): RuntimeModelHints | undefined {
+  const models: RuntimeModelName[] = [];
+  for (const line of text.split(/\r?\n/)) {
+    const match = /^([a-z0-9][a-z0-9.-]{0,80})\t(.{1,80})$/.exec(line.trim());
+    if (match === null || models.some((model) => model.id === match[1])) continue;
+    models.push({ id: match[1]!, displayName: match[2]!.trim() });
+  }
+  if (models.length === 0) return undefined;
+  return { aliases: models.map((model) => model.id), efforts: [], models };
 }
 
 /**
