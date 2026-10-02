@@ -63,7 +63,7 @@ type JsonObject = Record<string, unknown>;
 /** What a tool was pointed at, in the parameter names agy prints. */
 export function agyToolTarget(parameters: unknown): string | undefined {
   if (!isObject(parameters)) return undefined;
-  for (const key of ["CommandLine", "AbsolutePath", "TargetFile", "Url", "Query", "SearchPath", "DirectoryPath"]) {
+  for (const key of ["CommandLine", "AbsolutePath", "TargetFile", "Url", "Query", "query", "SearchPath", "DirectoryPath", "Pattern"]) {
     const value = stringValue(parameters[key]);
     if (value !== undefined && value.trim().length > 0) return value;
   }
@@ -96,6 +96,8 @@ export function createAgyEventNormalizer(context: AgyInvocationContext): AgyEven
   /** The message item each agent_response step writes into, newest last. */
   let lastMessageItem: string | undefined;
   const openTools = new Set<number>();
+  /** The agent_response steps that wrote words: theirs is writing time, not thought. */
+  const spoken = new Set<number>();
 
   const emit = <TType extends NormalizedRuntimeEventType>(type: TType, payload: NormalizedRuntimePayloadMap[TType]): NormalizedRuntimeEvent => {
     normalizedSequence += 1;
@@ -134,7 +136,25 @@ export function createAgyEventNormalizer(context: AgyInvocationContext): AgyEven
 
     if (type === "agent_response") {
       const text = stringValue(step.text_delta);
+      /*
+       * THOUGHT, AS TIME (0.542). agy sends no thinking text, only a step that
+       * ends with no words before a tool call, its length, and how many
+       * thinking tokens it spent. Spent ones read "Thought for Ns" with
+       * nothing to open, as Cursor's do; a step that spent none was not
+       * thinking, and no line claims it was.
+       */
+      if ((text === undefined || text.length === 0) && state === "DONE" && !spoken.has(index)) {
+        const used = isObject(step.usage) && typeof step.usage.thinking_tokens === "number" ? step.usage.thinking_tokens : 0;
+        const seconds = typeof step.duration_seconds === "number" ? step.duration_seconds : undefined;
+        if (used <= 0 || seconds === undefined) return [];
+        const itemId = `thought_${String(index)}`;
+        return [
+          emit("step.started", { stepKind: "reasoning", itemId, evidence }),
+          emit("step.completed", { stepKind: "reasoning", itemId, durationMs: Math.round(seconds * 1000), evidence }),
+        ];
+      }
       if (text === undefined || text.length === 0) return [];
+      spoken.add(index);
       lastMessageItem = `msg_${String(index)}`;
       return [emit("message.delta", { itemId: lastMessageItem, operation: "append", text: boundedMessageText(text), final: false, evidence })];
     }

@@ -443,10 +443,12 @@ export function activityEntries(
         })
         return
       }
-      // A plan update that names nothing reads as what it did, never as the
-      // runtime's tool id: Colin saw Antigravity's bare `manage_task done` (0.541).
-      if (detail.kind !== 'edit' && toolLooksAt(detail.tool ?? detail.name) === 'plan' && (detail.tool === undefined || detail.tool === detail.name)) {
-        entries.push({ kind: 'tool', key: `item_${String(index)}`, name: 'Updated the plan', tool: undefined, settled: detail.settled, failed })
+      // A plan update or a wait that names nothing reads as what it did, never
+      // as the runtime's tool id: Colin saw Antigravity's bare `manage_task
+      // done` (0.541), which was a check on a background command (0.542).
+      const looked = detail.kind === 'edit' || (detail.tool !== undefined && detail.tool !== detail.name) ? undefined : toolLooksAt(detail.tool ?? detail.name)
+      if (looked === 'plan' || looked === 'wait') {
+        entries.push({ kind: 'tool', key: `item_${String(index)}`, name: looked === 'plan' ? 'Updated the plan' : 'Checked on a command', tool: undefined, settled: detail.settled, failed })
         return
       }
       entries.push({
@@ -1835,7 +1837,9 @@ function toolLooksAt(tool: string | undefined): Looked | undefined {
   const name = (tool ?? '').toLowerCase()
   if (/web_?search|search_?web/.test(name)) return 'web'
   if (/fetch|read_?url|url_?content|browser/.test(name)) return 'fetch'
-  if (/todo|update_?plan|manage_?task|task_?boundary/.test(name)) return 'plan'
+  if (/todo|update_?plan|task_?boundary/.test(name)) return 'plan'
+  // Antigravity CLI's check on a command it sent to the background (measured 0.542: Action "status").
+  if (name === 'manage_task') return 'wait'
   // Code run in a runtime's own interpreter tool: Codex's `node_repl` (0.493).
   if (/repl/.test(name)) return 'code'
   // Cursor's wait on a command it sent away.
@@ -3109,7 +3113,11 @@ export function buildThread(
           // just hit a dropdown". Absent when the start was never seen.
           const began = runningStep?.register === 'thinking' ? Date.parse(runningStep.startedAt) : NaN
           const ended = Date.parse(event.occurredAt)
-          const durationMs = Number.isNaN(began) || Number.isNaN(ended) ? undefined : Math.max(0, ended - began)
+          // As the runtime timed it when it says (Antigravity CLI reports a step only once it ends, 0.542).
+          const timed = (event.payload as { readonly durationMs?: unknown }).durationMs
+          const durationMs = typeof timed === 'number' && Number.isFinite(timed) && timed >= 0
+            ? timed
+            : Number.isNaN(began) || Number.isNaN(ended) ? undefined : Math.max(0, ended - began)
           /*
            * THE LENGTH ALONE, when there are no words (0.489,
            * DISPLAY-COVERAGE gap 6). Claude Code and Antigravity show

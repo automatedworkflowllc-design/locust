@@ -38,11 +38,29 @@ const details = (() => {
   return activity?.type === 'activity' ? activity.details : []
 })()
 
+describe("Antigravity's thought (0.542)", () => {
+  it('reads "Thought for Ns" from the time agy gives the step, though the step arrives already over', () => {
+    // Both arrive at once, as agy sends them: its own timing is the length.
+    const thought = [
+      event('run.started', {}),
+      event('step.started', { stepKind: 'reasoning', itemId: 'thought_1' }),
+      event('step.completed', { stepKind: 'reasoning', itemId: 'thought_1', durationMs: 4385 }),
+      event('tool.started', { itemId: 'tool_2', toolKind: 'view_file', name: 'view_file', command: 'note.txt', phase: 'started' }),
+      event('tool.completed', { itemId: 'tool_2', toolKind: 'view_file', name: 'view_file', command: 'note.txt', phase: 'completed' }),
+      event('run.completed', {})
+    ]
+    const activity = buildThread(thought, { running: false }).find((item) => item.type === 'activity')
+    const steps = activity?.type === 'activity' ? activity.details : []
+    expect(steps[0]).toMatchObject({ kind: 'reasoning', durationMs: 4385, output: '' })
+  })
+})
+
 describe("Antigravity's rows", () => {
-  it('a plan update reads as one, never as manage_task', () => {
+  it('a check on a background command reads as one, never as manage_task', () => {
+    // Measured 0.542: manage_task is {Action: "status", TaskId} on a command agy sent away.
     const rows = activityEntries(details)
-    const plan = rows.find((entry) => entry.kind === 'tool')
-    expect(plan?.kind === 'tool' ? plan.name : undefined).toBe('Updated the plan')
+    const check = rows.find((entry) => entry.kind === 'tool')
+    expect(check?.kind === 'tool' ? check.name : undefined).toBe('Checked on a command')
     expect(JSON.stringify(rows)).not.toContain('manage_task')
   })
 

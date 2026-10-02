@@ -115,6 +115,15 @@ describe("the agy command", () => {
     expect(flash?.models).toEqual([{ id: "gemini-3.8-flash", displayName: "Gemini 3.8 Flash", efforts: ["low", "medium", "high"] }]);
   });
 
+  it("thinking reads as its time, only where thinking tokens were spent (0.542)", () => {
+    // reads-a-file: step 1 spent 62 thinking tokens over 4.39s before its tool.
+    const thought = run("reads-a-file").events.filter((event) => event.type === "step.completed" && payload<{ stepKind: string }>(event).stepKind === "reasoning");
+    expect(thought.map((event) => payload<{ durationMs: number; message?: string }>(event))).toEqual([expect.objectContaining({ durationMs: 4385 })]);
+    expect(payload<{ message?: string }>(thought[0]).message).toBeUndefined();
+    // command-allowed spent none: no line claims it thought.
+    expect(run("command-allowed").events.some((event) => event.type.startsWith("step.") && payload<{ stepKind: string }>(event).stepKind === "reasoning")).toBe(false);
+  });
+
   it("a conversation the CLI does not have ends the session and says why (0.541, a conversation the app began)", () => {
     // Real: `agy --conversation <an app conversation id>`, 2026-10-02.
     const { events } = run("conversation-not-found", 1);

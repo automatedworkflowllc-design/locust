@@ -85,6 +85,8 @@ interface StepPayload {
   readonly itemType?: string;
   readonly status?: string;
   readonly message?: string;
+  /** How long the step took, as the runtime timed it (Antigravity CLI, 0.542). */
+  readonly durationMs?: number;
   readonly evidence: CodexEventEvidence;
 }
 

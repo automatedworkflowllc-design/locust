@@ -11,6 +11,22 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.542.0 - 2026-10-02
+
+### New
+
+- **Antigravity's thinking shows as "Thought for 4s"**, as Cursor's does.
+  Antigravity CLI sends no thinking text, only how long a step took and how
+  much of it was thinking, so the line has nothing to open, and a step that
+  did no thinking draws no line.
+
+### Fixed
+
+- **Antigravity's background-command checks read "Checked on a command".**
+  0.541 called them "Updated the plan"; measured, `manage_task` is a check on
+  a command Antigravity sent to the background.
+- **Antigravity's web searches name what they searched for.**
+
 ## 0.541.0 - 2026-10-02
 
 ### Fixed
