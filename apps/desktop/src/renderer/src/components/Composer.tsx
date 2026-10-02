@@ -355,6 +355,12 @@ export interface ComposerProps {
   readonly onSendQueued: () => void
   /** The queued message belongs to a conversation that is NOT the one on screen. */
   readonly queuedElsewhere: boolean
+  /**
+   * Which conversation the box is writing in (0.551). A message typed and not
+   * sent stays with its conversation, as Claude Code's does; Colin, on 0.549:
+   * "my message is staying in the chatbox for all chats if unsent".
+   */
+  readonly draftKey?: string
 }
 
 /**
@@ -462,9 +468,26 @@ export function Composer({
   onUnqueue,
   onSendQueued,
   onSendQueuedNow,
-  queuedElsewhere
+  queuedElsewhere,
+  draftKey
 }: ComposerProps): ReactElement {
   const [value, setValue] = useState('')
+  const drafts = useRef(new Map<string, string>())
+  const valueNow = useRef(value)
+  valueNow.current = value
+  const draftFor = useRef(draftKey)
+  useEffect(() => {
+    const before = draftFor.current
+    if (before === draftKey) return
+    if (before !== undefined) {
+      if (valueNow.current.trim().length > 0) drafts.current.set(before, valueNow.current)
+      else drafts.current.delete(before)
+    }
+    draftFor.current = draftKey
+    // A new conversation's first run takes its id as it starts: still the same conversation.
+    if (before !== undefined && before.startsWith('pending')) return
+    setValue(draftKey === undefined ? '' : drafts.current.get(draftKey) ?? '')
+  }, [draftKey])
   // What a reply on another runtime would carry, worked out by the host as it is typed (0.517).
   const [carried, setCarried] = useState<HandoffPreviewParts>()
   // What the person chose to leave out of that brief (0.527), for this conversation and runtime only.

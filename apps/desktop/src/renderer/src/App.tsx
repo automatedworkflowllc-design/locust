@@ -6225,6 +6225,10 @@ export default function App(): ReactElement {
     const parents = nestedUnder(named, sentFrom)
     return named.map((row) => (parents.has(row.missionId) ? { ...row, nestedUnder: parents.get(row.missionId)! } : row))
   }, [history, historyById, runs, workspaceId, missionTitles, compares, judgeIds])
+  // The conversation the box writes in, so an unsent message stays with it (0.551).
+  const shownConversation = liveRun?.data?.missionId ?? shownKey
+  const shownRow = shownConversation === undefined ? undefined : sidebarMissions.find((entry) => (entry.memberIds ?? [entry.missionId]).includes(shownConversation))
+  const composerDraftKey = shownConversation === undefined ? 'new' : shownRow?.rootId ?? shownRow?.missionId ?? shownConversation
   const besideRow = besideId === undefined ? undefined : sidebarMissions.find((entry) => (entry.memberIds ?? [entry.missionId]).includes(besideId))
   const besideRun = ((): LiveRunState | undefined => {
     if (besideId === undefined) return undefined
@@ -7875,6 +7879,7 @@ export default function App(): ReactElement {
           )}
           {screen === 'workroom' && (
           <Composer
+            draftKey={composerDraftKey}
             metal={metal}
             metalStrength={metalStrength}
             metalMotion={metalMotion}

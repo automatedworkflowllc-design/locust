@@ -1005,7 +1005,15 @@ export function ownerToSelect(
    */
   fromRun?: string
 ): string | undefined {
-  return fromRun ?? owners[missionId] ?? current
+  /*
+   * A CONVERSATION NOBODY OWNS IS ADDRESSED TO NOBODY (0.551). This kept the
+   * pick from before, so Colin opened a conversation with no teammate, typed,
+   * and the message went to Boss -- queued "Sends when Boss finishes" behind
+   * Boss's other conversation, on Boss's route. The box writes in the
+   * conversation on screen.
+   */
+  void current
+  return fromRun ?? owners[missionId]
 }
 
 /**

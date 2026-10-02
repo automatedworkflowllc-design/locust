@@ -970,10 +970,10 @@ describe('who the composer addresses when a conversation is opened', () => {
     expect(ownerToSelect('mission_booty', { mission_booty: 'tm_booty' }, 'tm_wren', undefined)).toBe('tm_booty')
   })
 
-  it('keeps the current selection for a conversation nobody owns', () => {
-    // An unowned raw conversation is a real state; blanking the composer
-    // would be a second wrong answer rather than a fix for the first.
-    expect(ownerToSelect('mission_nobody', owners, 'tm_wren')).toBe('tm_wren')
+  it('addresses nobody for a conversation nobody owns (0.551)', () => {
+    // Keeping Wren sent Colin's reply in a teammate-less conversation to the
+    // teammate picked before, queued behind that teammate's other conversation.
+    expect(ownerToSelect('mission_nobody', owners, 'tm_wren')).toBeUndefined()
     expect(ownerToSelect('mission_nobody', owners, undefined)).toBeUndefined()
   })
 })
