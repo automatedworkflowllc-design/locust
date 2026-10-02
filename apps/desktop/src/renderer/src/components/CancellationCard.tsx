@@ -69,7 +69,9 @@ export function CancellationCard({
          * condition is about tool calls, so the sentence names tool calls.
          */
         <div className="lc-card__body">
-          Stopped before it used any tools, so nothing is half-done.
+          {summary.toolsReportedWhenDone === true
+            ? 'Stopped before it reported using any tools. OpenCode reports a tool only once it finishes, so a command it had started may still have run.'
+            : 'Stopped before it used any tools, so nothing is half-done.'}
         </div>
       ) : (
         <dl className="lc-receipt">

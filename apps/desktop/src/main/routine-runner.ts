@@ -258,7 +258,7 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
    * person -- recorded in the same write that counts the run -- and a copy
    * that changed nothing is removed. Returns what is waiting, if anything.
    */
-  const complete = async (routineId: string, execution: RoutineExecution): Promise<RoutineStaged | undefined> => {
+  const complete = async (routineId: string, execution: RoutineExecution, failed?: string): Promise<RoutineStaged | undefined> => {
     let staged: RoutineStaged | undefined
     if (execution.inCopy === true && options.copies !== undefined) {
       const changes = await options.copies.changes(routineId).catch(() => undefined)
@@ -267,7 +267,7 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
         staged = { attemptId: execution.attemptId, finishedAt: new Date().toISOString(), folder, changed: changes.changed, deleted: changes.deleted }
       }
     }
-    await options.routines.recordRun(routineId, execution.attemptId, staged)
+    await options.routines.recordRun(routineId, execution.attemptId, staged, ...(failed === undefined ? [] : [failed]))
     if (execution.inCopy === true && staged === undefined) await options.copies?.discard(routineId).catch(() => undefined)
     active.delete(routineId)
     changed()
@@ -747,7 +747,7 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
         }
         const said = `the check \`${checked.command}\` still fails after ${String(fixes)} fix${fixes === 1 ? '' : 'es'}${checked.tail.length === 0 ? '' : `: ${checked.tail.slice(-3).join(' / ')}`}`
         if (execution.inCopy === true) {
-          const staged = await complete(progress.routineId, execution)
+          const staged = await complete(progress.routineId, execution, `${said.charAt(0).toUpperCase()}${said.slice(1)}.`.slice(0, 600))
           notice(progress, `Routine "${progress.name}" stopped: ${said}.${staged === undefined ? '' : ` ${waitingWords(staged)} -- whether work that does not pass is worth keeping is yours to judge.`}`)
           return
         }

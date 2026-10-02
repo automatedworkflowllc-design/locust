@@ -3705,6 +3705,12 @@ export interface CancellationSummary {
   readonly settled: readonly string[]
   readonly interrupted: readonly string[]
   readonly neverStarted: number
+  /**
+   * The runtime reports a tool only once it has finished (OpenCode), so a
+   * command it had started when the run stopped is not in either list (Sol,
+   * 0.532: a running timer, and the card said no tool had run).
+   */
+  readonly toolsReportedWhenDone?: boolean
 }
 
 export function cancellationSummary(
@@ -3752,7 +3758,8 @@ export function cancellationSummary(
   return {
     settled,
     interrupted,
-    neverStarted: Math.max(0, plannedSteps - done)
+    neverStarted: Math.max(0, plannedSteps - done),
+    ...(events.some((event) => event.sourceAdapter === 'opencode') ? { toolsReportedWhenDone: true } : {})
   }
 }
 

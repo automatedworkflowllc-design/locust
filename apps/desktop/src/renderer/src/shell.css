@@ -13191,6 +13191,14 @@ textarea {
   align-self: start;
 }
 
+.lc-automations .lc-routinerow__failed {
+  display: block;
+  margin-top: 2px;
+  color: var(--lc-amber-text);
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+
 .lc-automations .lc-routinerow:last-child {
   border-bottom: none;
 }

@@ -267,6 +267,11 @@ export function AutomationsScreen({
                       return folder === undefined ? null : <span title={folder.path}>{` · in ${folder.name}`}</span>
                     })()}
                   </span>
+                  {/* Its last run's check still failed (0.536): said here, where
+                      the next run is started, not only in the conversation. */}
+                  {routine.lastFailed !== undefined && (
+                    <span className="lc-routinerow__failed">Last run: {routine.lastFailed}</span>
+                  )}
                 </span>
                 {/* The schedule as a CHIP, not a third prose line. It is the
                     one fact on the row a person scans for -- does this go on

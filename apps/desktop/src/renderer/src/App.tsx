@@ -993,7 +993,7 @@ export default function App(): ReactElement {
     const notYet = stillStarting
       ? 'This conversation is still starting. It can be changed once its first receipt lands.'
       : undefined
-    const title = sidebarMissionsRef.current.find((row) => row.missionId === missionId)?.title ?? 'Mission'
+    const title = sidebarMissionsRef.current.find((row) => row.missionId === missionId)?.title ?? 'Conversation'
     setRowMenuArmed(undefined)
     setRowMenu({
       x: at.x,
@@ -8261,7 +8261,7 @@ export default function App(): ReactElement {
                     .catch(() => setSwarm(!next))
                 }
               },
-              { id: 'go-missions', group: 'Go to', label: 'Missions', hint: 'Ctrl 1', run: () => setScreen('missions') },
+              { id: 'go-missions', group: 'Go to', label: 'Conversations', hint: 'Ctrl 1', run: () => setScreen('missions') },
               { id: 'go-rooms', group: 'Go to', label: 'Rooms', hint: 'Ctrl 4', run: () => setScreen('rooms') },
               { id: 'go-memory', group: 'Go to', label: 'Memory', hint: 'Ctrl 5', run: () => setScreen('memory') },
               {
@@ -8294,7 +8294,7 @@ export default function App(): ReactElement {
               },
               {
                 id: 'inspector',
-                group: 'Mission',
+                group: 'Conversation',
                 label: inspectorOpen ? 'Close the Activity panel' : 'Open the Activity panel',
                 hint: 'Ctrl I',
                 run: () => setInspectorOpen(!inspectorOpen)
@@ -8303,7 +8303,7 @@ export default function App(): ReactElement {
                 ? [
                     {
                       id: 'stop',
-                      group: 'Mission',
+                      group: 'Conversation',
                       label: 'Stop the running reply',
                       run: cancelMission
                     }

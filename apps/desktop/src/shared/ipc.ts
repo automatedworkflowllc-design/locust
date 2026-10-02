@@ -1479,6 +1479,12 @@ export interface PublicRoutine {
    * and while it fails the teammate is asked to fix it, up to `tries` times.
    */
   readonly untilCheck?: RoutineGoal
+  /**
+   * The last run ended with its check still failing (0.536), in the words its
+   * conversation said it. Cleared by the next run. Sol, 0.535: the card said
+   * only "run 1 time" and offered Run again, as if it had gone fine.
+   */
+  readonly lastFailed?: string
 }
 
 /** Keep going until the folder's check passes, at most this many fixes (0.534). */

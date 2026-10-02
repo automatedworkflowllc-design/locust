@@ -11,29 +11,34 @@ import { parsedRoutine, validGoal } from './routine-store.js'
  * its steps done the folder's check runs; while it fails, the same teammate
  * is asked to fix what it said, in the same conversation, at most N times.
  */
-const setUp = (checks: readonly GoalCheck[], tries: number) => {
+const setUp = (checks: readonly GoalCheck[], tries: number, inCopy = false) => {
   const held = new Map<string, PublicRoutine>([['rt_tests', {
     routineId: 'rt_tests', name: 'Green tests', teammateId: 'tm_wren',
     route: { runtime: 'codex', model: 'gpt-6-luna', mode: 'accept-edits' },
     steps: ['Fix the cart total.'], learnedFrom: [], createdAt: '2026-10-01T00:00:00.000Z', runs: 0,
-    untilCheck: { tries }
+    untilCheck: { tries },
+    ...(inCopy ? { inCopy: true as const } : {})
   }]])
   const started: { prompt: string; followUpOf: string | undefined }[] = []
   const notices: string[] = []
   const recorded: string[] = []
+  const failures: (string | undefined)[] = []
   let checked = 0
   let mission = 0
   const options = {
     workspaceId: 'ws_test',
     folderNow: () => 'C:/work',
+    // A copy that changed nothing, for a routine that works in one.
+    copies: { make: async () => 'C:/copy', path: () => 'C:/copy', source: async () => 'C:/work', changes: async () => ({ changed: [], deleted: [] }), discard: async () => undefined },
     goalCheck: async () => checks[Math.min(checked++, checks.length - 1)],
     routines: {
       get: async (id: unknown) => held.get(String(id)),
       list: async () => [...held.values()],
-      recordRun: async (id: string) => {
+      recordRun: async (id: string, _attempt: string, _staged: unknown, failed?: string) => {
         recorded.push(id)
-        const { execution: _execution, ...rest } = held.get(id)!
-        held.set(id, { ...rest, runs: rest.runs + 1 })
+        failures.push(failed)
+        const { execution: _execution, lastFailed: _lastFailed, ...rest } = held.get(id)!
+        held.set(id, { ...rest, runs: rest.runs + 1, ...(failed === undefined ? {} : { lastFailed: failed }) })
       },
       saveProgress: async (id: string, execution: RoutineExecution) => { held.set(id, { ...held.get(id)!, execution }) },
       clearProgress: async () => undefined,
@@ -51,7 +56,7 @@ const setUp = (checks: readonly GoalCheck[], tries: number) => {
     askedAQuestion: async () => false,
     notify: (update: CodexMissionUpdate) => { if (update.kind === 'relay-notice') notices.push(update.message) }
   } as unknown as RoutineRunnerOptions
-  return { held, started, notices, recorded, runner: createRoutineRunner(options) }
+  return { held, started, notices, recorded, failures, runner: createRoutineRunner(options) }
 }
 const failing: GoalCheck = { command: 'npm test', passed: false, tail: ['FAIL cart.test.js', 'expected 6, got 0'] }
 const passing: GoalCheck = { command: 'npm test', passed: true, tail: [] }
@@ -82,6 +87,29 @@ describe('a routine that keeps going until its check passes', () => {
     expect(held.get('rt_tests')?.execution?.status).toBe('held')
     expect(held.get('rt_tests')?.execution?.reason).toMatch(/^The check `npm test` still fails after 1 fix: FAIL cart\.test\.js \/ expected 6, got 0\. The run does not count as done\./)
     expect(notices.at(-1)).toMatch(/stopped: the check `npm test` still fails after 1 fix/)
+  })
+
+  it('in a copy, when the fixes run out, the routine itself remembers the check still failed (0.536)', async () => {
+    const { failures, held, runner } = setUp([failing], 1, true)
+    await runner.run('rt_tests')
+    await runner.onRunEnded({ missionId: 'mission_1' })
+    await runner.onRunEnded({ missionId: 'mission_2' })
+    expect(failures).toEqual(['The check `npm test` still fails after 1 fix: FAIL cart.test.js / expected 6, got 0.'])
+    expect(held.get('rt_tests')?.lastFailed).toBe(failures[0])
+  })
+
+  it('a run that passes leaves no failure behind', async () => {
+    const { failures, runner } = setUp([passing], 1, true)
+    await runner.run('rt_tests')
+    await runner.onRunEnded({ missionId: 'mission_1' })
+    expect(failures).toEqual([undefined])
+  })
+
+  it('a last failure reads back from the file, and one that does not read is dropped (0.536)', () => {
+    const base = { routineId: 'rt_tests', name: 'Green tests', teammateId: 'tm_wren', route: { runtime: 'codex', model: 'gpt-6-luna', mode: 'accept-edits' }, steps: ['Fix it.'], learnedFrom: [], createdAt: '2026-10-01T00:00:00.000Z', runs: 1 }
+    expect(parsedRoutine({ ...base, lastFailed: 'The check still fails.' })?.lastFailed).toBe('The check still fails.')
+    expect(parsedRoutine({ ...base, lastFailed: 42 })?.lastFailed).toBeUndefined()
+    expect(parsedRoutine({ ...base, lastFailed: 'x'.repeat(601) })?.lastFailed).toBeUndefined()
   })
 
   it('finishes at once when the check passes the first time, and says so', async () => {

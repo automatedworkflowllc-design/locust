@@ -74,7 +74,7 @@ export interface RoutineStore {
    * Count reconciled final completion and clear its matching progress in one write
    * -- with, for a routine that works in a copy, what it changed there (0.533).
    */
-  recordRun(routineId: unknown, attemptId: string, staged?: RoutineStaged): Promise<void>
+  recordRun(routineId: unknown, attemptId: string, staged?: RoutineStaged, failed?: string): Promise<void>
   /** A copy's changes, kept or discarded: the routine stops waiting on them (0.533). */
   settleStaged(routineId: string, attemptId: string): Promise<void>
   saveProgress(routineId: string, progress: RoutineExecution, expectedAttemptId: string | null): Promise<void>
@@ -215,8 +215,14 @@ export function parsedRoutine(value: unknown): PublicRoutine | undefined {
     ...(record.inCopy === true ? { inCopy: true as const } : {}),
     // A goal that does not read is dropped, not the routine (0.534).
     ...(validGoal(record.untilCheck) ? { untilCheck: { tries: record.untilCheck.tries } } : {}),
-    ...(validStaged(record.staged) ? { staged: { ...record.staged, changed: [...record.staged.changed], deleted: [...record.staged.deleted] } } : {})
+    ...(validStaged(record.staged) ? { staged: { ...record.staged, changed: [...record.staged.changed], deleted: [...record.staged.deleted] } } : {}),
+    ...(validFailed(record.lastFailed) ? { lastFailed: record.lastFailed } : {})
   }
+}
+
+/** A last failure is a line of the run's own words, bounded (0.536). */
+function validFailed(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0 && value.length <= 600
 }
 
 function parsedExecution(value: unknown, steps: readonly string[], route: TeammateRoute): RoutineExecution {
@@ -438,7 +444,7 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
       })
     },
 
-    recordRun(routineId, attemptId, staged): Promise<void> {
+    recordRun(routineId, attemptId, staged, failed): Promise<void> {
       return serialize(async () => {
         if (!safeId(routineId)) return
         const file = await read()
@@ -451,8 +457,8 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
         // Counting and clearing share ONE rename: a crash cannot count twice,
         // nor leave a completed routine looking like it only started step 1.
         if (staged !== undefined && !validStaged(staged)) throw new Error('Routine copy changes are invalid')
-        const { execution: _execution, ...rest } = held
-        const next: PublicRoutine = { ...rest, runs: held.runs + 1, lastRunAt: new Date().toISOString(), ...(staged === undefined ? {} : { staged }) }
+        const { execution: _execution, lastFailed: _lastFailed, ...rest } = held
+        const next: PublicRoutine = { ...rest, runs: held.runs + 1, lastRunAt: new Date().toISOString(), ...(staged === undefined ? {} : { staged }), ...(validFailed(failed) ? { lastFailed: failed } : {}) }
         await write({
           ...file,
           routines: file.routines.map((routine) => (routine.routineId === next.routineId ? next : routine))

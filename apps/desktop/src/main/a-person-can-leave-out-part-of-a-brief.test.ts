@@ -32,7 +32,7 @@ describe('a person can leave out part of a brief', () => {
     expect(briefing).toBeDefined()
     expect(briefing?.prompt).not.toContain('I moved the session check after the cookie is set.')
     expect(briefing?.prompt).toContain('Now do the signup form')
-    expect(briefing?.prompt).toMatch(/\(The person chose to leave out: summary\.\)$/)
+    expect(briefing?.prompt).toMatch(/\(The person chose to leave out its last reply\.\)$/)
     expect(briefing?.kept).toEqual(['task', 'earlier', 'settled'])
     expect(briefing?.leftOutByYou).toEqual(['summary'])
     expect(briefing?.omitted).toEqual([])

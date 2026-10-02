@@ -39,8 +39,8 @@ export function RoutineChanges({
       </span>
       <span className="lc-routinechanges__line">
         {files.length === 1
-          ? 'Nothing has reached the folder. Keep writes it into the folder; Discard throws it away.'
-          : 'Nothing has reached the folder. Keep writes them into the folder; Discard throws them away.'}
+          ? 'Nothing has reached the folder. Keep writes it into the folder; Discard throws it away. It runs again once you choose.'
+          : 'Nothing has reached the folder. Keep writes them into the folder; Discard throws them away. It runs again once you choose.'}
       </span>
       <span className="lc-routinechanges__actions">
         <button type="button" className="lc-primarybutton" onClick={() => onSettle(routine.routineId, 'keep')}>

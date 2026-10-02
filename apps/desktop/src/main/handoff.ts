@@ -328,7 +328,18 @@ const KEEP_ORDER = OPTIONAL_SECTION_NAMES
 
 /** The person's own choice, named as such so it is never read as a gap in the record. */
 export function choiceNotice(leftOut: readonly string[]): string {
-  return `(The person chose to leave out: ${leftOut.join(', ')}.)`
+  // In the words the person saw on the part buttons: a reopened conversation
+  // shows this line, and "leave out: summary" read as Locust's own vocabulary
+  // (Sol, 0.532).
+  const words = leftOut.map((name) => CHOSEN_PART_WORDS[name] ?? name)
+  const joined = words.length <= 1 ? words.join('') : `${words.slice(0, -1).join(', ')} and ${words[words.length - 1] ?? ''}`
+  return `(The person chose to leave out ${joined}.)`
+}
+
+const CHOSEN_PART_WORDS: Readonly<Record<string, string>> = {
+  earlier: 'the earlier messages',
+  settled: 'the steps it finished',
+  summary: 'its last reply'
 }
 
 export function omissionNotice(omitted: readonly string[]): string {

@@ -42,6 +42,19 @@ describe('a run stopped before any tool ran', () => {
     expect(html).toContain('Send again')
   })
 
+  it('on OpenCode, which reports a tool only once it finishes, does not promise nothing ran (Sol, 0.532)', () => {
+    const html = thread({
+      cancelled: true,
+      onSendAgain: () => undefined,
+      events: [{ type: 'run.started', sourceAdapter: 'opencode', payload: {} }]
+    })
+    expect(html).not.toContain('Stopped before it used any tools')
+    expect(html).not.toContain('cannot repeat anything')
+    expect(html).toContain('OpenCode reports a tool only once it finishes, so a command it had started may still have run.')
+    expect(html).toContain('Look at the folder before sending it again')
+    expect(html).toContain('Send again')
+  })
+
   it('does not, when a tool had run', () => {
     const html = thread({
       cancelled: true,
