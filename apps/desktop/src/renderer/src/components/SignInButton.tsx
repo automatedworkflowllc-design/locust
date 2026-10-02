@@ -6,6 +6,9 @@ import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { SIGN_IN_OPENED_EVENT } from '../signInEvents.js'
 
+/** Runtimes whose sign-in command removes the current sign-in before it finishes (measured). */
+const SIGNS_OUT_AT_START: ReadonlySet<string> = new Set(['codex'])
+
 /**
  * SIGN IN, as a button.
  *
@@ -71,12 +74,19 @@ export function SignInButton({ runtime, again = false }: { readonly runtime: str
    * SIGNING IN AGAIN CAN SIGN YOU OUT (0.545). Sol, on 0.544, opened Codex's
    * login and closed it unanswered; Codex was signed out from then on. So
    * before the window opens, the row says so, and the person chooses.
+   *
+   * Measured 10/02 on a throwaway CODEX_HOME: `codex login` deletes the
+   * sign-in the moment it starts, before the browser has been answered. So
+   * for Codex the row says it plainly, not "may".
    */
   if (state === 'confirm') {
     const name = runtimeDisplayName(runtime as MissionRuntimeId)
+    const warning = SIGNS_OUT_AT_START.has(runtime)
+      ? `${name} signs out as soon as this opens, and stays signed out until you finish there.`
+      : `Until you finish signing in there, ${name} may stay signed out.`
     return (
       <span className="lc-runtimecell__confirm" role="group" aria-label={`Sign in to ${name} again`}>
-        <span className="lc-runtimecell__signin">Until you finish signing in there, {name} may stay signed out.</span>
+        <span className="lc-runtimecell__signin">{warning}</span>
         <button type="button" className="lc-runtimecell__again" onClick={open}>
           Open it
         </button>

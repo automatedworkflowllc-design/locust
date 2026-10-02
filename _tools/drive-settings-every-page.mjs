@@ -94,7 +94,7 @@ try {
             await new Promise((r) => setTimeout(r, 300))
             return said + ' | after Cancel: ' + (document.querySelector('.lc-runtimecell__confirm') ? 'still asking' : 'back')
           })()`))
-          check('AI agents: Sign in again warns it may sign you out, and Cancel opens nothing', /may stay signed out/.test(asked) && /after Cancel: back$/.test(asked), asked)
+          check('AI agents: Sign in again warns it may sign you out, and Cancel opens nothing', /stay(s)? signed out/.test(asked) && /after Cancel: back$/.test(asked), asked)
         }
       }
       check(`${label} at ${String(w)}: nothing past the edge, nothing scrolls sideways${seen.cut.length > 0 ? ' (cut short: ' + seen.cut.join(' | ') + ')' : ''}`, fine, JSON.stringify({ sideways: seen.sideways, past: seen.past }))

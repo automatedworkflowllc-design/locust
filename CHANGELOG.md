@@ -11,7 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
-## 0.545.0 - 2026-10-03
+## 0.546.0 - 2026-10-02
+
+### Fixed
+
+- **Sign in again on Codex says plainly that it signs Codex out.** Codex's own
+  sign-in removes the current one the moment it starts, before you have
+  answered in the browser (measured), so closing that window unfinished left
+  Codex signed out. The warning now says so for Codex instead of "may".
+
+## 0.545.0 - 2026-10-02
 
 ### New
 
