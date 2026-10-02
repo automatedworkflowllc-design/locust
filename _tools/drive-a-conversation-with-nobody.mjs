@@ -108,6 +108,27 @@ try {
     })
   })()`))))
   check('opened, it keeps the Claude mark', opened.runtime === 'claude' && opened.empty === false, JSON.stringify(opened))
+  // 0.551, Colin: "my message is staying in the chatbox for all chats if unsent".
+  const drafts = JSON.parse(String(await drive.capture('a draft stays with its conversation', () => drive.evaluate(`(async () => {
+    const field = () => document.querySelector('form.command-dock textarea')
+    const type = (text) => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(field(), text)
+      field().dispatchEvent(new Event('input', { bubbles: true }))
+    }
+    const open = async (word) => {
+      [...document.querySelectorAll('.lc-conv')].find((one) => one.title.startsWith(word))?.click()
+      await new Promise((r) => setTimeout(r, 1200))
+    }
+    type('half a thought for yo')
+    await new Promise((r) => setTimeout(r, 300))
+    await open('Summarize')
+    const elsewhere = field()?.value ?? null
+    await open('yo')
+    const back = field()?.value ?? null
+    return JSON.stringify({ elsewhere, back })
+  })()`))))
+  check('another conversation does not show the draft', drafts.elsewhere === '', JSON.stringify(drafts))
+  check('its own conversation gets it back', drafts.back === 'half a thought for yo', JSON.stringify(drafts))
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
