@@ -28,8 +28,8 @@ heading: the home screen then shows it once, as a splash.
 ### Improved
 
 - **Less work while a teammate is working.** The orb beside "working" was
-  drawn at every frame the screen shows -- 144 a second on a gaming laptop --
-  and was the largest single cost in the window while replies streamed. It
+  drawn at every frame the screen shows (144 a second on a gaming laptop),
+  the largest single cost in the window while replies streamed. It
   is now drawn at most 30 times a second, like the teammates' faces, and
   moves at the same speed. Measured with three replies streaming at once:
   about 40% less script time. Also, a reply's finished part is parsed again

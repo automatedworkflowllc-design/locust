@@ -76,6 +76,12 @@ try {
         check(`${label}: every switch says what it is`, seen.switches.every((name) => name.length > 0 && !/^Switch this (on|off)$/.test(name)), JSON.stringify(seen.switches))
         // A double hyphen is typing, not a dash (0.419).
         check(`${label}: no "--" in what it shows`, !/ -- /.test(seen.text), (/.{0,40} -- .{0,40}/.exec(seen.text) ?? [''])[0])
+        // Every signed-in agent can sign in again, as this account or another (0.543). Counted, not recorded.
+        if (label === 'AI agents') {
+          const again = Number(await drive.evaluate(`[...document.querySelectorAll('button.lc-runtimecell__again')].filter((b) => b.innerText.trim() === 'Sign in again').length`))
+          const signedIn = Number(await drive.evaluate(`[...document.querySelectorAll('.lc-runtimerow')].filter((row) => /READY|ACTIVE/.test(row.querySelector('.lc-tag')?.innerText ?? '')).length`))
+          check('AI agents: signed-in agents offer Sign in again', again > 0, `${String(again)} of ${String(signedIn)} ready rows`)
+        }
       }
       check(`${label} at ${String(w)}: nothing past the edge, nothing scrolls sideways${seen.cut.length > 0 ? ' (cut short: ' + seen.cut.join(' | ') + ')' : ''}`, fine, JSON.stringify({ sideways: seen.sideways, past: seen.past }))
     }
