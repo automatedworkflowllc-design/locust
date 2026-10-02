@@ -24,6 +24,10 @@ export interface RoutineExecution {
   readonly handOffs?: readonly RoutineHandOff[]
   /** Its steps run in the routine's copy, as the attempt started (0.533). */
   readonly inCopy?: true
+  /** Its standing goal, as the attempt started (0.534). */
+  readonly untilCheck?: { readonly tries: number }
+  /** How many fixes it has been asked for since its steps were done (0.534). */
+  readonly goalTry?: number
   readonly workspaceId: string
   readonly recovered?: boolean
   readonly missionId?: string

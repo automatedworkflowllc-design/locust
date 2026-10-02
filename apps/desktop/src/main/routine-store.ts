@@ -3,7 +3,8 @@ import { constants as fsConstants } from 'node:fs'
 import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
-import type { PublicRoutine, RoutineHandOff, RoutineStaged, TeammateRoute } from '../shared/ipc.js'
+import { MAX_GOAL_TRIES } from '../shared/ipc.js'
+import type { PublicRoutine, RoutineGoal, RoutineHandOff, RoutineStaged, TeammateRoute } from '../shared/ipc.js'
 import { validSchedule } from '../shared/routine-schedule.js'
 
 /** Every shape a schedule may take, said when one does not read (0.522). */
@@ -63,9 +64,11 @@ export interface RoutineStore {
     readonly handOffs?: unknown
     /** Works in a copy, kept or discarded by the person (0.533). */
     readonly inCopy?: unknown
+    /** Keep going until the check passes (0.534). */
+    readonly untilCheck?: unknown
   }): Promise<PublicRoutine>
   /** Corrections: the name, the steps, who takes them, and the schedule (`null` clears it). The teammate, route and provenance stay. */
-  update(input: { readonly routineId: unknown; readonly name: unknown; readonly steps: unknown; readonly schedule?: unknown; readonly handOffs?: unknown; readonly mode?: unknown; readonly inCopy?: unknown }): Promise<PublicRoutine>
+  update(input: { readonly routineId: unknown; readonly name: unknown; readonly steps: unknown; readonly schedule?: unknown; readonly handOffs?: unknown; readonly mode?: unknown; readonly inCopy?: unknown; readonly untilCheck?: unknown }): Promise<PublicRoutine>
   remove(routineId: unknown): Promise<void>
   /**
    * Count reconciled final completion and clear its matching progress in one write
@@ -150,6 +153,13 @@ const keptHandOffs = (handOffs: readonly RoutineHandOff[], owner: string): reado
   return cleaned.some((entry) => entry.teammateId !== undefined || entry.check === true) ? cleaned : undefined
 }
 
+/** A standing goal the store will keep: 1 to MAX_GOAL_TRIES fixes (0.534). */
+export function validGoal(value: unknown): value is RoutineGoal {
+  if (typeof value !== 'object' || value === null) return false
+  const tries = (value as { readonly tries?: unknown }).tries
+  return typeof tries === 'number' && Number.isInteger(tries) && tries >= 1 && tries <= MAX_GOAL_TRIES
+}
+
 /** What a finished copy run left, as the store will keep it (0.533). */
 export function validStaged(value: unknown): value is RoutineStaged {
   if (typeof value !== 'object' || value === null) return false
@@ -203,6 +213,8 @@ export function parsedRoutine(value: unknown): PublicRoutine | undefined {
     ...(validHandOffs(record.handOffs, record.steps.length) ? { handOffs: record.handOffs.map((entry) => ({ ...entry })) } : {}),
     // A copy's waiting changes that do not read are dropped, not the routine (0.533).
     ...(record.inCopy === true ? { inCopy: true as const } : {}),
+    // A goal that does not read is dropped, not the routine (0.534).
+    ...(validGoal(record.untilCheck) ? { untilCheck: { tries: record.untilCheck.tries } } : {}),
     ...(validStaged(record.staged) ? { staged: { ...record.staged, changed: [...record.staged.changed], deleted: [...record.staged.deleted] } } : {})
   }
 }
@@ -219,7 +231,9 @@ function parsedExecution(value: unknown, steps: readonly string[], route: Teamma
     && (item.canContinue === undefined || typeof item.canContinue === 'boolean')
     && (item.recovered === undefined || typeof item.recovered === 'boolean')
     && (item.settledAtDispatch === undefined || typeof item.settledAtDispatch === 'boolean')
-    && (item.inCopy === undefined || item.inCopy === true)) {
+    && (item.inCopy === undefined || item.inCopy === true)
+    && (item.untilCheck === undefined || validGoal(item.untilCheck))
+    && (item.goalTry === undefined || (Number.isInteger(item.goalTry) && Number(item.goalTry) >= 1 && Number(item.goalTry) <= MAX_GOAL_TRIES))) {
     // A receipt's hand-offs that do not read are dropped, never the receipt (0.435).
     if (item.handOffs !== undefined && !validHandOffs(item.handOffs, (item.steps as readonly string[]).length)) {
       const { handOffs: _dropped, ...rest } = item
@@ -336,6 +350,7 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
         }
         if (input.handOffs !== undefined && !validHandOffs(input.handOffs, input.steps.length)) throw new Error('Who takes each step does not line up with the steps')
         const handOffs = input.handOffs === undefined ? undefined : keptHandOffs(input.handOffs, input.teammateId)
+        if (input.untilCheck !== undefined && !validGoal(input.untilCheck)) throw new Error('Routine goal is invalid')
         const file = await read()
         if (file.routines.length >= MAX_ROUTINES) throw new Error('Too many routines')
         const routine: PublicRoutine = {
@@ -355,7 +370,8 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
           ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
           ...(validWorkspaceId(input.workspaceId) ? { workspaceId: input.workspaceId } : {}),
           ...(handOffs === undefined ? {} : { handOffs }),
-          ...(input.inCopy === true ? { inCopy: true as const } : {})
+          ...(input.inCopy === true ? { inCopy: true as const } : {}),
+          ...(validGoal(input.untilCheck) ? { untilCheck: { tries: input.untilCheck.tries } } : {})
         }
         await write({ ...file, routines: [...file.routines, routine] })
         return routine
@@ -380,9 +396,12 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
         const route = input.mode === undefined ? held.route : { ...held.route, mode: input.mode }
         if (!isTeammateRoute(route)) throw new Error('Routine route is invalid')
         // In a copy or not (0.533): given, as given; not given, as it was.
-        const { schedule: _held, handOffs: heldHandOffs, inCopy: heldInCopy, ...base } = { ...held, route }
+        const { schedule: _held, handOffs: heldHandOffs, inCopy: heldInCopy, untilCheck: heldGoal, ...base } = { ...held, route }
         const inCopy = input.inCopy === undefined ? heldInCopy === true : input.inCopy === true
-        const rest = { ...base, ...(inCopy ? { inCopy: true as const } : {}) }
+        // A goal (0.534): given, as given; null, none; not given, as it was.
+        if (input.untilCheck !== undefined && input.untilCheck !== null && !validGoal(input.untilCheck)) throw new Error('Routine goal is invalid')
+        const goal = input.untilCheck === undefined ? heldGoal : input.untilCheck === null ? undefined : { tries: (input.untilCheck as RoutineGoal).tries }
+        const rest = { ...base, ...(inCopy ? { inCopy: true as const } : {}), ...(goal === undefined ? {} : { untilCheck: goal }) }
         // Given: as given. Not given: kept only while the steps still line up.
         const handOffs = input.handOffs !== undefined
           ? keptHandOffs(input.handOffs, held.teammateId)

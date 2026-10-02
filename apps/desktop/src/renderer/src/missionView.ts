@@ -1440,6 +1440,10 @@ export function relativePath(path: string, workspacePath: string | undefined): s
   // the long home path would be the one row in the column nobody can read.
   const copied = /(?:^|\/)\.locust\/compare\/cmp_[A-Za-z0-9]+-[abc]\/(.+)$/.exec(full)
   if (copied?.[1] !== undefined) return copied[1]
+  // A routine's copy, under ~/.locust/routines (0.534): the same, so a run in one
+  // reads `answer.txt`, not its copy's home path beside the same file counted twice.
+  const routineCopy = /(?:^|\/)\.locust\/routines\/rt_[A-Za-z0-9]+\/(.+)$/.exec(full)
+  if (routineCopy?.[1] !== undefined) return routineCopy[1]
   // Windows paths are case-insensitive; comparing them case-sensitively is how
   // a correct prefix fails to match and the row keeps the unreadable path.
   const mirrored = cursorMirrorRelative(full, root)

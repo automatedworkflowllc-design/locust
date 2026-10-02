@@ -1,4 +1,4 @@
-import { readFile, rm, writeFile } from 'node:fs/promises'
+import { lstat, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -29,6 +29,24 @@ const nameFor = (routineId: string): string => {
 }
 const sourceFile = (root: string, routineId: string): string => join(root, `${nameFor(routineId)}.source.json`)
 
+/**
+ * THE FOLDER'S DEPENDENCIES, LINKED, NOT COPIED (0.534). A copy leaves them
+ * out, so a check like `npm test` failed in it by construction -- and a routine
+ * that keeps going until its check passes would spend every try on a fault no
+ * fix could reach. They are linked instead (a junction on Windows, which needs
+ * no rights), and on removal each link is unlinked BEFORE the copy goes, so
+ * nothing ever reaches through it into the folder's own.
+ */
+export const LINKED_DEPENDENCIES = ['node_modules', '.venv', 'venv'] as const
+
+async function unlinkDependencies(copy: string): Promise<void> {
+  for (const name of LINKED_DEPENDENCIES) {
+    const link = join(copy, name)
+    const found = await lstat(link).catch(() => undefined)
+    if (found?.isSymbolicLink() === true) await unlink(link).catch(async () => rm(link, { force: true }))
+  }
+}
+
 export interface RoutineCopies {
   /** A fresh copy of `folder` for this routine's run; any earlier one is removed first. */
   make(routineId: string, folder: string): Promise<string>
@@ -50,8 +68,15 @@ export function createRoutineCopies(root: string = ROUTINE_COPY_ROOT): RoutineCo
   return {
     async make(routineId, folder) {
       const name = nameFor(routineId)
+      await unlinkDependencies(join(root, name))
       await removeNamedCopy(name, root)
       const path = await makeCompareCopy({ name, folder, root })
+      for (const dependency of LINKED_DEPENDENCIES) {
+        const there = join(resolve(folder), dependency)
+        if ((await lstat(there).catch(() => undefined))?.isDirectory() === true) {
+          await symlink(there, join(path, dependency), 'junction').catch(() => undefined)
+        }
+      }
       await writeFile(sourceFile(root, routineId), JSON.stringify({ folder: resolve(folder) }), 'utf8')
       return path
     },
@@ -64,6 +89,7 @@ export function createRoutineCopies(root: string = ROUTINE_COPY_ROOT): RoutineCo
       return bringInCopy({ name: nameFor(routineId), folder, root })
     },
     async discard(routineId) {
+      await unlinkDependencies(join(root, nameFor(routineId)))
       await removeNamedCopy(nameFor(routineId), root)
       await rm(sourceFile(root, routineId), { force: true })
     }

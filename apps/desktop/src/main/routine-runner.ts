@@ -100,6 +100,26 @@ export interface RoutineRunnerOptions {
    */
   readonly copies?: Pick<RoutineCopies, 'make' | 'path' | 'source' | 'changes' | 'discard'>
   readonly folderNow?: () => string
+  /**
+   * A standing goal's check (0.534): the folder's own check command, run in
+   * `cwd` -- the folder, or the routine's copy. Undefined when the folder has
+   * no command set.
+   */
+  readonly goalCheck?: (cwd: string) => Promise<GoalCheck | undefined>
+}
+
+/** What a standing goal's check said (0.534). */
+export interface GoalCheck {
+  readonly command: string
+  readonly passed: boolean
+  /** The end of its output, for the teammate asked to fix it and for the person. */
+  readonly tail: readonly string[]
+}
+
+/** The fix a standing goal asks for, quoting what the check said (0.534). */
+export function goalFixPrompt(check: GoalCheck, fix: number, of: number): string {
+  const tail = check.tail.length === 0 ? '(it printed nothing)' : check.tail.join('\n')
+  return `The check \`${check.command}\` failed after the work above (fix ${String(fix)} of ${String(of)}). The end of its output:\n\n${tail}\n\nFix what it reports in this folder, then say in one or two sentences what you changed.`
 }
 
 export interface RoutineProgress {
@@ -336,10 +356,12 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
     /** The step before, when this one goes to another teammate or checks it (0.435). */
     handedFrom?: { readonly missionId: string; readonly name: string },
     /** The new files a watching routine runs for, said before step 1's own words (0.522). */
-    arrived?: { readonly folder: string; readonly files: readonly string[] }
+    arrived?: { readonly folder: string; readonly files: readonly string[] },
+    /** A standing goal's fix turn (0.534): its own words, after the last step. */
+    fix?: { readonly prompt: string; readonly goalTry: number }
   ): Promise<CodexMissionStartResponse> => {
     const saved = routine.steps[step - 1]
-    const prompt = saved === undefined || arrived === undefined || step !== 1 ? saved : `${arrivalNote(arrived.folder, arrived.files)}\n\n${saved}`
+    const prompt = fix !== undefined ? fix.prompt : saved === undefined || arrived === undefined || step !== 1 ? saved : `${arrivalNote(arrived.folder, arrived.files)}\n\n${saved}`
     if (prompt === undefined) {
       return { ok: false, error: { code: 'RUNTIME_START_FAILED', message: `Routine has no step ${String(step)}.` } }
     }
@@ -406,7 +428,7 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       if (step > 1 && held !== undefined && held.status !== 'abandoned') await hold(routine, held, message, false, true)
       return { ok: false, error: { code: 'INVALID_PROMPT', message } }
     }
-    const sent = handedFrom === undefined && !checks(routine, step)
+    const sent = fix !== undefined || (handedFrom === undefined && !checks(routine, step))
       ? prompt
       : handOffPrompt({
           step: prompt,
@@ -421,6 +443,8 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       status: 'dispatching', step, of: routine.steps.length, steps: routine.steps, route: routine.route,
       ...(routine.handOffs === undefined ? {} : { handOffs: routine.handOffs }),
       ...(routine.inCopy === true ? { inCopy: true as const } : {}),
+      ...(routine.untilCheck === undefined ? {} : { untilCheck: { tries: routine.untilCheck.tries } }),
+      ...(fix === undefined ? {} : { goalTry: fix.goalTry }),
       workspaceId: options.workspaceId,
       ...(prior?.recovered === true ? { recovered: true } : {}),
       startedAt: prior?.status === 'abandoned' || prior === undefined ? new Date().toISOString() : prior.startedAt,
@@ -477,7 +501,8 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
     return response
   }
 
-  const announce = (routine: PublicRoutine, peer: MissionPeerContext, step: number, response: CodexMissionStartResponse & { ok: true }): RoutineProgress => {
+  /** `said`: what the turn was actually asked, when it is not the saved step -- a goal's fix (0.534). */
+  const announce = (routine: PublicRoutine, peer: MissionPeerContext, step: number, response: CodexMissionStartResponse & { ok: true }, said?: string): RoutineProgress => {
     const progress: RoutineProgress = {
       routineId: routine.routineId,
       name: routine.name,
@@ -493,7 +518,7 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       runId: response.data.runId,
       missionId: response.data.missionId,
       teammateId: peer.self.teammateId,
-      prompt: routine.steps[step - 1] ?? '',
+      prompt: said ?? routine.steps[step - 1] ?? '',
       data: response.data,
       startedBy: { kind: 'routine', routineId: routine.routineId, step }
     })
@@ -524,8 +549,8 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       if (!execution.canContinue || execution.missionId === undefined) return { ok: false, error: { message: 'The saved step is not confirmed complete. Review its mission and external work; it cannot be safely continued.' } }
       // Recovery uses the saved definition, not edits made four days later --
       // who takes each step included (0.435).
-      const { handOffs: _current, inCopy: _now, ...base } = routine
-      const saved = { ...base, steps: execution.steps, route: execution.route, ...(execution.handOffs === undefined ? {} : { handOffs: execution.handOffs }), ...(execution.inCopy === true ? { inCopy: true as const } : {}), execution: { ...execution, recovered: true } }
+      const { handOffs: _current, inCopy: _now, untilCheck: _goalNow, ...base } = routine
+      const saved = { ...base, steps: execution.steps, route: execution.route, ...(execution.handOffs === undefined ? {} : { handOffs: execution.handOffs }), ...(execution.inCopy === true ? { inCopy: true as const } : {}), ...(execution.untilCheck === undefined ? {} : { untilCheck: execution.untilCheck }), execution: { ...execution, recovered: true } }
       const next = execution.step + 1
       const owner = ownerOf(saved, next)
       const before = ownerOf(saved, execution.step)
@@ -664,7 +689,7 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       // A CHECKER step counts only if it approves (0.435); the hold is final,
       // so a restart cannot re-decide it into a completed run.
       let approval = ''
-      if (checks(execution, progress.step)) {
+      if (execution.goalTry === undefined && checks(execution, progress.step)) {
         const verdict = await checkerSaid(mission.missionId, progress.teammateId)
         if (!verdict.approved) {
           await hold(stored, execution, `${verdict.why}. The run does not count as done. Review the work, then run the routine again.`, false, true)
@@ -672,6 +697,63 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
           return
         }
         approval = `, ${verdict.why}`
+      }
+      /*
+       * A STANDING GOAL (0.534): with its steps done, the folder's check runs --
+       * in the copy, for a routine that works in one. Passed: done, and said.
+       * Failed with fixes left: the same teammate is asked to fix what it says,
+       * in the same conversation, and the check runs again when that ends.
+       * Out of fixes: said, and not counted as done -- except that a copy's
+       * changes still wait for Keep or Discard, since only the person can judge
+       * whether work that does not pass is worth keeping.
+       */
+      if (progress.step >= progress.of && execution.untilCheck !== undefined && options.goalCheck !== undefined) {
+        const cwd = execution.inCopy === true && options.copies !== undefined ? options.copies.path(progress.routineId) : options.folderNow?.()
+        const checked = cwd === undefined ? undefined : await options.goalCheck(cwd).catch(() => undefined)
+        const fixes = execution.goalTry ?? 0
+        const allowed = execution.untilCheck.tries
+        const after = fixes === 0 ? '' : ` after ${String(fixes)} fix${fixes === 1 ? '' : 'es'}`
+        if (checked === undefined) {
+          const staged = await complete(progress.routineId, execution)
+          notice(progress, `Routine "${progress.name}" finished its steps, but this folder has no check command, so it was not checked. Set one in Settings > Project folder.${staged === undefined ? '' : ` ${waitingWords(staged)}.`}`)
+          return
+        }
+        if (checked.passed) {
+          const staged = await complete(progress.routineId, execution)
+          notice(progress, `Routine "${progress.name}" finished: the check \`${checked.command}\` passed${after}.${staged === undefined ? '' : ` ${waitingWords(staged)}.`}`, 'info')
+          return
+        }
+        if (fixes < allowed) {
+          const current = await options.routines.get(progress.routineId)
+          const { handOffs: _now, inCopy: _copyNow, untilCheck: _goalNow, ...base } = current ?? stored
+          const plan: PublicRoutine = { ...base, steps: execution.steps, route: execution.route, ...(execution.handOffs === undefined ? {} : { handOffs: execution.handOffs }), ...(execution.inCopy === true ? { inCopy: true as const } : {}), untilCheck: execution.untilCheck }
+          const peer = await options.peerContextFor(progress.teammateId)
+          if (peer === undefined) {
+            await hold(stored, execution, 'The check failed, and the teammate who would fix it is gone.', false, true)
+            return
+          }
+          // The fix turn is shown as what it was asked -- the check's own words -- not as the step again.
+          const fixPrompt = goalFixPrompt(checked, fixes + 1, allowed)
+          const response = await startStep(plan, peer, progress.of, mission.missionId, undefined, undefined, { prompt: fixPrompt, goalTry: fixes + 1 })
+          if (!response.ok) {
+            active.delete(progress.routineId)
+            notice(progress, `Routine "${progress.name}": the check failed, and the fix could not start: ${response.error.message}`)
+            return
+          }
+          await options.assignOwner(peer.self.teammateId, response.data.missionId).catch(() => undefined)
+          const started = announce(plan, peer, progress.of, response, fixPrompt)
+          notice(started, `Routine "${progress.name}": the check \`${checked.command}\` failed, so ${peer.self.name} is fixing it (fix ${String(fixes + 1)} of ${String(allowed)}).`, 'info')
+          return
+        }
+        const said = `the check \`${checked.command}\` still fails after ${String(fixes)} fix${fixes === 1 ? '' : 'es'}${checked.tail.length === 0 ? '' : `: ${checked.tail.slice(-3).join(' / ')}`}`
+        if (execution.inCopy === true) {
+          const staged = await complete(progress.routineId, execution)
+          notice(progress, `Routine "${progress.name}" stopped: ${said}.${staged === undefined ? '' : ` ${waitingWords(staged)} -- whether work that does not pass is worth keeping is yours to judge.`}`)
+          return
+        }
+        await hold(stored, execution, `${said.charAt(0).toUpperCase()}${said.slice(1)}. The run does not count as done. Review the work, then run the routine again.`, false, true)
+        notice(progress, `Routine "${progress.name}" stopped: ${said}. It does not count as done.`)
+        return
       }
       if (progress.step >= progress.of) {
         const staged = await complete(progress.routineId, execution)
@@ -688,8 +770,8 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
        */
       const current = await options.routines.get(progress.routineId)
       const startedPlan = (held: PublicRoutine): PublicRoutine => {
-        const { handOffs: _now, inCopy: _copyNow, ...base } = held
-        return { ...base, steps: execution.steps, route: execution.route, ...(execution.handOffs === undefined ? {} : { handOffs: execution.handOffs }), ...(execution.inCopy === true ? { inCopy: true as const } : {}) }
+        const { handOffs: _now, inCopy: _copyNow, untilCheck: _goalNow, ...base } = held
+        return { ...base, steps: execution.steps, route: execution.route, ...(execution.handOffs === undefined ? {} : { handOffs: execution.handOffs }), ...(execution.inCopy === true ? { inCopy: true as const } : {}), ...(execution.untilCheck === undefined ? {} : { untilCheck: execution.untilCheck }) }
       }
       const routine = current === undefined ? undefined : startedPlan(current)
       const next = progress.step + 1

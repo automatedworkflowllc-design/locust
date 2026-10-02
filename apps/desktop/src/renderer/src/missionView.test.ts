@@ -178,6 +178,13 @@ describe('how a path is written in a row', () => {
     expect(relativePath(String.raw`C:\Users\x\projects\streaks\.locust\compare\cmp_1-b\src\streak.js`, WS)).toBe('src/streak.js')
   })
 
+  it("drops a routine's copy the same way (0.534)", () => {
+    // Seen in drive-a-routine-until-its-check-passes: turn 1 listed answer.txt
+    // twice, once under the copy's home path.
+    expect(relativePath(String.raw`C:\Users\x\.locust\routines\rt_goal0000\answer.txt`, WS)).toBe('answer.txt')
+    expect(relativePath('/home/x/.locust/routines/rt_abc/docs/plan.md', WS)).toBe('docs/plan.md')
+  })
+
   it("drops a comparison column's plain copy outside the folder too (0.448)", () => {
     expect(relativePath(String.raw`C:\Users\x\.locust\compare\cmp_ab12-b\site\index.html`, WS)).toBe('site/index.html')
     // Anything else outside the folder keeps its whole path: there the place IS the information.

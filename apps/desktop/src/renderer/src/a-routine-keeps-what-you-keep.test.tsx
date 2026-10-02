@@ -53,6 +53,41 @@ describe('where a routine works', () => {
   })
 })
 
+describe('a standing goal in the dialog (0.534)', () => {
+  const withGoal = (checkCommand: string | undefined, initialGoalTries: number | undefined) =>
+    renderToStaticMarkup(
+      <RoutineDialog
+        teammate={cedar}
+        initialName="Green tests"
+        initialSteps={['Fix the cart total.']}
+        initialSchedule={undefined}
+        truncated={false}
+        routeLabel="Codex / GPT-6-Luna"
+        editing
+        modeName="Edit"
+        modeReadsOnly={false}
+        {...(checkCommand === undefined ? {} : { checkCommand })}
+        {...(initialGoalTries === undefined ? {} : { initialGoalTries })}
+        busy={false}
+        error={undefined}
+        onSave={() => undefined}
+        onCancel={() => undefined}
+      />
+    )
+
+  it('with no check command, says where to set one and cannot be chosen', () => {
+    const html = withGoal(undefined, undefined)
+    expect(html).toContain('This folder has no check command yet. Set one in Settings &gt; Project folder')
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Keep going until the check passes</)
+  })
+
+  it('chosen, it names the command, the fixes it may make, and that each is one more turn', () => {
+    const html = withGoal('npm test', 3)
+    expect(html).toMatch(/aria-checked="true"[^>]*>Keep going until the check passes</)
+    expect(html).toContain('When its steps are done it runs `npm test`. While that fails, it is asked to fix what it says, up to 3 times; then it stops and says what still fails. Each fix is one more turn.')
+  })
+})
+
 describe('the changes waiting on a routine\'s card', () => {
   const routine = {
     routineId: 'rt_inbox', name: 'Inbox receipt', teammateId: 'tm_cedar',

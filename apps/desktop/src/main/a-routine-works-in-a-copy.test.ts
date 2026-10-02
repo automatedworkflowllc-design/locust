@@ -62,6 +62,26 @@ describe('a routine\'s copy', () => {
     expect(await copies.source('rt_abc')).toBeUndefined()
   })
 
+  it('links the folder\'s dependencies, so a check can run in it, and discarding never reaches through the link (0.534)', async () => {
+    const folder = await temp('locust-rtcopy-folder-')
+    const root = await temp('locust-rtcopy-root-')
+    const { mkdir } = await import('node:fs/promises')
+    await mkdir(join(folder, 'node_modules', 'pkg'), { recursive: true })
+    await writeFile(join(folder, 'node_modules', 'pkg', 'index.js'), 'the real dependency')
+    const copies = createRoutineCopies(root)
+    const copy = await copies.make('rt_deps', folder)
+    expect(await readFile(join(copy, 'node_modules', 'pkg', 'index.js'), 'utf8')).toBe('the real dependency')
+    // Not counted as a change the routine made.
+    expect(await copies.changes('rt_deps')).toEqual({ changed: [], deleted: [] })
+    await copies.discard('rt_deps')
+    expect(await exists(copy)).toBe(false)
+    expect(await readFile(join(folder, 'node_modules', 'pkg', 'index.js'), 'utf8')).toBe('the real dependency')
+    // And a fresh copy over an old one unlinks first, too.
+    await copies.make('rt_deps', folder)
+    await copies.make('rt_deps', folder)
+    expect(await readFile(join(folder, 'node_modules', 'pkg', 'index.js'), 'utf8')).toBe('the real dependency')
+  })
+
   it('cannot be named so as to climb out of its root', async () => {
     const copies = createRoutineCopies(await temp('locust-rtcopy-root-'))
     expect(() => copies.path('../rt_x')).toThrow()

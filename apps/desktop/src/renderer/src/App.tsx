@@ -1575,6 +1575,8 @@ export default function App(): ReactElement {
     readonly running?: boolean
     /** It works in a copy, kept or discarded by the person (0.533). */
     readonly inCopy?: boolean
+    /** Its standing goal's fixes, when it has one (0.534). */
+    readonly goalTries?: number
     readonly busy: boolean
     readonly error?: string
   }>()
@@ -4970,6 +4972,8 @@ export default function App(): ReactElement {
     readonly readsOnly?: boolean
     /** Where it works (0.533): in the folder, or in a copy the person keeps. */
     readonly inCopy?: boolean
+    /** Keep going until the check passes (0.534); null takes it away. */
+    readonly untilCheck?: { readonly tries: number } | null
   }): void => {
     const bridge = window.desktop
     const dialog = routineDialog
@@ -5007,10 +5011,11 @@ export default function App(): ReactElement {
             learnedFrom: dialog.learnedFrom,
             ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
             ...(input.handOffs === undefined ? {} : { handOffs: input.handOffs }),
-            ...(input.inCopy === true ? { inCopy: true } : {})
+            ...(input.inCopy === true ? { inCopy: true } : {}),
+            ...(input.untilCheck === undefined || input.untilCheck === null ? {} : { untilCheck: input.untilCheck })
           })
         : // null clears a schedule the routine had; the store leaves an absent one alone.
-          bridge.updateRoutine({ routineId: dialog.routineId, name: input.name, steps: input.steps, schedule: input.schedule ?? null, ...(input.handOffs === undefined ? {} : { handOffs: input.handOffs }), ...(chosenMode === undefined ? {} : { mode: chosenMode }), ...(input.inCopy === undefined ? {} : { inCopy: input.inCopy }) })
+          bridge.updateRoutine({ routineId: dialog.routineId, name: input.name, steps: input.steps, schedule: input.schedule ?? null, ...(input.handOffs === undefined ? {} : { handOffs: input.handOffs }), ...(chosenMode === undefined ? {} : { mode: chosenMode }), ...(input.inCopy === undefined ? {} : { inCopy: input.inCopy }), ...(input.untilCheck === undefined ? {} : { untilCheck: input.untilCheck }) })
     void request
       .then(async (response) => {
         if (!response.ok) {
@@ -5041,6 +5046,7 @@ export default function App(): ReactElement {
       savedMode: routine.route.mode,
       running: routine.execution?.status === 'running' || routine.execution?.status === 'dispatching',
       ...(routine.inCopy === true ? { inCopy: true } : {}),
+      ...(routine.untilCheck === undefined ? {} : { goalTries: routine.untilCheck.tries }),
       busy: false
     })
   }
@@ -8440,6 +8446,8 @@ export default function App(): ReactElement {
           editing={routineDialog.routineId !== undefined}
           fresh={routineDialog.routineId === undefined && routineDialog.learnedFrom.length === 0}
           initialInCopy={routineDialog.inCopy === true}
+          {...(routineDialog.goalTries === undefined ? {} : { initialGoalTries: routineDialog.goalTries })}
+          {...(checkCommand.trim().length === 0 ? {} : { checkCommand })}
           running={routineDialog.running === true}
           {...(() => {
             const mode = routineDialog.savedMode ?? routineDialog.route?.mode

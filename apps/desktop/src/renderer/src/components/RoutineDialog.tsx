@@ -48,8 +48,14 @@ export function RoutineDialog({
   modeReadsOnly,
   fresh = false,
   initialInCopy = false,
+  initialGoalTries,
+  checkCommand,
   running = false
 }: {
+  /** A standing goal's fixes, when it has one (0.534). */
+  readonly initialGoalTries?: number
+  /** This folder's check command from Settings, or undefined for none (0.534). */
+  readonly checkCommand?: string
   /** It works in a copy, kept or discarded by the person (0.533). */
   readonly initialInCopy?: boolean
   /** Written from nothing on the Routines screen (0.530), not saved from a conversation. */
@@ -100,6 +106,8 @@ export function RoutineDialog({
     readonly readsOnly?: boolean
     /** Where it works (0.533); sent on a new routine, and on an edit only when it moved. */
     readonly inCopy?: boolean
+    /** Keep going until the check passes (0.534): fixes allowed, or null for none; absent, unchanged. */
+    readonly untilCheck?: { readonly tries: number } | null
     readonly teammateId?: string
     /** Who takes each step, in step order; absent when no choice was offered. */
     readonly handOffs?: readonly RoutineHandOff[]
@@ -115,6 +123,10 @@ export function RoutineDialog({
   // Where a run that changes files works (0.533): the folder, or a copy the person keeps.
   const [inCopy, setInCopy] = useState(initialInCopy)
   const copies = !readsOnly && inCopy
+  // A standing goal (0.534): keep going until the folder's check passes, at most this many fixes.
+  const [goalTries, setGoalTries] = useState<number | undefined>(initialGoalTries)
+  const hasCheck = checkCommand !== undefined && checkCommand.trim().length > 0
+  const goal = !readsOnly && goalTries !== undefined ? goalTries : undefined
   const shownMode = readsOnly ? 'Ask' : modeReadsOnly === true ? 'Edit' : modeName
   // One entry per step, kept in step with every add and remove (0.435).
   const [handOffs, setHandOffs] = useState<readonly RoutineHandOff[]>(
@@ -230,6 +242,51 @@ export function RoutineDialog({
                 folder until the person keeps it.
               */}
               {!readsOnly && (
+                <>
+                {/*
+                  WHEN ITS STEPS ARE DONE (0.534). A standing goal: the folder's own
+                  check (Settings > Project folder) runs, and while it fails the
+                  teammate is asked to fix what it says -- a few times at most, so a
+                  check that can never pass stops instead of spending on.
+                */}
+                <span className="lc-fieldlabel lc-mono" id="routine-goal-label">
+                  When its steps are done
+                </span>
+                <div className="lc-routinesched">
+                  <div className="lc-segmented" role="radiogroup" aria-labelledby="routine-goal-label">
+                    <button type="button" role="radio" aria-checked={goalTries === undefined} className={`lc-button${goalTries === undefined ? ' is-active' : ''}`} onClick={() => setGoalTries(undefined)}>
+                      Stop
+                    </button>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={goalTries !== undefined}
+                      disabled={!hasCheck && goalTries === undefined}
+                      className={`lc-button${goalTries !== undefined ? ' is-active' : ''}`}
+                      onClick={() => setGoalTries((held) => held ?? 3)}
+                    >
+                      Keep going until the check passes
+                    </button>
+                  </div>
+                  {goalTries !== undefined && (
+                    <label className="lc-routinesched__detail lc-mono">
+                      at most
+                      <select className="lc-input lc-routinesched__pick" aria-label="Fixes at most" value={goalTries} onChange={(event) => setGoalTries(Number(event.target.value))}>
+                        {[1, 2, 3, 4, 5].map((count) => (
+                          <option key={count} value={count}>{count}</option>
+                        ))}
+                      </select>
+                      {goalTries === 1 ? 'fix' : 'fixes'}
+                    </label>
+                  )}
+                </div>
+                <p className="lc-dialog__note lc-mono">
+                  {!hasCheck
+                    ? 'This folder has no check command yet. Set one in Settings > Project folder, such as npm test, to keep going until it passes.'
+                    : goalTries === undefined
+                      ? `It stops when its steps are done. Or it can run \`${checkCommand ?? ''}\` then, and keep fixing until it passes.`
+                      : `When its steps are done it runs \`${checkCommand ?? ''}\`. While that fails, it is asked to fix what it says, up to ${String(goalTries)} time${goalTries === 1 ? '' : 's'}; then it stops and says what still fails. Each fix is one more turn.`}
+                </p>
                 <div className="lc-routinesched">
                   <div className="lc-segmented" role="radiogroup" aria-label="Where it works">
                     {(
@@ -251,6 +308,7 @@ export function RoutineDialog({
                     ))}
                   </div>
                 </div>
+                </>
               )}
             </div>
           )}
@@ -627,6 +685,10 @@ export function RoutineDialog({
                 ...(modeName === undefined || readsOnly === (modeReadsOnly === true) ? {} : { readsOnly }),
                 // A copy only for a routine that may change files; sent when new, or when it moved.
                 ...(editing ? (copies === initialInCopy ? {} : { inCopy: copies }) : copies ? { inCopy: true } : {}),
+                // A goal: sent when new, or when it moved; null takes it away.
+                ...(editing
+                  ? goal === initialGoalTries ? {} : { untilCheck: goal === undefined ? null : { tries: goal } }
+                  : goal === undefined ? {} : { untilCheck: { tries: goal } }),
                 ...(runner.length === 0 ? {} : { teammateId: runner }),
                 // Lined up with the steps that are kept (0.435).
                 ...(canHandOff ? { handOffs: steps.flatMap((step, at) => (step.trim().length > 0 ? [handOffs[at] ?? {}] : [])) } : {})

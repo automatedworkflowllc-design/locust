@@ -1474,7 +1474,18 @@ export interface PublicRoutine {
   readonly inCopy?: true
   /** A finished run's changes, waiting in its copy for Keep or Discard (0.533). */
   readonly staged?: RoutineStaged
+  /**
+   * A standing goal (0.534): when its steps are done, the folder's check runs,
+   * and while it fails the teammate is asked to fix it, up to `tries` times.
+   */
+  readonly untilCheck?: RoutineGoal
 }
+
+/** Keep going until the folder's check passes, at most this many fixes (0.534). */
+export interface RoutineGoal {
+  readonly tries: number
+}
+export const MAX_GOAL_TRIES = 5
 
 /** What a routine's last run changed in its copy, waiting for the person (0.533). */
 export interface RoutineStaged {
@@ -1497,6 +1508,8 @@ export interface RoutineCreateRequest {
   readonly handOffs?: readonly RoutineHandOff[]
   /** Works in a copy, kept or discarded by the person (0.533). */
   readonly inCopy?: boolean
+  /** Keep going until the check passes (0.534). */
+  readonly untilCheck?: RoutineGoal
 }
 
 export interface RoutineUpdateRequest {
@@ -1511,6 +1524,8 @@ export interface RoutineUpdateRequest {
   readonly mode?: MissionMode
   /** Works in a copy (0.533); absent keeps it as it was. */
   readonly inCopy?: boolean
+  /** Keep going until the check passes (0.534); `null` stops after its steps; absent keeps it. */
+  readonly untilCheck?: RoutineGoal | null
 }
 
 export type RoutineListResponse =

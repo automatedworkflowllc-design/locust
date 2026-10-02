@@ -97,7 +97,7 @@ import { WorkbookUnreadable, readXlsx } from './xlsx.js'
 
 /** A spreadsheet the viewer reads may be this big on disk; the grid it draws is bounded anyway (0.364). */
 const MAX_SHEET_FILE_BYTES = 8 * 1024 * 1024
-import { createEditCheck } from './edit-check.js'
+import { comparableLines, createEditCheck, runCheckCommand } from './edit-check.js'
 import { createTeammateStore, parsedCheckCommand, TeammateNameTakenError, isTeammateRoute } from './teammate-store.js'
 import { createRoutineStore } from './routine-store.js'
 import { createRoomStore, exchangeOfRoomPost, recipientsOf } from './room-store.js'
@@ -2805,6 +2805,23 @@ if (!ownsSingleInstanceLock) {
       // A routine that works in a copy (0.533): made from the folder the window is in.
       copies: routineCopies,
       folderNow: () => workspacePath,
+      /*
+       * A standing goal's check (0.534): this folder's own command from Settings,
+       * the one the after-edits check runs -- never a command the project names.
+       * The end of what it printed goes to the teammate asked to fix it.
+       */
+      goalCheck: async (cwd) => {
+        if (!workspaceChosen) return undefined
+        const command = (await teammates.readSettings()).checkCommands?.[workspaceIdFor(workspacePath)]
+        if (command === undefined || command.length === 0) return undefined
+        const run = await runCheckCommand(command, cwd)
+        const tail = run.error !== undefined
+          ? [run.error]
+          : run.timedOut
+            ? ['The check ran past its time limit and was stopped.']
+            : comparableLines(run.output).slice(-25).map((line) => (line.length > 300 ? `${line.slice(0, 299)}…` : line))
+        return { command, passed: run.error === undefined && !run.timedOut && run.exitCode === 0, tail }
+      },
       // Read live (0.458): the folder the window is in now.
       get workspaceId() {
         return memoryWorkspaceId
@@ -5333,7 +5350,8 @@ if (!ownsSingleInstanceLock) {
           ...(workspaceChosen ? { workspaceId: memoryWorkspaceId } : {}),
           // Who takes each step (0.435); the store checks it.
           ...(input.handOffs === undefined ? {} : { handOffs: input.handOffs }),
-          ...(input.inCopy === true ? { inCopy: true } : {})
+          ...(input.inCopy === true ? { inCopy: true } : {}),
+          ...(input.untilCheck === undefined ? {} : { untilCheck: input.untilCheck })
         })
         return { ok: true, data: { routine } } as const
       } catch (error) {
@@ -5352,7 +5370,8 @@ if (!ownsSingleInstanceLock) {
           ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
           ...(input.handOffs === undefined ? {} : { handOffs: input.handOffs }),
           ...(input.mode === undefined ? {} : { mode: input.mode }),
-          ...(typeof input.inCopy === 'boolean' ? { inCopy: input.inCopy } : {})
+          ...(typeof input.inCopy === 'boolean' ? { inCopy: input.inCopy } : {}),
+          ...(input.untilCheck === undefined ? {} : { untilCheck: input.untilCheck })
         })
         return { ok: true, data: { routine } } as const
       } catch (error) {
