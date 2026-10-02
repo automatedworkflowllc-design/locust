@@ -11,6 +11,19 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.549.0 - 2026-10-02
+
+### Fixed
+
+- **A long Codex conversation can be followed up again.** Carrying on a Codex
+  conversation asked Codex for the whole thread back in one message; a long
+  one (measured: 9.3 MB, a 21-minute turn with screenshots) was over Locust's
+  limit, so every follow-up failed with "A message exceeded the line size
+  limit". Locust now asks only for what it uses (0.02 MB on the same thread).
+- **That failure no longer shows an unrelated Codex warning as its cause,**
+  in terminal colour codes. Colour codes are also cleaned from a runtime's
+  last word on any failure card.
+
 ## 0.548.0 - 2026-10-02
 
 ### Fixed

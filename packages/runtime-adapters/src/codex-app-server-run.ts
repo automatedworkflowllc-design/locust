@@ -35,6 +35,9 @@ import type {
  * what makes a follow-up here as warm as `codex exec resume`.
  */
 
+/** Terminal colour codes: stderr is written for a terminal, and a card is not one. */
+const TERMINAL_CODES = new RegExp(String.fromCharCode(27) + "\\[[0-9;?]*[ -/]*[@-~]", "g");
+
 export interface AppServerRunProcess {
   /** Write one framed line to the server. */
   write(line: string): void;
@@ -250,11 +253,16 @@ export function startCodexAppServerRun(
     });
   };
 
-  const lose = (why: string): void => {
+  /**
+   * `knownCause`: Locust itself saw why (a message past the size limit), so
+   * the server's stderr tail is not added -- on Colin's 10/02 failure it was
+   * an unrelated config warning, in terminal colour codes, read as the cause.
+   */
+  const lose = (why: string, knownCause = false): void => {
     if (settled) return;
     transportFailed = true;
     // The server's own last words after ours, so the card's "last word" is its (N10).
-    const said = child.stderrTail?.().trim() ?? "";
+    const said = knownCause ? "" : (child.stderrTail?.() ?? "").replace(TERMINAL_CODES, "").trim();
     stderr = stderr.length > 0 ? stderr : said.length > 0 ? `${why}
 ${said}` : why;
     finish();
@@ -297,7 +305,7 @@ ${said}` : why;
     onRequest: options.onRequest ?? (async () => ({ decision: "reject" }) as JsonValue),
     onDiagnostic: (diagnostic) => {
       if (diagnostic.code === "buffer-overflow" || diagnostic.code === "line-too-long") {
-        lose(diagnostic.message);
+        lose(diagnostic.message, true);
       }
     },
   });
@@ -339,9 +347,16 @@ ${said}` : why;
     const thread = await client.request(
       options.resumeThreadId === undefined ? "thread/start" : forking ? "thread/fork" : "thread/resume",
       {
+        /*
+         * Only the thread's id is read from the answer. Without
+         * `excludeTurns` the answer carries the whole history as ONE line:
+         * Colin's 20 MB thread (a long turn with screenshots) passed the
+         * 8 MB line limit, the answer was dropped, and every follow-up in
+         * that conversation failed before it began (10/02).
+         */
         ...(options.resumeThreadId === undefined
           ? {}
-          : { threadId: options.resumeThreadId }),
+          : { threadId: options.resumeThreadId, excludeTurns: true }),
         cwd: options.command.cwd,
         sandbox: options.sandbox,
         approvalPolicy: options.approvalPolicy,

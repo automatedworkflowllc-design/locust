@@ -168,6 +168,8 @@ describe("a turn over app-server", () => {
     expect(server.paramsOf("thread/resume")).toMatchObject({
       threadId: "thread_earlier",
       cwd: "/work",
+      // Without it the answer carries the whole history as one line: a 20 MB thread passed the 8 MB limit (10/02).
+      excludeTurns: true,
     });
   });
 
@@ -175,7 +177,7 @@ describe("a turn over app-server", () => {
     const { server } = await handshaken({ resumeThreadId: "thread_earlier", forkThread: true, sandbox: "read-only" });
     expect(server.idOf("thread/resume")).toBeUndefined();
     expect(server.idOf("thread/start")).toBeUndefined();
-    expect(server.paramsOf("thread/fork")).toMatchObject({ threadId: "thread_earlier", sandbox: "read-only", cwd: "/work" });
+    expect(server.paramsOf("thread/fork")).toMatchObject({ threadId: "thread_earlier", sandbox: "read-only", cwd: "/work", excludeTurns: true });
     expect(server.paramsOf("thread/fork")).not.toHaveProperty("ephemeral");
   });
 

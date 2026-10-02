@@ -4564,7 +4564,7 @@ function isLockedRuntimeConfig(said: string): boolean {
  * Built from the character code rather than a literal escape, which is
  * invisible in a diff and easy to break silently.
  */
-const ANSI = new RegExp(String.fromCharCode(27) + '\[[0-9;?]*[ -/]*[@-~]', 'g')
+const ANSI = new RegExp(String.fromCharCode(27) + '\\[[0-9;?]*[ -/]*[@-~]', 'g')
 
 /** The last line of stderr that says something, or undefined. */
 function lastStderrLine(stderr: string | undefined): string | undefined {
