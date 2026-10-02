@@ -3,7 +3,7 @@ import { constants as fsConstants } from 'node:fs'
 import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
-import type { PublicRoutine, RoutineHandOff, TeammateRoute } from '../shared/ipc.js'
+import type { PublicRoutine, RoutineHandOff, RoutineStaged, TeammateRoute } from '../shared/ipc.js'
 import { validSchedule } from '../shared/routine-schedule.js'
 
 /** Every shape a schedule may take, said when one does not read (0.522). */
@@ -61,12 +61,19 @@ export interface RoutineStore {
     readonly workspaceId?: unknown
     /** Who takes each step (0.435). */
     readonly handOffs?: unknown
+    /** Works in a copy, kept or discarded by the person (0.533). */
+    readonly inCopy?: unknown
   }): Promise<PublicRoutine>
   /** Corrections: the name, the steps, who takes them, and the schedule (`null` clears it). The teammate, route and provenance stay. */
-  update(input: { readonly routineId: unknown; readonly name: unknown; readonly steps: unknown; readonly schedule?: unknown; readonly handOffs?: unknown; readonly mode?: unknown }): Promise<PublicRoutine>
+  update(input: { readonly routineId: unknown; readonly name: unknown; readonly steps: unknown; readonly schedule?: unknown; readonly handOffs?: unknown; readonly mode?: unknown; readonly inCopy?: unknown }): Promise<PublicRoutine>
   remove(routineId: unknown): Promise<void>
-  /** Count reconciled final completion and clear its matching progress in one write. */
-  recordRun(routineId: unknown, attemptId: string): Promise<void>
+  /**
+   * Count reconciled final completion and clear its matching progress in one write
+   * -- with, for a routine that works in a copy, what it changed there (0.533).
+   */
+  recordRun(routineId: unknown, attemptId: string, staged?: RoutineStaged): Promise<void>
+  /** A copy's changes, kept or discarded: the routine stops waiting on them (0.533). */
+  settleStaged(routineId: string, attemptId: string): Promise<void>
   saveProgress(routineId: string, progress: RoutineExecution, expectedAttemptId: string | null): Promise<void>
   abandon(routineId: string, attemptId: string): Promise<void>
   /**
@@ -143,6 +150,17 @@ const keptHandOffs = (handOffs: readonly RoutineHandOff[], owner: string): reado
   return cleaned.some((entry) => entry.teammateId !== undefined || entry.check === true) ? cleaned : undefined
 }
 
+/** What a finished copy run left, as the store will keep it (0.533). */
+export function validStaged(value: unknown): value is RoutineStaged {
+  if (typeof value !== 'object' || value === null) return false
+  const item = value as Record<string, unknown>
+  const paths = (list: unknown): boolean => Array.isArray(list) && list.length <= 2_000 && list.every((path) => typeof path === 'string' && path.length > 0 && path.length <= 1_024)
+  return safeId(item.attemptId)
+    && typeof item.finishedAt === 'string' && !Number.isNaN(Date.parse(item.finishedAt))
+    && typeof item.folder === 'string' && item.folder.length > 0 && item.folder.length <= 4_096
+    && paths(item.changed) && paths(item.deleted)
+}
+
 export function parsedRoutine(value: unknown): PublicRoutine | undefined {
   if (typeof value !== 'object' || value === null) return undefined
   const record = value as Record<string, unknown>
@@ -182,7 +200,10 @@ export function parsedRoutine(value: unknown): PublicRoutine | undefined {
     // Named, like every field here: this object is rebuilt field by field (M15).
     ...(validWorkspaceId(record.workspaceId) ? { workspaceId: record.workspaceId } : {}),
     // Hand-offs that do not read are dropped, not the routine (0.435).
-    ...(validHandOffs(record.handOffs, record.steps.length) ? { handOffs: record.handOffs.map((entry) => ({ ...entry })) } : {})
+    ...(validHandOffs(record.handOffs, record.steps.length) ? { handOffs: record.handOffs.map((entry) => ({ ...entry })) } : {}),
+    // A copy's waiting changes that do not read are dropped, not the routine (0.533).
+    ...(record.inCopy === true ? { inCopy: true as const } : {}),
+    ...(validStaged(record.staged) ? { staged: { ...record.staged, changed: [...record.staged.changed], deleted: [...record.staged.deleted] } } : {})
   }
 }
 
@@ -197,7 +218,8 @@ function parsedExecution(value: unknown, steps: readonly string[], route: Teamma
     && (item.reason === undefined || (typeof item.reason === 'string' && item.reason.length <= 4000))
     && (item.canContinue === undefined || typeof item.canContinue === 'boolean')
     && (item.recovered === undefined || typeof item.recovered === 'boolean')
-    && (item.settledAtDispatch === undefined || typeof item.settledAtDispatch === 'boolean')) {
+    && (item.settledAtDispatch === undefined || typeof item.settledAtDispatch === 'boolean')
+    && (item.inCopy === undefined || item.inCopy === true)) {
     // A receipt's hand-offs that do not read are dropped, never the receipt (0.435).
     if (item.handOffs !== undefined && !validHandOffs(item.handOffs, (item.steps as readonly string[]).length)) {
       const { handOffs: _dropped, ...rest } = item
@@ -332,7 +354,8 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
           runs: 0,
           ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
           ...(validWorkspaceId(input.workspaceId) ? { workspaceId: input.workspaceId } : {}),
-          ...(handOffs === undefined ? {} : { handOffs })
+          ...(handOffs === undefined ? {} : { handOffs }),
+          ...(input.inCopy === true ? { inCopy: true as const } : {})
         }
         await write({ ...file, routines: [...file.routines, routine] })
         return routine
@@ -356,7 +379,10 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
         // A new mode for its runs (0.530), checked as a whole route is on create.
         const route = input.mode === undefined ? held.route : { ...held.route, mode: input.mode }
         if (!isTeammateRoute(route)) throw new Error('Routine route is invalid')
-        const { schedule: _held, handOffs: heldHandOffs, ...rest } = { ...held, route }
+        // In a copy or not (0.533): given, as given; not given, as it was.
+        const { schedule: _held, handOffs: heldHandOffs, inCopy: heldInCopy, ...base } = { ...held, route }
+        const inCopy = input.inCopy === undefined ? heldInCopy === true : input.inCopy === true
+        const rest = { ...base, ...(inCopy ? { inCopy: true as const } : {}) }
         // Given: as given. Not given: kept only while the steps still line up.
         const handOffs = input.handOffs !== undefined
           ? keptHandOffs(input.handOffs, held.teammateId)
@@ -393,7 +419,7 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
       })
     },
 
-    recordRun(routineId, attemptId): Promise<void> {
+    recordRun(routineId, attemptId, staged): Promise<void> {
       return serialize(async () => {
         if (!safeId(routineId)) return
         const file = await read()
@@ -405,8 +431,9 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
         }
         // Counting and clearing share ONE rename: a crash cannot count twice,
         // nor leave a completed routine looking like it only started step 1.
+        if (staged !== undefined && !validStaged(staged)) throw new Error('Routine copy changes are invalid')
         const { execution: _execution, ...rest } = held
-        const next: PublicRoutine = { ...rest, runs: held.runs + 1, lastRunAt: new Date().toISOString() }
+        const next: PublicRoutine = { ...rest, runs: held.runs + 1, lastRunAt: new Date().toISOString(), ...(staged === undefined ? {} : { staged }) }
         await write({
           ...file,
           routines: file.routines.map((routine) => (routine.routineId === next.routineId ? next : routine))
@@ -424,6 +451,16 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
           : current?.attemptId !== expectedAttemptId)) throw new Error('Routine execution changed; reload before continuing.')
         if (parsedExecution(progress, held.steps, held.route).attemptId !== progress.attemptId) throw new Error('Invalid routine progress')
         await write({ ...file, routines: file.routines.map((routine) => routine.routineId === routineId ? { ...held, execution: progress } : routine) })
+      })
+    },
+
+    settleStaged(routineId, attemptId) {
+      return serialize(async () => {
+        const file = await read()
+        const held = file.routines.find((routine) => routine.routineId === routineId)
+        if (held?.staged?.attemptId !== attemptId) throw new Error('Those changes were already kept or discarded; reload Routines.')
+        const { staged: _staged, ...rest } = held
+        await write({ ...file, routines: file.routines.map((routine) => routine.routineId === routineId ? rest : routine) })
       })
     },
 

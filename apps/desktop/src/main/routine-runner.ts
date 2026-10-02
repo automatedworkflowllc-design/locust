@@ -1,7 +1,7 @@
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import type { RecoveredMissionPhase } from '@teammate/mission-store'
 
-import type { CodexMissionStartResponse, CodexMissionUpdate, MissionMode, PublicRoutine, RoutineHandOff, RoutineRunResponse, TeammateRoute } from '../shared/ipc.js'
+import type { CodexMissionStartResponse, CodexMissionUpdate, MissionMode, PublicRoutine, RoutineHandOff, RoutineRunResponse, RoutineStaged, TeammateRoute } from '../shared/ipc.js'
 import { handOffPrompt, verdictOf } from '../shared/hand-off.js'
 import { isDue } from '../shared/routine-schedule.js'
 import { arrivalNote } from './routine-file-watch.js'
@@ -10,6 +10,7 @@ import type { MissionPeerContext } from './workroom-briefing.js'
 import { randomUUID } from 'node:crypto'
 import type { RoutineExecution, RoutineRecoveryRequest, RoutineRecoveryResponse } from '../shared/routine-recovery.js'
 import type { RoutineStore } from './routine-store.js'
+import type { RoutineCopies } from './routine-copy.js'
 import { hostReadsEventsOf } from '../shared/runtimes.js'
 import { stepTooLongNotice } from '../shared/step-budget.js'
 
@@ -56,6 +57,8 @@ export interface RoutineRunnerOptions {
     readonly peer: MissionPeerContext
     readonly followUpOf: string | undefined
     readonly startedBy: { readonly kind: 'routine'; readonly routineId: string; readonly step: number }
+    /** The routine's copy, when it works in one (0.533): the step runs there, not in the folder. */
+    readonly cwd?: string
   }) => Promise<CodexMissionStartResponse>
   readonly assignOwner: (teammateId: string, missionId: string) => Promise<void>
   /** How a finished mission ended, from the durable record. Undefined when the ledger cannot say. */
@@ -91,6 +94,12 @@ export interface RoutineRunnerOptions {
   /** A finished step's answer, for the teammate the next step goes to and for a checker's verdict (0.435). */
   readonly replyOf?: (missionId: string) => Promise<string | undefined>
   readonly notify: (update: CodexMissionUpdate) => void
+  /**
+   * A routine that works in a copy (0.533, routine-copy.ts): the copy each run
+   * makes, and the folder it is made from -- the one the window is in.
+   */
+  readonly copies?: Pick<RoutineCopies, 'make' | 'path' | 'source' | 'changes' | 'discard'>
+  readonly folderNow?: () => string
 }
 
 export interface RoutineProgress {
@@ -224,10 +233,31 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
     }
   }
 
-  const complete = async (routineId: string, execution: RoutineExecution): Promise<void> => {
-    await options.routines.recordRun(routineId, execution.attemptId)
+  /**
+   * A finished run. In a copy (0.533), what it changed there waits for the
+   * person -- recorded in the same write that counts the run -- and a copy
+   * that changed nothing is removed. Returns what is waiting, if anything.
+   */
+  const complete = async (routineId: string, execution: RoutineExecution): Promise<RoutineStaged | undefined> => {
+    let staged: RoutineStaged | undefined
+    if (execution.inCopy === true && options.copies !== undefined) {
+      const changes = await options.copies.changes(routineId).catch(() => undefined)
+      const folder = await options.copies.source(routineId).catch(() => undefined)
+      if (changes !== undefined && folder !== undefined && changes.changed.length + changes.deleted.length > 0) {
+        staged = { attemptId: execution.attemptId, finishedAt: new Date().toISOString(), folder, changed: changes.changed, deleted: changes.deleted }
+      }
+    }
+    await options.routines.recordRun(routineId, execution.attemptId, staged)
+    if (execution.inCopy === true && staged === undefined) await options.copies?.discard(routineId).catch(() => undefined)
     active.delete(routineId)
     changed()
+    return staged
+  }
+
+  /** "2 files changed in its copy" -- said in the run's own words when it finishes (0.533). */
+  const waitingWords = (staged: RoutineStaged): string => {
+    const count = staged.changed.length + staged.deleted.length
+    return `${String(count)} file${count === 1 ? '' : 's'} changed in its copy, waiting for you under Routines: Keep writes ${count === 1 ? 'it' : 'them'} into the folder, Discard throws ${count === 1 ? 'it' : 'them'} away`
   }
 
   // Policy (c): ask. A separate runtime can outlive Electron, and a missing
@@ -390,6 +420,7 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       attemptId: prior?.status === 'abandoned' || prior === undefined ? randomUUID() : prior.attemptId,
       status: 'dispatching', step, of: routine.steps.length, steps: routine.steps, route: routine.route,
       ...(routine.handOffs === undefined ? {} : { handOffs: routine.handOffs }),
+      ...(routine.inCopy === true ? { inCopy: true as const } : {}),
       workspaceId: options.workspaceId,
       ...(prior?.recovered === true ? { recovered: true } : {}),
       startedAt: prior?.status === 'abandoned' || prior === undefined ? new Date().toISOString() : prior.startedAt,
@@ -411,7 +442,8 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
         effort: route.effort,
         peer,
         followUpOf,
-        startedBy: { kind: 'routine', routineId: routine.routineId, step }
+        startedBy: { kind: 'routine', routineId: routine.routineId, step },
+        ...(routine.inCopy === true && options.copies !== undefined ? { cwd: options.copies.path(routine.routineId) } : {})
       })
       if (response.ok) {
         await options.routines.saveProgress(routine.routineId, { ...intent, status: 'running',
@@ -484,14 +516,16 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       }
       if (request.decision === 'abandon') {
         await options.routines.abandon(routine.routineId, execution.attemptId)
+        // Put down: its copy goes with it (0.533). Nothing of it reached the folder.
+        if (execution.inCopy === true) await options.copies?.discard(routine.routineId).catch(() => undefined)
         changed()
         return { ok: true }
       }
       if (!execution.canContinue || execution.missionId === undefined) return { ok: false, error: { message: 'The saved step is not confirmed complete. Review its mission and external work; it cannot be safely continued.' } }
       // Recovery uses the saved definition, not edits made four days later --
       // who takes each step included (0.435).
-      const { handOffs: _current, ...base } = routine
-      const saved = { ...base, steps: execution.steps, route: execution.route, ...(execution.handOffs === undefined ? {} : { handOffs: execution.handOffs }), execution: { ...execution, recovered: true } }
+      const { handOffs: _current, inCopy: _now, ...base } = routine
+      const saved = { ...base, steps: execution.steps, route: execution.route, ...(execution.handOffs === undefined ? {} : { handOffs: execution.handOffs }), ...(execution.inCopy === true ? { inCopy: true as const } : {}), execution: { ...execution, recovered: true } }
       const next = execution.step + 1
       const owner = ownerOf(saved, next)
       const before = ownerOf(saved, execution.step)
@@ -548,8 +582,27 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
         if (owner === first || await options.peerContextFor(owner) !== undefined) continue
         return { ok: false, error: { code: 'ROUTINE_REJECTED', message: removedStepSaying(routine, step) } }
       }
+      /*
+       * IN A COPY (0.533): a fresh copy of the folder for this run -- refused
+       * while the last run's changes still wait for Keep or Discard, so two
+       * runs' work never stacks up unseen.
+       */
+      if (routine.inCopy === true) {
+        if (routine.staged !== undefined) {
+          return { ok: false, error: { code: 'ROUTINE_REJECTED', message: `The last run's changes are waiting under Routines. Keep or Discard them, then run "${routine.name}" again.` } }
+        }
+        if (options.copies === undefined || options.folderNow === undefined) {
+          return { ok: false, error: { code: 'ROUTINE_REJECTED', message: 'This routine works in a copy of the folder, which this window cannot make. Nothing was started.' } }
+        }
+        try {
+          await options.copies.make(routine.routineId, options.folderNow())
+        } catch (error) {
+          return { ok: false, error: { code: 'ROUTINE_REJECTED', message: `${error instanceof Error ? error.message.replace(/^It answers in a copy of the folder, and/, 'It works in a copy of the folder, and') : 'A copy of the folder could not be made.'} Nothing was started.` } }
+        }
+      }
       const response = await startStep(routine, peer, 1, undefined, undefined, arrived)
       if (!response.ok) {
+        if (routine.inCopy === true) await options.copies?.discard(routine.routineId).catch(() => undefined)
         return { ok: false, error: { code: 'ROUTINE_REJECTED', message: response.error.message } }
       }
       await options.assignOwner(peer.self.teammateId, response.data.missionId).catch(() => undefined)
@@ -621,8 +674,8 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
         approval = `, ${verdict.why}`
       }
       if (progress.step >= progress.of) {
-        await complete(progress.routineId, execution)
-        notice(progress, `Routine "${progress.name}" finished: ${String(progress.of)} step${progress.of === 1 ? '' : 's'} completed${approval}.`, 'info')
+        const staged = await complete(progress.routineId, execution)
+        notice(progress, `Routine "${progress.name}" finished: ${String(progress.of)} step${progress.of === 1 ? '' : 's'} completed${approval}.${staged === undefined ? execution.inCopy === true ? ' Nothing changed in its copy, so there is nothing to keep.' : '' : ` ${waitingWords(staged)}.`}`, 'info')
         return
       }
       /*
@@ -635,8 +688,8 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
        */
       const current = await options.routines.get(progress.routineId)
       const startedPlan = (held: PublicRoutine): PublicRoutine => {
-        const { handOffs: _now, ...base } = held
-        return { ...base, steps: execution.steps, route: execution.route, ...(execution.handOffs === undefined ? {} : { handOffs: execution.handOffs }) }
+        const { handOffs: _now, inCopy: _copyNow, ...base } = held
+        return { ...base, steps: execution.steps, route: execution.route, ...(execution.handOffs === undefined ? {} : { handOffs: execution.handOffs }), ...(execution.inCopy === true ? { inCopy: true as const } : {}) }
       }
       const routine = current === undefined ? undefined : startedPlan(current)
       const next = progress.step + 1
@@ -696,6 +749,9 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       for (const routine of all) {
         if (routine.execution !== undefined && routine.execution.status !== 'abandoned') continue
         if (routine.schedule === undefined) continue
+        // Its last run's changes still wait for Keep or Discard (0.533): it does not run on
+        // its own until they are settled. A watched folder's new files stay ready meanwhile.
+        if (routine.staged !== undefined) continue
         // On a new file (0.522): due when the watcher has settled files for it and its hour is not full.
         const arrivedFiles = routine.schedule.kind === 'files' ? options.arrivals?.ready(routine.routineId, now.getTime()) ?? [] : []
         if (routine.schedule.kind === 'files' ? arrivedFiles.length === 0 : !isDue(routine.schedule, routine.lastRunAt ?? routine.createdAt, now)) continue

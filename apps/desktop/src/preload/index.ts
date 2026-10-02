@@ -110,6 +110,7 @@ import {
   ROUTINE_UPDATE_CHANNEL,
   ROUTINE_REMOVE_CHANNEL,
   ROUTINE_RUN_CHANNEL,
+  ROUTINE_SETTLE_CHANNEL,
   TEAMMATE_CREATE_CHANNEL,
   TEAMMATE_LIST_CHANNEL,
   TEAMMATE_REMOVE_CHANNEL,
@@ -227,6 +228,8 @@ import type {
   RoutineListResponse,
   RoutineMutationResponse,
   RoutineRunResponse,
+  RoutineSettleRequest,
+  RoutineSettleResponse,
   RoutineUpdateRequest,
   MemoryAddRequest,
   MemoryClearRequest,
@@ -368,6 +371,7 @@ const desktopApi: DesktopApi = {
   removeRoutine: (routineId: string) =>
     ipcRenderer.invoke(ROUTINE_REMOVE_CHANNEL, routineId) as Promise<RoutineMutationResponse>,
   runRoutine: (routineId: string) => ipcRenderer.invoke(ROUTINE_RUN_CHANNEL, routineId) as Promise<RoutineRunResponse>,
+  settleRoutine: (request: RoutineSettleRequest) => ipcRenderer.invoke(ROUTINE_SETTLE_CHANNEL, request) as Promise<RoutineSettleResponse>,
   startCodexMission: (request: CodexMissionStartRequest) =>
     ipcRenderer.invoke(CODEX_MISSION_START_CHANNEL, request) as Promise<CodexMissionStartResponse>,
   cancelCodexMission: (request: CodexMissionCancelRequest) =>

@@ -47,8 +47,11 @@ export function RoutineDialog({
   modeName,
   modeReadsOnly,
   fresh = false,
+  initialInCopy = false,
   running = false
 }: {
+  /** It works in a copy, kept or discarded by the person (0.533). */
+  readonly initialInCopy?: boolean
   /** Written from nothing on the Routines screen (0.530), not saved from a conversation. */
   readonly fresh?: boolean
   /** A saved routine is being corrected (0.493); absent, read off the other props as before. */
@@ -95,6 +98,8 @@ export function RoutineDialog({
     readonly schedule: RoutineSchedule | undefined
     /** Set only when the person changed what a run may do (0.530). */
     readonly readsOnly?: boolean
+    /** Where it works (0.533); sent on a new routine, and on an edit only when it moved. */
+    readonly inCopy?: boolean
     readonly teammateId?: string
     /** Who takes each step, in step order; absent when no choice was offered. */
     readonly handOffs?: readonly RoutineHandOff[]
@@ -107,6 +112,9 @@ export function RoutineDialog({
   const [steps, setSteps] = useState<readonly string[]>(initialSteps)
   // What a run may do to the folder (0.530): chosen here, not inherited unseen.
   const [readsOnly, setReadsOnly] = useState(modeReadsOnly === true)
+  // Where a run that changes files works (0.533): the folder, or a copy the person keeps.
+  const [inCopy, setInCopy] = useState(initialInCopy)
+  const copies = !readsOnly && inCopy
   const shownMode = readsOnly ? 'Ask' : modeReadsOnly === true ? 'Edit' : modeName
   // One entry per step, kept in step with every add and remove (0.435).
   const [handOffs, setHandOffs] = useState<readonly RoutineHandOff[]>(
@@ -211,8 +219,39 @@ export function RoutineDialog({
               <p className="lc-dialog__note lc-mono">
                 {readsOnly
                   ? 'It reads and answers; nothing in the folder changes.'
-                  : 'What a run changes lands in the folder straight away, with nothing to keep or undo first.'}
+                  : copies
+                    ? 'It changes files in a copy of the folder. When a run finishes, its changes wait under Routines: Keep writes them into the folder, Discard throws them away.'
+                    : 'What a run changes lands in the folder straight away, with nothing to keep or undo first.'}
               </p>
+              {/*
+                WHERE IT WORKS (0.533). Sol's 0.528 pass: "I would not trust a file
+                routine's no-change description after seeing it create files." A run
+                that changes files can work in a copy instead, and nothing reaches the
+                folder until the person keeps it.
+              */}
+              {!readsOnly && (
+                <div className="lc-routinesched">
+                  <div className="lc-segmented" role="radiogroup" aria-label="Where it works">
+                    {(
+                      [
+                        [false, 'In the folder'],
+                        [true, 'In a copy, you keep']
+                      ] as const
+                    ).map(([copy, label]) => (
+                      <button
+                        key={label}
+                        type="button"
+                        role="radio"
+                        aria-checked={inCopy === copy}
+                        className={`lc-button${inCopy === copy ? ' is-active' : ''}`}
+                        onClick={() => setInCopy(copy)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
           {running && (
@@ -522,7 +561,9 @@ export function RoutineDialog({
                   */}
                   {readsOnly
                     ? 'It reads the file and changes nothing.'
-                    : 'It may change files, and what it changes lands in the folder straight away.'}
+                    : copies
+                      ? 'It may change files in its copy; nothing lands in the folder until you keep it.'
+                      : 'It may change files, and what it changes lands in the folder straight away.'}
                 </p>
               </div>
             )}
@@ -584,6 +625,8 @@ export function RoutineDialog({
                 schedule,
                 // Only when it moved: an unchanged choice keeps the mode exactly as saved.
                 ...(modeName === undefined || readsOnly === (modeReadsOnly === true) ? {} : { readsOnly }),
+                // A copy only for a routine that may change files; sent when new, or when it moved.
+                ...(editing ? (copies === initialInCopy ? {} : { inCopy: copies }) : copies ? { inCopy: true } : {}),
                 ...(runner.length === 0 ? {} : { teammateId: runner }),
                 // Lined up with the steps that are kept (0.435).
                 ...(canHandOff ? { handOffs: steps.flatMap((step, at) => (step.trim().length > 0 ? [handOffs[at] ?? {}] : [])) } : {})

@@ -4,6 +4,7 @@ import type { PublicFolder, PublicRoutine, PublicTeammate } from '../../../share
 import { shortAgo } from '../railFlyout.js'
 import { routineChain, routineRunSummary, routineScheduleSummary, routineStepLabel } from '../routines.js'
 import { NOTHING_TO_SAVE_YET, savableConversations, turnsLabel } from '../savableConversations.js'
+import { RoutineChanges } from './RoutineChanges.js'
 import type { SavableConversation } from '../savableConversations.js'
 import { Icon } from './Icon.js'
 import { ScreenHeader } from './Screens.js'
@@ -43,8 +44,11 @@ export function AutomationsScreen({
   missions,
   onSaveRoutine,
   onNewRoutine,
+  onSettleRoutine,
   folders = []
 }: {
+  /** A copy routine's waiting changes: Keep, Discard, or open the copy (0.533). */
+  readonly onSettleRoutine?: (routineId: string, decision: 'keep' | 'discard' | 'open') => void
   /** A routine written here, step by step, rather than saved from a conversation (0.530). */
   readonly onNewRoutine?: () => void
   readonly routines: readonly PublicRoutine[]
@@ -274,13 +278,15 @@ export function AutomationsScreen({
                 <button
                   type="button"
                   className="lc-ghostbutton"
-                  disabled={replaying !== undefined || owner === undefined || (routine.execution !== undefined && routine.execution.status !== 'abandoned')}
+                  disabled={replaying !== undefined || owner === undefined || routine.staged !== undefined || (routine.execution !== undefined && routine.execution.status !== 'abandoned')}
                   title={
                     owner === undefined
                       ? 'The teammate this was taught to is gone, so it has no route to run on.'
-                      : replaying === undefined
-                        ? undefined
-                        : `${replaying.name} is running: ${routineStepLabel(replaying)}`
+                      : routine.staged !== undefined
+                        ? 'Its last run\'s changes are waiting: Keep or Discard them first.'
+                        : replaying === undefined
+                          ? undefined
+                          : `${replaying.name} is running: ${routineStepLabel(replaying)}`
                   }
                   onClick={() => onRunRoutine(routine.routineId)}
                 >
@@ -333,6 +339,7 @@ export function AutomationsScreen({
                   * the drive's SCREENSHOT, after its step text had already been
                   * read as a pass (2026-09-08).
                   */}
+                {onSettleRoutine !== undefined && <RoutineChanges routine={routine} onSettle={onSettleRoutine} />}
                 <RoutineRecovery
                   key={`${routine.execution?.attemptId}:${routine.execution?.step}`}
                   routine={routine}

@@ -1573,6 +1573,8 @@ export default function App(): ReactElement {
     /** A saved routine's own mode, and whether a run of it is going (0.493). */
     readonly savedMode?: MissionMode
     readonly running?: boolean
+    /** It works in a copy, kept or discarded by the person (0.533). */
+    readonly inCopy?: boolean
     readonly busy: boolean
     readonly error?: string
   }>()
@@ -4966,6 +4968,8 @@ export default function App(): ReactElement {
     readonly teammateId?: string
     /** Set only when the person changed what a run may do (0.530). */
     readonly readsOnly?: boolean
+    /** Where it works (0.533): in the folder, or in a copy the person keeps. */
+    readonly inCopy?: boolean
   }): void => {
     const bridge = window.desktop
     const dialog = routineDialog
@@ -5002,10 +5006,11 @@ export default function App(): ReactElement {
             steps: input.steps,
             learnedFrom: dialog.learnedFrom,
             ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
-            ...(input.handOffs === undefined ? {} : { handOffs: input.handOffs })
+            ...(input.handOffs === undefined ? {} : { handOffs: input.handOffs }),
+            ...(input.inCopy === true ? { inCopy: true } : {})
           })
         : // null clears a schedule the routine had; the store leaves an absent one alone.
-          bridge.updateRoutine({ routineId: dialog.routineId, name: input.name, steps: input.steps, schedule: input.schedule ?? null, ...(input.handOffs === undefined ? {} : { handOffs: input.handOffs }), ...(chosenMode === undefined ? {} : { mode: chosenMode }) })
+          bridge.updateRoutine({ routineId: dialog.routineId, name: input.name, steps: input.steps, schedule: input.schedule ?? null, ...(input.handOffs === undefined ? {} : { handOffs: input.handOffs }), ...(chosenMode === undefined ? {} : { mode: chosenMode }), ...(input.inCopy === undefined ? {} : { inCopy: input.inCopy }) })
     void request
       .then(async (response) => {
         if (!response.ok) {
@@ -5035,8 +5040,20 @@ export default function App(): ReactElement {
       ...(routine.handOffs === undefined ? {} : { handOffs: routine.handOffs }),
       savedMode: routine.route.mode,
       running: routine.execution?.status === 'running' || routine.execution?.status === 'dispatching',
+      ...(routine.inCopy === true ? { inCopy: true } : {}),
       busy: false
     })
+  }
+
+  /** A copy routine's waiting changes: kept, discarded, or the copy opened (0.533). */
+  const settleRoutine = (routineId: string, decision: 'keep' | 'discard' | 'open'): void => {
+    void window.desktop
+      ?.settleRoutine({ routineId, decision })
+      .then(async (answer) => {
+        if (answer.message.length > 0) setRoutineNotice(answer.message)
+        if (decision !== 'open') await reloadRoutines()
+      })
+      .catch(() => setRoutineNotice('That could not be done. Nothing was changed.'))
   }
 
   /** M30: a routine run to show once it is in the window. */
@@ -6928,6 +6945,7 @@ export default function App(): ReactElement {
               folders={folders}
               onSaveRoutine={openSaveRoutine}
               onNewRoutine={openNewRoutine}
+              onSettleRoutine={settleRoutine}
             />
           ) : screen === 'rooms' ? (
             <RoomScreen
@@ -8421,6 +8439,7 @@ export default function App(): ReactElement {
           truncated={routineDialog.truncated}
           editing={routineDialog.routineId !== undefined}
           fresh={routineDialog.routineId === undefined && routineDialog.learnedFrom.length === 0}
+          initialInCopy={routineDialog.inCopy === true}
           running={routineDialog.running === true}
           {...(() => {
             const mode = routineDialog.savedMode ?? routineDialog.route?.mode

@@ -22,6 +22,8 @@ export interface RoutineExecution {
   readonly route: TeammateRoute
   /** Who took each step, as the attempt started with it (0.435). */
   readonly handOffs?: readonly RoutineHandOff[]
+  /** Its steps run in the routine's copy, as the attempt started (0.533). */
+  readonly inCopy?: true
   readonly workspaceId: string
   readonly recovered?: boolean
   readonly missionId?: string

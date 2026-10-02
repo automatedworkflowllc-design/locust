@@ -35,6 +35,21 @@ const safeName = (compareId: string, slot: CompareSlotId): string => {
   return `${compareId}-${slot}`
 }
 
+/**
+ * WHICH COPY: a comparison's column, or one named outright (0.533: a routine
+ * that works in a copy, routine-copy.ts). A named copy is `rt_` and letters,
+ * digits or underscores, so it can never climb out of its root.
+ */
+export type CopyRef = { readonly compareId: string; readonly slot: CompareSlotId } | { readonly name: string }
+
+const nameOf = (ref: CopyRef): string => {
+  if ('name' in ref) {
+    if (!/^rt_[A-Za-z0-9_]{1,60}$/.test(ref.name)) throw new Error('That copy cannot be named so.')
+    return ref.name
+  }
+  return safeName(ref.compareId, ref.slot)
+}
+
 /** Files and bytes the copy would hold, stopping as soon as either limit is passed. */
 async function measure(folder: string): Promise<{ files: number; bytes: number; over: boolean }> {
   let files = 0
@@ -73,14 +88,12 @@ export async function copyRefusal(folder: string): Promise<string | undefined> {
 }
 
 /** The column's copy, made the first time and reused for its follow-ups. */
-export async function makeCompareCopy(input: {
+export async function makeCompareCopy(input: CopyRef & {
   readonly folder: string
-  readonly compareId: string
-  readonly slot: CompareSlotId
   readonly root?: string
 }): Promise<string> {
   const root = input.root ?? COPY_ROOT
-  const target = join(root, safeName(input.compareId, input.slot))
+  const target = join(root, nameOf(input))
   const made = await lstat(target).then((found) => found.isDirectory(), () => false)
   if (made) return target
   const source = resolve(input.folder)
@@ -102,12 +115,12 @@ export async function makeCompareCopy(input: {
   })
   // What each file was when copied (0.448): so Keep knows what the column
   // changed, and whether the person has since changed the same file.
-  await writeFile(manifestPath(root, input.compareId, input.slot), JSON.stringify(await hashTree(target)), 'utf8')
+  await writeFile(manifestPath(root, input), JSON.stringify(await hashTree(target)), 'utf8')
   return target
 }
 
 /** Beside the copy, never in it: a column must not find Locust's bookkeeping among its files. */
-const manifestPath = (root: string, compareId: string, slot: CompareSlotId): string => join(root, `${safeName(compareId, slot)}.manifest.json`)
+const manifestPath = (root: string, ref: CopyRef): string => join(root, `${nameOf(ref)}.manifest.json`)
 
 const hashOf = async (path: string): Promise<string> => createHash('sha256').update(await readFile(path)).digest('hex')
 
@@ -141,10 +154,10 @@ export interface CopyChanges {
  * clean to run. A column in a folder that is not a git project edits a plain
  * copy of it instead, and these read what it did against what it was given.
  */
-export async function copyChanges(input: { readonly compareId: string; readonly slot: CompareSlotId; readonly root?: string }): Promise<CopyChanges> {
+export async function copyChanges(input: CopyRef & { readonly root?: string }): Promise<CopyChanges> {
   const root = input.root ?? COPY_ROOT
-  const target = join(root, safeName(input.compareId, input.slot))
-  const before = JSON.parse(await readFile(manifestPath(root, input.compareId, input.slot), 'utf8')) as Record<string, string>
+  const target = join(root, nameOf(input))
+  const before = JSON.parse(await readFile(manifestPath(root, input), 'utf8')) as Record<string, string>
   const now = await hashTree(target)
   const changed = Object.keys(now).filter((path) => before[path] !== now[path]).sort()
   const deleted = Object.keys(before).filter((path) => now[path] === undefined).sort()
@@ -161,10 +174,10 @@ export type CopyBringIn =
  * folder and the ones it deleted are removed -- and nothing is, when the
  * person has since changed any of those same files themselves.
  */
-export async function bringInCopy(input: { readonly folder: string; readonly compareId: string; readonly slot: CompareSlotId; readonly root?: string }): Promise<CopyBringIn> {
+export async function bringInCopy(input: CopyRef & { readonly folder: string; readonly root?: string }): Promise<CopyBringIn> {
   const root = input.root ?? COPY_ROOT
-  const target = join(root, safeName(input.compareId, input.slot))
-  const before = JSON.parse(await readFile(manifestPath(root, input.compareId, input.slot), 'utf8')) as Record<string, string>
+  const target = join(root, nameOf(input))
+  const before = JSON.parse(await readFile(manifestPath(root, input), 'utf8')) as Record<string, string>
   const { changed, deleted } = await copyChanges(input)
   const touched = [...changed, ...deleted]
   if (touched.length === 0) return { kind: 'nothing' }
@@ -189,6 +202,13 @@ export async function bringInCopy(input: { readonly folder: string; readonly com
   return { kind: 'brought', files: touched.sort() }
 }
 
+/** One named copy and its manifest (0.533). Nothing else under the root is touched. */
+export async function removeNamedCopy(name: string, root: string = COPY_ROOT): Promise<void> {
+  const safe = nameOf({ name })
+  await rm(join(root, safe), { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+  await rm(join(root, `${safe}.manifest.json`), { force: true })
+}
+
 /** Every copy a comparison made. Nothing else under the root is touched. */
 export async function removeCompareCopies(compareId: string, root: string = COPY_ROOT): Promise<void> {
   if (!/^cmp_[A-Za-z0-9]{1,40}$/.test(compareId)) return
@@ -205,15 +225,13 @@ export async function removeCompareCopies(compareId: string, root: string = COPY
  * when they differ (and says so on stdout). A file git cannot count adds a
  * file and no lines -- never a guessed number.
  */
-export async function copyLineChanges(input: {
+export async function copyLineChanges(input: CopyRef & {
   readonly folder: string
-  readonly compareId: string
-  readonly slot: CompareSlotId
   readonly root?: string
   readonly runGit: (args: readonly string[], cwd: string) => Promise<string>
 }): Promise<{ readonly files: number; readonly added?: number; readonly removed?: number }> {
   const root = input.root ?? COPY_ROOT
-  const target = join(root, safeName(input.compareId, input.slot))
+  const target = join(root, nameOf(input))
   const { changed, deleted } = await copyChanges(input)
   let added = 0
   let removed = 0

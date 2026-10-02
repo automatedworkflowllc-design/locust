@@ -62,6 +62,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { MAX_PROMPT_LENGTH, createCodexMissionService, runtimeThreadIdOf } from './codex-mission.js'
 import { chosenLeaveOut } from './handoff.js'
 import { officeWordsSection } from './office-words.js'
+import { createRoutineCopies } from './routine-copy.js'
 import { openInTerminal, terminalRequestFor } from './open-in-terminal.js'
 import { createTerminalCatchUp, createTerminalImports, createTranscriptReader, transcriptPathFor } from './terminal-catch-up.js'
 import { importSession, listImportableSessions } from './session-import.js'
@@ -219,6 +220,7 @@ import {
   ROUTINE_UPDATE_CHANNEL,
   ROUTINE_REMOVE_CHANNEL,
   ROUTINE_RUN_CHANNEL,
+  ROUTINE_SETTLE_CHANNEL,
   MEMORY_LIST_CHANNEL,
   MEMORY_ADD_CHANNEL,
   MEMORY_UPDATE_CHANNEL,
@@ -2797,8 +2799,12 @@ if (!ownsSingleInstanceLock) {
     const compares = createCompareStore({ rootDirectory: app.getPath('userData') })
     // Folder watchers (0.522): routines that run on a new file, polled, inside the project folder.
     const fileArrivals = createFileArrivals({ get projectFolder() { return workspacePath } })
+    const routineCopies = createRoutineCopies()
     routineRunner = createRoutineRunner({
       arrivals: fileArrivals,
+      // A routine that works in a copy (0.533): made from the folder the window is in.
+      copies: routineCopies,
+      folderNow: () => workspacePath,
       // Read live (0.458): the folder the window is in now.
       get workspaceId() {
         return memoryWorkspaceId
@@ -2829,7 +2835,11 @@ if (!ownsSingleInstanceLock) {
           input.peer,
           input.followUpOf,
           undefined,
-          input.startedBy
+          input.startedBy,
+          undefined,
+          // In the routine's copy (0.533): a slot keyed by the teammate, so one run at a time
+          // stays one run at a time, and its end never commits the teammate's own branch.
+          input.cwd === undefined ? undefined : { key: input.peer.self.teammateId, cwd: input.cwd }
         ),
       assignOwner: (teammateId, missionId) => assignOwner(teammateId, missionId),
       phaseOf: async (missionId) => (await missionLedger.getMission(missionId))?.phase,
@@ -5322,7 +5332,8 @@ if (!ownsSingleInstanceLock) {
           // M15: the folder it is made in, so a schedule runs it only there.
           ...(workspaceChosen ? { workspaceId: memoryWorkspaceId } : {}),
           // Who takes each step (0.435); the store checks it.
-          ...(input.handOffs === undefined ? {} : { handOffs: input.handOffs })
+          ...(input.handOffs === undefined ? {} : { handOffs: input.handOffs }),
+          ...(input.inCopy === true ? { inCopy: true } : {})
         })
         return { ok: true, data: { routine } } as const
       } catch (error) {
@@ -5340,7 +5351,8 @@ if (!ownsSingleInstanceLock) {
           steps: input.steps,
           ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
           ...(input.handOffs === undefined ? {} : { handOffs: input.handOffs }),
-          ...(input.mode === undefined ? {} : { mode: input.mode })
+          ...(input.mode === undefined ? {} : { mode: input.mode }),
+          ...(typeof input.inCopy === 'boolean' ? { inCopy: input.inCopy } : {})
         })
         return { ok: true, data: { routine } } as const
       } catch (error) {
@@ -5352,6 +5364,8 @@ if (!ownsSingleInstanceLock) {
       if (!fromOwnWindow(event)) return routineRejected('The routine could not be removed.')
       try {
         await routines.remove(routineId)
+        // Its copy, if it worked in one, goes with it (0.533): nothing of it reached the folder.
+        if (typeof routineId === 'string') await routineCopies.discard(routineId).catch(() => undefined)
         return { ok: true, data: {} } as const
       } catch {
         return routineRejected('That routine could not be removed.')
@@ -5363,6 +5377,47 @@ if (!ownsSingleInstanceLock) {
       if (typeof routineId !== 'string' || routineRunner === undefined) return routineRejected('That routine could not be started.')
       if (!workspaceChosen) return routineRejected(NO_WORKSPACE_MESSAGE)
       return routineRunner.run(routineId)
+    })
+
+    /*
+     * A COPY ROUTINE'S CHANGES, SETTLED BY THE PERSON (0.533). Keep writes them
+     * into the folder the copy was made from -- and nothing at all when the
+     * person has since changed any of those same files; Discard throws the copy
+     * away; Open shows it in the file manager to look at first.
+     */
+    ipcMain.handle(ROUTINE_SETTLE_CHANNEL, async (event, request: unknown) => {
+      const refuse = (message: string) => ({ ok: false, message }) as const
+      if (!fromOwnWindow(event)) return refuse('That could not be done.')
+      const { routineId, decision } = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      if (typeof routineId !== 'string' || (decision !== 'keep' && decision !== 'discard' && decision !== 'open')) return refuse('That could not be done.')
+      const routine = await routines.get(routineId).catch(() => undefined)
+      const staged = routine?.staged
+      if (routine === undefined || staged === undefined) return refuse('Those changes were already kept or discarded.')
+      if (decision === 'open') {
+        const failed = await shell.openPath(routineCopies.path(routineId))
+        return failed.length === 0 ? ({ ok: true, message: '' } as const) : refuse(`The copy could not be opened: ${failed}`)
+      }
+      if (decision === 'discard') {
+        await routines.settleStaged(routineId, staged.attemptId)
+        await routineCopies.discard(routineId).catch(() => undefined)
+        sendToWindow({ kind: 'routine-recovery-changed' })
+        return { ok: true, message: `Discarded. Nothing from that run of "${routine.name}" reached the folder.` } as const
+      }
+      const kept = await routineCopies.keep(routineId).catch((error: unknown) => (error instanceof Error ? error : new Error('The changes could not be kept.')))
+      if (kept instanceof Error) return refuse(kept.message)
+      if (kept.kind === 'your-changes') {
+        const named = kept.files.length <= 3 ? kept.files.join(', ') : `${kept.files.slice(0, 3).join(', ')} and ${String(kept.files.length - 3)} more`
+        return refuse(`Not kept: you have changed ${named} since it ran, so nothing was written. Discard its changes, or put those files back and Keep again.`)
+      }
+      await routines.settleStaged(routineId, staged.attemptId)
+      await routineCopies.discard(routineId).catch(() => undefined)
+      sendToWindow({ kind: 'routine-recovery-changed' })
+      return {
+        ok: true,
+        message: kept.kind === 'nothing'
+          ? 'Nothing to write: the folder already matches.'
+          : `Kept: ${String(kept.files.length)} file${kept.files.length === 1 ? '' : 's'} written into the folder.`
+      } as const
     })
 
     ipcMain.handle(ROUTINE_RECOVERY_CHANNEL, (event, request: unknown) =>

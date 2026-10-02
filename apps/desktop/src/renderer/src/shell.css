@@ -13306,6 +13306,53 @@ textarea {
   margin-top: var(--lc-space-2);
 }
 
+/* A copy routine's last run, waiting for Keep or Discard (0.533, RoutineChanges.tsx):
+   a card across the row, on the card edge -- it asks for a decision, not an alarm. */
+.lc-routinerow > .lc-routinechanges {
+  grid-column: 1 / -1;
+  margin-top: var(--lc-space-2);
+}
+
+.lc-routinechanges {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--lc-space-3);
+  min-width: 0;
+  padding: var(--lc-space-4) var(--lc-space-5);
+  border: 1px solid var(--lc-border-button);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-raised);
+}
+
+.lc-routinechanges__head {
+  color: var(--lc-text-muted);
+}
+
+.lc-routinechanges__head strong {
+  color: var(--lc-text-primary);
+}
+
+.lc-routinechanges__files {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-secondary);
+}
+
+.lc-routinechanges__line {
+  max-width: 72ch;
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
+}
+
+.lc-routinechanges__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lc-space-4);
+}
+
 /*
  * A routine waiting on a person, as a card of its own (RoutineRecovery.tsx):
  * the lines it is, stacked, on an amber edge. It used to borrow the row's

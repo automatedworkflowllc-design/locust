@@ -472,6 +472,16 @@ export const ROUTINE_CREATE_CHANNEL = 'routines:create'
 export const ROUTINE_UPDATE_CHANNEL = 'routines:update'
 export const ROUTINE_REMOVE_CHANNEL = 'routines:remove'
 export const ROUTINE_RUN_CHANNEL = 'routines:run'
+/**
+ * A routine that works in a copy (0.533): its last run's changes, kept (written
+ * into the folder), discarded, or the copy opened to look at first.
+ */
+export const ROUTINE_SETTLE_CHANNEL = 'routines:settle'
+export interface RoutineSettleRequest {
+  readonly routineId: string
+  readonly decision: 'keep' | 'discard' | 'open'
+}
+export type RoutineSettleResponse = { readonly ok: true; readonly message: string } | { readonly ok: false; readonly message: string }
 export const MODEL_CATALOG_CHANNEL = 'models:list'
 /**
  * What the person set up inside the CLIs themselves -- agents, commands and
@@ -1457,6 +1467,24 @@ export interface PublicRoutine {
   readonly workspaceId?: string
   /** Who takes each step, in step order (0.435). Absent: every step is the routine's own teammate's. */
   readonly handOffs?: readonly RoutineHandOff[]
+  /**
+   * It works in a copy of the folder (0.533): what a run changes waits for the
+   * person to Keep or Discard, and nothing lands in the folder before that.
+   */
+  readonly inCopy?: true
+  /** A finished run's changes, waiting in its copy for Keep or Discard (0.533). */
+  readonly staged?: RoutineStaged
+}
+
+/** What a routine's last run changed in its copy, waiting for the person (0.533). */
+export interface RoutineStaged {
+  readonly attemptId: string
+  readonly finishedAt: string
+  /** The folder it was copied from, which Keep writes into. */
+  readonly folder: string
+  /** Changed or new files, then deleted ones, by their path in the folder. */
+  readonly changed: readonly string[]
+  readonly deleted: readonly string[]
 }
 
 export interface RoutineCreateRequest {
@@ -1467,6 +1495,8 @@ export interface RoutineCreateRequest {
   readonly learnedFrom: readonly string[]
   readonly schedule?: RoutineSchedule
   readonly handOffs?: readonly RoutineHandOff[]
+  /** Works in a copy, kept or discarded by the person (0.533). */
+  readonly inCopy?: boolean
 }
 
 export interface RoutineUpdateRequest {
@@ -1479,6 +1509,8 @@ export interface RoutineUpdateRequest {
   readonly schedule?: RoutineSchedule | null
   /** The mode its runs use (0.530: "Only read" or "Change files" in the dialog); absent keeps it. */
   readonly mode?: MissionMode
+  /** Works in a copy (0.533); absent keeps it as it was. */
+  readonly inCopy?: boolean
 }
 
 export type RoutineListResponse =
@@ -2971,6 +3003,8 @@ export interface DesktopApi {
   removeRoutine(routineId: string): Promise<RoutineMutationResponse>
   /** Replay a routine: its first step starts now, each later step when the one before completes. */
   runRoutine(routineId: string): Promise<RoutineRunResponse>
+  /** Keep, discard or open a copy routine's waiting changes (0.533). */
+  settleRoutine(request: RoutineSettleRequest): Promise<RoutineSettleResponse>
   /** Answer a pending approval. Unknown or already-answered ids are ignored. */
   listModels(): Promise<ModelCatalogResponse>
   /** Read-only: what the installed CLIs already have set up. */
