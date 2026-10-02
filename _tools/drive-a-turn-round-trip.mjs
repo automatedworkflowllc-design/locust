@@ -105,6 +105,13 @@ try {
   await send('Which file did you just read? Reply with only its name.')
   const second = await drive.capture('the follow-up', () => settle(/Which file did you just read\?[\s\S]*note\.txt/))
   check('the follow-up is answered from the same conversation', second.answeredAt !== undefined && second.settledAt !== undefined, second.text.slice(-300))
+  // Copy, as Claude Code's (0.545): one per turn, hidden until the reply is hovered. Never pressed here (the clipboard is the person's).
+  const copies = JSON.parse(String(await drive.evaluate(`JSON.stringify([...document.querySelectorAll('button[aria-label="Copy this reply"]')].map((b) => getComputedStyle(b).opacity))`)))
+  const box = JSON.parse(String(await drive.evaluate(`JSON.stringify((() => { const r = document.querySelector('.lc-agentline__body')?.getBoundingClientRect(); return r ? { x: r.left + 20, y: r.top + 8 } : null })())`)))
+  if (box !== null) await drive.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: box.x, y: box.y })
+  await sleep(400)
+  const shownOnHover = String(await drive.evaluate(`getComputedStyle(document.querySelector('button[aria-label="Copy this reply"]')).opacity`))
+  check('each turn has one Copy, hidden at rest and shown on hover', copies.length === 2 && copies.every((o) => o === '0') && shownOnHover === '1', `${JSON.stringify(copies)} then ${shownOnHover}`)
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
