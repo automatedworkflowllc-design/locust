@@ -81,7 +81,7 @@ import { imageMediaType } from '../../shared/image-files.js'
 import { signInCommand } from '../../shared/runtime-install.js'
 import { SIGN_IN_OPENED_EVENT } from './signInEvents.js'
 import { DEFAULT_RELAY_HOP_CAP, DEFAULT_MEMORY_MODE } from '../../shared/ipc.js'
-import type { PublicCloudFolder, PublicCloudTask, PublicCloudWhere, RewindPutBackResponse, RuntimeCommandsResponse } from '../../shared/ipc.js'
+import type { PublicClaudeCloudSession, PublicCloudFolder, PublicCloudTask, PublicCloudWhere, RewindPutBackResponse, RuntimeCommandsResponse } from '../../shared/ipc.js'
 import { stripTaskBlocks } from '../../shared/room-task.js'
 import { stripMemoryBlocks } from '../../shared/memory.js'
 import { stripDecisionBlocks } from '../../shared/decision.js'
@@ -1689,6 +1689,9 @@ export default function App(): ReactElement {
   const [cloudOn, setCloudOn] = useState(false)
   const [cloudTasks, setCloudTasks] = useState<readonly PublicCloudTask[]>([])
   const [cloudPanel, setCloudPanel] = useState(false)
+  // Claude's cloud (0.538): what was sent from this folder, to find again or bring home.
+  const [claudeCloud, setClaudeCloud] = useState<readonly PublicClaudeCloudSession[]>([])
+  const [claudeCloudNote, setClaudeCloudNote] = useState<string>()
   const [cloudWhere, setCloudWhere] = useState<PublicCloudWhere>()
   const [cloudNotes, setCloudNotes] = useState<readonly string[]>([])
   const [cloudProblem, setCloudProblem] = useState<string>()
@@ -3688,6 +3691,17 @@ export default function App(): ReactElement {
   const sendOrCompare = async (prompt: string, sendOptions?: { readonly leaveOut?: readonly string[] }): Promise<boolean | string> => {
     const bridge = window.desktop
     // Cloud (0.503): the task goes to Codex Cloud, and the panel follows it.
+    if (cloudOn && comparing === undefined && composerRoute.runtime === 'claude') {
+      if (!bridge) return 'Locust is not ready yet. Nothing was sent.'
+      const sent = await bridge.startClaudeCloud(prompt, pickedTeammate?.teammateId).catch(() => undefined)
+      if (sent === undefined) return 'Claude Code could not be opened. Nothing was sent.'
+      if (!sent.ok) return sent.message
+      setClaudeCloud((current) => [sent.session, ...current.filter((one) => one.id !== sent.session.id)])
+      setClaudeCloudNote(undefined)
+      setCloudPanel(true)
+      setCloudOn(false)
+      return true
+    }
     if (cloudOn && comparing === undefined) {
       if (!bridge) return 'Locust is not ready yet. Nothing was sent.'
       const started = await bridge.startCloudTask(prompt, pickedTeammate?.teammateId).catch(() => undefined)
@@ -7948,10 +7962,14 @@ export default function App(): ReactElement {
                 if (on) {
                   setCloudPanel(true)
                   void window.desktop?.cloudWhere().then(setCloudWhere).catch(() => undefined)
+                  void window.desktop?.listClaudeCloud().then(setClaudeCloud).catch(() => undefined)
                 }
               },
-              ...(composerRoute.runtime !== 'codex'
-                ? { refusal: 'Cloud runs on Codex: pick a Codex model first.' }
+              where: composerRoute.runtime === 'claude' ? 'claude' : 'codex',
+              ...(composerRoute.runtime === 'claude'
+                ? {}
+                : composerRoute.runtime !== 'codex'
+                ? { refusal: 'Cloud runs on Codex or Claude: pick one of their models first.' }
                 : cloudWhere?.codexReady === false
                   ? { refusal: 'Codex CLI is not installed or not signed in here.' }
                   // Not on GitHub is not refused here (0.504): the panel says so, with the folders that are.
@@ -8124,6 +8142,23 @@ export default function App(): ReactElement {
             folders={cloudFolders}
             onOpenFolder={(id) => switchToFolder(id)}
             onChooseFolder={() => void chooseWorkspace()}
+            claude={{
+              picked: composerRoute.runtime === 'claude',
+              sessions: claudeCloud,
+              note: claudeCloudNote,
+              onHome: (id) => {
+                void window.desktop?.bringClaudeCloudHome(id).then((answer) => {
+                  setClaudeCloudNote(answer.ok
+                    ? 'Claude Code opened in this folder with its list of cloud sessions. Pick this one, and its work comes into this folder.'
+                    : answer.message)
+                }).catch(() => setClaudeCloudNote('Claude Code could not be opened. Run claude --teleport in a terminal in this folder to bring it home.'))
+              },
+              onForget: (id) => {
+                setClaudeCloud((current) => current.filter((one) => one.id !== id))
+                void window.desktop?.forgetClaudeCloud(id).catch(() => undefined)
+              },
+              onOpenWeb: () => void window.desktop?.openLink('https://claude.ai/code').catch(() => undefined)
+            }}
           />
         ) : sideChat !== undefined && screen === 'workroom' ? (
           <SideChat

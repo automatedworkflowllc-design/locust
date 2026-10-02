@@ -17,6 +17,7 @@ import { COMPARE_SLOTS, COMPARE_TREES_DIRECTORY, comparesGoneWith, compareNeedsC
 import { reverseChanges } from '../shared/reverse-diff.js'
 import { createCloudTaskService, launchRunner } from './cloud-task-service.js'
 import { environmentOf, githubRepoOf } from './cloud-tasks.js'
+import { createClaudeCloud } from './claude-cloud.js'
 import type { Runner } from './cloud-tasks.js'
 import type { ReverseChange } from '../shared/reverse-diff.js'
 import { bringInCopy, COPY_ROOT, copyLineChanges, copyRefusal, makeCompareCopy, removeCompareCopies } from './compare-copies.js'
@@ -251,6 +252,10 @@ import {
   CLOUD_DIFF_CHANNEL,
   CLOUD_APPLY_CHANNEL,
   CLOUD_FOLDERS_CHANNEL,
+  CLAUDE_CLOUD_START_CHANNEL,
+  CLAUDE_CLOUD_LIST_CHANNEL,
+  CLAUDE_CLOUD_HOME_CHANNEL,
+  CLAUDE_CLOUD_FORGET_CHANNEL,
   REWIND_PUT_BACK_CHANNEL,
   WORKSPACE_ATTACH_CHANNEL,
   WORKSPACE_FILES_CHANNEL,
@@ -3673,6 +3678,26 @@ if (!ownsSingleInstanceLock) {
       const withEnvironments = await Promise.all(onGitHub.map(async (entry) => ({ ...entry, environment: await environmentOf(cloudAsk, entry.repo, entry.path) })))
       const rank = { ready: 0, unknown: 1, missing: 2 } as const
       return withEnvironments.sort((left, right) => rank[left.environment] - rank[right.environment])
+    })
+    // Claude's cloud (0.538): Claude Code in a window of its own, with the task given.
+    const claudeCloud = createClaudeCloud({ discover: discoverForWork, storePath: join(app.getPath('userData'), 'claude-cloud.json') })
+    const publicSession = <T extends { folder: string }>(session: T): Omit<T, 'folder'> => {
+      const { folder: _folder, ...rest } = session
+      return rest
+    }
+    ipcMain.handle(CLAUDE_CLOUD_START_CHANNEL, async (event, prompt: unknown, teammateId: unknown) => {
+      if (!fromOwnWindow(event) || typeof prompt !== 'string') return { ok: false, message: 'That could not be sent to the cloud.' }
+      if (freeRoutesOnly(process.argv, process.env)) return { ok: false, message: FREE_ONLY_REFUSAL }
+      const started = await claudeCloud.start(workspacePath, prompt.slice(0, 20_000), typeof teammateId === 'string' ? teammateId : undefined)
+      return started.ok ? { ok: true, session: publicSession(started.session) } : started
+    })
+    ipcMain.handle(CLAUDE_CLOUD_LIST_CHANNEL, async (event) => (fromOwnWindow(event) ? (await claudeCloud.list(workspacePath)).map(publicSession) : []))
+    ipcMain.handle(CLAUDE_CLOUD_HOME_CHANNEL, async (event, id: unknown) => {
+      if (!fromOwnWindow(event) || typeof id !== 'string') return { ok: false, message: 'That cloud session could not be brought home.' }
+      return claudeCloud.home(id)
+    })
+    ipcMain.handle(CLAUDE_CLOUD_FORGET_CHANNEL, async (event, id: unknown) => {
+      if (fromOwnWindow(event) && typeof id === 'string') await claudeCloud.forget(id)
     })
     ipcMain.handle(CLOUD_LIST_CHANNEL, async (event) => (fromOwnWindow(event) ? (await cloudTasks.list(workspacePath)).map(publicTask) : []))
     ipcMain.handle(CLOUD_REFRESH_CHANNEL, async (event, taskId: unknown) => {

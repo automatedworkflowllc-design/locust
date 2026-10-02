@@ -11,6 +11,25 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.538.0 - 2026-10-02
+
+### New
+
+- **Claude's cloud, from the Cloud choice.** With a Claude model picked,
+  Cloud in the chat-type menu sends your task to a Claude Code cloud session:
+  Claude Code opens in a window of its own in this folder, with the task
+  already given, and the work runs on Anthropic's machines. The first time in
+  a folder, Claude asks whether you trust it; answer in that window. Each
+  task is listed beside the conversation, with **See it on claude.ai** and
+  **Bring it home**, which opens Claude Code here with its list of cloud
+  sessions to pick from. With a Codex model, Cloud goes to Codex Cloud, as
+  before.
+
+### Improved
+
+- A routine says it runs on the model its teammate last worked on. "The
+  model at the time" was easy to read as whatever the message box showed.
+
 ## 0.537.0 - 2026-10-02
 
 ### Fixed

@@ -255,7 +255,13 @@ export interface ComposerProps {
    * CLOUD (0.503): the chat-type menu's fourth choice, a task for Codex Cloud.
    * `refusal` says why it cannot be picked here (not a Codex route, no GitHub).
    */
-  readonly cloud?: { readonly on: boolean; readonly onMode: (on: boolean) => void; readonly refusal?: string }
+  readonly cloud?: {
+    readonly on: boolean
+    readonly onMode: (on: boolean) => void
+    readonly refusal?: string
+    /** Which cloud the picked model goes to (0.538): Codex Cloud, or Claude's. Absent: Codex. */
+    readonly where?: 'codex' | 'claude'
+  }
   readonly asking?: { readonly label: string; readonly columns: number; readonly changes?: boolean; readonly blind?: boolean }
   /** Opens the model picker when it changes: Home's Compare models (0.442). */
   readonly pickerRequest?: number
@@ -381,6 +387,8 @@ const CHAT_MODES: readonly { readonly id: 'direct' | 'compare' | 'blind' | 'clou
   // 0.503: offered only where the window passes `cloud` (main/cloud-tasks.ts).
   { id: 'cloud', name: 'Cloud', desc: 'Runs in Codex Cloud on this repository; bring the change home when it is done', icon: 'cloud' }
 ]
+/** The Cloud choice when a Claude model is picked (0.538): Claude Code opens with the task, in a window of its own. */
+const CLAUDE_CLOUD_DESC = 'Runs in Claude’s cloud, in a Claude Code window of its own; bring it home when it is done'
 
 export function Composer({
   handBack,
@@ -834,7 +842,7 @@ export function Composer({
     asking !== undefined ? (asking.blind === true ? 'blind' : 'compare') : cloud?.on === true ? 'cloud' : compare?.on === true ? (compare.blind === true ? 'blind' : 'compare') : 'direct'
   const versus = asking?.label ?? versusLabel((compare?.picks ?? []).map((pick) => pick.label))
   // One column left answering (the others could not start) is asked as one.
-  const placeholder = cloud?.on === true && asking === undefined ? 'Describe a task for Codex Cloud…' : asking !== undefined ? (asking.columns <= 1 ? 'Ask a follow-up…' : `Ask ${asking.columns === 2 ? 'both' : `all ${String(asking.columns)}`}…`) : workingNow
+  const placeholder = cloud?.on === true && asking === undefined ? (cloud.where === 'claude' ? 'Describe a task for Claude’s cloud…' : 'Describe a task for Codex Cloud…') : asking !== undefined ? (asking.columns <= 1 ? 'Ask a follow-up…' : `Ask ${asking.columns === 2 ? 'both' : `all ${String(asking.columns)}`}…`) : workingNow
     ? queued === undefined
       ? `Say what is next — it goes to ${workingName} when this finishes…`
       : 'Edit the queued message to change it…'
@@ -1827,7 +1835,7 @@ export function Composer({
                           <Icon name={option.icon} size={15} />
                           <span className="lc-menu__text">
                             <span className="lc-menu__name">{option.name}</span>
-                            <span className="lc-menu__desc">{option.id === 'cloud' && cloud?.refusal !== undefined ? cloud.refusal : option.desc}</span>
+                            <span className="lc-menu__desc">{option.id === 'cloud' && cloud?.refusal !== undefined ? cloud.refusal : option.id === 'cloud' && cloud?.where === 'claude' ? CLAUDE_CLOUD_DESC : option.desc}</span>
                           </span>
                           {chatMode === option.id && <Icon name="check" size={13} />}
                         </button>

@@ -13191,6 +13191,13 @@ textarea {
   align-self: start;
 }
 
+/* Claude's cloud (0.538): its sessions sit above Codex's tasks, spaced as they are. */
+.lc-cloudtasks__claude {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-3);
+}
+
 .lc-automations .lc-routinerow__failed {
   display: block;
   margin-top: 2px;

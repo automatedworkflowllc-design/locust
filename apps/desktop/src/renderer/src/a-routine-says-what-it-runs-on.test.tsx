@@ -34,7 +34,7 @@ describe('the routine row', () => {
 })
 
 describe('the routine dialog', () => {
-  const wren = { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code', createdAt: '2026-09-01T00:00:00.000Z', avatar: seedAvatar('tm_wren') } as unknown as PublicTeammate
+  const wren = { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code', createdAt: '2026-09-01T00:00:00.000Z', avatar: seedAvatar('tm_wren'), route: { runtime: 'cursor', model: 'grok-4.7-high', mode: 'accept-edits' } } as unknown as PublicTeammate
   const dialog = (props: { readonly running?: boolean }) =>
     renderToStaticMarkup(
       <RoutineDialog

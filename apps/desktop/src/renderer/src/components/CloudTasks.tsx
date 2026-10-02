@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ReactElement } from 'react'
 
-import type { PublicCloudFolder, PublicCloudTask, PublicCloudWhere } from '../../../shared/ipc.js'
+import type { PublicClaudeCloudSession, PublicCloudFolder, PublicCloudTask, PublicCloudWhere } from '../../../shared/ipc.js'
 import { fileCounts, parseUnifiedDiff } from '../diff.js'
 import { agoLabel } from '../teammateWork.js'
 import { DiffView } from './DiffView.js'
@@ -25,7 +25,8 @@ export function CloudTasks({
   onClose,
   folders,
   onOpenFolder,
-  onChooseFolder
+  onChooseFolder,
+  claude
 }: {
   readonly tasks: readonly PublicCloudTask[]
   readonly where: PublicCloudWhere | undefined
@@ -42,7 +43,22 @@ export function CloudTasks({
   readonly folders: readonly PublicCloudFolder[] | undefined
   readonly onOpenFolder: (id: string) => void
   readonly onChooseFolder: () => void
+  /**
+   * Claude's cloud (0.538), when a Claude model is picked or a session was
+   * sent from this folder. Claude Code says nothing Locust can follow, so a
+   * session is listed as sent, with where to see it and how to bring it home.
+   */
+  readonly claude?: {
+    readonly picked: boolean
+    readonly sessions: readonly PublicClaudeCloudSession[]
+    readonly note: string | undefined
+    readonly onHome: (id: string) => void
+    readonly onForget: (id: string) => void
+    readonly onOpenWeb: () => void
+  }
 }): ReactElement {
+  // Codex's warnings are about Codex Cloud: not said while Claude's is the one picked, unless Codex tasks are here.
+  const codexSide = claude?.picked !== true || tasks.length > 0
   const known = folders ?? []
   const [open, setOpen] = useState<{ readonly taskId: string; readonly diff: string | undefined; readonly loading: boolean }>()
   const newestFirst = [...tasks].sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))
@@ -61,7 +77,7 @@ export function CloudTasks({
         <span className="lc-beside__who">
           <span className="lc-viewer__name">Cloud tasks</span>
           <span className="lc-beside__title lc-mono">
-            {where?.repo === undefined ? 'Codex Cloud' : `${where.repo}${where.branch === undefined ? '' : ` · ${where.branch}`}`}
+            {claude?.picked === true ? 'Claude’s cloud' : where?.repo === undefined ? 'Codex Cloud' : `${where.repo}${where.branch === undefined ? '' : ` · ${where.branch}`}`}
           </span>
         </span>
         <span className="lc-viewer__spacer" />
@@ -71,13 +87,16 @@ export function CloudTasks({
       </div>
       <div className="lc-beside__thread lc-cloudtasks__list">
         {problem !== undefined && <p className="lc-cloudtasks__problem" role="alert">{problem}</p>}
+        {claude !== undefined && (claude.picked || claude.sessions.length > 0) && (
+          <ClaudeCloudSessions {...claude} />
+        )}
         {/*
           * NOT ON GITHUB, SAID WITH THE WAY ON (0.504). Colin, at the old
           * refusal: "i have no idea what folder the cloud is in". The folder
           * is named, what the cloud needs is said, and the person's folders
           * that are on GitHub are one click away.
           */}
-        {where !== undefined && where.repo === undefined && (
+        {codexSide && where !== undefined && where.repo === undefined && (
           <div className="lc-cloudtasks__elsewhere">
             <p className="lc-cloudtasks__note">
               <strong>{where.folderName ?? 'This folder'}</strong> is not on GitHub. A cloud task runs on a copy of a GitHub
@@ -106,7 +125,7 @@ export function CloudTasks({
             </button>
           </div>
         )}
-        {notes.map((note) => (
+        {codexSide && notes.map((note) => (
           <p key={note} className="lc-cloudtasks__note">{note}</p>
         ))}
         {/*
@@ -115,7 +134,7 @@ export function CloudTasks({
           * repository was right, it had no environment. Said before a send,
           * with how to make one, and the folders that have one.
           */}
-        {where?.repo !== undefined && where.environment === 'missing' && (
+        {codexSide && where?.repo !== undefined && where.environment === 'missing' && (
           <div className="lc-cloudtasks__elsewhere">
             <p className="lc-cloudtasks__note">
               <strong>{where.repo}</strong> has no Codex Cloud environment yet, so a task sent from here would be refused. Make
@@ -141,7 +160,7 @@ export function CloudTasks({
             </button>
           </div>
         )}
-        {newestFirst.length === 0 && where?.repo !== undefined && where.environment !== 'missing' && (
+        {codexSide && newestFirst.length === 0 && where?.repo !== undefined && where.environment !== 'missing' && (
           <p className="lc-cloudtasks__empty">
             Pick Cloud in the chat-type menu and describe a task. It runs in Codex Cloud on this repository, as GitHub has
             it; its change stays there until you apply it here.
@@ -207,5 +226,47 @@ export function CloudTasks({
         })}
       </div>
     </aside>
+  )
+}
+
+/** What was handed to Claude's cloud from this folder (0.538). */
+function ClaudeCloudSessions({
+  picked,
+  sessions,
+  note,
+  onHome,
+  onForget,
+  onOpenWeb
+}: NonNullable<Parameters<typeof CloudTasks>[0]['claude']>): ReactElement {
+  return (
+    <div className="lc-cloudtasks__claude">
+      {(picked || sessions.length === 0) && (
+        <p className="lc-cloudtasks__empty">
+          Describe a task and send it. Claude Code opens in a window of its own with the task given, and does the
+          work on Anthropic’s machines, not this computer. The first time in a folder, Claude asks whether you trust
+          it: answer in that window.
+        </p>
+      )}
+      {note !== undefined && <p className="lc-cloudtasks__note" role="status">{note}</p>}
+      {sessions.map((session) => (
+        <section key={session.id} className="lc-cloudtask is-pending" aria-label={session.prompt}>
+          <div className="lc-cloudtask__prompt">{session.prompt}</div>
+          <div className="lc-cloudtask__state">
+            <span>Sent to Claude’s cloud {agoLabel(session.startedAt) ?? 'just now'}. Follow it in its window or on claude.ai.</span>
+          </div>
+          <div className="lc-cloudtask__actions">
+            <button type="button" className="lc-primarybutton" onClick={() => onHome(session.id)} title="Opens Claude Code here with its list of cloud sessions: pick this one and its work comes into this folder">
+              Bring it home
+            </button>
+            <button type="button" className="lc-button" onClick={onOpenWeb} title="Your Claude Code sessions, in your browser">
+              See it on claude.ai
+            </button>
+            <button type="button" className="lc-ghostbutton lc-iconbutton" aria-label={`Remove "${session.prompt}" from this list`} title="Remove from this list (the session itself stays on claude.ai)" onClick={() => onForget(session.id)}>
+              <Icon name="close" size={13} />
+            </button>
+          </div>
+        </section>
+      ))}
+    </div>
   )
 }

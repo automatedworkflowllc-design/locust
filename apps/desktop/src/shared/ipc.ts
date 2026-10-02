@@ -671,6 +671,28 @@ export const CLOUD_DIFF_CHANNEL = 'cloud:diff'
 export const CLOUD_APPLY_CHANNEL = 'cloud:apply'
 /** The person's folders that are on GitHub, for a cloud task from a folder that is not (0.504). */
 export const CLOUD_FOLDERS_CHANNEL = 'cloud:folders'
+/**
+ * CLAUDE'S CLOUD (0.538, main/claude-cloud.ts): a task handed to a Claude Code
+ * cloud session, in a window of its own; listed here so it can be found on
+ * claude.ai or brought home with `claude --teleport`.
+ */
+export const CLAUDE_CLOUD_START_CHANNEL = 'claude-cloud:start'
+export const CLAUDE_CLOUD_LIST_CHANNEL = 'claude-cloud:list'
+export const CLAUDE_CLOUD_HOME_CHANNEL = 'claude-cloud:home'
+export const CLAUDE_CLOUD_FORGET_CHANNEL = 'claude-cloud:forget'
+export interface ClaudeCloudSession {
+  readonly id: string
+  readonly startedAt: string
+  /** The task as it was sent, bounded. */
+  readonly prompt: string
+  readonly folder: string
+  readonly teammateId?: string
+}
+export type PublicClaudeCloudSession = Omit<ClaudeCloudSession, 'folder'>
+export type ClaudeCloudStartResponse =
+  | { readonly ok: true; readonly session: PublicClaudeCloudSession }
+  | { readonly ok: false; readonly message: string }
+export type ClaudeCloudHomeResponse = { readonly ok: true } | { readonly ok: false; readonly message: string }
 export interface PublicCloudFolder {
   readonly id: string
   readonly name: string
@@ -3068,6 +3090,11 @@ export interface DesktopApi {
   cloudTaskDiff(taskId: string): Promise<string | undefined>
   applyCloudTask(taskId: string): Promise<CloudApplyResponse>
   cloudFolders(): Promise<readonly PublicCloudFolder[]>
+  /** Claude's cloud (0.538): a window of Claude Code with the task given; the list; `--teleport` to bring one home. */
+  startClaudeCloud(prompt: string, teammateId?: string): Promise<ClaudeCloudStartResponse>
+  listClaudeCloud(): Promise<readonly PublicClaudeCloudSession[]>
+  bringClaudeCloudHome(id: string): Promise<ClaudeCloudHomeResponse>
+  forgetClaudeCloud(id: string): Promise<void>
   /** Undo the later turns' file changes before an edited message goes (0.502). */
   putBackFiles(request: RewindPutBackRequest): Promise<RewindPutBackResponse>
   /**
