@@ -256,6 +256,10 @@ export function ThreadItems({
     !faces || continuesSpeech(index) ? <span className="lc-agentline__gutter" /> : <AgentAvatar teammate={owner} />
   // Copy sits under the turn's last reply once nothing is still going, as Claude Code's does (0.545).
   const lastSpeech = items.some((one) => one.type === 'live-step') ? -1 : items.map((one) => one.type).lastIndexOf('agent-message')
+  const lastReply = lastSpeech < 0 ? undefined : items[lastSpeech]
+  const replyText = lastReply?.type === 'agent-message' && lastReply.streaming !== true && lastReply.text.trim().length > 0 ? lastReply.text : undefined
+  // A finished footer line takes Copy at its end (it measured 66px under DONE as its own row, 0.545).
+  const footTakesCopy = items.some((one) => one.type === 'activity' && one.finished)
   return (
     <>
       {items.map((item, index) => {
@@ -265,7 +269,7 @@ export function ThreadItems({
               {face(index)}
               <div className="lc-agentline__body">
                 <AgentText text={item.text} streaming={item.streaming === true} />
-                {index === lastSpeech && item.streaming !== true && item.text.trim().length > 0 && (
+                {index === lastSpeech && replyText !== undefined && !footTakesCopy && (
                   <div className="lc-agentline__tools">
                     <CopyButton className="lc-agentline__copy" label="this reply" text={item.text} />
                   </div>
@@ -413,6 +417,7 @@ export function ThreadItems({
               key={item.key}
               item={item}
               workspacePath={workspacePath}
+              {...(replyText === undefined ? {} : { replyText })}
               {...(onOpenFile === undefined ? {} : { onOpenFile })}
             />
           )
@@ -491,10 +496,13 @@ export function ThreadItems({
 function TurnFoot({
   item,
   workspacePath,
-  onOpenFile
+  onOpenFile,
+  replyText
 }: {
   readonly item: Extract<ThreadItem, { type: 'activity' }>
   readonly workspacePath: string | undefined
+  /** The turn's last reply, for the Copy at the end of this line (0.545). */
+  readonly replyText?: string
   readonly onOpenFile?: (path: string) => void
 }): ReactElement {
   // What changed on disk, not every edit call: one refused was no change.
@@ -547,6 +555,7 @@ function TurnFoot({
             {seg.text}
           </span>
         ))}
+        {replyText !== undefined && <CopyButton className="lc-agentline__copy" label="this reply" text={replyText} />}
       </div>
       {/*
         * What the runtime said about this turn before its work began, under

@@ -17971,10 +17971,17 @@ textarea {
 
 /* Copy under a finished reply (0.545): Claude Code's, quiet until the reply is
    hovered or the button has focus. */
+/* No height of its own: Copy floats into the room the next turn already
+   leaves, so a reply's spacing is what it was before Copy existed. */
+.lc-agentline__body {
+  position: relative;
+}
+
 .lc-agentline__tools {
-  display: flex;
-  min-height: 22px;
-  margin-top: var(--lc-space-1);
+  position: absolute;
+  left: -6px;
+  top: calc(100% + 2px);
+  height: 0;
 }
 
 .lc-agentline__copy {
@@ -17994,6 +18001,8 @@ textarea {
 }
 
 .lc-agentline:hover .lc-agentline__copy,
+.lc-agentline:hover ~ .lc-turnfoot .lc-agentline__copy,
+.lc-turnfoot:hover .lc-agentline__copy,
 .lc-agentline__copy:focus-visible,
 .lc-agentline__copy[aria-label^='Copied'] {
   opacity: 1;
@@ -18012,4 +18021,11 @@ textarea {
 .lc-copy__said {
   margin-left: var(--lc-space-1);
   font-size: var(--lc-text-description);
+}
+
+/* On the footer line, Copy keeps the line's own height. */
+.lc-trace .lc-agentline__copy {
+  padding: 0 4px;
+  line-height: inherit;
+  align-self: center;
 }
