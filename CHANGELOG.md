@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.548.0 - 2026-10-02
+
+### Fixed
+
+- **A review by an Antigravity teammate now only reads.** "Ask for a review"
+  runs the reviewer in Ask for that run, so it cannot change your files. An
+  Antigravity reviewer was left in its own mode because Antigravity's app
+  could not be held to Ask; through Antigravity CLI it can, so it is now.
+
 ## 0.547.0 - 2026-10-02
 
 ### Changed

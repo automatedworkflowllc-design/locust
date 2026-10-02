@@ -40,10 +40,12 @@ describe('a first hour that starts plainly', () => {
   it('a review reads: Ask, for that run only', () => {
     const edit = { teammateId: 'tm_rev', route: { runtime: 'opencode', model: 'opencode/free' }, mode: 'accept-edits', effort: undefined } as const
     expect(asReviewer(edit)).toEqual({ ...edit, mode: 'ask', oneOff: true })
-    // Already reading: unchanged. Antigravity cannot be held to Ask, so it is left alone.
+    // Already reading: unchanged. Antigravity's app cannot be held to Ask, so it is left alone.
     expect(asReviewer({ ...edit, mode: 'ask' })).toEqual({ ...edit, mode: 'ask' })
     expect(asReviewer({ ...edit, route: { runtime: 'antigravity', model: 'x' } })).toEqual({ ...edit, route: { runtime: 'antigravity', model: 'x' } })
-    expect(APP).toContain('{ as: asReviewer(startAs(reviewer, { route, mode, effort }, pickerRoutes)) }')
+    // Through its CLI it can (agy in Ask refused git status, 10/02).
+    expect(asReviewer({ ...edit, route: { runtime: 'antigravity', model: 'x' } }, true)).toEqual({ ...edit, route: { runtime: 'antigravity', model: 'x' }, mode: 'ask', oneOff: true })
+    expect(APP).toContain('{ as: asReviewer(startAs(reviewer, { route, mode, effort }, pickerRoutes), antigravityCli) }')
     expect(APP).toContain("...(as?.oneOff === true ? { keepSavedRoute: true } : {}),")
   })
 })

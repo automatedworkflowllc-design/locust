@@ -88,11 +88,12 @@ export interface StartAs {
  * found "Ask <reviewer> for a review" running in the reviewer's saved Edit
  * mode. The reviewer contract already says "edit nothing"; Ask makes the
  * runtime hold to it, as Claude Code's own review is read-only. For this run
- * only -- the reviewer's saved mode is theirs. Antigravity cannot be held to
- * Ask (it runs its own agent), so it keeps the mode it has.
+ * only -- the reviewer's saved mode is theirs. Antigravity's app cannot be
+ * held to Ask (it runs its own agent), so there it keeps the mode it has.
+ * Through its CLI it can: agy in Ask refused `git status` (measured 10/02).
  */
-export function asReviewer(as: StartAs): StartAs {
-  if (as.route.runtime === 'antigravity' || as.mode === 'ask' || as.mode === 'plan') return as
+export function asReviewer(as: StartAs, antigravityCli = false): StartAs {
+  if ((as.route.runtime === 'antigravity' && !antigravityCli) || as.mode === 'ask' || as.mode === 'plan') return as
   return { ...as, mode: 'ask', oneOff: true }
 }
 

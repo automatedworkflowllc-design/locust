@@ -5817,7 +5817,7 @@ export default function App(): ReactElement {
      * ordinary mission of the reviewer's, on their own route, as a new
      * conversation of theirs.
      */
-    void startMission(reviewBrief(material), undefined, { as: asReviewer(startAs(reviewer, { route, mode, effort }, pickerRoutes)) })
+    void startMission(reviewBrief(material), undefined, { as: asReviewer(startAs(reviewer, { route, mode, effort }, pickerRoutes), antigravityCli) })
   }
   /**
    * A3.1: the same review from two teammates on DIFFERENT coding agents, at
@@ -5837,7 +5837,7 @@ export default function App(): ReactElement {
     selectTeammate(pair[0].teammateId)
     void (async () => {
       for (const reviewer of pair) {
-        await startMission(brief, undefined, { as: asReviewer(startAs(reviewer, { route, mode, effort }, pickerRoutes)) })
+        await startMission(brief, undefined, { as: asReviewer(startAs(reviewer, { route, mode, effort }, pickerRoutes), antigravityCli) })
       }
     })()
   }
