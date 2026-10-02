@@ -1061,6 +1061,16 @@ export function createClaudeEventNormalizer(
         const itemId = identityValue(block.tool_use_id);
         if (itemId === undefined) continue;
         const open = openTools.get(itemId);
+        /*
+         * A SUBAGENT'S OWN TOOL, ENDING (0.543, the 0.536 review RUN-01).
+         * MEASURED on a Haiku run: a subagent's calls never stream a start --
+         * its assistant records are skipped above -- but its results came
+         * through here as completions of a call nobody opened, named `tool`,
+         * and the Activity panel drew each as a bare "tool" row. Its work is
+         * the Agent row's; a result for a call this conversation never made
+         * is not this conversation's.
+         */
+        if (open === undefined && fromSubagent(parsed)) continue;
         openTools.delete(itemId);
         const failed = block.is_error === true;
         const refusedFor = refusedCalls.get(itemId);

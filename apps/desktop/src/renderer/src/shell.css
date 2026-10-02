@@ -17902,3 +17902,54 @@ textarea {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* The window could not be drawn (WindowFallback.tsx, 0.543): what happened,
+   and the one thing to press. */
+.lc-windowfailed {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--lc-space-4);
+  padding: var(--lc-space-7);
+  background: var(--lc-bg-app);
+  color: var(--lc-text-primary);
+  font-family: var(--lc-font-ui);
+  text-align: center;
+}
+
+.lc-windowfailed__title {
+  margin: 0;
+  font-size: var(--lc-text-screen-title);
+  font-weight: 500;
+}
+
+.lc-windowfailed__body {
+  margin: 0;
+  max-width: 44ch;
+  color: var(--lc-text-secondary);
+  font-size: var(--lc-text-body);
+  line-height: 1.5;
+}
+
+.lc-windowfailed__reload {
+  padding: 6px 14px;
+  border: 1px solid var(--lc-border-control);
+  border-radius: var(--lc-radius-control);
+  background: var(--lc-bg-control);
+  color: var(--lc-text-control-fg);
+  font: inherit;
+  font-size: var(--lc-text-body);
+  cursor: pointer;
+}
+
+.lc-windowfailed__reload:hover {
+  border-color: var(--lc-border-hover);
+  color: var(--lc-text-primary);
+}
+
+.lc-windowfailed__reload:focus-visible {
+  outline: 2px solid var(--lc-focus-ring);
+  outline-offset: 2px;
+}

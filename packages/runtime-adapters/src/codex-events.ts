@@ -438,6 +438,11 @@ export function redactSecrets(value: string): string {
     .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/gi, "Bearer [redacted]")
     .replace(/\b(?:sk|pk)-[A-Za-z0-9_-]{12,}\b/g, "[redacted]")
     .replace(/\b(?:gh[opusr]_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AKIA[A-Z0-9]{16})\b/g, "[redacted]")
+    // A private key, a bare JWT, a Google API key, a Hugging Face token (0.543, the 0.536 review SEC-07).
+    .replace(/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9 ]*PRIVATE KEY-----/g, "[redacted]")
+    .replace(/\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g, "[redacted]")
+    .replace(/\bAIza[0-9A-Za-z_-]{35}\b/g, "[redacted]")
+    .replace(/\bhf_[A-Za-z0-9]{30,}\b/g, "[redacted]")
     .replace(
       // `["']?` before the colon (0.489): the JSON shape of a key,
       // `"accessToken": "..."`, put a quote between the name and the colon.
@@ -458,6 +463,11 @@ export function redactText(value: string): string {
     .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/gi, "Bearer [redacted]")
     .replace(/\b(?:sk|pk)-[A-Za-z0-9_-]{12,}\b/g, "[redacted]")
     .replace(/\b(?:gh[opusr]_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AKIA[A-Z0-9]{16})\b/g, "[redacted]")
+    // A private key, a bare JWT, a Google API key, a Hugging Face token (0.543, the 0.536 review SEC-07).
+    .replace(/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9 ]*PRIVATE KEY-----/g, "[redacted]")
+    .replace(/\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g, "[redacted]")
+    .replace(/\bAIza[0-9A-Za-z_-]{35}\b/g, "[redacted]")
+    .replace(/\bhf_[A-Za-z0-9]{30,}\b/g, "[redacted]")
     .replace(
       // `["']?` before the colon (0.489): the JSON shape of a key,
       // `"accessToken": "..."`, put a quote between the name and the colon.

@@ -67,6 +67,27 @@ export function contains(parent: string, child: string): boolean {
 }
 
 /**
+ * Whether a file is inside one of `roots` ON DISK, links followed (0.543).
+ *
+ * `contains` is path arithmetic, which is right for SHOWING a file in the
+ * file manager. Reading one is different: a link inside the folder could
+ * point anywhere, and its contents would be drawn on screen as though they
+ * were the folder's (the 0.536 code review, SEC-01). So a READ asks again of
+ * the real paths -- the file's and each root's, so a project that is itself
+ * reached through a junction still holds its own files.
+ */
+export async function insideOnDisk(path: string, roots: readonly string[]): Promise<boolean> {
+  const { realpath } = await import('node:fs/promises')
+  const real = await realpath(path).catch(() => undefined)
+  if (real === undefined) return false
+  for (const root of roots) {
+    const realRoot = await realpath(root).catch(() => undefined)
+    if (realRoot !== undefined && contains(realRoot, real)) return true
+  }
+  return false
+}
+
+/**
  * Decide whether a reveal request may be honoured.
  *
  * `roots` are the workspace folders the HOST knows about — never a list the

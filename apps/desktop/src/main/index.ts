@@ -85,7 +85,7 @@ import { CLOSE_BUTTONS, closeQuestion, shouldAskBeforeClosing, trayLine } from '
 import { createRecentEdits } from './recent-edits.js'
 import { readRuntimeArtifacts } from './runtime-artifacts.js'
 import { relative } from 'node:path'
-import { decideReveal } from './reveal-file.js'
+import { decideReveal, insideOnDisk } from './reveal-file.js'
 import { MAX_ATTACHMENTS } from '../shared/attachments.js'
 import { ATTACHMENT_DIR, attachmentDestination, excludeWith } from './attach-outside.js'
 import { imageMediaType, MAX_PREVIEW_BYTES } from '../shared/image-files.js'
@@ -4114,6 +4114,9 @@ if (!ownsSingleInstanceLock) {
       if (typeof requested !== 'string' || requested.length === 0) {
         return { ok: false, message: 'There is no file to open.' } as const
       }
+      const roots = [...(await workedInFolders()), ...(await teammateFolders()), ledgerDirectory]
+      // A link inside the folder that leads out of it is not the folder's to show (SEC-01).
+      const linkedOut = 'That file is a link to somewhere outside the folder your teammates work in, so Locust will not open it.'
       /*
        * A SPREADSHEET, READ FOR ITS CELLS (0.364). Penny's budget workbook
        * was refused here with the sentence below (Research & money drive,
@@ -4128,11 +4131,12 @@ if (!ownsSingleInstanceLock) {
        * renderer draws them as text (shared/office-document.ts).
        */
       if (OFFICE_EXTENSIONS.has(sheetKind)) {
-        const decision = decideReveal(requested, [...(await workedInFolders()), ...(await teammateFolders()), ledgerDirectory])
+        const decision = decideReveal(requested, roots)
         if (!decision.ok) {
           return { ok: false, message: 'That file is outside the folder your teammates work in, so Locust will not open it.' } as const
         }
         try {
+          if (!(await insideOnDisk(decision.path, roots))) return { ok: false, message: linkedOut } as const
           const measured = await stat(decision.path)
           if (!measured.isFile()) return { ok: false, message: 'That is a folder, not a file.' } as const
           if (measured.size > MAX_OFFICE_FILE_BYTES) {
@@ -4150,11 +4154,12 @@ if (!ownsSingleInstanceLock) {
         }
       }
       if (SHEET_EXTENSIONS.has(sheetKind)) {
-        const decision = decideReveal(requested, [...(await workedInFolders()), ...(await teammateFolders()), ledgerDirectory])
+        const decision = decideReveal(requested, roots)
         if (!decision.ok) {
           return { ok: false, message: 'That file is outside the folder your teammates work in, so Locust will not open it.' } as const
         }
         try {
+          if (!(await insideOnDisk(decision.path, roots))) return { ok: false, message: linkedOut } as const
           const measured = await stat(decision.path)
           if (!measured.isFile()) return { ok: false, message: 'That is a folder, not a file.' } as const
           if (measured.size > MAX_SHEET_FILE_BYTES) {
@@ -4175,11 +4180,7 @@ if (!ownsSingleInstanceLock) {
       if (!isViewableText(requested)) {
         return { ok: false, message: 'Locust does not open that kind of file here.' } as const
       }
-      const decision = decideReveal(requested, [
-        ...(await workedInFolders()),
-        ...(await teammateFolders()),
-        ledgerDirectory
-      ])
+      const decision = decideReveal(requested, roots)
       if (!decision.ok) {
         return {
           ok: false,
@@ -4187,6 +4188,7 @@ if (!ownsSingleInstanceLock) {
         } as const
       }
       try {
+        if (!(await insideOnDisk(decision.path, roots))) return { ok: false, message: linkedOut } as const
         const measured = await stat(decision.path)
         if (!measured.isFile()) return { ok: false, message: 'That is a folder, not a file.' } as const
         if (measured.size > MAX_TEXT_BYTES) {

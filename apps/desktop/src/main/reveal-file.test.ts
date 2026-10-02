@@ -1,6 +1,10 @@
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
-import { contains, decideReveal } from './reveal-file.js'
+import { contains, decideReveal, insideOnDisk } from './reveal-file.js'
 
 /**
  * The renderer asks; the host decides.
@@ -80,5 +84,30 @@ describe('deciding whether to reveal what the renderer asked for', () => {
     const other = process.platform === 'win32' ? 'D:\\other' : '/other'
     const target = process.platform === 'win32' ? 'D:\\other\\out.md' : '/other/out.md'
     expect(decideReveal(target, [WORKSPACE, other]).ok).toBe(true)
+  })
+})
+
+describe('a file READ is inside the folder on disk, links followed (0.543, the 0.536 review SEC-01)', () => {
+  it('refuses a link that leads out; keeps the folder’s own files, and a project reached through a junction', async () => {
+    const base = await mkdtemp(join(tmpdir(), 'locust-linked-out-'))
+    try {
+      const project = join(base, 'project')
+      const outside = join(base, 'outside')
+      await mkdir(project)
+      await mkdir(outside)
+      await writeFile(join(project, 'own.txt'), 'mine')
+      await writeFile(join(outside, 'secret.txt'), 'not the folder’s')
+      // Junctions need no special rights on Windows; a dir symlink elsewhere.
+      await symlink(outside, join(project, 'linked'), 'junction')
+      await symlink(project, join(base, 'alias'), 'junction')
+      // By path arithmetic the linked file is inside; on disk it is not.
+      expect(contains(project, join(project, 'linked', 'secret.txt'))).toBe(true)
+      expect(await insideOnDisk(join(project, 'linked', 'secret.txt'), [project])).toBe(false)
+      expect(await insideOnDisk(join(project, 'own.txt'), [project])).toBe(true)
+      expect(await insideOnDisk(join(base, 'alias', 'own.txt'), [join(base, 'alias')])).toBe(true)
+      expect(await insideOnDisk(join(project, 'missing.txt'), [project])).toBe(false)
+    } finally {
+      await rm(base, { recursive: true, force: true })
+    }
   })
 })

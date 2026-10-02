@@ -165,10 +165,12 @@ export function createMacUpdater(options: MacUpdaterOptions): UpdaterLike {
       await download(release.url, image, (percent) => emit('download-progress', { percent }))
       const facts = await stat(image)
       if (release.size !== undefined && facts.size !== release.size) throw new Error('The download is not the size the release states.')
-      if (release.sha256 !== undefined) {
-        const digest = createHash('sha256').update(await readFile(image)).digest('hex')
-        if (digest !== release.sha256) throw new Error('The download does not match the release it came from.')
-      }
+      // No digest, no update (0.543, the 0.536 review SEC-06): GitHub states one
+      // for every asset (measured on 0.532's dmgs), so its absence is a release
+      // that cannot be checked, never one to install unchecked.
+      if (release.sha256 === undefined) throw new Error('The release does not say what the download should be, so it was not installed.')
+      const digest = createHash('sha256').update(await readFile(image)).digest('hex')
+      if (digest !== release.sha256) throw new Error('The download does not match the release it came from.')
     }
     const mount = await mkdtemp(join(tmpdir(), 'locust-update-mount-'))
     const attached = await run('hdiutil', ['attach', image, '-nobrowse', '-readonly', '-noautoopen', '-mountpoint', mount])

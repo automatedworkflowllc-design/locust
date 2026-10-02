@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
 import { SplashApp } from './SplashApp'
+import { WindowFallback } from './components/WindowFallback'
 // Tokens first: the shell's palette, type and motion, plus the vendored Geist
 // faces. Then the shell itself, which consumes only those tokens.
 import './tokens.css'
@@ -30,5 +31,5 @@ const isSplash = window.location.hash === '#splash'
 if (isSplash) document.documentElement.classList.add('is-splash')
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>{isSplash ? <SplashApp /> : <App />}</StrictMode>
+  <StrictMode>{isSplash ? <SplashApp /> : <WindowFallback><App /></WindowFallback>}</StrictMode>
 )

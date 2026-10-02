@@ -229,6 +229,23 @@ describe("what a tool call's status means", () => {
   });
 });
 
+describe("a stop at a tool the mode refuses (0.543, the 0.536 review RUN-05)", () => {
+  const started = JSON.stringify({ type: "step_start", sessionID: "ses_1", part: { type: "step-start" } });
+  const wrote = JSON.stringify({
+    type: "tool_use",
+    sessionID: "ses_1",
+    part: { type: "tool", tool: "write", callID: "call_1", state: { status: "completed", input: { filePath: "notes.md", content: "hi" }, output: "" } },
+  });
+  const refused = { exitCode: 1, stderr: "permission requested: bash (npm test); auto-rejecting" };
+  const said = (lines: readonly string[]): string =>
+    (run(lines, refused).events.find((event) => event.type === "run.failed")?.payload as { readonly message: string }).message;
+
+  it("says nothing was changed only when nothing that could change anything had finished", () => {
+    expect(said([started])).toBe("The mode this run is in does not allow bash, so OpenCode stopped when it tried to use it. Nothing was changed.");
+    expect(said([started, wrote])).toBe("The mode this run is in does not allow bash, so OpenCode stopped when it tried to use it. What it did before that still stands: look at the folder.");
+  });
+});
+
 describe("a failed OpenCode tool call", () => {
   const started = JSON.stringify({ type: "step_start", sessionID: "ses_1", part: { type: "step-start" } });
   const errored = JSON.stringify({

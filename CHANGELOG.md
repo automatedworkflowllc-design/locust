@@ -11,6 +11,25 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.544.0 - 2026-10-02
+
+### Fixed
+
+- **A file that is a link out of the folder is not opened.** The viewer
+  checked a file's path, so a link inside the project that led elsewhere
+  showed what it led to. It now checks where the file really is, and a
+  project that is itself reached through a junction still opens its own files.
+- **A window that cannot be drawn says so.** If drawing it ever fails, the
+  window shows what happened and a button to reload it, instead of going blank.
+- **A Claude subagent's own tools stay inside its row.** Their results were
+  listed in Activity as calls named only "tool".
+- **OpenCode's stop note is true.** Stopped at a command its mode does not
+  allow, it said "Nothing was changed" even when it had written files before
+  that. It now says what it did before still stands.
+- **More secrets are scrubbed** from what a run records: private key blocks,
+  bare JWTs, Google API keys and Hugging Face tokens.
+- **A Mac update without a stated checksum is not installed.**
+
 ## 0.543.0 - 2026-10-02
 
 ### New

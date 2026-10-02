@@ -291,6 +291,8 @@ export function createOpenCodeEventNormalizer(
   // once the note says what it was.
   let stepMessages: string[] = [];
   let stepUsedTools = false;
+  /** A tool that can change something finished before any stop (0.543, the 0.536 review RUN-05). */
+  let changedBeforeStop = false;
   let finishedStep: { readonly messages: readonly string[]; readonly usedTools: boolean } | undefined;
 
   const emit = <TType extends NormalizedRuntimeEventType>(
@@ -476,6 +478,7 @@ export function createOpenCodeEventNormalizer(
         ...(target === undefined ? {} : { command: boundedMessageText(target) }),
         ...(title === undefined ? {} : { title: boundedMessageText(title) }),
       };
+      if (!verdict.failed && /^(bash|edit|write|patch|multiedit)$/i.test(kind)) changedBeforeStop = true;
       return [
         emit("tool.started", { ...common, phase: "started", evidence }),
         emit(verdict.failed ? "tool.failed" : "tool.completed", {
@@ -666,7 +669,7 @@ export function createOpenCodeEventNormalizer(
             message: refusedPath !== undefined && refusedPath.length > 0
               ? `OpenCode asked for ${refusedPath}, which is outside the folder this run may use, and stopped.`
               : blockedTool !== undefined
-                ? `The mode this run is in does not allow ${blockedTool}, so OpenCode stopped when it tried to use it. Nothing was changed.`
+                ? `The mode this run is in does not allow ${blockedTool}, so OpenCode stopped when it tried to use it.${changedBeforeStop ? ' What it did before that still stands: look at the folder.' : ' Nothing was changed.'}`
                 : completion.outputLimitExceeded
                 ? "OpenCode sent output faster than Locust could record it, so the run was stopped rather than leave a gap in its record. Sending it again usually works."
                 // The runtime's own account of why, when it gave one. Sits
