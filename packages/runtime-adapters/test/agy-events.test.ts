@@ -62,6 +62,23 @@ describe("Antigravity CLI's stream", () => {
     expect(payload<{ status: string; output: string }>(tools.at(-1))).toMatchObject({ status: "refused", output: "Not allowed in this mode." });
   });
 
+  it("a refusal agy reports as DONE is refused once the result names it (0.550, Sol on 0.546)", () => {
+    // Sol's own Ask run, from the beta ledger: the command ends DONE with no output
+    // or error, and only the result's denied_actions says it never ran.
+    const { events } = run("ask-command-denied-done");
+    const tools = events.filter((event) => event.type.startsWith("tool."));
+    expect(types(tools)).toEqual(["tool.started", "tool.failed"]);
+    expect(payload<{ status: string; command: string }>(tools[1])).toMatchObject({ status: "refused", command: "git status" });
+    // The step settles before the note that says why.
+    expect(events.findIndex((event) => event.type === "tool.failed")).toBeLessThan(events.findIndex((event) => event.type === "adapter.diagnostic"));
+  });
+
+  it("a write that ran with nothing to show is still done when the result refused something else", () => {
+    const { events } = run("edit-then-command-denied");
+    const write = events.find((event) => event.type.startsWith("tool.") && event.type !== "tool.started" && payload<{ name: string }>(event).name === "write_to_file");
+    expect(write?.type).toBe("tool.completed");
+  });
+
   it("an allowed command carries its command line and its output", () => {
     const { events } = run("command-allowed");
     const done = events.find((event) => event.type === "tool.completed");

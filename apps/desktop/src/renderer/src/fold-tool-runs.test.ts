@@ -60,7 +60,7 @@ describe('folding a run of plain tool calls', () => {
 
 describe('what a folded row says', () => {
   it('leads with the shared verb and the count', () => {
-    expect(foldedToolsText(['a.ts', 'b.ts'], 'read')).toBe('read 2 — a.ts, b.ts')
+    expect(foldedToolsText(['a.ts', 'b.ts'], 'read')).toBe('Read 2 files — a.ts, b.ts')
   })
 
   it('counts tool calls when there is no shared verb', () => {
@@ -70,7 +70,7 @@ describe('what a folded row says', () => {
   it('says how many it is not showing, rather than stopping silently', () => {
     const names = Array.from({ length: 11 }, (_unused, index) => `f${String(index)}.ts`)
     const said = foldedToolsText(names, 'read')
-    expect(said).toContain('read 11')
+    expect(said).toContain('Read 11 files')
     expect(said).toContain(`… ${String(11 - FOLDED_TOOL_NAMES_SHOWN)} more`)
     // And the names it DOES show are the first ones, in order.
     expect(said).toContain('f0.ts, f1.ts, f2.ts')

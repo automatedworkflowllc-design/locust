@@ -34,7 +34,7 @@ export function thoughtLine(durationMs: number | undefined): string {
 }
 import type { ReactElement } from 'react'
 
-import { activityCounts, activityEntries, netFileEntries, boundedShellOutput, commandTook, defaultOpenEntry, foldedToolsText, relativePath, durationText, thoughtHeadline } from '../missionView.js'
+import { activityCounts, activityEntries, netFileEntries, boundedShellOutput, commandTook, defaultOpenEntry, foldedToolsLead, foldedToolsNames, relativePath, durationText, thoughtHeadline } from '../missionView.js'
 import type { TraceSegment, ActivityDetail, ActivityEntry, PlanStep } from '../missionView.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { DiffView } from './DiffView.js'
@@ -677,7 +677,8 @@ export function ActivityCard({
                  */
                 <div className="lc-filerow is-static lc-filerow--folded">
                   <Icon name="activity" size={14} />
-                  <span className="lc-filerow__path">{foldedToolsText(entry.names, entry.verb)}</span>
+                  <span className="lc-filerow__lead">{foldedToolsLead(entry.names.length, entry.verb)}</span>
+                  <span className="lc-filerow__path">{foldedToolsNames(entry.names)}</span>
                   <span className="lc-filerow__result is-muted">done</span>
                 </div>
               ) : entry.kind === 'unreported' && entry.observed === true ? (

@@ -17,7 +17,7 @@ const BUSY = event('adapter.diagnostic', {
   message: 'The model’s provider answered "Rate limit exceeded", and OpenCode is trying again on its own. To go on now, press Stop and pick another model.'
 }, 2)
 const busyShown = (events: readonly NormalizedRuntimeEvent[], running: boolean): boolean =>
-  buildThread(events, { running, mayEdit: true, startedAt: at(0) }).some((item) => item.type === 'diagnostic' && item.busy === true)
+  buildThread(events, { running, mayEdit: true, startedAt: at(0) }).some((item) => item.type === 'diagnostic' && item.retrying === true)
 
 describe('the busy provider note', () => {
   it('shows while the run waits on the provider', () => {
@@ -30,6 +30,23 @@ describe('the busy provider note', () => {
 
   it('goes once the run has ended', () => {
     expect(busyShown([event('step.started', { stepKind: 'turn' }, 0), BUSY], false)).toBe(false)
+  })
+})
+
+describe("OpenCode's other provider error (0.550, Sol on 0.546)", () => {
+  // "Endpoint is unavailable" is not a rate limit, so it comes as opencode.runtime_error,
+  // and it says the same thing: OpenCode is trying again on its own.
+  const OTHER = event('adapter.diagnostic', {
+    level: 'warning',
+    code: 'opencode.runtime_error',
+    message: 'The model’s provider answered "Upstream request failed: Endpoint is unavailable.", and OpenCode is trying again on its own.'
+  }, 2)
+
+  it('shows while the run waits, and goes once the column has failed', () => {
+    expect(busyShown([event('step.started', { stepKind: 'turn' }, 0), OTHER], true)).toBe(true)
+    const failed = [event('step.started', { stepKind: 'turn' }, 0), OTHER, event('run.failed', { kind: 'process-failed', message: 'Error from provider (Console): Upstream request failed: Endpoint is unavailable.' }, 64)]
+    const said = buildThread(failed, { running: false, mayEdit: false, startedAt: at(0) }).map((item) => JSON.stringify(item)).join('\n')
+    expect(said).not.toContain('trying again on its own')
   })
 })
 

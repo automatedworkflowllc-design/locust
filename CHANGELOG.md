@@ -11,6 +11,29 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.550.0 - 2026-10-02
+
+### Fixed
+
+- **A conversation with no teammate keeps its model's logo when you open it.**
+  Opening it put the empty box back.
+- **A command Antigravity was not allowed to run says "Did not run",**
+  everywhere. Antigravity sometimes reports a refused command as finished and
+  says it was refused only at the end; the step, its footer and Activity said
+  "Ran git status".
+- **Compare starts on the effort your conversation is on.** A conversation on
+  Low opened Compare with its model on High.
+- **"Trying again on its own" goes once the run has failed.** It stayed on a
+  failed Compare column after OpenCode's retries had ended.
+- **A group of reads says "Read 3 files",** in words, as Activity does, where
+  it said "read 3".
+
+### Changed
+
+- **Cursor in Ask or Plan no longer lets every connector tool run.** Locust
+  adds Cursor's allow rules for your connectors only in Accept edits; in Ask
+  and Plan a connector tool runs only if you allowed it in Cursor yourself.
+
 ## 0.549.0 - 2026-10-02
 
 ### Fixed

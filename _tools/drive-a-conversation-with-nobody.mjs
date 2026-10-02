@@ -95,6 +95,19 @@ try {
   check("Wren's: Wren's face, no mark", by('Wren')?.face === true && by('Wren')?.runtime === null, JSON.stringify(by('Wren')))
   check('no empty box left', rows.every((row) => !row.empty), JSON.stringify(rows.map((row) => row.empty)))
   check('every mark sits in the face\'s 16px place', rows.filter((row) => row.runtime !== null).every((row) => row.width === 16), JSON.stringify(rows.map((row) => row.width)))
+  // 0.550, Colin on 0.549: opening the conversation put the empty box back.
+  const opened = JSON.parse(String(await drive.capture('the opened row', () => drive.evaluate(`(async () => {
+    const row = [...document.querySelectorAll('.lc-conv')].find((one) => one.title.startsWith('yo'))
+    if (!row) return JSON.stringify({ missing: true })
+    row.click()
+    await new Promise((r) => setTimeout(r, 1500))
+    const now = [...document.querySelectorAll('.lc-conv')].find((one) => one.title.startsWith('yo'))
+    return JSON.stringify({
+      runtime: now?.querySelector('.lc-conv__runtime svg')?.getAttribute('data-runtime') ?? null,
+      empty: now?.querySelector('.lc-conv__nobody') !== null
+    })
+  })()`))))
+  check('opened, it keeps the Claude mark', opened.runtime === 'claude' && opened.empty === false, JSON.stringify(opened))
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

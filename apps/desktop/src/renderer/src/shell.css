@@ -14795,6 +14795,15 @@ textarea {
   color: var(--lc-text-secondary);
 }
 
+/* What the group did, in words, as Activity's rows say it (0.550); the names
+   after it stay in code type, as paths do everywhere. */
+.lc-filerow__lead {
+  flex: none;
+  font-family: var(--lc-font-ui);
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-secondary);
+}
+
 /*
  * A nested list. Indented from its parent item and given a little air above
  * it, so the structure reads as structure rather than as a longer list.

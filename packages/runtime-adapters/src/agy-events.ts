@@ -126,6 +126,17 @@ export function createAgyEventNormalizer(context: AgyInvocationContext): AgyEven
     return { itemId: `tool_${String(index)}`, toolKind: name, name, ...(target === undefined ? {} : { command: boundedMessageText(target) }) };
   };
 
+  /** A call that ended DONE with nothing to show, until the next record says how it went. */
+  let held: (ReturnType<typeof toolRow> & { readonly phase: "completed"; readonly evidence: CodexEventEvidence; readonly durationMs?: number }) | undefined;
+  const releaseHeld = (denied: readonly string[] = []): readonly NormalizedRuntimeEvent[] => {
+    if (held === undefined) return [];
+    const call = held;
+    held = undefined;
+    const writes = /write|edit|replace|create|delete|move/i.test(call.toolKind);
+    const refused = denied.some((action) => (/command/i.test(action) ? /command|shell|terminal/i.test(call.toolKind) : /write|edit|file/i.test(action) && writes));
+    return [refused ? emit("tool.failed", { ...call, output: "Not allowed in this mode.", status: "refused" }) : emit("tool.completed", call)];
+  };
+
   function acceptStep(step: JsonObject, evidence: CodexEventEvidence): readonly NormalizedRuntimeEvent[] {
     const index = typeof step.step_index === "number" ? step.step_index : undefined;
     const type = stringValue(step.step_type);
@@ -156,12 +167,12 @@ export function createAgyEventNormalizer(context: AgyInvocationContext): AgyEven
       if (text === undefined || text.length === 0) return [];
       spoken.add(index);
       lastMessageItem = `msg_${String(index)}`;
-      return [emit("message.delta", { itemId: lastMessageItem, operation: "append", text: boundedMessageText(text), final: false, evidence })];
+      return [...releaseHeld(), emit("message.delta", { itemId: lastMessageItem, operation: "append", text: boundedMessageText(text), final: false, evidence })];
     }
 
     if (type === "tool") {
       const row = toolRow(index, step);
-      const events: NormalizedRuntimeEvent[] = [];
+      const events: NormalizedRuntimeEvent[] = [...releaseHeld()];
       if (state === "ACTIVE") {
         if (!openTools.has(index)) {
           openTools.add(index);
@@ -186,6 +197,18 @@ export function createAgyEventNormalizer(context: AgyInvocationContext): AgyEven
       // "failed" and "it exited non-zero"). Said refused, with its reason, as Claude's are.
       const errorText = isObject(info.error) ? stringValue(info.error.message) : undefined;
       const refused = errorText !== undefined && /permission check failed|permission denied|not allowed|denied/i.test(errorText);
+      /*
+       * A REFUSAL THAT ENDS "DONE" (0.550). agy also reports a refused call as
+       * DONE with no output and no error, and names it only in the result's
+       * `denied_actions` (Sol on 0.546: Ask's `git status` read "Ran git
+       * status" / done beside "1 refused"). A call that ends with nothing to
+       * show waits for what comes next: the result says whether it was refused.
+       */
+      if (state === "DONE" && errorText === undefined && output === undefined) {
+        events.push(...releaseHeld());
+        held = ended;
+        return events;
+      }
       events.push(
         state === "DONE"
           ? emit("tool.completed", ended)
@@ -237,6 +260,7 @@ export function createAgyEventNormalizer(context: AgyInvocationContext): AgyEven
       const denied = Array.isArray(result.denied_actions)
         ? result.denied_actions.flatMap((entry) => (isObject(entry) && typeof entry.action === "string" ? [entry.action] : []))
         : [];
+      events.unshift(...releaseHeld(denied));
       const said = agyDeniedSentence(denied);
       // agy ends the turn at a refusal, with no reply (0.541): say it stopped there.
       const stopped = response === undefined || response.trim().length === 0;
@@ -270,17 +294,19 @@ export function createAgyEventNormalizer(context: AgyInvocationContext): AgyEven
     },
     finish(completion: RuntimeProcessCompletion): readonly NormalizedRuntimeEvent[] {
       if (finalized) return [];
+      const ending = [...releaseHeld()];
       finalized = true;
       const process = processEvidence(completion);
       const thread = runtimeThreadId === undefined ? {} : { runtimeThreadId };
-      if (completion.cancelled) return [emit("run.cancelled", { ...thread, process })];
+      if (completion.cancelled) return [...ending, emit("run.cancelled", { ...thread, process })];
       if (status === "SUCCESS" && completion.exitCode === 0) {
-        return [emit("run.completed", { ...thread, ...(usage === undefined ? {} : { usage }), process })];
+        return [...ending, emit("run.completed", { ...thread, ...(usage === undefined ? {} : { usage }), process })];
       }
       // A conversation Antigravity CLI does not have (one the app began, 0.541):
       // the session is over, and the next reply starts fresh.
       const lost = resultError !== undefined && /trajectory not found/i.test(resultError);
       return [
+        ...ending,
         emit("run.failed", {
           kind: "process-failed",
           ...(lost ? { sessionEnded: true as const } : {}),

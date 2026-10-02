@@ -3656,7 +3656,12 @@ export default function App(): ReactElement {
   /** The two a new comparison starts on (compareDefaults.ts), as Arena opens Side by Side (0.460). */
   const startingPicks = (changes: boolean = compareChanges): readonly ComparePick[] =>
     defaultComparePicks({
-      current: composerRoute,
+      // The box's effort comes in with its model (0.550, Sol on 0.546: a
+      // conversation on Low opened Compare on High). The route carries none;
+      // the level is the box's own, when its model has that level.
+      current: effort !== undefined && (modelFamily(models, composerRoute.runtime, composerRoute.model)?.supportedEfforts ?? []).includes(effort)
+        ? { ...composerRoute, effort }
+        : composerRoute,
       recent: recentRoutes,
       answered: freeAnswered,
       models,
@@ -6152,6 +6157,8 @@ export default function App(): ReactElement {
         title: missionTitle(relayedTitle({ ...run, peerMessages: run.peerMessages ?? [] }) ?? shownPrompt(run)),
         phase: liveRunIsActive(run) ? 'running' : isTerminal(run.phase) ? (run.phase as 'completed' | 'failed' | 'cancelled') : 'interrupted',
         ...(run.data?.runtime === undefined ? {} : { runtime: run.data.runtime }),
+        // Its model too, so a row with no teammate keeps its logo once opened (0.550, Colin on 0.549).
+        ...((run.data?.model ?? recorded?.model) === undefined ? {} : { model: (run.data?.model ?? recorded?.model)! }),
         integrityIssueCount: run.restoredMission?.integrityIssueCount ?? 0
       })
     }

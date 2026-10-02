@@ -44,7 +44,7 @@ describe('the reads in a turn', () => {
     const activity = buildThread(events, { running: false, workspacePath: WORKSPACE }).find((item) => item.type === 'activity')
     const details = activity?.type === 'activity' ? activity.details : []
     const folded = foldPlainToolRuns(activityEntries(details, WORKSPACE)).find((entry) => entry.kind === 'tools')
-    expect(folded?.kind === 'tools' ? foldedToolsText(folded.names, folded.verb) : '').toBe('read 3 — locust-walk-ws-EfOL3P, README.md, src/index.ts')
+    expect(folded?.kind === 'tools' ? foldedToolsText(folded.names, folded.verb) : '').toBe('Read 3 files — locust-walk-ws-EfOL3P, README.md, src/index.ts')
   })
 
   it('leave a name that is not a path as it was', () => {

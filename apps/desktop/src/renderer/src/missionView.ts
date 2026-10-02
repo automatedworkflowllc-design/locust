@@ -153,11 +153,26 @@ export function foldPlainToolRuns(entries: readonly ActivityEntry[]): readonly A
  * not being shown, so a reader can tell a short list from a cut one.
  */
 export function foldedToolsText(names: readonly string[], verb: string | undefined): string {
+  return `${foldedToolsLead(names.length, verb)} — ${foldedToolsNames(names)}`
+}
+
+/**
+ * What a folded row did, in Activity's own words (0.550, Sol on 0.546: the
+ * group read "read 3", in code type, under rows that say "Read"): "Read 3
+ * files", "Searched 2 times". A tool with no word of its own is counted.
+ */
+export function foldedToolsLead(count: number, verb: string | undefined): string {
+  const said = verb === undefined ? undefined : railToolName({ name: verb, toolKind: verb })
+  const one = said === undefined ? undefined : /^(Read|Ran|Changed) a (file|command)$/.exec(said)
+  if (one !== null && one !== undefined) return `${one[1]!} ${String(count)} ${one[2]!}s`
+  if (said === 'Searched' || said === 'Searched the web' || said === 'Opened a page') return `${said} ${String(count)} times`
+  return `${String(count)} tool calls`
+}
+
+export function foldedToolsNames(names: readonly string[]): string {
   const shown = names.slice(0, FOLDED_TOOL_NAMES_SHOWN).join(', ')
   const rest = names.length - FOLDED_TOOL_NAMES_SHOWN
-  const tail = rest > 0 ? `${shown} … ${String(rest)} more` : shown
-  const lead = verb === undefined ? `${String(names.length)} tool calls` : `${verb} ${String(names.length)}`
-  return `${lead} — ${tail}`
+  return rest > 0 ? `${shown} … ${String(rest)} more` : shown
 }
 
 export type ActivityEntry =
@@ -1209,6 +1224,8 @@ export type ThreadItem =
        * offer another model beside it (C9).
        */
       readonly busy?: boolean
+      /** It says the runtime is trying again on its own: true only while the run is (0.550). */
+      readonly retrying?: boolean
     }
 
 /**
@@ -3282,7 +3299,8 @@ export function buildThread(
           type: 'diagnostic',
           level: event.payload.level,
           message: event.payload.message,
-          ...(/\.provider_busy\.runtime_error$/.test(event.payload.code) ? { busy: true } : {})
+          ...(/\.provider_busy\.runtime_error$/.test(event.payload.code) ? { busy: true } : {}),
+          ...(RETRYING_NOTE.test(event.payload.code) ? { retrying: true } : {})
         })
         break
       }
@@ -3700,13 +3718,20 @@ export function buildThread(
    * a run that had ended, and above the answer of a run whose model came
    * back on the third try: advice about a run with nothing left to stop.
    */
-  const busyAt = events.findIndex((event) => event.type === 'adapter.diagnostic' && /\.provider_busy\.runtime_error$/.test(event.payload.code))
+  const busyAt = events.findIndex((event) => event.type === 'adapter.diagnostic' && RETRYING_NOTE.test(event.payload.code))
   const recovered = busyAt >= 0 && events.slice(busyAt + 1).some((event) => (event.type === 'message.delta' && event.payload.text.trim().length > 0) || event.type === 'tool.started')
   if (busyAt >= 0 && (options.running !== true || recovered)) {
-    return items.filter((item) => !(item.type === 'diagnostic' && item.busy === true))
+    return items.filter((item) => !(item.type === 'diagnostic' && item.retrying === true))
   }
   return items
 }
+
+/**
+ * The notes that say a runtime is trying again on its own. OpenCode's other
+ * provider error says it too (0.550, Sol on 0.546: "Endpoint is unavailable"
+ * kept "OpenCode is trying again on its own" over a failed Compare column).
+ */
+const RETRYING_NOTE = /^opencode\.runtime_error$|\.provider_busy\.runtime_error$/
 
 /**
  * The cancellation summary, derived from events rather than from file

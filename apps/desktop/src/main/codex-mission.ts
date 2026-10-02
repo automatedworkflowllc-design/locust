@@ -1942,8 +1942,14 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
          * asks. Every other mode gets the answer written down where Cursor
          * reads it, before the run starts. Best effort: a workspace that
          * cannot be written leaves the run exactly as it was.
+         *
+         * NOT IN ASK OR PLAN (0.550). A wildcard per server lets every tool
+         * of it run, writes included, and Cursor's own Ask is read-only Q&A,
+         * not a connector filter (Cursor's research, 2026-10-02). So a
+         * read-only run adds no rule: a connector tool runs there only if the
+         * person allowed it themselves. Accept edits keeps the wildcard.
          */
-        if (runtime === 'cursor' && effectiveSandbox !== 'full-access' && options.allowConnectors !== undefined) {
+        if (runtime === 'cursor' && effectiveSandbox === 'workspace-write' && options.allowConnectors !== undefined) {
           const added = await options.allowConnectors(runCwd).catch(() => [] as readonly string[])
           if (added.length > 0) options.note?.('connectors-allowed', `${missionId} ${added.join(' ')}`)
         }
