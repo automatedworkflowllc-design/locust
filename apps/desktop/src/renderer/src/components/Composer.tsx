@@ -2174,11 +2174,14 @@ export function Composer({
                               setSlotEffort(slotEffort === index ? undefined : index)
                             }}
                           >
-                            <span className="lc-control__effort">
-                              {effortName(base)}
-                              {fast ? ' · Fast' : ''}
-                            </span>
-                            <ChevronGlyph />
+                            {/*
+                              * A METER, not the word (0.553). Colin, 10/02, of
+                              * three models each beside "Medium": "we need to
+                              * find a cleaner way to portray this". The word took
+                              * the names' room ("Claude...", "C"); four bars say
+                              * the level at a glance, and its name is the label.
+                              */}
+                            <EffortMeter filled={meterBars(bases, base)} fast={fast} />
                           </button>
                         )}
                         {effortable && slotEffort === index && (
@@ -2546,5 +2549,23 @@ export function Composer({
         </form>
       </div>
     </div>
+  )
+}
+
+/** Where a level sits on four bars: the lowest one bar, the highest four. */
+export function meterBars(bases: readonly string[], base: string): number {
+  const at = bases.indexOf(base)
+  if (at < 0 || bases.length === 0) return 2
+  if (bases.length === 1) return 4
+  return Math.max(1, Math.min(4, Math.round(1 + (at * 3) / (bases.length - 1))))
+}
+
+function EffortMeter({ filled, fast }: { readonly filled: number; readonly fast: boolean }) {
+  return (
+    <span className={`lc-effortmeter${fast ? ' is-fast' : ''}`} aria-hidden="true">
+      {[1, 2, 3, 4].map((bar) => (
+        <i key={bar} className={bar <= filled ? 'is-on' : undefined} style={{ height: `${String(4 + bar * 2)}px` }} />
+      ))}
+    </span>
   )
 }

@@ -56,7 +56,7 @@ const SLOTS = `(() => {
       const e = effort?.getBoundingClientRect()
       return {
         model: model.innerText.trim(),
-        effort: effort?.innerText.trim() ?? null,
+        effort: effort?.getAttribute('aria-label')?.replace(/^Effort for model [A-Z]: /, '') ?? null,
         joined: e === undefined ? null : Math.abs(e.left - m.right) <= 1.5 && Math.abs(e.top - m.top) <= 1,
         right: Math.round((e ?? m).right)
       }

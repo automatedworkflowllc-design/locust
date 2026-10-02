@@ -915,6 +915,8 @@ export type WorkspaceTextResponse =
 export const WORKSPACE_TEXT_CHANNEL = 'workspace:text'
 /** A web page's address in the preview (0.425): main/page-preview.ts. */
 export const WORKSPACE_PAGE_CHANNEL = 'workspace:page'
+/** A page a model wrote into its reply, to run on a stage (0.553, shared/reply-page.ts). */
+export const REPLY_PAGE_CHANNEL = 'reply:page'
 /** Point at a part of a running page (0.484): main/page-pick.ts. */
 export const PAGE_PICK_CHANNEL = 'workspace:page-pick'
 export const PAGE_PICK_CANCEL_CHANNEL = 'workspace:page-pick-cancel'
@@ -3122,6 +3124,8 @@ export interface DesktopApi {
   /** Where a web page in the folder is served for the preview frame (0.425). */
   /** `column`: a comparison column whose copy a relative path is read from first (0.452). */
   pageUrlFor(path: string, column?: { readonly compareId: string; readonly slot: string }): Promise<WorkspacePageResponse>
+  /** The address a reply's whole web page runs at (0.553). */
+  replyPageUrl(html: string): Promise<WorkspacePageResponse>
   /** Each runtime's own slash commands, as its CLI last listed them (0.426). */
   runtimeCommands(): Promise<RuntimeCommandsResponse>
   /** Show the diagnostics log in the file manager. Names no path. */

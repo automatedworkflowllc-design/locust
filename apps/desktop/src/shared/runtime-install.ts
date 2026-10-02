@@ -35,6 +35,8 @@ export interface RuntimeInstallFacts {
   readonly signIn?: string
   /** What signs in once more, as this account or another (Settings' "Sign in again"). */
   readonly signInAgain?: string
+  /** What to do inside the window `signInAgain` opens, when the command alone is not it. */
+  readonly signInAgainNote?: string
   /**
    * What the account is, in the person's terms. Absent means none is needed --
    * which is true of exactly one of them, and it is the whole on-ramp.
@@ -106,7 +108,19 @@ const FACTS: Readonly<Record<string, RuntimeInstallFacts | undefined>> = {
   },
   // Antigravity CLI (`agy`, 0.540): what Locust runs when it is installed;
   // its page has the one-line installer. Without it, the app route.
-  antigravity: { install: { kind: 'vendor', url: 'https://antigravity.google/product/antigravity-cli/' } },
+  /*
+   * Signed into inside `agy` itself (0.553). Colin, 10/02: "antigravity has
+   * no sign in again option like the other clis". It has no `login` command
+   * (`agy --help`); its own changelog: run it and its sign-in screen opens,
+   * and `/logout` then `/login` switch accounts -- Copilot's shape.
+   */
+  antigravity: {
+    install: { kind: 'vendor', url: 'https://antigravity.google/product/antigravity-cli/' },
+    signIn: 'agy',
+    signInAgain: 'agy',
+    signInAgainNote: 'then type /logout and /login',
+    account: 'a Google account'
+  },
   // Found and signed into like the others, but no mission can run under it --
   // its event stream has never been captured. Nothing to offer to install.
   gemini: undefined
@@ -160,5 +174,6 @@ export function installSentence(runtime: string, displayName: string): string {
 export function signInCommand(runtime: string, again = false): string | undefined {
   const facts = runtimeInstallFacts(runtime)
   const line = again ? facts?.signInAgain : facts?.signIn
-  return line === undefined ? undefined : `run ${line}`
+  if (line === undefined) return undefined
+  return again && facts?.signInAgainNote !== undefined ? `run ${line}, ${facts.signInAgainNote}` : `run ${line}`
 }

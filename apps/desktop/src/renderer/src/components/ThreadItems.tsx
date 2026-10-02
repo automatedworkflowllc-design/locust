@@ -13,6 +13,8 @@ import { TeammateBot } from './TeammateBot.js'
 import { MathTex } from './MathTex.js'
 import type { FaceActivity } from '../faceState.js'
 import { Icon } from './Icon.js'
+import { ReplyPage } from './ReplyPage.js'
+import { isWholePage } from '../../../shared/reply-page.js'
 
 /**
  * A link in a reply, and what the host said if it would not open it.
@@ -327,6 +329,10 @@ export function AgentText({
       {blocks.map((block, index) => {
         const last = index === blocks.length - 1
         if (block.kind === 'code') {
+          // A whole web page runs on a stage, once its block has closed (0.553).
+          if (!(streaming && last) && isWholePage(block.code, block.language)) {
+            return <ReplyPage key={`b${String(index)}`} code={block.code} {...(block.language === undefined ? {} : { language: block.language })} />
+          }
           return (
             <pre className="lc-code" key={`b${String(index)}`}>
               {block.language !== undefined && <span className="lc-code__lang lc-mono">{block.language}</span>}

@@ -1,3 +1,4 @@
+import { signInCommand } from '../shared/runtime-install.js'
 import { spawnSync } from 'node:child_process'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -34,8 +35,10 @@ describe('signing in is a button', () => {
     expect(signInArgs('muse', true)).toEqual(['login'])
     // Copilot's is its own /login, inside the window.
     expect(signInArgs('copilot', true)).toEqual([])
-    // No command to offer: nothing, rather than a guess.
-    expect(signInArgs('antigravity', true)).toBeUndefined()
+    // Antigravity's too (0.553): `agy` opens its sign-in; /logout and /login inside it.
+    expect(signInArgs('antigravity', true)).toEqual([])
+    expect(signInCommand('antigravity', true)).toBe('run agy, then type /logout and /login')
+    // No account at all: nothing, rather than a guess.
     expect(signInArgs('opencode', true)).toBeUndefined()
   })
 

@@ -1601,18 +1601,6 @@ export default function App(): ReactElement {
    * already set to change files goes back to answering.
    */
   const [compareChangesRefusal, setCompareChangesRefusal] = useState<string>()
-  useEffect(() => {
-    if (!compareOn) return
-    let current = true
-    void window.desktop?.compareChangesRefusal().then((refusal) => {
-      if (!current) return
-      setCompareChangesRefusal(refusal)
-      if (refusal !== undefined) setCompareChanges(false)
-    }).catch(() => undefined)
-    return () => {
-      current = false
-    }
-  }, [compareOn])
   /** The next comparison hides the names until one is kept (0.449). */
   const [compareBlind, setCompareBlind] = useState(false)
   /** What each column of the comparison on screen has changed, when it edits. */
@@ -2184,6 +2172,22 @@ export default function App(): ReactElement {
   const [workspaceName, setWorkspaceName] = useState('Local workspace')
   /** The folder itself, so activity rows can show paths the way a person writes them. */
   const [workspacePath, setWorkspacePath] = useState<string | undefined>(undefined)
+  // Whether a comparison here may change files (see compareChangesRefusal above).
+  useEffect(() => {
+    if (!compareOn) return
+    let current = true
+    void window.desktop?.compareChangesRefusal().then((refusal) => {
+      if (!current) return
+      setCompareChangesRefusal(refusal)
+      if (refusal !== undefined) setCompareChanges(false)
+    }).catch(() => undefined)
+    return () => {
+      current = false
+    }
+    // And again for another folder (0.553): Colin, 10/02, in a new folder of
+    // one file, "still getting this issue on compare mode" -- the answer was
+    // the last folder's (his `.claude`), read once when Compare was switched on.
+  }, [compareOn, workspacePath])
   // Only the ledger-failure card reads this: it offers to open the folder.
   const [ledgerPath, setLedgerPath] = useState<string | undefined>(undefined)
   const [workspaceMade, setWorkspaceMade] = useState(false)

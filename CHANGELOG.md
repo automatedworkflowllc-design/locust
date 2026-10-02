@@ -11,6 +11,27 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.553.0 - 2026-10-02
+
+### Added
+
+- **A web page in a reply runs right there.** When a model answers with a
+  whole page in a code block -- a game, a landing page -- it runs on a stage
+  in the reply, in a conversation and in each column of a comparison, with
+  its code one tab away.
+- **Antigravity has Sign in again,** like the other agents. It opens Antigravity,
+  where /logout and /login switch accounts.
+
+### Fixed
+
+- **Ask a judge works when the answers are long.** Long answers made the
+  judge's message too long to send, whichever model judged; it now reads
+  them from files.
+- **Compare no longer says a new folder is too big to copy.** It kept the
+  answer for the folder you were in before.
+- **A compared model's effort is a small meter beside its name,** so the
+  names fit.
+
 ## 0.552.0 - 2026-10-02
 
 ### Fixed

@@ -17,6 +17,13 @@ export interface JudgedAnswer {
   /** "A", "B", "C": the column's letter, never its model. */
   readonly letter: string
   readonly text: string
+  /**
+   * Where the answer was written whole, when quoting them all would not fit
+   * in one message (0.553). Colin, 10/02: "ask a judge not working for
+   * antigravity" -- three games of HTML quoted at 6,000 characters each ran
+   * past the 8,000 a run's message may hold, and the start was refused.
+   */
+  readonly file?: string
 }
 
 function quoted(text: string): string {
@@ -26,10 +33,13 @@ function quoted(text: string): string {
 
 export function judgePrompt(input: { readonly ask: string; readonly answers: readonly JudgedAnswer[]; readonly criteria?: string }): string {
   const criteria = input.criteria?.trim()
+  const inFiles = input.answers.some((answer) => answer.file !== undefined)
   return [
-    'You are judging answers that different AI models gave to the same request. Do not use any tools and do not change any files: read, and give your view.',
+    inFiles
+      ? 'You are judging answers that different AI models gave to the same request. Read each answer\'s file below in full; use no other tools and do not change any files. Then give your view.'
+      : 'You are judging answers that different AI models gave to the same request. Do not use any tools and do not change any files: read, and give your view.',
     `The request was:\n\n${input.ask.trim()}`,
-    ...input.answers.map((answer) => `Answer ${answer.letter}:\n\n${quoted(answer.text)}`),
+    ...input.answers.map((answer) => (answer.file === undefined ? `Answer ${answer.letter}:\n\n${quoted(answer.text)}` : `Answer ${answer.letter} is in the file ${answer.file}`)),
     ...(criteria === undefined || criteria.length === 0 ? [] : [`The person says a good answer does this:\n\n${criteria}`]),
     [
       'Reply in plain prose, in this order:',

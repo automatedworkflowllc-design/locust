@@ -5932,8 +5932,34 @@ textarea {
 .lc-control--sloteffort {
   flex: none;
   margin-left: -1px;
+  padding: 0 10px;
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
+}
+
+/* The effort as four bars (0.553): the level at a glance, in the room the
+   word "Medium" took from the model's name. */
+.lc-effortmeter {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+}
+
+.lc-effortmeter > i {
+  width: 3px;
+  border-radius: 1px;
+  background: var(--lc-text-muted);
+  opacity: 0.35;
+}
+
+.lc-effortmeter > i.is-on {
+  background: var(--lc-text-secondary);
+  opacity: 1;
+}
+
+.lc-effortmeter.is-fast > i.is-on {
+  background: var(--lc-amber-text);
 }
 
 /* One chevron per chip: the model half keeps its name's room, the effort
@@ -18048,3 +18074,87 @@ textarea {
   line-height: inherit;
   align-self: center;
 }
+
+/* A whole web page in a reply, running on a stage (0.553, ReplyPage.tsx):
+   framed like a page a teammate wrote, 16:10, its code a tab away. */
+.lc-replypage {
+  margin: 10px 0;
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+  overflow: hidden;
+  background: var(--lc-bg-raised);
+}
+
+.lc-replypage__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 6px 6px;
+  border-bottom: 1px solid var(--lc-border-card);
+}
+
+.lc-replypage__tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--lc-bg-field);
+}
+
+.lc-replypage__tab,
+.lc-replypage__action {
+  border: 0;
+  border-radius: 6px;
+  padding: 3px 10px;
+  background: transparent;
+  color: var(--lc-text-secondary);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  cursor: pointer;
+}
+
+.lc-replypage__tab.is-on {
+  background: var(--lc-bg-control);
+  color: var(--lc-text-primary);
+}
+
+.lc-replypage__tab:focus-visible,
+.lc-replypage__action:focus-visible {
+  outline: 2px solid var(--lc-text-secondary);
+  outline-offset: 1px;
+}
+
+.lc-replypage__live {
+  margin-left: auto;
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
+}
+
+.lc-replypage__action:hover,
+.lc-replypage__tab:hover {
+  color: var(--lc-text-primary);
+}
+
+.lc-replypage__frame {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  max-height: 70vh;
+  border: 0;
+  background: #fff;
+}
+
+.lc-replypage__code {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  max-height: 480px;
+  overflow: auto;
+}
+
+.lc-replypage__wait {
+  margin: 0;
+  padding: 24px 14px;
+  color: var(--lc-text-muted);
+}
+

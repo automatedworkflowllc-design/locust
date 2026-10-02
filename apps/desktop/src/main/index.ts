@@ -27,6 +27,8 @@ import { createApprovalRuleStore } from './approval-rule-store.js'
 import { createFileArrivals, POLL_MS } from './routine-file-watch.js'
 import { decideByRules, ruleCandidateOf, ruledActionOf, ruleSentence } from '../shared/approval-rules.js'
 import { judgePrompt } from './compare-judge.js'
+import { keepOutOfGit } from './attachments-for-run.js'
+import { REPLY_PAGE_ROOT, writeReplyPage } from './reply-page.js'
 import type { JudgedAnswer } from './compare-judge.js'
 import electronUpdater from 'electron-updater'
 
@@ -266,6 +268,7 @@ import {
   WORKSPACE_SAVE_COPY_CHANNEL,
   WORKSPACE_TEXT_CHANNEL,
   WORKSPACE_PAGE_CHANNEL,
+  REPLY_PAGE_CHANNEL,
   PAGE_PICK_CHANNEL,
   PAGE_PICK_CANCEL_CHANNEL,
   RUNTIME_COMMANDS_CHANNEL,
@@ -4021,7 +4024,8 @@ if (!ownsSingleInstanceLock) {
      */
     const pages = createPageServer({
       // And a comparison's plain copies (0.448), whose pages each column runs.
-      roots: async () => [...(await workedInFolders()), ...(await teammateFolders()), COPY_ROOT],
+      // And a reply's own page (0.553), each in a folder of its own.
+      roots: async () => [...(await workedInFolders()), ...(await teammateFolders()), COPY_ROOT, REPLY_PAGE_ROOT],
       base: () => (workspaceChosen ? workspacePath : undefined)
     })
     protocol.handle(PAGE_SCHEME, (request) => pages.handle(request.url))
@@ -4095,6 +4099,14 @@ if (!ownsSingleInstanceLock) {
       const frame = pageFrameOf(event.sender.mainFrame.framesInSubtree, pageUrl)
       await frame?.executeJavaScript(CANCEL_SCRIPT).catch(() => undefined)
     })
+    ipcMain.handle(REPLY_PAGE_CHANNEL, async (event, html: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      if (typeof html !== 'string') return { ok: false, message: 'There is no page to open.' } as const
+      const path = await writeReplyPage(html).catch(() => undefined)
+      if (path === undefined) return { ok: false, message: 'That is not a whole web page, so it cannot run here.' } as const
+      return pages.urlFor(path)
+    })
+
     ipcMain.handle(WORKSPACE_PAGE_CHANNEL, async (event, requested: unknown, column: unknown) => {
       if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
       if (typeof requested !== 'string' || requested.length === 0) return { ok: false, message: 'There is no page to open.' } as const
@@ -5117,8 +5129,26 @@ if (!ownsSingleInstanceLock) {
       const ask = newestAsk === undefined ? compare.prompt : ((await missionLedger.getMission(newestAsk).catch(() => undefined))?.metadata.prompt ?? compare.prompt)
       const runtime = route.runtime
       const model = route.model
+      const asked = { ask, ...(criteria === undefined || criteria.length === 0 ? {} : { criteria }) }
+      let brief = judgePrompt({ ...asked, answers })
+      // Too long for one message (0.553): each answer is written whole, and the judge reads the files.
+      if (brief.length > MAX_PROMPT_LENGTH) {
+        try {
+          await mkdir(join(workspacePath, ATTACHMENT_DIR), { recursive: true })
+          const filed: JudgedAnswer[] = []
+          for (const answer of answers) {
+            const file = `${ATTACHMENT_DIR}/judge-${compare.compareId}-${answer.letter}.md`
+            await writeFile(join(workspacePath, file), `${answer.text}\n`, 'utf8')
+            filed.push({ ...answer, file })
+          }
+          await keepOutOfGit(workspacePath)
+          brief = judgePrompt({ ...asked, answers: filed })
+        } catch {
+          return compareRefused('The answers are too long to hand a judge, and they could not be written for it to read.')
+        }
+      }
       const response = await codexMissions.start(
-        judgePrompt({ ask, answers, ...(criteria === undefined || criteria.length === 0 ? {} : { criteria }) }),
+        brief,
         runtime,
         'ask',
         { ...(model === 'account-default' ? {} : { model }), ...(typeof route.effort === 'string' ? { effort: route.effort } : {}) },
