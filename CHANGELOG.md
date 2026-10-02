@@ -17,8 +17,8 @@ heading: the home screen then shows it once, as a splash.
 
 - **Stopping an OpenCode run no longer promises that nothing ran.** OpenCode
   reports a tool only once it has finished, so a command it had just started
-  may not show. The Stop card now says so and asks you to look at the folder
-  before you send the message again. Other runtimes report a tool when it
+  may not show. The Stop card now says so, never claims no tool call was
+  open, and asks you to look at the folder before you send the message again. Other runtimes report a tool when it
   starts, and their card is unchanged.
 - A routine whose check still failed when its fixes ran out says so on its
   card under Routines ("Last run: ..."). Before, the card read like a normal

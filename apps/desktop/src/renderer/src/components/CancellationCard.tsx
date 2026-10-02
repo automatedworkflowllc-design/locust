@@ -108,7 +108,9 @@ export function CancellationCard({
                * sentence changes. What a stop cannot promise is said below,
                * beside the note about nothing being rolled back.
                */
-              'No tool call was open when you stopped it.'
+              summary.toolsReportedWhenDone === true
+                ? 'None reported. OpenCode reports a tool only once it finishes, so a command it had started may still have run.'
+                : 'No tool call was open when you stopped it.'
             ) : (
               <>
                 <ul className="lc-cancel__list">

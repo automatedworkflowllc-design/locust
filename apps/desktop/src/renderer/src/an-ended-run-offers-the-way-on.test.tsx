@@ -55,6 +55,18 @@ describe('a run stopped before any tool ran', () => {
     expect(html).toContain('Send again')
   })
 
+  it('on OpenCode with something finished, never says no tool call was open (0.536 drive)', () => {
+    const html = thread({
+      cancelled: true,
+      events: [
+        { type: 'tool.started', sourceAdapter: 'opencode', payload: { itemId: 'c1', name: 'write', command: 'started.txt' } },
+        { type: 'tool.completed', sourceAdapter: 'opencode', payload: { itemId: 'c1', name: 'write' } }
+      ]
+    })
+    expect(html).not.toContain('No tool call was open')
+    expect(html).toContain('None reported. OpenCode reports a tool only once it finishes, so a command it had started may still have run.')
+  })
+
   it('does not, when a tool had run', () => {
     const html = thread({
       cancelled: true,
