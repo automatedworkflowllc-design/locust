@@ -96,8 +96,9 @@ const FACTS: Readonly<Record<string, RuntimeInstallFacts | undefined>> = {
     signIn: 'muse login',
     account: 'a Muse Code subscription'
   },
-  // Not a CLI: a desktop app Locust drives and reads a transcript from.
-  antigravity: { install: { kind: 'vendor', url: 'https://antigravity.google' } },
+  // Antigravity CLI (`agy`, 0.540): what Locust runs when it is installed;
+  // its page has the one-line installer. Without it, the app route.
+  antigravity: { install: { kind: 'vendor', url: 'https://antigravity.google/product/antigravity-cli/' } },
   // Found and signed into like the others, but no mission can run under it --
   // its event stream has never been captured. Nothing to offer to install.
   gemini: undefined

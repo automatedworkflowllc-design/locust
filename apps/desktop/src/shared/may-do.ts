@@ -121,9 +121,12 @@ export function whatItMayDo(runtime: MissionRuntimeId, sandbox: MissionSandbox, 
       // Cursor's own ask mode, with its sandbox where one runs (macOS, Linux).
       return sandbox === 'full-access' ? rows(ANY_COMMAND) : rows()
     case 'antigravity':
+      // Through its CLI (0.540, measured): read-only refuses writes and
+      // commands, Edit allows file edits and still refuses commands, and only
+      // Auto lets it run them.
+      return sandbox === 'full-access' ? rows(ANY_COMMAND) : rows()
     case 'gemini':
-      // Antigravity's agent runs in its own app, on its own rules; Gemini CLI
-      // is refused before anything runs. Nothing to add to the mode itself.
+      // Gemini CLI is refused before anything runs. Nothing to add to the mode itself.
       return rows()
   }
 }

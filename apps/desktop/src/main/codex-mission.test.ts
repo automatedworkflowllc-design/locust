@@ -1600,7 +1600,7 @@ describe('mid-mission handoff', () => {
    * run and started nothing: the work in flight was lost for a refusal that
    * was known before anything was touched.
    */
-  function handoffRuntime(id: 'cursor' | 'antigravity', displayName: string): RuntimeDiscovery {
+  function handoffRuntime(id: 'cursor' | 'gemini', displayName: string): RuntimeDiscovery {
     return {
       ...codexRuntime(),
       id,
@@ -1617,7 +1617,7 @@ describe('mid-mission handoff', () => {
 
   // Cursor read-only on Windows left this list in 0.485: its ask mode holds.
   it.each([
-    ['a runtime whose events Locust cannot read', 'antigravity', 'accept-edits', /cannot read its event stream/],
+    ['a runtime whose events Locust cannot read', 'gemini', 'accept-edits', /cannot read its event stream/],
     ['a runtime that is signed out', 'claude', 'ask', /is signed out/]
   ] as const)('refuses a handoff to %s before stopping anything', async (_what, runtime, mode, reason) => {
     const createCheckpoint = vi.fn<MissionLedger['createCheckpoint']>(async () => checkpoint())
@@ -1625,7 +1625,7 @@ describe('mid-mission handoff', () => {
       codexRuntime(),
       { ...handoffClaudeRuntime(), readiness: 'authentication-required' as const },
       handoffRuntime('cursor', 'Cursor Agent'),
-      handoffRuntime('antigravity', 'Antigravity')
+      handoffRuntime('gemini', 'Gemini CLI')
     ]
     let release!: () => void
     const held = new Promise<void>((resolve) => { release = resolve })

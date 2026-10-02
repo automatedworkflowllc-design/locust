@@ -2666,7 +2666,8 @@ if (!ownsSingleInstanceLock) {
       post: (input) => workroom.post(input),
       cursorHoldsReadOnly: () => cursorCanEnforceReadOnly(process.platform),
       start: async (input) => {
-        if (input.runtime === 'antigravity') {
+        // The app route only when Antigravity CLI is not installed (0.540); the CLI runs as every other runtime does.
+        if (input.runtime === 'antigravity' && antigravityProbe.cliPath() === undefined) {
           try {
             const mission = await antigravityMissions.start(input.prompt, input.peer, {
               ...(input.model === undefined ? {} : { model: input.model }),
@@ -4781,8 +4782,8 @@ if (!ownsSingleInstanceLock) {
         budget: MAX_PROMPT_LENGTH - text.length - 2
       })
       const briefed = board.length === 0 ? text : `${text}\n\n${board}`
-      if (route.runtime === 'antigravity') {
-        return { ok: false, name: teammate.name, message: 'Antigravity cannot be posted to from a room yet.', retryable: false }
+      if (route.runtime === 'antigravity' && antigravityProbe.cliPath() === undefined) {
+        return { ok: false, name: teammate.name, message: 'Antigravity can be posted to from a room once Antigravity CLI is installed.', retryable: false }
       }
       const response = await codexMissions.start(
         briefed,
@@ -5195,8 +5196,8 @@ if (!ownsSingleInstanceLock) {
           continue
         }
         const route = teammate.route ?? { runtime: 'codex' as const, model: 'account-default', mode: 'ask' as const }
-        if (route.runtime === 'antigravity') {
-          notStarted.push({ name: teammate.name, message: 'Antigravity cannot be tagged yet.' })
+        if (route.runtime === 'antigravity' && antigravityProbe.cliPath() === undefined) {
+          notStarted.push({ name: teammate.name, message: 'Antigravity can be tagged once Antigravity CLI is installed.' })
           continue
         }
         const prompt = taggedPrompt({ message, ...(fromName === undefined ? {} : { fromName }), ...(answer === undefined ? {} : { answer }) })
@@ -6156,14 +6157,14 @@ if (!ownsSingleInstanceLock) {
       // `approve-each` needs a runtime able to stop and ask, and only Codex
       // has one. Another runtime asked for it would have been started on
       // Codex without a word; it is refused instead.
-      if (runtime === 'antigravity') {
+      if (runtime === 'antigravity' && antigravityProbe.cliPath() === undefined) {
         // The prompt was checked above, before the peer context was built.
         if (mode !== 'accept-edits') {
           return {
             ok: false,
             error: {
               code: 'RUNTIME_START_FAILED',
-              message: "Antigravity runs its own agent with its own permissions; Locust cannot hold it read-only. Choose Edit, or another route."
+              message: 'Without Antigravity CLI, Antigravity runs only in Edit: Locust cannot hold the app read-only. Install Antigravity CLI (Settings > AI agents) to run it in any mode, or choose Edit.'
             }
           } as const
         }

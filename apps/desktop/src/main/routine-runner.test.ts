@@ -225,10 +225,10 @@ describe('running a routine', () => {
     const gone = createRoutineRunner(harness({ peer: undefined }).options)
     expect(await gone.run('rt_1')).toMatchObject({ ok: false, error: { message: expect.stringContaining('no longer exists') } })
 
-    const antigravity = createRoutineRunner(
-      harness({ routines: [routine({ route: { runtime: 'antigravity', model: 'x', mode: 'accept-edits' } })] }).options
+    const unreadable = createRoutineRunner(
+      harness({ routines: [routine({ route: { runtime: 'gemini', model: 'x', mode: 'accept-edits' } })] }).options
     )
-    expect(await antigravity.run('rt_1')).toMatchObject({ ok: false, error: { message: expect.stringContaining('antigravity') } })
+    expect(await unreadable.run('rt_1')).toMatchObject({ ok: false, error: { message: expect.stringContaining('gemini') } })
 
     const failing = harness({ startFails: true })
     const runner = createRoutineRunner(failing.options)

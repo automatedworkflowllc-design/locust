@@ -4,7 +4,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
-import { parseAntigravityProjects, projectIdForWorkspace } from '@teammate/runtime-adapters'
+import { parseAgyModelList, parseAntigravityProjects, projectIdForWorkspace } from '@teammate/runtime-adapters'
 
 import { ANTIGRAVITY_TIER_NAMES } from '../shared/antigravity-models.js'
 
@@ -214,6 +214,8 @@ const samePids = (left: readonly number[], right: readonly number[]): boolean =>
 export function createAntigravityHostProbe(options: AntigravityProbeOptions = {}): {
   probe(): Promise<AntigravityHost | undefined>
   discoveryRecord(): Promise<RuntimeDiscovery>
+  /** Antigravity CLI (`agy`), when installed (0.540): runs go through it instead of the app. */
+  cliPath(): string | undefined
 } {
   const platform = options.platform ?? process.platform
   const localAppData = options.localAppData ?? process.env.LOCALAPPDATA ?? ''
@@ -249,6 +251,12 @@ export function createAntigravityHostProbe(options: AntigravityProbeOptions = {}
   // Read at ASK time, not at construction: a probe built during module load
   // would latch whatever the environment said before the drive set it.
   const hidden = (): boolean => options.localAppData === undefined && process.env.LOCUST_HIDE_RUNTIMES === '1'
+  /** Where the Antigravity CLI installer puts `agy` (install.ps1, 2026-10-02). */
+  const agyPath = (): string | undefined => {
+    if (hidden() || platform !== 'win32' || localAppData.length === 0) return undefined
+    const candidate = join(localAppData, 'agy', 'bin', 'agy.exe')
+    return existsSync(candidate) ? candidate : undefined
+  }
 
   const probe = async (): Promise<AntigravityHost | undefined> => {
     if (hidden()) return undefined
@@ -326,7 +334,41 @@ export function createAntigravityHostProbe(options: AntigravityProbeOptions = {}
 
   return {
     probe,
+    cliPath(): string | undefined {
+      return agyPath()
+    },
     async discoveryRecord(): Promise<RuntimeDiscovery> {
+      /*
+       * THE CLI FIRST (0.540). Google moved personal accounts from Gemini CLI
+       * to Antigravity CLI on 2026-06-18, and `agy` runs headless with a
+       * stream Locust can read whole -- every tool, the answer, the end of
+       * the run -- where the app route reads its transcript files and has
+       * missed all three. So when it is installed, it is Antigravity here,
+       * with the models it lists, and the app need not be open.
+       */
+      const cli = agyPath()
+      if (cli !== undefined) {
+        const version = await run(cli, ['--version'], {}).catch(() => undefined)
+        const listed = await run(cli, ['models'], {}).catch(() => undefined)
+        const models = listed === undefined ? undefined : parseAgyModelList(listed.stdout)
+        const raw = version?.stdout.trim().split(/\r?\n/)[0]
+        return {
+          id: 'antigravity',
+          kind: 'agent-runtime',
+          displayName: 'Antigravity',
+          optional: true,
+          supportedFeatures: [],
+          requiredFeatures: [],
+          modelHints: models ?? { aliases: [], efforts: [], models: [] },
+          availability: 'available',
+          readiness: models === undefined ? 'authentication-required' : 'ready',
+          executable: { commandName: 'agy', discoveredPath: cli, executablePath: cli, prefixArgs: [], kind: 'native' },
+          ...(raw === undefined ? {} : { version: parseVersion(raw) }),
+          diagnostics: models === undefined
+            ? [{ code: 'authentication-required', severity: 'warning', message: 'Antigravity CLI is installed but could not list its models.', resolution: 'Run agy in a terminal once and sign in with Google.' }]
+            : []
+        } as RuntimeDiscovery
+      }
       const installed = !hidden() && platform === 'win32' && antigravityExecutableCandidates(localAppData).some((candidate) => existsSync(candidate))
       const host = installed ? await probe() : undefined
       const base = {

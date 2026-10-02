@@ -603,7 +603,9 @@ describe('a read-only mode, where it is real', () => {
   it('offers Plan exactly where Ask is', () => {
     // Plan became the fourth MODE rather than a switch beside one (design
     // pass, 2026-09-05), so it is offered exactly where Ask is.
-    expect(modeRunsOn('plan', 'antigravity')).toBe(false)
+    expect(modeRunsOn('plan', 'gemini')).toBe(false)
+    // Antigravity holds Ask through its CLI (0.540), so Plan too.
+    expect(modeRunsOn('plan', 'antigravity')).toBe(true)
     expect(modeLabel('plan')).toBe('plan · read-only')
   })
 })
@@ -904,12 +906,11 @@ describe('the Auto mode, which has to be switched on before it is offered', () =
     expect(modesFor('codex', 'win32')).toContain('auto')
   })
 
-  it('is offered on every runtime Locust has a handle on, and not on Antigravity', () => {
-    for (const runtime of ['codex', 'claude', 'cursor', 'opencode', 'copilot'] as const) {
+  it('is offered on every runtime Locust has a handle on, Antigravity through its CLI included (0.540)', () => {
+    for (const runtime of ['codex', 'claude', 'cursor', 'opencode', 'copilot', 'antigravity'] as const) {
       expect(modesFor(runtime, 'win32')).toContain('auto')
     }
-    expect(modesFor('antigravity', 'win32')).not.toContain('auto')
-    expect(modeUnavailableReason('auto', 'antigravity', 'win32')).toMatch(/own permissions/)
+    expect(modesFor('muse', 'win32')).not.toContain('auto')
   })
 
   it('is never the mode a route falls back to', () => {

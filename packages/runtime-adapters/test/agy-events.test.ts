@@ -104,9 +104,12 @@ describe("the agy command", () => {
   it("reads agy models as printed", () => {
     const listed = parseAgyModelList("Fetching available models...\ngemini-3.8-flash-high\tGemini 3.8 Flash (High)\ngemini-3.1-pro-low\tGemini 3.1 Pro (Low)\nclaude-opus-4-6-thinking\tClaude Opus 4.6 (Thinking)\n");
     expect(listed?.models).toEqual([
-      { id: "gemini-3.8-flash-high", displayName: "Gemini 3.8 Flash (High)" },
-      { id: "gemini-3.1-pro-low", displayName: "Gemini 3.1 Pro (Low)" },
+      { id: "gemini-3.8-flash", displayName: "Gemini 3.8 Flash", efforts: ["high"] },
+      { id: "gemini-3.1-pro", displayName: "Gemini 3.1 Pro", efforts: ["low"] },
       { id: "claude-opus-4-6-thinking", displayName: "Claude Opus 4.6 (Thinking)" },
     ]);
+    // Each effort a row of its own in agy: one model here, efforts in order.
+    const flash = parseAgyModelList("gemini-3.8-flash-high\tGemini 3.8 Flash (High)\ngemini-3.8-flash-low\tGemini 3.8 Flash (Low)\ngemini-3.8-flash-medium\tGemini 3.8 Flash (Medium)\n");
+    expect(flash?.models).toEqual([{ id: "gemini-3.8-flash", displayName: "Gemini 3.8 Flash", efforts: ["low", "medium", "high"] }]);
   });
 });

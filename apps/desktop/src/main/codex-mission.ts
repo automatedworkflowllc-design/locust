@@ -14,6 +14,8 @@ import {
   createCopilotPromptCommand,
   createCursorEventNormalizer,
   createCursorPrintCommand,
+  createAgyEventNormalizer,
+  createAgyPrintCommand,
   createMuseEventNormalizer,
   createMuseExecCommand,
   createOpenCodeEventNormalizer,
@@ -74,6 +76,28 @@ import { recordableCommand } from './command-record.js'
 import { commandTooLong } from './command-length.js'
 import { MAX_LIVE_MISSIONS } from '../shared/live-missions.js'
 import { hostReadsEventsOf, runtimeDisplayName } from '../shared/runtimes.js'
+
+/**
+ * The model and effort to hand `agy` (0.540). The app route chose a TIER
+ * (flash, pro, flash_lite), and a teammate saved on one keeps it; the CLI
+ * takes a model and `--effort`. A saved id with its effort on the end
+ * (`gemini-3.8-flash-low`, as `agy models` lists them) is split the same way,
+ * and an effort chosen in the box wins over one in the name.
+ */
+export function agyRoute(model: string | undefined, effort: string | undefined): { readonly model?: string; readonly effort?: string } {
+  const tiers: Readonly<Record<string, { model: string; effort: string }>> = {
+    flash: { model: 'gemini-3.8-flash', effort: 'medium' },
+    pro: { model: 'gemini-3.1-pro', effort: 'high' },
+    flash_lite: { model: 'gemini-3.8-flash', effort: 'low' }
+  }
+  if (model === undefined) return effort === undefined ? {} : { effort }
+  const tier = Object.hasOwn(tiers, model) ? tiers[model] : undefined
+  const variant = /^(.*)-(low|medium|high|max)$/.exec(model)
+  const base = tier?.model ?? (variant === null ? model : variant[1]!)
+  const named = tier?.effort ?? (variant === null ? undefined : variant[2])
+  const chosen = effort ?? named
+  return { model: base, ...(chosen === undefined ? {} : { effort: chosen }) }
+}
 import { FREE_ONLY_REFUSAL, isFreeRoute } from './free-routes.js'
 import { attachmentsForRun } from './attachments-for-run.js'
 import { longTaskFile, longTaskFilePath } from './long-task-file.js'
@@ -1355,6 +1379,13 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             unreadableRuntimeRefusal(runtime)
           ) as CodexMissionStartResponse
         }
+        // Only the CLI is run from here: the app's own server takes none of these flags (0.540).
+        if (runtime === 'antigravity' && chosen.executable.commandName !== 'agy') {
+          return error(
+            'RUNTIME_START_FAILED',
+            'Antigravity runs here through Antigravity CLI, which is not installed. Settings > AI agents shows how to add it.'
+          ) as CodexMissionStartResponse
+        }
 
         // A reply resumes the earlier mission's own session. The handle comes
         // from the durable record of THAT mission, never from the renderer:
@@ -1582,7 +1613,9 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
                 ? 'copilot'
                 : runtime === 'muse'
                   ? 'muse'
-                  : 'codex'
+                  : runtime === 'antigravity'
+                    ? 'antigravity'
+                    : 'codex'
         // ONE definition of what this run may touch, computed before anything
         // records it, so the durable header and the receipt agree with what
         // the process was actually allowed to do.
@@ -1680,7 +1713,9 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
                 ? createCopilotEventNormalizer({ ...normalizerContext, sessionId: copilotSessionId! })
                 : runtime === 'muse'
                   ? createMuseEventNormalizer(normalizerContext)
-                  : createCodexEventNormalizer(normalizerContext)
+                  : runtime === 'antigravity'
+                    ? createAgyEventNormalizer(normalizerContext)
+                    : createCodexEventNormalizer(normalizerContext)
 
         // The argv, decided BEFORE anything durable is written. The builders
         // refuse what they cannot honour -- an effort for a runtime that has
@@ -1770,6 +1805,15 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               ...(repositoryRoot === undefined ? {} : { repositoryRoot }),
               ...(providers === undefined ? {} : { providers }),
               ...choice
+            })
+          }
+          if (runtime === 'antigravity') {
+            // Antigravity CLI (0.540): the prompt goes on stdin as its own stream-json line.
+            return createAgyPrintCommand(executable, {
+              workspacePath: runCwd,
+              sandbox: effectiveSandbox,
+              ...agyRoute(chosenModel, route.effort),
+              ...(resumeThreadId === undefined ? {} : { resumeThreadId })
             })
           }
           if (runtime === 'muse') {

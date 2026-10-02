@@ -40,9 +40,11 @@ export function runtimeDisplayName(runtime: MissionRuntimeId): string {
  * the note at the top of `muse-events.ts` for what that does and does not
  * establish.
  */
-export function hostReadsEventsOf(runtime: MissionRuntimeId): runtime is 'codex' | 'claude' | 'cursor' | 'opencode' | 'copilot' | 'muse' {
+export function hostReadsEventsOf(runtime: MissionRuntimeId): runtime is 'codex' | 'claude' | 'cursor' | 'opencode' | 'copilot' | 'muse' | 'antigravity' {
   return (
-    runtime === 'codex'
+    // Antigravity through its CLI, `agy` (0.540); the runner refuses the app's own server.
+    runtime === 'antigravity'
+    || runtime === 'codex'
     || runtime === 'claude'
     || runtime === 'cursor'
     || runtime === 'opencode'
@@ -59,5 +61,5 @@ export function hostReadsEventsOf(runtime: MissionRuntimeId): runtime is 'codex'
  * without being one the process runner reads.
  */
 export function hostCanRunMission(runtime: MissionRuntimeId): boolean {
-  return hostReadsEventsOf(runtime) || runtime === 'antigravity'
+  return hostReadsEventsOf(runtime)
 }

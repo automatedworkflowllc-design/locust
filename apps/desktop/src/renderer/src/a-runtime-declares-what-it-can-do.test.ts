@@ -62,6 +62,9 @@ describe('a runtime declares what it can do', () => {
     // flagged when the table was written, and this is the commit it was
     // flagged for.
     gemini: [],
+    // Antigravity through its CLI (0.540): every ordinary mode, each a flag
+    // measured on agy 1.2.14. The app route alone was Edit only.
+    antigravity: ['ask', 'plan', 'accept-edits', 'auto'],
     // Cursor read-only on Windows too (0.485): its own `--mode ask` held
     // against three pushed writes there on 2026-09-30, where plan mode had
     // written files (2026-09-02). The sandbox is still asked for wherever it

@@ -452,8 +452,10 @@ export function antigravityModelsFrom(runtimes: readonly RuntimeDiscovery[]): re
     id: model.id,
     runtime: 'antigravity' as const,
     displayName: model.displayName,
-    description: model.description ?? 'Antigravity model tier',
-    supportedEfforts: []
+    // A tier from the app route says so; the CLI's models are named whole (0.540).
+    description: model.description ?? (antigravity.executable?.commandName === 'agy' ? 'Through Antigravity CLI' : 'Antigravity model tier'),
+    // Low / Medium / High beside the model, not as models of their own (0.540).
+    supportedEfforts: model.efforts ?? []
   }))
 }
 

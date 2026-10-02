@@ -11,6 +11,24 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.540.0 - 2026-10-02
+
+### New
+
+- **Antigravity runs through Antigravity CLI.** Google moved personal
+  accounts, AI Pro included, from Gemini CLI to Antigravity CLI (`agy`). With
+  it installed, Antigravity works like every other AI agent here: each step
+  shows as it happens, the reply arrives whole, the run ends when it answers,
+  and a follow-up carries the conversation on. It works in any folder, not
+  only one the Antigravity app has open, and in every mode: Ask, Plan, Edit
+  and Auto (only Auto lets it run commands). Rooms and tags reach it too.
+- **Every model Antigravity offers**, not three tiers: Gemini 3.8 Flash,
+  Gemini 3.1 Pro, Claude Sonnet and Opus, and more, with Low, Medium and High
+  as the effort beside the model rather than as models of their own.
+
+Without the CLI, Antigravity runs through its app as before, in Edit only.
+Settings > AI agents links to the one-line installer.
+
 ## 0.539.0 - 2026-10-02
 
 ### Fixed

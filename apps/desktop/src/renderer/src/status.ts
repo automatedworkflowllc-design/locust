@@ -768,7 +768,9 @@ export const RUNTIME_CAPABILITIES: Readonly<Record<MissionRuntimeId, RuntimeCapa
    * there: no handle keeps it read-only, and none bounds it for Auto. The one
    * mode it can honestly offer is the one it offers.
    */
-  antigravity: { modes: ['accept-edits'], evidence: 'measured' },
+  // Through Antigravity CLI (0.540, measured 2026-10-02): read-only refuses
+  // writes and commands, Edit allows edits, Auto allows all.
+  antigravity: { modes: [...EVERY_ORDINARY_MODE], evidence: 'measured' },
   /*
    * TWO MODES, AND THE THIRD IS LEFT OFF DELIBERATELY.
    *
@@ -1032,7 +1034,7 @@ export function modeUnavailableReason(
   if (modeRunsOn(mode, runtime, platform)) return undefined
   if (mode === 'approve-each') return `Codex CLI, OpenCode and Copilot CLI only. ${runtimeLabel(runtime)} cannot stop and ask yet.`
   if (mode === 'auto') return `${runtimeLabel(runtime)} runs its own agent under its own permissions; Locust has no handle to widen.`
-  if (runtime === 'antigravity') return "Antigravity runs its own agent with its own permissions; Locust cannot hold it read-only."
+  if (runtime === 'antigravity') return 'Antigravity CLI runs this mode; without it, Antigravity runs only in Edit.'
   return 'Cursor Agent cannot be kept read-only on Windows: that needs macOS or Linux, and its plan mode alone does not stop it editing files.'
 }
 

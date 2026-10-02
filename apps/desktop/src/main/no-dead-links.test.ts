@@ -55,7 +55,7 @@ describe('links out of the app', () => {
     // Read from the runtime facts rather than copied, so a vendor URL that
     // moves cannot leave a dead link behind.
     expect(OUTBOUND_LINKS).toContain('https://cursor.com/cli')
-    expect(OUTBOUND_LINKS).toContain('https://antigravity.google')
+    expect(OUTBOUND_LINKS).toContain('https://antigravity.google/product/antigravity-cli/')
     expect(OUTBOUND_LINKS).toContain('https://nodejs.org')
   })
 

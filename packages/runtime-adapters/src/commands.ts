@@ -1092,14 +1092,33 @@ export function createAgyPrintCommand(
  * `id<TAB>Display name` per line.
  */
 export function parseAgyModelList(text: string): RuntimeModelHints | undefined {
-  const models: RuntimeModelName[] = [];
+  /*
+   * ONE MODEL, ITS EFFORTS BESIDE IT. agy lists each effort as its own row
+   * -- `gemini-3.8-flash-low  Gemini 3.8 Flash (Low)` -- and MEASURED
+   * 2026-10-02 it also takes `--model gemini-3.8-flash --effort low`. So the
+   * rows are folded into one model with its efforts, as Claude's and Codex's
+   * are, and the picker does not list Flash three times. Colin, at the
+   * first build: "effort is showing in model picker".
+   */
+  const models: { id: string; displayName: string; efforts: string[] }[] = [];
   for (const line of text.split(/\r?\n/)) {
     const match = /^([a-z0-9][a-z0-9.-]{0,80})\t(.{1,80})$/.exec(line.trim());
-    if (match === null || models.some((model) => model.id === match[1])) continue;
-    models.push({ id: match[1]!, displayName: match[2]!.trim() });
+    if (match === null) continue;
+    const variant = /^(.*)-(low|medium|high|max)$/.exec(match[1]!);
+    const id = variant === null ? match[1]! : variant[1]!;
+    const displayName = variant === null ? match[2]!.trim() : match[2]!.replace(/\s*\((low|medium|high|max)\)\s*$/i, "").trim();
+    const known = models.find((model) => model.id === id);
+    if (known === undefined) models.push({ id, displayName, efforts: variant === null ? [] : [variant[2]!] });
+    else if (variant !== null && !known.efforts.includes(variant[2]!)) known.efforts.push(variant[2]!);
   }
   if (models.length === 0) return undefined;
-  return { aliases: models.map((model) => model.id), efforts: [], models };
+  const order = ["low", "medium", "high", "max"];
+  const named: RuntimeModelName[] = models.map((model) => ({
+    id: model.id,
+    displayName: model.displayName,
+    ...(model.efforts.length === 0 ? {} : { efforts: [...model.efforts].sort((a, b) => order.indexOf(a) - order.indexOf(b)) }),
+  }));
+  return { aliases: named.map((model) => model.id), efforts: [], models: named };
 }
 
 /**

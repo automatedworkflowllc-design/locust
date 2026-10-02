@@ -11,14 +11,14 @@ import { assertSafeRuntimeCommand, PROMPT_FILE_PLACEHOLDER } from "./commands.js
  * purpose: that spec is a server to be spoken to, and running it as an
  * ordinary process would start something nobody is listening to.
  */
-const ACCEPTED_TRANSPORTS: ReadonlySet<string> = new Set(["prompt", "none", "prompt-file", "stream-json"]);
+const ACCEPTED_TRANSPORTS: ReadonlySet<string> = new Set(["prompt", "none", "prompt-file", "stream-json", "agy-json"]);
 
-/** One user turn in Claude Code's `--input-format stream-json`. */
 /** Antigravity CLI's input line (0.540): measured shape, the only one agy 1.2.14 accepted. */
 export function agyUserLine(text: string): string {
   return `${JSON.stringify({ event: "user", message: { role: "user", content: [{ type: "text", text }] } })}\n`;
 }
 
+/** One user turn in Claude Code's `--input-format stream-json`. */
 function streamJsonUserLine(text: string): string {
   return `${JSON.stringify({ type: "user", message: { role: "user", content: text } })}\n`;
 }
