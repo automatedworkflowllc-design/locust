@@ -563,7 +563,10 @@ function parsedFile(text: string): StoredFile {
         ? parsedAboutYouSuggestions((rawSettings as Record<string, unknown>).aboutYouSuggestions)
         : undefined
       return aboutYouSuggestions === undefined ? {} : { aboutYouSuggestions }
-    })()
+    })(),
+    ...(typeof rawSettings === 'object' && rawSettings !== null && isTeammateRoute((rawSettings as Record<string, unknown>).newChatRoute)
+      ? { newChatRoute: (rawSettings as Record<string, unknown>).newChatRoute as TeammateRoute }
+      : {})
   }
 
   return { schemaVersion: SCHEMA_VERSION, teammates, missionOwners: owners, missionTitles: titles, settings }
@@ -958,7 +961,11 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           ...(() => {
             const aboutYouSuggestions = parsedAboutYouSuggestions((settings as Record<string, unknown>).aboutYouSuggestions)
             return aboutYouSuggestions === undefined ? {} : { aboutYouSuggestions }
-          })()
+          })(),
+          // The model a new chat with nobody starts on (0.552); anything but a route is dropped.
+          ...(isTeammateRoute((settings as Record<string, unknown>).newChatRoute)
+            ? { newChatRoute: (settings as Record<string, unknown>).newChatRoute as TeammateRoute }
+            : {})
         }
         await write({ ...stored, settings: next })
         return next

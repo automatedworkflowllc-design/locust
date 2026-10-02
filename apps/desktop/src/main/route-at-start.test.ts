@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { composerRouteFor, routeAtStart } from '../shared/route-at-start.js'
+import { composerRouteFor, pickKeyFor, routeAtStart } from '../shared/route-at-start.js'
 import type { TeammateRoute } from '../shared/ipc.js'
 
 const saved: TeammateRoute = { runtime: 'codex', model: 'gpt-5.6-luna', mode: 'accept-edits', effort: 'low' }
@@ -49,16 +49,27 @@ describe('route authority at the moment of start', () => {
   })
 })
 
-describe('picker intent belongs to a teammate, not the last route effect', () => {
-  const choices = new Map([['tm_gem', fallback]])
-  it('a different teammate gets their own saved chip', () => {
-    expect(composerRouteFor(fallback, wren, choices)).toEqual(saved)
+describe('a pick belongs to the conversation it was made in (0.552)', () => {
+  // Colin, 10/02: "if i have a teammate set to a certain model i should be
+  // able to run a sepate chat with a new model without assigning that as
+  // their new model". Picks were keyed by teammate; now by conversation.
+  const choices = new Map([['mission_a', fallback], ['new:tm_gem', fallback]])
+  it('a new chat with a teammate starts on their saved model', () => {
+    expect(composerRouteFor(fallback, wren, choices, pickKeyFor(undefined, wren.teammateId))).toEqual(saved)
   })
-  it('returning to the teammate retains their explicit choice for this session', () => {
-    expect(composerRouteFor({ runtime: 'codex', model: saved.model }, { ...wren, teammateId: 'tm_gem' }, choices)).toEqual(fallback)
+  it('a pick made in a conversation is shown there again', () => {
+    expect(composerRouteFor({ runtime: 'codex', model: saved.model }, wren, choices, 'mission_a')).toEqual(fallback)
+  })
+  it('a conversation shows what it ran on, not the saved model of its teammate', () => {
+    const ran = { runtime: 'opencode' as const, model: 'opencode/free' }
+    expect(composerRouteFor(fallback, wren, choices, 'mission_b', ran)).toEqual(ran)
+  })
+  it('a pick for a new chat with one teammate is not for another', () => {
+    expect(composerRouteFor(fallback, { ...wren, teammateId: 'tm_gem' }, choices, pickKeyFor(undefined, 'tm_gem'))).toEqual(fallback)
+    expect(composerRouteFor(fallback, wren, choices, pickKeyFor(undefined, 'tm_wren'))).toEqual(saved)
   })
   it('home does not inherit a teammate override', () => {
     const home = { runtime: 'claude' as const, model: 'account-default' }
-    expect(composerRouteFor(home, undefined, choices)).toBe(home)
+    expect(composerRouteFor(home, undefined, choices, pickKeyFor(undefined, undefined))).toBe(home)
   })
 })

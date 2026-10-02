@@ -459,13 +459,29 @@ export function antigravityModelsFrom(runtimes: readonly RuntimeDiscovery[]): re
   }))
 }
 
+/**
+ * Whether a ready runtime that lists its own models at discovery listed none
+ * this time (0.552). OpenCode, Cursor and Claude Code each answer from a CLI
+ * probe that can fail on a busy machine while the runtime itself is fine.
+ */
+export function listsItsModelsButListedNone(runtimes: readonly RuntimeDiscovery[]): boolean {
+  return runtimes.some((entry) =>
+    (entry.id === 'opencode' || entry.id === 'cursor' || entry.id === 'claude')
+    && entry.readiness === 'ready'
+    && (entry.modelHints?.models === undefined || entry.modelHints.models.length === 0)
+    && !(entry.id === 'claude' && (entry.modelHints?.aliases?.length ?? 0) > 0))
+}
+
 export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {
   const now = options.now ?? (() => Date.now())
   let cached: { readonly at: number; readonly response: ModelCatalogResponse } | undefined
   let inFlight: Promise<ModelCatalogResponse> | undefined
+  /** A ready runtime whose own list came back empty on the last probe (0.552). */
+  let missingAList = false
 
   const probe = async (): Promise<ModelCatalogResponse> => {
     const runtimes = await options.discover()
+    missingAList = listsItsModelsButListedNone(runtimes)
     // Each runtime's models come from its own source and fail on their own:
     // Claude's and Cursor's from what their CLIs advertised at discovery,
     // Codex's from a live server read.
@@ -555,8 +571,12 @@ export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {
       const running = probe()
         .then((response) => {
           // Only a success is cached: a transient failure must not pin the
-          // picker to "unavailable" for the next ten minutes.
-          if (response.ok) cached = { at: now(), response }
+          // picker to "unavailable" for the next ten minutes. Nor a success
+          // MISSING a ready runtime's list (0.552): Colin, 10/02, "only
+          // account default is popping up for opencode" -- a slow launch's
+          // `opencode models` answered nothing, and every re-read the window
+          // made for ten minutes got the same answer back from here.
+          if (response.ok && !missingAList) cached = { at: now(), response }
           return response
         })
         .finally(() => {

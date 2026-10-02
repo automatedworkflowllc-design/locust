@@ -11,6 +11,23 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.552.0 - 2026-10-02
+
+### Fixed
+
+- **Each chat keeps its own model, mode, effort and chat mode.** Switching
+  chats carried the last chat's Plan, Ask or Compare into the next one, and a
+  reopened conversation showed its teammate's model instead of the one it ran
+  on. Now each conversation comes back as you left it.
+- **Trying another model in a chat no longer changes the teammate's model.**
+  A new chat with a teammate starts on the model in their profile; change it
+  there (Edit teammate) to change it for good.
+- **A new chat with no teammate starts on the last model you picked there,**
+  after a restart too.
+- **OpenCode's free models come back by themselves after a slow launch.**
+  When its model list came back empty, the picker offered only Account
+  Default for ten minutes; it now asks again until the list arrives.
+
 ## 0.551.0 - 2026-10-02
 
 ### Added

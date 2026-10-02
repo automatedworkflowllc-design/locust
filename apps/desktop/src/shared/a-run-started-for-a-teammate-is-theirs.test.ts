@@ -25,9 +25,14 @@ describe('who, on what, a run started for a teammate goes out as', () => {
     })
   })
 
-  it('a route picked for them in the composer wins, as it does there', () => {
-    const picked = new Map([['tm_rue', { runtime: 'opencode' as const, model: 'opencode/muse-spark-1.3-contributor-free' }]])
+  it('a route picked for their new chat wins, as it does in the box', () => {
+    const picked = new Map([['new:tm_rue', { runtime: 'opencode' as const, model: 'opencode/muse-spark-1.3-contributor-free' }]])
     expect(startAs(RUE, COMPOSER, picked).route).toEqual({ runtime: 'opencode', model: 'opencode/muse-spark-1.3-contributor-free' })
+  })
+
+  it('a pick made in some conversation of theirs does not (0.552)', () => {
+    const picked = new Map([['mission_other', { runtime: 'opencode' as const, model: 'opencode/muse-spark-1.3-contributor-free' }]])
+    expect(startAs(RUE, COMPOSER, picked).route).toEqual({ runtime: 'cursor', model: 'composer-2.5' })
   })
 
   it('a teammate who has never run takes the composer\'s route, mode and effort, under their own id', () => {

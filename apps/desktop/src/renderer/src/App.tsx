@@ -113,7 +113,7 @@ import { folderLabels } from '../../shared/folder-sections.js'
 import { nestedUnder } from '../../shared/nested-conversations.js'
 import { defaultComparePicks } from './compareDefaults.js'
 import { effortName } from './effortLevels.js'
-import { asReviewer, composerRouteFor, startAs } from '../../shared/route-at-start.js'
+import { asReviewer, composerRouteFor, pickKeyFor, startAs } from '../../shared/route-at-start.js'
 import type { StartAs } from '../../shared/route-at-start.js'
 import type { Screen } from './components/Screens.js'
 import { Icon } from './components/Icon.js'
@@ -1328,9 +1328,7 @@ export default function App(): ReactElement {
      */
     routeChosen.current = true
     setRoute(next)
-    if (pickedTeammate !== undefined) {
-      setPickerRoutes((current) => new Map(current).set(pickedTeammate.teammateId, next))
-    }
+    setPickerRoutes((current) => new Map(current).set(pickKey, next))
     setMode(group.route.mode)
     // Named, not spread: `undefined` clears an effort the group's runtime has no levels for.
     setEffort(group.route.effort)
@@ -2132,14 +2130,20 @@ export default function App(): ReactElement {
   const modelRetries = useRef(0)
   useEffect(() => {
     if (runtimeState.phase !== 'ready') return
-    if (!awaitingModels || modelRetries.current >= 6) return
+    // A minute in all (0.552): a slow launch's list can take longer than the
+    // first few seconds, and the host no longer holds a list missing one.
+    if (!awaitingModels || modelRetries.current >= 12) return
     const again = window.setTimeout(() => {
       modelRetries.current += 1
       readModels()
-    }, 3_000)
+    }, 5_000)
     return () => window.clearTimeout(again)
   }, [awaitingModels, runtimeState.phase, models])
   const [effort, setEffort] = useState<string>()
+  /** Each chat's mode and effort, by the same key as its model pick (0.552). */
+  const chatSetups = useRef(new Map<string, { readonly mode: MissionMode; readonly effort: string | undefined; readonly kind?: { readonly compare: boolean; readonly blind: boolean; readonly cloud: boolean } }>())
+  /** What a new chat with nobody starts on, as saved (0.552). */
+  const [newChatSetup, setNewChatSetup] = useState<{ readonly mode: MissionMode; readonly effort: string | undefined }>()
   const [swarm, setSwarm] = useState(false)
   /*
    * How many times the person has turned swarm on this session. The title
@@ -2865,6 +2869,12 @@ export default function App(): ReactElement {
           setLayout(isLayoutPreference(settings.layout) ? settings.layout : 'auto')
           setTube(settings.tube)
           setReplySize(settings.replySize)
+          // The model a new chat with nobody starts on (0.552).
+          const newChat = settings.newChatRoute
+          if (newChat !== undefined) {
+            setPickerRoutes((current) => (current.has('new') ? current : new Map(current).set('new', { runtime: newChat.runtime, model: newChat.model })))
+            setNewChatSetup({ mode: newChat.mode, effort: newChat.effort })
+          }
       if (settings.metal !== undefined) setMetal(settings.metal)
       if (settings.metalStrength !== undefined) setMetalStrength(settings.metalStrength)
       if (settings.metalMotion !== undefined) setMetalMotion(settings.metalMotion)
@@ -3204,7 +3214,54 @@ export default function App(): ReactElement {
   }, [comparing?.compareId, settledColumns])
   // Review changes follows the teammate on screen: another conversation never shows this one's branch.
   const reviewing = pickedTeammate !== undefined && pickedTeammate.teammateId === reviewingId && pickedTeammate.worktree === true ? pickedTeammate : undefined
-  const composerRoute = composerRouteFor(route, pickedTeammate, pickerRoutes)
+  /*
+   * Where a pick is held, and what the conversation on screen ran on (0.552).
+   * A run still starting has no record yet, so its new chat's pick holds.
+   */
+  const pickKey = pickKeyFor(liveRun === undefined ? shownKey : liveRun.data?.missionId, pickedTeammate?.teammateId)
+  const conversationRoute = liveRun?.data === undefined ? undefined : { runtime: liveRun.data.runtime, model: liveRun.data.model ?? 'account-default' }
+  const composerRoute = composerRouteFor(route, pickedTeammate, pickerRoutes, pickKey, conversationRoute)
+  /*
+   * EACH CHAT KEEPS ITS OWN SETUP (0.552). Colin, 10/02: "each time i switch
+   * to a new chat it just keeps the mode from the previous chat, there should
+   * be persistence in each chat, for permissions, model, chat type, and
+   * effort". The model is held above; the mode (Ask, Plan, Edit, Auto...) and
+   * the effort are held here, per conversation and per new chat, and put
+   * back when it is shown again. A chat never seen before starts on its own
+   * defaults: a conversation on what its record says (followRouteOf), a new
+   * chat with a teammate on their profile, a new chat with nobody on the
+   * last setup used there.
+   */
+  const setupKey = useRef(pickKey)
+  useEffect(() => {
+    if (setupKey.current !== pickKey) {
+      setupKey.current = pickKey
+      const held = chatSetups.current.get(pickKey)
+      // Never seen this session: a new chat's mode and effort from its
+      // defaults; a conversation's from its record (already set on opening).
+      const fresh = pickKey === 'new' ? newChatSetup : pickKey.startsWith('new:') ? (pickedTeammate?.route === undefined ? undefined : { mode: pickedTeammate.route.mode, effort: pickedTeammate.route.effort }) : undefined
+      // The chat mode too: a chat never seen is Direct, whatever the last one was.
+      const kind = held?.kind ?? { compare: false, blind: false, cloud: false }
+      const setup = held ?? (fresh === undefined ? undefined : { ...fresh, kind })
+      let moved = false
+      if (kind.compare !== compareOn || kind.blind !== compareBlind || kind.cloud !== cloudOn) {
+        setCompareOn(kind.compare)
+        setCompareBlind(kind.blind)
+        setCloudOn(kind.cloud)
+        moved = true
+      }
+      if (setup !== undefined && (setup.mode !== mode || setup.effort !== effort)) {
+        if (modeRunsOn(setup.mode, composerRoute.runtime, build?.platform)) setMode(setup.mode)
+        setEffort(setup.effort)
+        moved = true
+      }
+      if (moved) return
+    }
+    chatSetups.current.set(pickKey, { mode, effort, kind: { compare: compareOn, blind: compareBlind, cloud: cloudOn } })
+    if (pickKey === 'new' && newChatSetup !== undefined && (newChatSetup.mode !== mode || newChatSetup.effort !== effort)) {
+      rememberNewChatRoute(composerRoute, mode, effort)
+    }
+  }, [pickKey, mode, effort, compareOn, compareBlind, cloudOn])
 
   /** Who a run belongs to: what it was started with, or what the host recorded. */
   const ownerOf = (run: LiveRunState): string | undefined =>
@@ -3519,6 +3576,13 @@ export default function App(): ReactElement {
   const removeMemory = (memoryId: string): Promise<string | undefined> => memoryCall(window.desktop?.removeMemory(memoryId))
   const clearMemories = (scope: 'workspace' | 'all'): Promise<string | undefined> => memoryCall(window.desktop?.clearMemories({ scope }))
   const restoreMemory = (memoryId: string): Promise<string | undefined> => memoryCall(window.desktop?.restoreMemory(memoryId))
+  const rememberNewChatRoute = (next: RouteChoice, nextMode: MissionMode, nextEffort: string | undefined): void => {
+    const newChatRoute = { runtime: next.runtime, model: next.model, mode: nextMode, ...(nextEffort === undefined ? {} : { effort: nextEffort }) }
+    setNewChatSetup({ mode: nextMode, effort: nextEffort })
+    void window.desktop
+      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, replySize, layout, tube, newChatRoute })
+      .catch(() => undefined)
+  }
   const changeMemoryMode = (next: MemoryMode): void => {
     const before = memoryMode
     setMemoryMode(next)
@@ -4197,7 +4261,9 @@ export default function App(): ReactElement {
         // alone (startRoute).
         ...startRoute(models, route.runtime, route.model, swarmEffortFor(models, route.model, swarm, runEffort, route.runtime)),
         modelChoice: route.model,
-        ...(teammateId !== undefined && pickerRoutes.has(teammateId) ? { routeOverrideFor: teammateId } : {}),
+        // The host keeps a teammate's saved model unless this route was chosen
+        // here: picked in this chat, or the conversation's own (0.552).
+        ...(teammateId !== undefined && as === undefined && (pickerRoutes.has(pickKey) || conversationRoute !== undefined) ? { routeOverrideFor: teammateId } : {}),
         ...(teammateId === undefined ? {} : { teammateId }),
         // A review's Ask is for that run only (0.514): the host leaves the saved route alone.
         ...(as?.oneOff === true ? { keepSavedRoute: true } : {}),
@@ -4313,18 +4379,30 @@ export default function App(): ReactElement {
       }
 
       const runId = response.data.runId
+      // The conversation this starts (or continues) keeps the setup it was sent with (0.552).
+      chatSetups.current.set(response.data.missionId, { mode: modeOverride ?? runMode, effort: runEffort })
       // The host recorded the owner; mirror it so the sidebar files the
       // mission under the teammate at once rather than after a refresh.
       if (teammateId !== undefined) {
         const missionId = response.data.missionId
         setMissionOwners((current) => ({ ...current, [missionId]: teammateId }))
-        // The host recorded this route as the teammate's own; mirror it so a
-        // reply they make on their own, and the composer next time they are
-        // picked, use it at once.
+        // The host records a route only for a teammate who had none (0.552);
+        // mirror that, so their first run's route shows at once.
         const kept = { runtime: response.data.runtime, model: response.data.model, mode: modeOverride ?? runMode }
         setTeammates((current) =>
-          current.map((teammate) => (teammate.teammateId === teammateId ? { ...teammate, route: kept } : teammate))
+          current.map((teammate) => (teammate.teammateId === teammateId && teammate.route === undefined ? { ...teammate, route: kept } : teammate))
         )
+      }
+      // A pick for a new chat with a teammate was for that chat: it is the
+      // conversation's route now, and their next new chat starts on their own.
+      if (as === undefined && pickKey.startsWith('new:')) {
+        const used = pickKey
+        setPickerRoutes((current) => {
+          if (!current.has(used)) return current
+          const next = new Map(current)
+          next.delete(used)
+          return next
+        })
       }
       const queued = pendingUpdatesRef.current.get(runId) ?? []
       pendingUpdatesRef.current.delete(runId)
@@ -4526,17 +4604,14 @@ export default function App(): ReactElement {
       setRoute(choice)
       const ownerId = ownerOf(current)
       if (ownerId !== undefined) {
-        // M29: and the teammate's own pick, which the chat box prefers over
-        // the bare route. Left alone, it still held the route handed AWAY
-        // from, so the chip -- and the next follow-up -- went back there.
-        setPickerRoutes((routes) => new Map(routes).set(ownerId, choice))
+        // M29: the chip follows the route handed TO. Since 0.552 that is the
+        // conversation's own route -- the new run's record -- which the box
+        // reads before any teammate's; the teammate's saved model is unchanged.
         const missionId = response.data.missionId
         setMissionOwners((owners) => ({ ...owners, [missionId]: ownerId }))
-        // The host now remembers a handed-off route as the teammate's own;
-        // mirror it, as a start does, so the sidebar and the composer agree
-        // (the sidebar read the old route after a handoff, 2026-09-05).
+        // Mirrored only for a teammate with no route yet, as the host records it.
         const kept = { runtime: response.data.runtime, model: response.data.model, mode }
-        setTeammates((all) => all.map((teammate) => (teammate.teammateId === ownerId ? { ...teammate, route: kept } : teammate)))
+        setTeammates((all) => all.map((teammate) => (teammate.teammateId === ownerId && teammate.route === undefined ? { ...teammate, route: kept } : teammate)))
       }
       const queued = pendingUpdatesRef.current.get(newRunId) ?? []
       pendingUpdatesRef.current.delete(newRunId)
@@ -4639,9 +4714,11 @@ export default function App(): ReactElement {
     // moving it.
     routeChosen.current = true
     setRoute(next)
-    if (pickedTeammate !== undefined) {
-      setPickerRoutes((current) => new Map(current).set(pickedTeammate.teammateId, next))
-    }
+    // For this conversation, or this new chat, only (0.552): the teammate's
+    // own model changes in their profile. A new chat with nobody keeps the
+    // pick across a restart, as Claude Code's `/model` default does.
+    setPickerRoutes((current) => new Map(current).set(pickKey, next))
+    if (pickKey === 'new') rememberNewChatRoute(next, mode, effort)
     // Effort belongs to a model, so a level the new model never
     // advertised must not follow it across. But clearing to NOTHING
     // is what made picking a model empty the effort control --

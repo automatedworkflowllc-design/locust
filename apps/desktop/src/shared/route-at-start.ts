@@ -50,14 +50,39 @@ export function routeAtStart(
 
 export interface PickerRoute { readonly runtime: MissionRuntimeId; readonly model: string }
 
-/** Keep the chip and pending header on the same choice while effects settle. */
+/**
+ * Keep the chip and pending header on the same choice while effects settle.
+ *
+ * MODELS STAY WHERE YOU PUT THEM (0.552). Colin, 10/02: "everytime i switch
+ * to a model and go to a new chat it never saves to that model or that
+ * teammate". Picks were held per TEAMMATE and the teammate's saved route beat
+ * the conversation's own, so a reopened conversation showed the teammate's
+ * model and a pick in one chat followed them into every other. Claude Code's
+ * rule instead: a conversation keeps its model; a new one starts on the
+ * default. So, in order:
+ * - a pick made HERE (`key`: this conversation, or this new chat);
+ * - the conversation's own route, what its last turn ran on;
+ * - for a new chat with a teammate, the teammate's model;
+ * - otherwise the bare route (a new chat with nobody).
+ */
 export function composerRouteFor(
   fallback: PickerRoute,
   teammate: { readonly teammateId: string; readonly route?: TeammateRoute } | undefined,
-  explicit: ReadonlyMap<string, PickerRoute>
+  explicit: ReadonlyMap<string, PickerRoute>,
+  key?: string,
+  conversation?: PickerRoute
 ): PickerRoute {
+  const picked = key === undefined ? undefined : explicit.get(key)
+  if (picked !== undefined) return picked
+  if (conversation !== undefined) return conversation
   if (teammate === undefined) return fallback
-  return explicit.get(teammate.teammateId) ?? teammate.route ?? fallback
+  return teammate.route ?? fallback
+}
+
+/** Where the box's pick is held: the conversation on screen, or the new chat it starts (0.552). */
+export function pickKeyFor(conversation: string | undefined, teammateId: string | undefined): string {
+  if (conversation !== undefined) return conversation
+  return teammateId === undefined ? 'new' : `new:${teammateId}`
 }
 
 /**
@@ -103,8 +128,10 @@ export function startAs(
   explicit: ReadonlyMap<string, PickerRoute>
 ): StartAs {
   // Just the picker's two fields: a saved route also carries its mode and
-  // effort, which are said once, below, where they belong.
-  const route = composerRouteFor(composer.route, teammate, explicit)
+  // effort, which are said once, below, where they belong. A run started FOR
+  // a teammate is a new conversation, so it starts on their model; a pick
+  // for their new chat (`new:<id>`) still wins, as it does in the box.
+  const route = composerRouteFor(composer.route, teammate, explicit, pickKeyFor(undefined, teammate.teammateId))
   return {
     teammateId: teammate.teammateId,
     route: { runtime: route.runtime, model: route.model },

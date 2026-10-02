@@ -2206,6 +2206,12 @@ export interface WorkspaceSettings {
   readonly aboutYou?: string
   /** Lines teammates suggested for it, waiting for the person (0.424). */
   readonly aboutYouSuggestions?: readonly AboutYouSuggestion[]
+  /**
+   * The model a new chat with nobody starts on: the last one picked there
+   * (0.552). Claude Code's `/model` sets the default for new sessions; a
+   * conversation already going keeps its own.
+   */
+  readonly newChatRoute?: TeammateRoute
 }
 
 /*

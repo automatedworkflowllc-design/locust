@@ -2640,11 +2640,20 @@ if (!ownsSingleInstanceLock) {
     // A PERSON starting a teammate on a route is what makes it theirs. A run
     // the relay starts for them never re-records it, so a fallback onto the
     // sender's route cannot quietly become the recipient's own.
+    //
+    // Only a teammate who has NO route yet (0.552). Colin, 10/02: "if i have
+    // a teammate set to a certain model i should be able to run a sepate chat
+    // with a new model without assigning that as their new model". Every run
+    // rewrote it, so trying a model in one chat made it the teammate's. As in
+    // Claude Code, a conversation keeps its own model and the default changes
+    // only where it is set: the teammate's profile (Edit teammate's Model row).
     const rememberRoute = async (
       teammateId: string | undefined,
       route: { readonly runtime: MissionRuntimeId; readonly model: string; readonly mode: MissionMode; readonly effort?: string }
     ): Promise<void> => {
       if (teammateId === undefined) return
+      const own = (await teammates.list().catch(() => [])).find((entry) => entry.teammateId === teammateId)
+      if (own === undefined || own.route !== undefined) return
       await teammates.rememberRoute(teammateId, route).catch(() => undefined)
     }
 
