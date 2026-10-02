@@ -2817,7 +2817,7 @@ if (!ownsSingleInstanceLock) {
     const routines = createRoutineStore({ rootDirectory: app.getPath('userData') })
     const rooms = createRoomStore({ rootDirectory: app.getPath('userData') })
     // Comparisons (0.441, shared/compare.ts), kept beside the rooms, outside the ledger.
-    const compares = createCompareStore({ rootDirectory: app.getPath('userData') })
+    const compares = createCompareStore({ rootDirectory: app.getPath('userData'), copyRoot: COPY_ROOT })
     // Folder watchers (0.522): routines that run on a new file, polled, inside the project folder.
     const fileArrivals = createFileArrivals({ get projectFolder() { return workspacePath } })
     const routineCopies = createRoutineCopies()
@@ -3859,10 +3859,12 @@ if (!ownsSingleInstanceLock) {
       // file this app showed you, and refusing to open it would be the app
       // disowning its own work. All of them are the HOST's paths; the
       // renderer still names nothing it was not already shown.
+      // And a comparison column's copy (0.555): a file a column wrote there is one this app showed you.
       const decision = decideReveal(requested, [
         ...(await workedInFolders()),
         ...(await teammateFolders()),
-        ledgerDirectory
+        ledgerDirectory,
+        COPY_ROOT
       ])
       if (!decision.ok) {
         return {
@@ -3920,10 +3922,12 @@ if (!ownsSingleInstanceLock) {
      */
     ipcMain.handle(WORKSPACE_SAVE_COPY_CHANNEL, async (event, requested: unknown) => {
       if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      // And a comparison column's copy (0.555): a file a column wrote there is one this app showed you.
       const decision = decideReveal(requested, [
         ...(await workedInFolders()),
         ...(await teammateFolders()),
-        ledgerDirectory
+        ledgerDirectory,
+        COPY_ROOT
       ])
       if (!decision.ok) {
         return {
@@ -4138,7 +4142,7 @@ if (!ownsSingleInstanceLock) {
       if (typeof requested !== 'string' || requested.length === 0) {
         return { ok: false, message: 'There is no file to open.' } as const
       }
-      const roots = [...(await workedInFolders()), ...(await teammateFolders()), ledgerDirectory]
+      const roots = [...(await workedInFolders()), ...(await teammateFolders()), ledgerDirectory, COPY_ROOT]
       // A link inside the folder that leads out of it is not the folder's to show (SEC-01).
       const linkedOut = 'That file is a link to somewhere outside the folder your teammates work in, so Locust will not open it.'
       /*
@@ -4872,7 +4876,7 @@ if (!ownsSingleInstanceLock) {
      */
     const compareTrees = () => createWorktreeManager({ workspacePath, directory: COPY_ROOT })
     const discardCompareTrees = async (compare: PublicCompare): Promise<void> => {
-      if (compare.changes !== true || compare.changesIn === 'copy') return
+      if (compare.changes !== true || compare.changesIn !== undefined) return
       for (const column of compare.slots) await compareTrees().discard(compareTreeId(compare.compareId, column.slot)).catch(() => undefined)
     }
     const startCompareColumn = async (compare: PublicCompare, column: PublicCompareSlot, prompt: string, followUpOf?: string, retrying = false): Promise<string | undefined> => {
@@ -4889,6 +4893,9 @@ if (!ownsSingleInstanceLock) {
         } catch (error) {
           return error instanceof Error ? error.message.replace('It answers in a copy of the folder, and this', 'It works in a copy of the folder, and this') : 'A copy of the folder could not be made for it.'
         }
+      } else if (compare.changes === true && compare.changesIn === 'folder') {
+        // Too big to copy (0.555): it works in the folder itself, as the bar says.
+        tree = workspacePath
       } else if (compare.changes === true) {
         try {
           tree = await compareTrees().ensure({ teammateId: compareTreeId(compare.compareId, column.slot), name: `compare ${compare.compareId} ${column.slot}` })
@@ -4986,11 +4993,12 @@ if (!ownsSingleInstanceLock) {
         return compareRefused(`Pick ${String(MIN_COMPARE_SLOTS)} or ${String(MAX_COMPARE_SLOTS)} different models to compare.`)
       }
       if (teammateId !== undefined && !(await teammates.list()).some((entry) => entry.teammateId === teammateId)) return compareRefused('That teammate is no longer on the team.')
-      // A git project gives each column a worktree; any other folder, a plain copy (0.448).
-      const changesIn = changes && !(await compareTrees().probe()).repository ? ('copy' as const) : undefined
-      // Said before anything starts, never as two failed columns (0.457).
-      const cannotCopy = changesIn === 'copy' ? await copyRefusal(workspacePath) : undefined
-      if (cannotCopy !== undefined) return compareRefused(`${cannotCopy} Switch Compare to Ask and send it again.`)
+      /*
+       * A git project gives each column a worktree; any other folder, a plain
+       * copy (0.448) -- and one too big to copy, the folder itself (0.555),
+       * where 0.457 refused and sent the person back to Ask.
+       */
+      const changesIn = changes && !(await compareTrees().probe()).repository ? ((await copyRefusal(workspacePath)) === undefined ? ('copy' as const) : ('folder' as const)) : undefined
       try {
         return await askEveryColumn(await compares.create({ ...(teammateId === undefined ? {} : { teammateId }), prompt, routes, changes, blind, ...(changesIn === undefined ? {} : { changesIn }) }), prompt, false)
       } catch (error) {
@@ -5013,7 +5021,7 @@ if (!ownsSingleInstanceLock) {
         const compare = await compares.get(compareId)
         if (compare === undefined) return compareRefused('That comparison is no longer here.')
         let brought: readonly string[] | undefined
-        if (compare.changes === true && compare.kept === undefined) {
+        if (compare.changes === true && compare.kept === undefined && compare.changesIn !== 'folder') {
           const result = await (compare.changesIn === 'copy'
             ? bringInCopy({ folder: workspacePath, compareId, slot: slot as CompareSlotId })
             : compareTrees().bringIn(compareTreeId(compareId, slot as CompareSlotId))
@@ -5178,18 +5186,15 @@ if (!ownsSingleInstanceLock) {
       })
       return { ok: true, data: { compare: judged, refused: [] } } as const
     })
-    // A git project gives each column a worktree, so only a plain folder can be too big (0.457).
-    ipcMain.handle(COMPARE_CHANGES_REFUSAL_CHANNEL, async (event) => {
-      if (!fromOwnWindow(event)) return undefined
-      if ((await compareTrees().probe()).repository) return undefined
-      return copyRefusal(workspacePath)
-    })
+    // Nothing refuses a comparison that edits now (0.555): a folder too big to copy works in place.
+    ipcMain.handle(COMPARE_CHANGES_REFUSAL_CHANNEL, () => undefined)
     ipcMain.handle(COMPARE_CHANGES_CHANNEL, async (event, compareId: unknown) => {
       if (!fromOwnWindow(event)) return compareRefused('The request was rejected.')
       const compare = await compares.get(compareId).catch(() => undefined)
       if (compare === undefined) return compareRefused('That comparison is no longer here.')
       const columns: Partial<Record<CompareSlotId, { files: number; added?: number; removed?: number }>> = {}
-      if (compare.changes === true && compare.kept === undefined) {
+      // In the folder itself (0.555) the columns' changes are mixed in one place: no count it can stand behind.
+      if (compare.changes === true && compare.kept === undefined && compare.changesIn !== 'folder') {
         for (const column of compare.slots) {
           if (column.missionIds.length === 0) continue
           try {

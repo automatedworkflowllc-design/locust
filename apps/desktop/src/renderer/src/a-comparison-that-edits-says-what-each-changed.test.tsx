@@ -38,10 +38,10 @@ const column = (slot: 'a' | 'b'): CompareColumnView => ({
   state: 'done',
   span: '12s'
 })
-const render = (changeLines: Partial<Record<'a' | 'b', string>>): string =>
+const render = (changeLines: Partial<Record<'a' | 'b', string>>, shown: PublicCompare = compare): string =>
   renderToStaticMarkup(
     <CompareView
-      compare={compare}
+      compare={shown}
       changeLines={changeLines}
       prompts={[compare.prompt]}
       columns={[column('a'), column('b')]}
@@ -64,6 +64,23 @@ describe('a comparison that edits', () => {
     expect(keep).toHaveLength(2)
     expect(keep[0]).toContain('Its changes come into your folder, not committed')
     expect(html).not.toMatch(/worktree|branch/i)
+  })
+
+  /*
+   * 0.555. Sol, on Auto and told to "go find the app", wrote into Colin's
+   * folder from its copy: Auto runs with the whole disk, so the bar says so.
+   */
+  it('on Auto, says a model can still change files outside its copy', () => {
+    const auto: PublicCompare = { ...compare, slots: compare.slots.map((one) => ({ ...one, route: { ...one.route, mode: 'auto' as const } })) }
+    expect(render({}, auto)).toContain('On Auto, a model can still change files outside its copy if it is asked to.')
+    expect(render({})).not.toContain('On Auto')
+  })
+
+  it('in a folder too big to copy, says they all work in the folder itself, and Keep brings nothing in', () => {
+    const html = render({}, { ...compare, changesIn: 'folder' })
+    expect(html).toContain('This folder is too big to give each its own copy, so they all work in your folder itself.')
+    expect(html).not.toContain('Each changes its own copy')
+    expect(html).toContain('its changes are there already')
   })
 
   it('puts what each changed at its foot, before its time', () => {

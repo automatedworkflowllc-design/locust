@@ -26,8 +26,15 @@ import type { CompareSlotId } from '../shared/compare.js'
  * own store) is left out, and a folder too big to copy says so instead.
  */
 export const COPY_ROOT = join(homedir(), '.locust', 'compare')
-export const MAX_COPY_FILES = 5_000
-export const MAX_COPY_BYTES = 250 * 1024 * 1024
+/*
+ * Raised 0.555, measured on Colin's folders: a project of 11,339 files and
+ * 388 MB was refused at 5,000 and 250 MB. A file over MAX_COPIED_FILE_BYTES
+ * (a video, a database, a model) is left out of the copy rather than turning
+ * the whole folder away; a folder past these works in place ('folder').
+ */
+export const MAX_COPY_FILES = 20_000
+export const MAX_COPY_BYTES = 1024 * 1024 * 1024
+export const MAX_COPIED_FILE_BYTES = 20 * 1024 * 1024
 const LEFT_OUT = new Set(['.git', '.locust', 'node_modules', '.venv', 'venv', '__pycache__', 'dist', 'build', '.next', 'target', '.cache', '.turbo'])
 
 const safeName = (compareId: string, slot: CompareSlotId): string => {
@@ -51,7 +58,15 @@ const nameOf = (ref: CopyRef): string => {
 }
 
 /** Files and bytes the copy would hold, stopping as soon as either limit is passed. */
-async function measure(folder: string): Promise<{ files: number; bytes: number; over: boolean }> {
+/** How much a copy may hold; a test passes smaller ones rather than writing 20,000 files. */
+export interface CopyLimits {
+  readonly files: number
+  readonly bytes: number
+}
+const LIMITS: CopyLimits = { files: MAX_COPY_FILES, bytes: MAX_COPY_BYTES }
+const tooBig = (limits: CopyLimits): string => `more than ${limits.files.toLocaleString('en-US')} files or ${String(Math.round(limits.bytes / (1024 * 1024)))} MB`
+
+async function measure(folder: string, limits: CopyLimits): Promise<{ files: number; bytes: number; over: boolean }> {
   let files = 0
   let bytes = 0
   const walk = async (directory: string): Promise<boolean> => {
@@ -61,9 +76,11 @@ async function measure(folder: string): Promise<{ files: number; bytes: number; 
       if (entry.isDirectory()) {
         if (!(await walk(path))) return false
       } else if (entry.isFile()) {
+        const size = (await stat(path)).size
+        if (size > MAX_COPIED_FILE_BYTES) continue
         files += 1
-        bytes += (await stat(path)).size
-        if (files > MAX_COPY_FILES || bytes > MAX_COPY_BYTES) return false
+        bytes += size
+        if (files > limits.files || bytes > limits.bytes) return false
       }
     }
     return true
@@ -80,10 +97,10 @@ async function measure(folder: string): Promise<{ files: number; bytes: number; 
  * and both came back "could not start" with a Try again that could only fail
  * the same way.
  */
-export async function copyRefusal(folder: string): Promise<string | undefined> {
-  const size = await measure(resolve(folder)).catch(() => ({ over: true }))
+export async function copyRefusal(folder: string, limits: CopyLimits = LIMITS): Promise<string | undefined> {
+  const size = await measure(resolve(folder), limits).catch(() => ({ over: true }))
   return size.over
-    ? `This folder is too big to copy (more than ${MAX_COPY_FILES.toLocaleString('en-US')} files or ${String(Math.round(MAX_COPY_BYTES / (1024 * 1024)))} MB), so a comparison here can answer but not change files.`
+    ? `This folder is too big to give each model its own copy (${tooBig(limits)}).`
     : undefined
 }
 
@@ -91,26 +108,29 @@ export async function copyRefusal(folder: string): Promise<string | undefined> {
 export async function makeCompareCopy(input: CopyRef & {
   readonly folder: string
   readonly root?: string
+  readonly limits?: CopyLimits
 }): Promise<string> {
   const root = input.root ?? COPY_ROOT
   const target = join(root, nameOf(input))
   const made = await lstat(target).then((found) => found.isDirectory(), () => false)
   if (made) return target
   const source = resolve(input.folder)
-  const size = await measure(source)
+  const size = await measure(source, input.limits ?? LIMITS)
   if (size.over) {
     return Promise.reject(
-      new Error(`It answers in a copy of the folder, and this folder is too big to copy (more than ${MAX_COPY_FILES.toLocaleString('en-US')} files or ${String(Math.round(MAX_COPY_BYTES / (1024 * 1024)))} MB).`)
+      new Error(`It answers in a copy of the folder, and this folder is too big to copy (${tooBig(input.limits ?? LIMITS)}).`)
     )
   }
   await mkdir(root, { recursive: true })
   await cp(source, target, {
     recursive: true,
     errorOnExist: false,
-    filter: (from) => {
+    filter: async (from) => {
       const inside = relative(source, from)
       if (inside.length === 0) return true
-      return !inside.split(sep).some((part) => LEFT_OUT.has(part))
+      if (inside.split(sep).some((part) => LEFT_OUT.has(part))) return false
+      const found = await lstat(from).catch(() => undefined)
+      return found === undefined || !found.isFile() || found.size <= MAX_COPIED_FILE_BYTES
     }
   })
   // What each file was when copied (0.448): so Keep knows what the column
@@ -132,7 +152,7 @@ async function hashTree(tree: string): Promise<Record<string, string>> {
       if (LEFT_OUT.has(entry.name)) continue
       const path = join(directory, entry.name)
       if (entry.isDirectory()) await walk(path)
-      else if (entry.isFile()) out[relative(tree, path).split(sep).join('/')] = await hashOf(path)
+      else if (entry.isFile() && (await stat(path)).size <= MAX_COPIED_FILE_BYTES) out[relative(tree, path).split(sep).join('/')] = await hashOf(path)
     }
   }
   await walk(tree)

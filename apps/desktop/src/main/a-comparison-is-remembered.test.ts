@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -116,5 +116,44 @@ describe('a comparison', () => {
   it('gives each column a run slot of its own', () => {
     expect(compareSlotKey('tm_wren', 'cmp_1', 'a')).not.toBe(compareSlotKey('tm_wren', 'cmp_1', 'b'))
     expect(compareSlotKey('tm_wren', 'cmp_1', 'a')).not.toBe('tm_wren')
+  })
+})
+
+describe('where a comparison that edits works', () => {
+  // 0.555: a folder too big to copy works in place, and a restart remembers it.
+  it('in copies, or in the folder itself, survives a restart', async () => {
+    const root = await folder()
+    let id = 0
+    const store = createCompareStore({ rootDirectory: root, createId: () => `cmp_${String((id += 1))}` })
+    await store.create({ prompt: 'Make a landing page.', routes: ROUTES, changes: true, changesIn: 'copy' })
+    await store.create({ prompt: 'Tidy the notes.', routes: ROUTES, changes: true, changesIn: 'folder' })
+    const again = createCompareStore({ rootDirectory: root })
+    expect((await again.get('cmp_1'))?.changesIn).toBe('copy')
+    expect((await again.get('cmp_2'))?.changesIn).toBe('folder')
+  })
+})
+
+describe('where each column works', () => {
+  /*
+   * 0.555: Antigravity wrote optimization-review.md in its copy, and the
+   * file's chip, looking in Colin's folder, said the file was not there.
+   */
+  it('is its copy while it edits, and the folder once one is kept -- and it is never stored', async () => {
+    const root = await folder()
+    const store = createCompareStore({ rootDirectory: root, copyRoot: join(root, 'copies'), createId: () => 'cmp_7' })
+    const made = await store.create({ prompt: 'Review it.', routes: ROUTES, changes: true, changesIn: 'copy' })
+    expect(made.slots.map((column) => column.folder)).toEqual([join(root, 'copies', 'cmp_7-a'), join(root, 'copies', 'cmp_7-b')])
+    expect((await store.get('cmp_7'))?.slots[1]?.folder).toBe(join(root, 'copies', 'cmp_7-b'))
+    expect(await readFile(join(root, 'compares.json'), 'utf8')).not.toContain('copies')
+    await store.addTurn('cmp_7', 'a', 'm_a')
+    expect((await store.keep('cmp_7', 'a')).slots.every((column) => column.folder === undefined)).toBe(true)
+  })
+
+  it('is the folder itself for one that answers, or one too big to copy', async () => {
+    const root = await folder()
+    let id = 0
+    const store = createCompareStore({ rootDirectory: root, copyRoot: join(root, 'copies'), createId: () => `cmp_${String((id += 1))}` })
+    expect((await store.create({ prompt: 'Which?', routes: ROUTES })).slots.some((column) => column.folder !== undefined)).toBe(false)
+    expect((await store.create({ prompt: 'Tidy.', routes: ROUTES, changes: true, changesIn: 'folder' })).slots.some((column) => column.folder !== undefined)).toBe(false)
   })
 })

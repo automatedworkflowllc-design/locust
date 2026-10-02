@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { compareNeedsCopy, compareRefusalOf } from '../shared/compare.js'
-import { makeCompareCopy, MAX_COPY_FILES, removeCompareCopies } from './compare-copies.js'
+import { copyRefusal, makeCompareCopy, MAX_COPIED_FILE_BYTES, MAX_COPY_BYTES, removeCompareCopies } from './compare-copies.js'
 
 /**
  * A COLUMN THAT CANNOT BE HELD READ-ONLY ANSWERS IN A COPY (0.443).
@@ -50,10 +50,25 @@ describe('a copy for a column', () => {
   it('says so, and makes nothing, when the folder is too big to copy', async () => {
     const folder = await made('locust-copy-big-')
     const root = await made('locust-copy-root-')
-    await Promise.all(Array.from({ length: MAX_COPY_FILES + 1 }, (_, index) => writeFile(join(folder, `f${String(index)}.txt`), '', 'utf8')))
-    await expect(makeCompareCopy({ folder, compareId: 'cmp_2', slot: 'a', root })).rejects.toThrow(/too big to copy/)
+    await Promise.all(Array.from({ length: 6 }, (_, index) => writeFile(join(folder, `f${String(index)}.txt`), '', 'utf8')))
+    await expect(makeCompareCopy({ folder, compareId: 'cmp_2', slot: 'a', root, limits: { files: 5, bytes: MAX_COPY_BYTES } })).rejects.toThrow(/too big to copy \(more than 5 files/)
     expect(await readdir(root)).toEqual([])
-  }, 60_000)
+  })
+
+  /*
+   * 0.555: one big file -- a video, a database -- is left out of the copy,
+   * not a reason to turn the whole folder away.
+   */
+  it('leaves a file too big to copy out, and copies the rest', async () => {
+    const folder = await made('locust-copy-bigfile-')
+    const root = await made('locust-copy-root-')
+    await writeFile(join(folder, 'index.html'), '<p>x</p>', 'utf8')
+    await writeFile(join(folder, 'clip.mp4'), Buffer.alloc(MAX_COPIED_FILE_BYTES + 1))
+    expect(await copyRefusal(folder, { files: 1, bytes: 1024 })).toBeUndefined()
+    const copy = await makeCompareCopy({ folder, compareId: 'cmp_9', slot: 'a', root })
+    expect(await exists(join(copy, 'index.html'))).toBe(true)
+    expect(await exists(join(copy, 'clip.mp4'))).toBe(false)
+  })
 
   it('removes the comparison\'s copies and nothing else', async () => {
     const folder = await made('locust-copy-src-')

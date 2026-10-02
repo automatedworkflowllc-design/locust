@@ -34,6 +34,8 @@ export interface CompareColumnView {
   readonly copy?: true
   /** Why it could not start, when it could not. */
   readonly refused?: string
+  /** Where it works, when not the person's folder (0.555): its files are read there. */
+  readonly folder?: string
   /** One cell per ask, oldest first; a column that could not take an ask has none for it. */
   readonly turns: readonly { readonly missionId: string; readonly items: readonly ThreadItem[]; readonly running: boolean }[]
   readonly running: boolean
@@ -173,9 +175,14 @@ export function CompareView({
         <span>
           {kept === undefined
             ? `Comparing ${columns.map((column) => column.name).join(columns.length === 2 ? ' and ' : ', ')}${veiled ? ', names hidden until you keep one' : ''}. ${
-                compare.changes === true
-                  ? 'Each changes its own copy of your project; only the one you keep comes into your folder.'
-                  : 'They answer without changing files.'
+                compare.changes !== true
+                  ? 'They answer without changing files.'
+                  : compare.changesIn === 'folder'
+                    ? 'This folder is too big to give each its own copy, so they all work in your folder itself.'
+                    : `Each changes its own copy of your project; only the one you keep comes into your folder.${
+                        // Said, not promised (0.555): Auto runs with the whole disk, and Sol, told to, wrote outside its copy.
+                        compare.slots.some((column) => column.route.mode === 'auto') ? ' On Auto, a model can still change files outside its copy if it is asked to.' : ''
+                      }`
               }`
             : `You kept ${keptName ?? 'one'}; the conversation carries on with it.`}
         </span>
@@ -269,7 +276,7 @@ export function CompareView({
                               owner={owner}
                               faces={false}
                               activity={cell.running ? 'thinking' : 'idle'}
-                              workspacePath={workspacePath}
+                              workspacePath={column.folder ?? workspacePath}
                               decision={undefined}
                             />
                             </InComparisonCell.Provider>
@@ -405,7 +412,9 @@ export function CompareView({
                 disabled={keeping || !column.keepable}
                 title={
                   column.keepable
-                    ? compare.changes === true
+                    ? compare.changes === true && compare.changesIn === 'folder'
+                      ? 'Keep this one: the conversation carries on with it. They all worked in your folder, so its changes are there already, with the others’.'
+                      : compare.changes === true
                       ? 'Keep this one. Its changes come into your folder, not committed; the others stop, and their copies are removed.'
                       : 'Keep this one. The others stop, and the conversation carries on with it.'
                     : column.running ? 'Still answering.' : 'Nothing to keep: its answer did not finish.'

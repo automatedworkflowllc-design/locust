@@ -4001,7 +4001,8 @@ export default function App(): ReactElement {
     return offered === undefined ? [] : [offered, ...rest.map((one, index) => ({ one, index })).sort((x, y) => rank(x.one) - rank(y.one) || x.index - y.index).map(({ one }) => one)]
   }
   const compareColumnsFor = (compare: PublicCompare): { readonly prompts: readonly string[]; readonly columns: readonly CompareColumnView[] } => {
-    const cellOf = (missionId: string) => {
+    // Each column's files are read where it works (0.555): its copy, until one is kept.
+    const cellOf = (missionId: string, folder: string | undefined = workspacePath) => {
       const live = [...runs.values()].find((run) => run.data?.missionId === missionId)
       const recorded = historyById.get(missionId)
       const events = live !== undefined && live.events.length > 0 ? live.events : recorded?.events ?? []
@@ -4012,10 +4013,10 @@ export default function App(): ReactElement {
         running,
         phase: live?.phase ?? recorded?.phase ?? 'unknown',
         prompt: splitAttachments(live?.prompt ?? recorded?.prompt ?? '').text,
-        items: buildThread(events, { running, mayEdit: false, ...(workspacePath === undefined ? {} : { workspacePath }) })
+        items: buildThread(events, { running, mayEdit: false, ...(folder === undefined ? {} : { workspacePath: folder }) })
       }
     }
-    const cellsBySlot = compare.slots.map((column) => column.missionIds.map(cellOf))
+    const cellsBySlot = compare.slots.map((column) => column.missionIds.map((missionId) => cellOf(missionId, column.folder ?? workspacePath)))
     const columns = compare.slots.map((column, index): CompareColumnView => {
       const cells = cellsBySlot[index] ?? []
       const running = cells.some((cell) => cell.running)
@@ -4037,6 +4038,7 @@ export default function App(): ReactElement {
         runtimeName: runtimeNameOf(column.route.runtime),
         ...(compareNeedsCopy(column.route.runtime, build?.platform) ? { copy: true } : {}),
         ...(column.refused === undefined ? {} : { refused: column.refused }),
+        ...(column.folder === undefined ? {} : { folder: column.folder }),
         turns: cells.map((cell) => ({ missionId: cell.missionId, items: cell.items, running: cell.running })),
         approvals: approvals.filter((request) => {
           const missionId = runs.get(request.runId)?.data?.missionId

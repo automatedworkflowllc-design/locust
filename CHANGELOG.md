@@ -11,6 +11,23 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.555.0 - 2026-10-02
+
+### Changed
+
+- **Compare on Auto or Edit works in any folder.** A folder too big to give
+  each model its own copy is no longer refused: they all work in the folder
+  itself, and the bar says so. A git project still gives each model its own
+  copy, and a plain folder now does up to 20,000 files and 1 GB, leaving out
+  single files over 20 MB rather than refusing.
+- **On Auto, the bar says a model can still change files outside its copy**
+  if it is asked to.
+
+### Fixed
+
+- **A file a compared model wrote opens from its column.** Its chip looked in
+  your folder rather than the model's copy, and said the file was not there.
+
 ## 0.554.0 - 2026-10-02
 
 ### Changed

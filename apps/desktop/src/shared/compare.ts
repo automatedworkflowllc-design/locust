@@ -46,6 +46,11 @@ export interface PublicCompareSlot {
    * never surface as conversations of their own, but no longer drawn.
    */
   readonly retried?: readonly string[]
+  /**
+   * The folder it works in, when not the person's own (0.555): its copy or
+   * worktree, until one is kept. Never stored -- the store works it out.
+   */
+  readonly folder?: string
 }
 
 export interface PublicCompare {
@@ -65,9 +70,11 @@ export interface PublicCompare {
   /**
    * Where a comparison that edits keeps its columns' copies (0.448): 'copy'
    * is a plain copy of a folder that is not a git project; absent, each
-   * column is a git worktree.
+   * column is a git worktree. 'folder' (0.555): a folder too big to copy, so
+   * every column works in the folder itself -- Colin, 10/02: "maybe revisit
+   * the whole copy the whole folder thing" after a refusal kept him off Auto.
    */
-  readonly changesIn?: 'copy'
+  readonly changesIn?: 'copy' | 'folder'
   /**
    * The names are hidden until one is kept (0.449, Arena's Battle): columns
    * read Model A, Model B, so the answer is judged and not the name.

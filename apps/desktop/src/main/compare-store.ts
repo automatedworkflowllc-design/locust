@@ -3,7 +3,7 @@ import { constants as fsConstants } from 'node:fs'
 import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
-import { COMPARE_SLOTS, MAX_COMPARE_SLOTS, MAX_JUDGE_CRITERIA, MIN_COMPARE_SLOTS } from '../shared/compare.js'
+import { COMPARE_SLOTS, compareTreeId, MAX_COMPARE_SLOTS, MAX_JUDGE_CRITERIA, MIN_COMPARE_SLOTS } from '../shared/compare.js'
 import type { CompareRoute, CompareSlotId, PublicCompare, PublicCompareSlot } from '../shared/compare.js'
 
 /**
@@ -38,7 +38,7 @@ export interface CompareStore {
   list(): Promise<readonly PublicCompare[]>
   get(compareId: unknown): Promise<PublicCompare | undefined>
   /** A new comparison, its columns named in order; the oldest past `MAX_COMPARES` is forgotten. */
-  create(input: { readonly teammateId?: string; readonly prompt: string; readonly routes: readonly CompareRoute[]; readonly changes?: boolean; readonly changesIn?: 'copy'; readonly blind?: boolean }): Promise<PublicCompare>
+  create(input: { readonly teammateId?: string; readonly prompt: string; readonly routes: readonly CompareRoute[]; readonly changes?: boolean; readonly changesIn?: 'copy' | 'folder'; readonly blind?: boolean }): Promise<PublicCompare>
   /** A column's next turn started. */
   addTurn(compareId: string, slot: CompareSlotId, missionId: string): Promise<PublicCompare>
   /**
@@ -112,7 +112,7 @@ function parsedCompare(value: unknown): PublicCompare | undefined {
     createdAt,
     slots,
     ...(record.changes === true ? { changes: true as const } : {}),
-    ...(record.changes === true && record.changesIn === 'copy' ? { changesIn: 'copy' as const } : {}),
+    ...(record.changes === true && (record.changesIn === 'copy' || record.changesIn === 'folder') ? { changesIn: record.changesIn } : {}),
     ...(record.blind === true ? { blind: true as const } : {}),
     ...(keptSlot === undefined ? {} : { kept: keptSlot }),
     ...(judge === undefined ? {} : { judge })
@@ -144,6 +144,8 @@ export function createCompareStore(options: {
   readonly rootDirectory: string
   readonly now?: () => Date
   readonly createId?: () => string
+  /** Where columns' copies live (compare-copies.ts COPY_ROOT): each column is told its folder. */
+  readonly copyRoot?: string
 }): CompareStore {
   const rootDirectory = options.rootDirectory
   if (!isAbsolute(rootDirectory)) throw new Error('Compare store directory is invalid')
@@ -207,7 +209,7 @@ export function createCompareStore(options: {
     return { ...compare, slots: compare.slots.map((column) => (column.slot === slot ? edit(column) : column)) }
   }
 
-  return {
+  const inner: CompareStore = {
     list: () => serialize(async () => (await read()).compares),
 
     get: (compareId) => serialize(async () => (await read()).compares.find((compare) => compare.compareId === compareId)),
@@ -226,7 +228,7 @@ export function createCompareStore(options: {
           prompt,
           createdAt: now().toISOString(),
           ...(input.changes === true ? { changes: true as const } : {}),
-          ...(input.changes === true && input.changesIn === 'copy' ? { changesIn: 'copy' as const } : {}),
+          ...(input.changes === true && (input.changesIn === 'copy' || input.changesIn === 'folder') ? { changesIn: input.changesIn } : {}),
           ...(input.blind === true ? { blind: true as const } : {}),
           slots: input.routes.map((route, index) => ({
             slot: COMPARE_SLOTS[index]!,
@@ -302,4 +304,35 @@ export function createCompareStore(options: {
         await write({ schemaVersion: SCHEMA_VERSION, compares: file.compares.filter((compare) => compare.compareId !== compareId) })
       })
   }
+  const copyRoot = options.copyRoot
+  if (copyRoot === undefined) return inner
+  const shown = (compare: PublicCompare): PublicCompare => withColumnFolders(compare, copyRoot)
+  return {
+    ...inner,
+    list: async () => (await inner.list()).map(shown),
+    get: async (compareId) => {
+      const found = await inner.get(compareId)
+      return found === undefined ? undefined : shown(found)
+    },
+    create: async (input) => shown(await inner.create(input)),
+    addTurn: async (...args) => shown(await inner.addTurn(...args)),
+    retry: async (...args) => shown(await inner.retry(...args)),
+    refuse: async (...args) => shown(await inner.refuse(...args)),
+    keep: async (...args) => shown(await inner.keep(...args)),
+    addColumn: async (...args) => shown(await inner.addColumn(...args)),
+    judge: async (...args) => shown(await inner.judge(...args))
+  }
+}
+
+/**
+ * WHERE EACH COLUMN WORKS (0.555), worked out, never stored. Colin, on a
+ * comparison on Auto: Antigravity wrote optimization-review.md in its copy,
+ * and the file's chip, looking in his folder, said "That file is not there.
+ * The teammate named it but did not write it." A column that edits works in
+ * its copy (or worktree) until one is kept; then the kept one's files are in
+ * the folder and the copies are gone.
+ */
+export function withColumnFolders(compare: PublicCompare, copyRoot: string): PublicCompare {
+  if (compare.changes !== true || compare.changesIn === 'folder' || compare.kept !== undefined) return compare
+  return { ...compare, slots: compare.slots.map((column) => ({ ...column, folder: join(copyRoot, compareTreeId(compare.compareId, column.slot)) })) }
 }
