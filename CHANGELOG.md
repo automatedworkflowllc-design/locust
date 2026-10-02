@@ -11,6 +11,24 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.534.0 - 2026-10-02
+
+### New
+
+- **A routine can keep going until your check passes.** A routine that may
+  change files can now say what happens when its steps are done: stop, or
+  run this folder's check (the command you set in Settings > Project
+  folder, such as `npm test`) and, while it fails, ask the teammate to fix
+  what the check printed, up to the number of fixes you choose. When the
+  check passes it says so; when the fixes run out it stops, says what still
+  fails, and does not count the run as done. Each fix is one more turn.
+  In a copy, the passing result waits for you to Keep as usual.
+
+### Fixed
+
+- A routine that works in a copy lists the files it changed by their names
+  in your folder, not by the copy's long path.
+
 ## 0.533.0 - 2026-10-01
 
 ### New
