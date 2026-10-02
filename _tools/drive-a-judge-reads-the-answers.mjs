@@ -95,7 +95,7 @@ try {
     for (let i = 0; i < 80 && document.querySelectorAll('.lc-compare__judgepick option').length <= 2; i += 1) await new Promise((r) => setTimeout(r, 250))
     return ${state}
   })()`))))
-  check('with the answers in, it offers a judge, and not one of the two compared first', before.ask && before.choices.length > 0 && /Codex/.test(before.choices[0] ?? '') && !/Mimo|Ling/.test(before.choices[0] ?? ''), JSON.stringify(before.choices.slice(0, 4)))
+  check('with the answers in, it offers a judge, and not one of the two compared first', before.ask && before.choices.length > 0 && !/Mimo V2.6|Ling 3.0/.test(before.choices[0] ?? ''), JSON.stringify(before.choices.slice(0, 4)))
   check('every model it can be is listed, under its agent (0.554)', before.groups.length >= 2 && before.choices.length > 16, `${before.choices.length} models; ${JSON.stringify(before.groups)}`)
   await drive.capture('the judge asked', () => drive.evaluate(`(async () => {
     const box = document.querySelector('.lc-compare__judgecriteria')
@@ -117,7 +117,7 @@ try {
     if (after.label.length > 0 && !/reading/i.test(after.label) && (after.said.length > 0 || /did not answer/.test(after.view))) break
   }
   await drive.capture('the judge\'s view', () => drive.evaluate(`document.querySelector('.lc-compare__judge')?.scrollIntoView(); 1`))
-  check('the judge\'s view is shown under the answers, under the model that judged', /THE JUDGE'S VIEW · .*Codex|THE JUDGE'S VIEW · Account Default/i.test(after.view) && /Answer A/.test(after.view) && /Answer B/.test(after.view), after.view.slice(0, 400))
+  check('the judge\'s view is shown under the answers, under the model that judged', after.view.startsWith(`THE JUDGE'S VIEW · ${before.choices[0]}`) && /Answer A/.test(after.view) && /Answer B/.test(after.view), after.view.slice(0, 400))
   check('it says which it would keep, and says it is a view, not a decision', /keep/i.test(after.view) && /you keep the answer/.test(after.view), after.view.slice(-200))
   check('while it read, what it was doing showed as it came, not a bare "Reading the answers"', shownWhileReading.length > 0, shownWhileReading)
   const named = [...after.said.matchAll(/(\bnot\s+|n't\s+)?\bkeep:?[\s*_]*answer\s+([a-c])\b/gi)].at(-1)

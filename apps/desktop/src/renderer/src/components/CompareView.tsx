@@ -435,6 +435,18 @@ export interface ModelChoice {
 }
 
 /**
+ * THE MODEL PICKED, OR THE ONE OFFERED (0.554). The menu is first drawn
+ * before the agents are found, when only the compared models can judge; a
+ * pick held from then stayed on one of them, and the judge ran on a model it
+ * was judging. Until the person picks, it follows the one offered first.
+ */
+function useChosenModel(choices: readonly ModelChoice[]): readonly [string, (key: string) => void] {
+  const [picked, setPicked] = useState<string>()
+  const held = picked !== undefined && choices.some((one) => one.key === picked) ? picked : undefined
+  return [held ?? choices[0]?.key ?? '', setPicked] as const
+}
+
+/**
  * EVERY MODEL, UNDER ITS AGENT (0.554), as the composer's model menu lists
  * them. Colin, on 0.553: "not all of our models showing in judge category"
  * -- sixteen fit, and the free OpenCode ones filled most of them. The one
@@ -476,7 +488,7 @@ function JudgeAsk({ choices, again, busy, onJudge }: {
   readonly busy: boolean
   readonly onJudge: (choiceKey: string, criteria: string) => void
 }): ReactElement {
-  const [choice, setChoice] = useState(choices[0]?.key ?? '')
+  const [choice, setChoice] = useChosenModel(choices)
   const [criteria, setCriteria] = useState('')
   return (
     <div className="lc-compare__judgeask">
@@ -511,7 +523,7 @@ function AddModelAsk({ choices, busy, onAdd }: {
   readonly busy: boolean
   readonly onAdd: (choiceKey: string) => void
 }): ReactElement {
-  const [choice, setChoice] = useState(choices[0]?.key ?? '')
+  const [choice, setChoice] = useChosenModel(choices)
   return (
     <div className="lc-compare__judgeask">
       <span className="lc-compare__recordlabel lc-mono">ASK ANOTHER MODEL</span>

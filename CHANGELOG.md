@@ -22,6 +22,9 @@ heading: the home screen then shows it once, as a splash.
   head. It is still the judge's view: you keep the answer.
 - **Every model you can use is offered as a judge,** listed under its agent.
   Only sixteen fitted before, and the free OpenCode models took most of them.
+- **A judge is never one of the models it judges** when you open a
+  comparison right after Locust starts. The menu could stay on a compared
+  model it showed before your agents were found.
 
 ## 0.553.0 - 2026-10-02
 
