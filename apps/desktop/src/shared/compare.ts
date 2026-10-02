@@ -200,3 +200,19 @@ export function blindName(slot: CompareSlotId): string {
 export function versusLabel(names: readonly string[]): string {
   return names.join(' vs ')
 }
+
+/**
+ * WHICH ANSWER THE JUDGE WOULD KEEP (0.554), so the comparison can mark that
+ * column. The judge is asked to end on which answer it would keep
+ * (compare-judge.ts); Cursor's, on 0.553: "I would keep Answer C, because
+ * ...". The last "keep Answer X" counts. Undefined when it named none, one it
+ * would not keep, or one not in this comparison -- then nothing is marked,
+ * and its words still say what it said.
+ */
+export function judgePickOf(text: string, slots: readonly CompareSlotId[]): CompareSlotId | undefined {
+  const picks = [...text.matchAll(/(\bnot\s+|n't\s+)?\bkeep:?[\s*_]*answer\s+([a-c])\b/gi)]
+  const last = picks.at(-1)
+  if (last === undefined || last[1] !== undefined) return undefined
+  const letter = last[2]?.toLowerCase()
+  return slots.find((slot) => slot === letter)
+}

@@ -107,7 +107,7 @@ import type { ComparePick, ComparePicking, RouteChoice } from './components/Rout
 import { CompareView } from './components/CompareView.js'
 import { comparisonOf, foldComparisons } from './compareRows.js'
 import type { CompareColumnView } from './components/CompareView.js'
-import { blindName, changesLine, compareMembership, compareRecord, compareNeedsCopy, compareRefusalOf, judgeMissionIds, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../../shared/compare.js'
+import { blindName, changesLine, compareMembership, compareRecord, compareNeedsCopy, compareRefusalOf, judgeMissionIds, judgePickOf, MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS } from '../../shared/compare.js'
 import type { CompareSlotId, PublicCompare } from '../../shared/compare.js'
 import { folderLabels } from '../../shared/folder-sections.js'
 import { nestedUnder } from '../../shared/nested-conversations.js'
@@ -157,7 +157,7 @@ import { cappedLiveEvents, LIVE_EVENT_CAP,
   startedLabel,
   stitchedHandoff,
   runtimeNeverStarted, shownPrompt, typedPrompt, buildThread, durationText, runSpanMs, lastActivityAt, relativePath, fileTurns, shellCommandText, turnText, groupBoundary, groupJoins, groupLeavings, latestSetupNotes } from './missionView.js'
-import type { FilePutBack, LiveStarter, TurnSwitch, TurnVersions } from './missionView.js'
+import type { FilePutBack, LiveStarter, ThreadItem, TurnSwitch, TurnVersions } from './missionView.js'
 import { finishedToast } from './finishedToast.js'
 import { folderName, ranOnLine } from './ranOn.js'
 import { reviewBrief } from './reviewBrief.js'
@@ -3954,7 +3954,7 @@ export default function App(): ReactElement {
 
   /** The columns, from the live runs where they are going and the record where they are done. */
   /** The judge's view of a comparison, from its newest run (0.520). */
-  const judgeViewOf = (compare: PublicCompare): { readonly name: string; readonly running: boolean; readonly answer: string; readonly failed?: string } | undefined => {
+  const judgeViewOf = (compare: PublicCompare): { readonly name: string; readonly running: boolean; readonly answer: string; readonly items: readonly ThreadItem[]; readonly pick?: CompareSlotId; readonly failed?: string } | undefined => {
     const judge = compare.judge
     const missionId = judge?.missionIds.at(-1)
     if (judge === undefined || missionId === undefined) return undefined
@@ -3962,12 +3962,15 @@ export default function App(): ReactElement {
     const recorded = historyById.get(missionId)
     const events = live !== undefined && live.events.length > 0 ? live.events : recorded?.events ?? []
     const running = (live !== undefined && liveRunIsActive(live)) || (live === undefined && recorded === undefined)
-    const answer = buildThread(events, { running, mayEdit: false, ...(workspacePath === undefined ? {} : { workspacePath }) })
+    // Its whole thread, drawn as every other reply is (0.554): its steps and its words as they come.
+    const items = buildThread(events, { running, mayEdit: false, ...(workspacePath === undefined ? {} : { workspacePath }) })
+    const answer = items
       .flatMap((item) => (item.type === 'agent-message' && item.text.trim().length > 0 ? [item.text.trim()] : []))
       .join('\n\n')
     const name = judge.route.label ?? routeModelName(judge.route.runtime as MissionRuntimeId, judge.route.model, resolvedModels.get(`${judge.route.runtime}:${judge.route.model}`))
-    if (!running && answer.length === 0) return { name, running, answer, failed: 'The judge did not answer. Ask again, or pick another model.' }
-    return { name, running, answer }
+    if (!running && answer.length === 0) return { name, running, answer, items, failed: 'The judge did not answer. Ask again, or pick another model.' }
+    const pick = running ? undefined : judgePickOf(answer, compare.slots.map((column) => column.slot))
+    return { name, running, answer, items, ...(pick === undefined ? {} : { pick }) }
   }
   /**
    * The models a judge can be (0.520): ready ones, a free model that has

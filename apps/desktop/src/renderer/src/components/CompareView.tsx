@@ -13,7 +13,6 @@ import { Icon } from './Icon.js'
 import { RuntimeMark } from './RuntimeMark.js'
 import { ThreadItems } from './Thread.js'
 import { WorkingSpark } from './WorkingSpark.js'
-import { AgentText } from './ThreadItems.js'
 import type { CompareRecordRow } from '../compareRecord.js'
 
 /**
@@ -121,7 +120,7 @@ export function CompareView({
   /** Once one is kept: every model's record across your decided comparisons (0.519). */
   readonly record?: readonly CompareRecordRow[]
   /** The judge's view, when one was asked (0.520): its model, and what it said or is saying. */
-  readonly judge?: { readonly name: string; readonly running: boolean; readonly answer: string; readonly failed?: string }
+  readonly judge?: { readonly name: string; readonly running: boolean; readonly answer: string; readonly items: readonly ThreadItem[]; readonly pick?: CompareSlotId; readonly failed?: string }
   /** The models a judge can be, the first the one offered (0.520). */
   readonly judgeChoices?: readonly { readonly key: string; readonly label: string }[]
   /** A judge is being asked. */
@@ -205,6 +204,7 @@ export function CompareView({
             <div key={`head:${column.slot}`} className={`lc-compare__head${column.slot === kept ? ' is-kept' : ''}`}>
               {!veiled && <RuntimeMark runtime={column.runtime} size={13} />}
               <span className="lc-compare__name">{column.name}</span>
+              {judge?.pick === column.slot && <span className="lc-compare__judgebadge" title="The judge would keep this answer. Its view, not a decision.">Judge's pick</span>}
               {!veiled && (
               <span
                 className="lc-compare__runtime lc-mono"
@@ -301,14 +301,32 @@ export function CompareView({
            * view, marked as one; the person still keeps an answer.
            */
           <div className="lc-compare__judge" aria-label="The judge's view">
-            <span className="lc-compare__recordlabel lc-mono">{`THE JUDGE'S VIEW · ${judge.name}`}</span>
-            {judge.running ? (
-              <p className="lc-compare__quiet">Reading the answers…</p>
-            ) : judge.failed !== undefined ? (
+            <span className="lc-compare__recordlabel lc-mono">
+              {judge.running && <WorkingSpark />}
+              {`THE JUDGE'S VIEW · ${judge.name}${judge.running ? ' · reading' : ''}`}
+            </span>
+            {/*
+             * Drawn as every other reply (0.554). Colin, on 0.553: "very
+             * unresponsive... not even sure myself if its doing anything" --
+             * it said "Reading the answers…" until the judge was done, and
+             * hid its steps and words while they came.
+             */}
+            {judge.failed !== undefined ? (
               <p className="lc-compare__quiet">{judge.failed}</p>
+            ) : judge.items.length === 0 ? (
+              <p className="lc-compare__quiet">{judge.running ? 'Starting the judge…' : 'No answer was recorded.'}</p>
             ) : (
               <div className="lc-compare__judgesaid">
-                <AgentText text={judge.answer} streaming={false} />
+                <InComparisonCell.Provider value={true}>
+                  <ThreadItems
+                    items={judge.items}
+                    owner={undefined}
+                    faces={false}
+                    activity={judge.running ? 'thinking' : 'idle'}
+                    workspacePath={workspacePath}
+                    decision={undefined}
+                  />
+                </InComparisonCell.Provider>
               </div>
             )}
             <p className="lc-compare__judgenote">It read the answers as Answer A, Answer B and so on, not by model. Its view, not a decision: you keep the answer.</p>

@@ -79,6 +79,9 @@ const state = `JSON.stringify({
   choices: [...document.querySelectorAll('.lc-compare__judgepick option')].map((o) => o.innerText.trim()),
   view: document.querySelector('.lc-compare__judge')?.innerText.replace(/\\s+/g, ' ').trim() ?? '',
   kept: document.querySelector('.lc-compare__kept')?.innerText ?? '',
+  label: document.querySelector('.lc-compare__judge .lc-compare__recordlabel')?.innerText ?? '',
+  said: document.querySelector('.lc-compare__judgesaid')?.innerText.trim() ?? '',
+  badges: [...document.querySelectorAll('.lc-compare__head')].map((h, i) => (h.querySelector('.lc-compare__judgebadge') ? 'abc'[i] : '')).join(''),
   sidebar: [...document.querySelectorAll('.lc-convrow button.lc-conv')].map((b) => b.innerText.replace(/\\s+/g, ' ').trim())
 })`
 
@@ -101,15 +104,22 @@ try {
     await new Promise((r) => setTimeout(r, 1500))
     return ${state}
   })()`))
-  let after = { view: '' }
-  for (let waited = 0; waited < 240_000; waited += 3000) {
-    await sleep(3000)
+  // 0.554: while it reads, its steps and words show as they come, as any reply's do.
+  let after = { view: '', label: '', said: '' }
+  let shownWhileReading = ''
+  for (let waited = 0; waited < 240_000; waited += 1500) {
+    await sleep(1500)
     after = JSON.parse(String(await drive.evaluate(state)))
-    if (after.view.length > 0 && !/Reading the answers/.test(after.view)) break
+    if (/reading/i.test(after.label) && after.said.length > 0 && shownWhileReading === '') shownWhileReading = after.said.slice(0, 200)
+    if (after.label.length > 0 && !/reading/i.test(after.label) && (after.said.length > 0 || /did not answer/.test(after.view))) break
   }
   await drive.capture('the judge\'s view', () => drive.evaluate(`document.querySelector('.lc-compare__judge')?.scrollIntoView(); 1`))
   check('the judge\'s view is shown under the answers, under the model that judged', /THE JUDGE'S VIEW · .*Codex|THE JUDGE'S VIEW · Account Default/i.test(after.view) && /Answer A/.test(after.view) && /Answer B/.test(after.view), after.view.slice(0, 400))
   check('it says which it would keep, and says it is a view, not a decision', /keep/i.test(after.view) && /you keep the answer/.test(after.view), after.view.slice(-200))
+  check('while it read, what it was doing showed as it came, not a bare "Reading the answers"', shownWhileReading.length > 0, shownWhileReading)
+  const named = [...after.said.matchAll(/(\bnot\s+|n't\s+)?\bkeep:?[\s*_]*answer\s+([a-c])\b/gi)].at(-1)
+  const pick = named === undefined || named[1] !== undefined ? '' : named[2].toLowerCase()
+  check('the column it would keep wears "Judge\'s pick", and only that one', pick !== '' && after.badges === pick, `said ${pick || 'none'}, marked ${after.badges || 'none'}`)
   check('it kept nothing itself', after.kept === '', after.kept)
   check('and its run is not listed as a conversation', after.sidebar.length === 1, JSON.stringify(after.sidebar))
   const note = String(await drive.evaluate("document.querySelector('.lc-continuation')?.innerText ?? ''"))

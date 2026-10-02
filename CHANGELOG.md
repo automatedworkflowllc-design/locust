@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.554.0 - 2026-10-02
+
+### Changed
+
+- **A judge's view reads like every other reply.** While it reads the
+  answers you see what it is doing -- the files it opens, its words as they
+  come -- in place of a bare "Reading the answers".
+- **The answer the judge would keep says "Judge's pick"** in its column's
+  head. It is still the judge's view: you keep the answer.
+
 ## 0.553.0 - 2026-10-02
 
 ### Added

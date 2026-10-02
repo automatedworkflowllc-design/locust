@@ -18158,3 +18158,15 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+
+/* The column the judge would keep (0.554): a small mark in its head, never a decision. */
+.lc-compare__judgebadge {
+  flex: none;
+  padding: 1px 7px;
+  border: 1px solid var(--lc-border-control);
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--lc-text-muted);
+  white-space: nowrap;
+}
