@@ -11017,6 +11017,9 @@ textarea {
 }
 
 .lc-compare__recordlabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: var(--lc-text-mono-label);
   letter-spacing: 0.06em;
   color: var(--lc-text-muted);
@@ -11210,11 +11213,13 @@ textarea {
 }
 
 /* A column has no faces, so it has no face gutter: its cards and its words start at one edge. */
-.lc-compare__cell .lc-agentline {
+.lc-compare__cell .lc-agentline,
+.lc-compare__judgesaid .lc-agentline {
   gap: 0;
 }
 
-.lc-compare__cell .lc-agentline__gutter {
+.lc-compare__cell .lc-agentline__gutter,
+.lc-compare__judgesaid .lc-agentline__gutter {
   display: none;
 }
 
