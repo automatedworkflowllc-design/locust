@@ -50,6 +50,7 @@ try {
     return ${text(DIALOG)}
   })()`)))
   check('a teammate that never ran still gets "What a run may do"', /What a run may do Only read Change files/i.test(opened), opened)
+  check('and is told which model a run uses until it has worked on one', /Each run uses the model Birch last worked on \(this one, until they have worked on one\)/.test(opened), opened)
   const chosen = String(await drive.capture('"Only read" chosen', () => drive.evaluate(`(async () => {
     const dialog = ${DIALOG}
     const input = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set

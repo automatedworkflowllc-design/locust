@@ -58,7 +58,7 @@ describe('the routine dialog', () => {
     const html = dialog({})
     expect(html).toContain('Edit routine')
     expect(html).toContain('runs it on Cursor / Grok 4.7, in Edit.')
-    expect(html).toContain("Each run uses Wren&#x27;s model at the time, and always Edit.")
+    expect(html).toContain("Each run uses the model Wren last worked on, and always Edit.")
     expect(html).not.toContain('stays read-only')
   })
 

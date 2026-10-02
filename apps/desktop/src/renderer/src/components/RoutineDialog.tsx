@@ -193,7 +193,12 @@ export function RoutineDialog({
                 * read-only stays read-only" -- which sat on every routine, the
                 * ones that write included (Grok's 0.489 pass).
                 */}
-              {` Each run uses ${teammate.name}'s model at the time${shownMode === undefined ? '' : `, and always ${shownMode}`}.`}
+              {/*
+                * "The model at the time" was read by Sol (0.535) as whatever the
+                * message box showed; a model picked there counts only once a
+                * message is sent on it. Said as what it is.
+                */}
+              {` Each run uses the model ${teammate.name} last worked on${teammate.route === undefined ? ' (this one, until they have worked on one)' : ''}${shownMode === undefined ? '' : `, and always ${shownMode}`}.`}
             </p>
           )}
           {modeName !== undefined && (
