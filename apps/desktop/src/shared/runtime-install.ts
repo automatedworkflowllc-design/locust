@@ -33,6 +33,8 @@ export interface RuntimeInstallFacts {
    * Absent when the runtime needs no account at all.
    */
   readonly signIn?: string
+  /** What signs in once more, as this account or another (Settings' "Sign in again"). */
+  readonly signInAgain?: string
   /**
    * What the account is, in the person's terms. Absent means none is needed --
    * which is true of exactly one of them, and it is the whole on-ramp.
@@ -58,16 +60,20 @@ const FACTS: Readonly<Record<string, RuntimeInstallFacts | undefined>> = {
   claude: {
     install: { kind: 'npm', packageName: '@anthropic-ai/claude-code' },
     signIn: 'claude',
+    signInAgain: 'claude auth login',
     account: 'an Anthropic account'
   },
   codex: {
     install: { kind: 'npm', packageName: '@openai/codex' },
     signIn: 'codex',
+    signInAgain: 'codex login',
     account: 'a ChatGPT account'
   },
   copilot: {
     install: { kind: 'npm', packageName: '@github/copilot' },
     signIn: 'copilot',
+    // Its own /login, inside the window this opens.
+    signInAgain: 'copilot',
     account: 'a GitHub Copilot subscription'
   },
   cursor: {
@@ -76,6 +82,7 @@ const FACTS: Readonly<Record<string, RuntimeInstallFacts | undefined>> = {
     // the command that ran it, so this does not guess at one.
     install: { kind: 'vendor', url: 'https://cursor.com/cli' },
     signIn: 'cursor-agent login',
+    signInAgain: 'cursor-agent login',
     account: 'a Cursor account'
   },
   /*
@@ -94,6 +101,7 @@ const FACTS: Readonly<Record<string, RuntimeInstallFacts | undefined>> = {
   muse: {
     install: { kind: 'vendor', url: 'https://dev.meta.ai' },
     signIn: 'muse login',
+    signInAgain: 'muse login',
     account: 'a Muse Code subscription'
   },
   // Antigravity CLI (`agy`, 0.540): what Locust runs when it is installed;
@@ -149,7 +157,8 @@ export function installSentence(runtime: string, displayName: string): string {
  * screen a person opens when something is wrong knew LESS than the screen
  * they see once (Grok's audit, 2026-09-13).
  */
-export function signInCommand(runtime: string): string | undefined {
+export function signInCommand(runtime: string, again = false): string | undefined {
   const facts = runtimeInstallFacts(runtime)
-  return facts?.signIn === undefined ? undefined : `run ${facts.signIn}`
+  const line = again ? facts?.signInAgain : facts?.signIn
+  return line === undefined ? undefined : `run ${line}`
 }

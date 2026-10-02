@@ -11,6 +11,30 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.543.0 - 2026-10-02
+
+### New
+
+- **Antigravity joins comparisons** when it runs through Antigravity CLI.
+  Through its app alone it answered only in the folder Antigravity had open,
+  so it could not.
+- **Open an Antigravity conversation in a terminal**: Antigravity CLI picks
+  it up with `agy --conversation`, in the teammate's folder.
+- **Sign in again, from Settings.** Every signed-in AI agent's row has it:
+  a window opens running that agent's own sign-in (`claude auth login`,
+  `codex login`, `cursor-agent login`, `muse login`, or Copilot's `/login`),
+  where you can sign in as this account or another.
+
+### Improved
+
+- **Less work while a teammate is working.** The orb beside "working" was
+  drawn at every frame the screen shows -- 144 a second on a gaming laptop --
+  and was the largest single cost in the window while replies streamed. It
+  is now drawn at most 30 times a second, like the teammates' faces, and
+  moves at the same speed. Measured with three replies streaming at once:
+  about 40% less script time. Also, a reply's finished part is parsed again
+  only when more of it finishes.
+
 ## 0.542.0 - 2026-10-02
 
 ### New

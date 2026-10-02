@@ -17,9 +17,9 @@ import { SIGN_IN_OPENED_EVENT } from '../signInEvents.js'
  * The command stays reachable: it is the button's title, and it is what the
  * row falls back to when the window cannot be opened.
  */
-export function SignInButton({ runtime }: { readonly runtime: string }): ReactElement | null {
+export function SignInButton({ runtime, again = false }: { readonly runtime: string; readonly again?: boolean }): ReactElement | null {
   const [state, setState] = useState<'idle' | 'opening' | 'opened' | { readonly failed: string }>('idle')
-  const command = signInCommand(runtime)
+  const command = signInCommand(runtime, again)
   // Back in front means the window was dealt with, one way or the other. If
   // it signed in, discovery's own focus re-probe turns the row READY and this
   // button goes with it; if it was closed unfinished, the row must offer the
@@ -47,15 +47,15 @@ export function SignInButton({ runtime }: { readonly runtime: string }): ReactEl
   return (
     <button
       type="button"
-      className="lc-runtimecell__install"
-      title={`Opens a window that runs: ${command.replace(/^run /, '')}`}
+      className={again ? 'lc-runtimecell__again' : 'lc-runtimecell__install'}
+      title={again ? `Opens a window that runs: ${command.replace(/^run /, '')}. Sign in there as this account or another; the agent uses whichever signed in last.` : `Opens a window that runs: ${command.replace(/^run /, '')}`}
       disabled={state === 'opening'}
       onClick={() => {
         const bridge = window.desktop
         if (!bridge) return
         setState('opening')
         void bridge
-          .signInRuntime(runtime)
+          .signInRuntime(runtime, again)
           .then((response) => {
             setState(response.ok ? 'opened' : { failed: `${response.what} ${response.next}` })
             // The window asks again the moment the person comes back to it.
@@ -64,7 +64,7 @@ export function SignInButton({ runtime }: { readonly runtime: string }): ReactEl
           .catch(() => setState({ failed: 'The sign-in window could not be opened. Run the command shown in a terminal.' }))
       }}
     >
-      Sign in
+      {again ? 'Sign in again' : 'Sign in'}
     </button>
   )
 }

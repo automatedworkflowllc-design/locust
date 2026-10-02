@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
 import { ORB_BOX, Orb } from './Orb.js'
 
@@ -319,7 +319,9 @@ export function AgentText({
    * most, which is exactly the part still being written. See settledText.ts.
    */
   const { settled, tail } = streaming ? splitSettled(text) : { settled: text, tail: '' }
-  const blocks = parseAgentText(settled)
+  // Parsed again only when something new has settled, not on every frame of
+  // the tail (Sol's optimization check, 2026-10-02: ~1 ms a frame at 100k).
+  const blocks = useMemo(() => parseAgentText(settled), [settled])
   return (
     <>
       {blocks.map((block, index) => {

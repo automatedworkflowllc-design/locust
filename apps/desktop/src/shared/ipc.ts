@@ -3067,7 +3067,8 @@ export interface DesktopApi {
   /** An update started, landed or failed. Returns the unsubscribe. */
   onRuntimeUpdates(listener: (state: RuntimeUpdatesState) => void): () => void
   /** Open the runtime's sign-in in its own window. */
-  signInRuntime(runtime: string): Promise<RuntimeSignInResponse>
+  /** `again`: sign in once more, as this account or another (Colin, 2026-10-02). */
+  signInRuntime(runtime: string, again?: boolean): Promise<RuntimeSignInResponse>
   /** Open this conversation's session in its runtime's own terminal (0.387). */
   openInTerminal(missionId: string): Promise<OpenInTerminalResponse>
   /** Bring what was done in the terminal on this conversation into it (0.391). */

@@ -27,6 +27,18 @@ describe('signing in is a button', () => {
     expect(signInArgs('not-a-runtime')).toBeUndefined()
   })
 
+  it('signs in again with each CLI’s own command, read from its --help (Colin, 2026-10-02: change accounts)', () => {
+    expect(signInArgs('claude', true)).toEqual(['auth', 'login'])
+    expect(signInArgs('codex', true)).toEqual(['login'])
+    expect(signInArgs('cursor', true)).toEqual(['login'])
+    expect(signInArgs('muse', true)).toEqual(['login'])
+    // Copilot's is its own /login, inside the window.
+    expect(signInArgs('copilot', true)).toEqual([])
+    // No command to offer: nothing, rather than a guess.
+    expect(signInArgs('antigravity', true)).toBeUndefined()
+    expect(signInArgs('opencode', true)).toBeUndefined()
+  })
+
   it('refuses a runtime discovery did not find, rather than guessing a path', async () => {
     const answer = await openSignIn('muse', { discover: async () => [], closed: () => {}, platform: 'win32' })
     expect(answer.ok).toBe(false)

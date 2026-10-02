@@ -39,6 +39,8 @@ describe('the terminal offer', () => {
 
   it('is not made where there is no terminal to open', () => {
     expect(terminalOffer({ ...base, runtime: 'antigravity' })).toBeUndefined()
+    // Through Antigravity CLI it opens in agy (0.543).
+    expect(terminalOffer({ ...base, runtime: 'antigravity', antigravityCli: true })?.label).toBe('Open in Antigravity, in a terminal')
     expect(terminalOffer({ ...base, runtime: 'gemini' })).toBeUndefined()
     expect(terminalOffer({ ...base, runtime: 'opencode', model: 'own-1a2b3c4d/acme-70b' })).toBeUndefined()
     expect(terminalOffer({ ...base, missionId: undefined })).toBeUndefined()

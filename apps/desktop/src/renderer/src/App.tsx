@@ -720,6 +720,8 @@ export default function App(): ReactElement {
   // that opens a finished mission from another runtime on launch (room
   // smoke, 2026-09-05), which is exactly a person's profile after an update.
   const runtimes = runtimeState.phase === 'ready' ? runtimeState.runtimes : []
+  // Antigravity joins a comparison through its CLI, never through its app (0.543).
+  const antigravityCli = runtimes.some((status) => status.id === 'antigravity' && status.throughCli === true)
   const [build, setBuild] = useState<{ readonly version: string; readonly packaged: boolean; readonly platform: string }>()
   const [storage, setStorage] = useState<PublicStorageReport>()
   const [update, setUpdate] = useState<AppUpdateState>()
@@ -2402,10 +2404,16 @@ export default function App(): ReactElement {
   const frameBatcher = useRef(
     createFrameBatcher<Extract<CodexMissionUpdate, { readonly runId: string }>>((updates) => {
       setRuns((current) => {
-        let next = current
+        // ONE copy of the map per frame, made at the first update that changes
+        // a run, not one per update (Sol's optimization check, 2026-10-02):
+        // a burst of fragments copied the whole map once each. Same order,
+        // same result; `current` itself is never touched.
+        let next: Map<string, LiveRunState> | undefined
         for (const update of updates) {
-          if (next.has(update.runId)) {
-            next = withRun(next, update.runId, (run) => applyMissionUpdate(run, update))
+          const run = (next ?? current).get(update.runId)
+          if (run !== undefined) {
+            next ??= new Map(current)
+            next.set(update.runId, applyMissionUpdate(run, update))
             continue
           }
           // A run whose start receipt has not come back yet: hold its updates
@@ -2416,7 +2424,7 @@ export default function App(): ReactElement {
           const queued = pendingUpdatesRef.current.get(update.runId) ?? []
           if (!queued.includes(update)) pendingUpdatesRef.current.set(update.runId, [...queued, update].slice(-500))
         }
-        return next
+        return next ?? current
       })
     })
   )
@@ -3629,7 +3637,7 @@ export default function App(): ReactElement {
   // A comparison answers read-only; a model that cannot be held read-only here answers in a copy (0.443).
   // One that edits runs in Edit, in its own copy (0.445).
   const compareChoiceRefusal = (choice: { readonly runtime: ComparePick['runtime'] }, changes: boolean = compareChanges): string | undefined =>
-    compareRefusalOf(choice.runtime)
+    compareRefusalOf(choice.runtime, antigravityCli)
     ?? (changes
       ? modeRunsOn('accept-edits', choice.runtime, build?.platform) ? undefined : `${modeUnavailableReason('accept-edits', choice.runtime, build?.platform) ?? 'It cannot edit here.'} So it cannot join a comparison that edits.`
       : undefined)
@@ -3887,7 +3895,7 @@ export default function App(): ReactElement {
    */
   const judgeChoicesFor = (compare: PublicCompare): readonly { readonly key: string; readonly label: string; readonly runtime: MissionRuntimeId; readonly model: string }[] => {
     const compared = new Set(compare.slots.map((column) => `${column.route.runtime}:${column.route.model}`))
-    const ready = (runtime: string): boolean => runtimes.some((status) => status.id === runtime && status.ready) && compareRefusalOf(runtime) === undefined
+    const ready = (runtime: string): boolean => runtimes.some((status) => status.id === runtime && status.ready) && compareRefusalOf(runtime, antigravityCli) === undefined
     const picked: { key: string; label: string; runtime: MissionRuntimeId; model: string }[] = []
     const add = (runtime: MissionRuntimeId, model: string): void => {
       const key = `${runtime}:${model}`
@@ -6389,7 +6397,8 @@ export default function App(): ReactElement {
           missionId: terminalMissionId,
           running,
           // `missionOwner` is declared further down; the same lookup, here.
-          teammateName: teammates.find((teammate) => teammate.teammateId === ownerOf(liveRun))?.name
+          teammateName: teammates.find((teammate) => teammate.teammateId === ownerOf(liveRun))?.name,
+          antigravityCli
         })
   if (shownTerminal !== undefined && shownTerminal.disabled === undefined && terminalMissionId !== undefined) {
     const id = terminalMissionId

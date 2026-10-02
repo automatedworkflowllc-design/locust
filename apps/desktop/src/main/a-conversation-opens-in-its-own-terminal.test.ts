@@ -55,10 +55,11 @@ describe('the words that resume a session, read off each CLI’s own --help on 2
     expect(resumeArgsFor('cursor', id)).toEqual([`--resume=${id}`])
     expect(resumeArgsFor('opencode', 'ses_3f1a9c')).toEqual(['--session', 'ses_3f1a9c'])
     expect(resumeArgsFor('muse', id)).toEqual(['resume', id])
+    // Antigravity CLI (0.543): agy --conversation <id>.
+    expect(resumeArgsFor('antigravity', id)).toEqual(['--conversation', id])
   })
 
-  it('do not exist for an app with a window of its own, or a runtime that does not run here', () => {
-    expect(resumeArgsFor('antigravity', id)).toBeUndefined()
+  it('do not exist for a runtime that does not run here', () => {
     expect(resumeArgsFor('gemini', id)).toBeUndefined()
     expect(resumeArgsFor('omniroute', id)).toBeUndefined()
   })
@@ -174,7 +175,10 @@ describe('which conversation, and where', () => {
   })
 
   it('is refused, with the reason, for Antigravity, a model of your own, a turn with no session, and a CLI not found', async () => {
+    // Through its app (no CLI found): refused. Through Antigravity CLI: opened with agy.
     expect(await terminalRequestFor('m1', facts({ getMission: async () => ({ runtime: 'antigravity', model: 'flash', session: 'c1' }) }))).toMatchObject({ refused: expect.stringContaining("Antigravity's own window") })
+    const AGY = { ...CLAUDE, commandName: 'agy' }
+    expect(await terminalRequestFor('m1', facts({ getMission: async () => ({ runtime: 'antigravity', model: 'gemini-3.8-flash', session: 'c1' }), launchFor: async () => AGY }))).toMatchObject({ runtime: 'antigravity', sessionId: 'c1', launch: AGY })
     expect(await terminalRequestFor('m1', facts({ getMission: async () => ({ runtime: 'opencode', model: 'own-1a2b3c4d/acme-70b', session: 'ses_1' }) }))).toMatchObject({ refused: expect.stringContaining('model of your own') })
     expect(await terminalRequestFor('m1', facts({ getMission: async () => ({ runtime: 'claude', model: 'opus', session: undefined }) }))).toMatchObject({ refused: expect.stringContaining('no Claude Code session') })
     expect(await terminalRequestFor('m1', facts({ launchFor: async () => undefined }))).toMatchObject({ refused: expect.stringContaining('could not find Claude Code') })

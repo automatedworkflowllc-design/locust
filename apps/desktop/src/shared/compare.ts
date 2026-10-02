@@ -162,8 +162,9 @@ export function compareNeedsCopy(_runtime: string, _platform: string | undefined
 }
 
 /** A runtime that cannot join a comparison at all, and why; undefined when it can. */
-export function compareRefusalOf(runtime: string): string | undefined {
-  if (runtime === 'antigravity') return 'Antigravity answers only in the folder it has open, so it cannot answer in a comparison.'
+export function compareRefusalOf(runtime: string, antigravityCli = false): string | undefined {
+  // Through Antigravity CLI it answers in any folder, like every other column (0.543).
+  if (runtime === 'antigravity' && !antigravityCli) return 'Through its app, Antigravity answers only in the folder it has open, so it cannot answer in a comparison. Install Antigravity CLI and it can.'
   return undefined
 }
 

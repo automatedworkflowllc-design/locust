@@ -31,8 +31,9 @@ import type { RuntimeSignInResponse } from '../shared/ipc.js'
  */
 
 /** The words after the command name, e.g. `muse login` -> `['login']`. */
-export function signInArgs(runtime: string): readonly string[] | undefined {
-  const line = runtimeInstallFacts(runtime)?.signIn
+export function signInArgs(runtime: string, again = false): readonly string[] | undefined {
+  const facts = runtimeInstallFacts(runtime)
+  const line = again ? facts?.signInAgain : facts?.signIn
   if (line === undefined) return undefined
   return line.split(' ').filter((word) => word.length > 0).slice(1)
 }
@@ -58,8 +59,8 @@ export interface RuntimeSignInOptions {
   readonly platform?: NodeJS.Platform
 }
 
-export async function openSignIn(runtime: string, options: RuntimeSignInOptions): Promise<RuntimeSignInResponse> {
-  const args = signInArgs(runtime)
+export async function openSignIn(runtime: string, options: RuntimeSignInOptions, again = false): Promise<RuntimeSignInResponse> {
+  const args = signInArgs(runtime, again)
   if (args === undefined) {
     return { ok: false, what: 'This runtime has no sign-in step.', next: 'Nothing to do here.' }
   }

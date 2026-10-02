@@ -5121,6 +5121,32 @@ textarea {
   cursor: default;
 }
 
+/* Sign in again: quiet, since every signed-in row has one. */
+.lc-runtimecell__again {
+  padding: 4px 6px;
+  border: 0;
+  background: none;
+  color: var(--lc-text-muted);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.lc-runtimecell__again:hover:not(:disabled) {
+  color: var(--lc-text-primary);
+  text-decoration: underline;
+}
+
+.lc-runtimecell__again:focus-visible {
+  outline: 2px solid var(--lc-focus-ring);
+  outline-offset: 2px;
+}
+
+.lc-runtimecell__again:disabled {
+  cursor: default;
+}
+
 /* The one runtime that is a complete answer on its own gets the screen's only
    filled button. The recommendation is emphasis on the row that does the
    thing, not a second card above the panel saying the same name twice. */

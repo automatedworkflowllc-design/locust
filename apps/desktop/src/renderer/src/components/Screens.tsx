@@ -1988,6 +1988,8 @@ export function SettingsScreen({
                     * there (Grok's audit, 2026-09-13).
                     */}
                   {status.tag === 'SIGN IN' && <SignInButton runtime={runtime.id} />}
+                  {/* Another account, or the same one afresh (Colin, 2026-10-02: "change accounts in settings"). */}
+                  {(status.tag === 'READY' || status.tag === 'ACTIVE') && runtime.auth === 'authenticated' && <SignInButton runtime={runtime.id} again />}
                   {/* A newer version is out: the download is the person's to start (0.303). */}
                   {offersUpdate(runtimeUpdates?.agents.find((agent) => agent.runtime === runtime.id)) && onUpdateAgent !== undefined && (
                     <button type="button" className="lc-runtimecell__install" onClick={() => onUpdateAgent(runtime.id)}>

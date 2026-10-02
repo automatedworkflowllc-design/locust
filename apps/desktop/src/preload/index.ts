@@ -393,8 +393,8 @@ const desktopApi: DesktopApi = {
   /** Run `npm install -g <package>` for a runtime, watching npm's own output. */
   installRuntime: (runtime: string) =>
     ipcRenderer.invoke(RUNTIME_INSTALL_CHANNEL, runtime) as Promise<RuntimeInstallResponse>,
-  signInRuntime: (runtime: string) =>
-    ipcRenderer.invoke(RUNTIME_SIGN_IN_CHANNEL, runtime) as Promise<RuntimeSignInResponse>,
+  signInRuntime: (runtime: string, again?: boolean) =>
+    ipcRenderer.invoke(RUNTIME_SIGN_IN_CHANNEL, runtime, again === true) as Promise<RuntimeSignInResponse>,
   openInTerminal: (missionId: string) =>
     ipcRenderer.invoke(OPEN_IN_TERMINAL_CHANNEL, missionId) as Promise<OpenInTerminalResponse>,
   catchUpTerminal: (missionId: string) =>

@@ -60,7 +60,7 @@ import { macPath } from './mac-path.js'
 import { homedir, release } from 'node:os'
 import { execFile } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
-import { MAX_PROMPT_LENGTH, createCodexMissionService, runtimeThreadIdOf } from './codex-mission.js'
+import { MAX_PROMPT_LENGTH, createCodexMissionService, resumableThreadOf, runtimeThreadIdOf } from './codex-mission.js'
 import { chosenLeaveOut } from './handoff.js'
 import { officeWordsSection } from './office-words.js'
 import { createRoutineCopies } from './routine-copy.js'
@@ -2295,7 +2295,7 @@ if (!ownsSingleInstanceLock) {
 
     // The runtime's own sign-in, in a window of its own. Only an id crosses
     // the bridge; the command is the one the install facts name.
-    ipcMain.handle(RUNTIME_SIGN_IN_CHANNEL, async (event, runtime: unknown) => {
+    ipcMain.handle(RUNTIME_SIGN_IN_CHANNEL, async (event, runtime: unknown, again: unknown) => {
       if (!fromOwnWindow(event) || typeof runtime !== 'string') {
         return { ok: false, what: 'That runtime cannot be signed in from here.', next: 'Run the command shown in a terminal.' } as const
       }
@@ -2307,7 +2307,7 @@ if (!ownsSingleInstanceLock) {
           discoveryCache = undefined
           runtimeDiscovery.invalidate()
         }
-      })
+      }, again === true)
     })
 
     ipcMain.handle(MODEL_CATALOG_CHANNEL, async (event) => {
@@ -3421,7 +3421,8 @@ if (!ownsSingleInstanceLock) {
         liveMissionIds: () => [...codexMissions.liveMissionIds(), ...antigravityMissions.liveMissionIds()],
         getMission: async (missionId) => {
           const mission = await missionLedger.getMission(missionId)
-          return mission === undefined ? undefined : { runtime: mission.metadata.runtime, model: mission.metadata.model, session: runtimeThreadIdOf(mission) }
+          // Antigravity's own walk: never a conversation its app held, which the CLI does not have (0.543).
+          return mission === undefined ? undefined : { runtime: mission.metadata.runtime, model: mission.metadata.model, session: mission.metadata.runtime === 'antigravity' ? resumableThreadOf(mission, 'antigravity') : runtimeThreadIdOf(mission) }
         },
         ownerOf: async (missionId) => {
           const [owners, roster] = await Promise.all([teammates.missionOwners(), teammates.list()])
@@ -4851,7 +4852,7 @@ if (!ownsSingleInstanceLock) {
     const startCompareColumn = async (compare: PublicCompare, column: PublicCompareSlot, prompt: string, followUpOf?: string, retrying = false): Promise<string | undefined> => {
       const peer = compare.teammateId === undefined ? undefined : await peerContextFor(compare.teammateId)
       if (compare.teammateId !== undefined && peer === undefined) return 'That teammate is no longer on the team.'
-      const cannot = compareRefusalOf(column.route.runtime)
+      const cannot = compareRefusalOf(column.route.runtime, antigravityProbe.cliPath() !== undefined)
       if (cannot !== undefined) return cannot
       // A comparison that edits: the column's own copy of the project (0.445).
       let tree: string | undefined
@@ -5083,7 +5084,7 @@ if (!ownsSingleInstanceLock) {
       if (compare === undefined) return compareRefused('That comparison is no longer here.')
       const route = (typeof input.route === 'object' && input.route !== null ? input.route : {}) as Record<string, unknown>
       if (!isMissionRuntime(route.runtime) || typeof route.model !== 'string' || route.model.length === 0 || route.model.length > 200) return compareRefused('Pick a model to judge.')
-      const cannot = compareRefusalOf(route.runtime)
+      const cannot = compareRefusalOf(route.runtime, antigravityProbe.cliPath() !== undefined)
       if (cannot !== undefined) return compareRefused(cannot.replace('a comparison', 'a judge'))
       const criteria = typeof input.criteria === 'string' ? input.criteria.trim().slice(0, MAX_JUDGE_CRITERIA) : undefined
       const answers: JudgedAnswer[] = []

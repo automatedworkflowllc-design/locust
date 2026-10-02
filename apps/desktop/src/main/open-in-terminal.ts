@@ -32,6 +32,7 @@ export { macCommandScript } from './mac-terminal.js'
  *   cursor-agent       cursor-agent --resume=<chatId>  (an optional value)
  *   opencode 1.18.27   opencode --session <id>
  *   muse 1.4.0         muse resume <session-ref>
+ *   agy 1.2.14         agy --conversation <id>   (Antigravity CLI, 0.543)
  *
  * Antigravity is an app with a window of its own, and Gemini CLI does not run
  * here at all: neither is offered.
@@ -63,6 +64,8 @@ export function resumeArgsFor(runtime: string, sessionId: string): readonly stri
       return ['--session', sessionId]
     case 'muse':
       return ['resume', sessionId]
+    case 'antigravity':
+      return ['--conversation', sessionId]
     default:
       return undefined
   }
@@ -139,7 +142,6 @@ export async function terminalRequestFor(missionId: string, facts: TerminalFacts
   const mission = await facts.getMission(missionId).catch(() => undefined)
   if (mission === undefined) return { refused: 'That conversation is not in the ledger.' }
   const name = runtimeDisplayName(mission.runtime)
-  if (mission.runtime === 'antigravity') return { refused: "An Antigravity conversation lives in Antigravity's own window. Open it there." }
   // A model of the person's own runs on settings Locust hands OpenCode per run.
   if (/^own-[a-f0-9]{8}\//.test(mission.model)) {
     return { refused: 'A model of your own runs on settings only Locust gives OpenCode, so a terminal could not run it. Keep this conversation here.' }
@@ -149,6 +151,8 @@ export async function terminalRequestFor(missionId: string, facts: TerminalFacts
   const owner = await facts.ownerOf(missionId).catch(() => undefined)
   const cwd = (owner === undefined ? undefined : await facts.cwdFor(owner.teammateId).catch(() => undefined)) ?? facts.workspacePath
   const launch = await facts.launchFor(mission.runtime).catch(() => undefined)
+  // Antigravity resumes only through its CLI; its app's conversations live in its own window.
+  if (mission.runtime === 'antigravity' && launch?.commandName !== 'agy') return { refused: "An Antigravity conversation lives in Antigravity's own window. Open it there, or install Antigravity CLI to open it in a terminal." }
   if (launch === undefined) return { refused: `Locust could not find ${name} on this machine.` }
   return { runtime: mission.runtime, sessionId: mission.session, cwd, launch, title: `${owner?.name ?? 'Locust'} · ${name}` }
 }

@@ -108,6 +108,9 @@ export function Orb({
 /** How many times larger the 64 design is drawn before it is painted down. */
 export const PAINT_DOWN_FACTOR = 4
 
+/** How often a moving orb is drawn, at most, a second: the bots' rate (0.543). */
+export const ORB_FRAMES_PER_SECOND = 30
+
 /**
  * THE 64 DESIGN, PAINTED DOWN WELL.
  *
@@ -191,8 +194,21 @@ function PaintedDown({
     }
     let handle = 0
     let running = false
-    const loop = (): void => {
-      frame((performance.now() / 1000) * speed)
+    /*
+     * At most 30 drawings a second, as the bots (BOT_FRAMES_PER_SECOND).
+     * MEASURED 0.543, three teammates streaming: this one 26px orb, drawn at
+     * every animation frame (60 a second, 144 on a gaming laptop's screen),
+     * was the largest single cost in the window while a reply arrived --
+     * more than React and the reply's text together. Its time is still the
+     * clock's, so it moves at the same speed; it is only drawn less often.
+     */
+    let drawnAt = 0
+    const every = 1000 / ORB_FRAMES_PER_SECOND - 1
+    const loop = (now: number): void => {
+      if (now - drawnAt >= every) {
+        drawnAt = now
+        frame((performance.now() / 1000) * speed)
+      }
       if (running) handle = requestAnimationFrame(loop)
     }
     const start = (): void => {

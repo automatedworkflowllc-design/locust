@@ -84,6 +84,8 @@ describe('who answers in a copy', () => {
     expect(compareNeedsCopy('cursor', 'darwin')).toBe(false)
     expect(compareNeedsCopy('claude', 'win32')).toBe(false)
     expect(compareRefusalOf('antigravity')).toMatch(/only in the folder it has open/)
+    // Through Antigravity CLI it answers in any folder, so it may join (0.543).
+    expect(compareRefusalOf('antigravity', true)).toBeUndefined()
     expect(compareRefusalOf('cursor')).toBeUndefined()
   })
 })

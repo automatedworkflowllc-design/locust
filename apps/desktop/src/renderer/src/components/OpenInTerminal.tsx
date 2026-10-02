@@ -45,9 +45,12 @@ export function terminalOffer(input: {
   readonly missionId: string | undefined
   readonly running: boolean
   readonly teammateName: string | undefined
+  /** Antigravity resumes in a terminal only through Antigravity CLI (0.543). */
+  readonly antigravityCli?: boolean
 }): TerminalOffer | undefined {
   const { runtime, model, missionId, running, teammateName } = input
-  if (missionId === undefined || runtime === undefined || !isMissionRuntime(runtime) || !RESUMABLE.has(runtime)) return undefined
+  if (missionId === undefined || runtime === undefined || !isMissionRuntime(runtime)) return undefined
+  if (!RESUMABLE.has(runtime) && !(runtime === 'antigravity' && input.antigravityCli === true)) return undefined
   // A model of the person's own runs on settings only Locust hands OpenCode.
   if (model !== undefined && isOwnRoute(model)) return undefined
   const runtimeName = runtimeDisplayName(runtime)
