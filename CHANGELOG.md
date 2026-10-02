@@ -11,6 +11,19 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.533.0 - 2026-10-01
+
+### New
+
+- **A routine can work in a copy, and nothing lands until you keep it.**
+  A routine that may change files now asks where it works: in the folder,
+  or "in a copy, you keep". In a copy, each run works on a copy of your
+  folder. When it finishes, its card under Routines says which files it
+  changed: Keep writes them into the folder, Discard throws them away, and
+  Open the copy lets you look first. Keep refuses, and says so, if you have
+  changed the same files since. While changes wait, the routine does not run
+  again.
+
 ## 0.532.0 - 2026-10-01
 
 ### Fixed
