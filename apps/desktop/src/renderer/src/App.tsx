@@ -4223,9 +4223,10 @@ export default function App(): ReactElement {
          * when that one finishes, which is what a person means by sending it.
          */
         if (response.error.code === 'RUN_ALREADY_ACTIVE') {
-          const inFront = [...runs.entries()].find(
-            ([, run]) => liveRunIsActive(run) && teammateId !== undefined && ownerOf(run) === teammateId
-          )?.[0]
+          // In front: this conversation's own turn still running (0.551) -- never another conversation's.
+          const inFront = continuing?.data === undefined
+            ? undefined
+            : [...runs.entries()].find(([, run]) => liveRunIsActive(run) && run.data?.missionId === continuing.data!.missionId)?.[0]
           setRuns((current) => {
             const next = new Map(current)
             next.delete(key)
@@ -4245,7 +4246,7 @@ export default function App(): ReactElement {
           // An edited earlier message is never queued (0.500): the queue sends plain replies,
           // and this one would go out at the END of the conversation instead of where it was edited.
           if (rewind !== undefined) {
-            startRefusal.current = 'Not sent: this teammate is busy with another conversation. Your edited message is still in the box -- send it once they finish.'
+            startRefusal.current = 'Not sent: this conversation is still answering. Your edited message is still in the box -- send it once it finishes.'
             return false
           }
           if (inFront !== undefined) {
@@ -5349,9 +5350,14 @@ export default function App(): ReactElement {
   }, [sendAfterStop, runs, queued])
 
   /** The addressed teammate's live run, if they have one: they cannot be given a second. */
-  const busyRun = [...runs.values()].find(
-    (run) => liveRunIsActive(run) && pickedTeammate !== undefined && ownerOf(run) === pickedTeammate.teammateId
-  )
+  /*
+   * The run a message waits behind: the live one ON SCREEN, and no other
+   * (0.551). It was the addressed teammate's live run anywhere, so a new
+   * conversation with a teammate busy in another waited for that one to end.
+   * Colin: "we should 100% be able to have multiple convos with the same
+   * teammate going". Each conversation takes its own turns.
+   */
+  const busyRun = shownKey !== undefined && liveRunIsActive(runs.get(shownKey)) ? runs.get(shownKey) : undefined
 
   /*
    * THE CONVERSATION THE BOX QUEUES INTO, AND SHOWS THE QUEUE OF: the live

@@ -11,6 +11,28 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.551.0 - 2026-10-02
+
+### Added
+
+- **Several conversations with the same teammate at once.** Start another
+  conversation with a teammate who is busy in one, and it runs straight away,
+  beside the first. Only a reply to a turn that is still running waits for
+  it. Up to the same number of runs at once as before.
+
+### Fixed
+
+- **A message you have not sent stays with its conversation.** It followed
+  you into every other chat.
+- **Opening a conversation with no teammate addresses no teammate.** The box
+  kept whoever was picked before, so a message there went to that teammate,
+  on their model, queued behind their other conversation.
+- **An Antigravity command refused before it explained itself still says Did
+  not run.** A plan Antigravity writes into its own folder is never counted
+  as refused.
+- **When a run fails after OpenCode's retries, the provider's own reason
+  stays,** without the line saying it is trying again.
+
 ## 0.550.0 - 2026-10-02
 
 ### Fixed

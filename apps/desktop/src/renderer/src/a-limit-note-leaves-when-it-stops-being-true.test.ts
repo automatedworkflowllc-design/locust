@@ -47,6 +47,9 @@ describe("OpenCode's other provider error (0.550, Sol on 0.546)", () => {
     const failed = [event('step.started', { stepKind: 'turn' }, 0), OTHER, event('run.failed', { kind: 'process-failed', message: 'Error from provider (Console): Upstream request failed: Endpoint is unavailable.' }, 64)]
     const said = buildThread(failed, { running: false, mayEdit: false, startedAt: at(0) }).map((item) => JSON.stringify(item)).join('\n')
     expect(said).not.toContain('trying again on its own')
+    // What the provider said is still the reason, and stays (0.551).
+    const note = buildThread(failed, { running: false, mayEdit: false, startedAt: at(0) }).find((item) => item.type === 'diagnostic')
+    expect(note?.type === 'diagnostic' ? note.message : undefined).toBe('The model’s provider answered "Upstream request failed: Endpoint is unavailable.".')
   })
 })
 

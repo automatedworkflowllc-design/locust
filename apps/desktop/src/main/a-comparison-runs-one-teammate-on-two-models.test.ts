@@ -102,19 +102,17 @@ describe('a comparison', () => {
     expect(second.ok).toBe(true)
   })
 
-  it('still refuses a second ordinary run of the same teammate while one is going', async () => {
+  it('starts a second conversation with the same teammate while one is going (0.551)', async () => {
     const missions = service()
     expect((await missions.start('One', 'codex', 'ask', {}, () => undefined, undefined, WREN)).ok).toBe(true)
-    const again = await missions.start('Two', 'codex', 'ask', {}, () => undefined, undefined, WREN)
-    expect(again.ok).toBe(false)
-    if (!again.ok) expect(again.error.code).toBe('RUN_ALREADY_ACTIVE')
+    expect((await missions.start('Two', 'codex', 'ask', {}, () => undefined, undefined, WREN)).ok).toBe(true)
   })
 
   it('runs on two models with no teammate at all -- none is needed to compare', async () => {
     const missions = service()
-    // Nobody's missions share one slot: two at once are refused without a comparison's.
+    // Two conversations of nobody's run side by side too (0.551).
     expect((await missions.start('One', 'codex', 'ask', {}, () => undefined)).ok).toBe(true)
-    expect((await missions.start('Two', 'codex', 'ask', {}, () => undefined)).ok).toBe(false)
+    expect((await missions.start('Two', 'codex', 'ask', {}, () => undefined)).ok).toBe(true)
     const a = await missions.start('Go', 'codex', 'ask', {}, () => undefined, undefined, undefined, undefined, undefined, undefined, undefined, slotOf('a', undefined))
     const b = await missions.start('Go', 'codex', 'ask', {}, () => undefined, undefined, undefined, undefined, undefined, undefined, undefined, slotOf('b', undefined))
     expect(a.ok).toBe(true)

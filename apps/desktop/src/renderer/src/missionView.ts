@@ -3720,8 +3720,18 @@ export function buildThread(
    */
   const busyAt = events.findIndex((event) => event.type === 'adapter.diagnostic' && RETRYING_NOTE.test(event.payload.code))
   const recovered = busyAt >= 0 && events.slice(busyAt + 1).some((event) => (event.type === 'message.delta' && event.payload.text.trim().length > 0) || event.type === 'tool.started')
-  if (busyAt >= 0 && (options.running !== true || recovered)) {
+  if (busyAt >= 0 && recovered) {
     return items.filter((item) => !(item.type === 'diagnostic' && item.retrying === true))
+  }
+  // Ended without the model coming back: what the provider said is still the
+  // reason, so it stays, without the claim that a retry is under way (0.551,
+  // Boss on 0.550: dropping the whole note lost "Endpoint is unavailable").
+  if (busyAt >= 0 && options.running !== true) {
+    return items.map((item) => {
+      if (item.type !== 'diagnostic' || item.retrying !== true) return item
+      const { busy: _busy, retrying: _retrying, ...rest } = item
+      return { ...rest, message: item.message.replace(/,? and OpenCode is trying again on its own\.(?: To go on now, press Stop and pick another model\.)?$/, '.') }
+    })
   }
   return items
 }

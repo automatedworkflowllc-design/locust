@@ -780,6 +780,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
   const active = new Map<string, ActiveCodexMission>()
   /** Owners with a start in flight, between the guard and activation. */
   const starting = new Set<string>()
+  let freshClaims = 0
   /** Each live mission's consume loop, so a handoff can wait for ITS run alone. */
   const settling = new Map<string, Promise<void>>()
   let lifecycleVersion = 0
@@ -1324,6 +1325,14 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       })
       startOperations.add(startOperation)
       const owner = ownerKeyOf(peer, slot?.key)
+      /*
+       * WHAT IS CLAIMED WHILE THIS STARTS (0.551): the conversation, not the
+       * teammate. A new conversation claims a key of its own, so two can start
+       * side by side; a reply claims the turn it follows, so one conversation
+       * still takes its turns one at a time.
+       */
+      const follows = followUpOf ?? continuation?.missionId
+      const claimKey = slot !== undefined ? `slot:${owner}` : follows === undefined ? `new:${owner}:${String((freshClaims += 1))}` : `follows:${follows}`
       let claimed = false
       try {
         if (disposed) {
@@ -1338,9 +1347,14 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             `Enter a mission between 1 and ${MAX_PROMPT_LENGTH.toLocaleString('en-US')} characters.`
           ) as CodexMissionStartResponse
         }
-        // One live mission per teammate: a teammate is one identity doing one
-        // piece of work, and two runs sharing a name would share a workroom
-        // voice. Missions of nobody keep the old rule and run one at a time.
+        // ONE TURN AT A TIME PER CONVERSATION (0.551), not one conversation
+        // per teammate. It was one live mission per teammate -- "two runs
+        // sharing a name would share a workroom voice" -- and a teammate busy
+        // in one conversation could not start another. Colin, 2026-10-02:
+        // "we should 100% be able to have multiple convos with the same
+        // teammate going, that should be a basic day1 feature". Claude Code
+        // runs sessions side by side. So only a reply to a turn still running
+        // waits (the window queues it); the pool cap still bounds the total.
         //
         // EXCEPT the next turn of a run that has already ended. A run's
         // terminal events reach the window before this service lets go of it
@@ -1356,14 +1370,17 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         const winding = (mission: ActiveCodexMission): boolean =>
           mission.settled && followUpOf !== undefined && mission.missionId === followUpOf && mission.runtime === runtime
         const live = [...active.values()].filter((mission) => !winding(mission))
-        const ownerBusy = starting.has(owner) || live.some((mission) => ownerKeyOf(mission.peer, mission.slot) === owner)
+        // A comparison's column still runs one at a time.
+        const ownerBusy = starting.has(claimKey)
+          || (slot !== undefined && live.some((mission) => ownerKeyOf(mission.peer, mission.slot) === owner))
+          || (follows !== undefined && live.some((mission) => mission.missionId === follows))
         if (ownerBusy) {
           return error(
             'RUN_ALREADY_ACTIVE',
             peer === undefined
               // M27: said to the person now, so it names the real rule, not "Codex".
-              ? 'Another conversation without a teammate is running, and those run one at a time. Wait for it to finish or stop it first.'
-              : `${peer.self.name} already has a mission running. Wait for it to finish or stop it first.`
+              ? 'This conversation is still answering. Your message goes when it finishes.'
+              : `${peer.self.name} is still answering in this conversation. Your message goes when that turn finishes.`
           ) as CodexMissionStartResponse
         }
         if (starting.size + live.length + (options.liveElsewhere ?? (() => 0))() >= MAX_LIVE_MISSIONS) {
@@ -1375,7 +1392,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         }
 
         const startLifecycleVersion = lifecycleVersion
-        starting.add(owner)
+        starting.add(claimKey)
         claimed = true
         let runtimes: readonly RuntimeDiscovery[]
         try {
@@ -1557,7 +1574,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             // This call holds the owner's in-flight claim; the re-entry
             // would see it and refuse itself, so it is released first.
             if (claimed) {
-              starting.delete(owner)
+              starting.delete(claimKey)
               claimed = false
             }
             const switched = await service.start(
@@ -1681,6 +1698,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           resolvedRouteId,
           ...(chosen.version?.version === undefined ? {} : { cliVersion: chosen.version.version }),
           now,
+          // What Antigravity's mode refuses, so only a call it could have refused waits for the result (0.551).
+          ...(runtime === 'antigravity' ? { sandbox: effectiveSandbox } : {}),
           // Claude Code lists its commands at the start of a run (0.426).
           ...(runtime === 'claude' && options.onRuntimeCommands !== undefined
             ? { onCommands: (commands: readonly RuntimeCommandInfo[]) => options.onRuntimeCommands?.('claude', commands) }
@@ -2408,7 +2427,7 @@ ${sentPrompt.trim()}`
           }
         }
       } finally {
-        if (claimed) starting.delete(owner)
+        if (claimed) starting.delete(claimKey)
         startOperations.delete(startOperation)
         resolveStartOperation()
       }

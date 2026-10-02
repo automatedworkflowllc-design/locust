@@ -49,6 +49,8 @@ export interface AgyInvocationContext {
   readonly resolvedRouteId?: string;
   readonly cliVersion?: string;
   readonly now?: () => Date;
+  /** The run's mode: read-only refuses writes and commands, workspace-write commands, full access nothing. */
+  readonly sandbox?: "read-only" | "workspace-write" | "full-access";
 }
 
 export interface AgyEventNormalizer {
@@ -126,15 +128,34 @@ export function createAgyEventNormalizer(context: AgyInvocationContext): AgyEven
     return { itemId: `tool_${String(index)}`, toolKind: name, name, ...(target === undefined ? {} : { command: boundedMessageText(target) }) };
   };
 
-  /** A call that ended DONE with nothing to show, until the next record says how it went. */
-  let held: (ReturnType<typeof toolRow> & { readonly phase: "completed"; readonly evidence: CodexEventEvidence; readonly durationMs?: number }) | undefined;
+  /*
+   * Calls that ended DONE with nothing to show, which this mode could have
+   * refused: they wait for the result, whose `denied_actions` says which
+   * were (0.551). Boss's review of 0.550: one held call was let go as done
+   * the moment agy said a sentence after it -- and agy does explain a
+   * refusal before it stops.
+   */
+  type Held = ReturnType<typeof toolRow> & { readonly phase: "completed"; readonly evidence: CodexEventEvidence; readonly durationMs?: number };
+  const held: Held[] = [];
+  const isCommand = (kind: string): boolean => /command|shell|terminal/i.test(kind);
+  const isWrite = (kind: string): boolean => /write|edit|replace|create|delete|move/i.test(kind);
+  // agy writes its own plan into its brain folder in every mode (measured 2026-10-02, --mode plan).
+  const ownFile = (call: Held): boolean => call.command !== undefined && /[\\/]\.gemini[\\/]antigravity[^\\/]*[\\/]brain[\\/]/i.test(call.command);
+  const mayBeRefused = (call: Held): boolean => {
+    if (context.sandbox === "full-access") return false;
+    if (isCommand(call.toolKind)) return true;
+    return context.sandbox !== "workspace-write" && isWrite(call.toolKind) && !ownFile(call);
+  };
   const releaseHeld = (denied: readonly string[] = []): readonly NormalizedRuntimeEvent[] => {
-    if (held === undefined) return [];
-    const call = held;
-    held = undefined;
-    const writes = /write|edit|replace|create|delete|move/i.test(call.toolKind);
-    const refused = denied.some((action) => (/command/i.test(action) ? /command|shell|terminal/i.test(call.toolKind) : /write|edit|file/i.test(action) && writes));
-    return [refused ? emit("tool.failed", { ...call, output: "Not allowed in this mode.", status: "refused" }) : emit("tool.completed", call)];
+    const calls = held.splice(0);
+    const refused = new Set<Held>();
+    // Each denial is the latest held call of its kind.
+    for (const action of denied) {
+      const kind = /command/i.test(action) ? isCommand : /write|edit|file/i.test(action) ? isWrite : undefined;
+      const call = kind === undefined ? undefined : [...calls].reverse().find((one) => kind(one.toolKind) && !refused.has(one) && !ownFile(one));
+      if (call !== undefined) refused.add(call);
+    }
+    return calls.map((call) => (refused.has(call) ? emit("tool.failed", { ...call, output: "Not allowed in this mode.", status: "refused" }) : emit("tool.completed", call)));
   };
 
   function acceptStep(step: JsonObject, evidence: CodexEventEvidence): readonly NormalizedRuntimeEvent[] {
@@ -167,12 +188,12 @@ export function createAgyEventNormalizer(context: AgyInvocationContext): AgyEven
       if (text === undefined || text.length === 0) return [];
       spoken.add(index);
       lastMessageItem = `msg_${String(index)}`;
-      return [...releaseHeld(), emit("message.delta", { itemId: lastMessageItem, operation: "append", text: boundedMessageText(text), final: false, evidence })];
+      return [emit("message.delta", { itemId: lastMessageItem, operation: "append", text: boundedMessageText(text), final: false, evidence })];
     }
 
     if (type === "tool") {
       const row = toolRow(index, step);
-      const events: NormalizedRuntimeEvent[] = [...releaseHeld()];
+      const events: NormalizedRuntimeEvent[] = [];
       if (state === "ACTIVE") {
         if (!openTools.has(index)) {
           openTools.add(index);
@@ -204,9 +225,8 @@ export function createAgyEventNormalizer(context: AgyInvocationContext): AgyEven
        * status" / done beside "1 refused"). A call that ends with nothing to
        * show waits for what comes next: the result says whether it was refused.
        */
-      if (state === "DONE" && errorText === undefined && output === undefined) {
-        events.push(...releaseHeld());
-        held = ended;
+      if (state === "DONE" && errorText === undefined && output === undefined && mayBeRefused(ended)) {
+        held.push(ended);
         return events;
       }
       events.push(

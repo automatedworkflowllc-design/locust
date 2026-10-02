@@ -634,7 +634,9 @@ describe('Codex mission service', () => {
     const updates: CodexMissionUpdate[] = []
     const first = await service.start('Wait safely.', 'codex', 'ask', {}, (update) => updates.push(update))
     expect(first.ok).toBe(true)
-    await expect(service.start('A second run.', 'codex', 'ask', {}, () => undefined)).resolves.toMatchObject({
+    // A reply to the turn still running waits (0.551: a new conversation would start).
+    const firstMission = first.ok ? first.data.missionId : undefined
+    await expect(service.start('A second run.', 'codex', 'ask', {}, () => undefined, undefined, undefined, firstMission)).resolves.toMatchObject({
       ok: false,
       error: { code: 'RUN_ALREADY_ACTIVE' }
     })
@@ -796,13 +798,15 @@ describe('Codex mission durability and lifecycle boundaries', () => {
       schedule: () => undefined
     })
 
-    const first = service.start('First mission.', 'codex', 'ask', {}, () => undefined)
-    await expect(service.start('Second mission.', 'codex', 'ask', {}, () => undefined)).resolves.toMatchObject({
+    // Two replies to one turn (0.551: the claim is the conversation's, not the teammate's).
+    const first = service.start('First mission.', 'codex', 'ask', {}, () => undefined, undefined, undefined, 'mission_earlier')
+    await expect(service.start('Second mission.', 'codex', 'ask', {}, () => undefined, undefined, undefined, 'mission_earlier')).resolves.toMatchObject({
       ok: false,
       error: { code: 'RUN_ALREADY_ACTIVE' }
     })
     finishDiscovery([codexRuntime()])
-    await expect(first).resolves.toMatchObject({ ok: true })
+    // The earlier turn is not in this fake ledger; what is checked is the claim during discovery.
+    await first
   })
 
   it('drains in-flight work on dispose, latches the service closed, and keeps interrupt reusable', async () => {
@@ -2128,15 +2132,16 @@ describe('missions side by side', () => {
     expect(signals[1]?.aborted).toBe(true)
   })
 
-  it('refuses a second live mission for the same teammate, by name', async () => {
+  it('starts a second conversation with the same teammate, and holds a reply to a turn still running (0.551)', async () => {
     const { start } = openEnded()
     const { service } = scheduledService({ start })
-    await service.start('Atlas works.', 'codex', 'ask', {}, () => undefined, undefined, ATLAS)
+    const first = await service.start('Atlas works.', 'codex', 'ask', {}, () => undefined, undefined, ATLAS)
+    expect((await service.start('Atlas, something else.', 'codex', 'ask', {}, () => undefined, undefined, ATLAS)).ok).toBe(true)
     await expect(
-      service.start('Atlas again.', 'codex', 'ask', {}, () => undefined, undefined, ATLAS)
+      service.start('Atlas again.', 'codex', 'ask', {}, () => undefined, undefined, ATLAS, first.ok ? first.data.missionId : undefined)
     ).resolves.toEqual({
       ok: false,
-      error: { code: 'RUN_ALREADY_ACTIVE', message: 'Atlas already has a mission running. Wait for it to finish or stop it first.' }
+      error: { code: 'RUN_ALREADY_ACTIVE', message: 'Atlas is still answering in this conversation. Your message goes when that turn finishes.' }
     })
   })
 

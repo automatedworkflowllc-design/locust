@@ -155,11 +155,11 @@ describe('a run that has ended but is still being wound down', () => {
     expect(next.ok ? 'started' : next.error.code).toBe('started')
   })
 
-  it('still refuses a second conversation for the same teammate until it has let go', async () => {
+  it('starts another conversation at once: it waits for nothing (0.551)', async () => {
     const h = harness()
     await endedTurn(h)
     const other = await h.service.start('Something else entirely', 'codex', 'accept-edits', {}, () => undefined)
     h.release()
-    expect(other.ok ? 'started' : other.error.code).toBe('RUN_ALREADY_ACTIVE')
+    expect(other.ok ? 'started' : other.error.code).toBe('started')
   })
 })

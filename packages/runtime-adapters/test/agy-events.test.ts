@@ -19,8 +19,8 @@ const completion = (exitCode = 0) => ({
   outputLimitExceeded: false, forcedTerminationAttempted: false, terminationUnconfirmed: false, cancelled: false,
   startedAt: "2026-10-02T00:00:00.000Z", finishedAt: "2026-10-02T00:00:10.000Z",
 }) as never;
-const run = (name: string, exitCode = 0) => {
-  const normalizer = createAgyEventNormalizer({ runId: "run_1", missionId: "mission_1", now: () => new Date("2026-10-02T00:00:00Z") });
+const run = (name: string, exitCode = 0, sandbox?: "read-only" | "workspace-write" | "full-access") => {
+  const normalizer = createAgyEventNormalizer({ runId: "run_1", missionId: "mission_1", now: () => new Date("2026-10-02T00:00:00Z"), ...(sandbox === undefined ? {} : { sandbox }) });
   const events: NormalizedRuntimeEvent[] = [];
   fixture(name).forEach((raw, index) => events.push(...normalizer.accept({ sequence: index + 1, raw } as never)));
   events.push(...normalizer.finish(completion(exitCode)));
@@ -52,7 +52,7 @@ describe("Antigravity CLI's stream", () => {
   });
 
   it("in Edit, the file is written and the command refused, said as such", () => {
-    const { events } = run("edit-then-command-denied");
+    const { events } = run("edit-then-command-denied", 0, "workspace-write");
     const tools = events.filter((event) => event.type.startsWith("tool."));
     expect(tools.map((event) => `${event.type}:${payload<{ name: string }>(event).name}`)).toEqual([
       "tool.started:write_to_file", "tool.completed:write_to_file", "tool.started:run_command", "tool.failed:run_command",
@@ -77,6 +77,32 @@ describe("Antigravity CLI's stream", () => {
     const { events } = run("edit-then-command-denied");
     const write = events.find((event) => event.type.startsWith("tool.") && event.type !== "tool.started" && payload<{ name: string }>(event).name === "write_to_file");
     expect(write?.type).toBe("tool.completed");
+  });
+
+  it("a refusal agy explains before it stops is still refused (0.551, Boss on 0.550)", () => {
+    // Sol's record with a sentence put between the refused call and the result.
+    const { events } = run("ask-command-denied-then-said");
+    const settled = events.filter((event) => event.type === "tool.completed" || event.type === "tool.failed");
+    expect(types(settled)).toEqual(["tool.failed"]);
+    expect(payload<{ status: string }>(settled[0])).toMatchObject({ status: "refused" });
+  });
+
+  it("plan mode: its own plan file is written, the change it went on to make is refused", () => {
+    // Measured 2026-10-02, `--mode plan`: agy writes plan.md into its brain folder, then tries the change.
+    const { events } = run("plan-mode-writes-its-plan", 0, "read-only");
+    const settled = events.filter((event) => event.type === "tool.completed" || event.type === "tool.failed");
+    const by = (end: string) => settled.find((event) => payload<{ command?: string }>(event).command?.endsWith(end));
+    expect(by("plan.md")?.type).toBe("tool.completed");
+    expect(by("greet.js")?.type).toBe("tool.failed");
+    expect(payload<{ status: string }>(by("greet.js"))).toMatchObject({ status: "refused" });
+  });
+
+  it("in Edit an edit is never held: it is done as it ends", () => {
+    const { events } = run("edit-then-command-denied", 0, "workspace-write");
+    const write = events.findIndex((event) => event.type === "tool.completed" && payload<{ name: string }>(event).name === "write_to_file");
+    const command = events.findIndex((event) => event.type === "tool.started" && payload<{ name: string }>(event).name === "run_command");
+    expect(write).toBeGreaterThanOrEqual(0);
+    expect(write).toBeLessThan(command);
   });
 
   it("an allowed command carries its command line and its output", () => {
