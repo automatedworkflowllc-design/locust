@@ -156,6 +156,10 @@ export function connectorsNote(
     if (!hasConnectors) return undefined
     return `Your connectors are signed in on Claude Code. A teammate on ${shortRuntimeName(runtime as MissionRuntimeId)} uses that program's own instead — a different set, signed in separately.`
   }
+  // Ask and Plan ask before each connector call, as Claude Code's plan mode does (0.545, measured).
+  if (mode === 'ask' || mode === 'plan') {
+    return 'Your connectors work in this mode, and each call asks you first, as Claude Code does. A connector acts on the service it reaches, not this machine.'
+  }
   return mode === 'auto'
     ? 'Your connectors work here, and so does everything else on this machine.'
     : 'Your connectors work in this mode too. This mode only limits what happens on this machine — a connector acts on the service it reaches.'

@@ -74,4 +74,10 @@ describe('the two a comparison starts on', () => {
     const picks = defaultComparePicks({ ...base, current: undefined, recent: [], models: [model('claude', 'old', { older: true }), model('opencode', 'mine', { own: true }), model('claude', 'opus'), model('codex', 'gpt-6-sol')] })
     expect(picks.map((pick) => pick.model)).toEqual(['opus', 'gpt-6-sol'])
   })
+
+  it("keeps the box's effort on the first column (0.545, Sol: Flash Low opened Compare on Medium)", () => {
+    const picks = defaultComparePicks({ ...base, current: { runtime: 'claude', model: 'opus', effort: 'low' }, recent: ['codex:gpt-6-sol'] })
+    expect(picks[0]).toMatchObject({ runtime: 'claude', model: 'opus', effort: 'low' })
+    expect(picks[1]?.effort).toBeUndefined()
+  })
 })

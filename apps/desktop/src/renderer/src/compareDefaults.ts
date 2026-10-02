@@ -1,7 +1,7 @@
 import type { PublicModel } from '../../shared/ipc.js'
 import type { ComparePick } from './components/RoutePicker.js'
 
-type Choice = { readonly runtime: ComparePick['runtime']; readonly model: string }
+type Choice = { readonly runtime: ComparePick['runtime']; readonly model: string; readonly effort?: string }
 
 /**
  * THE TWO MODELS A COMPARISON STARTS ON (0.460).
@@ -57,5 +57,6 @@ export function defaultComparePicks(input: {
     ?? candidates.find((one) => one.runtime !== first.runtime)
     ?? candidates[1]
   if (second === undefined) return []
-  return [first, second].map((choice) => ({ ...choice, label: input.label(choice) }))
+  // The box's effort comes with its model (0.545, Sol: Flash Low opened Compare on Medium).
+  return [first, second].map((choice) => ({ runtime: choice.runtime, model: choice.model, ...(choice.effort === undefined ? {} : { effort: choice.effort }), label: input.label(choice) }))
 }

@@ -11,6 +11,39 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.545.0 - 2026-10-03
+
+### New
+
+- **Copy, as Claude Code has it.** Hover a teammate's finished reply and Copy
+  takes its text, Markdown and all. A file a teammate hands over has Copy
+  beside Save a copy, for its text: quicker than saving it and adding it from
+  Downloads.
+
+### Changed
+
+- **In Ask and Plan, a Claude teammate asks before each connector call**, as
+  Claude Code itself does in its plan mode (measured). Connectors it was given
+  were used without asking in every mode until now. Edit and Auto are as they
+  were.
+
+### Fixed
+
+- **Sign in again says first that it may sign you out** until you finish in
+  the window, and Cancel opens nothing. A tester closed Codex's sign-in
+  unanswered and Codex stayed signed out.
+- **A sign-in window that closes puts its row back** at once; it kept saying
+  "Finish in the window that opened."
+- **Claude's cloud says when a folder is not on GitHub**: it works on a copy
+  of a GitHub repository, so from any other folder it starts with no project.
+  It offers your folders that are, and no longer sends you to a window that
+  has already closed: the session is on claude.ai and in the Claude app.
+- **Activity says "Did not run git status"** for a command the mode refused,
+  not "Ran", and shows a runtime's note in its own words.
+- **Compare keeps the effort you chose** for the model it starts on.
+- **Every runtime's file read says Read**, as Claude's does, not `view_file`
+  or `read`; searches, listings and fetches likewise.
+
 ## 0.544.0 - 2026-10-02
 
 ### Fixed

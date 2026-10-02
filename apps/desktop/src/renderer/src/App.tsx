@@ -2197,6 +2197,7 @@ export default function App(): ReactElement {
   }, [workspaceId])
   // The folders to offer when this one is not on GitHub, asked only when the panel would show them.
   useEffect(() => {
+    // Claude's cloud asks too when the folder is not on GitHub (0.545); its environment is Codex's concern.
     if (!cloudPanel || cloudWhere === undefined || (cloudWhere.repo !== undefined && cloudWhere.environment !== 'missing')) return
     setCloudFolders(undefined)
     void window.desktop?.cloudFolders().then(setCloudFolders).catch(() => setCloudFolders([]))
@@ -2702,6 +2703,9 @@ export default function App(): ReactElement {
       signInOpened = true
     }
     window.addEventListener(SIGN_IN_OPENED_EVENT, onSignInOpened)
+    // A sign-in window closed: ask now, not only when this window next has focus (0.545).
+    let askAfterSignIn: (() => void) | undefined
+    const stopSignInClosed = bridge.onSignInClosed?.(() => askAfterSignIn?.()) ?? (() => undefined)
     void bridge
       .getLocalRuntimes()
       .then((response) => {
@@ -2826,6 +2830,10 @@ export default function App(): ReactElement {
     const firstRecheck = setTimeout(() => {
       if (unanswered) askAgain()
     }, RUNTIME_RECHECK_MS)
+    askAfterSignIn = () => {
+      signInOpened = false
+      askAgain()
+    }
     const onFocus = (): void => {
       if (signInOpened) {
         signInOpened = false
@@ -3033,6 +3041,7 @@ export default function App(): ReactElement {
       clearTimeout(firstRecheck)
       window.removeEventListener('focus', onFocus)
       window.removeEventListener(SIGN_IN_OPENED_EVENT, onSignInOpened)
+      stopSignInClosed()
       removeMissionListener()
       frameBatcher.current.dispose()
       removeApprovalListener()

@@ -589,6 +589,8 @@ export type RuntimeInstallResponse =
  * executable discovery found. See `main/runtime-sign-in.ts`.
  */
 export const RUNTIME_SIGN_IN_CHANNEL = 'runtime:sign-in'
+/** The host says a sign-in window it opened has closed, so the row can recover (0.545). */
+export const RUNTIME_SIGN_IN_CLOSED_CHANNEL = 'runtime:sign-in-closed'
 
 export type RuntimeSignInResponse =
   | { readonly ok: true }
@@ -3069,6 +3071,8 @@ export interface DesktopApi {
   /** Open the runtime's sign-in in its own window. */
   /** `again`: sign in once more, as this account or another (Colin, 2026-10-02). */
   signInRuntime(runtime: string, again?: boolean): Promise<RuntimeSignInResponse>
+  /** A sign-in window Locust opened has closed, finished or not (0.545). */
+  onSignInClosed(listener: (runtime: string) => void): () => void
   /** Open this conversation's session in its runtime's own terminal (0.387). */
   openInTerminal(missionId: string): Promise<OpenInTerminalResponse>
   /** Bring what was done in the terminal on this conversation into it (0.391). */

@@ -20,6 +20,7 @@ import { parseAgentText } from '../agentText.js'
 import { folderName, ranOnLine } from '../ranOn.js'
 import { useFollowBottom } from '../useFollowBottom.js'
 import { JumpToBottom } from './JumpToBottom.js'
+import { CopyButton } from './CopyButton.js'
 import { ledgerFailureRows, ledgerFailureSentence } from '../ledgerFailure.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { liveActivityOf } from '../faceState.js'
@@ -127,6 +128,20 @@ function HandedFiles({
             * a download. Reveal answers "where is it"; this answers "I want
             * it somewhere else". Neither one ever opens it.
             */}
+          {workspacePath !== undefined && (
+            <CopyButton
+              className="lc-handedfile__save"
+              label={file.path}
+              text={async () => {
+                const read = await window.desktop?.readTextFile(`${workspacePath}/${file.path}`)
+                if (read === undefined) return { refused: 'Locust could not reach that file.' }
+                if (!read.ok) return { refused: read.message }
+                // A spreadsheet or a Word file has no text to copy as it is: saving a copy keeps it whole.
+                if (read.mode === 'table' || read.mode === 'document') return { refused: 'Only a text file can be copied. Save a copy instead.' }
+                return read.text
+              }}
+            />
+          )}
           <button
             type="button"
             className="lc-handedfile__save"
@@ -239,6 +254,8 @@ export function ThreadItems({
   }
   const face = (index: number): ReactElement =>
     !faces || continuesSpeech(index) ? <span className="lc-agentline__gutter" /> : <AgentAvatar teammate={owner} />
+  // Copy sits under the turn's last reply once nothing is still going, as Claude Code's does (0.545).
+  const lastSpeech = items.some((one) => one.type === 'live-step') ? -1 : items.map((one) => one.type).lastIndexOf('agent-message')
   return (
     <>
       {items.map((item, index) => {
@@ -248,6 +265,11 @@ export function ThreadItems({
               {face(index)}
               <div className="lc-agentline__body">
                 <AgentText text={item.text} streaming={item.streaming === true} />
+                {index === lastSpeech && item.streaming !== true && item.text.trim().length > 0 && (
+                  <div className="lc-agentline__tools">
+                    <CopyButton className="lc-agentline__copy" label="this reply" text={item.text} />
+                  </div>
+                )}
               </div>
             </div>
           )

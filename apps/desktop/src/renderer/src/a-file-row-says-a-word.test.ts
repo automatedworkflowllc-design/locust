@@ -9,8 +9,17 @@ describe('the word on a file row', () => {
     expect(fileToolWord('file_change')).toBe('changed')
   }, 10_000)
 
-  it("keeps every other runtime's own tool word", () => {
-    expect(fileToolWord('read')).toBe('read')
+  it("says a read, a search, a listing and a fetch in Claude Code's words, whoever ran it (0.545)", () => {
+    // Cursor's 0.544 pass: Read on Claude, read on Cursor, view_file on Antigravity.
+    for (const read of ['Read', 'read', 'view_file', 'read_file']) expect(fileToolWord(read), read).toBe('Read')
+    expect(fileToolWord('grep_search')).toBe('Grep')
+    expect(fileToolWord('list_dir')).toBe('Glob')
+    expect(fileToolWord('find_by_name')).toBe('Glob')
+    expect(fileToolWord('search_web')).toBe('WebSearch')
+    expect(fileToolWord('read_url_content')).toBe('WebFetch')
+  }, 10_000)
+
+  it("keeps a word with no Claude Code counterpart as it is", () => {
     expect(fileToolWord('edit')).toBe('edit')
     expect(fileToolWord('Write')).toBe('Write')
   }, 10_000)

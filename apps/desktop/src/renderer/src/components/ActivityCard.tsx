@@ -9,8 +9,23 @@ import { Fragment, useEffect, useRef, useState, useContext } from 'react'
  * and a row reading "src/signup.ts  file_change" was an internal name on the
  * screen (first-impressions drive, 0.349). That one becomes a word.
  */
+/*
+ * The word beside a row, in Claude Code's own tool words (0.545). Cursor's
+ * 0.544 pass: the same read said `Read` on Claude, `read` on Cursor and
+ * `view_file` on Antigravity. Every runtime's read, search, listing and fetch
+ * now says what Claude Code's would; a word with no counterpart stays its own.
+ */
+const CLAUDE_TOOL_WORDS: readonly (readonly [RegExp, string])[] = [
+  [/^(read|read_?file|readfile|view|view_?file|open_?file|readtoolcall)$/i, 'Read'],
+  [/^(grep|grep_?search|ripgrep|codebase_?search|semsearch)$/i, 'Grep'],
+  [/^(glob|find_?by_?name|file_?search|list_?dir|list_?directory|listdir|ls)$/i, 'Glob'],
+  [/^(web_?search|search_?web|websearch)$/i, 'WebSearch'],
+  [/^(fetch|web_?fetch|read_?url(_?content)?|url_?content)$/i, 'WebFetch']
+]
+
 export function fileToolWord(tool: string): string {
-  return tool === 'file_change' ? 'changed' : tool
+  if (tool === 'file_change') return 'changed'
+  return CLAUDE_TOOL_WORDS.find(([pattern]) => pattern.test(tool))?.[1] ?? tool
 }
 
 export function thoughtLine(durationMs: number | undefined): string {

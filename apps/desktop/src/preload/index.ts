@@ -31,6 +31,7 @@ import {
   RUNTIME_ARTIFACTS_CHANNEL,
   RUNTIME_INSTALL_CHANNEL,
   RUNTIME_SIGN_IN_CHANNEL,
+  RUNTIME_SIGN_IN_CLOSED_CHANNEL,
   OPEN_IN_TERMINAL_CHANNEL,
   TERMINAL_CATCH_UP_CHANNEL,
   SESSION_IMPORT_LIST_CHANNEL,
@@ -395,6 +396,13 @@ const desktopApi: DesktopApi = {
     ipcRenderer.invoke(RUNTIME_INSTALL_CHANNEL, runtime) as Promise<RuntimeInstallResponse>,
   signInRuntime: (runtime: string, again?: boolean) =>
     ipcRenderer.invoke(RUNTIME_SIGN_IN_CHANNEL, runtime, again === true) as Promise<RuntimeSignInResponse>,
+  onSignInClosed: (listener: (runtime: string) => void) => {
+    const handler = (_event: unknown, runtime: string): void => listener(runtime)
+    ipcRenderer.on(RUNTIME_SIGN_IN_CLOSED_CHANNEL, handler)
+    return () => {
+      ipcRenderer.removeListener(RUNTIME_SIGN_IN_CLOSED_CHANNEL, handler)
+    }
+  },
   openInTerminal: (missionId: string) =>
     ipcRenderer.invoke(OPEN_IN_TERMINAL_CHANNEL, missionId) as Promise<OpenInTerminalResponse>,
   catchUpTerminal: (missionId: string) =>

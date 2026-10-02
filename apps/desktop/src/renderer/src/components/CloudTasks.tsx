@@ -96,12 +96,26 @@ export function CloudTasks({
           * is named, what the cloud needs is said, and the person's folders
           * that are on GitHub are one click away.
           */}
-        {codexSide && where !== undefined && where.repo === undefined && (
+        {/*
+          * CLAUDE'S CLOUD, TOO (0.545). Colin's first send from .claude went
+          * through, and the session answered that /home/user "isn't a git
+          * repository": Claude's cloud works on a GitHub repository, and
+          * without one it starts with no project. It still runs, so it is
+          * said, not refused.
+          */}
+        {(codexSide || claude?.picked === true) && where !== undefined && where.repo === undefined && (
           <div className="lc-cloudtasks__elsewhere">
-            <p className="lc-cloudtasks__note">
-              <strong>{where.folderName ?? 'This folder'}</strong> is not on GitHub. A cloud task runs on a copy of a GitHub
-              repository in Codex Cloud, not on this computer, so it needs a folder that is on GitHub.
-            </p>
+            {claude?.picked === true && !codexSide ? (
+              <p className="lc-cloudtasks__note">
+                <strong>{where.folderName ?? 'This folder'}</strong> is not on GitHub. Claude’s cloud works on a copy of a
+                GitHub repository, so a task sent from here starts with no project. Open a folder that is on GitHub to work on it there.
+              </p>
+            ) : (
+              <p className="lc-cloudtasks__note">
+                <strong>{where.folderName ?? 'This folder'}</strong> is not on GitHub. A cloud task runs on a copy of a GitHub
+                repository in Codex Cloud, not on this computer, so it needs a folder that is on GitHub.
+              </p>
+            )}
             {folders === undefined ? (
               <p className="lc-cloudtasks__note">Checking your other folders…</p>
             ) : known.length > 0 ? (
@@ -111,7 +125,7 @@ export function CloudTasks({
                   {known.map((folder) => (
                     <li key={folder.id}>
                       <span className="lc-cloudtasks__foldername">{folder.name}</span>
-                      <span className="lc-cloudtasks__repo lc-mono">{folder.environment === 'ready' ? folder.repo : `${folder.repo} · no cloud environment`}</span>
+                      <span className="lc-cloudtasks__repo lc-mono">{folder.environment === 'ready' || !codexSide ? folder.repo : `${folder.repo} · no cloud environment`}</span>
                       <button type="button" className="lc-button" onClick={() => onOpenFolder(folder.id)}>Open</button>
                     </li>
                   ))}
@@ -252,7 +266,7 @@ function ClaudeCloudSessions({
         <section key={session.id} className="lc-cloudtask is-pending" aria-label={session.prompt}>
           <div className="lc-cloudtask__prompt">{session.prompt}</div>
           <div className="lc-cloudtask__state">
-            <span>Sent to Claude’s cloud {agoLabel(session.startedAt) ?? 'just now'}. Follow it in its window or on claude.ai.</span>
+            <span>Sent to Claude’s cloud {agoLabel(session.startedAt) ?? 'just now'}. Follow it on claude.ai or in the Claude app.</span>
           </div>
           <div className="lc-cloudtask__actions">
             <button type="button" className="lc-primarybutton" onClick={() => onHome(session.id)} title="Opens Claude Code here with its list of cloud sessions: pick this one and its work comes into this folder">

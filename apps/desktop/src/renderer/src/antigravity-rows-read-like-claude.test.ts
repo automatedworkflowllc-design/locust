@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { activityEntries, activityTrace, buildThread, traceOutcome } from './missionView.js'
+import { activityEntries, activityTrace, buildSignalRail, buildThread, traceOutcome } from './missionView.js'
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
 /**
@@ -70,5 +70,19 @@ describe("Antigravity's rows", () => {
     const line = activityTrace(details, events, traceOutcome(events, false)).map((segment) => segment.text).join(' · ')
     expect(line).toContain('1 refused')
     expect(line).not.toMatch(/non-zero|ran git status/)
+  })
+})
+
+describe("Antigravity's refusal in Activity (0.545, Sol on 0.544)", () => {
+  it('a refused command did not run, and a runtime note is its sentence, not its code', () => {
+    const withNote = [
+      ...events.slice(0, -1),
+      event('adapter.diagnostic', { level: 'warning', code: 'antigravity.denied_actions', message: 'It stopped there. Antigravity was not allowed to run a command in this mode.', terminal: false }),
+      events.at(-1)!
+    ]
+    const names = buildSignalRail(withNote, { running: false }).map((row) => row.name)
+    expect(names).toContain('Did not run git status')
+    expect(names.join(' | ')).not.toMatch(/Ran git status|antigravity\.denied_actions/)
+    expect(names.some((name) => name.startsWith('It stopped there.'))).toBe(true)
   })
 })

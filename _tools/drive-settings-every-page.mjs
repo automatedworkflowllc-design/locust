@@ -81,6 +81,20 @@ try {
           const again = Number(await drive.evaluate(`[...document.querySelectorAll('button.lc-runtimecell__again')].filter((b) => b.innerText.trim() === 'Sign in again').length`))
           const signedIn = Number(await drive.evaluate(`[...document.querySelectorAll('.lc-runtimerow')].filter((row) => /READY|ACTIVE/.test(row.querySelector('.lc-tag')?.innerText ?? '')).length`))
           check('AI agents: signed-in agents offer Sign in again', again > 0, `${String(again)} of ${String(signedIn)} ready rows`)
+          // It asks first, and Cancel opens nothing (0.545: Sol's closed Codex login left Codex signed out).
+          const asked = String(await drive.evaluate(`(async () => {
+            const button = [...document.querySelectorAll('button.lc-runtimecell__again')].find((b) => b.innerText.trim() === 'Sign in again')
+            if (!button) return 'no button'
+            button.click()
+            await new Promise((r) => setTimeout(r, 300))
+            const group = document.querySelector('.lc-runtimecell__confirm')
+            const said = group?.innerText.replace(/\\s+/g, ' ').trim() ?? 'no warning'
+            const cancel = group ? [...group.querySelectorAll('button')].find((b) => b.innerText.trim() === 'Cancel') : undefined
+            cancel?.click()
+            await new Promise((r) => setTimeout(r, 300))
+            return said + ' | after Cancel: ' + (document.querySelector('.lc-runtimecell__confirm') ? 'still asking' : 'back')
+          })()`))
+          check('AI agents: Sign in again warns it may sign you out, and Cancel opens nothing', /may stay signed out/.test(asked) && /after Cancel: back$/.test(asked), asked)
         }
       }
       check(`${label} at ${String(w)}: nothing past the edge, nothing scrolls sideways${seen.cut.length > 0 ? ' (cut short: ' + seen.cut.join(' | ') + ')' : ''}`, fine, JSON.stringify({ sideways: seen.sideways, past: seen.past }))

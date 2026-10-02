@@ -201,6 +201,7 @@ import {
   RUNTIME_UPDATES_SET_CHANNEL,
   RUNTIME_INSTALL_PROGRESS_CHANNEL,
   RUNTIME_SIGN_IN_CHANNEL,
+  RUNTIME_SIGN_IN_CLOSED_CHANNEL,
   OPEN_IN_TERMINAL_CHANNEL,
   TERMINAL_CATCH_UP_CHANNEL,
   SESSION_IMPORT_LIST_CHANNEL,
@@ -2306,6 +2307,8 @@ if (!ownsSingleInstanceLock) {
         closed: () => {
           discoveryCache = undefined
           runtimeDiscovery.invalidate()
+          // The row was left saying "Finish in the window that opened" after it closed (Sol, 0.544).
+          if (!event.sender.isDestroyed()) event.sender.send(RUNTIME_SIGN_IN_CLOSED_CHANNEL, runtime)
         }
       }, again === true)
     })

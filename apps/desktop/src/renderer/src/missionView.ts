@@ -3863,6 +3863,16 @@ export function railToolName(tool: { readonly name: string; readonly toolKind?: 
   return railLabel(shown === undefined ? tool.name : `${tool.name} · ${shown}`)
 }
 
+/**
+ * A call the mode refused, or the person declined, never ran (0.545). Sol, on
+ * 0.544: Activity said "Ran git status" above "refused", for a command that
+ * Antigravity's Edit mode never let run.
+ */
+export function railNeverRan(name: string, status: string | undefined): string {
+  if (status !== 'refused' && status !== 'declined') return name
+  return name.startsWith('Ran ') ? `Did not run ${name.slice('Ran '.length)}` : name === 'Ran a command' ? 'Did not run a command' : name
+}
+
 export function buildSignalRail(
   events: readonly NormalizedRuntimeEvent[],
   options: { readonly running: boolean }
@@ -3912,7 +3922,7 @@ export function buildSignalRail(
           })
         } else {
           const ended = outcome(settled)
-          rows.push({ key: event.id, name: railToolName(event.payload), meta: `${clock} · ${ended.meta}`, tone: ended.tone, live: false })
+          rows.push({ key: event.id, name: railNeverRan(railToolName(event.payload), settled.payload.status), meta: `${clock} · ${ended.meta}`, tone: ended.tone, live: false })
         }
         break
       }
@@ -3921,7 +3931,7 @@ export function buildSignalRail(
         // Its call already has its row, which says how it ended.
         if (started.has(event.payload.itemId)) break
         const ended = outcome(event)
-        rows.push({ key: event.id, name: railToolName(event.payload), meta: `${clock} · ${ended.meta}`, tone: ended.tone, live: false })
+        rows.push({ key: event.id, name: railNeverRan(railToolName(event.payload), event.payload.status), meta: `${clock} · ${ended.meta}`, tone: ended.tone, live: false })
         break
       }
       case 'step.started':
@@ -3971,7 +3981,7 @@ export function buildSignalRail(
       case 'adapter.diagnostic':
         rows.push({
           key: event.id,
-          name: `Runtime note · ${event.payload.code}`,
+          name: railLabel(event.payload.message.trim().length > 0 ? event.payload.message : 'A note from the runtime', 96),
           meta: `${clock} · ${event.payload.level}`,
           tone: event.payload.level === 'error' ? 'red' : 'amber',
           live: false

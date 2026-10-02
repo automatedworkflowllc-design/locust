@@ -5121,6 +5121,21 @@ textarea {
   cursor: default;
 }
 
+/* Sign in again, asked first: the warning may wrap; its two choices stay quiet. */
+.lc-runtimecell__confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--lc-space-1) var(--lc-space-2);
+  max-width: 320px;
+}
+
+.lc-runtimecell__confirm .lc-runtimecell__signin {
+  white-space: normal;
+  text-align: right;
+}
+
 /* Sign in again: quiet, since every signed-in row has one. */
 .lc-runtimecell__again {
   padding: 4px 6px;
@@ -17952,4 +17967,49 @@ textarea {
 .lc-windowfailed__reload:focus-visible {
   outline: 2px solid var(--lc-focus-ring);
   outline-offset: 2px;
+}
+
+/* Copy under a finished reply (0.545): Claude Code's, quiet until the reply is
+   hovered or the button has focus. */
+.lc-agentline__tools {
+  display: flex;
+  min-height: 22px;
+  margin-top: var(--lc-space-1);
+}
+
+.lc-agentline__copy {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lc-space-1);
+  padding: 3px 6px;
+  border: 0;
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  color: var(--lc-text-muted);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--lc-motion-hover) var(--lc-ease), color var(--lc-motion-hover) var(--lc-ease), background var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-agentline:hover .lc-agentline__copy,
+.lc-agentline__copy:focus-visible,
+.lc-agentline__copy[aria-label^='Copied'] {
+  opacity: 1;
+}
+
+.lc-agentline__copy:hover {
+  color: var(--lc-text-primary);
+  background: var(--lc-bg-control);
+}
+
+.lc-agentline__copy:focus-visible {
+  outline: 2px solid var(--lc-focus-ring);
+  outline-offset: 1px;
+}
+
+.lc-copy__said {
+  margin-left: var(--lc-space-1);
+  font-size: var(--lc-text-description);
 }

@@ -721,6 +721,17 @@ export function resumableThreadOf(prior: RecoveredMission, runtime: string): str
   return runtimeThreadIdOf(prior) ?? prior.metadata.continuesFrom?.runtimeThreadId
 }
 
+/**
+ * The connectors a Claude run is given allow rules for (0.545). None in Ask or
+ * Plan (read-only): there every connector call asks, as Claude Code's own plan
+ * mode does -- measured with a test server, 2026-10-03. None when the person
+ * asked to be asked about every one. Otherwise the named ones.
+ */
+export function claudeConnectorRules(sandbox: string, askEvery: boolean, named: readonly string[]): { readonly connectors?: readonly string[] } {
+  if (askEvery || sandbox === 'read-only' || named.length === 0) return {}
+  return { connectors: named }
+}
+
 function validRunId(value: unknown): value is string {
   return typeof value === 'string'
     && value.length > 0
@@ -1881,11 +1892,19 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
                    * which is Colin's ruling and the normal state. It is also
                    * the shape of a future "ask me each time" setting.
                    */
-                  if (askEveryConnector) return {}
+                  /*
+                   * ASK ASKS (0.545). MEASURED 2026-10-03 with a test server: in
+                   * its own plan mode Claude Code asks before every connector
+                   * tool, even one marked read-only, and Codex's read-only
+                   * sandbox refuses any that change things. Locust's Ask had
+                   * pre-approved every ticked connector, so a teammate in Ask
+                   * could call one that changes things without a word. Colin,
+                   * 2026-10-03: "i just want it to work the way the actual
+                   * models do." So Ask sends no rules: each call is a card.
+                   */
                   // The teammate's own list when it has one -- a NARROWING of
                   // what the person has -- else everything the person has.
-                  const named = peer?.connectors ?? options.connectors?.() ?? []
-                  return named.length === 0 ? {} : { connectors: named }
+                  return claudeConnectorRules(effectiveSandbox, askEveryConnector, peer?.connectors ?? options.connectors?.() ?? [])
                 })(),
                 // Claude's containment IS this value: it picks the permission
                 // mode and the tool list. Leaving it out defaulted every
