@@ -3978,21 +3978,27 @@ export default function App(): ReactElement {
    * one of the compared models while another can judge (Optima's judges are
    * not the contestants).
    */
-  const judgeChoicesFor = (compare: PublicCompare): readonly { readonly key: string; readonly label: string; readonly runtime: MissionRuntimeId; readonly model: string }[] => {
+  const judgeChoicesFor = (compare: PublicCompare): readonly { readonly key: string; readonly label: string; readonly runtime: MissionRuntimeId; readonly model: string; readonly group: string; readonly short: string }[] => {
     const compared = new Set(compare.slots.map((column) => `${column.route.runtime}:${column.route.model}`))
     const ready = (runtime: string): boolean => runtimes.some((status) => status.id === runtime && status.ready) && compareRefusalOf(runtime, antigravityCli) === undefined
-    const picked: { key: string; label: string; runtime: MissionRuntimeId; model: string }[] = []
+    const picked: { key: string; label: string; runtime: MissionRuntimeId; model: string; group: string; short: string }[] = []
     const add = (runtime: MissionRuntimeId, model: string): void => {
       const key = `${runtime}:${model}`
       if (picked.some((one) => one.key === key) || !ready(runtime)) return
-      picked.push({ key, runtime, model, label: `${runtimeNameOf(runtime)} / ${routeModelName(runtime, model, resolvedModels.get(key))}` })
+      const short = routeModelName(runtime, model, resolvedModels.get(key))
+      picked.push({ key, runtime, model, label: `${runtimeNameOf(runtime)} / ${short}`, group: runtimeNameOf(runtime), short })
     }
     for (const model of freeAnswered) add('opencode', model)
     add(composerRoute.runtime, composerRoute.model)
     const catalogue = models.filter((model) => model.older !== true && model.own !== true)
     for (const model of [...catalogue.filter((one) => one.id.endsWith('-free')), ...catalogue.filter((one) => !one.id.endsWith('-free'))]) add(model.runtime, model.id)
     const others = picked.filter((one) => !compared.has(one.key))
-    return [...others, ...picked.filter((one) => compared.has(one.key))].slice(0, 16)
+    const ordered = [...others, ...picked.filter((one) => compared.has(one.key))]
+    // Every one (0.554): the offered one first, the rest under their agent in the catalogue's order.
+    const [offered, ...rest] = ordered
+    const runtimeOrder = [composerRoute.runtime, ...catalogue.map((model) => model.runtime)]
+    const rank = (one: { readonly runtime: string }): number => runtimeOrder.indexOf(one.runtime as MissionRuntimeId)
+    return offered === undefined ? [] : [offered, ...rest.map((one, index) => ({ one, index })).sort((x, y) => rank(x.one) - rank(y.one) || x.index - y.index).map(({ one }) => one)]
   }
   const compareColumnsFor = (compare: PublicCompare): { readonly prompts: readonly string[]; readonly columns: readonly CompareColumnView[] } => {
     const cellOf = (missionId: string) => {

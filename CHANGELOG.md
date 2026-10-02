@@ -20,6 +20,8 @@ heading: the home screen then shows it once, as a splash.
   come -- in place of a bare "Reading the answers".
 - **The answer the judge would keep says "Judge's pick"** in its column's
   head. It is still the judge's view: you keep the answer.
+- **Every model you can use is offered as a judge,** listed under its agent.
+  Only sixteen fitted before, and the free OpenCode models took most of them.
 
 ## 0.553.0 - 2026-10-02
 

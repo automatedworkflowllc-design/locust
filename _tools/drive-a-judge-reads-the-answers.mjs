@@ -77,6 +77,7 @@ const check = (what, ok, detail) => {
 const state = `JSON.stringify({
   ask: !!document.querySelector('.lc-compare__judgeask'),
   choices: [...document.querySelectorAll('.lc-compare__judgepick option')].map((o) => o.innerText.trim()),
+  groups: [...document.querySelectorAll('.lc-compare__judgepick optgroup')].map((g) => g.label),
   view: document.querySelector('.lc-compare__judge')?.innerText.replace(/\\s+/g, ' ').trim() ?? '',
   kept: document.querySelector('.lc-compare__kept')?.innerText ?? '',
   label: document.querySelector('.lc-compare__judge .lc-compare__recordlabel')?.innerText ?? '',
@@ -90,10 +91,12 @@ try {
   await drive.resize(1440, 900)
   const before = JSON.parse(String(await drive.capture('the comparison, answers in', () => drive.evaluate(`(async () => {
     ;[...document.querySelectorAll('.lc-convrow button.lc-conv')].find((r) => /CRM should/i.test(r.innerText))?.click()
-    for (let i = 0; i < 20 && !document.querySelector('.lc-compare__judgeask'); i += 1) await new Promise((r) => setTimeout(r, 250))
+    // Until the agents are found: before then only the two compared can judge.
+    for (let i = 0; i < 80 && document.querySelectorAll('.lc-compare__judgepick option').length <= 2; i += 1) await new Promise((r) => setTimeout(r, 250))
     return ${state}
   })()`))))
   check('with the answers in, it offers a judge, and not one of the two compared first', before.ask && before.choices.length > 0 && /Codex/.test(before.choices[0] ?? '') && !/Mimo|Ling/.test(before.choices[0] ?? ''), JSON.stringify(before.choices.slice(0, 4)))
+  check('every model it can be is listed, under its agent (0.554)', before.groups.length >= 2 && before.choices.length > 16, `${before.choices.length} models; ${JSON.stringify(before.groups)}`)
   await drive.capture('the judge asked', () => drive.evaluate(`(async () => {
     const box = document.querySelector('.lc-compare__judgecriteria')
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set

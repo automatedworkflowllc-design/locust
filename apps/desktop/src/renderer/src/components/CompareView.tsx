@@ -122,12 +122,12 @@ export function CompareView({
   /** The judge's view, when one was asked (0.520): its model, and what it said or is saying. */
   readonly judge?: { readonly name: string; readonly running: boolean; readonly answer: string; readonly items: readonly ThreadItem[]; readonly pick?: CompareSlotId; readonly failed?: string }
   /** The models a judge can be, the first the one offered (0.520). */
-  readonly judgeChoices?: readonly { readonly key: string; readonly label: string }[]
+  readonly judgeChoices?: readonly ModelChoice[]
   /** A judge is being asked. */
   readonly judging?: boolean
   readonly onJudge?: (choiceKey: string, criteria: string) => void
   /** Models not yet in it, that the same question can be put to (0.523). */
-  readonly addChoices?: readonly { readonly key: string; readonly label: string }[]
+  readonly addChoices?: readonly ModelChoice[]
   readonly adding?: boolean
   readonly onAddModel?: (choiceKey: string) => void
 }): ReactElement {
@@ -424,13 +424,54 @@ export function CompareView({
   )
 }
 
+/** A model a judge or a new column can be: grouped under its agent when `group` is given. */
+export interface ModelChoice {
+  readonly key: string
+  readonly label: string
+  /** "Claude Code", "OpenCode": the agent it runs on, the menu's heading. */
+  readonly group?: string
+  /** Its name alone, under that heading. */
+  readonly short?: string
+}
+
+/**
+ * EVERY MODEL, UNDER ITS AGENT (0.554), as the composer's model menu lists
+ * them. Colin, on 0.553: "not all of our models showing in judge category"
+ * -- sixteen fit, and the free OpenCode ones filled most of them. The one
+ * offered stays first; the rest follow under their agent's name.
+ */
+function ModelOptions({ choices }: { readonly choices: readonly ModelChoice[] }): ReactElement {
+  const [first, ...rest] = choices
+  const groups: { readonly name: string; readonly members: ModelChoice[] }[] = []
+  for (const one of rest) {
+    const name = one.group ?? ''
+    const group = groups.find((candidate) => candidate.name === name)
+    if (group === undefined) groups.push({ name, members: [one] })
+    else group.members.push(one)
+  }
+  return (
+    <>
+      {first !== undefined && <option value={first.key}>{first.label}</option>}
+      {groups.map((group) =>
+        group.name.length === 0 ? (
+          group.members.map((one) => <option key={one.key} value={one.key}>{one.label}</option>)
+        ) : (
+          <optgroup key={group.name} label={group.name}>
+            {group.members.map((one) => <option key={one.key} value={one.key}>{one.short ?? one.label}</option>)}
+          </optgroup>
+        )
+      )}
+    </>
+  )
+}
+
 /**
  * ASK A JUDGE (0.520): which model reads the answers, and what a good answer
  * does if the person wants to say. One line under the answers, once at
  * least two have finished; nothing runs until Judge is pressed.
  */
 function JudgeAsk({ choices, again, busy, onJudge }: {
-  readonly choices: readonly { readonly key: string; readonly label: string }[]
+  readonly choices: readonly ModelChoice[]
   readonly again: boolean
   readonly busy: boolean
   readonly onJudge: (choiceKey: string, criteria: string) => void
@@ -442,11 +483,7 @@ function JudgeAsk({ choices, again, busy, onJudge }: {
       <span className="lc-compare__recordlabel lc-mono">{again ? 'ASK ANOTHER JUDGE' : 'ASK A JUDGE'}</span>
       <div className="lc-compare__judgerow">
         <select className="lc-input lc-compare__judgepick" aria-label="The model that judges" value={choice} onChange={(event) => setChoice(event.target.value)}>
-          {choices.map((one) => (
-            <option key={one.key} value={one.key}>
-              {one.label}
-            </option>
-          ))}
+          <ModelOptions choices={choices} />
         </select>
         <input
           className="lc-input lc-compare__judgecriteria"
@@ -470,7 +507,7 @@ function JudgeAsk({ choices, again, busy, onJudge }: {
  * others were. After Optima, which runs a benchmark again on each new model.
  */
 function AddModelAsk({ choices, busy, onAdd }: {
-  readonly choices: readonly { readonly key: string; readonly label: string }[]
+  readonly choices: readonly ModelChoice[]
   readonly busy: boolean
   readonly onAdd: (choiceKey: string) => void
 }): ReactElement {
@@ -480,11 +517,7 @@ function AddModelAsk({ choices, busy, onAdd }: {
       <span className="lc-compare__recordlabel lc-mono">ASK ANOTHER MODEL</span>
       <div className="lc-compare__judgerow">
         <select className="lc-input lc-compare__judgepick" aria-label="The model to ask too" value={choice} onChange={(event) => setChoice(event.target.value)}>
-          {choices.map((one) => (
-            <option key={one.key} value={one.key}>
-              {one.label}
-            </option>
-          ))}
+          <ModelOptions choices={choices} />
         </select>
         <button type="button" className="lc-button" disabled={busy || choice.length === 0} onClick={() => onAdd(choice)}>
           {busy ? 'Asking…' : 'Ask it too'}
