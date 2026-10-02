@@ -75,8 +75,13 @@ try {
   await drive.ready()
   await drive.resize(1209, 770)
   await drive.evaluate(openTeammateScript('Gem'))
-  await sleep(1500)
-  const route = String(await drive.evaluate(`[...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')?.innerText.replace(/\\s+/g, ' ').trim() ?? ''`))
+  // The route is drawn once discovery has answered, which takes a few seconds on a cold start.
+  let route = ''
+  for (let i = 0; i < 40; i += 1) {
+    await sleep(500)
+    route = String(await drive.evaluate(`[...document.querySelectorAll('.lc-control')].find(b => b.getAttribute('aria-haspopup') === 'listbox')?.innerText.replace(/\\s+/g, ' ').trim() ?? ''`))
+    if (route.length > 0 && !/No AI agent/i.test(route)) break
+  }
   say(`route: ${route}`)
   const runtimeWord = { antigravity: /antigravity/i, codex: /codex/i, claude: /claude/i, cursor: /cursor/i, opencode: /opencode/i }[RUNTIME] ?? new RegExp(RUNTIME, 'i')
   if (!runtimeWord.test(route)) throw new Error(`refusing to send: the composer is on "${route}", not ${RUNTIME}`)
@@ -90,7 +95,7 @@ try {
     }
     return 'no effort chip in 20s'
   })()`))
-  if (RUNTIME === 'antigravity') check('the effort chip offers Low, not Fixed', effort === 'Low', effort)
+  if (RUNTIME === 'antigravity') check(`the effort chip offers ${EFFORT}, not Fixed`, effort.toLowerCase() === String(EFFORT), effort)
   await send('Read note.txt and reply with its first line exactly, then the word DONE.')
   const first = await drive.capture('the first turn', () => settle(/Thursdays/))
   check('it answered with the file’s first line', first.answeredAt !== undefined, first.text.slice(-400))
