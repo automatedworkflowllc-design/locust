@@ -135,7 +135,7 @@ export interface ClaudeCloudOptions {
   readonly now?: () => Date
   /** A terminal nobody sees (Windows); absent or failing, the window opens as before. */
   readonly terminal?: RunInPseudoTerminal
-  /** `git status --porcelain --untracked-files=no` in a folder: undefined when it is not a git checkout. */
+  /** `git status --porcelain` in a folder, untracked files counted as Claude Code counts them (measured 10/02: 128 "changed", nearly all untracked): undefined when it is not a git checkout. */
   readonly gitChanges?: (folder: string) => Promise<number | undefined>
   /** A command whose output is wanted (the follow-up, which needs no terminal). */
   readonly exec?: (file: string, args: readonly string[], options: { readonly cwd: string; readonly env: NodeJS.ProcessEnv; readonly verbatim: boolean }) => Promise<{ readonly code: number; readonly output: string }>
@@ -302,10 +302,10 @@ export function createClaudeCloud(options: ClaudeCloudOptions) {
 
 export type ClaudeCloud = ReturnType<typeof createClaudeCloud>
 
-/** Tracked files changed in `folder`; undefined when it is not a git checkout. */
+/** Files changed or untracked in `folder` (teleport refuses either); undefined when it is not a git checkout. */
 async function gitChangesIn(folder: string): Promise<number | undefined> {
   return new Promise((resolve) => {
-    execFile('git', ['status', '--porcelain', '--untracked-files=no'], { cwd: folder, windowsHide: true, timeout: 15_000 }, (error, stdout) => {
+    execFile('git', ['status', '--porcelain'], { cwd: folder, windowsHide: true, timeout: 15_000 }, (error, stdout) => {
       resolve(error === null ? stdout.split('\n').filter((line) => line.trim().length > 0).length : undefined)
     })
   })
