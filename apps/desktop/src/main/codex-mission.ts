@@ -37,7 +37,7 @@ import type {
   RuntimeProcessRunner, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { workspaceIdFor } from './workspace.js'
 import type { MissionContinuation, MissionLedger, RecoveredMission, Workroom, WorkroomMessage } from '@teammate/mission-store'
-import type { MissionSandbox, OpenCodeProvider, RuntimeCommandInfo, RuntimeCommandSpec } from '@teammate/runtime-adapters'
+import type { AcpCapabilities, MissionSandbox, OpenCodeProvider, RuntimeCommandInfo, RuntimeCommandSpec } from '@teammate/runtime-adapters'
 import { createHash, randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { isAbsolute } from 'node:path'
@@ -398,6 +398,8 @@ interface CodexMissionServiceOptions {
    * Copilot run in Approve-each rides so it can stop and ask (0.377) -- IN
    * the folder it is told. Absent: Copilot has no Approve-each.
    */
+  /** What an ACP agent said it can do, at the start of its run (W12): kept for Settings. */
+  readonly onAcpCapabilities?: (runtime: 'copilot', capabilities: AcpCapabilities) => void
   readonly acpSpawn?: (
     executablePath: string,
     args: readonly string[],
@@ -2289,6 +2291,7 @@ ${sentPrompt.trim()}`
               // Agent mode, which asks; never Autopilot, and allow-all off.
               modeId: COPILOT_ACP_SESSION.modeId,
               requiredConfig: COPILOT_ACP_SESSION.requiredConfig,
+              ...(options.onAcpCapabilities === undefined ? {} : { onCapabilities: (capabilities: AcpCapabilities) => options.onAcpCapabilities?.('copilot', capabilities) }),
               ...(handler === undefined
                 ? {}
                 : { onPermission: async (asked) => acpAnswerFor(await handler(acpPermissionRequest(asked, runCwd))) }),

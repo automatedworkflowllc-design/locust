@@ -37,8 +37,8 @@ export type { ClaudeCommandsOptions } from "./claude-commands.js";
 export type { OpenCodeCommandsOptions } from "./opencode-commands.js";
 export { ACP_DECLINED, ACP_PROMPT_RESULT, ACP_SESSION, acpToolNaming, createAcpEventNormalizer } from "./acp-events.js";
 export type { AcpEventNormalizer, AcpInvocationContext } from "./acp-events.js";
-export { ACP_PROTOCOL_VERSION, acpPermissionRequestOf, startAcpRun } from "./acp-run.js";
-export type { AcpPermissionAnswer, AcpPermissionOption, AcpPermissionRequest, AcpRun, AcpRunOptions } from "./acp-run.js";
+export { ACP_PROTOCOL_VERSION, acpCapabilitiesOf, acpPermissionRequestOf, startAcpRun } from "./acp-run.js";
+export type { AcpCapabilities, AcpPermissionAnswer, AcpPermissionOption, AcpPermissionRequest, AcpRun, AcpRunOptions } from "./acp-run.js";
 export { unifiedDiffOf } from "./line-diff.js";
 export type { OpenCodePermission, OpenCodePermissionAnswer, OpenCodePermissionReply, OpenCodeServeRunOptions } from "./opencode-serve-run.js";
 export type {

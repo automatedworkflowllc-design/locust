@@ -1872,6 +1872,20 @@ export interface PublicRuntimeStatus {
   readonly status: RuntimeProbeStatus
   /** Antigravity runs through Antigravity CLI rather than its app (0.541). */
   readonly throughCli?: true
+  /** What an Agent Client Protocol agent said it can do, at its last run (W12, 0.566). */
+  readonly agentCapabilities?: PublicAgentCapabilities
+}
+
+/** An ACP agent's own answer to `initialize`, in plain fields; shown, never acted on. */
+export interface PublicAgentCapabilities {
+  readonly continuesSessions: boolean
+  readonly images: boolean
+  readonly audio: boolean
+  readonly embeddedContext: boolean
+  readonly mcpOverHttp: boolean
+  readonly mcpOverSse: boolean
+  /** When it said so. */
+  readonly toldAt: string
 }
 
 export type RuntimeDiscoveryResponse =

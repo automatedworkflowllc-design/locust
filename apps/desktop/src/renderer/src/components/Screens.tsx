@@ -4,6 +4,7 @@ import { boardSectionOf, teamBoard } from '../teamBoard.js'
 import { durationText, runSpanMs, usagePercent, usageWindowSentence } from '../missionView.js'
 import { WhatsNew } from './WhatsNew.js'
 import { SETTINGS_PAGES, matchedHeadings, pageMatches } from '../settingsPages.js'
+import { agentCapabilityHeading, agentCapabilityLines } from '../agentCapabilities.js'
 import type { SettingsPageId } from '../settingsPages.js'
 import type { RuntimeUpdatesState, MetalMotion, MetalPreset, MetalStrength } from '../../../shared/ipc.js'
 import type { Spend } from '../../../shared/spend.js'
@@ -1963,6 +1964,17 @@ export function SettingsScreen({
                         {runtime.displayName} says: {note}
                       </div>
                     ))}
+                    {/* What an Agent Client Protocol agent told Locust it can do, at its last run (W12). */}
+                    {runtime.agentCapabilities !== undefined && (
+                      <div className="lc-runtimerow__detail lc-runtimerow__abilities">
+                        <span>{agentCapabilityHeading(runtime.displayName, runtime.agentCapabilities)}</span>
+                        <ul>
+                          {agentCapabilityLines(runtime.agentCapabilities).map((line) => (
+                            <li key={line}>{line}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                     {status.tag === 'NOT INSTALLED' && installCommand(runtime.id) !== undefined && (
                       <InstallCommand command={installCommand(runtime.id)!} />
                     )}

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { ACP_DECLINED, ACP_PROMPT_RESULT, ACP_SESSION, createAcpEventNormalizer } from "../src/acp-events.js";
-import { startAcpRun } from "../src/acp-run.js";
+import { acpCapabilitiesOf, startAcpRun } from "../src/acp-run.js";
+import type { AcpCapabilities } from "../src/acp-run.js";
 import { COPILOT_ACP_SESSION, createCopilotAcpCommand } from "../src/commands.js";
 import type { ExecutableLaunch } from "../src/commands.js";
 import type { AcpPermissionAnswer, AcpPermissionRequest, AcpRun, AcpRunOptions } from "../src/acp-run.js";
@@ -349,6 +350,78 @@ describe("an ACP run", () => {
     });
     await expect(acp.completion).resolves.toMatchObject({ exitCode: null, stderr: expect.stringContaining("version 2") as unknown });
     expect(agent.sent.map((message) => message.method)).toEqual(["initialize"]);
+  });
+});
+
+describe("what an ACP agent says it can do (W12)", () => {
+  it("reads the protocol's own keys, and only true counts", () => {
+    expect(acpCapabilitiesOf({ loadSession: true, promptCapabilities: { image: true, audio: false, embeddedContext: true }, mcpCapabilities: { http: true, sse: "yes" } })).toEqual({
+      continuesSessions: true,
+      images: true,
+      audio: false,
+      embeddedContext: true,
+      mcpOverHttp: true,
+      mcpOverSse: false,
+    });
+  });
+
+  it("reads what Copilot 1.0.88 really answered (fixtures/acp), its sessionCapabilities left out", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const lines = (await readFile(new URL("./fixtures/acp/copilot-1.0.88-load-approved.jsonl", import.meta.url), "utf8")).split("\n");
+    const line = lines.find((entry) => entry.includes("agentCapabilities"));
+    expect(line).toBeDefined();
+    const found = (value: unknown): unknown => {
+      if (typeof value !== "object" || value === null) return undefined;
+      const record = value as Record<string, unknown>;
+      if ("agentCapabilities" in record) return record.agentCapabilities;
+      for (const inner of Object.values(record)) {
+        const deeper = found(inner);
+        if (deeper !== undefined) return deeper;
+      }
+      return undefined;
+    };
+    expect(acpCapabilitiesOf(found(JSON.parse(line!)))).toEqual({
+      continuesSessions: true,
+      images: true,
+      audio: false,
+      embeddedContext: true,
+      mcpOverHttp: true,
+      mcpOverSse: true,
+    });
+  });
+
+  it("leaves out keys it does not know, and reads nothing from a malformed answer", () => {
+    const read = acpCapabilitiesOf({ loadSession: true, teleport: true, _meta: { anything: true }, promptCapabilities: { video: true } });
+    expect(Object.keys(read).sort()).toEqual(["audio", "continuesSessions", "embeddedContext", "images", "mcpOverHttp", "mcpOverSse"]);
+    expect(read.continuesSessions).toBe(true);
+    for (const malformed of [undefined, null, "all", [true], { promptCapabilities: "image" }]) {
+      expect(Object.values(acpCapabilitiesOf(malformed)).every((value) => value === false)).toBe(true);
+    }
+  });
+
+  it("is handed over once the agent answers on this protocol's version", async () => {
+    const seen: AcpCapabilities[] = [];
+    const { acp } = run(agentWith((prompt, agent) => ended(agent, prompt)), { onCapabilities: (capabilities) => seen.push(capabilities) });
+    await acp.completion;
+    expect(seen).toEqual([{ continuesSessions: true, images: false, audio: false, embeddedContext: false, mcpOverHttp: false, mcpOverSse: false }]);
+  });
+
+  it("is not handed over from an agent on another version of the protocol", async () => {
+    const seen: AcpCapabilities[] = [];
+    const { acp } = run((message, agent) => {
+      if (message.method === "initialize") agent.answer(message, { protocolVersion: 2, agentCapabilities: { loadSession: true } });
+    }, { onCapabilities: (capabilities) => seen.push(capabilities) });
+    await acp.completion;
+    expect(seen).toEqual([]);
+  });
+
+  it("a listener that throws does not stop the turn", async () => {
+    const { acp } = run(agentWith((prompt, agent) => ended(agent, prompt)), {
+      onCapabilities: () => {
+        throw new Error("listener broke");
+      },
+    });
+    await expect(acp.completion).resolves.toMatchObject({ exitCode: 0 });
   });
 });
 

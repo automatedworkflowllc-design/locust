@@ -153,6 +153,7 @@ import type { Relay } from './relay.js'
 import { createRuntimeDiscoveryService, RUNTIME_DISCOVERY_CHANNEL } from './runtime-discovery.js'
 import { bootOutcome, createDiscoveryLog } from './discovery-log.js'
 import { createRuntimeFactsStore } from './runtime-facts.js'
+import { createAcpCapabilitiesStore } from './acp-capabilities.js'
 import { createRuntimeInstaller } from './runtime-installer.js'
 import { openSignIn } from './runtime-sign-in.js'
 import { FREE_ONLY_REFUSAL, freeRoutesOnly } from './free-routes.js'
@@ -456,6 +457,9 @@ const executableLocator = process.env.LOCUST_HIDE_RUNTIMES === '1'
  */
 const runtimeFacts = createRuntimeFactsStore({ rootDirectory: app.getPath('userData') })
 const runtimeFactsLoaded = runtimeFacts.load().catch(() => undefined)
+// What an ACP agent said it can do at its last run (W12), for Settings > AI agents.
+const acpCapabilities = createAcpCapabilitiesStore({ rootDirectory: app.getPath('userData') })
+void acpCapabilities.load().catch(() => undefined)
 // Antigravity has no CLI probe: its readiness is whether the app is open,
 // which the host checks itself and merges into the same sweep.
 const antigravityProbe = createAntigravityHostProbe()
@@ -802,6 +806,7 @@ const waitingForWindow = new Promise<void>((resolve) => {
 
 const runtimeDiscovery = createRuntimeDiscoveryService({
   probe: discoverForWork,
+  agentCapabilities: (runtime) => acpCapabilities.get(runtime),
   /*
    * The question the first screen asks is "can an Install button run", not
    * "is Node on this machine". Since 0.178.0 those differ: the app carries
@@ -1947,6 +1952,11 @@ if (!ownsSingleInstanceLock) {
       opencodeServeSpawn: (executablePath, args, env, cwd) => spawnAppServer(executablePath, args, env, cwd),
       // 0.377: an Agent Client Protocol agent (Copilot, for Approve-each), started IN its folder.
       acpSpawn: (executablePath, args, env, cwd) => spawnAppServer(executablePath, args, env, cwd),
+      // W12: what it said it can do, said in Settings; the next sweep reads it.
+      onAcpCapabilities: (runtime, capabilities) => {
+        acpCapabilities.record(runtime, capabilities)
+        runtimeDiscovery.invalidate()
+      },
       // A3.3: the person's check for THIS folder, after a turn that changed files.
       afterEdits: (cwd) => editCheck.after(cwd),
       // 0.439: a commit per turn on the teammate's own branch (turn-checkpoint.ts).

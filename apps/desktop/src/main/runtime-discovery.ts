@@ -41,6 +41,8 @@ interface RuntimeDiscoveryServiceOptions {
   readonly npmIsBundled?: () => Promise<boolean>
   /** npm is on this machine and did not answer in five seconds. */
   readonly npmDidNotAnswer?: () => Promise<boolean>
+  /** What an ACP agent last said it can do (acp-capabilities.ts, W12). */
+  readonly agentCapabilities?: (runtime: LocalRuntimeId) => PublicRuntimeStatus['agentCapabilities']
 }
 
 function publicStatus(runtime: RuntimeDiscovery): PublicRuntimeStatus {
@@ -116,7 +118,11 @@ export function createRuntimeDiscoveryService(
           ok: true,
           data: {
             checkedAt: now().toISOString(),
-            runtimes: runtimes.map(publicStatus),
+            runtimes: runtimes.map((runtime) => {
+              const status = publicStatus(runtime)
+              const told = options.agentCapabilities?.(status.id)
+              return told === undefined ? status : { ...status, agentCapabilities: told }
+            }),
             npmPresent: options.npmPresent === undefined ? true : await options.npmPresent(),
             npmIsBundled: options.npmIsBundled === undefined ? false : await options.npmIsBundled(),
             npmDidNotAnswer: options.npmDidNotAnswer === undefined ? false : await options.npmDidNotAnswer()

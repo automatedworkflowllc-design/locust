@@ -103,6 +103,39 @@ export interface AcpRunOptions {
   /** How long a stopped turn is given to say it stopped before the process is ended anyway. */
   readonly cancelGraceMs?: number;
   readonly maxQueuedRecords?: number;
+  /** What the agent said it can do, once it has answered `initialize` on this protocol's version (W12). */
+  readonly onCapabilities?: (capabilities: AcpCapabilities) => void;
+}
+
+/**
+ * WHAT AN ACP AGENT SAYS IT CAN DO (W12, 0.566), from its `initialize`
+ * answer's `agentCapabilities`, in the protocol's own keys: `loadSession`,
+ * `promptCapabilities` (`image`, `audio`, `embeddedContext`) and
+ * `mcpCapabilities` (`http`, `sse`). Only `true` counts; a key this does not
+ * know is left out, never guessed at. It is shown, never acted on: Locust's
+ * own offer to the agent stays nothing (no files, no terminal).
+ */
+export interface AcpCapabilities {
+  readonly continuesSessions: boolean;
+  readonly images: boolean;
+  readonly audio: boolean;
+  readonly embeddedContext: boolean;
+  readonly mcpOverHttp: boolean;
+  readonly mcpOverSse: boolean;
+}
+
+export function acpCapabilitiesOf(agentCapabilities: unknown): AcpCapabilities {
+  const given = isObject(agentCapabilities) ? agentCapabilities : {};
+  const prompt = isObject(given.promptCapabilities) ? given.promptCapabilities : {};
+  const mcp = isObject(given.mcpCapabilities) ? given.mcpCapabilities : {};
+  return {
+    continuesSessions: given.loadSession === true,
+    images: prompt.image === true,
+    audio: prompt.audio === true,
+    embeddedContext: prompt.embeddedContext === true,
+    mcpOverHttp: mcp.http === true,
+    mcpOverSse: mcp.sse === true,
+  };
 }
 
 export type AcpRun = RuntimeProcessRun & {
@@ -331,6 +364,11 @@ export function startAcpRun(options: AcpRunOptions): AcpRun {
     );
     if (init.protocolVersion !== ACP_PROTOCOL_VERSION) {
       throw new Error(`The agent speaks version ${String(init.protocolVersion)} of the Agent Client Protocol, and Locust speaks ${String(ACP_PROTOCOL_VERSION)}.`);
+    }
+    try {
+      options.onCapabilities?.(acpCapabilitiesOf(init.agentCapabilities));
+    } catch {
+      // What it can do is shown in Settings; a listener's failure never stops the turn.
     }
     const cwd = options.command.cwd;
     let session: JsonObject;

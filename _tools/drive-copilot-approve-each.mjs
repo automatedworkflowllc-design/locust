@@ -22,7 +22,9 @@
 // history instead.
 //
 // Three premium requests: the approved turn, the denied turn, the reason sent
-// on. Any card after the first denial is denied too.
+// on. Any card after the first denial is denied too. Then (W12, 0.566) Settings
+// > AI agents, where Copilot's own answer about what it can do is said -- no
+// more turns.
 
 import { existsSync, readFileSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
@@ -186,6 +188,19 @@ try {
   // The LAST turn's fold: the first one's is the approved command.
   const fold = String(await drive.evaluate(`(() => ([...document.querySelectorAll('.lc-activity')].at(-1)?.innerText ?? '').replace(/[ ]+/g, ' '))()`))
   check('the denied call reads refused or declined, and nothing failed', /(declined|refused)/i.test(fold) && !/(failed|exited non-zero)/i.test(fold), fold.slice(0, 240))
+
+  // 3. W12 (0.566): what Copilot told Locust it can do, in Settings > AI agents. No more turns.
+  const row = String(await drive.capture('Settings, what Copilot said it can do', () => drive.evaluate(`(async () => {
+    const tab = [...document.querySelectorAll('button')].find((b) => (b.getAttribute('title') ?? '').startsWith('Settings'))
+    tab?.click()
+    await new Promise((r) => setTimeout(r, 1200))
+    const page = [...document.querySelectorAll('button, a')].find((b) => /^(AI agents|Runtimes)$/.test((b.textContent ?? '').trim()))
+    page?.click()
+    await new Promise((r) => setTimeout(r, 1500))
+    const copilotRow = [...document.querySelectorAll('.lc-runtimerow')].find((r) => /Copilot/.test(r.textContent ?? ''))
+    return copilotRow ? copilotRow.innerText.replace(/\\s+/g, ' ').trim() : 'no Copilot row'
+  })()`)))
+  check('Settings says what Copilot said it can do, in words', /said it can do \(today\)/.test(row) && /Can continue an earlier session: yes/.test(row), row.slice(0, 400))
 
   say(failures === 0 ? '\nCOPILOT APPROVE EACH PASSED' : `\nCOPILOT APPROVE EACH: ${String(failures)} FAILED`)
 } catch (error) {
