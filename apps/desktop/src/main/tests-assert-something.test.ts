@@ -34,7 +34,15 @@ function testFiles(at: string, found: string[] = []): string[] {
   for (const name of readdirSync(at)) {
     if (SKIP.includes(name)) continue
     const path = join(at, name)
-    if (statSync(path).isDirectory()) {
+    // Other suites make and remove scratch folders while this walks (0.563's
+    // ship gate): one gone between the listing and the look is skipped.
+    let info: ReturnType<typeof statSync>
+    try {
+      info = statSync(path)
+    } catch {
+      continue
+    }
+    if (info.isDirectory()) {
       testFiles(path, found)
       continue
     }
