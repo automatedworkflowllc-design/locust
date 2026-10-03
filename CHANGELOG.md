@@ -11,6 +11,28 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.572.0 - 2026-10-03
+
+### Fixed
+
+- **A teammate cut off is not said to have finished.** When a teammate you
+  wrote to hit its usage limit partway through, the conversation that asked
+  read "Codex finished without writing back". It now reads "Codex stopped
+  before writing back: its usage limit was reached", and a half-finished
+  run's last progress line is no longer brought back as if it were the answer.
+  A conversation resumed on another model is also told how the earlier turn
+  ended.
+- **Locust no longer works in an agent's own settings folder by accident.**
+  Opened from Claude Code's folder (`.claude`), Codex's, Cursor's, Gemini's,
+  your home folder or Windows' folder, Locust took that folder as the place
+  your teammates work. A teammate in `.claude` can read Claude Code's own
+  files. Locust now opens the folder you used last, or its own Locust folder,
+  instead. Choosing a folder yourself still works as before.
+- **Antigravity's blocked reads are named as reads.** When Antigravity was
+  not allowed to open a file outside the conversation's folder, Locust said
+  it "was not allowed to change files". It now says it could not read a file
+  outside the folder.
+
 ## 0.571.0 - 2026-10-03
 
 ### Fixed
