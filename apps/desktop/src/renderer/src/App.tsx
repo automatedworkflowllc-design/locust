@@ -8324,6 +8324,10 @@ export default function App(): ReactElement {
                 void window.desktop?.forgetClaudeCloud(id).catch(() => undefined)
               },
               onOpenWeb: (url) => void window.desktop?.openLink(url ?? 'https://claude.ai/code').catch(() => undefined),
+              onContinue: async (id) => {
+                const answer = await window.desktop?.continueClaudeCloudInTerminal(id).catch(() => undefined)
+                return answer === undefined ? 'The terminal could not be opened. Open this session on claude.ai.' : answer.ok ? undefined : answer.message
+              },
               onSend: async (id, message) => {
                 const answer = await window.desktop?.sendClaudeCloud(id, message).catch(() => undefined)
                 return answer === undefined ? 'Claude Code could not be reached. Nothing was sent.' : answer.ok ? undefined : answer.message

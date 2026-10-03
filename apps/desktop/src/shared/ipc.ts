@@ -703,6 +703,7 @@ export const CLAUDE_CLOUD_FORGET_CHANNEL = 'claude-cloud:forget'
 export const CLAUDE_CLOUD_SEND_CHANNEL = 'claude-cloud:send'
 export const CLAUDE_CLOUD_CHECK_CHANNEL = 'claude-cloud:check'
 export const CLAUDE_CLOUD_APPLY_CHANNEL = 'claude-cloud:apply'
+export const CLAUDE_CLOUD_TERMINAL_CHANNEL = 'claude-cloud:terminal'
 export interface ClaudeCloudSession {
   readonly id: string
   readonly startedAt: string
@@ -3229,6 +3230,7 @@ export interface DesktopApi {
   startClaudeCloud(prompt: string, teammateId?: string, choice?: { readonly model?: string; readonly effort?: string }): Promise<ClaudeCloudStartResponse>
   listClaudeCloud(): Promise<readonly PublicClaudeCloudSession[]>
   bringClaudeCloudHome(id: string): Promise<ClaudeCloudHomeResponse>
+  continueClaudeCloudInTerminal(id: string): Promise<OpenInTerminalResponse>
   forgetClaudeCloud(id: string): Promise<void>
   /** A follow-up to a cloud session Locust knows the id of (0.556). */
   sendClaudeCloud(id: string, message: string): Promise<ClaudeCloudHomeResponse>

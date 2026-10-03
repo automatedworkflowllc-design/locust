@@ -12,6 +12,9 @@ import { plainTerminalText } from './pseudo-terminal.js'
 import type { RunInPseudoTerminal } from './pseudo-terminal.js'
 import { sessionExchanges } from './session-import.js'
 import type { TerminalExchange } from './terminal-catch-up.js'
+import { isResumableSessionId, openInTerminal } from './open-in-terminal.js'
+import type { TerminalRequest } from './open-in-terminal.js'
+import type { OpenInTerminalResponse } from '../shared/ipc.js'
 
 /**
  * CLAUDE'S CLOUD (0.538): a task handed to a Claude Code cloud session, from
@@ -192,6 +195,8 @@ export interface ClaudeCloudOptions {
   readonly git?: GitRun
   /** A transcript's exchanges (session-import's reader). */
   readonly exchangesOf?: (path: string) => Promise<readonly TerminalExchange[]>
+  /** W5: tested without opening a real terminal or running Claude. */
+  readonly openTerminal?: (request: TerminalRequest) => Promise<OpenInTerminalResponse>
 }
 
 export type ClaudeCloudAnswer =
@@ -436,6 +441,27 @@ export function createClaudeCloud(options: ClaudeCloudOptions) {
     },
     async list(folder: string): Promise<readonly ClaudeCloudSession[]> {
       return (await read()).filter((session) => session.folder === folder)
+    },
+    /** W5: the terminal gets its own copy; Locust never watches its work. */
+    async continueInTerminal(id: string): Promise<OpenInTerminalResponse> {
+      const session = (await read()).find((entry) => entry.id === id)
+      if (session?.sessionId === undefined || !isResumableSessionId(session.sessionId)) {
+        return { ok: false, message: 'Locust does not know a valid id for this cloud session. Open it on claude.ai.' }
+      }
+      if (platform !== 'win32' && platform !== 'darwin') return { ok: false, message: 'Continue in terminal works on Windows and macOS so far. Open it on claude.ai.' }
+      const launch = (await options.discover()).find((entry) => entry.id === 'claude')?.executable
+      if (launch === undefined) return { ok: false, message: 'Claude Code is not installed here. Settings > AI agents shows how to add it.' }
+      const where = await worktreeOf(session.folder, `${readingWorktreeName(session.id)}-here`)
+      if (where === undefined) return { ok: false, message: 'This folder is not a git checkout. Open this session on claude.ai.' }
+      // A fresh, detached checkout, never a reading's worktree or the person's folder.
+      const made = await git(['worktree', 'add', '--detach', where, 'HEAD'], session.folder).catch(() => undefined)
+      if (made?.code !== 0) return { ok: false, message: 'The terminal worktree could not be created. An earlier copy may still be open; finish there or open the session on claude.ai.' }
+      const opened = await (options.openTerminal ?? ((request) => openInTerminal(request, { platform, spawn: run })))({
+        runtime: 'claude', sessionId: session.sessionId, cwd: where, launch,
+        title: 'Locust · Claude cloud', cloudSession: true
+      }).catch(() => ({ ok: false as const, message: 'The terminal could not be opened. Open this session on claude.ai.' }))
+      if (!opened.ok) await git(['worktree', 'remove', where], session.folder).catch(() => undefined)
+      return opened
     },
     async start(folder: string, prompt: string, teammateId?: string, choice?: CloudChoice): Promise<ClaudeCloudAnswer> {
       const task = cloudTaskText(prompt)

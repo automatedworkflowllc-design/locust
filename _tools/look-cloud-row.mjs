@@ -18,7 +18,7 @@ import { createRoot } from 'react-dom/client'
 import { CloudTasks } from ${src('components/CloudTasks.tsx')}
 const props = { tasks: [], where: { repo: 'example/project' }, notes: [], folders: [], onShowChange: async()=>undefined, onApply:()=>{}, onOpen:()=>{}, onClose:()=>{}, onOpenFolder:()=>{}, onChooseFolder:()=>{}, claude: {
  picked: true, sessions: [{id: 'cc_abcdef', sessionId: 'session_0123456789', prompt: 'Review the cart', startedAt: new Date().toISOString()}],
- onHome:()=>{}, onForget:()=>{}, onOpenWeb:()=>{}, onSend:async()=>undefined, onApply:async()=>undefined,
+ onHome:()=>{}, onForget:()=>{}, onOpenWeb:()=>{}, onSend:async()=>undefined, onApply:async()=>undefined, onContinue:async()=>undefined,
  onCheck:async()=>({ok:true, exchanges:[{prompt:'Review the cart',answer:'The totals now include every item.',at:new Date().toISOString()}],checkedAt:new Date().toISOString()})
 }}
 createRoot(document.getElementById('root')).render(h(CloudTasks,props))

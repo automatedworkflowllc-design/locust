@@ -64,6 +64,7 @@ export function CloudTasks({
     readonly onCheck: (id: string) => Promise<ClaudeCloudReading>
     /** Its change into this folder; resolves to what went wrong, or undefined when applied. */
     readonly onApply: (id: string) => Promise<string | undefined>
+    readonly onContinue: (id: string) => Promise<string | undefined>
   }
 }): ReactElement {
   // Codex's warnings are about Codex Cloud: not said while Claude's is the one picked, unless Codex tasks are here.
@@ -271,7 +272,8 @@ function ClaudeCloudSessions({
   onOpenWeb,
   onSend,
   onCheck,
-  onApply
+  onApply,
+  onContinue
 }: NonNullable<Parameters<typeof CloudTasks>[0]['claude']>): ReactElement {
   return (
     <div className="lc-cloudtasks__claude">
@@ -284,7 +286,7 @@ function ClaudeCloudSessions({
       )}
       {note !== undefined && <p className="lc-cloudtasks__note" role="status">{note}</p>}
       {sessions.map((session) => (
-        <ClaudeCloudRow key={session.id} session={session} onHome={onHome} onForget={onForget} onOpenWeb={onOpenWeb} onSend={onSend} onCheck={onCheck} onApply={onApply} />
+        <ClaudeCloudRow key={session.id} session={session} onHome={onHome} onForget={onForget} onOpenWeb={onOpenWeb} onSend={onSend} onCheck={onCheck} onApply={onApply} onContinue={onContinue} />
       ))}
     </div>
   )
@@ -297,10 +299,11 @@ function ClaudeCloudRow({
   onOpenWeb,
   onSend,
   onCheck,
-  onApply
+  onApply,
+  onContinue
 }: {
   readonly session: PublicClaudeCloudSession
-} & Pick<NonNullable<Parameters<typeof CloudTasks>[0]['claude']>, 'onHome' | 'onForget' | 'onOpenWeb' | 'onSend' | 'onCheck' | 'onApply'>): ReactElement {
+} & Pick<NonNullable<Parameters<typeof CloudTasks>[0]['claude']>, 'onHome' | 'onForget' | 'onOpenWeb' | 'onSend' | 'onCheck' | 'onApply' | 'onContinue'>): ReactElement {
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [said, setSaid] = useState<string>()
@@ -308,6 +311,7 @@ function ClaudeCloudRow({
   const [checking, setChecking] = useState(false)
   const [applying, setApplying] = useState(false)
   const [applied, setApplied] = useState(false)
+  const [openingTerminal, setOpeningTerminal] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [watching, setWatching] = useState(false)
   const [clock, setClock] = useState(Date.now())
@@ -408,6 +412,14 @@ function ClaudeCloudRow({
         <button type="button" className={known ? 'lc-button' : 'lc-primarybutton'} onClick={() => onOpenWeb(session.url)} title={known ? 'This session, on claude.ai' : 'Your Claude Code sessions, in your browser'}>
           See it on claude.ai
         </button>
+        {known && <button type="button" className="lc-button" disabled={openingTerminal || checking} onClick={() => {
+          setWatching(false)
+          setOpeningTerminal(true)
+          void onContinue(session.id).then((problem) => {
+            setOpeningTerminal(false)
+            setSaid(problem ?? 'Claude Code opened its own copy in a terminal. Locust does not see what happens there; use /remote-control in Claude Code to steer from your phone.')
+          }).catch(() => { setOpeningTerminal(false); setSaid('The terminal could not be opened. Open this session on claude.ai.') })
+        }}>{openingTerminal ? 'Opening terminal…' : 'Continue in terminal'}</button>}
         <button
           type="button"
           className="lc-button"
@@ -420,6 +432,7 @@ function ClaudeCloudRow({
           <Icon name="close" size={13} />
         </button>
       </div>
+      {known && <p className="lc-cloudtask__note">Continue in terminal opens its own copy in a fresh worktree. Locust does not see what happens there. Use /remote-control in Claude Code to keep steering from your phone.</p>}
       {expanded && reading?.ok === false && <p className="lc-cloudtask__note" role="alert">{reading.message}</p>}
       {expanded && read !== undefined && (
         <div className="lc-cloudtask__read">

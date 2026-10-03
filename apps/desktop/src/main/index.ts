@@ -263,6 +263,7 @@ import {
   CLAUDE_CLOUD_SEND_CHANNEL,
   CLAUDE_CLOUD_CHECK_CHANNEL,
   CLAUDE_CLOUD_APPLY_CHANNEL,
+  CLAUDE_CLOUD_TERMINAL_CHANNEL,
   REWIND_PUT_BACK_CHANNEL,
   WORKSPACE_ATTACH_CHANNEL,
   WORKSPACE_FILES_CHANNEL,
@@ -3729,6 +3730,10 @@ if (!ownsSingleInstanceLock) {
     ipcMain.handle(CLAUDE_CLOUD_HOME_CHANNEL, async (event, id: unknown) => {
       if (!fromOwnWindow(event) || typeof id !== 'string') return { ok: false, message: 'That cloud session could not be brought home.' }
       return claudeCloud.home(id)
+    })
+    ipcMain.handle(CLAUDE_CLOUD_TERMINAL_CHANNEL, async (event, id: unknown) => {
+      if (!fromOwnWindow(event) || typeof id !== 'string') return { ok: false, message: 'That cloud session could not be opened. Open it on claude.ai.' }
+      return claudeCloud.continueInTerminal(id)
     })
     ipcMain.handle(CLAUDE_CLOUD_SEND_CHANNEL, async (event, id: unknown, message: unknown) => {
       if (!fromOwnWindow(event) || typeof id !== 'string' || typeof message !== 'string') return { ok: false, message: 'That could not be sent to the cloud session.' }

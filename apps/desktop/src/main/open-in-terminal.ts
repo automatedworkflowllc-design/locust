@@ -116,6 +116,15 @@ export interface TerminalRequest {
   readonly launch: ExecutableLaunch
   /** The window's title: whose conversation, on what. */
   readonly title: string
+  /** W5: teleport a cloud copy, rather than resume a local conversation. */
+  readonly cloudSession?: true
+}
+
+export function terminalArgsFor(request: TerminalRequest): readonly string[] | undefined {
+  if (request.cloudSession === true) {
+    return request.runtime === 'claude' && isResumableSessionId(request.sessionId) ? ['--teleport', request.sessionId] : undefined
+  }
+  return resumeArgsFor(request.runtime, request.sessionId)
 }
 
 /** What the host knows, handed in so the decision can be tested without a ledger. */
@@ -176,14 +185,14 @@ function started(child: ReturnType<typeof spawn>): Promise<true | Error> {
 export async function openInTerminal(request: TerminalRequest, options: OpenInTerminalOptions = {}): Promise<OpenInTerminalResponse> {
   const platform = options.platform ?? process.platform
   if (platform === 'darwin') {
-    const resumeOnMac = resumeArgsFor(request.runtime, request.sessionId)
+    const resumeOnMac = terminalArgsFor(request)
     if (resumeOnMac === undefined) return { ok: false, message: 'This conversation has no session its runtime can resume in a terminal.' }
     return openInMacTerminal(request.cwd, terminalProgram(request.launch, resumeOnMac), request.launch.env, options.spawn ?? spawn)
   }
   if (platform !== 'win32') {
     return { ok: false, message: 'Opening a conversation in a terminal works on Windows and macOS so far.' }
   }
-  const resume = resumeArgsFor(request.runtime, request.sessionId)
+  const resume = terminalArgsFor(request)
   if (resume === undefined) return { ok: false, message: 'This conversation has no session its runtime can resume in a terminal.' }
   const program = terminalProgram(request.launch, resume)
   const run = options.spawn ?? spawn
