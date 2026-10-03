@@ -595,7 +595,8 @@ const connectorReader = createConnectorReader({
     // The listing prints on stdout; a machine with none says so there too.
     // Both streams are joined because a warning on stderr has never been a
     // reason to throw the list away.
-    if (result.timedOut === true) return undefined
+    // Said in Settings > Connectors (W8): the rules keep the last reading that answered.
+    if (result.timedOut === true) return 'timed-out'
     return `${result.stdout}
 ${result.stderr}`
   }

@@ -6621,6 +6621,75 @@ textarea {
   border-color: var(--lc-border-strong);
 }
 
+/* Settings > Connectors (W8): each connector, its state in words, what to do. */
+.lc-connectorhealth {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-4);
+  margin-top: var(--lc-space-6);
+}
+
+.lc-connectorhealth__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lc-connectorhealth__row {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr) auto;
+  gap: 2px var(--lc-space-4);
+  padding: 8px 10px;
+  border-radius: var(--lc-radius-control);
+  background: var(--lc-bg-raised);
+}
+
+.lc-connectorhealth__state {
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-label);
+  letter-spacing: var(--lc-tracking-label-wide);
+  text-transform: uppercase;
+}
+
+.lc-connectorhealth__state--good {
+  color: var(--lc-green-text);
+}
+
+.lc-connectorhealth__state--amber {
+  color: var(--lc-amber-text);
+}
+
+.lc-connectorhealth__state--red {
+  color: var(--lc-red-text);
+}
+
+.lc-connectorhealth__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--lc-text-primary);
+}
+
+.lc-connectorhealth__where {
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
+}
+
+.lc-connectorhealth__detail {
+  grid-column: 2 / -1;
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
+}
+
+.lc-connectorhealth__actions {
+  display: flex;
+  gap: var(--lc-space-3);
+}
+
 /* What an ACP agent said it can do (W12): a short list under its row. */
 .lc-runtimerow__abilities ul {
   margin: 2px 0 0;

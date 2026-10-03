@@ -1490,8 +1490,18 @@ export interface PublicConnector {
   readonly name: string
   /** A URL for a remote connector, a command for a local one. */
   readonly location: string
-  /** `needs-auth` is a real connector the person has not finished signing into. */
-  readonly status: 'connected' | 'needs-auth' | 'failed'
+  /**
+   * `needs-auth` is a real connector the person has not finished signing
+   * into; `failed`, Claude Code could not start or reach it; `timed-out`, the
+   * last check did not answer in 20 seconds; `unreadable`, words Locust does
+   * not know (in `said`) -- W8, 0.567.
+   */
+  readonly status: 'connected' | 'needs-auth' | 'failed' | 'timed-out' | 'unreadable'
+  readonly said?: string
+  /** How long the last check took, in ms. */
+  readonly checkedInMs?: number
+  /** When it was last seen connected, since Locust started. */
+  readonly lastConnectedAt?: string
 }
 
 export type ConnectorListResponse =

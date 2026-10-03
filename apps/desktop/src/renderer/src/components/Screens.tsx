@@ -5,6 +5,7 @@ import { durationText, runSpanMs, usagePercent, usageWindowSentence } from '../m
 import { WhatsNew } from './WhatsNew.js'
 import { SETTINGS_PAGES, matchedHeadings, pageMatches } from '../settingsPages.js'
 import { agentCapabilityHeading, agentCapabilityLines } from '../agentCapabilities.js'
+import { ConnectorHealth } from './ConnectorHealth.js'
 import type { SettingsPageId } from '../settingsPages.js'
 import type { RuntimeUpdatesState, MetalMotion, MetalPreset, MetalStrength } from '../../../shared/ipc.js'
 import type { Spend } from '../../../shared/spend.js'
@@ -2131,6 +2132,8 @@ export function SettingsScreen({
               </button>
             </div>
           </div>
+          {/* W8 (0.567): each connector's state, what to do, when it last worked, and a report to copy. */}
+          <ConnectorHealth />
         </section>
         )}
         {shownPage === 'runtimes' && (

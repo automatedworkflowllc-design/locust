@@ -63,6 +63,26 @@ describe("the connectors a person has", () => {
     ]);
   });
 
+  it("are read into every class the health check can say, written by hand (W8)", () => {
+    const found = parseClaudeConnectors([
+      "alpha: https://alpha.example/mcp - ✔ Connected",
+      "beta: https://beta.example/mcp - ! Needs authentication",
+      "gamma: node gamma.js - ✗ Failed to connect",
+      "delta: https://delta.example/mcp - ✗ Disconnected",
+      "epsilon: https://epsilon.example/mcp - ⏳ Pending approval",
+    ].join("\n"));
+    expect(found.map((entry) => `${entry.name}:${entry.status}`)).toEqual([
+      "alpha:connected",
+      "beta:needs-auth",
+      "gamma:failed",
+      "delta:failed",
+      "epsilon:unreadable",
+    ]);
+    // Words it does not know are kept, as printed, never guessed into failed or connected.
+    expect(found[4]?.said).toBe("⏳ Pending approval");
+    expect(found[0]).not.toHaveProperty("said");
+  });
+
   it("survive the header, blanks and anything else the CLI prints", () => {
     expect(parseClaudeConnectors("")).toEqual([]);
     expect(parseClaudeConnectors("No MCP servers configured. Use `claude mcp add`")).toEqual([]);

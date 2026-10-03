@@ -25,23 +25,39 @@ import type { ClaudeConnector } from '@teammate/runtime-adapters'
 /** How long a reading stands before it is taken again. */
 const TTL_MS = 5 * 60_000
 /** A read that has not answered by here is not going to help this run. */
-const TIMEOUT_MS = 20_000
+export const CONNECTOR_READ_TIMEOUT_MS = 20_000
+
+/**
+ * A connector as Settings shows it (W8, 0.567): the health check's class, and
+ * `timed-out` when the last check hit the 20 s limit (the connectors are
+ * those of the last reading that answered); how long that check took; when
+ * each was last seen connected, kept in memory across readings.
+ */
+export interface ReadConnector extends Omit<ClaudeConnector, 'status'> {
+  readonly status: ClaudeConnector['status'] | 'timed-out'
+  readonly checkedInMs?: number
+  readonly lastConnectedAt?: string
+}
+
+/** What the read said: the listing's text, `timed-out` at the limit, undefined when there is no Claude Code to ask. */
+export type ConnectorRead = string | 'timed-out' | undefined
 
 export interface ConnectorReader {
-  /** Every connector name, for the allow rules. Never throws, never waits. */
+  /** Every connector name, for the allow rules. Never throws, never waits. Always the last reading that answered. */
   names(): readonly string[]
   /** The full reading, for anything that wants to show it. */
-  current(): readonly ClaudeConnector[]
+  current(): readonly ReadConnector[]
   /** Take a reading if the held one is stale. Returns when that one settles. */
-  refresh(): Promise<readonly ClaudeConnector[]>
+  refresh(): Promise<readonly ReadConnector[]>
 }
 
 export function createConnectorReader(options: {
   /**
-   * Run `mcp list` on the person's Claude Code and hand back what it printed.
-   * Undefined when there is no Claude Code to ask, which is not a failure.
+   * Run `mcp list` on the person's Claude Code and hand back what it printed,
+   * or `timed-out`. Undefined when there is no Claude Code to ask, which is
+   * not a failure.
    */
-  readonly read: (timeoutMs: number) => Promise<string | undefined>
+  readonly read: (timeoutMs: number) => Promise<ConnectorRead>
   readonly now?: () => number
   readonly ttlMs?: number
 }): ConnectorReader {
@@ -49,20 +65,42 @@ export function createConnectorReader(options: {
   const ttl = options.ttlMs ?? TTL_MS
   let held: readonly ClaudeConnector[] = []
   let takenAt: number | undefined
-  let inFlight: Promise<readonly ClaudeConnector[]> | undefined
+  let inFlight: Promise<readonly ReadConnector[]> | undefined
+  let lastCheck: { readonly ms: number; readonly timedOut: boolean } | undefined
+  const lastConnected = new Map<string, number>()
 
-  const take = async (): Promise<readonly ClaudeConnector[]> => {
+  const view = (): readonly ReadConnector[] =>
+    held.map((entry) => {
+      const seen = lastConnected.get(entry.name)
+      return {
+        ...entry,
+        ...(lastCheck?.timedOut === true ? { status: 'timed-out' as const } : {}),
+        ...(lastCheck === undefined ? {} : { checkedInMs: lastCheck.ms }),
+        ...(seen === undefined ? {} : { lastConnectedAt: new Date(seen).toISOString() })
+      }
+    })
+
+  const take = async (): Promise<readonly ReadConnector[]> => {
+    const began = now()
     try {
-      const text = await options.read(TIMEOUT_MS)
+      const text = await options.read(CONNECTOR_READ_TIMEOUT_MS)
       // A read that could not run leaves the last good reading alone. A
       // Claude Code that is briefly busy should not empty the list and
       // silently take everyone's connectors away mid-session.
-      if (text === undefined) return held
+      if (text === undefined) return view()
+      if (text === 'timed-out') {
+        // Said, not hidden (W8): the rules keep the last good reading; Settings says it did not answer.
+        lastCheck = { ms: now() - began, timedOut: true }
+        takenAt = now()
+        return view()
+      }
       held = parseClaudeConnectors(text)
       takenAt = now()
-      return held
+      lastCheck = { ms: takenAt - began, timedOut: false }
+      for (const entry of held) if (entry.status === 'connected') lastConnected.set(entry.name, takenAt)
+      return view()
     } catch {
-      return held
+      return view()
     } finally {
       inFlight = undefined
     }
@@ -75,10 +113,10 @@ export function createConnectorReader(options: {
       return held.filter((entry) => entry.status === 'connected').map((entry) => entry.name)
     },
     current() {
-      return held
+      return view()
     },
     refresh() {
-      if (takenAt !== undefined && now() - takenAt < ttl) return Promise.resolve(held)
+      if (takenAt !== undefined && now() - takenAt < ttl) return Promise.resolve(view())
       inFlight ??= take()
       return inFlight
     }

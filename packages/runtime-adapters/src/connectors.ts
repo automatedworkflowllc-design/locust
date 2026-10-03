@@ -32,9 +32,13 @@ export interface ClaudeConnector {
   /**
    * What the health check said. `connected` is usable now; `needs-auth` is a
    * real server the person has not finished signing into, which is worth
-   * showing rather than hiding; `failed` is anything else it said.
+   * showing rather than hiding; `failed` is Claude Code saying it could not
+   * start or reach it; `unreadable` is words this parser does not know (W8,
+   * 0.567) -- kept in `said`, never guessed into one of the others.
    */
-  readonly status: "connected" | "needs-auth" | "failed";
+  readonly status: "connected" | "needs-auth" | "failed" | "unreadable";
+  /** For `unreadable`: what the health check printed, as it printed it (bounded). */
+  readonly said?: string;
 }
 
 /**
@@ -107,15 +111,15 @@ export function parseClaudeConnectors(text: string): readonly ClaudeConnector[] 
     const location = head.slice(colon + 2).trim();
     if (name.length === 0 || name.length > 120 || location.length === 0) continue;
     if (found.some((entry) => entry.name === name)) continue;
-    found.push({
-      name,
-      location,
-      status: /needs? authentication|authenticate/i.test(health)
-        ? "needs-auth"
+    // "Disconnected" holds "connected": failure words are read first.
+    const status: ClaudeConnector["status"] = /needs? authentication|authenticate/i.test(health)
+      ? "needs-auth"
+      : /fail|✗|error|could not|unable|disconnected|timed? ?out/i.test(health)
+        ? "failed"
         : /connected/i.test(health)
           ? "connected"
-          : "failed",
-    });
+          : "unreadable";
+    found.push({ name, location, status, ...(status === "unreadable" ? { said: health.slice(0, 80) } : {}) });
   }
   return found;
 }
