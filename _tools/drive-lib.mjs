@@ -68,6 +68,7 @@ export const recordRoot = (folder) =>
   process.env.LOCUST_DRIVE_OUT === undefined ? new URL(`../docs/${folder}/`, import.meta.url).pathname.slice(1) : join(process.env.LOCUST_DRIVE_OUT, folder)
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 export const say = (line) => console.error(line)
+export const reportRouteProbe = (route) => console.log(`route: ${String(route === '' ? 'no route control on this screen' : route)}`)
 export const git = (args, cwd) => new Promise((resolve, reject) => {
   execFile('git', args, { cwd, windowsHide: true }, (error, stdout) => (error ? reject(error) : resolve(stdout)))
 })
@@ -535,7 +536,7 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
           process.exit(1)
         }
       }
-      say(`route: ${String(route === '' ? 'no route control on this screen' : route)}`)
+      reportRouteProbe(route)
     }
     // Discovered and on its route: the next drive may start.
     await giveBackLaunchTurn()

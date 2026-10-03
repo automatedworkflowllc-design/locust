@@ -2289,7 +2289,7 @@ export function Composer({
                    * the mouse says and what the eye reads are now one thing.
                    */
                   title={[
-                    nothingConnected ? 'No AI agent on this machine can start yet.' : exactRoute,
+                    comparing ? versus : nothingConnected ? 'No AI agent on this machine can start yet.' : exactRoute,
                     handoffTitle(handoff),
                     usageSentence
                   ]

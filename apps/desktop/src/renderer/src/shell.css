@@ -11406,6 +11406,28 @@ textarea {
   max-width: 340px;
 }
 
+.lc-compare__select {
+  position: relative;
+  max-width: 100%;
+}
+
+.lc-compare__select select {
+  appearance: none;
+  padding-right: 30px;
+  max-width: 100%;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.lc-compare__select > svg {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%) rotate(90deg);
+  color: var(--lc-text-muted);
+  pointer-events: none;
+}
+
 .lc-compare__judgecriteria {
   flex: 1 1 220px;
   min-width: 0;

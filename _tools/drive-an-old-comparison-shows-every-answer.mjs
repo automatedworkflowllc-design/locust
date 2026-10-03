@@ -104,6 +104,10 @@ try {
     check(`${column.label}'s answer is shown`, opened.cells.some((cell) => cell.includes(word)), JSON.stringify(opened.cells))
   }
   check('no column says no answer was recorded', !opened.cells.some((cell) => /No answer was recorded/.test(cell)), JSON.stringify(opened.cells))
+  const controls = JSON.parse(String(await drive.capture('comparison controls', () => drive.evaluate(`JSON.stringify({
+    title: document.querySelector('.lc-control__versus')?.closest('button')?.title
+  })`))))
+  check('the route hover names every compared model', COLUMNS.every((column) => controls.title?.includes(column.label)), controls.title)
   const home = JSON.parse(String(await drive.capture('Home, from the comparison', () => drive.evaluate(`(async () => {
     document.querySelector('.lc-brand__lockup')?.click()
     await new Promise((r) => setTimeout(r, 1500))

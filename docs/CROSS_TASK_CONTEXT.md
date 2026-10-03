@@ -219,6 +219,13 @@ Use this template:
 - Deduced: the main process's existing bounded quit path now awaits Remote Control disposal. Unit tests exercise disposal with a fake child; no actual app quit or OS process tree termination was observed for this feature.
 - Not run: real `claude remote-control`, account/sign-in checks, trust or enable answers, live UI, packaged UI, or a remote phone session. Colin owns the account-dependent live check. Review/merge this executor branch before any release; W11 is built, not live.
 
+### 2026-10-03 — comparison and drive polish (Codex)
+
+- Ready for review: `exec/polish-batch`, based on `06e4a6c9`, in `C:/Users/<home>/Documents/Codex/locust-polish-batch`. Full file list, evidence paths, and limitations: [polish handoff](HANDOFF-2026-10-03-POLISH.md).
+- Four requested fixes: full comparison route tooltip (owned by Composer.tsx), styled judge select, stdout route probe, and a seeded Copy assertion with `--copy-only` mode.
+- Gate exit 0: 761 adapter, 150 mission-store, 7,762 desktop tests and required TypeScript checks; runtime-core 4/4 separately. Five new tests pass and all four requested regressions fail their named tests. Built-app drives: comparison 8/8, seeded Copy 1/1, zero captured renderer errors. Isolated real-component judge checks 5/5; generated frame inspected.
+- No version/CHANGELOG change, paid turn, packaging, push, or publication. Live model round trips and packaged checks remain unverified. Review and merge before release.
+
 ## Prompt for a new Codex task
 
 Use this when starting a related chat:

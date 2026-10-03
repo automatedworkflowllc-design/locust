@@ -10,6 +10,7 @@ import { PagePreview } from './DocPreview.js'
 import { ApprovalCard } from './ApprovalCard.js'
 import type { MissionApprovalDecision, MissionApprovalRequest } from '../../../shared/ipc.js'
 import { Icon } from './Icon.js'
+import { ChevronGlyph } from './ChatGlyphs.js'
 import { RuntimeMark } from './RuntimeMark.js'
 import { ThreadItems } from './Thread.js'
 import { WorkingSpark } from './WorkingSpark.js'
@@ -503,9 +504,12 @@ function JudgeAsk({ choices, again, busy, onJudge }: {
     <div className="lc-compare__judgeask">
       <span className="lc-compare__recordlabel lc-mono">{again ? 'ASK ANOTHER JUDGE' : 'ASK A JUDGE'}</span>
       <div className="lc-compare__judgerow">
-        <select className="lc-input lc-compare__judgepick" aria-label="The model that judges" value={choice} onChange={(event) => setChoice(event.target.value)}>
-          <ModelOptions choices={choices} />
-        </select>
+        <span className="lc-compare__select">
+          <select className="lc-input lc-compare__judgepick" aria-label="The model that judges" value={choice} onChange={(event) => setChoice(event.target.value)}>
+            <ModelOptions choices={choices} />
+          </select>
+          <ChevronGlyph />
+        </span>
         <input
           className="lc-input lc-compare__judgecriteria"
           aria-label="What a good answer does"
