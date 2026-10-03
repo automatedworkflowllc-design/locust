@@ -13,7 +13,7 @@ import { existsSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { openTeammateScript, say, scratchRepository, startDrive, recordRoot } from './drive-lib.mjs'
+import { conversationRows, openTeammateScript, say, scratchRepository, sleep, startDrive, recordRoot } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
@@ -32,7 +32,7 @@ const MODEL = process.env.LOCUST_FREE_MODEL ?? 'opencode/ling-3.0-flash-fin-free
  * folder here, and the file the approved command writes is looked for in
  * BOTH places -- the workspace, where it belongs, and the app's own folder.
  */
-const drive = await startDrive({
+let drive = await startDrive({
   ...(packaged === undefined ? {} : { packaged }),
   ...(outPath === undefined ? {} : { outPath }),
   name: 'opencode-approve-each',
@@ -114,6 +114,22 @@ try {
   await drive.capture('a shell command, declined', () =>
     drive.evaluate(ask('Run exactly this shell command with your bash tool: echo DENIED-RUN > denied.txt   If it is declined, do not try another way; say so in one sentence.', 'deny')))
   await drive.capture('the file the declined command would have written', () => `denied.txt: ${existsSync(join(workspace, 'denied.txt')) ? 'PRESENT' : 'ABSENT'}`)
+  /*
+   * AFTER A RELAUNCH (0.568, docs/DESIGN-durable-pause-2026-10.md): the
+   * declines are kept in the run's memory, so a reopened conversation may
+   * read the declined call as failed. Read the turn's rows, close, reopen
+   * on the same profile, open it again, and read them again.
+   */
+  const rowsOf = `JSON.stringify([...document.querySelectorAll('.lc-thread .lc-steps__line, .lc-thread .lc-activity')].map((row) => row.innerText.split(/\\s+/).join(' ').trim()))`
+  const before = JSON.parse(String(await drive.evaluate(rowsOf)))
+  const handoff = await drive.finish({ intro: 'Approved once, declined once; then closed.', last: false })
+  drive = await startDrive({ ...(packaged === undefined ? {} : { packaged }), name: 'opencode-approve-each', port: 9321, workspace, launchElsewhere: true, profilePath: handoff.profile, outPath: handoff.out, stepFrom: handoff.step })
+  await drive.ready()
+  await drive.evaluate(`(async () => { ${conversationRows()}[0]?.click(); await new Promise((r) => setTimeout(r, 1500)) })()`)
+  await sleep(500)
+  const after = JSON.parse(String(await drive.capture('opened again: the same turns', () => drive.evaluate(rowsOf))))
+  say(`  [${before.some((row) => /declined/i.test(row)) ? 'PASS' : 'FAIL'}] live, the declined call reads declined -- ${JSON.stringify(before)}`)
+  say(`  [${JSON.stringify(after) === JSON.stringify(before) ? 'PASS' : 'FAIL'}] after a relaunch the turns read as they did -- ${JSON.stringify(before)} -> ${JSON.stringify(after)}`)
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
