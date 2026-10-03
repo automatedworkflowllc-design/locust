@@ -2,6 +2,10 @@
 
 This project is early and intentionally local-first. Contributions should preserve the product's trust boundaries: explicit runtime/model/provider identity, narrow permissions, durable action receipts, and checkpointed fallback.
 
+## Issues and code
+
+Issues are welcome. Code is by invitation.
+
 ## Development setup
 
 Requirements: Node.js 22.22+ and pnpm 11.
