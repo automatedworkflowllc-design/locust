@@ -904,14 +904,14 @@ describe('thread composition', () => {
 })
 
 describe('cancellation summary', () => {
-  it('separates what finished from what was cut off mid-flight', () => {
+  it('separates tool outcomes and never substitutes them for unreported plan states', () => {
     const summary = cancellationSummary(
       [toolStart('t1', 'shell', 'pnpm build'), toolDone('t1'), toolStart('t2', 'shell', 'pnpm test')],
       4
     )
     expect(summary.settled).toEqual(['pnpm build'])
     expect(summary.interrupted).toEqual(['pnpm test'])
-    expect(summary.neverStarted).toBe(2)
+    expect(summary.neverStarted).toBe(4)
   })
 
   it('counts one file once, however each tool spelled its path', () => {

@@ -50,7 +50,7 @@ describe('a run stopped before any tool ran', () => {
     })
     expect(html).not.toContain('Stopped before it used any tools')
     expect(html).not.toContain('cannot repeat anything')
-    expect(html).toContain('OpenCode reports a tool only once it finishes, so a command it had started may still have run.')
+    expect(html).toContain('An unreported OpenCode command may have been running when stopped.')
     expect(html).toContain('Look at the folder before sending it again')
     expect(html).toContain('Send again')
   })
@@ -64,7 +64,7 @@ describe('a run stopped before any tool ran', () => {
       ]
     })
     expect(html).not.toContain('No tool call was open')
-    expect(html).toContain('None reported. OpenCode reports a tool only once it finishes, so a command it had started may still have run.')
+    expect(html).toContain('An unreported OpenCode command may have been running when stopped.')
   })
 
   it('does not, when a tool had run', () => {

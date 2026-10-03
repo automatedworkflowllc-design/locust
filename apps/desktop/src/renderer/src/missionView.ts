@@ -3890,6 +3890,8 @@ export interface CancellationSummary {
   readonly settled: readonly string[]
   readonly interrupted: readonly string[]
   readonly neverStarted: number
+  /** Plan states are counted separately from tool calls and observed files. */
+  readonly plan?: { readonly finished: number; readonly cutOff: number; readonly total: number }
   /**
    * The runtime reports a tool only once it has finished (OpenCode), so a
    * command it had started when the run stopped is not in either list (Sol,
@@ -3917,6 +3919,12 @@ export function cancellationSummary(
   // identity until the workspace root has had a say.
   const shown = (name: string): string => relativePath(name, workspacePath)
   const key = (name: string): string => shown(name).replace(/[\\/]+/g, '/').toLowerCase()
+  // Colin: "FINISHED never lists the workspace folder". Check the raw path
+  // before relativePath turns the root into its basename.
+  const normal = (path: string): string => path.replace(/[\\/]+/g, '/').replace(/\/$/, '').toLowerCase()
+  const root = workspacePath === undefined ? undefined : normal(workspacePath)
+  const isRoot = (name: string): boolean => root !== undefined &&
+    [root, root.split('/').at(-1), '.', ''].includes(normal(name))
   const settled: string[] = []
   const seen = new Set<string>()
   const open = new Map<string, string>()
@@ -3926,7 +3934,7 @@ export function cancellationSummary(
     } else if (event.type === 'tool.completed' || event.type === 'tool.failed') {
       const name = open.get(event.payload.itemId)
       if (name !== undefined) {
-        if (!seen.has(key(name))) {
+        if (!isRoot(name) && !seen.has(key(name))) {
           seen.add(key(name))
           settled.push(shown(name))
         }
@@ -3935,15 +3943,24 @@ export function cancellationSummary(
     }
   }
   const interrupted = [...open.values()].map(shown).filter((name) => {
+    if (isRoot(name)) return false
     if (seen.has(key(name))) return false
     seen.add(key(name))
     return true
   })
-  const done = settled.length + interrupted.length
+  // Colin: "its counts add up (finished + cut off + never started = the
+  // plan's steps)". Reading a directory or observing a changed file cannot
+  // advance the model's plan. Only its latest reported plan can do that.
+  const latestPlan = events.filter((event) => event.type === 'plan.updated').at(-1)
+  const steps = latestPlan?.type === 'plan.updated' ? readPlan(latestPlan.payload.plan) : undefined
+  const total = steps?.length ?? plannedSteps
+  const finished = steps?.filter((step) => step.state === 'done').length ?? 0
+  const cutOff = steps?.filter((step) => step.state === 'running').length ?? 0
   return {
     settled,
     interrupted,
-    neverStarted: Math.max(0, plannedSteps - done),
+    neverStarted: Math.max(0, total - finished - cutOff),
+    ...(total > 0 ? { plan: { finished, cutOff, total } } : {}),
     ...(events.some((event) => event.sourceAdapter === 'opencode') ? { toolsReportedWhenDone: true } : {})
   }
 }

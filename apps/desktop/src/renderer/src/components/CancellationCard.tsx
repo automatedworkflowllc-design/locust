@@ -4,7 +4,7 @@ import type { CancellationSummary } from '../missionView.js'
 
 /** No tool call settled, none was cut off, none was planned: what "nothing happened" means on this card. */
 export function stoppedBeforeAnyTool(summary: CancellationSummary): boolean {
-  return summary.settled.length === 0 && summary.interrupted.length === 0 && summary.neverStarted === 0
+  return summary.settled.length === 0 && summary.interrupted.length === 0 && summary.neverStarted === 0 && summary.plan === undefined
 }
 
 /**
@@ -35,6 +35,10 @@ export function CancellationCard({
   readonly byPerson?: boolean
 }): ReactElement {
   const nothingHappened = stoppedBeforeAnyTool(summary)
+  const hasToolActivity = summary.settled.length > 0 || summary.interrupted.length > 0
+  const opencode = summary.toolsReportedWhenDone === true
+  // Colin chose "Card only": name uncertainty, never invent a live command.
+  const unreportedCommand = 'An unreported OpenCode command may have been running when stopped. OpenCode reports tools only after they finish; check the folder before sending again.'
 
   // Standing, not amber: this reports a run that already stopped and asks for
   // nothing. Amber is reserved for a card that holds a control.
@@ -47,7 +51,7 @@ export function CancellationCard({
         <span className="lc-tag is-amber">Stopped</span>
       </div>
 
-      {nothingHappened ? (
+      {nothingHappened && !opencode ? (
         /*
          * Said as what the RUN did, not as a denial of what the person did.
          *
@@ -69,12 +73,16 @@ export function CancellationCard({
          * condition is about tool calls, so the sentence names tool calls.
          */
         <div className="lc-card__body">
-          {summary.toolsReportedWhenDone === true
-            ? 'Stopped before it reported using any tools. OpenCode reports a tool only once it finishes, so a command it had started may still have run.'
-            : 'Stopped before it used any tools, so nothing is half-done.'}
+          Stopped before it used any tools, so nothing is half-done.
         </div>
       ) : (
         <dl className="lc-receipt">
+          {summary.plan !== undefined && (
+            <>
+              <dt>Plan</dt>
+              <dd>{`${summary.plan.finished} finished · ${summary.plan.cutOff} cut off · ${summary.neverStarted} never started (${summary.plan.total} step${summary.plan.total === 1 ? '' : 's'})`}</dd>
+            </>
+          )}
           <dt>Finished</dt>
           <dd>
             {summary.settled.length === 0 ? (
@@ -91,7 +99,7 @@ export function CancellationCard({
           </dd>
 
           <dt>Cut off</dt>
-          <dd className={summary.interrupted.length > 0 ? 'lc-tone-amber' : undefined}>
+          <dd className={summary.interrupted.length > 0 || opencode ? 'lc-tone-amber' : undefined}>
             {summary.interrupted.length === 0 ? (
               /*
                * What this actually knows, said as what it knows.
@@ -108,8 +116,8 @@ export function CancellationCard({
                * sentence changes. What a stop cannot promise is said below,
                * beside the note about nothing being rolled back.
                */
-              summary.toolsReportedWhenDone === true
-                ? 'None reported. OpenCode reports a tool only once it finishes, so a command it had started may still have run.'
+              opencode
+                ? unreportedCommand
                 : 'No tool call was open when you stopped it.'
             ) : (
               <>
@@ -128,11 +136,12 @@ export function CancellationCard({
                 <span className="lc-cancel__note">
                   Started and never reported back — whether it took effect is unknown.
                 </span>
+                {opencode && <span className="lc-cancel__note">{unreportedCommand}</span>}
               </>
             )}
           </dd>
 
-          {summary.neverStarted > 0 && (
+          {summary.plan === undefined && summary.neverStarted > 0 && (
             <>
               <dt>Never started</dt>
               <dd>
@@ -148,7 +157,7 @@ export function CancellationCard({
         * yours to do" under "nothing is half-done" names changes that were
         * never made, on the card a double-clicked Send leaves most often.
         */}
-      {!nothingHappened && (
+      {hasToolActivity && (
         <p className="lc-approval__note">
           Everything up to this point is in the durable record. Nothing is rolled back — this build
           does not snapshot the workspace, so undoing a change is yours to do.
@@ -172,7 +181,7 @@ export function CancellationCard({
         * A warning that is false here does not buy safety, it spends the
         * reader's trust in the one warning on this card that is real.
         */}
-      {!nothingHappened && (
+      {hasToolActivity && !opencode && (
         <p className="lc-approval__note lc-tone-amber">
           A command that had already started may still finish on its own. If one was running, check the
           workspace rather than assuming it stopped when you did.

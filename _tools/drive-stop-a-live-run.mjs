@@ -1,4 +1,6 @@
 // Stop a run that is part way through writing files, and read what it says (0.530).
+// Colin: "its counts add up (finished + cut off + never started = the plan's steps);
+// FINISHED never lists the workspace folder". Card-only uncertainty, one warning.
 //
 //   node _tools/drive-stop-a-live-run.mjs [--packaged <exe>] [--tag <name>]
 //   LOCUST_SPEND=1 LOCUST_RUNTIME=codex LOCUST_MODEL=gpt-6-luna node _tools/drive-stop-a-live-run.mjs ...
@@ -83,6 +85,15 @@ try {
   const card = String(await drive.capture('what the conversation says', () => drive.evaluate(`[...document.querySelectorAll('.lc-card.is-standing')].map((c) => c.innerText.replace(/\\s+/g, ' ').trim()).join(' | ')`)))
   check('the card says the person stopped it', /You stopped this run/.test(card), card)
   check('files were written, so it does not claim nothing happened', !/Stopped before it used any tools|nothing was changed/i.test(card) && later.length > 0, card)
+  const plan = /(\d+) finished · (\d+) cut off · (\d+) never started \((\d+) steps?\)/.exec(card)
+  check('the plan counts add up', plan !== null && Number(plan[1]) + Number(plan[2]) + Number(plan[3]) === Number(plan[4]), card)
+  const planRows = await drive.evaluate(`document.querySelectorAll('.lc-plancard li').length`)
+  check('the card accounts for every step in the displayed plan', plan !== null && Number(plan[4]) === Number(planRows), `card ${plan?.[4]} / displayed ${planRows}`)
+  const finished = card.split('FINISHED')[1]?.split('CUT OFF')[0] ?? ''
+  check('Finished excludes the workspace folder', !finished.includes(workspace.split(/[\\/]/).at(-1)), finished)
+  if (RUNTIME === 'opencode') {
+    check('OpenCode uncertainty is said once', card.split('may have been running when stopped').length - 1 === 1 && !card.includes('may still finish on its own'), card)
+  }
   const thread = String(await drive.evaluate(`document.querySelector('.lc-thread')?.innerText.replace(/\\s+/g, ' ') ?? ''`))
   check('no "nothing was changed" anywhere in the conversation', !/nothing was changed/i.test(thread), thread.slice(-400))
 } catch (error) {

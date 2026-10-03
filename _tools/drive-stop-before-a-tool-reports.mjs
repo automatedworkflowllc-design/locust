@@ -1,4 +1,6 @@
 // Stop an OpenCode run while its command is running and not yet reported (0.536).
+// Colin: "Card only (Fix plan counts and workspace filtering; show that an
+// unreported OpenCode command may have been running, with one warning.)."
 //
 //   node _tools/drive-stop-before-a-tool-reports.mjs [--packaged <exe>] [--tag <name>]
 //
@@ -76,7 +78,8 @@ try {
   await sleep(2_000)
   const thread = String(await drive.capture('what the conversation says', () => drive.evaluate(`document.querySelector('.lc-thread')?.innerText.replace(/\\s+/g, ' ') ?? ''`)))
   check('it does not promise no tool ran', !/Stopped before it used any tools/.test(thread) && !/cannot repeat anything/.test(thread), thread.slice(-500))
-  check('it says a command it had started may still have run', /OpenCode reports a tool only once it finishes, so a command it had started may still have run\./.test(thread), thread.slice(-500))
+  check('Cut off names the unreported OpenCode command as uncertain', /CUT OFF.*An unreported OpenCode command may have been running when stopped\./.test(thread), thread.slice(-700))
+  check('the warning is said once', thread.split('may have been running when stopped').length - 1 === 1 && !thread.includes('may still finish on its own'), thread.slice(-700))
   check('it never says no tool call was open', !/No tool call was open/.test(thread), thread.slice(-500))
   // Send again is offered only when nothing at all was reported; then it says to look first.
   check('if it offers Send again, it says to look at the folder first', !/Send again/.test(thread) || /Look at the folder before sending it again/.test(thread), thread.slice(-500))
