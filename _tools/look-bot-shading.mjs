@@ -25,9 +25,11 @@ const esbuild = createRequire(require.resolve('vite/package.json'))('esbuild')
 const electron = require('electron')
 const args = process.argv.slice(2)
 const option = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined)
-const out = resolve(args.find((arg, i) => !arg.startsWith('--') && !['--lib', '--shading'].includes(args[i - 1])) ?? join(tmpdir(), 'bot-shading.png'))
+const out = resolve(args.find((arg, i) => !arg.startsWith('--') && !['--lib', '--shading', '--sizes', '--extra'].includes(args[i - 1])) ?? join(tmpdir(), 'bot-shading.png'))
 const lib = option('--lib')
 const shading = option('--shading') ?? 'plastic'
+// More of the frame's draw settings, as source: `--extra "lightFront: 70,"` (0.569, tuning fabric for small sizes).
+const extra = option('--extra') ?? ''
 if (!['plastic', 'fabric'].includes(shading)) throw new Error('--shading takes plastic or fabric')
 const src = (path) => JSON.stringify(join(DESKTOP, 'src/renderer/src', path).split('\\').join('/'))
 
@@ -40,7 +42,7 @@ import { TeammateBot } from ${src('components/TeammateBot.tsx')}
 
 const SHAPES = ['pill', 'pebble', 'droid', 'cat', 'ghost', 'blob', 'star', 'mech', 'cloud', 'alien']
 const HUES = ['lime', 'blue', 'violet', 'amber', 'rose', 'teal', 'clay', 'sky', 'lime', 'violet']
-const SIZES = [18, 32, 44, 96]
+const SIZES = ${JSON.stringify((option('--sizes') ?? '18,32,44,96').split(',').map(Number))}
 const label = (text) => h('div', { style: { color: '#8a8f98', font: '11px sans-serif', width: 54 } }, text)
 function Row({ size }) {
   return h('div', { style: { display: 'flex', alignItems: 'center', gap: 14, padding: '8px 12px', background: 'var(--lc-bg-sidebar)' } },
@@ -63,7 +65,7 @@ const swap = {
     build.onLoad({ filter: /components[\\/]Bot\.tsx$/ }, async (found) => {
       const text = await readFile(found.path, 'utf8')
       if (!text.includes("shading: 'plastic',")) throw new Error("Bot.tsx no longer says shading: 'plastic' -- update this tool")
-      return { contents: text.replace("shading: 'plastic',", `shading: '${shading}',`), loader: 'tsx' }
+      return { contents: text.replace("shading: 'plastic',", `shading: '${shading}', ${extra}`), loader: 'tsx' }
     })
   }
 }
