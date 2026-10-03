@@ -64,10 +64,13 @@ test('a home path written the unix way is rewritten', () => {
   assert.equal(scrubText(`/home/${account}/claude`), '/home/<home>/claude')
 })
 
-test('letters inside a longer word are left as written', () => {
-  const stuck = `prefix${account}suffix`
-  assert.equal(scrubText(stuck), stuck)
+test('the account name is rewritten even when the slashes around it are gone', () => {
+  assert.equal(scrubText(`C:Users${account}AppData`), 'C:Users<home>AppData')
   assert.equal(scrubText('the public copy keeps product docs'), 'the public copy keeps product docs')
+})
+
+test('a length-prefixed protobuf that embeds the account folder is excluded', () => {
+  assert.equal(isExcluded('packages/runtime-adapters/test/fixtures/antigravity/summaries.pb'), true)
 })
 
 test('a scrub that returns the text unchanged still has the user path', () => {

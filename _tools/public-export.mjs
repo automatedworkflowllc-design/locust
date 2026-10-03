@@ -133,6 +133,9 @@ export const EXCLUSIONS = [
   'docs/locust-*-frames-*.zip',
   'docs/cap-frontier-*.json',
   'docs/smoke-results*.json',
+  // Length-prefixed protobuf. Rewriting the account folder would change
+  // the string lengths, so the file stays out of the public copy.
+  'packages/runtime-adapters/test/fixtures/antigravity/summaries.pb',
   'apps/desktop/_ui-profile/**',
   '**/*.cpuprofile',
   'ASTRA-WORKTREE.md',
@@ -159,7 +162,7 @@ function accountName() {
 }
 
 function accountPattern() {
-  return new RegExp(`(?<![A-Za-z0-9_])${accountName()}(?![A-Za-z0-9_])`, 'gi')
+  return new RegExp(accountName(), 'gi')
 }
 
 export function compileGlob(glob) {
