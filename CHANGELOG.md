@@ -11,6 +11,38 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.571.0 - 2026-10-03
+
+### Fixed
+
+- **Usage on Home stays for every AI agent.** Each agent's last usage reading
+  came only from the twenty newest conversations, so an evening of Codex and
+  Antigravity work made Claude Code's reading disappear. Each agent's newest
+  reading is now kept.
+- **A long Antigravity turn reads as one line.** Antigravity thinks before
+  every step and says nothing about it, and each of those thoughts started a
+  new line: one two-minute turn showed 29 lines of "Thought for 4s, listed a
+  folder". A thought starts a new line only when it says something.
+- **A note is said once a turn.** Copilot's "reported a change to its
+  background tasks" could appear eight times above one answer; it now appears
+  once, with the turn's other notes.
+- **After you keep one model in a comparison, the others no longer show its
+  page.** A column you did not keep showed the kept model's page under its
+  own name; it now says its copy was removed.
+- **Switching a conversation to another agent says how the last turn ended.**
+  When Codex stopped on its usage limit, the next agent was told Codex had
+  "finished its last turn"; it is now told the turn ended on the limit.
+- **The Stopped card adds up.** Its plan line counts finished, cut-off and
+  never-started steps from the plan itself, the workspace folder is no longer
+  listed as something it finished, and an OpenCode command that may still
+  have been running is mentioned once.
+
+### Changed
+
+- **Comparisons:** the box's model chip lists every compared model when you
+  hover it, and "Ask a judge" uses the same dropdown style as the rest of
+  Locust.
+
 ## 0.570.0 - 2026-10-03
 
 ### Fixed

@@ -4195,6 +4195,16 @@ if (!ownsSingleInstanceLock) {
           const copy = compare.changesIn === 'copy' || await stat(join(COPY_ROOT, name)).then(() => true, () => false) ? join(COPY_ROOT, name) : join(workspacePath, COMPARE_TREES_DIRECTORY, name)
           const inCopy = join(copy, requested)
           if (await stat(inCopy).then((found) => found.isFile(), () => false)) return pages.urlFor(inCopy)
+          /*
+           * ONLY THE KEPT COLUMN FALLS BACK TO THE FOLDER (0.571). After Keep the
+           * folder's page IS the kept one's, so another column reading it showed
+           * the kept game under its own name -- the blind arena run, 2026-10-03:
+           * Opus's column drew Sonnet's "survive the dusk" title once Sonnet was
+           * kept. A column not kept has no page left on this computer.
+           */
+          if (compare.kept !== undefined && compare.kept.slot !== place.slot) {
+            return { ok: false, message: 'Its copy was removed when you kept another model, so this page is no longer on this computer.' } as const
+          }
         }
       }
       return pages.urlFor(requested)

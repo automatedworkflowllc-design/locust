@@ -3919,7 +3919,7 @@ export function cancellationSummary(
   // identity until the workspace root has had a say.
   const shown = (name: string): string => relativePath(name, workspacePath)
   const key = (name: string): string => shown(name).replace(/[\\/]+/g, '/').toLowerCase()
-  // Colin: "FINISHED never lists the workspace folder". Check the raw path
+  // Sonnet's 0.569 review (#7): FINISHED listed the workspace folder. Check the raw path
   // before relativePath turns the root into its basename.
   const normal = (path: string): string => path.replace(/[\\/]+/g, '/').replace(/\/$/, '').toLowerCase()
   const root = workspacePath === undefined ? undefined : normal(workspacePath)
@@ -3948,8 +3948,8 @@ export function cancellationSummary(
     seen.add(key(name))
     return true
   })
-  // Colin: "its counts add up (finished + cut off + never started = the
-  // plan's steps)". Reading a directory or observing a changed file cannot
+  // Sonnet's 0.569 review (#8): the counts must add up (finished + cut off +
+  // never started = the plan's steps). Reading a directory or observing a changed file cannot
   // advance the model's plan. Only its latest reported plan can do that.
   const latestPlan = events.filter((event) => event.type === 'plan.updated').at(-1)
   const steps = latestPlan?.type === 'plan.updated' ? readPlan(latestPlan.payload.plan) : undefined

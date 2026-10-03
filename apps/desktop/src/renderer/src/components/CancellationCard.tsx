@@ -37,7 +37,7 @@ export function CancellationCard({
   const nothingHappened = stoppedBeforeAnyTool(summary)
   const hasToolActivity = summary.settled.length > 0 || summary.interrupted.length > 0
   const opencode = summary.toolsReportedWhenDone === true
-  // Colin chose "Card only": name uncertainty, never invent a live command.
+  // "Card only" (10/03): name the uncertainty; never invent a command nobody reported.
   const unreportedCommand = 'An unreported OpenCode command may have been running when stopped. OpenCode reports tools only after they finish; check the folder before sending again.'
 
   // Standing, not amber: this reports a run that already stopped and asks for

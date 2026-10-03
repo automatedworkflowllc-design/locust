@@ -6,7 +6,9 @@ import {
   ACP_PROMPT_RESULT,
   ACP_SESSION,
   createAcpEventNormalizer,
+  asProcessNormalizer,
   createAgyEventNormalizer,
+  createAppServerEventNormalizer,
   createAntigravityEventNormalizer,
   createClaudeEventNormalizer,
   createCopilotEventNormalizer,
@@ -94,6 +96,14 @@ function acpRecords(raw: string): string[] {
   return records
 }
 
+/** Codex app-server's recorded session as codex-app-server-run.ts records it: each notification it was sent, in order. */
+function codexRecords(raw: string): string[] {
+  return linesOf(raw)
+    .map((line) => JSON.parse(line) as { dir: string; message?: { id?: unknown; method?: unknown; params?: unknown } })
+    .filter((row) => row.dir === 'in' && typeof row.message?.method === 'string' && row.message.id === undefined)
+    .map((row) => JSON.stringify({ method: row.message!.method, params: row.message!.params ?? null }))
+}
+
 /** OpenCode's server events as opencode-serve-run.ts turns them into `run`'s records. */
 function serveRecords(raw: string): string[] {
   type Json = Record<string, unknown>
@@ -124,6 +134,7 @@ const RECORDINGS: readonly Recording[] = Object.entries(FIXTURES)
     const [folder, file] = path.split('/fixtures/')[1]!.split('/') as [string, string]
     const name = `${folder}/${file}`
     if (folder === 'acp') return { name, runtime: file.startsWith('copilot') ? 'acp-copilot' : 'acp-opencode', records: acpRecords(raw) }
+    if (folder === 'codex') return { name, runtime: 'codex', records: codexRecords(raw) }
     if (file === 'serve-events.jsonl') return { name, runtime: 'opencode-serve', records: serveRecords(raw) }
     return { name, runtime: folder.startsWith('agy') ? 'agy' : folder, records: linesOf(raw) }
   })
@@ -137,6 +148,7 @@ function normalizerFor(runtime: string) {
     case 'agy': return createAgyEventNormalizer(base)
     case 'antigravity': return createAntigravityEventNormalizer({ ...base, conversationId: '03a2fcb4-8fd9-468e-a683-6bf3a5acd077' })
     case 'claude': return createClaudeEventNormalizer(base)
+    case 'codex': return asProcessNormalizer(createAppServerEventNormalizer(base))
     case 'copilot': return createCopilotEventNormalizer({ ...base, cliVersion: '1.0.88', sessionId: '11111111-2222-3333-4444-555555555555' })
     case 'cursor': return createCursorEventNormalizer({ ...base, cliVersion: '2026.08.31-4057e58' })
     case 'muse': return createMuseEventNormalizer({ ...base, cliVersion: '1.3.0' })
