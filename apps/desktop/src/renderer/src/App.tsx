@@ -65,7 +65,7 @@ import type { RoutineDraft } from './routines.js'
 import { RoutineDialog } from './components/RoutineDialog.js'
 import { AutomationsScreen } from './components/AutomationsScreen.js'
 import { TIDY_PROMPT } from '../../shared/memory-tidy.js'
-import { needsYou, needsYouLabel } from './needsYou.js'
+import { needsYou, needsYouLabel, waitingByTeammate } from './needsYou.js'
 import { withNote } from './diffNotes.js'
 import type { DiffNote } from './diffNotes.js'
 import { DiffNotesContext } from './components/DiffNotes.js'
@@ -6784,12 +6784,10 @@ export default function App(): ReactElement {
   }, [history, runs, workspaceId, judgeIds])
 
   const shownApprovals = approvals.filter((request) => request.runId === shownRunId)
-  const pendingApprovalsByOwner = new Map<string, number>()
-  for (const request of approvals) {
-    const run = runs.get(request.runId)
-    const owner = run === undefined ? undefined : ownerOf(run)
-    if (owner !== undefined) pendingApprovalsByOwner.set(owner, (pendingApprovalsByOwner.get(owner) ?? 0) + 1)
-  }
+  // Paused runs AND questions a teammate stopped on: both make its face wait on you (0.564).
+  const pendingApprovalsByOwner = waitingByTeammate(needsYouItems)
+  const shownMissionId = liveRun?.data?.missionId ?? shownKey
+  const shownQuestionOpen = needsYouItems.some((item) => item.kind === 'decision' && item.missionId === shownMissionId)
   // Which teammate is replaying a routine, and which step it is on. DERIVED
   // from the runs that are actually live rather than tracked alongside them:
   // a step that ended stops being reported because its run stopped running,
@@ -6866,7 +6864,7 @@ export default function App(): ReactElement {
           runtime: runtimes.find((entry) => entry.id === liveRun?.data?.runtime),
           ...runtimeReach(runtimes, runtimeState.phase === 'ready'),
           hasRunningMission: running,
-          pendingApprovals: shownApprovals.length,
+          pendingApprovals: shownApprovals.length + (shownQuestionOpen ? 1 : 0),
           roleLabel: roleLabelOf(missionOwner),
           ...(liveActivityByOwner[missionOwner.teammateId] === undefined
             ? {}

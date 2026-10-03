@@ -127,6 +127,21 @@ export function needsYou(input: {
 }
 
 /** The item as a row of the menu it opens. */
+/**
+ * How many things each teammate waits on the person for: runs paused for an
+ * approval AND questions it stopped on (0.564). The face counted approvals
+ * only, so a teammate that ended its turn on a question looked idle while the
+ * title bar said it needed you (Sol's 0.562 beta, act 3).
+ */
+export function waitingByTeammate(items: readonly NeedsYouItem[]): Map<string, number> {
+  const counts = new Map<string, number>()
+  for (const item of items) {
+    if (item.kind === 'memory' || item.teammateId === undefined) continue
+    counts.set(item.teammateId, (counts.get(item.teammateId) ?? 0) + 1)
+  }
+  return counts
+}
+
 export function needsYouLabel(item: NeedsYouItem): string {
   if (item.kind === 'memory') return `${String(item.count)} memory suggestion${item.count === 1 ? '' : 's'} waiting`
   if (item.kind === 'decision') return `${item.name} asked: ${item.what}`
