@@ -8390,7 +8390,8 @@ export default function App(): ReactElement {
               },
               onSend: async (id, message) => {
                 const answer = await window.desktop?.sendClaudeCloud(id, message).catch(() => undefined)
-                return answer === undefined ? 'Claude Code could not be reached. Nothing was sent.' : answer.ok ? undefined : answer.message
+                // The bridge failing mid-send leaves it unknown, not unsent (0.568).
+                return answer === undefined ? 'Locust could not confirm whether that was sent. Look at the session on claude.ai before sending it again.' : answer.ok ? undefined : answer.message
               },
               onCheck: async (id) => (await window.desktop?.checkClaudeCloud(id).catch(() => undefined)) ?? { ok: false, message: 'Claude Code could not be reached to read it. See it on claude.ai.' },
               onApply: async (id) => {

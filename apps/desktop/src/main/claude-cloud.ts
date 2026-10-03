@@ -573,7 +573,17 @@ export function createClaudeCloud(options: ClaudeCloudOptions) {
       // prefix, a URL slug), and a false "not sent" invites a resend of something already sent.
       if (ran.code === 0 && receipt?.ok === true) return { ok: true }
       const said = /Error:[ \t]*(.+)/.exec(plainTerminalText(ran.output))?.[1]?.trim()
-      return { ok: false, message: said === undefined ? 'Claude Code did not send that. Send it from claude.ai or the Claude app.' : `Claude Code did not send that: ${said.slice(0, 300)}` }
+      // Claude Code said it failed, and said nothing of a success: not sent.
+      if (said !== undefined && receipt?.ok !== true) return { ok: false, message: `Claude Code did not send that: ${said.slice(0, 300)}` }
+      /*
+       * NOT CONFIRMED IS NOT "NOT SENT" (0.568, docs/DESIGN-durable-pause-2026-10.md).
+       * No receipt and no error -- a crash after sending, a changed output, a
+       * success on the wrong stream -- leaves the send unknown, and this said
+       * "did not send that", which invites the same message again: a cloud
+       * session would then do the work twice. AGENTS.md: never retry an
+       * irreversible action after an uncertain result.
+       */
+      return { ok: false, message: 'Locust could not confirm that Claude Code sent that. Look at the session on claude.ai before sending it again, so it does not arrive twice.' }
     },
     async forget(id: string): Promise<void> {
       const sessions = await read()

@@ -38,6 +38,16 @@ it('A cloud send uses the last JSON answer and never accepts terminal success wo
   expect((await send({ code: 0, output: 'Sent to cloud session' })).result.ok).toBe(false)
   expect((await send({ code: 1, output: JSON.stringify({ ok: true, session_id: sessionId }) })).result.ok).toBe(false)
 })
+it('A send nobody confirmed is said to be unconfirmed, never "not sent", so it is not sent twice (0.568).', async () => {
+  const unconfirmed = 'Locust could not confirm that Claude Code sent that. Look at the session on claude.ai before sending it again, so it does not arrive twice.'
+  // No receipt, no error: Claude Code may have sent it.
+  expect((await send({ code: 0, output: 'Sent to cloud session' })).result).toEqual({ ok: false, message: unconfirmed })
+  // A success receipt on a failing exit, or only on stderr: contradictory, so unknown.
+  expect((await send({ code: 1, output: JSON.stringify({ ok: true, session_id: sessionId }) })).result).toEqual({ ok: false, message: unconfirmed })
+  expect((await send({ code: 0, output: JSON.stringify({ ok: true, session_id: sessionId }), stdout: '' })).result).toEqual({ ok: false, message: unconfirmed })
+  // Killed with nothing said at all.
+  expect((await send({ code: -1, output: '' })).result).toEqual({ ok: false, message: unconfirmed })
+})
 it('A configuration failure keeps the Error fallback and stderr cannot forge success.', async () => {
   expect((await send({ code: 1, output: 'Error: Sign in first\n', stdout: '' })).result).toEqual({ ok: false, message: 'Claude Code did not send that: Sign in first' })
   expect((await send({ code: 0, output: JSON.stringify({ ok: true, session_id: sessionId }), stdout: '' })).result.ok).toBe(false)
