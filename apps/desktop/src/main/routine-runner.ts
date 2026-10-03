@@ -13,6 +13,8 @@ import type { RoutineStore } from './routine-store.js'
 import type { RoutineCopies } from './routine-copy.js'
 import { hostReadsEventsOf } from '../shared/runtimes.js'
 import { stepTooLongNotice } from '../shared/step-budget.js'
+import { resolveValues, substituteSteps } from '../shared/routine-inputs.js'
+import type { RoutineValues } from '../shared/routine-inputs.js'
 
 /**
  * Replays a routine: step 1 starts as a new mission for the teammate, and each
@@ -36,6 +38,8 @@ import { stepTooLongNotice } from '../shared/step-budget.js'
  */
 
 export interface RoutineRunnerOptions {
+  /** W7: the host picker vouches for folder values at dispatch, after the final store read. */
+  readonly folderChosen?: (path: string) => boolean
   readonly workspaceId: string
   /**
    * The folder a routine was made in: its own record, or for one saved
@@ -136,8 +140,12 @@ export interface RoutineProgress {
 export interface RoutineRunner {
   reconcile(): Promise<void>
   recover(request: RoutineRecoveryRequest): Promise<RoutineRecoveryResponse>
-  /** `arrived`: the new files a watching routine runs for (0.522), named to step 1. */
-  run(routineId: string, arrived?: { readonly folder: string; readonly files: readonly string[] }): Promise<RoutineRunResponse>
+  /**
+   * `arrived`: the new files a watching routine runs for (0.522), named to step 1.
+   * `values` (W7): what a person entered for the routine's inputs. Absent, nobody
+   * was asked -- a run on its own -- and the defaults stand.
+   */
+  run(routineId: string, arrived?: { readonly folder: string; readonly files: readonly string[] }, values?: RoutineValues): Promise<RoutineRunResponse>
   /** Any run ending, however it ended. Only a routine's own current step moves it. */
   onRunEnded(mission: { readonly missionId: string }): Promise<void>
   running(): readonly RoutineProgress[]
@@ -160,6 +168,36 @@ function isAtCapacity(message: string): boolean {
 
 /** How long a scheduled routine waits after a start that failed before it is tried again. */
 export const SCHEDULE_HOLD_OFF_MS = 3_600_000
+
+/**
+ * THE ROUTINE AS THIS RUN WILL SAY IT (W7): every `{{key}}` in its steps
+ * replaced by the value settled for it, in main, as text, before any prompt is
+ * assembled. The run then keeps THESE steps -- they are what its record holds
+ * and what a recovery replays -- so a later edit, or a changed default, never
+ * changes a run that has begun. Refused here, before anything starts, when a
+ * required input has no value or a step ends up empty or too long to send.
+ */
+export function fillInputs(routine: PublicRoutine, given: RoutineValues | undefined, folderChosen?: (path: string) => boolean):
+  { readonly ok: true; readonly routine: PublicRoutine } | { readonly ok: false; readonly message: string } {
+  const inputs = routine.inputs
+  if (inputs === undefined || inputs.length === 0) {
+    if (given !== undefined && Object.keys(given).length > 0) return { ok: false, message: 'This routine does not ask for any values.' }
+    return { ok: true, routine }
+  }
+  const settled = resolveValues(inputs, given)
+  if (!settled.ok) return settled
+  for (const input of inputs) {
+    const path = settled.values[input.key]
+    if (input.kind === 'folder' && path && folderChosen?.(path) !== true) return { ok: false, message: `Choose "${input.label}" with the folder picker before running.` }
+  }
+  const steps = substituteSteps(routine.steps, settled.values)
+  for (const [at, step] of steps.entries()) {
+    if (step.trim().length === 0) return { ok: false, message: `Step ${String(at + 1)} is empty once the values are filled in. Nothing was started.` }
+    const tooLong = stepTooLongNotice(step)
+    if (tooLong !== undefined) return { ok: false, message: `Step ${String(at + 1)} is too long once the values are filled in: ${tooLong} Nothing was started.` }
+  }
+  return { ok: true, routine: { ...routine, steps } }
+}
 
 /**
  * Runtimes the routine runner can start: the ones whose events this host
@@ -566,12 +604,16 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       changed()
       return { ok: true }
     },
-    async run(routineId, arrived) {
+    async run(routineId, arrived, values) {
       await reconcile()
-      const routine = await options.routines.get(routineId)
-      if (routine === undefined) {
+      const stored = await options.routines.get(routineId)
+      if (stored === undefined) {
         return { ok: false, error: { code: 'ROUTINE_REJECTED', message: 'That routine no longer exists.' } }
       }
+      // What it asks for, settled before anything else is looked at (W7).
+      const filled = fillInputs(stored, values, options.folderChosen)
+      if (!filled.ok) return { ok: false, error: { code: 'ROUTINE_REJECTED', message: filled.message } }
+      const routine = filled.routine
       if (routine.execution !== undefined && routine.execution.status !== 'abandoned') {
         return { ok: false, error: { code: 'ROUTINE_REJECTED', message: 'This routine is already running or waiting for review. Open its routine card before starting more work.' } }
       }
@@ -900,7 +942,7 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
   return {
     running: () => runner.running(),
     reconcile: () => serial(() => runner.reconcile()),
-    run: (id) => serial(() => runner.run(id)),
+    run: (id, arrived, values) => serial(() => runner.run(id, arrived, values)),
     recover: (request) => serial(() => runner.recover(request)),
     onRunEnded: (mission) => serial(() => runner.onRunEnded(mission)),
     tick: (now) => serial(() => runner.tick(now))

@@ -63,6 +63,10 @@ import { queueHome, combineQueued, queuedIn, queuedVerdict, requeuedRows, retrie
 import type { QueuedRow } from './steering.js'
 import type { RoutineDraft } from './routines.js'
 import { RoutineDialog } from './components/RoutineDialog.js'
+import { RoutineRunDialog } from './components/RoutineInputs.js'
+import { RoutineExportDialog, RoutineImportDialog } from './components/RoutineFileDialog.js'
+import type { RoutineInput, RoutineValues } from '../../shared/routine-inputs.js'
+import type { RoutineImportPreview, RoutineFlaggedPath } from '../../shared/ipc.js'
 import { AutomationsScreen } from './components/AutomationsScreen.js'
 import { TIDY_PROMPT } from '../../shared/memory-tidy.js'
 import { needsYou, needsYouLabel, waitingByTeammate } from './needsYou.js'
@@ -1581,6 +1585,7 @@ export default function App(): ReactElement {
   const [queued, setQueued] = useState<readonly QueuedRow[]>([])
   /** The save/edit dialog, open on a draft taken from a conversation or on a routine already saved. */
   const [routineDialog, setRoutineDialog] = useState<{
+    readonly inputs?: readonly RoutineInput[]
     /** Undefined for a conversation nobody owns: the dialog asks who will run it. */
     readonly teammateId: string | undefined
     readonly routineId?: string
@@ -5152,6 +5157,7 @@ export default function App(): ReactElement {
   }
 
   const saveRoutine = (input: {
+    readonly inputs?: readonly RoutineInput[]
     readonly name: string
     readonly steps: readonly string[]
     readonly schedule: RoutineSchedule | undefined
@@ -5200,13 +5206,14 @@ export default function App(): ReactElement {
             route,
             steps: input.steps,
             learnedFrom: dialog.learnedFrom,
+            ...(input.inputs === undefined ? {} : { inputs: input.inputs }),
             ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
             ...(input.handOffs === undefined ? {} : { handOffs: input.handOffs }),
             ...(input.inCopy === true ? { inCopy: true } : {}),
             ...(input.untilCheck === undefined || input.untilCheck === null ? {} : { untilCheck: input.untilCheck })
           })
         : // null clears a schedule the routine had; the store leaves an absent one alone.
-          bridge.updateRoutine({ routineId: dialog.routineId, name: input.name, steps: input.steps, schedule: input.schedule ?? null, ...(input.handOffs === undefined ? {} : { handOffs: input.handOffs }), ...(chosenMode === undefined ? {} : { mode: chosenMode }), ...(input.inCopy === undefined ? {} : { inCopy: input.inCopy }), ...(input.untilCheck === undefined ? {} : { untilCheck: input.untilCheck }) })
+          bridge.updateRoutine({ routineId: dialog.routineId, name: input.name, steps: input.steps, schedule: input.schedule ?? null, ...(input.inputs === undefined ? {} : { inputs: input.inputs }), ...(input.handOffs === undefined ? {} : { handOffs: input.handOffs }), ...(chosenMode === undefined ? {} : { mode: chosenMode }), ...(input.inCopy === undefined ? {} : { inCopy: input.inCopy }), ...(input.untilCheck === undefined ? {} : { untilCheck: input.untilCheck }) })
     void request
       .then(async (response) => {
         if (!response.ok) {
@@ -5230,6 +5237,7 @@ export default function App(): ReactElement {
       routineId: routine.routineId,
       name: routine.name,
       steps: routine.steps,
+      ...(routine.inputs === undefined ? {} : { inputs: routine.inputs }),
       learnedFrom: routine.learnedFrom,
       truncated: false,
       ...(routine.schedule === undefined ? {} : { schedule: routine.schedule }),
@@ -5266,28 +5274,37 @@ export default function App(): ReactElement {
     if (owner !== undefined) setSelectedTeammateId(owner)
   }, [runs])
   const [routineNotice, setRoutineNotice] = useState<string>()
+  const [routineRunFor, setRoutineRunFor] = useState<PublicRoutine>()
+  const [routineImport, setRoutineImport] = useState<RoutineImportPreview>()
+  const [routineExport, setRoutineExport] = useState<{ routineId: string; flagged: readonly RoutineFlaggedPath[] }>()
+  const exportRoutine = async (routineId: string, paths?: 'input' | 'keep'): Promise<void> => {
+    if (!window.desktop) throw new Error('Desktop connection is unavailable.')
+    const answer = await window.desktop.exportRoutine({ routineId, ...(paths === undefined ? {} : { paths }) })
+    if (!answer.ok) {
+      if (answer.error.code === 'ABSOLUTE_PATHS') { setRoutineExport({ routineId, flagged: answer.error.flagged }); return }
+      throw new Error(answer.error.message)
+    }
+    if (!answer.data.cancelled) setRoutineNotice(`Exported to ${answer.data.path ?? 'a routine file'}.`)
+  }
+  const previewRoutineImport = (): void => {
+    void window.desktop?.previewRoutineImport().then((answer) => {
+      if (!answer.ok) { setRoutineNotice(answer.error.message); return }
+      setRoutineImport(answer.data.preview)
+    }).catch(() => setRoutineNotice('That routine file could not be opened. Choose a readable .locust-routine.json file.'))
+  }
+  const startRoutine = async (routineId: string, values?: RoutineValues): Promise<void> => {
+    if (!window.desktop) throw new Error('Desktop connection is unavailable.')
+    const response = await window.desktop.runRoutine(routineId, values)
+    if (!response.ok) throw new Error(response.error.message)
+    setRoutineNotice(undefined)
+    followRunRef.current = response.data.runId
+    setScreen('workroom')
+    await reloadRoutines()
+  }
   const runRoutine = (routineId: string): void => {
-    const bridge = window.desktop
-    if (!bridge) return
-    void bridge
-      .runRoutine(routineId)
-      .then(async (response) => {
-        if (!response.ok) {
-          // M30: said on the screen the Run was pressed on. It went into the
-          // teammate dialog's error, which only that dialog shows.
-          setRoutineNotice(`Not run: ${response.error.message}`)
-          return
-        }
-        setRoutineNotice(undefined)
-        // Follow the routine into the thread it is running in, the way the
-        // view follows a teammate's reply. M30: once the run is in the
-        // window -- openMission here read the runs from before the press,
-        // which cannot hold it, and left the old conversation on screen.
-        followRunRef.current = response.data.runId
-        setScreen('workroom')
-        await reloadRoutines()
-      })
-      .catch(() => setRoutineNotice('Not run: that routine could not be started. None of its steps ran.'))
+    const routine = routines.find((entry) => entry.routineId === routineId)
+    if (routine?.inputs?.length) { setRoutineRunFor(routine); return }
+    void startRoutine(routineId).catch((error: unknown) => setRoutineNotice(error instanceof Error ? error.message : 'The routine start could not be confirmed. Check its conversation before starting it again.'))
   }
 
   const recoverRoutine: import('./components/RoutineRecovery.js').RecoverRoutine = async (request) => {
@@ -7152,6 +7169,8 @@ export default function App(): ReactElement {
               folders={folders}
               onSaveRoutine={openSaveRoutine}
               onNewRoutine={openNewRoutine}
+              onImportRoutine={previewRoutineImport}
+              onExportRoutine={(id) => { void exportRoutine(id).catch((error: unknown) => setRoutineNotice(error instanceof Error ? error.message : 'That routine could not be exported. Check the destination folder and try again.')) }}
               onSettleRoutine={settleRoutine}
             />
           ) : screen === 'rooms' ? (
@@ -8682,6 +8701,16 @@ export default function App(): ReactElement {
       {feedbackFor !== undefined && (
         <FeedbackDialog conversation={feedbackFor.conversation} onClose={() => setFeedbackFor(undefined)} />
       )}
+      {routineRunFor !== undefined && <RoutineRunDialog routine={routineRunFor} onRun={(values) => startRoutine(routineRunFor.routineId, values)} onCancel={() => setRoutineRunFor(undefined)} />}
+      {routineExport !== undefined && <RoutineExportDialog flagged={routineExport.flagged} onExport={(paths) => exportRoutine(routineExport.routineId, paths)} onCancel={() => setRoutineExport(undefined)} />}
+      {routineImport !== undefined && <RoutineImportDialog preview={routineImport} team={teammates} onCancel={() => setRoutineImport(undefined)} onImport={async (teammateId) => {
+        if (!window.desktop) throw new Error('Desktop connection is unavailable.')
+        const route = teammates.find((mate) => mate.teammateId === teammateId)?.route ?? { runtime: composerRoute.runtime, model: composerRoute.model, mode: 'ask' as const }
+        const answer = await window.desktop.importRoutine({ token: routineImport.token, teammateId, route })
+        if (!answer.ok) throw new Error(answer.error.message)
+        setRoutineNotice('Routine imported. It has no schedule and has not run.')
+        await reloadRoutines()
+      }} />}
       {routineDialog !== undefined && (
         <RoutineDialog
           key={routineDialog.routineId ?? 'new'}
@@ -8697,6 +8726,7 @@ export default function App(): ReactElement {
             return folder === undefined ? {} : { folder: { name: folder.name, path: folder.path } }
           })()}
           initialSteps={routineDialog.steps}
+          {...(routineDialog.inputs === undefined ? {} : { initialInputs: routineDialog.inputs })}
           initialSchedule={routineDialog.schedule}
           // A hand-off chain (0.435): who takes each step, from the whole team.
           team={teammates}

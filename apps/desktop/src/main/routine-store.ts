@@ -6,6 +6,8 @@ import { isAbsolute, join } from 'node:path'
 import { MAX_GOAL_TRIES } from '../shared/ipc.js'
 import type { PublicRoutine, RoutineGoal, RoutineHandOff, RoutineStaged, TeammateRoute } from '../shared/ipc.js'
 import { validSchedule } from '../shared/routine-schedule.js'
+import { inputsRefusal, keptInputs, placeholdersIn, undeclaredPlaceholders, validInputs } from '../shared/routine-inputs.js'
+import type { RoutineInput } from '../shared/routine-inputs.js'
 
 /** Every shape a schedule may take, said when one does not read (0.522). */
 const SCHEDULE_REFUSAL = 'The schedule is not one Locust can keep: every 1 to 168 hours, daily or on set days at HH:MM, once at a date and time, or on a new file in a folder inside the project.'
@@ -66,9 +68,11 @@ export interface RoutineStore {
     readonly inCopy?: unknown
     /** Keep going until the check passes (0.534). */
     readonly untilCheck?: unknown
+    /** What it asks for when it runs (W7). */
+    readonly inputs?: unknown
   }): Promise<PublicRoutine>
   /** Corrections: the name, the steps, who takes them, and the schedule (`null` clears it). The teammate, route and provenance stay. */
-  update(input: { readonly routineId: unknown; readonly name: unknown; readonly steps: unknown; readonly schedule?: unknown; readonly handOffs?: unknown; readonly mode?: unknown; readonly inCopy?: unknown; readonly untilCheck?: unknown }): Promise<PublicRoutine>
+  update(input: { readonly routineId: unknown; readonly name: unknown; readonly steps: unknown; readonly schedule?: unknown; readonly handOffs?: unknown; readonly mode?: unknown; readonly inCopy?: unknown; readonly untilCheck?: unknown; readonly inputs?: unknown }): Promise<PublicRoutine>
   remove(routineId: unknown): Promise<void>
   /**
    * Count reconciled final completion and clear its matching progress in one write
@@ -177,6 +181,7 @@ export function parsedRoutine(value: unknown): PublicRoutine | undefined {
   if (!safeId(record.routineId) || !safeId(record.teammateId)) return undefined
   if (!validRoutineName(record.name) || !validSteps(record.steps) || !isTeammateRoute(record.route)) return undefined
   if (!validLearnedFrom(record.learnedFrom)) return undefined
+  if (record.inputs !== undefined && inputsRefusal(record.inputs, record.steps) !== undefined) return undefined
   if (typeof record.createdAt !== 'string' || Number.isNaN(Date.parse(record.createdAt))) return undefined
   if (typeof record.runs !== 'number' || !Number.isSafeInteger(record.runs) || record.runs < 0) return undefined
   if (record.lastRunAt !== undefined && (typeof record.lastRunAt !== 'string' || Number.isNaN(Date.parse(record.lastRunAt)))) {
@@ -216,7 +221,9 @@ export function parsedRoutine(value: unknown): PublicRoutine | undefined {
     // A goal that does not read is dropped, not the routine (0.534).
     ...(validGoal(record.untilCheck) ? { untilCheck: { tries: record.untilCheck.tries } } : {}),
     ...(validStaged(record.staged) ? { staged: { ...record.staged, changed: [...record.staged.changed], deleted: [...record.staged.deleted] } } : {}),
-    ...(validFailed(record.lastFailed) ? { lastFailed: record.lastFailed } : {})
+    ...(validFailed(record.lastFailed) ? { lastFailed: record.lastFailed } : {}),
+    // Validated above: a corrupt declaration must never become a run without inputs.
+    ...(validInputs(record.inputs) && record.inputs.length > 0 ? { inputs: keptInputs(record.inputs) } : {})
   }
 }
 
@@ -357,6 +364,10 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
         if (input.handOffs !== undefined && !validHandOffs(input.handOffs, input.steps.length)) throw new Error('Who takes each step does not line up with the steps')
         const handOffs = input.handOffs === undefined ? undefined : keptHandOffs(input.handOffs, input.teammateId)
         if (input.untilCheck !== undefined && !validGoal(input.untilCheck)) throw new Error('Routine goal is invalid')
+        // Every {{key}} a step writes must be declared as an input (W7).
+        const askedFor = input.inputs === undefined ? [] : input.inputs
+        const inputsSaying = inputsRefusal(askedFor, input.steps)
+        if (inputsSaying !== undefined) throw new Error(inputsSaying)
         const file = await read()
         if (file.routines.length >= MAX_ROUTINES) throw new Error('Too many routines')
         const routine: PublicRoutine = {
@@ -377,7 +388,8 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
           ...(validWorkspaceId(input.workspaceId) ? { workspaceId: input.workspaceId } : {}),
           ...(handOffs === undefined ? {} : { handOffs }),
           ...(input.inCopy === true ? { inCopy: true as const } : {}),
-          ...(validGoal(input.untilCheck) ? { untilCheck: { tries: input.untilCheck.tries } } : {})
+          ...(validGoal(input.untilCheck) ? { untilCheck: { tries: input.untilCheck.tries } } : {}),
+          ...((askedFor as readonly RoutineInput[]).length > 0 ? { inputs: keptInputs(askedFor as readonly RoutineInput[]) } : {})
         }
         await write({ ...file, routines: [...file.routines, routine] })
         return routine
@@ -402,12 +414,31 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
         const route = input.mode === undefined ? held.route : { ...held.route, mode: input.mode }
         if (!isTeammateRoute(route)) throw new Error('Routine route is invalid')
         // In a copy or not (0.533): given, as given; not given, as it was.
-        const { schedule: _held, handOffs: heldHandOffs, inCopy: heldInCopy, untilCheck: heldGoal, ...base } = { ...held, route }
+        const { schedule: _held, handOffs: heldHandOffs, inCopy: heldInCopy, untilCheck: heldGoal, inputs: heldInputs, ...base } = { ...held, route }
+        /*
+         * WHAT IT ASKS FOR (W7): given, as given; null, nothing; not given, as it
+         * was. Every {{key}} the steps now write must be declared -- except a
+         * marker a routine saved before this already held, which stays the plain
+         * text it always was, so editing its schedule is not refused over it.
+         */
+        if (input.inputs !== undefined && input.inputs !== null) {
+          const saying = inputsRefusal(input.inputs)
+          if (saying !== undefined) throw new Error(saying)
+        }
+        const nextInputs: readonly RoutineInput[] | undefined = input.inputs === undefined
+          ? heldInputs
+          : input.inputs === null || (input.inputs as readonly RoutineInput[]).length === 0 ? undefined : keptInputs(input.inputs as readonly RoutineInput[])
+        const longstanding = new Set(heldInputs === undefined && nextInputs === undefined ? held.steps.flatMap(placeholdersIn) : [])
+        const introduced = undeclaredPlaceholders(input.steps as readonly string[], nextInputs).filter((key) => !longstanding.has(key))
+        if (introduced.length > 0) {
+          const at = (input.steps as readonly string[]).findIndex((step) => placeholdersIn(step).includes(introduced[0] as string))
+          throw new Error(`Step ${String(at + 1)} uses {{${introduced[0] as string}}}, which is not declared as an input. Add an input with the key ${introduced[0] as string}, or take the braces out.`)
+        }
         const inCopy = input.inCopy === undefined ? heldInCopy === true : input.inCopy === true
         // A goal (0.534): given, as given; null, none; not given, as it was.
         if (input.untilCheck !== undefined && input.untilCheck !== null && !validGoal(input.untilCheck)) throw new Error('Routine goal is invalid')
         const goal = input.untilCheck === undefined ? heldGoal : input.untilCheck === null ? undefined : { tries: (input.untilCheck as RoutineGoal).tries }
-        const rest = { ...base, ...(inCopy ? { inCopy: true as const } : {}), ...(goal === undefined ? {} : { untilCheck: goal }) }
+        const rest = { ...base, ...(inCopy ? { inCopy: true as const } : {}), ...(goal === undefined ? {} : { untilCheck: goal }), ...(nextInputs === undefined ? {} : { inputs: nextInputs }) }
         // Given: as given. Not given: kept only while the steps still line up.
         const handOffs = input.handOffs !== undefined
           ? keptHandOffs(input.handOffs, held.teammateId)

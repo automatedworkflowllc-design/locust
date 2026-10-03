@@ -104,6 +104,7 @@ const MAX_SHEET_FILE_BYTES = 8 * 1024 * 1024
 import { comparableLines, createEditCheck, runCheckCommand } from './edit-check.js'
 import { createTeammateStore, parsedCheckCommand, TeammateNameTakenError, isTeammateRoute } from './teammate-store.js'
 import { createRoutineStore } from './routine-store.js'
+import { createRoutineIO } from './routine-io.js'
 import { createRoomStore, exchangeOfRoomPost, recipientsOf } from './room-store.js'
 import { createRoomTasks } from './room-tasks.js'
 import type { RoomTasks } from './room-tasks.js'
@@ -226,6 +227,10 @@ import {
   ROUTINE_UPDATE_CHANNEL,
   ROUTINE_REMOVE_CHANNEL,
   ROUTINE_RUN_CHANNEL,
+  ROUTINE_FOLDER_CHANNEL,
+  ROUTINE_EXPORT_CHANNEL,
+  ROUTINE_IMPORT_PREVIEW_CHANNEL,
+  ROUTINE_IMPORT_CHANNEL,
   ROUTINE_SETTLE_CHANNEL,
   MEMORY_LIST_CHANNEL,
   MEMORY_ADD_CHANNEL,
@@ -2836,6 +2841,7 @@ if (!ownsSingleInstanceLock) {
     // so a replayed step is a real mission on the teammate's own route, in
     // its own ledger, recorded as started by the routine.
     const routines = createRoutineStore({ rootDirectory: app.getPath('userData') })
+    let routineFolderChosen: (path: string) => boolean = () => false
     const rooms = createRoomStore({ rootDirectory: app.getPath('userData') })
     // Comparisons (0.441, shared/compare.ts), kept beside the rooms, outside the ledger.
     const compares = createCompareStore({ rootDirectory: app.getPath('userData'), copyRoot: COPY_ROOT })
@@ -2843,6 +2849,7 @@ if (!ownsSingleInstanceLock) {
     const fileArrivals = createFileArrivals({ get projectFolder() { return workspacePath } })
     const routineCopies = createRoutineCopies()
     routineRunner = createRoutineRunner({
+      folderChosen: (path) => routineFolderChosen(path),
       arrivals: fileArrivals,
       // A routine that works in a copy (0.533): made from the folder the window is in.
       copies: routineCopies,
@@ -5531,6 +5538,34 @@ if (!ownsSingleInstanceLock) {
       return { ok: true, data: { post, refused: refusals } } as const
     })
 
+    const routineIO = createRoutineIO({
+      routines, team: () => teammates.list(), connectors: () => connectorReader.names(),
+      workspace: () => workspaceChosen ? memoryWorkspaceId : undefined,
+      run: (id, values) => routineRunner === undefined ? Promise.resolve(routineRejected('That routine could not be started.')) : routineRunner.run(id, undefined, values),
+      pickFolder: async () => {
+        const scripted = !app.isPackaged ? process.env.LOCUST_ROUTINE_FOLDER_PATH : undefined
+        if (scripted) return (await stat(scripted)).isDirectory() ? scripted : undefined
+        return (await dialog.showOpenDialog({ title: 'Choose a routine input folder', properties: ['openDirectory'] })).filePaths[0]
+      },
+      pickImport: async () => {
+        const scripted = !app.isPackaged ? process.env.LOCUST_ROUTINE_FILE_PATH : undefined
+        return scripted || (await dialog.showOpenDialog({ title: 'Import a routine', filters: [{ name: 'Locust routine', extensions: ['locust-routine.json'] }], properties: ['openFile'] })).filePaths[0]
+      },
+      pickExport: async (name) => {
+        const scripted = !app.isPackaged ? process.env.LOCUST_ROUTINE_FILE_PATH : undefined
+        return scripted || (await dialog.showSaveDialog({ title: 'Export a routine', defaultPath: join(app.getPath('downloads'), name), filters: [{ name: 'Locust routine', extensions: ['locust-routine.json'] }], properties: ['showOverwriteConfirmation'] })).filePath
+      }
+    })
+    routineFolderChosen = routineIO.folderWasChosen
+    const routineIORequest = async (event: Electron.IpcMainInvokeEvent, work: () => Promise<unknown>): Promise<unknown> => {
+      if (!fromOwnWindow(event)) return routineRejected('That routine request was rejected.')
+      try { return await work() } catch (error) { return routineRejected(error instanceof Error ? error.message : 'That routine request could not be completed.') }
+    }
+    ipcMain.handle(ROUTINE_FOLDER_CHANNEL, (event) => routineIORequest(event, () => routineIO.folder()))
+    ipcMain.handle(ROUTINE_EXPORT_CHANNEL, (event, request: unknown) => routineIORequest(event, () => routineIO.export(request)))
+    ipcMain.handle(ROUTINE_IMPORT_PREVIEW_CHANNEL, (event) => routineIORequest(event, () => routineIO.preview()))
+    ipcMain.handle(ROUTINE_IMPORT_CHANNEL, (event, request: unknown) => routineIORequest(event, () => routineIO.import(request)))
+
     ipcMain.handle(ROUTINE_LIST_CHANNEL, async (event) => {
       if (!fromOwnWindow(event)) return { ok: false, error: { code: 'ROUTINES_UNAVAILABLE', message: 'Routines are unavailable.' } } as const
       try {
@@ -5557,7 +5592,8 @@ if (!ownsSingleInstanceLock) {
           // Who takes each step (0.435); the store checks it.
           ...(input.handOffs === undefined ? {} : { handOffs: input.handOffs }),
           ...(input.inCopy === true ? { inCopy: true } : {}),
-          ...(input.untilCheck === undefined ? {} : { untilCheck: input.untilCheck })
+          ...(input.untilCheck === undefined ? {} : { untilCheck: input.untilCheck }),
+          ...(input.inputs === undefined ? {} : { inputs: input.inputs })
         })
         return { ok: true, data: { routine } } as const
       } catch (error) {
@@ -5577,7 +5613,8 @@ if (!ownsSingleInstanceLock) {
           ...(input.handOffs === undefined ? {} : { handOffs: input.handOffs }),
           ...(input.mode === undefined ? {} : { mode: input.mode }),
           ...(typeof input.inCopy === 'boolean' ? { inCopy: input.inCopy } : {}),
-          ...(input.untilCheck === undefined ? {} : { untilCheck: input.untilCheck })
+          ...(input.untilCheck === undefined ? {} : { untilCheck: input.untilCheck }),
+          ...(input.inputs === undefined ? {} : { inputs: input.inputs })
         })
         return { ok: true, data: { routine } } as const
       } catch (error) {
@@ -5597,11 +5634,11 @@ if (!ownsSingleInstanceLock) {
       }
     })
 
-    ipcMain.handle(ROUTINE_RUN_CHANNEL, async (event, routineId: unknown) => {
+    ipcMain.handle(ROUTINE_RUN_CHANNEL, async (event, routineId: unknown, values: unknown) => {
       if (!fromOwnWindow(event)) return routineRejected('The routine could not be started.')
       if (typeof routineId !== 'string' || routineRunner === undefined) return routineRejected('That routine could not be started.')
       if (!workspaceChosen) return routineRejected(NO_WORKSPACE_MESSAGE)
-      return routineRunner.run(routineId)
+      return routineIORequest(event, () => routineIO.run(routineId, values))
     })
 
     /*

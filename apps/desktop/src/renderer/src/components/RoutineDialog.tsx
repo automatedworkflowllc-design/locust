@@ -8,6 +8,9 @@ import { EVERY_HOURS_CHOICES, onceMoment, watchedFolderValid, WEEKDAYS_ONLY } fr
 import { stepTooLongNotice } from '../../../shared/step-budget.js'
 import { MAX_ROUTINE_STEPS } from '../routines.js'
 import { TeammateBot } from './TeammateBot.js'
+import { RoutineInputEditor } from './RoutineInputs.js'
+import { inputsRefusal } from '../../../shared/routine-inputs.js'
+import type { RoutineInput } from '../../../shared/routine-inputs.js'
 
 /** Monday first, as a week reads; 0 is Sunday, as the schedule counts. */
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0] as const
@@ -51,7 +54,8 @@ export function RoutineDialog({
   initialInCopy = false,
   initialGoalTries,
   checkCommand,
-  running = false
+  running = false,
+  initialInputs = []
 }: {
   /** A standing goal's fixes, when it has one (0.534). */
   readonly initialGoalTries?: number
@@ -69,6 +73,7 @@ export function RoutineDialog({
   readonly modeReadsOnly?: boolean
   /** A run of it is going now: that run keeps the steps it started with. */
   readonly running?: boolean
+  readonly initialInputs?: readonly RoutineInput[]
   readonly teammate: PublicTeammate | undefined
   /**
    * Who could run it, when the conversation had no owner to inherit.
@@ -102,6 +107,7 @@ export function RoutineDialog({
   readonly onSave: (input: {
     readonly name: string
     readonly steps: readonly string[]
+    readonly inputs?: readonly RoutineInput[]
     readonly schedule: RoutineSchedule | undefined
     /** Set only when the person changed what a run may do (0.530). */
     readonly readsOnly?: boolean
@@ -119,6 +125,8 @@ export function RoutineDialog({
   const title = editing ? 'Edit routine' : fresh ? 'New routine' : 'Save as routine'
   const [name, setName] = useState(initialName)
   const [steps, setSteps] = useState<readonly string[]>(initialSteps)
+  const [inputs, setInputs] = useState<readonly RoutineInput[]>(initialInputs)
+  const inputsChanged = JSON.stringify(inputs) !== JSON.stringify(initialInputs)
   // What a run may do to the folder (0.530): chosen here, not inherited unseen.
   const [readsOnly, setReadsOnly] = useState(modeReadsOnly === true)
   // Where a run that changes files works (0.533): the folder, or a copy the person keeps.
@@ -153,7 +161,9 @@ export function RoutineDialog({
   const kept = steps.filter((step) => step.trim().length > 0)
   // The first step too long to send, by its number on screen (A5.1).
   const tooLongAt = steps.findIndex((step) => stepTooLongNotice(step.trim()) !== undefined)
-  const canSave = name.trim().length > 0 && kept.length > 0 && tooLongAt < 0 && !busy && (!mustPick || runner.length > 0)
+  // Legacy routines may contain literal braces. Unchanged declarations stay untouched.
+  const inputError = inputsRefusal(inputs, editing && initialInputs.length === 0 && !inputsChanged ? undefined : kept)
+  const canSave = name.trim().length > 0 && kept.length > 0 && tooLongAt < 0 && inputError === undefined && !busy && (!mustPick || runner.length > 0)
   // Focus in, Tab held inside, Escape closes, focus back to the opener.
   const box = useRef<HTMLDivElement>(null)
   useModal(box, onCancel)
@@ -659,6 +669,8 @@ export function RoutineDialog({
             )}
           </div>
 
+          <RoutineInputEditor inputs={inputs} onChange={setInputs} />
+          {inputError !== undefined && <p className="lc-dialog__error">{inputError}</p>}
           {truncated && (
             <p className="lc-dialog__note lc-mono">
               This conversation had more turns than a routine can hold, so the first {String(MAX_ROUTINE_STEPS)} are here.
@@ -686,6 +698,7 @@ export function RoutineDialog({
               onSave({
                 name: name.trim(),
                 steps: kept.map((step) => step.trim()),
+                ...(editing ? inputsChanged ? { inputs } : {} : { inputs }),
                 schedule,
                 // Only when it moved: an unchanged choice keeps the mode exactly as saved.
                 ...(modeName === undefined || readsOnly === (modeReadsOnly === true) ? {} : { readsOnly }),

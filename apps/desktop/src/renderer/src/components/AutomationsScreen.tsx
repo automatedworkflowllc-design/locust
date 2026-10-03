@@ -45,6 +45,8 @@ export function AutomationsScreen({
   missions,
   onSaveRoutine,
   onNewRoutine,
+  onImportRoutine,
+  onExportRoutine,
   onSettleRoutine,
   folders = []
 }: {
@@ -52,6 +54,8 @@ export function AutomationsScreen({
   readonly onSettleRoutine?: (routineId: string, decision: 'keep' | 'discard' | 'open') => void
   /** A routine written here, step by step, rather than saved from a conversation (0.530). */
   readonly onNewRoutine?: () => void
+  readonly onImportRoutine?: () => void
+  readonly onExportRoutine?: (routineId: string) => void
   readonly routines: readonly PublicRoutine[]
   /** The folders Locust knows, so a routine's card names the one it runs in (0.512). */
   readonly folders?: readonly PublicFolder[]
@@ -128,11 +132,12 @@ export function AutomationsScreen({
                * to get one clean job. Claude's own Routines starts from a blank
                * task; so does this, with the same dialog.
                */
-              actions: (
+              actions: (<>
+                {onImportRoutine !== undefined && <button type="button" className="lc-ghostbutton" onClick={onImportRoutine}>Import routine</button>}
                 <button type="button" className="lc-ghostbutton" onClick={onNewRoutine}>
                   New routine
                 </button>
-              )
+              </>)
             })}
         meta={
           routines.length === 0
@@ -299,6 +304,7 @@ export function AutomationsScreen({
                   Run
                 </button>
                 <span className="lc-routinerow__meta">
+                  {onExportRoutine !== undefined && <button type="button" className="lc-ghostbutton" aria-label={`Export ${routine.name}`} onClick={() => onExportRoutine(routine.routineId)}>Export</button>}
                   {/*
                     * Run keeps its word; the other two become icons.
                     *

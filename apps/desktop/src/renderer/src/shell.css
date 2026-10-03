@@ -18539,3 +18539,23 @@ textarea {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+/* Routine inputs and import previews share the existing modal's scrolling body. */
+.lc-routineinputs label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+  margin-bottom: var(--lc-space-3);
+}
+.lc-routineinputs__entry {
+  min-width: 0;
+  margin: var(--lc-space-3) 0;
+  padding: var(--lc-space-3);
+  border: 1px solid var(--lc-border-hairline);
+  border-radius: 8px;
+}
+.lc-routineinputs output,
+.lc-routinepreview__step {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

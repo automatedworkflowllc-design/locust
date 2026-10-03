@@ -6,6 +6,8 @@ import type { PetRows } from './pets.js'
 
 import type { RoutineSchedule } from './routine-schedule.js'
 export type { RoutineSchedule } from './routine-schedule.js'
+import type { RoutineInput } from './routine-inputs.js'
+export type { RoutineInput, RoutineInputKind } from './routine-inputs.js'
 import type { MemoryScope } from './memory.js'
 export type { MemoryScope } from './memory.js'
 import type { Spend } from './spend.js'
@@ -488,6 +490,15 @@ export const ROUTINE_CREATE_CHANNEL = 'routines:create'
 export const ROUTINE_UPDATE_CHANNEL = 'routines:update'
 export const ROUTINE_REMOVE_CHANNEL = 'routines:remove'
 export const ROUTINE_RUN_CHANNEL = 'routines:run'
+/**
+ * A routine that asks for inputs (W7): a folder value only ever comes from this
+ * picker, and a routine travels as a `.locust-routine.json` file -- written by
+ * Export, read (as a preview that starts nothing) and then added by Import.
+ */
+export const ROUTINE_FOLDER_CHANNEL = 'routines:chooseFolder'
+export const ROUTINE_EXPORT_CHANNEL = 'routines:export'
+export const ROUTINE_IMPORT_PREVIEW_CHANNEL = 'routines:importPreview'
+export const ROUTINE_IMPORT_CHANNEL = 'routines:import'
 /**
  * A routine that works in a copy (0.533): its last run's changes, kept (written
  * into the folder), discarded, or the copy opened to look at first.
@@ -1591,6 +1602,11 @@ export interface PublicRoutine {
    * only "run 1 time" and offered Run again, as if it had gone fine.
    */
   readonly lastFailed?: string
+  /**
+   * What the routine asks for when it runs (W7): at most 12, each answering a
+   * `{{key}}` in the steps. Absent: it asks for nothing, as every routine did.
+   */
+  readonly inputs?: readonly RoutineInput[]
 }
 
 /** Keep going until the folder's check passes, at most this many fixes (0.534). */
@@ -1622,6 +1638,8 @@ export interface RoutineCreateRequest {
   readonly inCopy?: boolean
   /** Keep going until the check passes (0.534). */
   readonly untilCheck?: RoutineGoal
+  /** What it asks for when it runs (W7). */
+  readonly inputs?: readonly RoutineInput[]
 }
 
 export interface RoutineUpdateRequest {
@@ -1638,6 +1656,8 @@ export interface RoutineUpdateRequest {
   readonly inCopy?: boolean
   /** Keep going until the check passes (0.534); `null` stops after its steps; absent keeps it. */
   readonly untilCheck?: RoutineGoal | null
+  /** What it asks for (W7); `null` asks for nothing; absent keeps what it had. */
+  readonly inputs?: readonly RoutineInput[] | null
 }
 
 export type RoutineListResponse =
@@ -1869,6 +1889,53 @@ export type RoomPostResponse =
 export type RoutineRunResponse =
   | { readonly ok: true; readonly data: { readonly missionId: string; readonly runId: string } }
   | { readonly ok: false; readonly error: { readonly code: 'ROUTINE_REJECTED'; readonly message: string } }
+
+/** A folder chosen for a routine's input; the only way a folder value gets into a run (W7). */
+export type RoutineFolderResponse =
+  | { readonly ok: true; readonly data: { readonly path: string } }
+  | { readonly ok: false; readonly error: { readonly code: 'CANCELLED' | 'REJECTED'; readonly message: string } }
+
+/**
+ * Export a routine as a file (W7). A step that names an absolute path is not
+ * written until the person says what to do with it: `input` turns each path into a
+ * text input (a path can name a file too), `keep` writes it as it is.
+ */
+export interface RoutineExportRequest {
+  readonly routineId: string
+  readonly paths?: 'input' | 'keep'
+}
+export interface RoutineFlaggedPath {
+  /** The step, counting from 1. */
+  readonly step: number
+  readonly path: string
+}
+export type RoutineExportResponse =
+  | { readonly ok: true; readonly data: { readonly path?: string; readonly cancelled?: true } }
+  | { readonly ok: false; readonly error: { readonly code: 'ROUTINE_REJECTED'; readonly message: string } }
+  | { readonly ok: false; readonly error: { readonly code: 'ABSOLUTE_PATHS'; readonly message: string; readonly flagged: readonly RoutineFlaggedPath[] } }
+
+/** What a routine file holds, shown before anything is created (W7). */
+export interface RoutineImportPreview {
+  /** Names the file the host read, for the Import that follows. */
+  readonly token: string
+  readonly name: string
+  readonly steps: readonly string[]
+  readonly inputs: readonly RoutineInput[]
+  /** The role of whoever took each step where it was made; absent where it was the routine's own teammate. */
+  readonly handOffRoles: readonly (string | undefined)[]
+  readonly runtime?: string
+  /** Each connector the steps name, and whether this machine has it. */
+  readonly connectors: readonly { readonly name: string; readonly present: boolean }[]
+}
+export type RoutineImportPreviewResponse =
+  | { readonly ok: true; readonly data: { readonly preview?: RoutineImportPreview } }
+  | { readonly ok: false; readonly error: { readonly code: 'ROUTINE_REJECTED'; readonly message: string } }
+export interface RoutineImportRequest {
+  readonly token: string
+  /** Who is given it; the routine runs on their route, read-only until its owner changes that. */
+  readonly teammateId: string
+  readonly route: TeammateRoute
+}
 export type RuntimeAuthState = 'authenticated' | 'unauthenticated' | 'unknown' | 'not-applicable'
 export type RuntimeProbeStatus = 'ready' | 'not-installed' | 'auth-required' | 'offline' | 'probe-failed'
 
@@ -3164,7 +3231,15 @@ export interface DesktopApi {
   updateRoutine(request: RoutineUpdateRequest): Promise<RoutineMutationResponse>
   removeRoutine(routineId: string): Promise<RoutineMutationResponse>
   /** Replay a routine: its first step starts now, each later step when the one before completes. */
-  runRoutine(routineId: string): Promise<RoutineRunResponse>
+  runRoutine(routineId: string, values?: Readonly<Record<string, string>>): Promise<RoutineRunResponse>
+  /** Pick a folder for a routine input: the only source a folder value is accepted from (W7). */
+  chooseRoutineFolder(): Promise<RoutineFolderResponse>
+  /** Write a routine as a `.locust-routine.json` file (W7). */
+  exportRoutine(request: RoutineExportRequest): Promise<RoutineExportResponse>
+  /** Choose a routine file and read it. Nothing is created and nothing runs (W7). */
+  previewRoutineImport(): Promise<RoutineImportPreviewResponse>
+  /** Add the previewed routine for a teammate: no schedule, nothing started (W7). */
+  importRoutine(request: RoutineImportRequest): Promise<RoutineMutationResponse>
   /** Keep, discard or open a copy routine's waiting changes (0.533). */
   settleRoutine(request: RoutineSettleRequest): Promise<RoutineSettleResponse>
   /** Answer a pending approval. Unknown or already-answered ids are ignored. */

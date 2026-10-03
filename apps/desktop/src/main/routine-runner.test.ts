@@ -10,6 +10,43 @@ const WREN: MissionPeerContext = {
   others: []
 }
 
+describe('W7: a routine settles its inputs before dispatch', () => {
+  const input = { key: 'topic', label: 'Topic', kind: 'text', required: true, default: 'default topic' } as const
+  it('sends the entered value, persists every filled step, and recovers the same words after an edit', async () => {
+    const saved = routine({ steps: ['Read {{topic}}', 'Report {{topic}}'], inputs: [input] })
+    const h = harness({ routines: [saved] })
+    const runner = createRoutineRunner(h.options)
+    expect((await runner.run(saved.routineId, undefined, { topic: 'entered $& {{topic}}' })).ok).toBe(true)
+    expect(h.starts[0]?.prompt).toBe('Read entered $& {{topic}}')
+    const held = await h.options.routines.get(saved.routineId)
+    expect(held?.execution?.steps).toEqual(['Read entered $& {{topic}}', 'Report entered $& {{topic}}'])
+    const changed = { ...held!, steps: ['changed', 'changed'], inputs: [{ ...input, default: 'changed' }] }
+    h.options.routines.get = async () => changed
+    h.phases.set('mission_1', 'completed')
+    await runner.onRunEnded({ missionId: 'mission_1' })
+    expect(h.starts[1]?.prompt).toBe('Report entered $& {{topic}}')
+  })
+  it('an automatic run sends defaults and required inputs without defaults emit a refusal with no dispatch', async () => {
+    const saved = routine({ schedule: { kind: 'every', hours: 1 }, steps: ['Read {{topic}}'], inputs: [input] })
+    const h = harness({ routines: [saved] })
+    expect(await createRoutineRunner(h.options).tick(new Date('2026-10-03T12:00:00Z'))).toEqual([saved.routineId])
+    expect(h.starts[0]?.prompt).toBe('Read default topic')
+    const missing = harness({ routines: [{ ...saved, inputs: [{ key: 'topic', label: 'Topic', kind: 'text', required: true }] }] })
+    expect(await createRoutineRunner(missing.options).tick(new Date('2026-10-03T12:00:00Z'))).toEqual([])
+    expect(missing.starts).toEqual([])
+    expect(missing.updates).toContainEqual(expect.objectContaining({ kind: 'routine-blocked', message: expect.stringContaining('cannot start on its own') }))
+  })
+  it('invalid or overlong values do not dispatch or create execution state', async () => {
+    const saved = routine({ steps: ['Read {{topic}}'], inputs: [input] })
+    const h = harness({ routines: [saved] })
+    const runner = createRoutineRunner(h.options)
+    expect((await runner.run(saved.routineId, undefined, { topic: 'a'.repeat(4001) })).ok).toBe(false)
+    expect((await runner.run(saved.routineId, undefined, { topic: 'two\nlines' })).ok).toBe(false)
+    expect(h.starts).toEqual([])
+    expect((await h.options.routines.get(saved.routineId))?.execution).toBeUndefined()
+  })
+})
+
 const routine = (overrides: Partial<PublicRoutine> = {}): PublicRoutine => ({
   routineId: 'rt_1',
   name: 'Nightly tidy',
