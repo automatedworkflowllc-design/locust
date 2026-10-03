@@ -11,6 +11,44 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.569.0 - 2026-10-03
+
+### New
+
+- **Remove several pets at once.** In a teammate's look, **Remove some…**
+  turns the Pets row into ticks; **Remove N** takes the ticked pets out of the
+  picker and off this computer. A pet a teammate wears keeps its files, so
+  their face stays until they get another look. **Show removed** lists them
+  again, and picking one brings it back.
+- **A message waiting for its turn survives closing Locust.** A message
+  queued behind a running teammate ("Sends when Ash finishes") is kept with
+  its conversation. When you open Locust again it is offered back with Edit,
+  Discard and Send. It is never sent on its own after a relaunch.
+- **Start Claude Code sessions on this computer from claude.ai.** Settings >
+  AI agents has a switch, **Let me start sessions on this computer from
+  claude.ai**, that runs Claude Code's Remote Control in your project folder
+  while Locust is open and shows what Claude Code prints. It needs your
+  claude.ai sign-in; if Claude Code asks you to trust the folder, Locust opens
+  Claude Code in a terminal for you to answer, and never answers for you. It
+  turns off when you quit Locust.
+
+### Improved
+
+- **The line under a running teammate says what it is doing.** Like Claude
+  Code's status line, it now leads with the step under way: "Reading
+  notes.txt", "Running npm test", "Editing summary.txt", or the plan's
+  current step, with the turn's clock beside it. It said "Working…" for most
+  of a run before.
+
+### Fixed
+
+- **An older comparison shows every model's answer.** Opening a comparison
+  from a day or more ago showed only the first column's answer; the others
+  read "No answer was recorded" though their answers were saved. Every column
+  is read now.
+- **Home works from a comparison.** Clicking Home while a comparison was open
+  did nothing when the comparison had no teammate.
+
 ## 0.568.0 - 2026-10-03
 
 ### Improved
