@@ -65,7 +65,7 @@ export function windowsCommandLine(path: string, prefix: readonly string[], acti
   const tail = action === 'start'
     ? [...choiceArgs(options.choice), '--cloud', `"%${TASK_VARIABLE}%"`].join(' ')
     : action === 'send'
-      ? `-p --cloud ${session ?? ''} "%${TASK_VARIABLE}%"`
+      ? `-p --cloud ${session ?? ''} --output-format json "%${TASK_VARIABLE}%"`
       : action === 'read'
         ? `--teleport ${session ?? ''} --worktree ${worktree ?? ''}`
         : session === undefined ? '--teleport' : `--teleport ${session}`
@@ -186,7 +186,7 @@ export interface ClaudeCloudOptions {
   /** `git status --porcelain` in a folder, untracked files counted as Claude Code counts them (measured 10/02: 128 "changed", nearly all untracked): undefined when it is not a git checkout. */
   readonly gitChanges?: (folder: string) => Promise<number | undefined>
   /** A command whose output is wanted (the follow-up, which needs no terminal). */
-  readonly exec?: (file: string, args: readonly string[], options: { readonly cwd: string; readonly env: NodeJS.ProcessEnv; readonly verbatim: boolean }) => Promise<{ readonly code: number; readonly output: string }>
+  readonly exec?: (file: string, args: readonly string[], options: { readonly cwd: string; readonly env: NodeJS.ProcessEnv; readonly verbatim: boolean }) => Promise<{ readonly code: number; readonly output: string; readonly stdout?: string }>
   /** Where Claude Code keeps its transcripts (`projects/`). */
   readonly claudeHome?: string
   readonly git?: GitRun
@@ -483,8 +483,17 @@ export function createClaudeCloud(options: ClaudeCloudOptions) {
       const env = { ...process.env, ...(launch.env ?? {}), [TASK_VARIABLE]: text }
       const ran = platform === 'win32'
         ? await exec('cmd.exe', [windowsCommandLine(launch.file, launch.prefix, 'send', { session: session.sessionId, stay: false })], { cwd: session.folder, env, verbatim: true })
-        : await exec(launch.file, [...launch.prefix, '-p', '--cloud', session.sessionId, text], { cwd: session.folder, env, verbatim: false })
-      if (ran.code === 0 && /Sent to cloud session/i.test(ran.output)) return { ok: true }
+        : await exec(launch.file, [...launch.prefix, '-p', '--cloud', session.sessionId, '--output-format', 'json', text], { cwd: session.folder, env, verbatim: false })
+      // W3: the documented receipt on stdout confirms the send; stderr and terminal prose do not.
+      let receipt: Record<string, unknown> | undefined
+      for (const line of (ran.stdout ?? ran.output).trim().split(/\r?\n/).reverse()) {
+        try {
+          const value: unknown = JSON.parse(line)
+          if (typeof value === 'object' && value !== null && !Array.isArray(value)) { receipt = value as Record<string, unknown>; break }
+        } catch { /* A diagnostic line is not a send receipt. */ }
+      }
+      if (receipt?.ok === false && typeof receipt.error === 'string') return { ok: false, message: receipt.error }
+      if (ran.code === 0 && receipt?.ok === true && receipt.session_id === session.sessionId) return { ok: true }
       const said = /Error:[ \t]*(.+)/.exec(plainTerminalText(ran.output))?.[1]?.trim()
       return { ok: false, message: said === undefined ? 'Claude Code did not send that. Send it from claude.ai or the Claude app.' : `Claude Code did not send that: ${said.slice(0, 300)}` }
     },
@@ -523,15 +532,16 @@ const gitRun: GitRun = (args, cwd, input) => new Promise((resolve) => {
 })
 
 /** A command's exit code and everything it printed. */
-async function execOutput(file: string, args: readonly string[], options: { readonly cwd: string; readonly env: NodeJS.ProcessEnv; readonly verbatim: boolean }): Promise<{ readonly code: number; readonly output: string }> {
+async function execOutput(file: string, args: readonly string[], options: { readonly cwd: string; readonly env: NodeJS.ProcessEnv; readonly verbatim: boolean }): Promise<{ readonly code: number; readonly output: string; readonly stdout: string }> {
   return new Promise((resolve) => {
     let output = ''
+    let stdout = ''
     const child = spawn(file, [...args], { cwd: options.cwd, env: options.env, windowsHide: true, windowsVerbatimArguments: options.verbatim, stdio: ['ignore', 'pipe', 'pipe'] })
     const guard = setTimeout(() => child.kill(), 120_000)
-    child.stdout.on('data', (chunk: Buffer) => { output += chunk.toString('utf8') })
+    child.stdout.on('data', (chunk: Buffer) => { const text = chunk.toString('utf8'); output += text; stdout += text })
     child.stderr.on('data', (chunk: Buffer) => { output += chunk.toString('utf8') })
-    child.once('error', () => { clearTimeout(guard); resolve({ code: -1, output }) })
-    child.once('close', (code) => { clearTimeout(guard); resolve({ code: code ?? -1, output }) })
+    child.once('error', () => { clearTimeout(guard); resolve({ code: -1, output, stdout }) })
+    child.once('close', (code) => { clearTimeout(guard); resolve({ code: code ?? -1, output, stdout }) })
   })
 }
 

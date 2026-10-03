@@ -120,7 +120,7 @@ describe('a session Locust knows', () => {
   const known = async (gitChanges?: number) => {
     windows.length = 0
     const execs: { file: string; args: readonly string[]; env: NodeJS.ProcessEnv }[] = []
-    let reply = { code: 0, output: 'Sent to cloud session.\nSession ID: session_01Jed6HzK3Np9xeyKnSQ7oBG\n' }
+    let reply = { code: 0, output: '{"ok":true,"session_id":"session_01Jed6HzK3Np9xeyKnSQ7oBG"}\n' }
     const cloud = createClaudeCloud({
       discover: claude, storePath: await store(), platform: 'win32', run: fakeSpawn, terminal: terminalDrawing(CREATED).terminal,
       gitChanges: async () => gitChanges,
@@ -149,7 +149,7 @@ describe('a session Locust knows', () => {
     const { cloud, id, execs } = await known(0)
     expect(await cloud.send(id, 'Also run the tests & report')).toEqual({ ok: true })
     expect(execs[0]!.file).toBe('cmd.exe')
-    expect(execs[0]!.args[0]).toBe(`/d /c ""C:\\npm\\claude.cmd" -p --cloud session_01Jed6HzK3Np9xeyKnSQ7oBG "%${TASK_VARIABLE}%""`)
+    expect(execs[0]!.args[0]).toBe(`/d /c ""C:\\npm\\claude.cmd" -p --cloud session_01Jed6HzK3Np9xeyKnSQ7oBG --output-format json "%${TASK_VARIABLE}%""`)
     expect(execs[0]!.env[TASK_VARIABLE]).toBe('Also run the tests & report')
   })
 
