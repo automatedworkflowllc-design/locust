@@ -107,7 +107,8 @@ try {
   check('the follow-up is answered from the same conversation', second.answeredAt !== undefined && second.settledAt !== undefined, second.text.slice(-300))
   // Copy, as Claude Code's (0.545): one per turn, hidden until the reply is hovered. Never pressed here (the clipboard is the person's).
   const copies = JSON.parse(String(await drive.evaluate(`JSON.stringify([...document.querySelectorAll('button[aria-label="Copy this reply"]')].map((b) => getComputedStyle(b).opacity))`)))
-  const box = JSON.parse(String(await drive.evaluate(`JSON.stringify((() => { const r = document.querySelector('.lc-agentline__body')?.getBoundingClientRect(); return r ? { x: r.left + 20, y: r.top + 8 } : null })())`)))
+  // The REPLY, in view: a free model's plan card can be the first body in the turn (0.570), and a long second reply scrolls the first out.
+  const box = JSON.parse(String(await drive.evaluate(`(async () => { const body = [...document.querySelectorAll('.lc-agentline__body')].find((one) => /Thursdays/.test(one.innerText)); body?.scrollIntoView({ block: 'center' }); await new Promise((r) => setTimeout(r, 400)); const r = body?.getBoundingClientRect(); return JSON.stringify(r ? { x: r.left + 20, y: r.top + 8 } : null) })()`)))
   if (box !== null) await drive.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: box.x, y: box.y })
   await sleep(400)
   const shownOnHover = String(await drive.evaluate(`getComputedStyle(document.querySelector('button[aria-label="Copy this reply"]')).opacity`))
