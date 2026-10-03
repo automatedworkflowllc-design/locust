@@ -562,7 +562,9 @@ export function createClaudeCloud(options: ClaudeCloudOptions) {
         } catch { /* A diagnostic line is not a send receipt. */ }
       }
       if (receipt?.ok === false && typeof receipt.error === 'string') return { ok: false, message: receipt.error }
-      if (ran.code === 0 && receipt?.ok === true && receipt.session_id === session.sessionId) return { ok: true }
+      // The receipt's session_id is not compared: Claude Code may name the session in another form (an id
+      // prefix, a URL slug), and a false "not sent" invites a resend of something already sent.
+      if (ran.code === 0 && receipt?.ok === true) return { ok: true }
       const said = /Error:[ \t]*(.+)/.exec(plainTerminalText(ran.output))?.[1]?.trim()
       return { ok: false, message: said === undefined ? 'Claude Code did not send that. Send it from claude.ai or the Claude app.' : `Claude Code did not send that: ${said.slice(0, 300)}` }
     },

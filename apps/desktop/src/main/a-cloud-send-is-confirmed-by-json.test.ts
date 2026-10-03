@@ -26,6 +26,10 @@ it.each(['win32', 'darwin'] as const)('A cloud send requests JSON and accepts th
   expect(result).toEqual({ ok: true })
   expect(calls[0]!.join(' ')).toContain('--output-format json')
 })
+it('A success receipt is trusted whatever form its session id takes, so a sent message is never offered again.', async () => {
+  expect((await send({ code: 0, output: '{"ok":true,"session_id":"cse_other_form"}\n' })).result).toEqual({ ok: true })
+  expect((await send({ code: 0, output: '{"ok":true}\n' })).result).toEqual({ ok: true })
+})
 it.each(['Session archived', 'Session not found'])('A failed JSON send displays %s verbatim.', async (error) => {
   expect((await send({ code: 1, output: JSON.stringify({ ok: false, session_id: sessionId, error }) })).result).toEqual({ ok: false, message: error })
 })
