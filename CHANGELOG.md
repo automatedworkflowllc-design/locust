@@ -11,6 +11,19 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.565.0 - 2026-10-03
+
+### Improved
+
+- **A tidier Pets row.** The small arrow on every pet not yet on this computer
+  is gone -- on a new computer that was an arrow on all 21. One line under the
+  pets says it instead: each downloads from openpets.dev the first time it is
+  picked.
+- **Dark pets show in the picker too.** A pet drawn in black, like Reaper, now
+  has a faint light edge in its tile, as it already had on a teammate's face.
+- **A bigger face beside the name** in a new or edited teammate, so the look
+  you pick is easier to see.
+
 ## 0.564.0 - 2026-10-03
 
 ### Improved
