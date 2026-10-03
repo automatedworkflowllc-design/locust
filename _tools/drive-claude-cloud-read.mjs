@@ -98,6 +98,21 @@ try {
   check('its change is shown as a diff of the file it made', read.files.includes('cloud-read-check.txt') && read.diffRows > 0, JSON.stringify(read.files))
   check('the folder is untouched before Apply', !existsSync(applied))
   check('Check again is offered', /Check again/.test(read.text))
+  // W4: watch this stored session twice. No cloud sends. The check timestamp
+  // comes from the row's successful reading, not from this drive's fixture.
+  const checkedAt = () => drive.evaluate(`document.querySelector('[data-cloud-checked-at]')?.getAttribute('data-cloud-checked-at') ?? ''`)
+  let lastChecked = String(await checkedAt())
+  check('Watch is offered', await drive.evaluate(click('/^Watch$/', "document.querySelector('.lc-cloudtask')")))
+  await drive.capture('Watching the stored session', () => drive.evaluate(`document.querySelector('.lc-cloudtask')?.innerText ?? ''`))
+  for (let pass = 1; pass <= 2; pass += 1) {
+    await drive.waitFor(`(() => { const at = document.querySelector('[data-cloud-checked-at]')?.getAttribute('data-cloud-checked-at'); return !!at && at !== ${JSON.stringify(lastChecked)} })()`, { timeoutMs: 240_000, what: `watch read ${String(pass)}` })
+    const nextChecked = String(await checkedAt())
+    check(`watch read ${String(pass)} landed in the row`, nextChecked !== lastChecked && !Number.isNaN(Date.parse(nextChecked)), nextChecked)
+    lastChecked = nextChecked
+    await drive.capture(`Watch read ${String(pass)}`, () => drive.evaluate(`document.querySelector('.lc-cloudtask')?.innerText ?? ''`))
+  }
+  const watched = String(await drive.evaluate(`document.querySelector('.lc-cloudtask')?.innerText ?? ''`))
+  check('two unchanged reads stop Watch and show when it was updated', /Watch stopped after two reads with nothing new/.test(watched) && /Updated \d+ min ago/.test(watched), watched.slice(-500))
   await drive.evaluate(click('/^Apply to this folder/', "document.querySelector('.lc-cloudtask')"))
   await drive.waitFor(`/Applied|does not apply|could not be applied|Check it again/.test(document.querySelector('.lc-cloudtask')?.innerText ?? '')`, { timeoutMs: 60_000, what: 'the Apply answer' })
   const after = String(await drive.capture('Applied', () => drive.evaluate(`document.querySelector('.lc-cloudtask')?.innerText.replace(/\\s+/g, ' ').trim() ?? ''`)))

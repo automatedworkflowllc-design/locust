@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import type { ClaudeCloudReading, PublicClaudeCloudSession, PublicCloudFolder, PublicCloudTask, PublicCloudWhere } from '../../../shared/ipc.js'
 import { fileCounts, parseUnifiedDiff } from '../diff.js'
 import { agoLabel } from '../teammateWork.js'
+import { cloudUpdatedLabel, startCloudWatch } from '../cloudWatch.js'
 import { DiffView } from './DiffView.js'
 import { Icon } from './Icon.js'
 import { AgentText } from './ThreadItems.js'
@@ -307,18 +308,50 @@ function ClaudeCloudRow({
   const [checking, setChecking] = useState(false)
   const [applying, setApplying] = useState(false)
   const [applied, setApplied] = useState(false)
-  const check = (): void => {
-    if (checking) return
+  const [expanded, setExpanded] = useState(false)
+  const [watching, setWatching] = useState(false)
+  const [clock, setClock] = useState(Date.now())
+  const readingRef = useRef(reading)
+  const pending = useRef<Promise<ClaudeCloudReading> | undefined>(undefined)
+  const readOnce = (): Promise<ClaudeCloudReading> => {
+    if (pending.current !== undefined) return pending.current
     setChecking(true)
     setSaid(undefined)
-    void onCheck(session.id).then((answer) => {
+    const request = onCheck(session.id).catch(() => ({ ok: false as const, message: 'Claude Code could not be reached to read it. Check again.' })).then((answer) => {
       setChecking(false)
       setApplied(false)
       setReading(answer)
+      readingRef.current = answer
+      pending.current = undefined
+      return answer
     })
+    pending.current = request
+    return request
   }
+  const readOnceRef = useRef(readOnce)
+  readOnceRef.current = readOnce
+  useEffect(() => {
+    if (!watching || !expanded) return
+    return startCloudWatch({
+      check: () => readOnceRef.current(),
+      ...(readingRef.current === undefined ? {} : { initial: readingRef.current }),
+      onReading: () => undefined,
+      onStopped: (reason) => {
+        setWatching(false)
+        setSaid(reason === 'time' ? 'Watch stopped after 30 minutes.' : reason === 'unchanged' ? 'Watch stopped after two reads with nothing new.' : 'Watch stopped because the session could not be read. Check again; the last reading stays here.')
+      }
+    })
+  }, [watching, expanded, session.id])
+  useEffect(() => {
+    if (!expanded) return
+    setClock(Date.now())
+    const timer = setInterval(() => setClock(Date.now()), 60_000)
+    return () => clearInterval(timer)
+  }, [expanded])
+  const check = (): void => { setExpanded(true); void readOnce() }
   const apply = (): void => {
     if (applying) return
+    setWatching(false)
     setApplying(true)
     void onApply(session.id).then((problem) => {
       setApplying(false)
@@ -362,9 +395,15 @@ function ClaudeCloudRow({
       {session.note !== undefined && <p className="lc-cloudtask__note">{session.note}</p>}
       <div className="lc-cloudtask__actions">
         {known && (
+          <>
           <button type="button" className="lc-primarybutton" disabled={checking} onClick={check} title="Claude Code brings the session in out of sight, in a worktree of its own; this folder is not touched">
             {checking ? 'Reading it…' : read === undefined ? 'Show what it did' : 'Check again'}
           </button>
+          <button type="button" className="lc-button" aria-pressed={watching} disabled={applying} onClick={() => { setExpanded(true); setWatching((on) => !on) }} title="Read every 90 seconds; stops after two unchanged reads, 30 minutes, or when you hide this row">
+            {watching ? 'Stop watching' : 'Watch'}
+          </button>
+          {expanded && <button type="button" className="lc-button" onClick={() => { setExpanded(false); setWatching(false) }}>Hide what it did</button>}
+          </>
         )}
         <button type="button" className={known ? 'lc-button' : 'lc-primarybutton'} onClick={() => onOpenWeb(session.url)} title={known ? 'This session, on claude.ai' : 'Your Claude Code sessions, in your browser'}>
           See it on claude.ai
@@ -381,9 +420,10 @@ function ClaudeCloudRow({
           <Icon name="close" size={13} />
         </button>
       </div>
-      {reading?.ok === false && <p className="lc-cloudtask__note" role="alert">{reading.message}</p>}
-      {read !== undefined && (
+      {expanded && reading?.ok === false && <p className="lc-cloudtask__note" role="alert">{reading.message}</p>}
+      {expanded && read !== undefined && (
         <div className="lc-cloudtask__read">
+          <p className="lc-cloudtask__note" role="status" data-cloud-checked-at={read.checkedAt}>{cloudUpdatedLabel(read.checkedAt, clock)}</p>
           {(read.exchanges.length > 0 || read.note === undefined) && (
             <p className="lc-cloudtask__note">
               {read.exchanges.length === 0

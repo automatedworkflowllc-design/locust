@@ -334,6 +334,7 @@ export function createClaudeCloud(options: ClaudeCloudOptions) {
     return diff.code === 0 && diff.stdout.trim().length > 0 ? diff.stdout : undefined
   }
 
+  const checks = new Map<string, Promise<ClaudeCloudReading>>()
   return {
     /**
      * WHAT THE SESSION DID, READ HERE (0.558). Colin, 2026-10-02: "why cant we
@@ -347,65 +348,72 @@ export function createClaudeCloud(options: ClaudeCloudOptions) {
      * Every check is a fresh teleport; nothing polls. It makes no model call.
      */
     async check(id: string): Promise<ClaudeCloudReading> {
-      const session = (await read()).find((entry) => entry.id === id)
-      if (session === undefined) return { ok: false, message: 'Locust does not know that cloud session any more.' }
-      if (session.sessionId === undefined) return { ok: false, message: 'Locust does not know this session’s id, so it cannot read it here. See it on claude.ai.' }
-      if (platform !== 'win32' || options.terminal === undefined) return { ok: false, message: 'Reading a cloud session here works on Windows so far. See it on claude.ai, or bring it home.' }
-      const launch = await launchOf()
-      if (!launch.ok) return launch
-      const name = readingWorktreeName(session.id)
-      const where = await worktreeOf(session.folder, name)
-      if (where === undefined) return { ok: false, message: 'This folder is not a git checkout, so Claude Code cannot bring the session into it. See it on claude.ai.' }
-      await removeReading(session.folder, name)
-      const began = Date.now()
-      const drawn = await options.terminal({
-        line: `cmd.exe ${windowsCommandLine(launch.file, launch.prefix, 'read', { session: session.sessionId, stay: false, worktree: name })}`,
-        cwd: session.folder,
-        // Run from inside Claude Code (a drive, a teammate), its markers would turn transcript saving off.
-        env: { ...withoutClaudeMarkers(process.env), ...(launch.env ?? {}) },
-        seconds: 120,
-        stopWhen: `${ASKS_THE_PERSON}|Filename too long`,
-        // Done when its transcript is written: measured 10/02, that comes a few seconds AFTER it says
-        // "Session resumed", and ending it at the words left none. Its prompt footer comes earlier still.
-        stopWhenWritten: transcriptFolderOf(claudeHome, where)
-      }).catch(() => ({ ok: false as const }))
-      if (!drawn.ok) return { ok: false, message: 'Claude Code could not be run to read it. See it on claude.ai.' }
-      const said = readTeleport(drawn.drawn)
-      if (said.problem !== undefined) {
+      const current = checks.get(id)
+      if (current !== undefined) return current
+      const pending = (async (): Promise<ClaudeCloudReading> => {
+        const session = (await read()).find((entry) => entry.id === id)
+        if (session === undefined) return { ok: false, message: 'Locust does not know that cloud session any more.' }
+        if (session.sessionId === undefined) return { ok: false, message: 'Locust does not know this session’s id, so it cannot read it here. See it on claude.ai.' }
+        if (platform !== 'win32' || options.terminal === undefined) return { ok: false, message: 'Reading a cloud session here works on Windows so far. See it on claude.ai, or bring it home.' }
+        const launch = await launchOf()
+        if (!launch.ok) return launch
+        const name = readingWorktreeName(session.id)
+        const where = await worktreeOf(session.folder, name)
+        if (where === undefined) return { ok: false, message: 'This folder is not a git checkout, so Claude Code cannot bring the session into it. See it on claude.ai.' }
         await removeReading(session.folder, name)
-        return said.problem === 'asks'
-          ? { ok: false, message: 'Claude Code asks whether you trust this folder first. Open Claude Code in this folder once and answer it, then check again.' }
-          : { ok: false, message: 'Git could not check the session out here: some of its paths are longer than Windows allows. Turning on long paths for this repository fixes it: git config core.longpaths true' }
-      }
-      let path: string | undefined
-      for (let tries = 0; tries < 10 && path === undefined; tries += 1) {
-        path = await transcriptFor(name, began)
-        if (path === undefined) await new Promise((done) => setTimeout(done, 500))
-      }
-      // Measured 10/02: in two runs of six the session came in (its branch checked out) but no
-      // transcript was saved within two minutes, for no reason it drew. Its change is still shown.
-      const home = await stat(where).then((found) => found.isDirectory(), () => false)
-      if (path === undefined && !home) {
-        await removeReading(session.folder, name)
-        return { ok: false, message: said.error === undefined ? 'Claude Code did not bring the session in. See it on claude.ai.' : `Claude Code did not bring the session in: ${said.error}` }
-      }
-      const exchanges = (path === undefined ? [] as readonly TerminalExchange[] : await exchangesOf(path).catch(() => [] as readonly TerminalExchange[])).slice(-MAX_EXCHANGES).map((exchange) => ({
-        prompt: exchange.prompt.slice(0, 4_000),
-        ...(exchange.answer === undefined ? {} : { answer: exchange.answer.slice(0, 16_000) }),
-        at: exchange.finishedAt,
-        ...(exchange.model === undefined ? {} : { model: exchange.model })
-      }))
-      const change = said.noBranch ? undefined : await changeIn(where, session.folder).catch(() => undefined)
-      const checkedAt = (options.now?.() ?? new Date()).toISOString()
-      return {
-        ok: true,
-        exchanges,
-        checkedAt,
-        ...(change === undefined ? {} : change.length > MAX_DIFF ? { changeTooBig: true } : { diff: change }),
-        ...(said.noBranch
-          ? { note: 'Claude Code could not check out its branch, so there is no change to show here. A session that changed nothing has none.' }
-          : path === undefined ? { note: 'Claude Code brought it in but did not save its conversation this time. Check again to read it.' } : {})
-      }
+        const began = Date.now()
+        const drawn = await options.terminal({
+          line: `cmd.exe ${windowsCommandLine(launch.file, launch.prefix, 'read', { session: session.sessionId, stay: false, worktree: name })}`,
+          cwd: session.folder,
+          // Run from inside Claude Code (a drive, a teammate), its markers would turn transcript saving off.
+          env: { ...withoutClaudeMarkers(process.env), ...(launch.env ?? {}) },
+          seconds: 120,
+          stopWhen: `${ASKS_THE_PERSON}|Filename too long`,
+          // Done when its transcript is written: measured 10/02, that comes a few seconds AFTER it says
+          // "Session resumed", and ending it at the words left none. Its prompt footer comes earlier still.
+          stopWhenWritten: transcriptFolderOf(claudeHome, where)
+        }).catch(() => ({ ok: false as const }))
+        if (!drawn.ok) return { ok: false, message: 'Claude Code could not be run to read it. See it on claude.ai.' }
+        const said = readTeleport(drawn.drawn)
+        if (said.problem !== undefined) {
+          await removeReading(session.folder, name)
+          return said.problem === 'asks'
+            ? { ok: false, message: 'Claude Code asks whether you trust this folder first. Open Claude Code in this folder once and answer it, then check again.' }
+            : { ok: false, message: 'Git could not check the session out here: some of its paths are longer than Windows allows. Turning on long paths for this repository fixes it: git config core.longpaths true' }
+        }
+        let path: string | undefined
+        for (let tries = 0; tries < 10 && path === undefined; tries += 1) {
+          path = await transcriptFor(name, began)
+          if (path === undefined) await new Promise((done) => setTimeout(done, 500))
+        }
+        // Measured 10/02: in two runs of six the session came in (its branch checked out) but no
+        // transcript was saved within two minutes, for no reason it drew. Its change is still shown.
+        const home = await stat(where).then((found) => found.isDirectory(), () => false)
+        if (path === undefined && !home) {
+          await removeReading(session.folder, name)
+          return { ok: false, message: said.error === undefined ? 'Claude Code did not bring the session in. See it on claude.ai.' : `Claude Code did not bring the session in: ${said.error}` }
+        }
+        const exchanges = (path === undefined ? [] as readonly TerminalExchange[] : await exchangesOf(path).catch(() => [] as readonly TerminalExchange[])).slice(-MAX_EXCHANGES).map((exchange) => ({
+          prompt: exchange.prompt.slice(0, 4_000),
+          ...(exchange.answer === undefined ? {} : { answer: exchange.answer.slice(0, 16_000) }),
+          at: exchange.finishedAt,
+          ...(exchange.model === undefined ? {} : { model: exchange.model })
+        }))
+        const change = said.noBranch ? undefined : await changeIn(where, session.folder).catch(() => undefined)
+        const checkedAt = (options.now?.() ?? new Date()).toISOString()
+        return {
+          ok: true,
+          exchanges,
+          checkedAt,
+          ...(change === undefined ? {} : change.length > MAX_DIFF ? { changeTooBig: true } : { diff: change }),
+          ...(said.noBranch
+            ? { note: 'Claude Code could not check out its branch, so there is no change to show here. A session that changed nothing has none.' }
+            : path === undefined ? { note: 'Claude Code brought it in but did not save its conversation this time. Check again to read it.' } : {})
+        }
+      })()
+      checks.set(id, pending)
+      try { return await pending }
+      finally { checks.delete(id) }
     },
     /** The change last read comes into the folder, not committed; the reading's worktree goes. */
     async apply(id: string): Promise<{ readonly ok: true } | { readonly ok: false; readonly message: string }> {
