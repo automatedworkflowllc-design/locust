@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.561.0 - 2026-10-03
+
+### Added
+
+- **Terminal faces.** Every teammate now wears a screen for a face, the way
+  Prompt does: a dark screen in its own colour, sized to its own shape, with
+  its eyes lit on it as code that says what it is doing. A bot with a mouth
+  has its mouth lit too. It is on by default; turn it off in Settings >
+  Appearance > Terminal faces and every teammate goes back to its own eyes.
+  The setting shows three bots wearing your choice beside it, and it is kept
+  across restarts.
+
 ## 0.560.0 - 2026-10-03
 
 ### Changed

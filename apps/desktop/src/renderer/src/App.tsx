@@ -182,6 +182,7 @@ import { homeRouteOf, isOwnRoute, modelDisplayName, rememberOwnModels, routeChro
 import { FeedbackDialog } from './components/FeedbackDialog.js'
 import { conversationText } from './feedback.js'
 import { withMessageDelta } from '../../shared/messageFragments.js'
+import { setTerminalFaces } from './botLook.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
 import type { Handoff } from './glances.js'
 import type { LiveActivity } from './faceState.js'
@@ -713,6 +714,9 @@ export default function App(): ReactElement {
   const [metal, setMetal] = useState<MetalPreset>('silver')
   const [metalStrength, setMetalStrength] = useState<MetalStrength>('standard')
   const [metalMotion, setMetalMotion] = useState<MetalMotion>('hover')
+  // Every bot's screen for a face (0.561); the bots read it from botLook, not from props.
+  const [terminalFaces, setTerminalFacesShown] = useState(true)
+  useEffect(() => setTerminalFaces(terminalFaces), [terminalFaces])
   const [metalBend, setMetalBend] = useState(true)
   // Declared HERE, right under its state, not a thousand lines down: a
   // helper above it closed over `runtimes` and was called during render,
@@ -1434,6 +1438,15 @@ export default function App(): ReactElement {
         setMetalMotion(before.metalMotion)
         setMetalBend(before.metalBend)
       })
+  }
+  /** Terminal faces on or off: shown at once, put back if the disk did not take it. */
+  const chooseTerminalFaces = (next: boolean): void => {
+    const before = terminalFaces
+    setTerminalFacesShown(next)
+    void window.desktop
+      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, replySize, layout, tube, terminalFaces: next })
+      .then((settings) => setTerminalFacesShown(settings.terminalFaces !== false))
+      .catch(() => setTerminalFacesShown(before))
   }
   // A3.3: this folder's check after edits, as the host last said it.
   const [checkCommand, setCheckCommand] = useState('')
@@ -2885,6 +2898,7 @@ export default function App(): ReactElement {
       if (settings.metalStrength !== undefined) setMetalStrength(settings.metalStrength)
       if (settings.metalMotion !== undefined) setMetalMotion(settings.metalMotion)
       if (settings.metalBend !== undefined) setMetalBend(settings.metalBend)
+      setTerminalFacesShown(settings.terminalFaces !== false)
         }
       })
       .catch(() => undefined)
@@ -7180,6 +7194,8 @@ export default function App(): ReactElement {
               metalMotion={metalMotion}
               metalBend={metalBend}
               onMetalChange={chooseMetal}
+              terminalFaces={terminalFaces}
+              onTerminalFacesChange={chooseTerminalFaces}
             onSwarmChange={(next) => {
                 // The same write the composer mark performs: optimistic, then
                 // reconciled with what the store actually saved.

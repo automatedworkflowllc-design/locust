@@ -52,9 +52,9 @@ describe('the settings pane', () => {
   })
 
   it('draws a setting that is one control as one line: name and description left, the control right (0.393, Appearance 0.394)', () => {
-    // Six again since 0.510: Finances (0.501) was shelved.
-    expect(SCREENS.split('lc-settings__section lc-settings__section--line').length - 1).toBe(6)
-    for (const name of ['Swarm', 'Auto mode', 'Plans', 'Reply text size', 'Sidebar', 'Boot screen']) {
+    // Six again since 0.510: Finances (0.501) was shelved. Seven with Terminal faces (0.561).
+    expect(SCREENS.split('lc-settings__section lc-settings__section--line').length - 1).toBe(7)
+    for (const name of ['Swarm', 'Auto mode', 'Plans', 'Reply text size', 'Terminal faces', 'Sidebar', 'Boot screen']) {
       const at = SCREENS.indexOf(`<h2 className="lc-settings__heading">${name}</h2>`)
       const line = SCREENS.lastIndexOf('<div className="lc-settingline">', at)
       expect(at - line, name).toBeLessThan(120)

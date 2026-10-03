@@ -2138,6 +2138,11 @@ export interface WorkspaceSettings {
   /** The cursor bend — the "gooey" dent that rides the ring. */
   readonly metalBend?: boolean
   /**
+   * Every bot wears a screen for a face, its eyes lit code (0.561); off, each
+   * keeps its own eyes. On unless it was switched off.
+   */
+  readonly terminalFaces?: boolean
+  /**
    * Teammates reply to each other on their own: a share to a teammate starts
    * a run for them, and their answer starts the sender's next turn. On by
    * default -- talking to each other is the point of having more than one --

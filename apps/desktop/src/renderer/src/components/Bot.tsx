@@ -17,6 +17,7 @@ import {
 import type { BotAvatarFace, BotAvatarState, BotAvatarType } from 'bot-avatars'
 import { anchorsOf, anchorVariables, paintedBounds, type BodyBox } from '../botAnchors.js'
 
+import { useTerminalFaces } from '../botLook.js'
 import { LOCUST_BOTS, isLocustBot } from '../locustBots.js'
 import type { LocustBotType } from '../locustBots.js'
 
@@ -209,7 +210,44 @@ export function eyeOpenness(lineWidth: number): number {
  * with the head; and the rig skips the face when the head is turned away, so
  * the back of the head is plain, as the mascot's is.
  */
-const VISOR = { halfWidth: 27, halfHeight: 17.5, corner: 12, y: 1.5 }
+export interface VisorBox {
+  readonly halfWidth: number
+  readonly halfHeight: number
+  readonly corner: number
+  /** Its centre's height on the face, in face units, y down. */
+  readonly y: number
+}
+
+/** Prompt's screen, the one drawn for it; a face with a mouth takes one that reaches down over the mouth. */
+export const EYES_VISOR: VisorBox = { halfWidth: 27, halfHeight: 17.5, corner: 12, y: 1.5 }
+export const MOUTH_VISOR: VisorBox = { halfWidth: 27, halfHeight: 21.5, corner: 12, y: 5.5 }
+
+/**
+ * EVERY SHAPE'S OWN SCREEN (0.561). Colin, 2026-10-03: "maybe im realizing
+ * they might all need a screen for a face, we can have it togglable in
+ * settings, terminal face". Twenty-two outlines, from a wide droid to a
+ * swarm's small head, so one screen size cannot fit them all: the screen is
+ * shrunk, from Prompt's, until it sits inside the body with a margin all
+ * round, tested point by point against the outline itself. `inside` answers
+ * for a point in the outline's own 0 to 100 units; the face's unit is
+ * faceScale of those, centred on faceX, faceY.
+ */
+export function fitVisor(
+  inside: (x: number, y: number) => boolean,
+  faceX: number,
+  faceY: number,
+  faceScale: number,
+  base: VisorBox,
+  margin = 3
+): VisorBox {
+  const scaled = (k: number): VisorBox => ({ halfWidth: base.halfWidth * k, halfHeight: base.halfHeight * k, corner: base.corner * k, y: base.y })
+  for (let k = 1; k > 0.5; k -= 0.025) {
+    const box = scaled(k)
+    const room = { ...box, halfWidth: box.halfWidth + margin, halfHeight: box.halfHeight + margin, corner: box.corner + margin }
+    if (visorOutline(room).every(([x, y]) => inside(faceX + x * faceScale, faceY + y * faceScale))) return box
+  }
+  return scaled(0.5)
+}
 /** The rig's face sphere, and the eye's turn past which the left eye is out of sight (asin(12.5 / 30) + 90deg). */
 const SPHERE = 30
 const LEFT_EYE_HIDDEN_AT = -1.12
@@ -219,8 +257,8 @@ const SCREEN_GLYPH_SCALE = 1.3
 const INKED_GLYPH_SCALE = 1.12
 
 /** A rounded rectangle's outline in face units, evenly spaced, to be laid on the sphere. */
-function visorOutline(): readonly (readonly [number, number])[] {
-  const { halfWidth: w, halfHeight: h, corner: r, y } = VISOR
+export function visorOutline(box: VisorBox): readonly (readonly [number, number])[] {
+  const { halfWidth: w, halfHeight: h, corner: r, y } = box
   const points: [number, number][] = []
   const edge = (ax: number, ay: number, bx: number, by: number, steps: number): void => {
     for (let i = 0; i < steps; i += 1) points.push([ax + ((bx - ax) * i) / steps, ay + ((by - ay) * i) / steps])
@@ -241,7 +279,6 @@ function visorOutline(): readonly (readonly [number, number])[] {
   arc(-w + r, y - h + r, Math.PI)
   return points
 }
-const VISOR_OUTLINE = visorOutline()
 
 /** A point of the face carried round the head's sphere, as the rig carries its eyes; past the edge, held at it. */
 export function onSphere(x: number, y: number, yaw: number, pitch: number): readonly [number, number] {
@@ -250,7 +287,10 @@ export function onSphere(x: number, y: number, yaw: number, pitch: number): read
   return [SPHERE * Math.sin(across) * Math.cos(down), -SPHERE * Math.sin(down)]
 }
 
-function hexRgb(hex: string): readonly [number, number, number] {
+/** A colour as red, green, blue: `#rgb`, `#rrggbb`, or `rgb()` as the library's shade gives it. */
+export function hexRgb(hex: string): readonly [number, number, number] {
+  const rgb = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/i.exec(hex.trim())
+  if (rgb !== null) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])]
   const h = hex.replace('#', '')
   const full = h.length === 3 ? [...h].map((c) => c + c).join('') : h.slice(0, 6)
   const n = Number.parseInt(full, 16)
@@ -258,14 +298,21 @@ function hexRgb(hex: string): readonly [number, number, number] {
 }
 
 /** A colour of the same hue at this saturation and lightness, 0 to 1. */
-export function sameHue(hex: string, saturation: number, lightness: number, alpha = 1): string {
-  const [r, g, b] = hexRgb(hex).map((c) => c / 255) as [number, number, number]
+export function sameHue(color: string, saturation: number, lightness: number, alpha = 1): string {
+  return `hsla(${Math.round(hueOf(color))}, ${Math.round(saturation * 100)}%, ${Math.round(lightness * 100)}%, ${alpha})`
+}
+
+/** A colour's hue in degrees, from `hsl()` as the library's shade gives it, or from a hex or `rgb()`. */
+export function hueOf(color: string): number {
+  const hsl = /^hsla?\(\s*(-?[\d.]+)/i.exec(color.trim())
+  if (hsl !== null) return ((Number(hsl[1]) % 360) + 360) % 360
+  const [r, g, b] = hexRgb(color).map((c) => c / 255) as [number, number, number]
   const max = Math.max(r, g, b)
   const min = Math.min(r, g, b)
   const d = max - min
   let hue = 0
   if (d > 0) hue = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4
-  return `hsla(${Math.round((hue * 60 + 360) % 360)}, ${Math.round(saturation * 100)}%, ${Math.round(lightness * 100)}%, ${alpha})`
+  return (hue * 60 + 360) % 360
 }
 
 export interface EyePaint {
@@ -274,6 +321,8 @@ export interface EyePaint {
   readonly screenOf: string | undefined
   /** Device pixels a face unit spans, for the glow. */
   readonly pixelsPerUnit: number
+  /** The screen's size on this face; Prompt's when not given. */
+  readonly visor?: VisorBox
 }
 
 /**
@@ -295,6 +344,8 @@ export function withGlyphEyes(
   const fill = own.fill.bind(context) as (...args: unknown[]) => void
   const translate = own.translate.bind(context)
   const screen = paint.screenOf
+  const box = paint.visor ?? EYES_VISOR
+  const visorShape = visorOutline(box)
   const lit = screen === undefined ? paint.ink : sameHue(screen, 0.95, 0.8)
   const glow = screen === undefined ? undefined : sameHue(screen, 1, 0.62, 0.85)
   const visorTop = screen === undefined ? '' : sameHue(screen, 0.42, 0.17)
@@ -323,13 +374,13 @@ export function withGlyphEyes(
   }
   const visor = (): void => {
     if (face === undefined) return
-    outline = VISOR_OUTLINE.map(([x, y]) => onSphere(x, y, yaw, pitch))
+    outline = visorShape.map(([x, y]) => onSphere(x, y, yaw, pitch))
     context.save()
     context.setTransform(face)
     context.globalAlpha = 1
     trace()
-    const top = onSphere(0, VISOR.y - VISOR.halfHeight, yaw, pitch)[1]
-    const bottom = onSphere(0, VISOR.y + VISOR.halfHeight, yaw, pitch)[1]
+    const top = onSphere(0, box.y - box.halfHeight, yaw, pitch)[1]
+    const bottom = onSphere(0, box.y + box.halfHeight, yaw, pitch)[1]
     const ground = context.createLinearGradient(0, top, 0, bottom)
     ground.addColorStop(0, visorTop)
     ground.addColorStop(1, visorBottom)
@@ -337,11 +388,11 @@ export function withGlyphEyes(
     fill()
     // The glass: a soft sheen across its top, and a fine lit rim.
     context.clip()
-    const sheen = context.createLinearGradient(0, top, 0, top + VISOR.halfHeight)
+    const sheen = context.createLinearGradient(0, top, 0, top + box.halfHeight)
     sheen.addColorStop(0, 'rgba(255,255,255,0.13)')
     sheen.addColorStop(1, 'rgba(255,255,255,0)')
     context.fillStyle = sheen
-    context.fillRect(-SPHERE, top, SPHERE * 2, VISOR.halfHeight)
+    context.fillRect(-SPHERE, top, SPHERE * 2, box.halfHeight)
     context.strokeStyle = 'rgba(255,255,255,0.16)'
     context.lineWidth = 1.6
     stroke()
@@ -401,8 +452,8 @@ export function withGlyphEyes(
     return stroke(...args)
   }
   ;(context as unknown as { fill: (...args: unknown[]) => void }).fill = (...args) => {
-    // A mouth is drawn in the face's ink too: it keeps the real one.
-    if (String(context.fillStyle).toLowerCase() === GLYPH_INK) context.fillStyle = paint.ink
+    // A mouth is drawn in the face's ink too: it keeps the real one, or is lit on a screen.
+    if (String(context.fillStyle).toLowerCase() === GLYPH_INK) context.fillStyle = screen === undefined ? paint.ink : lit
     return fill(...args)
   }
   return {
@@ -466,6 +517,23 @@ interface Outline {
   readonly faceScale: number
   /** Its face is a dark screen with lit eyes. */
   readonly screen: boolean
+}
+
+/** Each shape's screen, by shape and face, measured once against its outline. */
+const VISORS = new Map<string, VisorBox>()
+
+function visorOf(outline: Outline, face: BotAvatarFace, path: Path2D): VisorBox {
+  const base = face === 'mouth' ? MOUTH_VISOR : EYES_VISOR
+  // Prompt's screen was drawn for it; the rest are fitted.
+  if (outline.screen) return base
+  const key = `${outline.key}|${face}`
+  const known = VISORS.get(key)
+  if (known !== undefined) return known
+  const measure = document.createElement('canvas').getContext('2d')
+  if (measure === null) return base
+  const fitted = fitVisor((x, y) => measure.isPointInPath(path, x, y), outline.faceX, outline.faceY, outline.faceScale, base)
+  VISORS.set(key, fitted)
+  return fitted
 }
 
 export function outlineOf(type: BotType): Outline {
@@ -702,7 +770,9 @@ function RiggedBot({
   const rig = useRef<BotAvatarSim | null>(null)
   const glyphs = useRef(eyes)
   // A screen always has lit eyes: its resting ones when nothing else is asked.
-  const screen = outlineOf(type).screen
+  // Terminal faces on (Settings > Appearance), every shape wears one.
+  const terminal = useTerminalFaces()
+  const screen = outlineOf(type).screen || terminal
   glyphs.current = eyes ?? (screen ? SCREEN_RESTING_EYES : undefined)
   // What each frame reads, so a glance or the pointer never restarts the rig.
   const aim = useRef<{ follows: boolean; glance: Glance | undefined; glancedAt: number }>({
@@ -735,7 +805,8 @@ function RiggedBot({
     // Read at each frame, so a teammate's eyes change with what it does without restarting its rig.
     const painter = withGlyphEyes(context, () => glyphs.current, {
       ink,
-      screenOf: outline.screen ? body : undefined,
+      screenOf: screen ? body : undefined,
+      visor: visorOf(outline, face ?? outline.face, path),
       // The face is drawn at size / 100 a unit (times its own scale), at dpr device pixels a CSS pixel.
       pixelsPerUnit: (size / 100) * outline.faceScale * dpr
     })
@@ -806,7 +877,7 @@ function RiggedBot({
     }
     // A new state eases in on the running rig (below); only a still bot is
     // redrawn from scratch for one.
-  }, [type, size, color, face, seed, paused, paused ? state : undefined, jumpEvery, paused ? eyes?.join('') : undefined])
+  }, [type, size, color, face, seed, paused, paused ? state : undefined, jumpEvery, paused ? eyes?.join('') : undefined, screen])
 
   useEffect(() => {
     if (!paused) rig.current?.setState(state)
@@ -848,6 +919,8 @@ function RiggedBot({
     <canvas
       ref={ref}
       aria-hidden
+      // What it wears, for a drive to read beside the pixels: a screen, or its own eyes.
+      data-face={screen ? 'screen' : 'eyes'}
       onClick={interactive ? () => rig.current?.poke() : undefined}
       style={{
         display: 'block',

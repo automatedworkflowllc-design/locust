@@ -96,7 +96,7 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
     label: 'Appearance',
     group: 'Locust',
     icon: 'palette',
-    headings: ['Reply text size', 'Sidebar', 'Send button', 'Boot screen'],
+    headings: ['Reply text size', 'Terminal faces', 'Sidebar', 'Send button', 'Boot screen'],
     alsoKnownAs: {
       // 'font' moved to Reply text size, which is the only setting in this
       // app that changes one. The sidebar has never had a font control.
@@ -105,6 +105,7 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
       // Colin's own were 'text size', and nobody searches for 'prose'.
       'Send button': ['metal', 'chromatic', 'silver', 'gold', 'shine', 'shimmer', 'hover', 'send', 'button', 'effect', 'bend', 'gooey', 'animation', 'motion'],
       'Reply text size': ['text', 'text size', 'font', 'font size', 'bigger', 'smaller', 'type', 'reading'],
+      'Terminal faces': ['face', 'faces', 'screen', 'eyes', 'bot', 'bots', 'avatar', 'terminal', 'mascot', 'look'],
       'Boot screen': ['splash', 'startup', 'launch']
     }
   },

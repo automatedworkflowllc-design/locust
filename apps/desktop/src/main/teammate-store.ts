@@ -141,7 +141,7 @@ interface StoredFile {
 
 // Relay is ON unless switched off: teammates talking to each other is the
 // point of having more than one, and the hop cap is what bounds the spend.
-const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, interrupt: false, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full', replySize: 'standard', metal: 'silver', metalStrength: 'standard', metalMotion: 'hover', metalBend: false }
+const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, interrupt: false, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full', replySize: 'standard', metal: 'silver', metalStrength: 'standard', metalMotion: 'hover', metalBend: false, terminalFaces: true }
 
 /** A layout this build can draw, or the default. Never trusts the file. */
 function parsedLayout(value: unknown): LayoutPreference {
@@ -168,6 +168,11 @@ function oneOf<T extends string>(value: unknown, allowed: readonly T[], fallback
 const METAL_PRESETS = ['off', 'chromatic', 'silver', 'gold'] as const
 const METAL_STRENGTHS = ['subtle', 'standard', 'strong'] as const
 const METAL_MOTIONS = ['hover', 'always'] as const
+
+/** Terminal faces (0.561): on unless a stored false says off -- an absent key is the new default. */
+function parsedTerminalFaces(raw: unknown): boolean {
+  return !(typeof raw === 'object' && raw !== null && (raw as Record<string, unknown>).terminalFaces === false)
+}
 
 /** The send button's metal, read off whatever the file happens to hold. */
 function parsedMetal(raw: unknown): Pick<WorkspaceSettings, 'metal' | 'metalStrength' | 'metalMotion' | 'metalBend'> {
@@ -543,6 +548,7 @@ function parsedFile(text: string): StoredFile {
       ? parsedTube((rawSettings as Record<string, unknown>).tube)
       : 'full',
     ...parsedMetal(rawSettings),
+    terminalFaces: parsedTerminalFaces(rawSettings),
     replySize: typeof rawSettings === 'object' && rawSettings !== null
       ? parsedReplySize((rawSettings as Record<string, unknown>).replySize)
       : 'standard',
@@ -945,6 +951,7 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
             ? parsedLayout((settings as Record<string, unknown>).layout)
             : 'auto',
           ...parsedMetal(settings),
+          terminalFaces: parsedTerminalFaces(settings),
           replySize: typeof settings === 'object' && settings !== null
             ? parsedReplySize((settings as Record<string, unknown>).replySize)
             : 'standard',

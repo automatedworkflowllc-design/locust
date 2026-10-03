@@ -367,7 +367,7 @@ describe('workspace settings', () => {
       expect((await teammates.readSettings()).relay).toBe(true)
     }
     await teammates.writeSettings({ swarm: false, relay: false })
-    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full', replySize: 'standard', metal: 'silver', metalStrength: 'standard', metalMotion: 'hover', metalBend: false })
+    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full', replySize: 'standard', metal: 'silver', metalStrength: 'standard', metalMotion: 'hover', metalBend: false, terminalFaces: true })
   })
 
   // L19 (the code review): a write replaced the whole settings object, so a
@@ -385,11 +385,11 @@ describe('workspace settings', () => {
 
   it('defaults swarm off and persists a change', async () => {
     const { root, store: teammates } = await store()
-    expect(await teammates.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full', replySize: 'standard', metal: 'silver', metalStrength: 'standard', metalMotion: 'hover', metalBend: false })
+    expect(await teammates.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full', replySize: 'standard', metal: 'silver', metalStrength: 'standard', metalMotion: 'hover', metalBend: false, terminalFaces: true })
 
     await teammates.writeSettings({ swarm: true })
 
-    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: true, relay: true, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full', replySize: 'standard', metal: 'silver', metalStrength: 'standard', metalMotion: 'hover', metalBend: false })
+    expect(await createTeammateStore({ rootDirectory: root }).readSettings()).toEqual({ swarm: true, relay: true, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full', replySize: 'standard', metal: 'silver', metalStrength: 'standard', metalMotion: 'hover', metalBend: false, terminalFaces: true })
   })
 
   it('only a literal true turns it on', async () => {
@@ -397,7 +397,7 @@ describe('workspace settings', () => {
     const { store: teammates } = await store()
     for (const value of ['true', 1, {}, [], null, undefined]) {
       await teammates.writeSettings({ swarm: value, relay: false })
-      expect(await teammates.readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full', replySize: 'standard', metal: 'silver', metalStrength: 'standard', metalMotion: 'hover', metalBend: false })
+      expect(await teammates.readSettings()).toEqual({ swarm: false, relay: false, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full', replySize: 'standard', metal: 'silver', metalStrength: 'standard', metalMotion: 'hover', metalBend: false, terminalFaces: true })
     }
   })
 
@@ -410,7 +410,7 @@ describe('workspace settings', () => {
     await writeFile(path, JSON.stringify(file), 'utf8')
 
     const reopened = createTeammateStore({ rootDirectory: root })
-    expect(await reopened.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full', replySize: 'standard', metal: 'silver', metalStrength: 'standard', metalMotion: 'hover', metalBend: false })
+    expect(await reopened.readSettings()).toEqual({ swarm: false, relay: true, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full', replySize: 'standard', metal: 'silver', metalStrength: 'standard', metalMotion: 'hover', metalBend: false, terminalFaces: true })
     expect((await reopened.list()).map((entry) => entry.teammateId)).toEqual([wren.teammateId])
   })
 
@@ -595,7 +595,7 @@ describe('asking before every connector call', () => {
     const { store: teammates } = await store()
     expect((await teammates.readSettings()).askConnectors).toBe(false)
     for (const wrong of ['true', 1, 'yes', {}] as const) {
-      const written = await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: wrong as never, layout: 'auto', tube: 'full', replySize: 'standard', metal: 'silver', metalStrength: 'standard', metalMotion: 'hover', metalBend: false })
+      const written = await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: wrong as never, layout: 'auto', tube: 'full', replySize: 'standard', metal: 'silver', metalStrength: 'standard', metalMotion: 'hover', metalBend: false, terminalFaces: true })
       expect(written.askConnectors, String(wrong)).toBe(false)
     }
   })
@@ -604,7 +604,7 @@ describe('asking before every connector call', () => {
     // Every write carries the whole object; a caller that forgot this field
     // would switch it off as a side effect of changing the layout.
     const { store: teammates } = await store()
-    await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: true, layout: 'auto', tube: 'full', replySize: 'standard', metal: 'silver', metalStrength: 'standard', metalMotion: 'hover', metalBend: false })
+    await teammates.writeSettings({ swarm: false, relay: true, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: true, layout: 'auto', tube: 'full', replySize: 'standard', metal: 'silver', metalStrength: 'standard', metalMotion: 'hover', metalBend: false, terminalFaces: true })
     const after = await teammates.writeSettings({ swarm: true, relay: true, relayHopCap: 12, interrupt: false, memoryMode: 'auto', autoMode: false, askConnectors: true, layout: 'rail' })
     expect(after.askConnectors).toBe(true)
     expect((await teammates.readSettings()).askConnectors).toBe(true)
@@ -705,6 +705,29 @@ describe('the cursor bend is off until somebody asks for it', () => {
     expect((await createTeammateStore({ rootDirectory: root }).readSettings()).metalBend).toBe(true)
     await teammates.writeSettings({ ...settings, metalBend: false })
     expect((await createTeammateStore({ rootDirectory: root }).readSettings()).metalBend).toBe(false)
+  })
+})
+
+/**
+ * Colin, 2026-10-03: "they might all need a screen for a face, we can have it
+ * togglable in settings, terminal face, and if the user chooses to have it off
+ * it will revert back to our previous eyes." On for everyone, existing
+ * profiles too (an absent key reads as on); a stored off stays off, and a
+ * write of some other setting keeps it.
+ */
+describe('terminal faces are on until somebody turns them off', () => {
+  it('is on on a fresh profile', async () => {
+    const { store: teammates } = await store()
+    expect((await teammates.readSettings()).terminalFaces).toBe(true)
+  })
+
+  it('stays off once turned off, across a write of something else', async () => {
+    const { root, store: teammates } = await store()
+    await teammates.writeSettings({ ...(await teammates.readSettings()), terminalFaces: false })
+    await teammates.writeSettings({ swarm: true })
+    expect((await createTeammateStore({ rootDirectory: root }).readSettings()).terminalFaces).toBe(false)
+    await teammates.writeSettings({ swarm: true, terminalFaces: true })
+    expect((await createTeammateStore({ rootDirectory: root }).readSettings()).terminalFaces).toBe(true)
   })
 })
 

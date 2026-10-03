@@ -42,6 +42,8 @@ import {
   runtimeListOrder
 } from '../status.js'
 import { CliArtifacts } from './CliArtifacts.js'
+import { Bot } from './Bot.js'
+import type { EyeGlyphs } from './Bot.js'
 import { TeammateBot } from './TeammateBot.js'
 import { RuntimeMark } from './RuntimeMark.js'
 import { keepCurrentNote, offersUpdate, updateLine } from '../agentUpdates.js'
@@ -1366,6 +1368,13 @@ function CheckAfterEditsRow({ saved, onSave }: { readonly saved: string; readonl
   )
 }
 
+/** Three bots wearing the Terminal faces choice beside it: at work, in thought, done. */
+const TERMINAL_FACES_PREVIEW: readonly (readonly ['droid' | 'ghost' | 'cat', EyeGlyphs])[] = [
+  ['droid', ['>', '_']],
+  ['ghost', ['-', '-']],
+  ['cat', ['^', '^']]
+]
+
 export function SettingsScreen({
   runtimes,
   limitedRuntimes,
@@ -1409,6 +1418,8 @@ export function SettingsScreen({
   metalMotion,
   metalBend,
   onMetalChange,
+  terminalFaces = true,
+  onTerminalFacesChange,
   onReplySizeChange,
   onTubeChange,
   onSwarmChange,
@@ -1500,6 +1511,9 @@ export function SettingsScreen({
     readonly metalMotion?: MetalMotion
     readonly metalBend?: boolean
   }) => void
+  /** Every bot wears a screen for a face (0.561). */
+  readonly terminalFaces?: boolean
+  readonly onTerminalFacesChange?: (on: boolean) => void
   readonly onReplySizeChange: (size: ReplyTextSize) => void
   readonly onAutoModeChange: (autoMode: boolean) => void
   readonly askConnectors: boolean
@@ -2369,6 +2383,46 @@ export function SettingsScreen({
               characters at Standard and 72 at Large.
             </p>
           </More>
+        </section>
+        )}
+        {shownPage === 'appearance' && (
+        <section className="lc-settings__section lc-settings__section--line" data-setting="terminal-faces">
+          <div className="lc-settingline">
+            <div className="lc-settingline__text">
+              <h2 className="lc-settings__heading">Terminal faces</h2>
+              <p className="lc-settings__lede">
+                {terminalFaces
+                  ? 'On. Every teammate wears a screen for a face, its eyes lit code that says what it is doing.'
+                  : "Off. Each teammate keeps its own eyes, which turn to code while it works."}
+              </p>
+            </div>
+            <div className="lc-settingline__preview" aria-hidden>
+              {TERMINAL_FACES_PREVIEW.map(([type, eyes], i) => (
+                <span key={type} className="lc-settingline__bot">
+                  <Bot type={type} size={40} paused seed={0.3 + i * 0.2} eyes={eyes} />
+                </span>
+              ))}
+            </div>
+            <div className="lc-segmented" role="radiogroup" aria-label="Terminal faces">
+              {(
+                [
+                  [true, 'On'],
+                  [false, 'Off']
+                ] as const
+              ).map(([option, label]) => (
+                <button
+                  key={label}
+                  type="button"
+                  role="radio"
+                  aria-checked={terminalFaces === option}
+                  className={`lc-button${terminalFaces === option ? ' is-active' : ''}`}
+                  onClick={() => onTerminalFacesChange?.(option)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
         </section>
         )}
         {shownPage === 'appearance' && (

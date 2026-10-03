@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { GLYPH_INK, GLYPH_SHAPES, glyphMotion, SCREEN_RESTING_EYES, eyeOpenness, onSphere, outlineOf, sameHue, withGlyphEyes } from './components/Bot.js'
+import { EYES_VISOR, GLYPH_INK, GLYPH_SHAPES, fitVisor, glyphMotion, hueOf, visorOutline, SCREEN_RESTING_EYES, eyeOpenness, onSphere, outlineOf, sameHue, withGlyphEyes } from './components/Bot.js'
 import type { EyeGlyphs } from './components/Bot.js'
 import { eyeGlyphsFor } from './components/TeammateBot.js'
 import type { FaceActivity } from './faceState.js'
@@ -177,5 +177,33 @@ describe('eyes that are alive', () => {
         expect(Math.abs(m.dy), pair).toBeLessThanOrEqual(2)
       }
     }
+  })
+})
+
+/**
+ * EVERY SHAPE'S OWN SCREEN (0.561), Terminal faces on: fitted to the body.
+ */
+describe('a fitted screen', () => {
+  // A body that is a circle of radius 30 about 50, 50, in the outline's own units.
+  const circle = (x: number, y: number): boolean => Math.hypot(x - 50, y - 50) <= 30
+
+  it('keeps its full size where the body has room', () => {
+    const roomy = (x: number, y: number): boolean => x > 0 && x < 100 && y > 0 && y < 100
+    expect(fitVisor(roomy, 50, 50, 1, EYES_VISOR)).toEqual(EYES_VISOR)
+  })
+
+  it('shrinks until it sits inside the body with a margin', () => {
+    const fitted = fitVisor(circle, 50, 50, 1, EYES_VISOR)
+    expect(fitted.halfWidth).toBeLessThan(EYES_VISOR.halfWidth)
+    // Every point of its outline is inside the body; a size bigger by a step would not be.
+    for (const [x, y] of visorOutline(fitted)) expect(circle(50 + x, 50 + y)).toBe(true)
+    const bigger = { ...fitted, halfWidth: fitted.halfWidth * 1.1 + 3, halfHeight: fitted.halfHeight * 1.1 + 3, corner: fitted.corner * 1.1 + 3 }
+    expect(visorOutline(bigger).every(([x, y]) => circle(50 + x, 50 + y))).toBe(false)
+  })
+
+  it('reads the hue of whatever colour the plastic hands it', () => {
+    expect(hueOf('hsl(219.7 89.7% 64.7%)')).toBeCloseTo(219.7)
+    expect(hueOf('#ff0000')).toBe(0)
+    expect(hueOf('rgb(0, 0, 255)')).toBe(240)
   })
 })

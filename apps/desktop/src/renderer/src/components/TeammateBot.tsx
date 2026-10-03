@@ -4,6 +4,7 @@ import type { BotAvatarState } from 'bot-avatars'
 import { botFor } from '../../../shared/avatar.js'
 import type { FaceActivity } from '../faceState.js'
 import type { GlanceSide } from '../glances.js'
+import { useTerminalFaces } from '../botLook.js'
 import { Bot, outlineOf } from './Bot.js'
 import type { EyeGlyphs, Glance } from './Bot.js'
 import { PRESENCE_TONE } from './PixelFace.js'
@@ -202,6 +203,8 @@ export function TeammateBot({
   const color = hueColor(hue)
   const tone = PRESENCE_TONE[presence]
   const eyes = eyeGlyphsFor(activity === 'done' && !hopsWhenDone ? 'idle' : activity)
+  // A lit eye on a screen reads at any size; an inked one only from GLYPH_EYES_MIN.
+  const terminal = useTerminalFaces()
   return (
     <span
       className={`lc-face lc-bot${bounces ? ' is-bouncing' : ''}${className === undefined ? '' : ` ${className}`}`}
@@ -221,7 +224,7 @@ export function TeammateBot({
         face={bot.face}
         seed={seedOf(teammateId ?? name ?? bot.shape)}
         hop={hops}
-        {...((size >= GLYPH_EYES_MIN || outlineOf(bot.shape).screen) && eyes !== undefined ? { eyes } : {})}
+        {...((size >= GLYPH_EYES_MIN || terminal || outlineOf(bot.shape).screen) && eyes !== undefined ? { eyes } : {})}
         {...(glance === undefined ? {} : { glance: GLANCE_TOWARD[glance] })}
         {...(color === undefined ? {} : { color })}
         {...(jumpEvery === undefined ? {} : { jumpEvery })}

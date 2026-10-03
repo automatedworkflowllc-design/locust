@@ -9825,6 +9825,21 @@ textarea {
   margin: 0;
 }
 
+/* Terminal faces (0.561): three bots wearing the choice, beside it. */
+.lc-settingline__preview {
+  display: flex;
+  gap: var(--lc-space-3);
+  margin-left: auto;
+  flex: none;
+}
+
+.lc-settingline__bot {
+  position: relative;
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+}
+
 .lc-settings__section--line .lc-settings__more {
   margin: var(--lc-space-3) 0 0;
 }
