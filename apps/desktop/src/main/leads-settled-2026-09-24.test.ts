@@ -17,7 +17,7 @@ describe('the connector list', () => {
    * read, so no connector allow rule was ever made.
    */
   it('is read through a runner whose ceiling is above what it asks for', () => {
-    const asked = Number(/const TIMEOUT_MS = ([\d_]+)/.exec(READER)?.[1]?.replace(/_/g, ''))
+    const asked = Number(/const (?:CONNECTOR_READ_)?TIMEOUT_MS = ([\d_]+)/.exec(READER)?.[1]?.replace(/_/g, ''))
     const ceiling = Number(/createNodeProbeRunner\(\{ maximumTimeoutMs: ([\d_]+) \}\)/.exec(INDEX)?.[1]?.replace(/_/g, ''))
     expect(asked).toBeGreaterThan(10_000)
     expect(ceiling).toBeGreaterThan(asked)

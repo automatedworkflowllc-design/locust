@@ -38,13 +38,13 @@ export function ConnectorHealth({ now = () => new Date() }: { readonly now?: () 
     void navigator.clipboard
       .writeText(text)
       .then(() => setNotice('Report copied: names, states, timings and hosts only.'))
-      .catch(() => setNotice('The report could not be copied.'))
+      .catch(() => setNotice('The report could not be copied; your connectors are as listed above. Press Copy report again.'))
   }
 
   return (
     <div className="lc-connectorhealth" aria-label="Connectors on this machine">
       {connectors === undefined ? (
-        <p className="lc-settings__note">{reading ? 'Reading your connectors…' : 'Your connectors could not be read.'}</p>
+        <p className="lc-settings__note">{reading ? 'Reading your connectors…' : 'Your connectors could not be read just now; your teammates keep the ones that last worked. Check again in a moment.'}</p>
       ) : connectors.length === 0 ? (
         <p className="lc-settings__note">Your Claude Code has no connectors.</p>
       ) : (
