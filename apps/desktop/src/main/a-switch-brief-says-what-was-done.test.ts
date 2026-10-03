@@ -55,6 +55,47 @@ describe('settled actions', () => {
   })
 })
 
+describe('settled actions, as Antigravity records them (0.567)', () => {
+  // Its adapter names a tool twice (`toolKind` and `name` are both
+  // `run_command`) and keeps what it ran in `command`: the shape of Colin's
+  // W7 ledger, whose brief to Codex read `run_command: run_command` forty times.
+  const reconcile = (events: unknown[]) => reconcileMission(
+    { metadata: { missionId: 'm', runId: 'r' }, events, issues: [] } as unknown as Parameters<typeof reconcileMission>[0],
+    { epoch: 1, reason: 'route-switch', now: () => new Date() } as unknown as Parameters<typeof reconcileMission>[1]
+  )
+  const tool = (sequence: number, itemId: string, toolKind: string, command?: string) => [
+    { id: `s${String(sequence)}`, runId: 'r', missionId: 'm', sequence, type: 'tool.started', occurredAt: 'x', sourceAdapter: 'antigravity', payload: { itemId, toolKind, name: toolKind, ...(command === undefined ? {} : { command }), phase: 'started' } },
+    { id: `c${String(sequence)}`, runId: 'r', missionId: 'm', sequence: sequence + 1, type: 'tool.completed', occurredAt: 'x', sourceAdapter: 'antigravity', payload: { itemId, toolKind, name: toolKind, phase: 'completed' } }
+  ]
+
+  it('are named by the command run and the file read or written, never the tool twice', () => {
+    const reconciled = reconcile([
+      ...tool(1, 'tool_2', 'run_command', 'git status -sb'),
+      ...tool(3, 'tool_4', 'view_file', 'docs/PLAN.md'),
+      ...tool(5, 'tool_6', 'write_to_file', 'apps/desktop/src/shared/routine-inputs.ts'),
+      ...tool(7, 'tool_8', 'manage_task')
+    ])
+    expect(reconciled.settledNames).toEqual([
+      'run_command: git status -sb',
+      'view_file: docs/PLAN.md',
+      'write_to_file: apps/desktop/src/shared/routine-inputs.ts',
+      'manage_task'
+    ])
+    const prompt = composeHandoffPrompt('Build W7.', reconciled, 'Antigravity', 'keep working')!.prompt
+    expect(prompt).toContain('- write_to_file: apps/desktop/src/shared/routine-inputs.ts')
+    expect(prompt).not.toContain('run_command: run_command')
+  })
+
+  it('past the most recent forty, the rest are said to be earlier, not unrecorded', () => {
+    const reconciled = reconcile(Array.from({ length: 62 }, (_, at) => tool(at * 2 + 1, `tool_${String(at)}`, 'run_command', `step ${String(at)}`)).flat())
+    expect(reconciled.settledNames).toHaveLength(40)
+    expect(reconciled.settledNames?.at(-1)).toBe('run_command: step 61')
+    const prompt = composeHandoffPrompt('Build W7.', reconciled, 'Antigravity', 'keep working')!.prompt
+    expect(prompt).toContain('- and 22 earlier actions, not listed here')
+    expect(prompt).not.toContain('whose details were not recorded')
+  })
+})
+
 describe('the earlier turns', () => {
   const earlier = [
     { asked: 'Find why the build is slow.', answered: 'The TypeScript step re-checks every package on each build.' },

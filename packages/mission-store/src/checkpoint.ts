@@ -154,6 +154,21 @@ function transcriptDigestFor(events: readonly NormalizedRuntimeEvent[]): string 
 }
 
 /**
+ * A finished action, named by what it ran (0.567).
+ *
+ * `toolKind: name` alone handed Codex forty lines of `run_command:
+ * run_command` and `view_file: view_file` when Colin moved a W7 conversation
+ * off Antigravity (2026-10-03): that adapter names the tool twice and keeps
+ * what it ran -- the command line, the file read or written -- in `command`,
+ * which is the part that says what was done.
+ */
+function actionNameOf(payload: { readonly toolKind: string; readonly name: string; readonly command?: string; readonly title?: string }): string {
+  const head = payload.name === payload.toolKind ? payload.name : `${payload.toolKind}: ${payload.name}`
+  const what = (payload.command ?? payload.title)?.replace(/\s+/g, ' ').trim()
+  return (what === undefined || what.length === 0 || what === payload.name ? head : `${head}: ${what}`).slice(0, 300)
+}
+
+/**
  * Derive a checkpoint from durably recorded state. Pure: same events in, same
  * checkpoint out, no clock and no filesystem.
  */
@@ -173,7 +188,7 @@ export function reconcileMission(
   for (const event of events) {
     if (event.type === 'tool.started') {
       const { itemId, toolKind, name } = event.payload
-      started.set(itemId, `${toolKind}: ${name}`.slice(0, 300))
+      started.set(itemId, actionNameOf(event.payload))
       open.set(itemId, {
         itemId,
         toolKind,

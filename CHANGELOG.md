@@ -34,6 +34,12 @@ heading: the home screen then shows it once, as a splash.
   connector check did not answer in 20 seconds, Locust quietly kept the last
   list; Settings now says the check did not answer, while your teammates keep
   using the connectors that last worked.
+- **Switching a conversation to another AI tells it what was actually done.**
+  The summary the new one starts from listed Antigravity's work as
+  `run_command: run_command` and `view_file: view_file`, forty times. Each
+  action is now named by the command it ran or the file it read or wrote.
+  Past the latest forty, the summary says how many earlier ones it leaves
+  out, rather than claiming they were never recorded.
 
 ### Fixed
 

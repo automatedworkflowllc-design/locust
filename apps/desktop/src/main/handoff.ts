@@ -1,4 +1,5 @@
 import type { ReconciledCheckpoint } from '@teammate/mission-store'
+import { MAX_SETTLED_NAMES } from '@teammate/mission-store'
 import { withAttachments } from '../shared/attachments.js'
 
 /**
@@ -147,13 +148,19 @@ function sectionsFor(
   if (checkpoint.settledActions.length > 0) {
     const names = checkpoint.settledNames ?? []
     const unnamed = checkpoint.settledActions.length - names.length
+    // A full list was cut to its most recent entries: the rest WERE recorded (0.567).
+    const capped = names.length >= MAX_SETTLED_NAMES
     sections.push({
       name: 'settled',
       text:
         'These actions reported finishing before the stop:\n'
         + [
           ...(names.length === 0 ? [] : [bullets(names)]),
-          ...(unnamed > 0 ? [`- ${String(unnamed)} ${names.length === 0 ? '' : 'other '}${unnamed === 1 ? 'action' : 'actions'} whose details were not recorded`] : [])
+          ...(unnamed > 0
+            ? [capped
+              ? `- and ${String(unnamed)} earlier ${unnamed === 1 ? 'action' : 'actions'}, not listed here`
+              : `- ${String(unnamed)} ${names.length === 0 ? '' : 'other '}${unnamed === 1 ? 'action' : 'actions'} whose details were not recorded`]
+            : [])
         ].join('\n')
     })
   }
