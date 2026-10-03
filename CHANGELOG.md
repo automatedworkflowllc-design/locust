@@ -11,6 +11,23 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.560.0 - 2026-10-03
+
+### Changed
+
+- **A teammate's code eyes are drawn, not typed, and they move.** In 0.559
+  the eyes were letters set in a font, and they sat still. Now each is a few
+  thick, round strokes, as heavy as the eye it replaces, and each state has
+  its own little loop: at work the cursor types forward and then blinks,
+  thinking dashes drift and now and then pull in to dots, a finished
+  teammate's `^ ^` bobs, and a stuck one's `x x` shudders. They still blink,
+  turn and glance with the head. A teammate that keeps still keeps its eyes
+  still too, as does everyone with reduced motion on.
+- **Prompt has a screen for a face.** The Prompt bot's face is now a dark
+  screen in its own colour, curved round its head, with its eyes lit on it in
+  a bright tint of the same colour. At rest it shows two lit bars that blink
+  and glance. Its lit eyes read even at the sidebar's small sizes.
+
 ## 0.559.0 - 2026-10-02
 
 ### Added

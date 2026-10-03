@@ -4,7 +4,7 @@ import type { BotAvatarState } from 'bot-avatars'
 import { botFor } from '../../../shared/avatar.js'
 import type { FaceActivity } from '../faceState.js'
 import type { GlanceSide } from '../glances.js'
-import { Bot } from './Bot.js'
+import { Bot, outlineOf } from './Bot.js'
 import type { EyeGlyphs, Glance } from './Bot.js'
 import { PRESENCE_TONE } from './PixelFace.js'
 import { RuntimeMark } from './RuntimeMark.js'
@@ -177,7 +177,7 @@ export function eyeGlyphsFor(activity: FaceActivity): EyeGlyphs | undefined {
   }
 }
 
-/** Below this a glyph is a speck: the rig's own eyes read better. */
+/** Below this an inked glyph is a speck: the rig's own eyes read better. A screen's lit ones read at any size. */
 export const GLYPH_EYES_MIN = 22
 
 /** Below this a badge is a speck: the mark is not drawn. */
@@ -221,7 +221,7 @@ export function TeammateBot({
         face={bot.face}
         seed={seedOf(teammateId ?? name ?? bot.shape)}
         hop={hops}
-        {...(size >= GLYPH_EYES_MIN && eyes !== undefined ? { eyes } : {})}
+        {...((size >= GLYPH_EYES_MIN || outlineOf(bot.shape).screen) && eyes !== undefined ? { eyes } : {})}
         {...(glance === undefined ? {} : { glance: GLANCE_TOWARD[glance] })}
         {...(color === undefined ? {} : { color })}
         {...(jumpEvery === undefined ? {} : { jumpEvery })}

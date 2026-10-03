@@ -31,9 +31,11 @@ export interface LocustBotShape {
   readonly faceX: number
   readonly faceY: number
   readonly faceScale: number
+  /** Its face is a dark screen, its eyes lit glyphs on it (Bot.tsx). */
+  readonly screen?: boolean
 }
 
-const f = (n: number): number => Math.round(n * 100) / 100
+const f =(n: number): number => Math.round(n * 100) / 100
 
 /** A rotated ellipse as two clockwise half-arcs, so a union of them stays filled. */
 export function ellipsePath(cx: number, cy: number, rx: number, ry: number, deg = 0): string {
@@ -129,7 +131,8 @@ export const LOCUST_BOTS: Readonly<Record<LocustBotType, LocustBotShape>> = {
    *
    * - Critter: a wide block with stub arms and four short legs -- the shape a
    *   coding agent's little terminal creature has, in our plastic.
-   * - Prompt: a soft terminal window, its three title-bar dots up top.
+   * - Prompt: a soft terminal window, its three title-bar dots up top, its
+   *   face a dark screen with lit eyes (0.560).
    */
   critter: {
     name: 'Critter',
@@ -149,7 +152,9 @@ export const LOCUST_BOTS: Readonly<Record<LocustBotType, LocustBotShape>> = {
     turn: 1,
     faceX: 50,
     faceY: 58,
-    faceScale: 0.95
+    faceScale: 0.95,
+    // Colin, 2026-10-03, of the codex mascot: "he also seems to have a screen for a face".
+    screen: true
   }
 }
 

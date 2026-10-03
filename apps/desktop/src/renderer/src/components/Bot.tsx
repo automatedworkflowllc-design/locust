@@ -98,52 +98,328 @@ export type EyeGlyphs = readonly [string, string]
  * face's ink, and the glyph turns, glances and blinks as the eye did. The eyes
  * are told apart by a stand-in ink only the face uses.
  */
-const GLYPH_INK = '#010203'
+export const GLYPH_INK = '#010203'
 
 /**
- * The context's own `stroke` and `fill`, shadowed on this one context (cheaper
- * than wrapping every call of every frame). `frame()` is called before each
- * frame: the left eye is drawn first, and an eye turned out of sight is not
- * drawn at all, so the count starts again each frame from the stroke's place.
+ * DRAWN, NOT TYPED (0.560). Colin, 2026-10-03, beside the codex mascot's
+ * sheet: "the eyes for this one look thick and filled out, not like we just
+ * gave them text for eyes". 0.559 set each glyph in a monospace font, and it
+ * read as a letter pasted on a face. Now each is a few strokes as thick as
+ * the eye it replaces, round at every end and corner -- the rig's own eye is
+ * one round stroke 12.6 across, so a glyph stays the eye's weight -- in eye
+ * units, the eye's centre at 0, y down. A blink squashes the strokes' places,
+ * never their weight, so a blinking glyph is a line and not a sliver.
  */
-function withGlyphEyes(context: CanvasRenderingContext2D, eyesNow: () => EyeGlyphs | undefined, ink: string): { readonly frame: (yaw: number) => void } {
+interface GlyphShape {
+  /** Polylines, each a run of x, y pairs. */
+  readonly lines: readonly (readonly number[])[]
+  /** A ring, its radius. */
+  readonly ring?: number
+  /** Stroke weight. */
+  readonly weight: number
+}
+
+export const GLYPH_SHAPES: Readonly<Record<string, GlyphShape>> = {
+  '>': { lines: [[-3.3, -5.4, 3.5, 0, -3.3, 5.4]], weight: 4.6 },
+  '<': { lines: [[3.3, -5.4, -3.5, 0, 3.3, 5.4]], weight: 4.6 },
+  _: { lines: [[-4.6, 4.4, 4.6, 4.4]], weight: 4.6 },
+  '-': { lines: [[-4.8, 0.4, 4.8, 0.4]], weight: 4.6 },
+  '^': { lines: [[-5.2, 2.8, 0, -2.6, 5.2, 2.8]], weight: 4.4 },
+  x: { lines: [[-3.9, -3.9, 3.9, 3.9], [3.9, -3.9, -3.9, 3.9]], weight: 4.2 },
+  '|': { lines: [[0, -4.9, 0, 4.9]], weight: 5.4 },
+  o: { lines: [], ring: 3.9, weight: 3.8 }
+}
+
+/** Where a glyph is this moment, in eye units: moved, stretched, or not lit at all. */
+export interface GlyphMotion {
+  readonly dx: number
+  readonly dy: number
+  readonly sx: number
+  readonly sy: number
+  readonly shown: boolean
+}
+
+const AT_REST: GlyphMotion = { dx: 0, dy: 0, sx: 1, sy: 1, shown: true }
+const frac = (n: number): number => n - Math.floor(n)
+/** 0 to 1 and back over `length` seconds starting at `from` of a cycle, eased in and out. */
+function hump(phase: number, from: number, length: number): number {
+  const p = (phase - from) / length
+  return p <= 0 || p >= 1 ? 0 : Math.sin(Math.PI * p) ** 2
+}
+
+/**
+ * EYES THAT ARE ALIVE (0.560). Colin, 2026-10-03, of 0.559: "it looks like
+ * the eyes are just staying as flat lines on not cycling through any effects
+ * so they dont look alive". The mascot's sheet is frames, each eye doing
+ * something; here each pair has its own small loop, on the rig's clock (a
+ * still bot is drawn at second 0, which is each loop's rest):
+ *
+ * - `>_` at work: the cursor types forward in a burst, then blinks where it
+ *   stopped, and the prompt nudges on with each burst.
+ * - `--` in thought: the dashes drift side to side, looking up a little, and
+ *   now and then pull in to dots, mulling, and back.
+ * - `^^` done: a happy bob.
+ * - `xx` stuck: a shudder now and then.
+ * - `||` a screen at rest: the rig's blinks and glances, which squash and
+ *   move the bars.
+ */
+export function glyphMotion(pair: string, eye: 0 | 1, seconds: number): GlyphMotion {
+  // A still bot: each pair as it rests.
+  if (seconds === 0) return AT_REST
+  switch (pair) {
+    case '>_': {
+      const phase = frac(seconds / 2.6)
+      const typing = phase < 0.3
+      if (eye === 0) return { ...AT_REST, dx: 1.3 * hump(phase, 0, 0.12) }
+      // Typing: a step forward every sixth of a second; then blinking, half a second on, half off.
+      const steps = typing ? Math.floor((phase * 2.6) / 0.16) % 4 : 3
+      const blinkOn = typing || frac((phase * 2.6 - 0.78) / 1.0) < 0.55
+      return { ...AT_REST, dx: steps * 0.9 - 1.35, shown: blinkOn }
+    }
+    case '--': {
+      const drift = Math.sin(seconds * 1.25)
+      const mull = hump(frac(seconds / 4.2), 0.62, 0.22)
+      return { dx: 1.6 * drift, dy: -0.9 - 0.6 * Math.abs(drift), sx: 1 - 0.68 * mull, sy: 1 + 0.15 * mull, shown: true }
+    }
+    case '^^': {
+      const bob = Math.max(0, Math.sin(seconds * 4.2 + eye * 0.35))
+      return { dx: 0, dy: -1.5 * bob, sx: 1 + 0.06 * bob, sy: 1 - 0.08 * bob, shown: true }
+    }
+    case 'xx': {
+      const shudder = hump(frac(seconds / 3), 0, 0.14)
+      return { ...AT_REST, dx: 1.1 * shudder * Math.sin(seconds * 70) }
+    }
+    default:
+      return AT_REST
+  }
+}
+
+/** The rig's eye weight is 2.8 shut and 12.6 open, so its weight says how open the eye is. */
+export function eyeOpenness(lineWidth: number): number {
+  return Math.max(0, Math.min(1, (lineWidth - 2.8) / 9.8))
+}
+
+/**
+ * A SCREEN FOR A FACE (0.560). Colin, 2026-10-03, of the codex mascot: "he
+ * also seems to have a screen for a face". A shape marked `screen` wears a
+ * dark visor of its own hue, its eyes lit glyphs on it in a bright tint of
+ * the same hue with a little glow -- our plastic and our colours, not the
+ * mascot's navy and cyan. The visor is laid ON the head's sphere, point by
+ * point, by the projection the rig gives its eyes, so it turns and curves
+ * with the head; and the rig skips the face when the head is turned away, so
+ * the back of the head is plain, as the mascot's is.
+ */
+const VISOR = { halfWidth: 27, halfHeight: 17.5, corner: 12, y: 1.5 }
+/** The rig's face sphere, and the eye's turn past which the left eye is out of sight (asin(12.5 / 30) + 90deg). */
+const SPHERE = 30
+const LEFT_EYE_HIDDEN_AT = -1.12
+/** How much larger a lit glyph is than an inked one: a screen's eyes fill it, as the mascot's do. */
+const SCREEN_GLYPH_SCALE = 1.3
+/** An inked glyph a little larger than the eye, and heavier: a dot is round and full, and a stroke of the dot's size reads thinner. */
+const INKED_GLYPH_SCALE = 1.12
+
+/** A rounded rectangle's outline in face units, evenly spaced, to be laid on the sphere. */
+function visorOutline(): readonly (readonly [number, number])[] {
+  const { halfWidth: w, halfHeight: h, corner: r, y } = VISOR
+  const points: [number, number][] = []
+  const edge = (ax: number, ay: number, bx: number, by: number, steps: number): void => {
+    for (let i = 0; i < steps; i += 1) points.push([ax + ((bx - ax) * i) / steps, ay + ((by - ay) * i) / steps])
+  }
+  const arc = (cx: number, cy: number, from: number): void => {
+    for (let i = 0; i < 6; i += 1) {
+      const t = from + (i / 6) * (Math.PI / 2)
+      points.push([cx + r * Math.cos(t), cy + r * Math.sin(t)])
+    }
+  }
+  edge(-w + r, y - h, w - r, y - h, 8)
+  arc(w - r, y - h + r, -Math.PI / 2)
+  edge(w, y - h + r, w, y + h - r, 4)
+  arc(w - r, y + h - r, 0)
+  edge(w - r, y + h, -w + r, y + h, 8)
+  arc(-w + r, y + h - r, Math.PI / 2)
+  edge(-w, y + h - r, -w, y - h + r, 4)
+  arc(-w + r, y - h + r, Math.PI)
+  return points
+}
+const VISOR_OUTLINE = visorOutline()
+
+/** A point of the face carried round the head's sphere, as the rig carries its eyes; past the edge, held at it. */
+export function onSphere(x: number, y: number, yaw: number, pitch: number): readonly [number, number] {
+  const across = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, Math.asin(Math.max(-1, Math.min(1, x / SPHERE))) + yaw))
+  const down = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, Math.asin(Math.max(-1, Math.min(1, -y / SPHERE))) + pitch))
+  return [SPHERE * Math.sin(across) * Math.cos(down), -SPHERE * Math.sin(down)]
+}
+
+function hexRgb(hex: string): readonly [number, number, number] {
+  const h = hex.replace('#', '')
+  const full = h.length === 3 ? [...h].map((c) => c + c).join('') : h.slice(0, 6)
+  const n = Number.parseInt(full, 16)
+  return Number.isNaN(n) ? [128, 128, 128] : [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+
+/** A colour of the same hue at this saturation and lightness, 0 to 1. */
+export function sameHue(hex: string, saturation: number, lightness: number, alpha = 1): string {
+  const [r, g, b] = hexRgb(hex).map((c) => c / 255) as [number, number, number]
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const d = max - min
+  let hue = 0
+  if (d > 0) hue = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+  return `hsla(${Math.round((hue * 60 + 360) % 360)}, ${Math.round(saturation * 100)}%, ${Math.round(lightness * 100)}%, ${alpha})`
+}
+
+export interface EyePaint {
+  readonly ink: string
+  /** The body colour, for a screen's own tints; undefined, the face is no screen. */
+  readonly screenOf: string | undefined
+  /** Device pixels a face unit spans, for the glow. */
+  readonly pixelsPerUnit: number
+}
+
+/**
+ * The context's own `stroke`, `fill` and `translate`, shadowed on this one
+ * context (cheaper than wrapping every call of every frame). `frame()` is
+ * called before each frame: the left eye is drawn first, and an eye turned out
+ * of sight is not drawn at all, so the count starts again each frame from the
+ * stroke's place. The rig moves to each eye with one translate from the face's
+ * own transform, so the transform before the last translate is the face's.
+ */
+export function withGlyphEyes(
+  context: CanvasRenderingContext2D,
+  eyesNow: () => EyeGlyphs | undefined,
+  paint: EyePaint
+): { readonly frame: (yaw: number, pitch: number, seconds: number) => void } {
   // From the prototype, never the context: a second effect on the same canvas must not stack on the first.
   const own = Object.getPrototypeOf(context) as CanvasRenderingContext2D
   const stroke = own.stroke.bind(context) as (...args: unknown[]) => void
   const fill = own.fill.bind(context) as (...args: unknown[]) => void
+  const translate = own.translate.bind(context)
+  const screen = paint.screenOf
+  const lit = screen === undefined ? paint.ink : sameHue(screen, 0.95, 0.8)
+  const glow = screen === undefined ? undefined : sameHue(screen, 1, 0.62, 0.85)
+  const visorTop = screen === undefined ? '' : sameHue(screen, 0.42, 0.17)
+  const visorBottom = screen === undefined ? '' : sameHue(screen, 0.5, 0.08)
   let drawn = 0
-  // The left eye goes round the back (out of sight, not drawn) only past this much turn to the left:
-  // its centre, 12.5 left on a sphere of 30, reaches the edge at asin(12.5 / 30) + 90deg -- about 64deg.
+  let yaw = 0
+  let pitch = 0
+  let seconds = 0
   let leftHidden = false
-  const glyphAt = (): void => {
+  let face: DOMMatrix | undefined
+  if (screen !== undefined) {
+    ;(context as unknown as { translate: (x: number, y: number) => void }).translate = (x, y) => {
+      face = context.getTransform()
+      translate(x, y)
+    }
+  }
+  // The visor's outline this frame, on the sphere: drawn once, and clipped to again for each eye.
+  let outline: (readonly [number, number])[] = []
+  const trace = (): void => {
+    context.beginPath()
+    outline.forEach(([px, py], i) => {
+      if (i === 0) context.moveTo(px, py)
+      else context.lineTo(px, py)
+    })
+    context.closePath()
+  }
+  const visor = (): void => {
+    if (face === undefined) return
+    outline = VISOR_OUTLINE.map(([x, y]) => onSphere(x, y, yaw, pitch))
+    context.save()
+    context.setTransform(face)
+    context.globalAlpha = 1
+    trace()
+    const top = onSphere(0, VISOR.y - VISOR.halfHeight, yaw, pitch)[1]
+    const bottom = onSphere(0, VISOR.y + VISOR.halfHeight, yaw, pitch)[1]
+    const ground = context.createLinearGradient(0, top, 0, bottom)
+    ground.addColorStop(0, visorTop)
+    ground.addColorStop(1, visorBottom)
+    context.fillStyle = ground
+    fill()
+    // The glass: a soft sheen across its top, and a fine lit rim.
+    context.clip()
+    const sheen = context.createLinearGradient(0, top, 0, top + VISOR.halfHeight)
+    sheen.addColorStop(0, 'rgba(255,255,255,0.13)')
+    sheen.addColorStop(1, 'rgba(255,255,255,0)')
+    context.fillStyle = sheen
+    context.fillRect(-SPHERE, top, SPHERE * 2, VISOR.halfHeight)
+    context.strokeStyle = 'rgba(255,255,255,0.16)'
+    context.lineWidth = 1.6
+    stroke()
+    context.restore()
+  }
+  const glyphAt = (args: unknown[]): void => {
     // The rig draws the left eye first; an eye out of sight is not drawn at all.
     const left = drawn === 0 && !leftHidden
-    const glyph = eyesNow()?.[left ? 0 : 1] ?? ''
     drawn += 1
+    if (drawn === 1 && screen !== undefined) visor()
+    const pair = eyesNow()
+    const shape = GLYPH_SHAPES[pair?.[left ? 0 : 1] ?? '']
+    if (shape === undefined) {
+      // Not a glyph we draw: the rig's own eye, in the face's colour.
+      context.strokeStyle = lit
+      return stroke(...args)
+    }
+    const scale = screen === undefined ? INKED_GLYPH_SCALE : SCREEN_GLYPH_SCALE
+    const squash = 0.08 + 0.92 * eyeOpenness(context.lineWidth)
+    const motion = glyphMotion(pair?.join('') ?? '', left ? 0 : 1, seconds)
+    if (!motion.shown) return
     context.save()
-    context.fillStyle = ink
-    context.font = '800 25px ui-monospace, "Cascadia Mono", Consolas, monospace'
-    context.textAlign = 'center'
-    context.textBaseline = 'middle'
-    context.fillText(glyph, 0, glyph === '_' ? -6 : 1)
+    if (screen !== undefined && face !== undefined && outline.length > 0) {
+      // A lit eye stays on its screen, however far it glances or drifts.
+      const eye = context.getTransform()
+      context.setTransform(face)
+      trace()
+      context.clip()
+      context.setTransform(eye)
+    }
+    context.lineCap = 'round'
+    context.lineJoin = 'round'
+    context.lineWidth = shape.weight * scale
+    context.strokeStyle = lit
+    if (glow !== undefined) {
+      context.shadowColor = glow
+      context.shadowBlur = 3.2 * paint.pixelsPerUnit
+    }
+    context.beginPath()
+    for (const line of shape.lines) {
+      for (let i = 0; i < line.length; i += 2) {
+        const x = ((line[i] ?? 0) * motion.sx + motion.dx) * scale
+        const y = ((line[i + 1] ?? 0) * motion.sy * squash + motion.dy) * scale
+        if (i === 0) context.moveTo(x, y)
+        else context.lineTo(x, y)
+      }
+    }
+    if (shape.ring !== undefined) {
+      const r = shape.ring * scale
+      context.ellipse(motion.dx * scale, motion.dy * scale, r * motion.sx, Math.max(0.3, r * motion.sy * squash), 0, 0, Math.PI * 2)
+    }
+    stroke()
     context.restore()
   }
   ;(context as unknown as { stroke: (...args: unknown[]) => void }).stroke = (...args) => {
-    if (String(context.strokeStyle).toLowerCase() === GLYPH_INK) return glyphAt()
+    if (String(context.strokeStyle).toLowerCase() === GLYPH_INK) return glyphAt(args)
     return stroke(...args)
   }
   ;(context as unknown as { fill: (...args: unknown[]) => void }).fill = (...args) => {
     // A mouth is drawn in the face's ink too: it keeps the real one.
-    if (String(context.fillStyle).toLowerCase() === GLYPH_INK) context.fillStyle = ink
+    if (String(context.fillStyle).toLowerCase() === GLYPH_INK) context.fillStyle = paint.ink
     return fill(...args)
   }
   return {
-    frame: (yaw) => {
+    frame: (y, p, s) => {
       drawn = 0
-      leftHidden = yaw < -1.12
+      seconds = s
+      yaw = y
+      pitch = p
+      leftHidden = y < LEFT_EYE_HIDDEN_AT
+      face = undefined
+      outline = []
     }
   }
 }
+
+/** A screen's eyes when nothing else is asked of them: two lit bars, as the mascot rests. */
+export const SCREEN_RESTING_EYES: EyeGlyphs = ['|', '|']
 
 /**
  * SMALL BOTS ARE DRAWN AT TWICE THEIR SIZE AND SHRUNK.
@@ -188,6 +464,8 @@ interface Outline {
   readonly faceX: number
   readonly faceY: number
   readonly faceScale: number
+  /** Its face is a dark screen with lit eyes. */
+  readonly screen: boolean
 }
 
 export function outlineOf(type: BotType): Outline {
@@ -202,7 +480,8 @@ export function outlineOf(type: BotType): Outline {
       face: 'eyes',
       faceX: shape.faceX,
       faceY: shape.faceY,
-      faceScale: shape.faceScale
+      faceScale: shape.faceScale,
+      screen: shape.screen === true
     }
   }
   const preset = botAvatarPresets[type]
@@ -215,7 +494,8 @@ export function outlineOf(type: BotType): Outline {
     face: preset.face,
     faceX: preset.faceX,
     faceY: preset.faceY,
-    faceScale: preset.faceScale
+    faceScale: preset.faceScale,
+    screen: false
   }
 }
 
@@ -421,7 +701,9 @@ function RiggedBot({
   const ref = useRef<HTMLCanvasElement>(null)
   const rig = useRef<BotAvatarSim | null>(null)
   const glyphs = useRef(eyes)
-  glyphs.current = eyes
+  // A screen always has lit eyes: its resting ones when nothing else is asked.
+  const screen = outlineOf(type).screen
+  glyphs.current = eyes ?? (screen ? SCREEN_RESTING_EYES : undefined)
   // What each frame reads, so a glance or the pointer never restarts the rig.
   const aim = useRef<{ follows: boolean; glance: Glance | undefined; glancedAt: number }>({
     follows: interactive,
@@ -451,11 +733,17 @@ function RiggedBot({
     rig.current = sim
     const still = paused || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
     // Read at each frame, so a teammate's eyes change with what it does without restarting its rig.
-    const painter = withGlyphEyes(context, () => glyphs.current, ink)
+    const painter = withGlyphEyes(context, () => glyphs.current, {
+      ink,
+      screenOf: outline.screen ? body : undefined,
+      // The face is drawn at size / 100 a unit (times its own scale), at dpr device pixels a CSS pixel.
+      pixelsPerUnit: (size / 100) * outline.faceScale * dpr
+    })
     const draw = (): void => {
       context.setTransform(dpr, 0, 0, dpr, 0, 0)
       context.clearRect(0, 0, side, side)
-      painter.frame(sim.pose.yaw)
+      // A still bot is drawn at its loops' rest; a moving one on its own clock, offset so a row does not move in unison.
+      painter.frame(sim.pose.yaw, sim.pose.pitch, still ? 0 : performance.now() / 1000 + seed * 17)
       drawBotAvatarFrame(context, size, sim.pose, {
         path,
         ...(parts === undefined ? {} : { parts }),
