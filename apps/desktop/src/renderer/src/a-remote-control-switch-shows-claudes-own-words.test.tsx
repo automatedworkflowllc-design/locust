@@ -25,7 +25,7 @@ it('A trust handoff stays off and asks the person to finish setup and deliberate
 })
 it('The switch is disabled while ending and states when later output was omitted.', () => {
   const html = view({ ...off, phase: 'stopping', truncated: true })
-  expect(html).toContain('disabled=""'); expect(html).toContain('Waiting for Claude Code to end'); expect(html).toContain('Later output was omitted')
+  expect(html).toContain('disabled=""'); expect(html).toContain('Waiting for Claude Code to end'); expect(html).toContain('the rest was left out')
 })
 it('Settings search finds Remote Control, phone, and claude.ai under AI agents.', () => {
   const page = SETTINGS_PAGES.find((page) => page.id === 'runtimes')!

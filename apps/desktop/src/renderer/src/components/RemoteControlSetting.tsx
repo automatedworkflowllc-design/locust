@@ -16,7 +16,7 @@ export function RemoteControlSetting() {
       finally { asking = false }
     }
     void read()
-    const timer = setInterval(() => { void read() }, 500)
+    const timer = setInterval(() => { void read() }, 1000)
     return () => { alive = false; clearInterval(timer) }
   }, [])
   return <RemoteControlView state={state} busy={busy} error={error} onToggle={async (enabled) => {
@@ -52,7 +52,7 @@ export function RemoteControlView({ state, busy, error, onToggle }: {
       {state?.stdout && <><div>Claude Code output</div><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: 240, overflow: 'auto' }}>{state.stdout}</pre></>}
       {state?.stderr && <><div>Claude Code errors</div><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: 240, overflow: 'auto' }}>{state.stderr}</pre></>}
       {(error ?? state?.error) && <pre role="alert" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{error ?? state?.error}</pre>}
-      {state?.truncated && <p>The first 64 Ki characters of each stream are shown. Later output was omitted.</p>}
+      {state?.truncated && <p>Only the start of what Claude Code printed is shown; the rest was left out.</p>}
     </div>
   </div>
 }
