@@ -1424,7 +1424,9 @@ if (!ownsSingleInstanceLock) {
       installDirectory,
       remembered: readRememberedWorkspace(rememberedWorkspaceFile),
       defaultWorkspace,
-      platform: process.platform
+      platform: process.platform,
+      homeDirectory: homedir(),
+      systemDirectory: process.env.SystemRoot
     })
     // A default that cannot be made falls back to the old answer: no
     // workspace, every start refused with the reason. Never a crash at boot.

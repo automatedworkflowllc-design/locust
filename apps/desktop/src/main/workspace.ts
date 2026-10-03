@@ -57,6 +57,10 @@ export function resolveWorkspacePath(options: {
   /** The folder to make and use when nothing else names one; undefined keeps the old "no workspace" answer. */
   readonly defaultWorkspace?: string | undefined
   readonly platform: NodeJS.Platform
+  /** The person's home folder; a launch from it, or from an agent's settings folder in it, is not a workspace. */
+  readonly homeDirectory?: string | undefined
+  /** Windows' own folder (`%SystemRoot%`); a launch from inside it is not a workspace. */
+  readonly systemDirectory?: string | undefined
 }): WorkspaceResolution {
   // An explicit argument wins: it is how the app reopens itself in a folder
   // the person just chose.
@@ -65,8 +69,12 @@ export function resolveWorkspacePath(options: {
     return { path: resolve(argument), source: 'argument' }
   }
   // Launched from a real folder -- a terminal, a shortcut with a start-in --
-  // that folder is the workspace, as it always was.
-  if (!isInsideDirectory(options.cwd, options.installDirectory, options.platform)) {
+  // that folder is the workspace, as it always was. Not the home folder, an
+  // agent's own settings folder, or Windows' own (0.572; see notATeammateFolder).
+  if (
+    !isInsideDirectory(options.cwd, options.installDirectory, options.platform)
+    && notATeammateFolder(options.cwd, options.homeDirectory, options.platform, options.systemDirectory) === undefined
+  ) {
     return { path: resolve(options.cwd), source: 'launch-folder' }
   }
   if (
@@ -84,6 +92,36 @@ export function resolveWorkspacePath(options: {
     return { path: resolve(options.defaultWorkspace), source: 'default' }
   }
   return { path: undefined, source: 'none' }
+}
+
+/**
+ * The folders under home where the agents keep their own settings, sign-ins
+ * and transcripts. A teammate working in one reads them as its project.
+ */
+export const AGENT_SETTINGS_FOLDERS = ['.claude', '.codex', '.cursor', '.gemini', '.config'] as const
+
+/**
+ * Why a folder is no place for teammates to work, or undefined when it is fine.
+ *
+ * Colin's ledger, 2026-10-03: Bro (Chief of Staff) worked in
+ * `C:\Users\<name>\.claude`, Claude Code's own folder; in Auto its first
+ * command listed the credential files there, and its report was written into
+ * it. A launch folder like that was taken as the workspace without a word.
+ */
+export function notATeammateFolder(
+  candidate: string,
+  homeDirectory: string | undefined,
+  platform: NodeJS.Platform,
+  systemDirectory?: string
+): string | undefined {
+  if (!isAbsolute(candidate)) return undefined
+  if (systemDirectory !== undefined && isInsideDirectory(candidate, systemDirectory, platform)) return "Windows' own folder"
+  if (homeDirectory === undefined) return undefined
+  if (isInsideDirectory(homeDirectory, candidate, platform)) return 'your home folder'
+  for (const name of AGENT_SETTINGS_FOLDERS) {
+    if (isInsideDirectory(candidate, resolve(homeDirectory, name), platform)) return `${name}, where the agents keep their own settings`
+  }
+  return undefined
 }
 
 /** Whether `candidate` is `directory` or somewhere under it. Case-blind on Windows, where the filesystem is. */
