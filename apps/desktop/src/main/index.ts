@@ -264,6 +264,7 @@ import {
   CLAUDE_CLOUD_CHECK_CHANNEL,
   CLAUDE_CLOUD_APPLY_CHANNEL,
   CLAUDE_CLOUD_TERMINAL_CHANNEL,
+  CLAUDE_CLOUD_ENVIRONMENT_CHANNEL,
   REWIND_PUT_BACK_CHANNEL,
   WORKSPACE_ATTACH_CHANNEL,
   WORKSPACE_FILES_CHANNEL,
@@ -3722,11 +3723,13 @@ if (!ownsSingleInstanceLock) {
       const picked = typeof choice === 'object' && choice !== null ? (choice as Record<string, unknown>) : {}
       const started = await claudeCloud.start(workspacePath, prompt.slice(0, 20_000), typeof teammateId === 'string' ? teammateId : undefined, {
         ...(typeof picked.model === 'string' ? { model: picked.model } : {}),
-        ...(typeof picked.effort === 'string' ? { effort: picked.effort } : {})
+        ...(typeof picked.effort === 'string' ? { effort: picked.effort } : {}),
+        ...(typeof picked.environment === 'string' ? { environment: picked.environment } : {})
       })
       return started.ok ? { ok: true, session: publicSession(started.session) } : started
     })
     ipcMain.handle(CLAUDE_CLOUD_LIST_CHANNEL, async (event) => (fromOwnWindow(event) ? (await claudeCloud.list(workspacePath)).map(publicSession) : []))
+    ipcMain.handle(CLAUDE_CLOUD_ENVIRONMENT_CHANNEL, async (event) => fromOwnWindow(event) ? claudeCloud.environment(workspacePath) : undefined)
     ipcMain.handle(CLAUDE_CLOUD_HOME_CHANNEL, async (event, id: unknown) => {
       if (!fromOwnWindow(event) || typeof id !== 'string') return { ok: false, message: 'That cloud session could not be brought home.' }
       return claudeCloud.home(id)

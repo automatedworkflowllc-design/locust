@@ -2186,6 +2186,17 @@ export default function App(): ReactElement {
   const [workspaceName, setWorkspaceName] = useState('Local workspace')
   /** The folder itself, so activity rows can show paths the way a person writes them. */
   const [workspacePath, setWorkspacePath] = useState<string | undefined>(undefined)
+  const [cloudEnvironment, setCloudEnvironment] = useState({ folder: '', value: '', edited: false })
+  useEffect(() => {
+    if (workspacePath === undefined) return
+    const folder = workspacePath
+    let active = true
+    setCloudEnvironment({ folder, value: '', edited: false })
+    void window.desktop?.getClaudeCloudEnvironment().then((value) => {
+      if (active) setCloudEnvironment((current) => current.folder === folder && !current.edited ? { folder, value: value ?? '', edited: false } : current)
+    }).catch(() => undefined)
+    return () => { active = false }
+  }, [workspacePath])
   // Whether a comparison here may change files (see compareChangesRefusal above).
   useEffect(() => {
     if (!compareOn) return
@@ -3802,7 +3813,8 @@ export default function App(): ReactElement {
       if (!bridge) return 'Locust is not ready yet. Nothing was sent.'
       // On the model and effort in the box (0.557): without them, every session ran on the account's default.
       const cloudEffort = effort !== undefined && (modelFamily(models, 'claude', composerRoute.model)?.supportedEfforts ?? []).includes(effort) ? effort : undefined
-      const sent = await bridge.startClaudeCloud(prompt, pickedTeammate?.teammateId, { model: composerRoute.model, ...(cloudEffort === undefined ? {} : { effort: cloudEffort }) }).catch(() => undefined)
+      const environment = cloudEnvironment.folder === workspacePath ? cloudEnvironment.value : ''
+      const sent = await bridge.startClaudeCloud(prompt, pickedTeammate?.teammateId, { model: composerRoute.model, ...(cloudEffort === undefined ? {} : { effort: cloudEffort }), ...(environment.length === 0 ? {} : { environment }) }).catch(() => undefined)
       if (sent === undefined) return 'Claude Code could not be opened. Nothing was sent.'
       if (!sent.ok) return sent.message
       setClaudeCloud((current) => [sent.session, ...current.filter((one) => one.id !== sent.session.id)])
@@ -8129,6 +8141,10 @@ export default function App(): ReactElement {
                 }
               },
               where: composerRoute.runtime === 'claude' ? 'claude' : 'codex',
+              environment: {
+                value: cloudEnvironment.folder === workspacePath ? cloudEnvironment.value : '',
+                onChange: (value) => setCloudEnvironment({ folder: workspacePath ?? '', value, edited: true })
+              },
               ...(composerRoute.runtime === 'claude'
                 ? {}
                 : composerRoute.runtime !== 'codex'

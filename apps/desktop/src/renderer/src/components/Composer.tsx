@@ -40,6 +40,7 @@ import { Icon } from './Icon.js'
 import { Beam } from './Beam.js'
 import { effortFooter, effortName } from '../effortLevels.js'
 import { EffortSlider } from './EffortSlider.js'
+import { CloudEnvironmentField } from './CloudEnvironmentField.js'
 import { effortScale, joinEffort, splitEffort } from '../effortScale.js'
 import { ATTACHMENT_DIR, attachmentLabel, MAX_ATTACHMENTS, withAttachments } from '../../../shared/attachments.js'
 import { diffNotesTile, withDiffNotes } from '../diffNotes.js'
@@ -265,6 +266,7 @@ export interface ComposerProps {
     readonly refusal?: string
     /** Which cloud the picked model goes to (0.538): Codex Cloud, or Claude's. Absent: Codex. */
     readonly where?: 'codex' | 'claude'
+    readonly environment?: { readonly value: string; readonly onChange: (value: string) => void }
   }
   readonly asking?: { readonly label: string; readonly columns: number; readonly changes?: boolean; readonly blind?: boolean }
   /** Opens the model picker when it changes: Home's Compare models (0.442). */
@@ -1770,6 +1772,7 @@ export function Composer({
           </div>
         )}
         <form className="command-dock lc-composer__form" onSubmit={submit}>
+          {cloud?.on === true && cloud.where === 'claude' && cloud.environment !== undefined && <CloudEnvironmentField {...cloud.environment} />}
           <div className="lc-composer__box" onMouseDown={pressBox}>
             <textarea
               ref={field}

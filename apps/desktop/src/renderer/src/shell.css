@@ -18203,6 +18203,19 @@ textarea {
   color: var(--lc-amber-text);
   font-size: var(--lc-text-description);
 }
+.lc-cloud-environment {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+  padding: var(--lc-space-3) var(--lc-space-4);
+  font-size: var(--lc-text-description);
+}
+.lc-cloud-environment .lc-input {
+  width: 100%;
+}
+.lc-cloud-environment .lc-input[aria-invalid="true"] {
+  border-color: var(--lc-amber-text);
+}
 .lc-cloudtask {
   display: flex;
   flex-direction: column;

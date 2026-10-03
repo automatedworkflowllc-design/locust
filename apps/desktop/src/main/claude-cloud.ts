@@ -15,6 +15,7 @@ import type { TerminalExchange } from './terminal-catch-up.js'
 import { isResumableSessionId, openInTerminal } from './open-in-terminal.js'
 import type { TerminalRequest } from './open-in-terminal.js'
 import type { OpenInTerminalResponse } from '../shared/ipc.js'
+import { isCloudEnvironmentId } from '../shared/claude-cloud.js'
 
 /**
  * CLAUDE'S CLOUD (0.538): a task handed to a Claude Code cloud session, from
@@ -86,14 +87,16 @@ export function windowsCommandLine(path: string, prefix: readonly string[], acti
 export interface CloudChoice {
   readonly model?: string
   readonly effort?: string
+  readonly environment?: string
 }
 const MODEL_NAME = /^[A-Za-z0-9][A-Za-z0-9._\-[\]]{0,79}$/
 const EFFORTS: readonly string[] = ['low', 'medium', 'high', 'xhigh', 'max']
 
 export function choiceArgs(choice: CloudChoice | undefined): string[] {
+  if (choice?.environment !== undefined && !isCloudEnvironmentId(choice.environment)) throw new Error('Use an environment ID beginning ccpool_ with 1 to 80 letters, digits, underscores or hyphens, or leave it empty.')
   const model = choice?.model !== undefined && choice.model !== 'account-default' && MODEL_NAME.test(choice.model) ? choice.model : undefined
   const effort = choice?.effort !== undefined && EFFORTS.includes(choice.effort) ? choice.effort : undefined
-  return [...(model === undefined ? [] : ['--model', model]), ...(effort === undefined ? [] : ['--effort', effort])]
+  return [...(model === undefined ? [] : ['--model', model]), ...(effort === undefined ? [] : ['--effort', effort]), ...(choice?.environment === undefined ? [] : ['--environment', choice.environment])]
 }
 
 /** A Claude Code cloud session's id, as it prints one. */
@@ -222,6 +225,31 @@ export function createClaudeCloud(options: ClaudeCloudOptions) {
     const temp = `${options.storePath}.${randomUUID()}.tmp`
     await writeFile(temp, JSON.stringify({ sessions }, null, 2), 'utf8')
     await rename(temp, options.storePath)
+  }
+  // Non-secret, per-folder choice; kept separately so refreshing the session list cannot erase it.
+  const environmentPath = `${options.storePath}.environments.json`
+  const environments = async (): Promise<{ folder: string; id: string }[]> => {
+    try {
+      const value: unknown = JSON.parse(await readFile(environmentPath, 'utf8'))
+      if (!Array.isArray(value)) return []
+      return value.filter((entry): entry is { folder: string; id: string } => typeof entry === 'object' && entry !== null
+        && typeof entry.folder === 'string' && entry.folder.length > 0 && entry.folder.length <= 4_000
+        && typeof entry.id === 'string' && isCloudEnvironmentId(entry.id)).slice(0, MAX_KEPT)
+    } catch { return [] }
+  }
+  let environmentWrites: Promise<void> = Promise.resolve()
+  const rememberEnvironment = (folder: string, id: string | undefined): Promise<void> => {
+    const pending = environmentWrites.then(async () => {
+      const saved = await environments()
+      const previous = saved.filter((entry) => entry.folder !== folder)
+      if (id === undefined && previous.length === saved.length) return
+      await mkdir(dirname(environmentPath), { recursive: true })
+      const temp = `${environmentPath}.${randomUUID()}.tmp`
+      await writeFile(temp, JSON.stringify(id === undefined ? previous : [{ folder, id }, ...previous].slice(0, MAX_KEPT)), 'utf8')
+      await rename(temp, environmentPath)
+    })
+    environmentWrites = pending.catch(() => undefined)
+    return pending
   }
 
   /** How Claude Code is launched here, or what to say when it cannot be. */
@@ -442,6 +470,9 @@ export function createClaudeCloud(options: ClaudeCloudOptions) {
     async list(folder: string): Promise<readonly ClaudeCloudSession[]> {
       return (await read()).filter((session) => session.folder === folder)
     },
+    async environment(folder: string): Promise<string | undefined> {
+      return (await environments()).find((entry) => entry.folder === folder)?.id
+    },
     /** W5: the terminal gets its own copy; Locust never watches its work. */
     async continueInTerminal(id: string): Promise<OpenInTerminalResponse> {
       const session = (await read()).find((entry) => entry.id === id)
@@ -466,6 +497,10 @@ export function createClaudeCloud(options: ClaudeCloudOptions) {
     async start(folder: string, prompt: string, teammateId?: string, choice?: CloudChoice): Promise<ClaudeCloudAnswer> {
       const task = cloudTaskText(prompt)
       if (task.length === 0) return { ok: false, message: 'Describe the task first. Nothing was sent.' }
+      if (choice?.environment !== undefined && !isCloudEnvironmentId(choice.environment)) {
+        return { ok: false, message: 'Use an environment ID beginning ccpool_ with 1 to 80 letters, digits, underscores or hyphens, or leave it empty. Nothing was sent.' }
+      }
+      await rememberEnvironment(folder, choice?.environment)
       const unseen = await startUnseen(folder, task, choice)
       if (unseen?.kind === 'failed' && unseen.message !== undefined) {
         // Claude Code said why, in so many words: that is the answer, and nothing was created.

@@ -704,6 +704,7 @@ export const CLAUDE_CLOUD_SEND_CHANNEL = 'claude-cloud:send'
 export const CLAUDE_CLOUD_CHECK_CHANNEL = 'claude-cloud:check'
 export const CLAUDE_CLOUD_APPLY_CHANNEL = 'claude-cloud:apply'
 export const CLAUDE_CLOUD_TERMINAL_CHANNEL = 'claude-cloud:terminal'
+export const CLAUDE_CLOUD_ENVIRONMENT_CHANNEL = 'claude-cloud:environment'
 export interface ClaudeCloudSession {
   readonly id: string
   readonly startedAt: string
@@ -3227,7 +3228,8 @@ export interface DesktopApi {
   cloudFolders(): Promise<readonly PublicCloudFolder[]>
   /** Claude's cloud (0.538): a window of Claude Code with the task given; the list; `--teleport` to bring one home. */
   /** `choice`: the box's Claude model and effort, which the session runs on (0.557). */
-  startClaudeCloud(prompt: string, teammateId?: string, choice?: { readonly model?: string; readonly effort?: string }): Promise<ClaudeCloudStartResponse>
+  startClaudeCloud(prompt: string, teammateId?: string, choice?: { readonly model?: string; readonly effort?: string; readonly environment?: string }): Promise<ClaudeCloudStartResponse>
+  getClaudeCloudEnvironment(): Promise<string | undefined>
   listClaudeCloud(): Promise<readonly PublicClaudeCloudSession[]>
   bringClaudeCloudHome(id: string): Promise<ClaudeCloudHomeResponse>
   continueClaudeCloudInTerminal(id: string): Promise<OpenInTerminalResponse>
