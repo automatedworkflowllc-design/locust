@@ -55,7 +55,7 @@ import type { EditCheckResult } from './edit-check.js'
 import type { ApprovalChannel } from './approval-channel.js'
 import { fileChangesOf, itemOf } from './approval-patch.js'
 import type { FileChangeRecord } from './approval-patch.js'
-import { composeColdFollowUp, composeHandoffPrompt } from './handoff.js'
+import { composeColdFollowUp, composeHandoffPrompt, howTurnEnded } from './handoff.js'
 import type { EarlierTurn } from './handoff.js'
 import { changedPaths, observedEditEvents, observedPatches, sharedTreeNotice, snapshotWorkspace, unreportedPaths } from './disk-observation.js'
 import type { RecentEdits } from './recent-edits.js'
@@ -1560,7 +1560,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               prompt,
               await earlierTurnsOf(prior),
               taskFile,
-              leaveOut
+              leaveOut,
+              howTurnEnded(prior.events)
             )
             const briefing = composed === undefined || taskFile === undefined ? composed : { ...composed, prompt: withAttachments(composed.prompt, [taskFile]) }
             if (briefing === undefined) {
@@ -2478,7 +2479,7 @@ ${sentPrompt.trim()}`
         return { kind: 'refused', message: `That conversation cannot be continued safely on another runtime: ${checkpoint.safetyReason}` }
       }
       const taskFile = longTaskFilePath(prior.metadata.prompt, prior.metadata.missionId)
-      const composed = composeHandoffPrompt(prior.metadata.prompt, checkpoint, runtimeDisplayName(prior.metadata.runtime), prompt, await earlierTurnsOf(prior), taskFile, leaveOut)
+      const composed = composeHandoffPrompt(prior.metadata.prompt, checkpoint, runtimeDisplayName(prior.metadata.runtime), prompt, await earlierTurnsOf(prior), taskFile, leaveOut, howTurnEnded(prior.events))
       if (composed === undefined) return { kind: 'refused', message: 'That conversation is too long to carry to another runtime with this reply.' }
       return {
         kind: 'switch',

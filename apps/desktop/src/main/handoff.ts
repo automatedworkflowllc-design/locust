@@ -87,7 +87,8 @@ function sectionsFor(
   fromRuntime: string,
   next?: string,
   earlier: readonly EarlierTurn[] = [],
-  taskFile?: string
+  taskFile?: string,
+  ended?: string
 ): readonly { readonly name: string; readonly text: string }[] {
   /*
    * SAID AS IT HAPPENED (QA-2026-09-29 round 2, N4). A person who replied on
@@ -108,7 +109,9 @@ function sectionsFor(
     {
       name: 'task',
       text: clean
-        ? `You are taking over this conversation from another agent (${fromRuntime}), which finished its last turn. The last thing it was asked was:\n\n${task}`
+        ? ended === undefined
+          ? `You are taking over this conversation from another agent (${fromRuntime}), which finished its last turn. The last thing it was asked was:\n\n${task}`
+          : `You are taking over this conversation from another agent (${fromRuntime}), whose last turn ended before it finished: ${ended}. The last thing it was asked was:\n\n${task}`
         : `You are continuing work that another agent (${fromRuntime}) started and stopped partway through. The original task was:\n\n${task}`
     }
   ]
@@ -216,6 +219,23 @@ export function composeColdFollowUp(earlier: readonly EarlierTurn[], next: strin
   ].join('\n\n')
 }
 
+/**
+ * HOW THE TURN HANDED OVER ENDED, when it did not finish (0.571). Colin,
+ * 2026-10-03: Codex hit its 5-hour limit before answering a teammate, he
+ * switched the conversation to Gemini, and its brief said Codex "finished its
+ * last turn". Nothing had been left mid-action -- the only test -- because
+ * nothing had been done at all. Undefined for a turn that completed.
+ */
+export function howTurnEnded(events: readonly { readonly type: string; readonly payload?: unknown }[]): string | undefined {
+  const end = [...events].reverse().find((event) => event.type === 'run.completed' || event.type === 'run.failed' || event.type === 'run.cancelled')
+  if (end === undefined || end.type === 'run.completed') return undefined
+  if (end.type === 'run.cancelled') return 'the person stopped it'
+  const kind = (end.payload as { readonly kind?: unknown } | undefined)?.kind
+  if (kind === 'quota-exhausted') return 'its usage limit was reached'
+  if (kind === 'temporary-rate-limit') return 'its provider was turning requests away'
+  return 'it failed'
+}
+
 export function composeHandoffPrompt(
   originalPrompt: string,
   checkpoint: ReconciledCheckpoint,
@@ -232,9 +252,11 @@ export function composeHandoffPrompt(
   /** A long task's file, project-relative (0.513, long-task-file.ts): quoted from, never clipped. */
   taskFile?: string,
   /** Sections the person chose to leave out (0.527); only DROPPABLE_SECTION_NAMES are honoured. */
-  leaveOut: readonly string[] = []
+  leaveOut: readonly string[] = [],
+  /** How the turn handed over ended, when it did not finish (`howTurnEnded`). */
+  ended?: string
 ): HandoffBriefing | undefined {
-  const composed = sectionsFor(originalPrompt, checkpoint, fromRuntime, next, earlier, taskFile)
+  const composed = sectionsFor(originalPrompt, checkpoint, fromRuntime, next, earlier, taskFile, ended)
   const droppable: readonly string[] = DROPPABLE_SECTION_NAMES
   const leftOutByYou = composed.filter((section) => droppable.includes(section.name) && leaveOut.includes(section.name)).map((section) => section.name)
   const sections = composed.filter((section) => !leftOutByYou.includes(section.name))

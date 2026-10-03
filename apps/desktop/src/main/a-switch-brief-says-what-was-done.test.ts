@@ -3,7 +3,7 @@ import type { ReconciledCheckpoint } from '@teammate/mission-store'
 import { reconcileMission } from '@teammate/mission-store'
 import { describe, expect, it } from 'vitest'
 
-import { composeHandoffPrompt, MAX_HANDOFF_PROMPT_LENGTH, NOTICE_BUDGET, OPTIONAL_SECTION_NAMES, omissionNotice } from './handoff.js'
+import { composeHandoffPrompt, howTurnEnded, MAX_HANDOFF_PROMPT_LENGTH, NOTICE_BUDGET, OPTIONAL_SECTION_NAMES, omissionNotice } from './handoff.js'
 
 /**
  * A2.11 (reported #13): A RUNTIME SWITCH IS TOLD WHAT HAPPENED, IN WORDS.
@@ -139,5 +139,28 @@ describe('the earlier turns', () => {
 
   it('fit the notice’s reserve with every optional section named', () => {
     expect(omissionNotice(OPTIONAL_SECTION_NAMES).length + 2).toBeLessThanOrEqual(NOTICE_BUDGET)
+  })
+})
+
+/**
+ * Colin, 2026-10-03: Codex hit its 5-hour limit before answering a teammate,
+ * the conversation went to Gemini, and its brief said Codex "finished its last
+ * turn". A turn that ended on a limit, a failure or a Stop is said as one.
+ */
+describe('how the turn handed over ended', () => {
+  const ended = (type: string, payload: Record<string, unknown> = {}) => [{ type: 'run.started', payload: {} }, { type, payload }]
+
+  it('says a turn cut off by a usage limit was not finished', () => {
+    const said = howTurnEnded(ended('run.failed', { kind: 'quota-exhausted', message: 'You have hit your usage limit.' }))
+    expect(said).toBe('its usage limit was reached')
+    const prompt = composeHandoffPrompt('Answer Casper.', checkpoint(), 'Codex CLI', 'Carry on.', [], undefined, [], said)!.prompt
+    expect(prompt).toContain('whose last turn ended before it finished: its usage limit was reached')
+    expect(prompt).not.toContain('which finished its last turn')
+  })
+
+  it('still says a completed turn finished', () => {
+    expect(howTurnEnded(ended('run.completed'))).toBeUndefined()
+    expect(composeHandoffPrompt('Answer Casper.', checkpoint(), 'Codex CLI', 'Carry on.')!.prompt).toContain('which finished its last turn')
+    expect(howTurnEnded(ended('run.cancelled'))).toBe('the person stopped it')
   })
 })
