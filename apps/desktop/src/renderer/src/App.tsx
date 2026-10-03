@@ -3785,7 +3785,9 @@ export default function App(): ReactElement {
     // Cloud (0.503): the task goes to Codex Cloud, and the panel follows it.
     if (cloudOn && comparing === undefined && composerRoute.runtime === 'claude') {
       if (!bridge) return 'Locust is not ready yet. Nothing was sent.'
-      const sent = await bridge.startClaudeCloud(prompt, pickedTeammate?.teammateId).catch(() => undefined)
+      // On the model and effort in the box (0.557): without them, every session ran on the account's default.
+      const cloudEffort = effort !== undefined && (modelFamily(models, 'claude', composerRoute.model)?.supportedEfforts ?? []).includes(effort) ? effort : undefined
+      const sent = await bridge.startClaudeCloud(prompt, pickedTeammate?.teammateId, { model: composerRoute.model, ...(cloudEffort === undefined ? {} : { effort: cloudEffort }) }).catch(() => undefined)
       if (sent === undefined) return 'Claude Code could not be opened. Nothing was sent.'
       if (!sent.ok) return sent.message
       setClaudeCloud((current) => [sent.session, ...current.filter((one) => one.id !== sent.session.id)])

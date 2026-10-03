@@ -3704,10 +3704,15 @@ if (!ownsSingleInstanceLock) {
       const { folder: _folder, ...rest } = session
       return rest
     }
-    ipcMain.handle(CLAUDE_CLOUD_START_CHANNEL, async (event, prompt: unknown, teammateId: unknown) => {
+    ipcMain.handle(CLAUDE_CLOUD_START_CHANNEL, async (event, prompt: unknown, teammateId: unknown, choice: unknown) => {
       if (!fromOwnWindow(event) || typeof prompt !== 'string') return { ok: false, message: 'That could not be sent to the cloud.' }
       if (freeRoutesOnly(process.argv, process.env)) return { ok: false, message: FREE_ONLY_REFUSAL }
-      const started = await claudeCloud.start(workspacePath, prompt.slice(0, 20_000), typeof teammateId === 'string' ? teammateId : undefined)
+      // Plain strings only; claude-cloud passes a name or level and nothing else (choiceArgs).
+      const picked = typeof choice === 'object' && choice !== null ? (choice as Record<string, unknown>) : {}
+      const started = await claudeCloud.start(workspacePath, prompt.slice(0, 20_000), typeof teammateId === 'string' ? teammateId : undefined, {
+        ...(typeof picked.model === 'string' ? { model: picked.model } : {}),
+        ...(typeof picked.effort === 'string' ? { effort: picked.effort } : {})
+      })
       return started.ok ? { ok: true, session: publicSession(started.session) } : started
     })
     ipcMain.handle(CLAUDE_CLOUD_LIST_CHANNEL, async (event) => (fromOwnWindow(event) ? (await claudeCloud.list(workspacePath)).map(publicSession) : []))

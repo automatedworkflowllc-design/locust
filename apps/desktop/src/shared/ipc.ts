@@ -3115,7 +3115,8 @@ export interface DesktopApi {
   applyCloudTask(taskId: string): Promise<CloudApplyResponse>
   cloudFolders(): Promise<readonly PublicCloudFolder[]>
   /** Claude's cloud (0.538): a window of Claude Code with the task given; the list; `--teleport` to bring one home. */
-  startClaudeCloud(prompt: string, teammateId?: string): Promise<ClaudeCloudStartResponse>
+  /** `choice`: the box's Claude model and effort, which the session runs on (0.557). */
+  startClaudeCloud(prompt: string, teammateId?: string, choice?: { readonly model?: string; readonly effort?: string }): Promise<ClaudeCloudStartResponse>
   listClaudeCloud(): Promise<readonly PublicClaudeCloudSession[]>
   bringClaudeCloudHome(id: string): Promise<ClaudeCloudHomeResponse>
   forgetClaudeCloud(id: string): Promise<void>

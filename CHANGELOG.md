@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.557.0 - 2026-10-02
+
+### Fixed
+
+- **A task for Claude's cloud runs on the model you picked.** Claude Code was
+  given no model, so every cloud session ran on your account's default
+  (Opus), whatever the box said. It now gets the box's Claude model and its
+  effort.
+
 ## 0.556.0 - 2026-10-02
 
 ### Changed

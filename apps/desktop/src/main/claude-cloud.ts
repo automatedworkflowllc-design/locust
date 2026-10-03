@@ -55,15 +55,36 @@ export const TASK_VARIABLE = 'LOCUST_CLAUDE_CLOUD_TASK'
  * is expanded once and never read again as a command. `/k` keeps the window,
  * so whatever Claude Code says on its way out can be read.
  */
-export function windowsCommandLine(path: string, prefix: readonly string[], action: 'start' | 'home' | 'send', options: { readonly session?: string; readonly stay?: boolean } = {}): string {
+export function windowsCommandLine(path: string, prefix: readonly string[], action: 'start' | 'home' | 'send', options: { readonly session?: string; readonly stay?: boolean; readonly choice?: CloudChoice } = {}): string {
   const head = [`"${path}"`, ...prefix.map((part) => `"${part}"`)].join(' ')
   const session = options.session !== undefined && SESSION_ID.test(options.session) ? options.session : undefined
   const tail = action === 'start'
-    ? `--cloud "%${TASK_VARIABLE}%"`
+    ? [...choiceArgs(options.choice), '--cloud', `"%${TASK_VARIABLE}%"`].join(' ')
     : action === 'send'
       ? `-p --cloud ${session ?? ''} "%${TASK_VARIABLE}%"`
       : session === undefined ? '--teleport' : `--teleport ${session}`
   return `/d ${options.stay === false ? '/c' : '/k'} "${head} ${tail}"`
+}
+
+/**
+ * The model and effort picked in the box, for the session (0.557). Colin,
+ * 2026-10-02: "you're sending all these cloud messages on opus 5.5" -- and
+ * his own test on Sonnet Low went the same way: `--cloud` was given no model,
+ * so every session ran on the account's default. Measured: `--model haiku
+ * --cloud "..."` is accepted. Only a plain name or level is passed, never
+ * anything cmd could read as more.
+ */
+export interface CloudChoice {
+  readonly model?: string
+  readonly effort?: string
+}
+const MODEL_NAME = /^[A-Za-z0-9][A-Za-z0-9._\-[\]]{0,79}$/
+const EFFORTS: readonly string[] = ['low', 'medium', 'high', 'xhigh', 'max']
+
+export function choiceArgs(choice: CloudChoice | undefined): string[] {
+  const model = choice?.model !== undefined && choice.model !== 'account-default' && MODEL_NAME.test(choice.model) ? choice.model : undefined
+  const effort = choice?.effort !== undefined && EFFORTS.includes(choice.effort) ? choice.effort : undefined
+  return [...(model === undefined ? [] : ['--model', model]), ...(effort === undefined ? [] : ['--effort', effort])]
 }
 
 /** A Claude Code cloud session's id, as it prints one. */
@@ -164,15 +185,15 @@ export function createClaudeCloud(options: ClaudeCloudOptions) {
   }
 
   /** Claude Code in a window of its own, in `folder`. */
-  const open = async (folder: string, action: 'start' | 'home', task?: string, sessionId?: string): Promise<{ readonly ok: true } | { readonly ok: false; readonly message: string }> => {
+  const open = async (folder: string, action: 'start' | 'home', task?: string, sessionId?: string, choice?: CloudChoice): Promise<{ readonly ok: true } | { readonly ok: false; readonly message: string }> => {
     const launch = await launchOf()
     if (!launch.ok) return launch
     if (platform === 'darwin') {
-      const args = action === 'start' ? ['--cloud', task ?? ''] : sessionId === undefined ? ['--teleport'] : ['--teleport', sessionId]
+      const args = action === 'start' ? [...choiceArgs(choice), '--cloud', task ?? ''] : sessionId === undefined ? ['--teleport'] : ['--teleport', sessionId]
       const opened = await openInMacTerminal(folder, { file: launch.file, args: [...launch.prefix, ...args] }, launch.env)
       return opened.ok ? { ok: true } : { ok: false, message: opened.message }
     }
-    const line = windowsCommandLine(launch.file, launch.prefix, action, sessionId === undefined ? {} : { session: sessionId })
+    const line = windowsCommandLine(launch.file, launch.prefix, action, { ...(sessionId === undefined ? {} : { session: sessionId }), ...(choice === undefined ? {} : { choice }) })
     try {
       const child = run('cmd.exe', [line], {
         cwd: folder,
@@ -196,12 +217,12 @@ export function createClaudeCloud(options: ClaudeCloudOptions) {
    * link come back. Undefined when that terminal could not run, or Claude
    * Code asked the person something -- then the window is the way.
    */
-  const startUnseen = async (folder: string, task: string): Promise<CloudStartReading | undefined> => {
+  const startUnseen = async (folder: string, task: string, choice: CloudChoice | undefined): Promise<CloudStartReading | undefined> => {
     if (platform !== 'win32' || options.terminal === undefined) return undefined
     const launch = await launchOf()
     if (!launch.ok) return undefined
     const drawn = await options.terminal({
-      line: `cmd.exe ${windowsCommandLine(launch.file, launch.prefix, 'start', { stay: false })}`,
+      line: `cmd.exe ${windowsCommandLine(launch.file, launch.prefix, 'start', { stay: false, ...(choice === undefined ? {} : { choice }) })}`,
       cwd: folder,
       env: { ...(launch.env ?? {}), [TASK_VARIABLE]: task },
       seconds: 60,
@@ -214,10 +235,10 @@ export function createClaudeCloud(options: ClaudeCloudOptions) {
     async list(folder: string): Promise<readonly ClaudeCloudSession[]> {
       return (await read()).filter((session) => session.folder === folder)
     },
-    async start(folder: string, prompt: string, teammateId?: string): Promise<ClaudeCloudAnswer> {
+    async start(folder: string, prompt: string, teammateId?: string, choice?: CloudChoice): Promise<ClaudeCloudAnswer> {
       const task = cloudTaskText(prompt)
       if (task.length === 0) return { ok: false, message: 'Describe the task first. Nothing was sent.' }
-      const unseen = await startUnseen(folder, task)
+      const unseen = await startUnseen(folder, task, choice)
       if (unseen?.kind === 'failed' && unseen.message !== undefined) {
         // Claude Code said why, in so many words: that is the answer, and nothing was created.
         return { ok: false, message: `Claude Code did not start a cloud session: ${unseen.message}` }
@@ -225,7 +246,7 @@ export function createClaudeCloud(options: ClaudeCloudOptions) {
       let asked = false
       if (unseen?.kind !== 'created') {
         // No terminal to hide in, or a question only the person answers: Claude Code's own window.
-        const opened = await open(folder, 'start', task)
+        const opened = await open(folder, 'start', task, undefined, choice)
         if (!opened.ok) return opened
         asked = unseen?.kind === 'asks'
       }

@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { ASKS_THE_PERSON, TASK_VARIABLE, createClaudeCloud, readCloudStart, windowsCommandLine } from './claude-cloud.js'
+import { ASKS_THE_PERSON, TASK_VARIABLE, choiceArgs, createClaudeCloud, readCloudStart, windowsCommandLine } from './claude-cloud.js'
 import type { PseudoTerminalRun } from './pseudo-terminal.js'
 import { plainTerminalText } from './pseudo-terminal.js'
 
@@ -157,6 +157,31 @@ describe('a session Locust knows', () => {
     const { cloud, id, answer } = await known(0)
     answer({ code: 1, output: 'Error: failed to send message to cloud session: Session not found\n' })
     expect(await cloud.send(id, 'More')).toEqual({ ok: false, message: 'Claude Code did not send that: failed to send message to cloud session: Session not found' })
+  })
+})
+
+/*
+ * 0.557. Colin, 2026-10-02: "you're sending all these cloud messages on opus
+ * 5.5" -- `--cloud` was given no model, so a session picked on Sonnet Low ran
+ * on the account's default.
+ */
+describe('the model and effort picked in the box', () => {
+  it('go with the task, hidden or in the window', async () => {
+    windows.length = 0
+    const { runs, terminal } = terminalDrawing(CREATED)
+    const cloud = createClaudeCloud({ discover: claude, storePath: await store(), platform: 'win32', run: fakeSpawn, terminal })
+    await cloud.start('C:/work/app', 'Fix it', undefined, { model: 'claude-sonnet-5-5', effort: 'low' })
+    expect(runs[0]!.line).toContain('--model claude-sonnet-5-5 --effort low --cloud "%')
+    const shown = createClaudeCloud({ discover: claude, storePath: await store(), platform: 'win32', run: fakeSpawn })
+    await shown.start('C:/work/app', 'Fix it', undefined, { model: 'haiku' })
+    expect(windows[0]!.args[0]).toContain('--model haiku --cloud "%')
+  })
+
+  it('pass only a plain name and a known level: the account default, and anything else, is left out', () => {
+    expect(choiceArgs({ model: 'account-default', effort: 'low' })).toEqual(['--effort', 'low'])
+    expect(choiceArgs({ model: 'opus & calc', effort: 'turbo' })).toEqual([])
+    expect(choiceArgs({ model: 'claude-opus-5-5[1m]' })).toEqual(['--model', 'claude-opus-5-5[1m]'])
+    expect(choiceArgs(undefined)).toEqual([])
   })
 })
 
