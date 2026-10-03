@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import type { ReactElement } from 'react'
 
-import type { PublicClaudeCloudSession, PublicCloudFolder, PublicCloudTask, PublicCloudWhere } from '../../../shared/ipc.js'
+import type { ClaudeCloudReading, PublicClaudeCloudSession, PublicCloudFolder, PublicCloudTask, PublicCloudWhere } from '../../../shared/ipc.js'
 import { fileCounts, parseUnifiedDiff } from '../diff.js'
 import { agoLabel } from '../teammateWork.js'
 import { DiffView } from './DiffView.js'
 import { Icon } from './Icon.js'
+import { AgentText } from './ThreadItems.js'
 
 /**
  * CLOUD TASKS (0.503): what was handed to Codex Cloud from this folder, how
@@ -58,6 +59,10 @@ export function CloudTasks({
     readonly onOpenWeb: (url?: string) => void
     /** A follow-up to the session; resolves to what went wrong, or undefined when sent. */
     readonly onSend: (id: string, message: string) => Promise<string | undefined>
+    /** What the session said and changed, brought in out of sight (0.558). */
+    readonly onCheck: (id: string) => Promise<ClaudeCloudReading>
+    /** Its change into this folder; resolves to what went wrong, or undefined when applied. */
+    readonly onApply: (id: string) => Promise<string | undefined>
   }
 }): ReactElement {
   // Codex's warnings are about Codex Cloud: not said while Claude's is the one picked, unless Codex tasks are here.
@@ -263,7 +268,9 @@ function ClaudeCloudSessions({
   onHome,
   onForget,
   onOpenWeb,
-  onSend
+  onSend,
+  onCheck,
+  onApply
 }: NonNullable<Parameters<typeof CloudTasks>[0]['claude']>): ReactElement {
   return (
     <div className="lc-cloudtasks__claude">
@@ -276,7 +283,7 @@ function ClaudeCloudSessions({
       )}
       {note !== undefined && <p className="lc-cloudtasks__note" role="status">{note}</p>}
       {sessions.map((session) => (
-        <ClaudeCloudRow key={session.id} session={session} onHome={onHome} onForget={onForget} onOpenWeb={onOpenWeb} onSend={onSend} />
+        <ClaudeCloudRow key={session.id} session={session} onHome={onHome} onForget={onForget} onOpenWeb={onOpenWeb} onSend={onSend} onCheck={onCheck} onApply={onApply} />
       ))}
     </div>
   )
@@ -287,13 +294,44 @@ function ClaudeCloudRow({
   onHome,
   onForget,
   onOpenWeb,
-  onSend
+  onSend,
+  onCheck,
+  onApply
 }: {
   readonly session: PublicClaudeCloudSession
-} & Pick<NonNullable<Parameters<typeof CloudTasks>[0]['claude']>, 'onHome' | 'onForget' | 'onOpenWeb' | 'onSend'>): ReactElement {
+} & Pick<NonNullable<Parameters<typeof CloudTasks>[0]['claude']>, 'onHome' | 'onForget' | 'onOpenWeb' | 'onSend' | 'onCheck' | 'onApply'>): ReactElement {
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [said, setSaid] = useState<string>()
+  const [reading, setReading] = useState<ClaudeCloudReading>()
+  const [checking, setChecking] = useState(false)
+  const [applying, setApplying] = useState(false)
+  const [applied, setApplied] = useState(false)
+  const check = (): void => {
+    if (checking) return
+    setChecking(true)
+    setSaid(undefined)
+    void onCheck(session.id).then((answer) => {
+      setChecking(false)
+      setApplied(false)
+      setReading(answer)
+    })
+  }
+  const apply = (): void => {
+    if (applying) return
+    setApplying(true)
+    void onApply(session.id).then((problem) => {
+      setApplying(false)
+      if (problem === undefined) {
+        setApplied(true)
+        setSaid('Its change is in this folder, not committed. Look it over before you keep it.')
+      } else {
+        setSaid(problem)
+      }
+    })
+  }
+  const read = reading?.ok === true ? reading : undefined
+  const files = read?.diff === undefined ? [] : parseUnifiedDiff(read.diff)
   const known = session.sessionId !== undefined
   const send = (): void => {
     const text = draft.trim()
@@ -304,7 +342,7 @@ function ClaudeCloudRow({
       setSending(false)
       if (problem === undefined) {
         setDraft('')
-        setSaid('Sent. Its reply shows on claude.ai and in the Claude app.')
+        setSaid('Sent. Check again in a moment to read its reply.')
       } else {
         setSaid(problem)
       }
@@ -317,13 +355,18 @@ function ClaudeCloudRow({
       <div className="lc-cloudtask__state">
         <span>
           {known
-            ? `In Claude’s cloud since ${agoLabel(session.startedAt) ?? 'just now'}. Its replies are on claude.ai and in the Claude app.`
+            ? `In Claude’s cloud since ${agoLabel(session.startedAt) ?? 'just now'}.`
             : `Sent to Claude’s cloud ${agoLabel(session.startedAt) ?? 'just now'}. Follow it on claude.ai or in the Claude app.`}
         </span>
       </div>
       {session.note !== undefined && <p className="lc-cloudtask__note">{session.note}</p>}
       <div className="lc-cloudtask__actions">
-        <button type="button" className="lc-primarybutton" onClick={() => onOpenWeb(session.url)} title={known ? 'This session, on claude.ai' : 'Your Claude Code sessions, in your browser'}>
+        {known && (
+          <button type="button" className="lc-primarybutton" disabled={checking} onClick={check} title="Claude Code brings the session in out of sight, in a worktree of its own; this folder is not touched">
+            {checking ? 'Reading it…' : read === undefined ? 'Show what it did' : 'Check again'}
+          </button>
+        )}
+        <button type="button" className={known ? 'lc-button' : 'lc-primarybutton'} onClick={() => onOpenWeb(session.url)} title={known ? 'This session, on claude.ai' : 'Your Claude Code sessions, in your browser'}>
           See it on claude.ai
         </button>
         <button
@@ -338,6 +381,63 @@ function ClaudeCloudRow({
           <Icon name="close" size={13} />
         </button>
       </div>
+      {reading?.ok === false && <p className="lc-cloudtask__note" role="alert">{reading.message}</p>}
+      {read !== undefined && (
+        <div className="lc-cloudtask__read">
+          {(read.exchanges.length > 0 || read.note === undefined) && (
+            <p className="lc-cloudtask__note">
+              {read.exchanges.length === 0
+                ? 'Claude Code brought it in, but it has no finished reply yet.'
+                : `What it said, as of ${agoLabel(read.checkedAt) ?? 'just now'}:`}
+            </p>
+          )}
+          {read.exchanges.length > 0 && (
+            <ol className="lc-cloudtask__thread" aria-label="The session’s conversation">
+              {read.exchanges.map((exchange, index) => (
+                <li key={`${exchange.at}:${String(index)}`} className="lc-cloudtask__exchange">
+                  <div className="lc-cloudtask__ask">{exchange.prompt}</div>
+                  {exchange.answer !== undefined && (
+                    <div className="lc-cloudtask__reply">
+                      <AgentText text={exchange.answer} streaming={false} />
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ol>
+          )}
+          {read.note !== undefined && <p className="lc-cloudtask__note">{read.note}</p>}
+          {read.changeTooBig === true && <p className="lc-cloudtask__note">Its change is too big to show here. Apply still brings it in whole.</p>}
+          {(files.length > 0 || read.changeTooBig === true) && (
+            <>
+              {files.length > 0 && (
+                <div className="lc-review__files">
+                  {files.map((file) => {
+                    const counts = fileCounts(file)
+                    return (
+                      <section key={`${session.id}:${file.path}`} aria-label={file.path}>
+                        <div className="lc-review__path lc-mono">
+                          <span className="lc-review__name">{file.path}</span>
+                          {file.status !== 'MODIFIED' && <span className="lc-review__status">{file.status.toLowerCase()}</span>}
+                          <span className="lc-diff__addmark">+{counts.added}</span> <span className="lc-diff__delmark">−{counts.removed}</span>
+                        </div>
+                        <DiffView file={file} truncated={false} reported={undefined} />
+                      </section>
+                    )
+                  })}
+                </div>
+              )}
+              <div className="lc-cloudtask__actions">
+                <button type="button" className="lc-primarybutton" disabled={applying || applied} onClick={apply} title="Its change comes into this folder, not committed, so you can look before you keep it">
+                  {applied ? 'Applied' : applying ? 'Applying…' : 'Apply to this folder'}
+                </button>
+              </div>
+            </>
+          )}
+          {read.diff === undefined && read.changeTooBig !== true && read.note === undefined && (
+            <p className="lc-cloudtask__note">It has changed nothing yet.</p>
+          )}
+        </div>
+      )}
       {known && (
         <form
           className="lc-cloudtask__more"

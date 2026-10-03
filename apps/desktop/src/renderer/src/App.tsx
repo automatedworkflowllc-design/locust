@@ -8312,6 +8312,11 @@ export default function App(): ReactElement {
               onSend: async (id, message) => {
                 const answer = await window.desktop?.sendClaudeCloud(id, message).catch(() => undefined)
                 return answer === undefined ? 'Claude Code could not be reached. Nothing was sent.' : answer.ok ? undefined : answer.message
+              },
+              onCheck: async (id) => (await window.desktop?.checkClaudeCloud(id).catch(() => undefined)) ?? { ok: false, message: 'Claude Code could not be reached to read it. See it on claude.ai.' },
+              onApply: async (id) => {
+                const answer = await window.desktop?.applyClaudeCloud(id).catch(() => undefined)
+                return answer === undefined ? 'Its change could not be applied. Nothing was changed.' : answer.ok ? undefined : answer.message
               }
             }}
           />

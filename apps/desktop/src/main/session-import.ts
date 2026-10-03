@@ -122,6 +122,8 @@ async function claudeSession(path: string, bytes: number, mtimeMs: number, now: 
   if (byPerson === undefined) return undefined
   const sessionId = byPerson.sessionId as string
   const cwd = byPerson.cwd as string
+  // Locust's own reading of a Claude cloud session (claude-cloud.ts, 0.558): not a conversation the person had here.
+  if (/[\\/]\.claude[\\/]worktrees[\\/]locust-cloud-[a-f0-9]+[\\/]?$/i.test(cwd)) return undefined
   let title: string | undefined
   for (const entry of seen) {
     if (entry.type === 'custom-title' && typeof entry.customTitle === 'string') title = entry.customTitle

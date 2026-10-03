@@ -11,6 +11,23 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.558.0 - 2026-10-02
+
+### Added
+
+- **Read a Claude cloud session in Locust.** A session's row now has "Show
+  what it did". Claude Code brings the session in out of sight, in a worktree
+  of its own, so your folder is not touched. The row then shows the
+  conversation (each task and its answer) and the session's change as a diff.
+  "Apply to this folder" brings the change in, not committed, and "Check
+  again" reads it afresh. No model is called to read it.
+
+### Fixed
+
+- **Bring it home counts untracked files.** Claude Code refuses a folder with
+  untracked files, and Locust now says so before opening a window that would
+  only refuse.
+
 ## 0.557.0 - 2026-10-02
 
 ### Fixed

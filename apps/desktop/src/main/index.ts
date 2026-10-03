@@ -261,6 +261,8 @@ import {
   CLAUDE_CLOUD_HOME_CHANNEL,
   CLAUDE_CLOUD_FORGET_CHANNEL,
   CLAUDE_CLOUD_SEND_CHANNEL,
+  CLAUDE_CLOUD_CHECK_CHANNEL,
+  CLAUDE_CLOUD_APPLY_CHANNEL,
   REWIND_PUT_BACK_CHANNEL,
   WORKSPACE_ATTACH_CHANNEL,
   WORKSPACE_FILES_CHANNEL,
@@ -3724,6 +3726,14 @@ if (!ownsSingleInstanceLock) {
       if (!fromOwnWindow(event) || typeof id !== 'string' || typeof message !== 'string') return { ok: false, message: 'That could not be sent to the cloud session.' }
       if (freeRoutesOnly(process.argv, process.env)) return { ok: false, message: FREE_ONLY_REFUSAL }
       return claudeCloud.send(id, message.slice(0, 20_000))
+    })
+    ipcMain.handle(CLAUDE_CLOUD_CHECK_CHANNEL, async (event, id: unknown) => {
+      if (!fromOwnWindow(event) || typeof id !== 'string') return { ok: false, message: 'That cloud session could not be read.' }
+      return claudeCloud.check(id)
+    })
+    ipcMain.handle(CLAUDE_CLOUD_APPLY_CHANNEL, async (event, id: unknown) => {
+      if (!fromOwnWindow(event) || typeof id !== 'string') return { ok: false, message: 'That change could not be applied.' }
+      return claudeCloud.apply(id)
     })
     ipcMain.handle(CLAUDE_CLOUD_FORGET_CHANNEL, async (event, id: unknown) => {
       if (fromOwnWindow(event) && typeof id === 'string') await claudeCloud.forget(id)

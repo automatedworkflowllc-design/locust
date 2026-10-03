@@ -1,14 +1,17 @@
 import { execFile, spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { mkdir, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
+import { homedir } from 'node:os'
+import { dirname, isAbsolute, join, resolve as resolvePath } from 'node:path'
 
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 
-import type { ClaudeCloudSession } from '../shared/ipc.js'
+import type { ClaudeCloudReading, ClaudeCloudSession } from '../shared/ipc.js'
 import { openInMacTerminal } from './mac-terminal.js'
 import { plainTerminalText } from './pseudo-terminal.js'
 import type { RunInPseudoTerminal } from './pseudo-terminal.js'
+import { sessionExchanges } from './session-import.js'
+import type { TerminalExchange } from './terminal-catch-up.js'
 
 /**
  * CLAUDE'S CLOUD (0.538): a task handed to a Claude Code cloud session, from
@@ -55,14 +58,17 @@ export const TASK_VARIABLE = 'LOCUST_CLAUDE_CLOUD_TASK'
  * is expanded once and never read again as a command. `/k` keeps the window,
  * so whatever Claude Code says on its way out can be read.
  */
-export function windowsCommandLine(path: string, prefix: readonly string[], action: 'start' | 'home' | 'send', options: { readonly session?: string; readonly stay?: boolean; readonly choice?: CloudChoice } = {}): string {
+export function windowsCommandLine(path: string, prefix: readonly string[], action: 'start' | 'home' | 'send' | 'read', options: { readonly session?: string; readonly stay?: boolean; readonly choice?: CloudChoice; readonly worktree?: string } = {}): string {
   const head = [`"${path}"`, ...prefix.map((part) => `"${part}"`)].join(' ')
   const session = options.session !== undefined && SESSION_ID.test(options.session) ? options.session : undefined
+  const worktree = options.worktree !== undefined && /^locust-cloud-[a-f0-9]{1,12}$/.test(options.worktree) ? options.worktree : undefined
   const tail = action === 'start'
     ? [...choiceArgs(options.choice), '--cloud', `"%${TASK_VARIABLE}%"`].join(' ')
     : action === 'send'
       ? `-p --cloud ${session ?? ''} "%${TASK_VARIABLE}%"`
-      : session === undefined ? '--teleport' : `--teleport ${session}`
+      : action === 'read'
+        ? `--teleport ${session ?? ''} --worktree ${worktree ?? ''}`
+        : session === undefined ? '--teleport' : `--teleport ${session}`
   return `/d ${options.stay === false ? '/c' : '/k'} "${head} ${tail}"`
 }
 
@@ -127,6 +133,48 @@ export function readCloudStart(drawn: string): CloudStartReading {
   return error === undefined ? { kind: 'failed' } : { kind: 'failed', message: error.slice(0, 300) }
 }
 
+/**
+ * Where Claude Code keeps a folder's transcripts: `projects/` and the folder's
+ * path with every other character a dash (measured: `C:\...\.claude\worktrees\x`
+ * is `C--...--claude-worktrees-x`).
+ */
+export function transcriptFolderOf(claudeHome: string, folder: string): string {
+  return join(claudeHome, 'projects', folder.replace(/[^A-Za-z0-9]/g, '-'))
+}
+
+/** The worktree a session is read into, by Locust's own id for it: never a name the person chose. */
+export function readingWorktreeName(id: string): string {
+  return `locust-cloud-${id.replace(/^cc_/, '').slice(0, 12)}`
+}
+
+export type CloudReadingProblem = 'asks' | 'long-paths' | undefined
+
+/** What `claude --teleport <id> --worktree <name>` drew, for what only the person can do about it. */
+export function readTeleport(drawn: string): { readonly problem: CloudReadingProblem; readonly noBranch: boolean; readonly error?: string } {
+  const text = plainTerminalText(drawn)
+  const error = /Error:[ \t]*(.+)/.exec(text)?.[1]?.trim().slice(0, 300)
+  return {
+    problem: new RegExp(ASKS_THE_PERSON, 'i').test(text) ? 'asks' : /Filename too long/i.test(text) ? 'long-paths' : undefined,
+    // Measured 10/02: a session that changed nothing pushed no branch, and Claude Code says so.
+    noBranch: /resumed without branch|Failed to checkout branch/i.test(text),
+    ...(error === undefined ? {} : { error })
+  }
+}
+
+/** Every Claude Code variable that would mark the run as Claude Code's own child, and so stop it saving its transcript. */
+function withoutClaudeMarkers(env: NodeJS.ProcessEnv): Record<string, string | undefined> {
+  const out: Record<string, string | undefined> = {}
+  // Measured 10/02: with any of them left (CLAUDE_PID too), the transcript folder was made and left empty.
+  for (const key of Object.keys(env)) if (/^CLAUDE/i.test(key) && !/^CLAUDE_CONFIG_DIR$/i.test(key)) out[key] = undefined
+  return out
+}
+
+export type GitRun = (args: readonly string[], cwd: string, input?: string) => Promise<{ readonly code: number; readonly stdout: string; readonly stderr: string }>
+
+/** The bound on a change Locust reads into the panel. */
+const MAX_DIFF = 4 * 1024 * 1024
+const MAX_EXCHANGES = 40
+
 export interface ClaudeCloudOptions {
   readonly discover: () => Promise<readonly RuntimeDiscovery[]>
   readonly storePath: string
@@ -139,6 +187,11 @@ export interface ClaudeCloudOptions {
   readonly gitChanges?: (folder: string) => Promise<number | undefined>
   /** A command whose output is wanted (the follow-up, which needs no terminal). */
   readonly exec?: (file: string, args: readonly string[], options: { readonly cwd: string; readonly env: NodeJS.ProcessEnv; readonly verbatim: boolean }) => Promise<{ readonly code: number; readonly output: string }>
+  /** Where Claude Code keeps its transcripts (`projects/`). */
+  readonly claudeHome?: string
+  readonly git?: GitRun
+  /** A transcript's exchanges (session-import's reader). */
+  readonly exchangesOf?: (path: string) => Promise<readonly TerminalExchange[]>
 }
 
 export type ClaudeCloudAnswer =
@@ -231,7 +284,148 @@ export function createClaudeCloud(options: ClaudeCloudOptions) {
     return drawn.ok ? readCloudStart(drawn.drawn) : undefined
   }
 
+  const git = options.git ?? gitRun
+  const claudeHome = options.claudeHome ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.claude')
+  const exchangesOf = options.exchangesOf ?? ((path: string) => sessionExchanges('claude', path))
+
+  /**
+   * Where `--worktree <name>` puts the session: `.claude/worktrees/<name>` in
+   * the repository's main checkout (measured 10/02: from a linked worktree it
+   * landed beside git's common directory, not in the folder itself).
+   */
+  const worktreeOf = async (folder: string, name: string): Promise<string | undefined> => {
+    const common = await git(['rev-parse', '--path-format=absolute', '--git-common-dir'], folder).catch(() => undefined)
+    if (common === undefined || common.code !== 0) return undefined
+    const dir = common.stdout.trim()
+    if (dir.length === 0) return undefined
+    return join(dirname(isAbsolute(dir) ? dir : resolvePath(folder, dir)), '.claude', 'worktrees', name)
+  }
+  /** The reading's worktree and its branch, gone. Claude Code locks the worktrees it makes, hence the second --force. */
+  const removeReading = async (folder: string, name: string): Promise<void> => {
+    const where = await worktreeOf(folder, name)
+    if (where === undefined) return
+    await git(['worktree', 'remove', '--force', '--force', where], folder).catch(() => undefined)
+    await git(['worktree', 'prune'], folder).catch(() => undefined)
+    await git(['branch', '-D', `worktree-${name}`], folder).catch(() => undefined)
+  }
+  /** The transcript Claude Code wrote for the worktree, the newest since `since`. */
+  const transcriptFor = async (name: string, since: number): Promise<string | undefined> => {
+    const projects = join(claudeHome, 'projects')
+    let best: { readonly path: string; readonly at: number } | undefined
+    for (const dir of await readdir(projects).catch(() => [] as string[])) {
+      // The folder's path, every other character a dash: `...--claude-worktrees-<name>`.
+      if (!dir.endsWith(`-claude-worktrees-${name}`)) continue
+      for (const file of await readdir(join(projects, dir)).catch(() => [] as string[])) {
+        if (!file.endsWith('.jsonl')) continue
+        const path = join(projects, dir, file)
+        const at = (await stat(path).catch(() => undefined))?.mtimeMs
+        if (at !== undefined && at >= since - 5_000 && (best === undefined || at > best.at)) best = { path, at }
+      }
+    }
+    return best?.path
+  }
+  /** What the session's branch changed, from where it parted from the folder's commit. Undefined: nothing. */
+  const changeIn = async (where: string, folder: string): Promise<string | undefined> => {
+    const head = await git(['rev-parse', 'HEAD'], folder)
+    if (head.code !== 0) return undefined
+    const base = await git(['merge-base', 'HEAD', head.stdout.trim()], where)
+    if (base.code !== 0) return undefined
+    const diff = await git(['diff', '--binary', base.stdout.trim(), 'HEAD'], where)
+    return diff.code === 0 && diff.stdout.trim().length > 0 ? diff.stdout : undefined
+  }
+
   return {
+    /**
+     * WHAT THE SESSION DID, READ HERE (0.558). Colin, 2026-10-02: "why cant we
+     * make this work for the user? ... exhaust all possibilities". Attaching
+     * is refused for the account, but `claude --teleport <id> --worktree
+     * <name>` fetches the session's whole conversation and checks out its
+     * branch in a worktree of its own -- the folder itself untouched. Run in a
+     * terminal nobody sees; once Claude Code's prompt is up, it is ended, and
+     * the transcript it saved is read as an imported session is. Its change
+     * is the branch against the folder's commit, kept until Apply or Forget.
+     * Every check is a fresh teleport; nothing polls. It makes no model call.
+     */
+    async check(id: string): Promise<ClaudeCloudReading> {
+      const session = (await read()).find((entry) => entry.id === id)
+      if (session === undefined) return { ok: false, message: 'Locust does not know that cloud session any more.' }
+      if (session.sessionId === undefined) return { ok: false, message: 'Locust does not know this session’s id, so it cannot read it here. See it on claude.ai.' }
+      if (platform !== 'win32' || options.terminal === undefined) return { ok: false, message: 'Reading a cloud session here works on Windows so far. See it on claude.ai, or bring it home.' }
+      const launch = await launchOf()
+      if (!launch.ok) return launch
+      const name = readingWorktreeName(session.id)
+      const where = await worktreeOf(session.folder, name)
+      if (where === undefined) return { ok: false, message: 'This folder is not a git checkout, so Claude Code cannot bring the session into it. See it on claude.ai.' }
+      await removeReading(session.folder, name)
+      const began = Date.now()
+      const drawn = await options.terminal({
+        line: `cmd.exe ${windowsCommandLine(launch.file, launch.prefix, 'read', { session: session.sessionId, stay: false, worktree: name })}`,
+        cwd: session.folder,
+        // Run from inside Claude Code (a drive, a teammate), its markers would turn transcript saving off.
+        env: { ...withoutClaudeMarkers(process.env), ...(launch.env ?? {}) },
+        seconds: 120,
+        stopWhen: `${ASKS_THE_PERSON}|Filename too long`,
+        // Done when its transcript is written: measured 10/02, that comes a few seconds AFTER it says
+        // "Session resumed", and ending it at the words left none. Its prompt footer comes earlier still.
+        stopWhenWritten: transcriptFolderOf(claudeHome, where)
+      }).catch(() => ({ ok: false as const }))
+      if (!drawn.ok) return { ok: false, message: 'Claude Code could not be run to read it. See it on claude.ai.' }
+      const said = readTeleport(drawn.drawn)
+      if (said.problem !== undefined) {
+        await removeReading(session.folder, name)
+        return said.problem === 'asks'
+          ? { ok: false, message: 'Claude Code asks whether you trust this folder first. Open Claude Code in this folder once and answer it, then check again.' }
+          : { ok: false, message: 'Git could not check the session out here: some of its paths are longer than Windows allows. Turning on long paths for this repository fixes it: git config core.longpaths true' }
+      }
+      let path: string | undefined
+      for (let tries = 0; tries < 10 && path === undefined; tries += 1) {
+        path = await transcriptFor(name, began)
+        if (path === undefined) await new Promise((done) => setTimeout(done, 500))
+      }
+      // Measured 10/02: in two runs of six the session came in (its branch checked out) but no
+      // transcript was saved within two minutes, for no reason it drew. Its change is still shown.
+      const home = await stat(where).then((found) => found.isDirectory(), () => false)
+      if (path === undefined && !home) {
+        await removeReading(session.folder, name)
+        return { ok: false, message: said.error === undefined ? 'Claude Code did not bring the session in. See it on claude.ai.' : `Claude Code did not bring the session in: ${said.error}` }
+      }
+      const exchanges = (path === undefined ? [] as readonly TerminalExchange[] : await exchangesOf(path).catch(() => [] as readonly TerminalExchange[])).slice(-MAX_EXCHANGES).map((exchange) => ({
+        prompt: exchange.prompt.slice(0, 4_000),
+        ...(exchange.answer === undefined ? {} : { answer: exchange.answer.slice(0, 16_000) }),
+        at: exchange.finishedAt,
+        ...(exchange.model === undefined ? {} : { model: exchange.model })
+      }))
+      const change = said.noBranch ? undefined : await changeIn(where, session.folder).catch(() => undefined)
+      const checkedAt = (options.now?.() ?? new Date()).toISOString()
+      return {
+        ok: true,
+        exchanges,
+        checkedAt,
+        ...(change === undefined ? {} : change.length > MAX_DIFF ? { changeTooBig: true } : { diff: change }),
+        ...(said.noBranch
+          ? { note: 'Claude Code could not check out its branch, so there is no change to show here. A session that changed nothing has none.' }
+          : path === undefined ? { note: 'Claude Code brought it in but did not save its conversation this time. Check again to read it.' } : {})
+      }
+    },
+    /** The change last read comes into the folder, not committed; the reading's worktree goes. */
+    async apply(id: string): Promise<{ readonly ok: true } | { readonly ok: false; readonly message: string }> {
+      const session = (await read()).find((entry) => entry.id === id)
+      if (session === undefined) return { ok: false, message: 'Locust does not know that cloud session any more.' }
+      const name = readingWorktreeName(session.id)
+      const where = await worktreeOf(session.folder, name)
+      const there = where !== undefined && (await stat(where).then((found) => found.isDirectory(), () => false))
+      if (!there) return { ok: false, message: 'Check it again first: Locust no longer has its change.' }
+      const change = await changeIn(where, session.folder).catch(() => undefined)
+      if (change === undefined) return { ok: false, message: 'It has no change to bring in.' }
+      // `git apply` changes nothing unless every file applies.
+      const applied = await git(['apply', '--whitespace=nowarn', '-'], session.folder, change)
+      if (applied.code !== 0) {
+        const why = applied.stderr.split('\n').find((line) => line.trim().length > 0)?.replace(/^error:\s*/, '').trim()
+        return { ok: false, message: `Its change does not apply cleanly to this folder${why === undefined ? '' : ` (${why.slice(0, 200)})`}. Nothing was changed.` }
+      }
+      await removeReading(session.folder, name)
+      return { ok: true }
+    },
     async list(folder: string): Promise<readonly ClaudeCloudSession[]> {
       return (await read()).filter((session) => session.folder === folder)
     },
@@ -295,7 +489,10 @@ export function createClaudeCloud(options: ClaudeCloudOptions) {
       return { ok: false, message: said === undefined ? 'Claude Code did not send that. Send it from claude.ai or the Claude app.' : `Claude Code did not send that: ${said.slice(0, 300)}` }
     },
     async forget(id: string): Promise<void> {
-      await write((await read()).filter((entry) => entry.id !== id)).catch(() => undefined)
+      const sessions = await read()
+      const session = sessions.find((entry) => entry.id === id)
+      if (session?.sessionId !== undefined) await removeReading(session.folder, readingWorktreeName(session.id)).catch(() => undefined)
+      await write(sessions.filter((entry) => entry.id !== id)).catch(() => undefined)
     }
   }
 }
@@ -310,6 +507,20 @@ async function gitChangesIn(folder: string): Promise<number | undefined> {
     })
   })
 }
+
+/** git, its output apart, with what it reads on stdin. */
+const gitRun: GitRun = (args, cwd, input) => new Promise((resolve) => {
+  let stdout = ''
+  let stderr = ''
+  const child = spawn('git', [...args], { cwd, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] })
+  const guard = setTimeout(() => child.kill(), 120_000)
+  child.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf8') })
+  child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf8') })
+  child.stdin.on('error', () => undefined)
+  child.stdin.end(input ?? '')
+  child.once('error', () => { clearTimeout(guard); resolve({ code: -1, stdout, stderr }) })
+  child.once('close', (code) => { clearTimeout(guard); resolve({ code: code ?? -1, stdout, stderr }) })
+})
 
 /** A command's exit code and everything it printed. */
 async function execOutput(file: string, args: readonly string[], options: { readonly cwd: string; readonly env: NodeJS.ProcessEnv; readonly verbatim: boolean }): Promise<{ readonly code: number; readonly output: string }> {

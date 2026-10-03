@@ -99,15 +99,15 @@ try {
     title: document.querySelector('.lc-cloudtask__title')?.textContent ?? '',
     text: document.querySelector('.lc-cloudtask')?.innerText.replace(/\\s+/g, ' ').trim() ?? ''
   })`))))
-  check('the row carries the session’s title, and says where its replies are', row.title.length > 0 && /In Claude’s cloud since .* Its replies are on claude\.ai and in the Claude app\./.test(row.text), JSON.stringify(row))
+  check('the row carries the session’s title, and says where its replies are', row.title.length > 0 && /In Claude’s cloud since /.test(row.text) && /Show what it did/.test(row.text), JSON.stringify(row))
   const listed = JSON.parse(String(await drive.evaluate(`window.desktop.listClaudeCloud().then((all) => JSON.stringify(all[0] ?? {}))`)))
   check('its link is the session’s own', /^https:\/\/claude\.ai\/code\/session_[A-Za-z0-9]+$/.test(listed.url ?? '') && listed.url.endsWith(listed.sessionId), JSON.stringify(listed))
   await drive.evaluate(setText('.lc-cloudtask__more input', 'Thanks, nothing more.'))
   await sleep(300)
   await drive.evaluate(`(() => { document.querySelector('.lc-cloudtask__more')?.requestSubmit(); return 1 })()`)
-  await drive.waitFor(`/Sent\\. Its reply shows|did not send/.test(document.querySelector('.lc-cloudtask')?.innerText ?? '')`, { timeoutMs: 120_000, what: 'the follow-up answer' })
+  await drive.waitFor(`/Sent\\. Check again|did not send/.test(document.querySelector('.lc-cloudtask')?.innerText ?? '')`, { timeoutMs: 120_000, what: 'the follow-up answer' })
   const after = String(await drive.capture('Follow-up sent', () => drive.evaluate(`document.querySelector('.lc-cloudtask')?.innerText.replace(/\\s+/g, ' ').trim() ?? ''`)))
-  check('a follow-up goes to the session', /Sent\. Its reply shows on claude\.ai/.test(after), after)
+  check('a follow-up goes to the session', /Sent\. Check again in a moment/.test(after), after)
   check('still no Claude Code window', claudeWindows() - before === 0)
 } catch (error) {
   failures += 1

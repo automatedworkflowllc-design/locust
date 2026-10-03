@@ -683,6 +683,8 @@ export const CLAUDE_CLOUD_LIST_CHANNEL = 'claude-cloud:list'
 export const CLAUDE_CLOUD_HOME_CHANNEL = 'claude-cloud:home'
 export const CLAUDE_CLOUD_FORGET_CHANNEL = 'claude-cloud:forget'
 export const CLAUDE_CLOUD_SEND_CHANNEL = 'claude-cloud:send'
+export const CLAUDE_CLOUD_CHECK_CHANNEL = 'claude-cloud:check'
+export const CLAUDE_CLOUD_APPLY_CHANNEL = 'claude-cloud:apply'
 export interface ClaudeCloudSession {
   readonly id: string
   readonly startedAt: string
@@ -704,6 +706,25 @@ export type ClaudeCloudStartResponse =
   | { readonly ok: true; readonly session: PublicClaudeCloudSession }
   | { readonly ok: false; readonly message: string }
 export type ClaudeCloudHomeResponse = { readonly ok: true } | { readonly ok: false; readonly message: string }
+/** One exchange of a cloud session, read from the transcript Claude Code saved when it brought the session in (0.558). */
+export interface ClaudeCloudExchange {
+  readonly prompt: string
+  readonly answer?: string
+  readonly at: string
+  readonly model?: string
+}
+export type ClaudeCloudReading =
+  | {
+      readonly ok: true
+      readonly exchanges: readonly ClaudeCloudExchange[]
+      readonly checkedAt: string
+      /** The session branch's change against the folder's commit, as a unified diff. */
+      readonly diff?: string
+      /** There is a change, too big to show here; Apply still brings it in. */
+      readonly changeTooBig?: boolean
+      readonly note?: string
+    }
+  | { readonly ok: false; readonly message: string }
 export interface PublicCloudFolder {
   readonly id: string
   readonly name: string
@@ -3122,6 +3143,8 @@ export interface DesktopApi {
   forgetClaudeCloud(id: string): Promise<void>
   /** A follow-up to a cloud session Locust knows the id of (0.556). */
   sendClaudeCloud(id: string, message: string): Promise<ClaudeCloudHomeResponse>
+  checkClaudeCloud(id: string): Promise<ClaudeCloudReading>
+  applyClaudeCloud(id: string): Promise<ClaudeCloudHomeResponse>
   /** Undo the later turns' file changes before an edited message goes (0.502). */
   putBackFiles(request: RewindPutBackRequest): Promise<RewindPutBackResponse>
   /**

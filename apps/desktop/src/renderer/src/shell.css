@@ -18199,3 +18199,41 @@ textarea {
   flex: 1;
   min-width: 0;
 }
+
+/*
+ * WHAT A CLAUDE CLOUD SESSION SAID (0.558), read in the row: the asks as
+ * plain lines, the replies as an agent's text, a hairline between exchanges.
+ */
+.lc-cloudtask__read {
+  display: grid;
+  gap: var(--lc-space-3);
+  margin-top: var(--lc-space-3);
+}
+
+.lc-cloudtask__thread {
+  display: grid;
+  gap: var(--lc-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.lc-cloudtask__exchange + .lc-cloudtask__exchange {
+  padding-top: var(--lc-space-4);
+  border-top: 1px solid var(--lc-border-hairline);
+}
+
+.lc-cloudtask__ask {
+  margin-bottom: var(--lc-space-2);
+  color: var(--lc-text-secondary);
+  font-size: var(--lc-text-description);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.lc-cloudtask__reply {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

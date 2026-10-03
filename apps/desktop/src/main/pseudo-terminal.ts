@@ -48,7 +48,8 @@ public static class LocustPty {
   [DllImport("kernel32.dll", SetLastError = true)] static extern bool UpdateProcThreadAttribute(IntPtr list, uint flags, IntPtr attr, IntPtr value, IntPtr size, IntPtr prev, IntPtr ret);
   [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)] static extern bool CreateProcess(string app, string cmd, IntPtr pa, IntPtr ta, bool inherit, uint flags, IntPtr env, string cwd, ref STARTUPINFOEX si, out PROCESS_INFORMATION pi);
   [DllImport("kernel32.dll")] static extern uint WaitForSingleObject(IntPtr h, uint ms);
-  public static byte[] Run(string cwd, string line, int seconds, string stopWhen) {
+  public static byte[] Run(string cwd, string line, int seconds, string stopWhen, string watch) {
+    var began = DateTime.UtcNow.AddSeconds(-5); long seen = -1;
     SafeFileHandle inR, inW, outR, outW;
     CreatePipe(out inR, out inW, IntPtr.Zero, 0); CreatePipe(out outR, out outW, IntPtr.Zero, 0);
     IntPtr pc;
@@ -70,6 +71,13 @@ public static class LocustPty {
     var answered = false; var exited = false;
     for (int tick = 0; tick < seconds * 10; tick++) {
       if (WaitForSingleObject(pi.hProcess, 100) == 0) { exited = true; break; }
+      // A file the program writes, there and no longer growing: what was waited for is done.
+      if (watch.Length > 0 && tick % 10 == 9 && Directory.Exists(watch)) {
+        long now = -1;
+        foreach (var f in new DirectoryInfo(watch).GetFiles("*.jsonl")) if (f.LastWriteTimeUtc >= began && f.Length > now) now = f.Length;
+        if (now > 0 && now == seen) break;
+        seen = now;
+      }
       string text; lock (drawn) text = System.Text.Encoding.UTF8.GetString(drawn.ToArray());
       if (!answered && text.Contains("\u001b[6n")) { var a = System.Text.Encoding.ASCII.GetBytes("\u001b[1;1R"); input.Write(a, 0, a.Length); input.Flush(); answered = true; }
       if (stop != null && stop.IsMatch(Regex.Replace(text, "\u001b\\[[0-9;?<>=]*[ -/]*[@-~]", ""))) break;
@@ -84,7 +92,8 @@ public static class LocustPty {
   }
 }
 "@
-$drawn = [LocustPty]::Run($env:LOCUST_PTY_CWD, $env:LOCUST_PTY_LINE, [int]$env:LOCUST_PTY_SECONDS, $env:LOCUST_PTY_STOP)
+$watch = if ($env:LOCUST_PTY_WATCH) { $env:LOCUST_PTY_WATCH } else { '' }
+$drawn = [LocustPty]::Run($env:LOCUST_PTY_CWD, $env:LOCUST_PTY_LINE, [int]$env:LOCUST_PTY_SECONDS, $env:LOCUST_PTY_STOP, $watch)
 [Console]::Out.Write([Convert]::ToBase64String($drawn))
 `
 
@@ -107,6 +116,13 @@ export interface PseudoTerminalRun {
   readonly seconds: number
   /** A .NET regular expression: once what is drawn matches, the program is ended. */
   readonly stopWhen?: string
+  /**
+   * A folder: once a .jsonl written since the start is in it and has stopped
+   * growing for a second, the program is ended. Claude Code writes a
+   * teleported session's transcript a few seconds after it says "Session
+   * resumed" (measured 10/02), so the words are too early a signal.
+   */
+  readonly stopWhenWritten?: string
 }
 
 export type RunInPseudoTerminal = (run: PseudoTerminalRun) => Promise<{ readonly ok: true; readonly drawn: string } | { readonly ok: false }>
@@ -129,7 +145,7 @@ export const runInPseudoTerminal: RunInPseudoTerminal = async (run) => {
       cwd: run.cwd,
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'ignore'],
-      env: { ...process.env, ...run.env, LOCUST_PTY_CWD: run.cwd, LOCUST_PTY_LINE: run.line, LOCUST_PTY_SECONDS: String(run.seconds), LOCUST_PTY_STOP: run.stopWhen ?? '' }
+      env: { ...process.env, ...run.env, LOCUST_PTY_CWD: run.cwd, LOCUST_PTY_LINE: run.line, LOCUST_PTY_SECONDS: String(run.seconds), LOCUST_PTY_STOP: run.stopWhen ?? '', LOCUST_PTY_WATCH: run.stopWhenWritten ?? '' }
     })
     // The helper ends the program at `seconds`; this is for the helper itself.
     const guard = setTimeout(() => child.kill(), (run.seconds + 30) * 1000)
