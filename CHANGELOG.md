@@ -11,6 +11,23 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.570.0 - 2026-10-03
+
+### Fixed
+
+- **A finished message stops showing the typing cursor.** Antigravity never
+  marks a message as finished, so the blinking `_` stayed at the end of every
+  message it had already sent, through all the steps after it. A message is
+  now finished once anything comes after it, for every AI agent.
+- **Antigravity's check-back timer reads as a wait.** The steps line said
+  "used schedule"; it now says it waited for a command.
+- **The queued-message hint names the agent.** In a conversation without a
+  teammate it said "it goes to This teammate when this finishes"; it now
+  names the AI agent, such as Antigravity.
+- **Removing pets:** the "Removed 3 pets" message clears once you pick a pet,
+  instead of staying beside the new count, and a ticked pet's mark is easier
+  to see.
+
 ## 0.569.0 - 2026-10-03
 
 ### New

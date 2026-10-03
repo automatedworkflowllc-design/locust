@@ -8699,7 +8699,7 @@ textarea {
   height: 16px;
   border-radius: 50%;
   background: var(--lc-red-text);
-  color: var(--lc-bg-window, #121316);
+  color: var(--lc-bg-window);
   font-size: 12px;
   font-weight: 700;
   line-height: 1;
