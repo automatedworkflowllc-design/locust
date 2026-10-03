@@ -27,7 +27,8 @@ import type { PseudoTerminalRun } from './pseudo-terminal.js'
 
 const roots: string[] = []
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
+  // A worktree's folder can still be held for a moment on Windows (EBUSY): retried, not failed.
+  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 const temp = async (label: string): Promise<string> => {
   const root = await mkdtemp(join(tmpdir(), `locust-cloud-read-${label}-`))
@@ -91,7 +92,9 @@ function teleporting(w: Awaited<ReturnType<typeof world>>, options: { readonly d
 
 const exists = (path: string): Promise<boolean> => stat(path).then(() => true, () => false)
 
-describe('reading a cloud session', () => {
+// Every read here makes and removes a real git worktree: seconds each on Windows
+// when the whole suite shares the disk, so past vitest's default 5 s (0.563's gates).
+describe('reading a cloud session', { timeout: 30_000 }, () => {
   it('teleports into a worktree of its own, out of sight, and stops once Claude Code is up', async () => {
     const w = await world()
     const { runs, terminal } = teleporting(w)
@@ -152,10 +155,7 @@ describe('reading a cloud session', () => {
     expect(await readFile(join(w.repo, 'cart.js'), 'utf8')).toBe('export const total = () => 0 // mine\n')
   })
 
-  // Two whole reads, each a real git worktree made and removed: past vitest's
-  // default 5 s on Windows when the full suite shares the disk (5.1 s in the
-  // 0.563 gate, under one alone).
-  it('checking again starts from a fresh worktree, not the last one', { timeout: 20_000 }, async () => {
+  it('checking again starts from a fresh worktree, not the last one', async () => {
     const w = await world()
     const { runs, terminal } = teleporting(w)
     const cloud = createClaudeCloud({ discover: claude, storePath: w.storePath, platform: 'win32', terminal, claudeHome: w.home })
