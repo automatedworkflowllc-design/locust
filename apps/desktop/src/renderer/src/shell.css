@@ -18677,3 +18677,32 @@ textarea {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* Save the record (0.574): the dialog that says what the file holds, once. */
+.lc-saverecord {
+  width: 460px;
+}
+
+.lc-saverecord__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-4);
+}
+
+.lc-saverecord__claim {
+  margin: 0;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+  text-wrap: pretty;
+}
+
+.lc-saverecord__with {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+}
+
+.lc-saverecord__said {
+  color: var(--lc-text-secondary);
+  overflow-wrap: anywhere;
+}

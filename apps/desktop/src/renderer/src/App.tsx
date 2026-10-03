@@ -102,6 +102,7 @@ import { exchangeAcross, exchangeOf } from './exchange.js'
 import type { ExchangeMission } from './exchange.js'
 import { FirstLaunch } from './components/FirstLaunch.js'
 import { CommandPalette } from './components/CommandPalette.js'
+import { SaveRecordDialog } from './components/SaveRecordDialog.js'
 import type { PaletteAction } from './components/CommandPalette.js'
 import { IdleTeammate } from './components/IdleTeammate.js'
 import { Inspector } from './components/Inspector.js'
@@ -950,6 +951,8 @@ export default function App(): ReactElement {
   const [renamingGroupId, setRenamingGroupId] = useState<string>()
   /** Whether the sidebar is asking for a new group's name. */
   const [namingGroup, setNamingGroup] = useState(false)
+  /** The conversation whose record is being saved (0.574): any turn of it; its parents come along. */
+  const [savingRecordOf, setSavingRecordOf] = useState<string>()
   /**
    * A conversation waiting for the group about to be made.
    *
@@ -1160,6 +1163,13 @@ export default function App(): ReactElement {
               ? { disabledReason: 'Nothing here was typed by you, so there are no steps to replay.' }
               : {}),
           onSelect: () => openSaveRoutine(missionId)
+        },
+        {
+          // The whole conversation as one file, to read before it is sent anywhere (0.574; mission-export.ts).
+          label: 'Save the record…',
+          shortcut: 'e',
+          ...(notYet !== undefined ? { disabledReason: notYet } : {}),
+          onSelect: () => setSavingRecordOf(missionId)
         },
         {
           label: 'Copy its record id',
@@ -8529,6 +8539,7 @@ export default function App(): ReactElement {
         )}
       </div>
       {sharingTeam && <ShareTeamDialog teammates={teammates} onClose={() => setSharingTeam(false)} />}
+      {savingRecordOf !== undefined && <SaveRecordDialog missionId={savingRecordOf} onClose={() => setSavingRecordOf(undefined)} />}
       {paletteOpen && (
         <CommandPalette
           onClose={() => setPaletteOpen(false)}
@@ -8613,6 +8624,18 @@ export default function App(): ReactElement {
                     }
                   ]
                 : []),
+              // Only where a conversation is on screen: the record is of that one (0.574).
+              ...(terminalMissionId === undefined || terminalMissionId.startsWith('pending:')
+                ? []
+                : [
+                    {
+                      id: 'save-record',
+                      group: 'Conversation',
+                      label: 'Save the record…',
+                      hint: 'this conversation, as one file',
+                      run: () => setSavingRecordOf(terminalMissionId)
+                    }
+                  ]),
               /*
                * The conversations, found by any word said in them or by the
                * teammate's name (0.414). The placeholder has always promised

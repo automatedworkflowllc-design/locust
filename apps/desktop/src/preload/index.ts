@@ -40,6 +40,7 @@ import {
   SESSION_IMPORT_LIST_CHANNEL,
   SESSION_IMPORT_CHANNEL,
   TEAM_CARD_SAVE_CHANNEL,
+  MISSION_RECORD_SAVE_CHANNEL,
   TEAM_CARD_ADD_CHANNEL,
   RUNTIME_INSTALL_PROGRESS_CHANNEL,
   RUNTIME_UPDATES_CHANNEL,
@@ -290,6 +291,8 @@ import type {
   SessionImportListResponse,
   SessionImportResponse,
   TeamCardRect,
+  MissionRecordSaveRequest,
+  MissionRecordSaveResponse,
   TeamCardSaveResponse,
   TeamCardAddResponse
 } from '../shared/ipc.js'
@@ -450,6 +453,7 @@ const desktopApi: DesktopApi = {
   listImportableSessions: () => ipcRenderer.invoke(SESSION_IMPORT_LIST_CHANNEL) as Promise<SessionImportListResponse>,
   importSession: (runtime: 'claude' | 'codex', sessionId: string) =>
     ipcRenderer.invoke(SESSION_IMPORT_CHANNEL, { runtime, sessionId }) as Promise<SessionImportResponse>,
+  saveMissionRecord: (request: MissionRecordSaveRequest) => ipcRenderer.invoke(MISSION_RECORD_SAVE_CHANNEL, request) as Promise<MissionRecordSaveResponse>,
   saveTeamCard: (rect: TeamCardRect) => ipcRenderer.invoke(TEAM_CARD_SAVE_CHANNEL, rect) as Promise<TeamCardSaveResponse>,
   addTeamFromCard: () => ipcRenderer.invoke(TEAM_CARD_ADD_CHANNEL) as Promise<TeamCardAddResponse>,
   onRuntimeInstallProgress: (listener: (progress: RuntimeInstallProgress) => void) => {

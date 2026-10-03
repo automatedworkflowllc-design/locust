@@ -661,6 +661,12 @@ export type SessionImportResponse = { readonly ok: true; readonly missionId: str
 /** The team as a picture of itself (shared/team-card.ts, 0.398). */
 export const TEAM_CARD_SAVE_CHANNEL = 'team-card:save'
 export const TEAM_CARD_ADD_CHANNEL = 'team-card:add'
+/**
+ * Save the record (0.574): one conversation as one Markdown file, written
+ * where the person picks, and optionally the events exactly as the ledger
+ * holds them beside it. Nothing uploads and nothing opens.
+ */
+export const MISSION_RECORD_SAVE_CHANNEL = 'missions:save-record'
 /** Where on the window the card is drawn, in CSS pixels: what is photographed. */
 export interface TeamCardRect {
   readonly x: number
@@ -672,6 +678,17 @@ export interface TeamCardRect {
 export type TeamCardSaveResponse = { readonly ok: true; readonly path?: string } | { readonly ok: false; readonly message: string }
 /** Who was added, and who could not be (by the name the card gave them). Nothing picked: both empty. */
 export type TeamCardAddResponse = { readonly ok: true; readonly added: readonly string[]; readonly skipped: readonly string[] } | { readonly ok: false; readonly message: string }
+
+export interface MissionRecordSaveRequest {
+  /** Any turn of the conversation; its parents come with it. */
+  readonly missionId: string
+  /** Also write the events exactly as the ledger holds them, as JSON beside the file. */
+  readonly includeRaw: boolean
+}
+/** `path` absent: the person cancelled the save, which is not a failure. */
+export type MissionRecordSaveResponse =
+  | { readonly ok: true; readonly path?: string; readonly rawPath?: string }
+  | { readonly ok: false; readonly message: string }
 
 export interface TerminalCatchUpResponse {
   readonly imported: number
@@ -3277,6 +3294,8 @@ export interface DesktopApi {
   listImportableSessions(): Promise<SessionImportListResponse>
   importSession(runtime: 'claude' | 'codex', sessionId: string): Promise<SessionImportResponse>
   saveTeamCard(rect: TeamCardRect): Promise<TeamCardSaveResponse>
+  /** Save a conversation's record as one Markdown file (mission-export.ts). */
+  saveMissionRecord(request: MissionRecordSaveRequest): Promise<MissionRecordSaveResponse>
   addTeamFromCard(): Promise<TeamCardAddResponse>
   readWorkspaceSettings(): Promise<WorkspaceSettings>
   /** Pick the folder the teammates work in. Reopens the app there on success. */

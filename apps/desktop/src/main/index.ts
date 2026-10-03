@@ -74,6 +74,7 @@ import { createTerminalCatchUp, createTerminalImports, createTranscriptReader, t
 import { importSession, listImportableSessions } from './session-import.js'
 import type { ImportableSession } from './session-import.js'
 import { readTextChunk, withTextChunk } from './png-text.js'
+import { recordTurns, missionRecordMarkdown, rawRecordJson, recordFileName } from './mission-export.js'
 import { TEAM_CARD_KEYWORD, freeName, readTeamCard, teamCardOf } from '../shared/team-card.js'
 import { approvalAnswerFrom, createApprovalChannel } from './approval-channel.js'
 import { PeerRecordError } from './peer-exchange.js'
@@ -217,6 +218,7 @@ import {
   SESSION_IMPORT_CHANNEL,
   TEAM_CARD_SAVE_CHANNEL,
   TEAM_CARD_ADD_CHANNEL,
+  MISSION_RECORD_SAVE_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
   TEAMMATE_RENAME_MISSION_CHANNEL,
   GROUP_LIST_CHANNEL,
@@ -3378,6 +3380,72 @@ if (!ownsSingleInstanceLock) {
         return { ok: true, path: target } as const
       } catch {
         return { ok: false, message: 'The team card could not be saved. Nothing was written.' } as const
+      }
+    })
+
+    /*
+     * SAVE THE RECORD (0.574; mission-export.ts). A conversation as one
+     * Markdown file, from what the ledger holds and nothing else.
+     *
+     * Only Locust's own window may ask, and the DESTINATION is never the
+     * window's: it comes back from a native save dialog, so the only place
+     * this writes is one the person just chose by hand. The request names a
+     * turn and a tick; the text is built here, from the ledger, never from
+     * anything the window sent. Nothing is uploaded and nothing is opened --
+     * the file is the person's to read before they send it anywhere.
+     * `LOCUST_RECORD_PATH` is a drive's stand-in for the dialog.
+     */
+    ipcMain.handle(MISSION_RECORD_SAVE_CHANNEL, async (event, raw: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      const request = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>
+      const missionId = request.missionId
+      if (typeof missionId !== 'string' || missionId.length === 0 || missionId.length > 128) return { ok: false, message: 'There is no conversation to save.' } as const
+      const window = BrowserWindow.fromWebContents(event.sender)
+      if (window === null) return { ok: false, message: 'That request was rejected.' } as const
+      try {
+        const chain = await recordTurns((id) => missionLedger.getMission(id), missionId)
+        const first = chain.missions[0]
+        if (first === undefined) return { ok: false, message: 'That conversation is not in the ledger, so there is nothing to save.' } as const
+        const owners = await teammates.missionOwners().catch(() => ({}) as Record<string, string>)
+        // The newest turn that has an owner on file: a turn handed over by Locust may not.
+        const ownerId = [...chain.missions].reverse().map((turn) => owners[turn.metadata.missionId]).find((id) => id !== undefined)
+        const owner = ownerId === undefined ? undefined : (await teammates.list().catch(() => [])).find((entry) => entry.teammateId === ownerId)
+        // Where the teammate works NOW: its own folder, else the project's, and only for a record from this project.
+        const folder = owner?.folder ?? (workspaceChosen && first.metadata.workspaceId === memoryWorkspaceId ? workspacePath : undefined)
+        const now = new Date()
+        const savedAt = now.toISOString()
+        const markdown = missionRecordMarkdown({
+          missions: chain.missions,
+          ...(owner === undefined ? {} : { teammate: owner.name }),
+          ...(folder === undefined ? {} : { folder }),
+          locustVersion: app.getVersion(),
+          savedAt,
+          ...(chain.missingParent === undefined ? {} : { missingParent: chain.missingParent })
+        })
+        const scripted = !app.isPackaged ? process.env.LOCUST_RECORD_PATH : undefined
+        const target = scripted !== undefined && scripted.length > 0
+          ? scripted
+          : (await dialog.showSaveDialog(window, {
+              title: 'Save the record',
+              defaultPath: join(app.getPath('downloads'), recordFileName(owner?.name, now)),
+              filters: [{ name: 'Markdown', extensions: ['md'] }],
+              properties: ['createDirectory', 'showOverwriteConfirmation']
+            })).filePath
+        // Cancelled is not a failure: nothing was written.
+        if (target === undefined || target.length === 0) return { ok: true } as const
+        await writeFile(target, markdown, 'utf8')
+        if (request.includeRaw !== true) return { ok: true, path: target } as const
+        // Beside the file, under its name; never over a file that is already there.
+        const stem = target.replace(/\.[^./\\]+$/, '')
+        let rawPath = `${stem}.json`
+        for (let copy = 2; copy < 100; copy += 1) {
+          if (await stat(rawPath).then(() => false, () => true)) break
+          rawPath = `${stem} (${String(copy)}).json`
+        }
+        await writeFile(rawPath, rawRecordJson(chain.missions, app.getVersion(), savedAt), { encoding: 'utf8', flag: 'wx' })
+        return { ok: true, path: target, rawPath } as const
+      } catch {
+        return { ok: false, message: 'The record could not be saved. Nothing was sent anywhere.' } as const
       }
     })
 
