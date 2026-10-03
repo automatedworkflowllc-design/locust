@@ -11,6 +11,33 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.563.0 - 2026-10-03
+<!-- big -->
+
+### Added
+
+- **A teammate can be a pet.** Under the bots in a teammate's look there is
+  now a row of pets. OpenPets' Hoodie Cat comes with Locust, and any pet you
+  made in Codex shows up there too. **Browse the gallery** opens the pets on
+  openpets.dev in place, Featured or Originals, with a search. Click one and
+  that pet is downloaded to this computer and put on the teammate; nothing is
+  downloaded before you click, and each pet stays its maker's -- Locust ships
+  none of them. Picking a pet for a teammate with no name yet names it after
+  the pet. A pet is only the face: the teammate is the same in every other
+  way, its model, conversations, rooms and routines.
+- **A pet shows what its teammate is doing**, in its own drawings. It reads
+  while it thinks, gets busy while it works, waves when a message arrives,
+  waits with you inside the amber ring, jumps when it is done and slumps when
+  it is stuck. At rest it keeps still, as a bot does. A pet that has gone
+  missing shows the teammate's bot instead, and the look says why.
+
+### Fixed
+
+- **No teammate looks stuck while Locust starts.** For the first seconds after
+  every launch, before Locust had found which AI agents are on the computer,
+  every teammate counted as stuck, and a teammate with a screen showed red
+  crosses for eyes. Until Locust knows, a teammate now simply rests.
+
 ## 0.562.0 - 2026-10-03
 
 ### Added

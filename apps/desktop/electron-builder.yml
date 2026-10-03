@@ -70,6 +70,10 @@ extraResources:
   # staged by _tools/vendor-recall.mjs. Real files: onnxruntime imports its
   # loader by URL, which cannot point inside an archive. tokenizer.json stays
   # behind -- vocab.txt is the part of it the app reads.
+  # Locust's own pet (0.563, pet-library.ts): OpenPets' Hoodie Cat, MIT, its
+  # licence beside it. Real files, read by the host like any other pet's.
+  - from: resources/pets
+    to: pets
   - from: resources/recall
     to: recall
     filter:

@@ -17,7 +17,7 @@ import {
   facePresenceFor,
   missionPhaseView,
   missionsMatching,
-  runtimeIsUsable,
+  runtimeReach,
   shortMissionId,
   runtimeOfTeammate,
   stateInWords,
@@ -1309,8 +1309,7 @@ export function Sidebar({
              */
             const status = viewByTeammate[teammate.teammateId] ?? teammateStatusView({
               runtime: undefined,
-              anyRuntimeUsable: runtimes.some(runtimeIsUsable),
-              anyRuntimeInstalled: runtimes.some((entry) => entry.installed),
+              ...runtimeReach(runtimes, runtimes.length > 0),
               hasRunningMission: false,
               pendingApprovals: 0,
               roleLabel: roleLabelOf(teammate)
@@ -1705,8 +1704,7 @@ export function Sidebar({
           const theirRuntime = runtimeOfTeammate(open, theirs)
           const status = teammateStatusView({
             runtime: theirRuntime === undefined ? undefined : runtimes.find((entry) => entry.id === theirRuntime),
-            anyRuntimeUsable: runtimes.some(runtimeIsUsable),
-            anyRuntimeInstalled: runtimes.some((entry) => entry.installed),
+            ...runtimeReach(runtimes, runtimes.length > 0),
             hasRunningMission:
               theirs.some((mission) => mission.phase === 'running') || starting.includes(open.teammateId),
             pendingApprovals: pendingApprovals[open.teammateId] ?? 0,

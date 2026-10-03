@@ -132,6 +132,24 @@ export function runtimeIsUsable(runtime: PublicRuntimeStatus): boolean {
 }
 
 /**
+ * WHETHER ANY RUNTIME IS USABLE, OR INSTALLED -- AND NOTHING WHILE IT IS NOT
+ * KNOWN YET (0.563). Discovery lists every runtime it knows, installed or not,
+ * so its first answer is never empty; before it, the window holds an empty
+ * list, and `[].some(...)` said "nothing is usable". Every teammate was
+ * BLOCKED for the first seconds of every launch: a screen showed red crosses
+ * for eyes, and a pet slumped in its failure (found by drive-pet-looks.mjs).
+ * Not known is not blocked: until discovery answers, this says nothing, and a
+ * teammate's face is whatever else it is.
+ */
+export function runtimeReach(
+  runtimes: readonly PublicRuntimeStatus[],
+  known: boolean
+): { readonly anyRuntimeUsable?: boolean; readonly anyRuntimeInstalled?: boolean } {
+  if (!known) return {}
+  return { anyRuntimeUsable: runtimes.some(runtimeIsUsable), anyRuntimeInstalled: runtimes.some((entry) => entry.installed) }
+}
+
+/**
  * The tag a route row wears, given what discovery proved and whether this is
  * the row the composer is set to.
  *

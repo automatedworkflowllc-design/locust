@@ -4,8 +4,11 @@ import type { BotAvatarState } from 'bot-avatars'
 import { botFor } from '../../../shared/avatar.js'
 import type { FaceActivity } from '../faceState.js'
 import type { GlanceSide } from '../glances.js'
+import { petStateFor } from '../petMotion.js'
+import { usePetLook } from '../pets.js'
 import { Bot } from './Bot.js'
 import type { EyeGlyphs, Glance, Phosphor } from './Bot.js'
+import { PetSprite } from './PetSprite.js'
 import { PRESENCE_TONE } from './PixelFace.js'
 import { RuntimeMark } from './RuntimeMark.js'
 import type { PixelFaceProps } from './PixelFace.js'
@@ -221,36 +224,53 @@ export function TeammateBot({
   runtime
 }: TeammateBotProps): ReactElement {
   const bot = botFor(avatar)
-  const { state, paused, jumpEvery, bounces, hops } = botMotion(activity === 'done' && !hopsWhenDone ? 'idle' : activity, motion)
+  const shownActivity = activity === 'done' && !hopsWhenDone ? 'idle' : activity
+  const { state, paused, jumpEvery, bounces, hops } = botMotion(shownActivity, motion)
   const color = hueColor(hue)
   const tone = PRESENCE_TONE[presence]
-  const eyes = eyeGlyphsFor(activity === 'done' && !hopsWhenDone ? 'idle' : activity)
+  const eyes = eyeGlyphsFor(shownActivity)
+  /*
+   * A PET FOR A FACE (0.563): in the bot's box, with the bot's ring, dot and
+   * mark -- "these should be the exact same as teammates". Never a screen or
+   * code eyes ("the new eyes will have to be isolated to our current
+   * sprites"), and no bounce: a pet's own rows are its motion. A pet that
+   * cannot be drawn -- its file gone or unreadable -- shows the bot instead,
+   * never an empty box.
+   */
+  const pet = avatar.pet
+  const petNow = usePetLook(pet)
+  const wearsPet = pet !== undefined && petNow?.status !== 'missing'
   return (
     <span
-      className={`lc-face lc-bot${bounces ? ' is-bouncing' : ''}${className === undefined ? '' : ` ${className}`}`}
+      className={`lc-face lc-bot${bounces && !wearsPet ? ' is-bouncing' : ''}${className === undefined ? '' : ` ${className}`}`}
       style={{ position: 'relative', display: 'inline-flex', width: size, height: size, flexShrink: 0 }}
       {...(name === undefined ? { 'aria-hidden': true } : { role: 'img', 'aria-label': name, title: name })}
       data-activity={activity}
       data-bot={bot.shape}
+      {...(wearsPet ? { 'data-pet': pet.id } : {})}
       data-motion={motion}
       {...(teammateId === undefined ? {} : { 'data-teammate': teammateId })}
     >
       {activity === 'waiting' && <span className="lc-bot__ring" />}
-      <Bot
-        type={bot.shape}
-        size={size}
-        state={state}
-        paused={paused && glance === undefined}
-        face={bot.face}
-        seed={seedOf(teammateId ?? name ?? bot.shape)}
-        hop={hops}
-        {...(eyes === undefined ? {} : { eyes })}
-        {...(bot.screen === undefined ? {} : { screen: bot.screen })}
-        phosphor={phosphorFor(activity === 'done' && !hopsWhenDone ? 'idle' : activity)}
-        {...(glance === undefined ? {} : { glance: GLANCE_TOWARD[glance] })}
-        {...(color === undefined ? {} : { color })}
-        {...(jumpEvery === undefined ? {} : { jumpEvery })}
-      />
+      {wearsPet ? (
+        <PetSprite pet={pet} size={size} state={petStateFor(shownActivity)} {...(glance === undefined ? {} : { glance })} />
+      ) : (
+        <Bot
+          type={bot.shape}
+          size={size}
+          state={state}
+          paused={paused && glance === undefined}
+          face={bot.face}
+          seed={seedOf(teammateId ?? name ?? bot.shape)}
+          hop={hops}
+          {...(eyes === undefined ? {} : { eyes })}
+          {...(bot.screen === undefined ? {} : { screen: bot.screen })}
+          phosphor={phosphorFor(shownActivity)}
+          {...(glance === undefined ? {} : { glance: GLANCE_TOWARD[glance] })}
+          {...(color === undefined ? {} : { color })}
+          {...(jumpEvery === undefined ? {} : { jumpEvery })}
+        />
+      )}
       {tone !== undefined && <span className={`lc-presence lc-presence--${tone}`} />}
       {runtime !== undefined && size >= MARKED_FACE_MIN && (
         <span className="lc-bot__mark" data-runtime={runtime}>

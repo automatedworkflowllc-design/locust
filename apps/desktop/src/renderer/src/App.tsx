@@ -178,7 +178,7 @@ import { splitAttachments, withAttachments } from '../../shared/attachments.js'
 // Only `heldFor`: this file has its own `ownerOf` for live runs, which is a
 // different question from who owns a recorded mission.
 import { heldFor, routineOf } from './conversationList.js'
-import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeFacts, modeRunsOn, modesFor, modeUnavailableReason, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, nextFreeModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
+import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeFacts, modeRunsOn, modesFor, modeUnavailableReason, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, runtimeReach, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, nextFreeModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
 import { homeRouteOf, isOwnRoute, modelDisplayName, rememberOwnModels, routeChrome, routeModelName } from './routeName.js'
 import { FeedbackDialog } from './components/FeedbackDialog.js'
 import { conversationText } from './feedback.js'
@@ -6814,8 +6814,7 @@ export default function App(): ReactElement {
     const theirRuntime = runtimeOfTeammate(teammate, owned)
     viewByTeammate[teammate.teammateId] = teammateStatusView({
       runtime: theirRuntime === undefined ? undefined : runtimes.find((entry) => entry.id === theirRuntime),
-      anyRuntimeUsable: runtimes.some(runtimeIsUsable),
-            anyRuntimeInstalled: runtimes.some((entry) => entry.installed),
+      ...runtimeReach(runtimes, runtimeState.phase === 'ready'),
       /*
        * Starting counts as working, because the sidebar says so.
        *
@@ -6853,8 +6852,7 @@ export default function App(): ReactElement {
       ? undefined
       : teammateStatusView({
           runtime: runtimes.find((entry) => entry.id === liveRun?.data?.runtime),
-          anyRuntimeUsable: runtimes.some(runtimeIsUsable),
-            anyRuntimeInstalled: runtimes.some((entry) => entry.installed),
+          ...runtimeReach(runtimes, runtimeState.phase === 'ready'),
           hasRunningMission: running,
           pendingApprovals: shownApprovals.length,
           roleLabel: roleLabelOf(missionOwner),

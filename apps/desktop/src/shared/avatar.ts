@@ -110,6 +110,38 @@ export function botFor(avatar: AvatarSpec): BotSpec {
   }
 }
 
+/**
+ * A PET FOR A FACE (0.563). Colin, 2026-10-03, of OpenPets' library: "that
+ * would be quite the library of teammates, no?" -- "that project is fully mit
+ * so yeah i want a full port" -- "theyre just going to be added to the list of
+ * potential choices for teammates" -- "just clarity these should be the exact
+ * same as teammates". A pet is only a face: a teammate wearing one is a
+ * teammate in every other way. Where the pet came from, and its folder's name:
+ * Locust's own one ('bundled'), one added from the openpets.dev gallery
+ * ('gallery'), or one the person made in Codex (`~/.codex/pets`, 'codex').
+ */
+export type PetSource = 'gallery' | 'codex' | 'bundled'
+
+export interface PetRef {
+  readonly source: PetSource
+  readonly id: string
+}
+
+/** OpenPets' own rule for a pet's id (catalog-validation.ts), 'builtin' being theirs. */
+export function isPetId(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-z0-9][a-z0-9_-]{0,63}$/.test(value) && value !== 'builtin'
+}
+
+export function isPetRef(value: unknown): value is PetRef {
+  if (typeof value !== 'object' || value === null) return false
+  const record = value as Record<string, unknown>
+  return (record.source === 'gallery' || record.source === 'codex' || record.source === 'bundled') && isPetId(record.id)
+}
+
+export function samePet(a: PetRef | undefined, b: PetRef | undefined): boolean {
+  return a !== undefined && b !== undefined && a.source === b.source && a.id === b.id
+}
+
 export interface AvatarSpec {
   /** plain, cans, bangs, buns, cap, antenna */
   readonly headwear: 0 | 1 | 2 | 3 | 4 | 5
@@ -119,6 +151,11 @@ export interface AvatarSpec {
   readonly mouth: 0 | 1 | 2 | 3
   /** The bot the person picked. Absent: derived from the three above (`botFor`). */
   readonly bot?: BotSpec
+  /**
+   * The pet worn instead of the bot (0.563). The bot stays on the record: it
+   * is the face shown while a pet cannot be (its file gone or unreadable).
+   */
+  readonly pet?: PetRef
 }
 
 /** Half-cell coordinates on the even 0-14 grid, as the spec tabulates them. */
@@ -178,6 +215,7 @@ export function isAvatarSpec(value: unknown): value is AvatarSpec {
     && within(record.accessory, ACCESSORY_COUNT)
     && within(record.mouth, MOUTH_COUNT)
     && (record.bot === undefined || isBotSpec(record.bot))
+    && (record.pet === undefined || isPetRef(record.pet))
 }
 
 /**
@@ -192,14 +230,16 @@ export function cleanAvatar(avatar: AvatarSpec): AvatarSpec {
     mouth: avatar.mouth,
     ...(avatar.bot === undefined
       ? {}
-      : { bot: { shape: avatar.bot.shape, face: avatar.bot.face, ...(typeof avatar.bot.screen === 'boolean' ? { screen: avatar.bot.screen } : {}) } })
+      : { bot: { shape: avatar.bot.shape, face: avatar.bot.face, ...(typeof avatar.bot.screen === 'boolean' ? { screen: avatar.bot.screen } : {}) } }),
+    ...(avatar.pet === undefined ? {} : { pet: { source: avatar.pet.source, id: avatar.pet.id } })
   }
 }
 
 /**
  * The next look: every part advances together, so a shuffle always changes
  * something -- and a shape the person had picked gives way to the derived one,
- * so shuffling moves through the bots too.
+ * so shuffling moves through the bots too. A pet gives way the same way: a
+ * shuffle is a roll through the bots.
  */
 export function shuffledAvatar(current: AvatarSpec): AvatarSpec {
   return {

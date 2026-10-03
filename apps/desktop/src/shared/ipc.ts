@@ -1,7 +1,8 @@
 import type { ReverseChange } from './reverse-diff.js'
 import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
-import type { AvatarSpec } from './avatar.js'
+import type { AvatarSpec, PetSource } from './avatar.js'
+import type { PetRows } from './pets.js'
 
 import type { RoutineSchedule } from './routine-schedule.js'
 export type { RoutineSchedule } from './routine-schedule.js'
@@ -449,6 +450,23 @@ export type WorkspaceChooseResponse =
         readonly message: string
       }
     }
+/*
+ * PETS AS TEAMMATES' FACES (0.563, main/pet-library.ts). The host keeps them,
+ * checks them and reads them; the window only ever names one by its source
+ * and id -- never a path, never an address.
+ */
+/** The pets on this computer: Locust's own, the ones added from the gallery, and Codex's. */
+export const PET_LIST_CHANNEL = 'pets:list'
+/** One pet's sheet, as bytes, for the window to draw. */
+export const PET_SHEET_CHANNEL = 'pets:sheet'
+/** A slice of the openpets.dev gallery: featured or originals, matching a search. */
+export const PET_GALLERY_CHANNEL = 'pets:gallery'
+/** A gallery pet's small picture, as a data URL. */
+export const PET_THUMBNAIL_CHANNEL = 'pets:thumbnail'
+/** Download a gallery pet to this computer: only ever on the person's click. */
+export const PET_ADD_CHANNEL = 'pets:add'
+/** Take a gallery pet off this computer, refused while a teammate wears it. */
+export const PET_REMOVE_CHANNEL = 'pets:remove'
 export const TEAMMATE_LIST_CHANNEL = 'teammates:list'
 export const TEAMMATE_CREATE_CHANNEL = 'teammates:create'
 export const TEAMMATE_REMOVE_CHANNEL = 'teammates:remove'
@@ -1431,6 +1449,62 @@ export type TeammateListResponse =
       }
     }
   | { readonly ok: false; readonly error: { readonly code: 'TEAMMATES_UNAVAILABLE'; readonly message: string } }
+
+/** A pet on this computer, wearable as a teammate's face (0.563). */
+export interface PublicPet {
+  readonly source: PetSource
+  readonly id: string
+  readonly displayName: string
+  readonly description: string
+  /** 9 (a version 1 sheet) or 11 (version 2: a resting pose, and a head that turns). */
+  readonly rows: PetRows
+}
+
+/** A pet in the openpets.dev gallery, as a tile shows it. */
+export interface PublicGalleryPet {
+  readonly id: string
+  readonly displayName: string
+  readonly featured: boolean
+  readonly original: boolean
+  readonly rows: PetRows
+  /** Already added to this computer. */
+  readonly added: boolean
+}
+
+/** Which of the gallery's curated pets to show: OpenPets' featured, or its own originals. */
+export type PetGalleryFilter = 'featured' | 'originals'
+
+export interface PetGalleryRequest {
+  readonly filter: PetGalleryFilter
+  /** Words to match in a pet's name and description; empty for all. */
+  readonly query: string
+  /** How many matches to skip, for "More". */
+  readonly offset: number
+}
+
+/** Every pet refusal is said in words a person can act on. */
+export interface PetFailure {
+  readonly ok: false
+  readonly error: { readonly code: 'PETS_UNAVAILABLE' | 'REFUSED' | 'WORN'; readonly message: string }
+}
+
+export type PetListResponse = { readonly ok: true; readonly data: { readonly pets: readonly PublicPet[] } } | PetFailure
+export type PetSheetResponse = { readonly ok: true; readonly data: { readonly bytes: Uint8Array; readonly rows: PetRows } } | PetFailure
+export type PetGalleryResponse =
+  | {
+      readonly ok: true
+      readonly data: {
+        readonly pets: readonly PublicGalleryPet[]
+        /** How many match in all, so the window knows whether to offer "More". */
+        readonly total: number
+        /** The gallery could not be reached, and this is what Locust last read of it. */
+        readonly stale: boolean
+      }
+    }
+  | PetFailure
+export type PetThumbnailResponse = { readonly ok: true; readonly data: { readonly dataUrl: string } } | PetFailure
+export type PetAddResponse = { readonly ok: true; readonly data: { readonly pet: PublicPet } } | PetFailure
+export type PetRemoveResponse = { readonly ok: true } | PetFailure
 
 /**
  * Each teammate's money this calendar month, by id. A teammate with none is
@@ -3066,6 +3140,16 @@ export interface DesktopApi {
   /** Delete the trash for good. */
   emptyTrash(): Promise<TrashMutationResponse>
   listTeammates(): Promise<TeammateListResponse>
+  /** The pets on this computer (0.563). */
+  listPets(): Promise<PetListResponse>
+  /** One pet's sheet, to draw. */
+  readPetSheet(source: PetSource, id: string): Promise<PetSheetResponse>
+  /** Browse the openpets.dev gallery: reads the catalog, downloads no pet. */
+  browsePetGallery(request: PetGalleryRequest): Promise<PetGalleryResponse>
+  petThumbnail(id: string): Promise<PetThumbnailResponse>
+  /** Download one gallery pet to this computer. Only ever on the person's click. */
+  addPet(id: string): Promise<PetAddResponse>
+  removePet(id: string): Promise<PetRemoveResponse>
   createTeammate(request: TeammateCreateRequest): Promise<TeammateMutationResponse>
   updateTeammate(request: TeammateUpdateRequest): Promise<TeammateMutationResponse>
   teammateSpend(): Promise<TeammateSpendResponse>

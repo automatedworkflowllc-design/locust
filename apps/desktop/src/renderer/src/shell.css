@@ -8537,6 +8537,217 @@ textarea {
   outline-offset: 2px;
 }
 
+/* A pet keeps its own face, so the face choice steps aside: Shuffle takes the
+   right end of the line it held (0.563). */
+.lc-lookhead > .lc-fieldlabel + .lc-shuffle {
+  margin-left: auto;
+}
+
+/*
+ * PETS, UNDER THE BOTS (0.563, NewTeammateDialog + PetGallery). The same grid
+ * and tiles as the bots, a heading of their own, and the gallery opening in
+ * place beneath them.
+ */
+.lc-pets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-4);
+  margin-top: var(--lc-space-2);
+}
+
+.lc-pets__browse {
+  font-size: var(--lc-text-description);
+}
+
+.lc-pets__caption {
+  margin: 0;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+}
+
+/* A colour under a pet: a plain swatch, since a pet is not tinted. */
+.lc-hue__chip {
+  display: block;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.lc-pettile {
+  position: relative;
+  display: grid;
+}
+
+/* Take a gallery pet off this computer: a small x on the tile's corner, shown on hover or focus. */
+.lc-pettile__remove {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--lc-border-strong);
+  background: var(--lc-bg-raised);
+  color: var(--lc-text-secondary);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-pettile:hover .lc-pettile__remove,
+.lc-pettile:focus-within .lc-pettile__remove {
+  opacity: 1;
+}
+
+.lc-pettile__remove:focus-visible {
+  outline: 2px solid var(--lc-focus-ring);
+  outline-offset: 1px;
+}
+
+.lc-petgallery {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-4);
+  padding: 12px;
+  border-radius: var(--lc-radius-card);
+  border: 1px solid var(--lc-border-card);
+  background: var(--lc-bg-raised);
+}
+
+.lc-petgallery__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+}
+
+.lc-petgallery__search {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+}
+
+.lc-petgallery__filter {
+  flex: none;
+}
+
+.lc-petgallery__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 6px;
+}
+
+.lc-petgallery__grid[aria-busy='true'] {
+  opacity: 0.7;
+}
+
+.lc-petgallery__tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px 4px 6px;
+  border-radius: var(--lc-radius-control);
+  border: 1px solid var(--lc-border-card);
+  background: transparent;
+  color: var(--lc-text-secondary);
+  font: inherit;
+  cursor: pointer;
+  transition: background var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-petgallery__tile:hover {
+  background: var(--lc-hover-surface);
+}
+
+.lc-petgallery__tile:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.lc-petgallery__tile.is-selected {
+  border-color: var(--lc-lime-border);
+  background: var(--lc-lime-tint);
+}
+
+.lc-petgallery__tile:focus-visible {
+  outline: 2px solid var(--lc-focus-ring);
+  outline-offset: 2px;
+}
+
+/* A gallery picture is 148 x 160 (a frame's own shape): shown whole, never cropped. */
+.lc-petgallery__picture {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 56px;
+}
+
+.lc-petgallery__picture img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.lc-petgallery__placeholder {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--lc-hover-surface);
+}
+
+.lc-petgallery__name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-primary);
+}
+
+.lc-petgallery__state {
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-label);
+  letter-spacing: var(--lc-tracking-label-wide);
+  text-transform: uppercase;
+  color: var(--lc-text-muted);
+}
+
+.lc-petgallery__tile.is-selected .lc-petgallery__state {
+  color: var(--lc-lime);
+}
+
+.lc-petgallery__note {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+  margin: 0;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+}
+
+.lc-petgallery__more {
+  align-self: center;
+  margin-left: 0;
+  font-size: var(--lc-text-description);
+}
+
+.lc-petgallery__credit {
+  margin: 0;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+}
+
+.lc-petgallery__credit .lc-linkbutton {
+  color: var(--lc-text-secondary);
+}
+
 .lc-rolegrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

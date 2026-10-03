@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import { useModal } from '../useModal.js'
 
-import { BOT_SHAPES, botFor, screenSuits, seedAvatar, shuffledAvatar } from '../../../shared/avatar.js'
-import type { AvatarSpec, BotFace, BotShape, BotSpec } from '../../../shared/avatar.js'
+import { BOT_SHAPES, botFor, samePet, screenSuits, seedAvatar, shuffledAvatar } from '../../../shared/avatar.js'
+import type { AvatarSpec, BotFace, BotShape, BotSpec, PetRef } from '../../../shared/avatar.js'
 import { useTerminalFaces } from '../botLook.js'
-import type { MissionMode, PublicTeammate, TeammateHue, TeammateRole, PublicConnector, PublicModel, PublicRuntimeStatus, TeammateRoute } from '../../../shared/ipc.js'
+import { refreshPetList, setPetLook, usePetList, usePetLook } from '../pets.js'
+import type { MissionMode, PublicPet, PublicTeammate, TeammateHue, TeammateRole, PublicConnector, PublicModel, PublicRuntimeStatus, TeammateRoute } from '../../../shared/ipc.js'
 import { ROLE_DESCRIPTIONS } from '../../../shared/ipc.js'
 import { defaultEffort, modelFamily, modeRunsOn, modesFor, modeSummary } from '../status.js'
 import { effortFooter } from '../effortLevels.js'
@@ -15,6 +16,7 @@ import { routeLabel } from './GroupSettingsDialog.js'
 import { RoutePicker } from './RoutePicker.js'
 import type { RouteChoice } from './RoutePicker.js'
 import { TeammateBot } from './TeammateBot.js'
+import { PetGallery } from './PetGallery.js'
 import { branchNameFor } from '../../../shared/worktree-name.js'
 import { dollars, isMonthlyLimit } from '../../../shared/spend.js'
 import type { Spend } from '../../../shared/spend.js'
@@ -156,6 +158,24 @@ export function connectorLabel(name: string): string {
     .filter((word) => word.length > 0)
     .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
     .join(' ')
+}
+
+/** Where a pet came from, said under the pets and on each one's tile. */
+export function petOrigin(pet: PublicPet): string {
+  switch (pet.source) {
+    case 'bundled':
+      return 'comes with Locust'
+    case 'gallery':
+      return 'from openpets.dev'
+    case 'codex':
+      return 'from Codex'
+  }
+}
+
+/** The look without its pet: a bot again. */
+function withoutPet(avatar: AvatarSpec): AvatarSpec {
+  const { pet: _pet, ...bot } = avatar
+  return bot
 }
 
 export function NewTeammateDialog({
@@ -320,6 +340,53 @@ export function NewTeammateDialog({
     return { shape, face: held.face, ...(held.screen === undefined ? {} : { screen: held.screen }) }
   }
 
+  /*
+   * PETS, IN THE SAME LIST OF LOOKS (0.563). Colin, 2026-10-03: "theyre just
+   * going to be added to the list of potential choices for teammates". Under
+   * the bots: the pets on this computer -- Locust's own, the ones added from
+   * openpets.dev, Codex's -- picked as a bot is picked, and the gallery,
+   * browsed in place. A pet keeps its own face, so the Eyes / Mouth / Screen
+   * choice steps aside while one is worn, and the colour swatches become
+   * plain colours: the colour still marks the teammate, it does not tint the
+   * pet.
+   */
+  const { pets } = usePetList()
+  const wornPet: PetRef | undefined = avatar.pet
+  const wornLook = usePetLook(wornPet)
+  const wornEntry = wornPet === undefined ? undefined : pets?.find((pet) => samePet(pet, wornPet))
+  const [galleryOpen, setGalleryOpen] = useState(false)
+  const [petNotice, setPetNotice] = useState<string>()
+  const wearPet = (pet: PublicPet): void => {
+    setPetNotice(undefined)
+    setAvatar((current) => ({ ...current, pet: { source: pet.source, id: pet.id } }))
+    // Picking a pet is the quickest way to a new teammate: an empty name takes the pet's own.
+    if (!editing && name.trim().length === 0) {
+      const own = pet.displayName.slice(0, 40).trim()
+      if (own.length > 0 && !takenNames.some((other) => other.trim().toLowerCase() === own.toLowerCase())) setName(own)
+    }
+  }
+  const removePet = (pet: PublicPet): void => {
+    setPetNotice(undefined)
+    void window.desktop?.removePet(pet.id).then(async (answer) => {
+      if (!answer.ok) {
+        setPetNotice(answer.error.message)
+        return
+      }
+      setPetLook({ source: 'gallery', id: pet.id }, undefined)
+      setAvatar((current) => (samePet(current.pet, pet) ? withoutPet(current) : current))
+      await refreshPetList()
+    })
+  }
+  const who = trimmed.length === 0 ? 'This teammate' : trimmed
+  const petCaption =
+    wornPet === undefined
+      ? undefined
+      : wornLook?.status === 'missing'
+        ? `${who}\u2019s pet could not be found, so ${who} is showing a bot. ${wornLook.reason}`
+        : wornEntry === undefined
+          ? undefined
+          : `${wornEntry.displayName}, ${petOrigin(wornEntry)}`
+
   // Focus in (the name field, above), Tab held inside, Escape closes -- from
   // anywhere now, not only while focus happened to be in the dialog.
   const box = useRef<HTMLDivElement>(null)
@@ -383,7 +450,11 @@ export function NewTeammateDialog({
                     className={`lc-hue${hue === option.hue ? ' is-selected' : ''}`}
                     onClick={() => setHue(option.hue)}
                   >
-                    <TeammateBot hue={option.hue} avatar={avatar} size={24} />
+                    {wornPet === undefined ? (
+                      <TeammateBot hue={option.hue} avatar={avatar} size={24} />
+                    ) : (
+                      <span className="lc-hue__chip" style={{ background: `var(--lc-hue-${option.hue})` }} />
+                    )}
                   </button>
                 ))}
               </div>
@@ -460,39 +531,41 @@ export function NewTeammateDialog({
           <div className="lc-dialog__section">
             <div className="lc-lookhead">
               <span className="lc-fieldlabel lc-mono">Look</span>
-              <div className="lc-lookface" role="radiogroup" aria-label="Face">
-                {(['eyes', 'mouth', 'screen'] as const).map((face) => {
-                  const off = face === 'screen' ? !terminal && !alwaysScreen : alwaysScreen
-                  return (
-                    <button
-                      key={face}
-                      type="button"
-                      role="radio"
-                      aria-checked={faceChoice === face}
-                      className={faceChoice === face ? 'is-selected' : undefined}
-                      disabled={off}
-                      title={
-                        off
-                          ? face === 'screen'
-                            ? 'Turn Terminal faces on in Settings > Appearance to give a teammate a screen.'
-                            : "Prompt's face is its screen."
-                          : undefined
-                      }
-                      onClick={() =>
-                        setAvatar((current) => {
-                          const held = botFor(current)
-                          return {
-                            ...current,
-                            bot: face === 'screen' ? { shape: held.shape, face: held.face, screen: true } : { shape: held.shape, face, screen: false }
-                          }
-                        })
-                      }
-                    >
-                      {face === 'eyes' ? 'Eyes' : face === 'mouth' ? 'Mouth' : 'Screen'}
-                    </button>
-                  )
-                })}
-              </div>
+              {wornPet === undefined && (
+                <div className="lc-lookface" role="radiogroup" aria-label="Face">
+                  {(['eyes', 'mouth', 'screen'] as const).map((face) => {
+                    const off = face === 'screen' ? !terminal && !alwaysScreen : alwaysScreen
+                    return (
+                      <button
+                        key={face}
+                        type="button"
+                        role="radio"
+                        aria-checked={faceChoice === face}
+                        className={faceChoice === face ? 'is-selected' : undefined}
+                        disabled={off}
+                        title={
+                          off
+                            ? face === 'screen'
+                              ? 'Turn Terminal faces on in Settings > Appearance to give a teammate a screen.'
+                              : "Prompt's face is its screen."
+                            : undefined
+                        }
+                        onClick={() =>
+                          setAvatar((current) => {
+                            const held = botFor(current)
+                            return {
+                              ...current,
+                              bot: face === 'screen' ? { shape: held.shape, face: held.face, screen: true } : { shape: held.shape, face, screen: false }
+                            }
+                          })
+                        }
+                      >
+                        {face === 'eyes' ? 'Eyes' : face === 'mouth' ? 'Mouth' : 'Screen'}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
               <button
                 type="button"
                 className="lc-ghostbutton lc-shuffle"
@@ -507,16 +580,68 @@ export function NewTeammateDialog({
                   key={shape}
                   type="button"
                   role="radio"
-                  aria-checked={look.shape === shape}
+                  aria-checked={wornPet === undefined && look.shape === shape}
                   aria-label={SHAPE_NAMES[shape]}
                   title={SHAPE_NAMES[shape]}
                   data-shape={shape}
-                  className={`lc-look${look.shape === shape ? ' is-selected' : ''}`}
-                  onClick={() => setAvatar((current) => ({ ...current, bot: withShape(current, shape) }))}
+                  className={`lc-look${wornPet === undefined && look.shape === shape ? ' is-selected' : ''}`}
+                  onClick={() => setAvatar((current) => ({ ...withoutPet(current), bot: withShape(current, shape) }))}
                 >
-                  <TeammateBot hue={hue} avatar={{ ...avatar, bot: withShape(avatar, shape) }} size={30} />
+                  <TeammateBot hue={hue} avatar={{ ...withoutPet(avatar), bot: withShape(avatar, shape) }} size={30} />
                 </button>
               ))}
+            </div>
+
+            <div className="lc-pets" role="group" aria-label="Pets">
+              <div className="lc-lookhead">
+                <span className="lc-fieldlabel lc-mono">Pets</span>
+                <button
+                  type="button"
+                  className="lc-ghostbutton lc-pets__browse"
+                  aria-expanded={galleryOpen}
+                  onClick={() => setGalleryOpen((open) => !open)}
+                >
+                  {galleryOpen ? 'Close the gallery' : 'Browse the gallery'}
+                </button>
+              </div>
+              {pets !== undefined && pets.length > 0 && (
+                <div className="lc-lookgrid" role="radiogroup" aria-label="Pets on this computer">
+                  {pets.map((pet) => {
+                    const chosen = samePet(wornPet, pet)
+                    return (
+                      <span key={`${pet.source}/${pet.id}`} className="lc-pettile">
+                        <button
+                          type="button"
+                          role="radio"
+                          aria-checked={chosen}
+                          aria-label={pet.displayName}
+                          title={`${pet.displayName}, ${petOrigin(pet)}`}
+                          data-pet={pet.id}
+                          data-source={pet.source}
+                          className={`lc-look${chosen ? ' is-selected' : ''}`}
+                          onClick={() => wearPet(pet)}
+                        >
+                          <TeammateBot hue={hue} avatar={{ ...avatar, pet: { source: pet.source, id: pet.id } }} size={34} />
+                        </button>
+                        {pet.source === 'gallery' && (
+                          <button
+                            type="button"
+                            className="lc-pettile__remove"
+                            aria-label={`Remove ${pet.displayName} from this computer`}
+                            title={`Remove ${pet.displayName} from this computer`}
+                            onClick={() => removePet(pet)}
+                          >
+                            &times;
+                          </button>
+                        )}
+                      </span>
+                    )
+                  })}
+                </div>
+              )}
+              {petCaption !== undefined && <p className="lc-pets__caption">{petCaption}</p>}
+              {petNotice !== undefined && <p className="lc-pets__caption lc-tone-amber">{petNotice}</p>}
+              {galleryOpen && <PetGallery selected={wornPet} onPick={wearPet} />}
             </div>
           </div>
 

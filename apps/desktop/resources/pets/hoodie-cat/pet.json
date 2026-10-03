@@ -1,0 +1,8 @@
+{
+  "id": "hoodie-cat",
+  "displayName": "Hoodie Cat",
+  "description": "OpenPets' own cat, in a blue hoodie with a backpack.",
+  "spritesheetPath": "spritesheet.webp",
+  "spriteVersionNumber": 2,
+  "addedFrom": "https://github.com/OpenPetsHQ/openpets/blob/2d14120cf027c9e80db7ff78e60711be08d39df4/apps/desktop/assets/default-pet-spritesheet.webp"
+}

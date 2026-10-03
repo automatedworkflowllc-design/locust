@@ -152,7 +152,10 @@ describe('reading a cloud session', () => {
     expect(await readFile(join(w.repo, 'cart.js'), 'utf8')).toBe('export const total = () => 0 // mine\n')
   })
 
-  it('checking again starts from a fresh worktree, not the last one', async () => {
+  // Two whole reads, each a real git worktree made and removed: past vitest's
+  // default 5 s on Windows when the full suite shares the disk (5.1 s in the
+  // 0.563 gate, under one alone).
+  it('checking again starts from a fresh worktree, not the last one', { timeout: 20_000 }, async () => {
     const w = await world()
     const { runs, terminal } = teleporting(w)
     const cloud = createClaudeCloud({ discover: claude, storePath: w.storePath, platform: 'win32', terminal, claudeHome: w.home })

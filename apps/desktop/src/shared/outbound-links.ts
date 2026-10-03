@@ -33,7 +33,15 @@ const RUNTIME_LINKS: readonly string[] = ['cursor', 'antigravity', 'codex', 'cla
 /** Node.js itself: what four of the five runtimes install through. */
 const NODE_LINK = 'https://nodejs.org'
 
-export const OUTBOUND_LINKS: readonly string[] = [...new Set([...RUNTIME_LINKS, NODE_LINK])]
+/**
+ * The pet gallery's home, and where its terms send a report about a pet
+ * (0.563): "Rights remain with their respective owners", contact
+ * admin@openpets.dev. A fixed address, like every other here.
+ */
+export const OPENPETS_LINK = 'https://openpets.dev'
+export const OPENPETS_REPORT_LINK = 'mailto:admin@openpets.dev?subject=A%20pet%20on%20openpets.dev'
+
+export const OUTBOUND_LINKS: readonly string[] = [...new Set([...RUNTIME_LINKS, NODE_LINK, OPENPETS_LINK, OPENPETS_REPORT_LINK])]
 
 /** Whether the host may open this, asked of the host's own list. */
 export function isOutboundLink(url: unknown): url is string {

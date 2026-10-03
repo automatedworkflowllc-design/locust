@@ -6,7 +6,7 @@ import { ownGitArgs } from './git-guard.js'
 import { APP_USER_MODEL_ID, DEVELOPMENT_APP_USER_MODEL_ID, mayShowToasts, repairStartMenuShortcut, sweepStaleElectronShortcuts } from './stale-shortcut.js'
 import { openingPlacement, readSavedWindow } from './window-bounds.js'
 import type { SavedWindow } from './window-bounds.js'
-import { app, BrowserWindow, crashReporter, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, powerSaveBlocker, protocol, safeStorage, screen, session, shell, Tray } from 'electron'
+import { app, BrowserWindow, crashReporter, dialog, ipcMain, Menu, nativeImage, nativeTheme, net, Notification, powerSaveBlocker, protocol, safeStorage, screen, session, shell, Tray } from 'electron'
 import { createPageServer, fromPagePreview, pageMayReach, PAGE_SCHEME } from './page-preview.js'
 import { CANCEL_SCRIPT, captureRectOf, pageFrameOf, pickInFrame } from './page-pick.js'
 import { createRuntimeCommands } from './runtime-commands.js'
@@ -315,8 +315,16 @@ import {
   OWN_MODEL_ADD_CHANNEL,
   OWN_MODEL_REMOVE_CHANNEL,
   OWN_MODEL_TEST_CHANNEL,
-  OWN_MODEL_CHAT_ONLY_CHANNEL
+  OWN_MODEL_CHAT_ONLY_CHANNEL,
+  PET_LIST_CHANNEL,
+  PET_SHEET_CHANNEL,
+  PET_GALLERY_CHANNEL,
+  PET_THUMBNAIL_CHANNEL,
+  PET_ADD_CHANNEL,
+  PET_REMOVE_CHANNEL
 } from '../shared/ipc.js'
+import { createPetLibrary, PetError } from './pet-library.js'
+import { isPetRef } from '../shared/avatar.js'
 import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { isMissionRuntime, runtimeDisplayName } from '../shared/runtimes.js'
 import { routeAtStart } from '../shared/route-at-start.js'
@@ -4534,6 +4542,100 @@ if (!ownsSingleInstanceLock) {
         return { ok: true, data: {} } as const
       } catch {
         return teammateRejected('That teammate could not be removed.')
+      }
+    })
+
+    /*
+     * PETS, TEAMMATES' OTHER FACES (0.563, pet-library.ts). Locust's own pet
+     * beside the app (resources/pets), the ones the person adds in their
+     * profile, and Codex's where Codex keeps them, read only. The gallery is
+     * reached only through these handlers, and a pet is downloaded only by
+     * PET_ADD_CHANNEL -- the person's click on Add.
+     */
+    const pets = createPetLibrary({
+      installedRoot: join(app.getPath('userData'), 'pets'),
+      cacheRoot: join(app.getPath('userData'), 'pets-cache'),
+      bundledRoot: app.isPackaged ? join(process.resourcesPath, 'pets') : join(__dirname, '../../resources/pets'),
+      codexRoot: join(process.env.CODEX_HOME ?? join(homedir(), '.codex'), 'pets'),
+      fetch: (url, init) => net.fetch(url, init),
+      log: (message) => note('pets', message)
+    })
+    const petFailure = (error: unknown, fallback: string) =>
+      ({ ok: false, error: { code: 'PETS_UNAVAILABLE', message: error instanceof PetError ? error.message : fallback } }) as const
+    const petRefused = { ok: false, error: { code: 'REFUSED', message: 'That request was rejected.' } } as const
+
+    ipcMain.handle(PET_LIST_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return petRefused
+      try {
+        return { ok: true, data: { pets: await pets.list() } } as const
+      } catch (error) {
+        return petFailure(error, 'The pets on this computer could not be read.')
+      }
+    })
+
+    ipcMain.handle(PET_SHEET_CHANNEL, async (event, source: unknown, id: unknown) => {
+      if (!fromOwnWindow(event)) return petRefused
+      const ref = { source, id }
+      if (!isPetRef(ref)) return petRefused
+      try {
+        return { ok: true, data: await pets.sheet(ref) } as const
+      } catch (error) {
+        return petFailure(error, 'That pet could not be read.')
+      }
+    })
+
+    ipcMain.handle(PET_GALLERY_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return petRefused
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      try {
+        return {
+          ok: true,
+          data: await pets.gallery({
+            filter: input.filter === 'originals' ? 'originals' : 'featured',
+            query: typeof input.query === 'string' ? input.query : '',
+            offset: typeof input.offset === 'number' ? input.offset : 0
+          })
+        } as const
+      } catch (error) {
+        return petFailure(error, 'The pet gallery could not be read.')
+      }
+    })
+
+    ipcMain.handle(PET_THUMBNAIL_CHANNEL, async (event, id: unknown) => {
+      if (!fromOwnWindow(event) || typeof id !== 'string') return petRefused
+      try {
+        return { ok: true, data: { dataUrl: await pets.thumbnail(id) } } as const
+      } catch (error) {
+        return petFailure(error, 'That pet’s picture could not be read.')
+      }
+    })
+
+    ipcMain.handle(PET_ADD_CHANNEL, async (event, id: unknown) => {
+      if (!fromOwnWindow(event) || typeof id !== 'string') return petRefused
+      try {
+        return { ok: true, data: { pet: await pets.add(id) } } as const
+      } catch (error) {
+        return petFailure(error, 'That pet could not be added.')
+      }
+    })
+
+    ipcMain.handle(PET_REMOVE_CHANNEL, async (event, id: unknown) => {
+      if (!fromOwnWindow(event) || typeof id !== 'string') return petRefused
+      try {
+        // A pet a teammate wears stays: removing it would take that teammate's face.
+        const wearers = (await teammates.list()).filter((teammate) => teammate.avatar.pet?.source === 'gallery' && teammate.avatar.pet.id === id)
+        if (wearers.length > 0) {
+          const names = wearers.map((teammate) => teammate.name)
+          const who = names.length === 1 ? names[0]! : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]!}`
+          return {
+            ok: false,
+            error: { code: 'WORN', message: `${who} ${names.length === 1 ? 'wears' : 'wear'} this pet. Give ${names.length === 1 ? 'them' : 'each of them'} another look first.` }
+          } as const
+        }
+        await pets.remove(id)
+        return { ok: true } as const
+      } catch (error) {
+        return petFailure(error, 'That pet could not be removed.')
       }
     })
 
