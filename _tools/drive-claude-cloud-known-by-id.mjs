@@ -28,6 +28,9 @@ const claudeWindows = () => {
   return Number(out.trim())
 }
 
+/** The hidden start's command line, while it runs (about four seconds): '' when none is running. */
+const hiddenStart = () => execFileSync('powershell.exe', ['-NoProfile', '-Command', "(Get-CimInstance Win32_Process -Filter \"Name='cmd.exe'\" | Where-Object { $_.CommandLine -match '/c' -and $_.CommandLine -match '--cloud' } | Select-Object -First 1).CommandLine"], { encoding: 'utf8' }).trim()
+
 const drive = await startDrive({
   ...(packaged === undefined ? {} : { packaged }),
   name: `claude-cloud-known-${tag}`,
@@ -80,14 +83,17 @@ try {
   const typed = await drive.evaluate(setText('form.command-dock textarea', 'Reply with the single word ok. Change nothing.'))
   await sleep(400)
   await drive.capture('Task written, Cloud on', () => drive.evaluate(`(() => { document.querySelector('form.command-dock')?.requestSubmit(); return 1 })()`))
-  // While it starts: no Claude Code window.
+  // While it starts: no Claude Code window, and (0.557) the box's model goes with it.
   let windowsSeen = 0
-  for (let waited = 0; waited < 20_000; waited += 2000) {
-    await sleep(2000)
+  let started = ''
+  for (let waited = 0; waited < 20_000; waited += 1000) {
+    await sleep(1000)
     windowsSeen = Math.max(windowsSeen, claudeWindows() - before)
+    if (started === '') started = hiddenStart()
   }
   check('the task was written and sent', typed === true)
   check('no Claude Code window opened', windowsSeen === 0, `windows: ${String(windowsSeen)}`)
+  check('the session starts on the model picked in the box', /--model haiku/.test(started) && /--cloud/.test(started), started)
   await drive.waitFor(`!!document.querySelector('.lc-cloudtask__more')`, { timeoutMs: 60_000, what: 'the session row with its box' })
   const row = JSON.parse(String(await drive.capture('The session, known', () => drive.evaluate(`JSON.stringify({
     title: document.querySelector('.lc-cloudtask__title')?.textContent ?? '',
