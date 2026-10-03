@@ -84,6 +84,8 @@ export interface PetRemoval {
   readonly showRemoved: boolean
   /** What the last removal did: plain when it all went, amber when some could not be removed. */
   readonly report: { readonly text: string; readonly warn: boolean } | undefined
+  /** Clears the report: a pet picked after removing says nothing more about the removal (Sonnet's 0.569 pass). */
+  readonly dismiss: () => void
   readonly start: () => void
   readonly cancel: () => void
   readonly toggle: (id: string) => void
@@ -105,6 +107,7 @@ export function usePetRemoval(onNotice: (notice: string | undefined) => void): P
     busy,
     showRemoved,
     report,
+    dismiss: () => setReport(undefined),
     start: () => {
       onNotice(undefined)
       setReport(undefined)

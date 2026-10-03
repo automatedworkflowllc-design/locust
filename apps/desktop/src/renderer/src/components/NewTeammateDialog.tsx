@@ -368,6 +368,8 @@ export function NewTeammateDialog({
   ]
   const wearPet = (pet: PublicPet): void => {
     setPetNotice(undefined)
+    // "Removed 3 pets" beside "2 removed" once one came back read wrong (Sonnet's 0.569 pass).
+    petRemoval.dismiss()
     setAvatar((current) => ({ ...current, pet: { source: pet.source, id: pet.id } }))
     // Picking a pet is the quickest way to a new teammate: an empty name takes the pet's own.
     if (!editing && name.trim().length === 0) {

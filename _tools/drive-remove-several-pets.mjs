@@ -102,6 +102,8 @@ try {
     return ${read}
   })()`))))
   check('picking Robot brings it back into the picker', back.picks.includes('robot') && !back.removedShown.includes('robot'), JSON.stringify(back))
+  // Sonnet's 0.569 pass: "Removed 3 pets" stayed beside "2 removed" once Robot came back.
+  check('and the removal message goes once a pet is picked', !back.captions.some((line) => /Removed 3 pets/.test(line)), JSON.stringify(back.captions))
   const file2 = JSON.parse(await readFile(join(drive.profile, 'pets-removed.json'), 'utf8').catch(() => '{}'))
   check('and out of the removed list', JSON.stringify(file2.ids) === JSON.stringify(['dot', 'reaper']), JSON.stringify(file2))
 } catch (error) {

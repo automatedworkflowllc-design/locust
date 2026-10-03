@@ -8688,13 +8688,21 @@ textarea {
   border-color: var(--lc-red-text);
 }
 
+/* A filled badge, big enough to read without the edge (Sonnet's 0.569 pass: "a roughly 6px x"). */
 .lc-pettile__tick {
   position: absolute;
-  top: 2px;
-  right: 4px;
-  font-size: 11px;
+  top: -5px;
+  right: -5px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--lc-red-text);
+  color: var(--lc-bg-window, #121316);
+  font-size: 12px;
+  font-weight: 700;
   line-height: 1;
-  color: var(--lc-red-text);
 }
 
 /* A removed pet, shown to bring back: faded until hovered. */
