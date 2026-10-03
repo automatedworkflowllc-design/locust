@@ -50,6 +50,10 @@ heading: the home screen then shows it once, as a splash.
   words; it now reads Claude Code's own answer, shows its error word for word
   when a session is archived or gone, and never reports a sent message as
   unsent.
+- **A Claude cloud session that no longer exists says so.** Reading one that
+  was archived or deleted said Claude Code "did not save its conversation this
+  time"; it now says the session is not found in Claude's cloud, and removes
+  the empty copy Claude Code had started for it.
 
 ## 0.563.0 - 2026-10-03
 <!-- big -->

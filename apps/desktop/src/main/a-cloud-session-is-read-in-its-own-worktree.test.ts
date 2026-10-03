@@ -211,10 +211,23 @@ describe('reading a cloud session', { timeout: 30_000 }, () => {
 
   it('not brought in at all: says what Claude Code said, and leaves no worktree behind', async () => {
     const w = await world()
-    const cloud = createClaudeCloud({ discover: claude, storePath: w.storePath, platform: 'win32', terminal: teleporting(w, { transcript: false, worktree: false, drawn: 'Error: Session not found\r\n' }).terminal, claudeHome: w.home })
+    const cloud = createClaudeCloud({ discover: claude, storePath: w.storePath, platform: 'win32', terminal: teleporting(w, { transcript: false, worktree: false, drawn: 'Error: Could not reach Claude\r\n' }).terminal, claudeHome: w.home })
     const read = await cloud.check(w.id)
-    expect(read).toEqual({ ok: false, message: 'Claude Code did not bring the session in: Session not found' })
+    expect(read).toEqual({ ok: false, message: 'Claude Code did not bring the session in: Could not reach Claude' })
     expect(await exists(join(w.repo, '.claude', 'worktrees', w.name))).toBe(false)
+  }, 15_000)
+
+  it('a session archived or deleted (measured 10/03): the worktree Claude Code made first is removed, and it says the session is gone', async () => {
+    const w = await world()
+    // Claude Code 2.1.288 makes and locks the worktree, then looks the session up: no branch, no transcript.
+    const cloud = createClaudeCloud({ discover: claude, storePath: w.storePath, platform: 'win32', terminal: teleporting(w, { transcript: false, change: false, drawn: 'Session not found: session_01ARukdj17v2vKLMYm6pc6WE\r\n' }).terminal, claudeHome: w.home })
+    const read = await cloud.check(w.id)
+    expect(read.ok).toBe(false)
+    if (read.ok) return
+    expect(read.message).toMatch(/not found in Claude.s cloud: it was archived or deleted/)
+    expect(read.message).not.toMatch(/did not save its conversation/)
+    expect(await exists(join(w.repo, '.claude', 'worktrees', w.name))).toBe(false)
+    expect(git(w.repo, 'branch', '--list', `worktree-${w.name}`)).toBe('')
   }, 15_000)
 
   it('the trust question is left to the person; nothing is answered', async () => {

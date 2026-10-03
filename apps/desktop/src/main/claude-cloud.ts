@@ -156,10 +156,12 @@ export function readingWorktreeName(id: string): string {
 export type CloudReadingProblem = 'asks' | 'long-paths' | undefined
 
 /** What `claude --teleport <id> --worktree <name>` drew, for what only the person can do about it. */
-export function readTeleport(drawn: string): { readonly problem: CloudReadingProblem; readonly noBranch: boolean; readonly error?: string } {
+export function readTeleport(drawn: string): { readonly problem: CloudReadingProblem; readonly noBranch: boolean; readonly gone: boolean; readonly error?: string } {
   const text = plainTerminalText(drawn)
   const error = /Error:[ \t]*(.+)/.exec(text)?.[1]?.trim().slice(0, 300)
   return {
+    // Measured 10/03 (0.564): an archived or deleted session -- Claude Code makes the worktree first, then says this.
+    gone: /Session not found/i.test(text),
     problem: new RegExp(ASKS_THE_PERSON, 'i').test(text) ? 'asks' : /Filename too long/i.test(text) ? 'long-paths' : undefined,
     // Measured 10/02: a session that changed nothing pushed no branch, and Claude Code says so.
     noBranch: /resumed without branch|Failed to checkout branch/i.test(text),
@@ -413,6 +415,11 @@ export function createClaudeCloud(options: ClaudeCloudOptions) {
           return said.problem === 'asks'
             ? { ok: false, message: 'Claude Code asks whether you trust this folder first. Open Claude Code in this folder once and answer it, then check again.' }
             : { ok: false, message: 'Git could not check the session out here: some of its paths are longer than Windows allows. Turning on long paths for this repository fixes it: git config core.longpaths true' }
+        }
+        if (said.gone) {
+          // Its worktree was made before Claude Code looked the session up: nothing came in.
+          await removeReading(session.folder, name)
+          return { ok: false, message: 'Claude Code says this session is not found in Claude’s cloud: it was archived or deleted. See it on claude.ai, or forget it here.' }
         }
         let path: string | undefined
         for (let tries = 0; tries < 10 && path === undefined; tries += 1) {
