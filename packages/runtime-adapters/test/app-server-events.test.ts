@@ -151,7 +151,7 @@ describe("tools", () => {
 
   it("describes a file change by its count rather than its diff", () => {
     // The diff can be enormous and this lands in a durable ledger.
-    expect(toolCommandOf({ type: "fileChange", changes: [1, 2, 3] })).toBe("3 file change(s)");
+    expect(toolCommandOf({ type: "fileChange", changes: [1, 2, 3] })).toBe("3 files");
   });
 
   it("treats an unknown non-tool item as a step, not a tool", () => {

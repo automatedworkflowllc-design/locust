@@ -75,10 +75,14 @@ export function agyToolTarget(parameters: unknown): string | undefined {
 /** A denied action, said for a person: what Antigravity was stopped from doing, and how to let it. */
 export function agyDeniedSentence(actions: readonly string[]): string | undefined {
   if (actions.length === 0) return undefined;
-  const writes = actions.some((action) => /write|edit|file/i.test(action));
+  // `read_file` is a read outside the folder, not a change (0.572: it was said
+  // as "not allowed to change files" because "file" matched writes).
+  const reads = actions.some((action) => /read/i.test(action));
+  const writes = actions.some((action) => /write|edit/i.test(action) || (/file/i.test(action) && !/read/i.test(action)));
   const commands = actions.some((action) => /command/i.test(action));
-  if (commands && !writes) return "Antigravity was not allowed to run a command in this mode. Edit lets it change files but not run commands; Auto lets it do both.";
-  if (writes && !commands) return "Antigravity was not allowed to change files in this mode. Choose Edit or Auto to let it.";
+  if (reads && !writes && !commands) return "Antigravity was not allowed to read a file outside this conversation's folder in this mode. Move the file into the folder, or choose Auto to let it.";
+  if (commands && !writes && !reads) return "Antigravity was not allowed to run a command in this mode. Edit lets it change files but not run commands; Auto lets it do both.";
+  if (writes && !commands && !reads) return "Antigravity was not allowed to change files in this mode. Choose Edit or Auto to let it.";
   return `Antigravity was not allowed to do everything it tried in this mode (${actions.join(", ")}). Choose Auto to let it.`;
 }
 

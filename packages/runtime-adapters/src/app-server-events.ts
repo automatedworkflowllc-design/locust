@@ -125,7 +125,13 @@ export function toolCommandOf(item: Record<string, unknown>): string | undefined
   if (command !== undefined) return boundedMessageText(command);
   const query = stringValue(item.query);
   if (query !== undefined) return boundedMessageText(query);
-  if (Array.isArray(item.changes)) return `${item.changes.length} file change(s)`;
+  // The files it names, one per line, as the desktop's own record of the
+  // change writes them (0.572; "1 file change(s)" read as a stutter).
+  if (Array.isArray(item.changes)) {
+    const paths = item.changes.flatMap((change) => (typeof change === "object" && change !== null && typeof (change as Record<string, unknown>).path === "string" && ((change as Record<string, unknown>).path as string).length > 0 ? [(change as Record<string, unknown>).path as string] : []));
+    if (paths.length === item.changes.length && paths.length > 0) return boundedMessageText(paths.join("\n"));
+    return item.changes.length === 1 ? "1 file" : `${item.changes.length} files`;
+  }
   return undefined;
 }
 

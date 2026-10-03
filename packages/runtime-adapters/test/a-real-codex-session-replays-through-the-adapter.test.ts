@@ -94,7 +94,7 @@ it('The recorded file change preserves the patch and produces one matched apply_
   const starts = events.filter((event) => event.type === 'tool.started' && event.payload.name === 'apply_patch')
   const ends = events.filter((event) => event.type === 'tool.completed' && event.payload.name === 'apply_patch')
   expect(starts).toHaveLength(1); expect(ends).toHaveLength(1)
-  expect(ends[0].payload).toMatchObject({ itemId: starts[0].payload.itemId, status: 'completed', command: '1 file change(s)' })
+  expect(ends[0].payload).toMatchObject({ itemId: starts[0].payload.itemId, status: 'completed', command: 'C:\\fixture\\codex\\notes.txt' })
   expect(events.findLast((event) => event.type === 'message.delta')?.payload).toMatchObject({ text: 'FILE_CHANGED', final: true })
 })
 it('The recorded steer targets the live turn, is accepted without interrupting it, and changes the final answer.', async () => {
