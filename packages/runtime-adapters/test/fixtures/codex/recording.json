@@ -1,0 +1,36 @@
+{
+  "version": "0.160.0",
+  "model": "gpt-6-luna",
+  "effort": "low",
+  "recordedOn": "2026-10-03",
+  "scenarios": [
+    {
+      "name": "file-change",
+      "messages": 24,
+      "approvals": 0,
+      "fileChanged": true,
+      "terminal": 0,
+      "cancelled": false,
+      "finalText": "FILE_CHANGED"
+    },
+    {
+      "name": "approval-declined",
+      "messages": 42,
+      "approvals": 1,
+      "fileChanged": false,
+      "terminal": 0,
+      "cancelled": false,
+      "finalText": "APPROVAL_DECLINED"
+    },
+    {
+      "name": "steer",
+      "messages": 42,
+      "approvals": 0,
+      "steerAccepted": true,
+      "fileChanged": false,
+      "terminal": 0,
+      "cancelled": false,
+      "finalText": "STEER_ACCEPTED"
+    }
+  ]
+}
