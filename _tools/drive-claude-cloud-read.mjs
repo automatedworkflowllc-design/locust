@@ -58,8 +58,21 @@ try {
   const before = claudeWindows()
   await drive.ready()
   await drive.resize(1209, 770)
-  await drive.waitFor(`[...document.querySelectorAll('button')].some((b) => /Cloud tasks/.test((b.getAttribute('aria-label') ?? '') + (b.getAttribute('title') ?? '') + b.innerText))`, { timeoutMs: 60_000, what: 'the Cloud tasks action' })
-  await drive.evaluate(click('/Cloud tasks/'))
+  // Clay, then Cloud in the chat-type menu: the panel opens with this folder's sessions.
+  await drive.evaluate(`(async () => {
+    const clay = [...document.querySelectorAll('button')].find((b) => /Clay/.test((b.getAttribute('title') ?? '') + ' ' + (b.getAttribute('aria-label') ?? '') + ' ' + b.innerText))
+    clay?.click()
+    await new Promise((r) => setTimeout(r, 900))
+    return 1
+  })()`)
+  await drive.waitFor(`!!document.querySelector('.lc-control--chatmode')`, { timeoutMs: 60_000, what: 'the chat-type chip' })
+  await drive.evaluate(`(async () => {
+    document.querySelector('.lc-control--chatmode')?.click()
+    await new Promise((r) => setTimeout(r, 500))
+    ;[...document.querySelectorAll('.lc-menu__item')].find((b) => /^Cloud/.test(b.innerText.trim()))?.click()
+    await new Promise((r) => setTimeout(r, 900))
+    return 1
+  })()`)
   await drive.waitFor(`!!document.querySelector('.lc-cloudtask')`, { timeoutMs: 30_000, what: 'the session row' })
   const row = String(await drive.capture('The session, before reading', () => drive.evaluate(`document.querySelector('.lc-cloudtask')?.innerText.replace(/\\s+/g, ' ').trim() ?? ''`)))
   check('the row offers to show what it did', /Show what it did/.test(row) && /See it on claude\.ai/.test(row), row)
