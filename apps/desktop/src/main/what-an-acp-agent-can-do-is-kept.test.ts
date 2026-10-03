@@ -71,3 +71,28 @@ it('reaches Settings on the runtime it was said by, and no other', async () => {
   expect(answer.data.runtimes.find((entry) => entry.id === 'codex')).not.toHaveProperty('agentCapabilities')
   await store.settled()
 })
+
+it('reaches an answer discovery already cached, without probing a CLI again (measured on 0.566)', async () => {
+  const root = await scratch()
+  const store = createAcpCapabilitiesStore({ rootDirectory: root, now: at })
+  let probes = 0
+  const runtime = { id: 'copilot', displayName: 'GitHub Copilot', availability: 'available', readiness: 'ready' } as unknown as RuntimeDiscovery
+  const discovery = createRuntimeDiscoveryService({
+    probe: async () => {
+      probes += 1
+      return [runtime]
+    },
+    agentCapabilities: (id) => store.get(id),
+    cacheTtlMs: 60_000
+  })
+  const before = await discovery.get()
+  if (!before.ok) throw new Error('discovery failed')
+  expect(before.data.runtimes[0]).not.toHaveProperty('agentCapabilities')
+  // A Copilot run starts and says what it can do; the next ask is answered from the cache.
+  store.record('copilot', said)
+  const after = await discovery.get()
+  if (!after.ok) throw new Error('discovery failed')
+  expect(after.data.runtimes[0]?.agentCapabilities?.continuesSessions).toBe(true)
+  expect(probes).toBe(1)
+  await store.settled()
+})

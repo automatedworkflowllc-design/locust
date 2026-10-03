@@ -107,22 +107,38 @@ export function createRuntimeDiscoveryService(
   let cached: { readonly expiresAt: number; readonly response: RuntimeDiscoveryResponse } | undefined
   let inFlight: Promise<RuntimeDiscoveryResponse> | undefined
 
+  /*
+   * What an ACP agent said it can do is added to EVERY answer, the cached one
+   * too (W12): it changes when a run starts, not when a CLI is probed, so it
+   * must never wait for -- or force -- a re-probe of every CLI. Measured on
+   * the packaged 0.566 drive: recorded, but the row was the launch's answer.
+   */
+  const told = (response: RuntimeDiscoveryResponse): RuntimeDiscoveryResponse => {
+    if (!response.ok || options.agentCapabilities === undefined) return response
+    return {
+      ...response,
+      data: {
+        ...response.data,
+        runtimes: response.data.runtimes.map((status) => {
+          const said = options.agentCapabilities?.(status.id)
+          return said === undefined ? status : { ...status, agentCapabilities: said }
+        })
+      }
+    }
+  }
+
   return {
     get(): Promise<RuntimeDiscoveryResponse> {
       const currentTime = now().getTime()
-      if (cached && currentTime < cached.expiresAt) return Promise.resolve(cached.response)
-      if (inFlight) return inFlight
+      if (cached && currentTime < cached.expiresAt) return Promise.resolve(told(cached.response))
+      if (inFlight) return options.agentCapabilities === undefined ? inFlight : inFlight.then(told)
 
       inFlight = options.probe()
         .then(async (runtimes): Promise<RuntimeDiscoveryResponse> => ({
           ok: true,
           data: {
             checkedAt: now().toISOString(),
-            runtimes: runtimes.map((runtime) => {
-              const status = publicStatus(runtime)
-              const told = options.agentCapabilities?.(status.id)
-              return told === undefined ? status : { ...status, agentCapabilities: told }
-            }),
+            runtimes: runtimes.map(publicStatus),
             npmPresent: options.npmPresent === undefined ? true : await options.npmPresent(),
             npmIsBundled: options.npmIsBundled === undefined ? false : await options.npmIsBundled(),
             npmDidNotAnswer: options.npmDidNotAnswer === undefined ? false : await options.npmDidNotAnswer()
@@ -137,7 +153,7 @@ export function createRuntimeDiscoveryService(
           inFlight = undefined
         })
 
-      return inFlight
+      return options.agentCapabilities === undefined ? inFlight : inFlight.then(told)
     },
     invalidate(): void {
       cached = undefined

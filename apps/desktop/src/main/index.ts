@@ -1954,10 +1954,7 @@ if (!ownsSingleInstanceLock) {
       // 0.377: an Agent Client Protocol agent (Copilot, for Approve-each), started IN its folder.
       acpSpawn: (executablePath, args, env, cwd) => spawnAppServer(executablePath, args, env, cwd),
       // W12: what it said it can do, said in Settings; the next sweep reads it.
-      onAcpCapabilities: (runtime, capabilities) => {
-        acpCapabilities.record(runtime, capabilities)
-        runtimeDiscovery.invalidate()
-      },
+      onAcpCapabilities: (runtime, capabilities) => acpCapabilities.record(runtime, capabilities),
       // A3.3: the person's check for THIS folder, after a turn that changed files.
       afterEdits: (cwd) => editCheck.after(cwd),
       // 0.439: a commit per turn on the teammate's own branch (turn-checkpoint.ts).

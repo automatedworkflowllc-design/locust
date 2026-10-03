@@ -21,6 +21,19 @@ heading: the home screen then shows it once, as a splash.
   connectors over the web. Its row now lists each as a plain yes or no, as
   Copilot's own answer and from when. Nothing here changes what Locust lets
   Copilot do: it is still offered no files and no terminal of its own.
+- **Settings > Connectors lists your connectors and how each is.** Each one
+  says Connected, Needs sign-in, Not working, Did not answer or Unknown, with
+  what to do about it ("Run /mcp in Claude Code and sign in to Notion") and
+  when it last worked. **Copy report** puts names, states, timings and hosts
+  on the clipboard for someone helping -- never a command, a key or a full
+  address. Locust never calls a connector's tools to test it.
+
+### Improved
+
+- **A connector check that takes too long says so.** When Claude Code's
+  connector check did not answer in 20 seconds, Locust quietly kept the last
+  list; Settings now says the check did not answer, while your teammates keep
+  using the connectors that last worked.
 
 ## 0.565.0 - 2026-10-03
 

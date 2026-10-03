@@ -2509,6 +2509,8 @@ export default function App(): ReactElement {
           setLimitedRuntimes((current) => (current.get(runtime) === said ? current : new Map(current).set(runtime, said)))
         }
         if (update.event.type === 'run.completed') {
+          // W12: an ACP run (Copilot) told Locust what it can do as it started; the row in Settings reads it now.
+          if (runtime === 'copilot') askDiscoveryAgain.current()
           setLimitedRuntimes((current) => {
             if (!current.has(runtime)) return current
             const next = new Map(current)
