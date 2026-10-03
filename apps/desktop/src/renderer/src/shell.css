@@ -18554,6 +18554,18 @@ textarea {
   border: 1px solid var(--lc-border-hairline);
   border-radius: 8px;
 }
+/* The import preview's lists sit under their labels, not a blank line below them (0.567). */
+.lc-routineinputs ol,
+.lc-routineinputs ul {
+  display: grid;
+  gap: var(--lc-space-2);
+  margin: 0 0 var(--lc-space-3);
+  padding-left: 1.4em;
+}
+.lc-routineinputs li > p,
+.lc-routineinputs > p {
+  margin: 0;
+}
 .lc-routineinputs output,
 .lc-routinepreview__step {
   white-space: pre-wrap;

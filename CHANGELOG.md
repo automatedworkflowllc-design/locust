@@ -11,6 +11,26 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.567.0 - 2026-10-03
+
+### New
+
+- **Routines can ask for answers when they run.** Write `{{topic}}` in a step
+  and add an input for it: a line of text, a longer text, one of a few
+  choices, or a folder. Pressing **Run** asks for each answer, with defaults
+  filled in, and the step goes out with your answers in place. A routine that
+  runs on its own uses the defaults; when a required answer has none, it says
+  so and starts nothing. A folder can only be chosen with the folder picker,
+  never typed.
+- **Routines travel as files.** **Export** saves a routine as a
+  `.locust-routine.json` file: its steps, the inputs it asks for, who should
+  take each step, and the connectors it needs. It never includes your answers,
+  your history or anything about this computer. When a step names a path on
+  this machine, Export offers to make it an input instead. **Import routine**
+  shows the whole routine before anything is saved, says which connectors
+  you have, and lets you choose the teammate who takes it. An imported routine
+  arrives in Ask, with no schedule, and runs nothing until you press Run.
+
 ## 0.566.0 - 2026-10-03
 
 ### New

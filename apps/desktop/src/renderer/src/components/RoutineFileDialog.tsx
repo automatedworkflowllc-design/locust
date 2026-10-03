@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { PublicTeammate, RoutineFlaggedPath, RoutineImportPreview } from '../../../shared/ipc.js'
+import { isMissionRuntime, runtimeDisplayName } from '../../../shared/runtimes.js'
 import { useModal } from '../useModal.js'
 
 export function RoutineImportDialog({ preview, team, onImport, onCancel }: { readonly preview: RoutineImportPreview; readonly team: readonly PublicTeammate[]; readonly onImport: (teammateId: string) => Promise<void>; readonly onCancel: () => void }): ReactElement {
@@ -15,7 +16,7 @@ export function RoutineImportDialog({ preview, team, onImport, onCancel }: { rea
       <span className="lc-fieldlabel">Steps</span><ol>{preview.steps.map((step, at) => <li key={at}><p className="lc-routinepreview__step">{step}</p>{preview.handOffRoles[at] && <p className="lc-dialog__note">Source role: {preview.handOffRoles[at]}</p>}</li>)}</ol>
       <span className="lc-fieldlabel">Inputs</span>{preview.inputs.length === 0 ? <p>None</p> : <ul>{preview.inputs.map((input) => <li key={input.key}>{input.label} · {input.kind}{input.required ? ' · required' : ''}{input.default === undefined ? '' : ` · default: ${input.default}`}{input.choices === undefined ? '' : ` · choices: ${input.choices.join(', ')}`}</li>)}</ul>}
       <span className="lc-fieldlabel">Connectors it needs</span>{preview.connectors.length === 0 ? <p>None named</p> : <ul>{preview.connectors.map((entry) => <li key={entry.name}>{entry.name} · {entry.present ? 'present' : 'missing'}</li>)}</ul>}
-      {preview.runtime && <p className="lc-dialog__note">Made for {preview.runtime}. It will use your selected teammate’s route.</p>}
+      {preview.runtime && <p className="lc-dialog__note">Made for {isMissionRuntime(preview.runtime) ? runtimeDisplayName(preview.runtime) : preview.runtime}. It will use your selected teammate’s route.</p>}
       <label>Give it to<select className="lc-input" aria-label="Give routine to" value={owner} onChange={(event) => setOwner(event.target.value)}><option value="">Choose a teammate</option>{team.map((mate) => <option key={mate.teammateId} value={mate.teammateId}>{mate.name}</option>)}</select></label>
       <p className="lc-dialog__note">Every step goes to this teammate. Import saves it read-only, with no schedule, and runs nothing.</p>
       {error && <p className="lc-dialog__error">{error}</p>}
