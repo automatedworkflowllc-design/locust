@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto'
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { dirname } from 'node:path'
 
 import { workspaceIdFor } from './workspace.js'
 import { joinMessageFragments } from '../shared/messageFragments.js'
@@ -168,6 +170,56 @@ export function usageWindowsFrom(missions: readonly RecoveredMission[]): Record<
   for (const [runtime, entry] of latest) windows[runtime] = `${entry.said} · from a run at ${entry.at}`
   return windows
 }
+
+/** When a reading was seen: the "from a run at <iso>" it carries. */
+function readingAt(said: string): string {
+  return / · from a run at (\S+)$/.exec(said)?.[1] ?? ''
+}
+
+/**
+ * EACH AGENT'S LAST USAGE READING, KEPT (0.571).
+ *
+ * Colin, 2026-10-03: "claude code on home stopped showing usage". The
+ * reading was read only off the newest twenty conversations, and an evening
+ * of Codex and Antigravity runs had pushed his last Claude run to the
+ * fortieth. Its account had not stopped having a window; Locust had stopped
+ * looking. The newest reading of each agent is now kept in a small file, the
+ * newer of the kept and the fresh one wins, and a file that does not exist yet
+ * is filled once from the conversations past the first twenty.
+ */
+export async function rememberedUsageWindows(
+  fresh: Record<string, string>,
+  file: string,
+  older: () => Promise<readonly RecoveredMission[]>
+): Promise<Record<string, string>> {
+  let kept: Record<string, string> | undefined
+  try {
+    const parsed = JSON.parse(await readFile(file, 'utf8')) as unknown
+    if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      kept = Object.fromEntries(Object.entries(parsed as Record<string, unknown>).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
+    }
+  } catch {
+    kept = undefined
+  }
+  const merged: Record<string, string> = { ...(kept ?? usageWindowsFrom(await older().catch(() => []))) }
+  for (const [runtime, said] of Object.entries(fresh)) {
+    const before = merged[runtime]
+    if (before === undefined || readingAt(said) >= readingAt(before)) merged[runtime] = said
+  }
+  if (kept === undefined || JSON.stringify(kept) !== JSON.stringify(merged)) {
+    try {
+      await mkdir(dirname(file), { recursive: true })
+      await writeFile(`${file}.tmp`, JSON.stringify(merged), 'utf8')
+      await rename(`${file}.tmp`, file)
+    } catch {
+      // Not kept this time: the reading shown is still right, and the next load tries again.
+    }
+  }
+  return merged
+}
+
+/** How far back a first fill looks for a reading. */
+const USAGE_BACKFILL_MISSIONS = 80
 
 /** A run's money as a row carries it: the amounts, not the moment. */
 function amountsOf(money: RunMoney | undefined): Spend | undefined {
@@ -692,7 +744,9 @@ export async function readMissionHistory(
   /** The folder this window works in; defaults to the process's own. */
   workspacePath: string = process.cwd(),
   /** What the window already holds, `missionId -> digest` (see `missionDigest`). */
-  known?: ReadonlyMap<string, string>
+  known?: ReadonlyMap<string, string>,
+  /** Where each agent's last usage reading is kept; absent, only the newest conversations are read. */
+  usageFile?: string
 ): Promise<MissionHistoryResponse> {
   try {
     // The kept page when the ledger can give one (see CachedLedgerFile);
@@ -772,7 +826,16 @@ export async function readMissionHistory(
         // decide whether a runtime is at its limit would be a new cost for no
         // new fact.
         limitedRuntimes: limitedRuntimesFrom(recent),
-        usageWindows: usageWindowsFrom(recent)
+        usageWindows: usageFile === undefined
+          ? usageWindowsFrom(recent)
+          : await rememberedUsageWindows(usageWindowsFrom(recent), usageFile, async () => {
+            const back: RecoveredMission[] = []
+            for (const entry of page.missions.slice(MAX_HISTORY_MISSIONS, USAGE_BACKFILL_MISSIONS)) {
+              const whole = await ledger.getMission(entry.mission.metadata.missionId).catch(() => undefined)
+              if (whole !== undefined) back.push(whole)
+            }
+            return back
+          })
       }
     }
   } catch {

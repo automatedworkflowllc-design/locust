@@ -5818,7 +5818,7 @@ if (!ownsSingleInstanceLock) {
       }
       // The window's own folder decides which conversation it opens on; what
       // it already holds decides which records come without their events.
-      const history = await readMissionHistory(missionLedger, workroom, workspacePath, knownDigests(known))
+      const history = await readMissionHistory(missionLedger, workroom, workspacePath, knownDigests(known), join(app.getPath('userData'), 'usage-readings.json'))
       // Every folder listed needs a path to open in (0.458): recovered once, for those from before folders were kept.
       if (history.ok) await recoverFolders(history.data.missions).catch(() => undefined)
       /*
