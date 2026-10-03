@@ -82,6 +82,22 @@ export function petCellAt(state: PetState, elapsed: number, rows: PetRows, still
   return { row: spec.row, column: Math.floor(time / frameMs) % spec.frames, shown: state, settled: false }
 }
 
+/**
+ * HOW LONG ONE DRAWING MELTS INTO THE NEXT (0.564). Colin, after 0.563: *"we
+ * should try to smooth out the animations a bit like they are with the other
+ * teammates"*. A pet's rows step 6-8 drawings a movement; bots move at 30 a
+ * second. Each new drawing appears with the last one fading off it over about
+ * half a frame (at most 80 ms), so the steps read as movement, not flicker.
+ * None at rest or when still: nothing moves there.
+ */
+export const PET_FADE_MAX_MS = 80
+
+export function petFadeMs(state: PetState, still: boolean): number {
+  if (still || state === 'idle') return 0
+  const spec = PET_ROWS[state]
+  return Math.min(PET_FADE_MAX_MS, Math.round(spec.ms / spec.frames / 2))
+}
+
 /** How long until the next cell, or undefined once nothing more will change. */
 export function petNextChangeIn(state: PetState, elapsed: number, still: boolean): number | undefined {
   if (state === 'idle' || still) return undefined

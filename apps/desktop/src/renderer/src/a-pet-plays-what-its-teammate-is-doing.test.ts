@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { PET_NEUTRAL, PET_ROWS } from '../../shared/pets.js'
 import type { FaceActivity } from './faceState.js'
-import { petCellAt, petGlanceCell, petNextChangeIn, petStateFor } from './petMotion.js'
+import { PET_FADE_MAX_MS, petCellAt, petFadeMs, petGlanceCell, petNextChangeIn, petStateFor } from './petMotion.js'
+import { DARK_PET, paintedBrightness } from './pets.js'
 
 /**
  * A PET SAYS WHAT ITS TEAMMATE IS DOING (0.563).
@@ -84,5 +85,30 @@ describe('a pet glancing at a teammate', () => {
   it('keeps its pose where its sheet has no head to turn, or would show the back of it', () => {
     expect(petGlanceCell('right', 9)).toBeUndefined()
     expect(petGlanceCell('down', 11)).toBeUndefined()
+  })
+})
+
+describe('smoother, and seen on a dark ground (0.564)', () => {
+  it('melts each drawing into the next over about half a frame, never longer than PET_FADE_MAX_MS', () => {
+    for (const state of ['running', 'review', 'waving', 'jumping', 'failed', 'waiting'] as const) {
+      const frame = PET_ROWS[state].ms / PET_ROWS[state].frames
+      expect(petFadeMs(state, false), state).toBe(Math.min(PET_FADE_MAX_MS, Math.round(frame / 2)))
+      expect(petFadeMs(state, false)).toBeGreaterThan(0)
+    }
+  })
+
+  it('fades nothing at rest or when still: nothing moves there', () => {
+    expect(petFadeMs('idle', false)).toBe(0)
+    expect(petFadeMs('running', true)).toBe(0)
+  })
+
+  it('measures how dark a pet is from its opaque pixels only', () => {
+    const pixels = (rgba: readonly number[][]): Uint8ClampedArray => new Uint8ClampedArray(rgba.flat())
+    // A black cloak on a clear ground: dark, whatever the clear pixels hold.
+    const reaper = paintedBrightness(pixels([[10, 10, 12, 255], [20, 18, 22, 255], [255, 255, 255, 0], [255, 255, 255, 40]]))
+    expect(reaper).toBeLessThan(DARK_PET)
+    const cloud = paintedBrightness(pixels([[250, 240, 220, 255], [240, 230, 210, 255]]))
+    expect(cloud).toBeGreaterThan(DARK_PET)
+    expect(paintedBrightness(pixels([[0, 0, 0, 0]]))).toBeUndefined()
   })
 })

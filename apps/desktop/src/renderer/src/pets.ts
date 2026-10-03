@@ -27,7 +27,15 @@ export interface PetAtlas {
   readonly frameWidth: number
   readonly frameHeight: number
   readonly body: PetBody
+  /**
+   * Its resting pose is mostly near-black, so it would sink into Locust's dark
+   * ground (0.564: Reaper, Cabin, Dot): drawn with a faint light rim.
+   */
+  readonly dark: boolean
 }
+
+/** Below this mean brightness (0-1) of its painted pixels a pet is drawn with a rim. Measured 0.564: Reaper 0.08, Cabin 0.12, Dot and the Yeelight bot 0.20; the next darkest, Meowbot, 0.36 reads unaided. */
+export const DARK_PET = 0.25
 
 export type PetLook =
   | { readonly status: 'loading' }
@@ -64,9 +72,21 @@ export function setPetLook(ref: PetRef, look: PetLook | undefined): void {
   changed()
 }
 
-/** The resting pose's painted bounds, read from the sheet's own pixels. */
-function bodyOf(image: CanvasImageSource, rows: PetRows, frameWidth: number, frameHeight: number): PetBody {
-  const whole: PetBody = { left: 0, top: 0, right: 1, bottom: 1 }
+/** The mean brightness (0-1) of the pixels that are mostly opaque; undefined when none are. */
+export function paintedBrightness(data: Uint8ClampedArray): number | undefined {
+  let sum = 0
+  let count = 0
+  for (let i = 0; i + 3 < data.length; i += 4) {
+    if ((data[i + 3] ?? 0) <= 128) continue
+    sum += (0.2126 * (data[i] ?? 0) + 0.7152 * (data[i + 1] ?? 0) + 0.0722 * (data[i + 2] ?? 0)) / 255
+    count += 1
+  }
+  return count === 0 ? undefined : sum / count
+}
+
+/** The resting pose's painted bounds and its darkness, read from the sheet's own pixels. */
+function restingOf(image: CanvasImageSource, rows: PetRows, frameWidth: number, frameHeight: number): { readonly body: PetBody; readonly dark: boolean } {
+  const whole = { body: { left: 0, top: 0, right: 1, bottom: 1 }, dark: false }
   if (typeof document === 'undefined') return whole
   const canvas = document.createElement('canvas')
   canvas.width = frameWidth
@@ -75,13 +95,17 @@ function bodyOf(image: CanvasImageSource, rows: PetRows, frameWidth: number, fra
   if (context === null) return whole
   const column = rows === 11 ? PET_NEUTRAL.column : 0
   context.drawImage(image, column * frameWidth, 0, frameWidth, frameHeight, 0, 0, frameWidth, frameHeight)
-  const painted = paintedBounds(context.getImageData(0, 0, frameWidth, frameHeight).data, frameWidth, frameHeight)
+  const data = context.getImageData(0, 0, frameWidth, frameHeight).data
+  const painted = paintedBounds(data, frameWidth, frameHeight)
   if (painted === undefined) return whole
   return {
-    left: painted.left / frameWidth,
-    top: painted.top / frameHeight,
-    right: painted.right / frameWidth,
-    bottom: painted.bottom / frameHeight
+    body: {
+      left: painted.left / frameWidth,
+      top: painted.top / frameHeight,
+      right: painted.right / frameWidth,
+      bottom: painted.bottom / frameHeight
+    },
+    dark: (paintedBrightness(data) ?? 1) < DARK_PET
   }
 }
 
@@ -105,7 +129,7 @@ export async function ensurePet(ref: PetRef): Promise<void> {
     const image = await createImageBitmap(new Blob([new Uint8Array(bytes)], { type: 'image/webp' }))
     const frameWidth = image.width / PET_COLUMNS
     const frameHeight = image.height / rows
-    looks.set(key, { status: 'ready', atlas: { image, rows, frameWidth, frameHeight, body: bodyOf(image, rows, frameWidth, frameHeight) } })
+    looks.set(key, { status: 'ready', atlas: { image, rows, frameWidth, frameHeight, ...restingOf(image, rows, frameWidth, frameHeight) } })
   } catch {
     // It read and would not draw: the last word on a sheet is the window's own decode.
     looks.set(key, { status: 'missing', reason: 'Its sheet is on this computer but would not draw.' })

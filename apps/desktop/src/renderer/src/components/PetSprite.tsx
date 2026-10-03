@@ -5,7 +5,7 @@ import type { PetRef } from '../../../shared/avatar.js'
 import type { PetState } from '../../../shared/pets.js'
 import { anchorsOf, anchorVariables } from '../botAnchors.js'
 import type { GlanceSide } from '../glances.js'
-import { petCellAt, petGlanceCell, petNextChangeIn } from '../petMotion.js'
+import { petCellAt, petFadeMs, petGlanceCell, petNextChangeIn } from '../petMotion.js'
 import { usePetLook } from '../pets.js'
 import type { PetAtlas } from '../pets.js'
 import { GLANCE_HOLD_MS } from './Bot.js'
@@ -32,6 +32,11 @@ import { GLANCE_HOLD_MS } from './Bot.js'
  * a pixel at these sizes and shows a sliver of the next one -- and so its
  * paint can be measured for the waiting ring and the presence dot, which sit
  * on its body as they sit on a bot's (botAnchors.ts).
+ *
+ * SMOOTHER, 0.564: each new drawing appears with the last fading off it
+ * (petFadeMs), a few animation frames and then asleep again; and a pet whose
+ * resting pose is near-black wears a faint light rim (`data-pet-dark`,
+ * shell.css) so it does not sink into the dark ground.
  */
 export interface PetSpriteProps {
   readonly pet: PetRef
@@ -88,6 +93,47 @@ export function PetSprite({ pet, size, state, still = false, glance }: PetSprite
     let drawn = ''
     let timer: ReturnType<typeof setTimeout> | undefined
     let onScreen = true
+    const fadeMs = petFadeMs(state, frozen)
+    // The drawing fading out, and when the one replacing it appeared.
+    let fading: { readonly row: number; readonly column: number; readonly at: number } | undefined
+    let shownCell: { readonly row: number; readonly column: number } | undefined
+    let frame: number | undefined
+    canvas.toggleAttribute('data-pet-dark', atlas.dark)
+
+    const paint = (cell: { readonly row: number; readonly column: number }, alpha: number): void => {
+      context.globalAlpha = alpha
+      context.drawImage(
+        atlas.image,
+        cell.column * atlas.frameWidth,
+        cell.row * atlas.frameHeight,
+        atlas.frameWidth,
+        atlas.frameHeight,
+        left,
+        0,
+        drawWidth,
+        side
+      )
+      context.globalAlpha = 1
+    }
+
+    const render = (now: number): void => {
+      if (shownCell === undefined) return
+      context.clearRect(0, 0, side, side)
+      context.imageSmoothingEnabled = true
+      context.imageSmoothingQuality = 'high'
+      paint(shownCell, 1)
+      const remaining = fading === undefined ? 0 : 1 - (now - fading.at) / fadeMs
+      if (fading !== undefined && remaining > 0) {
+        paint(fading, remaining)
+        // A few animation frames until it is gone; a covered window draws none, and the next tick ends it.
+        frame ??= requestAnimationFrame((at) => {
+          frame = undefined
+          render(at)
+        })
+      } else {
+        fading = undefined
+      }
+    }
 
     const glancing = (now: number): GlanceSide | undefined => {
       const looking = glanced.current
@@ -101,22 +147,15 @@ export function PetSprite({ pet, size, state, still = false, glance }: PetSprite
       const shown = turned ?? cell
       canvas.dataset.petState = cell.shown
       const key = `${String(shown.row)}:${String(shown.column)}`
-      if (key === drawn) return
+      if (key === drawn) {
+        // Past its fade: the new drawing alone.
+        if (fading !== undefined && now - fading.at >= fadeMs) render(now)
+        return
+      }
       drawn = key
-      context.clearRect(0, 0, side, side)
-      context.imageSmoothingEnabled = true
-      context.imageSmoothingQuality = 'high'
-      context.drawImage(
-        atlas.image,
-        shown.column * atlas.frameWidth,
-        shown.row * atlas.frameHeight,
-        atlas.frameWidth,
-        atlas.frameHeight,
-        left,
-        0,
-        drawWidth,
-        side
-      )
+      fading = fadeMs > 0 && shownCell !== undefined && onScreen ? { ...shownCell, at: now } : undefined
+      shownCell = { row: shown.row, column: shown.column }
+      render(now)
     }
 
     const tick = (): void => {
@@ -148,6 +187,7 @@ export function PetSprite({ pet, size, state, still = false, glance }: PetSprite
     document.addEventListener('visibilitychange', wake)
     return () => {
       if (timer !== undefined) clearTimeout(timer)
+      if (frame !== undefined) cancelAnimationFrame(frame)
       watch?.disconnect()
       document.removeEventListener('visibilitychange', wake)
     }

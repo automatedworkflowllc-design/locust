@@ -6,6 +6,7 @@ import type { AvatarSpec, PetRef } from '../../shared/avatar.js'
 import { setTerminalFaces } from './botLook.js'
 import { NewTeammateDialog } from './components/NewTeammateDialog.js'
 import { TeammateBot } from './components/TeammateBot.js'
+import { PET_PICKS } from '../../shared/pet-picks.js'
 import { setPetLook } from './pets.js'
 
 /**
@@ -84,12 +85,23 @@ describe('the look picker', () => {
       />
     )
 
-  it('lists pets under the bots, with the gallery a click away', () => {
+  it('offers exactly the pets Locust offers, under the bots, and no gallery (0.564)', () => {
     const html = open()
     expect(html).toContain('aria-label="Pets"')
-    expect(html).toContain('Browse the gallery')
-    // Nothing is browsed, let alone downloaded, until it is opened.
-    expect(html).not.toContain('Pet gallery')
+    const offered = [...html.matchAll(/data-pet="([a-z0-9-]+)" data-source="gallery"/g)].map((found) => found[1])
+    expect(offered).toEqual(PET_PICKS.map((pick) => pick.id))
+    // Colin: "remove all the others" -- no search, no Featured/Originals, no More, no bundled Hoodie Cat tile.
+    expect(html).not.toContain('Browse the gallery')
+    expect(html).not.toContain('Search pets')
+    expect(html).not.toContain('data-pet="hoodie-cat"')
+    // Not on this computer yet: each says it downloads when picked, and nothing has been fetched.
+    expect(html).toContain('downloads from openpets.dev when picked')
+    expect(html).toContain('Rights stay with each pet')
+  })
+
+  it('keeps a pet the teammate already wears that is not offered, shown as chosen', () => {
+    const html = open(wearing(CAT))
+    expect(html).toMatch(/aria-checked="true"[^>]*data-pet="hoodie-cat"|data-pet="hoodie-cat"[^>]*aria-checked="true"/)
   })
 
   it('under a pet, steps the face choice aside and shows plain colours', () => {

@@ -5,7 +5,8 @@ import { useModal } from '../useModal.js'
 import { BOT_SHAPES, botFor, samePet, screenSuits, seedAvatar, shuffledAvatar } from '../../../shared/avatar.js'
 import type { AvatarSpec, BotFace, BotShape, BotSpec, PetRef } from '../../../shared/avatar.js'
 import { useTerminalFaces } from '../botLook.js'
-import { refreshPetList, setPetLook, usePetList, usePetLook } from '../pets.js'
+import { usePetList, usePetLook } from '../pets.js'
+import { isPetPick } from '../../../shared/pet-picks.js'
 import type { MissionMode, PublicPet, PublicTeammate, TeammateHue, TeammateRole, PublicConnector, PublicModel, PublicRuntimeStatus, TeammateRoute } from '../../../shared/ipc.js'
 import { ROLE_DESCRIPTIONS } from '../../../shared/ipc.js'
 import { defaultEffort, modelFamily, modeRunsOn, modesFor, modeSummary } from '../status.js'
@@ -16,7 +17,7 @@ import { routeLabel } from './GroupSettingsDialog.js'
 import { RoutePicker } from './RoutePicker.js'
 import type { RouteChoice } from './RoutePicker.js'
 import { TeammateBot } from './TeammateBot.js'
-import { PetGallery } from './PetGallery.js'
+import { PetCredit, PetPickTiles } from './PetPicks.js'
 import { branchNameFor } from '../../../shared/worktree-name.js'
 import { dollars, isMonthlyLimit } from '../../../shared/spend.js'
 import type { Spend } from '../../../shared/spend.js'
@@ -343,9 +344,9 @@ export function NewTeammateDialog({
   /*
    * PETS, IN THE SAME LIST OF LOOKS (0.563). Colin, 2026-10-03: "theyre just
    * going to be added to the list of potential choices for teammates". Under
-   * the bots: the pets on this computer -- Locust's own, the ones added from
-   * openpets.dev, Codex's -- picked as a bot is picked, and the gallery,
-   * browsed in place. A pet keeps its own face, so the Eyes / Mouth / Screen
+   * the bots: the pets Locust offers (PetPicks, 0.564 -- the gallery went),
+   * the person's own Codex pets, and a pet this teammate already wears that
+   * is neither, picked as a bot is picked. A pet keeps its own face, so the Eyes / Mouth / Screen
    * choice steps aside while one is worn, and the colour swatches become
    * plain colours: the colour still marks the teammate, it does not tint the
    * pet.
@@ -354,8 +355,16 @@ export function NewTeammateDialog({
   const wornPet: PetRef | undefined = avatar.pet
   const wornLook = usePetLook(wornPet)
   const wornEntry = wornPet === undefined ? undefined : pets?.find((pet) => samePet(pet, wornPet))
-  const [galleryOpen, setGalleryOpen] = useState(false)
   const [petNotice, setPetNotice] = useState<string>()
+  // Beside the picks: the person's own Codex pets, and a pet worn that is neither (kept, so it shows as chosen).
+  const offered = (pet: PetRef): boolean => pet.source === 'gallery' && isPetPick(pet.id)
+  const otherPets: readonly PublicPet[] = [
+    ...(pets ?? []).filter((pet) => pet.source === 'codex' || (samePet(wornPet, pet) && !offered(pet))),
+    // Worn, not offered, and the list not read yet: its tile now, named once the list arrives.
+    ...(wornPet !== undefined && !offered(wornPet) && wornPet.source !== 'codex' && pets?.some((pet) => samePet(pet, wornPet)) !== true
+      ? [{ source: wornPet.source, id: wornPet.id, displayName: wornPet.id, description: '', rows: 9 as const }]
+      : [])
+  ]
   const wearPet = (pet: PublicPet): void => {
     setPetNotice(undefined)
     setAvatar((current) => ({ ...current, pet: { source: pet.source, id: pet.id } }))
@@ -364,18 +373,6 @@ export function NewTeammateDialog({
       const own = pet.displayName.slice(0, 40).trim()
       if (own.length > 0 && !takenNames.some((other) => other.trim().toLowerCase() === own.toLowerCase())) setName(own)
     }
-  }
-  const removePet = (pet: PublicPet): void => {
-    setPetNotice(undefined)
-    void window.desktop?.removePet(pet.id).then(async (answer) => {
-      if (!answer.ok) {
-        setPetNotice(answer.error.message)
-        return
-      }
-      setPetLook({ source: 'gallery', id: pet.id }, undefined)
-      setAvatar((current) => (samePet(current.pet, pet) ? withoutPet(current) : current))
-      await refreshPetList()
-    })
   }
   const who = trimmed.length === 0 ? 'This teammate' : trimmed
   const petCaption =
@@ -593,55 +590,32 @@ export function NewTeammateDialog({
             </div>
 
             <div className="lc-pets" role="group" aria-label="Pets">
-              <div className="lc-lookhead">
-                <span className="lc-fieldlabel lc-mono">Pets</span>
-                <button
-                  type="button"
-                  className="lc-ghostbutton lc-pets__browse"
-                  aria-expanded={galleryOpen}
-                  onClick={() => setGalleryOpen((open) => !open)}
-                >
-                  {galleryOpen ? 'Close the gallery' : 'Browse the gallery'}
-                </button>
+              <span className="lc-fieldlabel lc-mono">Pets</span>
+              <div className="lc-lookgrid" role="radiogroup" aria-label="Pets">
+                <PetPickTiles selected={wornPet} installed={pets} onWear={wearPet} onNotice={setPetNotice} />
+                {otherPets.map((pet) => {
+                  const chosen = samePet(wornPet, pet)
+                  return (
+                    <button
+                      key={`${pet.source}/${pet.id}`}
+                      type="button"
+                      role="radio"
+                      aria-checked={chosen}
+                      aria-label={pet.displayName}
+                      title={`${pet.displayName}, ${petOrigin(pet)}`}
+                      data-pet={pet.id}
+                      data-source={pet.source}
+                      className={`lc-look lc-pettile${chosen ? ' is-selected' : ''}`}
+                      onClick={() => wearPet(pet)}
+                    >
+                      <TeammateBot hue={hue} avatar={{ ...avatar, pet: { source: pet.source, id: pet.id } }} size={34} />
+                    </button>
+                  )
+                })}
               </div>
-              {pets !== undefined && pets.length > 0 && (
-                <div className="lc-lookgrid" role="radiogroup" aria-label="Pets on this computer">
-                  {pets.map((pet) => {
-                    const chosen = samePet(wornPet, pet)
-                    return (
-                      <span key={`${pet.source}/${pet.id}`} className="lc-pettile">
-                        <button
-                          type="button"
-                          role="radio"
-                          aria-checked={chosen}
-                          aria-label={pet.displayName}
-                          title={`${pet.displayName}, ${petOrigin(pet)}`}
-                          data-pet={pet.id}
-                          data-source={pet.source}
-                          className={`lc-look${chosen ? ' is-selected' : ''}`}
-                          onClick={() => wearPet(pet)}
-                        >
-                          <TeammateBot hue={hue} avatar={{ ...avatar, pet: { source: pet.source, id: pet.id } }} size={34} />
-                        </button>
-                        {pet.source === 'gallery' && (
-                          <button
-                            type="button"
-                            className="lc-pettile__remove"
-                            aria-label={`Remove ${pet.displayName} from this computer`}
-                            title={`Remove ${pet.displayName} from this computer`}
-                            onClick={() => removePet(pet)}
-                          >
-                            &times;
-                          </button>
-                        )}
-                      </span>
-                    )
-                  })}
-                </div>
-              )}
               {petCaption !== undefined && <p className="lc-pets__caption">{petCaption}</p>}
               {petNotice !== undefined && <p className="lc-pets__caption lc-tone-amber">{petNotice}</p>}
-              {galleryOpen && <PetGallery selected={wornPet} onPick={wearPet} />}
+              <PetCredit />
             </div>
           </div>
 

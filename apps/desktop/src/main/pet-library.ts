@@ -4,7 +4,8 @@ import { join, sep } from 'node:path'
 
 import { isPetId } from '../shared/avatar.js'
 import type { PetRef, PetSource } from '../shared/avatar.js'
-import type { PetGalleryFilter, PetGalleryRequest, PublicGalleryPet, PublicPet } from '../shared/ipc.js'
+import type { PublicPet } from '../shared/ipc.js'
+import { isPetPick } from '../shared/pet-picks.js'
 import { petRowsFor } from '../shared/pets.js'
 import type { PetRows } from '../shared/pets.js'
 import { webpSize, WEBP_HEADER_BYTES } from './webp-size.js'
@@ -51,7 +52,6 @@ export const CODEX_PETS_MAX = 100
 export const CATALOG_FRESH_MS = 6 * 60 * 60 * 1000
 export const THUMBNAILS_KEPT = 400
 /** One screen of gallery tiles. */
-export const GALLERY_PAGE = 24
 const FETCH_TIMEOUT_MS = 30_000
 
 export const CATALOG_INDEX_URL = 'https://openpets.dev/pets/catalog.v3.json'
@@ -81,7 +81,6 @@ export interface PetLibrary {
   list(): Promise<readonly PublicPet[]>
   /** A pet's sheet, checked, to draw. */
   sheet(ref: PetRef): Promise<{ readonly bytes: Uint8Array; readonly rows: PetRows }>
-  gallery(request: PetGalleryRequest): Promise<{ readonly pets: readonly PublicGalleryPet[]; readonly total: number; readonly stale: boolean }>
   thumbnail(id: string): Promise<string>
   add(id: string): Promise<PublicPet>
   remove(id: string): Promise<void>
@@ -211,14 +210,9 @@ export function parsedCatalogEntries(value: unknown): readonly CatalogEntry[] {
   return entries
 }
 
-/** Every word must be in the pet's name or its description. */
-export function matchesQuery(entry: { readonly displayName: string; readonly searchText: string }, query: string): boolean {
-  const words = query.toLowerCase().split(/\s+/).filter((word) => word.length > 0)
-  const text = `${entry.displayName} ${entry.searchText}`.toLowerCase()
-  return words.every((word) => text.includes(word))
-}
-
-const UNREACHABLE = 'The pet gallery could not be reached. Check your connection and try again.'
+const UNREACHABLE = 'openpets.dev could not be reached. Check your connection and try again.'
+const NOT_OFFERED = 'That pet is not one Locust offers.'
+const NOT_LISTED = 'openpets.dev no longer lists that pet.'
 
 export function createPetLibrary(options: PetLibraryOptions): PetLibrary {
   const now = options.now ?? (() => Date.now())
@@ -476,16 +470,16 @@ export function createPetLibrary(options: PetLibraryOptions): PetLibrary {
   async function catalogEntry(id: string): Promise<CatalogEntry> {
     const { index: known } = await galleryIndex()
     const listed = known.entries.find((entry) => entry.id === id)
-    if (listed === undefined) throw new PetError('That pet is not in the gallery.')
+    if (listed === undefined) throw new PetError(NOT_LISTED)
     const address = known.pages[listed.catalogPage]
-    if (address === undefined) throw new PetError('That pet is not in the gallery.')
+    if (address === undefined) throw new PetError(NOT_LISTED)
     let page = pageEntries.get(listed.catalogPage)
     if (page === undefined || now() - page.fetchedAt >= CATALOG_FRESH_MS) {
       page = { fetchedAt: now(), entries: parsedCatalogEntries(await downloadJson(address)) }
       pageEntries.set(listed.catalogPage, page)
     }
     const entry = page.entries.find((candidate) => candidate.id === id)
-    if (entry === undefined) throw new PetError('That pet is not in the gallery.')
+    if (entry === undefined) throw new PetError(NOT_LISTED)
     return entry
   }
 
@@ -528,23 +522,9 @@ export function createPetLibrary(options: PetLibraryOptions): PetLibrary {
       return { bytes, rows: pet.rows }
     },
 
-    async gallery(request) {
-      const filter: PetGalleryFilter = request.filter === 'originals' ? 'originals' : 'featured'
-      const query = typeof request.query === 'string' ? request.query.slice(0, 80) : ''
-      const offset = Number.isInteger(request.offset) && request.offset >= 0 ? Math.min(request.offset, 10_000) : 0
-      const { index: known, stale } = await galleryIndex()
-      // OpenPets' own app shows only its curated pets: the featured, and its originals.
-      const matching = known.entries.filter((entry) => (filter === 'originals' ? entry.original : entry.featured) && matchesQuery(entry, query))
-      const slice = matching.slice(offset, offset + GALLERY_PAGE)
-      const pets: PublicGalleryPet[] = []
-      for (const entry of slice) {
-        pets.push({ id: entry.id, displayName: entry.displayName, featured: entry.featured, original: entry.original, rows: entry.rows, added: await isAdded(entry.id) })
-      }
-      return { pets, total: matching.length, stale }
-    },
-
     async thumbnail(id) {
-      if (!isPetId(id)) throw new PetError('That pet is not in the gallery.')
+      // Only the pets Locust offers (shared/pet-picks.ts, 0.564): the rest of the catalog is not shown.
+      if (!isPetId(id) || !isPetPick(id)) throw new PetError(NOT_OFFERED)
       const running = thumbnailsReading.get(id)
       if (running !== undefined) return running
       const reading = (async () => {
@@ -578,7 +558,7 @@ export function createPetLibrary(options: PetLibraryOptions): PetLibrary {
     },
 
     async add(id) {
-      if (!isPetId(id)) throw new PetError('That pet is not in the gallery.')
+      if (!isPetId(id) || !isPetPick(id)) throw new PetError(NOT_OFFERED)
       const running = adding.get(id)
       if (running !== undefined) return running
       const work = (async (): Promise<PublicPet> => {

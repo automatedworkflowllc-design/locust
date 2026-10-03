@@ -320,7 +320,6 @@ import {
   OWN_MODEL_CHAT_ONLY_CHANNEL,
   PET_LIST_CHANNEL,
   PET_SHEET_CHANNEL,
-  PET_GALLERY_CHANNEL,
   PET_THUMBNAIL_CHANNEL,
   PET_ADD_CHANNEL,
   PET_REMOVE_CHANNEL
@@ -4597,23 +4596,6 @@ if (!ownsSingleInstanceLock) {
         return { ok: true, data: await pets.sheet(ref) } as const
       } catch (error) {
         return petFailure(error, 'That pet could not be read.')
-      }
-    })
-
-    ipcMain.handle(PET_GALLERY_CHANNEL, async (event, request: unknown) => {
-      if (!fromOwnWindow(event)) return petRefused
-      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
-      try {
-        return {
-          ok: true,
-          data: await pets.gallery({
-            filter: input.filter === 'originals' ? 'originals' : 'featured',
-            query: typeof input.query === 'string' ? input.query : '',
-            offset: typeof input.offset === 'number' ? input.offset : 0
-          })
-        } as const
-      } catch (error) {
-        return petFailure(error, 'The pet gallery could not be read.')
       }
     })
 

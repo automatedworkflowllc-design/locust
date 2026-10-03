@@ -4737,6 +4737,15 @@ textarea {
 }
 
 /*
+ * A near-black pet on the dark ground (0.564: Reaper, Cabin, Dot): a faint
+ * light rim that follows its outline, so it reads at 20 px. PetSprite sets
+ * `data-pet-dark` from the resting pose's own brightness (pets.ts DARK_PET).
+ */
+.lc-bot [data-face='pet'][data-pet-dark] {
+  filter: drop-shadow(0 0 0.6px rgba(236, 240, 247, 0.55)) drop-shadow(0 0 2.5px rgba(236, 240, 247, 0.14));
+}
+
+/*
  * The runtime's mark on a face (TeammateBot `runtime`, 0.383): the dot's
  * mirror image on the body's lower left, on a disc of the ground it stands on
  * so it reads as a badge and never as part of the bot's own drawing.
@@ -8545,9 +8554,9 @@ textarea {
 }
 
 /*
- * PETS, UNDER THE BOTS (0.563, NewTeammateDialog + PetGallery). The same grid
- * and tiles as the bots, a heading of their own, and the gallery opening in
- * place beneath them.
+ * PETS, UNDER THE BOTS (0.563; 0.564: the pets Locust offers, PetPicks). The
+ * same grid and tiles as the bots, a heading of their own, each pet shown by
+ * its small picture, and a small arrow on one not yet on this computer.
  */
 .lc-pets {
   display: flex;
@@ -8556,14 +8565,14 @@ textarea {
   margin-top: var(--lc-space-2);
 }
 
-.lc-pets__browse {
-  font-size: var(--lc-text-description);
-}
-
 .lc-pets__caption {
   margin: 0;
   font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
+}
+
+.lc-pets__credit .lc-linkbutton {
+  color: var(--lc-text-secondary);
 }
 
 /* A colour under a pet: a plain swatch, since a pet is not tinted. */
@@ -8577,176 +8586,72 @@ textarea {
 
 .lc-pettile {
   position: relative;
-  display: grid;
 }
 
-/* Take a gallery pet off this computer: a small x on the tile's corner, shown on hover or focus. */
-.lc-pettile__remove {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  display: grid;
-  place-items: center;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  border-radius: 50%;
-  border: 1px solid var(--lc-border-strong);
-  background: var(--lc-bg-raised);
-  color: var(--lc-text-secondary);
-  font-size: 13px;
-  line-height: 1;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity var(--lc-motion-hover) var(--lc-ease);
+.lc-pettile.is-busy {
+  cursor: progress;
 }
 
-.lc-pettile:hover .lc-pettile__remove,
-.lc-pettile:focus-within .lc-pettile__remove {
-  opacity: 1;
-}
-
-.lc-pettile__remove:focus-visible {
-  outline: 2px solid var(--lc-focus-ring);
-  outline-offset: 1px;
-}
-
-.lc-petgallery {
-  display: flex;
-  flex-direction: column;
-  gap: var(--lc-space-4);
-  padding: 12px;
-  border-radius: var(--lc-radius-card);
-  border: 1px solid var(--lc-border-card);
-  background: var(--lc-bg-raised);
-}
-
-.lc-petgallery__bar {
-  display: flex;
-  align-items: center;
-  gap: var(--lc-space-3);
-}
-
-.lc-petgallery__search {
-  flex: 1;
-  min-width: 0;
-  height: 30px;
-}
-
-.lc-petgallery__filter {
-  flex: none;
-}
-
-.lc-petgallery__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
-  gap: 6px;
-}
-
-.lc-petgallery__grid[aria-busy='true'] {
-  opacity: 0.7;
-}
-
-.lc-petgallery__tile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  min-width: 0;
-  padding: 8px 4px 6px;
-  border-radius: var(--lc-radius-control);
-  border: 1px solid var(--lc-border-card);
-  background: transparent;
-  color: var(--lc-text-secondary);
-  font: inherit;
-  cursor: pointer;
-  transition: background var(--lc-motion-hover) var(--lc-ease);
-}
-
-.lc-petgallery__tile:hover {
-  background: var(--lc-hover-surface);
-}
-
-.lc-petgallery__tile:disabled {
+.lc-pettile:disabled:not(.is-busy) {
   cursor: default;
   opacity: 0.55;
 }
 
-.lc-petgallery__tile.is-selected {
-  border-color: var(--lc-lime-border);
-  background: var(--lc-lime-tint);
-}
-
-.lc-petgallery__tile:focus-visible {
-  outline: 2px solid var(--lc-focus-ring);
-  outline-offset: 2px;
-}
-
-/* A gallery picture is 148 x 160 (a frame's own shape): shown whole, never cropped. */
-.lc-petgallery__picture {
+/* A pet's small picture is 148 x 160 (a frame's own shape): shown whole in the tile, never cropped. */
+.lc-pettile__picture {
   display: grid;
   place-items: center;
-  width: 52px;
-  height: 56px;
+  width: 32px;
+  height: 34px;
 }
 
-.lc-petgallery__picture img {
+.lc-pettile__picture img {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
 }
 
-.lc-petgallery__placeholder {
-  width: 36px;
-  height: 36px;
+.lc-pettile.is-busy .lc-pettile__picture {
+  animation: lcPetFetching 1.2s steps(6) infinite alternate;
+}
+
+@keyframes lcPetFetching {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.35;
+  }
+}
+
+.lc-pettile__placeholder {
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: var(--lc-hover-surface);
 }
 
-.lc-petgallery__name {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--lc-text-description);
-  color: var(--lc-text-primary);
-}
-
-.lc-petgallery__state {
-  font-family: var(--lc-font-mono);
-  font-size: var(--lc-text-mono-label);
-  letter-spacing: var(--lc-tracking-label-wide);
-  text-transform: uppercase;
-  color: var(--lc-text-muted);
-}
-
-.lc-petgallery__tile.is-selected .lc-petgallery__state {
-  color: var(--lc-lime);
-}
-
-.lc-petgallery__note {
-  display: flex;
-  align-items: center;
-  gap: var(--lc-space-3);
-  margin: 0;
-  font-size: var(--lc-text-description);
-  color: var(--lc-text-muted);
-}
-
-.lc-petgallery__more {
-  align-self: center;
-  margin-left: 0;
-  font-size: var(--lc-text-description);
-}
-
-.lc-petgallery__credit {
-  margin: 0;
-  font-size: var(--lc-text-description);
-  color: var(--lc-text-muted);
-}
-
-.lc-petgallery__credit .lc-linkbutton {
+/* Not on this computer yet: its click downloads it from openpets.dev. */
+.lc-pettile__get {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  display: grid;
+  place-items: center;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--lc-bg-raised);
+  box-shadow: 0 0 0 1px var(--lc-border-hairline);
   color: var(--lc-text-secondary);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-pettile.is-busy .lc-pettile__picture {
+    animation: none;
+    opacity: 0.55;
+  }
 }
 
 .lc-rolegrid {

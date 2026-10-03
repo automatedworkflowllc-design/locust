@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { isAvatarSpec, cleanAvatar, seedAvatar, shuffledAvatar } from '../shared/avatar.js'
+import { isAvatarSpec, isPetId, cleanAvatar, seedAvatar, shuffledAvatar } from '../shared/avatar.js'
+import { isPetPick, PET_PICKS } from '../shared/pet-picks.js'
 import { petRowsFor } from '../shared/pets.js'
 import { CATALOG_INDEX_URL, createPetLibrary, PET_SHEET_MAX } from './pet-library.js'
 import type { PetFetch } from './pet-library.js'
@@ -17,7 +18,8 @@ import { webpSize } from './webp-size.js'
  * full port" -- "theyre just going to be added to the list of potential
  * choices for teammates". The gallery's pets are other people's art ("Rights
  * remain with their respective owners", openpets.dev's terms), so Locust ships
- * none: a person browses, clicks Add, and that one pet is downloaded. What
+ * none: a person picks one of the pets Locust offers (shared/pet-picks.ts,
+ * 0.564 -- the open gallery went) and that one pet is downloaded. What
  * comes down is held to OpenPets' own rules -- its addresses (https,
  * openpets.dev, /pets/), an answer from where it was sent and nowhere else, a
  * size that fits, and a sheet the shape of a pet -- before it is written.
@@ -149,6 +151,7 @@ function gallery(pets: readonly { id: string; name: string; featured?: boolean; 
 }
 
 const sheetAt = (id: string): string => `https://openpets.dev/pets/${id}-openpets/spritesheet.webp`
+const thumbAt = (id: string): string => `https://openpets.dev/pets/${id}-openpets/thumb.webp`
 
 async function library(fetch: PetFetch, now: () => number = () => Date.now()) {
   const root = await scratch()
@@ -163,43 +166,42 @@ async function library(fetch: PetFetch, now: () => number = () => Date.now()) {
   return { root, pets }
 }
 
-describe('adding a pet from the gallery', () => {
-  it('downloads nothing while the gallery is browsed, and only the one pet on Add', async () => {
-    const served = gallery([{ id: 'yuyu-chibi', name: 'Yuyu' }, { id: 'vincent-hamster', name: 'Vincent Hamster' }])
-    served.serve(sheetAt('yuyu-chibi'), () => new Response(webp('VP8L', 1536, 2288), { status: 200 }))
+describe('adding one of the pets Locust offers', () => {
+  it('downloads nothing until a pet is picked, and then only that one pet', async () => {
+    const served = gallery([{ id: 'luna-techbot', name: 'Luna TechBot' }, { id: 'robot', name: 'Robot' }])
+    served.serve(sheetAt('luna-techbot'), () => new Response(webp('VP8L', 1536, 2288), { status: 200 }))
+    served.serve(thumbAt('robot'), () => new Response(webp('VP8L', 148, 160), { status: 200 }))
     const { root, pets } = await library(served.fetch)
 
-    const shown = await pets.gallery({ filter: 'featured', query: '', offset: 0 })
-    expect(shown.pets.map((pet) => pet.id)).toEqual(['yuyu-chibi', 'vincent-hamster'])
+    expect(await pets.thumbnail('robot')).toMatch(/^data:image\/webp;base64,/)
     expect(served.asked.some((url) => url.endsWith('spritesheet.webp'))).toBe(false)
 
-    const added = await pets.add('yuyu-chibi')
-    expect(added).toEqual({ source: 'gallery', id: 'yuyu-chibi', displayName: 'Yuyu', description: 'Yuyu, drawn for the tests.', rows: 11 })
-    expect(served.asked.filter((url) => url.endsWith('spritesheet.webp'))).toEqual([sheetAt('yuyu-chibi')])
-    expect(await readdir(join(root, 'pets'))).toEqual(['yuyu-chibi'])
-    const meta = JSON.parse(await readFile(join(root, 'pets', 'yuyu-chibi', 'pet.json'), 'utf8')) as Record<string, unknown>
-    expect(meta).toMatchObject({ id: 'yuyu-chibi', displayName: 'Yuyu', spritesheetPath: 'spritesheet.webp', spriteVersionNumber: 2, addedFrom: 'https://openpets.dev' })
-    expect((await pets.list()).map((pet) => `${pet.source}/${pet.id}`)).toEqual(['gallery/yuyu-chibi'])
-    expect((await pets.gallery({ filter: 'featured', query: '', offset: 0 })).pets.find((pet) => pet.id === 'yuyu-chibi')?.added).toBe(true)
+    const added = await pets.add('luna-techbot')
+    expect(added).toEqual({ source: 'gallery', id: 'luna-techbot', displayName: 'Luna TechBot', description: 'Luna TechBot, drawn for the tests.', rows: 11 })
+    expect(served.asked.filter((url) => url.endsWith('spritesheet.webp'))).toEqual([sheetAt('luna-techbot')])
+    expect(await readdir(join(root, 'pets'))).toEqual(['luna-techbot'])
+    const meta = JSON.parse(await readFile(join(root, 'pets', 'luna-techbot', 'pet.json'), 'utf8')) as Record<string, unknown>
+    expect(meta).toMatchObject({ id: 'luna-techbot', displayName: 'Luna TechBot', spritesheetPath: 'spritesheet.webp', spriteVersionNumber: 2, addedFrom: 'https://openpets.dev' })
+    expect((await pets.list()).map((pet) => `${pet.source}/${pet.id}`)).toEqual(['gallery/luna-techbot'])
   })
 
   it('refuses a sheet that is not the shape of a pet, and keeps nothing of it', async () => {
-    const served = gallery([{ id: 'squashed', name: 'Squashed' }, { id: 'opaque', name: 'Opaque' }, { id: 'not-webp', name: 'Not Webp' }])
-    served.serve(sheetAt('squashed'), () => new Response(webp('VP8L', 1536, 2000), { status: 200 }))
-    served.serve(sheetAt('opaque'), () => new Response(webp('VP8L', 1536, 2288, { alpha: false }), { status: 200 }))
-    served.serve(sheetAt('not-webp'), () => new Response('<html>a page, not a pet</html>', { status: 200 }))
+    const served = gallery([{ id: 'robot', name: 'Robot' }, { id: 'nori', name: 'Nori' }, { id: 'bitty', name: 'Bitty' }])
+    served.serve(sheetAt('robot'), () => new Response(webp('VP8L', 1536, 2000), { status: 200 }))
+    served.serve(sheetAt('nori'), () => new Response(webp('VP8L', 1536, 2288, { alpha: false }), { status: 200 }))
+    served.serve(sheetAt('bitty'), () => new Response('<html>a page, not a pet</html>', { status: 200 }))
     const { root, pets } = await library(served.fetch)
-    await expect(pets.add('squashed')).rejects.toThrow(/1536 x 2288/)
-    await expect(pets.add('opaque')).rejects.toThrow(/transparency/)
-    await expect(pets.add('not-webp')).rejects.toThrow(/not a WebP/)
+    await expect(pets.add('robot')).rejects.toThrow(/1536 x 2288/)
+    await expect(pets.add('nori')).rejects.toThrow(/transparency/)
+    await expect(pets.add('bitty')).rejects.toThrow(/not a WebP/)
     expect(await readdir(join(root, 'pets')).catch(() => [])).toEqual([])
   })
 
   it('refuses a file larger than a pet, whether it says so or not', async () => {
-    const served = gallery([{ id: 'says-big', name: 'Says Big' }, { id: 'is-big', name: 'Is Big' }])
-    served.serve(sheetAt('says-big'), () => new Response(webp('VP8L', 1536, 2288), { status: 200, headers: { 'content-length': String(PET_SHEET_MAX + 1) } }))
+    const served = gallery([{ id: 'dot', name: 'Dot' }, { id: 'brew', name: 'Brew' }])
+    served.serve(sheetAt('dot'), () => new Response(webp('VP8L', 1536, 2288), { status: 200, headers: { 'content-length': String(PET_SHEET_MAX + 1) } }))
     // No length given, and more than the cap sent: counted as it arrives.
-    served.serve(sheetAt('is-big'), () => {
+    served.serve(sheetAt('brew'), () => {
       let sent = 0
       const chunk = new Uint8Array(1024 * 1024)
       return new Response(
@@ -217,85 +219,71 @@ describe('adding a pet from the gallery', () => {
       )
     })
     const { pets } = await library(served.fetch)
-    await expect(pets.add('says-big')).rejects.toThrow(/larger than a pet/)
-    await expect(pets.add('is-big')).rejects.toThrow(/larger than a pet/)
+    await expect(pets.add('dot')).rejects.toThrow(/larger than a pet/)
+    await expect(pets.add('brew')).rejects.toThrow(/larger than a pet/)
   })
 
   it('refuses an answer that came from somewhere else', async () => {
-    const served = gallery([{ id: 'wanderer', name: 'Wanderer' }])
-    served.serve(sheetAt('wanderer'), () => {
+    const served = gallery([{ id: 'reaper', name: 'Reaper' }])
+    served.serve(sheetAt('reaper'), () => {
       const response = new Response(webp('VP8L', 1536, 2288), { status: 200 })
       Object.defineProperty(response, 'redirected', { value: true })
       Object.defineProperty(response, 'url', { value: 'https://elsewhere.example/sheet.webp' })
       return response
     })
     const { pets } = await library(served.fetch)
-    await expect(pets.add('wanderer')).rejects.toThrow(/somewhere else/)
+    await expect(pets.add('reaper')).rejects.toThrow(/somewhere else/)
   })
 
-  it('never fetches an address off openpets.dev, nor a pet by a made-up id', async () => {
-    const served = gallery([{ id: 'offsite', name: 'Offsite', sheet: 'https://evil.example/pets/offsite/spritesheet.webp' }, { id: 'climber', name: 'Climber', sheet: 'https://openpets.dev/elsewhere/spritesheet.webp' }])
+  it('never fetches an address off openpets.dev, nor a pet Locust does not offer', async () => {
+    const served = gallery([
+      { id: 'glitchcat', name: 'Glitchcat', sheet: 'https://evil.example/pets/glitchcat/spritesheet.webp' },
+      { id: 'meowbot', name: 'Meowbot', sheet: 'https://openpets.dev/elsewhere/spritesheet.webp' },
+      { id: 'yuyu-chibi', name: 'Yuyu' }
+    ])
     const { pets } = await library(served.fetch)
-    await expect(pets.add('offsite')).rejects.toThrow(/not in the gallery/)
-    await expect(pets.add('climber')).rejects.toThrow(/not in the gallery/)
-    for (const id of ['../yuyu', 'builtin', 'Yuyu', '', 'a'.repeat(70)]) await expect(pets.add(id)).rejects.toThrow(/not in the gallery/)
+    await expect(pets.add('glitchcat')).rejects.toThrow(/no longer lists/)
+    await expect(pets.add('meowbot')).rejects.toThrow(/no longer lists/)
+    // In the catalog, but not one of the picks (shared/pet-picks.ts): refused before anything is asked.
+    const before = served.asked.length
+    for (const id of ['yuyu-chibi', '../robot', 'builtin', 'Robot', '', 'a'.repeat(70)]) {
+      await expect(pets.add(id)).rejects.toThrow(/not one Locust offers/)
+      await expect(pets.thumbnail(id)).rejects.toThrow(/not one Locust offers/)
+    }
+    expect(served.asked.length).toBe(before)
     expect(served.asked.some((url) => !url.startsWith('https://openpets.dev/pets/'))).toBe(false)
     expect(served.asked.some((url) => url.endsWith('spritesheet.webp'))).toBe(false)
   })
 
   it('takes a pet back off the computer', async () => {
-    const served = gallery([{ id: 'yuyu-chibi', name: 'Yuyu' }])
-    served.serve(sheetAt('yuyu-chibi'), () => new Response(webp('VP8L', 1536, 2288), { status: 200 }))
+    const served = gallery([{ id: 'luna-techbot', name: 'Luna TechBot' }])
+    served.serve(sheetAt('luna-techbot'), () => new Response(webp('VP8L', 1536, 2288), { status: 200 }))
     const { root, pets } = await library(served.fetch)
-    await pets.add('yuyu-chibi')
-    await pets.remove('yuyu-chibi')
+    await pets.add('luna-techbot')
+    await pets.remove('luna-techbot')
     expect(await readdir(join(root, 'pets'))).toEqual([])
     await expect(pets.remove('../pets')).rejects.toThrow(/not on this computer/)
   })
-})
 
-describe('browsing the gallery', () => {
-  it('shows OpenPets\u2019 curated pets, featured or its originals, matching every word searched', async () => {
-    const served = gallery([
-      { id: 'yuyu-chibi', name: 'Yuyu', featured: true, original: true },
-      { id: 'plain-cat', name: 'Plain Cat', featured: false, original: false },
-      { id: 'vincent-hamster', name: 'Vincent Hamster', featured: true, original: false },
-      { id: 'luna-techbot', name: 'Luna TechBot', featured: false, original: true }
-    ])
-    const { pets } = await library(served.fetch)
-    expect((await pets.gallery({ filter: 'featured', query: '', offset: 0 })).pets.map((pet) => pet.id)).toEqual(['yuyu-chibi', 'vincent-hamster'])
-    expect((await pets.gallery({ filter: 'originals', query: '', offset: 0 })).pets.map((pet) => pet.id)).toEqual(['yuyu-chibi', 'luna-techbot'])
-    expect((await pets.gallery({ filter: 'featured', query: 'hamster small', offset: 0 })).pets.map((pet) => pet.id)).toEqual(['vincent-hamster'])
-    expect((await pets.gallery({ filter: 'featured', query: 'dragon', offset: 0 })).total).toBe(0)
-  })
-
-  it('pages, and says when it is showing the last list it read because the gallery is out of reach', async () => {
-    let clock = 1_000_000
-    const many = Array.from({ length: 30 }, (_, index) => ({ id: `pet-${String(index).padStart(2, '0')}`, name: `Pet ${String(index)}` }))
-    const served = gallery(many)
-    let online = true
-    const fetch: PetFetch = async (url, init) => {
-      if (!online) throw new Error('offline')
-      return served.fetch(url, init)
-    }
-    const { pets } = await library(fetch, () => clock)
-    const first = await pets.gallery({ filter: 'featured', query: '', offset: 0 })
-    expect(first.pets).toHaveLength(24)
-    expect(first.total).toBe(30)
-    expect(first.stale).toBe(false)
-    expect((await pets.gallery({ filter: 'featured', query: '', offset: 24 })).pets.map((pet) => pet.id)).toEqual(many.slice(24).map((pet) => pet.id))
-    online = false
-    clock += 7 * 60 * 60 * 1000
-    const later = await pets.gallery({ filter: 'featured', query: '', offset: 0 })
-    expect(later.stale).toBe(true)
-    expect(later.total).toBe(30)
-  })
-
-  it('says so in words when the gallery cannot be reached at all', async () => {
+  it('says so in words when openpets.dev cannot be reached at all', async () => {
     const { pets } = await library(async () => {
       throw new Error('offline')
     })
-    await expect(pets.gallery({ filter: 'featured', query: '', offset: 0 })).rejects.toThrow(/could not be reached/)
+    await expect(pets.thumbnail('robot')).rejects.toThrow(/could not be reached/)
+    await expect(pets.add('robot')).rejects.toThrow(/could not be reached/)
+  })
+})
+
+describe('the pets Locust offers', () => {
+  it('are 21 distinct pets, each a pet id the library accepts', () => {
+    expect(PET_PICKS).toHaveLength(21)
+    expect(new Set(PET_PICKS.map((pick) => pick.id)).size).toBe(21)
+    for (const pick of PET_PICKS) {
+      expect(isPetId(pick.id), pick.id).toBe(true)
+      expect(isPetPick(pick.id)).toBe(true)
+      expect(pick.displayName.trim().length).toBeGreaterThan(0)
+    }
+    expect(isPetPick('hoodie-cat')).toBe(false)
   })
 })
 

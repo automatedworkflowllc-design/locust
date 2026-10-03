@@ -2,9 +2,10 @@
 // shows it in the sidebar and on the Team screen at the bots' sizes, with its
 // ring and dot on it; Locust's own pet, one added from the gallery and one
 // from Codex all draw; a pet that is gone shows the teammate's bot; Terminal
-// faces leaves a pet alone; the look picker lists the pets under the bots and
-// makes a new teammate wear one, kept after a relaunch; a pet a teammate
-// wears cannot be removed; and a free turn moves the pet through its rows.
+// faces leaves a pet alone; the look picker offers the pets Locust offers
+// (0.564, shared/pet-picks.ts) and the Codex one under the bots and makes a
+// new teammate wear one, kept after a relaunch; and a free turn moves the pet
+// through its rows.
 //
 //   node _tools/drive-pet-looks.mjs [--packaged <exe>]
 //
@@ -12,8 +13,9 @@
 // choices for teammates" -- "just clarity these should be the exact same as
 // teammates". Offline but for one free OpenCode turn: the gallery pet is
 // seeded into the profile from Locust's own sheet, the Codex one into a
-// scratch CODEX_HOME; nothing is downloaded (drive-pet-gallery.mjs does that,
-// opt-in).
+// scratch CODEX_HOME, and one of the picks (Robot, drawn with Locust's own
+// sheet) as if downloaded before; no pet is downloaded (drive-pet-picks.mjs
+// does that, opt-in), though the picker reads the picks' small pictures.
 
 import { copyFile, mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -34,6 +36,9 @@ const profile = await mkdtemp(join(tmpdir(), 'locust-drive-pet-looks-'))
 await mkdir(join(profile, 'pets', 'test-cat'), { recursive: true })
 await copyFile(SHEET, join(profile, 'pets', 'test-cat', 'spritesheet.webp'))
 await writeFile(join(profile, 'pets', 'test-cat', 'pet.json'), petJson('test-cat', 'Test Cat'))
+await mkdir(join(profile, 'pets', 'robot'), { recursive: true })
+await copyFile(SHEET, join(profile, 'pets', 'robot', 'spritesheet.webp'))
+await writeFile(join(profile, 'pets', 'robot', 'pet.json'), petJson('robot', 'Robot'))
 const codexHome = await mkdtemp(join(tmpdir(), 'locust-drive-pet-codex-'))
 await mkdir(join(codexHome, 'pets', 'mochi'), { recursive: true })
 await copyFile(SHEET, join(codexHome, 'pets', 'mochi', 'spritesheet.webp'))
@@ -119,7 +124,7 @@ const openNewTeammate = `(async () => {
   return JSON.stringify({
     dialog: document.querySelector('[role=dialog][aria-label="New teammate"]') !== null,
     tiles: [...(pets?.querySelectorAll('[role=radio][data-pet]') ?? [])].map((tile) => tile.dataset.source + '/' + tile.dataset.pet),
-    browse: pets?.querySelector('.lc-pets__browse')?.innerText ?? '',
+    browse: pets?.querySelector('.lc-pets__browse, .lc-petgallery') !== null && pets !== null,
     face: document.querySelector('[role=radiogroup][aria-label="Face"]') !== null
   })
 })()`
@@ -138,21 +143,13 @@ const pickPet = (id) => `(async () => {
     chips: document.querySelectorAll('.lc-hue__chip').length
   })
 })()`
-const tryRemove = (id) => `(async () => {
-  document.querySelector('[role=group][aria-label="Pets"] [data-pet=${JSON.stringify(id)}]')?.closest('.lc-pettile')?.querySelector('.lc-pettile__remove')?.click()
-  await new Promise((r) => setTimeout(r, 1200))
-  return JSON.stringify({
-    notice: [...document.querySelectorAll('.lc-pets__caption')].map((line) => line.innerText).join(' | '),
-    still: document.querySelector('[role=group][aria-label="Pets"] [role=radio][data-pet=${JSON.stringify(id)}]') !== null
-  })
-})()`
 const create = `(async () => {
   const button = [...document.querySelectorAll('.lc-dialog__foot button')].find((b) => b.innerText.trim() === 'Create teammate')
   button?.click()
   await new Promise((r) => setTimeout(r, 1800))
   return document.querySelector('[role=dialog][aria-label="New teammate"]') === null ? 'created' : 'still open: ' + (document.querySelector('.lc-dialog__error')?.innerText ?? '')
 })()`
-const createdId = `(() => [...document.querySelectorAll('.lc-faces__one')].find((face) => (face.getAttribute('aria-label') ?? '').startsWith('Hoodie Cat'))?.querySelector('[data-teammate]')?.dataset.teammate ?? '')()`
+const createdId = `(() => [...document.querySelectorAll('.lc-faces__one')].find((face) => (face.getAttribute('aria-label') ?? '').startsWith('Robot'))?.querySelector('[data-teammate]')?.dataset.teammate ?? '')()`
 // What the pet faces show, sampled through a turn.
 const petStates = `JSON.stringify([...document.querySelectorAll('canvas[data-face="pet"]')].filter((c) => c.closest('[data-teammate="tm_hood"]')).map((c) => c.dataset.petState))`
 
@@ -180,16 +177,15 @@ try {
   await drive.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
 
   const picker = JSON.parse(String(await drive.capture('New teammate: the pets under the bots', () => drive.evaluate(openNewTeammate))))
-  check('the look picker lists the pets on this computer under the bots: Locust’s own, the added one, Codex’s', picker.dialog && ['bundled/hoodie-cat', 'gallery/test-cat', 'codex/mochi'].every((tile) => picker.tiles.includes(tile)) && picker.browse === 'Browse the gallery' && picker.face, JSON.stringify(picker))
-  const removed = JSON.parse(String(await drive.capture('Removing a pet a teammate wears', () => drive.evaluate(tryRemove('test-cat')))))
-  check('a pet a teammate wears cannot be removed, and the picker says who wears it', removed.still && /Toast wears this pet/.test(removed.notice), JSON.stringify(removed))
-  const picked = JSON.parse(String(await drive.capture('Picked Hoodie Cat', () => drive.evaluate(pickPet('hoodie-cat')))))
-  check('picking a pet wears it: the face choice steps aside, the name is the pet’s, the preview is the pet at work', picked.chosen === 'true' && !picked.face && picked.name === 'Hoodie Cat' && picked.preview === 'pet' && picked.previewState === 'running' && picked.chips === 9, JSON.stringify(picked))
+  const offered = picker.tiles.filter((tile) => tile.startsWith('gallery/'))
+  check('the look picker offers the 21 picks and the Codex pet under the bots -- not Locust’s bundled cat, not a pet added before 0.564, no gallery', picker.dialog && offered.length === 21 && offered.includes('gallery/robot') && picker.tiles.includes('codex/mochi') && !picker.tiles.includes('bundled/hoodie-cat') && !picker.tiles.includes('gallery/test-cat') && !picker.browse && picker.face, JSON.stringify(picker))
+  const picked = JSON.parse(String(await drive.capture('Picked Robot', () => drive.evaluate(pickPet('robot')))))
+  check('picking a pet wears it: the face choice steps aside, the name is the pet’s, the preview is the pet at work', picked.chosen === 'true' && !picked.face && picked.name === 'Robot' && picked.preview === 'pet' && picked.previewState === 'running' && picked.chips === 9, JSON.stringify(picked))
   const made = String(await drive.capture('Created', () => drive.evaluate(create)))
   await sleep(800)
   const id = String(await drive.evaluate(createdId))
   const after = byId(JSON.parse(String(await drive.evaluate(faces('.lc-sidebar')))))
-  check('the new teammate wears the pet in the sidebar', made === 'created' && id !== '' && drewPet(after[id], 'hoodie-cat'), `${made} ${id} ${JSON.stringify(after[id])}`)
+  check('the new teammate wears the pet in the sidebar', made === 'created' && id !== '' && drewPet(after[id], 'robot'), `${made} ${id} ${JSON.stringify(after[id])}`)
   await drive.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] })
 
   // A free turn: the pet works, then rests.
@@ -221,7 +217,7 @@ try {
   await sleep(1500)
   const again = JSON.parse(String(await drive.capture('After a relaunch', () => drive.evaluate(faces('.lc-sidebar')))))
   const created = again.find((face) => !['tm_hood', 'tm_toast', 'tm_mochi', 'tm_gone'].includes(face.teammate))
-  check('after a relaunch the new teammate still wears its pet', created !== undefined && drewPet(created, 'hoodie-cat'), JSON.stringify(created))
+  check('after a relaunch the new teammate still wears its pet', created !== undefined && drewPet(created, 'robot'), JSON.stringify(created))
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

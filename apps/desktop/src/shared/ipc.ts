@@ -459,9 +459,7 @@ export type WorkspaceChooseResponse =
 export const PET_LIST_CHANNEL = 'pets:list'
 /** One pet's sheet, as bytes, for the window to draw. */
 export const PET_SHEET_CHANNEL = 'pets:sheet'
-/** A slice of the openpets.dev gallery: featured or originals, matching a search. */
-export const PET_GALLERY_CHANNEL = 'pets:gallery'
-/** A gallery pet's small picture, as a data URL. */
+/** The small picture of a pet Locust offers (shared/pet-picks.ts), as a data URL. */
 export const PET_THUMBNAIL_CHANNEL = 'pets:thumbnail'
 /** Download a gallery pet to this computer: only ever on the person's click. */
 export const PET_ADD_CHANNEL = 'pets:add'
@@ -1462,28 +1460,6 @@ export interface PublicPet {
   readonly rows: PetRows
 }
 
-/** A pet in the openpets.dev gallery, as a tile shows it. */
-export interface PublicGalleryPet {
-  readonly id: string
-  readonly displayName: string
-  readonly featured: boolean
-  readonly original: boolean
-  readonly rows: PetRows
-  /** Already added to this computer. */
-  readonly added: boolean
-}
-
-/** Which of the gallery's curated pets to show: OpenPets' featured, or its own originals. */
-export type PetGalleryFilter = 'featured' | 'originals'
-
-export interface PetGalleryRequest {
-  readonly filter: PetGalleryFilter
-  /** Words to match in a pet's name and description; empty for all. */
-  readonly query: string
-  /** How many matches to skip, for "More". */
-  readonly offset: number
-}
-
 /** Every pet refusal is said in words a person can act on. */
 export interface PetFailure {
   readonly ok: false
@@ -1492,18 +1468,6 @@ export interface PetFailure {
 
 export type PetListResponse = { readonly ok: true; readonly data: { readonly pets: readonly PublicPet[] } } | PetFailure
 export type PetSheetResponse = { readonly ok: true; readonly data: { readonly bytes: Uint8Array; readonly rows: PetRows } } | PetFailure
-export type PetGalleryResponse =
-  | {
-      readonly ok: true
-      readonly data: {
-        readonly pets: readonly PublicGalleryPet[]
-        /** How many match in all, so the window knows whether to offer "More". */
-        readonly total: number
-        /** The gallery could not be reached, and this is what Locust last read of it. */
-        readonly stale: boolean
-      }
-    }
-  | PetFailure
 export type PetThumbnailResponse = { readonly ok: true; readonly data: { readonly dataUrl: string } } | PetFailure
 export type PetAddResponse = { readonly ok: true; readonly data: { readonly pet: PublicPet } } | PetFailure
 export type PetRemoveResponse = { readonly ok: true } | PetFailure
@@ -3146,10 +3110,8 @@ export interface DesktopApi {
   listPets(): Promise<PetListResponse>
   /** One pet's sheet, to draw. */
   readPetSheet(source: PetSource, id: string): Promise<PetSheetResponse>
-  /** Browse the openpets.dev gallery: reads the catalog, downloads no pet. */
-  browsePetGallery(request: PetGalleryRequest): Promise<PetGalleryResponse>
   petThumbnail(id: string): Promise<PetThumbnailResponse>
-  /** Download one gallery pet to this computer. Only ever on the person's click. */
+  /** Download one of the pets Locust offers to this computer. Only ever on the person's click. */
   addPet(id: string): Promise<PetAddResponse>
   removePet(id: string): Promise<PetRemoveResponse>
   createTeammate(request: TeammateCreateRequest): Promise<TeammateMutationResponse>
