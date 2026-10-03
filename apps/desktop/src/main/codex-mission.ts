@@ -2673,7 +2673,10 @@ ${sentPrompt.trim()}`
         runtimeDisplayName(recovered.metadata.runtime),
         undefined,
         [],
-        taskFile
+        taskFile,
+        // A resumed run says how the one it continues ended (0.572).
+        [],
+        howTurnEnded(recovered.events)
       )
       const briefing = composed === undefined || taskFile === undefined ? composed : { ...composed, prompt: withAttachments(composed.prompt, [taskFile]) }
       if (briefing === undefined) {

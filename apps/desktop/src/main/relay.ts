@@ -412,6 +412,13 @@ export interface RelayOptions {
   readonly peerContextFor: (teammateId: string) => Promise<MissionPeerContext | undefined>
   /** A finished run's final message, for bringing back an answer it did not write back (A2.1). */
   readonly finalReplyOf?: (missionId: string) => Promise<string | undefined>
+  /**
+   * How a run ended when it did not complete (`howTurnEnded`), undefined when
+   * it completed. Codex hit its usage limit mid-answer and Bro's thread said
+   * "Codex finished without writing back" (Colin's ledger, 10/03): it had not
+   * finished, and a cut-off run's last progress line is not an answer.
+   */
+  readonly howEnded?: (missionId: string) => Promise<string | undefined>
   /** Posts a returned answer to the asker's messages, as the answerer's (A2.1). */
   readonly post?: (input: {
     readonly from: { readonly teammateId: string; readonly name: string; readonly missionId: string }
@@ -1355,13 +1362,17 @@ export function createRelay(options: RelayOptions): Relay {
       // rather than being left to conclude the message never arrived.
       const exchange = exchanges.get(mission.missionId)
       exchanges.delete(mission.missionId)
+      const ended = options.howEnded === undefined ? undefined : await options.howEnded(mission.missionId).catch(() => undefined)
       if (exchange !== undefined) {
-        const returned = exchange.wantsAnswer === true && (await returnAnswer(exchange, mission).catch(() => false))
+        // Only a run that completed has an answer to bring back (0.572).
+        const returned = ended === undefined && exchange.wantsAnswer === true && (await returnAnswer(exchange, mission).catch(() => false))
         if (!returned) {
           notifyAndKeep(
             exchange.askerRunId,
             exchange.askerMissionId,
-            `${exchange.recipientName} finished without writing back. Anything they said is in their own conversation.`
+            ended === undefined
+              ? `${exchange.recipientName} finished without writing back. Anything they said is in their own conversation.`
+              : `${exchange.recipientName} stopped before writing back: ${ended}. Anything they said is in their own conversation.`
           )
         }
       }
@@ -1376,7 +1387,7 @@ export function createRelay(options: RelayOptions): Relay {
           notify(
             meeting.askerRunId,
             meeting.askerMissionId,
-            `${mission.peer.self.name} finished without replying. Still waiting on ${[...meeting.awaiting.values()].join(', ')}.`
+            `${mission.peer.self.name} ${ended === undefined ? 'finished without replying' : `stopped before replying: ${ended}`}. Still waiting on ${[...meeting.awaiting.values()].join(', ')}.`
           )
         } else {
           await closeMeeting(meeting, {

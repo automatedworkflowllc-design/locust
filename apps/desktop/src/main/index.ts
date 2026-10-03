@@ -66,7 +66,7 @@ import { homedir, release } from 'node:os'
 import { execFile } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
 import { MAX_PROMPT_LENGTH, createCodexMissionService, resumableThreadOf, runtimeThreadIdOf } from './codex-mission.js'
-import { chosenLeaveOut } from './handoff.js'
+import { chosenLeaveOut, howTurnEnded } from './handoff.js'
 import { officeWordsSection } from './office-words.js'
 import { createRoutineCopies } from './routine-copy.js'
 import { openInTerminal, terminalRequestFor } from './open-in-terminal.js'
@@ -2711,6 +2711,10 @@ if (!ownsSingleInstanceLock) {
         const tracker = createTranscriptTracker()
         tracker.track(recovered.events)
         return tracker.latestFinal
+      },
+      howEnded: async (missionId) => {
+        const recovered = await missionLedger.getMission(missionId)
+        return recovered === undefined ? undefined : howTurnEnded(recovered.events)
       },
       post: (input) => workroom.post(input),
       cursorHoldsReadOnly: () => cursorCanEnforceReadOnly(process.platform),
