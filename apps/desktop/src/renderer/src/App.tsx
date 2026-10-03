@@ -885,6 +885,14 @@ export default function App(): ReactElement {
         setDeleteError(undefined)
         setRowNotice(`Moved to ${teammatesRef.current.find((mate) => mate.teammateId === teammateId)?.name ?? 'that teammate'}.`)
         setMissionOwners((current) => ({ ...current, [missionId]: teammateId }))
+        /*
+         * And so is the box under it (0.567). Opening a conversation picks its
+         * owner; handing over the one on screen did not, so the next reply
+         * went to the OLD teammate -- who does not own it, so it started them
+         * a new conversation. Colin, 2026-10-03, after assigning a failed
+         * Antigravity conversation to Codex: "it started a whole new chat".
+         */
+        if (liveRunRef.current?.data?.missionId === missionId) setSelectedTeammateId(teammateId)
         // The run on screen, if it is this one, is now theirs too.
         setRuns((current) => {
           let next = current
@@ -3317,6 +3325,23 @@ export default function App(): ReactElement {
     && !(comparing !== undefined && comparing.kept === undefined)
       // Plain words (0.517): "checkpoint" and "briefed" were the app's, not the person's.
       ? `Your next message goes to ${runtimeNameOf(composerRoute.runtime)} with a summary of this conversation, not ${runtimeNameOf(shownData.runtime)}'s memory of it.`
+      : undefined
+  /*
+   * A reply addressed to someone who does not own the conversation on screen
+   * starts them a new one -- on purpose, but it was said nowhere until the
+   * new row appeared (0.567, Colin: "it started a whole new chat").
+   */
+  const shownOwner = liveRun === undefined ? undefined : ownerOf(liveRun)
+  const newConversationNote =
+    liveRun !== undefined
+    && shownData !== undefined
+    && !liveRunIsActive(liveRun)
+    && pickedTeammate !== undefined
+    && shownOwner !== undefined
+    && shownOwner !== pickedTeammate.teammateId
+    && !cloudOn
+    && comparing === undefined
+      ? `Your next message starts a new conversation with ${pickedTeammate.name}. This one stays with ${teammates.find((mate) => mate.teammateId === shownOwner)?.name ?? 'its teammate'}.`
       : undefined
   // What that summary carries, asked of the host as the reply is typed (0.517, Composer).
   const continuation = continuationNote === undefined || shownData === undefined
@@ -8019,7 +8044,7 @@ export default function App(): ReactElement {
             hasConnectors={connectorList !== undefined && connectorList.length > 0}
             // Said before the send: a reply on another runtime continues
             // from the stopped run's checkpoint, not from its memory.
-            continuationNote={continuationNote}
+            continuationNote={continuationNote ?? newConversationNote}
             {...(continuation === undefined ? {} : { continuation })}
             workspaceName={workspaceName.length === 0 ? undefined : workspaceName}
             workspacePath={workspacePath}

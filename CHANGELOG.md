@@ -35,6 +35,15 @@ heading: the home screen then shows it once, as a splash.
   list; Settings now says the check did not answer, while your teammates keep
   using the connectors that last worked.
 
+### Fixed
+
+- **A conversation you hand to another teammate takes the message box with
+  it.** After **Assign to** on the conversation you were looking at, your
+  reply still went to the teammate who had it before. They no longer owned
+  it, so it started them a new conversation instead of continuing this one.
+  The box now sends to whoever you assigned it to. If a reply ever would start
+  a new conversation, the box says so before you send.
+
 ## 0.565.0 - 2026-10-03
 
 ### Improved
