@@ -3351,7 +3351,13 @@ export function buildThread(
         // reached the middle of a conversation as "Unhandled Claude record:
         // tool_progress" (Colin, 2026-09-22: "?"). It goes to the fold's foot
         // with the turn's other remarks -- still readable, out of the thread.
-        const unknownRecord = /\.unknown_event$/.test(event.payload.code)
+        // Copilot's word that its background tasks changed carries nothing a
+        // person can read (0.571: eight in a row above one answer); it is kept
+        // for the ledger, and said at the foot with the run's other remarks.
+        const unknownRecord = /\.(unknown_event|background_tasks_changed)$/.test(event.payload.code)
+        // SAID ONCE A TURN (0.571): the same sentence again adds nothing.
+        const sentence = noticeKey(event.payload.message)
+        if (foldNotices.some((notice) => noticeKey(notice.message) === sentence) || items.some((held) => held.type === 'diagnostic' && noticeKey(held.message) === sentence)) break
         // A compaction is let through too: after a `/compact` the person sent
         // (0.426) it is the whole of the turn's answer, and in the fold it
         // left the thread saying the turn "ended without a reply".
@@ -3501,6 +3507,10 @@ export function buildThread(
   events.forEach((event, index) => {
     if (event.type === 'message.delta' && !beganAt.has(event.payload.itemId)) beganAt.set(event.payload.itemId, index)
   })
+  const thoughtsWithWords = new Set(events.flatMap((event) =>
+    (event.type === 'step.started' || event.type === 'step.completed') && typeof event.payload.itemId === 'string' && typeof event.payload.message === 'string' && event.payload.message.trim().length > 0
+      ? [event.payload.itemId]
+      : []))
   type Piece =
     | { readonly at: number; readonly row: number }
     | { readonly at: number; readonly message: (typeof messages)[number] }
@@ -3518,9 +3528,16 @@ export function buildThread(
      * Antigravity's own apps start a new block each time the model plans its
      * next move, and every runtime but Claude without thinking reports that
      * moment, with words or without: the stretch reads as the moves it was.
+     *
+     * ONLY A THOUGHT WITH WORDS (0.571). Antigravity thinks before every call
+     * and Locust keeps none of its words, so one turn of Bro's (Colin,
+     * 2026-10-03) drew 29 lines, each "Thought for 4s, listed a folder". A
+     * thought that says nothing is no new move to read; it folds into the
+     * line it sits in, as Claude Code folds its steps, and still shows there.
      */
     ...events.flatMap((event, at): Piece[] =>
       at < endAt && event.type === 'step.started' && (event.payload.stepKind === 'reasoning' || /reasoning/i.test(event.payload.itemType ?? ''))
+        && (event.payload.itemId === undefined || thoughtsWithWords.has(event.payload.itemId))
         ? [{ at, thinks: true }]
         : [])
   ].sort((a, b) => a.at - b.at)

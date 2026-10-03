@@ -39,7 +39,7 @@ describe('a stretch with nothing said', () => {
       ...think('r1', '**Inspecting the config**\n\nLooking for where the port is set.'),
       ...shell('c1', 'cat config.json'),
       ...shell('c2', 'rg port src'),
-      ...think('r2'),
+      ...think('r2', '**Running the tests**'),
       ...shell('c3', 'npm test'),
       ...think('r3'),
       ...shell('c4', 'npm run build'),
@@ -47,7 +47,8 @@ describe('a stretch with nothing said', () => {
       event('run.completed', {})
     ]
     const lines = buildThread(events, { running: false }).flatMap((item) => (item.type === 'steps' ? [stepsLine(item.details, true).segments[0]!.text] : []))
-    expect(lines).toEqual(['Inspecting the config: read config.json, searched for port', 'Thought for 1s, ran npm test', 'Thought for 1s, ran npm run build'])
+    // A thought with no words folds into the line it sits in (0.571): r3 adds no line.
+    expect(lines).toEqual(['Inspecting the config: read config.json, searched for port', 'Running the tests: ran 2 commands'])
   })
 
   it('leaves a turn with no thinking reported as one line between what was said (Claude Code without thinking)', () => {
