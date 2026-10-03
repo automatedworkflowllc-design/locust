@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.566.0 - 2026-10-03
+
+### New
+
+- **Settings > AI agents says what GitHub Copilot can do.** When Copilot runs
+  a turn in Approve each, it tells Locust what it supports: continuing an
+  earlier session, pictures, sound or a file's contents in a message, and
+  connectors over the web. Its row now lists each as a plain yes or no, as
+  Copilot's own answer and from when. Nothing here changes what Locust lets
+  Copilot do: it is still offered no files and no terminal of its own.
+
 ## 0.565.0 - 2026-10-03
 
 ### Improved
