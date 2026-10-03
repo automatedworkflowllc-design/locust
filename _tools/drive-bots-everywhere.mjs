@@ -125,7 +125,8 @@ try {
     return JSON.stringify({ looks: grid ? grid.querySelectorAll('.lc-look').length : 0, drawn: grid ? [...grid.querySelectorAll('canvas')].filter((c) => c.width > 0).length : 0, colours: document.querySelectorAll('.lc-hues [role="radio"]').length })
   })()`))
   say(`new teammate dialog: ${JSON.stringify(dialog)}`)
-  check('the Look grid offers all twenty shapes, drawn', dialog.looks === 20 && dialog.drawn === 20, JSON.stringify(dialog))
+  // 0.559: twenty-two, with the Critter and the Prompt.
+  check('the Look grid offers all twenty-two shapes, drawn', dialog.looks === 22 && dialog.drawn === 22, JSON.stringify(dialog))
   check('nine colours', dialog.colours === 9, String(dialog.colours))
   await shoot('03-new-teammate.png')
   // Pick the Swarm, and see the preview take it.
@@ -136,6 +137,15 @@ try {
   })()`)
   check('choosing a look changes the preview', picked === 'swarm', picked)
   await shoot('04-look-picked.png')
+  for (const shape of ['critter', 'prompt']) {
+    const now = await drive.evaluate(`(async () => {
+      document.querySelector('.lc-look[data-shape="${shape}"]')?.click()
+      await new Promise((r) => setTimeout(r, 500))
+      return document.querySelector('.lc-dialog__identity .lc-bot')?.getAttribute('data-bot') ?? ''
+    })()`)
+    check(`the ${shape} can be picked`, now === shape, now)
+    await shoot(`05-look-${shape}.png`)
+  }
   say(failures === 0 ? '\nBOTS EVERYWHERE PASSED' : `\nBOTS EVERYWHERE: ${String(failures)} FAILED`)
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

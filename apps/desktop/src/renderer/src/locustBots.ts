@@ -17,7 +17,7 @@
  *   the face on the head.
  */
 
-export type LocustBotType = 'hopper' | 'swarm'
+export type LocustBotType = 'hopper' | 'swarm' | 'critter' | 'prompt'
 
 export interface LocustBotShape {
   readonly name: string
@@ -54,6 +54,16 @@ export function rodPath(ax: number, ay: number, bx: number, by: number, r: numbe
     `M${f(ax + nx)} ${f(ay + ny)}L${f(bx + nx)} ${f(by + ny)}` +
     `A${r} ${r} 0 0 0 ${f(bx - nx)} ${f(by - ny)}L${f(ax - nx)} ${f(ay - ny)}` +
     `A${r} ${r} 0 0 0 ${f(ax + nx)} ${f(ay + ny)}Z`
+  )
+}
+
+/** A rectangle with round corners, clockwise from its top edge, as one filled subpath. */
+export function roundRectPath(x: number, y: number, w: number, h: number, r: number): string {
+  return (
+    `M${f(x + r)} ${f(y)}H${f(x + w - r)}A${r} ${r} 0 0 1 ${f(x + w)} ${f(y + r)}` +
+    `V${f(y + h - r)}A${r} ${r} 0 0 1 ${f(x + w - r)} ${f(y + h)}` +
+    `H${f(x + r)}A${r} ${r} 0 0 1 ${f(x)} ${f(y + h - r)}` +
+    `V${f(y + r)}A${r} ${r} 0 0 1 ${f(x + r)} ${f(y)}Z`
   )
 }
 
@@ -108,9 +118,41 @@ export const LOCUST_BOTS: Readonly<Record<LocustBotType, LocustBotShape>> = {
     faceX: 50,
     faceY: 31,
     faceScale: 0.74
+  },
+  /*
+   * TWO THAT NOD TO THE AGENTS (0.559). Colin, 2026-10-02: "keep the
+   * mascots, if its a problem on wider release, we remove, just stylize them
+   * like our teammates so its not a 1:1". Neither is Anthropic's or OpenAI's
+   * drawing: each is an outline in this file, worn in the teammate's own hue
+   * and the rig's plastic like every other bot. Picked only, never derived,
+   * so no teammate's face changes, and taking them out later is two entries.
+   *
+   * - Critter: a wide block with stub arms and four short legs -- the shape a
+   *   coding agent's little terminal creature has, in our plastic.
+   * - Prompt: a soft terminal window, its three title-bar dots up top.
+   */
+  critter: {
+    name: 'Critter',
+    body: roundRectPath(15, 30, 70, 44, 13) + roundRectPath(5, 45, 14, 13, 5) + roundRectPath(81, 45, 14, 13, 5),
+    parts: rodPath(27, 70, 27, 89, 3.6) + rodPath(41, 70, 41, 89, 3.6) + rodPath(59, 70, 59, 89, 3.6) + rodPath(73, 70, 73, 89, 3.6),
+    partsDepth: 0.55,
+    turn: 1,
+    faceX: 50,
+    faceY: 51,
+    faceScale: 0.9
+  },
+  prompt: {
+    name: 'Prompt',
+    body: roundRectPath(12, 28, 76, 58, 18),
+    parts: ellipsePath(27, 24, 3.8, 3.8) + ellipsePath(38, 24, 3.8, 3.8) + ellipsePath(49, 24, 3.8, 3.8),
+    partsDepth: 0.5,
+    turn: 1,
+    faceX: 50,
+    faceY: 58,
+    faceScale: 0.95
   }
 }
 
 export function isLocustBot(type: string): type is LocustBotType {
-  return type === 'hopper' || type === 'swarm'
+  return type === 'hopper' || type === 'swarm' || type === 'critter' || type === 'prompt'
 }

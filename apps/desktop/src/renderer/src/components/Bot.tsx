@@ -82,6 +82,67 @@ export interface BotProps {
   readonly hop?: boolean
   /** Looks this way for a moment (GLANCE_HOLD_MS) each time it is given, then back. */
   readonly glance?: Glance
+  /** Each eye drawn as a code glyph, left then right (`eyeGlyphs`): undefined, the rig's own eyes. */
+  readonly eyes?: EyeGlyphs
+}
+
+/** The glyph each eye becomes, left and right. */
+export type EyeGlyphs = readonly [string, string]
+
+/**
+ * EYES THAT ARE CODE (0.559). Colin, 2026-10-02: "I kind of like what the
+ * codex mascot does with the eyes making them different coding lines. Should
+ * we implement that to all of our teammates?" The rig draws each eye as one
+ * stroke at that eye's own centre, already carried round the head's sphere and
+ * squashed for a blink -- so the stroke is swapped for a glyph there, in the
+ * face's ink, and the glyph turns, glances and blinks as the eye did. The eyes
+ * are told apart by a stand-in ink only the face uses.
+ */
+const GLYPH_INK = '#010203'
+
+/**
+ * The context's own `stroke` and `fill`, shadowed on this one context (cheaper
+ * than wrapping every call of every frame). `frame()` is called before each
+ * frame: the left eye is drawn first, and an eye turned out of sight is not
+ * drawn at all, so the count starts again each frame from the stroke's place.
+ */
+function withGlyphEyes(context: CanvasRenderingContext2D, eyesNow: () => EyeGlyphs | undefined, ink: string): { readonly frame: (yaw: number) => void } {
+  // From the prototype, never the context: a second effect on the same canvas must not stack on the first.
+  const own = Object.getPrototypeOf(context) as CanvasRenderingContext2D
+  const stroke = own.stroke.bind(context) as (...args: unknown[]) => void
+  const fill = own.fill.bind(context) as (...args: unknown[]) => void
+  let drawn = 0
+  // The left eye goes round the back (out of sight, not drawn) only past this much turn to the left:
+  // its centre, 12.5 left on a sphere of 30, reaches the edge at asin(12.5 / 30) + 90deg -- about 64deg.
+  let leftHidden = false
+  const glyphAt = (): void => {
+    // The rig draws the left eye first; an eye out of sight is not drawn at all.
+    const left = drawn === 0 && !leftHidden
+    const glyph = eyesNow()?.[left ? 0 : 1] ?? ''
+    drawn += 1
+    context.save()
+    context.fillStyle = ink
+    context.font = '800 25px ui-monospace, "Cascadia Mono", Consolas, monospace'
+    context.textAlign = 'center'
+    context.textBaseline = 'middle'
+    context.fillText(glyph, 0, glyph === '_' ? -6 : 1)
+    context.restore()
+  }
+  ;(context as unknown as { stroke: (...args: unknown[]) => void }).stroke = (...args) => {
+    if (String(context.strokeStyle).toLowerCase() === GLYPH_INK) return glyphAt()
+    return stroke(...args)
+  }
+  ;(context as unknown as { fill: (...args: unknown[]) => void }).fill = (...args) => {
+    // A mouth is drawn in the face's ink too: it keeps the real one.
+    if (String(context.fillStyle).toLowerCase() === GLYPH_INK) context.fillStyle = ink
+    return fill(...args)
+  }
+  return {
+    frame: (yaw) => {
+      drawn = 0
+      leftHidden = yaw < -1.12
+    }
+  }
 }
 
 /**
@@ -354,10 +415,13 @@ function RiggedBot({
   interactive = false,
   jumpEvery,
   hop = false,
-  glance
+  glance,
+  eyes
 }: BotProps): ReactElement {
   const ref = useRef<HTMLCanvasElement>(null)
   const rig = useRef<BotAvatarSim | null>(null)
+  const glyphs = useRef(eyes)
+  glyphs.current = eyes
   // What each frame reads, so a glance or the pointer never restarts the rig.
   const aim = useRef<{ follows: boolean; glance: Glance | undefined; glancedAt: number }>({
     follows: interactive,
@@ -386,9 +450,12 @@ function RiggedBot({
     if (jumpEvery !== undefined) sim.setJump({ every: jumpEvery })
     rig.current = sim
     const still = paused || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
+    // Read at each frame, so a teammate's eyes change with what it does without restarting its rig.
+    const painter = withGlyphEyes(context, () => glyphs.current, ink)
     const draw = (): void => {
       context.setTransform(dpr, 0, 0, dpr, 0, 0)
       context.clearRect(0, 0, side, side)
+      painter.frame(sim.pose.yaw)
       drawBotAvatarFrame(context, size, sim.pose, {
         path,
         ...(parts === undefined ? {} : { parts }),
@@ -399,7 +466,7 @@ function RiggedBot({
         faceY: outline.faceY,
         faceScale: outline.faceScale,
         color: body,
-        ink,
+        ink: glyphs.current === undefined ? ink : GLYPH_INK,
         shading: 'plastic',
         dpr,
         theme: 'dark',
@@ -451,7 +518,7 @@ function RiggedBot({
     }
     // A new state eases in on the running rig (below); only a still bot is
     // redrawn from scratch for one.
-  }, [type, size, color, face, seed, paused, paused ? state : undefined, jumpEvery])
+  }, [type, size, color, face, seed, paused, paused ? state : undefined, jumpEvery, paused ? eyes?.join('') : undefined])
 
   useEffect(() => {
     if (!paused) rig.current?.setState(state)

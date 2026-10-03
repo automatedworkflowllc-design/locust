@@ -5,7 +5,7 @@ import { botFor } from '../../../shared/avatar.js'
 import type { FaceActivity } from '../faceState.js'
 import type { GlanceSide } from '../glances.js'
 import { Bot } from './Bot.js'
-import type { Glance } from './Bot.js'
+import type { EyeGlyphs, Glance } from './Bot.js'
 import { PRESENCE_TONE } from './PixelFace.js'
 import { RuntimeMark } from './RuntimeMark.js'
 import type { PixelFaceProps } from './PixelFace.js'
@@ -153,6 +153,33 @@ export interface TeammateBotProps extends PixelFaceProps {
   readonly runtime?: string
 }
 
+/**
+ * EYES THAT SAY WHAT IT IS DOING (0.559). Colin, 2026-10-02: "I kind of like
+ * what the codex mascot does with the eyes making them different coding
+ * lines. Should we implement that to all of our teammates?" Every teammate:
+ * a prompt while it works, dashes while it thinks, carets when it is done,
+ * crosses when it is stuck. Waiting on you keeps its own eyes and the amber
+ * ring; talking, listening and idle keep the rig's eyes, which move.
+ */
+export function eyeGlyphsFor(activity: FaceActivity): EyeGlyphs | undefined {
+  switch (activity) {
+    case 'working':
+    case 'delegating':
+      return ['>', '_']
+    case 'thinking':
+      return ['-', '-']
+    case 'done':
+      return ['^', '^']
+    case 'blocked':
+      return ['x', 'x']
+    default:
+      return undefined
+  }
+}
+
+/** Below this a glyph is a speck: the rig's own eyes read better. */
+export const GLYPH_EYES_MIN = 22
+
 /** Below this a badge is a speck: the mark is not drawn. */
 export const MARKED_FACE_MIN = 24
 
@@ -174,6 +201,7 @@ export function TeammateBot({
   const { state, paused, jumpEvery, bounces, hops } = botMotion(activity === 'done' && !hopsWhenDone ? 'idle' : activity, motion)
   const color = hueColor(hue)
   const tone = PRESENCE_TONE[presence]
+  const eyes = eyeGlyphsFor(activity === 'done' && !hopsWhenDone ? 'idle' : activity)
   return (
     <span
       className={`lc-face lc-bot${bounces ? ' is-bouncing' : ''}${className === undefined ? '' : ` ${className}`}`}
@@ -193,6 +221,7 @@ export function TeammateBot({
         face={bot.face}
         seed={seedOf(teammateId ?? name ?? bot.shape)}
         hop={hops}
+        {...(size >= GLYPH_EYES_MIN && eyes !== undefined ? { eyes } : {})}
         {...(glance === undefined ? {} : { glance: GLANCE_TOWARD[glance] })}
         {...(color === undefined ? {} : { color })}
         {...(jumpEvery === undefined ? {} : { jumpEvery })}

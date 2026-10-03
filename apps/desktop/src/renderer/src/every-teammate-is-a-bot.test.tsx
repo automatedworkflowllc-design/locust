@@ -30,9 +30,10 @@ import { TeammateBot, botMotion } from './components/TeammateBot.js'
  */
 
 describe('the shapes', () => {
-  it("are the library's eighteen, then Locust's own two", () => {
+  it("are the library's eighteen, then Locust's own two, then the two that nod to the agents", () => {
     expect(BOT_SHAPES.slice(0, 18)).toEqual(botAvatarTypes)
-    expect(BOT_SHAPES.slice(18)).toEqual(['hopper', 'swarm'])
+    // Colin, 2026-10-02: "keep the mascots ... just stylize them like our teammates so its not a 1:1".
+    expect(BOT_SHAPES.slice(18)).toEqual(['hopper', 'swarm', 'critter', 'prompt'])
   })
 })
 
@@ -42,13 +43,23 @@ describe("a teammate's bot", () => {
     expect(botFor(look)).toEqual(botFor(seedAvatar('tm_wren')))
   })
 
-  it('can be any of the twenty, from the looks the seed can make', () => {
+  it('can be any of the first twenty, from the looks the seed can make -- and a new shape moves no one', () => {
     const reached = new Set<string>()
     for (let headwear = 0; headwear < HEADWEAR_COUNT; headwear += 1)
       for (let accessory = 0; accessory < ACCESSORY_COUNT; accessory += 1)
         for (let mouth = 0; mouth < MOUTH_COUNT; mouth += 1)
           reached.add(botFor({ headwear, accessory, mouth } as AvatarSpec).shape)
-    expect([...reached].sort()).toEqual([...BOT_SHAPES].sort())
+    expect([...reached].sort()).toEqual([...BOT_SHAPES.slice(0, 20)].sort())
+  })
+
+  it('is the same derived bot it was before the critter and the prompt joined', () => {
+    // Measured on 0.558 for these seeds; a shape added to the list must not move them.
+    const before = (id: string) => {
+      const look = seedAvatar(id)
+      const index = (look.headwear * ACCESSORY_COUNT * MOUTH_COUNT + look.accessory * MOUTH_COUNT + look.mouth) % 20
+      return BOT_SHAPES[index]
+    }
+    for (const id of ['tm_wren', 'tm_atlas', 'tm_clay', 'tm_sol', 'tm_gem']) expect(botFor(seedAvatar(id)).shape).toBe(before(id))
   })
 
   it('is the one the person picked, when they picked one', () => {
@@ -128,7 +139,9 @@ describe('the new teammate dialog', () => {
 
   it('offers every shape to choose from, and the face', () => {
     const look = html.slice(html.indexOf('aria-label="Look"'))
-    expect((look.match(/class="lc-look( is-selected)?"/g) ?? []).length).toBe(20)
+    expect((look.match(/class="lc-look( is-selected)?"/g) ?? []).length).toBe(22)
+    expect(html).toContain('aria-label="Critter"')
+    expect(html).toContain('aria-label="Prompt"')
     expect(html).toContain('aria-label="Hopper, a Locust"')
     expect(html).toContain('aria-label="Swarm, a Locust"')
     expect(html).toContain('aria-label="Face"')

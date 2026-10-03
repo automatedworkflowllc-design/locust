@@ -276,9 +276,9 @@ function ClaudeCloudSessions({
     <div className="lc-cloudtasks__claude">
       {(picked || sessions.length === 0) && (
         <p className="lc-cloudtasks__empty">
-          Describe a task and send it. Claude does the work on Anthropic’s machines, not this computer, and you can
-          follow it on claude.ai or in the Claude app. If Claude Code needs to ask you something first, such as whether
-          you trust this folder, it opens a window for that.
+          Describe a task and send it. Claude does the work on Anthropic’s machines, not this computer. Show what it
+          did reads its conversation and its change here; Apply brings the change into this folder. If Claude Code
+          needs to ask you something first, such as whether you trust this folder, it opens a window for that.
         </p>
       )}
       {note !== undefined && <p className="lc-cloudtasks__note" role="status">{note}</p>}

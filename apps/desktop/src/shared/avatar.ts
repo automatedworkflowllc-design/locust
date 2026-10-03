@@ -48,8 +48,14 @@ export const BOT_SHAPES = [
   'pebble',
   'puddle',
   'hopper',
-  'swarm'
+  'swarm',
+  // Picked only (0.559): never in DERIVED_SHAPES, so no teammate's face changes for them.
+  'critter',
+  'prompt'
 ] as const
+
+/** The shapes a look is derived from: the first twenty, for good -- a new shape must never move anyone's face. */
+const DERIVED_SHAPES = BOT_SHAPES.slice(0, 20)
 
 export type BotShape = (typeof BOT_SHAPES)[number]
 export type BotFace = 'eyes' | 'mouth'
@@ -74,9 +80,9 @@ export function botFor(avatar: AvatarSpec): BotSpec {
   if (avatar.bot !== undefined && isBotSpec(avatar.bot)) return avatar.bot
   const index =
     (avatar.headwear * ACCESSORY_COUNT * MOUTH_COUNT + avatar.accessory * MOUTH_COUNT + avatar.mouth) %
-    BOT_SHAPES.length
+    DERIVED_SHAPES.length
   return {
-    shape: BOT_SHAPES[index] ?? 'clover',
+    shape: DERIVED_SHAPES[index] ?? 'clover',
     // The open mouth of the pixel face is the one that becomes a mouth.
     face: avatar.mouth === 2 ? 'mouth' : 'eyes'
   }

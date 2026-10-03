@@ -11,6 +11,20 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.559.0 - 2026-10-02
+
+### Added
+
+- **A teammate's eyes say what it is doing.** Every teammate's eyes now turn
+  into code while it works: `>_` while it works, `- -` while it thinks, `^ ^`
+  when it is done, `x x` when it is stuck. They still turn, glance and blink
+  with the head. Talking, listening, idle and waiting on you keep the bot's own
+  eyes.
+- **Two new bots to pick: Critter and Prompt.** A blocky critter on four
+  short legs, and a soft terminal window with its three dots, drawn in the
+  same plastic and your teammate's colour as every other bot. Pick them in the
+  look picker; no existing teammate's face changes.
+
 ## 0.558.0 - 2026-10-02
 
 ### Added

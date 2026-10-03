@@ -112,7 +112,9 @@ const SHAPE_NAMES: Readonly<Record<BotShape, string>> = {
   pebble: 'Pebble',
   puddle: 'Puddle',
   hopper: 'Hopper, a Locust',
-  swarm: 'Swarm, a Locust'
+  swarm: 'Swarm, a Locust',
+  critter: 'Critter',
+  prompt: 'Prompt'
 }
 
 const ROLES: readonly { readonly role: TeammateRole; readonly description: string }[] = (
