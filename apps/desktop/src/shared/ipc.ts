@@ -1,6 +1,7 @@
 import type { ReverseChange } from './reverse-diff.js'
 import type { RemoteControlState } from './claude-remote-control.js'
 import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
+import type { QueuedMessagesResponse, SavedQueuedMessage } from './queued-messages.js'
 
 import type { AvatarSpec, PetSource } from './avatar.js'
 import type { PetRows } from './pets.js'
@@ -3147,6 +3148,8 @@ export type MissionDeleteResponse =
     }
 
 export interface DesktopApi {
+  readQueuedMessages(): Promise<QueuedMessagesResponse>
+  writeQueuedMessages(rows: readonly SavedQueuedMessage[]): Promise<QueuedMessagesResponse>
   readonly platform: string
   /** How many things need the person now: the taskbar shows it (0.379). */
   setNeedsYouCount(count: number): void

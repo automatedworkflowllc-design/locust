@@ -346,14 +346,16 @@ export interface ComposerProps {
   readonly queued: string | undefined
   /** How many separate things are waiting, so the strip can say so. */
   readonly queuedCount?: number
+  readonly queuedAttachments?: readonly string[]
   /** Why a queued message has not gone yet, when it is not simply still running. */
   readonly queuedNote: string | undefined
+  readonly queueError?: string
   /** With the files attached to it, which ride on the row and go when it goes (L20). */
   /** `now`: Ctrl+Enter -- stop the run on screen and send this at once (0.485). */
-  readonly onQueue: (text: string, attachments: readonly string[], now?: boolean) => void
+  readonly onQueue: (text: string, attachments: readonly string[], now?: boolean) => void | Promise<boolean>
   /** Stop the run on screen and send the queued message now; absent where that is not the run on screen. */
   readonly onSendQueuedNow?: () => void
-  readonly onUnqueue: () => void
+  readonly onUnqueue: () => void | Promise<boolean>
   readonly onSendQueued: () => void
   /** The queued message belongs to a conversation that is NOT the one on screen. */
   readonly queuedElsewhere: boolean
@@ -468,7 +470,9 @@ export function Composer({
   busyWith,
   queued,
   queuedCount,
+  queuedAttachments,
   queuedNote,
+  queueError,
   onQueue,
   onUnqueue,
   onSendQueued,
@@ -946,8 +950,10 @@ export function Composer({
 
   /** Set by Ctrl+Enter for the submit it starts: stop the run and send this now (0.485). */
   const sendNow = useRef(false)
+  const queueing = useRef(false)
   const submit = (submitEvent: FormEvent<HTMLFormElement>): void => {
     submitEvent.preventDefault()
+    if (queueing.current) return
     const now = sendNow.current
     sendNow.current = false
     const typed = value.trim()
@@ -978,10 +984,14 @@ export function Composer({
       // With its files, and the tiles cleared, as a send does. L20 (the code
       // review): the queued row dropped them, and the tiles then rode along
       // on the next, unrelated message.
-      onQueue(prompt, attached, now && onSendQueuedNow !== undefined)
-      setValue('')
-      setAttached([])
-      if (notes.length > 0) onClearDiffNotes?.()
+      queueing.current = true
+      void Promise.resolve(onQueue(prompt, attached, now && onSendQueuedNow !== undefined)).then((saved) => {
+        if (saved === false) return
+        // A disk acknowledgement must not erase a newer thought typed meanwhile.
+        if (valueNow.current === value) setValue('')
+        setAttached([])
+        if (notes.length > 0) onClearDiffNotes?.()
+      }).finally(() => { queueing.current = false })
       return
     }
     if (!canStart) {
@@ -1475,6 +1485,7 @@ export function Composer({
             </div>
           </div>
         )}
+        {queueError !== undefined && queued === undefined && <div className="lc-queued is-editing" role="status">{queueError}</div>}
         {queued !== undefined && (
           <div className="lc-queued" role="status" aria-live="polite">
             <div className="lc-queued__bubble">
@@ -1522,9 +1533,12 @@ export function Composer({
                 type="button"
                 className="lc-queued__action"
                 onClick={() => {
-                  setValue(queued)
-                  setOffTheQueue(true)
-                  onUnqueue()
+                  void Promise.resolve(onUnqueue()).then((saved) => {
+                    if (saved === false) return
+                    setValue(queued)
+                    setAttached(queuedAttachments ?? [])
+                    setOffTheQueue(true)
+                  })
                 }}
               >
                 Edit

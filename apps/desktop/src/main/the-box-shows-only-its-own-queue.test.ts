@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
+// Colin: "Keep the queue beside its conversation in the profile"; the selector now lives in the durable controller.
+
 /**
  * THE BOX UNDER A CONVERSATION SHOWS, EDITS AND SENDS ITS OWN QUEUE.
  *
@@ -14,6 +16,7 @@ import { describe, expect, it } from 'vitest'
  * to show, `setQueued([])` for Edit and Discard, and one fold for everyone.
  */
 const app = readFileSync(fileURLToPath(new URL('../renderer/src/App.tsx', import.meta.url)), 'utf8')
+const queue = readFileSync(fileURLToPath(new URL('../renderer/src/conversationQueue.ts', import.meta.url)), 'utf8')
 
 describe("the composer's queue", () => {
   it('is never emptied whole: Edit and Discard take one conversation out of it', () => {
@@ -27,9 +30,13 @@ describe("the composer's queue", () => {
     expect(app).toMatch(/queuedCount=\{waitingHere\.length\}/)
   })
 
-  it('sends only what was queued in the conversation on screen', () => {
+  it('The composer sends only what was queued in the conversation on screen.', () => {
     expect(app).toMatch(/const front = queuedIn\(queued, shownKey\)\[0\]/)
-    expect(app).toMatch(/takeNext\(queued, shownKey\)/)
+    // Selection moved into the controller so its removal can be saved
+    // before sending. Keep the App-to-controller conversation binding here;
+    // the controller's tests exercise its behavior with two conversations.
+    expect(app).toMatch(/void sendQueued\(shownKey, \(going\) => startMission/)
+    expect(queue).toContain('const next = takeNext(before, key)')
   })
 })
 

@@ -82,6 +82,8 @@ import { bundledNpmBinDirectory, bundledNpmPrefix, findBundledNpm } from './bund
 import { createModelCatalog } from './model-catalog.js'
 import { describeGone, diagnosticLine, shouldRoll, startupDetail } from './diagnostics.js'
 import { createGroupStore } from './group-store.js'
+import { createQueuedMessageStore } from './queued-message-store.js'
+import { QUEUED_MESSAGES_READ_CHANNEL, QUEUED_MESSAGES_WRITE_CHANNEL } from '../shared/queued-messages.js'
 import { createBriefSessions } from './brief-sessions.js'
 import { createRunEnd } from './run-end.js'
 import { createKeepAwake, KEEP_AWAKE_BEAT_MS } from './keep-awake.js'
@@ -845,6 +847,7 @@ const runtimeDiscovery = createRuntimeDiscoveryService({
 const ownsSingleInstanceLock = app.requestSingleInstanceLock()
 let missionServiceForShutdown: CodexMissionService | undefined
 let remoteControlForShutdown: ReturnType<typeof createRemoteControl> | undefined
+let queuedMessagesForShutdown: ReturnType<typeof createQueuedMessageStore> | undefined
 /** Antigravity's watches too: never disposed, they polled and wrote on through the flush (B4 lead). */
 let antigravityServiceForShutdown: { dispose(): Promise<void> } | undefined
 let ledgerForShutdown: MissionLedger | undefined
@@ -1448,6 +1451,8 @@ if (!ownsSingleInstanceLock) {
     // A person told "Locust cannot write its ledger" and given no way to go
     // and look at the folder has been informed and not helped.
     const groups = createGroupStore({ rootDirectory: app.getPath('userData') })
+    const queuedMessages = createQueuedMessageStore(app.getPath('userData'))
+    queuedMessagesForShutdown = queuedMessages
     /*
      * Every folder worked in, by id and path (0.458, folders.ts): a
      * conversation from another folder is listed, opened and continued there.
@@ -4697,6 +4702,17 @@ if (!ownsSingleInstanceLock) {
       }
     })
 
+    ipcMain.handle(QUEUED_MESSAGES_READ_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'Saved messages are unavailable.' }
+      try { return { ok: true, rows: await queuedMessages.list() } }
+      catch { return { ok: false, message: 'Saved messages could not be read. Reopen Locust to try again; the saved file has been kept.' } }
+    })
+    ipcMain.handle(QUEUED_MESSAGES_WRITE_CHANNEL, async (event, rows: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'Saved messages are unavailable.' }
+      try { return { ok: true, rows: await queuedMessages.replace(rows) } }
+      catch { return { ok: false, message: 'This queue change was not saved. Your queued messages are still here; try again.' } }
+    })
+
     ipcMain.handle(GROUP_CREATE_CHANNEL, async (event, name: unknown) => {
       if (!fromOwnWindow(event)) return groupRejected('The group could not be created.')
       try {
@@ -6877,6 +6893,7 @@ if (ownsSingleInstanceLock) {
       deadlineMs: SHUTDOWN_DEADLINE_MS,
       work: async () => {
         await remoteControlForShutdown?.dispose()
+        await queuedMessagesForShutdown?.flush()
         await missionServiceForShutdown?.dispose()
         await antigravityServiceForShutdown?.dispose()
         await ledgerForShutdown?.flush()

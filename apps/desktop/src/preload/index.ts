@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { REMOTE_CONTROL_GET_CHANNEL, REMOTE_CONTROL_SET_CHANNEL, type RemoteControlState } from '../shared/claude-remote-control.js'
+import { QUEUED_MESSAGES_READ_CHANNEL, QUEUED_MESSAGES_WRITE_CHANNEL } from '../shared/queued-messages.js'
+import type { QueuedMessagesResponse, SavedQueuedMessage } from '../shared/queued-messages.js'
 import type { CompareSlotId } from '../shared/compare.js'
 import {
   CODEX_MISSION_CANCEL_CHANNEL,
@@ -392,6 +394,8 @@ const desktopApi: DesktopApi = {
     ipcRenderer.invoke(TEAMMATE_ASSIGN_CHANNEL, { teammateId, missionId }) as Promise<TeammateMutationResponse>,
   renameMission: (missionId: string, title: string) =>
     ipcRenderer.invoke(TEAMMATE_RENAME_MISSION_CHANNEL, { missionId, title }) as Promise<TeammateMutationResponse>,
+  readQueuedMessages: () => ipcRenderer.invoke(QUEUED_MESSAGES_READ_CHANNEL) as Promise<QueuedMessagesResponse>,
+  writeQueuedMessages: (rows: readonly SavedQueuedMessage[]) => ipcRenderer.invoke(QUEUED_MESSAGES_WRITE_CHANNEL, rows) as Promise<QueuedMessagesResponse>,
   listGroups: () => ipcRenderer.invoke(GROUP_LIST_CHANNEL) as Promise<GroupListResponse>,
   createGroup: (name: string) => ipcRenderer.invoke(GROUP_CREATE_CHANNEL, name) as Promise<GroupMutationResponse>,
   renameGroup: (groupId: string, name: string) =>

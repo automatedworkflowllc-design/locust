@@ -20,6 +20,8 @@ export type QueuedVerdict =
   /** Held, with the reason a person needs to decide what to do. */
   | { readonly kind: 'held'; readonly note: string }
 
+export const QUEUE_RESTORED_NOTE = 'saved before Locust closed — press Send to continue'
+
 export function queuedVerdict(input: {
   /** Whether that run is still going. */
   readonly running: boolean
@@ -27,7 +29,12 @@ export function queuedVerdict(input: {
   readonly phase: string | undefined
   /** Whether the conversation it belongs to is the one on screen. */
   readonly onScreen: boolean
+  /** A relaunched queue needs a fresh Send, even if its run completed. */
+  readonly restored?: boolean
+  readonly held?: string
 }): QueuedVerdict {
+  if (input.held !== undefined) return { kind: 'held', note: input.held }
+  if (input.restored) return { kind: 'held', note: QUEUE_RESTORED_NOTE }
   if (input.phase === undefined) return { kind: 'held', note: 'held — that conversation is no longer open' }
   if (input.running) return { kind: 'waiting' }
   if (input.phase !== 'completed') {
@@ -83,6 +90,10 @@ export function requeuedTo<T extends { readonly key: string }>(
  * one instruction and attribute both to whoever typed last.
  */
 export interface QueuedRow {
+  /** Recovered words are offered back, never scheduled automatically. */
+  readonly restored?: boolean
+  /** A refused dispatch waits for a fresh decision rather than retrying itself. */
+  readonly held?: string
   readonly id: string
   /** The run it was typed at. Follows a re-key, as `requeuedTo` always has. */
   readonly key: string
@@ -169,7 +180,7 @@ export function combineQueued(rows: readonly QueuedRow[]): readonly QueuedRow[] 
   let taken = 1
   while (taken < rows.length) {
     const next = rows[taken]
-    if (next === undefined || next.key !== front.key || !canMergeFollower(next)) break
+    if (next === undefined || next.key !== front.key || next.restored !== front.restored || next.held !== front.held || !canMergeFollower(next)) break
     taken += 1
   }
   if (taken === 1) return rows

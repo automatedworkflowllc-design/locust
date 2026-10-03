@@ -59,8 +59,9 @@ import type { Workbook } from '../../shared/sheet.js'
 import type { OfficeDocument } from '../../shared/office-document.js'
 import type { Spend } from '../../shared/spend.js'
 import { routineDraft, routineStepPhrase } from './routines.js'
-import { queueHome, combineQueued, queuedIn, queuedVerdict, requeuedRows, retriedAfterBusy, takeNext, withoutQueueOf } from './steering.js'
+import { queueHome, combineQueued, queuedIn, queuedVerdict, requeuedRows, retriedAfterBusy, withoutQueueOf } from './steering.js'
 import type { QueuedRow } from './steering.js'
+import { useConversationQueue } from './useConversationQueue.js'
 import type { RoutineDraft } from './routines.js'
 import { RoutineDialog } from './components/RoutineDialog.js'
 import { RoutineRunDialog } from './components/RoutineInputs.js'
@@ -1582,7 +1583,7 @@ export default function App(): ReactElement {
    * reasoning in `steering.ts`; grok-build does the same thing and Colin
    * asked for it by name.
    */
-  const [queued, setQueued] = useState<readonly QueuedRow[]>([])
+  const [queued, setQueued, queueError, sendQueued] = useConversationQueue()
   /** The save/edit dialog, open on a draft taken from a conversation or on a routine already saved. */
   const [routineDialog, setRoutineDialog] = useState<{
     readonly inputs?: readonly RoutineInput[]
@@ -4422,8 +4423,7 @@ export default function App(): ReactElement {
             return false
           }
           if (inFront !== undefined) {
-            setQueued((rows) => [...rows, { id: `q_${String(rows.length)}_${inFront}`, key: inFront, text: prompt, origin: 'person' as const }])
-            return true
+            return await setQueued((rows) => [...rows, { id: `q_${String(rows.length)}_${inFront}`, key: inFront, text: prompt, origin: 'person' as const }])
           }
           // Nothing of theirs is on screen to wait behind -- the cap is full,
           // or the run belongs to a window this one cannot see. The words go
@@ -4433,8 +4433,7 @@ export default function App(): ReactElement {
           // finishing that run. Dropped, it was simply gone.
           if (options?.requeue !== undefined) {
             const back = retriedAfterBusy(options.requeue, previousKey ?? options.requeue.key, Date.now())
-            setQueued((rows) => [back, ...rows])
-            return true
+            return await setQueued((rows) => [back, ...rows])
           }
           startRefusal.current = `Not sent: ${response.error.message} Your message is back in the box.`
           return false
@@ -5496,6 +5495,8 @@ export default function App(): ReactElement {
       : queuedVerdict({
           running: queuedRun !== undefined && liveRunIsActive(queuedRun),
           phase: queuedRun?.phase,
+          restored: front.restored,
+          held: front.held,
           onScreen: true
         })
   /** Ticks when a queued message's retry time comes round, so the effect below looks again. */
@@ -5510,16 +5511,12 @@ export default function App(): ReactElement {
     }
     // Folded at the moment of sending rather than as it is typed, so a person
     // can still edit or drop any row right up until it goes.
-    const { going, rest } = takeNext(queued, shownKey)
-    if (going === undefined) return undefined
     // Cleared BEFORE sending: this effect runs again on the state the send
     // produces, and a queue still holding the message would send it twice.
     // Only what actually went is dropped -- anything the fold refused to
     // merge stays queued and takes its own turn, and every other
     // conversation's rows stay where they are.
-    setQueued(rest)
-    // With its files (L20): the row carried them; nothing put them back.
-    void startMission(withAttachments(going.text, going.attachments ?? []), undefined, { requeue: going })
+    void sendQueued(shownKey, (going) => startMission(withAttachments(going.text, going.attachments ?? []), undefined, { requeue: going }))
     return undefined
   }, [queued, front, shownKey, verdict?.kind, queueClock])
 
@@ -5538,10 +5535,7 @@ export default function App(): ReactElement {
     if (run !== undefined && liveRunIsActive(run)) return
     setSendAfterStop(undefined)
     if (run === undefined || run.phase === 'completed') return
-    const { going, rest } = takeNext(queued, sendAfterStop)
-    if (going === undefined) return
-    setQueued(rest)
-    void startMission(withAttachments(going.text, going.attachments ?? []), undefined, { requeue: going })
+    void sendQueued(sendAfterStop, (going) => startMission(withAttachments(going.text, going.attachments ?? []), undefined, { requeue: going }))
   }, [sendAfterStop, runs, queued])
 
   /** The addressed teammate's live run, if they have one: they cannot be given a second. */
@@ -5588,6 +5582,8 @@ export default function App(): ReactElement {
       : queuedVerdict({
           running: waitingRun !== undefined && liveRunIsActive(waitingRun),
           phase: waitingRun?.phase,
+          restored: waitingHere[0].restored,
+          held: waitingHere[0].held,
           onScreen: queueKey === shownKey
         })
   const queuedNote = waitingVerdict?.kind === 'held' ? waitingVerdict.note : undefined
@@ -8274,23 +8270,27 @@ export default function App(): ReactElement {
             // rather than the pieces it was typed in.
             queued={combineQueued(waitingHere)[0]?.text}
             queuedCount={waitingHere.length}
-            queuedNote={queuedNote}
+            queuedAttachments={combineQueued(waitingHere)[0]?.attachments}
+            queuedNote={queueError ?? queuedNote}
+            queueError={queueError}
             queuedElsewhere={queueKey !== shownKey}
-            onQueue={(text, attachments, now) => {
+            onQueue={async (text, attachments, now) => {
               // Into the conversation the box shows the queue of (queueKey):
               // the live run on screen, else the addressed teammate's busy run.
               const key = queueKey
               if (key !== undefined) {
-                setQueued((rows) => [
+                const saved = await setQueued((rows) => [
                   ...rows,
                   { id: `q_${String(rows.length)}_${key}`, key, text, origin: 'person' as const, ...(attachments.length === 0 ? {} : { attachments }), ...(waitForKey === undefined ? {} : { waitFor: waitForKey }) }
                 ])
                 // Ctrl+Enter: stop the run on screen and send this at once.
-                if (now === true && key === liveOnScreen) {
+                if (saved && now === true && key === liveOnScreen) {
                   setSendAfterStop(key)
                   cancelMission()
                 }
+                return saved
               }
+              return false
             }}
             {...(queueKey !== undefined && queueKey === liveOnScreen
               ? {
@@ -8303,9 +8303,7 @@ export default function App(): ReactElement {
             onUnqueue={() => setQueued((rows) => withoutQueueOf(rows, queueKey))}
             onSendQueued={() => {
               if (queueKey === undefined) return
-              const { going, rest } = takeNext(queued, queueKey)
-              setQueued(rest)
-              if (going !== undefined) void startMission(withAttachments(going.text, going.attachments ?? []), undefined, { requeue: going })
+              void sendQueued(queueKey, (going) => startMission(withAttachments(going.text, going.attachments ?? []), undefined, { requeue: going }))
             }}
           />
           )}
