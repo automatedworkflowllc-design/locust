@@ -16,8 +16,9 @@ import { refreshPetList, setPetLook } from '../pets.js'
  * and asked for *"all the others"* to go (shared/pet-picks.ts), so the Pets
  * row is those 21, always there: no search, no paging. A tile shows the pet's
  * small picture -- light to show, where 21 live sheets were seconds of
- * decoding -- and a pet not on this computer yet carries a small arrow: its
- * click downloads that one pet from openpets.dev and puts it on the teammate.
+ * decoding. A pet not on this computer yet downloads from openpets.dev on its
+ * click and goes on the teammate; the credit line says so once (0.565: an
+ * arrow on each tile put 21 arrows on a new computer's row).
  * Nothing is downloaded before a click, and each pet's rights stay with its
  * maker (PetCredit says so, and where to report one).
  */
@@ -133,13 +134,6 @@ export function PetPickTiles({
             onClick={() => wear(pick)}
           >
             <PickPicture id={pick.id} />
-            {!here && (
-              <span className="lc-pettile__get" aria-hidden>
-                <svg viewBox="0 0 10 10" width="8" height="8">
-                  <path d="M5 1.5v6M2.2 4.8 5 7.6l2.8-2.8" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </span>
-            )}
           </button>
         )
       })}
@@ -164,7 +158,7 @@ export function PetCredit(): ReactElement {
         <button type="button" className="lc-linkbutton" onClick={() => open(OPENPETS_LINK)}>
           openpets.dev
         </button>
-        , made by its community. Rights stay with each pet&rsquo;s maker.{' '}
+        , made by its community; each downloads the first time it is picked. Rights stay with each pet&rsquo;s maker.{' '}
         <button type="button" className="lc-linkbutton" onClick={() => open(OPENPETS_REPORT_LINK)}>
           Report a pet
         </button>

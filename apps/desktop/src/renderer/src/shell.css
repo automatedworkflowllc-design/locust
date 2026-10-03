@@ -8556,7 +8556,7 @@ textarea {
 /*
  * PETS, UNDER THE BOTS (0.563; 0.564: the pets Locust offers, PetPicks). The
  * same grid and tiles as the bots, a heading of their own, each pet shown by
- * its small picture, and a small arrow on one not yet on this computer.
+ * its small picture.
  */
 .lc-pets {
   display: flex;
@@ -8609,6 +8609,8 @@ textarea {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+  /* A faint light edge, so a pet drawn in black (Reaper) is not lost on the dark tile (0.565). */
+  filter: drop-shadow(0 0 0.6px rgba(236, 240, 247, 0.45));
 }
 
 .lc-pettile.is-busy .lc-pettile__picture {
@@ -8629,22 +8631,6 @@ textarea {
   height: 22px;
   border-radius: 50%;
   background: var(--lc-hover-surface);
-}
-
-/* Not on this computer yet: its click downloads it from openpets.dev. */
-.lc-pettile__get {
-  position: absolute;
-  right: 3px;
-  bottom: 3px;
-  display: grid;
-  place-items: center;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--lc-bg-raised);
-  box-shadow: 0 0 0 1px var(--lc-border-hairline);
-  color: var(--lc-text-secondary);
-  pointer-events: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
