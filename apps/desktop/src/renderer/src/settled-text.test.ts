@@ -81,4 +81,56 @@ describe('what has settled in a streaming reply', () => {
       previous = settled.length
     }
   })
+
+  /*
+   * Colin, 2026-10-02: a long table "takes a long time to adjust to format
+   * because it only formats after the whole block sends". A table, a list and
+   * headings have no blank line inside them, so each settles a line at a time.
+   */
+  describe('a table, a list and headings settle a line at a time', () => {
+    it('settles a table from its rule on, row by finished row', () => {
+      const text = join('Intro.', '', '| File | Why |', '|---|---|', '| a.ts | one |', '| b.ts | tw')
+      const { settled, tail } = splitSettled(text)
+      expect(settled).toBe(join('Intro.', '', '| File | Why |', '|---|---|', '| a.ts | one |'))
+      expect(tail).toBe('| b.ts | tw')
+    })
+
+    it('holds a header row back until the rule under it has arrived', () => {
+      // A header without its rule is still prose: settling it would draw pipes, then a table.
+      expect(splitSettled(join('Intro.', '', '| File | Why |', '|---|')).settled).toBe('Intro.')
+      expect(splitSettled(join('Intro.', '', '| File | Why |', '')).settled).toBe('Intro.')
+    })
+
+    it('settles a reply that opens with a table', () => {
+      expect(splitSettled(join('| A | B |', '| - | - |', '| 1 | 2 |', '')).settled).toBe(join('| A | B |', '| - | - |', '| 1 | 2 |'))
+    })
+
+    it('settles each finished list item and heading, never the line still being written', () => {
+      const text = join('## Findings', '- first, done', '- second, done', '1. third, done', '- fourth is still')
+      const { settled, tail } = splitSettled(text)
+      expect(settled).toBe(join('## Findings', '- first, done', '- second, done', '1. third, done'))
+      expect(tail).toBe('- fourth is still')
+    })
+
+    it('stops at prose: a paragraph line still waits for its blank line', () => {
+      const text = join('- an item', 'A sentence after it', 'that runs on')
+      expect(splitSettled(text).settled).toBe('- an item')
+    })
+
+    it('settles the rows after a closed fence too', () => {
+      const text = join(FENCE, 'x', FENCE, '- after the code', '- still writ')
+      expect(splitSettled(text).settled).toBe(join(FENCE, 'x', FENCE, '- after the code'))
+    })
+
+    it('only moves forward as a table arrives a character at a time', () => {
+      const whole = join('Intro.', '', '| A | B |', '|---|---|', '| 1 | 2 |', '| 3 | 4 |', '', 'After.')
+      let previous = 0
+      for (let at = 1; at <= whole.length; at += 1) {
+        const { settled, tail } = splitSettled(whole.slice(0, at))
+        expect(settled.length, JSON.stringify(whole.slice(0, at))).toBeGreaterThanOrEqual(previous)
+        expect(settled.length === 0 ? tail : join(settled, tail)).toBe(whole.slice(0, at))
+        previous = settled.length
+      }
+    })
+  })
 })

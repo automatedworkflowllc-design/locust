@@ -11,6 +11,28 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.556.0 - 2026-10-02
+
+### Changed
+
+- **Claude's cloud starts without a window, and Locust knows the session.**
+  A task sent to Claude's cloud starts out of sight on Windows, and its row
+  shows the session's title and where it starts from. "See it on claude.ai"
+  opens that session, a follow-up can be sent to it from the row, and "Bring
+  it home" brings that session home by name instead of asking you to pick
+  from a list. Claude Code's window still opens when it needs to ask whether
+  you trust the folder. Claude Code does not let Locust read a cloud
+  session's replies, so the row says to read them on claude.ai or in the
+  Claude app.
+- **Tables, lists and headings format as they arrive.** A long table used
+  to stay as raw pipes until the whole of it had been written; each finished
+  row, item and heading now takes its shape the moment its line is done.
+
+### Fixed
+
+- **Bringing a session home into a folder with changes says so first,**
+  instead of opening a window that only refuses.
+
 ## 0.555.0 - 2026-10-02
 
 ### Changed

@@ -8291,8 +8291,11 @@ export default function App(): ReactElement {
               note: claudeCloudNote,
               onHome: (id) => {
                 void window.desktop?.bringClaudeCloudHome(id).then((answer) => {
+                  const known = claudeCloud.find((one) => one.id === id)?.sessionId !== undefined
                   setClaudeCloudNote(answer.ok
-                    ? 'Claude Code opened in this folder with its list of cloud sessions. Pick this one, and its work comes into this folder.'
+                    ? known
+                      ? 'Claude Code opened in this folder and is bringing this session’s work into it.'
+                      : 'Claude Code opened in this folder with its list of cloud sessions. Pick this one, and its work comes into this folder.'
                     : answer.message)
                 }).catch(() => setClaudeCloudNote('Claude Code could not be opened. Run claude --teleport in a terminal in this folder to bring it home.'))
               },
@@ -8300,7 +8303,11 @@ export default function App(): ReactElement {
                 setClaudeCloud((current) => current.filter((one) => one.id !== id))
                 void window.desktop?.forgetClaudeCloud(id).catch(() => undefined)
               },
-              onOpenWeb: () => void window.desktop?.openLink('https://claude.ai/code').catch(() => undefined)
+              onOpenWeb: (url) => void window.desktop?.openLink(url ?? 'https://claude.ai/code').catch(() => undefined),
+              onSend: async (id, message) => {
+                const answer = await window.desktop?.sendClaudeCloud(id, message).catch(() => undefined)
+                return answer === undefined ? 'Claude Code could not be reached. Nothing was sent.' : answer.ok ? undefined : answer.message
+              }
             }}
           />
         ) : sideChat !== undefined && screen === 'workroom' ? (

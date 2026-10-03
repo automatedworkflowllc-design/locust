@@ -54,7 +54,10 @@ export function CloudTasks({
     readonly note: string | undefined
     readonly onHome: (id: string) => void
     readonly onForget: (id: string) => void
-    readonly onOpenWeb: () => void
+    /** The session's own page when Locust knows it, otherwise the list of sessions. */
+    readonly onOpenWeb: (url?: string) => void
+    /** A follow-up to the session; resolves to what went wrong, or undefined when sent. */
+    readonly onSend: (id: string, message: string) => Promise<string | undefined>
   }
 }): ReactElement {
   // Codex's warnings are about Codex Cloud: not said while Claude's is the one picked, unless Codex tasks are here.
@@ -243,44 +246,120 @@ export function CloudTasks({
   )
 }
 
-/** What was handed to Claude's cloud from this folder (0.538). */
+
+/**
+ * What was handed to Claude's cloud from this folder (0.538).
+ *
+ * 0.556: a session Locust started out of sight carries Claude Code's own id,
+ * so it opens on claude.ai itself, takes a follow-up from here, and comes
+ * home by name. What it SAYS is not readable from here -- Claude Code does
+ * not let this account attach to a cloud session -- so the row says where
+ * to read it rather than pretending to follow it.
+ */
 function ClaudeCloudSessions({
   picked,
   sessions,
   note,
   onHome,
   onForget,
-  onOpenWeb
+  onOpenWeb,
+  onSend
 }: NonNullable<Parameters<typeof CloudTasks>[0]['claude']>): ReactElement {
   return (
     <div className="lc-cloudtasks__claude">
       {(picked || sessions.length === 0) && (
         <p className="lc-cloudtasks__empty">
-          Describe a task and send it. Claude Code opens in a window of its own with the task given, and does the
-          work on Anthropic’s machines, not this computer. The first time in a folder, Claude asks whether you trust
-          it: answer in that window.
+          Describe a task and send it. Claude does the work on Anthropic’s machines, not this computer, and you can
+          follow it on claude.ai or in the Claude app. If Claude Code needs to ask you something first, such as whether
+          you trust this folder, it opens a window for that.
         </p>
       )}
       {note !== undefined && <p className="lc-cloudtasks__note" role="status">{note}</p>}
       {sessions.map((session) => (
-        <section key={session.id} className="lc-cloudtask is-pending" aria-label={session.prompt}>
-          <div className="lc-cloudtask__prompt">{session.prompt}</div>
-          <div className="lc-cloudtask__state">
-            <span>Sent to Claude’s cloud {agoLabel(session.startedAt) ?? 'just now'}. Follow it on claude.ai or in the Claude app.</span>
-          </div>
-          <div className="lc-cloudtask__actions">
-            <button type="button" className="lc-primarybutton" onClick={() => onHome(session.id)} title="Opens Claude Code here with its list of cloud sessions: pick this one and its work comes into this folder">
-              Bring it home
-            </button>
-            <button type="button" className="lc-button" onClick={onOpenWeb} title="Your Claude Code sessions, in your browser">
-              See it on claude.ai
-            </button>
-            <button type="button" className="lc-ghostbutton lc-iconbutton" aria-label={`Remove "${session.prompt}" from this list`} title="Remove from this list (the session itself stays on claude.ai)" onClick={() => onForget(session.id)}>
-              <Icon name="close" size={13} />
-            </button>
-          </div>
-        </section>
+        <ClaudeCloudRow key={session.id} session={session} onHome={onHome} onForget={onForget} onOpenWeb={onOpenWeb} onSend={onSend} />
       ))}
     </div>
+  )
+}
+
+function ClaudeCloudRow({
+  session,
+  onHome,
+  onForget,
+  onOpenWeb,
+  onSend
+}: {
+  readonly session: PublicClaudeCloudSession
+} & Pick<NonNullable<Parameters<typeof CloudTasks>[0]['claude']>, 'onHome' | 'onForget' | 'onOpenWeb' | 'onSend'>): ReactElement {
+  const [draft, setDraft] = useState('')
+  const [sending, setSending] = useState(false)
+  const [said, setSaid] = useState<string>()
+  const known = session.sessionId !== undefined
+  const send = (): void => {
+    const text = draft.trim()
+    if (text.length === 0 || sending) return
+    setSending(true)
+    setSaid(undefined)
+    void onSend(session.id, text).then((problem) => {
+      setSending(false)
+      if (problem === undefined) {
+        setDraft('')
+        setSaid('Sent. Its reply shows on claude.ai and in the Claude app.')
+      } else {
+        setSaid(problem)
+      }
+    })
+  }
+  return (
+    <section className="lc-cloudtask is-pending" aria-label={session.title ?? session.prompt}>
+      {session.title !== undefined && <div className="lc-cloudtask__title">{session.title}</div>}
+      <div className="lc-cloudtask__prompt">{session.prompt}</div>
+      <div className="lc-cloudtask__state">
+        <span>
+          {known
+            ? `In Claude’s cloud since ${agoLabel(session.startedAt) ?? 'just now'}. Its replies are on claude.ai and in the Claude app.`
+            : `Sent to Claude’s cloud ${agoLabel(session.startedAt) ?? 'just now'}. Follow it on claude.ai or in the Claude app.`}
+        </span>
+      </div>
+      {session.note !== undefined && <p className="lc-cloudtask__note">{session.note}</p>}
+      <div className="lc-cloudtask__actions">
+        <button type="button" className="lc-primarybutton" onClick={() => onOpenWeb(session.url)} title={known ? 'This session, on claude.ai' : 'Your Claude Code sessions, in your browser'}>
+          See it on claude.ai
+        </button>
+        <button
+          type="button"
+          className="lc-button"
+          onClick={() => onHome(session.id)}
+          title={known ? 'Claude Code brings this session’s work into this folder' : 'Opens Claude Code here with its list of cloud sessions: pick this one and its work comes into this folder'}
+        >
+          Bring it home
+        </button>
+        <button type="button" className="lc-ghostbutton lc-iconbutton" aria-label={`Remove "${session.prompt}" from this list`} title="Remove from this list (the session itself stays on claude.ai)" onClick={() => onForget(session.id)}>
+          <Icon name="close" size={13} />
+        </button>
+      </div>
+      {known && (
+        <form
+          className="lc-cloudtask__more"
+          onSubmit={(event) => {
+            event.preventDefault()
+            send()
+          }}
+        >
+          <input
+            className="lc-input"
+            value={draft}
+            placeholder="Tell it more…"
+            aria-label={`Tell "${session.title ?? session.prompt}" more`}
+            disabled={sending}
+            onChange={(event) => setDraft(event.target.value)}
+          />
+          <button type="submit" className="lc-button" disabled={sending || draft.trim().length === 0}>
+            {sending ? 'Sending…' : 'Send'}
+          </button>
+        </form>
+      )}
+      {said !== undefined && <p className="lc-cloudtask__note" role="status">{said}</p>}
+    </section>
   )
 }

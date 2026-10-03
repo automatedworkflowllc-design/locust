@@ -18175,3 +18175,27 @@ textarea {
   color: var(--lc-text-muted);
   white-space: nowrap;
 }
+
+/* Claude's cloud (0.556): its title, what Claude Code said about it, and a follow-up. */
+.lc-cloudtask__title {
+  color: var(--lc-text-primary);
+  font-weight: 600;
+}
+.lc-cloudtask__title + .lc-cloudtask__prompt {
+  color: var(--lc-text-secondary);
+  font-size: var(--lc-text-description);
+}
+.lc-cloudtask__note {
+  margin: 0;
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
+  text-wrap: pretty;
+}
+.lc-cloudtask__more {
+  display: flex;
+  gap: var(--lc-space-3);
+}
+.lc-cloudtask__more .lc-input {
+  flex: 1;
+  min-width: 0;
+}

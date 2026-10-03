@@ -30,6 +30,49 @@ export interface SettledSplit {
 
 const FENCE = /^[ \t]*`{3,}/
 
+// The parser's own line shapes (agentText.ts), for the blocks that settle a line at a time.
+const BULLET = /^[ \t]*[-*+][ \t]+\S/
+const NUMBERED = /^[ \t]*\d+[.)][ \t]+\S/
+const HEADING = /^[ \t]{0,3}#{1,6}[ \t]+\S/
+const RULE = /^[ \t]{0,3}(-{3,}|\*{3,}|_{3,})[ \t]*$/
+const QUOTE = /^[ \t]{0,3}>/
+const TABLE_ROW = /^[ \t]{0,3}\|?[^\n]*\|[^\n]*$/
+const TABLE_RULE = /^[ \t]{0,3}\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/
+
+/**
+ * Where the blocks that settle a LINE at a time end, from `start`.
+ *
+ * Colin, 2026-10-02: a long table "takes a long time to adjust to format
+ * because it only formats after the whole block sends" -- a table, a list
+ * and a run of headings have no blank line inside them, so the paragraph
+ * rule kept a whole report as raw pipes until it ended. Their finished lines
+ * never change shape when another line arrives: a row joins the table under
+ * it, an item joins the list. So each settles when its line is complete. A
+ * table settles from its rule on, never its header alone, because a header
+ * row without the rule beneath it is still prose. Only complete lines count
+ * (the last element of `lines` is the one still being written), and the end
+ * only moves forward as lines arrive. Returns -1 when nothing settles here.
+ */
+function lineBlocksEnd(lines: readonly string[], start: number): number {
+  const complete = lines.length - 1
+  let at = Math.max(0, start)
+  let end = -1
+  while (at < complete) {
+    const line = lines[at]!
+    if (BULLET.test(line) || NUMBERED.test(line) || HEADING.test(line) || RULE.test(line) || QUOTE.test(line)) {
+      at += 1
+    } else if (TABLE_ROW.test(line) && !TABLE_RULE.test(line)) {
+      if (at + 1 >= complete || !TABLE_RULE.test(lines[at + 1]!)) break
+      at += 2
+      while (at < complete && TABLE_ROW.test(lines[at]!) && !TABLE_RULE.test(lines[at]!)) at += 1
+    } else {
+      break
+    }
+    end = at
+  }
+  return end
+}
+
 export function splitSettled(text: string): SettledSplit {
   const normalised = text.replace(/\r\n/g, '\n')
   const lines = normalised.split('\n')
@@ -51,11 +94,12 @@ export function splitSettled(text: string): SettledSplit {
       }
       continue
     }
-    if (!inFence && line.trim().length === 0) lastBoundary = index
+    // Only a finished line is a boundary: the last one is still being written.
+    if (!inFence && line.trim().length === 0 && index < lines.length - 1) lastBoundary = index
   }
   // An open fence is never split. Everything from its opener onward is tail,
   // however many blank lines it holds.
-  const cut = inFence ? fenceOpenedAt : lastBoundary
+  const cut = inFence ? fenceOpenedAt : Math.max(lastBoundary, lineBlocksEnd(lines, lastBoundary < 0 ? 0 : (lines[lastBoundary] ?? "").trim().length === 0 ? lastBoundary + 1 : lastBoundary))
   if (cut <= 0) return { settled: '', tail: normalised }
   return {
     settled: lines.slice(0, cut).join('\n'),

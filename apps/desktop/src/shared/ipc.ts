@@ -682,6 +682,7 @@ export const CLAUDE_CLOUD_START_CHANNEL = 'claude-cloud:start'
 export const CLAUDE_CLOUD_LIST_CHANNEL = 'claude-cloud:list'
 export const CLAUDE_CLOUD_HOME_CHANNEL = 'claude-cloud:home'
 export const CLAUDE_CLOUD_FORGET_CHANNEL = 'claude-cloud:forget'
+export const CLAUDE_CLOUD_SEND_CHANNEL = 'claude-cloud:send'
 export interface ClaudeCloudSession {
   readonly id: string
   readonly startedAt: string
@@ -689,6 +690,14 @@ export interface ClaudeCloudSession {
   readonly prompt: string
   readonly folder: string
   readonly teammateId?: string
+  /** Claude Code's own id for it, when Locust started it out of sight (0.556). */
+  readonly sessionId?: string
+  /** The session on claude.ai. */
+  readonly url?: string
+  /** The title Claude Code gave it. */
+  readonly title?: string
+  /** What Claude Code said about where it starts from, or what it waits for. */
+  readonly note?: string
 }
 export type PublicClaudeCloudSession = Omit<ClaudeCloudSession, 'folder'>
 export type ClaudeCloudStartResponse =
@@ -3110,6 +3119,8 @@ export interface DesktopApi {
   listClaudeCloud(): Promise<readonly PublicClaudeCloudSession[]>
   bringClaudeCloudHome(id: string): Promise<ClaudeCloudHomeResponse>
   forgetClaudeCloud(id: string): Promise<void>
+  /** A follow-up to a cloud session Locust knows the id of (0.556). */
+  sendClaudeCloud(id: string, message: string): Promise<ClaudeCloudHomeResponse>
   /** Undo the later turns' file changes before an edited message goes (0.502). */
   putBackFiles(request: RewindPutBackRequest): Promise<RewindPutBackResponse>
   /**
