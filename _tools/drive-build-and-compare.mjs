@@ -82,7 +82,11 @@ try {
       setInput.call(box, 'free')
       box.dispatchEvent(new Event('input', { bubbles: true }))
       await new Promise((r) => setTimeout(r, 700))
-      const row = [...document.querySelectorAll('.lc-picker__row:not(.is-recent)')].find((one) => !one.disabled && one.querySelector('.lc-picker__label')?.textContent.trim() === wants[index])
+      // By its id or by the name the row shows ("Nemotron 3 Ultra Free").
+      const row = [...document.querySelectorAll('.lc-picker__row:not(.is-recent)')].find((one) => {
+        const label = one.querySelector('.lc-picker__label')?.textContent.trim() ?? ''
+        return !one.disabled && (label === wants[index] || label.toLowerCase().replace(/\\s+/g, '-') === wants[index])
+      })
       row?.click()
       await new Promise((r) => setTimeout(r, 400))
       labels.push(document.querySelectorAll('.lc-control--slot .lc-control__model')[index]?.textContent.trim() ?? '')
@@ -153,6 +157,21 @@ try {
   check('Keep brings the kept page into the folder, and says so', page.length > 200 && /Its changes came into your folder: index\.html\./.test(kept.compared) && readFileSync(join(workspace, 'notes.md'), 'utf8') === 'My folder.\n', JSON.stringify({ compared: kept.compared, problem: kept.problem, bytes: page.length }))
   check('the kept page still runs in the conversation', kept.gone && kept.frames.length >= 1 && kept.waits.length === 0, JSON.stringify(kept))
   check('both copies are removed', copiesNow().filter((name) => !before.has(name)).length === 0, JSON.stringify(copiesNow().filter((name) => !before.has(name))))
+  // The blind arena run (0.571): reopened after Keep, a column NOT kept drew the kept model's page under its own name.
+  const reopened = JSON.parse(String(await drive.capture('The comparison reopened after Keep', () => drive.evaluate(`(async () => {
+    document.querySelector('.lc-compared__open')?.click()
+    for (let i = 0; i < 20 && !document.querySelector('.lc-compare'); i += 1) await new Promise((r) => setTimeout(r, 250))
+    await new Promise((r) => setTimeout(r, 2500))
+    const grid = document.querySelector('.lc-compare')
+    return JSON.stringify({
+      open: grid !== null,
+      frames: grid === null ? 0 : grid.querySelectorAll('iframe.lc-docpreview__frame').length,
+      srcs: grid === null ? [] : [...grid.querySelectorAll('iframe.lc-docpreview__frame')].map((frame) => frame.getAttribute('src')),
+      pages: grid === null ? [] : [...grid.querySelectorAll('.lc-compare__page')].map((el) => el.innerText.replace(/\\s+/g, ' ').slice(0, 200)),
+      text: grid?.innerText.replace(/\\s+/g, ' ') ?? ''
+    })
+  })()`))))
+  check('reopened, only the kept column runs a page; the other says its copy is gone', reopened.open && reopened.frames === 1 && /Its copy was removed when you kept /.test(reopened.text), JSON.stringify({ open: reopened.open, frames: reopened.frames, srcs: reopened.srcs, pages: reopened.pages, said: /Its copy was removed when you kept /.test(reopened.text) }))
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

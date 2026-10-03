@@ -256,7 +256,15 @@ export function CompareView({
                 {columns.map((column) => {
                   const cell = column.turns[turn]
                   if (railed(column.slot)) return <div key={`cell:${column.slot}:${String(turn)}`} className="lc-compare__cell is-rail" />
-                  const page = cell === undefined || cell.running ? undefined : builtPageOf(cell.items, workspacePath)
+                  const built = cell === undefined || cell.running ? undefined : builtPageOf(cell.items, workspacePath)
+                  /*
+                   * A COLUMN NOT KEPT HAS NO PAGE LEFT (0.571). Keep removes the
+                   * other copies, and their page's name then reads from the
+                   * folder -- which holds the KEPT page: the blind arena run
+                   * showed Sonnet's title screen in Opus's column, under Opus's name.
+                   */
+                  const copyGone = built !== undefined && compare.changes === true && compare.changesIn !== 'folder' && compare.kept !== undefined && compare.kept.slot !== column.slot
+                  const page = copyGone ? undefined : built
                   return (
                     <div key={`cell:${column.slot}:${String(turn)}`} className="lc-compare__cell" aria-label={`${column.name}'s answer`}>
                       {cell === undefined ? (
@@ -265,6 +273,9 @@ export function CompareView({
                         <p className="lc-compare__quiet">{cell.running ? 'Starting…' : 'No answer was recorded.'}</p>
                       ) : (
                         <>
+                          {copyGone && (
+                            <p className="lc-compare__quiet">{`Its copy was removed when you kept ${columns.find((other) => other.slot === compare.kept?.slot)?.name ?? 'another model'}, so the page it made is no longer on this computer. What it said about it is below.`}</p>
+                          )}
                           {page !== undefined && (
                             <div className="lc-compare__page" aria-label={`The page ${column.name} made, running`}>
                               <PagePreview path={page} name={page.replace(/\\/g, '/').split('/').pop() ?? page} column={{ compareId: compare.compareId, slot: column.slot }} />
