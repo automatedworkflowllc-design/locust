@@ -3227,6 +3227,34 @@ export default function App(): ReactElement {
   }, [shownKey, pickedTeammate?.teammateId])
   // A comparison follows the teammate it was started with (0.441).
   const comparing = compares.find((compare) => compare.compareId === comparingId && compare.teammateId === pickedTeammate?.teammateId)
+  /*
+   * EVERY COLUMN OF A COMPARISON IS READ WHEN IT IS SHOWN (0.569).
+   *
+   * History sends the newest twenty turns whole and the rest as rows (H3),
+   * and opening a comparison read only the conversation it opened through --
+   * the first column. Colin, 2026-10-03, on the day-old arcade-game compare:
+   * "disappeared from all models except claude". Cursor's column (the one
+   * opened) answered; Codex's and Claude Code's read "No answer was
+   * recorded", their ledgers whole on disk. Each column's turns and the
+   * judge's are read here, once each.
+   */
+  const comparedReads = useRef(new Set<string>())
+  useEffect(() => {
+    const bridge = window.desktop
+    if (comparing === undefined || bridge?.readMission === undefined) return
+    const ids = [...comparing.slots.flatMap((slot) => slot.missionIds), ...(comparing.judge?.missionIds ?? [])]
+    const missing = missingTranscripts(ids, historyByIdRef.current).filter((id) => !comparedReads.current.has(id))
+    if (missing.length === 0) return
+    for (const id of missing) comparedReads.current.add(id)
+    void Promise.all(missing.map((id) => bridge.readMission(id).catch(() => undefined))).then((answers) => {
+      const read = new Map(
+        answers.flatMap((answer) => (answer !== undefined && answer.ok ? [[answer.data.mission.missionId, answer.data.mission] as const] : []))
+      )
+      // A read that did not answer may be tried again the next time the comparison is shown.
+      for (const id of missing) if (!read.has(id)) comparedReads.current.delete(id)
+      if (read.size > 0) setHistory((current) => current.map((entry) => read.get(entry.missionId) ?? entry))
+    })
+  }, [comparing, history])
   const compareMembers = useMemo(() => compareMembership(compares).byMission, [compares])
   /*
    * What each column of a comparison that edits has changed (0.445), read
@@ -7029,6 +7057,8 @@ export default function App(): ReactElement {
           onHome={() => {
             setSelectedTeammateId(undefined)
             setShownKey(undefined)
+            // A comparison too (0.569): one started with no teammate stayed on screen, so Home did nothing from it (Colin).
+            setComparingId(undefined)
             setRoomNotice(undefined)
             setScreen('workroom')
           }}
