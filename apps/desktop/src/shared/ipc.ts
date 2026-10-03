@@ -1,4 +1,5 @@
 import type { ReverseChange } from './reverse-diff.js'
+import type { RemoteControlState } from './claude-remote-control.js'
 import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
 import type { AvatarSpec, PetSource } from './avatar.js'
@@ -3290,6 +3291,8 @@ export interface DesktopApi {
   /** Claude's cloud (0.538): a window of Claude Code with the task given; the list; `--teleport` to bring one home. */
   /** `choice`: the box's Claude model and effort, which the session runs on (0.557). */
   startClaudeCloud(prompt: string, teammateId?: string, choice?: { readonly model?: string; readonly effort?: string; readonly environment?: string }): Promise<ClaudeCloudStartResponse>
+  getRemoteControl(): Promise<RemoteControlState>
+  setRemoteControl(enabled: boolean): Promise<RemoteControlState>
   getClaudeCloudEnvironment(): Promise<string | undefined>
   listClaudeCloud(): Promise<readonly PublicClaudeCloudSession[]>
   bringClaudeCloudHome(id: string): Promise<ClaudeCloudHomeResponse>

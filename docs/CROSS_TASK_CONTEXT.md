@@ -208,6 +208,17 @@ Use this template:
 - Known issues: hardening backlog (write-side event validation parity, batched fsync, >500-ledger scan ordering, byte-capped history IPC, head-of-run preservation past 500 live events); live smoke pending quota.
 - Recommended next step: live UI smoke, then the reconciled checkpoint record, then the Claude adapter per ROADMAP M2.
 
+### 2026-10-03 — W11 Remote Control Settings switch (Casper)
+
+- Scope: `exec/w11-casper`, fresh worktree `C:\Users\<home>\Documents\Codex\locust-exec-w11-casper`, based on `origin/main` at `edb05f22141f253d461cf4e73681b1fd28af8d7d`. No version or CHANGELOG change, packaging, push or publication.
+- Built: an off-by-default Settings > AI agents switch; host-owned `claude remote-control --spawn worktree --name Locust` in the current project folder; boolean-only validated IPC; first stdout/stderr shown verbatim, separately capped at 64 Ki characters with a visible truncation notice. No persistence, automatic retry or stdin answers.
+- Lifecycle: off/quit kill only the owned process tree and await close. Dispose latches against later starts; a pending discovery is invalidated by off or quit. A termination deadline reports failure rather than claiming the process ended.
+- Trust/setup: trust prompts, `Workspace not trusted`, and the one-time enable prompt stop the server before opening normal interactive Claude Code for the person. It is a setup terminal, not a second unmanaged server. The person completes setup and explicitly enables the switch again. Windows/macOS terminal launch is unit-tested with mocks; other platforms receive manual guidance. Settings uses the existing switch/card styles; its search includes Remote Control, phone and claude.ai.
+- Observed: 40/40 new unit tests in four files passed with fake processes/terminal launchers. Four deliberate regressions to arguments, off cleanup, quit cleanup and whitespace preservation each failed the named assertion, then were restored. Full `_tools/gate.sh` via Git Bash passed, exit 0: 761 adapter, 150 mission-store, 7,678 desktop tests plus its required TypeScript checks. `git diff --check` passed.
+- Earlier checks: Windows' default `bash` selected an unavailable WSL distribution; Git Bash ran the gate. The first executable gate caught two new source-check failures (class names and the trust regex's slash spelling), both fixed without weakening tests. The second timed out an existing conversation-name cap test; that case then passed in a 59/59 smaller run and the final gate passed using `LOCUST_GATE_TMP=C:/Users/<home>/Documents/Codex/.tmp/w11-casper-gate`.
+- Deduced: the main process's existing bounded quit path now awaits Remote Control disposal. Unit tests exercise disposal with a fake child; no actual app quit or OS process tree termination was observed for this feature.
+- Not run: real `claude remote-control`, account/sign-in checks, trust or enable answers, live UI, packaged UI, or a remote phone session. Colin owns the account-dependent live check. Review/merge this executor branch before any release; W11 is built, not live.
+
 ## Prompt for a new Codex task
 
 Use this when starting a related chat:

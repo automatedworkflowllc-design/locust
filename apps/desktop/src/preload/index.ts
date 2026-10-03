@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import { REMOTE_CONTROL_GET_CHANNEL, REMOTE_CONTROL_SET_CHANNEL, type RemoteControlState } from '../shared/claude-remote-control.js'
 import type { CompareSlotId } from '../shared/compare.js'
 import {
   CODEX_MISSION_CANCEL_CHANNEL,
@@ -479,6 +480,8 @@ const desktopApi: DesktopApi = {
   cloudTaskDiff: (taskId: string) => ipcRenderer.invoke(CLOUD_DIFF_CHANNEL, taskId) as Promise<string | undefined>,
   applyCloudTask: (taskId: string) => ipcRenderer.invoke(CLOUD_APPLY_CHANNEL, taskId) as Promise<CloudApplyResponse>,
   cloudFolders: () => ipcRenderer.invoke(CLOUD_FOLDERS_CHANNEL) as Promise<readonly PublicCloudFolder[]>,
+  getRemoteControl: () => ipcRenderer.invoke(REMOTE_CONTROL_GET_CHANNEL) as Promise<RemoteControlState>,
+  setRemoteControl: (enabled: boolean) => ipcRenderer.invoke(REMOTE_CONTROL_SET_CHANNEL, enabled) as Promise<RemoteControlState>,
   startClaudeCloud: (prompt: string, teammateId?: string, choice?: { readonly model?: string; readonly effort?: string; readonly environment?: string }) => ipcRenderer.invoke(CLAUDE_CLOUD_START_CHANNEL, prompt, teammateId, choice) as Promise<ClaudeCloudStartResponse>,
   getClaudeCloudEnvironment: () => ipcRenderer.invoke(CLAUDE_CLOUD_ENVIRONMENT_CHANNEL) as Promise<string | undefined>,
   listClaudeCloud: () => ipcRenderer.invoke(CLAUDE_CLOUD_LIST_CHANNEL) as Promise<readonly PublicClaudeCloudSession[]>,

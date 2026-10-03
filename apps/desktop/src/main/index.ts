@@ -18,6 +18,8 @@ import { reverseChanges } from '../shared/reverse-diff.js'
 import { createCloudTaskService, launchRunner } from './cloud-task-service.js'
 import { environmentOf, githubRepoOf } from './cloud-tasks.js'
 import { createClaudeCloud } from './claude-cloud.js'
+import { createRemoteControl } from './claude-remote-control.js'
+import { registerRemoteControlIpc } from './remote-control-ipc.js'
 import { runInPseudoTerminal } from './pseudo-terminal.js'
 import type { Runner } from './cloud-tasks.js'
 import type { ReverseChange } from '../shared/reverse-diff.js'
@@ -842,6 +844,7 @@ const runtimeDiscovery = createRuntimeDiscoveryService({
 })
 const ownsSingleInstanceLock = app.requestSingleInstanceLock()
 let missionServiceForShutdown: CodexMissionService | undefined
+let remoteControlForShutdown: ReturnType<typeof createRemoteControl> | undefined
 /** Antigravity's watches too: never disposed, they polled and wrote on through the flush (B4 lead). */
 let antigravityServiceForShutdown: { dispose(): Promise<void> } | undefined
 let ledgerForShutdown: MissionLedger | undefined
@@ -3726,6 +3729,9 @@ if (!ownsSingleInstanceLock) {
     })
     // Claude's cloud (0.538): Claude Code in a window of its own, with the task given.
     const claudeCloud = createClaudeCloud({ discover: discoverForWork, storePath: join(app.getPath('userData'), 'claude-cloud.json'), terminal: runInPseudoTerminal })
+    const remoteControl = createRemoteControl({ discover: discoverForWork, folder: () => workspacePath })
+    remoteControlForShutdown = remoteControl
+    registerRemoteControlIpc(ipcMain, remoteControl, fromOwnWindow, () => freeRoutesOnly(process.argv, process.env) ? FREE_ONLY_REFUSAL : undefined)
     const publicSession = <T extends { folder: string }>(session: T): Omit<T, 'folder'> => {
       const { folder: _folder, ...rest } = session
       return rest
@@ -6873,6 +6879,7 @@ if (ownsSingleInstanceLock) {
     boundedShutdown({
       deadlineMs: SHUTDOWN_DEADLINE_MS,
       work: async () => {
+        await remoteControlForShutdown?.dispose()
         await missionServiceForShutdown?.dispose()
         await antigravityServiceForShutdown?.dispose()
         await ledgerForShutdown?.flush()

@@ -169,7 +169,7 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
       // "node" and "npm" are what a person types after the first screen has
       // just talked to them about Node. This is the page about the CLIs that
       // are installed with them.
-      'AI agents & accounts': ['runtime', 'runtimes', 'node', 'node.js', 'npm', 'install', 'cli', 'model', 'models', 'sign in', 'account', 'api key'],
+      'AI agents & accounts': ['runtime', 'runtimes', 'node', 'node.js', 'npm', 'install', 'cli', 'model', 'models', 'sign in', 'account', 'api key', 'remote control', 'phone', 'claude.ai'],
       'When a model hits its limit': ['route', 'limit', 'quota', 'rate limit', 'usage', 'fallback']
     }
   },

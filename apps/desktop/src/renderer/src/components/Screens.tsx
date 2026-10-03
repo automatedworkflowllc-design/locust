@@ -3,6 +3,7 @@ import { BOT_SIZE } from '../botSizes.js'
 import { boardSectionOf, teamBoard } from '../teamBoard.js'
 import { durationText, runSpanMs, usagePercent, usageWindowSentence } from '../missionView.js'
 import { WhatsNew } from './WhatsNew.js'
+import { RemoteControlSetting } from './RemoteControlSetting.js'
 import { SETTINGS_PAGES, matchedHeadings, pageMatches } from '../settingsPages.js'
 import { agentCapabilityHeading, agentCapabilityLines } from '../agentCapabilities.js'
 import { ConnectorHealth } from './ConnectorHealth.js'
@@ -1889,6 +1890,7 @@ export function SettingsScreen({
         {shownPage === 'runtimes' && (
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">AI agents &amp; accounts</h2>
+          <RemoteControlSetting />
           <p className="lc-settings__lede">
             Each AI agent uses the account already signed in on this machine. Locust adds nothing of its own.
           </p>
