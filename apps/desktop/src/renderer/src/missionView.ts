@@ -1865,6 +1865,8 @@ function toolLooksAt(tool: string | undefined): Looked | undefined {
   if (/todo|update_?plan|task_?boundary/.test(name)) return 'plan'
   // Antigravity CLI's check on a command it sent to the background (measured 0.542: Action "status").
   if (name === 'manage_task') return 'wait'
+  // Its timer that checks back on a background command (0.570: "used schedule" on Colin's run).
+  if (name === 'schedule') return 'wait'
   // Code run in a runtime's own interpreter tool: Codex's `node_repl` (0.493).
   if (/repl/.test(name)) return 'code'
   // Cursor's wait on a command it sent away.
@@ -3445,6 +3447,32 @@ export function buildThread(
   const shownText = (text: string): string =>
     unwrapProtocolTags(stripFileBlocks(stripMemoryBlocks(stripTaskBlocks(stripDecisionBlocks(stripShareBlocks(text))))))
   const messages = assistantMessages(events)
+  /*
+   * A MESSAGE SOMETHING CAME AFTER IS NOT STILL BEING WRITTEN (0.570).
+   *
+   * Colin, 2026-10-03, on an Antigravity (Claude Sonnet 5.5) run: "antigravity
+   * has the _ typing animation after finished messages". Its ledger: each
+   * message arrives as one delta that is never marked final, so the caret
+   * stayed on "The matrix run is in progress..." through the steps after it.
+   * The provider's `final` is one signal; this is the other, and it holds for
+   * every runtime: a call started, or another message began, after this one.
+   * A message whose own text comes again afterwards is live again.
+   */
+  const moved = new Set<string>()
+  {
+    let open: string | undefined
+    for (const event of events) {
+      if (event.type === 'message.delta') {
+        const id = event.payload.itemId
+        if (open !== undefined && open !== id) moved.add(open)
+        moved.delete(id)
+        open = id
+      } else if (event.type === 'tool.started' && open !== undefined) {
+        moved.add(open)
+        open = undefined
+      }
+    }
+  }
 
   /*
    * A TURN IS DRAWN IN THE ORDER IT HAPPENED (0.491): what the teammate said,
@@ -3551,9 +3579,10 @@ export function buildThread(
         key: `msg_${message.itemId}`,
         type: 'agent-message',
         text,
-        // A caret only where text is genuinely still arriving: the run is live
-        // AND the provider has not marked this message final.
-        streaming: options.running && !message.final
+        // A caret only where text is genuinely still arriving: the run is live,
+        // the provider has not marked this message final, and nothing has come
+        // after it (Antigravity never marks one final; see `moved`).
+        streaming: options.running && !message.final && !moved.has(message.itemId)
       })
     }
     if (handedNow) items.push({ key: `files_${message.itemId}`, type: 'files', files: handed })

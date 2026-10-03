@@ -8264,7 +8264,8 @@ export default function App(): ReactElement {
             onHandOff={handOffMission}
             handingOff={handingOff}
             teammateName={pickedTeammate?.name}
-            busyWith={busyRun === undefined ? undefined : (pickedTeammate?.name ?? 'This teammate')}
+            // Nobody's conversation names the agent it runs on: "it goes to This teammate" read wrong (Colin, 0.570).
+            busyWith={busyRun === undefined ? undefined : (pickedTeammate?.name ?? (busyRun.runtime === undefined ? 'this teammate' : runtimeNameOf(busyRun.runtime)))}
             // What is waiting, as the person will see it go: folded, so the
             // strip shows the one instruction that will actually be sent
             // rather than the pieces it was typed in.
