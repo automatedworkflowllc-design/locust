@@ -21,9 +21,7 @@ export const READ_FIELDS = [
   ['TurnError', '', ['message', 'codexErrorInfo']],
   ['WarningNotification', '', ['message']],
   ['GuardianWarningNotification', '', ['message']],
-  // Deliberately not changed to "summary": the parser still reads message.
-  // Codex 0.160.0 exposes this real drift when the live check is enabled.
-  ['ConfigWarningNotification', '', ['message']],
+  ['ConfigWarningNotification', '', ['summary', 'details']],
   ['ThreadItem', 'agentMessage', ['type', 'id', 'text']],
   ['ThreadItem', 'reasoning', ['type', 'id', 'summary']],
   ['ThreadItem', 'commandExecution', ['type', 'id', 'command', 'status', 'exitCode', 'aggregatedOutput']],

@@ -235,6 +235,22 @@ Use this template:
 - Deduced, not observed live: a configWarning carrying only summary would be silently dropped by that existing branch. Production repair is a follow-up: support the current warning field and deliberately update the schema inventory; the enabled installed-CLI test should then pass. Replay/schema validation does not independently prove the backend's internal model choice, every protocol event family, or schema-less legacy aliases.
 - Not recorded/run: an exhausted provider limit (no account-exhaustion attempt), live configWarning, other Codex versions, packaged UI, or a release. Review the executor commit before any merge/release; the default gate is green and the opt-in maintainer diagnostic currently reports the existing warning-field drift.
 
+### 2026-10-03 — Codex app-server config warning fields (Gemini Flash)
+
+- Scope/owner: `exec/codex-warning`, in `C:\Users\<home>\Documents\Codex\locust-codex-warning`.
+- Files changed: `packages/runtime-adapters/src/app-server-events.ts`, `packages/runtime-adapters/test/codex-schema-read-fields.ts`, `packages/runtime-adapters/test/a-config-warning-says-its-summary.test.ts`, `docs/CROSS_TASK_CONTEXT.md`.
+- Outcome: Fixed schema drift in `app-server-events.ts` where `configWarning` notifications dropped when `message` was missing. The normalizer now reads `params.summary` with optional `params.details` line appended, while maintaining fallback to `params.message` for `configWarning` and retaining `params.message` for `warning` and `guardianWarning`. Updated `codex-schema-read-fields.ts` to track canonical `['summary', 'details']` on `ConfigWarningNotification`.
+- Validation:
+  - Observed control: `test/a-config-warning-says-its-summary.test.ts` failed 2 assertions (`expected [] to have a length of 1 but got +0`) on the un-fixed code, then passed 6/6 after fix.
+  - Observed opt-in schema test: `LOCUST_CODEX_SCHEMA=1 npx vitest run test/a-codex-schema-change-cannot-silently-drop-a-read-field.test.ts` passed 5/5 against installed Codex CLI 0.160.0.
+  - Observed adapter suite: `npx vitest run && npx tsc -p .` passed with 780 tests passed (1 skipped).
+  - Observed gate: `bash _tools/gate.sh` passed exit 0: 780 adapter tests, 150 mission-store tests, 8,046 desktop tests passed (8,976 total); all TypeScript checks passed; `git diff --check` clean.
+- Deduced: When Codex app-server emits `configWarning` with `summary` and optional `details`, it produces a normalized `adapter.diagnostic` warning event with code `app.warning` instead of silently dropping the event.
+- Not run: Live session with a real broken config trigger causing Codex app-server to push live `configWarning` over JSON-RPC; no model calls.
+- Decisions made: `ConfigWarningNotification` in `codex-schema-read-fields.ts` tracks `['summary', 'details']` to ensure any future removal of either field from generated schema is caught.
+- Known issues: None.
+- Recommended next step: Review and merge `exec/codex-warning` into main.
+
 ## Prompt for a new Codex task
 
 Use this when starting a related chat:

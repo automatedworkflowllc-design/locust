@@ -699,8 +699,12 @@ export function createAppServerEventNormalizer(
         case "warning":
         case "guardianWarning":
         case "configWarning": {
-          const message = stringValue(params.message);
-          if (message === undefined) return [];
+          const rawMessage = notification.method === "configWarning"
+            ? (stringValue(params.summary) ?? stringValue(params.message))
+            : stringValue(params.message);
+          if (rawMessage === undefined) return [];
+          const details = notification.method === "configWarning" ? stringValue(params.details) : undefined;
+          const message = details !== undefined ? `${rawMessage}\n${details}` : rawMessage;
           return [
             emit("adapter.diagnostic", {
               level: "warning",
