@@ -446,6 +446,40 @@ export interface FacePose {
   readonly pitch: number
   readonly lookX: number
   readonly lookY: number
+  /** The body's rise this frame, in the outline's units, up negative: the rig's own `y`. */
+  readonly y?: number
+}
+
+/**
+ * A SCREEN'S EYES HAVE WEIGHT (0.574). Colin, 2026-10-03: "you seem more than
+ * capable of showing emotion with motion and the eyes, it just still kind of
+ * looks janky and needs work with the physics". Set into the screen, the eyes
+ * moved as one piece with the body, a sticker on it: a hop lifted and dropped
+ * them without a trace. Now they trail it, as a thing with weight does: when
+ * the body speeds up or slows down (a hop's take-off and landing, a turn) the
+ * eyes are left behind by a unit or two and spring back, with one soft
+ * overshoot. The spring is under critical damping (2 x sqrt(LAG_SPRING) is
+ * 32), so it settles inside half a second; the lag is held to LAG_MOST, and
+ * the eyes' own room on the screen (screenEyeLayout) still bounds them.
+ */
+export interface Lag {
+  readonly x: number
+  readonly y: number
+  readonly vx: number
+  readonly vy: number
+}
+export const LAG_REST: Lag = { x: 0, y: 0, vx: 0, vy: 0 }
+const LAG_SPRING = 260
+const LAG_DAMPING = 22
+const LAG_GAIN = 0.35
+const LAG_MOST = 3
+
+/** One step of the eyes' spring: `kickX`, `kickY` are the change in the body's speed this step (face units a second). */
+export function stepLag(lag: Lag, dt: number, kickX: number, kickY: number): Lag {
+  const vx = lag.vx + (-LAG_SPRING * lag.x - LAG_DAMPING * lag.vx) * dt - kickX * LAG_GAIN
+  const vy = lag.vy + (-LAG_SPRING * lag.y - LAG_DAMPING * lag.vy) * dt - kickY * LAG_GAIN
+  const held = (value: number): number => Math.max(-LAG_MOST, Math.min(LAG_MOST, value))
+  return { x: held(lag.x + vx * dt), y: held(lag.y + vy * dt), vx, vy }
 }
 
 /** A colour as red, green, blue: `#rgb`, `#rrggbb`, or `rgb()` as the library's shade gives it. */
@@ -544,6 +578,9 @@ export function withGlyphEyes(
   // The body's front this frame (frontPlane): the screen and its eyes are drawn flat in it.
   let plane = frontPlane(0, 0, faceAt)
   let look = { x: 0, y: 0 }
+  // The eyes' lag behind the body (stepLag), and the body's last place and speed it is measured from.
+  let lag = LAG_REST
+  let body: { readonly at: number; readonly x: number; readonly y: number; readonly vx: number; readonly vy: number } | undefined
   let seconds = 0
   /*
    * EYES BLINK WHEN THEY CHANGE (0.562). A teammate that starts work, finishes
@@ -746,7 +783,22 @@ export function withGlyphEyes(
       }
       // The screen turns with the body's front, all the way (frontPlane).
       plane = frontPlane(pose.yaw, pose.pitch, faceAt)
-      look = { x: pose.lookX, y: pose.lookY }
+      // How the body's front moved since the last frame: across with its turn, up and down with its hop.
+      const across = Math.sin(pose.yaw) * FRONT_DEPTH
+      const rise = pose.y ?? 0
+      const dt = body === undefined ? 0 : s - body.at
+      if (s === 0 || body === undefined || dt <= 0 || dt > 0.1) {
+        // Still, first drawn, or back from a hidden tab: the eyes sit where they are put.
+        lag = LAG_REST
+        body = { at: s, x: across, y: rise, vx: 0, vy: 0 }
+      } else {
+        const vx = (across - body.x) / dt
+        const vy = (rise - body.y) / dt
+        lag = stepLag(lag, dt, vx - body.vx, vy - body.vy)
+        body = { at: s, x: across, y: rise, vx, vy }
+      }
+      // A glance and the lag together; the layout keeps both inside the screen.
+      look = { x: pose.lookX + lag.x / 0.9, y: pose.lookY + lag.y / 0.5 }
       leftHidden = pose.yaw < LEFT_EYE_HIDDEN_AT
       face = undefined
     },
