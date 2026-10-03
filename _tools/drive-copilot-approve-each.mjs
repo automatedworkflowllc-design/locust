@@ -188,7 +188,9 @@ try {
   // The LAST turn's folds: the first one's is the approved command. Since the
   // files-changed note became an activity row of its own, the call's fold is
   // not always the very last one (0.566), so the last turn's rows are read together.
-  const fold = String(await drive.evaluate(`(() => ([...document.querySelectorAll('.lc-activity')].slice(-3).map((row) => row.innerText).join(' | ')).replace(/[ ]+/g, ' '))()`))
+  // A turn of steps draws its fold as a steps line ("1 step · 1 declined"), not
+  // an activity card -- the packaged 0.566 run read only the first turn's card.
+  const fold = String(await drive.evaluate(`(() => ([...document.querySelectorAll('.lc-activity, .lc-steps__line')].slice(-3).map((row) => row.innerText).join(' | ')).replace(/[ ]+/g, ' '))()`))
   check('the denied call reads refused or declined, and nothing failed', /(declined|refused)/i.test(fold) && !/(failed|exited non-zero)/i.test(fold), fold.slice(0, 240))
 
   // 3. W12 (0.566): what Copilot told Locust it can do, in Settings > AI agents. No more turns.
