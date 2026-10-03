@@ -79,6 +79,19 @@ try {
     }
     await sleep(300)
   }
+  // The window (0.573): opened at the bottom, and scrolling to the top puts older turns on the page.
+  const windowed = String(await drive.evaluate(`(async () => {
+    const box = document.querySelector('.lc-thread')
+    const label = () => document.querySelector('.lc-thread__earlier')?.textContent ?? 'none'
+    const atBottom = box ? Math.round(box.scrollHeight - box.clientHeight - box.scrollTop) : null
+    const before = label()
+    if (box) box.scrollTop = 0
+    await new Promise((r) => setTimeout(r, 1500))
+    const after = label()
+    const top = box ? Math.round(box.scrollTop) : null
+    return JSON.stringify({ distanceFromBottomOnOpen: atBottom, button: before, afterScrollingUp: after, scrollTopAfterLoad: top })
+  })()`))
+  note(`window: ${windowed}`)
   // What the thread is made of: elements under each kind of block, largest first.
   const census = String(await drive.evaluate(`(() => {
     const thread = document.querySelector('.lc-thread')

@@ -854,6 +854,25 @@ textarea {
   text-decoration-color: currentColor;
 }
 
+/* "Show 12 earlier turns" at the top of a long conversation (0.573): the
+   window's edge, quiet like the notes, centred because it belongs to no turn. */
+.lc-thread__earlier {
+  align-self: center;
+  padding: 4px 12px;
+  border: 1px solid var(--lc-border-button);
+  border-radius: 999px;
+  background: none;
+  font: inherit;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-secondary);
+  cursor: pointer;
+}
+.lc-thread__earlier:hover,
+.lc-thread__earlier:focus-visible {
+  color: var(--lc-text-primary);
+  border-color: var(--lc-border-strong);
+}
+
 /*
  * The files a message was sent with, under the message.
  *

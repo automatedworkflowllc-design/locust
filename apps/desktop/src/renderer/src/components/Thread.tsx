@@ -1,6 +1,6 @@
 import { EditCheckCard } from './EditCheckCard.js'
 import type { EditCheckShown } from './EditCheckCard.js'
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
@@ -912,6 +912,34 @@ export interface ThreadProps {
   }
 }
 
+/**
+ * HOW MUCH OF A LONG CONVERSATION IS PUT ON THE PAGE AT ONCE (0.573).
+ *
+ * Colin, 10/03: "hitching/lagging when clicking between two working
+ * sessions". Measured on a copy of his ledger (`_tools/profile-real-switch.mjs`):
+ * his Codex conversation is 1,538 messages and 1,032 step lines, 23,635
+ * elements, every one of them built and laid out on every click into it --
+ * 0.6-0.8 s with the window frozen, each time. Nobody reads 1,500 messages
+ * at once: the conversation opens on its newest turns, up to this many rows,
+ * and the older ones go on the page as the person scrolls up to them, the
+ * way a chat app loads its history. The newest earlier turn is always shown,
+ * however long; the turn in progress is never held back.
+ */
+export const EARLIER_ROWS_SHOWN = 400
+
+/** The index of the oldest earlier turn on the page: the newest turns whose rows fit in `budget`, at least one. */
+export function firstEarlierTurnShown(sizes: readonly number[], budget: number = EARLIER_ROWS_SHOWN): number {
+  let rows = 0
+  let first = sizes.length
+  for (let index = sizes.length - 1; index >= 0; index -= 1) {
+    const size = sizes[index] ?? 0
+    if (first < sizes.length && rows + size > budget) break
+    rows += size
+    first = index
+  }
+  return first
+}
+
 export function Thread({
   prompt,
   editCheck,
@@ -989,6 +1017,8 @@ onResume,
    */
   const earlier = useMemo(() => {
     const said = new Set<string>()
+    /** Each turn's rows, which is what decides how many turns go on the page (EARLIER_ROWS_SHOWN). */
+    const sizes: number[] = []
     const elements = earlierTurns.map((turn, index) => {
       const built = buildThread(turn.events, {
         running: false,
@@ -1004,6 +1034,7 @@ onResume,
         ...(workspacePath === undefined ? {} : { workspacePath })
       })
       for (const key of foldNoticeKeys(built)) said.add(key)
+      sizes.push(built.length)
       return (
         <ThreadItems
           items={built}
@@ -1014,9 +1045,24 @@ onResume,
         />
       )
     })
-    return { elements, said }
+    return { elements, said, sizes }
   }, [earlierTurns, mayEdit, workspacePath, peers.self])
   const earlierWork = earlier.elements
+  /*
+   * A LONG CONVERSATION OPENS ON ITS NEWEST TURNS (0.573). The rest wait
+   * above, put on the page as the person scrolls up to them (or presses
+   * "Show earlier turns"). See EARLIER_ROWS_SHOWN. Each "show earlier" adds
+   * another budget's worth; opening another conversation starts over.
+   */
+  const shownIdentity = shownMissionId ?? restoredMission?.missionId ?? startedAtIso ?? ''
+  const [earlierBudget, setEarlierBudget] = useState({ identity: shownIdentity, rows: EARLIER_ROWS_SHOWN })
+  let earlierRows = earlierBudget.rows
+  if (earlierBudget.identity !== shownIdentity) {
+    earlierRows = EARLIER_ROWS_SHOWN
+    setEarlierBudget({ identity: shownIdentity, rows: EARLIER_ROWS_SHOWN })
+  }
+  const firstShown = firstEarlierTurnShown(earlier.sizes, earlierRows)
+  const showEarlier = (): void => setEarlierBudget((current) => ({ identity: shownIdentity, rows: (current.identity === shownIdentity ? current.rows : EARLIER_ROWS_SHOWN) + EARLIER_ROWS_SHOWN }))
   const items = buildThread(events, {
     running,
     latestTurn: true,
@@ -1269,6 +1315,43 @@ onResume,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restoredMission?.missionId, startedAtIso])
 
+  /*
+   * Older turns going on the page above keep the reader where they were.
+   * The browser's own scroll anchoring does not do it at the very top (the
+   * real app, scrolled to 0: every older turn came in at once, one batch
+   * after another, the view pinned to the top), so the distance from the
+   * bottom is kept across the render and put back before paint. That also
+   * puts the button back out of sight, so batches come one scroll at a time.
+   */
+  const keepFromBottom = useRef<number | undefined>(undefined)
+  const showEarlierHere = (): void => {
+    const box = follow.ref.current
+    if (box !== null) keepFromBottom.current = box.scrollHeight - box.scrollTop
+    showEarlier()
+  }
+  useLayoutEffect(() => {
+    const box = follow.ref.current
+    const kept = keepFromBottom.current
+    keepFromBottom.current = undefined
+    if (box === null || kept === undefined) return
+    box.scrollTop = box.scrollHeight - kept
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstShown])
+
+  // Scrolled up to the window's top edge, the next older turns go on the page.
+  const earlierButton = useRef<HTMLButtonElement | null>(null)
+  useEffect(() => {
+    const button = earlierButton.current
+    const box = follow.ref.current
+    if (button === null || box === null || typeof IntersectionObserver === 'undefined') return undefined
+    const watch = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) showEarlierHere()
+    }, { root: box, rootMargin: '600px 0px 0px 0px' })
+    watch.observe(button)
+    return () => watch.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstShown, shownIdentity])
+
   return (
     <div className="lc-thread" ref={follow.ref} onScroll={follow.onScroll}>
       <div className="lc-thread__column">
@@ -1293,7 +1376,14 @@ onResume,
           a user bubble would attribute to them something they never said --
           which is why a handoff contributes no bubble of its own here.
         */}
+        {firstShown > 0 && (
+          <button type="button" className="lc-thread__earlier" ref={earlierButton} onClick={showEarlierHere}>
+            {`Show ${String(firstShown)} earlier ${firstShown === 1 ? 'turn' : 'turns'}`}
+          </button>
+        )}
         {earlierTurns.map((turn, index) => {
+          // Not on the page yet: above the window (firstEarlierTurnShown).
+          if (index < firstShown) return null
           const marker = markers.find((candidate) => candidate.beforeTurn === index)
           const seam = terminalSeamBefore(earlierTurns[index - 1]?.inTerminal, turn.inTerminal)
           // Stopped before it said anything, then sent again: one message (0.496).
