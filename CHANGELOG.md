@@ -11,6 +11,21 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.573.0 - 2026-10-03
+
+### Improved
+
+- **Switching between long conversations no longer freezes the window.**
+  Opening a long conversation built every message it ever had, and in a
+  conversation with 1,500 messages that froze Locust for most of a second
+  on every click. A conversation now opens on its newest turns, and the older
+  ones appear as you scroll up to them, or when you press "Show earlier
+  turns" at the top. Clicking into that conversation took 0.8 seconds and
+  now takes about 0.2.
+- **Teammate faces in a conversation draw together.** Each face beside a
+  turn measured itself on its own, which made the window redo its layout once
+  per face. They now measure in one pass.
+
 ## 0.572.0 - 2026-10-03
 
 ### Fixed
