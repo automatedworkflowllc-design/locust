@@ -11,6 +11,20 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.574.0 - 2026-10-03
+
+### Improved
+
+- **Screen faces stay put on their teammate.** A teammate wearing a screen
+  had it slide across its head as it turned, and at a wide turn one eye was
+  cut off at the edge. The screen is now set flat into the front of the
+  body, so it turns, tilts and narrows with it, and both eyes stay on it.
+- **No mouth on a screen.** A teammate with a mouth that wears a screen now
+  shows only its eyes; the screen's eyes say how it is.
+- **Eyes on a screen have a little weight.** They trail the body by a touch
+  when it hops or turns, and settle again, instead of moving as one piece
+  with it.
+
 ## 0.573.0 - 2026-10-03
 
 ### Improved
