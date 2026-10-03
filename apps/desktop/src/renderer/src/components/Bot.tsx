@@ -14,7 +14,7 @@ import {
   shade,
   warmBotAvatarPlastic
 } from 'bot-avatars'
-import type { BotAvatarFace, BotAvatarState, BotAvatarType } from 'bot-avatars'
+import type { BotAvatarFace, BotAvatarPose, BotAvatarState, BotAvatarType } from 'bot-avatars'
 import { anchorsOf, anchorVariables, paintedBounds, type BodyBox } from '../botAnchors.js'
 
 import { screenSuits } from '../../../shared/avatar.js'
@@ -775,6 +775,56 @@ export function withGlyphEyes(
 /** A screen's eyes when nothing else is asked of them: two lit bars, as the mascot rests. */
 export const SCREEN_RESTING_EYES: EyeGlyphs = ['|', '|']
 
+/** How much of the rig's squash and stretch a screen-faced body keeps. */
+export const SCREEN_SQUASH = 0.45
+/** How far a screen-faced head may turn when the rig's own heading cannot be read. */
+const SCREEN_YAW_LIMIT = 0.75
+
+/**
+ * A SCREEN KEEPS ITS FACE TO YOU (0.568).
+ *
+ * Colin, 2026-10-03: *"the screen faces are a little janky ... they kind of
+ * clip around and go crazy ... might just need some proper motion/screen
+ * physics"*. Measured frame by frame (`_tools/look-screen-motion.mjs`), the
+ * rig did three things a screen cannot wear:
+ *
+ * - **It spun.** The working loop turns the body a full circle every third
+ *   hop (hard-coded in the rig, not its `spin` setting), and a resting flip
+ *   does the same every few seconds: the screen swept round to the back of
+ *   the head and its eyes clipped away, then came back. The turn the rig
+ *   would have without the spin -- its own heading, glances and the pointer
+ *   included -- is kept; the spin is not.
+ * - **It laughed.** Every two to four seconds of work the rig narrows its
+ *   eyes for most of a second. A screen ignores a shut longer than a blink,
+ *   so its glyphs squashed for a third of a second and snapped open again:
+ *   `>▮` flickering through `--`. A screen says how it is with its glyphs.
+ * - **It squashed hard.** Each landing pressed the body to about four fifths
+ *   of its height, the visor and its glyphs with it. A screen keeps a little
+ *   under half of that: the hop still lands.
+ *
+ * Eyes that are the rig's own keep everything (Colin, 2026-09-23: "all that
+ * movement is fine and great"). The rig's pose is copied, never changed: it
+ * eases from its own last frame.
+ */
+export function screenPose(pose: BotAvatarPose, heading: number | undefined): BotAvatarPose {
+  const wrapped = Math.atan2(Math.sin(pose.yaw), Math.cos(pose.yaw))
+  const yaw = heading ?? Math.max(-SCREEN_YAW_LIMIT, Math.min(SCREEN_YAW_LIMIT, wrapped))
+  return {
+    ...pose,
+    yaw,
+    laugh: 0,
+    whirl: 0,
+    sx: 1 + (pose.sx - 1) * SCREEN_SQUASH,
+    sy: 1 + (pose.sy - 1) * SCREEN_SQUASH
+  }
+}
+
+/** The rig's heading without its spins: kept privately by bot-avatars, so read defensively. */
+function headingOf(sim: BotAvatarSim): number | undefined {
+  const heading = (sim as unknown as { readonly baseYaw?: unknown }).baseYaw
+  return typeof heading === 'number' && Number.isFinite(heading) ? heading : undefined
+}
+
 /**
  * SMALL BOTS ARE DRAWN AT TWICE THEIR SIZE AND SHRUNK.
  *
@@ -1134,9 +1184,11 @@ function RiggedBot({
     const draw = (): void => {
       context.setTransform(dpr, 0, 0, dpr, 0, 0)
       context.clearRect(0, 0, side, side)
+      // A screen keeps its face to you: no spin, no laugh, a softer squash (screenPose).
+      const pose = screen ? screenPose(sim.pose, headingOf(sim)) : sim.pose
       // A still bot is drawn at its loops' rest; a moving one on its own clock, offset so a row does not move in unison.
-      painter.frame(sim.pose, still ? 0 : performance.now() / 1000 + seed * 17)
-      drawBotAvatarFrame(context, size, sim.pose, {
+      painter.frame(pose, still ? 0 : performance.now() / 1000 + seed * 17)
+      drawBotAvatarFrame(context, size, pose, {
         path,
         ...(parts === undefined ? {} : { parts }),
         ...(outline.partsDepth === undefined ? {} : { partsDepth: outline.partsDepth }),
