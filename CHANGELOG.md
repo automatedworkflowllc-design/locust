@@ -11,6 +11,28 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.568.0 - 2026-10-03
+
+### Improved
+
+- **Screen faces move steadily.** A teammate with a screen for a face used to
+  spin a full turn every few hops while it worked, so its screen swept to the
+  back of its head and its eyes clipped away, and it squashed hard on every
+  landing. Its eyes also flickered into dashes every few seconds. A screen
+  now keeps facing you: it still hops, leans, glances and follows your
+  pointer, but it never spins, lands more softly, and its eyes only change
+  when its state does. Teammates with their own eyes move as before.
+
+### Fixed
+
+- **A Claude cloud message Locust could not confirm is no longer called "not
+  sent".** When Claude Code ended without saying whether a follow-up reached
+  your cloud session, Locust said it "did not send that", which invited
+  sending it again, so the session could do the work twice. Locust now says
+  it could not confirm the send and asks you to look at the session on
+  claude.ai first. When Claude Code says a send failed, Locust still shows
+  its words.
+
 ## 0.567.0 - 2026-10-03
 
 ### New
