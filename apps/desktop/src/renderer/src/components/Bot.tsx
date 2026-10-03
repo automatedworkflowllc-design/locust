@@ -1067,7 +1067,58 @@ const PAINT = new Map<string, BodyBox>()
  * face is a flex box, where nothing collapses. So only the paint's place on
  * the canvas is kept; the canvas's place in its box is read each time.
  */
-function anchorToBody(canvas: HTMLCanvasElement, context: CanvasRenderingContext2D, key: string): boolean {
+/**
+ * ONE MEASURE FOR EVERY FACE (0.573).
+ *
+ * Each face anchored itself as it was drawn: two `getBoundingClientRect`
+ * reads, then CSS variables written on its box. A conversation draws a face
+ * beside its turns -- 86 in one of Colin's -- and every read after the face
+ * before it had written laid the whole page out again, so clicking into that
+ * conversation froze the window for 0.7-0.8 s, every time
+ * (`_tools/profile-real-switch.mjs` on a copy of his ledger; his report:
+ * "hitching/lagging when clicking between two working sessions"). Faces now
+ * wait for the next frame, which measures every waiting face before any of
+ * them writes: one layout, however many faces.
+ */
+export interface AnchorJob {
+  readonly canvas: HTMLCanvasElement
+  readonly context: CanvasRenderingContext2D
+  readonly key: string
+  readonly settle: (anchored: boolean) => void
+}
+const anchorQueue: AnchorJob[] = []
+let anchorFrame = 0
+
+export function anchorSoon(job: AnchorJob): void {
+  anchorQueue.push(job)
+  if (anchorFrame !== 0) return
+  anchorFrame = requestAnimationFrame(() => {
+    anchorFrame = 0
+    const jobs = anchorQueue.splice(0)
+    // Every read first...
+    const measured = jobs.map((job) => (job.canvas.isConnected ? measureBody(job.canvas, job.context, job.key) : true))
+    // ...then every write.
+    jobs.forEach((job, at) => {
+      const one = measured[at]
+      if (typeof one === 'boolean') {
+        job.settle(one)
+        return
+      }
+      for (const [name, value] of Object.entries(one.variables)) one.host.style.setProperty(name, value)
+      job.settle(true)
+    })
+  })
+}
+
+/**
+ * Where the ring and dot go on this face, read from the page; true when there
+ * is nothing to place, false when it is not laid out yet. Reads only.
+ */
+function measureBody(
+  canvas: HTMLCanvasElement,
+  context: CanvasRenderingContext2D,
+  key: string
+): { readonly host: HTMLElement; readonly variables: Readonly<Record<string, string>> } | boolean {
   const host = canvas.closest<HTMLElement>('.lc-bot')
   if (host === null) return true
   let paint = PAINT.get(key)
@@ -1101,8 +1152,7 @@ function anchorToBody(canvas: HTMLCanvasElement, context: CanvasRenderingContext
     right: across(drawn.left + paint.right * drawn.width),
     bottom: down(drawn.top + paint.bottom * drawn.height)
   }
-  for (const [name, value] of Object.entries(anchorVariables(anchorsOf(body)))) host.style.setProperty(name, value)
-  return true
+  return { host, variables: anchorVariables(anchorsOf(body)) }
 }
 
 function RiggedBot({
@@ -1206,8 +1256,21 @@ function RiggedBot({
       })
     }
     let anchored = false
+    let waiting = false
+    let gone = false
+    // Measured with every other face in the next frame (anchorSoon), not here.
     const anchor = (): void => {
-      if (!anchored) anchored = anchorToBody(canvas, context, `${outline.key}|${state}`)
+      if (anchored || waiting) return
+      waiting = true
+      anchorSoon({
+        canvas,
+        context,
+        key: `${outline.key}|${state}`,
+        settle: (done) => {
+          waiting = false
+          if (!gone) anchored = done
+        }
+      })
     }
     if (still) {
       draw()
@@ -1251,6 +1314,7 @@ function RiggedBot({
           })
     watch?.observe(canvas)
     return () => {
+      gone = true
       stop()
       watch?.disconnect()
       rig.current = null
