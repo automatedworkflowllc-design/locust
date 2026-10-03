@@ -124,7 +124,7 @@ const openNewTeammate = `(async () => {
   return JSON.stringify({
     dialog: document.querySelector('[role=dialog][aria-label="New teammate"]') !== null,
     tiles: [...(pets?.querySelectorAll('[role=radio][data-pet]') ?? [])].map((tile) => tile.dataset.source + '/' + tile.dataset.pet),
-    browse: pets?.querySelector('.lc-pets__browse, .lc-petgallery') !== null && pets !== null,
+    browse: pets?.querySelector('input, [role=list]') !== null && pets !== null,
     face: document.querySelector('[role=radiogroup][aria-label="Face"]') !== null
   })
 })()`

@@ -64,7 +64,7 @@ const openPicker = `(async () => {
     ids: tiles().map((tile) => tile.dataset.pet),
     pictures: tiles().filter((tile) => tile.querySelector('img') !== null).length,
     toDownload: tiles().filter((tile) => tile.dataset.here === 'no').length,
-    gallery: document.querySelector('.lc-petgallery, .lc-pets__browse, input[aria-label="Search pets"]') !== null,
+    gallery: document.querySelector('.lc-pets input, .lc-pets [role=list]') !== null,
     credit: document.querySelector('.lc-pets__credit')?.innerText ?? ''
   })
 })()`

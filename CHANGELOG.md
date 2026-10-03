@@ -11,6 +11,46 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.564.0 - 2026-10-03
+
+### Improved
+
+- **Pets: a short list that fits Locust, in place of the gallery.** The open
+  gallery mixed every style of community art and did not sit well beside the
+  bots, so it is gone: no search, no Featured or Originals. The Pets row in a
+  teammate's look now offers 21 pets -- little robots, terminals and
+  screen-faced gadgets -- each shown by its picture. One that is not on this
+  computer yet carries a small arrow; click it and that one pet downloads from
+  openpets.dev and goes on the teammate. A teammate already wearing a pet keeps
+  it.
+- **Pets move more smoothly.** Each drawing now melts into the next instead of
+  snapping to it, and a pet drawn mostly in black has a faint light edge so it
+  no longer disappears into the dark sidebar.
+- **A teammate that asked you something waits on you.** When a teammate ends
+  its turn on a question, its face now waits inside the amber ring, as it does
+  for a paused run, instead of resting while the title bar says it needs you.
+- **The AI agent's badge on a face is smaller** and sits further off the body,
+  so a small face in the sidebar reads as a face.
+- **Claude cloud sessions can be watched.** With a session's row open,
+  **Watch** reads it again every minute and a half and says when it last
+  updated; it stops on its own when two reads bring nothing new, after half an
+  hour, or when you close the row.
+- **Continue a Claude cloud session in your terminal.** A cloud row offers a
+  terminal copy of the session, in its own checkout beside your folder, and
+  says plainly that Locust cannot see what happens there. (Checked by tests;
+  no terminal was opened while building it.)
+- **Claude cloud can start in your organization's own environment.** Starting
+  a cloud task offers an optional environment ID, checked before anything
+  runs and remembered for that folder.
+
+### Fixed
+
+- **A message sent to a Claude cloud session is confirmed by Claude Code
+  itself.** Locust used to look for "Sent to cloud session" in the terminal's
+  words; it now reads Claude Code's own answer, shows its error word for word
+  when a session is archived or gone, and never reports a sent message as
+  unsent.
+
 ## 0.563.0 - 2026-10-03
 <!-- big -->
 
