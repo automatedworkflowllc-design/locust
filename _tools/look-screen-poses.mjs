@@ -46,7 +46,7 @@ for (const [type, color] of types) {
     warmBotAvatarPlastic(outline.key, path, SIZE)
     const sim = new BotAvatarSim(0.3, 'default')
     const pose = { ...sim.pose, yaw, lookX, eyeOpen: 1, blinkL: 0, blinkR: 0 }
-    const painter = withGlyphEyes(ctx, () => [${JSON.stringify(process.env.EYES ?? '•,•')}.split(',')[0], ${JSON.stringify(process.env.EYES ?? '•,•')}.split(',')[1]], { ink: autoInk(body), screenOf: body, pixelsPerUnit: SIZE / 100 * outline.faceScale, visor: visorOf(outline, outline.face, path), eyeY: 1 })
+    const painter = withGlyphEyes(ctx, () => [${JSON.stringify(process.env.EYES ?? '•,•')}.split(',')[0], ${JSON.stringify(process.env.EYES ?? '•,•')}.split(',')[1]], { ink: autoInk(body), screenOf: body, pixelsPerUnit: SIZE / 100 * outline.faceScale, visor: visorOf(outline, outline.face, path), eyeY: 1, faceAt: { x: outline.faceX, y: outline.faceY, scale: outline.faceScale } })
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     painter.frame(pose, 0)
     drawBotAvatarFrame(ctx, SIZE, pose, { path, ...(parts ? { parts } : {}), ...(outline.partsDepth === undefined ? {} : { partsDepth: outline.partsDepth }), typeKey: outline.key, face: outline.face, faceX: outline.faceX, faceY: outline.faceY, faceScale: outline.faceScale, color: body, ink: GLYPH_INK, shading: 'plastic', dpr: 1, theme: 'dark', still: true })

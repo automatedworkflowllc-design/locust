@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { EYES_VISOR, GLYPH_INK, GLYPH_SHAPES, PHOSPHOR, fitVisor, glyphMotion, hueOf, visorOutline, SCREEN_RESTING_EYES, eyeOpenness, onSphere, outlineOf, sameHue, withGlyphEyes } from './components/Bot.js'
+import { EYES_VISOR, GLYPH_INK, GLYPH_SHAPES, PHOSPHOR, fitVisor, glyphMotion, hueOf, visorOutline, SCREEN_RESTING_EYES, eyeOpenness, frontPlane, outlineOf, sameHue, withGlyphEyes } from './components/Bot.js'
 import type { EyeGlyphs } from './components/Bot.js'
 import { eyeGlyphsFor } from './components/TeammateBot.js'
 import type { FaceActivity } from './faceState.js'
@@ -47,6 +47,7 @@ class Recorder {
     return { a: 1 }
   }
   setTransform(): void {}
+  transform(): void {}
   scale(): void {}
   save(): void {}
   restore(): void {}
@@ -131,13 +132,33 @@ describe('a screen for a face', () => {
     expect(sameHue('#6fb7d6', 0.95, 0.8)).toMatch(/^hsla\(19[0-9], 95%, 80%, 1\)$/)
   })
 
-  it('turns with the head, and holds at its edge past it', () => {
-    // Facing ahead, a point on the face's midline is where it is; off it, the rig's own projection.
-    expect(onSphere(10, 0, 0, 0)[0]).toBeCloseTo(10)
-    expect(onSphere(0, 4, 0, 0)[1]).toBeCloseTo(4)
-    expect(onSphere(0, 0, 0.5, 0)[0]).toBeCloseTo(30 * Math.sin(0.5))
-    // Turned right round, a point of the face sits at the sphere's edge, never back across it.
-    expect(onSphere(20, 0, 3, 0)[0]).toBeCloseTo(30)
+  it("is set flat in the body's front, and turns with it all the way (0.574)", () => {
+    const centred = { x: 50, y: 50, scale: 1 }
+    // Facing ahead: the front layer, a touch inside the body's widest (its rim).
+    const ahead = frontPlane(0, 0, centred)
+    expect(ahead[0]).toBeCloseTo(0.95)
+    expect(ahead[3]).toBeCloseTo(0.95)
+    expect(ahead[4]).toBeCloseTo(0)
+    expect(ahead[5]).toBeCloseTo(0)
+    // Turned: narrower across by the turn, and carried toward it by the body's half-depth, as the plastic's front is.
+    const turned = frontPlane(0.5, 0, centred)
+    expect(turned[0]).toBeCloseTo(Math.cos(0.5) * 0.95)
+    expect(turned[4]).toBeCloseTo(Math.sin(0.5) * 9.75)
+    // A face set low on its body moves with the body's front, not round its own centre.
+    const low = frontPlane(0, 0.3, { x: 50, y: 60, scale: 0.95 })
+    expect(low[5]).toBeCloseTo((Math.cos(0.3) * 0.95 * 10 - Math.sin(0.3) * 9.75 - 10) / 0.95)
+  })
+
+  it("wears no mouth: the rig's mouth is not drawn on a screen, and is on a face of plastic (0.574)", () => {
+    const mouthOn = (screenOf?: string): number => {
+      const drawn = drawEyes(['•', '•'], screenOf)
+      const before = drawn.calls.filter((call) => call === 'fill').length
+      drawn.fillStyle = GLYPH_INK
+      drawn.fill()
+      return drawn.calls.filter((call) => call === 'fill').length - before
+    }
+    expect(mouthOn('#6fb7d6')).toBe(0)
+    expect(mouthOn(undefined)).toBe(1)
   })
 })
 
