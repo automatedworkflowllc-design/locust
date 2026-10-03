@@ -47,6 +47,7 @@ class Recorder {
     return { a: 1 }
   }
   setTransform(): void {}
+  scale(): void {}
   save(): void {}
   restore(): void {}
   beginPath(): void {}
@@ -68,7 +69,7 @@ function drawEyes(eyes: EyeGlyphs | undefined, screenOf?: string): Recorder {
     screenOf,
     pixelsPerUnit: 1
   })
-  painter.frame(0, 0, 0)
+  painter.frame({ yaw: 0, pitch: 0, lookX: 0, lookY: 0 }, 0)
   // As the rig draws each eye: a move to it, then one stroke in the face's ink, open.
   for (let eye = 0; eye < 2; eye += 1) {
     context.translate()
@@ -81,7 +82,7 @@ function drawEyes(eyes: EyeGlyphs | undefined, screenOf?: string): Recorder {
 
 describe('a glyph eye', () => {
   it('is round strokes, never a letter', () => {
-    const drawn = drawEyes(['>', '_'])
+    const drawn = drawEyes(['>', '▮'])
     expect(drawn.calls).not.toContain('fillText')
     expect(drawn.calls.filter((call) => call === 'stroke')).toHaveLength(2)
     expect(drawn.caps).toEqual(['round', 'round'])
@@ -116,7 +117,7 @@ describe('a screen for a face', () => {
   })
 
   it('is drawn once a frame, under the eyes, and the eyes are lit in the teammate\'s own hue', () => {
-    const drawn = drawEyes(['>', '_'], '#6fb7d6')
+    const drawn = drawEyes(['>', '▮'], '#6fb7d6')
     // The visor's fill, its rim, then each eye.
     expect(drawn.calls.filter((call) => call === 'fill')).toHaveLength(1)
     expect(drawn.calls.indexOf('fill')).toBeLessThan(drawn.calls.lastIndexOf('stroke'))
@@ -150,28 +151,43 @@ describe('eyes that are alive', () => {
     Array.from({ length: 240 }, (_, i) => glyphMotion(pair, eye, 1 + i / 30))
 
   it('move, every pair a state asks for, over a few seconds', () => {
-    for (const pair of ['>_', '--', '^^', 'xx']) {
+    for (const pair of ['>▮', '••', '^^', 'xx']) {
       const seen = new Set(over(pair, 1).map((m) => `${m.dx.toFixed(2)},${m.dy.toFixed(2)},${m.sx.toFixed(2)},${m.shown}`))
       expect(seen.size, pair).toBeGreaterThan(4)
     }
   })
 
   it('at work, the cursor blinks and the prompt stays lit', () => {
-    expect(over('>_', 1).some((m) => !m.shown)).toBe(true)
-    expect(over('>_', 1).some((m) => m.shown)).toBe(true)
-    expect(over('>_', 0).every((m) => m.shown)).toBe(true)
+    expect(over('>▮', 1).some((m) => !m.shown)).toBe(true)
+    expect(over('>▮', 1).some((m) => m.shown)).toBe(true)
+    expect(over('>▮', 0).every((m) => m.shown)).toBe(true)
   })
 
-  it('in thought, now and then pull in to dots', () => {
-    expect(Math.min(...over('--', 0).map((m) => m.sx))).toBeLessThan(0.5)
+  it('in thought, look up and about, then bounce in turn like a reply being typed', () => {
+    const left = Array.from({ length: 126 }, (_, i) => glyphMotion('••', 0, 4.2 * 3 + i / 30))
+    const right = Array.from({ length: 126 }, (_, i) => glyphMotion('••', 1, 4.2 * 3 + i / 30))
+    // Looking both ways, and up.
+    expect(Math.min(...left.map((m) => m.dx))).toBeLessThan(-1)
+    expect(Math.max(...left.map((m) => m.dx))).toBeGreaterThan(1)
+    expect(Math.min(...left.map((m) => m.dy))).toBeLessThan(-1)
+    // The bounce: the two dots are not level at the same moment.
+    expect(left.some((m, i) => Math.abs(m.dy - (right[i]?.dy ?? 0)) > 0.6)).toBe(true)
+    // And never a flat line: a round eye is only squashed so far.
+    expect(Math.min(...left.map((m) => m.sy))).toBeGreaterThan(0.5)
+  })
+
+  it('are never flat lines for work or thought', () => {
+    for (const activity of ['working', 'delegating', 'thinking'] as const) {
+      for (const glyph of eyeGlyphsFor(activity) ?? []) expect(['-', '_'], activity).not.toContain(glyph)
+    }
   })
 
   it('rest on a still bot, which is drawn at second 0', () => {
-    for (const pair of ['>_', '--', '^^', 'xx', '||']) expect(glyphMotion(pair, 1, 0)).toEqual({ dx: 0, dy: 0, sx: 1, sy: 1, shown: true })
+    for (const pair of ['>▮', '••', '^^', 'xx', '||']) expect(glyphMotion(pair, 1, 0)).toEqual({ dx: 0, dy: 0, sx: 1, sy: 1, shown: true })
   })
 
   it('stay small: a glyph never wanders off its eye', () => {
-    for (const pair of ['>_', '--', '^^', 'xx']) {
+    for (const pair of ['>▮', '••', '^^', 'xx']) {
       for (const m of [...over(pair, 0), ...over(pair, 1)]) {
         expect(Math.abs(m.dx), pair).toBeLessThanOrEqual(2)
         expect(Math.abs(m.dy), pair).toBeLessThanOrEqual(2)

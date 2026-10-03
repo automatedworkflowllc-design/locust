@@ -29,7 +29,7 @@ import { createRoot } from 'react-dom/client'
 import { Bot } from ${JSON.stringify(join(DESKTOP, 'src/renderer/src/components/Bot.tsx').replace(/\\/g, '/'))}
 
 const shapes = [['droid', '#5b8def'], ['ghost', '#c7a6ff'], ['cat', '#ff8c42'], ['hopper', '#7fd17a'], ['critter', '#e8845c'], ['prompt', '#6fb7d6']]
-const eyes = [[undefined, 'own'], [['>', '_'], 'working'], [['-', '-'], 'thinking'], [['^', '^'], 'done'], [['x', 'x'], 'blocked']]
+const eyes = [[undefined, 'own'], [['>', '▮'], 'working'], [['•', '•'], 'thinking'], [['^', '^'], 'done'], [['x', 'x'], 'blocked']]
 const cell = (children, label) => h('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, width: 112 } }, children, h('span', { style: { color: '#8a8f98', font: '11px sans-serif' } }, label))
 createRoot(document.getElementById('root')).render(h('div', { style: { padding: 16, display: 'grid', gap: 10 } },
   shapes.map(([type, color], row) => h('div', { key: type, style: { display: 'flex', gap: 6, alignItems: 'flex-end' } },
@@ -38,7 +38,7 @@ createRoot(document.getElementById('root')).render(h('div', { style: { padding: 
       h('span', { style: { display: 'inline-flex', width: 96, height: 96, position: 'relative' } }, h(Bot, { type, size: 96, color, paused: true, seed: 0.2 + row * 0.1, ...(glyphs ? { eyes: glyphs } : {}) })),
       ), label)),
     eyes.slice(1, 3).map(([glyphs, label]) => cell(h('span', { style: { display: 'inline-flex', width: 32, height: 32, position: 'relative' } }, h(Bot, { type, size: 32, color, paused: true, seed: 0.2 + row * 0.1, eyes: glyphs })), label + ' 32')),
-    cell(h('span', { style: { display: 'inline-flex', width: 96, height: 96, position: 'relative' } }, h(Bot, { type, size: 96, color, paused: false, seed: 0.2 + row * 0.1, glance: { x: 1, y: 0 }, eyes: ['>', '_'] })), 'glancing')
+    cell(h('span', { style: { display: 'inline-flex', width: 96, height: 96, position: 'relative' } }, h(Bot, { type, size: 96, color, paused: false, seed: 0.2 + row * 0.1, glance: { x: 1, y: 0 }, eyes: ['>', '▮'] })), 'glancing')
   ))
 ))
 `

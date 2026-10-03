@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { BOT_SIZE } from '../botSizes.js'
 import type { ReactElement } from 'react'
 
 import { agoLabel } from '../teammateWork.js'
@@ -141,7 +142,7 @@ export function PeerThread({
         onClick={() => setOpen(!open)}
       >
         <span>{label}</span>
-        <TeammateBot hue={peerHue} avatar={faceOf(peer.teammateId, peerProfile)} size={16} />
+        <TeammateBot hue={peerHue} avatar={faceOf(peer.teammateId, peerProfile)} size={BOT_SIZE.peerToggle} />
         <span className={`lc-peer__name is-${peerHue}`}>{peer.name}</span>
         {waited !== undefined && <span className="lc-peer__when lc-mono">sent {waited}</span>}
         {!open && snippet !== undefined && <span className="lc-peer__snippet">{snippet}</span>}
@@ -160,7 +161,7 @@ export function PeerThread({
             const author = teammates.find((teammate) => teammate.teammateId === message.from.teammateId)
             return (
               <div key={message.messageId} className="lc-peer__message">
-                <TeammateBot hue={hue} avatar={faceOf(message.from.teammateId, author)} size={20} />
+                <TeammateBot hue={hue} avatar={faceOf(message.from.teammateId, author)} size={BOT_SIZE.peerOrigin} />
                 <div className="lc-peer__body">
                   {/* The pill above already names the sender when every
                     * message came from one side, which is the ordinary case. */}

@@ -1,4 +1,5 @@
 import type { ComponentProps, ReactElement } from 'react'
+import { BOT_SIZE } from '../botSizes.js'
 
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
@@ -60,7 +61,7 @@ export function BesideConversation({
   return (
     <aside className="lc-viewer lc-beside" aria-label={`Beside: ${title}`}>
       <div className="lc-viewer__head">
-        {owner !== undefined && <TeammateBot hue={owner.hue} avatar={owner.avatar} size={18} teammateId={owner.teammateId} activity={running ? 'working' : 'idle'} />}
+        {owner !== undefined && <TeammateBot hue={owner.hue} avatar={owner.avatar} size={BOT_SIZE.besideHead} teammateId={owner.teammateId} activity={running ? 'working' : 'idle'} />}
         <span className="lc-beside__who">
           <span className="lc-viewer__name">{owner?.name ?? 'Conversation'}</span>
           <span className="lc-beside__title">{title}</span>

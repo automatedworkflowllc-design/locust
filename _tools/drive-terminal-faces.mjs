@@ -24,8 +24,8 @@ const seed = {
   schemaVersion: 1,
   teammates: [
     { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: '2026-10-03T01:00:00.000Z', route: FREE_ROUTE },
-    { teammateId: 'tm_ada', name: 'Ada', hue: 'blue', role: 'Docs & QA', createdAt: '2026-10-03T01:00:00.000Z', route: FREE_ROUTE, avatar: { shape: 'droid' } },
-    { teammateId: 'tm_ivo', name: 'Ivo', hue: 'clay', role: 'Code & Migrations', createdAt: '2026-10-03T01:00:00.000Z', route: FREE_ROUTE, avatar: { shape: 'cat' } }
+    { teammateId: 'tm_ada', name: 'Ada', hue: 'blue', role: 'Docs & QA', createdAt: '2026-10-03T01:00:00.000Z', route: FREE_ROUTE, avatar: { headwear: 0, accessory: 0, mouth: 0, bot: { shape: 'droid', face: 'eyes' } } },
+    { teammateId: 'tm_ivo', name: 'Ivo', hue: 'clay', role: 'Code & Migrations', createdAt: '2026-10-03T01:00:00.000Z', route: FREE_ROUTE, avatar: { headwear: 1, accessory: 1, mouth: 1, bot: { shape: 'cat', face: 'eyes' } } }
   ],
   missionOwners: {},
   settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'auto' }

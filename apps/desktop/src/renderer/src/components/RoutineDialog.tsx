@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { BOT_SIZE } from '../botSizes.js'
 import type { ReactElement } from 'react'
 import { useModal } from '../useModal.js'
 
@@ -185,7 +186,7 @@ export function RoutineDialog({
 
           {teammate !== undefined && (
             <p className="lc-dialog__note lc-mono">
-              <TeammateBot hue={teammate.hue} avatar={teammate.avatar} size={16} /> {teammate.name} runs it
+              <TeammateBot hue={teammate.hue} avatar={teammate.avatar} size={BOT_SIZE.pickerMark} /> {teammate.name} runs it
               {routeLabel === undefined ? '' : ` on ${routeLabel}`}
               {shownMode === undefined ? '' : `, in ${shownMode}`}.
               {/*

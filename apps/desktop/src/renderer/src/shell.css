@@ -7909,10 +7909,11 @@ textarea {
   height: 26px;
 }
 
-/* The face's place, kept when the face is already shown beside this line. */
+/* The face's place, kept when the face is already shown beside this line:
+   as wide as the face, BOT_SIZE.threadLive (botSizes.ts, 34 since 0.561). */
 .lc-livestep__gutter {
   flex: none;
-  width: 26px;
+  width: 34px;
 }
 
 .lc-livestep__label {
@@ -15579,32 +15580,39 @@ textarea {
 
 /* A conversation nobody owns keeps the face's footprint, so its title still
    starts on the same x as every other row. An unowned row that shuffled left
-   would read as a different KIND of thing, which it is not. */
+   would read as a different KIND of thing, which it is not.
+
+   The footprint is the owner's face, BOT_SIZE.conversationOwner (botSizes.ts):
+   20 since 0.561, when the faces grew to carry their screens. The dashed box
+   keeps its own 16 and is centred in it, so it still reads as a quiet
+   placeholder rather than a hole the size of a face. */
 .lc-conv__nobody {
   flex: none;
+  box-sizing: border-box;
   width: 16px;
   height: 16px;
+  margin: 0 2px;
   border-radius: 4px;
   border: 1px dashed var(--lc-border-hairline);
 }
 
-/* A conversation with no teammate: its model's mark, in the face's footprint. */
+/* A conversation with no teammate: its model's mark, in the face's footprint (20, as above). */
 .lc-conv__runtime {
   flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
 }
 
-/* A room's row: the people mark in the face's footprint (withRoomsFolded). */
+/* A room's row: the people mark in the face's footprint (withRoomsFolded; 20, as above). */
 .lc-conv__room {
   flex: none;
   display: inline-grid;
   place-items: center;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   color: var(--lc-text-muted);
 }
 
@@ -15678,7 +15686,11 @@ textarea {
   flex: none;
   display: grid;
   place-items: center;
-  padding: 2px;
+  /* 1px, not 2, since the faces grew to 32 (botSizes.ts sidebarFaces, 0.561):
+     five faces and the Team pill then end exactly on the strip's content
+     edge, measured (drive-bot-sizes.mjs) -- at 2px the pill was pressed 6px
+     into the strip's padding. */
+  padding: 1px;
   border: 1px solid transparent;
   border-radius: var(--lc-radius-control);
   background: transparent;

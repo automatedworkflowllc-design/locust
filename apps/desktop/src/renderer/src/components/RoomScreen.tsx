@@ -1,4 +1,5 @@
 import type { KeyboardEvent, ReactElement } from 'react'
+import { BOT_SIZE } from '../botSizes.js'
 import { useEffect, useRef, useState } from 'react'
 
 import type { PublicRoom, PublicTeammate, RoomTaskRequest } from '../../../shared/ipc.js'
@@ -780,7 +781,7 @@ export function RoomScreen({
                           )
                         }
                       >
-                        <TeammateBot hue={teammate.hue} avatar={teammate.avatar} size={16} activity="idle" presence="none" />
+                        <TeammateBot hue={teammate.hue} avatar={teammate.avatar} size={BOT_SIZE.pickerMark} activity="idle" presence="none" />
                         {teammate.name}
                         {/* A tick as well as the lime. `.lc-button.is-active`
                             is border, tint and text colour -- all three are
@@ -1081,7 +1082,7 @@ export function RoomScreen({
                         onClick={() => jumpTo(entry.postId, id)}
                       >
                         {teammate !== undefined && (
-                          <TeammateBot hue={teammate.hue} avatar={teammate.avatar} size={22} activity="idle" presence="none" />
+                          <TeammateBot hue={teammate.hue} avatar={teammate.avatar} size={BOT_SIZE.postFace} activity="idle" presence="none" />
                         )}
                         <span className="lc-posthead__pip" aria-hidden="true" />
                       </button>
@@ -1113,7 +1114,7 @@ export function RoomScreen({
                      */
                     const face =
                       who === undefined ? null : (
-                        <TeammateBot hue={who.hue} avatar={who.avatar} size={22} activity="idle" presence="none" name={who.name} />
+                        <TeammateBot hue={who.hue} avatar={who.avatar} size={BOT_SIZE.roomSaid} activity="idle" presence="none" name={who.name} />
                       )
                     if (item.kind === 'said') {
                       return (
@@ -1236,7 +1237,7 @@ export function RoomScreen({
                           <TeammateBot
                             hue={teammate.hue}
                             avatar={teammate.avatar}
-                            size={22}
+                            size={BOT_SIZE.roomAnswer}
                             activity={answer.phase === 'running' || answer.phase === 'starting' ? 'thinking' : 'idle'}
                             presence={answer.phase === 'running' || answer.phase === 'starting' ? 'working' : 'none'}
                             name={name}
@@ -1391,7 +1392,7 @@ export function RoomScreen({
                     <span className="lc-settings__note">unassigned</span>
                   ) : (
                     <>
-                      <TeammateBot hue={owner.hue} avatar={owner.avatar} size={16} activity="idle" presence="none" />
+                      <TeammateBot hue={owner.hue} avatar={owner.avatar} size={BOT_SIZE.pickerMark} activity="idle" presence="none" />
                       {owner.name}
                     </>
                   )}
@@ -1588,7 +1589,7 @@ export function RoomScreen({
                 onClick={() => pick(member)}
               >
                 <span className="lc-slash__name lc-mentions__who">
-                  <TeammateBot hue={member.hue} avatar={member.avatar} size={16} activity="idle" presence="none" />
+                  <TeammateBot hue={member.hue} avatar={member.avatar} size={BOT_SIZE.pickerMark} activity="idle" presence="none" />
                   {member.name}
                 </span>
                 <span className="lc-slash__detail">{roleLabelOf(member)}</span>
@@ -1620,7 +1621,7 @@ export function RoomScreen({
                     box.current?.focus()
                   }}
                 >
-                  {member !== undefined && <TeammateBot hue={member.hue} avatar={member.avatar} size={14} activity="idle" presence="none" />}
+                  {member !== undefined && <TeammateBot hue={member.hue} avatar={member.avatar} size={BOT_SIZE.tileMark} activity="idle" presence="none" />}
                   <span className="lc-attached__name">{name}</span>
                   <Icon name="close" size={11} />
                 </button>

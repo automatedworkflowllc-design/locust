@@ -161,14 +161,21 @@ export interface TeammateBotProps extends PixelFaceProps {
  * a prompt while it works, dashes while it thinks, carets when it is done,
  * crosses when it is stuck. Waiting on you keeps its own eyes and the amber
  * ring; talking, listening and idle keep the rig's eyes, which move.
+ *
+ * ALERT, NOT FLAT (0.561). Colin, 2026-10-03: "thinking and working should
+ * have animations where the teammate looks alert, not flat lines" -- "you can
+ * even cycle dots in there on the screen, just anything but flat lines". At
+ * work the prompt's cursor is a solid block, not an underscore; in thought the
+ * eyes are round and wide open, looking up and about, then bouncing in turn
+ * like a reply being typed (Bot.tsx glyphMotion).
  */
 export function eyeGlyphsFor(activity: FaceActivity): EyeGlyphs | undefined {
   switch (activity) {
     case 'working':
     case 'delegating':
-      return ['>', '_']
+      return ['>', '▮']
     case 'thinking':
-      return ['-', '-']
+      return ['•', '•']
     case 'done':
       return ['^', '^']
     case 'blocked':

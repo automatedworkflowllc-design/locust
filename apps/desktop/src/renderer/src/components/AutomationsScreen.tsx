@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import { BOT_SIZE } from '../botSizes.js'
 
 import type { PublicFolder, PublicRoutine, PublicTeammate } from '../../../shared/ipc.js'
 import { shortAgo } from '../railFlyout.js'
@@ -202,7 +203,7 @@ export function AutomationsScreen({
                 return (
                   <div className="lc-savable__row" key={mission.missionId}>
                     {owner !== undefined && (
-                      <TeammateBot hue={owner.hue} avatar={owner.avatar} size={16} teammateId={owner.teammateId} />
+                      <TeammateBot hue={owner.hue} avatar={owner.avatar} size={BOT_SIZE.savableRow} teammateId={owner.teammateId} />
                     )}
                     <button
                       type="button"
@@ -239,7 +240,7 @@ export function AutomationsScreen({
             return (
               <div className="lc-routinerow" key={routine.routineId}>
                 {owner !== undefined && (
-                  <TeammateBot hue={owner.hue} avatar={owner.avatar} size={18} teammateId={owner.teammateId} />
+                  <TeammateBot hue={owner.hue} avatar={owner.avatar} size={BOT_SIZE.routineRow} teammateId={owner.teammateId} />
                 )}
                 <span className="lc-routinerow__name" title={routine.steps.join(STEP_GAP)}>
                   {routine.name}

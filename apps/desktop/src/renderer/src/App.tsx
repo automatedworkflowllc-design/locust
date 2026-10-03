@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { BOT_SIZE } from './botSizes.js'
 import type { ReactElement } from 'react'
 
 import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
@@ -7486,7 +7487,7 @@ export default function App(): ReactElement {
                     <TeammateBot
                       hue={missionOwner.hue}
                       avatar={missionOwner.avatar}
-                      size={32}
+                      size={BOT_SIZE.workroomHeader}
                       teammateId={missionOwner.teammateId}
                       activity={workroomOwnerView?.activity ?? 'idle'}
                       hopsWhenDone={false}

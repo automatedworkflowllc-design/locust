@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
+import { BOT_SIZE } from '../botSizes.js'
 import type { ReactElement, ReactNode } from 'react'
 
 import type { GroupMembership, PublicGroup, PublicRecoveredMission, PublicRoutine, PublicRuntimeStatus, PublicTeammate, PublicRoom } from '../../../shared/ipc.js'
@@ -913,7 +914,7 @@ export function Sidebar({
                         </span>
                       )
                     ) : (
-                      <TeammateBot hue={by.hue} avatar={by.avatar} size={16} teammateId={by.teammateId} name={by.name} />
+                      <TeammateBot hue={by.hue} avatar={by.avatar} size={BOT_SIZE.conversationOwner} teammateId={by.teammateId} name={by.name} />
                     )}
                     {fromRoutine !== undefined && (
                       <span className="lc-conv__routine" role="img" aria-label={`${fromRoutine.charAt(0).toUpperCase()}${fromRoutine.slice(1)}`}>
@@ -1131,7 +1132,7 @@ export function Sidebar({
                 <TeammateBot
                   hue={teammate.hue}
                   avatar={teammate.avatar}
-                  size={26}
+                  size={BOT_SIZE.sidebarFaces}
                   teammateId={teammate.teammateId}
                   // Which model is who, on the one surface that names nobody's
                   // route in words (0.383) -- not on a model of their own.
@@ -1362,7 +1363,7 @@ export function Sidebar({
                   <TeammateBot
                     hue={teammate.hue}
                     avatar={teammate.avatar}
-                    size={30}
+                    size={BOT_SIZE.railRow}
                     activity={status.activity}
                     presence={facePresenceFor(status.status)}
                     teammateId={teammate.teammateId}

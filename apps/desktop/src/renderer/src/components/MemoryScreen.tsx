@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import { BOT_SIZE } from '../botSizes.js'
 import { useEffect, useState } from 'react'
 
 import type { MemoryMode, MemoryScope, MemoryUpdateRequest, PublicForgottenMemory, PublicMemory, PublicTeammate } from '../../../shared/ipc.js'
@@ -272,7 +273,7 @@ export function MemoryScreen({
               <span>{writer.name}</span>
             ) : (
               <span className="lc-memory__author">
-                <TeammateBot hue={author.hue} avatar={author.avatar} size={14} activity="idle" presence="none" />
+                <TeammateBot hue={author.hue} avatar={author.avatar} size={BOT_SIZE.memoryAuthor} activity="idle" presence="none" />
                 {author.name}
               </span>
             )}

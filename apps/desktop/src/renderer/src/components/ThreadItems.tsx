@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
+import { BOT_SIZE } from '../botSizes.js'
 import type { ReactElement } from 'react'
 import { ORB_BOX, Orb } from './Orb.js'
 
@@ -1042,7 +1043,7 @@ export function LiveStepCard({
       {!showFace ? <span className="lc-livestep__gutter" /> : <TeammateBot
         hue={face.hue}
         avatar={face.avatar}
-        size={26}
+        size={BOT_SIZE.threadLive}
         /*
          * THE FACE KEEPS ITS OWN MOTION, beside the orb rather than instead
          * of it.

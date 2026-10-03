@@ -14,12 +14,12 @@ import { GLYPH_EYES_MIN, eyeGlyphsFor } from './components/TeammateBot.js'
  * (waiting on you). Looked at, drawn, at 96 and 32: _tools/look-glyph-eyes.mjs.
  */
 describe('the glyph each state wears', () => {
-  it('is a prompt at work, dashes in thought, carets when done, crosses when stuck', () => {
+  it('is a prompt and a block cursor at work, round eyes in thought, carets when done, crosses when stuck', () => {
     const all: readonly FaceActivity[] = ['thinking', 'working', 'delegating', 'responding', 'waiting', 'receiving', 'blocked', 'done', 'idle']
     expect(Object.fromEntries(all.map((activity) => [activity, eyeGlyphsFor(activity)?.join('') ?? 'own']))).toEqual({
-      thinking: '--',
-      working: '>_',
-      delegating: '>_',
+      thinking: '••',
+      working: '>▮',
+      delegating: '>▮',
       responding: 'own',
       waiting: 'own',
       receiving: 'own',

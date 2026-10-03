@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
+import { BOT_SIZE } from '../botSizes.js'
 import { boardSectionOf, teamBoard } from '../teamBoard.js'
 import { durationText, runSpanMs, usagePercent, usageWindowSentence } from '../missionView.js'
 import { WhatsNew } from './WhatsNew.js'
@@ -623,7 +624,7 @@ export function TeammatesScreen({
           <TeammateBot
             hue={teammate.hue}
             avatar={teammate.avatar}
-            size={36}
+            size={BOT_SIZE.rosterCard}
             activity={viewByTeammate[teammate.teammateId]?.activity ?? 'idle'}
             // The roster had no dot because it had no status. It has
             // both now, from the same call the sidebar reads.
@@ -1370,8 +1371,8 @@ function CheckAfterEditsRow({ saved, onSave }: { readonly saved: string; readonl
 
 /** Three bots wearing the Terminal faces choice beside it: at work, in thought, done. */
 const TERMINAL_FACES_PREVIEW: readonly (readonly ['droid' | 'ghost' | 'cat', EyeGlyphs])[] = [
-  ['droid', ['>', '_']],
-  ['ghost', ['-', '-']],
+  ['droid', ['>', '▮']],
+  ['ghost', ['•', '•']],
   ['cat', ['^', '^']]
 ]
 

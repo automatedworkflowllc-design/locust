@@ -43,6 +43,19 @@ describe('the conversation row', () => {
     expect(rule('.lc-conv__nobody {')).toContain('width: 16px')
   })
 
+  it("gives every row's mark the owner's face footprint, whatever size the face is (0.561)", () => {
+    // The faces grew to carry their screens (botSizes.ts). Every stand-in in
+    // the face's place -- nobody, a model's mark, a room -- must take the
+    // same width, or titles start at different x from row to row.
+    const face = Number(/conversationOwner: (\d+)/.exec(readFileSync(fileURLToPath(new URL('../renderer/src/botSizes.ts', import.meta.url)), 'utf8'))?.[1])
+    expect(face).toBeGreaterThan(16)
+    const nobody = rule('.lc-conv__nobody {')
+    expect(Number(/width: (\d+)px/.exec(nobody)?.[1]) + 2 * Number(/margin: 0 (\d+)px/.exec(nobody)?.[1] ?? 0)).toBe(face)
+    expect(rule('.lc-conv__runtime {')).toContain(`width: ${face}px`)
+    expect(rule('.lc-conv__room {')).toContain(`width: ${face}px`)
+    expect(SIDEBAR).toContain('size={BOT_SIZE.conversationOwner}')
+  })
+
   it('lines the ages up', () => {
     expect(rule('.lc-conv__age {')).toContain('tabular-nums')
   })
