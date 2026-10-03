@@ -2201,6 +2201,8 @@ export default function App(): ReactElement {
     const bridge = window.desktop
     if (bridge === undefined) return
     void bridge.listCloudTasks().then(setCloudTasks).catch(() => undefined)
+    // Claude's sessions too (0.556), so the header can offer the panel after a restart.
+    void Promise.resolve().then(() => bridge.listClaudeCloud()).then(setClaudeCloud).catch(() => undefined)
     void bridge.cloudWhere().then(setCloudWhere).catch(() => undefined)
   }, [workspaceId])
   // The folders to offer when this one is not on GitHub, asked only when the panel would show them.
@@ -6534,7 +6536,8 @@ export default function App(): ReactElement {
     const model = liveRun === undefined ? 'this model' : routeModelName(sideRuntime, liveRun.data?.model ?? 'account-default', resolvedModels.get(`${sideRuntime}:${liveRun.data?.model ?? 'account-default'}`))
     headerActions.push({ label: 'Ask on the side', onSelect: () => setSideChat((current) => (current?.of === of ? current : { of, runIds: [], model })) })
   }
-  if (cloudTasks.length > 0) {
+  // Claude's sessions too (0.556): closed, the panel was otherwise only reached by picking Cloud again.
+  if (cloudTasks.length > 0 || claudeCloud.length > 0) {
     headerActions.push({ label: 'Cloud tasks', onSelect: () => setCloudPanel(true) })
   }
   if (liveRun !== undefined && !running) {

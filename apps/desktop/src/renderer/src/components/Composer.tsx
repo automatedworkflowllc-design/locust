@@ -397,8 +397,11 @@ const CHAT_MODES: readonly { readonly id: 'direct' | 'compare' | 'blind' | 'clou
   // 0.503: offered only where the window passes `cloud` (main/cloud-tasks.ts).
   { id: 'cloud', name: 'Cloud', desc: 'Runs in Codex Cloud on this repository; bring the change home when it is done', icon: 'cloud' }
 ]
-/** The Cloud choice when a Claude model is picked (0.538): Claude Code opens with the task, in a window of its own. */
-const CLAUDE_CLOUD_DESC = 'Runs in Claude’s cloud, in a Claude Code window of its own; bring it home when it is done'
+/**
+ * The Cloud choice when a Claude model is picked (0.538). Since 0.556 no
+ * window opens unless Claude Code has a question for the person.
+ */
+const CLAUDE_CLOUD_DESC = 'Runs in Claude’s cloud; follow it on claude.ai, tell it more from here, bring it home when it is done'
 
 export function Composer({
   handBack,
