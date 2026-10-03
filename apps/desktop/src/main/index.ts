@@ -6,7 +6,7 @@ import { ownGitArgs } from './git-guard.js'
 import { APP_USER_MODEL_ID, DEVELOPMENT_APP_USER_MODEL_ID, mayShowToasts, repairStartMenuShortcut, sweepStaleElectronShortcuts } from './stale-shortcut.js'
 import { openingPlacement, readSavedWindow } from './window-bounds.js'
 import type { SavedWindow } from './window-bounds.js'
-import { app, BrowserWindow, crashReporter, dialog, ipcMain, Menu, nativeImage, nativeTheme, net, Notification, powerSaveBlocker, protocol, safeStorage, screen, session, shell, Tray } from 'electron'
+import { app, BrowserWindow, crashReporter, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, powerSaveBlocker, protocol, safeStorage, screen, session, shell, Tray } from 'electron'
 import { createPageServer, fromPagePreview, pageMayReach, PAGE_SCHEME } from './page-preview.js'
 import { CANCEL_SCRIPT, captureRectOf, pageFrameOf, pickInFrame } from './page-pick.js'
 import { createRuntimeCommands } from './runtime-commands.js'
@@ -4557,7 +4557,15 @@ if (!ownsSingleInstanceLock) {
       cacheRoot: join(app.getPath('userData'), 'pets-cache'),
       bundledRoot: app.isPackaged ? join(process.resourcesPath, 'pets') : join(__dirname, '../../resources/pets'),
       codexRoot: join(process.env.CODEX_HOME ?? join(homedir(), '.codex'), 'pets'),
-      fetch: (url, init) => net.fetch(url, init),
+      /*
+       * Node's own fetch, not the window session's (net.fetch): a packaged
+       * build cancels every request through that session but the page
+       * preview's (above), which is the renderer's egress rule -- and the
+       * gallery could not be reached at all in 0.563's packaged drive. The
+       * host's own reads go out as the update check's do, held instead to
+       * pet-library.ts's rules: openpets.dev under /pets/, no redirect.
+       */
+      fetch: (url, init) => fetch(url, init),
       log: (message) => note('pets', message)
     })
     const petFailure = (error: unknown, fallback: string) =>
