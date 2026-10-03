@@ -75,6 +75,8 @@ export interface PetLibraryOptions {
   readonly fetch: PetFetch
   readonly now?: () => number
   readonly log?: (message: string) => void
+  /** The picks the person removed from the picker (0.569): `<userData>/pets-removed.json`. */
+  readonly removedFile?: string
 }
 
 export interface PetLibrary {
@@ -83,7 +85,13 @@ export interface PetLibrary {
   sheet(ref: PetRef): Promise<{ readonly bytes: Uint8Array; readonly rows: PetRows }>
   thumbnail(id: string): Promise<string>
   add(id: string): Promise<PublicPet>
-  remove(id: string): Promise<void>
+  /**
+   * Takes a pick out of the picker (0.569), and its download with it unless
+   * `keepFiles` -- a pet a teammate wears keeps its files, so their face stays.
+   */
+  remove(id: string, keepFiles?: boolean): Promise<void>
+  /** The picks taken out of the picker, oldest first. Adding one again brings it back. */
+  removedPicks(): Promise<readonly string[]>
 }
 
 /** A pet.json, as Codex writes one and as Locust writes its own. */
@@ -218,6 +226,29 @@ export function createPetLibrary(options: PetLibraryOptions): PetLibrary {
   const now = options.now ?? (() => Date.now())
   const log = options.log ?? (() => undefined)
   const thumbnailsRoot = join(options.cacheRoot, 'thumbnails')
+  const removedFile = options.removedFile ?? `${options.installedRoot}-removed.json`
+  /** Read whole, defensively: a file that does not read is no removals, never an error. */
+  const readRemoved = async (): Promise<readonly string[]> => {
+    try {
+      const value: unknown = JSON.parse(await readFile(removedFile, 'utf8'))
+      const ids = isRecord(value) && Array.isArray(value.ids) ? value.ids : []
+      return [...new Set(ids.filter((id): id is string => typeof id === 'string' && isPetId(id) && isPetPick(id)))]
+    } catch {
+      return []
+    }
+  }
+  // One write at a time, each from the last one's result: two quick removals both stay.
+  let removedWrites: Promise<unknown> = Promise.resolve()
+  const changeRemoved = (change: (ids: readonly string[]) => readonly string[]): Promise<void> => {
+    const next = removedWrites.then(async () => {
+      const ids = change(await readRemoved())
+      const incoming = `${removedFile}.${randomBytes(4).toString('hex')}.tmp`
+      await writeFile(incoming, `${JSON.stringify({ schemaVersion: 1, ids }, null, 2)}\n`)
+      await rename(incoming, removedFile)
+    })
+    removedWrites = next.catch(() => undefined)
+    return next
+  }
 
   /**
    * One address, read whole, refused past `max` bytes -- counted as it
@@ -607,14 +638,21 @@ export function createPetLibrary(options: PetLibraryOptions): PetLibrary {
       })()
       adding.set(id, work)
       try {
-        return await work
+        const pet = await work
+        // Picked again: back in the picker.
+        if ((await readRemoved()).includes(id)) await changeRemoved((ids) => ids.filter((kept) => kept !== id)).catch(() => undefined)
+        return pet
       } finally {
         adding.delete(id)
       }
     },
 
-    async remove(id) {
+    removedPicks: readRemoved,
+
+    async remove(id, keepFiles = false) {
       if (!isPetId(id)) throw new PetError('That pet is not on this computer.')
+      if (isPetPick(id)) await changeRemoved((ids) => (ids.includes(id) ? ids : [...ids, id]))
+      if (keepFiles) return
       const folder = join(options.installedRoot, id)
       let info
       try {

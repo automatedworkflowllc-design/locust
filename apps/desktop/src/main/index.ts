@@ -4603,7 +4603,8 @@ if (!ownsSingleInstanceLock) {
     ipcMain.handle(PET_LIST_CHANNEL, async (event) => {
       if (!fromOwnWindow(event)) return petRefused
       try {
-        return { ok: true, data: { pets: await pets.list() } } as const
+        const [list, removed] = await Promise.all([pets.list(), pets.removedPicks()])
+        return { ok: true, data: { pets: list, removed } } as const
       } catch (error) {
         return petFailure(error, 'The pets on this computer could not be read.')
       }
@@ -4641,18 +4642,14 @@ if (!ownsSingleInstanceLock) {
     ipcMain.handle(PET_REMOVE_CHANNEL, async (event, id: unknown) => {
       if (!fromOwnWindow(event) || typeof id !== 'string') return petRefused
       try {
-        // A pet a teammate wears stays: removing it would take that teammate's face.
+        /*
+         * Out of the picker either way (0.569, Colin: "give me an option to
+         * delete some of them"). A pet a teammate wears keeps its files, so
+         * that teammate's face stays until they get another look.
+         */
         const wearers = (await teammates.list()).filter((teammate) => teammate.avatar.pet?.source === 'gallery' && teammate.avatar.pet.id === id)
-        if (wearers.length > 0) {
-          const names = wearers.map((teammate) => teammate.name)
-          const who = names.length === 1 ? names[0]! : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]!}`
-          return {
-            ok: false,
-            error: { code: 'WORN', message: `${who} ${names.length === 1 ? 'wears' : 'wear'} this pet. Give ${names.length === 1 ? 'them' : 'each of them'} another look first.` }
-          } as const
-        }
-        await pets.remove(id)
-        return { ok: true } as const
+        await pets.remove(id, wearers.length > 0)
+        return { ok: true, data: { keptFor: wearers.map((teammate) => teammate.name) } } as const
       } catch (error) {
         return petFailure(error, 'That pet could not be removed.')
       }

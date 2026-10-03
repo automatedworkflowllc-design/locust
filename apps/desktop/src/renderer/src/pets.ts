@@ -157,11 +157,17 @@ export function usePetLook(ref: PetRef | undefined): PetLook | undefined {
 /* ---- The pets on this computer, for the look picker. ---- */
 
 let list: readonly PublicPet[] | undefined
+/** The picks taken out of the picker (0.569); the same array until it changes, for useSyncExternalStore. */
+let removedPicks: readonly string[] = []
 let listError: string | undefined
 let listReading: Promise<void> | undefined
 
 export function petList(): readonly PublicPet[] | undefined {
   return list
+}
+
+export function petRemovedPicks(): readonly string[] {
+  return removedPicks
 }
 
 export function petListError(): string | undefined {
@@ -177,6 +183,8 @@ export function refreshPetList(): Promise<void> {
       const answer = await bridge.listPets()
       if (answer.ok) {
         list = answer.data.pets
+        const removed = answer.data.removed ?? []
+        if (removed.join('|') !== removedPicks.join('|')) removedPicks = removed
         listError = undefined
       } else {
         listError = answer.error.message
@@ -192,11 +200,12 @@ export function refreshPetList(): Promise<void> {
 }
 
 /** The pets on this computer, read when first asked for. */
-export function usePetList(): { readonly pets: readonly PublicPet[] | undefined; readonly error: string | undefined } {
+export function usePetList(): { readonly pets: readonly PublicPet[] | undefined; readonly error: string | undefined; readonly removed: readonly string[] } {
   const pets = useSyncExternalStore(subscribe, petList, petList)
   const error = useSyncExternalStore(subscribe, petListError, petListError)
+  const removed = useSyncExternalStore(subscribe, petRemovedPicks, petRemovedPicks)
   useEffect(() => {
     void refreshPetList()
   }, [])
-  return { pets, error }
+  return { pets, error, removed }
 }

@@ -8650,6 +8650,63 @@ textarea {
   color: var(--lc-text-secondary);
 }
 
+/* The heading, with Remove some... at its right end (0.569). */
+.lc-pets__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lc-space-3);
+}
+
+.lc-pets__actions {
+  display: inline-flex;
+  gap: var(--lc-space-3);
+}
+
+.lc-pets__action {
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-secondary);
+  text-decoration: none;
+}
+
+.lc-pets__action:hover:not(:disabled) {
+  color: var(--lc-text-primary);
+  text-decoration: underline;
+}
+
+.lc-pets__action:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.lc-pets__action--remove:not(:disabled) {
+  color: var(--lc-red-text);
+}
+
+/* Ticked to remove: a red edge and an x in the corner. */
+.lc-pettile.is-ticked {
+  border-color: var(--lc-red-text);
+}
+
+.lc-pettile__tick {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--lc-red-text);
+}
+
+/* A removed pet, shown to bring back: faded until hovered. */
+.lc-pettile.is-removed {
+  opacity: 0.45;
+  border-style: dashed;
+}
+
+.lc-pettile.is-removed:hover {
+  opacity: 0.85;
+}
+
 /* A colour under a pet: a plain swatch, since a pet is not tinted. */
 .lc-hue__chip {
   display: block;

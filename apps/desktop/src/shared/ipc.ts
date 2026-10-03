@@ -1478,11 +1478,13 @@ export interface PetFailure {
   readonly error: { readonly code: 'PETS_UNAVAILABLE' | 'REFUSED' | 'WORN'; readonly message: string }
 }
 
-export type PetListResponse = { readonly ok: true; readonly data: { readonly pets: readonly PublicPet[] } } | PetFailure
+/** `removed` (0.569): the picks the person took out of the picker. */
+export type PetListResponse = { readonly ok: true; readonly data: { readonly pets: readonly PublicPet[]; readonly removed?: readonly string[] } } | PetFailure
 export type PetSheetResponse = { readonly ok: true; readonly data: { readonly bytes: Uint8Array; readonly rows: PetRows } } | PetFailure
 export type PetThumbnailResponse = { readonly ok: true; readonly data: { readonly dataUrl: string } } | PetFailure
 export type PetAddResponse = { readonly ok: true; readonly data: { readonly pet: PublicPet } } | PetFailure
-export type PetRemoveResponse = { readonly ok: true } | PetFailure
+/** `keptFor` (0.569): who wears it, so its files stayed for their face. */
+export type PetRemoveResponse = { readonly ok: true; readonly data?: { readonly keptFor: readonly string[] } } | PetFailure
 
 /**
  * Each teammate's money this calendar month, by id. A teammate with none is

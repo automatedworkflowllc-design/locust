@@ -265,6 +265,34 @@ describe('adding one of the pets Locust offers', () => {
     await expect(pets.remove('../pets')).rejects.toThrow(/not on this computer/)
   })
 
+  it('takes several out of the picker at once, keeps a worn one\'s files, and brings one back when picked (0.569)', async () => {
+    const served = gallery([{ id: 'luna-techbot', name: 'Luna TechBot' }, { id: 'robot', name: 'Robot' }])
+    served.serve(sheetAt('luna-techbot'), () => new Response(webp('VP8L', 1536, 2288), { status: 200 }))
+    served.serve(sheetAt('robot'), () => new Response(webp('VP8L', 1536, 2288), { status: 200 }))
+    const { root, pets } = await library(served.fetch)
+    await pets.add('luna-techbot')
+    await pets.add('robot')
+    expect(await pets.removedPicks()).toEqual([])
+    // At once, as the picker's Remove 3 sends them: every one is kept in the list.
+    await Promise.all([pets.remove('luna-techbot'), pets.remove('robot', true), pets.remove('reaper')])
+    expect([...(await pets.removedPicks())].sort()).toEqual(['luna-techbot', 'reaper', 'robot'])
+    // A worn pet's files stay, so its teammate's face does.
+    expect(await readdir(join(root, 'pets'))).toEqual(['robot'])
+    // Picked again: back in the picker, and nothing downloaded, its files having stayed.
+    const asked = served.asked.length
+    await pets.add('robot')
+    expect(served.asked.length).toBe(asked)
+    expect([...(await pets.removedPicks())].sort()).toEqual(['luna-techbot', 'reaper'])
+  })
+
+  it('reads a removed list that does not read as nothing removed, and keeps only picks from one that does', async () => {
+    const { root, pets } = await library(gallery([]).fetch)
+    await writeFile(join(root, 'pets-removed.json'), '{ not json')
+    expect(await pets.removedPicks()).toEqual([])
+    await writeFile(join(root, 'pets-removed.json'), JSON.stringify({ schemaVersion: 1, ids: ['robot', '../pets', 'yuyu-chibi', 5, 'robot'] }))
+    expect(await pets.removedPicks()).toEqual(['robot'])
+  })
+
   it('says so in words when openpets.dev cannot be reached at all', async () => {
     const { pets } = await library(async () => {
       throw new Error('offline')

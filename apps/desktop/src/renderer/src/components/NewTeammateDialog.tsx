@@ -17,7 +17,7 @@ import { routeLabel } from './GroupSettingsDialog.js'
 import { RoutePicker } from './RoutePicker.js'
 import type { RouteChoice } from './RoutePicker.js'
 import { TeammateBot } from './TeammateBot.js'
-import { PetCredit, PetPickTiles } from './PetPicks.js'
+import { PetCredit, PetPickTiles, PetRemovalControls, usePetRemoval } from './PetPicks.js'
 import { branchNameFor } from '../../../shared/worktree-name.js'
 import { dollars, isMonthlyLimit } from '../../../shared/spend.js'
 import type { Spend } from '../../../shared/spend.js'
@@ -351,11 +351,12 @@ export function NewTeammateDialog({
    * plain colours: the colour still marks the teammate, it does not tint the
    * pet.
    */
-  const { pets } = usePetList()
+  const { pets, removed: removedPets } = usePetList()
   const wornPet: PetRef | undefined = avatar.pet
   const wornLook = usePetLook(wornPet)
   const wornEntry = wornPet === undefined ? undefined : pets?.find((pet) => samePet(pet, wornPet))
   const [petNotice, setPetNotice] = useState<string>()
+  const petRemoval = usePetRemoval(setPetNotice)
   // Beside the picks: the person's own Codex pets, and a pet worn that is neither (kept, so it shows as chosen).
   const offered = (pet: PetRef): boolean => pet.source === 'gallery' && isPetPick(pet.id)
   const otherPets: readonly PublicPet[] = [
@@ -590,10 +591,13 @@ export function NewTeammateDialog({
             </div>
 
             <div className="lc-pets" role="group" aria-label="Pets">
-              <span className="lc-fieldlabel lc-mono">Pets</span>
+              <div className="lc-pets__head">
+                <span className="lc-fieldlabel lc-mono">Pets</span>
+                <PetRemovalControls removal={petRemoval} />
+              </div>
               <div className="lc-lookgrid" role="radiogroup" aria-label="Pets">
-                <PetPickTiles selected={wornPet} installed={pets} onWear={wearPet} onNotice={setPetNotice} />
-                {otherPets.map((pet) => {
+                <PetPickTiles selected={wornPet} installed={pets} onWear={wearPet} onNotice={setPetNotice} removed={removedPets} removal={petRemoval} />
+                {petRemoval.ticked === undefined && otherPets.map((pet) => {
                   const chosen = samePet(wornPet, pet)
                   return (
                     <button
@@ -615,6 +619,15 @@ export function NewTeammateDialog({
               </div>
               {petCaption !== undefined && <p className="lc-pets__caption">{petCaption}</p>}
               {petNotice !== undefined && <p className="lc-pets__caption lc-tone-amber">{petNotice}</p>}
+              {petRemoval.report !== undefined && <p className={`lc-pets__caption${petRemoval.report.warn ? ' lc-tone-amber' : ''}`}>{petRemoval.report.text}</p>}
+              {petRemoval.ticked === undefined && removedPets.length > 0 && (
+                <p className="lc-pets__caption">
+                  {`${String(removedPets.length)} removed. `}
+                  <button type="button" className="lc-linkbutton lc-pets__action" onClick={() => petRemoval.setShowRemoved(!petRemoval.showRemoved)}>
+                    {petRemoval.showRemoved ? 'Hide removed' : 'Show removed'}
+                  </button>
+                </p>
+              )}
               <PetCredit />
             </div>
           </div>
