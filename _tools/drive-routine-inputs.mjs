@@ -1,6 +1,7 @@
 // W7: make a routine with two inputs, run on FREE_ROUTE, read its ledger prompt,
 // export the exact allowed keys, and import into a fresh profile through the preview.
-// Native file dialogs use dev-only LOCUST_ROUTINE_FILE_PATH; no packaged drive.
+// Native file dialogs use dev-only LOCUST_ROUTINE_FILE_PATH, so `--packaged <exe>`
+// (0.567) drives everything up to the finished run and stops before Export.
 import { mkdtemp, readFile, readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,6 +9,7 @@ import { FREE_ROUTE, startDrive, scratchRepository, say, sleep } from './drive-l
 
 if (!FREE_ROUTE.model.startsWith('opencode/') || !FREE_ROUTE.model.endsWith('-free')) throw new Error('This drive requires a free OpenCode route.')
 const route = { ...FREE_ROUTE, mode: 'ask' }
+const packaged = process.argv.includes('--packaged') ? process.argv[process.argv.indexOf('--packaged') + 1] : undefined
 const workspace = await scratchRepository('locust-routine-inputs-ws-')
 const transfer = await mkdtemp(join(tmpdir(), 'locust-routine-inputs-file-'))
 const filePath = join(transfer, 'Portable notes.locust-routine.json')
@@ -37,7 +39,7 @@ let drive
 let sourceProfile
 let exported
 try {
-  drive = await startDrive({ name: 'routine-inputs-source', port: 9897, workspace, seed: seed('tm_source', 'Cedar'), keep: true, env: { LOCUST_ROUTINE_FILE_PATH: filePath } })
+  drive = await startDrive({ ...(packaged === undefined ? {} : { packaged }), name: 'routine-inputs-source', port: 9897, workspace, seed: seed('tm_source', 'Cedar'), keep: true, env: { LOCUST_ROUTINE_FILE_PATH: filePath } })
   sourceProfile = drive.profile
   await drive.ready()
   await drive.resize(1200, 720)
@@ -100,6 +102,10 @@ try {
   }
   check('the free run completes', mission.phase === 'completed', mission.phase)
   await drive.capture('the routine run finished', () => drive.evaluate(`document.querySelector('.lc-thread')?.innerText.slice(-1200)`))
+  if (packaged !== undefined) {
+    check('source captures have no renderer errors', drive.record.every((entry) => entry.errors.length === 0))
+    throw new Error('PACKAGED-STOP')
+  }
   await navigation(drive)
   await drive.evaluate(`document.querySelector('button[aria-label="Export Portable notes"]')?.click()`)
   await sleep(700)
@@ -158,7 +164,7 @@ try {
   check('cancel after picking the folder still starts nothing', noRun.ok && noRun.data.missions.length === 0)
   check('import captures have no renderer errors', drive.record.every((entry) => entry.errors.length === 0))
 } catch (error) {
-  check('drive completes without an exception', false, error instanceof Error ? error.stack : String(error))
+  if (!(error instanceof Error && error.message === 'PACKAGED-STOP')) check('drive completes without an exception', false, error instanceof Error ? error.stack : String(error))
 } finally {
   if (drive) await drive.finish({ intro: `W7 dev build; ${route.model}; fresh-profile routine import; no model run in this profile.`, extra: `${checks - failures}/${checks} checks passed. Transfer file: ${filePath}` })
 }
