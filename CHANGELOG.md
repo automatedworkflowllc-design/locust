@@ -11,6 +11,46 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.562.0 - 2026-10-03
+
+### Added
+
+- **Each teammate's face is your choice: Eyes, a Mouth, or a Screen.** Pick it
+  in the teammate's look. Until you pick, a screen goes on the shapes it suits
+  -- the droid, the mech, Prompt, the critter, and the square, pill, hexagon,
+  pebble, circle, ghost and cat -- and the rounder, grown shapes keep their
+  own eyes. Settings > Appearance > Terminal faces still turns every screen
+  off at once; Prompt keeps its screen, since that is its face.
+- **The title screen's three each have a part.** Prompt, the Codex nod, types
+  in bursts, finishes with a hop, looks over at the ghost, waits on you in
+  amber, and gets back to it. The ghost thinks, has an idea, and looks across.
+  The locust sleeps, eyes shut and z's drifting up, until your pointer comes
+  near; then it watches you, and a click makes its day.
+
+### Changed
+
+- **A screen glows one terminal colour, and colour means something.** Every
+  screen's eyes glow the same cyan; they turn green when a teammate is done,
+  amber while it waits on you (the colour of its ring), and red when it is
+  stuck. A teammate's own colour stays in its body and in the tint of its
+  screen.
+- **Code eyes belong to the screen.** A teammate without a screen keeps its
+  own eyes, which blink, glance and laugh, and still shows what it is doing
+  with its ring, its dot and its hop.
+- **Eyes blink when they change** instead of jumping from one look to the
+  next.
+
+### Fixed
+
+- **Eyes no longer run off the edge of a screen.** On a smaller screen, a
+  thinking or finished teammate's eyes could poke through its top, and a
+  teammate turning its head to follow your pointer could lose an eye off the
+  side. Every eye now stays inside its screen, at every size, glance and
+  moment.
+- **A teammate that hops when it finishes lands facing you.** On a busy
+  computer the hop's spin could come back mid-air and leave it turned away,
+  facing backwards.
+
 ## 0.561.0 - 2026-10-03
 
 ### Added

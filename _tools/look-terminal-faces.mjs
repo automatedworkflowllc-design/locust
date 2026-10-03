@@ -29,13 +29,13 @@ import { BOT_SHAPES } from ${JSON.stringify(join(DESKTOP, 'src/shared/avatar.ts'
 import { setTerminalFaces } from ${JSON.stringify(join(DESKTOP, 'src/renderer/src/botLook.ts').split(String.fromCharCode(92)).join('/'))}
 
 setTerminalFaces(${JSON.stringify(process.env.TERMINAL !== 'off')})
-const hues = ['#5b8def', '#c7a6ff', '#ff8c42', '#7fd17a', '#e8845c', '#6fb7d6', '#f06292', '#ffd54f']
-const eyes = [['>', '▮'], ['•', '•'], ['^', '^'], undefined]
-const cell = (type, i, face, glyphs) => h('div', { key: type + face + i, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', width: 104 } },
-  h('span', { style: { display: 'inline-flex', width: 80, height: 80, position: 'relative' } }, h(Bot, { type, size: 80, color: hues[i % hues.length], paused: true, seed: 0.2 + i * 0.07, face, ...(glyphs ? { eyes: glyphs } : {}) })),
-  h('span', { style: { color: '#8a8f98', font: '11px sans-serif', marginTop: 4 } }, type + (face === 'mouth' ? ' (mouth)' : '')))
+const hues = ['#5b8def', '#c7a6ff', '#ff8c42', '#7fd17a', '#e8845c', '#6fb7d6', '#f06292', '#ffd54f', '#e8ecf2', '#7d8796']
+const eyes = [[['>', '▮'], 'cyan'], [['•', '•'], 'cyan'], [['^', '^'], 'green'], [['x', 'x'], 'red'], [undefined, 'amber'], [undefined, 'cyan']]
+const cell = (type, i, face, [glyphs, phosphor] = [undefined, 'cyan']) => h('div', { key: type + face + i, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', width: 104 } },
+  h('span', { style: { display: 'inline-flex', width: 80, height: 80, position: 'relative' } }, h(Bot, { type, size: 80, color: hues[i % hues.length], paused: true, seed: 0.2 + i * 0.07, face, phosphor, ...(glyphs ? { eyes: glyphs } : {}) })),
+  h('span', { style: { color: '#8a8f98', font: '11px sans-serif', marginTop: 4 } }, type + (face === 'mouth' ? ' (mouth)' : '') + ' · ' + phosphor))
 createRoot(document.getElementById('root')).render(h('div', { style: { padding: 16, display: 'flex', flexWrap: 'wrap', gap: 6, width: 1240 } },
-  [...BOT_SHAPES.map((type, i) => cell(type, i, undefined, eyes[i % eyes.length])), ...BOT_SHAPES.slice(0, 6).map((type, i) => cell(type, i + 3, 'mouth', eyes[i % 3]))]
+  [...BOT_SHAPES.map((type, i) => cell(type, i, undefined, eyes[i % eyes.length])), ...BOT_SHAPES.slice(0, 6).map((type, i) => cell(type, i + 3, 'mouth', eyes[i % eyes.length]))]
 ))
 `
 

@@ -17,6 +17,7 @@ import {
 import type { BotAvatarFace, BotAvatarState, BotAvatarType } from 'bot-avatars'
 import { anchorsOf, anchorVariables, paintedBounds, type BodyBox } from '../botAnchors.js'
 
+import { screenSuits } from '../../../shared/avatar.js'
 import { useTerminalFaces } from '../botLook.js'
 import { LOCUST_BOTS, isLocustBot } from '../locustBots.js'
 import type { LocustBotType } from '../locustBots.js'
@@ -85,6 +86,14 @@ export interface BotProps {
   readonly glance?: Glance
   /** Each eye drawn as a code glyph, left then right (`eyeGlyphs`): undefined, the rig's own eyes. */
   readonly eyes?: EyeGlyphs
+  /** What a screen's eyes glow (PHOSPHOR); cyan when not given. A face with no screen ignores it. */
+  readonly phosphor?: Phosphor
+  /**
+   * Wears a screen for a face while Terminal faces is on: true or false as the
+   * teammate chose, undefined for whatever suits its shape (`screenSuits`).
+   * Prompt always does: the screen is its face.
+   */
+  readonly screen?: boolean
 }
 
 /** The glyph each eye becomes, left and right. */
@@ -118,6 +127,8 @@ interface GlyphShape {
   readonly ring?: number
   /** Stroke weight. */
   readonly weight: number
+  /** An eye already shut (asleep): the rig's own closing does not flatten it further. */
+  readonly closed?: true
 }
 
 export const GLYPH_SHAPES: Readonly<Record<string, GlyphShape>> = {
@@ -129,6 +140,8 @@ export const GLYPH_SHAPES: Readonly<Record<string, GlyphShape>> = {
   x: { lines: [[-3.9, -3.9, 3.9, 3.9], [3.9, -3.9, -3.9, 3.9]], weight: 4.2 },
   '|': { lines: [[0, -4.9, 0, 4.9]], weight: 5.4 },
   o: { lines: [], ring: 3.9, weight: 3.8 },
+  // An eye shut in sleep: a soft arc, low in the middle, as a contented sleeper's (0.562).
+  c: { lines: [[-4.6, -0.9, -2.6, 1.0, 0, 1.7, 2.6, 1.0, 4.6, -0.9]], weight: 3.8, closed: true },
   // A round eye, wide awake: one stroke of no length, its round cap a dot.
   '•': { lines: [[0, -0.01, 0, 0.01]], weight: 8.4 },
   // A block cursor: a short, fat bar, round at both ends.
@@ -219,6 +232,11 @@ export function glyphMotion(pair: string, eye: 0 | 1, seconds: number): GlyphMot
       const shudder = hump(frac(seconds / 3), 0, 0.14)
       return { ...AT_REST, dx: 1.1 * shudder * Math.sin(seconds * 70) }
     }
+    case 'cc': {
+      // Asleep: the slow rise and fall of breathing, nothing more.
+      const breath = Math.sin(seconds * 1.3)
+      return { ...AT_REST, dy: 0.5 * breath, sx: 1 + 0.03 * breath }
+    }
     default:
       return AT_REST
   }
@@ -293,6 +311,90 @@ const SCREEN_TURN = 0.55
 const SCREEN_GLYPH_SCALE = 1.3
 /** An inked glyph a little larger than the eye, and heavier: a dot is round and full, and a stroke of the dot's size reads thinner. */
 const INKED_GLYPH_SCALE = 1.12
+
+/**
+ * EVERY EYE STAYS INSIDE ITS SCREEN (0.562). Colin, 2026-10-03: "some of them
+ * the eyes are clipping through the top of the square or almost". The eyes'
+ * PLACE was kept on the screen, but not their SIZE or their motion: a
+ * thinking eye looks up by 1.8 units and a done eye bobs, and on a small
+ * fitted screen the glyph's top ran into the screen's edge and was cut. So a
+ * glyph's whole reach is measured -- its strokes, half its weight, and the most
+ * its motion can move (2 units) and stretch it (1.16x, glyphMotion) -- and the
+ * glyphs are made only as large, and placed only as far, as the screen can
+ * hold with SCREEN_PAD to spare. Checked for every pair, glance and moment.
+ */
+const MOTION_REACH = 2
+const MOTION_STRETCH = 1.16
+const SCREEN_PAD = 1.5
+
+/** How far a glyph's ink can reach from its eye's centre, in glyph units, across and down, moving as it does. */
+export function glyphReach(shape: GlyphShape): { readonly x: number; readonly y: number } {
+  let x = 0
+  let y = 0
+  for (const line of shape.lines) {
+    for (let i = 0; i < line.length; i += 2) {
+      x = Math.max(x, Math.abs(line[i] ?? 0))
+      y = Math.max(y, Math.abs(line[i + 1] ?? 0))
+    }
+  }
+  if (shape.ring !== undefined) {
+    x = Math.max(x, shape.ring)
+    y = Math.max(y, shape.ring)
+  }
+  const half = shape.weight / 2
+  return { x: x * MOTION_STRETCH + MOTION_REACH + half, y: y * MOTION_STRETCH + MOTION_REACH + half }
+}
+
+export interface ScreenEyeLayout {
+  /** The glyphs' size, glyph units to face units. */
+  readonly scale: number
+  /** Each eye's centre in face units, left then right. */
+  readonly centres: readonly [readonly [number, number], readonly [number, number]]
+}
+
+/**
+ * Where a screen's two eyes go and how large they are: as large as the
+ * mascot's on a screen Prompt's size, smaller on a smaller screen, and never
+ * so large or so far out that a glyph, moving, could touch the screen's edge
+ * or the other eye. A glance moves them only within the room that leaves.
+ */
+export function screenEyeLayout(
+  box: VisorBox,
+  pair: EyeGlyphs,
+  look: { readonly x: number; readonly y: number },
+  eyeY: number,
+  /** The head's own turn: a glance toward the side the head turns to is held back, see below. */
+  yaw = 0
+): ScreenEyeLayout {
+  const dot = GLYPH_SHAPES['\u2022'] as GlyphShape
+  const reaches = [glyphReach(GLYPH_SHAPES[pair[0]] ?? dot), glyphReach(GLYPH_SHAPES[pair[1]] ?? dot)]
+  const reachX = Math.max(reaches[0]?.x ?? 0, reaches[1]?.x ?? 0)
+  const reachY = Math.max(reaches[0]?.y ?? 0, reaches[1]?.y ?? 0)
+  const k = Math.max(0.5, Math.min(1, box.halfWidth / EYES_VISOR.halfWidth, box.halfHeight / EYES_VISOR.halfHeight))
+  const roomX = box.halfWidth - SCREEN_PAD
+  const roomY = box.halfHeight - SCREEN_PAD
+  // Two eyes side by side, a unit apart at the least, inside the screen across; one eye's height inside it down.
+  const scale = Math.max(0.1, Math.min(SCREEN_GLYPH_SCALE * k, roomY / reachY, (roomX - 0.5) / (2 * reachX)))
+  // Half a unit of air between the eyes at the least: the scale above leaves room for it.
+  const spread = Math.max(reachX * scale + 0.5, Math.min(12.5 * k, roomX - reachX * scale))
+  const across = Math.max(0, roomX - spread - reachX * scale)
+  const down = Math.max(0, roomY - reachY * scale)
+  /*
+   * A HEAD TURNED ONE WAY HOLDS BACK A GLANCE THE SAME WAY. Following a
+   * pointer off to one side turns the head and glances the eyes that way
+   * together; the screen turns less than the head (SCREEN_TURN), so its far
+   * edge then runs past the body's turned outline and the far eye went with
+   * it, cut by the body (_tools/look-screen-poses.mjs, yaw 0.75). The room
+   * toward the turn shrinks as the turn grows, gone at 0.7 rad.
+   */
+  const held = Math.max(0, 1 - Math.abs(yaw) / 0.7)
+  const toward = Math.sign(yaw)
+  const leftRoom = toward < 0 ? across * held : across
+  const rightRoom = toward > 0 ? across * held : across
+  const x = Math.max(-leftRoom, Math.min(rightRoom, look.x * 0.9))
+  const y = Math.max(box.y - down, Math.min(box.y + down, eyeY + look.y * 0.5))
+  return { scale, centres: [[x - spread, y], [x + spread, y]] }
+}
 
 /** A rounded rectangle's outline in face units, evenly spaced, to be laid on the sphere. */
 export function visorOutline(box: VisorBox): readonly (readonly [number, number])[] {
@@ -378,8 +480,31 @@ export function hueOf(color: string): number {
   return (hue * 60 + 360) % 360
 }
 
+/**
+ * WHAT A SCREEN GLOWS (0.562). Colin, 2026-10-03: "why do white ones have the
+ * cool blue terminal font color and the others just stick with the color of
+ * the teammate, i think we can come up with something better than that". The
+ * lit eyes took a bright tint of the body's own hue, so a pale teammate came
+ * out terminal blue and every other one wore its own colour twice -- a rule
+ * nobody chose. Now every screen glows ONE terminal colour, the cool cyan he
+ * liked, and colour means something: green when the teammate is done, amber
+ * while it waits on you (the same amber as its ring), red when it is stuck --
+ * a terminal's own green, yellow and red. The teammate's hue stays where it
+ * says who: the body, and the tint of the screen's glass.
+ */
+export type Phosphor = 'cyan' | 'green' | 'amber' | 'red'
+
+export const PHOSPHOR: Readonly<Record<Phosphor, { readonly lit: string; readonly glow: string }>> = {
+  cyan: { lit: 'hsl(190, 100%, 80%)', glow: 'hsla(192, 100%, 58%, 0.85)' },
+  green: { lit: 'hsl(140, 90%, 74%)', glow: 'hsla(140, 95%, 48%, 0.85)' },
+  amber: { lit: 'hsl(40, 100%, 72%)', glow: 'hsla(36, 100%, 52%, 0.85)' },
+  red: { lit: 'hsl(356, 100%, 77%)', glow: 'hsla(356, 100%, 58%, 0.85)' }
+}
+
 export interface EyePaint {
   readonly ink: string
+  /** What a screen's eyes glow this frame; cyan when not given. Ignored when the face is no screen. */
+  readonly phosphorNow?: () => Phosphor
   /** The body colour, for a screen's own tints; undefined, the face is no screen. */
   readonly screenOf: string | undefined
   /** Device pixels a face unit spans, for the glow. */
@@ -402,7 +527,7 @@ export function withGlyphEyes(
   context: CanvasRenderingContext2D,
   eyesNow: () => EyeGlyphs | undefined,
   paint: EyePaint
-): { readonly frame: (pose: FacePose, seconds: number) => void } {
+): { readonly frame: (pose: FacePose, seconds: number) => void; readonly drawsGlyphs: () => boolean } {
   // From the prototype, never the context: a second effect on the same canvas must not stack on the first.
   const own = Object.getPrototypeOf(context) as CanvasRenderingContext2D
   const stroke = own.stroke.bind(context) as (...args: unknown[]) => void
@@ -411,15 +536,49 @@ export function withGlyphEyes(
   const screen = paint.screenOf
   const box = paint.visor ?? EYES_VISOR
   const visorShape = visorOutline(box)
-  const lit = screen === undefined ? paint.ink : sameHue(screen, 0.95, 0.8)
-  const glow = screen === undefined ? undefined : sameHue(screen, 1, 0.62, 0.85)
+  // A screen's glow is read each frame (PHOSPHOR), so a state's colour arrives without restarting the rig.
+  let lit = screen === undefined ? paint.ink : PHOSPHOR.cyan.lit
+  let glow = screen === undefined ? undefined : PHOSPHOR.cyan.glow
   const visorTop = screen === undefined ? '' : sameHue(screen, 0.42, 0.17)
   const visorBottom = screen === undefined ? '' : sameHue(screen, 0.5, 0.08)
   let drawn = 0
   let yaw = 0
   let pitch = 0
   let look = { x: 0, y: 0 }
+  let headYaw = 0
   let seconds = 0
+  /*
+   * EYES BLINK WHEN THEY CHANGE (0.562). A teammate that starts work, finishes
+   * or gets stuck used to swap one glyph for the next between two frames -- a
+   * pop. Now the old eyes close, the new ones open in their place, and a new
+   * glow comes in with them: SWAP_S, as long as a blink. A still bot (seconds
+   * 0) swaps at once.
+   */
+  const SWAP_S = 0.26
+  let shownPair: EyeGlyphs | undefined = eyesNow()
+  let shownTone: Phosphor = paint.phosphorNow?.() ?? 'cyan'
+  let swap: { readonly start: number; readonly pair: EyeGlyphs | undefined; readonly tone: Phosphor } | undefined
+  /** 0 open, 1 shut: how far the change-blink has the eyes closed this frame. */
+  let swapShut = 0
+  /*
+   * A SCREEN'S EYES OPEN WHEN THE BOT WAKES. The rig closes its eyes to sleep
+   * and opens them again slowly, over seconds, and a screen's glyphs followed
+   * its openness -- so the title screen's locust, woken, kept squinting bars
+   * for a second and more. A screen shows sleep with its own closed glyph
+   * ('c'), so on a screen only a blink closes the eyes: an eye shut for longer
+   * than a blink is drawn open.
+   */
+  const BLINK_S = 0.35
+  let shutSince: number | undefined
+  const screenOpenness = (open: number): number => {
+    if (open >= 0.5 || seconds === 0) {
+      shutSince = undefined
+      return open
+    }
+    shutSince ??= seconds
+    return seconds - shutSince > BLINK_S ? 1 : open
+  }
+  const sameEyes = (a: EyeGlyphs | undefined, b: EyeGlyphs | undefined): boolean => (a?.join('') ?? '') === (b?.join('') ?? '')
   let leftHidden = false
   let face: DOMMatrix | undefined
   if (screen !== undefined) {
@@ -501,20 +660,17 @@ export function withGlyphEyes(
   const screenEyes = (open: number): void => {
     visor()
     if (face === undefined) return
-    const pair = eyesNow() ?? SCREEN_RESTING_EYES
-    const k = Math.max(0.55, Math.min(1, box.halfWidth / EYES_VISOR.halfWidth))
-    const scale = SCREEN_GLYPH_SCALE * k
-    const spread = 12.5 * k
-    const across = Math.max(0, box.halfWidth - spread - 6.5 * scale)
-    const down = Math.max(0, box.halfHeight - 6.5 * scale)
-    const lookX = Math.max(-across, Math.min(across, look.x * 0.9))
-    const lookY = Math.max(box.y - down, Math.min(box.y + down, (paint.eyeY ?? 1) + look.y * 0.5))
-    const squash = 0.08 + 0.92 * open
+    const pair = shownPair ?? SCREEN_RESTING_EYES
+    const { scale, centres } = screenEyeLayout(box, pair, look, paint.eyeY ?? 1, headYaw)
+    const squash = (0.08 + 0.92 * open) * (1 - 0.92 * swapShut)
     for (const eye of [0, 1] as const) {
       const shape = GLYPH_SHAPES[pair[eye]] ?? GLYPH_SHAPES['•']
       const motion = glyphMotion(pair.join(''), eye, seconds)
       if (shape === undefined || !motion.shown) continue
-      const at = sphereAt((eye === 0 ? -spread : spread) + lookX, lookY, yaw, pitch)
+      const [cx, cy] = centres[eye]
+      // An eye shut in sleep stays as drawn; only a change-blink closes it further.
+      const eyeSquash = shape.closed === true ? 1 - 0.92 * swapShut : squash
+      const at = sphereAt(cx, cy, yaw, pitch)
       if (at.z < 0.05) continue
       context.save()
       context.setTransform(face)
@@ -524,7 +680,7 @@ export function withGlyphEyes(
       // The context's own translate: the shadowed one would take this for the face's.
       translate(at.x, at.y)
       context.scale(Math.max(0.02, at.sx), Math.max(0.02, at.sy))
-      drawGlyph(shape, motion, scale, squash)
+      drawGlyph(shape, motion, scale, eyeSquash)
       context.restore()
     }
   }
@@ -533,17 +689,17 @@ export function withGlyphEyes(
     const left = drawn === 0 && !leftHidden
     drawn += 1
     if (screen !== undefined) {
-      if (drawn === 1) screenEyes(eyeOpenness(context.lineWidth))
+      if (drawn === 1) screenEyes(screenOpenness(eyeOpenness(context.lineWidth)))
       return
     }
-    const pair = eyesNow()
+    const pair = shownPair
     const shape = GLYPH_SHAPES[pair?.[left ? 0 : 1] ?? '']
     if (shape === undefined) {
       // Not a glyph we draw: the rig's own eye, in the face's colour.
       context.strokeStyle = lit
       return stroke(...args)
     }
-    const squash = 0.08 + 0.92 * eyeOpenness(context.lineWidth)
+    const squash = (shape.closed === true ? 1 : 0.08 + 0.92 * eyeOpenness(context.lineWidth)) * (1 - 0.92 * swapShut)
     const motion = glyphMotion(pair?.join('') ?? '', left ? 0 : 1, seconds)
     if (!motion.shown) return
     context.save()
@@ -576,14 +732,43 @@ export function withGlyphEyes(
     frame: (pose, s) => {
       drawn = 0
       seconds = s
+      const wanted = eyesNow()
+      const tone = paint.phosphorNow?.() ?? 'cyan'
+      if (s === 0) {
+        // Still: no blink to run.
+        swap = undefined
+        shownPair = wanted
+        shownTone = tone
+        swapShut = 0
+      } else {
+        const target = swap === undefined ? { pair: shownPair, tone: shownTone } : swap
+        if (!sameEyes(target.pair, wanted) || target.tone !== tone) swap = { start: s, pair: wanted, tone }
+        if (swap !== undefined) {
+          const p = (s - swap.start) / SWAP_S
+          if (p >= 0.5) {
+            shownPair = swap.pair
+            shownTone = swap.tone
+          }
+          swapShut = p >= 1 ? 0 : p < 0.5 ? p * 2 : (1 - p) * 2
+          if (p >= 1) swap = undefined
+        }
+      }
+      if (screen !== undefined) {
+        const phosphor = PHOSPHOR[shownTone]
+        lit = phosphor.lit
+        glow = phosphor.glow
+      }
       // The screen and its eyes turn with the head, but not as far (SCREEN_TURN).
+      headYaw = pose.yaw
       yaw = pose.yaw * SCREEN_TURN
       pitch = pose.pitch * SCREEN_TURN
       look = { x: pose.lookX, y: pose.lookY }
       leftHidden = pose.yaw < LEFT_EYE_HIDDEN_AT
       face = undefined
       outline = []
-    }
+    },
+    /** Whether this frame draws glyphs (or is blinking between them): the rig must then draw its eyes in GLYPH_INK. */
+    drawsGlyphs: () => shownPair !== undefined || swap !== undefined
   }
 }
 
@@ -882,16 +1067,31 @@ function RiggedBot({
   jumpEvery,
   hop = false,
   glance,
-  eyes
+  eyes,
+  phosphor,
+  screen: screenChoice
 }: BotProps): ReactElement {
   const ref = useRef<HTMLCanvasElement>(null)
   const rig = useRef<BotAvatarSim | null>(null)
   const glyphs = useRef(eyes)
-  // A screen always has lit eyes: its resting ones when nothing else is asked.
-  // Terminal faces on (Settings > Appearance), every shape wears one.
+  // The rig's own clock (seconds it has been stepped), and when a hop's held-back spin returns on it.
+  const rigTime = useRef(0)
+  const spinBackAt = useRef<number | undefined>(undefined)
+  // Terminal faces on (Settings > Appearance): a teammate wears a screen as it chose, or as its shape suits.
   const terminal = useTerminalFaces()
-  const screen = outlineOf(type).screen || terminal
-  glyphs.current = eyes ?? (screen ? SCREEN_RESTING_EYES : undefined)
+  const screen = outlineOf(type).screen || (terminal && (screenChoice ?? screenSuits(type)))
+  /*
+   * CODE EYES ARE A SCREEN'S (0.562). Colin: "maybe also a toggle for the
+   * computer eyes as well, or should the computer eyes be exclusive to the
+   * terminal screen?" Exclusive. Lit on a screen they read as a terminal's
+   * output; inked straight onto plastic they were the "text for eyes" he
+   * turned down in the first place. A face with no screen keeps the rig's own
+   * eyes -- blinking, glancing, laughing -- and says its state with its ring,
+   * dot and hop. A screen with nothing asked of it rests on two lit bars.
+   */
+  glyphs.current = screen ? eyes ?? SCREEN_RESTING_EYES : undefined
+  const glowing = useRef(phosphor)
+  glowing.current = phosphor
   // What each frame reads, so a glance or the pointer never restarts the rig.
   const aim = useRef<{ follows: boolean; glance: Glance | undefined; glancedAt: number }>({
     follows: interactive,
@@ -923,6 +1123,7 @@ function RiggedBot({
     // Read at each frame, so a teammate's eyes change with what it does without restarting its rig.
     const painter = withGlyphEyes(context, () => glyphs.current, {
       ink,
+      phosphorNow: () => glowing.current ?? 'cyan',
       screenOf: screen ? body : undefined,
       visor: visorOf(outline, face ?? outline.face, path),
       // The rig's eye height for each face (its own `eyes: 1, mouth: -3.5`).
@@ -945,7 +1146,7 @@ function RiggedBot({
         faceY: outline.faceY,
         faceScale: outline.faceScale,
         color: body,
-        ink: glyphs.current === undefined ? ink : GLYPH_INK,
+        ink: painter.drawsGlyphs() ? GLYPH_INK : ink,
         shading: 'plastic',
         dpr,
         theme: 'dark',
@@ -976,6 +1177,13 @@ function RiggedBot({
           sim.setPointer(0, 0, 0)
         }
         sim.update(seconds)
+        // The rig's own clock, as the rig counts it (it takes at most 0.05 s a step).
+        rigTime.current += Math.min(0.05, seconds)
+        const restoreAt = spinBackAt.current
+        if (restoreAt !== undefined && rigTime.current >= restoreAt) {
+          spinBackAt.current = undefined
+          sim.setJump({ spin: botAvatarJumpDefaults.spin })
+        }
       },
       () => onScreen && document.visibilityState !== 'hidden'
     )
@@ -997,7 +1205,7 @@ function RiggedBot({
     }
     // A new state eases in on the running rig (below); only a still bot is
     // redrawn from scratch for one.
-  }, [type, size, color, face, seed, paused, paused ? state : undefined, jumpEvery, paused ? eyes?.join('') : undefined, screen])
+  }, [type, size, color, face, seed, paused, paused ? state : undefined, jumpEvery, paused ? eyes?.join('') : undefined, paused ? phosphor : undefined, screen])
 
   useEffect(() => {
     if (!paused) rig.current?.setState(state)
@@ -1021,16 +1229,22 @@ function RiggedBot({
    * whenever the hop's moment ends. Declared after the rig's effect, so a
    * bot woken for its hop hops on the rig just made.
    */
-  const landing = useRef(0)
-  useEffect(() => () => window.clearTimeout(landing.current), [])
+  /*
+   * THE TURN COMES BACK ON THE RIG'S CLOCK, NOT THE WALL'S (0.562). It came
+   * back on a 1.5 s timer; the rig advances at most 0.05 s a frame, so when
+   * frames come slowly -- a busy machine, a window half covered, a hidden one
+   * -- the hop was still in the air when the spin came back, and the bot
+   * turned part way round mid-hop and finished the turn slowly, faceless
+   * (the title screen's Prompt, look-cover.mjs, every frame after its hop).
+   * Now the spin returns once the RIG has lived HOP_MS since the hop.
+   */
   useEffect(() => {
     if (!hop) return
     const sim = rig.current
     if (sim === null) return
     sim.setJump({ spin: 0 })
     sim.poke()
-    window.clearTimeout(landing.current)
-    landing.current = window.setTimeout(() => sim.setJump({ spin: botAvatarJumpDefaults.spin }), HOP_MS)
+    spinBackAt.current = rigTime.current + HOP_MS / 1000
   }, [hop])
 
   const box = size * BOT_AVATAR_OVERSCAN

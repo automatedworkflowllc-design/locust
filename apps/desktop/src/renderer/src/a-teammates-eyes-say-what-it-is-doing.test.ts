@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { FaceActivity } from './faceState.js'
-import { GLYPH_EYES_MIN, eyeGlyphsFor } from './components/TeammateBot.js'
+import { eyeGlyphsFor } from './components/TeammateBot.js'
 
 /**
  * A TEAMMATE'S EYES SAY WHAT IT IS DOING (0.559).
@@ -29,9 +29,9 @@ describe('the glyph each state wears', () => {
     })
   })
 
-  it('is not drawn where a glyph would be a speck', () => {
-    // The sidebar's smallest faces keep the rig's eyes; the header's 32 and up read.
-    expect(GLYPH_EYES_MIN).toBeGreaterThan(16)
-    expect(GLYPH_EYES_MIN).toBeLessThanOrEqual(26)
+  it('is drawn on a screen only (0.562): a face with no screen keeps its own eyes', () => {
+    // Colin: "should the computer eyes be exclusive to the terminal screen?" -- yes. Bot.tsx sets
+    // the glyphs only when it wears a screen; see a-teammate-chooses-its-screen.test.tsx for the faces.
+    expect(eyeGlyphsFor('working')).toEqual(['>', '▮'])
   })
 })

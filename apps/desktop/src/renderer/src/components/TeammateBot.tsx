@@ -4,9 +4,8 @@ import type { BotAvatarState } from 'bot-avatars'
 import { botFor } from '../../../shared/avatar.js'
 import type { FaceActivity } from '../faceState.js'
 import type { GlanceSide } from '../glances.js'
-import { useTerminalFaces } from '../botLook.js'
-import { Bot, outlineOf } from './Bot.js'
-import type { EyeGlyphs, Glance } from './Bot.js'
+import { Bot } from './Bot.js'
+import type { EyeGlyphs, Glance, Phosphor } from './Bot.js'
 import { PRESENCE_TONE } from './PixelFace.js'
 import { RuntimeMark } from './RuntimeMark.js'
 import type { PixelFaceProps } from './PixelFace.js'
@@ -185,8 +184,24 @@ export function eyeGlyphsFor(activity: FaceActivity): EyeGlyphs | undefined {
   }
 }
 
-/** Below this an inked glyph is a speck: the rig's own eyes read better. A screen's lit ones read at any size. */
-export const GLYPH_EYES_MIN = 22
+/**
+ * What a screen's eyes glow for each state (0.562): the terminal's cyan while
+ * it works, thinks or idles; green when it is done, amber while it waits on
+ * you (the ring's amber), red when it is stuck. See PHOSPHOR in Bot.tsx.
+ */
+export function phosphorFor(activity: FaceActivity): Phosphor {
+  switch (activity) {
+    case 'done':
+      return 'green'
+    case 'waiting':
+      return 'amber'
+    case 'blocked':
+      return 'red'
+    default:
+      return 'cyan'
+  }
+}
+
 
 /** Below this a badge is a speck: the mark is not drawn. */
 export const MARKED_FACE_MIN = 24
@@ -210,8 +225,6 @@ export function TeammateBot({
   const color = hueColor(hue)
   const tone = PRESENCE_TONE[presence]
   const eyes = eyeGlyphsFor(activity === 'done' && !hopsWhenDone ? 'idle' : activity)
-  // A lit eye on a screen reads at any size; an inked one only from GLYPH_EYES_MIN.
-  const terminal = useTerminalFaces()
   return (
     <span
       className={`lc-face lc-bot${bounces ? ' is-bouncing' : ''}${className === undefined ? '' : ` ${className}`}`}
@@ -231,7 +244,9 @@ export function TeammateBot({
         face={bot.face}
         seed={seedOf(teammateId ?? name ?? bot.shape)}
         hop={hops}
-        {...((size >= GLYPH_EYES_MIN || terminal || outlineOf(bot.shape).screen) && eyes !== undefined ? { eyes } : {})}
+        {...(eyes === undefined ? {} : { eyes })}
+        {...(bot.screen === undefined ? {} : { screen: bot.screen })}
+        phosphor={phosphorFor(activity === 'done' && !hopsWhenDone ? 'idle' : activity)}
         {...(glance === undefined ? {} : { glance: GLANCE_TOWARD[glance] })}
         {...(color === undefined ? {} : { color })}
         {...(jumpEvery === undefined ? {} : { jumpEvery })}

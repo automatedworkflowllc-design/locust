@@ -2393,13 +2393,13 @@ export function SettingsScreen({
               <h2 className="lc-settings__heading">Terminal faces</h2>
               <p className="lc-settings__lede">
                 {terminalFaces
-                  ? 'On. Every teammate wears a screen for a face, its eyes lit code that says what it is doing.'
-                  : "Off. Each teammate keeps its own eyes, which turn to code while it works."}
+                  ? "On. A teammate with a screen for a face wears it, its eyes lit code that says what it is doing. Choose each one's face in its look."
+                  : 'Off. Every teammate keeps its own eyes.'}
               </p>
             </div>
             <div className="lc-settingline__preview" aria-hidden>
               {TERMINAL_FACES_PREVIEW.map(([type, eyes], i) => (
-                <span key={type} className="lc-settingline__bot">
+                <span key={type} className="lc-settingline__bot" data-bot={type}>
                   <Bot type={type} size={40} paused seed={0.3 + i * 0.2} eyes={eyes} />
                 </span>
               ))}

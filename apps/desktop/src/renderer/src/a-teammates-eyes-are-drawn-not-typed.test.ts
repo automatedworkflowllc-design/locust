@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { EYES_VISOR, GLYPH_INK, GLYPH_SHAPES, fitVisor, glyphMotion, hueOf, visorOutline, SCREEN_RESTING_EYES, eyeOpenness, onSphere, outlineOf, sameHue, withGlyphEyes } from './components/Bot.js'
+import { EYES_VISOR, GLYPH_INK, GLYPH_SHAPES, PHOSPHOR, fitVisor, glyphMotion, hueOf, visorOutline, SCREEN_RESTING_EYES, eyeOpenness, onSphere, outlineOf, sameHue, withGlyphEyes } from './components/Bot.js'
 import type { EyeGlyphs } from './components/Bot.js'
 import { eyeGlyphsFor } from './components/TeammateBot.js'
 import type { FaceActivity } from './faceState.js'
@@ -116,13 +116,13 @@ describe('a screen for a face', () => {
     expect(outlineOf('droid').screen).toBe(false)
   })
 
-  it('is drawn once a frame, under the eyes, and the eyes are lit in the teammate\'s own hue', () => {
+  it('is drawn once a frame, under the eyes, and the eyes glow the terminal cyan, not the teammate\'s hue (0.562)', () => {
     const drawn = drawEyes(['>', '▮'], '#6fb7d6')
     // The visor's fill, its rim, then each eye.
     expect(drawn.calls.filter((call) => call === 'fill')).toHaveLength(1)
     expect(drawn.calls.indexOf('fill')).toBeLessThan(drawn.calls.lastIndexOf('stroke'))
     const lit = drawn.styles.slice(-2)
-    expect(lit[0]).toBe(sameHue('#6fb7d6', 0.95, 0.8))
+    expect(lit[0]).toBe(PHOSPHOR.cyan.lit)
     expect(lit[1]).toBe(lit[0])
   })
 

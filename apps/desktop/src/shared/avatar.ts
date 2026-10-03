@@ -63,6 +63,27 @@ export type BotFace = 'eyes' | 'mouth'
 export interface BotSpec {
   readonly shape: BotShape
   readonly face: BotFace
+  /** Wears a screen for a face (0.562); absent: whatever suits its shape (`screenSuits`). */
+  readonly screen?: boolean
+}
+
+/**
+ * WHICH SHAPES A SCREEN SUITS (0.562). Colin, 2026-10-03: "do you think
+ * design wise some of the teammates shouldnt have the computer screen/terminal
+ * face? ... have it toggleable in the teammate editor". Looked at, all 22 with
+ * a screen (look-terminal-faces.mjs): it suits the made, boxy shapes -- a
+ * droid, a mech, Prompt, the critter, a square, a pill, a hexagon, a pebble,
+ * a circle's helmet, the ghost, the cat's visor -- and on the grown, bumpy
+ * ones (a star, a flower, a clover, a cloud, a drop, a blob, a puddle, the
+ * triangle, the alien's own eyes, the insects' small heads) it reads as a mask
+ * stuck on. So it is each teammate's choice, defaulting to this.
+ */
+export const SCREEN_SHAPES: ReadonlySet<BotShape> = new Set<BotShape>([
+  'square', 'ghost', 'circle', 'droid', 'mech', 'hexagon', 'cat', 'pill', 'pebble', 'critter', 'prompt'
+])
+
+export function screenSuits(shape: string): boolean {
+  return SCREEN_SHAPES.has(shape as BotShape)
 }
 
 export function isBotSpec(value: unknown): value is BotSpec {
@@ -71,7 +92,8 @@ export function isBotSpec(value: unknown): value is BotSpec {
   return (
     typeof record.shape === 'string' &&
     (BOT_SHAPES as readonly string[]).includes(record.shape) &&
-    (record.face === 'eyes' || record.face === 'mouth')
+    (record.face === 'eyes' || record.face === 'mouth') &&
+    (record.screen === undefined || typeof record.screen === 'boolean')
   )
 }
 
@@ -168,7 +190,9 @@ export function cleanAvatar(avatar: AvatarSpec): AvatarSpec {
     headwear: avatar.headwear,
     accessory: avatar.accessory,
     mouth: avatar.mouth,
-    ...(avatar.bot === undefined ? {} : { bot: { shape: avatar.bot.shape, face: avatar.bot.face } })
+    ...(avatar.bot === undefined
+      ? {}
+      : { bot: { shape: avatar.bot.shape, face: avatar.bot.face, ...(typeof avatar.bot.screen === 'boolean' ? { screen: avatar.bot.screen } : {}) } })
   }
 }
 

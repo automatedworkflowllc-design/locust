@@ -221,8 +221,13 @@ try {
     // The machine cover has no card border, so its width is the cover's.
     // Since 0.351 the drawing grows into spare height (coverGrowFor): at most
     // 1.45x the card's share of 960, keeping 3% of the card clear each side.
+    // And since 0.401 it gives height back on a page too tall for its pane,
+    // down to COVER_MIN_GROW (0.85) -- this check still asked for "never
+    // smaller" and failed on every full Home since (found 0.562; the same on
+    // 0.561's packaged build). The range is the documented one; the k on the
+    // page must still be the card's share times a factor inside it.
     const grown = Number(m.k) / (m.card.width / 960)
-    check(`${label}: k is the card's width over the cover's 960, grown at most 1.45x`, grown > 0.998 && grown <= 1.452, `${m.k} = ${(m.card.width / 960).toFixed(3)} x ${grown.toFixed(3)}`)
+    check(`${label}: k is the card's width over the cover's 960, grown or given back within 0.85-1.45x`, grown >= 0.848 && grown <= 1.452, `${m.k} = ${(m.card.width / 960).toFixed(3)} x ${grown.toFixed(3)}`)
     check(`${label}: grown, the machine keeps 3% of the card clear each side`, m.machine.left - m.card.left >= 0.03 * m.card.width - 1 && m.card.right - m.machine.right >= 0.03 * m.card.width - 1, `${Math.round(m.machine.left - m.card.left)}px and ${Math.round(m.card.right - m.machine.right)}px of ${Math.round(m.card.width)}`)
     check(`${label}: the claim is centred under the lockup (letters to letters)`, Math.abs(m.claimLetters.mid - m.lockupInk.mid) <= 1.5, `claim centre ${m.claimLetters.mid.toFixed(1)}, lockup centre ${m.lockupInk.mid.toFixed(1)}`)
     check(`${label}: the lockup is centred on the machine's glass`, Math.abs(m.lockupInk.mid - m.glass.mid) <= 3, `lockup centre ${m.lockupInk.mid.toFixed(1)}, glass centre ${m.glass.mid.toFixed(1)}`)

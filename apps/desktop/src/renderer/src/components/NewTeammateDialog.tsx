@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import { useModal } from '../useModal.js'
 
-import { BOT_SHAPES, botFor, seedAvatar, shuffledAvatar } from '../../../shared/avatar.js'
-import type { AvatarSpec, BotShape } from '../../../shared/avatar.js'
+import { BOT_SHAPES, botFor, screenSuits, seedAvatar, shuffledAvatar } from '../../../shared/avatar.js'
+import type { AvatarSpec, BotFace, BotShape, BotSpec } from '../../../shared/avatar.js'
+import { useTerminalFaces } from '../botLook.js'
 import type { MissionMode, PublicTeammate, TeammateHue, TeammateRole, PublicConnector, PublicModel, PublicRuntimeStatus, TeammateRoute } from '../../../shared/ipc.js'
 import { ROLE_DESCRIPTIONS } from '../../../shared/ipc.js'
 import { defaultEffort, modelFamily, modeRunsOn, modesFor, modeSummary } from '../status.js'
@@ -302,6 +303,22 @@ export function NewTeammateDialog({
   const taken = takenNames.find((other) => other.trim().toLowerCase() === trimmed.toLowerCase())
   const canCreate = trimmed.length > 0 && taken === undefined && limit !== 'invalid'
   const look = botFor(avatar)
+  /*
+   * THE FACE: EYES, A MOUTH, OR A SCREEN (0.562). Colin: "should we just
+   * remove it alright or have it toggleable in the teammate editor" -- the
+   * editor. A screen is offered while Terminal faces is on (Settings >
+   * Appearance) and, until the person picks, follows what suits the shape
+   * (`screenSuits`); Prompt's face is always its screen.
+   */
+  const terminal = useTerminalFaces()
+  const alwaysScreen = look.shape === 'prompt'
+  const wearsScreen = alwaysScreen || (terminal && (look.screen ?? screenSuits(look.shape)))
+  const faceChoice: BotFace | 'screen' = wearsScreen ? 'screen' : look.face
+  /** The bot with this shape and the face as chosen so far (a screen choice travels with it). */
+  const withShape = (current: AvatarSpec, shape: BotShape): BotSpec => {
+    const held = botFor(current)
+    return { shape, face: held.face, ...(held.screen === undefined ? {} : { screen: held.screen }) }
+  }
 
   // Focus in (the name field, above), Tab held inside, Escape closes -- from
   // anywhere now, not only while focus happened to be in the dialog.
@@ -444,18 +461,37 @@ export function NewTeammateDialog({
             <div className="lc-lookhead">
               <span className="lc-fieldlabel lc-mono">Look</span>
               <div className="lc-lookface" role="radiogroup" aria-label="Face">
-                {(['eyes', 'mouth'] as const).map((face) => (
-                  <button
-                    key={face}
-                    type="button"
-                    role="radio"
-                    aria-checked={look.face === face}
-                    className={look.face === face ? 'is-selected' : undefined}
-                    onClick={() => setAvatar((current) => ({ ...current, bot: { shape: botFor(current).shape, face } }))}
-                  >
-                    {face === 'eyes' ? 'Eyes' : 'Mouth'}
-                  </button>
-                ))}
+                {(['eyes', 'mouth', 'screen'] as const).map((face) => {
+                  const off = face === 'screen' ? !terminal && !alwaysScreen : alwaysScreen
+                  return (
+                    <button
+                      key={face}
+                      type="button"
+                      role="radio"
+                      aria-checked={faceChoice === face}
+                      className={faceChoice === face ? 'is-selected' : undefined}
+                      disabled={off}
+                      title={
+                        off
+                          ? face === 'screen'
+                            ? 'Turn Terminal faces on in Settings > Appearance to give a teammate a screen.'
+                            : "Prompt's face is its screen."
+                          : undefined
+                      }
+                      onClick={() =>
+                        setAvatar((current) => {
+                          const held = botFor(current)
+                          return {
+                            ...current,
+                            bot: face === 'screen' ? { shape: held.shape, face: held.face, screen: true } : { shape: held.shape, face, screen: false }
+                          }
+                        })
+                      }
+                    >
+                      {face === 'eyes' ? 'Eyes' : face === 'mouth' ? 'Mouth' : 'Screen'}
+                    </button>
+                  )
+                })}
               </div>
               <button
                 type="button"
@@ -476,9 +512,9 @@ export function NewTeammateDialog({
                   title={SHAPE_NAMES[shape]}
                   data-shape={shape}
                   className={`lc-look${look.shape === shape ? ' is-selected' : ''}`}
-                  onClick={() => setAvatar((current) => ({ ...current, bot: { shape, face: botFor(current).face } }))}
+                  onClick={() => setAvatar((current) => ({ ...current, bot: withShape(current, shape) }))}
                 >
-                  <TeammateBot hue={hue} avatar={{ ...avatar, bot: { shape, face: look.face } }} size={30} />
+                  <TeammateBot hue={hue} avatar={{ ...avatar, bot: withShape(avatar, shape) }} size={30} />
                 </button>
               ))}
             </div>

@@ -4575,6 +4575,84 @@ textarea {
   line-height: 0;
 }
 
+/*
+ * THE SLEEPING LOCUST'S Z'S (0.562, coverScript.ts). Three small mono z's
+ * drift up from its head and fade, in the screens' own cyan (PHOSPHOR.cyan in
+ * Bot.tsx) with its glow -- the title screen's sleeper says it is asleep the
+ * way a terminal would. Stepped like the ghost's float (it costs less than a
+ * smooth loop), held with the cover when it rests, and still for reduced
+ * motion.
+ */
+.lc-cover__zzz {
+  position: absolute;
+  right: -4%;
+  top: 6%;
+  width: 34%;
+  height: 40%;
+  pointer-events: none;
+  font-family: var(--lc-font-mono);
+  font-weight: 700;
+  line-height: 1;
+  color: hsl(190, 100%, 80%);
+  text-shadow: 0 0 calc(6px * var(--lc-cover-k)) hsla(192, 100%, 58%, 0.75);
+}
+
+.lc-cover__zzz i {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  font-style: normal;
+  font-size: calc(12px * var(--lc-cover-k));
+  opacity: 0;
+  animation: lcCoverZzz 3.6s steps(36) infinite;
+}
+
+.lc-cover__zzz i:nth-child(2) {
+  font-size: calc(15px * var(--lc-cover-k));
+  animation-delay: 1.2s;
+}
+
+.lc-cover__zzz i:nth-child(3) {
+  font-size: calc(18px * var(--lc-cover-k));
+  animation-delay: 2.4s;
+}
+
+@keyframes lcCoverZzz {
+  0% {
+    transform: translate(0, 0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.9;
+  }
+  70% {
+    opacity: 0.65;
+  }
+  100% {
+    transform: translate(calc(16px * var(--lc-cover-k)), calc(-36px * var(--lc-cover-k)));
+    opacity: 0;
+  }
+}
+
+.lc-cover__zzz.is-resting i {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-cover__zzz i {
+    animation: none;
+    opacity: 0.7;
+  }
+
+  .lc-cover__zzz i:nth-child(2) {
+    transform: translate(calc(8px * var(--lc-cover-k)), calc(-14px * var(--lc-cover-k)));
+  }
+
+  .lc-cover__zzz i:nth-child(3) {
+    transform: translate(calc(16px * var(--lc-cover-k)), calc(-30px * var(--lc-cover-k)));
+  }
+}
+
 /* Swarm, turned on (HomeCover's SwarmRun): small swarm bots crossing the
    cover once -- over the machine, under the three standing on it (the order
    they are drawn in), and never in the way of a click. Each is placed by its
@@ -8415,6 +8493,12 @@ textarea {
   color: var(--lc-text-primary);
   border-color: var(--lc-lime-border);
   background: var(--lc-lime-tint);
+}
+
+/* A face this look cannot take: a screen with Terminal faces off, or eyes and a mouth on Prompt (0.562). */
+.lc-lookface button:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .lc-lookhead .lc-shuffle {

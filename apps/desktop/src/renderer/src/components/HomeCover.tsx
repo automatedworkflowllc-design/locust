@@ -4,9 +4,11 @@ import type { CSSProperties, ReactElement } from 'react'
 import type { BotAvatarState } from 'bot-avatars'
 
 import type { TeammateHue, TubePreference } from '../../../shared/ipc.js'
+import { PLEASED, SLEEPING, STILL_THINKER, STILL_WORKER, THINKER, THINKER_OFFSET, WATCHING, WORKER, WORKER_OFFSET, beatAt } from '../coverScript.js'
+import type { CoverBeat } from '../coverScript.js'
 import { Beam } from './Beam.js'
 import { Bot } from './Bot.js'
-import type { BotType } from './Bot.js'
+import type { BotType, Glance } from './Bot.js'
 import { PoweredLockup } from './PoweredLockup.js'
 
 /**
@@ -127,9 +129,8 @@ interface CoverBot {
   readonly state: BotAvatarState
   /** Floats instead of hopping: a slow bob, no idle jumps. */
   readonly floats?: boolean
-  /** Locust's own marks: the presence dot, and the ring of a teammate waiting on you. */
-  readonly dot?: 'live' | 'amber'
-  readonly waiting?: boolean
+  /** Its part on the title screen (coverScript.ts). */
+  readonly part: 'worker' | 'thinker' | 'sleeper'
   /** Top-left on the cover's canvas, where a bot is 120 across. */
   readonly x: number
   readonly y: number
@@ -140,12 +141,25 @@ interface CoverBot {
  * locust green lol"*, and of the ghost's working hops and spins: *"a little
  * loud for a title screen, especially for a ghost"* -- so it floats: the
  * library's idle look-around with no jumps, carried on a slow bob.
+ *
+ * 0.562: *"maybe use ghost, the codex looking one and our locust"* -- the droid
+ * in the middle is now Prompt, the Codex nod, in the teammate blue. Each plays
+ * a part (coverScript.ts): Prompt works, the ghost thinks, the locust sleeps
+ * until you come near.
  */
 export const COVER_CAST: readonly CoverBot[] = [
-  { key: 'wren', type: 'ghost', state: 'default', floats: true, dot: 'live', x: 245, y: -10 },
-  { key: 'atlas', type: 'droid', hue: 'blue', state: 'default', dot: 'amber', waiting: true, x: 432, y: 0 },
-  { key: 'sable', type: 'hopper', hue: 'lime', state: 'sleeping', x: 619, y: -2 }
+  { key: 'wren', type: 'ghost', state: 'default', floats: true, part: 'thinker', x: 245, y: -10 },
+  // Prompt's body ends at 86 of its 100 units (locustBots.ts), so its box sits 7 lower to stand on the bezel.
+  { key: 'atlas', type: 'prompt', hue: 'blue', state: 'default', part: 'worker', x: 432, y: 7 },
+  { key: 'sable', type: 'hopper', hue: 'lime', state: 'sleeping', part: 'sleeper', x: 619, y: -2 }
 ]
+
+/** How a beat's glance reads to a bot: across the machine to a neighbour, a touch downward. */
+function glanceOf(beat: CoverBeat): Glance | undefined {
+  if (beat.glance === 'left') return { x: -1, y: 0.15 }
+  if (beat.glance === 'right') return { x: 1, y: 0.15 }
+  return undefined
+}
 
 /*
  * THE MACHINE (A2). His words,
@@ -444,6 +458,50 @@ export function HomeCover({
   const awake = focused && touched
 
   /*
+   * THE PARTS' CLOCK. It runs only while the cover does -- ready, in front,
+   * touched, and not asked to hold still -- and the cover renders only when a
+   * beat changes, never on a tick.
+   */
+  const playing = ready && awake && !reducedMotion()
+  const timeline = useRef<{ banked: number; resumedAt: number | undefined }>({ banked: 0, resumedAt: undefined })
+  const elapsed = (): number => {
+    const held = timeline.current
+    return held.banked + (held.resumedAt === undefined ? 0 : (performance.now() - held.resumedAt) / 1000)
+  }
+  const [beatTick, setBeatTick] = useState(0)
+  useEffect(() => {
+    const held = timeline.current
+    if (playing && held.resumedAt === undefined) held.resumedAt = performance.now()
+    if (!playing && held.resumedAt !== undefined) {
+      held.banked += (performance.now() - held.resumedAt) / 1000
+      held.resumedAt = undefined
+    }
+    setBeatTick((count) => count + 1)
+  }, [playing])
+  useEffect(() => {
+    if (!playing) return undefined
+    const now = elapsed()
+    const next = Math.min(beatAt(WORKER, now + WORKER_OFFSET).left, beatAt(THINKER, now + THINKER_OFFSET).left)
+    const timer = window.setTimeout(() => setBeatTick((count) => count + 1), Math.ceil(next * 1000) + 30)
+    return () => window.clearTimeout(timer)
+  }, [playing, beatTick])
+  // A click on the awake locust: a hop and green carets, for a moment.
+  const [pleasedAt, setPleasedAt] = useState<number>()
+  useEffect(() => {
+    if (pleasedAt === undefined) return undefined
+    const timer = window.setTimeout(() => setPleasedAt(undefined), PLEASED.seconds * 1000)
+    return () => window.clearTimeout(timer)
+  }, [pleasedAt])
+  const now = elapsed()
+  const still = !ready || reducedMotion()
+  const beatOf = (mate: CoverBot): CoverBeat => {
+    if (mate.part === 'worker') return still ? STILL_WORKER : beatAt(WORKER, now + WORKER_OFFSET).beat
+    if (mate.part === 'thinker') return still ? STILL_THINKER : beatAt(THINKER, now + THINKER_OFFSET).beat
+    if (!sleeper.awake) return SLEEPING
+    return pleasedAt === undefined ? WATCHING : PLEASED
+  }
+
+  /*
    * THE HOPPER WAKES FOR A POINTER. It sleeps on the machine until a pointer
    * comes within WAKE_WITHIN of it, opens its eyes and follows it (every bot
    * on the cover follows a pointer that comes near), and dozes off again
@@ -550,31 +608,59 @@ export function HomeCover({
           const size = at(FACE)
           const color = mate.hue === undefined ? undefined : hueColor(mate.hue)
           const state = mate.key === SLEEPER && sleeper.awake ? 'default' : mate.state
+          const beat = beatOf(mate)
+          const asleep = mate.part === 'sleeper' && !sleeper.awake
+          // The worker and the thinker are always on; the locust only once it is awake. Amber while it waits on you.
+          const dot = !ready || asleep ? undefined : beat.waiting === true ? 'amber' : 'live'
+          const glance = ready && awake ? glanceOf(beat) : undefined
           return (
             <span key={mate.key} className="lc-cover__face" style={{ left: atX(mate.x), top: at(mate.y) }}>
               <span
                 className={`lc-bot${ready && mate.floats === true ? ' is-floating' : ''}${ready && !awake ? ' is-resting' : ''}`}
                 data-bot={mate.type}
                 data-state={ready ? state : 'still'}
+                data-beat={ready ? beat.name : 'still'}
                 style={{ width: size, height: size }}
                 ref={(node) => {
                   if (node === null) faces.current.delete(mate.key)
                   else faces.current.set(mate.key, node)
                 }}
+                onClick={mate.part === 'sleeper' && sleeper.awake ? () => setPleasedAt(performance.now()) : undefined}
               >
-                {ready && mate.waiting === true && <span className="lc-bot__ring" />}
+                {/*
+                  * Keyed, every one: the ring comes and goes in front of the bot, and without
+                  * keys React took the bot's place for the ring and REMOUNTED the bot -- a new
+                  * rig, mid-motion, its face spun away (0.562, look-cover.mjs).
+                  */}
+                {ready && beat.waiting === true && <span key="ring" className="lc-bot__ring" />}
                 <Bot
+                  key="bot"
                   type={mate.type}
                   size={size}
                   state={ready ? state : 'default'}
                   paused={!ready || !awake}
                   interactive
                   seed={0.2 + index * 0.3}
-                  {...(mate.floats === true ? { jumpEvery: 0 } : {})}
+                  phosphor={beat.phosphor}
+                  // All three wear screens on the title screen (Terminal faces on): the parts are played in code eyes.
+                  screen
+                  hop={ready && awake && beat.hop === true}
+                  {...(beat.eyes === undefined ? {} : { eyes: beat.eyes })}
+                  {...(glance === undefined ? {} : { glance })}
+                  // No idle jumps on the title screen: the library's include whole flips, and a face spun round
+                  // to its back read as a bot with no face (0.562, look-cover.mjs). Hops come from the parts, or a click.
+                  jumpEvery={0}
                   {...(color === undefined ? {} : { color })}
                 />
-                {ready && mate.dot !== undefined && (
-                  <span className={`lc-presence lc-presence--${mate.dot}`} style={{ width: Math.max(8, Math.round(size * 0.08)), height: Math.max(8, Math.round(size * 0.08)) }} />
+                {dot !== undefined && (
+                  <span key="dot" className={`lc-presence lc-presence--${dot}`} style={{ width: Math.max(8, Math.round(size * 0.08)), height: Math.max(8, Math.round(size * 0.08)) }} />
+                )}
+                {ready && asleep && (
+                  <span key="zzz" className={`lc-cover__zzz${awake ? '' : ' is-resting'}`} aria-hidden="true">
+                    <i>z</i>
+                    <i>z</i>
+                    <i>z</i>
+                  </span>
                 )}
               </span>
             </span>

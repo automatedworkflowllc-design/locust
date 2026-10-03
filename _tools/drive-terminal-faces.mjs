@@ -25,7 +25,10 @@ const seed = {
   teammates: [
     { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: '2026-10-03T01:00:00.000Z', route: FREE_ROUTE },
     { teammateId: 'tm_ada', name: 'Ada', hue: 'blue', role: 'Docs & QA', createdAt: '2026-10-03T01:00:00.000Z', route: FREE_ROUTE, avatar: { headwear: 0, accessory: 0, mouth: 0, bot: { shape: 'droid', face: 'eyes' } } },
-    { teammateId: 'tm_ivo', name: 'Ivo', hue: 'clay', role: 'Code & Migrations', createdAt: '2026-10-03T01:00:00.000Z', route: FREE_ROUTE, avatar: { headwear: 1, accessory: 1, mouth: 1, bot: { shape: 'cat', face: 'eyes' } } }
+    { teammateId: 'tm_ivo', name: 'Ivo', hue: 'clay', role: 'Code & Migrations', createdAt: '2026-10-03T01:00:00.000Z', route: FREE_ROUTE, avatar: { headwear: 1, accessory: 1, mouth: 1, bot: { shape: 'cat', face: 'eyes' } } },
+    // 0.562: a teammate's own choice beats its shape's default, both ways.
+    { teammateId: 'tm_juno', name: 'Juno', hue: 'violet', role: 'Docs & QA', createdAt: '2026-10-03T01:00:00.000Z', route: FREE_ROUTE, avatar: { headwear: 2, accessory: 0, mouth: 0, bot: { shape: 'star', face: 'eyes', screen: true } } },
+    { teammateId: 'tm_moss', name: 'Moss', hue: 'blue', role: 'Docs & QA', createdAt: '2026-10-03T01:00:00.000Z', route: FREE_ROUTE, avatar: { headwear: 3, accessory: 2, mouth: 1, bot: { shape: 'droid', face: 'eyes', screen: false } } }
   ],
   missionOwners: {},
   settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'auto' }
@@ -61,7 +64,14 @@ const faces = `(async () => {
     }
     const median = [...body].sort((a, b) => a - b)[Math.floor(body.length / 2)] ?? 0
     const dark = body.filter((sum) => sum < median * 0.45).length
-    out.push({ face: canvas.dataset.face, darkShare: Math.round((dark / Math.max(1, body.length)) * 100) })
+    const host = canvas.closest('[data-bot]')
+    out.push({
+      face: canvas.dataset.face,
+      bot: host?.dataset.bot ?? '',
+      teammate: host?.closest('[data-teammate]')?.dataset.teammate ?? '',
+      cover: canvas.closest('.lc-cover') !== null,
+      darkShare: Math.round((dark / Math.max(1, body.length)) * 100)
+    })
   }
   return JSON.stringify(out)
 })()`
@@ -92,11 +102,17 @@ const team = `(async () => {
   await new Promise((r) => setTimeout(r, 1200))
   return 'team'
 })()`
-const summary = (list) => {
+// What each face should wear (0.562): Prompt always a screen; the title screen's three a screen while
+// Terminal faces is on; any other teammate as it chose, or as its shape suits (shared/avatar.ts SCREEN_SHAPES).
+const SUITS = new Set(['square', 'ghost', 'circle', 'droid', 'mech', 'hexagon', 'cat', 'pill', 'pebble', 'critter', 'prompt'])
+const CHOSE = { tm_juno: true, tm_moss: false }
+const expected = (f, on) => f.bot === 'prompt' || (on && (f.cover || (CHOSE[f.teammate] ?? SUITS.has(f.bot))))
+const summary = (list, on) => {
   const screens = list.filter((f) => f.face === 'screen')
   const eyes = list.filter((f) => f.face === 'eyes')
+  const wrong = list.filter((f) => (f.face === 'screen') !== expected(f, on)).map((f) => `${f.teammate || (f.cover ? 'cover' : '?')}:${f.bot}:${f.face}`)
   // The share of each body that is a dark patch: the least of the screens, the most of the own-eyed.
-  return { screens: screens.length, eyes: eyes.length, leastScreen: Math.min(...screens.map((f) => f.darkShare), 100), mostEyes: Math.max(...eyes.map((f) => f.darkShare), 0), all: list.map((f) => f.darkShare).join(' ') }
+  return { screens: screens.length, eyes: eyes.length, wrong, leastScreen: Math.min(...screens.map((f) => f.darkShare), 100), mostEyes: Math.max(...eyes.map((f) => f.darkShare), 0) }
 }
 
 let drive = await startDrive({ name: `terminal-faces-${tag}`, port: 9881, workspace, outPath: OUT, keep: true, seed, sendsNothing: true, ...(packaged === undefined ? {} : { packaged }) })
@@ -105,14 +121,14 @@ try {
   await drive.ready()
   await drive.resize(1440, 900)
   await sleep(1500)
-  const first = summary(JSON.parse(String(await drive.capture('On by default: the sidebar', () => drive.evaluate(faces)))))
-  check('on by default: every bot on screen wears a screen, a dark field at its face', first.screens >= 3 && first.eyes === 0 && first.leastScreen >= 12, JSON.stringify(first))
+  const first = summary(JSON.parse(String(await drive.capture('On by default: the sidebar', () => drive.evaluate(faces)))), true)
+  check('on by default: each bot wears what its shape or its own choice says, a screen a dark field at its face', first.wrong.length === 0 && first.screens >= 3 && first.leastScreen >= 12 && first.mostEyes < 9, JSON.stringify(first))
   const row = JSON.parse(String(await drive.capture('Settings > Appearance: Terminal faces', () => drive.evaluate(openAppearance))))
   check('Settings > Appearance has Terminal faces, On', row.row && row.on === 'On' && /screen for a face/.test(row.lede), JSON.stringify(row))
   const off = String(await drive.capture('Switched Off', () => drive.evaluate(choose('Off'))))
   check('Off is taken', off === 'Off', off)
-  const after = summary(JSON.parse(String(await drive.capture('Off: the preview and sidebar', () => drive.evaluate(faces)))))
-  check('off: the bots keep their own eyes, no dark field, at once', after.screens === 0 && after.eyes >= 3 && after.mostEyes < 9, JSON.stringify(after))
+  const after = summary(JSON.parse(String(await drive.capture('Off: the preview and sidebar', () => drive.evaluate(faces)))), false)
+  check('off: every bot keeps its own eyes, no dark field, at once', after.wrong.length === 0 && after.screens === 0 && after.eyes >= 3 && after.mostEyes < 9, JSON.stringify(after))
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
@@ -127,13 +143,13 @@ try {
   await drive.resize(1440, 900)
   await sleep(1500)
   await drive.evaluate(team)
-  const relaunched = summary(JSON.parse(String(await drive.capture('After a relaunch: the Team screen', () => drive.evaluate(faces)))))
-  check('after a relaunch it is still off: the Team screen bots keep their own eyes', relaunched.screens === 0 && relaunched.eyes >= 3 && relaunched.mostEyes < 9, JSON.stringify(relaunched))
+  const relaunched = summary(JSON.parse(String(await drive.capture('After a relaunch: the Team screen', () => drive.evaluate(faces)))), false)
+  check('after a relaunch it is still off: the Team screen bots keep their own eyes', relaunched.wrong.length === 0 && relaunched.screens === 0 && relaunched.eyes >= 3 && relaunched.mostEyes < 9, JSON.stringify(relaunched))
   const row = JSON.parse(String(await drive.capture('Settings still says Off', () => drive.evaluate(openAppearance))))
   check('Settings still says Off', row.on === 'Off', JSON.stringify(row))
   const on = String(await drive.capture('Switched back On', () => drive.evaluate(choose('On'))))
-  const back = summary(JSON.parse(String(await drive.capture('On again', () => drive.evaluate(faces)))))
-  check('On again puts the screens back at once', on === 'On' && back.screens >= 3 && back.eyes === 0 && back.leastScreen >= 12, JSON.stringify(back))
+  const back = summary(JSON.parse(String(await drive.capture('On again', () => drive.evaluate(faces)))), true)
+  check('On again puts the screens back at once, as each chose', on === 'On' && back.wrong.length === 0 && back.screens >= 3 && back.leastScreen >= 12, JSON.stringify(back))
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
