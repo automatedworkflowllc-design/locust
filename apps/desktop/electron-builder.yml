@@ -74,6 +74,10 @@ extraResources:
   # licence beside it. Real files, read by the host like any other pet's.
   - from: resources/pets
     to: pets
+    filter:
+      - hoodie-cat/pet.json
+      - hoodie-cat/spritesheet.webp
+      - hoodie-cat/LICENSE
   - from: resources/recall
     to: recall
     filter:
