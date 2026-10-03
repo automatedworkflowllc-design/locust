@@ -799,6 +799,7 @@ function useElapsed(startedAt: string): { readonly label: string; readonly now: 
 export function LiveRegisterLine({
   register,
   label,
+  action,
   detail,
   startedAt,
   orb,
@@ -819,6 +820,8 @@ export function LiveRegisterLine({
   readonly register: LiveRegister
   /** Whatever the runtime called this step, if it called it anything. */
   readonly label?: string
+  /** The step under way, in words: leads the line in the register's place (0.569). */
+  readonly action?: string
   readonly detail?: string
   readonly startedAt: string
   /** Draws the dots: waiting on the model with nothing to show yet. */
@@ -846,7 +849,15 @@ export function LiveRegisterLine({
    */
   const ASIDE_LIMIT = 56
   const trimmed = said === undefined || said.length <= ASIDE_LIMIT ? said : `${said.slice(0, ASIDE_LIMIT - 1)}…`
-  const aside = [trimmed, detail].filter((part) => part !== undefined && part.length > 0)
+  /*
+   * THE ACTION LEADS (0.569), as Claude Code's status line leads with
+   * "Editing pet-library.ts": what is being done, then the clock. The
+   * runtime's words are then the headline, not an aside said twice; the
+   * register stays in the orb and the line's muted, swept type, which is
+   * what tells it from the reply (Colin, 2026-09-11).
+   */
+  const headline = action !== undefined && action.length > 0 ? action : sweepText(word)
+  const aside = [action === undefined ? trimmed : undefined, detail].filter((part) => part !== undefined && part.length > 0)
   return (
     <>
       <span className="lc-livestep__label">
@@ -904,7 +915,7 @@ export function LiveRegisterLine({
             * theirs too: an ellipsis and a full stop, which is what their page
             * shows beside every orb.
             */}
-          <span className="lc-sweep" data-text={sweepText(word)}>{sweepText(word)}</span>
+          <span className="lc-sweep" data-text={headline}>{headline}</span>
           {/*
             * THE DOTS ONLY WHERE THERE IS NO ORB.
             *
@@ -991,6 +1002,7 @@ export type LiveRegister = 'starting' | 'working' | 'thinking' | 'writing' | 'to
  */
 export function LiveStepCard({
   label,
+  action,
   detail,
   startedAt,
   kind,
@@ -1015,6 +1027,8 @@ export function LiveStepCard({
    */
   readonly orb?: OrbState
   readonly label: string
+  /** The step under way, in words (0.569). */
+  readonly action?: string
   readonly detail: string | undefined
   readonly startedAt: string
   readonly kind: 'turn' | 'reasoning' | 'item'
@@ -1081,6 +1095,7 @@ export function LiveStepCard({
       <LiveRegisterLine
         register={register}
         label={label}
+        {...(action === undefined ? {} : { action })}
         {...(detail === undefined ? {} : { detail })}
         startedAt={startedAt}
         {...(orb === undefined ? {} : { orb })}

@@ -427,6 +427,7 @@ export function ThreadItems({
             <LiveStepCard
               key={item.key}
               label={item.label}
+              {...(item.action === undefined ? {} : { action: item.action })}
               detail={item.detail}
               startedAt={item.startedAt}
               kind={item.kind}

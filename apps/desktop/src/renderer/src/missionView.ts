@@ -1120,6 +1120,14 @@ export type ThreadItem =
        */
       readonly orb?: OrbState
       readonly label: string
+      /**
+       * THE STEP UNDER WAY, IN WORDS (0.569): "Reading notes.txt", "Running npm
+       * test", the plan's current step. It leads the line, as Claude Code's
+       * status line leads with it; absent, the register's own word does.
+       * Never on a connector, which keeps its register word (it reaches off
+       * this machine), or on thought.
+       */
+      readonly action?: string
       readonly detail: string | undefined
       /** When the step began, so the card can show elapsed time as it runs. */
       readonly startedAt: string
@@ -1918,6 +1926,83 @@ export function thoughtHeadline(text: string): string | undefined {
 /** "Run the tests" -> "run the tests", keeping a word that is capitalised on its own (`README`). */
 function lowerFirst(text: string): string {
   return /^[A-Z][a-z]/.test(text) ? `${text.charAt(0).toLowerCase()}${text.slice(1)}` : text
+}
+
+/**
+ * THE STEP UNDER WAY, IN WORDS, AS CLAUDE CODE'S STATUS LINE SAYS IT (0.569).
+ *
+ * Colin, 2026-10-03, with four frames of Claude Code's line -- "Reading pet
+ * removal in main and who calls it", "Running a command", "Editing
+ * pet-library.ts", each with the turn's clock -- "anything we can use from
+ * this taskbar setup". Filmed (`_tools/look-live-line.mjs`), Locust's line
+ * said "Working... step 2 of 3 · 15s" for a whole run that read a file, ran a
+ * command and wrote another: true, and nothing a person could not have
+ * guessed. This is `stepsLine` in the present tense for the one step that is
+ * open: the model's own description where it gave one, else what the call
+ * looks at, else what it runs. Undefined for thought, which has its own line.
+ */
+export function liveActionLine(detail: ActivityDetail, workspacePath?: string): string | undefined {
+  const clip = (text: string, max = 56): string => (text.length > max ? `${text.slice(0, max - 1)}…` : text)
+  const capital = (text: string): string => `${text.charAt(0).toUpperCase()}${text.slice(1)}`
+  const fileName = (path: string): string | undefined => {
+    const bare = relativePath(path, workspacePath).trim().replace(/^["']+|["']+$/g, '')
+    if (bare.length === 0 || /\s/.test(bare) && !/[\\/]/.test(bare)) return undefined
+    if (!/[./\\]/.test(bare)) return undefined
+    return bare.split(/[\\/]/).filter((part) => part.length > 0).at(-1)
+  }
+  if (detail.kind === 'reasoning') return undefined
+  const title = detail.title?.replace(/\s+/g, ' ').trim()
+  if (title !== undefined && title.length > 0) return clip(capital(title))
+  if (detail.kind === 'shell') {
+    const looked = commandLooksAt(detail.name)
+    if (looked === 'read') {
+      const target = commandTarget(detail.name)
+      return target === undefined ? 'Reading a file' : `Reading ${clip(target, 40)}`
+    }
+    if (looked === 'search') {
+      const pattern = commandPattern(detail.name)
+      return pattern === undefined ? 'Searching the files' : `Searching for ${clip(pattern, 32)}`
+    }
+    if (looked === 'list') return 'Listing files'
+    const first = shellCommandText(detail.name).split('\n')[0]?.trim() ?? ''
+    // A runtime that names its command by the model's phrase ("Running the tests").
+    if (/^[A-Z][a-z]+ing\b/.test(first)) return clip(first)
+    if ((first.match(/[A-Za-z]/g)?.length ?? 0) < 3) return 'Running a script'
+    if (first.length > 40 && /\s-(?:e|c|-eval|-command|Command)\s+["'`]/.test(first)) return `Running a ${commandHead(first).replace(/\.exe$/i, '')} script`
+    return `Running ${clip(first, 40)}`
+  }
+  if (detail.kind === 'helper') return `Asking a helper${detail.name.trim().length === 0 ? '' : `: ${clip(detail.name.trim(), 40)}`}`
+  if (detail.kind === 'edit') {
+    const entry = activityEntries([detail], workspacePath)[0]
+    const path = entry === undefined ? undefined : entry.kind === 'file' ? entry.file.path : entry.kind === 'unreported' ? entry.name : undefined
+    const name = path === undefined ? undefined : fileName(path) ?? path
+    const verb = entry?.kind === 'file' && entry.file.status === 'ADDED' ? 'Creating' : entry?.kind === 'file' && entry.file.status === 'DELETED' ? 'Deleting' : 'Editing'
+    return name === undefined ? 'Editing a file' : `${verb} ${clip(name, 40)}`
+  }
+  const tool = (detail.tool ?? detail.name).toLowerCase()
+  // A runtime's own writing tool (Antigravity's write_to_file names the file it writes).
+  if (/^(write|write_?to_?file|create_?file|edit|edit_?file|str_?replace\w*|apply_?patch|replace\w*)$/.test(tool)) {
+    const name = fileName(detail.name)
+    return name === undefined ? 'Writing a file' : `Writing ${clip(name, 40)}`
+  }
+  switch (toolLooksAt(detail.tool ?? detail.name)) {
+    case 'read': {
+      const name = fileName(detail.name)
+      return name === undefined ? 'Reading a file' : `Reading ${clip(name, 40)}`
+    }
+    case 'list': {
+      const name = fileName(detail.name)
+      return name === undefined ? 'Listing a folder' : `Listing ${clip(name, 40)}`
+    }
+    case 'glob': return 'Finding files'
+    case 'search': return /\s{2}|^[A-Z][a-z]+ing\b/.test(detail.name) || detail.name.trim().length === 0 ? 'Searching the files' : `Searching for ${clip(detail.name.trim(), 32)}`
+    case 'web': return 'Searching the web'
+    case 'fetch': return 'Fetching a page'
+    case 'plan': return 'Updating the plan'
+    case 'wait': return 'Waiting for a command'
+    case 'code': return 'Running code'
+    default: return `Using ${clip(detail.tool ?? detail.name, 40)}`
+  }
 }
 
 export function stepsLine(details: readonly ActivityDetail[], finished: boolean, workspacePath?: string): StepsLine {
@@ -3524,6 +3609,8 @@ export function buildThread(
     const planAside = planSteps === undefined || underway < 0
       ? undefined
       : `step ${String(underway + 1)} of ${String(planSteps.steps.length)}`
+    // The plan's step under way, when no call is open to say more (OpenCode reports a call once it ends).
+    const planAction = planSteps === undefined || underway < 0 ? undefined : planSteps.steps[underway]?.text.replace(/\s+/g, ' ').trim()
     /*
      * A TOOL STILL OPEN outranks everything, because it is the most specific
      * true thing about the run: more specific than the turn around it, and
@@ -3574,6 +3661,7 @@ export function buildThread(
         // suite" says more over eight minutes than `npm test`, and far more
         // than "Bash". The command is on its row below.
         label: openTool.title ?? openTool.name,
+        ...(openToolMeta.viaConnector ? {} : { action: liveActionLine(openTool, options.workspacePath) ?? planAction }),
         detail: openToolMeta.connector ?? planAside,
         startedAt: turnStartedAt ?? openToolMeta.at,
         kind: 'item',
@@ -3585,6 +3673,7 @@ export function buildThread(
         key: 'live-step',
         type: 'live-step',
         label: runningStep.label,
+        ...(runningStep.kind === 'reasoning' || planAction === undefined ? {} : { action: planAction }),
         detail: runningStep.detail ?? planAside,
         startedAt: turnStartedAt ?? runningStep.startedAt,
         kind: runningStep.kind,
@@ -3645,6 +3734,7 @@ export function buildThread(
           type: 'live-step',
           label: spoken ? 'Working' : 'Starting',
           register: spoken ? ('working' as const) : ('starting' as const),
+          ...(spoken && planAction !== undefined ? { action: planAction } : {}),
           detail: planAside,
           startedAt: since,
           kind: 'turn',
