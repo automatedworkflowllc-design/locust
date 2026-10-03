@@ -4745,12 +4745,13 @@ textarea {
   position: absolute;
   left: var(--lc-bot-mark-left);
   bottom: var(--lc-bot-dot-bottom);
-  transform: translate(-50%, 50%);
+  /* Smaller and further off the body (0.564): at 46% it covered a 32 px bot's lower left. */
+  transform: translate(-64%, 58%);
   z-index: 1;
   display: grid;
   place-items: center;
-  width: 46%;
-  height: 46%;
+  width: 36%;
+  height: 36%;
   border-radius: 50%;
   background: var(--lc-bg-sidebar);
   box-shadow: 0 0 0 1px var(--lc-border-hairline);

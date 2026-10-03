@@ -274,7 +274,7 @@ export function TeammateBot({
       {tone !== undefined && <span className={`lc-presence lc-presence--${tone}`} />}
       {runtime !== undefined && size >= MARKED_FACE_MIN && (
         <span className="lc-bot__mark" data-runtime={runtime}>
-          <RuntimeMark runtime={runtime} size={Math.round(size * 0.3)} />
+          <RuntimeMark runtime={runtime} size={Math.round(size * 0.24)} />
         </span>
       )}
     </span>
