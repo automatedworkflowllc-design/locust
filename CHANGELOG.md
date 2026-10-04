@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.598.0 - 2026-10-04
+
+### Fixed
+
+- **Locust itself, not only the card, refuses to remember "Always" for a command that reaches other programs.** Since 0.579 the approval card for a command that stops other programs, signs you out or shuts the computer down hides "Always allow this session" and the offer to save a rule. Behind the card, Locust still took an "Always" if one arrived by another route and would have remembered it for every later command of that run, and it would have saved a rule for the same command without looking. Now Locust decides from the same rule the card uses: such an "Always" is applied as "this once", the record of the conversation says so ("asked each time: stops every python.exe"), and a rule for it is refused with the card's own sentence. An ordinary command's "Always", a denial and a question's answers are unchanged.
+
 ## 0.597.0 - 2026-10-04
 
 ### Fixed

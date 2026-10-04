@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { COMPOUND_REFUSAL, decideByRules, diffPaths, insideFolder, ruleCandidateOf, ruledActionOf, ruleSentence, unwrappedCommand } from './approval-rules.js'
+import { COMPOUND_REFUSAL, decideByRules, diffPaths, enforcedAnswer, insideFolder, ruleCandidateOf, ruledActionOf, ruleRefusalFor, ruleSentence, unwrappedCommand } from './approval-rules.js'
 import type { ApprovalRule, RuledAction } from './approval-rules.js'
 
 /**
@@ -168,5 +168,34 @@ describe('a rule as a sentence', () => {
     expect(ruleSentence(rule('allow', 'command', 'npm run test:*', { teammateId: 'tm_wren', folder: FOLDER }), 'Wren')).toBe('Wren may run commands starting "npm run test" in project without asking.')
     expect(ruleSentence(rule('deny', 'command', 'git push'))).toBe('Any teammate may not run "git push".')
     expect(ruleSentence(rule('allow', 'edit', 'src/**'))).toBe('Any teammate may change files matching src/** without asking.')
+  })
+})
+
+/*
+ * THE HOST'S OWN GUARD ON "ALWAYS" (0.598). The card hides "Always" and the
+ * rule offer for a command that reaches other programs (0.579); the main
+ * process took whatever the window sent. Now it decides from the same
+ * classifier, so a stale window or a devtools call cannot widen a run's grant.
+ */
+describe("the host's own guard on Always for a command that reaches", () => {
+  const requestFor = (command: string) => ({ kind: 'command', summary: 'Run a command', detail: command })
+
+  it('turns Always into this once for a command that reaches other programs, and says so', () => {
+    const { answer, note } = enforcedAnswer(requestFor('Stop-Process -Name node'), { approvalId: 'ap_1', decision: 'approve-always' })
+    expect(answer).toEqual({ approvalId: 'ap_1', decision: 'approve-once' })
+    expect(note).toMatch(/^asked each time: stops every node/)
+  })
+
+  it('leaves an ordinary command, a denial and a question alone', () => {
+    expect(enforcedAnswer(requestFor('git status'), { approvalId: 'ap_1', decision: 'approve-always' })).toEqual({ answer: { approvalId: 'ap_1', decision: 'approve-always' } })
+    expect(enforcedAnswer(requestFor('Stop-Process -Name node'), { approvalId: 'ap_1', decision: 'deny', reason: 'no' })).toEqual({ answer: { approvalId: 'ap_1', decision: 'deny', reason: 'no' } })
+    expect(enforcedAnswer({ kind: 'question', summary: 'Which?', detail: '' }, { approvalId: 'ap_2', answers: { q1: ['a'] } })).toEqual({ answer: { approvalId: 'ap_2', answers: { q1: ['a'] } } })
+  })
+
+  it("refuses a rule for such a command with the card's own sentence, and none for an ordinary one", () => {
+    expect(ruleRefusalFor(requestFor('taskkill /F /IM python.exe'))).toBe('Not saved as a rule: this command stops every python.exe. Stops every python.exe on this computer, not only the ones this run started. Locust asks each time.')
+    expect(ruleRefusalFor(requestFor('git status'))).toBeUndefined()
+    // A compound command carrying a reach is refused for the reach, before the compound rule gets to it.
+    expect(ruleRefusalFor(requestFor('git status; taskkill /F /IM python.exe'))).toMatch(/^Not saved as a rule/)
   })
 })

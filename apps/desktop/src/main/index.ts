@@ -28,7 +28,7 @@ import type { CompareSlotId, PublicCompare, PublicCompareSlot } from '../shared/
 import { createCompareStore } from './compare-store.js'
 import { createApprovalRuleStore } from './approval-rule-store.js'
 import { createFileArrivals, POLL_MS } from './routine-file-watch.js'
-import { decideByRules, ruleCandidateOf, ruledActionOf, ruleSentence } from '../shared/approval-rules.js'
+import { decideByRules, enforcedAnswer, ruleCandidateOf, ruledActionOf, ruleRefusalFor, ruleSentence } from '../shared/approval-rules.js'
 import { judgePrompt } from './compare-judge.js'
 import { keepOutOfGit } from './attachments-for-run.js'
 import { REPLY_PAGE_ROOT, writeReplyPage } from './reply-page.js'
@@ -2574,6 +2574,10 @@ if (!ownsSingleInstanceLock) {
       const { approvalId, effect, reason } = input as Record<string, unknown>
       const raised = typeof approvalId === 'string' ? raisedApprovals.get(approvalId) : undefined
       if (raised === undefined || (effect !== 'allow' && effect !== 'deny')) return { ok: false, message: 'That card is no longer waiting.' } as const
+      // The host's own guard (0.598): a command that reaches other programs is never a rule,
+      // whatever the window asked; the card hides the offer, this is what stands when it does not.
+      const refusal = ruleRefusalFor(raised.request)
+      if (refusal !== undefined) return { ok: false, message: refusal } as const
       const candidate = ruleCandidateOf(ruledActionOf(raised.request), {
         ...(raised.teammateId === undefined ? {} : { teammateId: raised.teammateId }),
         ...(raised.request.cwd === null ? {} : { folder: raised.request.cwd })
@@ -2602,7 +2606,12 @@ if (!ownsSingleInstanceLock) {
       // mission service's approval channel; a Claude Code connector permission
       // in the permission host; an Antigravity question in its mission
       // service. An id is minted by exactly one of them.
-      return { ok: await answerApproval(decided) } as const
+      // The host's own guard on "Always" (0.598): for a command that reaches other programs the
+      // answer is applied as this once, whatever the window sent, and the record says so. A card
+      // no longer in the raised map (evicted) is answered as it came.
+      const raised = raisedApprovals.get(decided.approvalId)
+      const enforced = raised === undefined ? { answer: decided } : enforcedAnswer(raised.request, decided)
+      return { ok: await answerApproval(enforced.answer, undefined, enforced.note) } as const
     })
 
     const teammates = createTeammateStore({ rootDirectory: app.getPath('userData') })
