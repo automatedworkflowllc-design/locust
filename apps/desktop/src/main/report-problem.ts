@@ -1,4 +1,7 @@
 import type { FeedbackReport } from '../shared/ipc.js'
+import { SUPPORT_ADDRESS } from '../shared/support.js'
+
+export { SUPPORT_ADDRESS }
 
 /**
  * WHERE FEEDBACK GOES -- one address, named here, in the host.
@@ -26,8 +29,26 @@ import type { FeedbackReport } from '../shared/ipc.js'
  */
 export const REPORT_DESTINATION = 'https://github.com/automatedworkflowllc-design/locust-releases/issues/new'
 
+/**
+ * THE PRIVATE WAY (0.593, the PRD's R23). A GitHub issue is public and needs
+ * a GitHub account; a report that carries a conversation, or comes from
+ * someone without an account, needs an address. One constant
+ * (shared/support.ts, shown in Settings > Help too), forwarded to the
+ * maintainer; a placeholder there fails a test, so the box can never offer
+ * an address nobody reads.
+ */
+
 /** Kept well under the length a browser and GitHub take in one address. */
 export const MAX_REPORT_URL = 7_500
+
+/**
+ * A mailto body is cut by the mail client, not the browser: Outlook and the
+ * Windows Mail app take about 2,000 characters of a mailto, and silently drop
+ * the rest. So the email carries the words and the facts, and the
+ * conversation only while it fits; "Save this report as a file" carries it
+ * whole.
+ */
+export const MAX_MAILTO_URL = 1_900
 
 /** The person's own words, at most this long. */
 export const MAX_DESCRIPTION = 2_000
@@ -82,6 +103,48 @@ function urlWith(text: string): string {
   const url = new URL(REPORT_DESTINATION)
   url.searchParams.set('body', text)
   return url.toString()
+}
+
+/** The report as a file: everything, uncut, and where to send it. */
+export function reportFileText(facts: ReportFacts, report: FeedbackReport): string {
+  const description = report.description.trim().slice(0, MAX_DESCRIPTION)
+  const conversation = report.conversation?.trim()
+  return [
+    `A report for Locust's makers. Send it to ${SUPPORT_ADDRESS}, or open it as an issue at ${REPORT_DESTINATION} (public).`,
+    '',
+    body(facts, description, conversation !== undefined && conversation.length > 0 ? conversation : undefined, false)
+  ].join(NEWLINE)
+}
+
+/** "Locust 0.593.0: <the first words>" */
+export function reportSubject(facts: Pick<ReportFacts, 'version'>, description: string): string {
+  const words = description.trim().replace(/\s+/g, ' ')
+  const first = words.length > 60 ? `${words.slice(0, 57).trimEnd()}...` : words
+  return `Locust ${facts.version}: ${first.length > 0 ? first : 'a problem'}`
+}
+
+function mailtoWith(subject: string, text: string): string {
+  return `mailto:${SUPPORT_ADDRESS}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`
+}
+
+/**
+ * The email, filled in. The conversation goes only while the whole address
+ * fits MAX_MAILTO_URL -- its END first, as the issue does -- and when none of
+ * it fits, the body says the file carries it.
+ */
+export function supportMailtoUrl(facts: ReportFacts, report: FeedbackReport): string {
+  const description = report.description.trim().slice(0, MAX_DESCRIPTION)
+  const subject = reportSubject(facts, description)
+  const conversation = report.conversation?.trim()
+  const whole = mailtoWith(subject, body(facts, description, conversation !== undefined && conversation.length > 0 ? conversation : undefined, false))
+  if (conversation === undefined || conversation.length === 0 || whole.length <= MAX_MAILTO_URL) return whole
+  let keep = conversation.length
+  while (keep > 40) {
+    keep = Math.floor(keep * 0.8)
+    const url = mailtoWith(subject, body(facts, description, `...${conversation.slice(conversation.length - keep)}`, true))
+    if (url.length <= MAX_MAILTO_URL) return url
+  }
+  return mailtoWith(subject, [body(facts, description, undefined, false), '', 'The conversation did not fit in an email; "Save this report as a file" in Locust carries it whole.'].join(NEWLINE))
 }
 
 /**

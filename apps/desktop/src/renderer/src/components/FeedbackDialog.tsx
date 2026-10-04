@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import { useModal } from '../useModal.js'
+import { SUPPORT_ADDRESS } from '../../../shared/support.js'
 
 /** The words the host keeps (main/report-problem.ts MAX_DESCRIPTION). */
 const MOST = 2_000
@@ -35,6 +36,45 @@ export function FeedbackDialog({
   const [withConversation, setWithConversation] = useState(false)
   const [sending, setSending] = useState(false)
   const [refused, setRefused] = useState<string>()
+  // The private ways (0.593, R23): the mail app, or a file saved whole.
+  const [saved, setSaved] = useState<string>()
+  const report = (): { description: string; conversation?: string } => ({ description: text.trim(), ...(conversation === undefined || !withConversation ? {} : { conversation }) })
+  const email = (): void => {
+    if (!ready) return
+    const bridge = window.desktop
+    if (bridge === undefined) return
+    setSending(true)
+    setRefused(undefined)
+    void bridge.emailFeedback(report()).then((opened) => {
+      if (opened.ok) {
+        onClose()
+        return
+      }
+      setRefused(opened.message)
+      setSending(false)
+    }).catch(() => {
+      setRefused('Your mail app could not be opened. What you wrote is still here.')
+      setSending(false)
+    })
+  }
+  const saveFile = (): void => {
+    if (!ready) return
+    const bridge = window.desktop
+    if (bridge === undefined) return
+    setSending(true)
+    setRefused(undefined)
+    void bridge.saveFeedbackFile(report()).then((written) => {
+      setSending(false)
+      if (!written.ok) {
+        setRefused(written.message ?? 'The report could not be saved. What you wrote is still here; Email or Send still work.')
+        return
+      }
+      if (written.path !== undefined) setSaved(written.path)
+    }).catch(() => {
+      setRefused('The report could not be saved. What you wrote is still here.')
+      setSending(false)
+    })
+  }
   const box = useRef<HTMLDivElement>(null)
   useModal(box, onClose)
   const ready = text.trim().length > 0 && !sending
@@ -94,10 +134,20 @@ export function FeedbackDialog({
             {`This report will include your description${withConversation && conversation !== undefined ? ', this conversation,' : ''} and your Locust and ${typeof navigator !== 'undefined' && /Macintosh|Mac OS X/.test(navigator.userAgent) ? 'macOS' : 'Windows'} versions. It opens on GitHub as a public issue that anyone can read, and you send it from there.`}
           </p>
           {refused !== undefined && <p className="lc-feedback__claim lc-tone-amber">{refused}</p>}
+          {saved !== undefined && <p className="lc-feedback__claim" role="status">Saved to {saved}. Send it to {SUPPORT_ADDRESS}, or attach it to an issue.</p>}
+          <p className="lc-feedback__claim">
+            Send opens a public GitHub issue (an account is needed). Email opens your mail app to {SUPPORT_ADDRESS}, which only Locust&rsquo;s makers read; a long conversation may not fit an email, and Save as a file keeps all of it.
+          </p>
         </div>
         <div className="lc-dialog__foot">
           <button type="button" className="lc-button" onClick={onClose}>
             Cancel
+          </button>
+          <button type="button" className="lc-ghostbutton" disabled={!ready} onClick={saveFile}>
+            Save as a file
+          </button>
+          <button type="button" className="lc-ghostbutton" disabled={!ready} onClick={email}>
+            Email
           </button>
           <button type="button" className="lc-primarybutton" disabled={!ready} onClick={send}>
             Send

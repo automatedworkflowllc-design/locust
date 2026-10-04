@@ -22,6 +22,20 @@ describe('the box', () => {
     expect(html).toMatch(/<button type="button" class="lc-primarybutton" disabled="">Send<\/button>/)
   })
 
+  /*
+   * The private ways (0.593, PRD R23): the same report to the support
+   * address, or saved whole as a file. Both wait for words, like Send; the
+   * box says where each goes and that an email cuts a long conversation.
+   */
+  it('also offers Email and Save as a file, off until something is written, and says where each goes', () => {
+    const html = renderToStaticMarkup(<FeedbackDialog onClose={() => undefined} />)
+    expect(html).toMatch(/<button type="button" class="lc-ghostbutton" disabled="">Save as a file<\/button>/)
+    expect(html).toMatch(/<button type="button" class="lc-ghostbutton" disabled="">Email<\/button>/)
+    expect(html).toContain('Email opens your mail app to support@locust.lol')
+    expect(html).toContain('Save as a file keeps all of it')
+    expect(html).toContain('Send opens a public GitHub issue')
+  })
+
   it('says what goes with it, that it is public, and that the person sends it on GitHub', () => {
     const alone = renderToStaticMarkup(<FeedbackDialog onClose={() => undefined} />)
     expect(alone).toContain('This report will include your description and your Locust and Windows versions. It opens on GitHub as a public issue that anyone can read, and you send it from there.')

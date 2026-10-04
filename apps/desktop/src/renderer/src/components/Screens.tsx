@@ -9,6 +9,7 @@ import { agentCapabilityHeading, agentCapabilityLines } from '../agentCapabiliti
 import { ConnectorHealth } from './ConnectorHealth.js'
 import type { SettingsPageId } from '../settingsPages.js'
 import type { LoginItemState, RuntimeUpdatesState, MetalMotion, MetalPreset, MetalStrength } from '../../../shared/ipc.js'
+import { SUPPORT_ADDRESS } from '../../../shared/support.js'
 import type { Spend } from '../../../shared/spend.js'
 import { isOwnRoute, modelDisplayName, routeChrome, routeModelName } from '../routeName.js'
 import type { ReactElement, ReactNode } from 'react'
@@ -2887,6 +2888,25 @@ export function SettingsScreen({
             If Locust crashes or behaves oddly, send feedback and say what happened. The log below helps.
           </p>
           <ProblemReport />
+        </section>
+        )}
+        {shownPage === 'app' && (
+        <section className="lc-settings__section">
+          {/* Where a person reaches Locust's makers (0.593, the PRD's R23): one private address, the public bug page, and what each carries. */}
+          <h2 className="lc-settings__heading">Help</h2>
+          <p className="lc-settings__lede">
+            Stuck, or something looks wrong? Two ways to reach the people who make Locust.
+          </p>
+          <dl className="lc-receipt lc-receipt--flush">
+            <dt>Email</dt>
+            <dd className="lc-mono">{SUPPORT_ADDRESS}</dd>
+            <dt>Who reads it</dt>
+            <dd>Only Locust&rsquo;s makers. Send feedback above fills the email in: what you wrote, your Locust version and system, and a conversation only if you include it.</dd>
+            <dt>Bug reports</dt>
+            <dd>Send feedback above also opens a GitHub issue, filled in the same way. Issues are public and need a GitHub account.</dd>
+            <dt>Long reports</dt>
+            <dd>An email cuts off a long conversation. Save as a file keeps all of it; attach the file to the email or the issue.</dd>
+          </dl>
         </section>
         )}
 

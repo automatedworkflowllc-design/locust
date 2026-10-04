@@ -85,11 +85,13 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
     label: 'General',
     group: 'Locust',
     icon: 'settings',
-    headings: ['Startup', 'Updates', 'Report a problem'],
+    headings: ['Startup', 'Updates', 'Report a problem', 'Help'],
     alsoKnownAs: {
       Startup: ['login item', 'tray', 'keep running', 'sign-in'],
       Updates: ['version', 'upgrade'],
-      'Report a problem': ['bug', 'feedback', 'support', 'crash']
+      'Report a problem': ['bug', 'feedback', 'crash'],
+      // Where to reach a person (0.593, R23): the address, the public issues page.
+      Help: ['email', 'contact', 'support', 'issue']
     }
   },
   {
