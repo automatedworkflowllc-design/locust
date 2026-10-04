@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { briefedMemories } from '../shared/memory.js'
 import type { MemoryLine } from '../shared/memory.js'
@@ -16,6 +16,14 @@ import type { Embedder } from './memory-recall.js'
  * closest in meaning to what was asked, found on this machine -- and when
  * that cannot answer, the brief is exactly what it was before.
  */
+
+/*
+ * Limits here are hang guards, not budgets (0.610). The 0.610 gate went red on `saved`'s poll
+ * below: it waited vitest's default one second for a cache the store writes in the background,
+ * with an fsync, and on a busy disk (C: 93 % full, the harness report's p99 of 645 ms per fsync
+ * under load) that write took longer. Nothing here is about speed, so nothing may fail for it.
+ */
+vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 })
 
 const STAGED = fileURLToPath(new URL('../../resources/recall/', import.meta.url))
 const staged = Object.values(RECALL_FILES).every((name) => existsSync(join(STAGED, name)))
@@ -35,7 +43,7 @@ async function folder(vocab: readonly string[]): Promise<{ directory: string; ca
 
 /** The cache is written in the background; a test waits for it before its folder goes. */
 async function saved(cacheFile: string): Promise<void> {
-  await expect.poll(async () => existsSync(cacheFile) && (await readFile(cacheFile, 'utf8')).length > 0).toBe(true)
+  await expect.poll(async () => existsSync(cacheFile) && (await readFile(cacheFile, 'utf8')).length > 0, { timeout: 30_000 }).toBe(true)
 }
 
 const VOCAB = ['[PAD]', '[UNK]', '[CLS]', '[SEP]', 'deploy', 'site', 'publish', 'reply', 'short', '##s', ',', '.']
