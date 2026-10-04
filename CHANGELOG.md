@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.589.0 - 2026-10-04
+
+### Fixed
+
+- **An inverted grep in a kill pipeline no longer names a match.** A pipeline that filtered process ids with `grep -v` (or `findstr /v`, or `-NotMatch`) before `xargs kill` was read as stopping every match of the inverted pattern. An inverted step names what is left out, so the reach line now looks past it to the match before it: filtering the grep itself out of a `ps` listing still says "stops every python".
+- The Board's quiet Done list judges the trash by every turn of a conversation, as the columns do.
+
+### Improved
+
+- Two packages from the first design (`contracts`, `runtime-core`), which nothing in the app imports, moved out of the workspace into `attic/`. `pnpm check` builds and tests less; nothing you use changes.
+
 ## 0.588.0 - 2026-10-04
 
 ### Fixed

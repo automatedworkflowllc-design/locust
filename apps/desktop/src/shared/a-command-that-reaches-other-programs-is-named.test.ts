@@ -38,6 +38,8 @@ const REACHES: readonly (readonly [string, string, string])[] = [
   ['taskkill /F /FI "USERNAME eq alice"', 'every-process-of-user', 'alice'],
   ['kill -9 $(lsof -t -i:3000)', 'every-process-on-port', '3000'],
   ['lsof -ti tcp:5173 | xargs kill', 'every-process-on-port', '5173'],
+  // The inverted grep names what is left out; the match before it names what is stopped (0.589).
+  ['ps aux | grep python | grep -v grep | awk \'{print $2}\' | xargs kill', 'every-process-named', 'python'],
   ['fuser -k 8080/tcp', 'every-process-on-port', '8080'],
   ['npx kill-port 3000', 'every-process-on-port', '3000'],
   ['Stop-Process -Id (Get-NetTCPConnection -LocalPort 3000).OwningProcess -Force', 'every-process-on-port', '3000'],
@@ -94,6 +96,9 @@ const DOES_NOT: readonly string[] = [
   'Get-Process python',
   'ps aux | grep vite',
   'pgrep node',
+  // Numbers from a file the run could see, filtered by an inverted grep: no match is named (0.589).
+  'cat pids.txt | grep -v "^#" | xargs kill',
+  'type pids.txt | findstr /v "#" | xargs kill',
   'shutdown /a',
   'npm run build && npm test',
   'python -m pytest -q',

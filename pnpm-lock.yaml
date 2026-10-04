@@ -85,8 +85,6 @@ importers:
         specifier: 7.3.6
         version: 7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.33.0)
 
-  packages/contracts: {}
-
   packages/mission-store:
     dependencies:
       '@teammate/runtime-adapters':
@@ -94,12 +92,6 @@ importers:
         version: link:../runtime-adapters
 
   packages/runtime-adapters: {}
-
-  packages/runtime-core:
-    dependencies:
-      '@teammate/contracts':
-        specifier: workspace:*
-        version: link:../contracts
 
 packages:
 
