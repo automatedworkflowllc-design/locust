@@ -353,6 +353,21 @@ export function relayPrompt(input: {
  * cap, so a teammate that writes one has written to a person who may not
  * look for hours -- and it has no way to know that unless it is told.
  */
+/**
+ * What a reply that runs READ-ONLY is told, after the brief (0.592).
+ *
+ * Handoff review finding (a), 2026-10-03: Bro, in Ask, received Codex's
+ * reply, tried a command, was refused by the mode, and wrote nothing back --
+ * the exchange ended in silence with the answer sitting in the quote. The
+ * brief above never said the mode: it is decided later, where the route is
+ * settled (`startFor`), so the sentence is added there. It names the cost
+ * (a refused command ends the run with nothing written) and what to answer
+ * from instead, the way the OpenCode read-only section does for a direct run.
+ */
+export function readOnlyReplySentence(): string {
+  return 'You are replying in a read-only mode: a shell command is refused here and ends this run with nothing written. What you were sent is quoted in this message -- answer from it and from your read tools, and write back in the share block.'
+}
+
 export function budgetSentence(hop: number, cap: number | undefined): string {
   const budget = cap ?? MAX_RELAY_HOPS
   const left = budget - hop
@@ -882,7 +897,8 @@ export function createRelay(options: RelayOptions): Relay {
     let response: CodexMissionStartResponse
     try {
       response = await options.start({
-        prompt: input.prompt,
+        // A read-only reply is told so (0.592): the mode is settled only here.
+        prompt: route.mode === 'ask' || route.mode === 'plan' ? `${input.prompt} ${readOnlyReplySentence()}` : input.prompt,
         runtime: route.runtime,
         mode: route.mode,
         model: route.model === 'account-default' ? undefined : route.model,

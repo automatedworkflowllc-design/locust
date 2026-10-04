@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.592.0 - 2026-10-04
+
+### Fixed
+
+- **A teammate replying read-only is told so, and answers instead of going quiet.** A teammate in Ask who received another teammate's message would sometimes try a command, be refused by the mode, and write nothing back -- the exchange ended in silence with the answer sitting in the quoted message. The reply brief now says, when the reply runs read-only, that a command is refused and ends the run with nothing written, and to answer from the quote and its read tools.
+
 ## 0.591.0 - 2026-10-04
 
 ### Improved

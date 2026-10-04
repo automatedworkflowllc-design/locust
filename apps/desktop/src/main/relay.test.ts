@@ -348,6 +348,20 @@ describe('relaying a share', () => {
     expect(said?.kind === 'relay-notice' ? said.message : '').toContain('read-only')
   })
 
+  it('tells a read-only reply that a command is refused and the message is quoted (0.592), and says nothing of it to one that may edit', async () => {
+    // Handoff review finding (a), 2026-10-03: a recipient in Ask tried a
+    // command, was refused, and wrote nothing -- the answer was in the quote.
+    const ro = harness({ booty: bootyPeer })
+    await ro.relay.onShared(sharing(), [message(BOOTY)])
+    expect(ro.starts[0]).toMatchObject({ mode: 'ask' })
+    expect(ro.starts[0]?.prompt).toContain('You are replying in a read-only mode: a shell command is refused here and ends this run with nothing written.')
+    expect(ro.starts[0]?.prompt).toContain('answer from it and from your read tools')
+    const rw = harness({ booty: { self: { ...BOOTY, route: { ...BOOTY_ROUTE, mode: 'accept-edits' } }, others: [WREN] } })
+    await rw.relay.onShared(sharing(), [message(BOOTY)])
+    expect(rw.starts[0]).toMatchObject({ mode: 'accept-edits' })
+    expect(rw.starts[0]?.prompt).not.toContain('read-only mode')
+  })
+
   it('lends Accept edits to a Cursor recipient where read-only cannot be held, and says so', async () => {
     // MEASURED 2026-09-17 on Windows: a relayed start in `ask` on Cursor is
     // refused by the mission service ("cannot be held read-only on this
