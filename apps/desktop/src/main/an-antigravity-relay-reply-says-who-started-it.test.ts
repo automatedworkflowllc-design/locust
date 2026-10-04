@@ -23,7 +23,7 @@ describe('an Antigravity run the relay started', () => {
       appendHostFailure: async () => undefined,
       getMission: async () => undefined,
       appendPeerLinks: async () => undefined,
-      appendEditCheck: async () => undefined
+      appendEditCheck: async () => undefined, appendApproval: async () => undefined
     } as unknown as MissionLedger
     const conversation = '03a2fcb4-8fd9-468e-a683-6bf3a5acd077'
     let ids = 0

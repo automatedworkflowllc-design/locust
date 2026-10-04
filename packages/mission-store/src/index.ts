@@ -26,7 +26,7 @@ import type { CheckpointReason, ReconciledCheckpoint } from './checkpoint.js'
  */
 export type MissionRecordedMode = "ask" | "plan" | "accept-edits" | "approve-each" | "auto";
 
-export const MISSION_LEDGER_SCHEMA_VERSION = 19 as const
+export const MISSION_LEDGER_SCHEMA_VERSION = 20 as const
 
 /**
  * Versions this reader accepts, each a strict subset of the next, so all are
@@ -139,8 +139,16 @@ export const MISSION_LEDGER_SCHEMA_VERSION = 19 as const
  * the conversation never sees. `of` names the conversation's turn it forked
  * from, `question` counts them from 1. A v18 reader would draw it as a turn of
  * no conversation, so the number moves for the reason it moved at v18.
+ *
+ * v19 -> v20 adds `mission.approval` records: a card the person answered, and
+ * how (0.576). Saving a conversation's record (0.575) found the ledger held
+ * no approval at all -- only a declined call's own words, and nothing of one
+ * that was allowed -- so the record a person is told they get could not show
+ * what they let a teammate do. The host answers the card, not the runtime, so
+ * it cannot be a runtime event, and a v19 reader stops at a record it cannot
+ * name: the number moves for the reason it moved at v5 and v17.
  */
-export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19] as const
+export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20] as const
 
 export type MissionLedgerSchemaVersion =
   (typeof SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS)[number]
@@ -363,6 +371,29 @@ export interface MissionEditCheck {
 const MAX_EDIT_CHECK_LINES = 60
 const MAX_EDIT_CHECK_LINE_LENGTH = 500
 
+/**
+ * A card the person answered (v20). What it asked, in the card's own words;
+ * what the answer was; and who gave it -- the person on the card, the person
+ * on the card while saving a rule ("Yes, and don't ask again"), or a rule
+ * they saved answering it before it reached them. `words` is what was said
+ * with it: the person's reason for a denial, or the rule's own sentence.
+ * A card nobody answered (the run ended first, or Locust refused it) is not
+ * recorded here: the run's own events already say what happened to the call.
+ */
+export interface MissionApproval {
+  readonly approvalId: string
+  readonly kind: 'command' | 'file-change' | 'question' | 'connector'
+  readonly asked: string
+  readonly answer: 'allowed' | 'allowed-always' | 'denied' | 'answered'
+  readonly by: 'card' | 'card-saving-a-rule' | 'saved-rule'
+  readonly words?: string
+  readonly askedAt: string
+  readonly occurredAt: string
+}
+
+const MAX_APPROVAL_ASKED = 2_000
+const MAX_APPROVAL_WORDS = 1_000
+
 export interface MissionHostFailure {
   readonly code: MissionHostFailureCode
   readonly message: string
@@ -395,6 +426,10 @@ export interface RecoveredMission {
   readonly peerLinks: readonly MissionPeerLink[]
   /** What the person's check said after this turn, in ledger order (A3.3). */
   readonly editChecks: readonly MissionEditCheck[]
+  /** The cards the person answered on this turn, and how, in ledger order (v20). */
+  readonly approvals: readonly MissionApproval[]
+  /** The file's schema version: from 20 on, a card answered on this turn is in `approvals`. */
+  readonly schemaVersion?: MissionLedgerSchemaVersion
   readonly phase: RecoveredMissionPhase
   readonly lastUpdatedAt: string
   readonly ledgerSequence: number
@@ -443,6 +478,8 @@ export interface MissionLedger {
   appendPeerLinks(missionId: string, links: readonly MissionPeerLink[]): Promise<void>
   /** Record what the person's check said after this turn (A3.3). */
   appendEditCheck(missionId: string, check: MissionEditCheck): Promise<void>
+  /** A card the person answered (v20). A mission written before v20 cannot hold one and refuses it. */
+  appendApproval(missionId: string, approval: MissionApproval): Promise<void>
   /**
    * Move a mission's record to the trash. Returns false when there was none.
    *
@@ -665,7 +702,15 @@ interface EditCheckRecord {
   readonly check: MissionEditCheck
 }
 
-type LedgerRecord = CreatedRecord | EventRecord | HostFailureRecord | CheckpointRecord | PeerRecord | EditCheckRecord
+interface ApprovalRecord {
+  readonly schemaVersion: MissionLedgerSchemaVersion
+  readonly recordType: 'mission.approval'
+  readonly ledgerSequence: number
+  readonly occurredAt: string
+  readonly approval: MissionApproval
+}
+
+type LedgerRecord = CreatedRecord | EventRecord | HostFailureRecord | CheckpointRecord | PeerRecord | EditCheckRecord | ApprovalRecord
 type JsonObject = Record<string, unknown>
 
 interface ParsedLedger {
@@ -876,6 +921,56 @@ export function boundedEditCheck(check: MissionEditCheck): MissionEditCheck {
     unchanged: check.unchanged,
     first: check.first,
     occurredAt: check.occurredAt
+  }
+}
+
+function validateApproval(approval: MissionApproval): MissionApproval {
+  requireText(approval.approvalId, 'Approval id', 200)
+  if (!['command', 'file-change', 'question', 'connector'].includes(approval.kind)) throw new Error('Approval kind is invalid')
+  requireText(approval.asked, 'Approval question', MAX_APPROVAL_ASKED)
+  if (!['allowed', 'allowed-always', 'denied', 'answered'].includes(approval.answer)) throw new Error('Approval answer is invalid')
+  if (!['card', 'card-saving-a-rule', 'saved-rule'].includes(approval.by)) throw new Error('Approval answerer is invalid')
+  if (approval.words !== undefined && (typeof approval.words !== 'string' || approval.words.length > MAX_APPROVAL_WORDS)) {
+    throw new Error('Approval words are invalid')
+  }
+  requireTimestamp(approval.askedAt, 'Approval asked timestamp')
+  requireTimestamp(approval.occurredAt, 'Approval timestamp')
+  return approval
+}
+
+/** A card's answer, cut to what the record can hold. Exported so the host bounds it the way the reader accepts it. */
+export function boundedApproval(approval: MissionApproval): MissionApproval {
+  const asked = approval.asked.trim().slice(0, MAX_APPROVAL_ASKED)
+  const words = approval.words?.trim().slice(0, MAX_APPROVAL_WORDS)
+  return {
+    approvalId: approval.approvalId.slice(0, 200),
+    kind: approval.kind,
+    asked: asked.length === 0 ? '(the card said nothing more)' : asked,
+    answer: approval.answer,
+    by: approval.by,
+    ...(words === undefined || words.length === 0 ? {} : { words }),
+    askedAt: approval.askedAt,
+    occurredAt: approval.occurredAt
+  }
+}
+
+function parsedApproval(value: unknown): MissionApproval | undefined {
+  if (!isObject(value)) return undefined
+  try {
+    const candidate = value as unknown as MissionApproval
+    validateApproval(candidate)
+    return {
+      approvalId: candidate.approvalId,
+      kind: candidate.kind,
+      asked: candidate.asked,
+      answer: candidate.answer,
+      by: candidate.by,
+      ...(candidate.words === undefined ? {} : { words: candidate.words }),
+      askedAt: candidate.askedAt,
+      occurredAt: candidate.occurredAt
+    }
+  } catch {
+    return undefined
   }
 }
 
@@ -1308,6 +1403,7 @@ async function readLedgerFile(path: string, missionId: string): Promise<ParsedLe
   const checkpoints: ReconciledCheckpoint[] = []
   const peerLinks: MissionPeerLink[] = []
   const editChecks: MissionEditCheck[] = []
+  const approvals: MissionApproval[] = []
   let expectedSequence = 2
   let expectedEventSequence = 1
   let lastUpdatedAt = metadata.createdAt
@@ -1386,6 +1482,14 @@ async function readLedgerFile(path: string, missionId: string): Promise<ParsedLe
       }
       editChecks.push(check)
       lastUpdatedAt = check.occurredAt
+    } else if (value.recordType === 'mission.approval') {
+      const approval = parsedApproval(value.approval)
+      if (schemaVersion < 20 || approval === undefined || value.occurredAt !== approval.occurredAt) {
+        issues.push(publicIssue('invalid-record', 'An invalid approval record and its tail were ignored.', missionId))
+        break
+      }
+      approvals.push(approval)
+      lastUpdatedAt = approval.occurredAt
     } else {
       issues.push(publicIssue('invalid-record', 'An unknown mission record and its tail were ignored.', missionId))
       break
@@ -1401,6 +1505,8 @@ async function readLedgerFile(path: string, missionId: string): Promise<ParsedLe
       checkpoints,
       peerLinks,
       editChecks,
+      approvals,
+      schemaVersion,
       phase: phaseFor(events, hostFailures),
       lastUpdatedAt,
       ledgerSequence: expectedSequence - 1,
@@ -1994,6 +2100,29 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
           ledgerSequence: sequence,
           occurredAt: check.occurredAt,
           check
+        }
+        await appendRecords(missionId, [record])
+        nextSequences.set(missionId, sequence + 1)
+      })
+    },
+
+    appendApproval(missionId: string, approval: MissionApproval): Promise<void> {
+      return serialize(async () => {
+        requireSafeId(missionId, 'missionId')
+        validateApproval(approval)
+        const hydrated = await hydrateForAppend(missionId)
+        if (hydrated.schemaVersion < 20) {
+          // Same rule as a check result on a pre-v17 file: an older mission
+          // cannot take a record its own readers would stop at.
+          throw new Error('Mission ledger version cannot hold approvals')
+        }
+        const sequence = hydrated.nextSequence
+        const record: ApprovalRecord = {
+          schemaVersion: hydrated.schemaVersion,
+          recordType: 'mission.approval',
+          ledgerSequence: sequence,
+          occurredAt: approval.occurredAt,
+          approval
         }
         await appendRecords(missionId, [record])
         nextSequences.set(missionId, sequence + 1)

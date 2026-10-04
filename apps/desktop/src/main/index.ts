@@ -48,12 +48,12 @@ import {
   discoverInstalledRuntimes,
   killSpawnedTree
 } from '@teammate/runtime-adapters'
-import { createFileMissionLedger, createFileWorkroom } from '@teammate/mission-store'
+import { boundedApproval, createFileMissionLedger, createFileWorkroom } from '@teammate/mission-store'
 import { retireSetAsideMessages } from './set-aside-messages.js'
 import { MAC_RELEASES_API, newerMacRelease } from './mac-release.js'
 import { createMacUpdater, macSelfUpdateTarget } from './mac-self-update.js'
 import type { AppChangelog, AppChangelogEntry, CodexMissionStartResponse, WorkspaceSettings } from '../shared/ipc.js'
-import type { MissionLedger, Workroom } from '@teammate/mission-store'
+import type { MissionApproval, MissionLedger, Workroom } from '@teammate/mission-store'
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 import { spawn } from 'node:child_process'
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync, existsSync, renameSync, statSync, unlinkSync } from 'node:fs'
@@ -1777,9 +1777,48 @@ if (!ownsSingleInstanceLock) {
      * (answerByRule). Nothing a teammate writes reaches it; the guard test
      * (approvals-come-only-from-the-window) holds that.
      */
-    const answerApproval = async (answer: MissionApprovalAnswer): Promise<boolean> =>
-      codexMissions.decide(answer) || permissionHost.decide(answer) || (await antigravityMissions.decide(answer))
+    const answerApproval = async (answer: MissionApprovalAnswer, by: MissionApproval['by'] = 'card', words?: string): Promise<boolean> => {
+      const answered = codexMissions.decide(answer) || permissionHost.decide(answer) || (await antigravityMissions.decide(answer))
+      if (answered) recordAnswer(answer, by, words)
+      return answered
+    }
     const raisedApprovals = new Map<string, { readonly request: MissionApprovalRequest; readonly teammateId?: string }>()
+    /*
+     * EVERY ANSWER IS WRITTEN DOWN (0.576, ledger v20). Saving a conversation's
+     * record found the ledger held no approval: a declined call kept its own
+     * words, and an allowed one left no trace, so the record could not show
+     * what the person let a teammate do. Written here, where every answer
+     * passes, with the card as it was raised; never awaited -- a slow disk
+     * must not hold the run the answer releases -- and a mission from before
+     * v20 simply cannot take it.
+     */
+    const recordAnswer = (answer: MissionApprovalAnswer, by: MissionApproval['by'], words: string | undefined): void => {
+      const raised = raisedApprovals.get(answer.approvalId)
+      if (raised === undefined) return
+      const { request } = raised
+      const asked = [request.summary, request.detail].map((text) => text.trim()).filter((text, index, all) => text.length > 0 && all.indexOf(text) === index).join('\n')
+      const given = 'answers' in answer
+        ? 'answered'
+        : answer.decision === 'deny'
+          ? 'denied'
+          : answer.decision === 'approve-always'
+            ? 'allowed-always'
+            : 'allowed'
+      const said = words
+        ?? ('answers' in answer ? Object.values(answer.answers).flat().join('; ') : answer.decision === 'deny' ? answer.reason : undefined)
+      void missionLedger
+        .appendApproval(request.missionId, boundedApproval({
+          approvalId: request.approvalId,
+          kind: request.kind,
+          asked,
+          answer: given,
+          by,
+          ...(said === undefined || said.trim().length === 0 ? {} : { words: said }),
+          askedAt: request.requestedAt,
+          occurredAt: new Date().toISOString()
+        }))
+        .catch(() => undefined)
+    }
     const ruleContextOf = async (request: MissionApprovalRequest): Promise<{ teammateId?: string; folder?: string }> => {
       const owners = await teammates.missionOwners().catch(() => ({}) as Record<string, string>)
       const teammateId = owners[request.missionId]
@@ -1798,7 +1837,7 @@ if (!ownsSingleInstanceLock) {
         : { approvalId: request.approvalId, decision: 'deny' as const, reason: `A rule the person saved says no: ${sentence}` }
       // After the runtime has finished registering the request it just raised.
       await new Promise((settle) => setTimeout(settle, 0))
-      const answered = await answerApproval(answer)
+      const answered = await answerApproval(answer, 'saved-rule', sentence)
       if (!answered) return false
       await approvalRules.used(verdict.rule.ruleId).catch(() => undefined)
       sendToWindow({
@@ -2507,7 +2546,7 @@ if (!ownsSingleInstanceLock) {
       } catch (error) {
         return { ok: false, message: error instanceof Error ? error.message : 'That rule could not be saved. Answer the card as usual.' } as const
       }
-      const answered = await answerApproval(decided)
+      const answered = await answerApproval(decided, 'card-saving-a-rule')
       if (!answered) return { ok: false, message: 'The rule was saved, but this card had already been answered.' } as const
       return { ok: true, rules: await approvalRules.list() } as const
     })

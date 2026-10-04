@@ -81,7 +81,7 @@ describe('a comparison', () => {
         appendEvents: async () => undefined,
         appendHostFailure: async () => undefined,
         appendPeerLinks: async () => undefined,
-        appendEditCheck: async () => undefined,
+        appendEditCheck: async () => undefined, appendApproval: async () => undefined,
         getMission: async () => undefined,
         listMissions: async () => ({ missions: [], issues: [], unreadableCount: 0 }),
         flush: async () => undefined

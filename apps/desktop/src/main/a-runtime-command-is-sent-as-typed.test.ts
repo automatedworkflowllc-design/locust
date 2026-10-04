@@ -110,7 +110,7 @@ describe('a command the person typed', () => {
     hostFailures: [],
     checkpoints: [],
     peerLinks: [],
-    editChecks: [],
+    editChecks: [], approvals: [],
     phase: 'completed',
     lastUpdatedAt: NOW,
     ledgerSequence: 1,
@@ -128,7 +128,7 @@ describe('a command the person typed', () => {
       createCheckpoint: async () => {
         throw new Error('not used')
       },
-      appendPeerLinks: async () => undefined, appendEditCheck: async () => undefined,
+      appendPeerLinks: async () => undefined, appendEditCheck: async () => undefined, appendApproval: async () => undefined,
       deleteMission: async () => true,
       listTrashedMissions: async () => [],
       restoreMission: async () => true,

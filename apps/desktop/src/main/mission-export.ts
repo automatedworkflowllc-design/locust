@@ -1,4 +1,4 @@
-import type { RecoveredMission } from '@teammate/mission-store'
+import type { MissionApproval, RecoveredMission } from '@teammate/mission-store'
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
 import { runtimeDisplayName } from '../shared/runtimes.js'
@@ -189,14 +189,41 @@ function callState(call: Call): string {
   return parts.join(' · ')
 }
 
-function approvalsSection(calls: readonly Call[], events: readonly NormalizedRuntimeEvent[]): string {
+const ANSWERED: Record<MissionApproval['answer'], string> = {
+  allowed: 'Allowed',
+  'allowed-always': 'Allowed for the rest of the session',
+  denied: 'Denied',
+  answered: 'Answered'
+}
+const ANSWERED_BY: Record<MissionApproval['by'], string> = {
+  card: 'by the person, on the card',
+  'card-saving-a-rule': 'by the person, on the card, saving it as a rule',
+  'saved-rule': 'by a rule the person saved, before the card reached them'
+}
+
+/** The cards answered on a turn (ledger v20): what each asked, the answer, and who gave it. */
+function cardsAnswered(approvals: readonly MissionApproval[]): string[] {
   const lines: string[] = []
+  for (const approval of approvals) {
+    lines.push(`- **${ANSWERED[approval.answer]}** ${ANSWERED_BY[approval.by]} · ${approval.kind} · asked ${approval.askedAt} · answered ${approval.occurredAt}`)
+    lines.push('', quoted(`The card asked: ${approval.asked}`), '')
+    if (approval.words !== undefined) lines.push(quoted(`Said with the answer: ${approval.words}`), '')
+  }
+  return lines
+}
+
+function approvalsSection(calls: readonly Call[], events: readonly NormalizedRuntimeEvent[], mission: RecoveredMission): string {
+  // From ledger v20 every card answered is its own record; before it, only a call's own status says anything.
+  const recordsCards = (mission.schemaVersion ?? 0) >= 20
+  const lines: string[] = recordsCards ? cardsAnswered(mission.approvals) : []
   for (const call of calls) {
     if (!isDeclined(call) && !isRefused(call) && !namesASavedRule(call)) continue
     const words = outputText(call.output)
     const asked = `\`${oneLine(what(call))}\``
     if (namesASavedRule(call)) {
       lines.push(`- **Denied, and the words recorded with it name a saved rule.** Asked: ${asked}. The call did not run.`)
+    } else if (isDeclined(call) && recordsCards) {
+      lines.push(`- **Declined.** Asked: ${asked}. The call did not run; the answer that declined it is listed above.`)
     } else if (isDeclined(call)) {
       lines.push(
         `- **Declined.** Asked: ${asked}. The ledger records the call as declined: the answer was no, given through Locust's approval card or a rule the person saved. `
@@ -215,11 +242,16 @@ function approvalsSection(calls: readonly Call[], events: readonly NormalizedRun
   const nothing = lines.length === 0
   return [
     nothing
-      ? 'No declined or refused call is recorded in this turn.'
+      ? recordsCards
+        ? 'No card was answered, and no call was declined or refused, in this turn.'
+        : 'No declined or refused call is recorded in this turn.'
       : lines.join('\n').replace(/\n\n\n+/g, '\n\n'),
     '',
-    '_Not in the ledger:_ an approval that was allowed, what the card asked in full, who answered it and how. '
-    + 'A call listed under Commands or File changes may or may not have been approved first; the record cannot tell.'
+    recordsCards
+      ? '_Recorded:_ every card answered on this turn, with who answered it. '
+        + 'Not recorded: a card no one answered because the run ended first, and a call that ran in a mode that asks nothing.'
+      : '_Not in the ledger:_ an approval that was allowed, what the card asked in full, who answered it and how. '
+        + 'A call listed under Commands or File changes may or may not have been approved first; the record cannot tell.'
   ].join('\n')
 }
 
@@ -437,7 +469,7 @@ function turnSection(mission: RecoveredMission, at: number, source: RecordSource
   }
   out.push('', `### ${asked.heading}`, '', asked.body)
   out.push('', `### ${teammate} said`, '', said.length > 0 ? quoted(said) : '_Nothing was said in this turn._')
-  out.push('', '### Approvals and refusals', '', approvalsSection(calls, mission.events))
+  out.push('', '### Approvals and refusals', '', approvalsSection(calls, mission.events, mission))
   out.push('', '### Commands', '', commandsSection(calls))
   out.push('', '### File changes', '', changesSection(calls))
   if (other !== undefined) out.push('', '### Other tool calls', '', other)

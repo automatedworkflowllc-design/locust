@@ -48,7 +48,7 @@ function mission(missionId: string, prompt: string, parent?: string): RecoveredM
     hostFailures: [],
     checkpoints: [],
     peerLinks: [],
-    editChecks: [],
+    editChecks: [], approvals: [],
     phase: 'completed',
     lastUpdatedAt: NOW,
     ledgerSequence: 1,

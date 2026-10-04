@@ -11,7 +11,7 @@
 //      is untouched and the conversation says it was declined.
 // Every step is captured, to be looked at.
 
-import { mkdir, readFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { FREE_ROUTE, recordRoot, say, scratchRepository, sleep, startDrive, teammateFace } from './drive-lib.mjs'
@@ -159,6 +159,12 @@ try {
   // Any count: a model may ask again after the denial (0.467 run: "2 declined",
   // a git status the drive also denied). The wording is what this guards.
   check('and the steps say the person declined it, not that a mode refused it', /\d+ declined/.test(after) && !/refused/.test(after), after.slice(-240))
+  // 0.576 (ledger v20): every card answered is written down with the turn, by whom, and with the words said.
+  const ledgerDir = join(drive.profile, 'mission-ledger')
+  const records = (await Promise.all((await readdir(ledgerDir).catch(() => [])).filter((name) => name.endsWith('.jsonl')).map((name) => readFile(join(ledgerDir, name), 'utf8'))))
+    .flatMap((text) => text.split('\n').filter((line) => line.includes('"mission.approval"')).map((line) => JSON.parse(line).approval))
+  check('the ledger holds the card approved once, as allowed on the card', records.some((one) => one.answer === 'allowed' && one.by === 'card'), JSON.stringify(records).slice(0, 300))
+  check('and the card denied, with the reason the person typed', records.some((one) => one.answer === 'denied' && one.by === 'card' && one.words === 'Keep it as hi, please.'), JSON.stringify(records).slice(0, 300))
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

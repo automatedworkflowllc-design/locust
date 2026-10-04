@@ -87,7 +87,7 @@ describe('a turn on its own branch', () => {
       },
       appendHostFailure: async () => undefined,
       appendPeerLinks: async () => undefined,
-      appendEditCheck: async () => undefined,
+      appendEditCheck: async () => undefined, appendApproval: async () => undefined,
       getMission: async () => undefined,
       listMissions: async () => ({ missions: [], issues: [], unreadableCount: 0 }),
       flush: async () => undefined

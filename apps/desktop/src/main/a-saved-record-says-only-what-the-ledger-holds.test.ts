@@ -169,12 +169,15 @@ async function seed(options: { readonly tearTurnThree?: boolean } = {}): Promise
 const record = (turns: readonly RecoveredMission[], over: Partial<Parameters<typeof missionRecordMarkdown>[0]> = {}): string =>
   missionRecordMarkdown({ missions: turns, teammate: 'Wren', folder: 'C:\\work\\locust', locustVersion: '0.575.0', savedAt: SAVED_AT, ...over })
 
+/** The same turns as a ledger written before cards were recorded (v19) reads them. */
+const before20 = (turns: readonly RecoveredMission[]): RecoveredMission[] => turns.map((turn) => ({ ...turn, schemaVersion: 19 as const, approvals: [] }))
+
 const GOLDEN = new URL('./a-saved-record-says-only-what-the-ledger-holds.golden.md', import.meta.url)
 
 describe('a saved record, from a ledger seeded through its own writer', () => {
   it('reads exactly as the golden file: every turn, every declined call, every command, every diff, how each ended', async () => {
     const { turns } = await seed({ tearTurnThree: true })
-    const markdown = record(turns)
+    const markdown = record(before20(turns))
     // `LOCUST_UPDATE_GOLDEN=1` rewrites it; the diff is then read by a person, not trusted.
     if (process.env.LOCUST_UPDATE_GOLDEN === '1') await writeFile(GOLDEN, markdown, 'utf8')
     expect(markdown).toBe(await readFile(GOLDEN, 'utf8'))
@@ -233,9 +236,9 @@ describe('a reply saved alone', () => {
 })
 
 describe('what the file says about approvals', () => {
-  it('lists a declined call as declined, with the words recorded, and does not say whether a click or a rule answered', async () => {
+  it('in a turn written before cards were recorded, lists a declined call as declined and does not say whether a click or a rule answered', async () => {
     const { turns } = await seed()
-    const markdown = record(turns)
+    const markdown = record(before20(turns))
     expect(markdown).toContain('- **Declined.** Asked: `rm -rf build`.')
     expect(markdown).toContain('> Recorded with the call: The person declined this, and said: use the build script instead')
     expect(markdown).toContain('It does not record which, and the words recorded with the call do not say.')
@@ -255,9 +258,9 @@ describe('what the file says about approvals', () => {
     expect(markdown).toContain('no answer from a person is recorded')
   })
 
-  it('says, in every turn, that an allowed approval and who answered a card are not in the ledger', async () => {
+  it('in turns written before cards were recorded, says in every one that an allowed approval and who answered are not in the ledger', async () => {
     const { turns } = await seed()
-    const markdown = record(turns)
+    const markdown = record(before20(turns))
     const said = markdown.match(/_Not in the ledger:_ an approval that was allowed, what the card asked in full, who answered it and how\./g) ?? []
     expect(said).toHaveLength(3)
     // And a call that ran is never described as approved.
@@ -266,7 +269,59 @@ describe('what the file says about approvals', () => {
 
   it('says a turn with no declined or refused call has none recorded, instead of leaving the section out', async () => {
     const { turns } = await seed()
-    expect(record(turns)).toContain('No declined or refused call is recorded in this turn.')
+    expect(record(before20(turns))).toContain('No declined or refused call is recorded in this turn.')
+  })
+})
+
+/**
+ * CARDS ANSWERED ARE IN THE RECORD (0.576, ledger v20). The record export
+ * found the ledger held no approval at all; now each answered card is its own
+ * record, written where every answer passes, and the file lists them.
+ */
+describe('a saved record of turns that record their cards', () => {
+  const answered = async (): Promise<string> => {
+    const { ledger } = await seed()
+    await ledger.appendApproval('mission_one', {
+      approvalId: 'ap_1', kind: 'command', asked: 'Run a command\nnpm test', answer: 'allowed', by: 'card',
+      askedAt: ISO(0, 59), occurredAt: ISO(1, 0)
+    })
+    await ledger.appendApproval('mission_one', {
+      approvalId: 'ap_2', kind: 'command', asked: 'Run a command\nrm -rf build', answer: 'denied', by: 'card',
+      words: 'use the build script instead', askedAt: ISO(1, 10), occurredAt: ISO(1, 12)
+    })
+    await ledger.appendApproval('mission_one', {
+      approvalId: 'ap_3', kind: 'command', asked: 'Run a command\ngit push origin main', answer: 'denied', by: 'saved-rule',
+      words: 'never run git push for Wren in this folder.', askedAt: ISO(1, 20), occurredAt: ISO(1, 21)
+    })
+    await ledger.flush()
+    const turns = (await recordTurns((id) => ledger.getMission(id), 'mission_three')).missions
+    return record(turns)
+  }
+
+  it('lists each card answered: what it asked, the answer, and who gave it', async () => {
+    const markdown = await answered()
+    expect(markdown).toContain(`- **Allowed** by the person, on the card · command · asked ${ISO(0, 59)} · answered ${ISO(1, 0)}`)
+    expect(markdown).toContain('> The card asked: Run a command\n> npm test')
+    expect(markdown).toContain('- **Denied** by the person, on the card · command')
+    expect(markdown).toContain('> Said with the answer: use the build script instead')
+    expect(markdown).toContain('- **Denied** by a rule the person saved, before the card reached them · command')
+  })
+
+  it('points a declined call at the answer above instead of saying it cannot tell', async () => {
+    const markdown = await answered()
+    expect(markdown).toContain('- **Declined.** Asked: `rm -rf build`. The call did not run; the answer that declined it is listed above.')
+    expect(markdown).not.toContain('It does not record which')
+  })
+
+  it('says what it records and what it still does not, and never that an allowed approval is missing', async () => {
+    const markdown = await answered()
+    expect(markdown).toContain('_Recorded:_ every card answered on this turn, with who answered it.')
+    expect(markdown).not.toContain('_Not in the ledger:_ an approval that was allowed')
+  })
+
+  it('says a turn that records cards had none answered, rather than leaving the section out', async () => {
+    const markdown = await answered()
+    expect(markdown).toContain('No card was answered, and no call was declined or refused, in this turn.')
   })
 })
 

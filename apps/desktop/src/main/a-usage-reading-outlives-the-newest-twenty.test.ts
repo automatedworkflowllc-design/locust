@@ -22,7 +22,7 @@ const mission = (missionId: string, runtime: string, at: string, usage?: string)
   events: usage === undefined
     ? [{ type: 'noise' }]
     : [{ id: `e_${missionId}`, type: 'adapter.diagnostic', sourceAdapter: runtime, occurredAt: at, payload: { level: 'info', code: `${runtime}.usage_window`, message: usage } }],
-  hostFailures: [], checkpoints: [], peerLinks: [], editChecks: [], phase: 'completed', lastUpdatedAt: at, ledgerSequence: 1, issues: []
+  hostFailures: [], checkpoints: [], peerLinks: [], editChecks: [], approvals: [], phase: 'completed', lastUpdatedAt: at, ledgerSequence: 1, issues: []
 }) as unknown as RecoveredMission
 
 const ledgerOf = (missions: readonly RecoveredMission[]): MissionLedger =>

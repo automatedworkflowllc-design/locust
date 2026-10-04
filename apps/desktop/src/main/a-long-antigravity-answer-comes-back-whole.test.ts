@@ -44,7 +44,7 @@ function fakeLedger(): MissionLedger {
     appendHostFailure: async () => undefined,
     getMission: async () => undefined,
     appendPeerLinks: async () => undefined,
-    appendEditCheck: async () => undefined
+    appendEditCheck: async () => undefined, appendApproval: async () => undefined
   } as unknown as MissionLedger
 }
 

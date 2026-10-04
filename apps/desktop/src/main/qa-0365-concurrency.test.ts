@@ -95,7 +95,7 @@ const fakeLedger = (overrides: Partial<MissionLedger> = {}): MissionLedger =>
     appendEvents: async () => undefined,
     appendHostFailure: async () => undefined,
     createCheckpoint: async () => { throw new Error('not used') },
-    appendPeerLinks: async () => undefined, appendEditCheck: async () => undefined,
+    appendPeerLinks: async () => undefined, appendEditCheck: async () => undefined, appendApproval: async () => undefined,
     deleteMission: async () => true,
     listTrashedMissions: async () => [],
     restoreMission: async () => true,

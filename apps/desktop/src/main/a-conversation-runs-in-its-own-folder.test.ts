@@ -94,7 +94,7 @@ describe('a turn that continues a conversation', () => {
         appendEvents: async () => undefined,
         appendHostFailure: async () => undefined,
         appendPeerLinks: async () => undefined,
-        appendEditCheck: async () => undefined,
+        appendEditCheck: async () => undefined, appendApproval: async () => undefined,
         getMission: async (missionId: string) =>
           missionId === 'mission_earlier'
             ? {

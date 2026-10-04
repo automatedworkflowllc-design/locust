@@ -87,7 +87,7 @@ describe('a question on the side', () => {
         appendEvents: async () => undefined,
         appendHostFailure: async () => undefined,
         appendPeerLinks: async () => undefined,
-        appendEditCheck: async () => undefined,
+        appendEditCheck: async () => undefined, appendApproval: async () => undefined,
         getMission: async (missionId: string) =>
           missionId === 'mission_convo'
             ? {
