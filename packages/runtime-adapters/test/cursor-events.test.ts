@@ -367,6 +367,19 @@ describe("records Cursor sends that this adapter does not draw", () => {
     timestamp_ms: 1
   });
 
+  it("says Cursor's reconnect and resume in words, as the records in a real run had them (0.575)", () => {
+    const events = run([
+      { type: "connection", subtype: "reconnecting", session_id: "s1", timestamp_ms: 1, attempt: 1, endpoint_url: "https://agentn.global.api5.cursor.sh" },
+      { type: "retry", subtype: "starting", session_id: "s1", timestamp_ms: 2, attempt: 1, is_resume: true }
+    ]);
+    const said = events.filter((event) => event.type === "adapter.diagnostic").map((event) => (event.payload as { message: string }).message);
+    expect(said).toEqual([
+      "Cursor lost its connection and is reconnecting (attempt 1).",
+      "Cursor is picking the turn back up after the reconnect (attempt 1)."
+    ]);
+    expect(said.join(" ")).not.toMatch(/Unhandled|cursor\.sh/);
+  });
+
   it("says nothing at all about interaction_query, because the tool row already says it", () => {
     const events = run([query("TSMC capex"), query("NVDA targets"), { ...query("GOOGL"), subtype: "response" }]);
     const said = events.filter((event) => event.type === "adapter.diagnostic");

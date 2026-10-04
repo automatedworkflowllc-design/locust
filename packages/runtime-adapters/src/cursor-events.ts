@@ -620,6 +620,30 @@ export function createCursorEventNormalizer(
     if (type === "interaction_query") return [];
 
     /*
+     * CURSOR'S OWN NETWORK RECOVERY (0.575). Colin, 10/03, of a 42-minute Grok
+     * run: "small error at the end ... not sure if it was intended". Two lines
+     * read "Unhandled Cursor record: connection" and "... retry". In his
+     * ledger they are Cursor losing its connection and picking the turn back
+     * up: `connection` / `reconnecting` with an attempt and an endpoint, then
+     * `retry` / `starting` with `is_resume`; the run carried on. Said in words,
+     * once per attempt, and nothing about the endpoint.
+     */
+    if (type === "connection" || type === "retry") {
+      const subtype = stringValue(parsed.subtype);
+      const attempt = typeof parsed.attempt === "number" && Number.isFinite(parsed.attempt) ? ` (attempt ${String(parsed.attempt)})` : "";
+      const said = type === "connection"
+        ? subtype === "reconnecting"
+          ? `Cursor lost its connection and is reconnecting${attempt}.`
+          : `Cursor's connection: ${subtype ?? "changed"}${attempt}.`
+        : subtype === "starting"
+          ? parsed.is_resume === true
+            ? `Cursor is picking the turn back up after the reconnect${attempt}.`
+            : `Cursor is retrying${attempt}.`
+          : `Cursor's retry: ${subtype ?? "changed"}${attempt}.`;
+      return [diagnostic("info", `cursor.${type}`, said, evidence)];
+    }
+
+    /*
      * A record type nobody handled is worth saying ONCE.
      *
      * This said it per record, and Cursor sends a lot of them: Colin's room
