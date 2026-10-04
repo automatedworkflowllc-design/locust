@@ -25,7 +25,7 @@ describe('what `@` is asking for', () => {
 
   it('is nothing for an @ inside a sentence, or a word that carries one', () => {
     expect(atQuery('email me @ noon please')).toBeUndefined()
-    expect(atQuery('write to colin@example.com')).toBeUndefined()
+    expect(atQuery('write to sam@example.com')).toBeUndefined()
     expect(atQuery('no at sign')).toBeUndefined()
   })
 

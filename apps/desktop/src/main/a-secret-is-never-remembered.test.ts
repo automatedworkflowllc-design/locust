@@ -70,7 +70,7 @@ describe('a secret, by its shape', () => {
     'Postgres runs at postgres://db.internal:5432/app for the tests.',
     'The AWS region is us-east-1 and the bucket is shop-assets.',
     'Order 1234 5678 9012 3456 shipped on Tuesday.',
-    'Call the shop at 352-555-0142 or +1 703 939 1174.',
+    'Call the shop at 352-555-0142 or +1 703 555 0174.',
     'The build number was 20260929104512.',
     // Passes Luhn, opens like no card network: a millisecond timestamp.
     'The run started at 1727600000001.',

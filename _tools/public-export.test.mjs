@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { accountRemains, isExcluded, scrubText } from './public-export.mjs'
+import { accountRemains, denyHits, denyTerms, isExcluded, scrubText } from './public-export.mjs'
 
 const account = ['h', 'i', 's', 'b', 'o'].join('')
 const slash = String.fromCharCode(92)
@@ -82,4 +82,15 @@ test('a scrub that returns the text unchanged still has the user path', () => {
   const broken = (text) => text
   assert.equal(accountRemains(broken(sample)), true)
   assert.equal(accountRemains(scrubText(sample)), false)
+})
+
+test('a deny-file phone number is found however it is written, and nothing else is', () => {
+  const terms = denyTerms('# the owner\n+1 555 010 0199\nFairhaven Lane\n')
+  assert.deepEqual(terms, ['+1 555 010 0199', 'Fairhaven Lane'])
+  assert.deepEqual(denyHits("'Call the shop at 555-010-0199.'", terms), [1])
+  assert.deepEqual(denyHits('(555) 010 0199', terms), [1])
+  assert.deepEqual(denyHits('12 fairhaven lane', terms), [2])
+  // Controls: other numbers, and digits from unrelated runs glued together.
+  assert.deepEqual(denyHits('Call 555-010-0142. Order 5550 shipped; 100199 left.', terms), [])
+  assert.deepEqual(denyHits('sha a5b5c5d0e1f0g0h1i9j9', terms), [])
 })

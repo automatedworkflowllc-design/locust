@@ -25,7 +25,7 @@ const store = async () => {
   roots.push(root)
   return createTeammateStore({ rootDirectory: root })
 }
-const PERSON = 'Colin, in [removed]. Daughter Emma. Email colin@example.com, phone 352-555-0142. Likes short answers.'
+const PERSON = 'Sam, in Fairhaven. Daughter Juniper. Email sam@example.com, phone 352-555-0142. Likes short answers.'
 
 describe('About you', () => {
   it('keeps personal details: names, places, family, an email, a phone number', async () => {

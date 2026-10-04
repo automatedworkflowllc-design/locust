@@ -128,8 +128,8 @@ describe('a suggested line that holds a key (0.433)', () => {
   })
 
   it('while a personal detail is put to the person as before', async () => {
-    const h = harness('OK.\n<locust-memory>\nabout you :: Lives in [removed], has a daughter named Emma, and prefers texts at 352-555-0142.\n</locust-memory>', 'off')
+    const h = harness('OK.\n<locust-memory>\nabout you :: Lives in Fairhaven, has a daughter named Juniper, and prefers texts at 352-555-0142.\n</locust-memory>', 'off')
     await h.reader.onRunEnded({ missionId: 'mission_1' })
-    expect(h.suggested).toEqual([['Lives in [removed], has a daughter named Emma, and prefers texts at 352-555-0142.', 'Ada']])
+    expect(h.suggested).toEqual([['Lives in Fairhaven, has a daughter named Juniper, and prefers texts at 352-555-0142.', 'Ada']])
   })
 })

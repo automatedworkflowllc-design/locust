@@ -238,16 +238,43 @@ function formatBytes(bytes) {
 function parseArgs(argv) {
   let from
   let out
+  let deny
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]
     if (arg === '--from') from = argv[i += 1]
     else if (arg === '--out') out = argv[i += 1]
+    else if (arg === '--deny') deny = argv[i += 1]
     else throw new Error(`Unknown argument ${arg ?? ''}`)
   }
   if (!from || !out) {
-    throw new Error('Usage: node _tools/public-export.mjs --from <commit> --out <empty folder outside the repo>')
+    throw new Error('Usage: node _tools/public-export.mjs --from <commit> --out <empty folder outside the repo> [--deny <file outside the repo>]')
   }
-  return { from, out }
+  return { from, out, deny }
+}
+
+// `--deny` (0.578): the owner's own details -- a phone number, a street, a
+// name -- one per line, in a file kept OUTSIDE the repository (the list is
+// itself personal). The copy is refused if any of them is in any file. A
+// line of mostly digits also matches with its separators changed or gone,
+// so "+1 555 010 0100" catches "555-010-0100". Hits give the term's number
+// (comment lines skipped), never its text.
+export function denyTerms(text) {
+  return text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length >= 4 && !line.startsWith('#'))
+}
+
+export function denyHits(text, terms) {
+  const lower = text.toLowerCase()
+  // Each run of digits and phone separators, as its digits alone.
+  const numbers = (text.match(/\d[\d\s().+-]{5,}\d/g) ?? []).map((run) => run.replace(/\D/g, ''))
+  const hits = []
+  terms.forEach((term, index) => {
+    const termDigits = term.replace(/\D/g, '')
+    const numeric = termDigits.length >= 7 && termDigits.length >= term.replace(/\s/g, '').length * 0.6
+    const core = termDigits.length > 10 ? termDigits.slice(-10) : termDigits
+    if (lower.includes(term.toLowerCase())) hits.push(index + 1)
+    else if (numeric && numbers.some((run) => run.includes(core))) hits.push(index + 1)
+  })
+  return hits
 }
 
 function run(command, args, options = {}) {
@@ -332,7 +359,7 @@ async function scanFile(rel, text) {
 }
 
 async function main() {
-  const { from, out } = parseArgs(process.argv.slice(2))
+  const { from, out, deny } = parseArgs(process.argv.slice(2))
   const repo = (await run('git', ['rev-parse', '--show-toplevel'])).stdout.trim()
   const commit = (await run('git', ['-C', repo, 'rev-parse', '--verify', `${from}^{commit}`])).stdout.trim()
   const destination = resolve(out)
@@ -392,7 +419,9 @@ async function main() {
   const excludedPaths = tree.filter((file) => isExcluded(file.path)).map((file) => file.path)
   await writeFile(excludePath, `${excludedPaths.join('\n')}\n`)
   await run('git', ['-C', repo, 'archive', '--format=tar', '-o', tarPath, commit])
-  await run('tar', ['-xf', tarPath, '-C', destination, `--exclude-from=${excludePath}`])
+  // Windows' own bsdtar: the GNU tar Git Bash puts first on PATH reads `C:` in -f as a remote host.
+  const tar = process.platform === 'win32' ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe') : 'tar'
+  await run(tar, ['-xf', tarPath, '-C', destination, `--exclude-from=${excludePath}`])
   await rm(tarPath, { force: true })
   await rm(excludePath, { force: true })
 
@@ -437,6 +466,25 @@ async function main() {
   }
   console.log('Account folder remaining: none')
   console.log('')
+
+  if (deny !== undefined) {
+    if (inside(repo, resolve(deny))) throw new Error('--deny must be outside the repository: the list is itself personal')
+    const terms = denyTerms(await readFile(deny, 'utf8'))
+    const found = []
+    for (const full of await walkFiles(destination)) {
+      const rel = relative(destination, full).split(sep).join('/')
+      const lines = denyHits((await readFile(full)).toString('latin1'), terms)
+      if (lines.length > 0) found.push(`  ${rel}: deny term ${lines.join(', ')}`)
+    }
+    if (found.length > 0) {
+      console.log(`Refusing to finish: ${String(found.length)} files hold a term from the deny file`)
+      for (const line of found) console.log(line)
+      process.exitCode = 1
+      return
+    }
+    console.log(`Deny file: none of its ${String(terms.length)} terms is in the copy`)
+    console.log('')
+  }
 
   const gitleaks = await commandExists('gitleaks')
   const trufflehog = await commandExists('trufflehog')
