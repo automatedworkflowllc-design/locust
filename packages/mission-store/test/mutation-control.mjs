@@ -98,8 +98,9 @@ const MUTATIONS = [
   {
     file: INDEX,
     name: 'the history is dated by the file timestamp rather than the record',
-    from: '        const updatedAt = parsed.mission === undefined ? undefined : Date.parse(parsed.mission.lastUpdatedAt)',
-    to: '        const updatedAt = Date.now()',
+    // Anchored to the storage report's read since 0.600 (the line was renamed when the dates cache arrived).
+    from: '          const read = parsed.mission === undefined ? undefined : Date.parse(parsed.mission.lastUpdatedAt)',
+    to: '          const read = file.mtimeMs',
     expect: 'counts the missions and their bytes, and dates the oldest by the record a prune would judge'
   },
   {
@@ -219,8 +220,9 @@ const MUTATIONS = [
   {
     name: 'the reader forgets how to read version 1',
     file: INDEX,
-    from: '  return value === 1 || value === 2',
-    to: '  return value === 2',
+    // Anchored to the SUPPORTED_VERSIONS set since 0.600 (the version check stopped listing numbers).
+    from: '  return SUPPORTED_VERSIONS.has(value)',
+    to: '  return value !== 1 && SUPPORTED_VERSIONS.has(value)',
     expect: 'still recovers a mission recorded before the version bump'
   },
   {

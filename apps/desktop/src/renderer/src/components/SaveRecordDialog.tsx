@@ -45,7 +45,7 @@ export function SaveRecordDialog({ missionId, onClose }: { readonly missionId: s
           <p className="lc-saverecord__claim">{RECORD_CLAIM}</p>
           <label className="lc-saverecord__with">
             <input type="checkbox" checked={includeRaw} onChange={(event) => setIncludeRaw(event.target.checked)} />
-            <span>Include the raw record (JSON)</span>
+            <span>Include the raw record (JSON, not scrubbed)</span>
           </label>
           {said !== undefined && (
             <p className="lc-saverecord__claim lc-saverecord__said" role="status">

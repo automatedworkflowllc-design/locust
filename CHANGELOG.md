@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.601.0 - 2026-10-04
+
+### Improved
+
+- **Save the record leaves out text shaped like a key or a token, and says how many pieces it left out.** The saved Markdown is written to be sent to someone, and it carried command output, diffs and the words said with a card's answer exactly as recorded. Each piece shaped like a key (an API key, a GitHub or Slack token, a signed token, a private key, a password written after its name, a card number) is now replaced with "[secret-shaped text removed]", and the file's header says how many pieces were replaced, or "none found". The raw JSON, if you tick it, is the ledger exactly as recorded and says so at its top; the tick now reads "Include the raw record (JSON, not scrubbed)".
+
 ## 0.600.0 - 2026-10-04
 
 ### Fixed

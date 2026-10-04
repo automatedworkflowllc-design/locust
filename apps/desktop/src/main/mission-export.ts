@@ -2,6 +2,7 @@ import type { MissionApproval, RecoveredMission } from '@teammate/mission-store'
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
 import { runtimeDisplayName } from '../shared/runtimes.js'
+import { scrubSecrets } from '../shared/secrets.js'
 import { isShellTool, isEditCommand, reportsAChange } from '../shared/tool-kinds.js'
 
 /**
@@ -85,6 +86,25 @@ function oneLine(text: string): string {
 function outputText(output: unknown): string | undefined {
   if (output === undefined || output === null) return undefined
   return typeof output === 'string' ? output : JSON.stringify(output, null, 2)
+}
+
+/**
+ * What the file holds in place of a key. The ledger's own words that are
+ * written verbatim pass through `scrubbed`, which keeps the count the header
+ * reports. The count belongs to one `missionRecordMarkdown` call: it is zeroed
+ * there, and the file is built in one synchronous pass.
+ */
+let piecesReplaced = 0
+function scrubbed(text: string): string {
+  const clean = scrubSecrets(text)
+  piecesReplaced += clean.replaced
+  return clean.text
+}
+
+/** `outputText`, scrubbed: for the places a call's output is written into the file, not where it is only read. */
+function outputWords(output: unknown): string | undefined {
+  const words = outputText(output)
+  return words === undefined ? undefined : scrubbed(words)
 }
 
 /** What the assistant said in one turn, rebuilt the way the thread rebuilds it: deltas append or replace per item. */
@@ -207,7 +227,7 @@ function cardsAnswered(approvals: readonly MissionApproval[]): string[] {
   for (const approval of approvals) {
     lines.push(`- **${ANSWERED[approval.answer]}** ${ANSWERED_BY[approval.by]} · ${approval.kind} · asked ${approval.askedAt} · answered ${approval.occurredAt}`)
     lines.push('', quoted(`The card asked: ${approval.asked}`), '')
-    if (approval.words !== undefined) lines.push(quoted(`Said with the answer: ${approval.words}`), '')
+    if (approval.words !== undefined) lines.push(quoted(`Said with the answer: ${scrubbed(approval.words)}`), '')
   }
   return lines
 }
@@ -220,7 +240,7 @@ function approvalsSection(calls: readonly Call[], events: readonly NormalizedRun
   const lines: string[] = recordsCards ? cardsAnswered(mission.approvals) : []
   for (const call of calls) {
     if (!isDeclined(call) && !isRefused(call) && !namesASavedRule(call)) continue
-    const words = outputText(call.output)
+    const words = outputWords(call.output)
     const asked = `\`${oneLine(what(call))}\``
     if (namesASavedRule(call)) {
       lines.push(`- **Denied, and the words recorded with it name a saved rule.** Asked: ${asked}. The call did not run.`)
@@ -269,7 +289,7 @@ function commandsSection(calls: readonly Call[]): string {
       const out: string[] = [`**Command ${String(at + 1)}** · ${callState(call)}${call.background === true ? ' · run in the background' : ''} · started ${call.startedAt}`]
       if (call.title !== undefined) out.push(`   The runtime described it as: ${oneLine(call.title)}`)
       out.push('', fenced(call.command ?? call.name, 'sh'))
-      const words = outputText(call.output)
+      const words = outputWords(call.output)
       if (words === undefined) out.push('', '_No output is recorded for this command._')
       else if (words.length === 0) out.push('', '_The command printed nothing._')
       else out.push('', 'Output as recorded:', '', fenced(words))
@@ -285,7 +305,7 @@ function changesSection(calls: readonly Call[]): string {
     .map((call, at) => {
       const paths = (call.command ?? call.name).split('\n').map((path) => path.trim()).filter((path) => path.length > 0)
       const out: string[] = [`**Change ${String(at + 1)}** · ${paths.map((path) => `\`${path}\``).join(', ')} · ${callState(call)}${call.status !== undefined && /on disk|from disk/.test(call.status) ? ' · seen on disk by Locust after the run, not reported by the runtime' : ''}`]
-      const words = outputText(call.output)
+      const recorded = call.patch === undefined ? outputText(call.output) : undefined
       if (call.patch !== undefined) {
         out.push('', `Diff as recorded: +${String(call.patch.added)} −${String(call.patch.removed)}`)
         if (call.patch.truncated) {
@@ -294,12 +314,12 @@ function changesSection(calls: readonly Call[]): string {
             `_Too large to keep whole. The ledger holds only the first ${String(call.patch.text.length)} characters of this diff; the runtime reported +${String(call.patch.added)} −${String(call.patch.removed)} for the whole change._`
           )
         }
-        out.push('', fenced(call.patch.text, 'diff'))
-      } else if (words !== undefined && /too large/i.test(`${call.status ?? ''} ${words}`)) {
-        out.push('', `No diff is recorded. The ledger's own words: ${oneLine(words)}`)
+        out.push('', fenced(scrubbed(call.patch.text), 'diff'))
+      } else if (recorded !== undefined && /too large/i.test(`${call.status ?? ''} ${recorded}`)) {
+        out.push('', `No diff is recorded. The ledger's own words: ${oneLine(scrubbed(recorded))}`)
       } else {
         out.push('', '_No diff is recorded for this change._')
-        if (words !== undefined && words.length > 0) out.push('', quoted(`Recorded with the call: ${words}`))
+        if (recorded !== undefined && recorded.length > 0) out.push('', quoted(`Recorded with the call: ${scrubbed(recorded)}`))
       }
       return out.join('\n')
     })
@@ -349,7 +369,7 @@ function endingSection(mission: RecoveredMission): string {
   }
   for (const check of mission.editChecks) {
     lines.push('', `The person's check, \`${oneLine(check.command)}\`, after this turn: **${check.outcome}** (${check.occurredAt}).`)
-    if (check.newLines.length > 0) lines.push('', fenced(check.newLines.join('\n')))
+    if (check.newLines.length > 0) lines.push('', fenced(scrubbed(check.newLines.join('\n'))))
   }
   return lines.join('\n')
 }
@@ -499,6 +519,9 @@ export function missionRecordMarkdown(source: RecordSource): string {
     last.phase === 'interrupted'
       ? `no ending is recorded; the last thing recorded is at ${last.lastUpdatedAt}`
       : `${last.lastUpdatedAt} (${last.phase})`
+  piecesReplaced = 0
+  // The turns are built first: the header counts what they replaced.
+  const turns = missions.map((mission, at) => turnSection(mission, at, source, teammate))
   out.push(
     `- **Teammate:** ${source.teammate ?? `${NOT_RECORDED}: the roster no longer names them`}`,
     `- **Folder:** ${source.folder === undefined ? `${NOT_RECORDED}. The ledger holds only the workspace id \`${first.metadata.workspaceId}\`.` : `${source.folder} (where the teammate works now; the ledger holds only the workspace id \`${first.metadata.workspaceId}\`)`}`,
@@ -508,6 +531,9 @@ export function missionRecordMarkdown(source: RecordSource): string {
     `- **Locust version:** ${source.locustVersion}, the build that wrote this file. The ledger does not record which build ran each turn.`,
     `- **Saved:** ${source.savedAt}`,
     `- **The record's own check:** ${integrity(missions, source.missingParent)}`,
+    piecesReplaced === 0
+      ? '- **Secret-shaped text:** none found.'
+      : `- **Secret-shaped text:** ${String(piecesReplaced)} ${piecesReplaced === 1 ? 'piece' : 'pieces'} replaced in this file. The raw record keeps the original.`,
     '',
     '## Who answered',
     ''
@@ -520,13 +546,13 @@ export function missionRecordMarkdown(source: RecordSource): string {
     out.push(`- **Turn ${String(at + 1)}** · ${runLine(mission)}`)
   })
   out.push('')
-  missions.forEach((mission, at) => out.push(turnSection(mission, at, source, teammate), ''))
+  turns.forEach((turn) => out.push(turn, ''))
   return `${out.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd()}\n`
 }
 
 /** The events exactly as the ledger holds them, for the person who wants to check the Markdown against them. */
 export function rawRecordJson(missions: readonly RecoveredMission[], locustVersion: string, savedAt: string): string {
-  return `${JSON.stringify({ writtenBy: `Locust ${locustVersion}`, savedAt, missions }, null, 2)}\n`
+  return `${JSON.stringify({ warning: 'This file is the ledger as recorded, including any secret-shaped text the Markdown replaced.', writtenBy: `Locust ${locustVersion}`, savedAt, missions }, null, 2)}\n`
 }
 
 /**

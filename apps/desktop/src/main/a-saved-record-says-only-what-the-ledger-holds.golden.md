@@ -9,6 +9,7 @@
 - **Saved:** 2026-10-03T08:00:00.000Z
 - **The record's own check:** **record incomplete.** 1 problem was found reading this conversation's ledger, so what follows may stop short of what happened:
   - `truncated-tail`: An incomplete final ledger record was ignored after recovery. (mission_three)
+- **Secret-shaped text:** none found.
 
 ## Who answered
 
