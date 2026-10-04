@@ -128,6 +128,56 @@ interface Folder {
 
 export interface CursorConnectorKeeper {
   readonly allow: (workspace: string, servers: readonly string[]) => Promise<CursorConnectorGrant>
+  /**
+   * Take back the rules a run of an EARLIER Locust left behind (0.588): one
+   * that was live when Locust quit or crashed never reached its `release`, so
+   * its rules stayed and the next run in that folder -- in Ask, even -- had
+   * connector access it was never given. Called once at start, before any
+   * run; resolves to the files it changed.
+   */
+  readonly recover: () => Promise<readonly string[]>
+}
+
+/**
+ * Where the keeper writes what it holds, so a Locust that quits mid-run can
+ * take the rules back when it next starts. A file in the profile; its
+ * failure never fails a run.
+ */
+export interface HoldStore {
+  readonly read: () => Promise<string | undefined>
+  readonly write: (text: string) => Promise<void>
+}
+
+const HOLD_STORE_VERSION = 1
+
+/** The store's shape: each file the keeper's rules are in, and how the file looked before. */
+interface StoredHolds {
+  readonly version: typeof HOLD_STORE_VERSION
+  readonly folders: Readonly<Record<string, { readonly original: Original; readonly rules: readonly string[] }>>
+}
+
+function parseStoredHolds(text: string | undefined): StoredHolds | undefined {
+  if (text === undefined || text.trim().length === 0) return { version: HOLD_STORE_VERSION, folders: {} }
+  let value: unknown
+  try {
+    value = JSON.parse(text) as unknown
+  } catch {
+    return undefined
+  }
+  if (!isRecord(value) || value.version !== HOLD_STORE_VERSION || !isRecord(value.folders)) return undefined
+  const folders: Record<string, { readonly original: Original; readonly rules: readonly string[] }> = {}
+  for (const [path, held] of Object.entries(value.folders)) {
+    if (!isRecord(held) || !Array.isArray(held.rules) || !isRecord(held.original)) continue
+    const rules = held.rules.filter((rule): rule is string => typeof rule === 'string')
+    if (rules.length === 0) continue
+    const original = held.original
+    const flag = (name: string): boolean => original[name] === true
+    folders[path] = {
+      original: { createdFile: flag('createdFile'), createdDir: flag('createdDir'), hadPermissions: flag('hadPermissions'), hadAllow: flag('hadAllow'), hadDeny: flag('hadDeny') },
+      rules
+    }
+  }
+  return { version: HOLD_STORE_VERSION, folders }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -165,8 +215,17 @@ function withoutRules(text: string, rules: readonly string[], original: Original
   return { text: `${JSON.stringify(record, null, 2)}\n` }
 }
 
-export function createCursorConnectorKeeper(io: AllowIo = nodeIo): CursorConnectorKeeper {
+export function createCursorConnectorKeeper(io: AllowIo = nodeIo, store?: HoldStore): CursorConnectorKeeper {
   const folders = new Map<string, Folder>()
+  // What is held, written down after every change (0.588); a store that cannot be written is not a run's problem.
+  const remember = async (): Promise<void> => {
+    if (store === undefined) return
+    const held: StoredHolds = {
+      version: HOLD_STORE_VERSION,
+      folders: Object.fromEntries([...folders].map(([path, folder]) => [path, { original: folder.original, rules: [...folder.holds.keys()] }]))
+    }
+    await store.write(`${JSON.stringify(held, null, 2)}\n`).catch(() => undefined)
+  }
   // One read-modify-write at a time per file, so two runs starting (or
   // ending) together cannot overwrite each other's change.
   const queues = new Map<string, Promise<unknown>>()
@@ -213,6 +272,7 @@ export function createCursorConnectorKeeper(io: AllowIo = nodeIo): CursorConnect
     const mine = [...merged.added, ...relied]
     if (mine.length === 0) return NO_GRANT
     for (const rule of mine) folder.holds.set(rule, (folder.holds.get(rule) ?? 0) + 1)
+    await remember()
     let released = false
     return {
       added: merged.added,
@@ -237,6 +297,7 @@ export function createCursorConnectorKeeper(io: AllowIo = nodeIo): CursorConnect
       }
     }
     if (folder.holds.size === 0) folders.delete(path)
+    await remember()
     if (last.length === 0) return
     let text: string
     try {
@@ -254,12 +315,47 @@ export function createCursorConnectorKeeper(io: AllowIo = nodeIo): CursorConnect
     if (taken.text !== text) await io.writeFile(path, taken.text)
   }
 
+  async function recover(): Promise<readonly string[]> {
+    if (store === undefined) return []
+    const stored = parseStoredHolds(await store.read().catch(() => undefined))
+    // A store that does not read as itself is left as it is: never written over, never acted on.
+    if (stored === undefined) return []
+    const changed: string[] = []
+    for (const [path, held] of Object.entries(stored.folders)) {
+      await serial(path, async () => {
+        // A live run of THIS process holds the file: its own release will see to it.
+        if (folders.has(path)) return
+        let text: string
+        try {
+          text = await io.readFile(path)
+        } catch {
+          return // already gone
+        }
+        const taken = withoutRules(text, held.rules, held.original)
+        if (taken === 'unreadable') return
+        if (taken.text === undefined) {
+          await io.removeFile(path)
+          if (held.original.createdDir) await io.removeDir(dirname(path)).catch(() => undefined)
+          changed.push(path)
+          return
+        }
+        if (taken.text !== text) {
+          await io.writeFile(path, taken.text)
+          changed.push(path)
+        }
+      }).catch(() => undefined)
+    }
+    if (Object.keys(stored.folders).length > 0) await remember()
+    return changed
+  }
+
   return {
     allow: (workspace, servers) => {
       if (servers.length === 0) return Promise.resolve(NO_GRANT)
       const path = join(workspace, CURSOR_PROJECT_CONFIG)
       return serial(path, () => take(path, servers)).catch(() => NO_GRANT)
-    }
+    },
+    recover
   }
 }
 
