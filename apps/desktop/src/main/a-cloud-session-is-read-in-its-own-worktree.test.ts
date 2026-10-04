@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -31,7 +31,9 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
 })
 const temp = async (label: string): Promise<string> => {
-  const root = await mkdtemp(join(tmpdir(), `locust-cloud-read-${label}-`))
+  // The real spelling: Claude Code slugs the folder's real path into its transcript folder name, so a
+  // TEMP given as a Windows short name (`RUNNER~1` on a hosted runner) would make the expectation lie.
+  const root = await realpath(await mkdtemp(join(tmpdir(), `locust-cloud-read-${label}-`)))
   roots.push(root)
   return root
 }
