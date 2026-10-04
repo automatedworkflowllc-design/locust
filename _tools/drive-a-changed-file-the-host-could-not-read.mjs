@@ -122,7 +122,8 @@ try {
   check('the new turn opens and has a NOTES.md row', after.opened === 'opened' && after.rows.length > 0, after.opened + ' ' + JSON.stringify(after.rows).slice(0, 200))
   check('the row says the host saw it change', after.rows.some((text) => /changed · seen on disk/.test(text)), after.rows.join(' || '))
   check('and no row says the runtime did not report it', !after.rows.some((text) => /did not report the change/.test(text)), after.rows.join(' || '))
-  check("with Codex's own word kept (changed)", after.rows.some((text) => /\bchanged\b.*changed · seen on disk/.test(text)), after.rows.join(' || '))
+  // Codex's word for a file_change is "changed", which the status says already: once, not "changed changed".
+  check('and reads "NOTES.md changed · seen on disk", the word once', after.rows.every((text) => /^NOTES\.md changed · seen on disk$/.test(text)), after.rows.join(' || '))
   say(failures === 0 ? '\nA CHANGED FILE THE HOST COULD NOT READ PASSED' : `\nA CHANGED FILE THE HOST COULD NOT READ: ${String(failures)} FAILED`)
 } catch (error) {
   failures += 1

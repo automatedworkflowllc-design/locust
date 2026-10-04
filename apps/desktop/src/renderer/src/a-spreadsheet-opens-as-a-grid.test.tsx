@@ -111,6 +111,11 @@ describe('a spreadsheet in the conversation', () => {
     expect(html).toContain('changed · seen on disk')
     expect(html).toContain('>Write<')
     expect(html).not.toContain('did not report the change')
+    // Codex's word for a file_change is "changed", which the status says already: not twice
+    // (the packaged drive on 0.597 read "NOTES.md changed changed · seen on disk").
+    const codex = fold([edit('C:/work/NOTES.md', { tool: 'file_change', status: 'reported by the runtime, changed on disk' })])
+    expect(codex).toContain('changed · seen on disk')
+    expect(codex).not.toContain('lc-filerow__status">changed<')
   })
 
   it('still says a runtime did not report a change it did not see on disk', () => {
