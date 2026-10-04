@@ -11,6 +11,20 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.583.0 - 2026-10-04
+
+### Changed
+
+- **Home is centered and fits two rows of teammates without scrolling.** At
+  a window around 1200x780 with six teammates, Home ran a little taller than
+  the window and opened scrolled down, cutting off the top of the cover. Now
+  the page is centered. When it is short of height, the space between its
+  sections tightens before anything is cut. A page that still runs over
+  opens at the top.
+- **Claw'd sleeps on the cover.** The locust there drew with stair-stepped
+  legs and antennae, and no fur, under Plush. The sleeper on the cover is now
+  Claw'd, who takes the fur. The swarm still flies past.
+
 ## 0.582.0 - 2026-10-04
 
 ### Changed

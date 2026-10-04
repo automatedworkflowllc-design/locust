@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { PublicRoutine } from '../../shared/ipc.js'
 import { AutomationsScreen } from './components/AutomationsScreen.js'
@@ -29,9 +29,17 @@ const routine = {
 } as PublicRoutine
 
 describe('a missed routine', () => {
+  // The screen reads the clock itself; pinned to the test's own `now`, or the
+  // render says "yesterday" whenever the suite runs before 08:00 (0.583).
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('says Missed, 08:00 today, and the row offers Run now', () => {
     expect(missedLine(missedAt, now)).toBe('Missed, 08:00 today')
     expect(routineScheduleSummary(routine, now)).toBe('Missed, 08:00 today')
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(now)
     const html = renderToStaticMarkup(
       <AutomationsScreen
         routines={[routine]}

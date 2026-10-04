@@ -108,6 +108,36 @@ export function coverRoomFor(usable: number, others: number, base: number): numb
   return spare - 24
 }
 
+/**
+ * The bots' reach above the cover's box, in the cover's units: `.lc-cover--machine`'s
+ * `margin-top: calc(48px * var(--lc-cover-k))`. It scales with the cover, so the
+ * cover's FOOTPRINT on the page is (COVER_HEIGHT + COVER_REACH) at its scale --
+ * and the room it was given was once measured against the box alone, so a page
+ * "fitted" to the box ran 35px long (Home at 1209x782, 0.583).
+ */
+export const COVER_REACH = 48
+
+/** Home's normal spacing (`.lc-empty` padding, `.lc-empty__inner` gap); `.is-tight` uses less. */
+export const HOME_PAD = 32
+export const HOME_GAP = 12
+
+/**
+ * HOME IS SHORT (0.583) when, at its normal spacing, even the smallest cover
+ * does not fit: then its padding and gaps tighten. Colin, 2026-10-04: "2 rows
+ * of teammates should be enough to have home page centered with no scroll
+ * bar" -- at 1209x782 with six teammates it ran 50px over with the cover
+ * already at its floor.
+ *
+ * Decided from what the class cannot move -- the sections' own heights, the
+ * cover's footprint at its width, the pane's height and the NORMAL spacing --
+ * so tightening never argues itself back off (the 0.516 stutter was two
+ * measures arguing).
+ */
+export function homeIsShort(sections: number, count: number, footprint: number, paneHeight: number): boolean {
+  if (![sections, count, footprint, paneHeight].every(Number.isFinite) || paneHeight <= 0) return false
+  return sections + footprint * COVER_MIN_GROW + HOME_GAP * Math.max(0, count - 1) + HOME_PAD * 2 > paneHeight + 0.5
+}
+
 /** The grow factor for this much spare height above a cover of this height; short of room, below 1. */
 export function coverGrowFor(room: number, baseHeight: number): number {
   if (!Number.isFinite(room) || !Number.isFinite(baseHeight) || baseHeight <= 0 || room === 0) return 1
@@ -151,7 +181,10 @@ export const COVER_CAST: readonly CoverBot[] = [
   { key: 'wren', type: 'ghost', state: 'default', floats: true, part: 'thinker', x: 245, y: -10 },
   // Prompt's body ends at 86 of its 100 units (locustBots.ts), so its box sits 7 lower to stand on the bezel.
   { key: 'atlas', type: 'prompt', hue: 'blue', state: 'default', part: 'worker', x: 432, y: 7 },
-  { key: 'sable', type: 'hopper', hue: 'lime', state: 'sleeping', part: 'sleeper', x: 619, y: -2 }
+  // The sleeper is Claw'd's critter (0.583). Colin, 2026-10-04, under Plush: "plush looks good on
+  // the regular avatars but locust is jagged" -- the Hopper's thin legs and antennae step at this
+  // size and take no fur -- "might be worth swapping to claw'd". The swarm still flies past.
+  { key: 'sable', type: 'critter', hue: 'clay', state: 'sleeping', part: 'sleeper', x: 619, y: -2 }
 ]
 
 /** How a beat's glance reads to a bot: across the machine to a neighbour, a touch downward. */

@@ -28,7 +28,8 @@ describe('a scrolled Home', () => {
 
   it('is marked from its own scroll position, on a scroll and on following its end', () => {
     expect(home.match(/setScrolled\(el\.scrollTop > 0\)/g)).toHaveLength(2)
-    expect(home).toContain("className={`lc-empty${scrolled ? ' is-scrolled' : ''}`}")
+    // 0.583 adds `is-tight` beside it (a short Home tightens its spacing).
+    expect(home).toContain("className={`lc-empty${scrolled ? ' is-scrolled' : ''}${tight ? ' is-tight' : ''}`}")
   })
 
   it('is not faded at rest: the plain pane has no mask', () => {

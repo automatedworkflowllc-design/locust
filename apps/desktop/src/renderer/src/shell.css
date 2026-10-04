@@ -2877,6 +2877,16 @@ textarea {
   scrollbar-gutter: stable both-edges;
 }
 
+/* SHORT OF HEIGHT (0.583, HomeCover's `homeIsShort`): with the cover at its
+   floor the page still ran over, so the space around the sections gives
+   first -- 56px between them at five sections, enough for two rows of
+   teammates at 1209x782 with nothing taken out. */
+.lc-empty.is-tight {
+  padding-top: var(--lc-space-5);
+  padding-bottom: var(--lc-space-5);
+}
+
+
 /* The roster as evidence: a count you can open, not eight rows you must
    scroll past to reach the composer. */
 .lc-roster {
@@ -4466,14 +4476,25 @@ textarea {
      the design said 420 and the file said 520 -- both too narrow). The mark
      card, claim lines and folder card all still centre in it. */
   max-width: var(--lc-thread-max-width);
-  /* The bottom anchor, and a refusal to be squashed: see `.lc-empty`. */
+  /* CENTRED (0.583), and a refusal to be squashed. It was anchored to the
+     bottom, over the composer (see `.lc-empty`); Colin, 2026-10-04: "2 rows
+     of teammates should be enough to have home page centered with no scroll
+     bar". Auto margins centre it when there is room and resolve to zero when
+     there is not, so a page that runs over still overflows at the bottom,
+     where it scrolls. */
   margin-top: auto;
+  margin-bottom: auto;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: var(--lc-space-5);
   text-align: left;
+}
+
+/* Tight (0.583): see `.lc-empty.is-tight`. */
+.lc-empty.is-tight > .lc-empty__inner {
+  gap: var(--lc-space-4);
 }
 
 /*
