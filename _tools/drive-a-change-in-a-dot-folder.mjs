@@ -13,7 +13,8 @@
 //
 // Which runtime matters. The free OpenCode model reports its own diff, so its
 // row never said "did not report" in the first place (measured on the 0.596
-// package: `report.md ADDED +1 -0` in the dot-folder too). The rows that did
+// package: `report.md ADDED +1 -0` in the dot-folder too), and Antigravity sends a NEW
+// file's contents as its diff; so the drive asks for an EDIT of README.md. The rows that did
 // are the runtimes that name a file and send no change: Codex's file_change,
 // Antigravity's write_to_file. --antigravity runs Wren on Antigravity Flash
 // through its CLI (a real account's quota, so LOCUST_SPEND=1 is required);
@@ -72,10 +73,15 @@ try {
   await drive.resize(1215, 800)
   await sleep(1500)
   await drive.evaluate(`(async () => { ${teammateFace('Wren')}.click(); await new Promise(r => setTimeout(r, 600)) })()`)
-  await drive.capture('ask for report.md, and send', () => drive.evaluate(`(async () => {
+  // An EDIT of a file that exists, not a new file: Antigravity sends a new
+  // file's contents as its diff (write_to_file without Overwrite), and so does
+  // OpenCode for anything; what it never sends is the change behind an edit
+  // (replace_file_content, or write_to_file over an existing file) -- the row
+  // Colin's ledger showed fourteen times.
+  await drive.capture('ask for a line in README.md, and send', () => drive.evaluate(`(async () => {
     const box = document.querySelector('textarea[aria-label="Message"]')
     const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set
-    setter.call(box, 'Create a new file named report.md in this folder containing exactly one line: The passphrase is HERON-2291. Do not change any other file, and do not run any commands.')
+    setter.call(box, 'Edit the existing file README.md in this folder: add one line at the end that says exactly: The passphrase is HERON-2291. Do not create any new file, do not change any other file, and do not run any commands.')
     box.dispatchEvent(new Event('input', { bubbles: true }))
     await new Promise(r => setTimeout(r, 250))
     box.focus()
@@ -96,20 +102,22 @@ try {
     }
     return JSON.stringify([...document.querySelectorAll('.lc-filerow')].map(r => r.innerText.replace(/\\s+/g, ' ').trim()))
   })()`))))
-  const onDisk = await readFile(join(workspace, 'report.md'), 'utf8').catch(() => undefined)
-  check('Wren wrote report.md with the passphrase (ground truth, read from disk)', onDisk !== undefined && /HERON-2291/.test(onDisk), onDisk?.slice(0, 80))
-  const row = rows.find((text) => /report\.md/.test(text))
-  check('a row names report.md', row !== undefined, JSON.stringify(rows).slice(0, 300))
+  const onDisk = await readFile(join(workspace, 'README.md'), 'utf8').catch(() => undefined)
+  check('Wren put the passphrase into README.md (ground truth, read from disk)', onDisk !== undefined && /HERON-2291/.test(onDisk), onDisk?.slice(-60))
+  // The EDIT rows for the file: a step row and the turn's files-card row; never its read rows.
+  const edits = rows.filter((text) => /README\.md/.test(text) && !/\bRead\b/.test(text))
+  check('an edit row names README.md', edits.length > 0, JSON.stringify(rows).slice(0, 400))
+  const shown = edits.join(' || ')
   if (plain) {
-    check('in an ordinary folder the row carries its diff (ADDED, +1)', row !== undefined && /ADDED|\+1/.test(row), row)
+    check('in an ordinary folder the row carries its diff (MODIFIED, +1)', edits.length > 0 && edits.every((text) => /MODIFIED|ADDED|\+1/.test(text)), shown)
   } else {
-    check('in a dot-folder the row says the host saw it change', row !== undefined && /changed · seen on disk/.test(row), row)
-    check('and not that the runtime did not report it', row !== undefined && !/did not report the change/.test(row), row)
-    check("with Wren's own word kept", row !== undefined && /Write|Edit|write|edit/.test(row), row)
+    check('in a dot-folder every edit row says the host saw it change', edits.length > 0 && edits.every((text) => /changed · seen on disk/.test(text) || /MODIFIED|ADDED|\+\d/.test(text)), shown)
+    check('and none says the runtime did not report it', edits.length > 0 && !edits.some((text) => /did not report the change/.test(text)), shown)
+    check("with Wren's own word kept", edits.length > 0 && edits.every((text) => /\b(Write|Edit|write|edit|changed)\b/.test(text)), shown)
   }
   say(failures === 0 ? `\nA CHANGE IN A ${plain ? 'PLAIN' : 'DOT'} FOLDER PASSED` : `\nA CHANGE IN A ${plain ? 'PLAIN' : 'DOT'} FOLDER: ${String(failures)} FAILED`)
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
-  await drive.finish({ intro: `Build: ${packaged ?? 'whatever pnpm build last wrote to out/'}. Wren on ${antigravity ? 'Antigravity Flash (CLI)' : 'the free OpenCode model'} writes report.md in ${plain ? 'an ordinary folder (the control)' : 'a dot-folder, which Locust never reads'}; the file row afterwards.` })
+  await drive.finish({ intro: `Build: ${packaged ?? 'whatever pnpm build last wrote to out/'}. Wren on ${antigravity ? 'Antigravity Flash (CLI)' : 'the free OpenCode model'} edits README.md in ${plain ? 'an ordinary folder (the control)' : 'a dot-folder, which Locust never reads'}; the file rows afterwards.` })
 }
