@@ -148,11 +148,11 @@ const EXCLUSION_PATTERNS = EXCLUSIONS.map((glob) => ({ glob, re: compileGlob(glo
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.ico', '.icns', '.svg'])
 
 const SCAN_PATTERNS = [
-  { name: 'sk-', re: /sk-[A-Za-z0-9_-]{8,}/g },
-  { name: 'ghp_', re: /ghp_[A-Za-z0-9]{8,}/g },
-  { name: 'AKIA', re: /AKIA[A-Z0-9]{8,}/g },
+  { name: 'sk-', re: /(?<![A-Za-z0-9])sk-[A-Za-z0-9_-]{8,}/g },
+  { name: 'ghp_', re: /(?<![A-Za-z0-9])ghp_[A-Za-z0-9]{8,}/g },
+  { name: 'AKIA', re: /(?<![A-Za-z0-9])AKIA[A-Z0-9]{8,}/g },
   { name: '-----BEGIN', re: /-----BEGIN [A-Z ]+-----/g },
-  { name: 'xox', re: /xox[baprs]-[A-Za-z0-9-]{8,}/g },
+  { name: 'xox', re: /(?<![A-Za-z0-9])xox[baprs]-[A-Za-z0-9-]{8,}/g },
   { name: 'email', re: /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g },
   { name: 'phone', re: /(?<!\d)(?:\+\d{1,3}[\s.-])?(?:\(\d{3}\)|\d{3})[\s.-]\d{3}[\s.-]\d{4}(?!\d)/g }
 ]
