@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.608.0 - 2026-10-05
+
+### Improved
+
+- **An Antigravity run's words reach the thread sooner.** While an Antigravity run is live, Locust looks at its transcript four times a second instead of once, so each new step shows up to three quarters of a second earlier. Nothing changes when no run is live.
+
 ## 0.607.0 - 2026-10-05
 
 ### Changed
