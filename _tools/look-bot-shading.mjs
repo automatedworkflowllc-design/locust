@@ -39,6 +39,10 @@ import ${src('shell.css')}
 import { createElement as h } from 'react'
 import { createRoot } from 'react-dom/client'
 import { TeammateBot } from ${src('components/TeammateBot.tsx')}
+import { setPlush } from ${src('botLook.ts')}
+
+// --shading fabric is the app's own Plush (0.577): the short pile where small, the library's fabric above.
+setPlush(${JSON.stringify(shading === 'fabric')})
 
 const SHAPES = ${JSON.stringify((option('--shapes') ?? 'pill,pebble,droid,cat,ghost,blob,star,mech,cloud,alien').split(','))}
 const HUES = ['lime', 'blue', 'violet', 'amber', 'rose', 'teal', 'clay', 'sky', 'lime', 'violet']
@@ -64,8 +68,10 @@ const swap = {
   setup(build) {
     build.onLoad({ filter: /components[\\/]Bot\.tsx$/ }, async (found) => {
       const text = await readFile(found.path, 'utf8')
-      if (!text.includes("shading: 'plastic',")) throw new Error("Bot.tsx no longer says shading: 'plastic' -- update this tool")
-      return { contents: text.replace("shading: 'plastic',", `shading: '${shading}', ${extra}`), loader: 'tsx' }
+      const anchor = "shading: plush ? 'fabric' : 'plastic',"
+      if (!text.includes(anchor)) throw new Error(`Bot.tsx no longer says ${anchor} -- update this tool`)
+      // --extra lays more draw settings over the app's own, for this picture only.
+      return { contents: text.replace(anchor, `${anchor} ${extra}`), loader: 'tsx' }
     })
   }
 }
