@@ -4,6 +4,7 @@ import type { ReactElement } from 'react'
 import type { MissionApprovalDecision, MissionApprovalRequest, MissionQuestion } from '../../../shared/ipc.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { dataSentLine } from '../../../shared/approval-data.js'
+import { commandReach } from '../../../shared/command-reach.js'
 import { Icon } from './Icon.js'
 import { RuntimeMark } from './RuntimeMark.js'
 import { DiffView } from './DiffView.js'
@@ -263,6 +264,10 @@ export function ApprovalCard({
         : request.kind === 'connector'
           ? 'Unknown — a connector acts on the service it reaches, and Locust cannot undo what happens there.'
           : 'Nothing is changed by answering.')
+  // A command that acts on programs this run did not start (0.578): the
+  // arena's `taskkill //F //IM python.exe` stops every Python on the computer,
+  // and the card said only "Run a command". See shared/command-reach.ts.
+  const reach = request.kind === 'command' ? commandReach(request.detail) : undefined
 
   // A card that waits on the person is brought into view when it appears.
   // Its buttons sat below the fold while the run said "waiting on you"
@@ -318,6 +323,12 @@ export function ApprovalCard({
           <>
             <dt>{isQuestion ? 'Question' : 'Exact'}</dt>
             <dd className="lc-mono lc-approval__detail">{request.detail}</dd>
+          </>
+        )}
+        {reach !== undefined && (
+          <>
+            <dt>Reaches</dt>
+            <dd className="lc-approval__reach" data-reach={reach.kind}>{reach.said}</dd>
           </>
         )}
         <dt>Where</dt>

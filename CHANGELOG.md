@@ -11,6 +11,24 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.578.0 - 2026-10-04
+
+### New
+
+- **A command that reaches beyond its own work says so.** When a teammate
+  runs something like `taskkill /IM python.exe`, the command row now says
+  "stops every python.exe", and hovering says it in full: it stops every
+  Python program on this computer, not only the ones the run started. If you
+  are asked first, the approval card has a **Reaches** line saying the same,
+  before you answer. It covers stopping programs by name (`taskkill /IM`,
+  `Stop-Process -Name`, `pkill`, `killall` and piped forms), by port, every
+  program of a user, and restarting or shutting down the computer, including
+  inside `powershell -Command`, `cmd /c` and `bash -c`. Stopping one program
+  by its number says nothing more, and neither does a command that only
+  mentions one of these.
+- **Locust is open source**, MIT licensed, at
+  github.com/automatedworkflowllc-design/locust-app.
+
 ## 0.577.0 - 2026-10-04
 
 ### New

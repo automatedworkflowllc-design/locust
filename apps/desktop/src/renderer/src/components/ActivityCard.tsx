@@ -43,6 +43,7 @@ import { InComparisonCell, PinnedPagesContext } from '../pinnedPages.js'
 import { Icon } from './Icon.js'
 import { AgentText, PlanSteps } from './ThreadItems.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
+import { commandReach } from '../../../shared/command-reach.js'
 
 /**
  * The disclosure chain for what a teammate did, three rungs deep:
@@ -542,6 +543,7 @@ export function ActivityCard({
                       {entry.command}
                     </span>
                     <BackgroundBadge entry={entry} />
+                    <ReachBadge entry={entry} />
                     {entry.output !== undefined && entry.settled && (
                       <span className="lc-filerow__result is-muted">no output</span>
                     )}
@@ -588,6 +590,7 @@ export function ActivityCard({
                         * work once the runtime says.
                         */}
                       <BackgroundBadge entry={entry} />
+                      <ReachBadge entry={entry} />
                       {entry.output !== undefined && entry.output.trim() === '' && entry.settled && (
                         <span className="lc-filerow__result is-muted">no output</span>
                       )}
@@ -939,6 +942,23 @@ function shellResultClass(entry: Extract<ActivityEntry, { kind: 'shell' }>, fini
  * command killed right after the answer -- and that is the case a person can
  * do something about: ask for it again, run in the foreground.
  */
+/*
+ * A command that acted on programs this run did not start (0.578), said on
+ * its row. In Auto no card is asked, so the row is the only place left to
+ * say that `taskkill //F //IM python.exe` stopped every Python on the
+ * computer. Not on a refused command: it never ran.
+ */
+function ReachBadge({ entry }: { readonly entry: Extract<ActivityEntry, { kind: 'shell' }> }) {
+  if (entry.refused !== undefined) return null
+  const reach = commandReach(entry.command)
+  if (reach === undefined) return null
+  return (
+    <span className="lc-shellbadge is-reach lc-mono" title={reach.said} data-reach={reach.kind}>
+      {reach.short}
+    </span>
+  )
+}
+
 function BackgroundBadge({ entry }: { readonly entry: Extract<ActivityEntry, { kind: 'shell' }> }) {
   if (entry.background !== true) return null
   if (entry.backgroundEnded === 'stopped-with-run') {

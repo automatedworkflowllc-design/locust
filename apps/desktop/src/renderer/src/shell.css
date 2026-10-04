@@ -10549,6 +10549,17 @@ textarea {
 }
 
 /*
+ * The command acted on programs this run did not start (0.578). Amber, but
+ * outlined rather than filled, so it does not read as the stalled verdict:
+ * it is a fact about what the command reached, beside the verdict.
+ */
+.lc-shellbadge.is-reach {
+  color: var(--lc-amber-text);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--lc-amber-tint);
+}
+
+/*
  * What the runtime said about the turn, at the foot of the fold. Standing
  * register -- a left rule, no box, no new species on the census.
  */
@@ -11695,6 +11706,12 @@ textarea {
   white-space: pre-wrap;
   max-height: 160px;
   overflow-y: auto;
+}
+
+/* What the command reaches beyond this run (0.578): the one row on the card a
+ * person cannot read off the command without knowing the tool. */
+.lc-approval__reach {
+  color: var(--lc-amber-text);
 }
 
 .lc-approval__actions {
