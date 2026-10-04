@@ -357,8 +357,10 @@ describe('what the card sends reaches the service', () => {
     const handler = source.slice(at, at + 1400)
     expect(at).toBeGreaterThan(-1)
     expect(handler).toContain('approvalAnswerFrom(answer)')
-    // Through the one funnel (0.521), which asks Antigravity too.
-    expect(handler).toContain('answerApproval(decided)')
+    // Through the one funnel (0.521), which asks Antigravity too -- after the host's own guard on
+    // Always (0.598, enforcedAnswer), so the funnel is given the enforced answer, never the raw one.
+    expect(handler).toContain('enforcedAnswer(raised.request, decided)')
+    expect(handler).toContain('answerApproval(enforced.answer')
     expect(source).toContain('codexMissions.decide(answer) || permissionHost.decide(answer) || (await antigravityMissions.decide(answer))')
   })
 

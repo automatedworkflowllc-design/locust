@@ -21,6 +21,9 @@
  *   - No rule, or anything this cannot read: ask.
  */
 
+import { commandReach } from './command-reach.js'
+import type { CommandReach } from './command-reach.js'
+
 export type RuleEffect = 'allow' | 'deny'
 /** What a rule is about: a shell command, a file edited, a file read, a connector's tool. */
 export type RuleKind = 'command' | 'edit' | 'read' | 'connector'
@@ -309,4 +312,41 @@ export function ruleCandidateOf(
   }
   if (action.kind === 'connector') return { effect: 'allow', kind: 'connector', pattern: `${action.server}/${action.tool}`, ...scope }
   return undefined
+}
+
+/**
+ * THE HOST'S OWN GUARD ON "ALWAYS" (0.598). Since 0.579 the card hides
+ * "Always allow this session" and the rule offer when the command reaches
+ * other programs (`Stop-Process -Name node`, `taskkill /IM python.exe`,
+ * `shutdown`). The card was the only guard: the main process took any
+ * `approve-always` the window sent and remembered it for every later command
+ * of the run, and saved a rule for the same command without looking. One
+ * stale window, one devtools call, one renderer regression was the whole
+ * distance. Now the host decides the same thing from the same classifier.
+ */
+export function reachOfRequest(request: Parameters<typeof ruledActionOf>[0]): CommandReach | undefined {
+  const action = ruledActionOf(request)
+  return action.kind === 'command' ? commandReach(action.command) : undefined
+}
+
+/**
+ * The answer the host applies. An "Always" for a command that reaches other
+ * programs becomes "this once", with a note the record keeps; every other
+ * answer -- an ordinary command's Always, a denial, a question's answers --
+ * is applied as it came.
+ */
+export function enforcedAnswer<T extends { readonly approvalId: string; readonly decision?: string }>(
+  request: Parameters<typeof ruledActionOf>[0],
+  answer: T
+): { readonly answer: T; readonly note?: string } {
+  if (answer.decision !== 'approve-always') return { answer }
+  const reach = reachOfRequest(request)
+  if (reach === undefined) return { answer }
+  return { answer: { ...answer, decision: 'approve-once' } as T, note: `asked each time: ${reach.short}` }
+}
+
+/** Why a rule is not saved for this request, in the card's own words; undefined when it may be. */
+export function ruleRefusalFor(request: Parameters<typeof ruledActionOf>[0]): string | undefined {
+  const reach = reachOfRequest(request)
+  return reach === undefined ? undefined : `Not saved as a rule: this command ${reach.short}. ${reach.said} Locust asks each time.`
 }
