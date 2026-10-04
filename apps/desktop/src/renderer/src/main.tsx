@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import App from './App'
 import { SplashApp } from './SplashApp'
 import { WindowFallback } from './components/WindowFallback'
+import { watchWindowPresence } from './windowPresence'
 // Tokens first: the shell's palette, type and motion, plus the vendored Geist
 // faces. Then the shell itself, which consumes only those tokens.
 import './tokens.css'
@@ -29,6 +30,10 @@ const isSplash = window.location.hash === '#splash'
  * `body` are above anything a component can reach.
  */
 if (isSplash) document.documentElement.classList.add('is-splash')
+
+// Behind other windows, nothing moves (0.611, windowPresence.ts): watched from the start, so the
+// stylesheet's hold works before any face is on screen. The loading window is never held.
+watchWindowPresence()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>{isSplash ? <SplashApp /> : <WindowFallback><App /></WindowFallback>}</StrictMode>

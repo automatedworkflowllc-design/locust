@@ -425,6 +425,15 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
       return 'window never came to 60 Hz'
     })()`)
     if (/never/.test(String(shown))) say(`  ${String(shown)}`)
+    /*
+     * And as if in front (0.611). Behind other windows every face and every
+     * animation now holds (windowPresence.ts), and a drive's window often opens
+     * behind whatever Colin is typing in. The page is told it is focused, so a
+     * drive sees the app as a person looking at it does, wherever the window
+     * landed. A drive that tests the rest sends the window's own blur, which
+     * the app still hears (drive-bots-everywhere, probe-faces-rest-behind).
+     */
+    await send('Emulation.setFocusEmulationEnabled', { enabled: true })
 
     /*
      * Did the app ACCEPT the roster it was seeded with?

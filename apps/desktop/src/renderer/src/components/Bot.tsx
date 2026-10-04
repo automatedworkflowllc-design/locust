@@ -21,6 +21,8 @@ import { screenSuits } from '../../../shared/avatar.js'
 import { usePlush, useTerminalFaces } from '../botLook.js'
 import { LOCUST_BOTS, isLocustBot } from '../locustBots.js'
 import type { LocustBotType } from '../locustBots.js'
+import { WINDOW_PRESENCE } from '../windowPresence.js'
+import type { WindowPresence } from '../windowPresence.js'
 
 /**
  * A BOT: one of bot-avatars' eighteen, or one of Locust's own.
@@ -1088,6 +1090,13 @@ export interface BotFrames {
 export const BOT_FRAMES_PER_SECOND = 30
 
 /**
+ * Whether the window is in front, for a bot's clock (0.611): windowPresence.ts.
+ * The cover already rested behind other windows (HomeCover, 0.305); the faces
+ * beside a run did not, and were drawn 30 times a second for nobody.
+ */
+export type BotPresence = WindowPresence
+
+/**
  * A MOVING BOT'S CLOCK: its first frame now, then one per animation frame
  * while it is showing, at most BOT_FRAMES_PER_SECOND of them. Returns the way
  * to stop it.
@@ -1100,6 +1109,10 @@ export const BOT_FRAMES_PER_SECOND = 30
  * droid on the machine and no Hopper (2026-09-23). Setting the canvas's size
  * clears it, too, so a bot whose state changed while nothing was painting
  * went blank the same way.
+ *
+ * While the window is behind other windows the clock asks for no frames at
+ * all: the face holds where it was, and picks up from there when the window
+ * comes back, with no jump for the time it was away (0.611).
  */
 export function startBotClock(
   draw: () => void,
@@ -1109,15 +1122,18 @@ export function startBotClock(
     requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
     cancelAnimationFrame: (handle) => window.cancelAnimationFrame(handle),
     now: () => performance.now()
-  }
+  },
+  presence: BotPresence = WINDOW_PRESENCE
 ): () => void {
   draw()
   let last = frames.now()
   let handle = 0
+  let stopped = false
   // A millisecond of slack, so a 60 Hz screen's second frame (33.3 ms) is not
   // turned away for arriving a hair early.
   const every = 1000 / BOT_FRAMES_PER_SECOND - 1
   const tick = (now: number): void => {
+    handle = 0
     // A frame too soon after the last is passed over, and its time goes to the next.
     if (now - last >= every) {
       const seconds = Math.min(0.05, (now - last) / 1000)
@@ -1127,10 +1143,25 @@ export function startBotClock(
         draw()
       }
     }
-    handle = frames.requestAnimationFrame(tick)
+    if (!stopped && !presence.away()) handle = frames.requestAnimationFrame(tick)
   }
-  handle = frames.requestAnimationFrame(tick)
-  return () => frames.cancelAnimationFrame(handle)
+  const unwatch = presence.watch(() => {
+    if (stopped) return
+    if (presence.away()) {
+      if (handle !== 0) frames.cancelAnimationFrame(handle)
+      handle = 0
+    } else if (handle === 0) {
+      // Back in front: the time it was away is not stepped through.
+      last = frames.now()
+      handle = frames.requestAnimationFrame(tick)
+    }
+  })
+  if (!presence.away()) handle = frames.requestAnimationFrame(tick)
+  return () => {
+    stopped = true
+    unwatch()
+    if (handle !== 0) frames.cancelAnimationFrame(handle)
+  }
 }
 
 /**
