@@ -11,6 +11,14 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.594.0 - 2026-10-04
+
+### Improved
+
+- **A long run reads as a list of steps, with the current one open.** A group of steps opens while it is the one under way; when the run moves on to the next group, it folds back to its one-line summary ("Thought for 3s, read 2 files · 1 failed"), one press from the detail. The last group stays open when the run ends, and a group you opened or closed yourself is never touched. Until now every group that had ever been live stayed open, and a run with many steps became a wall. Nothing disappears: the summary line is still there, and one press reopens it.
+- **A thought's words are not shown twice.** When a step line that is one thought is open, the line says "Thought for 3s" and the words are underneath, once.
+- **Cursor's scratch files are named for what they are.** Cursor keeps large connector results in files of its own under `.cursor\projects\...\agent-tools\`; a step that read or searched one said "Searched 3a5a3562-ffd2-….txt". It now says "Cursor's saved tool result".
+
 ## 0.593.0 - 2026-10-04
 
 ### New

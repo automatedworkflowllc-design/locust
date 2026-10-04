@@ -1079,6 +1079,13 @@ export type ThreadItem =
        * the app (ActivityCard's rule); a press folds it.
        */
       readonly live?: boolean
+      /**
+       * The run moved on past this group (0.594): a later group is live, or the
+       * model is talking after it. Drawn folded to its line unless the person
+       * opened or closed it themselves. Never set once the turn is over, so
+       * the last group of a finished run keeps whatever state it had.
+       */
+      readonly superseded?: boolean
     }
   | {
       readonly key: string
@@ -1499,6 +1506,10 @@ export function relativePath(path: string, workspacePath: string | undefined): s
   // reads `answer.txt`, not its copy's home path beside the same file counted twice.
   const routineCopy = /(?:^|\/)\.locust\/routines\/rt_[A-Za-z0-9]+\/(.+)$/.exec(full)
   if (routineCopy?.[1] !== undefined) return routineCopy[1]
+  // Cursor's own scratch (0.594): it writes a large connector result to a file
+  // under its project folder and reads or greps it back. A UUID file name says
+  // nothing to a person; what it is does.
+  if (/(?:^|\/)\.cursor\/projects\/[^/]+\/agent-tools\/[^/]+$/i.test(full)) return "Cursor's saved tool result"
   // Windows paths are case-insensitive; comparing them case-sensitively is how
   // a correct prefix fails to match and the row keeps the unreadable path.
   const mirrored = cursorMirrorRelative(full, root)
@@ -2029,7 +2040,7 @@ export function liveActionLine(detail: ActivityDetail, workspacePath?: string): 
   }
 }
 
-export function stepsLine(details: readonly ActivityDetail[], finished: boolean, workspacePath?: string): StepsLine {
+export function stepsLine(details: readonly ActivityDetail[], finished: boolean, workspacePath?: string, options: { readonly open?: boolean } = {}): StepsLine {
   const phrases = new Map<string, { count: number; names: string[] }>()
   const note = (kind: string, name: string | undefined): void => {
     const held = phrases.get(kind) ?? { count: 0, names: [] }
@@ -2158,8 +2169,9 @@ export function stepsLine(details: readonly ActivityDetail[], finished: boolean,
   } else if (thoughts > 0 && (thoughtMs >= 1_000 || words.length === 0)) {
     // "Thought" with no length says nothing beside the steps; alone, it is the step.
     const thought = thoughtMs >= 1_000 ? `thought for ${durationText(thoughtMs)}` : 'thought'
-    // Alone, and with words but no headline (Cursor's thinking): its first words say what about.
-    const said = words.length === 0 ? thoughtText?.replace(/\s+/g, ' ').trim() : undefined
+    // Alone, and with words but no headline (Cursor's thinking): its first words say what about --
+    // closed. Open, the words are underneath, once (0.594: the line said them and the body said them again).
+    const said = words.length === 0 && options.open !== true ? thoughtText?.replace(/\s+/g, ' ').trim() : undefined
     words.unshift(said !== undefined && said.length > 0 ? `${thought}: ${clip(said, 70)}` : thought)
   }
   /*
@@ -3729,10 +3741,20 @@ export function buildThread(
         break
       }
     }
-    if (lastSteps >= 0 && !items.slice(lastSteps + 1).some((item) => item.type === 'agent-message')) {
-      const group = items[lastSteps]!
-      if (group.type === 'steps') items[lastSteps] = { ...group, live: true }
+    const liveAt = lastSteps >= 0 && !items.slice(lastSteps + 1).some((item) => item.type === 'agent-message') ? lastSteps : -1
+    if (liveAt >= 0) {
+      const group = items[liveAt]!
+      if (group.type === 'steps') items[liveAt] = { ...group, live: true }
     }
+    // Every group BEFORE the last one of a running turn is superseded (0.594):
+    // the run has moved on to more steps, so it folds to its line -- Claude
+    // Code's shape, one step open. Colin, 2026-10-04, of a Grok run on Cursor:
+    // every group that had ever been live stayed open and the thread read as a
+    // wall. The last group is not: the model talking after it is the reply,
+    // and the 9/8 ask (the work stays in view when the run ends) holds for it.
+    items.forEach((item, at) => {
+      if (item.type === 'steps' && at !== lastSteps) items[at] = { ...item, superseded: true }
+    })
     const streaming = items.some((item) => item.type === 'agent-message' && item.streaming)
     /*
      * WHICH STEP OF ITS PLAN, on the live line (0.493). Colin, 2026-09-30,
