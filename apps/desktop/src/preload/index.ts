@@ -96,6 +96,7 @@ import {
   OPEN_LINK_CHANNEL,
   MAC_RELEASE_CHANNEL,
   APPROVAL_RULES_LIST_CHANNEL,
+  APPROVAL_RULES_REMOVE_ALL_CHANNEL,
   APPROVAL_RULES_REMOVE_CHANNEL,
   APPROVAL_RULE_FROM_CARD_CHANNEL,
   HANDOFF_PREVIEW_CHANNEL,
@@ -571,6 +572,7 @@ const desktopApi: DesktopApi = {
     ipcRenderer.invoke(WORKSPACE_SETTINGS_WRITE_CHANNEL, settings) as Promise<WorkspaceSettings>,
   listApprovalRules: () => ipcRenderer.invoke(APPROVAL_RULES_LIST_CHANNEL) as Promise<ApprovalRulesResponse>,
   removeApprovalRule: (ruleId: string) => ipcRenderer.invoke(APPROVAL_RULES_REMOVE_CHANNEL, ruleId) as Promise<ApprovalRulesResponse>,
+  removeAllApprovalRules: () => ipcRenderer.invoke(APPROVAL_RULES_REMOVE_ALL_CHANNEL) as Promise<ApprovalRulesResponse>,
   ruleFromApprovalCard: (request: ApprovalRuleFromCardRequest) => ipcRenderer.invoke(APPROVAL_RULE_FROM_CARD_CHANNEL, request) as Promise<ApprovalRulesResponse>,
   decideMissionApproval: (answer: MissionApprovalAnswer) =>
     ipcRenderer.invoke(MISSION_APPROVAL_DECIDE_CHANNEL, answer) as Promise<{ readonly ok: boolean }>,

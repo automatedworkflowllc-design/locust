@@ -36,6 +36,26 @@ export function SavedApprovalRules(): ReactElement {
       else setProblem(answer.message)
     }).catch(() => setProblem('That rule could not be removed. It still answers cards; try again.')).finally(() => setRemoving(undefined))
   }
+  /*
+   * REMOVE ALL (0.587, QA's Q7). Locust's stance is that no rules means ask,
+   * so the reset is "remove all": two presses, the second naming how many go
+   * and that every card asks again. The host clears the file through its own
+   * channel; nothing else can.
+   */
+  const [confirmingAll, setConfirmingAll] = useState(false)
+  const [removingAll, setRemovingAll] = useState(false)
+  const removeAll = (): void => {
+    const bridge = window.desktop
+    if (bridge === undefined) return
+    setRemovingAll(true)
+    void bridge.removeAllApprovalRules().then((answer) => {
+      if (answer.ok) setRules(answer.rules)
+      else setProblem(answer.message)
+    }).catch(() => setProblem('The rules could not be removed. They still answer cards; try again.')).finally(() => {
+      setRemovingAll(false)
+      setConfirmingAll(false)
+    })
+  }
   return (
     <>
       <p className="lc-settings__lede">
@@ -66,8 +86,54 @@ export function SavedApprovalRules(): ReactElement {
               </button>
             </div>
           ))}
+          <RemoveAllRules count={rules.length} confirming={confirmingAll} removing={removingAll} onAsk={() => setConfirmingAll(true)} onConfirm={removeAll} onKeep={() => setConfirmingAll(false)} />
         </div>
       )}
     </>
+  )
+}
+
+/**
+ * The row under the list that takes every rule back (0.587): one press asks,
+ * the second names how many go and that every card asks again afterwards.
+ */
+export function RemoveAllRules({
+  count,
+  confirming,
+  removing,
+  onAsk,
+  onConfirm,
+  onKeep
+}: {
+  readonly count: number
+  readonly confirming: boolean
+  readonly removing: boolean
+  readonly onAsk: () => void
+  readonly onConfirm: () => void
+  readonly onKeep: () => void
+}): ReactElement {
+  return (
+    <div className="lc-policyrow lc-savedrules__all">
+      {confirming ? (
+        <>
+          <span className="lc-settings__note lc-savedrule__text">
+            Remove {count === 1 ? 'the 1 saved rule' : `all ${String(count)} saved rules`}? Every card asks again afterwards.
+          </span>
+          <button type="button" className="lc-denybutton" disabled={removing} onClick={onConfirm}>
+            {removing ? 'Removing…' : 'Remove all'}
+          </button>
+          <button type="button" className="lc-ghostbutton" disabled={removing} onClick={onKeep}>
+            Keep them
+          </button>
+        </>
+      ) : (
+        <>
+          <span className="lc-settings__note lc-savedrule__text">Start over: take every rule back at once.</span>
+          <button type="button" className="lc-ghostbutton" onClick={onAsk}>
+            Remove all rules
+          </button>
+        </>
+      )}
+    </div>
   )
 }

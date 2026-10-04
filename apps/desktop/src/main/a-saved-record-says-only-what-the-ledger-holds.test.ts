@@ -10,6 +10,7 @@ import type { MissionLedger, MissionLedgerMetadata, RecoveredMission } from '@te
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
 import { MISSION_RECORD_SAVE_CHANNEL } from '../shared/ipc.js'
+import { approvalNotRecordedNote } from './approval-record-note.js'
 import { SAVED_RULE_DENIAL, missionRecordMarkdown, rawRecordJson, recordFileName, recordTurns } from './mission-export.js'
 
 /**
@@ -322,6 +323,23 @@ describe('a saved record of turns that record their cards', () => {
   it('says a turn that records cards had none answered, rather than leaving the section out', async () => {
     const markdown = await answered()
     expect(markdown).toContain('No card was answered, and no call was declined or refused, in this turn.')
+  })
+
+  it('counts an answer the host could not write down, and does not claim every answer is there (0.587)', async () => {
+    const { ledger, turns } = await seed()
+    const three = turns.find((turn) => turn.metadata.missionId === 'mission_three')!
+    // The note the host builds must be one the ledger's reader accepts: a refused
+    // note would be unwritable, and a written-but-unreadable one would hide the turn.
+    const note = approvalNotRecordedNote({ mission: three, runId: three.metadata.runId, missionId: 'mission_three', kind: 'command', answer: 'allowed', why: 'disk full', now: () => new Date(ISO(21, 30)) })!
+    await ledger.appendEvents('mission_three', [note])
+    await ledger.flush()
+    const markdown = record((await recordTurns((id) => ledger.getMission(id), 'mission_three')).missions)
+    const turnThree = markdown.slice(markdown.indexOf('## Turn 3'))
+    expect(turnThree).toContain('_Recorded:_ every card answered on this turn should be here; 1 could not be written down, and the notes under "How it ended" say which.')
+    expect(turnThree).not.toContain('with who answered it.')
+    // The other turns, with nothing unwritten, still make the whole claim (control).
+    expect(markdown.slice(0, markdown.indexOf('## Turn 3'))).toContain('_Recorded:_ every card answered on this turn, with who answered it.')
+    expect(markdown).toContain('Note Locust wrote into the record (`host.approval-not-recorded`, ' + ISO(21, 30) + '): The answer to a card (command, allowed) could not be written to this record: disk full')
   })
 })
 

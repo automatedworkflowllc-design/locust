@@ -17,7 +17,10 @@ export function isShellTool(name: string, toolKind: string | undefined): boolean
   // 76 `run_command` calls, none of them counted as a command. So "Ran N
   // commands" said nothing, the trace line had nothing to trace, and the
   // reviewer's WHAT RAN was empty for a run that had run seventy-six things.
-  return /^(bash|shell|run_command|run_terminal_cmd|execute_command)$/i.test(name)
+  // `powershell` is Copilot CLI's shell tool (0.587): its calls drew as "Used
+  // powershell" rows, were not counted as commands, and never reached the
+  // reach classifier -- the Copilot leg of the cross-model pass, 2026-10-04.
+  return /^(bash|shell|powershell|pwsh|cmd|run_command|run_terminal_cmd|execute_command)$/i.test(name)
     || toolKind === 'command_execution'
     || toolKind === 'run_command'
 }

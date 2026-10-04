@@ -346,6 +346,8 @@ export interface LoginItemState {
   readonly openAtLogin: boolean
   /** False in a development build and off Windows. */
   readonly available: boolean
+  /** Which of those it is (0.587), so the switch's note can say so. */
+  readonly why?: 'development' | 'platform'
 }
 
 export interface KeepRunningState {
@@ -1256,6 +1258,8 @@ export const MISSION_APPROVAL_DECIDE_CHANNEL = 'mission-approval:decide'
  */
 export const APPROVAL_RULES_LIST_CHANNEL = 'approval-rules:list'
 export const APPROVAL_RULES_REMOVE_CHANNEL = 'approval-rules:remove'
+/** Every saved rule at once (0.587): Settings > Teammates, "Remove all rules". */
+export const APPROVAL_RULES_REMOVE_ALL_CHANNEL = 'approval-rules:remove-all'
 export const APPROVAL_RULE_FROM_CARD_CHANNEL = 'approval-rules:from-card'
 export interface PublicApprovalRule {
   readonly ruleId: string
@@ -3478,6 +3482,7 @@ export interface DesktopApi {
   /** Saved approval rules (0.521). */
   listApprovalRules(): Promise<ApprovalRulesResponse>
   removeApprovalRule(ruleId: string): Promise<ApprovalRulesResponse>
+  removeAllApprovalRules(): Promise<ApprovalRulesResponse>
   /** Answer this card, and save its rule so the same is not asked again. */
   ruleFromApprovalCard(request: ApprovalRuleFromCardRequest): Promise<ApprovalRulesResponse>
   onMissionApproval(listener: (request: MissionApprovalRequest) => void): () => void

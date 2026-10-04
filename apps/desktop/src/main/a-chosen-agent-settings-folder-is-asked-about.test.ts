@@ -30,6 +30,8 @@ describe('choosing a folder that is no place for teammates', () => {
 
   it('asks about home too, and nothing about a project folder (control)', () => {
     expect(notATeammateFolder(HOME, HOME, 'win32')).toBe('your home folder')
+    // Copilot CLI's own folder joined the guard in 0.587.
+    expect(notATeammateFolder(`${HOME}\\.copilot\\session-state`, HOME, 'win32')).toBe('.copilot, where the agents keep their own settings')
     expect(notATeammateFolder(`${HOME}\\Documents\\shop`, HOME, 'win32')).toBeUndefined()
   })
 

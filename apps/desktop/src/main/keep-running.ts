@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 
 /**
@@ -29,5 +29,8 @@ export function readKeepRunning(file: string): boolean {
 
 export function writeKeepRunning(file: string, keepRunning: boolean): void {
   mkdirSync(dirname(file), { recursive: true })
-  writeFileSync(file, `${JSON.stringify({ keepRunning })}\n`, 'utf8')
+  // Whole or absent (0.587): written beside, then renamed over, as the other stores do.
+  const temporary = `${file}.tmp`
+  writeFileSync(temporary, `${JSON.stringify({ keepRunning })}\n`, 'utf8')
+  renameSync(temporary, file)
 }

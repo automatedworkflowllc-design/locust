@@ -215,6 +215,8 @@ function cardsAnswered(approvals: readonly MissionApproval[]): string[] {
 function approvalsSection(calls: readonly Call[], events: readonly NormalizedRuntimeEvent[], mission: RecoveredMission): string {
   // From ledger v20 every card answered is its own record; before it, only a call's own status says anything.
   const recordsCards = (mission.schemaVersion ?? 0) >= 20
+  // Answers the host could not write down (0.587): each left a note under "How it ended".
+  const unwritten = events.filter((event) => event.type === 'adapter.diagnostic' && event.payload.code === 'host.approval-not-recorded').length
   const lines: string[] = recordsCards ? cardsAnswered(mission.approvals) : []
   for (const call of calls) {
     if (!isDeclined(call) && !isRefused(call) && !namesASavedRule(call)) continue
@@ -248,7 +250,10 @@ function approvalsSection(calls: readonly Call[], events: readonly NormalizedRun
       : lines.join('\n').replace(/\n\n\n+/g, '\n\n'),
     '',
     recordsCards
-      ? '_Recorded:_ every card answered on this turn, with who answered it. '
+      ? (unwritten > 0
+          // The host knows an answer never reached the ledger (0.587): the claim must not read complete.
+          ? `_Recorded:_ every card answered on this turn should be here; ${String(unwritten)} could not be written down, and the notes under "How it ended" say which. `
+          : '_Recorded:_ every card answered on this turn, with who answered it. ')
         + 'Not recorded: a card no one answered because the run ended first, and a call that ran in a mode that asks nothing.'
       : '_Not in the ledger:_ an approval that was allowed, what the card asked in full, who answered it and how. '
         + 'A call listed under Commands or File changes may or may not have been approved first; the record cannot tell.'
