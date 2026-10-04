@@ -94,6 +94,13 @@ const read = async () => JSON.parse(String(await drive.evaluate(`(() => {
 })()`)))
 try {
   await drive.ready()
+  // Until the agents are found the strip says "checking N on this machine" and the starters are not
+  // drawn yet. A fixed 2.5 s was enough on the dev build and not on the 0.610 package (the check of
+  // seven tools still running at 4 s): wait for "N ready", as the team-cards drive does.
+  for (let i = 0; i < 120; i += 1) {
+    if (/^\d+ ready$/.test(String(await drive.evaluate(`document.querySelector('.lc-agenthead__note')?.innerText.trim() ?? ''`)))) break
+    await sleep(500)
+  }
   for (const [w, h] of [[1440, 900], [1209, 770]]) {
     await drive.resize(w, h)
     await sleep(w === 1440 ? 2500 : 1500)
