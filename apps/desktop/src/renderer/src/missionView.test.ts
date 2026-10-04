@@ -3175,3 +3175,22 @@ describe('a plan does not claim nothing changed when something did', () => {
     expect(shown?.type === 'plan' ? shown.touchedNothing : 'missing').toBeUndefined()
   })
 })
+
+describe('the group still growing at the end of a running turn (0.584)', () => {
+  // Colin, 2026-10-04, of a silent ten-minute Flash turn: "its stacking on one
+  // line". The trailing group is live: drawn open, its rows arriving.
+  const at = '2026-10-04T05:00:00.000Z'
+  it('is live', () => {
+    const items = buildThread([toolStart('t1', 'Read', 'a.txt'), toolDone('t1'), toolStart('t2', 'Read', 'b.txt'), toolDone('t2')], { running: true, startedAt: at })
+    const steps = items.filter((i) => i.type === 'steps')
+    expect(steps).toHaveLength(1)
+    expect(steps[0]).toMatchObject({ live: true })
+  })
+  it('is not live once the model is talking after it, nor when the turn is over (controls)', () => {
+    const talking = buildThread([toolStart('t1', 'Read', 'a.txt'), toolDone('t1'), delta('m1', 'Found it.', 'append')], { running: true, startedAt: at })
+    expect(talking.some((i) => i.type === 'steps')).toBe(true)
+    expect(talking.find((i) => i.type === 'steps')).not.toMatchObject({ live: true })
+    const over = buildThread([toolStart('t1', 'Read', 'a.txt'), toolDone('t1')], { running: false, startedAt: at })
+    expect(over.find((i) => i.type === 'steps')).not.toMatchObject({ live: true })
+  })
+})

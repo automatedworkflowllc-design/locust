@@ -403,6 +403,8 @@ export function ThreadItems({
                   details={item.details}
                   runtimeName={undefined}
                   workspacePath={workspacePath}
+                  // The group still growing shows its rows as they land (0.584, `live`).
+                  openByDefault={item.live === true}
                   {...(onOpenFile === undefined ? {} : { onOpenFile })}
                 />
               </div>

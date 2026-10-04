@@ -1071,6 +1071,14 @@ export type ThreadItem =
       readonly type: 'steps'
       readonly details: readonly ActivityDetail[]
       readonly finished: boolean
+      /**
+       * The group still growing at the end of a running turn (0.584): drawn
+       * open, its rows arriving as the calls land, as Claude Code streams each
+       * call. Colin, 2026-10-04, of a silent ten-minute Flash turn: "its
+       * stacking on one line". A group opened this way is never closed by
+       * the app (ActivityCard's rule); a press folds it.
+       */
+      readonly live?: boolean
     }
   | {
       readonly key: string
@@ -3656,6 +3664,20 @@ export function buildThread(
   }
 
   if (options.running) {
+    // The group still growing at the end of the turn is live (0.584): open, its
+    // rows arriving. Text after it means the model is talking, and no group is.
+    // The turn's foot (above) sits after every group, so it is looked past.
+    let lastSteps = -1
+    for (let i = items.length - 1; i >= 0; i -= 1) {
+      if (items[i]!.type === 'steps') {
+        lastSteps = i
+        break
+      }
+    }
+    if (lastSteps >= 0 && !items.slice(lastSteps + 1).some((item) => item.type === 'agent-message')) {
+      const group = items[lastSteps]!
+      if (group.type === 'steps') items[lastSteps] = { ...group, live: true }
+    }
     const streaming = items.some((item) => item.type === 'agent-message' && item.streaming)
     /*
      * WHICH STEP OF ITS PLAN, on the live line (0.493). Colin, 2026-09-30,

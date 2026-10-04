@@ -506,9 +506,13 @@ interface CodexMissionServiceOptions {
   /**
    * Let a Cursor run outside Auto call its connectors: merge an allow rule
    * per configured server into the workspace's `.cursor/cli.json`. Returns
-   * the rules added this time. See `cursor-connector-allow.ts`.
+   * the rules added this time and a `release` that takes them back; it is
+   * called when the run's process ends. See `cursor-connector-allow.ts`.
    */
-  readonly allowConnectors?: (workspace: string) => Promise<readonly string[]>
+  readonly allowConnectors?: (workspace: string) => Promise<{
+    readonly added: readonly string[]
+    readonly release: () => Promise<void>
+  }>
   /**
    * How many missions are live on the OTHER transports right now.
    *
@@ -1970,11 +1974,12 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
          * not a connector filter (Cursor's research, 2026-10-02). So a
          * read-only run adds no rule: a connector tool runs there only if the
          * person allowed it themselves. Accept edits keeps the wildcard.
+         *
+         * TAKEN BACK when the run ends. The grant is made right before the
+         * process starts (below, beside the default-model guard) so that the
+         * one place a run ends -- its process completing, or failing to start
+         * -- is the one place the rules are given back.
          */
-        if (runtime === 'cursor' && effectiveSandbox === 'workspace-write' && options.allowConnectors !== undefined) {
-          const added = await options.allowConnectors(runCwd).catch(() => [] as readonly string[])
-          if (added.length > 0) options.note?.('connectors-allowed', `${missionId} ${added.join(' ')}`)
-        }
         try {
           command = buildCommand(prompt)
         } catch (cause) {
@@ -2306,15 +2311,27 @@ ${sentPrompt.trim()}`
             // it is put back when the run ends (0.431).
             const cursorGuard = runtime === 'cursor' && chosenModel !== undefined ? options.cursorDefaultModel : undefined
             if (cursorGuard !== undefined) await cursorGuard.before(chosenModel!)
+            const connectorGrant =
+              runtime === 'cursor' && effectiveSandbox === 'workspace-write' && options.allowConnectors !== undefined
+                ? await options.allowConnectors(runCwd).catch(() => undefined)
+                : undefined
+            if (connectorGrant !== undefined && connectorGrant.added.length > 0) {
+              options.note?.('connectors-allowed', `${missionId} ${connectorGrant.added.join(' ')}`)
+            }
             try {
               process = options.runner.start(command, runtimePrompt, { signal: controller.signal })
             } catch (startError) {
               if (cursorGuard !== undefined) void cursorGuard.after().catch(() => undefined)
+              if (connectorGrant !== undefined) void connectorGrant.release().catch(() => undefined)
               throw startError
             }
             if (cursorGuard !== undefined) {
               const release = (): void => void cursorGuard.after().catch(() => undefined)
               process.completion.then(release, release)
+            }
+            if (connectorGrant !== undefined) {
+              const giveBack = (): void => void connectorGrant.release().catch(() => undefined)
+              process.completion.then(giveBack, giveBack)
             }
             // A2.10: Claude Code's input stays open while its turn runs, so a
             // message can be handed to it there too.

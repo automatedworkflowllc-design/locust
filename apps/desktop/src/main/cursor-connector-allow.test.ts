@@ -75,14 +75,17 @@ describe('writing the workspace file', () => {
         },
         mkdir: async (path: string) => {
           dirs.push(path)
-        }
+        },
+        exists: async () => false,
+        removeFile: async () => undefined,
+        removeDir: async () => undefined
       }
     }
   }
 
   it('adds the rules under the workspace and says which were added', async () => {
     const fake = io({})
-    const added = await allowCursorConnectors('C:\\work', ['robinhood-local'], fake.io)
+    const { added } = await allowCursorConnectors('C:\\work', ['robinhood-local'], fake.io)
     expect(added).toEqual(['Mcp(robinhood-local:*)'])
     const [path, text] = Object.entries(fake.writes)[0]!
     expect(path.replace(/\\/g, '/')).toBe('C:/work/.cursor/cli.json')
@@ -92,15 +95,15 @@ describe('writing the workspace file', () => {
 
   it('does nothing with no servers, and does not write when nothing is new', async () => {
     const fake = io({})
-    expect(await allowCursorConnectors('C:\\work', [], fake.io)).toEqual([])
+    expect((await allowCursorConnectors('C:\\work', [], fake.io)).added).toEqual([])
     expect(fake.writes).toEqual({})
   })
 
   it('does not write over a file it could not read, and does not throw', async () => {
     const fake = io({ 'C:\\work\\.cursor\\cli.json': '{ broken' })
-    expect(await allowCursorConnectors('C:\\work', ['a'], fake.io)).toEqual([])
+    expect((await allowCursorConnectors('C:\\work', ['a'], fake.io)).added).toEqual([])
     expect(fake.writes).toEqual({})
     const failing = { ...fake.io, readFile: async () => { throw Object.assign(new Error('EACCES'), { code: 'EACCES' }) } }
-    expect(await allowCursorConnectors('C:\\work', ['a'], failing)).toEqual([])
+    expect((await allowCursorConnectors('C:\\work', ['a'], failing)).added).toEqual([])
   })
 })

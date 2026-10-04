@@ -11,6 +11,7 @@ import { BLOCK_PLACEMENT } from '../shared/trailer.js'
 import { FILE_BLOCK_EXAMPLE_PATH, FILE_TAG } from '../shared/handover.js'
 import { MEMORY_HEADING, MEMORY_RULES, MEMORY_TAG } from '../shared/memory.js'
 import { ABOUT_YOU_HEADING } from '../shared/about-you.js'
+import { agentNamed } from '../shared/runtimes.js'
 import { roomHistorySection } from '../shared/room-history.js'
 import type { RoomHistory } from '../shared/room-history.js'
 
@@ -177,9 +178,19 @@ export function stillHoldsLine(standing: string, peer?: MissionPeerContext): str
  * earlier short-brief runs said Booty alone. About fifty characters keep
  * that fact next to the question.
  */
+export function describePeer(entry: PeerRosterEntry): string {
+  // A peer named like an agent (0.584, Casper's report went to the TEAMMATE
+  // named Codex): its role stays, and the roster settles which Codex this is.
+  const agent = agentNamed(entry.name)
+  if (agent !== undefined) {
+    return `${entry.name} (${entry.role}; a teammate here, not the ${agent} program)`
+  }
+  return `${entry.name} (${entry.role})`
+}
+
 function identityOf(peer: MissionPeerContext | undefined): string {
   if (peer === undefined) return ''
-  const others = peer.others.map((entry) => `${entry.name} (${entry.role})`).join(', ')
+  const others = peer.others.map(describePeer).join(', ')
   return others.length === 0 ? `You are ${peer.self.name}. ` : `You are ${peer.self.name}; your teammates here are ${others}. `
 }
 
@@ -292,7 +303,7 @@ function inboundSection(messages: readonly WorkroomMessage[], remaining: number,
 }
 
 function rosterSection(peer: MissionPeerContext): string {
-  const others = peer.others.map((entry) => `${entry.name} (${entry.role})`).join(', ')
+  const others = peer.others.map(describePeer).join(', ')
   const example = peer.others[0]?.name ?? 'Name'
   return [
     // The roster prints `Name (Role)` while `to=` takes the NAME ALONE, which
