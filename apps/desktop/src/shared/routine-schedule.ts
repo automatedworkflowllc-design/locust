@@ -1,11 +1,13 @@
 /**
  * When a routine runs on its own.
  *
- * Four shapes, all local and all only while the app is open (the parity
- * map's own bound for a desktop product): every N hours from the last run,
+ * Four shapes, all local. A run starts only while the app is open; a time
+ * that already passed while it was closed is missed, not caught up (the
+ * runner). Every N hours from the last run,
  * daily at a wall-clock time, on chosen days of the week at a time (0.517),
  * or once at a date and time (0.517). Nothing here starts anything; the
- * runner asks `nextRunAfter` and starts a routine whose next run has passed.
+ * runner asks `nextRunAfter`, starts a routine whose time arrives while the
+ * app is open, and misses one whose time passed while it was closed.
  * A routine with no schedule is what every routine was before this: it runs
  * when a person presses Run.
  */
@@ -97,9 +99,9 @@ const slotOn = (now: Date, dayOffset: number, at: string): Date => {
  * and what time it is now; undefined when it will not run again (a `once`
  * that has run).
  *
- * `every`: the last run plus the interval; if that has already passed, now
- * -- a routine that missed several intervals while the app was closed runs
- * once, not once per missed interval.
+ * `every`: the last run plus the interval; if that has already passed, now.
+ * The runner records one miss for the stretch that passed while the app was
+ * closed, and does not start it.
  * `daily`: today at the wall-clock time if it is still ahead and the last
  * run was before it; otherwise tomorrow at that time.
  * `weekly`: the latest chosen-day slot that has passed, if the routine has
@@ -142,6 +144,48 @@ export function nextRunAfter(schedule: RoutineSchedule, lastRunAt: string, now: 
 export function isDue(schedule: RoutineSchedule, lastRunAt: string, now: Date): boolean {
   const next = nextRunAfter(schedule, lastRunAt, now)
   return next !== undefined && next.getTime() <= now.getTime()
+}
+
+/**
+ * The slot that passed while the app was closed, or undefined when the
+ * routine is not due, or became due after `openedAt` (it should start).
+ *
+ * `every` walks to the latest interval boundary at or before open, so one
+ * closed stretch is one miss. Setting the clock to that boundary does not
+ * leave the earlier hours still due on the next tick.
+ */
+export function missedSlot(schedule: RoutineSchedule, lastRunAt: string, openedAt: Date, now: Date): Date | undefined {
+  if (schedule.kind === 'files' || !isDue(schedule, lastRunAt, now)) return undefined
+  if (schedule.kind === 'every') {
+    const start = new Date(lastRunAt).getTime()
+    const step = schedule.hours * 3_600_000
+    if (!Number.isFinite(start) || step <= 0 || start + step > openedAt.getTime()) return undefined
+    const steps = Math.floor((openedAt.getTime() - start) / step)
+    return new Date(start + steps * step)
+  }
+  const next = nextRunAfter(schedule, lastRunAt, now)
+  if (next === undefined || next.getTime() > openedAt.getTime()) return undefined
+  return next
+}
+
+const pad2 = (value: number): string => String(value).padStart(2, '0')
+
+/**
+ * The tray's "next routine" line: the soonest run still ahead, or that none is.
+ */
+export function nextRoutineDueLine(
+  routines: readonly { readonly name: string; readonly schedule?: RoutineSchedule; readonly lastRunAt?: string; readonly createdAt: string }[],
+  now: Date
+): string {
+  let best: { readonly name: string; readonly at: Date } | undefined
+  for (const routine of routines) {
+    if (routine.schedule === undefined || routine.schedule.kind === 'files') continue
+    const next = nextRunAfter(routine.schedule, routine.lastRunAt ?? routine.createdAt, now)
+    if (next === undefined || next.getTime() <= now.getTime()) continue
+    if (best === undefined || next.getTime() < best.at.getTime()) best = { name: routine.name, at: next }
+  }
+  if (best === undefined) return 'No routine due'
+  return `Next: ${best.name} at ${pad2(best.at.getHours())}:${pad2(best.at.getMinutes())}`
 }
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const

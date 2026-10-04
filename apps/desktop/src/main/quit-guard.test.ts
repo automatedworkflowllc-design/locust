@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { CLOSE_BUTTONS, closeQuestion, shouldAskBeforeClosing, trayLine } from './quit-guard.js'
+import { CLOSE_BUTTONS, closeQuestion, hideToTrayOnClose, shouldAskBeforeClosing, trayLine, trayMenuLabels } from './quit-guard.js'
 
 const moment = (over: Partial<Parameters<typeof shouldAskBeforeClosing>[0]> = {}) => ({
   liveRuns: 1,
@@ -41,6 +41,14 @@ describe('closing the window while a teammate works asks first', () => {
 
   it('keeping the work going is the first button and the default; Cancel leaves the window open (0.397)', () => {
     expect(CLOSE_BUTTONS).toEqual(['Keep working in the background', 'Quit anyway', 'Cancel'])
+  })
+
+  it('a window set to keep running hides to the tray without asking, and the menu names the next routine', () => {
+    expect(hideToTrayOnClose({ ...moment(), keepRunning: true })).toBe(true)
+    expect(hideToTrayOnClose({ ...moment({ liveRuns: 0 }), keepRunning: true })).toBe(true)
+    expect(hideToTrayOnClose({ ...moment(), keepRunning: false })).toBe(false)
+    expect(hideToTrayOnClose({ ...moment({ appQuitting: true }), keepRunning: true })).toBe(false)
+    expect(trayMenuLabels('Next: Morning digest at 08:00')).toEqual(['Open Locust', 'Next: Morning digest at 08:00', 'Quit'])
   })
 
   it('the tray says who is working while the window is closed, and when nobody is', () => {

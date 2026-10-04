@@ -52,7 +52,7 @@ import { createFileMissionLedger, createFileWorkroom } from '@teammate/mission-s
 import { retireSetAsideMessages } from './set-aside-messages.js'
 import { MAC_RELEASES_API, newerMacRelease } from './mac-release.js'
 import { createMacUpdater, macSelfUpdateTarget } from './mac-self-update.js'
-import type { AppChangelog, AppChangelogEntry, WorkspaceSettings } from '../shared/ipc.js'
+import type { AppChangelog, AppChangelogEntry, CodexMissionStartResponse, WorkspaceSettings } from '../shared/ipc.js'
 import type { MissionLedger, Workroom } from '@teammate/mission-store'
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 import { spawn } from 'node:child_process'
@@ -89,7 +89,10 @@ import { createBriefSessions } from './brief-sessions.js'
 import { createRunEnd } from './run-end.js'
 import { createKeepAwake, KEEP_AWAKE_BEAT_MS } from './keep-awake.js'
 import { attentionDot, needsYouCountFrom, taskbarAttention } from './taskbar-attention.js'
-import { CLOSE_BUTTONS, closeQuestion, shouldAskBeforeClosing, trayLine } from './quit-guard.js'
+import { CLOSE_BUTTONS, closeQuestion, hideToTrayOnClose, shouldAskBeforeClosing, trayLine, trayMenuLabels } from './quit-guard.js'
+import { BACKGROUND_ARG, createLoginItem } from './login-item.js'
+import { nextRoutineDueLine } from '../shared/routine-schedule.js'
+import { BACKGROUND_FILE, readKeepRunning, writeKeepRunning } from './keep-running.js'
 import { createRecentEdits } from './recent-edits.js'
 import { readRuntimeArtifacts } from './runtime-artifacts.js'
 import { relative } from 'node:path'
@@ -193,6 +196,10 @@ import {
   APP_UPDATE_CHECK_CHANNEL,
   APP_UPDATE_INSTALL_CHANNEL,
   APP_UPDATE_LANE_CHANNEL,
+  KEEP_RUNNING_GET_CHANNEL,
+  KEEP_RUNNING_SET_CHANNEL,
+  LOGIN_ITEM_GET_CHANNEL,
+  LOGIN_ITEM_SET_CHANNEL,
   APP_UPDATE_STATE_CHANNEL,
   MISSION_DELETE_CHANNEL,
   MISSION_PRUNE_CHANNEL,
@@ -1306,12 +1313,18 @@ protocol.registerSchemesAsPrivileged([
 ])
 
 
+/** Opens the window from the tray when --background started with none. */
+let openFromBackground: (() => void) | undefined
+
 if (!ownsSingleInstanceLock) {
   app.quit()
 } else {
   app.on('second-instance', () => {
     const window = BrowserWindow.getAllWindows()[0]
-    if (!window) return
+    if (!window) {
+      openFromBackground?.()
+      return
+    }
     if (window.isMinimized()) window.restore()
     // In the tray while teammates work (0.397): opening Locust again brings it back.
     if (!window.isVisible()) window.show()
@@ -1319,6 +1332,9 @@ if (!ownsSingleInstanceLock) {
   })
 
   void app.whenReady().then(() => {
+    // A slot at or before this is missed. Taken before the window, so a
+    // routine whose time already passed does not start at launch.
+    const appOpenedAt = new Date()
     /*
      * The first line of every run.
      *
@@ -2888,6 +2904,7 @@ if (!ownsSingleInstanceLock) {
         return { command, passed: run.error === undefined && !run.timedOut && run.exitCode === 0, tail }
       },
       // Read live (0.458): the folder the window is in now.
+      openedAt: appOpenedAt,
       get workspaceId() {
         return memoryWorkspaceId
       },
@@ -2900,8 +2917,29 @@ if (!ownsSingleInstanceLock) {
       },
       routines,
       peerContextFor,
-      start: (input) =>
-        codexMissions.start(
+      start: (input): Promise<CodexMissionStartResponse> => {
+        // The login-item smoke records that a due routine dispatched, and
+        // sends nothing to a model. A packaged build never takes this path.
+        const sink = app.isPackaged ? undefined : process.env.LOCUST_SCHEDULE_SINK
+        if (sink !== undefined && sink.length > 0) {
+          mkdirSync(dirname(sink), { recursive: true })
+          appendFileSync(sink, `${input.startedBy.routineId}\n`, 'utf8')
+          return Promise.resolve({
+            ok: true,
+            data: {
+              missionId: 'mission_schedule_sink',
+              runId: 'run_schedule_sink',
+              runtime: input.runtime,
+              model: input.model ?? '',
+              resolvedRouteId: 'schedule-sink',
+              cliVersion: null,
+              sandbox: 'read-only',
+              peerMessages: [],
+              peerDeliveryFailed: false
+            }
+          })
+        }
+        return codexMissions.start(
           input.prompt,
           input.runtime,
           input.mode,
@@ -2922,7 +2960,8 @@ if (!ownsSingleInstanceLock) {
           // In the routine's copy (0.533): a slot keyed by the teammate, so one run at a time
           // stays one run at a time, and its end never commits the teammate's own branch.
           input.cwd === undefined ? undefined : { key: input.peer.self.teammateId, cwd: input.cwd }
-        ),
+        )
+      },
       assignOwner: (teammateId, missionId) => assignOwner(teammateId, missionId),
       phaseOf: async (missionId) => (await missionLedger.getMission(missionId))?.phase,
       // Whichever transport owns it. The ledger cannot say "still going" --
@@ -6114,6 +6153,36 @@ if (!ownsSingleInstanceLock) {
       return updates.check()
     })
 
+    const loginItems = createLoginItem({
+      host: {
+        setLoginItemSettings: (settings) => { app.setLoginItemSettings(settings) },
+        getLoginItemSettings: (query) => app.getLoginItemSettings(query)
+      },
+      // The smoke sets the seam so a development copy can prove the Run key,
+      // then puts the key back. A normal development launch does not.
+      packaged: app.isPackaged || process.env.LOCUST_LOGIN_ITEM_SMOKE === '1',
+      execPath: process.execPath,
+      platform: process.platform
+    })
+    const backgroundFile = (): string => join(app.getPath('userData'), BACKGROUND_FILE)
+    ipcMain.handle(LOGIN_ITEM_GET_CHANNEL, (event) => {
+      if (!fromOwnWindow(event)) return { openAtLogin: false, available: false }
+      return loginItems.read()
+    })
+    ipcMain.handle(LOGIN_ITEM_SET_CHANNEL, (event, openAtLogin: unknown) => {
+      if (!fromOwnWindow(event) || typeof openAtLogin !== 'boolean') return loginItems.read()
+      return loginItems.set(openAtLogin)
+    })
+    ipcMain.handle(KEEP_RUNNING_GET_CHANNEL, (event) => {
+      if (!fromOwnWindow(event)) return { keepRunning: false }
+      return { keepRunning: readKeepRunning(backgroundFile()) }
+    })
+    ipcMain.handle(KEEP_RUNNING_SET_CHANNEL, (event, keep: unknown) => {
+      if (!fromOwnWindow(event) || typeof keep !== 'boolean') return { keepRunning: readKeepRunning(backgroundFile()) }
+      writeKeepRunning(backgroundFile(), keep)
+      return { keepRunning: keep }
+    })
+
     ipcMain.handle(APP_UPDATE_LANE_CHANNEL, async (event, everyBuild: unknown) => {
       if (!fromOwnWindow(event) || typeof everyBuild !== 'boolean') {
         return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'The request was rejected.' } } as const
@@ -6767,11 +6836,13 @@ if (!ownsSingleInstanceLock) {
         showAppWindow()
       })
     }
+    // --background is the tray and no window: a splash would be a window.
+    const startInBackground = process.argv.includes(BACKGROUND_ARG)
     // Read, not assumed: somebody who turned the ceremony off gets no
     // loading window and the app opens straight away. Synchronously
     // optimistic, because the splash must exist BEFORE the app window is
     // ready to show or the app would show itself first.
-    openSplash('full')
+    if (!startInBackground) openSplash('full')
     /*
      * A CAP ON THE LOADING SCREEN.
      *
@@ -6781,22 +6852,24 @@ if (!ownsSingleInstanceLock) {
      * and the splash closed regardless, and the runtimes carry on answering
      * behind it exactly as they did before there was a splash at all.
      */
-    setTimeout(() => {
-      const splash = splashWindow
-      if (splash === undefined || splash.isDestroyed()) return
-      splashWindow = undefined
-      showAppWindow()
-      splash.close()
-    }, SPLASH_CAP_MS)
-    void teammates
-      .readSettings()
-      .then((held) => {
-        if (held.tube !== 'off') return
+    if (!startInBackground) {
+      setTimeout(() => {
         const splash = splashWindow
+        if (splash === undefined || splash.isDestroyed()) return
         splashWindow = undefined
-        if (splash !== undefined && !splash.isDestroyed()) splash.close()
-      })
-      .catch(() => undefined)
+        showAppWindow()
+        splash.close()
+      }, SPLASH_CAP_MS)
+      void teammates
+        .readSettings()
+        .then((held) => {
+          if (held.tube !== 'off') return
+          const splash = splashWindow
+          splashWindow = undefined
+          if (splash !== undefined && !splash.isDestroyed()) splash.close()
+        })
+        .catch(() => undefined)
+    }
 
     /*
      * 0.382: closing the window while a teammate works asks first
@@ -6814,6 +6887,8 @@ if (!ownsSingleInstanceLock) {
      */
     let tray: Tray | undefined
     let trayBeat: ReturnType<typeof setInterval> | undefined
+    let trayOpen: () => void = () => undefined
+    let trayQuit: () => void = () => undefined
     const workingNames = async (liveIds: readonly string[]): Promise<readonly string[]> => {
       const [roster, owners] = await Promise.all([teammates.list(), teammates.missionOwners()]).catch(() => [[], {}] as const)
       return liveIds
@@ -6826,6 +6901,41 @@ if (!ownsSingleInstanceLock) {
       tray?.destroy()
       tray = undefined
     }
+    const trayIcon = () =>
+      // macOS draws a menu-bar icon from a small PNG and cannot read an .ico
+      // at all: handed one, the icon is empty and a closed Locust has no
+      // way back but the Dock (the first macOS build, 2026-09-29).
+      process.platform === 'darwin'
+        ? nativeImage.createFromPath(app.isPackaged ? join(process.resourcesPath, 'icon-32.png') : join(__dirname, '../../resources/icon-32.png')).resize({ width: 18, height: 18 })
+        : nativeImage.createFromPath(app.isPackaged ? join(process.resourcesPath, 'icon.ico') : join(__dirname, '../../resources/icon-512.png'))
+    /**
+     * One tray, for --background and for a window that closed into it.
+     * Open Locust, the next routine due, Quit.
+     */
+    const ensureTray = (onOpen: () => void, onQuit: () => void): void => {
+      trayOpen = onOpen
+      trayQuit = onQuit
+      if (tray === undefined) {
+        tray = new Tray(trayIcon())
+        tray.on('click', () => trayOpen())
+      }
+      const say = (): void => {
+        const liveIds = [...codexMissions.liveMissionIds(), ...antigravityMissions.liveMissionIds()]
+        void workingNames(liveIds).then((names) => tray?.setToolTip(trayLine(names, liveIds.length)))
+        void routines.list().then((all) => {
+          if (tray === undefined) return
+          const [openLabel, dueLabel, quitLabel] = trayMenuLabels(nextRoutineDueLine(all, new Date()))
+          tray.setContextMenu(Menu.buildFromTemplate([
+            { label: openLabel, click: () => trayOpen() },
+            { label: dueLabel, enabled: false },
+            { label: quitLabel, click: () => { leaveTray(); trayQuit() } }
+          ]))
+        }).catch(() => undefined)
+      }
+      say()
+      if (trayBeat !== undefined) clearInterval(trayBeat)
+      trayBeat = setInterval(say, 5_000)
+    }
     const toTray = (window: BrowserWindow, quit: () => void): void => {
       const reopen = (): void => {
         leaveTray()
@@ -6833,27 +6943,7 @@ if (!ownsSingleInstanceLock) {
         window.show()
         window.focus()
       }
-      if (tray === undefined) {
-        // macOS draws a menu-bar icon from a small PNG and cannot read an .ico
-        // at all: handed one, the icon is empty and a closed Locust has no
-        // way back but the Dock (the first macOS build, 2026-09-29).
-        const trayImage = process.platform === 'darwin'
-          ? nativeImage.createFromPath(app.isPackaged ? join(process.resourcesPath, 'icon-32.png') : join(__dirname, '../../resources/icon-32.png')).resize({ width: 18, height: 18 })
-          : nativeImage.createFromPath(app.isPackaged ? join(process.resourcesPath, 'icon.ico') : join(__dirname, '../../resources/icon-512.png'))
-        tray = new Tray(trayImage)
-        tray.on('click', reopen)
-        tray.setContextMenu(Menu.buildFromTemplate([
-          { label: 'Open Locust', click: reopen },
-          { type: 'separator' },
-          { label: 'Quit Locust', click: () => { leaveTray(); quit() } }
-        ]))
-      }
-      const say = (): void => {
-        const liveIds = [...codexMissions.liveMissionIds(), ...antigravityMissions.liveMissionIds()]
-        void workingNames(liveIds).then((names) => tray?.setToolTip(trayLine(names, liveIds.length)))
-      }
-      say()
-      trayBeat ??= setInterval(say, 5_000)
+      ensureTray(reopen, quit)
       window.hide()
     }
     const guardClose = (window: BrowserWindow): void => {
@@ -6871,6 +6961,11 @@ if (!ownsSingleInstanceLock) {
       }
       window.on('close', (event) => {
         const liveIds = [...codexMissions.liveMissionIds(), ...antigravityMissions.liveMissionIds()]
+        if (hideToTrayOnClose({ liveRuns: liveIds.length, appQuitting, sessionEnding, confirmed, keepRunning: readKeepRunning(backgroundFile()) })) {
+          event.preventDefault()
+          toTray(window, quit)
+          return
+        }
         if (!shouldAskBeforeClosing({ liveRuns: liveIds.length, appQuitting, sessionEnding, confirmed })) {
           leaveTray()
           return
@@ -6907,22 +7002,42 @@ if (!ownsSingleInstanceLock) {
       })
     }
 
-    createWindow(codexMissions, (window) => {
-      approvalWindow = window
-      guardClose(window)
-      replayDiscoveryToWindow()
-      // The sweep may begin: there is somebody to watch it now.
-      windowIsUp()
-      /*
-       * AND IT DOES BEGIN, rather than waiting to be asked.
-       *
-       * The first sweep used to start when the app's renderer asked for it,
-       * which is after its whole bundle has loaded and run: measured 0.84 s
-       * into a launch, with the window itself there at 0.37 s (2026-09-22).
-       * The renderer's ask now joins the sweep already under way.
-       */
-      void discoverForWork().catch(() => undefined)
-    })
+    const openMain = (beginSweep: boolean): void => {
+      createWindow(codexMissions, (window) => {
+        approvalWindow = window
+        guardClose(window)
+        replayDiscoveryToWindow()
+        if (!beginSweep) return
+        // The sweep may begin: there is somebody to watch it now.
+        windowIsUp()
+        /*
+         * AND IT DOES BEGIN, rather than waiting to be asked.
+         *
+         * The first sweep used to start when the app's renderer asked for it,
+         * which is after its whole bundle has loaded and run: measured 0.84 s
+         * into a launch, with the window itself there at 0.37 s (2026-09-22).
+         * The renderer's ask now joins the sweep already under way.
+         */
+        void discoverForWork().catch(() => undefined)
+      })
+    }
+    const openExistingOrMain = (): void => {
+      const existing = BrowserWindow.getAllWindows().find((one) => !one.isDestroyed())
+      if (existing !== undefined) {
+        if (existing.isMinimized()) existing.restore()
+        existing.show()
+        existing.focus()
+        return
+      }
+      openMain(true)
+    }
+    openFromBackground = openExistingOrMain
+    if (startInBackground) {
+      ensureTray(openExistingOrMain, () => { app.quit() })
+      console.error('Locust is in the tray.')
+    } else {
+      openMain(true)
+    }
 
     app.on('activate', () => {
       // The Dock icon brings back a window kept working in the background
@@ -6954,7 +7069,15 @@ app.on('before-quit', () => {
 })
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+  if (process.platform === 'darwin') return
+  // A quit from the tray is already leaving. Keeping the process up is only
+  // for a window that closed while the person asked Locust to stay.
+  if (appQuitting) {
+    app.quit()
+    return
+  }
+  if (readKeepRunning(join(app.getPath('userData'), BACKGROUND_FILE))) return
+  app.quit()
 })
 
 /**

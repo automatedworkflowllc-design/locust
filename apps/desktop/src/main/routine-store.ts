@@ -4,7 +4,7 @@ import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
 import { MAX_GOAL_TRIES } from '../shared/ipc.js'
-import type { PublicRoutine, RoutineGoal, RoutineHandOff, RoutineStaged, TeammateRoute } from '../shared/ipc.js'
+import type { PublicRoutine, RoutineGoal, RoutineHandOff, RoutineHistoryEntry, RoutineStaged, TeammateRoute } from '../shared/ipc.js'
 import { validSchedule } from '../shared/routine-schedule.js'
 import { inputsRefusal, keptInputs, placeholdersIn, undeclaredPlaceholders, validInputs } from '../shared/routine-inputs.js'
 import type { RoutineInput } from '../shared/routine-inputs.js'
@@ -92,6 +92,11 @@ export interface RoutineStore {
   /** Put the held attempt down and keep the routine, its clock started at `keptAt` (the decision). */
   keepSchedule(routineId: string, attemptId: string, keptAt: string): Promise<void>
   clearProgress(routineId: string, attemptId: string): Promise<void>
+  /**
+   * A time that passed while Locust was closed. Not a completed run: `runs`
+   * stays, and the clock moves to that slot so the next tick does not start it.
+   */
+  recordMiss(routineId: string, dueAt: string, recordedAt: string): Promise<void>
   /** Drop every routine of a teammate who is gone; their steps had nobody to run them. */
   removeForTeammate(teammateId: unknown): Promise<void>
 }
@@ -175,6 +180,26 @@ export function validStaged(value: unknown): value is RoutineStaged {
     && paths(item.changed) && paths(item.deleted)
 }
 
+const HISTORY_CAP = 30
+
+function parsedHistory(value: unknown): readonly RoutineHistoryEntry[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const entries: RoutineHistoryEntry[] = []
+  for (const item of value.slice(-HISTORY_CAP)) {
+    if (typeof item !== 'object' || item === null) continue
+    const record = item as Record<string, unknown>
+    if (record.kind !== 'missed') continue
+    if (typeof record.dueAt !== 'string' || Number.isNaN(Date.parse(record.dueAt))) continue
+    if (typeof record.recordedAt !== 'string' || Number.isNaN(Date.parse(record.recordedAt))) continue
+    entries.push({ kind: 'missed', dueAt: record.dueAt, recordedAt: record.recordedAt })
+  }
+  return entries.length === 0 ? undefined : entries
+}
+
+function parsedInstant(value: unknown): string | undefined {
+  return typeof value === 'string' && !Number.isNaN(Date.parse(value)) ? value : undefined
+}
+
 export function parsedRoutine(value: unknown): PublicRoutine | undefined {
   if (typeof value !== 'object' || value === null) return undefined
   const record = value as Record<string, unknown>
@@ -190,6 +215,8 @@ export function parsedRoutine(value: unknown): PublicRoutine | undefined {
   // A schedule that does not read is dropped, not the routine: the steps
   // are the person's words and outrank a malformed timer.
   const schedule = validSchedule(record.schedule) ? record.schedule : undefined
+  const missedAt = parsedInstant(record.missedAt)
+  const history = parsedHistory(record.history)
   const route: TeammateRoute = {
     runtime: record.route.runtime,
     model: record.route.model,
@@ -222,6 +249,8 @@ export function parsedRoutine(value: unknown): PublicRoutine | undefined {
     ...(validGoal(record.untilCheck) ? { untilCheck: { tries: record.untilCheck.tries } } : {}),
     ...(validStaged(record.staged) ? { staged: { ...record.staged, changed: [...record.staged.changed], deleted: [...record.staged.deleted] } } : {}),
     ...(validFailed(record.lastFailed) ? { lastFailed: record.lastFailed } : {}),
+    ...(missedAt === undefined ? {} : { missedAt }),
+    ...(history === undefined ? {} : { history }),
     // Validated above: a corrupt declaration must never become a run without inputs.
     ...(validInputs(record.inputs) && record.inputs.length > 0 ? { inputs: keptInputs(record.inputs) } : {})
   }
@@ -488,7 +517,7 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
         // Counting and clearing share ONE rename: a crash cannot count twice,
         // nor leave a completed routine looking like it only started step 1.
         if (staged !== undefined && !validStaged(staged)) throw new Error('Routine copy changes are invalid')
-        const { execution: _execution, lastFailed: _lastFailed, ...rest } = held
+        const { execution: _execution, lastFailed: _lastFailed, missedAt: _missedAt, ...rest } = held
         const next: PublicRoutine = { ...rest, runs: held.runs + 1, lastRunAt: new Date().toISOString(), ...(staged === undefined ? {} : { staged }), ...(validFailed(failed) ? { lastFailed: failed } : {}) }
         await write({
           ...file,
@@ -559,6 +588,23 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
         const next: PublicRoutine = { ...rest, execution: { ...held.execution, status: 'abandoned', canContinue: false,
           updatedAt: new Date().toISOString(), reason: 'Abandoned by you; schedule removed. This does not stop an external runtime or undo its work.' } }
         await write({ ...file, routines: file.routines.map((routine) => routine.routineId === routineId ? next : routine) })
+      })
+    },
+
+    recordMiss(routineId, dueAt, recordedAt): Promise<void> {
+      return serialize(async () => {
+        if (!safeId(routineId) || parsedInstant(dueAt) === undefined || parsedInstant(recordedAt) === undefined) return
+        const file = await read()
+        const held = file.routines.find((routine) => routine.routineId === routineId)
+        if (held === undefined) return
+        if (held.execution !== undefined && held.execution.status !== 'abandoned') return
+        const entry: RoutineHistoryEntry = { kind: 'missed', dueAt, recordedAt }
+        const history = [...(held.history ?? []), entry].slice(-HISTORY_CAP)
+        const next: PublicRoutine = { ...held, lastRunAt: dueAt, missedAt: dueAt, history }
+        await write({
+          ...file,
+          routines: file.routines.map((routine) => (routine.routineId === routineId ? next : routine))
+        })
       })
     },
 

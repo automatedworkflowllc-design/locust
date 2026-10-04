@@ -335,6 +335,22 @@ export type AppUpdateResponse =
     }
 /** Switch between every build and the one a day testers get; answers with the update state. */
 export const APP_UPDATE_LANE_CHANNEL = 'app-update:lane'
+/** What Windows will do at sign-in, read back from the login item itself. */
+export const LOGIN_ITEM_GET_CHANNEL = 'login-item:get'
+export const LOGIN_ITEM_SET_CHANNEL = 'login-item:set'
+/** Keep the process up when the window closes. Off unless the person turned it on. */
+export const KEEP_RUNNING_GET_CHANNEL = 'keep-running:get'
+export const KEEP_RUNNING_SET_CHANNEL = 'keep-running:set'
+
+export interface LoginItemState {
+  readonly openAtLogin: boolean
+  /** False in a development build and off Windows. */
+  readonly available: boolean
+}
+
+export interface KeepRunningState {
+  readonly keepRunning: boolean
+}
 export const MISSION_PRUNE_CHANNEL = 'mission:prune'
 export const MISSION_TRASH_LIST_CHANNEL = 'mission:trash:list'
 export const MISSION_RESTORE_CHANNEL = 'mission:restore'
@@ -1570,6 +1586,13 @@ export interface RoutineHandOff {
   readonly check?: true
 }
 
+/** A scheduled time that passed while Locust was closed. */
+export interface RoutineHistoryEntry {
+  readonly kind: 'missed'
+  readonly dueAt: string
+  readonly recordedAt: string
+}
+
 /**
  * A routine: a conversation a person saved as steps a teammate can replay.
  * The teammate cannot watch a person work outside the app; what it can learn
@@ -1623,6 +1646,16 @@ export interface PublicRoutine {
    * only "run 1 time" and offered Run again, as if it had gone fine.
    */
   readonly lastFailed?: string
+  /**
+   * The scheduled time that passed while Locust was closed. The card says
+   * "Missed, 08:00 today" until a real run clears it. Not a completed run.
+   */
+  readonly missedAt?: string
+  /**
+   * Misses, oldest first, capped. A real run does not erase them: the miss
+   * stays in the history after the card has moved on.
+   */
+  readonly history?: readonly RoutineHistoryEntry[]
   /**
    * What the routine asks for when it runs (W7): at most 12, each answering a
    * `{{key}}` in the steps. Absent: it asks for nothing, as every routine did.
@@ -3192,6 +3225,11 @@ export interface DesktopApi {
   installUpdate(): Promise<AppUpdateResponse>
   /** Every build, or only the one a day testers get; checks again on the new lane. */
   setUpdateLane(everyBuild: boolean): Promise<AppUpdateResponse>
+  /** What Windows holds for sign-in. Read again each time Settings opens. */
+  readLoginItem(): Promise<LoginItemState>
+  setLoginItem(openAtLogin: boolean): Promise<LoginItemState>
+  readKeepRunning(): Promise<KeepRunningState>
+  setKeepRunning(keepRunning: boolean): Promise<KeepRunningState>
   onUpdateState(listener: (state: AppUpdateState) => void): () => void
   pruneMissions(request: MissionPruneRequest): Promise<MissionPruneResponse>
   /**

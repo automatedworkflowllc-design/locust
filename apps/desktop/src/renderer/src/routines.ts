@@ -180,12 +180,27 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
  * in the person's own clock. Undefined for a routine that only runs when
  * pressed, so the card says nothing rather than "never".
  */
+/** "Missed, 08:00 today" — the slot that passed while Locust was closed. */
+export function missedLine(missedAt: string, now: Date): string | undefined {
+  const at = new Date(missedAt)
+  if (Number.isNaN(at.getTime())) return undefined
+  const when = clock(at)
+  if (sameDay(at, now)) return `Missed, ${when} today`
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+  if (sameDay(at, yesterday)) return `Missed, ${when} yesterday`
+  return `Missed, ${WEEKDAYS[at.getDay()] ?? ''} ${when}`
+}
+
 export function routineScheduleSummary(
-  routine: Pick<PublicRoutine, 'schedule' | 'lastRunAt' | 'createdAt' | 'execution'>,
+  routine: Pick<PublicRoutine, 'schedule' | 'lastRunAt' | 'createdAt' | 'execution' | 'missedAt'>,
   now: Date
 ): string | undefined {
   if (routine.schedule === undefined) return undefined
   if (routine.execution !== undefined && routine.execution.status !== 'abandoned') return `${scheduleLabel(routine.schedule)} · ${routine.execution.status === 'running' ? 'in progress' : 'held for review; no automatic retry'}`
+  if (routine.missedAt !== undefined) {
+    const missed = missedLine(routine.missedAt, now)
+    if (missed !== undefined) return missed
+  }
   const next = nextRunAfter(routine.schedule, routine.lastRunAt ?? routine.createdAt, now)
   // A watcher has no next time: it is waiting for a file (0.522).
   if (routine.schedule.kind === 'files') return `${scheduleLabel(routine.schedule)} · watching`

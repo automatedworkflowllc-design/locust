@@ -21,6 +21,10 @@ import {
   APP_UPDATE_CHECK_CHANNEL,
   APP_UPDATE_INSTALL_CHANNEL,
   APP_UPDATE_LANE_CHANNEL,
+  KEEP_RUNNING_GET_CHANNEL,
+  KEEP_RUNNING_SET_CHANNEL,
+  LOGIN_ITEM_GET_CHANNEL,
+  LOGIN_ITEM_SET_CHANNEL,
   APP_UPDATE_STATE_CHANNEL,
   MISSION_PRUNE_CHANNEL,
   MISSION_STORAGE_CHANNEL,
@@ -283,6 +287,8 @@ import type {
   LandResponse,
   ResolveResponse,
   RuntimeInstallProgress,
+  KeepRunningState,
+  LoginItemState,
   RuntimeUpdatesState,
   RuntimeInstallResponse,
   RuntimeSignInResponse,
@@ -353,6 +359,10 @@ const desktopApi: DesktopApi = {
   checkForUpdate: () => ipcRenderer.invoke(APP_UPDATE_CHECK_CHANNEL) as Promise<AppUpdateResponse>,
   installUpdate: () => ipcRenderer.invoke(APP_UPDATE_INSTALL_CHANNEL) as Promise<AppUpdateResponse>,
   setUpdateLane: (everyBuild: boolean) => ipcRenderer.invoke(APP_UPDATE_LANE_CHANNEL, everyBuild) as Promise<AppUpdateResponse>,
+  readLoginItem: () => ipcRenderer.invoke(LOGIN_ITEM_GET_CHANNEL) as Promise<LoginItemState>,
+  setLoginItem: (openAtLogin: boolean) => ipcRenderer.invoke(LOGIN_ITEM_SET_CHANNEL, openAtLogin === true) as Promise<LoginItemState>,
+  readKeepRunning: () => ipcRenderer.invoke(KEEP_RUNNING_GET_CHANNEL) as Promise<KeepRunningState>,
+  setKeepRunning: (keepRunning: boolean) => ipcRenderer.invoke(KEEP_RUNNING_SET_CHANNEL, keepRunning === true) as Promise<KeepRunningState>,
   onUpdateState: (listener: (state: AppUpdateState) => void) => {
     const handler = (_event: unknown, state: AppUpdateState): void => {
       listener(state)

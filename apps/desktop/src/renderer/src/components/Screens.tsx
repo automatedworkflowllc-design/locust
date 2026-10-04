@@ -8,7 +8,7 @@ import { SETTINGS_PAGES, matchedHeadings, pageMatches } from '../settingsPages.j
 import { agentCapabilityHeading, agentCapabilityLines } from '../agentCapabilities.js'
 import { ConnectorHealth } from './ConnectorHealth.js'
 import type { SettingsPageId } from '../settingsPages.js'
-import type { RuntimeUpdatesState, MetalMotion, MetalPreset, MetalStrength } from '../../../shared/ipc.js'
+import type { LoginItemState, RuntimeUpdatesState, MetalMotion, MetalPreset, MetalStrength } from '../../../shared/ipc.js'
 import type { Spend } from '../../../shared/spend.js'
 import { isOwnRoute, modelDisplayName, routeChrome, routeModelName } from '../routeName.js'
 import type { ReactElement, ReactNode } from 'react'
@@ -1402,6 +1402,11 @@ export function SettingsScreen({
   onCheckUpdate,
   onInstallUpdate,
   onUpdateLane,
+  loginItem = { openAtLogin: false, available: false },
+  onLoginItemChange,
+  onGeneralOpen,
+  keepRunning = false,
+  onKeepRunningChange,
   relay,
   onRelayChange,
   interrupt,
@@ -1486,6 +1491,14 @@ export function SettingsScreen({
   readonly onInstallUpdate: () => Promise<AppUpdateResponse>
   /** Every build, or the one a day testers get (main/update-lane.ts). */
   readonly onUpdateLane?: (everyBuild: boolean) => void
+  /** What Windows holds for sign-in. Read again each time this page opens. */
+  readonly loginItem?: LoginItemState
+  readonly onLoginItemChange?: (openAtLogin: boolean) => void
+  /** Settings opened on General: read the login item again, so the switch shows what Windows holds. */
+  readonly onGeneralOpen?: () => void
+  /** Keep Locust running when the window is closed. Off unless the person turned it on. */
+  readonly keepRunning?: boolean
+  readonly onKeepRunningChange?: (keepRunning: boolean) => void
   /** Whether teammates start runs to answer each other. */
   readonly relay: boolean
   readonly onRelayChange: (relay: boolean) => void
@@ -1563,6 +1576,11 @@ export function SettingsScreen({
   // A search that hides the page you were on moves you to the first that
   // survived, rather than showing an empty pane beside a list of matches.
   const shownPage = shownPages.some((entry) => entry.id === page) ? page : shownPages[0]?.id
+  useEffect(() => {
+    if (shownPage === 'app') onGeneralOpen?.()
+    // The page opening is the event. The callback is recreated every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shownPage])
   /*
    * AND THE PANE OPENS AT WHAT WAS SEARCHED FOR, not at the top of the page.
    *
@@ -2665,6 +2683,48 @@ export function SettingsScreen({
         </section>
         )}
 
+        {shownPage === 'app' && (
+        <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">Startup</h2>
+          <p className="lc-settings__lede">
+            Routines run while Locust is open. Signing in can open it in the tray, with no window, until you ask for one.
+          </p>
+          <div className="lc-settingrows">
+            <div className="lc-settingrow">
+              <span className="lc-settings__note">Start Locust when you sign in to Windows.</span>
+              <button
+                type="button"
+                className={`lc-switch${loginItem.openAtLogin ? ' is-on' : ''}`}
+                role="switch"
+                aria-checked={loginItem.openAtLogin}
+                aria-label="Start Locust when you sign in to Windows."
+                disabled={loginItem.available !== true}
+                onClick={() => onLoginItemChange?.(loginItem.openAtLogin !== true)}
+              >
+                <span className="lc-switch__knob" />
+              </button>
+            </div>
+            <div className="lc-settingrow">
+              <span className="lc-settings__note">Keep Locust running in the background when the window is closed.</span>
+              <button
+                type="button"
+                className={`lc-switch${keepRunning ? ' is-on' : ''}`}
+                role="switch"
+                aria-checked={keepRunning}
+                aria-label="Keep Locust running in the background when the window is closed."
+                onClick={() => onKeepRunningChange?.(keepRunning !== true)}
+              >
+                <span className="lc-switch__knob" />
+              </button>
+            </div>
+          </div>
+          {loginItem.available !== true && (
+            <p className="lc-settings__note">
+              Only the installed app can sign in with Windows. A development copy would register Electron.
+            </p>
+          )}
+        </section>
+        )}
         {shownPage === 'app' && (
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Updates</h2>

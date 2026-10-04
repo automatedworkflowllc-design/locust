@@ -6,6 +6,8 @@ import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime
 
 import type {
   PublicFolder,
+  KeepRunningState,
+  LoginItemState,
   RuntimeUpdatesState,
   LayoutPreference,
   TubePreference,
@@ -1924,6 +1926,15 @@ export default function App(): ReactElement {
    * without a restart.
    */
   const [runtimeUpdates, setRuntimeUpdates] = useState<RuntimeUpdatesState>()
+  const [loginItem, setLoginItem] = useState<LoginItemState>({ openAtLogin: false, available: false })
+  const [keepRunning, setKeepRunning] = useState(false)
+  const readStartup = (): void => {
+    const bridge = window.desktop
+    if (bridge === undefined) return
+    void bridge.readLoginItem().then(setLoginItem).catch(() => undefined)
+    void bridge.readKeepRunning().then((state: KeepRunningState) => setKeepRunning(state.keepRunning)).catch(() => undefined)
+  }
+  useEffect(() => { readStartup() }, [])
   useEffect(() => {
     const bridge = window.desktop
     if (bridge === undefined) return undefined
@@ -7208,6 +7219,11 @@ export default function App(): ReactElement {
               onImportRoutine={previewRoutineImport}
               onExportRoutine={(id) => { void exportRoutine(id).catch((error: unknown) => setRoutineNotice(error instanceof Error ? error.message : 'That routine could not be exported. Check the destination folder and try again.')) }}
               onSettleRoutine={settleRoutine}
+              signInOn={loginItem.openAtLogin}
+              onOpenSignIn={() => {
+                setSettingsLanding('app')
+                setScreen('settings')
+              }}
             />
           ) : screen === 'rooms' ? (
             <RoomScreen
@@ -7271,6 +7287,16 @@ export default function App(): ReactElement {
                     if (response.ok) setUpdate(response.data)
                   })
                   .catch(() => undefined)
+              }}
+              loginItem={loginItem}
+              onLoginItemChange={(openAtLogin) => {
+                void window.desktop?.setLoginItem(openAtLogin).then(setLoginItem).catch(() => undefined)
+              }}
+              onGeneralOpen={readStartup}
+              keepRunning={keepRunning}
+              onKeepRunningChange={(next) => {
+                setKeepRunning(next)
+                void window.desktop?.setKeepRunning(next).then((state) => setKeepRunning(state.keepRunning)).catch(() => setKeepRunning(!next))
               }}
               relay={relay}
               swarm={swarm}

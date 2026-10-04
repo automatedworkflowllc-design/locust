@@ -3,7 +3,7 @@ import type { RecoveredMissionPhase } from '@teammate/mission-store'
 
 import type { CodexMissionStartResponse, CodexMissionUpdate, MissionMode, PublicRoutine, RoutineHandOff, RoutineRunResponse, RoutineStaged, TeammateRoute } from '../shared/ipc.js'
 import { handOffPrompt, verdictOf } from '../shared/hand-off.js'
-import { isDue } from '../shared/routine-schedule.js'
+import { isDue, missedSlot } from '../shared/routine-schedule.js'
 import { arrivalNote } from './routine-file-watch.js'
 import type { FileArrivals } from './routine-file-watch.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
@@ -47,7 +47,16 @@ export interface RoutineRunnerOptions {
    * from. Undefined when neither says; such a routine runs as before (M15).
    */
   readonly homeOf?: (routine: PublicRoutine) => Promise<string | undefined>
-  readonly routines: Pick<RoutineStore, 'get' | 'list' | 'recordRun' | 'saveProgress' | 'clearProgress' | 'abandon' | 'keepSchedule'>
+  readonly routines: Pick<RoutineStore, 'get' | 'list' | 'recordRun' | 'saveProgress' | 'clearProgress' | 'abandon' | 'keepSchedule'> & {
+    /** A slot that passed before this process opened. Absent in tests that do not exercise misses. */
+    recordMiss?(routineId: string, dueAt: string, recordedAt: string): Promise<void>
+  }
+  /**
+   * When this process opened. A slot at or before this is missed, not started.
+   * Absent means the process has been open for the whole clock the test uses,
+   * so a due routine still starts.
+   */
+  readonly openedAt?: Date
   /** Whether the teammate has a live run of anyone's. A scheduled routine waits for it to end. */
   readonly teammateBusy?: (teammateId: string) => Promise<boolean>
   readonly peerContextFor: (teammateId: string) => Promise<MissionPeerContext | undefined>
@@ -883,6 +892,15 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
         // for project A replayed its steps, in its write mode, in project B.
         const home = await (options.homeOf ?? (async (entry: PublicRoutine) => entry.workspaceId))(routine).catch(() => undefined)
         if (home !== undefined && home !== options.workspaceId) continue
+        // No catch-up. A time that passed while Locust was closed is missed,
+        // recorded, and not started. A time that passes while it is open still starts.
+        if (routine.schedule.kind !== 'files') {
+          const slot = missedSlot(routine.schedule, routine.lastRunAt ?? routine.createdAt, options.openedAt ?? new Date(0), now)
+          if (slot !== undefined) {
+            await options.routines.recordMiss?.(routine.routineId, slot.toISOString(), now.toISOString())
+            continue
+          }
+        }
         const until = heldOff.get(routine.routineId)
         if (until !== undefined && until > now.getTime()) continue
         heldOff.delete(routine.routineId)

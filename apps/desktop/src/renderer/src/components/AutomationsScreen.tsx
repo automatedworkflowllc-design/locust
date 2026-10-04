@@ -48,10 +48,15 @@ export function AutomationsScreen({
   onImportRoutine,
   onExportRoutine,
   onSettleRoutine,
-  folders = []
+  folders = [],
+  signInOn = false,
+  onOpenSignIn
 }: {
   /** A copy routine's waiting changes: Keep, Discard, or open the copy (0.533). */
   readonly onSettleRoutine?: (routineId: string, decision: 'keep' | 'discard' | 'open') => void
+  /** What Windows holds for "Start Locust when you sign in". The word links to that switch. */
+  readonly signInOn?: boolean
+  readonly onOpenSignIn?: () => void
   /** A routine written here, step by step, rather than saved from a conversation (0.530). */
   readonly onNewRoutine?: () => void
   readonly onImportRoutine?: () => void
@@ -301,7 +306,7 @@ export function AutomationsScreen({
                   }
                   onClick={() => onRunRoutine(routine.routineId)}
                 >
-                  Run
+                  {routine.missedAt !== undefined && (routine.execution === undefined || routine.execution.status === 'abandoned') ? 'Run now' : 'Run'}
                 </button>
                 <span className="lc-routinerow__meta">
                   {onExportRoutine !== undefined && <button type="button" className="lc-ghostbutton" aria-label={`Export ${routine.name}`} onClick={() => onExportRoutine(routine.routineId)}>Export</button>}
@@ -396,8 +401,14 @@ export function AutomationsScreen({
       )}
 
       <p className="lc-screen__note">
-        <Icon name="clock" size={12} /> A scheduled routine runs only while Locust is open, on its teammate&rsquo;s
-        own route and permissions.
+        <Icon name="clock" size={12} /> Routines run while Locust is open. Start Locust when you sign in:{' '}
+        {onOpenSignIn === undefined ? (
+          signInOn ? 'On' : 'Off'
+        ) : (
+          <button type="button" className="lc-linkbutton" onClick={onOpenSignIn}>
+            {signInOn ? 'On' : 'Off'}
+          </button>
+        )}
       </p>
       {/*
         * Set up in the CLI, listed here.

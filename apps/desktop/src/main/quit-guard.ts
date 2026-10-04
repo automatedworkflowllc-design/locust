@@ -63,6 +63,20 @@ export function closeQuestion(workingNames: readonly string[], liveRuns: number)
 /** The buttons, in order: keeping the work going is the default; Cancel leaves the window open. */
 export const CLOSE_BUTTONS = ['Keep working in the background', 'Quit anyway', 'Cancel'] as const
 
+/**
+ * Close hides to the tray with no question. On only when the person asked
+ * Locust to keep running, and never while a quit or a session end is already
+ * under way.
+ */
+export function hideToTrayOnClose(moment: CloseMoment & { readonly keepRunning: boolean }): boolean {
+  return moment.keepRunning && !moment.appQuitting && !moment.sessionEnding && !moment.confirmed
+}
+
+/** Tray menu, both for --background and for a window that closed to the tray. */
+export function trayMenuLabels(nextDue: string): readonly [string, string, string] {
+  return ['Open Locust', nextDue, 'Quit']
+}
+
 /** The tray's line while Locust runs without a window: who is working, or that nobody is. */
 export function trayLine(workingNames: readonly string[], liveRuns: number): string {
   if (liveRuns === 0) return 'Locust: nobody is working. Click to open.'

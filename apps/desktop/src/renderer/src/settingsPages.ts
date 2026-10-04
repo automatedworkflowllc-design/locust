@@ -85,8 +85,9 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
     label: 'General',
     group: 'Locust',
     icon: 'settings',
-    headings: ['Updates', 'Report a problem'],
+    headings: ['Startup', 'Updates', 'Report a problem'],
     alsoKnownAs: {
+      Startup: ['login item', 'tray', 'keep running', 'sign-in'],
       Updates: ['version', 'upgrade'],
       'Report a problem': ['bug', 'feedback', 'support', 'crash']
     }
