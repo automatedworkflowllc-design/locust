@@ -83,6 +83,8 @@ import { missingTranscripts, heldDigests, mergeHistory } from './historyMerge.js
 import { savableMissionId } from './savableConversations.js'
 import { MemoryScreen } from './components/MemoryScreen.js'
 import { isMissionRuntime, runtimeDisplayName } from '../../shared/runtimes.js'
+import type { StartPhase } from '../../shared/ipc.js'
+import { carriedStartPhase, startingLabelOf, withStartPhase } from './startPhase.js'
 import { reviewPairOf } from './review-pair.js'
 import type { EditCheckShown } from './components/EditCheckCard.js'
 import { imageMediaType } from '../../shared/image-files.js'
@@ -327,6 +329,8 @@ interface LiveRunState {
    * must not say "You stopped this run" then (code review B4, (f)).
    */
   readonly stopPressed?: boolean
+  /** The start's phase, from the main process, while the run is starting (0.602). */
+  readonly startPhase?: StartPhase
 }
 
 type RuntimeDiscoveryState =
@@ -392,6 +396,7 @@ function applyMissionUpdate(run: LiveRunState, update: CodexMissionUpdate): Live
   }
   // A host-started run is adopted by the listener, never applied to a run.
   if (update.kind === 'mission-started') return live
+  if (update.kind === 'start-phase') return live
   // A hop being started belongs to a teammate, not to any one run.
   if (update.kind === 'relay-starting' || update.kind === 'relay-start-settled') return live
   // A room's board moving is the room's business, not this run's.
@@ -2555,6 +2560,8 @@ export default function App(): ReactElement {
     })
 
     const removeMissionListener = bridge.onCodexMissionUpdate((update) => {
+      // A start's phase (0.602) arrives before the run knows its id: matched by teammate, not by id.
+      if (update.kind === 'start-phase') setRuns((current) => withStartPhase(current, update))
       // A3.3: kept by mission, apart from the run state -- a finished run is
       // rebuilt from its record, which holds no check, and a result that
       // landed first was wiped by that rebuild (drive, 2026-09-25).
@@ -4573,6 +4580,11 @@ export default function App(): ReactElement {
         const switched = response.data.switchedFrom
         let next: LiveRunState = {
           ...starting,
+          // The start's last phase stays on the line (0.602): the response
+          // says the program exists, not that it has spoken, and the seconds
+          // until it does were drawn as a bare "Starting…" (the dev drive,
+          // 2026-10-04: the response at 148 ms, the first word at 14.4 s).
+          ...carriedStartPhase(current.get(key)),
           runtime: response.data.runtime,
           data: response.data,
           phase: 'running',
@@ -6832,7 +6844,7 @@ export default function App(): ReactElement {
   const liveTurnOf = (missionId: string): LiveTurn | undefined => {
     const run = [...runs.values()].find((entry) => entry.data?.missionId === missionId)
     if (run === undefined || !liveRunIsActive(run)) return undefined
-    const live = buildThread(run.events, { running: true, ...(run.startedAtIso === undefined ? {} : { startedAt: run.startedAtIso }) })
+    const live = buildThread(run.events, { running: true, ...(run.startedAtIso === undefined ? {} : { startedAt: run.startedAtIso }), ...startingLabelOf(run) })
       .find((item) => item.type === 'live-step')
     if (live === undefined || live.type !== 'live-step') return undefined
     return {
@@ -7963,6 +7975,7 @@ export default function App(): ReactElement {
                 prompt={liveRun.prompt}
                 startedBy={liveRun.startedBy}
                 planMode={liveRun.plan === true}
+                {...startingLabelOf(liveRun)}
                 onOpenPeerRun={(messageId) => {
                   // Only where the record shows the message actually reached
                   // a run. Nothing received it yet is a real state -- it

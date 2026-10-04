@@ -2811,6 +2811,8 @@ export interface MissionThreadOptions {
    * held back -- which is the lag it exists to remove.
    */
   readonly startedAt?: string
+  /** What the live line says while nothing has arrived (0.602): the start's phase, else "Starting". */
+  readonly startingLabel?: string
   /**
    * True when the run is stopped on an approval. A run awaiting a decision is
    * still `running`, so the waiting line would sit directly above the card
@@ -3929,7 +3931,7 @@ export function buildThread(
         items.push({
           key: 'live-step',
           type: 'live-step',
-          label: spoken ? 'Working' : 'Starting',
+          label: spoken ? 'Working' : (options.startingLabel ?? 'Starting'),
           register: spoken ? ('working' as const) : ('starting' as const),
           ...(spoken && planAction !== undefined ? { action: planAction } : {}),
           detail: planAside,

@@ -3323,3 +3323,12 @@ describe('a named file the host saw change but could not read (0.597)', () => {
     expect(rows[0]).toMatchObject({ kind: 'unreported', observed: true, tool: 'write_to_file' })
   })
 })
+
+describe('the live line while nothing has arrived (0.602)', () => {
+  it("says the start's phase when given one, else Starting", () => {
+    const withPhase = buildThread([], { running: true, startedAt: '2026-10-04T20:00:00.000Z', startingLabel: 'Reading the folder' }).find((item) => item.type === 'live-step')
+    expect(withPhase?.type === 'live-step' ? withPhase.label : undefined).toBe('Reading the folder')
+    const plain = buildThread([], { running: true, startedAt: '2026-10-04T20:00:00.000Z' }).find((item) => item.type === 'live-step')
+    expect(plain?.type === 'live-step' ? plain.label : undefined).toBe('Starting')
+  })
+})

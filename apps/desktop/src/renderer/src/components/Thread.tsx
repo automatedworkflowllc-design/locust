@@ -851,6 +851,8 @@ export interface ThreadProps {
   /** Where earlier groups' words stopped briefing this conversation; drawn as the join line's mirror. */
   readonly groupLeavings?: readonly GroupLeaving[]
   readonly events: readonly NormalizedRuntimeEvent[]
+  /** The live line's words while nothing has arrived (0.602): the start's phase. */
+  readonly startingLabel?: string
   readonly running: boolean
   readonly restoredMission: PublicRecoveredMission | undefined
   /** The turn being shown, so its own memories are drawn under it. */
@@ -956,6 +958,7 @@ export function Thread({
   onOpenPeerRun,
   earlierTurns,
   planMode = false,
+  startingLabel,
   groupBoundary,
   pastBoundaries = [],
   groupLeavings = [],
@@ -1081,6 +1084,7 @@ onResume,
     // Only the orb reads this: `solving` is the one of the four mapped states
     // no open tool can answer for, because planning is the turn's mode.
     planMode,
+    ...(startingLabel === undefined ? {} : { startingLabel }),
     ...(workspacePath === undefined ? {} : { workspacePath }),
     ...(startedAtIso === undefined ? {} : { startedAt: startedAtIso })
   })

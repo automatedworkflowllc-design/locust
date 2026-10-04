@@ -2815,7 +2815,18 @@ export type CodexMissionCancelResponse =
     }
   | { readonly ok: false; readonly error: CodexMissionError }
 
+/** The phases of a start, in order (0.602): what the live line says while nothing has arrived. */
+export type StartPhase = 'looking' | 'briefing' | 'reading-folder' | 'starting-runtime'
+
 export type CodexMissionUpdate =
+  | {
+      /** The start's phase (0.602), sent while the window's run is still "starting" and before it knows its ids. */
+      readonly kind: 'start-phase'
+      readonly runtime: MissionRuntimeId
+      readonly teammateId?: string
+      readonly phase: StartPhase
+      readonly at: string
+    }
   | {
       readonly kind: 'event'
       readonly runId: string
