@@ -10,12 +10,12 @@ This repository is a mirror, exported from the private development repository
 at each release. Issues and discussion are welcome here; code changes are by
 invitation (see CONTRIBUTING.md).
 
-**Locust** puts Claude Code, Codex, Cursor, OpenCode, GitHub Copilot and more
-side by side under one roof. You give a teammate a mission; it runs on your
-machine, under your own provider accounts, in a read-only sandbox unless you
-say otherwise. Every event is written to an append-only local ledger before it
-reaches the screen, so what you are shown is what was recorded, and a mission
-survives a restart.
+**Locust** puts Claude Code, Codex, Cursor, OpenCode, GitHub Copilot,
+Antigravity and Muse side by side under one roof. You give a teammate a
+mission; it runs on your machine, under your own provider accounts, in a
+read-only sandbox unless you say otherwise. Every event is written to an
+append-only local ledger before it reaches the screen, so what you are shown
+is what was recorded, and a mission survives a restart.
 
 <table>
 <tr>
@@ -31,7 +31,7 @@ survives a restart.
 </tr>
 </table>
 
-<sub>Screenshots from the packaged app on a demo profile (0.437; the hand-off from 0.438). The models in the picker are what that account offers; yours come from your own accounts. Taken by `_tools/drive-promo-shots.mjs`, which runs the missions rather than mocking them.</sub>
+<sub>Screenshots from the packaged app on a demo profile (0.437; the hand-off from 0.438). The models in the picker are what that account offers; yours come from your own accounts. Taken by `_tools/drive-promo-shots.mjs`, which runs the missions rather than mocking them. The app has moved on since (teammate looks, the Board, saved approval rules); `CHANGELOG.md` has every release.</sub>
 
 ## Why this exists
 
@@ -41,99 +41,95 @@ makes every one of those decisions inspectable -- and, where it matters,
 yours to make.
 
 ```text
-Mission control plane
-├─ Codex runtime → user-owned Codex account or API route
-├─ Claude runtime → user-owned Claude/API route
-└─ Native runtime → curated OmniRoute, direct API, or local model
+You ──► a teammate (name, role, face; its own runtime, model and mode)
+          │
+          ├─ Claude Code ──── the CLI you installed and signed into
+          ├─ Codex CLI ─────── "
+          ├─ Cursor Agent ──── "
+          ├─ OpenCode ──────── "
+          ├─ Copilot CLI ───── "
+          ├─ Antigravity ───── the IDE's own agent, through its CLI
+          └─ Muse Code ─────── "
+          │
+          ▼
+        one append-only ledger per conversation, written before the screen is
 ```
+
+There is no model of Locust's own and no account of Locust's own. Each runtime
+runs its own tools; Locust asks you before an action where the runtime offers a
+place to ask, says so where it cannot, and records what happened either way.
 
 ## Repository map
 
-- `apps/desktop` — Electron + React desktop control room.
-- `packages/contracts` — shared runtime, routing, checkpoint, and event contracts.
-- `packages/runtime-core` — provider-neutral routing and safe-handoff logic.
-- `packages/runtime-adapters` — safe installed-CLI discovery, launch/process transport, and provider event normalization.
-- `docs` — product, architecture, model-routing, Codex wire contract, and cross-task context.
+- `apps/desktop` — the Electron + React app: main process (runtimes, ledger, approvals, routines, updates), preload bridge, renderer.
+- `packages/runtime-adapters` — finding installed CLIs without reading their credentials, the process transport, and one event normalizer per runtime, each built from streams measured off the real CLI.
+- `packages/mission-store` — the versioned, append-only mission ledger and its reader.
+- `packages/contracts`, `packages/runtime-core` — an earlier design (routing contracts, fallback policy, a hand-off state machine). Nothing in the app imports them; they are kept for history and will move to `attic/`.
+- `_tools` — the release tools and the drives: scripts that launch the built app over CDP, do what a person does, and keep screenshots as the record.
+- `_smoke` — live smokes against the real CLIs, run by hand.
+- `docs` — `ARCHITECTURE.md` (the September design, with a note on what was built instead), `CODE-SIGNING.md`, the roadmap documents (history), and the assets.
 
 ## What works now
 
-**Recently (0.43x):** each runtime's own `/` commands in the menu (Claude
-Code, OpenCode, Codex); `@` attaches a project file or tags a teammate from
-any conversation, who is sent the message in a conversation of their own;
-**hand-off chains**, routines whose steps go to different teammates on their
-own runtimes, with a checker that must approve before the run counts; and up
-to eight runs at once. `CHANGELOG.md` has every release.
+As of 0.588 (2026-10-04). Everything here runs in the built app and is checked
+by drives against the packaged build, not by unit tests alone.
 
-Everything in this section is running in the built app and verified by a live
-smoke against the real CLIs, not by tests alone. The smokes live in `_smoke/`
-and are run by hand: they need a signed-in provider and a desktop session, so
-they are not part of `pnpm check`.
+**Seven runtimes, side by side.** Claude Code, Codex CLI, Cursor Agent,
+OpenCode, Copilot CLI, Antigravity and Muse Code each own real conversations
+end to end. Each is found on your machine without reading its credential
+files, reports whether it is signed in, and offers the models its own CLI
+names -- nothing is offered that the installed CLI did not list. Gemini CLI is
+found and signed into like the others but refused: Google serves the CLI to
+API keys and enterprise licences only, and its stream has never been measured,
+so Locust says so rather than start a process whose output nobody can read.
 
-**Runtimes, side by side.** Codex CLI and Claude Code are both selectable
-and both own real missions end to end. Discovery is read-only and reports
-version and authentication readiness without reading credential files; a
-runtime that is not ready is never drawn as available.
+**Teammates.** A teammate is a name, a role, a look and routing defaults: its
+runtime, model, reasoning effort and mode. Up to 64 teammates; up to 8
+conversations running at once, each with its own process and its own ledger
+writer. A face moves only while its teammate is working.
 
-**Cursor Agent, as a third runtime.** Found, versioned and asked about
-sign-in like the other two, with its models read off `cursor-agent
---list-models` (Grok, Composer, Gemini Flash and the Claude and GPT lines,
-effort baked into each id). A mission under it runs read-only in Cursor's
-plan mode or in write mode without forced commands, streams into the same
-thread, resumes its own session on a reply, and is recorded as Cursor's by
-a normalizer built from streams measured off the real CLI. Live-verified by
-`_smoke/cursor-smoke.mjs`.
+**Five modes, and cards before consequences.** Ask (read-only), Plan, Accept
+edits, Approve each and Auto. In Approve each an approval card says the exact
+command and the folder it runs in, and a command that reaches beyond its own
+run -- `taskkill /IM python.exe`, `kill -9 -1`, a shutdown -- is named for
+what it does and is asked about every time. Approve once and Always are
+session-scoped; a rule you choose to save ("Yes, and don't ask again") is
+listed in Settings with how many cards it answered, and can be removed one at
+a time or all at once. Where a runtime offers no place to ask (Cursor in Auto,
+Antigravity's after-the-fact refusals), the card is not pretended; the record
+says what happened.
 
-**Gemini CLI, found but refused.** Discovered and signed into, then refused
-by Google: since June 2026 the CLI serves only API keys and enterprise
-licences, not consumer accounts, and the app says so rather than starting a
-process it cannot read. Gemini models are reachable through Cursor.
+**The record.** Every conversation is an append-only ledger: each event,
+each card and its answer, each hand-off, written before the screen shows it.
+A conversation can be saved as a Markdown record that says what it holds and,
+in so many words, what it does not. Completed, failed, cancelled and
+interrupted runs come back after a restart with their integrity reported
+truthfully.
 
-**Each runtime's own models, and effort that is actually sent.** Codex's
-models come from a live `model/list`; Claude Code's from the aliases its own
-`--help` advertises. Nothing is offered that the installed CLI did not name,
-so a new release appears without a code change. The chosen reasoning effort
-reaches the runtime (`--effort` for Claude, a config override for `codex
-exec`, per-turn on the app-server transport), and a model is never offered
-under a runtime it does not belong to.
+**Teams.** Teammates hand work to each other through a product-owned channel:
+a run ends with a share per named recipient, the host checks the name against
+the roster, and the recipient's next turn sees it quoted as a claim, dated and
+attributed. Hand-off chains run a routine's steps across teammates on
+different runtimes, with a checker that must approve before the run counts.
+Rooms hold a conversation several teammates take part in.
 
-**Teammates, and missions that run at once.** A teammate is local identity
-and routing defaults: a name, a role, a hue and a generated pixel face seeded
-from its immutable id. Missions are started by messaging a teammate; up to
-eight run at once, one per teammate, each with its own process and ledger
-writer. A face animates only while its teammate is actually working, which
-makes motion a status signal rather than decoration.
+**Routines.** A routine runs a teammate on a schedule -- every N hours,
+daily, weekly, once, or when files in a folder change -- and can keep running
+in the background after the window is closed.
 
-**The workroom.** Teammates share findings with each other through a
-product-owned, append-only channel: a completed run ends with one share block
-per named recipient, the host checks the name against the roster and posts the
-message attributed to the sending mission, and the recipient's next mission is
-shown it quoted as a claim -- dated, attributed, and stated to carry no
-authority. Cross-references live in each mission's ledger by message id; the
-text has exactly one home.
+**The Board.** Every conversation in columns by what it needs from you: Needs
+you, Working, Ready to look at, Done -- across every runtime at once.
 
-**Missions are durable.** A versioned, append-only local ledger
-(`packages/mission-store`) persists mission metadata, every normalized event,
-host failures, reconciled checkpoints and workroom cross-references before the
-UI shows them, and restores completed, failed, cancelled and interrupted runs
-after a restart with truthful integrity reporting.
+**Compare.** The same mission on several models at once, each in its own copy
+of the folder, side by side; keep the one you like.
 
-**Mid-mission route switching.** A running mission can be handed to the other
-runtime. The host stops it, waits for it to settle, writes a reconciled
-checkpoint and briefs a continuation -- and because a mission records ONE
-runtime, the continuation is a new mission that records what it continues,
-which is also what actually happened. The thread shows the seam, including how
-many actions were left in doubt.
+**Updates.** The Windows installer updates itself from GitHub Releases with a
+differential download, and Settings says which build you are on. The installer
+is not signed yet; see the policy below.
 
-**Per-action approvals.** The `approve-each` mode runs on the experimental
-`codex app-server` transport, where the runtime stops before a consequential
-action and the card says exactly what would happen. `Approve once` and
-`Always allow` are session-scoped; there is deliberately no forever-grant.
-
-The renderer holds no permissions and, in packaged builds, no network egress.
-Automatic fallback, the curated OmniRoute gateway, app connections and
-external tools remain future work -- `docs/ROADMAP.md` and
-`docs/REMAINING-PLAN.md` lay out the path, and `docs/REMAINING-PLAN.md` is
-also the honest list of what is still open.
+What is still open, in the order the authors would take it, is in
+`CHANGELOG.md`'s most recent entries and the issues here. The roadmap documents
+under `docs/` are the September plan and are kept as history, not as a promise.
 
 ## Run locally
 
@@ -153,21 +149,23 @@ Run all checks:
 pnpm check
 ```
 
-This builds every workspace package, runs TypeScript checks, and runs the complete test suite.
+This builds every workspace package, runs TypeScript checks, and runs the complete test suite (about 9,300 tests across the desktop app, the adapters and the ledger, as of 0.588).
 
 Green tests are not the evidence here. Each package carries a mutation
 control (`test/mutation-control.mjs`) that breaks one behaviour at a time and
 requires the NAMED test to fail, rejecting any mutation that stops the file
 running -- a red suite caused by a broken file proves nothing about any test
 in it. Run them with `node test/mutation-control.mjs`
-from a package directory.
+from a package directory. The drives in `_tools/drive-*.mjs` are the other
+half: each launches the packaged app, does what a person does, and keeps its
+screenshots; a drive that cannot fail on the build before the fix is not
+trusted.
 
 ## Working on it from another agent session
 
-Read `AGENTS.md`, `PROJECT.md`, and `docs/CROSS_TASK_CONTEXT.md`. The
-cross-task document carries the current handoff and a paste-ready prompt;
-`docs/REMAINING-PLAN.md` is the ordered list of what is done and what is
-open, and is kept honest about the difference.
+Read `AGENTS.md` and `PROJECT.md`. `docs/CROSS_TASK_CONTEXT.md` carries the
+conventions an agent session is expected to keep; `CHANGELOG.md` is the record
+of what has shipped, release by release, written for the person using the app.
 
 ## Code signing policy
 
@@ -178,4 +176,7 @@ it is, including who approves each release and what is never collected, is in
 
 ## Current scope
 
-The first release runs on the user’s own computer. It will detect installed Codex and Claude CLIs, support API-key and local-model routes, and offer an optional curated OmniRoute integration. Persistent cloud computers come after the local execution, approval, and recovery model is proven.
+Locust runs on your own computer, on the CLIs you installed and the accounts
+you signed into. There is no hosted service, no account with Locust, and no
+telemetry. Cloud execution, if it ever comes, comes after the local approval
+and recovery model has proved itself in use.

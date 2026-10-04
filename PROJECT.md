@@ -1,6 +1,29 @@
 # Project state
 
-Updated: 2026-08-31
+Updated: 2026-10-04 (the "Where it is now" section). The sections after it
+are the record as it stood in late August and early September 2026 and are
+kept as history; where they disagree with the current section, the current
+section is right.
+
+## Where it is now (2026-10-04, 0.588)
+
+Seven runtimes own real conversations end to end -- Claude Code, Codex CLI,
+Cursor Agent, OpenCode, Copilot CLI, Antigravity and Muse Code -- each found
+on the machine without reading its credentials, each offering the models its
+own CLI names. Gemini CLI is found and refused, with the reason said. Up to 64
+teammates; up to 8 conversations live at once. Five modes (Ask, Plan, Accept
+edits, Approve each, Auto); approval cards where the runtime offers a gate,
+with a "reaches" line for commands that act beyond their own run and saved
+rules a person can list and remove. Teams: shares between teammates, hand-off
+chains with a checker, rooms. Routines on a schedule or on folder changes,
+running in the background if asked. The Board. Compare across models. A
+Markdown record of any conversation that says what it does and does not
+hold. Self-update with a differential download; the installer is not signed
+yet (`docs/CODE-SIGNING.md`). About 9,300 tests, forty live smokes and some
+360 drives against the packaged build; 694 releases since 0.1.0 on
+2026-09-01. The public repository is a mirror brought up at each release.
+`CHANGELOG.md` is the running record; `docs/ARCHITECTURE.md` opens with what
+was built instead of the September design.
 
 ## Product thesis
 
@@ -45,7 +68,7 @@ One harmless read-only Codex mission is live end to end and now survives restart
 
 ## Run and validate
 
-From `C:\Users\<home>\Documents\Codex\ai-teammate-platform`:
+From the repository root:
 
 ```powershell
 pnpm install

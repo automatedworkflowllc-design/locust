@@ -4,11 +4,12 @@ This file is the canonical handoff point for Codex tasks working on this project
 
 ## Canonical workspace
 
-```text
-C:\Users\<home>\Documents\Codex\ai-teammate-platform
-```
+The repository root, wherever it is checked out. (An earlier version of this
+file named one developer's Windows folder here; the public copy of the
+repository is a mirror and has no canonical path.) Executor sessions work in
+a Git worktree of their own, never in the checkout a tester is using.
 
-To cross-reference work from another Codex chat, open or save that directory as the task's project. Chats created in generated projectless directories do not automatically share a working directory, but they can use this absolute path when it is in their permitted workspace. Prefer a saved Codex project for this directory so future tasks begin in the correct context.
+To cross-reference work from another agent chat, open or save the checkout as the task's project. Chats created in generated projectless directories do not automatically share a working directory, but they can use the checkout's absolute path when it is in their permitted workspace. Prefer a saved project for this directory so future tasks begin in the correct context.
 
 If multiple tasks use the same checkout, all edits are immediately shared. Use that only for coordinated work with explicitly non-overlapping file ownership. Inspect current files and `git status` before modifying anything; do not reset, overwrite, stash, or “clean up” changes owned by another task.
 
@@ -210,24 +211,24 @@ Use this template:
 
 ### 2026-10-03 — W11 Remote Control Settings switch (Casper)
 
-- Scope: `exec/w11-casper`, fresh worktree `C:\Users\<home>\Documents\Codex\locust-exec-w11-casper`, based on `origin/main` at `edb05f22141f253d461cf4e73681b1fd28af8d7d`. No version or CHANGELOG change, packaging, push or publication.
+- Scope: `exec/w11-casper`, fresh worktree `<home>\Documents\Codex\locust-exec-w11-casper`, based on `origin/main` at `edb05f22141f253d461cf4e73681b1fd28af8d7d`. No version or CHANGELOG change, packaging, push or publication.
 - Built: an off-by-default Settings > AI agents switch; host-owned `claude remote-control --spawn worktree --name Locust` in the current project folder; boolean-only validated IPC; first stdout/stderr shown verbatim, separately capped at 64 Ki characters with a visible truncation notice. No persistence, automatic retry or stdin answers.
 - Lifecycle: off/quit kill only the owned process tree and await close. Dispose latches against later starts; a pending discovery is invalidated by off or quit. A termination deadline reports failure rather than claiming the process ended.
 - Trust/setup: trust prompts, `Workspace not trusted`, and the one-time enable prompt stop the server before opening normal interactive Claude Code for the person. It is a setup terminal, not a second unmanaged server. The person completes setup and explicitly enables the switch again. Windows/macOS terminal launch is unit-tested with mocks; other platforms receive manual guidance. Settings uses the existing switch/card styles; its search includes Remote Control, phone and claude.ai.
 - Observed: 40/40 new unit tests in four files passed with fake processes/terminal launchers. Four deliberate regressions to arguments, off cleanup, quit cleanup and whitespace preservation each failed the named assertion, then were restored. Full `_tools/gate.sh` via Git Bash passed, exit 0: 761 adapter, 150 mission-store, 7,678 desktop tests plus its required TypeScript checks. `git diff --check` passed.
-- Earlier checks: Windows' default `bash` selected an unavailable WSL distribution; Git Bash ran the gate. The first executable gate caught two new source-check failures (class names and the trust regex's slash spelling), both fixed without weakening tests. The second timed out an existing conversation-name cap test; that case then passed in a 59/59 smaller run and the final gate passed using `LOCUST_GATE_TMP=C:/Users/<home>/Documents/Codex/.tmp/w11-casper-gate`.
+- Earlier checks: Windows' default `bash` selected an unavailable WSL distribution; Git Bash ran the gate. The first executable gate caught two new source-check failures (class names and the trust regex's slash spelling), both fixed without weakening tests. The second timed out an existing conversation-name cap test; that case then passed in a 59/59 smaller run and the final gate passed using `LOCUST_GATE_TMP=<home>/Documents/Codex/.tmp/w11-casper-gate`.
 - Deduced: the main process's existing bounded quit path now awaits Remote Control disposal. Unit tests exercise disposal with a fake child; no actual app quit or OS process tree termination was observed for this feature.
 - Not run: real `claude remote-control`, account/sign-in checks, trust or enable answers, live UI, packaged UI, or a remote phone session. Colin owns the account-dependent live check. Review/merge this executor branch before any release; W11 is built, not live.
 
 ### 2026-10-03 — comparison and drive polish (Codex)
 
-- Ready for review: `exec/polish-batch`, based on `06e4a6c9`, in `C:/Users/<home>/Documents/Codex/locust-polish-batch`. Full file list, evidence paths, and limitations: [polish handoff](HANDOFF-2026-10-03-POLISH.md).
+- Ready for review: `exec/polish-batch`, based on `06e4a6c9`, in `<home>/Documents/Codex/locust-polish-batch`. Full file list, evidence paths, and limitations: [polish handoff](HANDOFF-2026-10-03-POLISH.md).
 - Four requested fixes: full comparison route tooltip (owned by Composer.tsx), styled judge select, stdout route probe, and a seeded Copy assertion with `--copy-only` mode.
 - Gate exit 0: 761 adapter, 150 mission-store, 7,762 desktop tests and required TypeScript checks; runtime-core 4/4 separately. Five new tests pass and all four requested regressions fail their named tests. Built-app drives: comparison 8/8, seeded Copy 1/1, zero captured renderer errors. Isolated real-component judge checks 5/5; generated frame inspected.
 - No version/CHANGELOG change, paid turn, packaging, push, or publication. Live model round trips and packaged checks remain unverified. Review and merge before release.
 ### 2026-10-03 — research 3.2 real Codex fixtures and schema drift (Casper)
 
-- Scope: `exec/3-2-casper`, fresh from `origin/main` at `06e4a6c9aa648ab1d391ef7a95ca096aa36a9592`, in `C:\Users\<home>\Documents\Codex\locust-exec-3-2-casper`. No production adapter change, push, publication, packaging, version bump or CHANGELOG edit.
+- Scope: `exec/3-2-casper`, fresh from `origin/main` at `06e4a6c9aa648ab1d391ef7a95ca096aa36a9592`, in `<home>\Documents\Codex\locust-exec-3-2-casper`. No production adapter change, push, publication, packaging, version bump or CHANGELOG edit.
 - Observed live: installed Codex 0.160.0; each turn explicitly requested `gpt-6-luna` / `low`. Three retained recordings in `packages/runtime-adapters/test/fixtures/codex`: one approval declined (42 rows), a file changed from BEFORE to AFTER with host read-back (24 rows), and an accepted mid-command steer whose final answer is STEER_ACCEPTED (42 rows). No tool approval was granted. Two other turns were rejected with `model 'gpt-6-luna' is not enabled in rustponsesapi`; later requests on the same model succeeded. Six requests total are documented in the fixture README.
 - Privacy: paths/ids/machine metadata/timestamps scrubbed before fixture persistence; private account readings, instruction bodies, legacy raw mirrors and hidden reasoning omitted. Public summaries and the real prompts, commands, patches, messages, usage counts and ordering remain. Fixtures replay through the actual client, run adapter and normalizer, strictly matching outbound requests before releasing the next inbound messages. The recorder is `_tools/record-codex-app-server-fixtures.mjs`, explicitly gated by `LOCUST_SPEND=1`.
 - Observed tests: 9 new offline tests passed, one installed-CLI schema test skipped by default. Four negative controls failed their named assertions (decline status, file receipt, steer answer and missing-field detection), then were restored. Final gate exit 0: 770 adapters passed / 1 skipped, 150 mission-store passed, 7,757 desktop passed, 8,677 passed in total; all gate TypeScript checks passed. `git diff --check` passed.
@@ -237,7 +238,7 @@ Use this template:
 
 ### 2026-10-03 — Codex app-server config warning fields (Gemini Flash)
 
-- Scope/owner: `exec/codex-warning`, in `C:\Users\<home>\Documents\Codex\locust-codex-warning`.
+- Scope/owner: `exec/codex-warning`, in `<home>\Documents\Codex\locust-codex-warning`.
 - Files changed: `packages/runtime-adapters/src/app-server-events.ts`, `packages/runtime-adapters/test/codex-schema-read-fields.ts`, `packages/runtime-adapters/test/a-config-warning-says-its-summary.test.ts`, `docs/CROSS_TASK_CONTEXT.md`.
 - Outcome: Fixed schema drift in `app-server-events.ts` where `configWarning` notifications dropped when `message` was missing. The normalizer now reads `params.summary` with optional `params.details` line appended, while maintaining fallback to `params.message` for `configWarning` and retaining `params.message` for `warning` and `guardianWarning`. Updated `codex-schema-read-fields.ts` to track canonical `['summary', 'details']` on `ConfigWarningNotification`.
 - Validation:
@@ -256,5 +257,5 @@ Use this template:
 Use this when starting a related chat:
 
 ```text
-Work in C:\Users\<home>\Documents\Codex\ai-teammate-platform. First read AGENTS.md, PROJECT.md, docs/CROSS_TASK_CONTEXT.md, docs/PRODUCT.md, docs/ARCHITECTURE.md, docs/MODEL_ROUTING.md, and docs/CODEX_RUNTIME.md. Inspect the current tree and git status before editing because other Codex tasks may share this checkout. Preserve unrelated changes, state which files you own, and use a separate Git worktree for substantial parallel source changes. Update the handoff log if your work changes implementation status or architectural decisions.
+Work in <repository root>. First read AGENTS.md, PROJECT.md, docs/CROSS_TASK_CONTEXT.md, docs/PRODUCT.md, docs/ARCHITECTURE.md, docs/MODEL_ROUTING.md, and docs/CODEX_RUNTIME.md. Inspect the current tree and git status before editing because other Codex tasks may share this checkout. Preserve unrelated changes, state which files you own, and use a separate Git worktree for substantial parallel source changes. Update the handoff log if your work changes implementation status or architectural decisions.
 ```

@@ -1,6 +1,26 @@
 # Architecture
 
-Status: architectural baseline for the local MVP. Implementation details may evolve, but the boundaries and safety invariants are deliberate.
+Status: the September 2026 design. Read with the note below: the product that
+shipped keeps this document's boundaries -- a renderer with no permissions and
+no network, an append-only ledger written before the screen, approval before
+consequence -- but not several of its mechanisms.
+
+**What was built instead (as of 0.588, 2026-10-04).** There is no tool broker
+that every action passes through, no SQLite, no native runtime and no
+Off/Ask/Automatic fallback. Each runtime runs its own tools, and Locust gates
+where the runtime offers a gate: Claude Code through a permission host served
+to it as an MCP server; Codex through `app-server` approvals; OpenCode through
+`serve` permissions; Copilot through its permission cards; Cursor only through
+the allow rules Locust writes into the folder's `.cursor/cli.json` for the run
+and takes back after it (inconclusive in Ask); Antigravity by reporting the
+refusals its transcript names after the fact. State is JSON files in the
+profile plus the ledger. The normalized event vocabulary below is the one the
+adapters emit; the packages `contracts` and `runtime-core` that held the
+fallback policy and the hand-off state machine are not imported by the app.
+Mid-run hand-off between runtimes writes a reconciled checkpoint and starts a
+new conversation that records what it continues, as section "Checkpoint and
+handoff protocol" describes. Everything else here is design intent, kept
+because the invariants still hold and the reasons for them are written down.
 
 ## System shape
 
