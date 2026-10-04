@@ -19,7 +19,10 @@ const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.i
 const packaged = arg('--packaged')
 const tag = arg('--tag') ?? 'local'
 // --send: two free OpenCode models that list levels, each at its own; spends nothing.
-const SEND = process.argv.includes('--send') || process.argv.includes('--changes')
+// --keep (0.612): then Keep the first column, and the chat box must carry on at THAT column's level,
+// not the model's default (arena round 2's reveal: "You kept Sonnet 5.5 · High" over a box saying Medium).
+const KEEP = process.argv.includes('--keep')
+const SEND = process.argv.includes('--send') || process.argv.includes('--changes') || KEEP
 // --changes: the two models change the project, in Auto, in a git folder (Sol, 0.491: a column wrote to
 // the real folder). Checks the folder is untouched before Keep and no column works inside it.
 const CHANGES = process.argv.includes('--changes')
@@ -211,6 +214,19 @@ try {
     const started = slots.map((slot) => ({ model: slot.route.model, effort: slot.route.effort, ran: slot.missionIds.length }))
     say(`  started with: ${JSON.stringify(started)}`)
     check('each column was started at its own level', FREE.every((want) => started.some((run) => want.model.test(run.model) && run.effort === want.effort && run.ran > 0)), JSON.stringify(started))
+    if (KEEP && !CHANGES) {
+      const kept = String(await drive.capture('Kept the first column', () => drive.evaluate(`(async () => {
+        const keep = document.querySelector('.lc-compare__foot .lc-primarybutton')
+        if (!keep) return 'no keep'
+        keep.click()
+        for (let i = 0; i < 40 && document.querySelector('.lc-compare'); i += 1) await new Promise((r) => setTimeout(r, 250))
+        await new Promise((r) => setTimeout(r, 1000))
+        return document.querySelector('.lc-compared')?.innerText.replace(/\\s+/g, ' ').trim() ?? 'nothing said'
+      })()`)))
+      const chip = String(await drive.evaluate(`(() => { const b = [...document.querySelectorAll('button.lc-control')].find((c) => c.querySelector('.lc-control__effort')); return b ? b.innerText.replace(/\\s+/g, ' ').trim() : '' })()`))
+      say(`  kept: ${kept}; the chat box's effort: ${chip}`)
+      check("after Keep, the chat box carries on at the kept column's level", new RegExp(`\\b${FREE[0].level}\\b`, 'i').test(chip), JSON.stringify({ kept, chip }))
+    }
     if (CHANGES) {
       const flat = (path) => path.replace(/\\/g, '/').toLowerCase()
       const trees = execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: workspace, encoding: 'utf8' })

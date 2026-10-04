@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.612.0 - 2026-10-04
+
+### Fixed
+
+- **Keeping a compared answer keeps its effort.** After you kept one model's answer, the chat box went back to that model's default effort, so a comparison run at High carried on at Medium. The conversation now carries on at the effort the kept column ran at, when the model offers it.
+
 ## 0.611.0 - 2026-10-04
 
 ### Improved
