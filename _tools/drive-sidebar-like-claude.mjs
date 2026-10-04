@@ -49,7 +49,8 @@ try {
   await sleep(4000)
   const wide = JSON.parse(String(await drive.capture('1440: the sidebar with two projects', () => drive.evaluate(read))))
   say(`  ${JSON.stringify(wide)}`)
-  check('the places are a list at the top: Missions, Rooms, Routines', JSON.stringify(wide.places) === JSON.stringify(['Missions', 'Rooms', 'Routines']), JSON.stringify(wide.places))
+  // Renamed Conversations in 0.526; rows with counts since 0.605, so the count is stripped before the words are compared.
+  check('the places are a list at the top: Conversations, Rooms, Routines', JSON.stringify(wide.places.map((text) => text.replace(/\s*\d+$/, ''))) === JSON.stringify(['Conversations', 'Rooms', 'Routines']), JSON.stringify(wide.places))
   check('project headings are names alone: no count, no icon', wide.heads.includes('Investments') && wide.heads.includes('Locust') && wide.heads.every((h) => !/\d/.test(h)) && wide.headIcons === 0, JSON.stringify({ heads: wide.heads, icons: wide.headIcons }))
   check('the rest are under "Ungrouped"', wide.heads.includes('Ungrouped'), JSON.stringify(wide.heads))
   check('rows carry no ages', wide.ages === 0, String(wide.ages))
