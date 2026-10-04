@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process'
-import { appendFile, mkdir, readFile, rm, stat } from 'node:fs/promises'
+import { realpathSync } from 'node:fs'
+import { appendFile, mkdir, readFile, realpath, rm, stat } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 
 import { releaseProcessTree } from '@teammate/runtime-adapters'
@@ -26,6 +27,28 @@ import { ownGitArgs } from './git-guard.js'
  */
 
 const GIT_TIMEOUT_MS = 20_000
+
+/**
+ * A folder's real spelling: symlinks and Windows short names resolved. git
+ * prints real paths (`C:\Users\runneradmin\...`) and this manager compares
+ * them with its own, so a folder given as `C:\Users\RUNNER~1\...` -- a hosted
+ * runner's TEMP, measured 10/04 -- is taken by its real name once, here, and
+ * every tree, listing and admin directory agrees with git from then on. A
+ * folder that does not exist yet keeps its spelling; probe says so.
+ */
+function realSpelling(path: string): string {
+  try {
+    return realpathSync.native(path)
+  } catch {
+    return path
+  }
+}
+
+/** Whether two spellings name one folder: case, slashes and the real spelling of each. */
+async function sameFolder(a: string, b: string): Promise<boolean> {
+  const spell = async (path: string): Promise<string> => (await realpath(path).catch(() => path)).replace(/\\/g, '/').toLowerCase()
+  return (await spell(a)) === (await spell(b))
+}
 /**
  * Making a tree checks out the whole project, which on Windows -- a scanner in
  * front of every file -- is not a twenty-second job for a big one. MEASURED
@@ -411,7 +434,7 @@ export function parseWorktreeList(output: string, root: string, directory: strin
 }
 
 export function createWorktreeManager(options: WorktreeManagerOptions): WorktreeManager {
-  const root = resolve(options.workspacePath)
+  const root = realSpelling(resolve(options.workspacePath))
   const runGit = options.runGit ?? defaultRunGit
   const trees = options.directory ?? WORKTREE_DIR
 
@@ -426,8 +449,8 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
       return { repository: false, gitVersion, reason: `git ${gitVersion} is older than 2.5, which worktrees need.` }
     }
     try {
-      const top = (await runGit(['rev-parse', '--show-toplevel'], root)).trim().replace(/\\/g, '/')
-      if (top.toLowerCase() !== root.replace(/\\/g, '/').toLowerCase()) {
+      const top = (await runGit(['rev-parse', '--show-toplevel'], root)).trim()
+      if (await sameFolder(top, root) === false) {
         return { repository: false, gitVersion, reason: 'The project folder is inside a repository but is not its root. Own copies need the folder to be the repository root.' }
       }
     } catch {

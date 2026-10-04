@@ -344,7 +344,7 @@ describe('recency-aware scanning past the file cap', () => {
     // it is what a user reads to understand an incomplete list.
     const capIssue = snapshot.issues.find((issue) => issue.code === 'file-limit-exceeded')
     expect(capIssue?.message).toContain('most recently updated')
-  })
+  }, 60_000) // 2,001 files: a hosted Windows runner took 7.5 s where the default allows 5.
 })
 
 describe('deleting a mission', () => {

@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.595.0 - 2026-10-04
+
+### Fixed
+
+- **A project folder given by its Windows short name works for own branches.** Windows keeps a second, eight-character spelling of many folders (`C:\Users\RUNNER~1\...` for a user named runneradmin) and some tools hand that one out. git prints the real one, and Locust compared the two as text: such a folder was refused as "inside a repository but not its root", and its teammates' own branches were listed as none. Locust now takes the folder by its real spelling, and its trees, listings and branches agree with git.
+
+### Improved
+
+- **The open-source copy of Locust tests itself on every push.** The public repository on GitHub now builds Locust and runs its whole test suite on a hosted Windows machine, which is what a code-signing service asks to see. The first run found three differences between that machine and a person's: a test fixture that is not published (its tests are reported as skipped there), one test that needed more time on a slow disk, and the short-name case above. All three are handled.
+
 ## 0.594.0 - 2026-10-04
 
 ### Improved

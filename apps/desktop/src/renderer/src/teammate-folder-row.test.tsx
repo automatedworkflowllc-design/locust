@@ -59,8 +59,8 @@ describe('the folder a teammate works in', () => {
   })
 
   it('shows the folder it was pointed at, and the way back', () => {
-    const html = draw({ ...WREN, folder: '/home/<home>/claude' }, true)
-    expect(html).toContain('/home/<home>/claude')
+    const html = draw({ ...WREN, folder: '/home/dev/claude' }, true)
+    expect(html).toContain('/home/dev/claude')
     expect(html).toContain('Use the project folder')
     expect(html).toContain('Change')
     expect(html).not.toContain('The project folder<')

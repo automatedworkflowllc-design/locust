@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -491,15 +491,16 @@ describe("reading a tool call's arguments", () => {
   });
 });
 
-describe("the project id `new-conversation` refuses to start without", () => {
-  const bytes = new Uint8Array(
-    readFileSync(new URL("./fixtures/antigravity/summaries.pb", import.meta.url)),
-  );
+// A real IDE's summaries file. It is kept unscrubbed because its paths are
+// length-prefixed inside a schema-less protobuf, so the public copy of the
+// repository leaves it out, and these tests are reported as skipped there.
+const summaries = new URL("./fixtures/antigravity/summaries.pb", import.meta.url);
+
+describe.skipIf(!existsSync(summaries))("the project id `new-conversation` refuses to start without", () => {
+  const bytes = existsSync(summaries) ? new Uint8Array(readFileSync(summaries)) : new Uint8Array();
   const projects = parseAntigravityProjects(bytes);
 
   it("finds the workspace the IDE had open and the project it belongs to", () => {
-    // This binary is kept unscrubbed: its paths are length-prefixed inside a
-    // schema-less protobuf, so replacing them would break the length prefixes.
     expect([...projects]).toEqual([
       ["c:/Users/<home>/Documents/antigravtest", "daf0f8ec-bb8e-49e8-a445-954eb0a62d0f"],
     ]);
@@ -521,7 +522,9 @@ describe("the project id `new-conversation` refuses to start without", () => {
   it("has no answer for a workspace the file never mentioned", () => {
     expect(projectIdForWorkspace(projects, "c:/work/pebble")).toBeUndefined();
   });
+});
 
+describe("the project file's parser, without the file", () => {
   it("returns nothing for bytes that are not this file, rather than a guess", () => {
     expect(parseAntigravityProjects(new Uint8Array([0, 1, 2, 3]))).toEqual(new Map());
   });
