@@ -348,6 +348,14 @@ async function projectFolderOf(options: CodexMissionServiceOptions, missionId: s
   return (await options.folderOf(earlier).catch(() => undefined)) ?? current
 }
 
+/**
+ * How many normalized events may wait for the disk before the stream loop stops
+ * reading (0.603). Past this the loop awaits the append in flight, and the
+ * runtime's records back up into the runner's own bounded queue as they always
+ * did. A thousand events is about a megabyte of envelopes.
+ */
+const MAX_WAITING_EVENTS = 1_000
+
 interface CodexMissionServiceOptions {
   /** The folder the service was started in; `currentFolder` wins when given. */
   readonly workspacePath: string
@@ -467,6 +475,8 @@ interface CodexMissionServiceOptions {
   readonly createId?: () => string
   readonly now?: () => Date
   readonly schedule?: (task: () => void) => void
+  /** Events normalized and waiting for the disk before the loop stops reading (0.603); tests lower it. */
+  readonly maxWaitingEvents?: number
   /**
    * Whether the workspace has Auto switched on. Asked here rather than at the
    * window's edge because every way a run can start -- a person, a relay hop,
@@ -888,18 +898,67 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
   const consume = async (mission: ActiveCodexMission): Promise<void> => {
     let persistenceFailed = false
     let persistenceReason: string | undefined
+    /*
+     * ONE APPEND ON THE DISK AT A TIME; WHAT ARRIVES MEANWHILE JOINS THE NEXT
+     * (0.603).
+     *
+     * Every durable append is an fsync, and this loop used to await it before
+     * reading the next record. On a quiet SSD that is 2 ms a token and
+     * invisible. Under contention -- a second teammate streaming, the gate,
+     * Chrome -- it is tens of milliseconds a token, every token paying its
+     * own, 300 to 1,000 fsyncs a turn (the Fable review of 2026-10-05, on
+     * Colin's own ledgers). Records are now read and normalized while an
+     * append is in flight, and when it lands, everything that arrived goes in
+     * one append. On a quiet disk nothing changes. Under contention the
+     * appends fall to what the disk can do, the stream never waits on more
+     * than one of them, and a token still reaches the screen only after it is
+     * on disk: persist-before-emit holds per batch, as before.
+     *
+     * Bounded: past `maxWaiting` events the loop waits for the write before
+     * reading on, so a flood backs up into the runner's own bounded queue as
+     * it always did, rather than into memory here.
+     */
+    const maxWaiting = options.maxWaitingEvents ?? MAX_WAITING_EVENTS
+    let waiting: NormalizedRuntimeEvent[] = []
+    let writer: Promise<void> | undefined
+    let ledgerFailed = false
+    const write = async (): Promise<void> => {
+      try {
+        while (waiting.length > 0 && !ledgerFailed) {
+          const batch = waiting
+          waiting = []
+          try {
+            await persistAndEmit(mission, options.ledger, batch)
+          } catch (error) {
+            persistenceReason = reasonOf(error)
+            options.note?.('ledger-write-failed', `${mission.missionId}: ${persistenceReason ?? 'no message'}`)
+            ledgerFailed = true
+            persistenceFailed = true
+            mission.controller.abort()
+            return
+          }
+          // Best effort, after the durable write: a failure here must not be
+          // reported as the ledger's.
+          await explainADeniedRead(mission, batch).catch(() => undefined)
+        }
+      } finally {
+        // Cleared in the same turn as the last check above, so a push that
+        // follows cannot find a writer that is about to stop.
+        writer = undefined
+      }
+    }
+    const flush = (): void => {
+      if (writer === undefined && waiting.length > 0 && !ledgerFailed) writer = write()
+    }
     try {
       for await (const record of mission.process.records) {
         try {
-          // Take everything already buffered along with this record and
-          // persist it as ONE durable append. Each append costs an fsync, and
-          // paying that per provider record lets the runner's bounded queue
-          // fill while we wait -- a full queue ends the run as an output-limit
-          // breach, so a verbose mission would be killed for being verbose.
-          // Ordering and persist-before-emit are unchanged: the batch is
-          // written before any of its events reach the renderer.
+          // Take everything already buffered along with this record, so the
+          // runner's bounded queue does not fill while this loop works -- a
+          // full queue ends the run as an output-limit breach, so a verbose
+          // mission would be killed for being verbose.
           // Defensive: a stream from a source that does not implement draining
-          // must degrade to one record per append, not throw -- a TypeError
+          // must degrade to one record at a time, not throw -- a TypeError
           // here would be caught below and reported as a persistence failure,
           // which is a misleading thing to tell a user about a working ledger.
           const buffered = typeof mission.process.records.drainAvailable === 'function'
@@ -926,20 +985,12 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           }
           // The first event of the run dates the end of the start (0.602).
           if (events.length > 0) mission.startTiming.firstEventAt ??= Date.now()
-          try {
-            await persistAndEmit(mission, options.ledger, events)
-          } catch (error) {
-            persistenceReason = reasonOf(error)
-            options.note?.('ledger-write-failed', `${mission.missionId}: ${persistenceReason ?? 'no message'}`)
-            persistenceFailed = true
-            mission.controller.abort()
-            break
-          }
-          // Best effort, after the durable write: a failure here must not be
-          // reported as the ledger's.
-          await explainADeniedRead(mission, events).catch(() => undefined)
+          waiting.push(...events)
+          flush()
+          if (waiting.length >= maxWaiting && writer !== undefined) await writer
+          if (ledgerFailed) break
         } catch (error) {
-          // Anything else that escapes the two guarded steps above: still a
+          // Anything else that escapes the guarded steps above: still a
           // stop, still with whatever reason the error carries.
           persistenceReason = reasonOf(error)
           persistenceFailed = true
@@ -951,6 +1002,11 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       // The completion receipt below determines whether this was a bounded-output
       // stop or an unrecoverable transport failure.
     }
+    // What was still being written, or waiting to be, lands before the run's
+    // end is read -- including what a failing adapter left behind it.
+    if (writer !== undefined) await writer
+    flush()
+    if (writer !== undefined) await writer
 
     if (persistenceFailed) {
       try {
