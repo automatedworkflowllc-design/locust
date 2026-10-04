@@ -1,0 +1,64 @@
+# Locust's public CI: typecheck and test on every push and pull request, and
+# unsigned Windows and macOS builds when started by hand. The Windows build's
+# artifact is what SignPath Foundation signs once the project is accepted.
+# No secrets are used.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm typecheck
+      - run: pnpm test
+
+  package:
+    if: github.event_name == 'workflow_dispatch'
+    needs: test
+    strategy:
+      matrix:
+        os: [windows-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Stage npm and the memory-recall model
+        run: |
+          node _tools/vendor-npm.mjs
+          node _tools/vendor-recall.mjs
+      - run: pnpm build
+      - name: Package
+        working-directory: apps/desktop
+        run: pnpm exec electron-builder --config electron-builder.yml --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: locust-${{ matrix.os }}
+          path: |
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.dmg
+          if-no-files-found: error
+          retention-days: 7
