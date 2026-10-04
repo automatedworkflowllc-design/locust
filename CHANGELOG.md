@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.603.0 - 2026-10-05
+
+### Improved
+
+- **A streaming reply no longer waits on the disk one piece at a time.** Every piece of a reply is written to the conversation's record before it is shown, and each write is a disk sync. The thread used to wait for each sync before reading the next piece, so on a busy disk (another teammate streaming, a build running) every piece paid its own wait, several hundred times a turn. Now the next pieces are read while one write is on the disk, and go in one write when it lands. On a quiet disk nothing changes; on a busy one the stream keeps pace with the runtime and the writes fall to what the disk can do. What is shown is still only what is already on disk.
+
 ## 0.602.0 - 2026-10-05
 
 ### Improved

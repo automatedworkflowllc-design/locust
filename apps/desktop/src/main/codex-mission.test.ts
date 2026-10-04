@@ -3671,3 +3671,108 @@ describe('the start says its phase, and the run writes where its seconds went', 
     expect(phasesOf(updates)).toEqual(['looking', 'briefing', 'starting-runtime'])
   })
 })
+
+/*
+ * DURABLE WRITE PIPELINING (0.603). Every append is an fsync, and the loop
+ * used to await each before reading the next record -- one fsync a token,
+ * each token waiting on its own. Records are now read and normalized while an
+ * append is on the disk, and everything that arrived meanwhile goes in the
+ * next append. Persist-before-emit still holds per batch.
+ */
+describe('durable write pipelining', () => {
+  const record = (sequence: number, value: Record<string, unknown>): RuntimeJsonlRecord => ({ sequence, raw: JSON.stringify(value) })
+  const deferred = (): { readonly promise: Promise<void>; readonly resolve: () => void } => {
+    let resolve!: () => void
+    const promise = new Promise<void>((settle) => { resolve = settle })
+    return { promise, resolve }
+  }
+  /** A stream the test paces: it hands over what it is given, when it is given, and counts what the consumer took. */
+  const pacedStream = () => {
+    const queue: Array<{ readonly record: RuntimeJsonlRecord } | { readonly end: true }> = []
+    const waiters: Array<() => void> = []
+    const push = (entry: { readonly record: RuntimeJsonlRecord } | { readonly end: true }): void => { queue.push(entry); waiters.shift()?.() }
+    const taken: number[] = []
+    const stream: RuntimeProcessRecordStream = {
+      async *[Symbol.asyncIterator]() {
+        for (;;) {
+          if (queue.length === 0) await new Promise<void>((resolve) => waiters.push(resolve))
+          const next = queue.shift()!
+          if ('end' in next) return
+          taken.push(next.record.sequence)
+          yield next.record
+        }
+      },
+      drainAvailable: () => []
+    }
+    return { stream, taken, give: (entry: RuntimeJsonlRecord) => push({ record: entry }), end: () => push({ end: true }) }
+  }
+
+  it('reads and normalizes while an append is on the disk, and writes what arrived in one append when it lands', async () => {
+    const appends: NormalizedRuntimeEvent[][] = []
+    const emittedAtAppend: string[][] = []
+    const emitted: string[] = []
+    const firstAppend = deferred()
+    const appendEvents = vi.fn<MissionLedger['appendEvents']>(async (_missionId, events) => {
+      appends.push([...events])
+      emittedAtAppend.push([...emitted])
+      if (appends.length === 1) await firstAppend.promise
+    })
+    const paced = pacedStream()
+    const start = vi.fn((): RuntimeProcessRun => ({ records: paced.stream, completion: Promise.resolve(completion()) })) satisfies RuntimeProcessRunner['start']
+    const { service, scheduled } = scheduledService({ start }, fakeLedger({ appendEvents }))
+    await service.start('Do work.', 'codex', 'ask', {}, (update) => { if (update.kind === 'event') emitted.push(update.event.type) })
+    scheduled[0]?.()
+
+    paced.give(record(1, { type: 'thread.started', thread_id: 'thread-live' }))
+    await vi.waitFor(() => expect(appends).toHaveLength(1))
+    expect(appends[0]!.map(({ type }) => type)).toEqual(['run.started'])
+    // Three more records while the first append is still on the disk.
+    paced.give(record(2, { type: 'turn.started' }))
+    paced.give(record(3, { type: 'item.completed', item: { id: 'a', type: 'agent_message', text: 'one' } }))
+    paced.give(record(4, { type: 'turn.completed' }))
+    await vi.waitFor(() => expect(paced.taken).toEqual([1, 2, 3, 4]))
+    // Read and normalized, not yet written or shown: the disk still holds the first append.
+    expect(appends).toHaveLength(1)
+    expect(emitted).toEqual([])
+    firstAppend.resolve()
+    await vi.waitFor(() => expect(appends).toHaveLength(2))
+    // One append for everything that arrived meanwhile, in order.
+    expect(appends[1]!.map(({ type }) => type)).toEqual(['step.started', 'message.delta', 'step.completed'])
+    // Persist-before-emit, per batch: when the second append began, only the first batch had been shown.
+    expect(emittedAtAppend[1]).toEqual(['run.started'])
+    paced.end()
+    await vi.waitFor(() => expect(appends.length).toBeGreaterThanOrEqual(3))
+    expect(appends[2]!.map(({ type }) => type)).toEqual(['run.completed'])
+    // The host's start-timing note (0.602) follows the run's own events; the order of those is what this checks.
+    await vi.waitFor(() => expect(emitted.filter((type) => type !== 'adapter.diagnostic')).toEqual(['run.started', 'step.started', 'message.delta', 'step.completed', 'run.completed']))
+  })
+
+  it('stops reading at the bound and lets a flood back up into the runner, as it always did', async () => {
+    const appends: NormalizedRuntimeEvent[][] = []
+    const firstAppend = deferred()
+    const appendEvents = vi.fn<MissionLedger['appendEvents']>(async (_missionId, events) => {
+      appends.push([...events])
+      if (appends.length === 1) await firstAppend.promise
+    })
+    const paced = pacedStream()
+    const start = vi.fn((): RuntimeProcessRun => ({ records: paced.stream, completion: Promise.resolve(completion()) })) satisfies RuntimeProcessRunner['start']
+    const { service, scheduled } = scheduledService({ start }, fakeLedger({ appendEvents }), { maxWaitingEvents: 2 })
+    await service.start('Do work.', 'codex', 'ask', {}, () => undefined)
+    scheduled[0]?.()
+    paced.give(record(1, { type: 'thread.started', thread_id: 'thread-live' }))
+    await vi.waitFor(() => expect(appends).toHaveLength(1))
+    // Two events waiting is the bound: the third record is not taken while the disk holds the first append.
+    paced.give(record(2, { type: 'turn.started' }))
+    paced.give(record(3, { type: 'item.completed', item: { id: 'a', type: 'agent_message', text: 'one' } }))
+    paced.give(record(4, { type: 'turn.completed' }))
+    await vi.waitFor(() => expect(paced.taken).toEqual([1, 2, 3]))
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(paced.taken).toEqual([1, 2, 3])
+    firstAppend.resolve()
+    await vi.waitFor(() => expect(paced.taken).toEqual([1, 2, 3, 4]))
+    await vi.waitFor(() => expect(appends.length).toBeGreaterThanOrEqual(2))
+    expect(appends[1]!.map(({ type }) => type)).toEqual(['step.started', 'message.delta'])
+    paced.end()
+    await vi.waitFor(() => expect(appends.flat().map(({ type }) => type)).toEqual(expect.arrayContaining(['step.completed', 'run.completed'])))
+  })
+})
