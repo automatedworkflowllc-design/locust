@@ -207,15 +207,18 @@ describe('the change behind a changed path', () => {
   it('carries the patch on the completed event, and says when the runtime had named the path', () => {
     const events = observedEditEvents({
       runId: 'run_1', missionId: 'mission_1', sourceAdapter: 'codex', nextSequence: 10,
-      paths: ['NOTES.md', 'other.txt'], at: '2026-09-05T00:00:00.000Z',
+      paths: ['NOTES.md', 'other.txt', 'big.bin'], at: '2026-09-05T00:00:00.000Z',
       patches: new Map([['NOTES.md', { text: '--- /dev/null\n+++ b/NOTES.md\n@@ -0,0 +1 @@\n+hi\n', added: 1, removed: 0, truncated: false }]]),
-      reported: new Set(['NOTES.md'])
+      reported: new Set(['NOTES.md', 'big.bin'])
     })
     const completed = events.filter((event) => event.type === 'tool.completed').map((event) => event.payload as { command: string; status: string; patch?: { added: number } })
     expect(completed[0]).toMatchObject({ command: 'NOTES.md', status: 'reported by the runtime, read from disk' })
     expect(completed[0]?.patch?.added).toBe(1)
     expect(completed[1]).toMatchObject({ command: 'other.txt', status: 'observed on disk' })
     expect(completed[1]?.patch).toBeUndefined()
+    // Named by the runtime, seen changed, not readable (0.597): said as changed, with no patch.
+    expect(completed[2]).toMatchObject({ command: 'big.bin', status: 'reported by the runtime, changed on disk' })
+    expect(completed[2]?.patch).toBeUndefined()
   })
 })
 

@@ -3553,3 +3553,52 @@ describe('a model of your own (0.357)', () => {
     expect(JSON.parse(spec.env?.OPENCODE_CONFIG_CONTENT ?? '{}').provider).toBeUndefined()
   })
 })
+
+describe('a file the runtime named but the host could not read (0.597)', () => {
+  it("is still said to have changed on disk, on the runtime's own row, with no patch", async () => {
+    const appended: { type: string; payload: Record<string, unknown> }[] = []
+    const scheduled: Array<() => void> = []
+    let looks = 0
+    let ids = 0
+    const service = createCodexMissionService({
+      workspacePath: WORKSPACE,
+      discover: async () => [codexRuntime()],
+      runner: {
+        start: () => ({
+          records: records([
+            { type: 'thread.started', thread_id: 'thread-live' },
+            { type: 'turn.started' },
+            { type: 'item.completed', item: { id: 'fc', type: 'file_change', status: 'completed', changes: [{ path: `${WORKSPACE}/src/app.ts`, kind: 'update' }] } },
+            { type: 'item.completed', item: { id: 'answer', type: 'agent_message', text: 'Done.' } },
+            { type: 'turn.completed', usage: { output_tokens: 2 } }
+          ]),
+          completion: Promise.resolve(completion())
+        })
+      },
+      ledger: fakeLedger({
+        appendEvents: async (_missionId, events) => {
+          appended.push(...(events as unknown as { type: string; payload: Record<string, unknown> }[]))
+        }
+      }),
+      observeDisk: async () => {
+        looks += 1
+        return looks > 1 ? new Map([['src/app.ts', ' M']]) : new Map<string, string>()
+      },
+      // Nothing readable behind it: a dot-folder, a binary, a file past the size cap.
+      observePatches: async () => new Map(),
+      createId: () => String(++ids),
+      now: () => new Date(NOW),
+      schedule: (task) => scheduled.push(task)
+    })
+    const response = await service.start('Fix app.ts.', 'codex', 'accept-edits', {}, () => undefined)
+    expect(response.ok).toBe(true)
+    while (scheduled.length > 0) scheduled.shift()!()
+    for (let i = 0; i < 20; i += 1) await new Promise((resolve) => setImmediate(resolve))
+    const observed = appended.filter((event) => event.payload.toolKind === 'observed_edit')
+    expect(observed.map((event) => [event.type, event.payload.command, event.payload.status])).toEqual([
+      ['tool.started', 'src/app.ts', 'reported by the runtime, changed on disk'],
+      ['tool.completed', 'src/app.ts', 'reported by the runtime, changed on disk']
+    ])
+    expect(observed[1]!.payload.patch).toBeUndefined()
+  })
+})

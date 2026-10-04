@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.597.0 - 2026-10-04
+
+### Fixed
+
+- **A file a teammate changed in a folder Locust does not read says so.** Locust never reads the text of a file inside a dot-folder, or a binary, or a very large file, so it cannot draw the change; until now the row for such a file said only that the runtime "did not report the change", which was true and told you nothing. When the folder itself is a dot-folder (a team working in `~/.claude`, say), that was every file. Now Locust still sees that the file changed, and the row says "changed · seen on disk" beside the teammate's own word for what it did (Write, Edit), with no diff underneath. Files Locust can read are unchanged: they carry their diff as before.
+
 ## 0.596.0 - 2026-10-04
 
 ### Fixed

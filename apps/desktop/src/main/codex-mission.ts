@@ -1040,7 +1040,10 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           const patches = changed.length === 0
             ? new Map<string, ToolPatch>()
             : await (options.observePatches ?? observedPatches)(mission.cwd, diskAfter, changed, {}, mission.diskBefore)
-          const worth = changed.filter((path) => unreported.has(path) || patches.has(path))
+          // Every changed path is worth its event (0.597): an unnamed one gets a row, a named one its
+          // patch -- or, when its text could not be read, the word that it changed on disk, which the
+          // thread lays on the runtime's row in place of "did not report the change".
+          const worth = changed
           if (worth.length > 0) {
             await persistAndEmit(
               mission,

@@ -728,6 +728,8 @@ export function ActivityCard({
                   <div className="lc-filerow is-static">
                     <Icon name="file" size={14} />
                     <span className="lc-filerow__path" title={entry.name}>{displayPath(entry.name, workspacePath)}</span>
+                    {/* The runtime's own word (Write, Edit); not Codex's "changed", which the status says already. */}
+                    {entry.tool !== undefined && fileToolWord(entry.tool) !== 'changed' && <span className="lc-filerow__status">{fileToolWord(entry.tool)}</span>}
                     <span className="lc-filerow__result is-muted">changed · seen on disk</span>
                   </div>
                   {onOpenFile !== undefined && (

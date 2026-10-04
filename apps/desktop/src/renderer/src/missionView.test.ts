@@ -3303,3 +3303,23 @@ describe('the text a file row shows for a path (0.596)', () => {
     expect(displayPath('C:\\Users\\dev\\.cursor\\projects\\x\\agent-tools\\3a5a3562.txt', workspace)).toBe("Cursor's saved tool result")
   })
 })
+
+describe('a named file the host saw change but could not read (0.597)', () => {
+  it('reads as changed on the runtime\'s own row, with its word, not as "did not report"', () => {
+    // Colin's ledger, 10/04: his workspace is ~/.claude, whose files the 0.489 secrets rule never
+    // reads, so every report a teammate wrote there said "did not report the change" -- while the
+    // host had seen the file change by name.
+    const thread = buildThread([
+      event('tool.started', { itemId: 'w', toolKind: 'write_to_file', name: 'write_to_file', command: 'report.md', phase: 'started' }),
+      event('tool.completed', { itemId: 'w', toolKind: 'write_to_file', name: 'write_to_file', command: 'report.md', phase: 'completed' }),
+      event('run.completed', { process: {} }),
+      event('tool.started', { itemId: 'obs', toolKind: 'observed_edit', name: 'edit', command: 'report.md', status: 'reported by the runtime, changed on disk', phase: 'started' }),
+      event('tool.completed', { itemId: 'obs', toolKind: 'observed_edit', name: 'edit', command: 'report.md', status: 'reported by the runtime, changed on disk', phase: 'completed' })
+    ], { running: false })
+    const activity = thread.find((item) => item.type === 'activity')
+    const entries = activity?.type === 'activity' ? activityEntries(activity.details) : []
+    const rows = entries.filter((entry) => (entry.kind === 'unreported' || entry.kind === 'tool') && /report\.md/.test(entry.name))
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ kind: 'unreported', observed: true, tool: 'write_to_file' })
+  })
+})

@@ -557,7 +557,14 @@ export function observedEditEvents(input: {
       toolKind: 'observed_edit',
       name: 'edit',
       command: path,
-      status: input.reported?.has(path) === true ? 'reported by the runtime, read from disk' : 'observed on disk',
+      // Three words (0.597): the host's own row; a named path with its text read; a named path the
+      // host saw change but could not read (a dot-folder, a binary, a file past the cap) -- said as
+      // changed, which the thread lays on the runtime's row in place of "did not report the change".
+      status: input.reported?.has(path) !== true
+        ? 'observed on disk'
+        : input.patches?.has(path) === true
+          ? 'reported by the runtime, read from disk'
+          : 'reported by the runtime, changed on disk',
       evidence: { redacted: true as const }
     }
     const patch = input.patches?.get(path)
