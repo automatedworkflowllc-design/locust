@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { test } from 'vitest'
 import { accountRemains, isExcluded, scrubText } from './public-export.mjs'
 
 const account = ['h', 'i', 's', 'b', 'o'].join('')
