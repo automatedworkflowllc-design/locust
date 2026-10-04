@@ -7668,7 +7668,8 @@ textarea {
   padding-top: 0;
 }
 .lc-sidebar__nav.lc-sidebar__places--pinned {
-  flex-direction: column;
+  /* Its own row, one column wide (0.586: the places became a grid). */
+  grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
 }
 .lc-sidebar__places--pinned button {
@@ -7686,7 +7687,10 @@ textarea {
 }
 
 .lc-shell.is-compact .lc-sidebar__places {
-  flex-direction: column;
+  /* One column in the rail (0.586): the places are a grid now, and the old
+     `flex-direction: column` had stopped stacking them. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
   align-items: center;
   padding: var(--lc-space-2) var(--lc-space-2);
 }

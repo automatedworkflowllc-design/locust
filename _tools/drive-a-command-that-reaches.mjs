@@ -24,6 +24,8 @@ await mkdir(OUT, { recursive: true })
 
 const REACHES = 'taskkill //F //IM python.exe'
 const ORDINARY = 'python -m pytest -q'
+// 0.586: Windows' older kill, one more spelling the row names.
+const OLDER = 'tskill python'
 
 const root = new URL('..', import.meta.url).pathname.slice(1)
 const adapters = await import(pathToFileURL(join(root, 'packages', 'runtime-adapters', 'dist', 'index.js')).href)
@@ -52,6 +54,7 @@ const records = [
   { type: 'turn.started' },
   ...command('c1', REACHES, 'SUCCESS: The process "python.exe" with PID 4120 has been terminated.\n'),
   ...command('c2', ORDINARY, '4 passed in 0.31s\n'),
+  ...command('c3', OLDER, ''),
   { type: 'item.completed', item: { id: 'answer', type: 'agent_message', text: 'Stopped the stuck Python and the tests pass now.' } },
   { type: 'turn.completed', usage: { input_tokens: 3000, cached_input_tokens: 0, output_tokens: 200 } }
 ]
@@ -100,6 +103,8 @@ try {
   check('the taskkill row says what it reached', reaching?.badge === 'stops every python.exe', reaching?.badge ?? 'no badge')
   check('its sentence is on hover', reaching?.title === 'Stops every python.exe on this computer, not only the ones this run started.', reaching?.title ?? 'no title')
   check('the pytest row says nothing more', ordinary !== undefined && ordinary.badge === null, ordinary?.badge ?? 'none')
+  const older = rows.find((row) => row.text.includes('tskill'))
+  check('0.586: the tskill row says what it reached', older?.badge === 'stops every python', older?.badge ?? 'no badge')
   check('the badge is drawn in amber, not the row colour', reaching?.colour !== null && reaching?.colour !== undefined && !/rgb\((2[0-4]\d|25[0-5]), (2[0-4]\d|25[0-5]), (2[0-4]\d|25[0-5])\)/.test(reaching.colour), reaching?.colour ?? 'none')
   check('the row does not overflow', reaching !== undefined && reaching.width <= 1, `${String(reaching?.width)} px`)
   for (const [w, h] of [[1440, 900], [900, 700]]) {
@@ -111,7 +116,7 @@ try {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
-  await drive.finish({ intro: `Build: ${packaged ?? 'out/'}. One seeded Codex turn: ${REACHES} and ${ORDINARY}. Nothing sent, nothing run.` })
+  await drive.finish({ intro: `Build: ${packaged ?? 'out/'}. One seeded Codex turn: ${REACHES}, ${ORDINARY} and ${OLDER}. Nothing sent, nothing run.` })
   say(failures === 0 ? 'PASSED' : `FAILED (${String(failures)})`)
   process.exitCode = failures === 0 ? 0 : 1
 }

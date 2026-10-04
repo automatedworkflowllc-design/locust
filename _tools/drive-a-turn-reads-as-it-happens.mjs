@@ -26,7 +26,9 @@ const ROUTES = {
   opencode: { runtime: 'opencode', model: 'opencode/nemotron-3-ultra-free', mode: 'auto' },
   // Auto: Antigravity's Edit cannot run commands (0.583). Colin, 2026-10-04, of a
   // Flash turn drawn as one bar: "make sure our outputs are proper across all channels".
-  antigravity: { runtime: 'antigravity', model: 'account-default', mode: 'auto' }
+  antigravity: { runtime: 'antigravity', model: 'account-default', mode: 'auto' },
+  // The cross-model pass (0.586): Copilot CLI on the person's own account.
+  copilot: { runtime: 'copilot', model: 'account-default', mode: 'auto' }
 }
 const runtime = arg('--runtime') ?? 'claude'
 const route = ROUTES[runtime]

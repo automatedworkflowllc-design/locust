@@ -139,12 +139,29 @@ try {
   await sleep(800)
   const working = JSON.parse(String(await drive.capture('the board: working', () => drive.evaluate(BOARD))))
   // The Board has no Stop button: the run is still going while the Board itself lists it under Working.
-  const listedWorking = (board) => column(board, 'Working')?.cards.some((c) => /Create a file/.test(c.title)) === true
-  if (!listedWorking(working)) say('  (the run had already ended before the Board was reopened: Working could not be seen)')
-  else check('WORKING lists it once approved', true, JSON.stringify(working.sections?.map((s) => [s.title, s.cards.map((c) => c.state)])))
+  const listedUnder = (board, title) => column(board, title)?.cards.some((c) => /Create a file/.test(c.title)) === true
+  // Still going = under Needs you (the card just answered, clearing) or Working.
+  const stillGoing = (board) => listedUnder(board, 'Needs you') || listedUnder(board, 'Working')
+  if (!stillGoing(working)) say('  (the run had already ended before the Board was reopened: Working could not be seen)')
+  else check('WORKING (or the clearing card) lists it once approved', true, JSON.stringify(working.sections?.map((s) => [s.title, s.cards.map((c) => c.state)])))
 
   // 4. It ends while the Board is on screen: Ready to look at; opening it clears that.
-  for (let i = 0; i < 360 && listedWorking(JSON.parse(String(await drive.evaluate(BOARD)))); i += 1) await sleep(500)
+  // A free model sometimes asks a second card (a listing before the write): answer it from the
+  // Board the way a person would -- open the card, Approve once, come back -- and keep waiting.
+  for (let i = 0; i < 360; i += 1) {
+    const now = JSON.parse(String(await drive.evaluate(BOARD)))
+    if (!stillGoing(now)) break
+    if (listedUnder(now, 'Needs you')) {
+      await drive.evaluate(`document.querySelector('.lc-board .lc-boardsection[data-column="needs-you"] .lc-convcard')?.click()`)
+      await sleep(900)
+      await drive.evaluate(`[...document.querySelectorAll('.lc-approval__actions button')].find((b) => /^Approve once$|^Allow once$/.test(b.innerText.trim()))?.click()`)
+      await sleep(700)
+      await drive.evaluate(OPEN_BOARD)
+      await sleep(600)
+      continue
+    }
+    await sleep(500)
+  }
   await sleep(1500)
   const ready = JSON.parse(String(await drive.capture('the board: ready to look at', () => drive.evaluate(BOARD))))
   check('READY TO LOOK AT lists the finish the person was not looking at', column(ready, 'Ready to look at')?.cards.some((c) => /Create a file/.test(c.title)) === true, JSON.stringify(ready.sections?.map((s) => [s.title, s.cards.map((c) => c.title.slice(0, 20))])))

@@ -41,6 +41,14 @@ const REACHES: readonly (readonly [string, string, string])[] = [
   ['fuser -k 8080/tcp', 'every-process-on-port', '8080'],
   ['npx kill-port 3000', 'every-process-on-port', '3000'],
   ['Stop-Process -Id (Get-NetTCPConnection -LocalPort 3000).OwningProcess -Force', 'every-process-on-port', '3000'],
+  // 0.586: Windows' older kill, and PowerShell's CIM and WMI terminate.
+  ['tskill python', 'every-process-named', 'python'],
+  ['tskill /A notepad', 'every-process-named', 'notepad'],
+  ["Get-CimInstance Win32_Process -Filter \"name='python.exe'\" | Invoke-CimMethod -MethodName Terminate", 'every-process-named', 'python.exe'],
+  ["Get-WmiObject Win32_Process -Filter \"name='node.exe'\" | % { $_.Terminate() }", 'every-process-named', 'node.exe'],
+  ["gwmi win32_process -filter \"Name = 'code.exe'\" | ForEach-Object { $_.Terminate() }", 'every-process-named', 'code.exe'],
+  ['shutdown /l', 'every-process-of-user', 'you'],
+  ['shutdown -h now', 'whole-machine', 'shut down'],
   ['shutdown /r /t 0', 'whole-machine', 'restart'],
   ['shutdown /s /t 60', 'whole-machine', 'shut down'],
   ['Restart-Computer -Force', 'whole-machine', 'restart'],
@@ -62,6 +70,11 @@ const REACHES: readonly (readonly [string, string, string])[] = [
 const DOES_NOT: readonly string[] = [
   'taskkill /PID 1234',
   'taskkill /F /PID 1234 /T',
+  // 0.586: one program by its number, and hibernate closes nothing.
+  'tskill 1234',
+  "Get-WmiObject Win32_Process -Filter \"processid=1234\" | % { $_.Terminate() }",
+  'Get-CimInstance Win32_Process -Filter "name=\'python.exe\'" | Select-Object Name',
+  'shutdown /h',
   'kill 1234',
   'kill -9 1234',
   'kill %1',

@@ -3663,6 +3663,35 @@ export function buildThread(
     })
   }
 
+  /*
+   * A TURN WITH NO WORK STILL SAYS WHAT THE RUNTIME SAID (0.586). A notice
+   * that arrives before any work began goes under the fold (`foldNotices`,
+   * above), and a turn with no activity has no fold -- so Copilot's "Third-
+   * party MCP servers are disabled by your organization's Copilot policy"
+   * was never drawn: the golden text read "(nothing in the thread)" for it.
+   * Found in the cross-runtime output pass Colin asked for (2026-10-04).
+   */
+  if (!options.running && activity.length === 0) {
+    // Once the turn has ended: while it runs the live line stands for it, and a
+    // line that came and went with the reply would read as a flicker.
+    foldNotices.forEach((notice, index) => {
+      if (items.some((held) => held.type === 'diagnostic' && noticeKey(held.message) === noticeKey(notice.message))) return
+      items.push({ key: `notice_${String(index)}`, type: 'diagnostic', level: notice.level, message: notice.message })
+    })
+  }
+  /*
+   * A RUN THAT FAILED BEFORE IT SAID ANYTHING NAMES WHY (0.586). `run.failed`
+   * carries the reason -- Antigravity's "could not run it: model no-such-model
+   * is not recognized" -- and it reached the rail and the foot only; with no
+   * activity the thread was blank beside a sidebar saying "failed". Said once:
+   * a diagnostic or a limit card that already carries the sentence is enough.
+   */
+  const failure = options.running ? undefined : events.find((event) => event.type === 'run.failed')
+  const why = failure === undefined ? undefined : failure.payload.message
+  if (failure !== undefined && typeof why === 'string' && why.trim().length > 0 && !items.some((held) => (held.type === 'diagnostic' || held.type === 'limit') && sameSentence(held.message, why))) {
+    items.push({ key: `failed_${failure.id}`, type: 'diagnostic', level: 'error', message: why })
+  }
+
   if (options.running) {
     // The group still growing at the end of the turn is live (0.584): open, its
     // rows arriving. Text after it means the model is talking, and no group is.

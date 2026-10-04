@@ -11,6 +11,27 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.586.0 - 2026-10-04
+
+### Fixed
+
+- **A turn that did nothing still tells you what happened.** A run that
+  failed before it said anything, such as a model name the agent did not
+  recognise, or an Antigravity conversation its CLI no longer had, left the
+  conversation blank beside a sidebar saying "failed"; and a warning the
+  agent gave before any work, such as Copilot's "third-party MCP servers are
+  disabled by your organization's policy", was never drawn when no work
+  followed. Both are now one line in the conversation, said once.
+
+### Improved
+
+- **A command that stops programs by name is named in more of its
+  spellings:** `tskill`, and PowerShell's CIM and WMI terminate
+  (`Get-CimInstance Win32_Process … | Invoke-CimMethod -MethodName Terminate`,
+  `Get-WmiObject … | % { $_.Terminate() }`). `shutdown /l` now says it signs
+  you out of Windows, closing every program you are running; `shutdown /h`
+  (hibernate) closes nothing and is not named.
+
 ## 0.585.0 - 2026-10-04
 
 ### New

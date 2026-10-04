@@ -1404,11 +1404,16 @@ describe('runtime notices in the thread', () => {
     payload: { stepKind: 'turn', evidence: { redacted: true } }
   } as unknown as NormalizedRuntimeEvent
 
-  it('keeps a notice raised before any work out of the thread, as setup talk', () => {
-    expect(buildThread([notice('d1', 1), step], { running: false }).some((item) => item.type === 'diagnostic')).toBe(false)
+  it('says a notice raised before any work once the turn ends with no fold to put it under (0.586)', () => {
+    // It was kept out as setup talk, which left the turn blank when nothing
+    // followed it (the cross-runtime output pass, 2026-10-04). Under a fold it
+    // still goes under the fold; with none, it is the turn's one line.
+    expect(buildThread([notice('d1', 1), step], { running: false }).some((item) => item.type === 'diagnostic')).toBe(true)
     // Codex's real shape: the turn opens, THEN the setup notice arrives, and
     // only after that does anything run. The turn opening is not work.
-    expect(buildThread([step, notice('d1', 3)], { running: false }).some((item) => item.type === 'diagnostic')).toBe(false)
+    expect(buildThread([step, notice('d1', 3)], { running: false }).some((item) => item.type === 'diagnostic')).toBe(true)
+    // While the turn runs, the live line stands for it and the notice waits.
+    expect(buildThread([step, notice('d1', 3)], { running: true, startedAt: at }).some((item) => item.type === 'diagnostic')).toBe(false)
   })
 
   it('shows a run in trouble even before any tool has run', () => {
@@ -3192,5 +3197,43 @@ describe('the group still growing at the end of a running turn (0.584)', () => {
     expect(talking.find((i) => i.type === 'steps')).not.toMatchObject({ live: true })
     const over = buildThread([toolStart('t1', 'Read', 'a.txt'), toolDone('t1')], { running: false, startedAt: at })
     expect(over.find((i) => i.type === 'steps')).not.toMatchObject({ live: true })
+  })
+})
+
+describe('a turn with no work still says what the runtime said (0.586)', () => {
+  // The cross-runtime output pass, 2026-10-04: three recorded runs drew
+  // "(nothing in the thread)" -- a Copilot policy warning that came before any
+  // work, and two Antigravity failures whose reason reached only the rail.
+  const policy = "Third-party MCP servers are disabled by your organization's Copilot policy."
+  it('draws a notice that came before any work when there is no fold to put it under', () => {
+    const items = buildThread([
+      event('adapter.diagnostic', { level: 'warning', code: 'copilot.session_warning', message: policy, terminal: false }),
+      event('run.completed', { process: {} })
+    ], { running: false })
+    expect(items.find((i) => i.type === 'diagnostic')).toMatchObject({ level: 'warning', message: policy })
+  })
+  it('keeps it under the fold when there was work (control)', () => {
+    const items = buildThread([
+      event('adapter.diagnostic', { level: 'warning', code: 'copilot.session_warning', message: policy, terminal: false }),
+      toolStart('t1', 'Read', 'a.txt'),
+      toolDone('t1'),
+      event('run.completed', { process: {} })
+    ], { running: false })
+    expect(items.some((i) => i.type === 'diagnostic' && i.message === policy)).toBe(false)
+    const foot = items.find((i) => i.type === 'activity')
+    expect(foot?.type === 'activity' && (foot.notices ?? []).some((n) => n.message === policy)).toBe(true)
+  })
+  it('names why a run failed before it said anything', () => {
+    const why = 'Antigravity could not run it: model no-such-model is not recognized'
+    const items = buildThread([event('run.failed', { kind: 'process-failed', message: why, runtimeTerminal: 'failed', process: {} })], { running: false })
+    expect(items.find((i) => i.type === 'diagnostic')).toMatchObject({ level: 'error', message: why })
+  })
+  it('does not say a failure twice when a diagnostic already carries it (control)', () => {
+    const said = 'The provider turned the request away.'
+    const items = buildThread([
+      event('adapter.diagnostic', { level: 'error', code: 'codex.runtime_error', message: said, terminal: true }),
+      event('run.failed', { kind: 'process-failed', message: said, runtimeTerminal: 'failed', process: {} })
+    ], { running: false })
+    expect(items.filter((i) => i.type === 'diagnostic' && i.message === said)).toHaveLength(1)
   })
 })

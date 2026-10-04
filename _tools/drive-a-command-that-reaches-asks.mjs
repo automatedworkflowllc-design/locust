@@ -20,6 +20,10 @@ const tag = arg('--tag') ?? 'local'
 const OUT = join(recordRoot('a-command-that-reaches-2026-10-04'), `asks-${tag}`)
 await mkdir(OUT, { recursive: true })
 const PROGRAM = 'locust-no-such-program.exe'
+// `--form cim` (0.586) asks for the CIM spelling instead; the card's Reaches line must read the same.
+const COMMAND = arg('--form') === 'cim'
+  ? `Get-CimInstance Win32_Process -Filter "name='${PROGRAM}'" | Invoke-CimMethod -MethodName Terminate`
+  : `taskkill /IM ${PROGRAM}`
 const workspace = await scratchRepository('locust-reach-asks-ws-')
 const drive = await startDrive({
   name: `a-command-that-reaches-asks-${tag}`, port: 9794, workspace, outPath: OUT, ...(packaged === undefined ? {} : { packaged }),
@@ -61,7 +65,7 @@ try {
   const sent = String(await drive.evaluate(`(async () => {
     const field = document.querySelector('form.command-dock textarea')
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
-    setter.call(field, ${JSON.stringify(`Run exactly this one shell command and nothing else: taskkill /IM ${PROGRAM}  Then reply with the word DONE.`)})
+    setter.call(field, ${JSON.stringify(`Run exactly this one shell command and nothing else: ${COMMAND}  Then reply with the word DONE.`)})
     field.dispatchEvent(new Event('input', { bubbles: true }))
     for (let i = 0; i < 120; i += 1) {
       await new Promise((r) => setTimeout(r, 250))
@@ -78,9 +82,9 @@ try {
     const card = JSON.parse(String(await drive.evaluate(CARD)))
     if (card.shown) {
       seen.push(card.rows.Exact ?? '')
-      if (first === undefined && /taskkill/i.test(card.rows.Exact ?? '')) {
+      if (first === undefined && /taskkill|cimmethod|win32_process/i.test(card.rows.Exact ?? '')) {
         first = card
-        await drive.capture('the card for taskkill', async () => JSON.stringify(card))
+        await drive.capture('the card for the command', async () => JSON.stringify(card))
       }
       await drive.evaluate(DENY)
       continue
@@ -88,7 +92,7 @@ try {
     if (i > 10 && !(await running())) break
   }
   say(`  cards seen: ${JSON.stringify(seen)}`)
-  check('a card asked about the taskkill command', first !== undefined, JSON.stringify(seen).slice(0, 200))
+  check('a card asked about the command', first !== undefined, JSON.stringify(seen).slice(0, 200))
   check('the card says what it reaches', first?.rows.Reaches === `Stops every ${PROGRAM} on this computer, not only the ones this run started.`, first?.rows.Reaches ?? 'no Reaches row')
   check('drawn apart from the rows around it (amber)', first?.colour !== null && first?.colour !== undefined && first.colour !== first.plain, `${String(first?.colour)} vs ${String(first?.plain)}`)
   check('0.579: neither Always nor a saved rule is offered', first !== undefined && !first.buttons.some((b) => /Always|ask again/i.test(b)), JSON.stringify(first?.buttons))
@@ -102,7 +106,7 @@ try {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
-  await drive.finish({ intro: `Build: ${packaged ?? 'out/'}. Wren on a free model in Approve each, asked to run taskkill /IM ${PROGRAM}; every card denied.`, extra: `Checks failed: ${String(failures)}` })
+  await drive.finish({ intro: `Build: ${packaged ?? 'out/'}. Wren on a free model in Approve each, asked to run ${COMMAND}; every card denied.`, extra: `Checks failed: ${String(failures)}` })
   say(failures === 0 ? 'PASSED' : `FAILED (${String(failures)})`)
   process.exitCode = failures === 0 ? 0 : 1
 }

@@ -76,7 +76,7 @@ try {
       await new Promise((r) => setTimeout(r, 1400))
       ${openSteps ? "for (const line of document.querySelectorAll('.lc-thread .lc-steps__line[aria-expanded=\"false\"]')) line.click(); await new Promise((r) => setTimeout(r, 500));" : ''}
       // The workroom header names the runtime ("Wren · Code & Migrations · OpenCode"); read it off the text.
-      const header = document.querySelector('.lc-workroom__head')?.innerText.replace(/\\s+/g, ' ').slice(0, 160) ?? ''
+      const header = document.querySelector('.lc-workroom__header')?.innerText.replace(/\\s+/g, ' ').slice(0, 240) ?? ''
       const text = document.querySelector('.lc-thread')?.innerText ?? ''
       return JSON.stringify({ header, runtime: '', text, length: text.length })
     })()`)))
