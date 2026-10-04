@@ -828,14 +828,25 @@ export function LiveRegisterLine({
   readonly thinking: boolean
 }): ReactElement {
   const elapsed = useElapsed(startedAt)
-  const word = REGISTER_WORD[register]
+  /*
+   * THE START SAYS ITS PHASE (0.602). While a run starts, the host knows what
+   * it is doing -- looking for the runtime, briefing it, reading the folder,
+   * starting the program -- and the line said only "Starting…" for the
+   * whole wait, four to ten seconds on a median start (the Fable review,
+   * 2026-10-05). The phase is the register said more exactly, so it takes
+   * the word's place, in the word's swept type, rather than trailing it as
+   * an aside: "Reading the folder…", "Starting OpenCode…". A label that is
+   * just "Starting" draws as it always did.
+   */
+  const phase = register === 'starting' && label !== undefined && label.trim().length > 0 ? label.trim() : undefined
+  const word = phase ?? REGISTER_WORD[register]
   /*
    * The runtime's own words, when they ARE words and not the register said
    * twice. `label` is "Thinking" or "Working" whenever the runtime named no
    * step, and printing that beside "thinking" is the app stuttering.
    */
   const said =
-    label === undefined || label.trim().toLowerCase() === word || /^(thinking|working|starting)$/i.test(label.trim())
+    phase !== undefined || label === undefined || label.trim().toLowerCase() === word || /^(thinking|working|starting)$/i.test(label.trim())
       ? undefined
       : label.trim()
   /*

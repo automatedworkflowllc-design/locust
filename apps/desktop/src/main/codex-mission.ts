@@ -50,6 +50,7 @@ import type {
   MissionHandoffResponse,
   MissionMode
 } from '../shared/ipc.js'
+import type { StartPhase } from '../shared/ipc.js'
 import { acpAnswerFor, acpPermissionRequest, openCodePermissionRequest, openCodeReplyFor, withDeclines, withFileChanges } from './approval-channel.js'
 import type { EditCheckResult } from './edit-check.js'
 import type { ApprovalChannel } from './approval-channel.js'
@@ -58,6 +59,8 @@ import type { FileChangeRecord } from './approval-patch.js'
 import { composeColdFollowUp, composeHandoffPrompt, howTurnEnded } from './handoff.js'
 import type { EarlierTurn } from './handoff.js'
 import { changedPaths, observedEditEvents, observedPatches, sharedTreeNotice, snapshotWorkspace, unreportedPaths } from './disk-observation.js'
+import { startTimingNote } from './start-timing.js'
+import type { StartTiming } from './start-timing.js'
 import type { RecentEdits } from './recent-edits.js'
 import { cursorCannotSee, cursorIgnoreNotice } from './cursor-visibility.js'
 import type { WorkspaceSnapshot } from './disk-observation.js'
@@ -196,6 +199,8 @@ interface ActiveCodexMission {
   lastSequence: number
   /** Every event persisted, so the observation can tell reported edits from unreported ones. */
   readonly persisted: NormalizedRuntimeEvent[]
+  /** When the start's phases began and the first event arrived (0.602); the run's end writes the note. */
+  readonly startTiming: StartTiming
 }
 
 /**
@@ -919,6 +924,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             mission.controller.abort()
             break
           }
+          // The first event of the run dates the end of the start (0.602).
+          if (events.length > 0) mission.startTiming.firstEventAt ??= Date.now()
           try {
             await persistAndEmit(mission, options.ledger, events)
           } catch (error) {
@@ -1061,6 +1068,24 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             )
           }
         }
+      } catch {
+        // The receipt stands on the runtime's own events.
+      }
+    }
+
+    // Where the seconds before "started" went (0.602): one host note after the run's own events.
+    const timingNote = startTimingNote({
+      runId: mission.runId,
+      missionId: mission.missionId,
+      sourceAdapter: mission.runtime,
+      nextSequence: mission.lastSequence + 1,
+      at: now().toISOString(),
+      runtimeName: runtimeDisplayName(mission.runtime),
+      timing: mission.startTiming
+    })
+    if (timingNote !== undefined) {
+      try {
+        await persistAndEmit(mission, options.ledger, [timingNote] as ReturnType<CodexEventNormalizer['accept']>)
       } catch {
         // The receipt stands on the runtime's own events.
       }
@@ -1249,6 +1274,14 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
       rewind?: boolean,
       leaveOut?: readonly string[]
     ): Promise<CodexMissionStartResponse> {
+      // The start's phases (0.602): said to the window as they begin, and timed for the note the run's end writes.
+      const sentAt = Date.now()
+      const phaseAt: Partial<Record<StartPhase, number>> = {}
+      const say = (phase: StartPhase): void => {
+        const at = Date.now()
+        phaseAt[phase] = at
+        emit({ kind: 'start-phase', runtime, ...(peer === undefined ? {} : { teammateId: peer.self.teammateId }), phase, at: new Date(at).toISOString() })
+      }
       // `account-default` is the shell's word for "send no --model", not a
       // model id. Passing it through would make the CLI look for a model that
       // does not exist.
@@ -1404,6 +1437,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         starting.add(claimKey)
         claimed = true
         let runtimes: readonly RuntimeDiscovery[]
+        say('looking')
         try {
           runtimes = await options.discover(runtime)
         } catch {
@@ -2001,6 +2035,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // deterministic over those.
         // M16: attached files placed where this run reads, when it runs
         // anywhere but the project folder. Only what is sent changes.
+        say('briefing')
         const attached = await attachmentsForRun(prompt, runFolder, runCwd).catch(() => prompt)
         // Cold, not a command and not a side question: told what was said before (0.495).
         const sentPrompt = coldEarlier === undefined || bare || side !== undefined ? attached : composeColdFollowUp(coldEarlier, attached, rewind === true)
@@ -2234,6 +2269,7 @@ ${sentPrompt.trim()}`
           // Look at the tree BEFORE the runtime can touch it. Only when it may:
           // a read-only run has nothing to observe, and asking git for every
           // question would be paying for an answer nobody reads.
+          if (effectiveSandbox !== 'read-only') say('reading-folder')
           diskBefore = effectiveSandbox === 'read-only' ? undefined : await (options.observeDisk ?? snapshotWorkspace)(runCwd)
           // Asked again once that look returns: git can take a while, and a
           // window closed or an app quit meanwhile must not get a run spawned
@@ -2322,6 +2358,7 @@ ${sentPrompt.trim()}`
               options.note?.('connectors-allowed', `${missionId} ${connectorGrant.added.join(' ')}`)
             }
             try {
+              say('starting-runtime')
               process = options.runner.start(command, runtimePrompt, { signal: controller.signal })
             } catch (startError) {
               if (cursorGuard !== undefined) void cursorGuard.after().catch(() => undefined)
@@ -2389,6 +2426,7 @@ ${sentPrompt.trim()}`
           settled: false,
           saidWhyAReadFailed: false,
           lastSequence: 0,
+          startTiming: { sentAt, phaseAt },
           persisted: []
         }
         active.set(runId, mission)

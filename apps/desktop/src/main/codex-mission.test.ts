@@ -310,14 +310,17 @@ describe('Codex mission service', () => {
       expect(updates.some((update) => update.kind === 'event' && update.event.type === 'run.completed')).toBe(true)
     })
     const eventUpdates = updates.filter((update) => update.kind === 'event')
-    expect(eventUpdates.every(({ event }) => event.cliVersion === '0.151.0-alpha.7.2')).toBe(true)
+    // The host's own notes (the start-timing note, 0.602) carry no CLI version; the runtime's events all do.
+    expect(eventUpdates.filter(({ event }) => (event.payload as { code?: string }).code !== 'host.start-timing').every(({ event }) => event.cliVersion === '0.151.0-alpha.7.2')).toBe(true)
     expect(JSON.stringify(updates)).toContain('Safe result')
     expect(appendEvents.mock.calls.flatMap(([, events]) => events).map(({ type }) => type)).toEqual([
       'run.started',
       'step.started',
       'message.delta',
       'step.completed',
-      'run.completed'
+      'run.completed',
+      // The host's start-timing note, appended after the run's own events (0.602).
+      'adapter.diagnostic'
     ])
   })
 
@@ -664,8 +667,8 @@ describe('Codex mission service', () => {
     await service.start('Safe prompt.', 'codex', 'ask', {}, (update) => updates.push(update))
     scheduled[0]?.()
 
-    await vi.waitFor(() => expect(updates).toHaveLength(1))
-    expect(updates[0]).toMatchObject({
+    await vi.waitFor(() => expect(updates.filter((update) => update.kind !== 'start-phase')).toHaveLength(1))
+    expect(updates.filter((update) => update.kind !== 'start-phase')[0]).toMatchObject({
       kind: 'transport-error',
       error: { code: 'RUNTIME_TRANSPORT_FAILED' }
     })
@@ -707,7 +710,7 @@ describe('Codex mission durability and lifecycle boundaries', () => {
     const { service, scheduled } = scheduledService({ start }, ledger)
     const updates: CodexMissionUpdate[] = []
     const response = await service.start('Persist safely.', 'codex', 'ask', {}, (update) => {
-      timeline.push(update.kind === 'event' ? `emit:${update.event.type}` : `emit:${update.kind}`)
+      if (update.kind !== 'start-phase') timeline.push(update.kind === 'event' ? `emit:${update.event.type}` : `emit:${update.kind}`)
       updates.push(update)
     })
     expect(response.ok).toBe(true)
@@ -763,8 +766,8 @@ describe('Codex mission durability and lifecycle boundaries', () => {
     const updates: CodexMissionUpdate[] = []
     await service.start('Safe prompt.', 'codex', 'ask', {}, (update) => updates.push(update))
     scheduled[0]?.()
-    await vi.waitFor(() => expect(updates).toHaveLength(1))
-    expect(updates[0]).toMatchObject({ kind: 'transport-error' })
+    await vi.waitFor(() => expect(updates.filter((update) => update.kind !== 'start-phase')).toHaveLength(1))
+    expect(updates.filter((update) => update.kind !== 'start-phase')[0]).toMatchObject({ kind: 'transport-error' })
     expect(appendHostFailure).toHaveBeenCalledWith('mission_2', expect.objectContaining({
       code: 'runtime-transport-failed'
     }))
@@ -777,8 +780,9 @@ describe('Codex mission durability and lifecycle boundaries', () => {
     const doomedUpdates: CodexMissionUpdate[] = []
     await doomed.start('Safe prompt.', 'codex', 'ask', {}, (update) => doomedUpdates.push(update))
     doomedScheduled[0]?.()
-    await vi.waitFor(() => expect(doomedUpdates).toHaveLength(1))
-    expect(doomedUpdates[0]).toMatchObject({ kind: 'persistence-error' })
+    const doomedSaid = () => doomedUpdates.filter((update) => update.kind !== 'start-phase')
+    await vi.waitFor(() => expect(doomedSaid()).toHaveLength(1))
+    expect(doomedSaid()[0]).toMatchObject({ kind: 'persistence-error' })
   })
 
   it('rejects a second start while the first is still resolving discovery', async () => {
@@ -1246,7 +1250,8 @@ describe('runtime selection', () => {
       expect(updates.some((update) => update.kind === 'event' && update.event.type === 'run.completed')).toBe(true)
     })
     const recorded = appendEvents.mock.calls.flatMap(([, events]) => events)
-    expect(recorded.map(({ type }) => type)).toEqual(['run.started', 'message.delta', 'run.completed'])
+    expect(recorded.map(({ type }) => type)).toEqual(['run.started', 'message.delta', 'run.completed', 'adapter.diagnostic'])
+    expect((recorded.at(-1)?.payload as { code?: string }).code).toBe('host.start-timing')
     expect(recorded.every((event) => event.sourceAdapter === 'cursor')).toBe(true)
     expect(recorded[0]?.runtimeThreadId).toBe('cursor-session-1')
   })
@@ -1371,9 +1376,11 @@ describe('durable write batching', () => {
       'step.completed'
     ])
     await vi.waitFor(() => {
-      expect(appendEvents.mock.calls).toHaveLength(2)
+      expect(appendEvents.mock.calls).toHaveLength(3)
     })
     expect(appendEvents.mock.calls[1]?.[1].map((event) => event.type)).toEqual(['run.completed'])
+    // The third append is the host's start-timing note, after the run's own events (0.602).
+    expect(appendEvents.mock.calls[2]?.[1].map((event) => (event.payload as { code?: string }).code)).toEqual(['host.start-timing'])
   })
 
   it('still persists every event before any of them is emitted', async () => {
@@ -2962,7 +2969,7 @@ describe('what a run changed on disk that it never said', () => {
     expect(observeDisk).toHaveBeenCalledTimes(2)
     const completedAt = appended.findIndex((event) => event.type === 'run.completed')
     expect(completedAt).toBeGreaterThan(-1)
-    const observed = appended.slice(completedAt + 1)
+    const observed = appended.slice(completedAt + 1).filter((event) => (event.payload as { code?: string }).code !== 'host.start-timing')
     expect(observed.map((event) => event.type)).toEqual(['tool.started', 'tool.completed'])
     expect(observed[0]?.payload).toMatchObject({ name: 'edit', command: 'src/notes.ts', status: 'observed on disk' })
     // Contiguous with the record it follows: the ledger refuses a gap.
@@ -3600,5 +3607,67 @@ describe('a file the runtime named but the host could not read (0.597)', () => {
       ['tool.completed', 'src/app.ts', 'reported by the runtime, changed on disk']
     ])
     expect(observed[1]!.payload.patch).toBeUndefined()
+  })
+})
+
+/*
+ * 0.602. Between Send and the runtime's "started" the window said one word for
+ * a median 4.5 to 10.5 s (10/04, 183 missions). The start now says its phase
+ * as each begins, and the run's end writes where the seconds went.
+ */
+describe('the start says its phase, and the run writes where its seconds went', () => {
+  const build = () => {
+    const appended: { type: string; payload: Record<string, unknown> }[] = []
+    const updates: CodexMissionUpdate[] = []
+    const scheduled: Array<() => void> = []
+    let ids = 0
+    const service = createCodexMissionService({
+      workspacePath: WORKSPACE,
+      discover: async () => [codexRuntime()],
+      runner: {
+        start: () => ({
+          records: records([
+            { type: 'thread.started', thread_id: 'thread-live' },
+            { type: 'turn.started' },
+            { type: 'item.completed', item: { id: 'answer', type: 'agent_message', text: 'Done.' } },
+            { type: 'turn.completed', usage: { output_tokens: 2 } }
+          ]),
+          completion: Promise.resolve(completion())
+        })
+      },
+      ledger: fakeLedger({
+        appendEvents: async (_missionId, events) => {
+          appended.push(...(events as unknown as { type: string; payload: Record<string, unknown> }[]))
+        }
+      }),
+      observeDisk: async () => new Map<string, string>(),
+      observePatches: async () => new Map(),
+      createId: () => String(++ids),
+      now: () => new Date(NOW),
+      schedule: (task) => scheduled.push(task)
+    })
+    return { service, appended, updates, scheduled }
+  }
+  const phasesOf = (updates: readonly CodexMissionUpdate[]): string[] => updates.filter((update) => update.kind === 'start-phase').map((update) => (update as { phase: string }).phase)
+
+  it('says looking, briefing, reading the folder and starting, in that order, and the end writes the note', async () => {
+    const { service, appended, updates, scheduled } = build()
+    const response = await service.start('Say done.', 'codex', 'accept-edits', {}, (update) => updates.push(update))
+    expect(response.ok).toBe(true)
+    expect(phasesOf(updates)).toEqual(['looking', 'briefing', 'reading-folder', 'starting-runtime'])
+    while (scheduled.length > 0) scheduled.shift()!()
+    for (let i = 0; i < 20; i += 1) await new Promise((resolve) => setImmediate(resolve))
+    const completed = appended.findIndex((event) => event.type === 'run.completed')
+    expect(completed).toBeGreaterThan(0)
+    const note = appended.slice(completed + 1).find((event) => event.payload.code === 'host.start-timing')
+    expect(note?.type).toBe('adapter.diagnostic')
+    expect(String(note?.payload.message)).toMatch(/^Started in \d+\.\d s: looked for Codex CLI \d+\.\d s, briefed \d+\.\d s, read the folder \d+\.\d s; Codex CLI took \d+\.\d s to say it had started\.$/)
+  })
+
+  it('reads no folder for a read-only start, and says so by leaving the phase out', async () => {
+    const { service, updates } = build()
+    const response = await service.start('What is here?', 'codex', 'ask', {}, (update) => updates.push(update))
+    expect(response.ok).toBe(true)
+    expect(phasesOf(updates)).toEqual(['looking', 'briefing', 'starting-runtime'])
   })
 })

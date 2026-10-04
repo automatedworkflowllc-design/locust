@@ -11,6 +11,13 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.602.0 - 2026-10-05
+
+### Improved
+
+- **While a teammate starts, the thread says what is happening.** Between Send and the runtime's first word there are several seconds (a median 4 to 10 depending on the runtime), and the live line said only "Starting" for all of it. It now says the phase: "Looking for Codex CLI", "Briefing", "Reading the folder", "Starting Codex CLI", in the runtime's own name.
+- **When the turn ends, Details records how long each part of the start took.** One line, kept in the saved record too: "Started in 6.3 s: looked for Codex CLI 0.1 s, briefed 1.4 s, read the folder 0.8 s; Codex CLI took 3.9 s to say it had started." A slow start can be read rather than guessed at.
+
 ## 0.601.0 - 2026-10-04
 
 ### Improved
