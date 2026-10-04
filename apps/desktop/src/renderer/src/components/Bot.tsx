@@ -217,7 +217,11 @@ export function glyphMotion(pair: string, eye: 0 | 1, seconds: number): GlyphMot
       const beat = Math.max(0, Math.sin((t - 2.1) * Math.PI * 2.4 - eye * Math.PI * 0.6))
       // Eased in from the last glance (up and left), so the eyes never jump.
       const p = Math.min(1, (t - 2.1) / 0.25)
-      const settle = p * p * (3 - 2 * p)
+      // ...and eased back there over the loop's last stretch, where the next loop's first glance starts
+      // (0.613). Nothing eased it back before, and at every wrap each dot crossed up to 1.9 in one frame:
+      // Colin, 2026-10-04, "dont really get wonky until it goes to the two dots".
+      const q = Math.max(0, Math.min(1, (t - (cycle - 0.35)) / 0.35))
+      const settle = p * p * (3 - 2 * p) * (1 - q * q * (3 - 2 * q))
       return {
         dx: -1.6 * (1 - settle),
         dy: -1.5 * (1 - settle) + (-0.5 - 1.3 * beat) * settle,
