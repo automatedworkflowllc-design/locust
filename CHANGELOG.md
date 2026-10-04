@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.582.0 - 2026-10-04
+
+### Changed
+
+- **Choosing an agent's own folder asks first.** If you pick `.claude`,
+  `.codex`, `.cursor`, `.gemini` or `.config` in your home folder, your home
+  folder itself, or Windows' folder as the place your teammates work, Locust
+  now says what is in it (settings, sign-in files, saved conversations) and
+  offers to choose another folder. **Work here anyway** still works there.
+
 ## 0.581.0 - 2026-10-04
 
 ### Fixed
