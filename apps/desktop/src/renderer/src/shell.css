@@ -13954,6 +13954,15 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+/* A scheduled routine in Approve each waits for the person when it fires unattended (0.591): said under the meta, quietly. */
+.lc-automations .lc-routinerow__waits {
+  display: block;
+  margin-top: 2px;
+  color: var(--lc-text-muted);
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+
 .lc-automations .lc-routinerow:last-child {
   border-bottom: none;
 }

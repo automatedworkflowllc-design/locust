@@ -169,6 +169,18 @@ export function routineRunSummary(routine: Pick<PublicRoutine, 'runs' | 'steps' 
   return `${steps} · run ${String(routine.runs)} time${routine.runs === 1 ? '' : 's'}`
 }
 
+/**
+ * A scheduled routine on a teammate in Approve each (0.591, the PRD's U4):
+ * fired while nobody is at the window, its run stops on the first card and
+ * waits there. Said on the row, where the schedule is set, instead of being
+ * found the next morning under "waiting on you". Undefined for every other
+ * mode, and for a routine that only runs when pressed (someone is there).
+ */
+export function routineWaitsForYou(routine: Pick<PublicRoutine, 'route' | 'schedule'>): string | undefined {
+  if (routine.schedule === undefined || routine.route.mode !== 'approve-each') return undefined
+  return 'Runs in Approve each: fired while you are away, it waits for you on its first card. Ask or Accept edits runs through.'
+}
+
 const pad = (value: number): string => String(value).padStart(2, '0')
 const clock = (at: Date): string => `${pad(at.getHours())}:${pad(at.getMinutes())}`
 const sameDay = (a: Date, b: Date): boolean =>

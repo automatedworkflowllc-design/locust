@@ -3,7 +3,7 @@ import { BOT_SIZE } from '../botSizes.js'
 
 import type { PublicFolder, PublicRoutine, PublicTeammate } from '../../../shared/ipc.js'
 import { shortAgo } from '../railFlyout.js'
-import { routineChain, routineRunSummary, routineScheduleSummary, routineStepLabel } from '../routines.js'
+import { routineChain, routineRunSummary, routineScheduleSummary, routineStepLabel, routineWaitsForYou } from '../routines.js'
 import { NOTHING_TO_SAVE_YET, savableConversations, turnsLabel } from '../savableConversations.js'
 import { RoutineChanges } from './RoutineChanges.js'
 import type { SavableConversation } from '../savableConversations.js'
@@ -282,6 +282,10 @@ export function AutomationsScreen({
                       the next run is started, not only in the conversation. */}
                   {routine.lastFailed !== undefined && (
                     <span className="lc-routinerow__failed">Last run: {routine.lastFailed}</span>
+                  )}
+                  {/* A scheduled routine in Approve each waits on its first card when it fires unattended (0.591, PRD U4). */}
+                  {routineWaitsForYou(routine) !== undefined && (
+                    <span className="lc-routinerow__waits">{routineWaitsForYou(routine)}</span>
                   )}
                 </span>
                 {/* The schedule as a CHIP, not a third prose line. It is the

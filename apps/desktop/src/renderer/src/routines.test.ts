@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { withAttachments } from '../../shared/attachments.js'
 import type { PublicRecoveredMission } from '../../shared/ipc.js'
-import { MAX_ROUTINE_STEPS, draftName, routineDraft, routineRunSummary, routineStepLabel, routineScheduleSummary } from './routines.js'
+import { MAX_ROUTINE_STEPS, draftName, routineDraft, routineRunSummary, routineStepLabel, routineScheduleSummary, routineWaitsForYou } from './routines.js'
 
 function turn(
   missionId: string,
@@ -169,5 +169,20 @@ describe('what a card says about a schedule', () => {
       routineScheduleSummary({ ...base, schedule: { kind: 'every', hours: 168 }, lastRunAt: new Date(2026, 8, 5, 6, 0).toISOString() }, now)
     ).toBe('every 168 hours · next Sat 06:00')
     expect(routineScheduleSummary({ ...base, schedule: { kind: 'every', hours: 1 } }, now)).toBe('every hour · due now')
+  })
+})
+
+describe('a scheduled routine in Approve each (0.591)', () => {
+  const route = (mode: 'ask' | 'plan' | 'accept-edits' | 'approve-each' | 'auto') => ({ runtime: 'codex' as const, model: 'account-default', mode })
+  it('says it waits for you when it fires unattended', () => {
+    expect(routineWaitsForYou({ route: route('approve-each'), schedule: { kind: 'daily', at: '07:00' } })).toBe(
+      'Runs in Approve each: fired while you are away, it waits for you on its first card. Ask or Accept edits runs through.'
+    )
+  })
+  it('says nothing for the other modes, or for a routine that only runs when pressed (controls)', () => {
+    expect(routineWaitsForYou({ route: route('ask'), schedule: { kind: 'daily', at: '07:00' } })).toBeUndefined()
+    expect(routineWaitsForYou({ route: route('accept-edits'), schedule: { kind: 'every', hours: 2 } })).toBeUndefined()
+    expect(routineWaitsForYou({ route: route('auto'), schedule: { kind: 'daily', at: '07:00' } })).toBeUndefined()
+    expect(routineWaitsForYou({ route: route('approve-each') })).toBeUndefined()
   })
 })
