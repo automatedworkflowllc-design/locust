@@ -3744,7 +3744,31 @@ export function buildThread(
         orb: orbStateFor(undefined, options.planMode === true, runningStep.register),
         ...(runningStep.kind === 'reasoning' ? { waiting: true } : {})
       })
-    } else if (!streaming) {
+    } else if (streaming) {
+      /*
+       * WRITING, while the reply arrives (0.581).
+       *
+       * This drew nothing: a "Working" line under arriving text would say the
+       * opposite of what the reader sees, so there was no line at all -- and
+       * the turn's clock and its Stop place went with it for as long as the
+       * reply took. Claude Code keeps its status line through a reply
+       * ("Writing… 12s"). This says what is visible -- writing, no waiting
+       * dots -- on the same clock the other branches use.
+       */
+      if (turnStartedAt !== undefined) {
+        items.push({
+          key: 'live-step',
+          type: 'live-step',
+          label: 'Writing',
+          register: 'writing' as const,
+          ...(planAction === undefined ? {} : { action: planAction }),
+          detail: planAside,
+          startedAt: turnStartedAt,
+          kind: 'turn',
+          orb: orbStateFor(undefined, options.planMode === true, 'writing')
+        })
+      }
+    } else {
       // Nothing has begun, or the last step closed and the next has not
       // opened. The thread used to draw NOTHING here, so pressing Enter left
       // an empty page until the runtime's first event -- seconds, for a CLI

@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.581.0 - 2026-10-04
+
+### Fixed
+
+- **The working line stays while a reply arrives.** The line under a running
+  turn, with its clock, disappeared for as long as the teammate's reply was
+  streaming in, and came back after. It now says **Writing** with the turn's
+  clock still running, the way Claude Code keeps its status line through a
+  reply.
+
 ## 0.580.0 - 2026-10-04
 
 ### Fixed
