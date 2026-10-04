@@ -59,20 +59,20 @@ describe('what the home screen draws', () => {
     for (const mate of COVER_CAST) expect(Math.abs(mate.y + 96 - COVER_MACHINE.y)).toBeLessThanOrEqual(18)
     expect(COVER_CAST.map((mate) => mate.key)).toEqual(['wren', 'atlas', 'sable'])
     // Colin: "lets definitely include ghost in there"; 0.562: "maybe use ghost, the codex looking one and our locust".
-    expect(botAttr(after, 'data-bot')).toEqual(['ghost', 'prompt', 'hopper'])
+    expect(botAttr(after, 'data-bot')).toEqual(['ghost', 'prompt', 'critter'])
     expect(botAttr(after, 'data-state')).toEqual(['default', 'default', 'sleeping'])
     // Each in its own part from the first frame: thinking, typing, asleep.
     expect(botAttr(after, 'data-beat')).toEqual(['thinking', 'typing', 'asleep'])
   })
 
-  it('has a white ghost that floats, and a green Locust', () => {
+  it("has a white ghost that floats, and Claw'd asleep (0.583: the Hopper was jagged in Plush)", () => {
     // Colin: "maybe make the ghost white and the locust green lol", and of
     // its hops: "a little loud for a title screen, especially for a ghost".
     const ghost = COVER_CAST.find((mate) => mate.type === 'ghost')
-    const locust = COVER_CAST.find((mate) => mate.type === 'hopper')
+    const locust = COVER_CAST.find((mate) => mate.part === 'sleeper')
     expect(ghost?.hue).toBeUndefined()
     expect(ghost?.floats).toBe(true)
-    expect(locust?.hue).toBe('lime')
+    expect(locust).toMatchObject({ type: 'critter', hue: 'clay' })
     expect(after).toContain('class="lc-bot is-floating" data-bot="ghost"')
     // Nothing floats before the runtimes have answered.
     expect(before).not.toContain('is-floating')

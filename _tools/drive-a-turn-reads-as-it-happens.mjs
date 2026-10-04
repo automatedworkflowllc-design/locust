@@ -23,7 +23,10 @@ const ROUTES = {
   claude: { runtime: 'claude', model: 'haiku', mode: 'auto' },
   codex: { runtime: 'codex', model: 'account-default', mode: 'auto' },
   cursor: { runtime: 'cursor', model: 'account-default', mode: 'auto' },
-  opencode: { runtime: 'opencode', model: 'opencode/nemotron-3-ultra-free', mode: 'auto' }
+  opencode: { runtime: 'opencode', model: 'opencode/nemotron-3-ultra-free', mode: 'auto' },
+  // Auto: Antigravity's Edit cannot run commands (0.583). Colin, 2026-10-04, of a
+  // Flash turn drawn as one bar: "make sure our outputs are proper across all channels".
+  antigravity: { runtime: 'antigravity', model: 'account-default', mode: 'auto' }
 }
 const runtime = arg('--runtime') ?? 'claude'
 const route = ROUTES[runtime]
@@ -48,10 +51,11 @@ const check = (what, ok, detail) => {
 // The thread as a reader meets it: each thing said, each step line, the live line, the foot.
 const ORDER = `(() => [...document.querySelectorAll('.lc-thread .lc-agentline__body, .lc-thread .lc-livestep, .lc-thread .lc-turnfoot')]
   .map((el) => el.classList.contains('lc-turnfoot') ? 'FOOT'
-    : el.classList.contains('lc-livestep') ? 'LIVE'
+    : el.classList.contains('lc-livestep') ? 'LIVE ' + el.innerText.replace(/\\s+/g, ' ').trim().replace(/\\d+s$/, '').slice(0, 40)
     : el.querySelector('.lc-steps__line') ? 'STEPS ' + el.querySelector('.lc-steps__line').innerText.replace(/\\s+/g, ' ').trim()
-    : 'SAID ' + el.innerText.replace(/\\s+/g, ' ').trim().slice(0, 50))
-  .filter((line) => line !== 'SAID '))()`
+    // A reply still arriving carries the caret (0.581: the live line stays under it).
+    : (el.querySelector('.lc-caret') ? 'SAYING ' : 'SAID ') + el.innerText.replace(/\\s+/g, ' ').trim().slice(0, 50))
+  .filter((line) => line !== 'SAID ' && line !== 'SAYING '))()`
 
 try {
   await drive.capture('launch', () => drive.ready())
@@ -73,8 +77,8 @@ try {
     return JSON.stringify(events.filter((e) => e.type === 'step.completed' && (e.payload.stepKind === 'reasoning' || /reasoning/i.test(e.payload.itemType ?? ''))).map((e) => String(e.payload.message ?? '').slice(0, 60)))
   })()`)))
   say(`  thoughts recorded: ${JSON.stringify(thoughts)}`)
-  const live = samples.filter((sample) => sample.includes('LIVE'))
-  const both = live.find((sample) => sample.some((line) => line.startsWith('STEPS')) && sample.some((line) => line.startsWith('SAID')))
+  const live = samples.filter((sample) => sample.some((line) => line.startsWith('LIVE')))
+  const both = live.find((sample) => sample.some((line) => line.startsWith('STEPS')) && sample.some((line) => line.startsWith('SAID') || line.startsWith('SAYING')))
   check('while it worked, its steps were lines among what it said', both !== undefined, JSON.stringify(live.at(-1) ?? []).slice(0, 240))
   const saidFinal = final.filter((line) => line.startsWith('SAID'))
   const stepsFinal = final.filter((line) => line.startsWith('STEPS'))
@@ -84,7 +88,12 @@ try {
   if (saidFinal.length < 3) say(`  (the model said ${String(saidFinal.length)} thing(s), not one before each step: nothing to interleave)`)
   else check('the finished turn reads said, steps, said, steps ...', stepsFinal.length >= 2 && work[0]?.startsWith('SAID') === true, JSON.stringify(final).slice(0, 300))
   // Nothing moved: what was said, in the order it was drawn live, is the order it ends in.
-  const lastLive = (live.at(-1) ?? []).filter((line) => line.startsWith('SAID')).map((line) => line.slice(0, 30))
+  const lastLive = (live.at(-1) ?? []).filter((line) => line.startsWith('SAID') || line.startsWith('SAYING')).map((line) => line.replace(/^SAYING /, 'SAID ').slice(0, 30))
+  // 0.581: while a reply arrives, the live line stays, saying it is writing.
+  const saying = samples.filter((sample) => sample.some((line) => line.startsWith('SAYING')))
+  const writing = saying.filter((sample) => sample.some((line) => /^LIVE .*Writing/.test(line)))
+  if (saying.length === 0) say('  (no sample caught a reply mid-stream: nothing to say about the line under one)')
+  else check('while a reply arrives, the live line stays and says Writing', writing.length === saying.length, JSON.stringify({ saying: saying.length, writing: writing.length, example: saying[0] }).slice(0, 300))
   const finalSaid = saidFinal.map((line) => line.slice(0, 30))
   check('nothing moved when it ended: the live order of what was said is the final order', lastLive.every((line, index) => finalSaid[index] === line), JSON.stringify({ lastLive, finalSaid }))
   check('the finished turn has its foot', final.at(-1) === 'FOOT' || final.includes('FOOT'), JSON.stringify(final.slice(-3)))

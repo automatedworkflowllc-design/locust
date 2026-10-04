@@ -11,6 +11,79 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.583.0 - 2026-10-04
+
+### Changed
+
+- **Home is centered and fits two rows of teammates without scrolling.** At
+  a window around 1200x780 with six teammates, Home ran a little taller than
+  the window and opened scrolled down, cutting off the top of the cover. Now
+  the page is centered. When it is short of height, the space between its
+  sections tightens before anything is cut. A page that still runs over
+  opens at the top.
+- **Claw'd sleeps on the cover.** The locust there drew with stair-stepped
+  legs and antennae, and no fur, under Plush. The sleeper on the cover is now
+  Claw'd, who takes the fur. The swarm still flies past.
+
+## 0.582.0 - 2026-10-04
+
+### Changed
+
+- **Choosing an agent's own folder asks first.** If you pick `.claude`,
+  `.codex`, `.cursor`, `.gemini` or `.config` in your home folder, your home
+  folder itself, or Windows' folder as the place your teammates work, Locust
+  now says what is in it (settings, sign-in files, saved conversations) and
+  offers to choose another folder. **Work here anyway** still works there.
+
+## 0.581.0 - 2026-10-04
+
+### Fixed
+
+- **The working line stays while a reply arrives.** The line under a running
+  turn, with its clock, disappeared for as long as the teammate's reply was
+  streaming in, and came back after. It now says **Writing** with the turn's
+  clock still running, the way Claude Code keeps its status line through a
+  reply.
+
+## 0.580.0 - 2026-10-04
+
+### Fixed
+
+- **A page a teammate makes runs in its turn again.** A new `index.html`
+  sat as a folded row under the reply instead of running, in any
+  conversation and after Keep brought a comparison's page into your folder.
+  It now opens and runs on arrival. A changed page, and any other file,
+  stays folded as before, and a comparison's columns still run each page
+  once, above the column.
+
+## 0.579.0 - 2026-10-04
+
+### Changed
+
+- **A command that reaches beyond its own work is asked about every time.**
+  Its approval card no longer offers "Always allow this session" or "Yes,
+  and don't ask again". For `taskkill /IM some.exe`, the agent's own
+  "Always" would have allowed every `taskkill` for the rest of the run, from
+  a card about one. Approve once and Deny are still there.
+
+## 0.578.0 - 2026-10-04
+
+### New
+
+- **A command that reaches beyond its own work says so.** When a teammate
+  runs something like `taskkill /IM python.exe`, the command row now says
+  "stops every python.exe", and hovering says it in full: it stops every
+  Python program on this computer, not only the ones the run started. If you
+  are asked first, the approval card has a **Reaches** line saying the same,
+  before you answer. It covers stopping programs by name (`taskkill /IM`,
+  `Stop-Process -Name`, `pkill`, `killall` and piped forms), by port, every
+  program of a user, and restarting or shutting down the computer, including
+  inside `powershell -Command`, `cmd /c` and `bash -c`. Stopping one program
+  by its number says nothing more, and neither does a command that only
+  mentions one of these.
+- **Locust is open source**, MIT licensed, at
+  github.com/automatedworkflowllc-design/locust-app.
+
 ## 0.577.0 - 2026-10-04
 
 ### New

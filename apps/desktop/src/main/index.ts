@@ -155,7 +155,7 @@ import { createRelay } from './relay.js'
 import { createAttention, finishFrom } from './attention.js'
 import { boundedShutdown } from './bounded-shutdown.js'
 import { createPermissionHost } from './permission-host.js'
-import { isInsideDirectory, readRememberedWorkspace, resolveWorkspacePath, WORKSPACE_ARGUMENT, writeRememberedWorkspace, workspaceIdFor } from './workspace.js'
+import { chooseFolderCaution, isInsideDirectory, notATeammateFolder, readRememberedWorkspace, resolveWorkspacePath, WORKSPACE_ARGUMENT, writeRememberedWorkspace, workspaceIdFor } from './workspace.js'
 import { createAntigravityHostProbe } from './antigravity-host.js'
 import { AntigravityStartError, antigravityStartRefusal, createAntigravityMissionService } from './antigravity-mission.js'
 import type { Relay } from './relay.js'
@@ -3649,15 +3649,26 @@ if (!ownsSingleInstanceLock) {
       if (owner === null || !fromOwnWindow(event)) {
         return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'The folder request was rejected.' } } as const
       }
-      const picked = await dialog.showOpenDialog(owner, {
-        title: 'Choose the folder your teammates work in',
-        buttonLabel: 'Work here',
-        properties: ['openDirectory', 'createDirectory'],
-        defaultPath: workspaceChosen ? workspacePath : app.getPath('home')
-      })
-      const next = picked.filePaths[0]
-      if (picked.canceled || next === undefined) {
-        return { ok: false, error: { code: 'CANCELLED', message: 'No folder chosen.' } } as const
+      let next: string | undefined
+      for (;;) {
+        const picked = await dialog.showOpenDialog(owner, {
+          title: 'Choose the folder your teammates work in',
+          buttonLabel: 'Work here',
+          properties: ['openDirectory', 'createDirectory'],
+          defaultPath: workspaceChosen ? workspacePath : app.getPath('home')
+        })
+        next = picked.filePaths[0]
+        if (picked.canceled || next === undefined) {
+          return { ok: false, error: { code: 'CANCELLED', message: 'No folder chosen.' } } as const
+        }
+        // An agent's own settings folder, home, or Windows' own: asked, not
+        // refused (0.582, chooseFolderCaution). Launch adoption already
+        // declined these; a folder picked here had no word at all.
+        const why = notATeammateFolder(next, app.getPath('home'), process.platform, process.env.SystemRoot)
+        if (why === undefined) break
+        const caution = chooseFolderCaution(next, why)
+        const answer = await dialog.showMessageBox(owner, { type: 'warning', message: caution.message, detail: caution.detail, buttons: [...caution.buttons], defaultId: 0, cancelId: 0, noLink: true })
+        if (answer.response === 1) break
       }
       if (isInsideDirectory(next, installDirectory, process.platform)) {
         return {

@@ -4,7 +4,7 @@ import type { ReactElement } from 'react'
 import type { PublicRuntimeStatus, TubePreference } from '../../../shared/ipc.js'
 import { connectedRuntimeCount, deferredOthersSentence, integrationOf, routeRowStatus, runtimeIsUsable } from '../status.js'
 import { FREE_START_RUNTIME, installCommand, installSentence, runtimeInstallFacts, signInCommand } from '../../../shared/runtime-install.js'
-import { COVER_HEIGHT, HomeCover, coverGrowFor, coverRoomFor, coverScale } from './HomeCover.js'
+import { COVER_HEIGHT, COVER_REACH, HomeCover, coverGrowFor, coverRoomFor, coverScale, homeIsShort } from './HomeCover.js'
 import { HomeTeam } from './HomeTeam.js'
 import { RuntimeMark } from './RuntimeMark.js'
 import { AgentMark } from './AgentMark.js'
@@ -323,7 +323,11 @@ export function FirstLaunch({
   useEffect(() => {
     const el = pane.current
     if (el === null || typeof ResizeObserver === 'undefined') return
-    let atEnd = true
+    // From the top (0.583): Home is centred now, and a page that still runs
+    // over opens at its cover. It opened at the END, so the cover was cut off
+    // until scrolled up -- Colin: "i have to always scroll up to have our home
+    // page centered". Once the person scrolls to the end it is followed there.
+    let atEnd = false
     const onScroll = (): void => {
       atEnd = el.scrollHeight - el.scrollTop - el.clientHeight < 4
       setScrolled(el.scrollTop > 0)
@@ -353,6 +357,8 @@ export function FirstLaunch({
    */
   const inner = useRef<HTMLDivElement>(null)
   const [coverGrow, setCoverGrow] = useState(1)
+  // Short of height even with the smallest cover: tighter padding and gaps (0.583, `homeIsShort`).
+  const [tight, setTight] = useState(false)
   useEffect(() => {
     const paneEl = pane.current
     const innerEl = inner.current
@@ -362,7 +368,8 @@ export function FirstLaunch({
       if (cover === null) return
       const padding = getComputedStyle(paneEl)
       const usable = paneEl.clientHeight - parseFloat(padding.paddingTop) - parseFloat(padding.paddingBottom)
-      const base = COVER_HEIGHT * coverScale(cover.clientWidth)
+      // The cover's footprint: its box and the bots' reach above it (COVER_REACH, 0.583).
+      const base = (COVER_HEIGHT + COVER_REACH) * coverScale(cover.clientWidth)
       /*
        * EVERYTHING ELSE, MEASURED FROM ITSELF (0.516). This was the column's
        * height less the cover's, which also took in the space around the
@@ -376,14 +383,15 @@ export function FirstLaunch({
       const column = getComputedStyle(innerEl)
       const gap = parseFloat(column.rowGap) || 0
       const children = [...innerEl.children] as HTMLElement[]
-      const others = children
+      const sections = children
         .filter((child) => child !== cover && !child.contains(cover))
         .reduce((sum, child) => {
           const style = getComputedStyle(child)
           return sum + child.offsetHeight + (parseFloat(style.marginTop) || 0) + (parseFloat(style.marginBottom) || 0)
         }, 0)
-        + gap * Math.max(0, children.length - 1)
         + (parseFloat(column.paddingTop) || 0) + (parseFloat(column.paddingBottom) || 0)
+      const others = sections + gap * Math.max(0, children.length - 1)
+      setTight(homeIsShort(sections, children.length, base, paneEl.clientHeight))
       setCoverGrow(coverGrowFor(coverRoomFor(usable, others, base), base))
     }
     measure()
@@ -394,7 +402,7 @@ export function FirstLaunch({
   }, [])
 
   return (
-    <div className={`lc-empty${scrolled ? ' is-scrolled' : ''}`} ref={pane}>
+    <div className={`lc-empty${scrolled ? ' is-scrolled' : ''}${tight ? ' is-tight' : ''}`} ref={pane}>
       <div className="lc-empty__inner" ref={inner}>
         {/* The design system's cover: the lockup lighting up once the runtimes have answered, and the teammates. */}
         <HomeCover ready={discoveryPhase === 'ready'} tube={tube ?? 'full'} swarmCalls={swarmCalls} grow={coverGrow} />

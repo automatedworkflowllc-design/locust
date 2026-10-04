@@ -760,7 +760,19 @@ describe('thread composition', () => {
     // Text arriving IS the teammate doing something visible; a "Working" line
     // under it would say the opposite of what the reader can see.
     const items = buildThread([delta('a', 'half a sen', 'append')], { running: true, startedAt: '2026-09-04T21:47:00.000Z' })
-    expect(items.some((i) => i.type === 'live-step')).toBe(false)
+    const live = items.find((i) => i.type === 'live-step')
+    expect(live).not.toMatchObject({ waiting: true })
+    expect(live).not.toMatchObject({ register: 'working' })
+  })
+
+  it('says it is writing while the reply arrives, on the turn clock (0.581)', () => {
+    // It drew nothing at all, so the clock and the line went away for as long
+    // as the reply took; Claude Code keeps its status line through a reply.
+    const items = buildThread([delta('a', 'half a sen', 'append')], { running: true, startedAt: '2026-09-04T21:47:00.000Z' })
+    expect(items.find((i) => i.type === 'live-step')).toMatchObject({ label: 'Writing', register: 'writing', startedAt: '2026-09-04T21:47:00.000Z' })
+    // Control: once the text is final and the run is still going, it is back to working.
+    const after = buildThread([delta('a', 'half a sentence.', 'append', true)], { running: true, startedAt: '2026-09-04T21:47:00.000Z' })
+    expect(after.find((i) => i.type === 'live-step')).toMatchObject({ register: 'working' })
   })
 
   it('never shows a live step for a run that is not running', () => {

@@ -1,6 +1,6 @@
 // The live line of a running turn, filmed: what it says, second by second (0.569).
 //
-//   node _tools/look-live-line.mjs [--packaged <exe>] [--tag <name>] [--frames 12] [--every 1500]
+//   node _tools/look-live-line.mjs [--packaged <exe>] [--tag <name>] [--frames 12] [--every 1500] [--prompt <text>]
 //
 // Colin, 2026-10-03, with four frames of Claude Code's new status line
 // ("Reading pet removal in main and who calls it 40m 11s >", "Running a
@@ -20,6 +20,8 @@ const packaged = arg('--packaged')
 const tag = arg('--tag') ?? 'local'
 const frames = Number(arg('--frames') ?? '14')
 const every = Number(arg('--every') ?? '1500')
+// `--prompt` (0.581): another turn -- a long reply, say -- to film the line while text streams.
+const PROMPT = arg('--prompt') ?? 'Read notes.txt. Then run this exact shell command: node -e "setTimeout(() => console.log(\'kiln ready\'), 6000)". Then write summary.txt with one line saying when the kiln fires. Then reply DONE.'
 const workspace = await scratchRepository('locust-look-live-ws-')
 await writeFile(join(workspace, 'notes.txt'), 'Kiln fires Thursday.\nGlaze orders close at noon.\n', 'utf8')
 const drive = await startDrive({
@@ -46,7 +48,7 @@ try {
   await drive.evaluate(`(async () => {
     const field = document.querySelector('form.command-dock textarea')
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
-    setter.call(field, ${JSON.stringify('Read notes.txt. Then run this exact shell command: node -e "setTimeout(() => console.log(\'kiln ready\'), 6000)". Then write summary.txt with one line saying when the kiln fires. Then reply DONE.')})
+    setter.call(field, ${JSON.stringify(PROMPT)})
     field.dispatchEvent(new Event('input', { bubbles: true }))
     for (let i = 0; i < 40; i += 1) {
       await new Promise((r) => setTimeout(r, 250))
