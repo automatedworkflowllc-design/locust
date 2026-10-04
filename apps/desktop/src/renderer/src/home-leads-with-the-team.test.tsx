@@ -90,3 +90,19 @@ describe('Home', () => {
     expect(home([ready('codex', 'Codex CLI'), signedOut('claude', 'Claude Code')], [])).toContain('lc-runtimepanel')
   }, 10_000)
 })
+
+  it('says where each teammate stands, beside the name, and reads it aloud with the card (0.606)', () => {
+    const html = home([ready('codex', 'Codex CLI')], [
+      { ...TEAM[0]!, working: false, state: { word: '2h ago', tone: 'muted', spoken: 'last worked 2 hours ago' } },
+      { ...TEAM[1]!, working: true, state: { word: 'replying', tone: 'live', spoken: 'replying now' } },
+      { teammateId: 'tm_sable', name: 'Sable', hue: 'clay', avatar: seedAvatar('tm_sable'), role: 'Data', working: false, state: { word: 'waiting on you', tone: 'amber', spoken: 'waiting on you' } }
+    ])
+    expect(html).toContain('<span class="lc-hometeam__state is-muted">2h ago</span>')
+    expect(html).toContain('<span class="lc-hometeam__state is-live">replying</span>')
+    expect(html).toContain('<span class="lc-hometeam__state is-amber">waiting on you</span>')
+    expect(html).toContain('Message Wren, Code &amp; Migrations, last worked 2 hours ago')
+    expect(html).toContain('Message Penny, Money, replying now')
+    expect(html).toContain('Message Sable, Data, waiting on you')
+    // The old "working" tag is gone: the state says it.
+    expect(html).not.toContain('lc-hometeam__working')
+  }, 10_000)

@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.606.0 - 2026-10-05
+
+### Improved
+
+- **Each team card on Home says where that teammate stands.** Beside the name: "working", "thinking" or "replying" while they work, "waiting on you" in amber when a card is asking, what blocks them in red, and, when idle, when they last worked ("2h ago", read aloud as "last worked 2 hours ago"; "no work yet" before a first conversation). The card used to say "working" or nothing, so a teammate waiting on your answer and one idle since Tuesday read the same.
+
 ## 0.605.0 - 2026-10-05
 
 ### Changed

@@ -85,6 +85,7 @@ import { MemoryScreen } from './components/MemoryScreen.js'
 import { isMissionRuntime, runtimeDisplayName } from '../../shared/runtimes.js'
 import type { StartPhase } from '../../shared/ipc.js'
 import { carriedStartPhase, startingLabelOf, withStartPhase } from './startPhase.js'
+import { teamCardState } from './homeTeamState.js'
 import { reviewPairOf } from './review-pair.js'
 import type { EditCheckShown } from './components/EditCheckCard.js'
 import { imageMediaType } from '../../shared/image-files.js'
@@ -6982,10 +6983,14 @@ export default function App(): ReactElement {
    * nothing to do.
    */
   const viewByTeammate: Record<string, TeammateStatusView> = {}
+  // When each teammate last worked (0.606): the newest of their conversations, for an idle card to say.
+  const lastWorkedByTeammate: Record<string, string> = {}
   for (const teammate of teammates) {
     const owned = sidebarMissions.filter(
       (mission) => (mission.ownerId ?? missionOwners[mission.missionId]) === teammate.teammateId
     )
+    const newest = owned.map((mission) => mission.lastAt).filter((at): at is string => at !== undefined).sort().at(-1)
+    if (newest !== undefined) lastWorkedByTeammate[teammate.teammateId] = newest
     // One resolver for every surface; see `runtimeOfTeammate`.
     const theirRuntime = runtimeOfTeammate(teammate, owned)
     viewByTeammate[teammate.teammateId] = teammateStatusView({
@@ -7623,7 +7628,9 @@ export default function App(): ReactElement {
                   avatar: mate.avatar,
                   role: roleLabelOf(mate),
                   ...(mate.route === undefined ? {} : homeRouteOf(mate.route, resolvedModels, models)),
-                  working: [...runs.values()].some((run) => liveRunIsActive(run) && ownerOf(run) === mate.teammateId)
+                  working: [...runs.values()].some((run) => liveRunIsActive(run) && ownerOf(run) === mate.teammateId),
+                  // Where they stand, beside the name (0.606): the sidebar face's own fact, worded for the card.
+                  ...((state) => (state === undefined ? {} : { state }))(teamCardState(viewByTeammate[mate.teammateId], lastWorkedByTeammate[mate.teammateId]))
                 }))}
                 onMessageTeammate={selectTeammate}
                 onChooseFolder={chooseWorkspace}

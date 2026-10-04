@@ -3,6 +3,7 @@ import type { ReactElement } from 'react'
 
 import type { AvatarSpec } from '../../../shared/avatar.js'
 import type { TeammateHue } from '../../../shared/ipc.js'
+import type { TeamCardState } from '../homeTeamState.js'
 import { Icon } from './Icon.js'
 import { RuntimeMark } from './RuntimeMark.js'
 import { TeammateBot } from './TeammateBot.js'
@@ -34,6 +35,8 @@ export interface HomeTeammate {
   readonly runtime?: MissionRuntimeId
   /** Running right now. */
   readonly working: boolean
+  /** Where the teammate stands (0.606): the live word, "waiting on you", what blocks them, or when they last worked. */
+  readonly state?: TeamCardState
 }
 
 export function HomeTeam({
@@ -68,13 +71,21 @@ export function HomeTeam({
             key={mate.teammateId}
             className="lc-hometeam__card"
             onClick={() => onMessage(mate.teammateId)}
-            aria-label={`Message ${mate.name}, ${mate.role}${mate.working ? ', working now' : ''}${mate.route === undefined ? '' : `, on ${mate.route}`}`}
+            aria-label={`Message ${mate.name}, ${mate.role}${mate.state !== undefined ? `, ${mate.state.spoken}` : mate.working ? ', working now' : ''}${mate.route === undefined ? '' : `, on ${mate.route}`}`}
           >
             <TeammateBot hue={mate.hue} avatar={mate.avatar} size={34} teammateId={mate.teammateId} activity={mate.working ? 'working' : 'idle'} />
             <span className="lc-hometeam__text">
               <span className="lc-hometeam__name">
                 {mate.name}
-                {mate.working && <span className="lc-hometeam__working">working</span>}
+                {/*
+                  * THE STATE, BESIDE THE NAME (0.606). The card said "working" or
+                  * nothing, so a teammate waiting on an answer, one blocked on a
+                  * sign-in and one idle since Tuesday all read the same. The same
+                  * fact the sidebar face draws, worded for here (homeTeamState.ts).
+                  */}
+                {mate.state !== undefined
+                  ? <span className={`lc-hometeam__state is-${mate.state.tone}`}>{mate.state.word}</span>
+                  : mate.working && <span className="lc-hometeam__state is-live">working</span>}
               </span>
               <span className="lc-hometeam__role">{mate.role}</span>
               {/*
