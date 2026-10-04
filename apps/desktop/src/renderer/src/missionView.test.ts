@@ -53,7 +53,9 @@ import { netFileEntries,
   threadMarkers,
   threadPeerCards,
   typedPrompt
-, commandsRun, commandsRunText, HANDOFF_INSTRUCTION_MARKER, isEditCommand, switchOf } from './missionView.js'
+, commandsRun, commandsRunText, HANDOFF_INSTRUCTION_MARKER, isEditCommand, switchOf,
+  stepsLine
+} from './missionView.js'
 
 const NOW = '2026-08-31T16:00:00.000Z'
 let sequence = 0
@@ -3197,6 +3199,54 @@ describe('the group still growing at the end of a running turn (0.584)', () => {
     expect(talking.find((i) => i.type === 'steps')).not.toMatchObject({ live: true })
     const over = buildThread([toolStart('t1', 'Read', 'a.txt'), toolDone('t1')], { running: false, startedAt: at })
     expect(over.find((i) => i.type === 'steps')).not.toMatchObject({ live: true })
+  })
+})
+
+describe('a group the run has moved past (0.594)', () => {
+  // Colin, 2026-10-04, of a Grok run on Cursor: every group that had ever been
+  // live stayed open and the thread read as a wall. Claude Code keeps one step
+  // open, the one under way; the rest fold to their line.
+  const at = '2026-10-04T05:00:00.000Z'
+  it('is superseded once a later group is live, and the live one is not', () => {
+    const items = buildThread(
+      [toolStart('t1', 'Read', 'a.txt'), toolDone('t1'), delta('m1', 'Found it.', 'append', true), toolStart('t2', 'Read', 'b.txt'), toolDone('t2')],
+      { running: true, startedAt: at }
+    )
+    const steps = items.filter((i) => i.type === 'steps')
+    expect(steps).toHaveLength(2)
+    expect(steps[0]).toMatchObject({ superseded: true })
+    expect(steps[0]).not.toMatchObject({ live: true })
+    expect(steps[1]).toMatchObject({ live: true })
+    expect(steps[1]).not.toMatchObject({ superseded: true })
+  })
+  it('is not superseded by the model talking after it (the reply is not a step), nor once the turn is over (controls)', () => {
+    // The last group keeps the 9/8 rule: the work stays in view when the run ends, reply or no reply.
+    const talking = buildThread([toolStart('t1', 'Read', 'a.txt'), toolDone('t1'), delta('m1', 'Found it.', 'append')], { running: true, startedAt: at })
+    expect(talking.find((i) => i.type === 'steps')).not.toMatchObject({ superseded: true })
+    const over = buildThread(
+      [toolStart('t1', 'Read', 'a.txt'), toolDone('t1'), delta('m1', 'Found it.', 'append', true), toolStart('t2', 'Read', 'b.txt'), toolDone('t2')],
+      { running: false, startedAt: at }
+    )
+    expect(over.filter((i) => i.type === 'steps').some((i) => (i as { superseded?: boolean }).superseded === true)).toBe(false)
+  })
+})
+
+describe('a lone thought on its step line (0.594)', () => {
+  const thought = { kind: 'reasoning', name: 'thought', settled: true, durationMs: 3_000, output: 'I will check the Roth IRA and related news. The account is read-only.' } as unknown as ActivityDetail
+  it('previews its words closed, and not open, where the words are underneath', () => {
+    const closed = stepsLine([thought], false).segments[0]?.text ?? ''
+    expect(closed.startsWith('Thought for 3s: I will check the Roth IRA and related news.')).toBe(true)
+    expect(closed.length).toBeLessThan(100)
+    expect(stepsLine([thought], false, undefined, { open: true }).segments[0]?.text).toBe('Thought for 3s')
+  })
+})
+
+describe("Cursor's scratch files (0.594)", () => {
+  it('are named for what they are, not by their UUID', () => {
+    const WS = 'C:/Users/x/projects/streaks'
+    expect(relativePath('C:/Users/x/.cursor/projects/C-Users-x-claude/agent-tools/3a5a3562-ffd2-47fc-b4bc-8d2d64fcd8a2.txt', WS)).toBe("Cursor's saved tool result")
+    // A project file of the same shape elsewhere keeps its name (control).
+    expect(relativePath('C:/Users/x/projects/streaks/agent-tools/notes.txt', WS)).toBe('agent-tools/notes.txt')
   })
 })
 

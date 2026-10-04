@@ -54,7 +54,7 @@ const check = (what, ok, detail) => {
 const ORDER = `(() => [...document.querySelectorAll('.lc-thread .lc-agentline__body, .lc-thread .lc-livestep, .lc-thread .lc-turnfoot')]
   .map((el) => el.classList.contains('lc-turnfoot') ? 'FOOT'
     : el.classList.contains('lc-livestep') ? 'LIVE ' + el.innerText.replace(/\\s+/g, ' ').trim().replace(/\\d+s$/, '').slice(0, 40)
-    : el.querySelector('.lc-steps__line') ? 'STEPS ' + el.querySelector('.lc-steps__line').innerText.replace(/\\s+/g, ' ').trim() + ' rows=' + String(el.querySelectorAll('.lc-steps__list .lc-filerow').length)
+    : el.querySelector('.lc-steps__line') ? 'STEPS ' + el.querySelector('.lc-steps__line').innerText.replace(/\\s+/g, ' ').trim() + ' rows=' + String(el.querySelectorAll('.lc-steps__list .lc-filerow').length) + ' open=' + String(el.querySelector('.lc-steps__line').getAttribute('aria-expanded'))
     // A reply still arriving carries the caret (0.581: the live line stays under it).
     : (el.querySelector('.lc-caret') ? 'SAYING ' : 'SAID ') + el.innerText.replace(/\\s+/g, ' ').trim().slice(0, 50))
   .filter((line) => line !== 'SAID ' && line !== 'SAYING '))()`
@@ -110,6 +110,11 @@ try {
   // 0.584: the group still growing shows its rows while it works.
   const grew = samples.filter((sample) => sample.some((line) => /^STEPS .* rows=[1-9]/.test(line)))
   check('while it worked, the growing group showed its rows', grew.length > 0, `${String(grew.length)} of ${String(samples.length)} samples; example: ${JSON.stringify(grew[0] ?? samples.at(-2) ?? [])}`.slice(0, 300))
+  // 0.594: once the run has moved on, a group folds to its line; only the one under way is open.
+  const stacked = samples.map((sample) => sample.filter((line) => line.startsWith('STEPS'))).filter((lines) => lines.length >= 2)
+  const unfolded = stacked.filter((lines) => lines.slice(0, -1).some((line) => / open=true/.test(line)))
+  if (stacked.length === 0) say('  (no sample held two groups at once: nothing to say about folding)')
+  else check('with two or more groups mid-run, every group but the last is folded', unfolded.length === 0, `${String(unfolded.length)} of ${String(stacked.length)} samples kept an earlier group open; example: ${JSON.stringify(unfolded[0] ?? stacked[0]).slice(0, 240)}`)
   check('the finished turn has its foot', final.at(-1) === 'FOOT' || final.includes('FOOT'), JSON.stringify(final.slice(-3)))
   await drive.capture('a group opened', () => drive.evaluate(`(async () => { document.querySelectorAll('.lc-thread .lc-steps__line')[1]?.click(); await new Promise((r) => setTimeout(r, 500)); return document.querySelector('.lc-thread .lc-steps__list')?.innerText.replace(/\\s+/g, ' ').slice(0, 200) ?? 'none' })()`))
 } catch (error) {

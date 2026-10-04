@@ -399,12 +399,16 @@ export function ThreadItems({
                   variant="steps"
                   summary=""
                   trace={stepsLine(item.details, item.finished, workspacePath).segments}
+                  // Open, a lone thought's line drops its preview: the words are underneath (0.594).
+                  traceOpen={stepsLine(item.details, item.finished, workspacePath, { open: true }).segments}
                   finished={item.finished}
                   details={item.details}
                   runtimeName={undefined}
                   workspacePath={workspacePath}
-                  // The group still growing shows its rows as they land (0.584, `live`).
+                  // The group still growing shows its rows as they land (0.584, `live`);
+                  // one the run has moved past folds back to its line (0.594, `superseded`).
                   openByDefault={item.live === true}
+                  fold={item.superseded === true}
                   {...(onOpenFile === undefined ? {} : { onOpenFile })}
                 />
               </div>

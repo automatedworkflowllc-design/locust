@@ -178,6 +178,8 @@ export function ActivityCard({
   onOpenFile,
   planUnderway = false,
   openByDefault = false,
+  fold = false,
+  traceOpen,
   variant = 'card',
   oneRowPerFile = false
 }: {
@@ -241,6 +243,14 @@ export function ActivityCard({
    * a person looking back at it found one collapsed line.
    */
   readonly openByDefault?: boolean
+  /**
+   * The run moved on past this group (0.594): fold it to its line, unless
+   * the person opened or closed it by hand. The one way the app closes a
+   * fold, and only while the turn is running -- see the effect below.
+   */
+  readonly fold?: boolean
+  /** The line to draw while open, when it differs (a lone thought keeps its preview for the closed line only). */
+  readonly traceOpen?: readonly TraceSegment[]
 }): ReactElement {
   const [open, setOpen] = useState(openByDefault)
   /**
@@ -252,6 +262,21 @@ export function ActivityCard({
    * made by hand outranks the default, always.
    */
   const decided = useRef(false)
+  /*
+   * FOLDED WHEN THE RUN MOVES ON (0.594). The rule below -- a default may
+   * open a fold and never close it -- was written for a fold closing under
+   * the person's eyes the moment they sent a follow-up (2026-09-08). It also
+   * meant every group that had ever been live stayed open, and a long Grok
+   * run on Cursor read as a wall (Colin, 2026-10-04). Claude Code keeps one
+   * step open: the one under way. So when the host says the run has moved
+   * past this group, it folds to its line -- one press reopens it, nothing is
+   * lost -- unless the person opened or closed it themselves. `fold` is never
+   * true once the turn is over, so the last group stays as it was.
+   */
+  useEffect(() => {
+    if (decided.current || fold !== true) return
+    setOpen(false)
+  }, [fold])
   useEffect(() => {
     if (decided.current) return
     /*
@@ -336,9 +361,9 @@ export function ActivityCard({
     <div className={steps ? 'lc-steps' : 'lc-card'}>
       {steps ? (
         <button type="button" className="lc-steps__line" onClick={() => decide(!open)} aria-expanded={open}>
-          {/* The words may be cut to fit; what went wrong never is. */}
-          <span className={`lc-steps__text${trace?.[0]?.tone === undefined ? '' : ` is-${trace[0].tone}`}`}>{trace?.[0]?.text ?? summary}</span>
-          {(trace ?? []).slice(1).map((seg) => (
+          {/* The words may be cut to fit; what went wrong never is. Open, the line may read differently (0.594). */}
+          <span className={`lc-steps__text${(open && traceOpen ? traceOpen : trace)?.[0]?.tone === undefined ? '' : ` is-${(open && traceOpen ? traceOpen : trace)![0]!.tone}`}`}>{(open && traceOpen ? traceOpen : trace)?.[0]?.text ?? summary}</span>
+          {((open && traceOpen ? traceOpen : trace) ?? []).slice(1).map((seg) => (
             <span className={`lc-steps__extra${seg.tone === undefined ? '' : ` is-${seg.tone}`}`} key={seg.key}>
               {seg.text}
             </span>
