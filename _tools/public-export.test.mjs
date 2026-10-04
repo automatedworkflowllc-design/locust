@@ -24,8 +24,12 @@ test('a beta review and a handoff are excluded', () => {
   assert.equal(isExcluded('docs/internal/notes.md'), true)
 })
 
-test('a handoff whose name does not start with that prefix stays', () => {
-  assert.equal(isExcluded('docs/BETA-HANDOFF-2026-09-21.md'), false)
+test('a document under docs that is not on the published list is excluded, even a new one', () => {
+  assert.equal(isExcluded('docs/BETA-HANDOFF-2026-09-21.md'), true)
+  assert.equal(isExcluded('docs/PLAN-2026-10-03-EXECUTE.md'), true)
+  assert.equal(isExcluded('docs/a-folder-made-tomorrow-2026-10-05/01-launch.png'), true)
+  assert.equal(isExcluded('docs/DECISION-2026-09-20-LOCUST-NEVER-RUNS-MODEL-CODE.md'), false)
+  assert.equal(isExcluded('docs/ROADMAP.md'), false)
 })
 
 test('the desktop ui profile is excluded', () => {

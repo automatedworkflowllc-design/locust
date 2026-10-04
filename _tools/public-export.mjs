@@ -143,7 +143,23 @@ export const EXCLUSIONS = [
   '**/*-profile/**'
 ]
 
+// docs/ is published only from this list. Everything else there -- plans,
+// tester briefs, findings, captures -- quotes real sessions, and a new folder
+// of screenshots must stay out without anyone remembering to list it. The
+// README links the documents named here.
+export const DOCS_PUBLISHED = [
+  'docs/assets/**',
+  'docs/wip/**',
+  'docs/ARCHITECTURE.md',
+  'docs/CODEX_RUNTIME.md',
+  'docs/ROADMAP.md',
+  'docs/REMAINING-PLAN.md',
+  'docs/CROSS_TASK_CONTEXT.md',
+  'docs/DECISION-*.md'
+]
+
 const EXCLUSION_PATTERNS = EXCLUSIONS.map((glob) => ({ glob, re: compileGlob(glob) }))
+const DOCS_PUBLISHED_PATTERNS = DOCS_PUBLISHED.map((glob) => compileGlob(glob))
 
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.ico', '.icns', '.svg'])
 
@@ -193,6 +209,7 @@ export function compileGlob(glob) {
 
 export function exclusionRule(repoPath) {
   const path = repoPath.replace(/\\/g, '/').replace(/^\.\//, '')
+  if (path.startsWith('docs/') && !DOCS_PUBLISHED_PATTERNS.some((re) => re.test(path))) return 'docs/ (not on DOCS_PUBLISHED)'
   for (const pattern of EXCLUSION_PATTERNS) {
     if (pattern.re.test(path)) return pattern.glob
   }
