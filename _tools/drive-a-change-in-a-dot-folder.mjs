@@ -1,6 +1,6 @@
 // Does a file a teammate wrote, in a folder Locust never reads, say that it changed (0.597)?
 //
-//   node _tools/drive-a-change-in-a-dot-folder.mjs [--packaged <exe>] [--tag <name>] [--plain]
+//   node _tools/drive-a-change-in-a-dot-folder.mjs [--packaged <exe>] [--tag <name>] [--plain] [--antigravity]
 //
 // The workspace is a git repository whose folder name starts with a dot
 // (`.locust-drive-dotfolder-ws-…`), as Colin's `~/.claude` does. Locust never
@@ -11,7 +11,13 @@
 // the teammate's own word, with no diff underneath. --plain runs the same in
 // an ordinary folder, the control: that row carries its diff.
 //
-// Wren on the free OpenCode model, Accept edits; nothing is spent.
+// Which runtime matters. The free OpenCode model reports its own diff, so its
+// row never said "did not report" in the first place (measured on the 0.596
+// package: `report.md ADDED +1 -0` in the dot-folder too). The rows that did
+// are the runtimes that name a file and send no change: Codex's file_change,
+// Antigravity's write_to_file. --antigravity runs Wren on Antigravity Flash
+// through its CLI (a real account's quota, so LOCUST_SPEND=1 is required);
+// without it, Wren is on the free OpenCode model and nothing is spent.
 
 import { execFileSync } from 'node:child_process'
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
@@ -24,7 +30,9 @@ const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.i
 const packaged = arg('--packaged')
 const tag = arg('--tag')
 const plain = process.argv.includes('--plain')
-const outPath = tag === undefined ? undefined : join(recordRoot('beta-fixes-2026-09-24'), `a-change-in-a-dot-folder-${plain ? 'plain-' : ''}${tag}`)
+const antigravity = process.argv.includes('--antigravity')
+const route = antigravity ? { runtime: 'antigravity', model: 'flash', mode: 'accept-edits' } : { ...FREE_ROUTE, mode: 'accept-edits' }
+const outPath = tag === undefined ? undefined : join(recordRoot('beta-fixes-2026-09-24'), `a-change-in-a-dot-folder-${plain ? 'plain-' : ''}${antigravity ? 'antigravity-' : ''}${tag}`)
 if (outPath !== undefined) await mkdir(outPath, { recursive: true })
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', windowsHide: true })
@@ -43,11 +51,12 @@ const drive = await startDrive({
   name: plain ? 'a-change-in-a-plain-folder' : 'a-change-in-a-dot-folder',
   port: 9586,
   workspace,
+  spends: antigravity,
   ...(packaged === undefined ? {} : { packaged }),
   ...(outPath === undefined ? {} : { outPath }),
   seed: {
     schemaVersion: 1,
-    teammates: [{ teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: '2026-09-05T05:00:00.000Z', route: { ...FREE_ROUTE, mode: 'accept-edits' } }],
+    teammates: [{ teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: '2026-09-05T05:00:00.000Z', route }],
     missionOwners: {},
     settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: false }
   }
@@ -102,5 +111,5 @@ try {
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
-  await drive.finish({ intro: `Build: ${packaged ?? 'whatever pnpm build last wrote to out/'}. Wren on the free OpenCode model writes report.md in ${plain ? 'an ordinary folder (the control)' : 'a dot-folder, which Locust never reads'}; the file row afterwards.` })
+  await drive.finish({ intro: `Build: ${packaged ?? 'whatever pnpm build last wrote to out/'}. Wren on ${antigravity ? 'Antigravity Flash (CLI)' : 'the free OpenCode model'} writes report.md in ${plain ? 'an ordinary folder (the control)' : 'a dot-folder, which Locust never reads'}; the file row afterwards.` })
 }
