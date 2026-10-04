@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.591.0 - 2026-10-04
+
+### Improved
+
+- **A scheduled routine in Approve each says it will wait for you.** Fired while nobody is at the window, such a routine stops on its first card and waits there; the Routines screen now says so on the row, where the schedule is set, instead of leaving it to be found the next morning under "waiting on you". Ask and Accept edits run through.
+
 ## 0.590.0 - 2026-10-04
 
 ### New
