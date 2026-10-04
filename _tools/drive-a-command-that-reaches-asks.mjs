@@ -39,7 +39,9 @@ const CARD = `JSON.stringify((() => {
   for (const dt of card?.querySelectorAll('.lc-receipt dt') ?? []) rows[dt.textContent.trim()] = dt.nextElementSibling?.textContent.replace(/\\s+/g, ' ').trim() ?? ''
   const reach = card?.querySelector('.lc-approval__reach')
   const plain = [...(card?.querySelectorAll('.lc-receipt dd') ?? [])].find((dd) => dd !== reach && !dd.classList.contains('lc-mono'))
-  return { shown: true, rows, colour: reach ? getComputedStyle(reach).color : null, plain: plain ? getComputedStyle(plain).color : null }
+  const buttons = [...actions.querySelectorAll('button')].map((b) => b.innerText.trim())
+  const note = card?.querySelector('.lc-approval__note')?.textContent.replace(/\\s+/g, ' ').trim() ?? ''
+  return { shown: true, rows, buttons, note, colour: reach ? getComputedStyle(reach).color : null, plain: plain ? getComputedStyle(plain).color : null }
 })())`
 const DENY = `(() => {
   const button = [...document.querySelectorAll('.lc-approval__actions button')].find((b) => /^Deny/.test(b.innerText.trim()))
@@ -89,6 +91,8 @@ try {
   check('a card asked about the taskkill command', first !== undefined, JSON.stringify(seen).slice(0, 200))
   check('the card says what it reaches', first?.rows.Reaches === `Stops every ${PROGRAM} on this computer, not only the ones this run started.`, first?.rows.Reaches ?? 'no Reaches row')
   check('drawn apart from the rows around it (amber)', first?.colour !== null && first?.colour !== undefined && first.colour !== first.plain, `${String(first?.colour)} vs ${String(first?.plain)}`)
+  check('0.579: neither Always nor a saved rule is offered', first !== undefined && !first.buttons.some((b) => /Always|ask again/i.test(b)), JSON.stringify(first?.buttons))
+  check('0.579: the note says it is asked every time', /asked about every time/.test(first?.note ?? ''), first?.note ?? '')
   check('every card was denied and the run ended', !(await running()))
   await drive.evaluate(`(() => { for (const b of document.querySelectorAll('.lc-thread .lc-steps__line[aria-expanded="false"]')) b.click(); return true })()`)
   await sleep(600)

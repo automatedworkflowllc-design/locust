@@ -448,10 +448,20 @@ export function ApprovalCard({
               >
                 {isQuestion ? 'Allow once' : 'Approve once'}
               </button>
-              <button type="button" className="lc-ghostbutton" disabled={busy} onClick={() => approve('approve-always')}>
-                Always allow this session
-              </button>
-              {rule !== undefined && (
+              {/*
+                * ASKED EACH TIME (0.579). A command that reaches programs this
+                * run did not start is not offered for the rest of the run or
+                * as a saved rule. "Always" is the runtime's own pattern --
+                * OpenCode answered `taskkill /IM locust-no-such-program.exe`
+                * with "taskkill *", every taskkill for the run -- and Locust
+                * cannot narrow it, so it is not offered.
+                */}
+              {reach === undefined && (
+                <button type="button" className="lc-ghostbutton" disabled={busy} onClick={() => approve('approve-always')}>
+                  Always allow this session
+                </button>
+              )}
+              {rule !== undefined && reach === undefined && (
                 <button type="button" className="lc-ghostbutton" disabled={busy || saving} title={rule.allowSentence} onClick={() => saveRule('allow')}>
                   Yes, and don&rsquo;t ask again
                 </button>
@@ -467,11 +477,13 @@ export function ApprovalCard({
               that outlives the run is a Settings decision, not one to take here.
             */}
             {/* What Always lets through, when the route can say (R35). */}
-            {request.alwaysCovers === undefined
-              ? 'Nothing has happened yet. “Always” lasts until this run ends.'
-              : `Nothing has happened yet. “Always” allows ${request.alwaysCovers}, until this run ends.`}
+            {reach !== undefined
+              ? 'Nothing has happened yet. A command that reaches beyond this run is asked about every time.'
+              : request.alwaysCovers === undefined
+                ? 'Nothing has happened yet. “Always” lasts until this run ends.'
+                : `Nothing has happened yet. “Always” allows ${request.alwaysCovers}, until this run ends.`}
             {/* A saved rule outlives the run, so what it would save is said before it is pressed (0.521). */}
-            {rule !== undefined && ` “Don’t ask again” saves a rule: ${rule.allowSentence} Settings > Teammates lists your rules.`}
+            {rule !== undefined && reach === undefined && ` “Don’t ask again” saves a rule: ${rule.allowSentence} Settings > Teammates lists your rules.`}
           </p>
           {ruleSaid !== undefined && <p className="lc-approval__note" role="status">{ruleSaid}</p>}
         </>

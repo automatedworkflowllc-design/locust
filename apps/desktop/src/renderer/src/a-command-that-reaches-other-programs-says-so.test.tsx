@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest'
 import type { MissionApprovalRequest } from '../../shared/ipc.js'
 import { ActivityCard } from './components/ActivityCard.js'
 import { ApprovalCard } from './components/ApprovalCard.js'
+import { ApprovalRuleContext } from './approvalRuleContext.js'
+import type { CardRule } from './approvalRuleContext.js'
 import type { ActivityDetail } from './missionView.js'
 
 /**
@@ -55,6 +57,40 @@ describe('the approval card', () => {
   it('has no such row for a command that acts on its own work', () => {
     expect(card('taskkill /F /PID 1234')).not.toContain('Reaches')
     expect(card('python -m pytest -q')).not.toContain('Reaches')
+  })
+})
+
+/*
+ * ASKED EACH TIME (0.579). OpenCode answered the live drive's card with
+ * "taskkill *" as its Always: every taskkill for the rest of the run, from a
+ * card about one. Neither Always nor a saved rule is offered for a command
+ * that reaches beyond its run.
+ */
+describe('a card for a command that reaches beyond its run', () => {
+  const RULE: CardRule = { allowSentence: 'Wren may run it without asking.', denySentence: 'Wren may never run it.', save: async () => undefined }
+  const offered = (detail: string, alwaysCovers?: string): string =>
+    renderToStaticMarkup(
+      <ApprovalRuleContext.Provider value={() => RULE}>
+        <ApprovalCard request={{ ...asked(detail), ...(alwaysCovers === undefined ? {} : { alwaysCovers }) }} onDecide={() => undefined} onAnswer={() => undefined} busy={false} />
+      </ApprovalRuleContext.Provider>
+    )
+
+  it('offers neither Always nor a saved rule, and says why', () => {
+    const html = offered(ARENA, 'anything matching “taskkill *”')
+    expect(html).toContain('Approve once')
+    expect(html).toContain('Deny')
+    expect(html).not.toContain('Always allow this session')
+    expect(html).not.toContain('don&rsquo;t ask again')
+    expect(html).not.toContain('don’t ask again')
+    expect(html).not.toContain('taskkill *')
+    expect(html).toContain('asked about every time')
+  })
+
+  it('still offers both on an ordinary command (control)', () => {
+    const html = offered('python -m pytest -q', 'anything matching “python *”')
+    expect(html).toContain('Always allow this session')
+    expect(html).toMatch(/don(&rsquo;|’)t ask again/)
+    expect(html).toContain('python *')
   })
 })
 

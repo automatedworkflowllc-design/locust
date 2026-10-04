@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.579.0 - 2026-10-04
+
+### Changed
+
+- **A command that reaches beyond its own work is asked about every time.**
+  Its approval card no longer offers "Always allow this session" or "Yes,
+  and don't ask again". For `taskkill /IM some.exe`, the agent's own
+  "Always" would have allowed every `taskkill` for the rest of the run, from
+  a card about one. Approve once and Deny are still there.
+
 ## 0.578.0 - 2026-10-04
 
 ### New
