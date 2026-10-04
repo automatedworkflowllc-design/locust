@@ -1,0 +1,118 @@
+# Mutation control for the mission-store suites, every night (2026-10-04).
+#
+# A passing suite is only evidence if it could have failed. The mission-store
+# suites (checkpoint, schema versions, the retention rules, the workroom) are
+# checked by test/mutation-control.mjs: it breaks one behaviour at a time in the
+# engine, runs the suite, and requires the EXPECTED test to fail. It runs 42
+# mutations and a baseline, a whole suite each, so it is not part of the gate;
+# the main agent has run it by hand. This runs it every night instead, where
+# minutes are free.
+#
+# WHERE THIS FILE GOES. Not in a workflow folder here: this is the master copy.
+# It runs on the PUBLIC mirror (automatedworkflowllc-design/locust-app), whose
+# Actions minutes are free; the private repository's are rationed. Put it, by
+# hand, at
+#
+#     .github/workflows/mutation-nightly.yml
+#
+# in the mirror. By hand because a push that carries a workflow needs a token
+# with the `workflow` scope, which the release machine does not have; and it
+# STAYS there through every release, because _tools/publish-mirror.mjs keeps
+# the mirror's own .github/workflows (KEPT_IN_MIRROR) and
+# _tools/public-export.mjs leaves workflows out of what it exports.
+#
+# NOTHING ELSE MAY RUN IN THIS JOB. mutation-control.mjs rewrites
+# packages/mission-store/src/index.ts (and checkpoint.ts and workroom.ts) while
+# it runs and puts them back; a build or a test run that overlapped it would
+# read mutated source and report a break that is not there. So: one job, its
+# steps in series, no matrix, no second job on the same checkout, and a
+# concurrency group so a manual run and the nightly queue rather than overlap.
+# Do not add other checks to this file; give them their own.
+#
+# WHAT A RED RUN MEANS. The job fails when a mutation SURVIVES (the suite did
+# not notice the break), when one fails for the WRONG reason, when an anchor is
+# no longer found in the source (the mutation went stale, which reads like a
+# pass and is an invariant that has quietly stopped being checked), or when the
+# baseline is not green. The log names which. The last step also fails if the
+# runner left any file under packages/mission-store/src changed.
+#
+# THE FIRST RUN is best made by hand (Actions > mutation-nightly > Run workflow)
+# before trusting the cron: the baseline has been green on Windows, and this
+# runs on Linux, which the suite has no known reason to mind (its one platform
+# branch is O_NOFOLLOW, which the source handles) but has not been seen on. If
+# the baseline is red there, change runs-on to windows-latest; nothing else
+# here is platform-specific.
+#
+# A scheduled workflow on a public repository is switched off by GitHub after
+# 60 days without repository activity. The mirror is pushed on every release,
+# so it stays on; if releases stop, so does this.
+
+name: mutation-nightly
+
+on:
+  schedule:
+    # 04:23 UTC. An off-peak minute on purpose: the top of an hour is when
+    # GitHub's scheduler is busiest, and runs started then are delayed or dropped.
+    - cron: '23 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mutation-nightly
+  cancel-in-progress: false
+
+jobs:
+  mutation:
+    runs-on: ubuntu-latest
+    # The suite is seconds and the run is 43 of it; this is a hang guard.
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # No install scripts: the root postinstall fetches the Electron binary
+      # (nothing here runs Electron), and the packages need none of the rest.
+      - name: Install
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      # mission-store's tests import runtime-adapters, and both are read from
+      # their built output. Built BEFORE the mutations start, never during.
+      - name: Build the packages
+        run: |
+          pnpm --filter @teammate/runtime-adapters build
+          pnpm --filter @teammate/mission-store build
+
+      - name: Mutation control
+        working-directory: packages/mission-store
+        shell: bash
+        run: |
+          set -o pipefail
+          node test/mutation-control.mjs 2>&1 | tee "$RUNNER_TEMP/mutation.log"
+
+      # Whatever happened above: the run's own account of itself, on the run's page.
+      - name: Say what it found
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### Mutation control'
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/mutation.log" 2>/dev/null || echo 'no log: the run never reached the mutations'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The runner restores every file it touches, including on error. Said
+      # here rather than trusted: a source file left mutated is the one outcome
+      # that would make every later run a lie.
+      - name: Every source file was put back
+        if: always()
+        run: git diff --exit-code -- packages/mission-store/src
