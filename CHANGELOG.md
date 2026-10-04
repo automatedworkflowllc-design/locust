@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.580.0 - 2026-10-04
+
+### Fixed
+
+- **A page a teammate makes runs in its turn again.** A new `index.html`
+  sat as a folded row under the reply instead of running, in any
+  conversation and after Keep brought a comparison's page into your folder.
+  It now opens and runs on arrival. A changed page, and any other file,
+  stays folded as before, and a comparison's columns still run each page
+  once, above the column.
+
 ## 0.579.0 - 2026-10-04
 
 ### Changed

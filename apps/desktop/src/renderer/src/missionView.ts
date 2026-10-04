@@ -685,6 +685,20 @@ export function defaultOpenEntry(entries: readonly ActivityEntry[]): string | un
   return first.large && !newPage ? undefined : first.key
 }
 
+/**
+ * The first NEW web page among a turn's files, to open on arrival (0.580).
+ *
+ * The turn's files card (one row per file, 0.494) opened nothing, so the
+ * 0.446 rule above never reached it: a page a teammate made sat as a folded
+ * row, in any conversation and after a comparison's Keep
+ * (drive-build-and-compare, failing since at least 0.570). Only the page
+ * opens there; a diff stays folded, as that card has always drawn them.
+ */
+export function newPageEntry(entries: readonly ActivityEntry[]): string | undefined {
+  const page = entries.find((entry) => entry.kind === 'file' && entry.file.status === 'ADDED' && /\.html?$/i.test(entry.file.path))
+  return page?.key
+}
+
 /** `14:44`, in the host's own timezone. */
 /**
  * A usage window as the runtime worded it, with its ISO reset instants

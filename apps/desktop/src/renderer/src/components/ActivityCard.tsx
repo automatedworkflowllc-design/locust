@@ -34,7 +34,7 @@ export function thoughtLine(durationMs: number | undefined): string {
 }
 import type { ReactElement } from 'react'
 
-import { activityCounts, activityEntries, netFileEntries, boundedShellOutput, commandTook, defaultOpenEntry, foldedToolsLead, foldedToolsNames, relativePath, durationText, thoughtHeadline } from '../missionView.js'
+import { activityCounts, activityEntries, netFileEntries, boundedShellOutput, commandTook, defaultOpenEntry, newPageEntry, foldedToolsLead, foldedToolsNames, relativePath, durationText, thoughtHeadline } from '../missionView.js'
 import type { TraceSegment, ActivityDetail, ActivityEntry, PlanStep } from '../missionView.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { DiffView } from './DiffView.js'
@@ -300,7 +300,11 @@ export function ActivityCard({
   const pinned = useContext(PinnedPagesContext)
   const inComparison = useContext(InComparisonCell)
   const steps = variant === 'steps'
-  const firstOpen = variant === 'card' ? defaultOpenEntry(entries) : undefined
+  // The files card opens a new page only (0.580, `newPageEntry`) -- not in a
+  // comparison's cell, whose page runs above it: after Keep the kept page's
+  // path is the folder's, not the copy's, so the pinned check below missed it
+  // and the reopened column ran the page twice.
+  const firstOpen = variant === 'card' ? defaultOpenEntry(entries) : variant === 'files' && !inComparison ? newPageEntry(entries) : undefined
   const initiallyOpen = entries.some((entry) => entry.key === firstOpen && entry.kind === 'file' && pinned.has(entry.file.path)) ? undefined : firstOpen
   const isOpen = (entry: ActivityEntry): boolean => toggled.get(entry.key) ?? entry.key === initiallyOpen
   const decide = (next: boolean): void => {
