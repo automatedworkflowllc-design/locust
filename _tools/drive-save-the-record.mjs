@@ -125,6 +125,8 @@ try {
     check('the file has the person\'s words and the answer', markdown.includes(PROMPT) && markdown.includes(ANSWER))
     check('the file lists the declined call with its recorded words', markdown.includes('Asked: `rm -rf build`') && markdown.includes(DECLINED))
     check('the file has the command that ran, with its output', markdown.includes('npm test') && markdown.includes('Tests 12 passed'))
+    // 0.599: the record names the third kind of call it cannot show -- one covered by an earlier Always on the run.
+    check('the file names a call covered by an earlier Always among what it cannot show', markdown.includes('covered by an earlier "Always" on this run, which raises no card'), (markdown.match(/Not recorded:[^\n]*/) ?? ['no Not recorded sentence'])[0].slice(0, 220))
     const rawPath = recordPath.replace(/\.md$/, '.json')
     const raw = JSON.parse(await readFile(rawPath, 'utf8').catch(() => '{}'))
     const rawText = JSON.stringify(raw)

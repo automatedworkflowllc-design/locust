@@ -254,7 +254,8 @@ function approvalsSection(calls: readonly Call[], events: readonly NormalizedRun
           // The host knows an answer never reached the ledger (0.587): the claim must not read complete.
           ? `_Recorded:_ every card answered on this turn should be here; ${String(unwritten)} could not be written down, and the notes under "How it ended" say which. `
           : '_Recorded:_ every card answered on this turn, with who answered it. ')
-        + 'Not recorded: a card no one answered because the run ended first, and a call that ran in a mode that asks nothing.'
+        // Three kinds, not two (0.599): the third raises no card, so nothing of it reaches the ledger.
+        + 'Not recorded: a card no one answered because the run ended first, a call that ran in a mode that asks nothing, and a call covered by an earlier "Always" on this run, which raises no card.'
       : '_Not in the ledger:_ an approval that was allowed, what the card asked in full, who answered it and how. '
         + 'A call listed under Commands or File changes may or may not have been approved first; the record cannot tell.'
   ].join('\n')
