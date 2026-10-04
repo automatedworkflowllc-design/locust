@@ -51,6 +51,9 @@ describe('Home', () => {
   it('folds the agent list to one line when every installed agent is ready', () => {
     const html = home([ready('codex', 'Codex CLI'), ready('claude', 'Claude Code'), absent('gemini', 'Gemini CLI')])
     expect(html).toContain('lc-agenthead is-folded')
+    // Named from the person's side of the screen (0.607): these are their accounts, signed in here.
+    expect(html).toContain('Connected accounts')
+    expect(html).not.toContain('>AI agents<')
     // The ready agents as their marks (0.383), each a thing to point at that
     // names itself and its state (AgentMark, 0.389) -- not a sentence of names.
     expect(html).toContain('aria-label="Codex CLI. Ready · 1.0.0"')

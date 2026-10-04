@@ -5899,120 +5899,25 @@ textarea {
 /* The list folded to one line when nothing on it needs the person
    (FirstLaunch, `folded`): what is ready, by name, and the way to the rest. */
 /* Build and compare (0.448): one quiet line under the agents, its starters as small pills. */
-.lc-buildhead {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
+/* The Compare starters as one line (0.607): "Try two models on a landing page,
+   a sales dashboard or an arcade game", each a link that fills the box. The
+   three cards took a row of Home for a thing most sessions do not start
+   with (the critique Colin nodded at, 2026-10-04). */
+.lc-buildline {
+  margin: 0;
   padding: 0 10px 0 14px;
-}
-
-.lc-buildhead .lc-agenthead__label {
-  margin-right: 4px;
-}
-
-/*
- * The starters as Arena's "Get started" cards (0.460): an icon tile, what it
- * makes, and a quieter line under it. Three across, in the room the pills had
- * beside the label, so Home keeps its height.
- */
-.lc-buildhead__cards {
-  flex: 1;
-  min-width: 0;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.lc-buildcard {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  padding: 6px 12px 6px 6px;
-  border: 1px solid var(--lc-border-card);
-  border-radius: 10px;
-  background: var(--lc-bg-raised);
-  color: var(--lc-text-secondary);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: background var(--lc-motion-hover) var(--lc-ease), border-color var(--lc-motion-hover) var(--lc-ease);
-}
-
-.lc-buildcard:hover,
-.lc-buildcard:focus-visible {
-  background: var(--lc-hover-surface-strong);
-  border-color: var(--lc-border-strong);
-  color: var(--lc-text-primary);
-}
-
-/* The thing it makes, drawn (BuildIcon), on a filled tile: an object to
-   pick, as Arena's cards have, not a glyph beside a word (0.461). */
-.lc-buildcard__icon {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  background: var(--lc-hover-surface-strong);
-  color: var(--lc-text-primary);
-}
-
-.lc-buildcard:hover .lc-buildcard__icon,
-.lc-buildcard:focus-visible .lc-buildcard__icon {
-  background: var(--lc-border-strong);
-}
-
-.lc-buildcard__text {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.lc-buildcard__name,
-.lc-buildcard__line {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.lc-buildcard__name {
-  font-size: var(--lc-text-control);
-  font-weight: 500;
-  color: var(--lc-text-primary);
-}
-
-.lc-buildcard__line {
   font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
+  line-height: 1.6;
+}
+.lc-buildline .lc-agenthead__label {
+  margin-right: 6px;
+}
+.lc-buildline .lc-linkbutton {
+  font-size: inherit;
 }
 
-/* A short window keeps the cards to one line: Home already has no height to
-   spare at 1366x768 (measured 2026-09-29: 33px over before the cards). The
-   drawn icon and the name stay; the line under it goes. */
-@media (max-height: 820px) {
-  .lc-buildcard {
-    padding: 2px 12px 2px 2px;
-  }
-
-  .lc-buildcard__icon {
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
-  }
-
-  .lc-buildcard__icon svg {
-    width: 15px;
-    height: 15px;
-  }
-
-  .lc-buildcard__line {
-    display: none;
-  }
-}
+/* The starter cards of 0.460 (.lc-buildhead, .lc-buildcard) went in 0.607; the one-line form is .lc-buildline above. */
 
 /* The composer's chip per compared model (0.460): the route chip's own look,
    capped so two or three and the + fit the row. */
