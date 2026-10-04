@@ -1885,6 +1885,15 @@ export function activityTrace(
 export interface StepsLine {
   /** The sentence first, then anything that went wrong, in amber. */
   readonly segments: readonly TraceSegment[]
+  /**
+   * The sentence in ever shorter forms (0.604), for a row too narrow for it:
+   * first with names given way to counts, then with the last phrases given
+   * way to "and N more". Each is shorter than the one before; the card picks
+   * the first that fits. Empty when nothing shorter can be said.
+   */
+  readonly shorter: readonly string[]
+  /** The sentence with every name whole (0.604): the line's hover title whenever what shows is not it. */
+  readonly title: string
 }
 
 type Looked = 'read' | 'search' | 'list' | 'web' | 'fetch' | 'plan' | 'wait' | 'glob' | 'code'
@@ -2054,6 +2063,44 @@ export function liveActionLine(detail: ActivityDetail, workspacePath?: string): 
   }
 }
 
+/**
+ * A FILE NAME LONGER THAN THE ROW CAN HOLD is cut in the middle, its extension
+ * kept (0.604): "a-full-rule-stor…very-rule.test.ts" still says what it is.
+ * The row's own end-of-line ellipsis on the whole sentence -- "created
+ * a-full-rule-store-keeps-every-rule.test.ts, edited ap…", Colin's screenshot
+ * of 2026-10-04 -- said nothing about the second file at all. 34 characters
+ * leaves a long name room beside its verb at the row's narrowest.
+ */
+export function shortName(name: string, max = 34): string {
+  if (name.length <= max) return name
+  const extension = /(?:\.[A-Za-z0-9]{1,8}){1,2}$/.exec(name)?.[0] ?? ''
+  const stem = name.slice(0, name.length - extension.length)
+  const room = Math.max(6, max - extension.length - 1)
+  const head = Math.ceil(room * 0.64)
+  const tail = room - head
+  return `${stem.slice(0, head)}…${tail > 0 ? stem.slice(stem.length - tail) : ''}${extension}`
+}
+
+/**
+ * The shorter forms of a steps sentence (0.604), each shorter than the last:
+ * the phrases without their names, then with the last phrases given way to
+ * "and N more". The card measures its row and shows the first that fits; the
+ * full sentence stays as the line's title. A lone failure is said whole or
+ * not at all.
+ */
+function shorterForms(words: readonly string[], briefs: readonly string[], sentence: string, loneFailed: boolean): string[] {
+  if (loneFailed || words.length === 0) return []
+  const cap = (text: string): string => `${text.charAt(0).toUpperCase()}${text.slice(1)}`
+  const shorter: string[] = []
+  const brief = briefs.join(', ')
+  if (brief.length < sentence.length) shorter.push(cap(brief))
+  for (let keep = briefs.length - 1; keep >= 1; keep -= 1) {
+    const text = `${briefs.slice(0, keep).join(', ')} and ${String(briefs.length - keep)} more`
+    if (text.length < (shorter.at(-1) ?? sentence).length) shorter.push(cap(text))
+  }
+  return shorter
+}
+
 export function stepsLine(details: readonly ActivityDetail[], finished: boolean, workspacePath?: string, options: { readonly open?: boolean } = {}): StepsLine {
   const phrases = new Map<string, { count: number; names: string[] }>()
   const note = (kind: string, name: string | undefined): void => {
@@ -2135,33 +2182,40 @@ export function stepsLine(details: readonly ActivityDetail[], finished: boolean,
   const clip = (text: string, max = 48): string => (text.length > max ? `${text.slice(0, max - 1)}…` : text)
   const times = (count: number, one: string, many: string): string => `${String(count)} ${count === 1 ? one : many}`
   const words: string[] = []
+  // The same phrases without their names (0.604): what the line falls back to when its row is too narrow for them.
+  const briefs: string[] = []
+  // And with every name whole, for the hover: a cut name says what it is, the title says all of it.
+  const longs: string[] = []
+  const word = (full: string, brief = full, long = full): void => { words.push(full); briefs.push(brief); longs.push(long) }
+  const files = (held: { count: number; names: string[] }): string => (held.names.length > 1 ? `read ${pluralize(held.names.length, 'file')}` : held.count === 1 ? 'read a file' : `read ${pluralize(held.count, 'file')}`)
+  const searches = (held: { count: number }): string => (held.count === 1 ? 'ran a search' : `ran ${times(held.count, 'search', 'searches')}`)
   for (const [kind, held] of phrases) {
     const named = one(held)
     switch (kind) {
-      case 'read': words.push(named !== undefined ? `read ${named}` : held.names.length > 1 ? `read ${pluralize(held.names.length, 'file')}` : held.count === 1 ? 'read a file' : `read ${pluralize(held.count, 'file')}`); break
-      case 'search': words.push(held.count === 1 ? (named !== undefined ? `searched for ${clip(named, 32)}` : 'searched the files') : `ran ${times(held.count, 'search', 'searches')}`); break
+      case 'read': word(named !== undefined ? `read ${shortName(named)}` : files(held), files(held), named !== undefined ? `read ${named}` : files(held)); break
+      case 'search': word(held.count === 1 ? (named !== undefined ? `searched for ${clip(named, 32)}` : 'searched the files') : `ran ${times(held.count, 'search', 'searches')}`, searches(held)); break
       case 'code': {
         const language = held.names.every((name) => /node|js/i.test(name)) ? 'JavaScript' : /python|py/i.test(held.names.join(' ')) ? 'Python' : 'code'
-        words.push(held.count === 1 ? `ran ${language}` : `ran ${language} ${String(held.count)} times`)
+        word(held.count === 1 ? `ran ${language}` : `ran ${language} ${String(held.count)} times`)
         break
       }
-      case 'glob': words.push(held.count > 1 ? `listed files ${String(held.count)} times` : named === undefined || /^(\*\*[\\/])?\*(\.\*)?$/.test(named) ? 'listed every file' : `listed files matching ${clip(named, 28)}`); break
-      case 'searchedIn': words.push(held.count === 1 && named !== undefined ? `searched ${named}` : `ran ${times(held.count, 'search', 'searches')}`); break
-      case 'wait': words.push(held.count === 1 ? 'waited for a command' : `waited ${String(held.count)} times`); break
-      case 'list': words.push(held.count === 1 ? (named !== undefined ? `listed ${named}` : 'listed a folder') : `listed ${pluralize(held.count, 'folder')}`); break
-      case 'web': words.push(held.count === 1 ? 'searched the web' : `searched the web ${String(held.count)} times`); break
-      case 'fetch': words.push(held.count === 1 ? 'fetched a page' : `fetched ${pluralize(held.count, 'page')}`); break
-      case 'plan': words.push('updated the plan'); break
-      case 'helper': words.push(held.count === 1 ? `asked a helper${named === undefined ? '' : `: ${clip(named)}`}` : `asked ${pluralize(held.count, 'helper')}`); break
+      case 'glob': word(held.count > 1 ? `listed files ${String(held.count)} times` : named === undefined || /^(\*\*[\\/])?\*(\.\*)?$/.test(named) ? 'listed every file' : `listed files matching ${clip(named, 28)}`, held.count > 1 ? `listed files ${String(held.count)} times` : 'listed files'); break
+      case 'searchedIn': word(held.count === 1 && named !== undefined ? `searched ${shortName(named)}` : `ran ${times(held.count, 'search', 'searches')}`, searches(held), held.count === 1 && named !== undefined ? `searched ${named}` : `ran ${times(held.count, 'search', 'searches')}`); break
+      case 'wait': word(held.count === 1 ? 'waited for a command' : `waited ${String(held.count)} times`); break
+      case 'list': word(held.count === 1 ? (named !== undefined ? `listed ${shortName(named)}` : 'listed a folder') : `listed ${pluralize(held.count, 'folder')}`, held.count === 1 ? 'listed a folder' : `listed ${pluralize(held.count, 'folder')}`, held.count === 1 ? (named !== undefined ? `listed ${named}` : 'listed a folder') : `listed ${pluralize(held.count, 'folder')}`); break
+      case 'web': word(held.count === 1 ? 'searched the web' : `searched the web ${String(held.count)} times`); break
+      case 'fetch': word(held.count === 1 ? 'fetched a page' : `fetched ${pluralize(held.count, 'page')}`); break
+      case 'plan': word('updated the plan'); break
+      case 'helper': word(held.count === 1 ? `asked a helper${named === undefined ? '' : `: ${clip(named)}`}` : `asked ${pluralize(held.count, 'helper')}`, held.count === 1 ? 'asked a helper' : `asked ${pluralize(held.count, 'helper')}`); break
       case 'created':
       case 'edited':
-      case 'deleted': words.push(held.names.length === 1 ? `${kind} ${held.names[0]!}` : `${kind} ${pluralize(Math.max(held.names.length, 1), 'file')}`); break
-      case 'tool': words.push(held.names.length === 1 ? (held.count === 1 ? `used ${held.names[0]!}` : `used ${held.names[0]!} ${String(held.count)} times`) : pluralize(held.count, 'other tool call')); break
+      case 'deleted': word(held.names.length === 1 ? `${kind} ${shortName(held.names[0]!)}` : `${kind} ${pluralize(Math.max(held.names.length, 1), 'file')}`, held.names.length === 1 ? `${kind} a file` : `${kind} ${pluralize(Math.max(held.names.length, 1), 'file')}`, held.names.length === 1 ? `${kind} ${held.names[0]!}` : `${kind} ${pluralize(Math.max(held.names.length, 1), 'file')}`); break
+      case 'tool': word(held.names.length === 1 ? (held.count === 1 ? `used ${held.names[0]!}` : `used ${held.names[0]!} ${String(held.count)} times`) : pluralize(held.count, 'other tool call'), held.names.length === 1 ? (held.count === 1 ? 'used a tool' : `used a tool ${String(held.count)} times`) : pluralize(held.count, 'other tool call')); break
       case 'command': {
         const titled = details.filter((detail) => detail.kind === 'shell' && commandLooksAt(detail.name) === undefined)
         const only = titled.length === 1 ? titled[0] : undefined
         const first = shellCommandText(only?.name ?? '').split('\n')[0]?.trim() ?? ''
-        words.push(
+        word(
           held.count > 1 ? `ran ${pluralize(held.count, 'command')}`
           : only?.title !== undefined ? lowerFirst(only.title)
           // A runtime that names its command by the model's phrase ("Running the tests").
@@ -2170,7 +2224,8 @@ export function stepsLine(details: readonly ActivityDetail[], finished: boolean,
           : (first.match(/[A-Za-z]/g)?.length ?? 0) < 3 ? 'ran a script'
           // Code handed to an interpreter inline, too long to show: `node -e "import ..."`.
           : first.length > 40 && /\s-(?:e|c|-eval|-command|Command)\s+["'`]/.test(first) ? `ran a ${commandHead(first).replace(/\.exe$/i, '')} script`
-          : `ran ${clip(first, 40)}`
+          : `ran ${clip(first, 40)}`,
+          held.count === 1 ? 'ran a command' : `ran ${pluralize(held.count, 'command')}`
         )
         break
       }
@@ -2179,7 +2234,9 @@ export function stepsLine(details: readonly ActivityDetail[], finished: boolean,
   // What it was thinking about leads, where the model said (Codex's headline).
   if (headline !== undefined) {
     const rest = words.splice(0, words.length).join(', ')
-    words.push(rest.length === 0 ? headline : `${headline}: ${rest}`)
+    const restBrief = briefs.splice(0, briefs.length).join(', ')
+    const restLong = longs.splice(0, longs.length).join(', ')
+    word(rest.length === 0 ? headline : `${headline}: ${rest}`, restBrief.length === 0 ? headline : `${headline}: ${restBrief}`, restLong.length === 0 ? headline : `${headline}: ${restLong}`)
   } else if (thoughts > 0 && (thoughtMs >= 1_000 || words.length === 0)) {
     // "Thought" with no length says nothing beside the steps; alone, it is the step.
     const thought = thoughtMs >= 1_000 ? `thought for ${durationText(thoughtMs)}` : 'thought'
@@ -2187,6 +2244,8 @@ export function stepsLine(details: readonly ActivityDetail[], finished: boolean,
     // closed. Open, the words are underneath, once (0.594: the line said them and the body said them again).
     const said = words.length === 0 && options.open !== true ? thoughtText?.replace(/\s+/g, ' ').trim() : undefined
     words.unshift(said !== undefined && said.length > 0 ? `${thought}: ${clip(said, 70)}` : thought)
+    briefs.unshift(thought)
+    longs.unshift(words[0]!)
   }
   /*
    * ONE TITLED COMMAND THAT FAILED is said the way Claude Code says it:
@@ -2206,7 +2265,8 @@ export function stepsLine(details: readonly ActivityDetail[], finished: boolean,
   if (silent > 0) segments.push({ key: 'silent', text: `${String(silent)} did not report`, tone: 'amber' })
   if (refused > 0) segments.push({ key: 'refused', text: `${String(refused)} refused`, tone: 'amber' })
   if (declined > 0) segments.push({ key: 'declined', text: `${String(declined)} declined`, tone: 'amber' })
-  return { segments }
+  const whole = loneFailed || words.length === 0 ? sentence : longs.join(', ')
+  return { segments, shorter: shorterForms(words, briefs, sentence, loneFailed), title: `${whole.charAt(0).toUpperCase()}${whole.slice(1)}` }
 }
 
 export function activitySummary(details: readonly ActivityDetail[]): string {

@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.604.0 - 2026-10-05
+
+### Fixed
+
+- **The steps line under a reply fits its row in whole phrases.** It used to be cut by the row's edge mid-word ("created a-full-rule-store-keeps-every-rule.test.ts, edited ap…"). A long file name is now cut in the middle with its extension kept ("a-full-rule-stor…very-rule.test.ts"), and when the sentence is still wider than the row, names give way to counts ("edited a file, read a file"), then the last phrases to "and 2 more". The full sentence is the line's hover title, and the rows under it still carry every full name.
+
 ## 0.603.0 - 2026-10-05
 
 ### Improved

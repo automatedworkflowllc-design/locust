@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState, useContext } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, useContext } from 'react'
 
 /** "Thought for 12s", or just "Thought" when the runtime never said when it began. */
 /**
@@ -183,6 +183,10 @@ export function ActivityCard({
   openByDefault = false,
   fold = false,
   traceOpen,
+  traceShorter,
+  traceOpenShorter,
+  traceTitle,
+  traceOpenTitle,
   variant = 'card',
   oneRowPerFile = false
 }: {
@@ -254,8 +258,53 @@ export function ActivityCard({
   readonly fold?: boolean
   /** The line to draw while open, when it differs (a lone thought keeps its preview for the closed line only). */
   readonly traceOpen?: readonly TraceSegment[]
+  /** The steps sentence in ever shorter forms (0.604), closed and open; the line shows the first that fits its row. */
+  readonly traceShorter?: readonly string[]
+  readonly traceOpenShorter?: readonly string[]
+  /** The sentence with every name whole (0.604): the hover title whenever what shows is not it. */
+  readonly traceTitle?: string
+  readonly traceOpenTitle?: string
 }): ReactElement {
   const [open, setOpen] = useState(openByDefault)
+  /*
+   * THE LINE FITS ITS ROW (0.604). The sentence is measured after it paints;
+   * while it still overflows its box, the next shorter form from the builder
+   * (`shorter`: names to counts, then "and N more") is tried, and the row's
+   * widening starts the fitting over. The row used to cut the sentence at its
+   * edge mid-word ("edited ap…", Colin's screenshot, 2026-10-04). The full
+   * sentence is the line's title whenever a shorter form is shown. A card
+   * that is not the steps line does none of this.
+   */
+  const shownTrace = open && traceOpen ? traceOpen : trace
+  const shorter = (open && traceOpen ? traceOpenShorter : traceShorter) ?? []
+  const fullText = shownTrace?.[0]?.text ?? summary
+  const boxRef = useRef<HTMLDivElement>(null)
+  const textRef = useRef<HTMLSpanElement>(null)
+  const [fitted, setFitted] = useState<{ readonly of: string; readonly level: number } | undefined>(undefined)
+  const [boxWidth, setBoxWidth] = useState(0)
+  const fitLevel = fitted?.of === fullText ? Math.min(fitted.level, shorter.length) : 0
+  const shownText = fitLevel === 0 ? fullText : shorter[fitLevel - 1]!
+  // Whole names on hover whenever the line shows anything less than them: a cut name, a count, "and N more".
+  const wholeText = (open && traceOpen ? traceOpenTitle : traceTitle) ?? fullText
+  const hoverTitle = shownText === wholeText ? undefined : wholeText
+  useLayoutEffect(() => {
+    const el = textRef.current
+    if (variant !== 'steps' || el === null) return
+    if (el.scrollWidth > el.clientWidth + 1 && fitLevel < shorter.length) setFitted({ of: fullText, level: fitLevel + 1 })
+  }, [variant, fullText, fitLevel, shorter.length, boxWidth, open])
+  useEffect(() => {
+    const box = boxRef.current
+    if (variant !== 'steps' || box === null || typeof ResizeObserver === 'undefined') return
+    let last = box.clientWidth
+    const observer = new ResizeObserver(() => {
+      const width = box.clientWidth
+      if (width > last) setFitted(undefined)
+      last = width
+      setBoxWidth(width)
+    })
+    observer.observe(box)
+    return () => observer.disconnect()
+  }, [variant])
   /**
    * Whether the person has decided for themselves.
    *
@@ -361,12 +410,12 @@ export function ActivityCard({
   const shown = capped ? entries.slice(0, FOLD_ROWS_SHOWN) : entries
 
   return (
-    <div className={steps ? 'lc-steps' : 'lc-card'}>
+    <div className={steps ? 'lc-steps' : 'lc-card'} ref={boxRef}>
       {steps ? (
         <button type="button" className="lc-steps__line" onClick={() => decide(!open)} aria-expanded={open}>
-          {/* The words may be cut to fit; what went wrong never is. Open, the line may read differently (0.594). */}
-          <span className={`lc-steps__text${(open && traceOpen ? traceOpen : trace)?.[0]?.tone === undefined ? '' : ` is-${(open && traceOpen ? traceOpen : trace)![0]!.tone}`}`}>{(open && traceOpen ? traceOpen : trace)?.[0]?.text ?? summary}</span>
-          {((open && traceOpen ? traceOpen : trace) ?? []).slice(1).map((seg) => (
+          {/* The words are shortened to fit, never cut (0.604); what went wrong never gives way. Open, the line may read differently (0.594). */}
+          <span ref={textRef} className={`lc-steps__text${shownTrace?.[0]?.tone === undefined ? '' : ` is-${shownTrace[0]!.tone}`}`} {...(hoverTitle === undefined ? {} : { title: hoverTitle })}>{shownText}</span>
+          {(shownTrace ?? []).slice(1).map((seg) => (
             <span className={`lc-steps__extra${seg.tone === undefined ? '' : ` is-${seg.tone}`}`} key={seg.key}>
               {seg.text}
             </span>
