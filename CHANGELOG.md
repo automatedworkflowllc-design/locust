@@ -11,6 +11,20 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.585.0 - 2026-10-04
+
+### New
+
+- **The Board.** A new place in the sidebar, beside Conversations, Rooms and
+  Routines, shows every conversation in columns by what it needs from you:
+  **Needs you** (a card or a question is waiting, and the card says what
+  for), **Working**, **Ready to look at** (it finished while you were
+  elsewhere and you have not opened it since) and **Done**. Each card wears
+  its teammate's face; pressing it opens the conversation. Across every
+  agent at once. When nothing is waiting or running, the Board says so and
+  lists what is done.
+- The sidebar's places now sit two by two, so all four read whole.
+
 ## 0.584.0 - 2026-10-04
 
 ### Changed

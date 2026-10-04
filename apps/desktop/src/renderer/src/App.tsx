@@ -110,6 +110,10 @@ import { IdleTeammate } from './components/IdleTeammate.js'
 import { Inspector } from './components/Inspector.js'
 import { FileViewer } from './components/FileViewer.js'
 import { MacUpdateBanner, MissionsScreen, SettingsScreen, TeammatesScreen, UpdateBanner } from './components/Screens.js'
+import { BoardScreen } from './components/BoardScreen.js'
+
+/** The board's trash set (0.585): the sidebar's rows already leave deleted conversations out. */
+const NO_TRASH: ReadonlySet<string> = new Set()
 import { WhatsNewSplash } from './components/WhatsNew.js'
 import type { SettingsPageId } from './settingsPages.js'
 import type { ComparePick, ComparePicking, RouteChoice } from './components/RoutePicker.js'
@@ -185,7 +189,7 @@ import { installCommand } from '../../shared/runtime-install.js'
 import { splitAttachments, withAttachments } from '../../shared/attachments.js'
 // Only `heldFor`: this file has its own `ownerOf` for live runs, which is a
 // different question from who owns a recorded mission.
-import { heldFor, routineOf } from './conversationList.js'
+import { conversationKeys, heldFor, routineOf } from './conversationList.js'
 import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeFacts, modeRunsOn, modesFor, modeUnavailableReason, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, runtimeReach, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, nextFreeModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
 import { homeRouteOf, isOwnRoute, modelDisplayName, rememberOwnModels, routeChrome, routeModelName } from './routeName.js'
 import { FeedbackDialog } from './components/FeedbackDialog.js'
@@ -2345,7 +2349,9 @@ export default function App(): ReactElement {
    * is not the one on screen; cleared the moment it is.
    */
   const [finishedUnseen, setFinishedUnseen] = useState<ReadonlySet<string>>(new Set())
-  const lookingAtRef = useRef<{ readonly screen: Screen; readonly teammateId: string | undefined }>({ screen: 'workroom', teammateId: undefined })
+  // The same, by conversation, for the board's Ready to look at (0.585): turns whose run ended while the person was elsewhere.
+  const [finishedUnseenMissions, setFinishedUnseenMissions] = useState<ReadonlySet<string>>(new Set())
+  const lookingAtRef = useRef<{ readonly screen: Screen; readonly teammateId: string | undefined; readonly missionId?: string }>({ screen: 'workroom', teammateId: undefined })
   /**
    * Stops pressed before the run had a name, by the key it had at the time.
    *
@@ -2570,6 +2576,11 @@ export default function App(): ReactElement {
         const looking = lookingAtRef.current
         if (owner !== undefined && !(looking.screen === 'workroom' && looking.teammateId === owner)) {
           setFinishedUnseen((current) => (current.has(owner) ? current : new Set([...current, owner])))
+        }
+        // By conversation too (0.585): a finish the person is not looking at waits on the board.
+        if (!(looking.screen === 'workroom' && looking.missionId === update.missionId)) {
+          const ended = update.missionId
+          setFinishedUnseenMissions((current) => (current.has(ended) ? current : new Set([...current, ended])))
         }
       }
       if (update.kind === 'event' && update.event.type === 'run.completed') {
@@ -6525,6 +6536,9 @@ export default function App(): ReactElement {
       ),
     [runs]
   )
+  // The board's facts (0.585): which conversations wait on the person, and for what.
+  const needsYouMissionIds = useMemo(() => new Set(needsYouItems.flatMap((item) => (item.kind === 'memory' ? [] : [item.missionId]))), [needsYouItems])
+  const waitingFor = useMemo(() => new Map(needsYouItems.flatMap((item) => (item.kind === 'memory' ? [] : [[item.missionId, item.what] as const]))), [needsYouItems])
   const needsYouCount = needsYouItems.length
   useEffect(() => {
     window.desktop?.setNeedsYouCount?.(needsYouCount)
@@ -6888,6 +6902,19 @@ export default function App(): ReactElement {
   // Paused runs AND questions a teammate stopped on: both make its face wait on you (0.564).
   const pendingApprovalsByOwner = waitingByTeammate(needsYouItems)
   const shownMissionId = liveRun?.data?.missionId ?? shownKey
+  // Looking at a conversation takes its finish out of the board's Ready to look at (0.585), as looking at a teammate does above.
+  lookingAtRef.current = { ...lookingAtRef.current, missionId: shownMissionId }
+  useEffect(() => {
+    if (screen !== 'workroom' || shownMissionId === undefined) return
+    setFinishedUnseenMissions((current) => {
+      const shown = sidebarMissions.find((row) => conversationKeys(row).includes(shownMissionId))
+      const gone = shown === undefined ? [shownMissionId] : [shownMissionId, ...conversationKeys(shown)]
+      if (!gone.some((id) => current.has(id))) return current
+      const next = new Set(current)
+      for (const id of gone) next.delete(id)
+      return next
+    })
+  }, [screen, shownMissionId, sidebarMissions])
   const shownQuestionOpen = needsYouItems.some((item) => item.kind === 'decision' && item.missionId === shownMissionId)
   // Which teammate is replaying a routine, and which step it is on. DERIVED
   // from the runs that are actually live rather than tracked alongside them:
@@ -7008,6 +7035,7 @@ export default function App(): ReactElement {
           runtimes={runtimes}
           routines={routines}
           onOpenAutomations={() => setScreen('automations')}
+          onOpenBoard={() => setScreen('board')}
           {...(cloudTasks.length > 0 ? { cloudTasks: { count: cloudTasks.length, onOpen: () => { setScreen('workroom'); setCloudPanel(true) } } } : {})}
           missions={sidebarMissions}
           folders={folders}
@@ -7144,6 +7172,18 @@ export default function App(): ReactElement {
               missionOwners={missionOwners}
               {...(missionsOwner === undefined ? {} : { ownerId: missionsOwner })}
               onShowEveryone={() => setMissionsOwner(undefined)}
+              onOpen={openMission}
+            />
+          ) : screen === 'board' ? (
+            <BoardScreen
+              missions={sidebarMissions}
+              rooms={rooms}
+              // Deleted conversations never reach the sidebar's rows: the host keeps them for the trash screen alone.
+              trashed={NO_TRASH}
+              facts={{ needsYou: needsYouMissionIds, toLookAt: finishedUnseenMissions }}
+              waitingFor={waitingFor}
+              teammates={teammates}
+              missionOwners={missionOwners}
               onOpen={openMission}
             />
           ) : screen === 'teammates' ? (
