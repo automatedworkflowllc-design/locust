@@ -608,7 +608,7 @@ describe('where the person finds it', () => {
     const html = renderToStaticMarkup(createElement(dialog.SaveRecordDialog as never, { missionId: 'mission_three', onClose: () => undefined }))
     expect(dialog.RECORD_CLAIM).toBe('This file contains the conversation. Read it before you send it.')
     expect(html.split(dialog.RECORD_CLAIM)).toHaveLength(2)
-    expect(html).toContain('Include the raw record (JSON)')
+    expect(html).toContain('Include the raw record (JSON, not scrubbed)')
     expect(html).toContain('Save the record…')
     expect(html).not.toMatch(/checked=""/)
   })
