@@ -35,8 +35,10 @@ export interface HomeTeammate {
   readonly runtime?: MissionRuntimeId
   /** Running right now. */
   readonly working: boolean
-  /** Where the teammate stands (0.606): the live word, "waiting on you", what blocks them, or when they last worked. */
+  /** Where the teammate stands (0.606): the live word, "waiting on you", or what blocks them. Absent when idle. */
   readonly state?: TeamCardState
+  /** What an idle teammate last did, for the card's hover (0.609): "last worked 3 hours ago", "no work yet". */
+  readonly lastWorked?: string
 }
 
 export function HomeTeam({
@@ -72,6 +74,7 @@ export function HomeTeam({
             className="lc-hometeam__card"
             onClick={() => onMessage(mate.teammateId)}
             aria-label={`Message ${mate.name}, ${mate.role}${mate.state !== undefined ? `, ${mate.state.spoken}` : mate.working ? ', working now' : ''}${mate.route === undefined ? '' : `, on ${mate.route}`}`}
+            {...(mate.state === undefined && mate.lastWorked !== undefined ? { title: mate.lastWorked } : {})}
           >
             <TeammateBot hue={mate.hue} avatar={mate.avatar} size={34} teammateId={mate.teammateId} activity={mate.working ? 'working' : 'idle'} />
             <span className="lc-hometeam__text">

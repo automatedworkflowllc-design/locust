@@ -11,6 +11,14 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.609.0 - 2026-10-05
+
+### Changed
+
+- **The Compare starters are a row of chips.** The one line of links from 0.607 read as a footnote. Each of the three things to try two models on is a chip again: the drawn thing on its tile and its name, one line tall, still a thing to press.
+- **The sidebar's places are one row again.** Three rows with a lone number at the far right left the sidebar mostly empty. Conversations, Rooms and Routines sit side by side as they did before the Board joined them, every word whole; Board stays in the bottom bar. The counts are gone: there was no clean place for them in one row, and the list below already shows what each holds.
+- **An idle team card is calm again.** "3h ago" and "no work yet" beside the name read as debris. A card says something only when there is something to say: the live word while the teammate works, "waiting on you", or a sign-in it needs. What an idle teammate last did is the card's hover. While Locust is still looking for your agents, no card claims anything.
+
 ## 0.608.0 - 2026-10-05
 
 ### Improved

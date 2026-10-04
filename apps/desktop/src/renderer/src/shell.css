@@ -5899,25 +5899,71 @@ textarea {
 /* The list folded to one line when nothing on it needs the person
    (FirstLaunch, `folded`): what is ready, by name, and the way to the rest. */
 /* Build and compare (0.448): one quiet line under the agents, its starters as small pills. */
-/* The Compare starters as one line (0.607): "Try two models on a landing page,
-   a sales dashboard or an arcade game", each a link that fills the box. The
-   three cards took a row of Home for a thing most sessions do not start
-   with (the critique Colin nodded at, 2026-10-04). */
-.lc-buildline {
-  margin: 0;
+/* The Compare starters as one row of chips (0.609). The three cards of 0.460
+   took a row of Home; the one line of links of 0.607 read as a footnote
+   (Colin, 2026-10-05: "looks trashy compared to what we had"). A chip each
+   -- the drawn thing on its tile (BuildIcon), the name -- is one line tall
+   and still an object to press. */
+.lc-buildhead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
   padding: 0 10px 0 14px;
-  font-size: var(--lc-text-description);
-  color: var(--lc-text-muted);
-  line-height: 1.6;
-}
-.lc-buildline .lc-agenthead__label {
-  margin-right: 6px;
-}
-.lc-buildline .lc-linkbutton {
-  font-size: inherit;
 }
 
-/* The starter cards of 0.460 (.lc-buildhead, .lc-buildcard) went in 0.607; the one-line form is .lc-buildline above. */
+.lc-buildhead .lc-agenthead__label {
+  margin-right: 4px;
+}
+
+.lc-buildhead__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.lc-buildchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 12px 3px 4px;
+  border: 1px solid var(--lc-border-card);
+  border-radius: 999px;
+  background: var(--lc-bg-raised);
+  color: var(--lc-text-secondary);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  cursor: pointer;
+  transition: background var(--lc-motion-hover) var(--lc-ease), border-color var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-buildchip:hover,
+.lc-buildchip:focus-visible {
+  background: var(--lc-hover-surface-strong);
+  border-color: var(--lc-border-strong);
+  color: var(--lc-text-primary);
+}
+
+.lc-buildchip__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--lc-hover-surface-strong);
+  color: var(--lc-text-primary);
+}
+
+.lc-buildchip__icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.lc-buildchip__name {
+  white-space: nowrap;
+}
 
 /* The composer's chip per compared model (0.460): the route chip's own look,
    capped so two or three and the + fit the row. */
@@ -6486,9 +6532,10 @@ textarea {
 }
 
 /* The state beside the name (0.606; was the lone "working" tag): the live
-   word in the live colour, "waiting on you" amber, what blocks them red, and
-   "last worked 2 hours ago" muted. Cut with an ellipsis before it pushes the
-   name: the role line below already does the same. */
+   word in the live colour, "waiting on you" amber, what blocks them red.
+   Idle draws nothing (0.609: "3h ago" beside the name read as debris). Cut
+   with an ellipsis before it pushes the name: the role line below already
+   does the same. */
 .lc-hometeam__state {
   min-width: 0;
   overflow: hidden;
@@ -6503,7 +6550,6 @@ textarea {
 .lc-hometeam__state.is-live { color: var(--lc-lime-text); }
 .lc-hometeam__state.is-amber { color: var(--lc-amber-text); }
 .lc-hometeam__state.is-red { color: var(--lc-red-text); }
-.lc-hometeam__state.is-muted { color: var(--lc-text-muted); }
 
 .lc-hometeam__role,
 .lc-hometeam__route {
@@ -7669,25 +7715,33 @@ textarea {
   /* Two by two (0.585): a fourth place, the Board, cut every word to its
      first letters in one row ("Conversa… Ro… Rout… Bo…", the Board's first
      drive). Two rows of two keep the words whole and the right edge used. */
-  /* Rows again, with counts (0.605). Colin, 2026-10-04, on the grid: rows,
-     each with how many it holds at its right, and Board down in the bottom
-     bar. The dead space of 0.488 is what the count now uses. */
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  /* Rows with counts (0.605) were three lines with a lone number at the far
+     right: "too much dead space" (Colin, 2026-10-05). One row again (0.609),
+     as 0.488 drew it: with Board in the bottom bar the three words fit side
+     by side, and each carries its count as a small badge beside the word. */
+  display: flex;
   align-items: center;
   gap: 0;
   padding: var(--lc-space-2) var(--lc-space-3) var(--lc-space-3);
 }
 
-/* A row with its count at the right: the icon, the word, the number. */
+/* The thin rule between places, as 0.488 had it. */
+.lc-sidebar__places button + button {
+  border-left: 1px solid var(--lc-border-hairline);
+  border-radius: 0;
+}
+
+
+/* Each place as wide as its word, the spare room shared (0.526): equal thirds
+   starved "Conversations". */
 .lc-sidebar__places button {
   display: flex;
   flex: 1 1 auto;
-  justify-content: flex-start;
+  justify-content: center;
   align-items: center;
   gap: var(--lc-space-2);
   min-width: 0;
-  padding: 6px var(--lc-space-3);
+  padding: 6px 3px;
   border: 0;
   border-radius: var(--lc-radius-control);
   background: transparent;
@@ -7737,9 +7791,9 @@ textarea {
 }
 
 .lc-shell.is-compact .lc-sidebar__places {
-  /* One column in the rail (0.586): the places are a grid now, and the old
-     `flex-direction: column` had stopped stacking them. */
-  grid-template-columns: minmax(0, 1fr);
+  /* One column in the rail: the places are a flex row again (0.609), so the
+     direction is said here, as it was before 0.586's grid. */
+  flex-direction: column;
   gap: 0;
   align-items: center;
   padding: var(--lc-space-2) var(--lc-space-2);

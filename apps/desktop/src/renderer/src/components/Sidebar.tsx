@@ -505,11 +505,6 @@ export function Sidebar({
     const owner = ownerOf(mission, missionOwners)
     return owner === undefined ? undefined : teammates.find((entry) => entry.teammateId === owner)?.name
   }
-  // Every conversation in the folder, whatever the search box or a face has narrowed the list to (0.605).
-  const conversationCount = conversationRows(missions).length
-  // A place's count, at its right; none at zero -- "0" beside "Routines" is a nag. The place itself always shows
-  // (rooms-are-reachable.test.ts guards that no place is gated on already having one).
-  const countOf = (held: number): ReactElement | null => (held === 0 ? null : <span className="lc-sidebar__count">{String(held)}</span>)
   const shownConversations = conversationRows(missionsMatching(missions, query, ownerName)).filter(
     (mission) => faceFilter === undefined || ownerOf(mission, missionOwners) === faceFilter
   )
@@ -1048,20 +1043,25 @@ export function Sidebar({
         * it carries no number; "0" beside "Routines" is a nag.
         */}
       <div className="lc-sidebar__nav lc-sidebar__places">
+        {/*
+          * NO COUNTS (0.609). 0.605 gave each place its count, as rows; the rows
+          * were "too much dead space" (Colin, 2026-10-05). In one row the counts
+          * do not fit beside the words (every word was cut) and on the icon's
+          * corner the "14" ran into the "C" of Conversations (the frames of this
+          * change). The list below already shows what each holds; the row stays
+          * three words.
+          */}
         <button type="button" onClick={() => { railClose(); onOpenMissions() }} title="All conversations (Ctrl 1)">
           <Icon name="inbox" size={14} />
           <span>Conversations</span>
-          {countOf(conversationCount)}
         </button>
         <button type="button" onClick={() => { railClose(); onOpenRooms() }} title="Rooms — ask several teammates at once (Ctrl 4)">
           <Icon name="users" size={14} />
           <span>Rooms</span>
-          {countOf(rooms.length)}
         </button>
         <button type="button" onClick={() => { railClose(); onOpenAutomations() }} title="Routines — work that repeats">
           <Icon name="clock" size={14} />
           <span>Routines</span>
-          {countOf(routines.length)}
         </button>
       </div>
       {cloudTasks !== undefined && (

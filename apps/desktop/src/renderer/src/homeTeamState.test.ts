@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { FaceActivity } from './faceState.js'
-import { teamCardState } from './homeTeamState.js'
+import { lastWorkedPhrase, teamCardState } from './homeTeamState.js'
 import type { TeammateStatusView } from './status.js'
 
 /*
@@ -14,30 +14,33 @@ const NOW = new Date('2026-10-05T12:00:00.000Z')
 
 describe('what a team card says beside the name', () => {
   it('says the live word while the teammate works', () => {
-    expect(teamCardState(view('working', 'responding'), '2026-10-05T11:00:00.000Z', NOW)).toEqual({ word: 'replying', tone: 'live', spoken: 'replying now' })
-    expect(teamCardState(view('working', 'thinking'), undefined, NOW)).toEqual({ word: 'thinking', tone: 'live', spoken: 'thinking now' })
+    expect(teamCardState(view('working', 'responding'))).toEqual({ word: 'replying', tone: 'live', spoken: 'replying now' })
+    expect(teamCardState(view('working', 'thinking'))).toEqual({ word: 'thinking', tone: 'live', spoken: 'thinking now' })
   })
 
   it('says "waiting on you" in amber when a card asks', () => {
-    expect(teamCardState(view('approval-needed', 'waiting', 'Money · waiting on you', 'amber'), undefined, NOW)).toEqual({ word: 'waiting on you', tone: 'amber', spoken: 'waiting on you' })
+    expect(teamCardState(view('approval-needed', 'waiting', 'Money · waiting on you', 'amber'))).toEqual({ word: 'waiting on you', tone: 'amber', spoken: 'waiting on you' })
   })
 
-  it('says what blocks the teammate, in red, or amber while the agent is checked again', () => {
-    expect(teamCardState(view('blocked', 'blocked', 'Sign-in needed', 'red'), undefined, NOW)).toEqual({ word: 'sign-in needed', tone: 'red', spoken: 'sign-in needed' })
-    expect(teamCardState(view('blocked', 'blocked', 'AI agent not installed', 'red'), undefined, NOW)).toMatchObject({ word: 'AI agent not installed', tone: 'red' })
-    expect(teamCardState(view('blocked', 'blocked', 'AI agent not answering — checking again', 'amber'), undefined, NOW)).toEqual({ word: 'AI agent not answering', tone: 'amber', spoken: 'AI agent not answering' })
+  it('says what blocks the teammate, in red -- and nothing while the agent is still being checked', () => {
+    expect(teamCardState(view('blocked', 'blocked', 'Sign-in needed', 'red'))).toEqual({ word: 'sign-in needed', tone: 'red', spoken: 'sign-in needed' })
+    expect(teamCardState(view('blocked', 'blocked', 'AI agent not installed', 'red'))).toMatchObject({ word: 'AI agent not installed', tone: 'red' })
+    // A moment, not a state: every card went amber for the seconds after launch while the strip said "checking".
+    expect(teamCardState(view('blocked', 'blocked', 'AI agent not answering — checking again', 'amber'))).toBeUndefined()
   })
 
-  it('says when an idle teammate last worked -- short on the card, whole when read aloud -- or that they have not yet', () => {
-    expect(teamCardState(view('idle', 'idle', 'Docs & QA · idle', 'muted'), '2026-10-05T10:00:00.000Z', NOW)).toEqual({ word: '2h ago', tone: 'muted', spoken: 'last worked 2 hours ago' })
-    expect(teamCardState(view('idle', 'idle', 'Docs & QA · idle', 'muted'), '2026-10-01T10:00:00.000Z', NOW)).toEqual({ word: '4d ago', tone: 'muted', spoken: 'last worked 4 days ago' })
-    expect(teamCardState(view('idle', 'idle', 'Docs & QA · idle', 'muted'), '2026-09-10T10:00:00.000Z', NOW)).toMatchObject({ word: '3w ago' })
-    expect(teamCardState(view('idle', 'idle', 'Docs & QA · idle', 'muted'), '2026-10-05T11:59:30.000Z', NOW)).toEqual({ word: 'just now', tone: 'muted', spoken: 'last worked just now' })
-    expect(teamCardState(view('idle', 'idle', 'Docs & QA · idle', 'muted'), '2026-10-05T11:45:00.000Z', NOW)).toMatchObject({ word: '15m ago' })
-    expect(teamCardState(view('idle', 'idle', 'Docs & QA · idle', 'muted'), undefined, NOW)).toEqual({ word: 'no work yet', tone: 'muted', spoken: 'no work yet' })
+  it('says nothing beside the name of an idle teammate (0.609): the card is calm when they are', () => {
+    expect(teamCardState(view('idle', 'idle', 'Docs & QA · idle', 'muted'))).toBeUndefined()
+  })
+
+  it('keeps what they last did for the hover, in whole words', () => {
+    expect(lastWorkedPhrase('2026-10-05T10:00:00.000Z', NOW)).toBe('last worked 2 hours ago')
+    expect(lastWorkedPhrase('2026-10-01T10:00:00.000Z', NOW)).toBe('last worked 4 days ago')
+    expect(lastWorkedPhrase('2026-10-05T11:59:30.000Z', NOW)).toBe('last worked just now')
+    expect(lastWorkedPhrase(undefined, NOW)).toBe('no work yet')
   })
 
   it('says nothing for a teammate the app has no view of', () => {
-    expect(teamCardState(undefined, undefined, NOW)).toBeUndefined()
+    expect(teamCardState(undefined)).toBeUndefined()
   })
 })

@@ -3,13 +3,12 @@
 //   node _tools/drive-the-team-cards-say-their-state.mjs [--packaged <exe>] [--tag <name>]
 //
 // Four teammates seeded with finished conversations at known times, Home
-// opened: every card carries a state beside the name, and an idle teammate's
-// says when they last worked ("3h ago" on the card, "last worked 3 hours ago"
-// read aloud). Then Wren is asked one word on the free
+// opened: an idle card says nothing beside the name (0.609: "3h ago" there
+// read as debris) and keeps what they last did as its hover ("last worked 3
+// hours ago", "no work yet"). Then Wren is asked one word on the free
 // OpenCode model (nothing spent): while the run is live her card says the
 // live word -- working, thinking or replying -- in the live colour, and once
-// it ends it says she last worked just now. The control (the 0.605 package)
-// has no state on an idle card at all, and "working" alone on a live one.
+// it ends the card is calm again and its hover says she last worked just now.
 
 import { createHash } from 'node:crypto'
 import { mkdir } from 'node:fs/promises'
@@ -75,24 +74,33 @@ const check = (what, ok, detail) => {
 /** Each card: the name, the state word and its tone class, and the spoken label. */
 const cards = async () => JSON.parse(String(await drive.evaluate(`JSON.stringify([...document.querySelectorAll('.lc-hometeam__card')].map((card) => {
   const state = card.querySelector('.lc-hometeam__state')
-  return { name: card.querySelector('.lc-hometeam__name')?.firstChild?.textContent?.trim() ?? '', word: state ? state.innerText.trim() : null, tone: state ? [...state.classList].find((c) => c.startsWith('is-')) ?? null : null, aria: card.getAttribute('aria-label') ?? '' }
+  return { name: card.querySelector('.lc-hometeam__name')?.firstChild?.textContent?.trim() ?? '', word: state ? state.innerText.trim() : null, tone: state ? [...state.classList].find((c) => c.startsWith('is-')) ?? null : null, aria: card.getAttribute('aria-label') ?? '', title: card.getAttribute('title') ?? '' }
 }))`)))
 const byName = (list, name) => list.find((card) => card.name === name)
 const LIVE = /^(working|thinking|replying|subagent working)$/
 try {
   await drive.ready()
   await drive.resize(1440, 900)
-  await sleep(2500)
+  // While the agents are still being looked for, no card may claim a state: every card went
+  // amber "AI agent not answ…" for those seconds in a dev frame of 0.609. Read once as early as
+  // the window allows, then wait for the strip to say how many are ready.
+  const early = await cards()
+  check('while the agents are still being checked, no card claims a state', early.every((card) => card.word === null), JSON.stringify(early.map((card) => [card.name, card.word])))
+  for (let i = 0; i < 60; i += 1) {
+    const note = String(await drive.evaluate(`document.querySelector('.lc-agenthead__note')?.innerText ?? ''`))
+    if (/^\d+ ready$/.test(note.trim())) break
+    await sleep(500)
+  }
+  await sleep(800)
   const before = await cards()
   await drive.capture('Home: the team cards, every teammate idle', async () => JSON.stringify(before))
   say(`  cards: ${JSON.stringify(before)}`)
   check('four cards', before.length === 4, String(before.length))
-  check('every card says a state beside the name', before.every((card) => card.word !== null && card.word.length > 0), JSON.stringify(before.map((card) => card.word)))
-  check('Wren, idle, says 3h ago on the card and "last worked 3 hours ago" aloud', byName(before, 'Wren')?.word === '3h ago' && byName(before, 'Wren')?.tone === 'is-muted' && (byName(before, 'Wren')?.aria ?? '').includes('last worked 3 hours ago'), JSON.stringify(byName(before, 'Wren')))
-  check('Atlas says yesterday in hours or a day', /^(1d|\d+h) ago$/.test(byName(before, 'Atlas')?.word ?? ''), JSON.stringify(byName(before, 'Atlas')))
-  check('Juno says weeks', byName(before, 'Juno')?.word === '3w ago', JSON.stringify(byName(before, 'Juno')))
-  check('Sable, with no conversation, says "no work yet"', byName(before, 'Sable')?.word === 'no work yet', JSON.stringify(byName(before, 'Sable')))
-  check('every card reads its state aloud, the idle ones in full words', before.every((card) => /, (last worked .+ ago|no work yet|[a-z ]+)(,|$)/.test(card.aria)), JSON.stringify(before.map((card) => card.aria)))
+  check('no idle card says anything beside the name', before.every((card) => card.word === null), JSON.stringify(before.map((card) => card.word)))
+  check('Wren\'s hover says she last worked 3 hours ago', byName(before, 'Wren')?.title === 'last worked 3 hours ago', JSON.stringify(byName(before, 'Wren')))
+  check('Atlas\'s hover says yesterday, in hours or a day', /^last worked (1 day|\d+ hours) ago$/.test(byName(before, 'Atlas')?.title ?? ''), JSON.stringify(byName(before, 'Atlas')))
+  check('Juno\'s hover says weeks', byName(before, 'Juno')?.title === 'last worked 3 weeks ago', JSON.stringify(byName(before, 'Juno')))
+  check('Sable\'s hover, with no conversation, says "no work yet"', byName(before, 'Sable')?.title === 'no work yet', JSON.stringify(byName(before, 'Sable')))
 
   // Wren, asked one word on the free model: her card goes live, then rests.
   const sent = JSON.parse(String(await drive.evaluate(`(async () => {
@@ -136,7 +144,7 @@ try {
     if (wren !== undefined && !LIVE.test(wren.word ?? '')) { rested = wren; break }
   }
   await drive.capture('Home after the run', async () => JSON.stringify(rested ?? await cards()))
-  check('once the run ends, her card says "just now", muted, and "last worked just now" aloud', rested?.word === 'just now' && rested?.tone === 'is-muted' && (rested?.aria ?? '').includes('last worked just now'), JSON.stringify(rested))
+  check('once the run ends, her card is calm again and its hover says she last worked just now', rested?.word === null && rested?.title === 'last worked just now', JSON.stringify(rested))
   say(failures === 0 ? '\nTHE TEAM CARDS SAY THEIR STATE PASSED' : `\nTHE TEAM CARDS SAY THEIR STATE: ${String(failures)} FAILED`)
 } catch (error) {
   failures += 1

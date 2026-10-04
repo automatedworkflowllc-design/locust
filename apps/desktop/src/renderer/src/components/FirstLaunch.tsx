@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import type { PublicRuntimeStatus, TubePreference } from '../../../shared/ipc.js'
@@ -71,14 +71,56 @@ function vendorUrl(runtime: string): string | undefined {
  * which is the point of putting them side by side (0.461: Colin, "get a bit
  * more creative with the options/icons? this is a bit lazy/sloppy no?").
  */
-/** The three things to try two models on: the card's name, a line about it, the noun the one-line form says (0.607), and the ask. */
-export const COMPARE_STARTERS: readonly { readonly label: string; readonly line: string; readonly noun: string; readonly prompt: string }[] = [
-  { label: 'Landing page', line: 'For a coffee shop', noun: 'a landing page', prompt: 'Make index.html: a one-page landing page for a small coffee shop, with a headline, three menu items with prices, and opening hours. One file, all CSS inside it.' },
-  { label: 'Sales dashboard', line: 'Live numbers, charts', noun: 'a sales dashboard', prompt: 'Make dashboard.html: a one-page sales dashboard with four headline numbers and a bar chart of the last six months, drawn with plain HTML and CSS. One file, made-up numbers, no libraries.' },
-  { label: 'Arcade game', line: 'Snake, in neon', noun: 'an arcade game', prompt: 'Make game.html: a neon-styled Snake game played with the arrow keys, with a score, a best score, and a way to restart. One file, all CSS and JavaScript inside it, no libraries.' }
+/** The three things to try two models on: the chip's name, a line about it, the drawn thing (BuildIcon), and the ask. */
+export const COMPARE_STARTERS: readonly { readonly label: string; readonly line: string; readonly icon: BuildIconName; readonly prompt: string }[] = [
+  { label: 'Landing page', line: 'For a coffee shop', icon: 'page', prompt: 'Make index.html: a one-page landing page for a small coffee shop, with a headline, three menu items with prices, and opening hours. One file, all CSS inside it.' },
+  { label: 'Sales dashboard', line: 'Live numbers, charts', icon: 'chart', prompt: 'Make dashboard.html: a one-page sales dashboard with four headline numbers and a bar chart of the last six months, drawn with plain HTML and CSS. One file, made-up numbers, no libraries.' },
+  { label: 'Arcade game', line: 'Snake, in neon', icon: 'game', prompt: 'Make game.html: a neon-styled Snake game played with the arrow keys, with a score, a best score, and a way to restart. One file, all CSS and JavaScript inside it, no libraries.' }
 ]
 
-// The starters' icons (0.461) went with the cards in 0.607: the one-line form names what each makes.
+type BuildIconName = 'page' | 'chart' | 'game'
+
+/**
+ * Each starter drawn as the thing it makes (0.461): a browser window with a
+ * headline, a chart with a trend over its bars, a gamepad. The app's general
+ * icons (a file, a grid, a play mark) said nothing about what would come back.
+ */
+function BuildIcon({ name }: { readonly name: BuildIconName }): ReactElement {
+  const common = { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true }
+  if (name === 'page') {
+    return (
+      <svg {...common}>
+        <rect x="3" y="4" width="18" height="16" rx="2.5" />
+        <path d="M3 8.5h18" />
+        <circle cx="6" cy="6.3" r="0.4" fill="currentColor" />
+        <circle cx="8" cy="6.3" r="0.4" fill="currentColor" />
+        <path d="M7 12.5h10" />
+        <path d="M7 15.5h6" />
+      </svg>
+    )
+  }
+  if (name === 'chart') {
+    return (
+      <svg {...common}>
+        <path d="M4 4v16h16" />
+        <path d="M8 16v-3" />
+        <path d="M12 16v-6" />
+        <path d="M16 16v-4" />
+        <path d="M7 10l4-3.5 3 2L19 5" />
+      </svg>
+    )
+  }
+  return (
+    <svg {...common}>
+      <path d="M7.5 7h9a4.5 4.5 0 0 1 4.3 5.8l-1.2 4a2.3 2.3 0 0 1-3.9 1l-2-2.3h-3.4l-2 2.3a2.3 2.3 0 0 1-3.9-1l-1.2-4A4.5 4.5 0 0 1 7.5 7z" />
+      <path d="M8 10v3" />
+      <path d="M6.5 11.5h3" />
+      <circle cx="15.5" cy="10.8" r="0.5" fill="currentColor" />
+      <circle cx="17" cy="12.8" r="0.5" fill="currentColor" />
+    </svg>
+  )
+}
+
 
 export function FirstLaunch({
   runtimes,
@@ -723,7 +765,7 @@ export function FirstLaunch({
                 * the folder. One line, so Home still fits a 1440x900 window.
                 */}
               {onCompareStarter !== undefined && (
-                <p className="lc-buildline">
+                <div className="lc-buildhead">
                   {/*
                     * What happens, not what the feature is called (0.461).
                     * Colin: "for 'build and compare' i feel like theres
@@ -731,29 +773,32 @@ export function FirstLaunch({
                     * The row reads as one sentence: try two models on a
                     * landing page.
                     *
-                    * ONE LINE (0.607), where there were three cards as
-                    * Arena's "Get started" (0.460). The cards took a row of
-                    * Home for a thing most sessions do not start with -- the
-                    * critique Colin nodded at, 2026-10-04. Each noun is the
-                    * press: it puts the words in the box and two models
+                    * ONE ROW OF CHIPS (0.609). The three cards of 0.460 took
+                    * a row of Home; the one line of links of 0.607 read as a
+                    * footnote (Colin, 2026-10-05: "looks trashy compared to
+                    * what we had"). A chip each -- the drawn thing on its
+                    * tile, the name -- is one line tall and still an object
+                    * to press: it puts the words in the box and two models
                     * beside them, each its own dropdown; Send starts both.
                     */}
                   <span className="lc-agenthead__label">Try two models on</span>
-                  {COMPARE_STARTERS.map((starter, index) => (
-                    <Fragment key={starter.label}>
-                      {index === 0 ? ' ' : index === COMPARE_STARTERS.length - 1 ? ' or ' : ', '}
+                  <div className="lc-buildhead__chips">
+                    {COMPARE_STARTERS.map((starter) => (
                       <button
+                        key={starter.label}
                         type="button"
-                        className="lc-linkbutton"
+                        className="lc-buildchip"
                         title={`Two models build this side by side, each in its own copy; you keep the one you like. ${starter.line}. The ask: ${starter.prompt}`}
                         onClick={() => onCompareStarter(starter.prompt)}
                       >
-                        {starter.noun}
+                        <span className="lc-buildchip__icon" aria-hidden="true">
+                          <BuildIcon name={starter.icon} />
+                        </span>
+                        <span className="lc-buildchip__name">{starter.label}</span>
                       </button>
-                    </Fragment>
-                  ))}
-                  .
-                </p>
+                    ))}
+                  </div>
+                </div>
               )}
               </>
             )
