@@ -6580,13 +6580,25 @@ textarea {
   color: var(--lc-text-name);
 }
 
-.lc-hometeam__working {
+/* The state beside the name (0.606; was the lone "working" tag): the live
+   word in the live colour, "waiting on you" amber, what blocks them red, and
+   "last worked 2 hours ago" muted. Cut with an ellipsis before it pushes the
+   name: the role line below already does the same. */
+.lc-hometeam__state {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: var(--lc-font-mono);
   font-size: var(--lc-text-mono-label);
   font-weight: 400;
   letter-spacing: var(--lc-tracking-label);
-  color: var(--lc-lime-text);
+  color: var(--lc-text-muted);
 }
+.lc-hometeam__state.is-live { color: var(--lc-lime-text); }
+.lc-hometeam__state.is-amber { color: var(--lc-amber-text); }
+.lc-hometeam__state.is-red { color: var(--lc-red-text); }
+.lc-hometeam__state.is-muted { color: var(--lc-text-muted); }
 
 .lc-hometeam__role,
 .lc-hometeam__route {
