@@ -156,6 +156,7 @@ import { createAttention, finishFrom } from './attention.js'
 import { boundedShutdown } from './bounded-shutdown.js'
 import { createPermissionHost } from './permission-host.js'
 import { chooseFolderCaution, isInsideDirectory, notATeammateFolder, readRememberedWorkspace, resolveWorkspacePath, WORKSPACE_ARGUMENT, writeRememberedWorkspace, workspaceIdFor } from './workspace.js'
+import { createUnwrittenAnswers } from './approval-record-note.js'
 import { createAntigravityHostProbe } from './antigravity-host.js'
 import { AntigravityStartError, antigravityStartRefusal, createAntigravityMissionService } from './antigravity-mission.js'
 import type { Relay } from './relay.js'
@@ -303,6 +304,7 @@ import {
   OPEN_LINK_CHANNEL,
   MAC_RELEASE_CHANNEL,
   APPROVAL_RULES_LIST_CHANNEL,
+  APPROVAL_RULES_REMOVE_ALL_CHANNEL,
   APPROVAL_RULES_REMOVE_CHANNEL,
   APPROVAL_RULE_FROM_CARD_CHANNEL,
   HANDOFF_PREVIEW_CHANNEL,
@@ -1783,6 +1785,8 @@ if (!ownsSingleInstanceLock) {
       return answered
     }
     const raisedApprovals = new Map<string, { readonly request: MissionApprovalRequest; readonly teammateId?: string }>()
+    // A card's answer the ledger refused: tried again at the run's end, else said in the record (0.587).
+    const unwrittenAnswers = createUnwrittenAnswers({ ledger: missionLedger })
     /*
      * EVERY ANSWER IS WRITTEN DOWN (0.576, ledger v20). Saving a conversation's
      * record found the ledger held no approval: a declined call kept its own
@@ -1806,18 +1810,21 @@ if (!ownsSingleInstanceLock) {
             : 'allowed'
       const said = words
         ?? ('answers' in answer ? Object.values(answer.answers).flat().join('; ') : answer.decision === 'deny' ? answer.reason : undefined)
+      const approval = boundedApproval({
+        approvalId: request.approvalId,
+        kind: request.kind,
+        asked,
+        answer: given,
+        by,
+        ...(said === undefined || said.trim().length === 0 ? {} : { words: said }),
+        askedAt: request.requestedAt,
+        occurredAt: new Date().toISOString()
+      })
       void missionLedger
-        .appendApproval(request.missionId, boundedApproval({
-          approvalId: request.approvalId,
-          kind: request.kind,
-          asked,
-          answer: given,
-          by,
-          ...(said === undefined || said.trim().length === 0 ? {} : { words: said }),
-          askedAt: request.requestedAt,
-          occurredAt: new Date().toISOString()
-        }))
-        .catch(() => undefined)
+        .appendApproval(request.missionId, approval)
+        // Not swallowed (0.587, QA's Q2): tried again when the run ends, and
+        // still refused, said in the record (approval-record-note.ts).
+        .catch((error: unknown) => unwrittenAnswers.remember(request.missionId, approval, error instanceof Error ? error.message : String(error)))
     }
     const ruleContextOf = async (request: MissionApprovalRequest): Promise<{ teammateId?: string; folder?: string }> => {
       const owners = await teammates.missionOwners().catch(() => ({}) as Record<string, string>)
@@ -1938,7 +1945,8 @@ if (!ownsSingleInstanceLock) {
       after: [
         { label: 'routine', step: () => routineRunner },
         { label: 'room tasks', step: () => roomTasks },
-        { label: 'attention', step: () => attentionReader }
+        { label: 'attention', step: () => attentionReader },
+        { label: 'unwritten answers', step: () => unwrittenAnswers }
       ],
       note
     })
@@ -2525,6 +2533,16 @@ if (!ownsSingleInstanceLock) {
         return { ok: true, rules: await approvalRules.list() } as const
       } catch (error) {
         return { ok: false, message: error instanceof Error ? error.message : 'That rule could not be removed. It still answers cards; try again.' } as const
+      }
+    })
+    // Every saved rule at once (0.587, QA's Q7): the window asks, the host clears, every card asks again.
+    ipcMain.handle(APPROVAL_RULES_REMOVE_ALL_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      try {
+        await approvalRules.removeAll()
+        return { ok: true, rules: await approvalRules.list() } as const
+      } catch (error) {
+        return { ok: false, message: error instanceof Error ? error.message : 'The rules could not be removed. They still answer cards; try again.' } as const
       }
     })
     // A card's "Yes, and don't ask again" / "No, and never": the rule is made HERE, from the request held.
@@ -6936,6 +6954,8 @@ if (!ownsSingleInstanceLock) {
      * opens the window again; its menu can quit.
      */
     let tray: Tray | undefined
+    // The tray menu's labels as last built (0.587): rebuilt only when they change.
+    let trayLabels: string | undefined
     let trayBeat: ReturnType<typeof setInterval> | undefined
     let trayOpen: () => void = () => undefined
     let trayQuit: () => void = () => undefined
@@ -6950,6 +6970,8 @@ if (!ownsSingleInstanceLock) {
       trayBeat = undefined
       tray?.destroy()
       tray = undefined
+      // The next tray starts without a menu; its first beat must build one.
+      trayLabels = undefined
     }
     const trayIcon = () =>
       // macOS draws a menu-bar icon from a small PNG and cannot read an .ico
@@ -6975,6 +6997,11 @@ if (!ownsSingleInstanceLock) {
         void routines.list().then((all) => {
           if (tray === undefined) return
           const [openLabel, dueLabel, quitLabel] = trayMenuLabels(nextRoutineDueLine(all, new Date()))
+          // Rebuilt only when a label changed (0.587): the beat is every five
+          // seconds, and a menu replaced under an open pointer closes it.
+          const labels = `${openLabel}\n${dueLabel}\n${quitLabel}`
+          if (labels === trayLabels) return
+          trayLabels = labels
           tray.setContextMenu(Menu.buildFromTemplate([
             { label: openLabel, click: () => trayOpen() },
             { label: dueLabel, enabled: false },

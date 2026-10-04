@@ -29,6 +29,7 @@ describe('a launch folder no teammate should work in', () => {
     ['Codex\'s folder', 'C:\\Users\\person\\.codex'],
     ['Cursor\'s folder', 'C:\\Users\\person\\.cursor'],
     ['Gemini\'s folder', 'C:\\Users\\person\\.gemini'],
+    ['Copilot\'s folder', 'C:\\Users\\person\\.copilot'],
     ['the home folder itself', 'C:\\Users\\person'],
     ['above home', 'C:\\Users'],
     ['Windows\' own folder', 'C:\\Windows\\System32'],

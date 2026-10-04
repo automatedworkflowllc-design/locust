@@ -2768,7 +2768,7 @@ export function SettingsScreen({
           </div>
           {loginItem.available !== true && (
             <p className="lc-settings__note">
-              Only the installed app can sign in with Windows. A development copy would register Electron.
+              {loginItem.why === 'platform' ? 'Windows only for now.' : 'Only the installed app can sign in with Windows. A development copy would register Electron.'}
             </p>
           )}
         </section>

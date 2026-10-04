@@ -95,7 +95,16 @@ try {
   const saying = samples.filter((sample) => sample.some((line) => line.startsWith('SAYING')))
   const writing = saying.filter((sample) => sample.some((line) => /^LIVE .*Writing/.test(line)))
   if (saying.length === 0) say('  (no sample caught a reply mid-stream: nothing to say about the line under one)')
-  else check('while a reply arrives, the live line stays and says Writing', writing.length === saying.length, JSON.stringify({ saying: saying.length, writing: writing.length, example: saying[0] }).slice(0, 300))
+  else {
+    // The samples that miss, with their live line, so a miss can be read (0.587).
+    // Writing, or the plan's step under way: a runtime that reports a plan
+    // (Cursor) leads the line with its current step while it narrates, as
+    // Claude Code's status line does (0.493). What may not happen is no line.
+    const held = saying.filter((sample) => sample.some((line) => /^LIVE .*(Writing|step \d+ of \d+)/.test(line)))
+    const missing = saying.filter((sample) => !held.includes(sample))
+    for (const sample of missing.slice(0, 3)) say(`  mid-stream without a live line: ${JSON.stringify(sample.filter((line) => /^(SAYING|LIVE)/.test(line))).slice(0, 240)}`)
+    check('while a reply arrives, the live line stays: Writing, or the plan step under way', held.length === saying.length, JSON.stringify({ saying: saying.length, writing: writing.length, withPlanStep: held.length - writing.length, example: saying[0] }).slice(0, 300))
+  }
   const finalSaid = saidFinal.map((line) => line.slice(0, 30))
   check('nothing moved when it ended: the live order of what was said is the final order', lastLive.every((line, index) => finalSaid[index] === line), JSON.stringify({ lastLive, finalSaid }))
   // 0.584: the group still growing shows its rows while it works.

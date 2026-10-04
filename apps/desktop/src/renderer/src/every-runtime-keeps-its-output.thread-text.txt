@@ -59,7 +59,7 @@ OK
 Third-party MCP servers are disabled by your organization's Copilot policy. Only built-in servers are available. Copilot CLI ended without a terminal result record.
 
 ## copilot/read-only-tools-denied.jsonl
-Used powershell 2 failed Unable to create blocked.txt because file-writing tools are blocked. 0s 2 tool calls Copilot CLI Copilot reported a change to its background tasks.
+Ran Set-Content -Path '.\blocked.txt' -Valu… 2 failed Unable to create blocked.txt because file-writing tools are blocked. 0s ran Set-Content -Path '.\blocked.txt' -Value 'hi' -NoNewline · it exited non-zero 1 other tool call Copilot CLI Copilot reported a change to its background tasks.
 
 ## copilot/session-first-turn.jsonl
 STORED

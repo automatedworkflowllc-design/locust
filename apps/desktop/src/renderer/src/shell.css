@@ -11897,6 +11897,13 @@ textarea {
   min-width: 0;
 }
 
+/* The row that takes every rule back (0.587): set off from the rules above it. */
+.lc-savedrules__all {
+  margin-top: var(--lc-space-4);
+  padding-top: var(--lc-space-5);
+  border-top: 1px solid var(--lc-border-hairline);
+}
+
 .lc-savedrule__uses {
   color: var(--lc-text-muted);
 }

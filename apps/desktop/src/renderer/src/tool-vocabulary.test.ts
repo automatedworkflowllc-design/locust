@@ -56,7 +56,10 @@ const VOCABULARY: readonly {
   // The plan tools of three runtimes: never a file change, whatever they spell.
   { adapter: 'opencode', name: 'todowrite', kind: 'todowrite', shell: false, edit: false },
   { adapter: 'claude', name: 'TodoWrite', kind: 'tool_use', shell: false, edit: false },
-  { adapter: 'copilot', name: 'write_agent', kind: 'tool_use', shell: false, edit: false }
+  { adapter: 'copilot', name: 'write_agent', kind: 'tool_use', shell: false, edit: false },
+  // Copilot CLI's shell (0.587): drawn as "Used powershell" until the cross-model pass caught it.
+  { adapter: 'copilot', name: 'powershell', kind: 'powershell', shell: true, edit: false },
+  { adapter: 'copilot', name: 'view', kind: 'view', shell: false, edit: false }
 ]
 
 describe('the tool vocabulary every runtime actually speaks', () => {

@@ -34,6 +34,8 @@ export interface ApprovalRuleStore {
   list(): Promise<readonly StoredRule[]>
   add(rule: Omit<ApprovalRule, 'ruleId' | 'createdAt'>): Promise<StoredRule>
   remove(ruleId: unknown): Promise<void>
+  /** Every rule at once (0.587): the file is left readable and empty, and every card asks again. Resolves to how many went. */
+  removeAll(): Promise<number>
   /** A card was answered by this rule. */
   used(ruleId: string): Promise<void>
 }
@@ -140,6 +142,12 @@ export function createApprovalRuleStore(options: { readonly rootDirectory: strin
       serialize(async () => {
         const file = await read()
         await write(file.rules.filter((rule) => rule.ruleId !== ruleId))
+      }),
+    removeAll: () =>
+      serialize(async () => {
+        const file = await read()
+        await write([])
+        return file.rules.length
       }),
     used: (ruleId) =>
       serialize(async () => {

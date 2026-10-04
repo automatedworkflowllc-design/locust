@@ -11,6 +11,24 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.587.0 - 2026-10-04
+
+### New
+
+- **Remove all saved rules at once.** Settings > Teammates > Saved approvals has a "Remove all rules" row under the list: it asks first ("Remove all 3 saved rules? Every card asks again afterwards."), and "Keep them" backs out. Until now each rule went one at a time.
+
+### Fixed
+
+- **Copilot's commands read as commands.** A Copilot CLI teammate's `powershell` tool was listed as a generic tool call, so its steps read "Ran a tool" instead of naming the command. `powershell`, `pwsh` and `cmd` now count as shell tools everywhere a command is shown, counted or asked about.
+- **A saved record no longer claims an answer it does not hold.** Since 0.576 every card you answer is written into the conversation's record; if that write ever failed, the record still said "every card answered on this turn, with who answered it". Now the write is tried again when the turn ends, and if it still fails a note goes into the record ("The answer to a card (command, allowed) could not be written to this record: ..."): the Recorded line says how many answers are missing, and the note under "How it ended" says which.
+
+### Improved
+
+- Launching Locust from Copilot CLI's own folder (`.copilot`) falls back to the folder chosen last time, and picking it in the window asks first, the same as `.claude`, `.codex`, `.cursor` and `.gemini`.
+- The "Start with Windows" switch's note says "Windows only for now." on another operating system, instead of explaining development builds.
+- The "keep running in the background" preference is written whole or not at all, like the other settings files.
+- The tray menu is rebuilt only when its words change, instead of every five seconds.
+
 ## 0.586.0 - 2026-10-04
 
 ### Fixed

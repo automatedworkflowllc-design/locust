@@ -33,6 +33,8 @@ export interface LoginItemState {
   readonly openAtLogin: boolean
   /** False in development and off Windows: the switch does not write a Run key. */
   readonly available: boolean
+  /** Which of those it is (0.587), so the switch's note can say so. */
+  readonly why?: 'development' | 'platform'
 }
 
 export interface LoginItem {
@@ -41,18 +43,19 @@ export interface LoginItem {
   set(openAtLogin: boolean): LoginItemState
 }
 
-const unavailable: LoginItemState = { openAtLogin: false, available: false }
+/** Off, and why (0.587): a development copy would register Electron; off Windows there is nothing to register yet. */
+const unavailableFor = (platform: string): LoginItemState => ({ openAtLogin: false, available: false, why: platform === 'win32' ? 'development' : 'platform' })
 
 export function createLoginItem(options: LoginItemOptions): LoginItem {
   const available = options.packaged && options.platform === 'win32'
   const query = (): LoginItemQuery => ({ path: options.execPath, args: [BACKGROUND_ARG] })
   return {
     read() {
-      if (!available) return unavailable
+      if (!available) return unavailableFor(options.platform)
       return { openAtLogin: options.host.getLoginItemSettings(query()).openAtLogin === true, available: true }
     },
     set(openAtLogin) {
-      if (!available) return unavailable
+      if (!available) return unavailableFor(options.platform)
       options.host.setLoginItemSettings({ openAtLogin, ...query() })
       return this.read()
     }

@@ -98,7 +98,8 @@ export function resolveWorkspacePath(options: {
  * The folders under home where the agents keep their own settings, sign-ins
  * and transcripts. A teammate working in one reads them as its project.
  */
-export const AGENT_SETTINGS_FOLDERS = ['.claude', '.codex', '.cursor', '.gemini', '.config'] as const
+// `.copilot` (0.587): Copilot CLI's own folder, which runtime-setup.ts already reads.
+export const AGENT_SETTINGS_FOLDERS = ['.claude', '.codex', '.cursor', '.gemini', '.copilot', '.config'] as const
 
 /**
  * Why a folder is no place for teammates to work, or undefined when it is fine.
