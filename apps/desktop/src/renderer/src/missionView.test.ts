@@ -54,7 +54,7 @@ import { netFileEntries,
   threadPeerCards,
   typedPrompt
 , commandsRun, commandsRunText, HANDOFF_INSTRUCTION_MARKER, isEditCommand, switchOf,
-  stepsLine
+  stepsLine, displayPath
 } from './missionView.js'
 
 const NOW = '2026-08-31T16:00:00.000Z'
@@ -3285,5 +3285,21 @@ describe('a turn with no work still says what the runtime said (0.586)', () => {
       event('run.failed', { kind: 'process-failed', message: said, runtimeTerminal: 'failed', process: {} })
     ], { running: false })
     expect(items.filter((i) => i.type === 'diagnostic' && i.message === said)).toHaveLength(1)
+  })
+})
+
+describe('the text a file row shows for a path (0.596)', () => {
+  const workspace = 'C:\\Users\\dev\\.claude'
+  it('is relative inside the folder, as before', () => {
+    expect(displayPath('C:\\Users\\dev\\.claude\\report.md', workspace)).toBe('report.md')
+    expect(displayPath('pebble/hello.txt', workspace)).toBe('pebble/hello.txt')
+  })
+  it('is the last two segments of a path elsewhere, behind an ellipsis', () => {
+    expect(displayPath('C:\\Users\\dev\\Documents\\Codex\\checkout\\apps\\desktop\\src\\components\\Thread.tsx', workspace)).toBe('…/components/Thread.tsx')
+    expect(displayPath('/home/dev/project/src/main.rs', workspace)).toBe('…/src/main.rs')
+  })
+  it('keeps a short absolute path whole, and names a scratch file for what it is', () => {
+    expect(displayPath('C:\\notes\\todo.txt', workspace)).toBe('C:\\notes\\todo.txt')
+    expect(displayPath('C:\\Users\\dev\\.cursor\\projects\\x\\agent-tools\\3a5a3562.txt', workspace)).toBe("Cursor's saved tool result")
   })
 })

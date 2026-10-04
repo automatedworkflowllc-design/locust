@@ -1536,6 +1536,20 @@ export function relativePath(path: string, workspacePath: string | undefined): s
   return stripped.length === 0 ? inside : stripped
 }
 
+/**
+ * The text a row shows for a path (0.596). Inside the folder it is the
+ * relative path, as before. Outside it -- a teammate on Antigravity editing a
+ * checkout elsewhere, in Colin's ledger 10/04 -- the whole absolute path made
+ * the row unreadable; now its last two segments behind an ellipsis, and the
+ * row carries the whole path on hover.
+ */
+export function displayPath(path: string, workspacePath: string | undefined): string {
+  const relative = relativePath(path, workspacePath)
+  if (relative !== path || !/^(?:[a-z]:)?[\\/]/i.test(path)) return relative
+  const parts = path.split(/[\\/]+/).filter((part) => part.length > 0)
+  return parts.length <= 3 ? path : `…/${parts.slice(-2).join('/')}`
+}
+
 export interface TraceSegment {
   readonly key: string
   readonly text: string

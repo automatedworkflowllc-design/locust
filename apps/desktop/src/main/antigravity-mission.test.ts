@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest'
 import type { AgentApi, AntigravityHost } from './antigravity-host.js'
 import { antigravityExecutableCandidates, createAntigravityHostProbe, parseServerCommandLine, transcriptPathFor } from './antigravity-host.js'
 import { AntigravityStartError, MAX_LIVE_ANTIGRAVITY_MISSIONS, antigravityStartRefusal, antigravityTier, createAntigravityMissionService } from './antigravity-mission.js'
-import type { AntigravityMissionService } from './antigravity-mission.js'
+import type { AntigravityMissionOptions, AntigravityMissionService } from './antigravity-mission.js'
+import type { MissionPeerContext } from './workroom-briefing.js'
 
 const NOW = '2026-09-03T09:00:00.000Z'
 const HOME = 'C:\\Users\\dev'
@@ -70,7 +71,7 @@ interface Harness {
   readonly notices: { message: string }[]
 }
 
-function harness(options: { host?: AntigravityHost | undefined; lines?: string[]; idleTimeoutMs?: number; askingNoticeMs?: number; refuseAppend?: boolean; ended?: string[]; spendRefusal?: (teammateId: string) => Promise<string | undefined> } = {}): Harness {
+function harness(options: { host?: AntigravityHost | undefined; lines?: string[]; idleTimeoutMs?: number; askingNoticeMs?: number; refuseAppend?: boolean; ended?: string[]; spendRefusal?: (teammateId: string) => Promise<string | undefined>; observeDisk?: AntigravityMissionOptions['observeDisk']; observePatches?: AntigravityMissionOptions['observePatches'] } = {}): Harness {
   const { ledger, created, appended } = fakeLedger(options.refuseAppend === true)
   const api = { calls: [] as { kind: string; input: unknown }[] }
   const transcript = { lines: options.lines ?? [] }
@@ -102,7 +103,9 @@ function harness(options: { host?: AntigravityHost | undefined; lines?: string[]
     ...(options.ended === undefined ? {} : { onRunEnded: async ({ missionId }) => { options.ended!.push(missionId) } }),
     ...(options.idleTimeoutMs === undefined ? {} : { idleTimeoutMs: options.idleTimeoutMs }),
     ...(options.askingNoticeMs === undefined ? {} : { askingNoticeMs: options.askingNoticeMs }),
-    ...(options.spendRefusal === undefined ? {} : { spendRefusal: options.spendRefusal })
+    ...(options.spendRefusal === undefined ? {} : { spendRefusal: options.spendRefusal }),
+    ...(options.observeDisk === undefined ? {} : { observeDisk: options.observeDisk }),
+    ...(options.observePatches === undefined ? {} : { observePatches: options.observePatches })
   })
   return { service, api, transcript, emitted, created, appended, updates, notices }
 }
@@ -426,5 +429,83 @@ describe('when the ledger refuses a receipt', () => {
     await settle()
     expect(test.appended.length).toBeGreaterThan(0)
     expect(test.updates.some((update) => update.kind === 'persistence-error')).toBe(false)
+  })
+})
+
+/*
+ * 0.596. Colin's ledger (10/04): every Antigravity edit row read "Antigravity
+ * did not report the change" -- the transcript names the file and never the
+ * change, and this service, unlike the process transports, never looked at
+ * the disk. Now it looks before the agent is told to begin and after the run.
+ */
+describe('what an Antigravity run changed on disk', () => {
+  const PATCH = { text: '--- /dev/null\n+++ b/hello.txt\n@@ -0,0 +1 @@\n+hello\n', added: 1, removed: 0, truncated: false }
+  /** Empty on the first look, hello.txt new on every look after. */
+  const looks = (): { observeDisk: NonNullable<AntigravityMissionOptions['observeDisk']>; looked: string[] } => {
+    const looked: string[] = []
+    return {
+      looked,
+      observeDisk: async (folder) => {
+        looked.push(folder)
+        return looked.length === 1 ? new Map() : new Map([['hello.txt', '??']])
+      }
+    }
+  }
+  type Sequenced = { type: string; sequence: number; payload: Record<string, unknown> }
+
+  it('reads the change behind a file the agent named and puts it after its own events, in sequence', async () => {
+    const { observeDisk, looked } = looks()
+    const h = harness({ lines: [], observeDisk, observePatches: async () => new Map([['hello.txt', PATCH]]) })
+    await h.service.start('make hello.txt', undefined, { model: 'flash' })
+    // Looked before the agent was told to begin.
+    expect(looked).toEqual([WORKSPACE])
+    expect(h.api.calls[0]?.kind).toBe('new')
+    h.transcript.lines = WRITE_LINES
+    await settle()
+    expect(looked).toEqual([WORKSPACE, WORKSPACE])
+    const all = h.appended.flatMap((entry) => entry.events) as unknown as Sequenced[]
+    const completed = all.findIndex((event) => event.type === 'run.completed')
+    expect(completed).toBeGreaterThan(0)
+    const observed = all.slice(completed + 1)
+    expect(observed.map((event) => event.type)).toEqual(['tool.started', 'tool.completed'])
+    // write_to_file named hello.txt, so the observation is that row's patch, not a second row.
+    expect(observed[0]!.payload).toMatchObject({ toolKind: 'observed_edit', command: 'hello.txt', status: 'reported by the runtime, read from disk' })
+    expect(observed[1]!.payload).toMatchObject({ toolKind: 'observed_edit', phase: 'completed', patch: PATCH })
+    expect(observed[0]!.sequence).toBe(all[completed]!.sequence + 1)
+    expect(observed[1]!.sequence).toBe(observed[0]!.sequence + 1)
+    // Persisted first, then emitted the same way.
+    expect(h.emitted.slice(-2).map((event) => event.type)).toEqual(['tool.started', 'tool.completed'])
+  })
+
+  it('says nothing when nothing changed, and nothing when it could not look first', async () => {
+    let looksMade = 0
+    const quiet = harness({ lines: [], observeDisk: async () => { looksMade += 1; return new Map() }, observePatches: async () => { throw new Error('nothing to read') } })
+    await quiet.service.start('make hello.txt', undefined, { model: 'flash' })
+    quiet.transcript.lines = WRITE_LINES
+    await settle()
+    expect(looksMade).toBe(2)
+    expect(quiet.appended.flatMap((entry) => entry.events).at(-1)?.type).toBe('run.completed')
+
+    let blindLooks = 0
+    const blind = harness({ lines: [], observeDisk: async () => { blindLooks += 1; return undefined } })
+    await blind.service.start('make hello.txt', undefined, { model: 'flash' })
+    blind.transcript.lines = WRITE_LINES
+    await settle()
+    expect(blindLooks).toBe(1)
+    expect(blind.appended.flatMap((entry) => entry.events).at(-1)?.type).toBe('run.completed')
+  })
+
+  it('from a folder two Antigravity runs shared, says the reading names nobody rather than counting it', async () => {
+    const { observeDisk } = looks()
+    const h = harness({ lines: [], observeDisk, observePatches: async () => new Map([['hello.txt', PATCH]]) })
+    const wren: MissionPeerContext = { self: { teammateId: 'tm_wren', name: 'Wren', role: 'Code' }, others: [] }
+    const booty: MissionPeerContext = { self: { teammateId: 'tm_booty', name: 'Booty', role: 'Code' }, others: [] }
+    await h.service.start('make hello.txt', wren, { model: 'flash' })
+    await h.service.start('make hello.txt', booty, { model: 'flash' })
+    h.transcript.lines = WRITE_LINES
+    await settle()
+    const all = h.appended.flatMap((entry) => entry.events)
+    expect(all.some((event) => event.type === 'adapter.diagnostic' && event.payload.code === 'host.shared_workspace')).toBe(true)
+    expect(all.some((event) => event.payload.toolKind === 'observed_edit')).toBe(false)
   })
 })
