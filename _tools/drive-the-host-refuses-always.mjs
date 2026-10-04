@@ -97,6 +97,14 @@ try {
       }
       await drive.capture('a later card', async () => JSON.stringify(card))
       await drive.evaluate(DENY)
+      if (cards.filter((entry) => /taskkill/i.test(entry.exact)).length >= 2) {
+        // The fact is in hand: the same command asked again. What remains is the record, which does
+        // not need the run to end on its own -- the free model dawdled six minutes after a denial
+        // once (0.598's first packaged run) -- so the run is stopped here.
+        await drive.evaluate(`(() => { document.querySelector('button[aria-label^="Stop the running"]')?.click(); return true })()`)
+        for (let j = 0; j < 60 && (await running()); j += 1) await sleep(1000)
+        break
+      }
       continue
     }
     if (i > 10 && !(await running())) break
@@ -106,7 +114,7 @@ try {
   check('a card asked about the command, without Always on it', first !== undefined && !first.buttons.some((b) => /Always|ask again/i.test(b)), JSON.stringify(first))
   check('the window was allowed to send Always for it anyway (the preload took the call)', sentAlways?.ok === true, JSON.stringify(sentAlways))
   check('0.598: the SAME command asked again on its second run (the host applied Always as this once)', cards.filter((card) => /taskkill/i.test(card.exact)).length >= 2, `${String(cards.length)} cards`)
-  check('the run ended', !(await running()))
+  check('the run ended, or was stopped once the second card had been seen', !(await running()))
   // The record: what the host wrote down for the first answer.
   const ledgerDir = join(profilePath, 'mission-ledger')
   const files = (await readdir(ledgerDir).catch(() => [])).filter((name) => name.endsWith('.jsonl'))
