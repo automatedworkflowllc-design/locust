@@ -11,6 +11,13 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.599.0 - 2026-10-04
+
+### Fixed
+
+- **A card's answer is written down however many cards were open.** Locust keeps the last 64 cards it raised so it can write each answer into the conversation's record. A card was kept even after it was answered, so past 64 open cards the oldest unanswered one was forgotten, and its answer, when it came, went unrecorded and "don't ask again" on it said the card was no longer waiting. An answered card now leaves the list the moment its answer is recorded, so the 64 are all cards still waiting.
+- **The saved record names the third kind of call it cannot show.** Its "Not recorded" sentence listed two: a card no one answered because the run ended, and a call made in a mode that asks nothing. There is a third: a call covered by an earlier "Always" on the same run, which raises no card. The sentence now says so.
+
 ## 0.598.0 - 2026-10-04
 
 ### Fixed

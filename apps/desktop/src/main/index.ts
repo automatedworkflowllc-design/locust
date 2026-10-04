@@ -160,6 +160,7 @@ import { boundedShutdown } from './bounded-shutdown.js'
 import { createPermissionHost } from './permission-host.js'
 import { chooseFolderCaution, isInsideDirectory, notATeammateFolder, readRememberedWorkspace, resolveWorkspacePath, WORKSPACE_ARGUMENT, writeRememberedWorkspace, workspaceIdFor } from './workspace.js'
 import { createUnwrittenAnswers } from './approval-record-note.js'
+import { createRaisedApprovals } from './raised-approvals.js'
 import { createAntigravityHostProbe } from './antigravity-host.js'
 import { AntigravityStartError, antigravityStartRefusal, createAntigravityMissionService } from './antigravity-mission.js'
 import type { Relay } from './relay.js'
@@ -1804,10 +1805,14 @@ if (!ownsSingleInstanceLock) {
      */
     const answerApproval = async (answer: MissionApprovalAnswer, by: MissionApproval['by'] = 'card', words?: string): Promise<boolean> => {
       const answered = codexMissions.decide(answer) || permissionHost.decide(answer) || (await antigravityMissions.decide(answer))
-      if (answered) recordAnswer(answer, by, words)
+      if (answered) {
+        recordAnswer(answer, by, words)
+        // Recorded: the card is no longer waiting (0.599), so the cap below counts only open cards.
+        raisedApprovals.forget(answer.approvalId)
+      }
       return answered
     }
-    const raisedApprovals = new Map<string, { readonly request: MissionApprovalRequest; readonly teammateId?: string }>()
+    const raisedApprovals = createRaisedApprovals()
     // A card's answer the ledger refused: tried again at the run's end, else said in the record (0.587).
     const unwrittenAnswers = createUnwrittenAnswers({ ledger: missionLedger })
     /*
@@ -1882,8 +1887,7 @@ if (!ownsSingleInstanceLock) {
     const raiseApproval = (request: MissionApprovalRequest): void => {
       void (async () => {
         const context = await ruleContextOf(request).catch(() => ({}) as { teammateId?: string })
-        raisedApprovals.set(request.approvalId, { request, ...(context.teammateId === undefined ? {} : { teammateId: context.teammateId }) })
-        if (raisedApprovals.size > 64) raisedApprovals.delete(raisedApprovals.keys().next().value as string)
+        raisedApprovals.remember(request, context.teammateId)
         if (await answerByRule(request).catch(() => false)) return
         showApproval(request)
       })()
