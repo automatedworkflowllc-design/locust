@@ -951,7 +951,7 @@ export default function App(): ReactElement {
   const [renamingGroupId, setRenamingGroupId] = useState<string>()
   /** Whether the sidebar is asking for a new group's name. */
   const [namingGroup, setNamingGroup] = useState(false)
-  /** The conversation whose record is being saved (0.574): any turn of it; its parents come along. */
+  /** The conversation whose record is being saved (0.575): any turn of it; its parents come along. */
   const [savingRecordOf, setSavingRecordOf] = useState<string>()
   /**
    * A conversation waiting for the group about to be made.
@@ -1165,7 +1165,7 @@ export default function App(): ReactElement {
           onSelect: () => openSaveRoutine(missionId)
         },
         {
-          // The whole conversation as one file, to read before it is sent anywhere (0.574; mission-export.ts).
+          // The whole conversation as one file, to read before it is sent anywhere (0.575; mission-export.ts).
           label: 'Save the record…',
           shortcut: 'e',
           ...(notYet !== undefined ? { disabledReason: notYet } : {}),
@@ -8624,7 +8624,7 @@ export default function App(): ReactElement {
                     }
                   ]
                 : []),
-              // Only where a conversation is on screen: the record is of that one (0.574).
+              // Only where a conversation is on screen: the record is of that one (0.575).
               ...(terminalMissionId === undefined || terminalMissionId.startsWith('pending:')
                 ? []
                 : [

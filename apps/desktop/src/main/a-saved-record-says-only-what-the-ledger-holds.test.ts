@@ -13,7 +13,7 @@ import { MISSION_RECORD_SAVE_CHANNEL } from '../shared/ipc.js'
 import { SAVED_RULE_DENIAL, missionRecordMarkdown, rawRecordJson, recordFileName, recordTurns } from './mission-export.js'
 
 /**
- * SAVE THE RECORD (0.574): one conversation as one Markdown file.
+ * SAVE THE RECORD (0.575): one conversation as one Markdown file.
  *
  * The ledger is seeded through its OWN writer and read back through its own
  * reader, so the file is checked against what a ledger really hands over --
@@ -167,7 +167,7 @@ async function seed(options: { readonly tearTurnThree?: boolean } = {}): Promise
 }
 
 const record = (turns: readonly RecoveredMission[], over: Partial<Parameters<typeof missionRecordMarkdown>[0]> = {}): string =>
-  missionRecordMarkdown({ missions: turns, teammate: 'Wren', folder: 'C:\\work\\locust', locustVersion: '0.574.0', savedAt: SAVED_AT, ...over })
+  missionRecordMarkdown({ missions: turns, teammate: 'Wren', folder: 'C:\\work\\locust', locustVersion: '0.575.0', savedAt: SAVED_AT, ...over })
 
 const GOLDEN = new URL('./a-saved-record-says-only-what-the-ledger-holds.golden.md', import.meta.url)
 
@@ -435,7 +435,7 @@ describe('what the file says about itself', () => {
     expect(markdown).toContain('# Record of a conversation with Wren')
     expect(markdown).toContain('- **Folder:** C:\\work\\locust (where the teammate works now; the ledger holds only the workspace id `ws_test`)')
     expect(markdown).toContain('- **Started:** 2026-10-02T09:00:00.000Z')
-    expect(markdown).toContain('- **Locust version:** 0.574.0, the build that wrote this file. The ledger does not record which build ran each turn.')
+    expect(markdown).toContain('- **Locust version:** 0.575.0, the build that wrote this file. The ledger does not record which build ran each turn.')
     const unnamed = record(turns, { folder: undefined as unknown as string, teammate: undefined as unknown as string })
     expect(unnamed).toContain('- **Teammate:** not recorded: the roster no longer names them')
     expect(unnamed).toContain('- **Folder:** not recorded. The ledger holds only the workspace id `ws_test`.')
@@ -459,8 +459,8 @@ describe('what the file says about itself', () => {
 describe('the raw record beside it', () => {
   it('holds the events exactly as the ledger holds them', async () => {
     const { turns } = await seed()
-    const parsed = JSON.parse(rawRecordJson(turns, '0.574.0', SAVED_AT)) as { missions: { events: unknown[]; metadata: unknown }[]; writtenBy: string }
-    expect(parsed.writtenBy).toBe('Locust 0.574.0')
+    const parsed = JSON.parse(rawRecordJson(turns, '0.575.0', SAVED_AT)) as { missions: { events: unknown[]; metadata: unknown }[]; writtenBy: string }
+    expect(parsed.writtenBy).toBe('Locust 0.575.0')
     expect(parsed.missions.map((mission) => mission.events)).toEqual(turns.map((turn) => JSON.parse(JSON.stringify(turn.events))))
     expect(parsed.missions.map((mission) => mission.metadata)).toEqual(turns.map((turn) => JSON.parse(JSON.stringify(turn.metadata))))
   })

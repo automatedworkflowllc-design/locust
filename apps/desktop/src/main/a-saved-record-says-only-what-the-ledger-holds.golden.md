@@ -5,7 +5,7 @@
 - **Started:** 2026-10-02T09:00:00.000Z
 - **Ended:** 2026-10-02T09:21:50.000Z (completed)
 - **Turns:** 3
-- **Locust version:** 0.574.0, the build that wrote this file. The ledger does not record which build ran each turn.
+- **Locust version:** 0.575.0, the build that wrote this file. The ledger does not record which build ran each turn.
 - **Saved:** 2026-10-03T08:00:00.000Z
 - **The record's own check:** **record incomplete.** 1 problem was found reading this conversation's ledger, so what follows may stop short of what happened:
   - `truncated-tail`: An incomplete final ledger record was ignored after recovery. (mission_three)

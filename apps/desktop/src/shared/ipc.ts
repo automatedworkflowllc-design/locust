@@ -662,7 +662,7 @@ export type SessionImportResponse = { readonly ok: true; readonly missionId: str
 export const TEAM_CARD_SAVE_CHANNEL = 'team-card:save'
 export const TEAM_CARD_ADD_CHANNEL = 'team-card:add'
 /**
- * Save the record (0.574): one conversation as one Markdown file, written
+ * Save the record (0.575): one conversation as one Markdown file, written
  * where the person picks, and optionally the events exactly as the ledger
  * holds them beside it. Nothing uploads and nothing opens.
  */
