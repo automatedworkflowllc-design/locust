@@ -11,6 +11,13 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.607.0 - 2026-10-05
+
+### Changed
+
+- **Home's agent strip is called "Connected accounts".** The line under the sign already said "Your AI agents, on your own accounts"; the strip beneath the team, which lists the agents signed in on this machine, now says what it is from your side of the screen. "7 ready", the marks and "Show all" are unchanged. Settings keeps "AI agents & accounts".
+- **The three "Try two models on" cards are one line.** "Try two models on a landing page, a sales dashboard or an arcade game", each a link that fills the box for a comparison, with "Compare models" still beside the accounts. The three cards took a row of Home for a thing most sessions do not start with.
+
 ## 0.606.0 - 2026-10-05
 
 ### Improved
