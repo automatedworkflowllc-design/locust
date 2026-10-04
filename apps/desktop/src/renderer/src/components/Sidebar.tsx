@@ -505,6 +505,11 @@ export function Sidebar({
     const owner = ownerOf(mission, missionOwners)
     return owner === undefined ? undefined : teammates.find((entry) => entry.teammateId === owner)?.name
   }
+  // Every conversation in the folder, whatever the search box or a face has narrowed the list to (0.605).
+  const conversationCount = conversationRows(missions).length
+  // A place's count, at its right; none at zero -- "0" beside "Routines" is a nag. The place itself always shows
+  // (rooms-are-reachable.test.ts guards that no place is gated on already having one).
+  const countOf = (held: number): ReactElement | null => (held === 0 ? null : <span className="lc-sidebar__count">{String(held)}</span>)
   const shownConversations = conversationRows(missionsMatching(missions, query, ownerName)).filter(
     (mission) => faceFilter === undefined || ownerOf(mission, missionOwners) === faceFilter
   )
@@ -1035,25 +1040,29 @@ export function Sidebar({
         * were a row of thirds in the footer. `lc-sidebar__nav` stays on the
         * list for everything that finds these buttons by it.
         */}
+      {/*
+        * ROWS, WITH COUNTS (0.605). Colin, 2026-10-04, on the two-by-two grid
+        * these had become: rows, each with how many it holds, and Board down
+        * in the bottom bar beside Settings -- it is a view of the
+        * conversations, not a fourth kind of place. A place with nothing in
+        * it carries no number; "0" beside "Routines" is a nag.
+        */}
       <div className="lc-sidebar__nav lc-sidebar__places">
         <button type="button" onClick={() => { railClose(); onOpenMissions() }} title="All conversations (Ctrl 1)">
           <Icon name="inbox" size={14} />
           <span>Conversations</span>
+          {countOf(conversationCount)}
         </button>
         <button type="button" onClick={() => { railClose(); onOpenRooms() }} title="Rooms — ask several teammates at once (Ctrl 4)">
           <Icon name="users" size={14} />
           <span>Rooms</span>
+          {countOf(rooms.length)}
         </button>
         <button type="button" onClick={() => { railClose(); onOpenAutomations() }} title="Routines — work that repeats">
           <Icon name="clock" size={14} />
           <span>Routines</span>
+          {countOf(routines.length)}
         </button>
-        {onOpenBoard !== undefined && (
-          <button type="button" onClick={() => { railClose(); onOpenBoard() }} title="Board — every conversation by what it needs from you">
-            <Icon name="columns" size={14} />
-            <span>Board</span>
-          </button>
-        )}
       </div>
       {cloudTasks !== undefined && (
         <div className="lc-sidebar__nav lc-sidebar__places lc-sidebar__places--pinned">
@@ -1874,18 +1883,27 @@ export function Sidebar({
           * 156px against 145px of ink. Nothing content-sized, so the
           * 371px-into-266px scar cannot reopen.
           */}
-        <div className="lc-sidebar__nav">
+        <div className={`lc-sidebar__nav${onOpenBoard === undefined ? '' : ' lc-sidebar__nav--board'}`}>
           <button type="button" onClick={() => { railClose(); onOpenSettings() }} title="Settings (Ctrl 3)">
             <Icon name="settings" size={14} />
             <span>Settings</span>
           </button>
-          {/* The status spans the two cells the removed label freed. It stays
-              mono and muted while the nav labels stay sentence case, so the
-              row reads as one fact beside places rather than three peers. */}
-          <div className="lc-connected lc-connected--wide" title={`${connected} AI agent${connected === 1 ? '' : 's'} ready`}>
+          {/* Board lives down here (0.605): a view of the conversations, beside the app's own controls, not a fourth place. */}
+          {onOpenBoard !== undefined && (
+            <button type="button" onClick={() => { railClose(); onOpenBoard() }} title="Board — every conversation by what it needs from you">
+              <Icon name="columns" size={14} />
+              <span>Board</span>
+            </button>
+          )}
+          {/* The status takes what the row leaves. It stays mono and muted
+              while the nav labels stay sentence case, so the row reads as one
+              fact beside places rather than three peers. Beside Board it says
+              "agents", and its title says "AI agents": the shorter line fits
+              the third of the row it has (measured at 267px, 2026-10-04). */}
+          <div className={`lc-connected ${onOpenBoard === undefined ? 'lc-connected--wide' : 'lc-connected--beside'}`} title={`${connected} AI agent${connected === 1 ? '' : 's'} ready`}>
             <span className={`lc-connected__dot${connected === 0 ? ' is-none' : ''}`} />
             <span>
-              {connected} AI agent{connected === 1 ? '' : 's'} ready
+              {connected} {onOpenBoard === undefined ? 'AI ' : ''}agent{connected === 1 ? '' : 's'} ready
             </span>
           </div>
         </div>

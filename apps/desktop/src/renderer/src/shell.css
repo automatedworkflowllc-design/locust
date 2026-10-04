@@ -7752,30 +7752,25 @@ textarea {
   /* Two by two (0.585): a fourth place, the Board, cut every word to its
      first letters in one row ("Conversa… Ro… Rout… Bo…", the Board's first
      drive). Two rows of two keep the words whole and the right edge used. */
+  /* Rows again, with counts (0.605). Colin, 2026-10-04, on the grid: rows,
+     each with how many it holds at its right, and Board down in the bottom
+     bar. The dead space of 0.488 is what the count now uses. */
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
-  gap: 2px 0;
+  gap: 0;
   padding: var(--lc-space-2) var(--lc-space-3) var(--lc-space-3);
 }
 
-/* The thin rule between the two columns, on each row's second place. */
-.lc-sidebar__places button:nth-child(even) {
-  border-left: 1px solid var(--lc-border-hairline);
-  border-radius: 0;
-}
-
-/* Each place as wide as its word, the spare room shared (0.526). Equal thirds
-   held "Missions"; "Conversations" is 84px of a 251px row, and its icon was
-   the part squeezed to nothing (measured by _tools/probe-places-widths.mjs). */
+/* A row with its count at the right: the icon, the word, the number. */
 .lc-sidebar__places button {
   display: flex;
   flex: 1 1 auto;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
   gap: var(--lc-space-2);
   min-width: 0;
-  padding: 6px 3px;
+  padding: 6px var(--lc-space-3);
   border: 0;
   border-radius: var(--lc-radius-control);
   background: transparent;
@@ -16498,6 +16493,19 @@ textarea {
   min-width: 0;
   padding: 0;
   overflow: hidden;
+}
+
+/* Board in the bottom bar (0.605): Settings and Board as wide as their words,
+   the status taking what is left -- "7 agents ready" in the third of a 267px
+   row it has; its title keeps "AI". */
+.lc-sidebar__nav--board {
+  grid-template-columns: auto auto minmax(0, 1fr);
+}
+.lc-connected--beside {
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  justify-content: flex-end;
 }
 
 /* --- Selecting missions to delete ------------------------------------- */

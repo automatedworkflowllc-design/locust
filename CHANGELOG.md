@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.605.0 - 2026-10-05
+
+### Changed
+
+- **The sidebar's places are rows, with counts, and Board moved to the bottom bar.** Conversations, Rooms and Routines each take a line of their own with how many they hold at the right (nothing is shown for an empty one). Board sits beside Settings at the bottom: it is a view of the conversations, not a fourth kind of place. The bottom line now reads "7 agents ready"; hovering it still says "7 AI agents ready".
+
 ## 0.604.0 - 2026-10-05
 
 ### Fixed
