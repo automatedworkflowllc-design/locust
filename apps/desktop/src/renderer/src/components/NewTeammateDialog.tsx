@@ -21,6 +21,7 @@ import { PetCredit, PetPickTiles, PetRemovalControls, usePetRemoval } from './Pe
 import { branchNameFor } from '../../../shared/worktree-name.js'
 import { dollars, isMonthlyLimit } from '../../../shared/spend.js'
 import type { Spend } from '../../../shared/spend.js'
+import { agentNamed } from '../../../shared/runtimes.js'
 
 /** What the dialog hands back. A limit is `null` when an edit removes one. */
 export interface TeammateDraft {
@@ -322,6 +323,7 @@ export function NewTeammateDialog({
   const trimmed = name.trim()
   // A2.18: a name another teammate has would make both unreachable by name.
   const taken = takenNames.find((other) => other.trim().toLowerCase() === trimmed.toLowerCase())
+  const agentMatch = trimmed.length === 0 ? undefined : agentNamed(trimmed)
   const canCreate = trimmed.length > 0 && taken === undefined && limit !== 'invalid'
   const look = botFor(avatar)
   /*
@@ -437,6 +439,11 @@ export function NewTeammateDialog({
               {taken !== undefined && (
                 <p id="lc-teammate-name-taken" className="lc-dialog__error">
                   Another teammate is already called {taken}.
+                </p>
+              )}
+              {agentMatch !== undefined && (
+                <p className="lc-dialog__note">
+                  {agentMatch} is also an AI agent&apos;s name. Your other teammates will be told this {agentMatch} is a teammate.
                 </p>
               )}
               <div className="lc-hues" role="radiogroup" aria-label="Avatar colour">

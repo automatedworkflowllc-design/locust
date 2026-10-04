@@ -25,6 +25,50 @@ export function runtimeDisplayName(runtime: MissionRuntimeId): string {
   return DISPLAY_NAMES[runtime]
 }
 
+function buildKnownAgentNames(): readonly { readonly name: string; readonly key: string }[] {
+  const entries: { readonly name: string; readonly key: string }[] = []
+  const seen = new Set<string>()
+
+  const add = (candidate: string): void => {
+    const key = candidate.trim().toLowerCase().replace(/\s+/g, '')
+    if (key.length > 0 && !seen.has(key)) {
+      seen.add(key)
+      entries.push({ name: candidate, key })
+    }
+  }
+
+  // Full display names first (e.g. "Claude Code", "Cursor Agent") so compound names match before single words
+  for (const [, displayName] of Object.entries(DISPLAY_NAMES)) {
+    add(displayName)
+  }
+  // Base agent names derived from the first word of each display name (e.g. "Codex", "Claude", "Cursor", "Gemini", "OpenCode", "Copilot", "Antigravity", "Muse")
+  for (const [, displayName] of Object.entries(DISPLAY_NAMES)) {
+    const base = displayName.split(/\s+/)[0]
+    if (base !== undefined && base.length > 0) {
+      add(base)
+    }
+  }
+  return entries
+}
+
+const KNOWN_AGENT_NAMES = buildKnownAgentNames()
+
+/**
+ * When a name matches an AI agent's name (ignoring case and spacing),
+ * returns the canonical agent display name; otherwise undefined.
+ */
+export function agentNamed(name: string | undefined): string | undefined {
+  if (typeof name !== 'string') return undefined
+  const cleaned = name.trim().toLowerCase().replace(/\s+/g, '')
+  if (cleaned.length === 0) return undefined
+  for (const candidate of KNOWN_AGENT_NAMES) {
+    if (candidate.key === cleaned) {
+      return candidate.name
+    }
+  }
+  return undefined
+}
+
 /**
  * The runtimes whose event streams the host has a normalizer for, each built
  * from fixtures measured off the real CLI. Gemini CLI is found and signed

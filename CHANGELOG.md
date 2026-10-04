@@ -11,6 +11,30 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.584.0 - 2026-10-04
+
+### Changed
+
+- **A turn's steps show as they happen.** While a teammate works without
+  saying anything, the group of steps at the end of its turn is open, each
+  call appearing as it lands, the way Claude Code shows them. A ten-minute
+  run used to be one line with a growing count. A group stays as you left
+  it; one press folds it.
+
+### Fixed
+
+- **Cursor gives back the rules it added.** A Cursor run outside Auto adds
+  connector rules to the folder's `.cursor/cli.json` so its connectors work.
+  They stayed, so a later Ask run inherited access it was never given, and
+  the folder kept a file you did not write. Each run now removes exactly the
+  rules it added when it ends, leaves any that were there before or that you
+  added, and deletes the file when it made it and nothing else is left.
+- **A teammate named like an AI agent is said as a teammate.** A teammate
+  asked to send its report "to Codex" sent it to the teammate named Codex,
+  which started a run. The roster now lists such a teammate as
+  "Codex (Code & Migrations; a teammate here, not the Codex program)", and
+  naming a teammate after an agent shows a note in the editor.
+
 ## 0.583.0 - 2026-10-04
 
 ### Changed
