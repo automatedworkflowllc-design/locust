@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { AgentApi, AntigravityHost } from './antigravity-host.js'
 import { antigravityExecutableCandidates, createAntigravityHostProbe, parseServerCommandLine, transcriptPathFor } from './antigravity-host.js'
-import { AntigravityStartError, MAX_LIVE_ANTIGRAVITY_MISSIONS, antigravityStartRefusal, antigravityTier, createAntigravityMissionService } from './antigravity-mission.js'
+import { ANTIGRAVITY_POLL_MS, AntigravityStartError, MAX_LIVE_ANTIGRAVITY_MISSIONS, antigravityStartRefusal, antigravityTier, createAntigravityMissionService } from './antigravity-mission.js'
 import type { AntigravityMissionOptions, AntigravityMissionService } from './antigravity-mission.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 
@@ -69,15 +69,18 @@ interface Harness {
   readonly appended: ReturnType<typeof fakeLedger>['appended']
   readonly updates: { kind: string }[]
   readonly notices: { message: string }[]
+  /** Every path handed to readTranscript (0.608): how often the file was read. */
+  readonly reads: string[]
 }
 
-function harness(options: { host?: AntigravityHost | undefined; lines?: string[]; idleTimeoutMs?: number; askingNoticeMs?: number; refuseAppend?: boolean; ended?: string[]; spendRefusal?: (teammateId: string) => Promise<string | undefined>; observeDisk?: AntigravityMissionOptions['observeDisk']; observePatches?: AntigravityMissionOptions['observePatches'] } = {}): Harness {
+function harness(options: { host?: AntigravityHost | undefined; lines?: string[]; statTranscript?: (path: string) => Promise<{ size: number; mtimeMs: number } | undefined>; idleTimeoutMs?: number; askingNoticeMs?: number; refuseAppend?: boolean; ended?: string[]; spendRefusal?: (teammateId: string) => Promise<string | undefined>; observeDisk?: AntigravityMissionOptions['observeDisk']; observePatches?: AntigravityMissionOptions['observePatches'] } = {}): Harness {
   const { ledger, created, appended } = fakeLedger(options.refuseAppend === true)
   const api = { calls: [] as { kind: string; input: unknown }[] }
   const transcript = { lines: options.lines ?? [] }
   const emitted: { type: string; payload: Record<string, unknown> }[] = []
   const updates: { kind: string }[] = []
   const notices: { message: string }[] = []
+  const reads: string[] = []
   let ids = 0
   const service = createAntigravityMissionService({
     workspacePath: WORKSPACE,
@@ -94,7 +97,11 @@ function harness(options: { host?: AntigravityHost | undefined; lines?: string[]
         api.calls.push({ kind: 'send', input })
       }
     }),
-    readTranscript: async (path) => (path === transcriptPathFor(HOME, CONVERSATION) ? transcript.lines.join('\n') : undefined),
+    readTranscript: async (path) => {
+      reads.push(path)
+      return path === transcriptPathFor(HOME, CONVERSATION) ? transcript.lines.join('\n') : undefined
+    },
+    ...(options.statTranscript === undefined ? {} : { statTranscript: options.statTranscript }),
     home: HOME,
     createId: () => String(++ids),
     now: () => new Date(NOW),
@@ -107,7 +114,7 @@ function harness(options: { host?: AntigravityHost | undefined; lines?: string[]
     ...(options.observeDisk === undefined ? {} : { observeDisk: options.observeDisk }),
     ...(options.observePatches === undefined ? {} : { observePatches: options.observePatches })
   })
-  return { service, api, transcript, emitted, created, appended, updates, notices }
+  return { service, api, transcript, emitted, created, appended, updates, notices, reads }
 }
 
 const settle = async (ticks = 12): Promise<void> => {
@@ -507,5 +514,43 @@ describe('what an Antigravity run changed on disk', () => {
     const all = h.appended.flatMap((entry) => entry.events)
     expect(all.some((event) => event.type === 'adapter.diagnostic' && event.payload.code === 'host.shared_workspace')).toBe(true)
     expect(all.some((event) => event.payload.toolKind === 'observed_edit')).toBe(false)
+  })
+})
+
+/*
+ * A LIVE RUN IS READ FOUR TIMES A SECOND (0.608; the review's item 7), and a
+ * transcript that has not changed is not read at all: the poll stats the
+ * file first and reads only when its size or time has moved. Four stats a
+ * second cost nothing; four whole-file reads a second of a transcript that
+ * grows for an hour would.
+ */
+describe('how often a live Antigravity run is read', () => {
+  it('polls four times a second by default', () => {
+    expect(ANTIGRAVITY_POLL_MS).toBe(250)
+  })
+
+  it('reads the transcript only when its size or time has moved', async () => {
+    const stats: { size: number; mtimeMs: number }[] = [{ size: 10, mtimeMs: 1 }]
+    const h = harness({ lines: [], statTranscript: async () => stats[0] })
+    await h.service.start('Fix the build.', undefined, {})
+    await settle(10)
+    const afterFirst = h.reads.length
+    expect(afterFirst).toBeGreaterThan(0)
+    // Twenty-odd polls at 5 ms, the file unmoved: no further read.
+    await settle(10)
+    expect(h.reads.length).toBe(afterFirst)
+    // The file grew: one read, then quiet again.
+    stats[0] = { size: 12, mtimeMs: 2 }
+    await settle(6)
+    expect(h.reads.length).toBe(afterFirst + 1)
+    await settle(6)
+    expect(h.reads.length).toBe(afterFirst + 1)
+  })
+
+  it('reads every time when the file cannot be stated, as before', async () => {
+    const h = harness({ lines: [], statTranscript: async () => undefined })
+    await h.service.start('Fix the build.', undefined, {})
+    await settle(8)
+    expect(h.reads.length).toBeGreaterThan(3)
   })
 })

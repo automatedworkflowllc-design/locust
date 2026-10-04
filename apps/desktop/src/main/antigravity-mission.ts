@@ -1,6 +1,6 @@
 import { workspaceIdFor } from './workspace.js'
 import { randomUUID } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 
 import type { MissionLedger, Workroom, WorkroomMessage } from '@teammate/mission-store'
@@ -57,6 +57,17 @@ import { FREE_ONLY_REFUSAL } from './free-routes.js'
 export { MAX_LIVE_ANTIGRAVITY_MISSIONS }
 /** No new transcript line for this long means the agent is not coming back. */
 export const ANTIGRAVITY_IDLE_TIMEOUT_MS = 10 * 60_000
+
+/**
+ * HOW OFTEN A LIVE RUN IS LOOKED AT (0.608). Once a second put each of
+ * Antigravity's steps on the thread up to a second late, half a second on
+ * average -- the longest tail of any runtime (the Fable review, 2026-10-05,
+ * item 7). Four times a second now, and cheap: the poll stats the transcript
+ * first and reads it only when its size or time has moved (`seen`), so a run
+ * that is thinking costs four stats a second, not four reads of a file that
+ * grows for an hour.
+ */
+export const ANTIGRAVITY_POLL_MS = 250
 /**
  * How long a silence with a tool still open may last before the person is
  * told it might be a question. Ninety seconds: long enough that an ordinary
@@ -102,6 +113,8 @@ export interface AntigravityMissionOptions {
   readonly createId?: () => string
   readonly now?: () => Date
   readonly pollMs?: number
+  /** The transcript's size and time, for the poll to skip an unmoved file (0.608). Test seam; absent means every poll reads. */
+  readonly statTranscript?: (path: string) => Promise<{ readonly size: number; readonly mtimeMs: number } | undefined>
   readonly idleTimeoutMs?: number
   /** How long an open tool may be silent before the person is told. Test seam. */
   readonly askingNoticeMs?: number
@@ -201,12 +214,23 @@ async function readTranscriptFile(path: string): Promise<string | undefined> {
   }
 }
 
+/** The transcript's size and time, or nothing when it cannot be stated -- then the poll reads, as it always did. */
+async function statTranscriptFile(path: string): Promise<{ readonly size: number; readonly mtimeMs: number } | undefined> {
+  try {
+    const info = await stat(path)
+    return { size: info.size, mtimeMs: info.mtimeMs }
+  } catch {
+    return undefined
+  }
+}
+
 export function createAntigravityMissionService(options: AntigravityMissionOptions): AntigravityMissionService {
   const createId = options.createId ?? randomUUID
   const now = options.now ?? (() => new Date())
   const home = options.home ?? homedir()
   const readTranscript = options.readTranscript ?? readTranscriptFile
-  const pollMs = options.pollMs ?? 1_000
+  const statTranscript = options.statTranscript ?? statTranscriptFile
+  const pollMs = options.pollMs ?? ANTIGRAVITY_POLL_MS
   const idleTimeoutMs = options.idleTimeoutMs ?? ANTIGRAVITY_IDLE_TIMEOUT_MS
   /*
    * ASSERTED, not assumed: the notice must come before the ending.
@@ -281,6 +305,8 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
     asking: Asking | undefined
     timer: NodeJS.Timeout | undefined
     polling: boolean
+    /** The transcript's size and time at the last read (0.608): an unmoved file is not read again. */
+    seen: { readonly size: number; readonly mtimeMs: number } | undefined
     ended: boolean
     /** The folder as it was before the agent was told to begin; undefined when the host could not look. */
     readonly diskBefore: WorkspaceSnapshot | undefined
@@ -586,7 +612,11 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
     if (run.polling || run.ended) return
     run.polling = true
     try {
-      const text = await readTranscript(run.transcriptPath)
+      // Stat first (0.608): a file that has not moved since the last read has nothing new in it.
+      const info = await statTranscript(run.transcriptPath)
+      const unmoved = info !== undefined && run.seen !== undefined && info.size === run.seen.size && info.mtimeMs === run.seen.mtimeMs
+      const text = unmoved ? undefined : await readTranscript(run.transcriptPath)
+      if (!unmoved) run.seen = info
       const lines = text === undefined ? [] : text.split('\n').filter((line) => line.trim().length > 0)
       let fresh: readonly NormalizedRuntimeEvent[] = []
       const read: NormalizedRuntimeEvent[] = []
@@ -879,6 +909,7 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
           asking: undefined,
           polling: false,
           ended: false,
+          seen: undefined,
           diskBefore,
           persisted: [],
           lastSequence: 0,
