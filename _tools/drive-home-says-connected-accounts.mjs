@@ -83,6 +83,12 @@ const read = async () => JSON.parse(String(await drive.evaluate(`(() => {
     line: starters ? starters.innerText.replace(/\\s+/g, ' ').trim() : null,
     lineBox: box(starters),
     links: starters ? [...starters.querySelectorAll('.lc-buildchip')].map((b) => b.innerText.replace(/\\s+/g, ' ').trim()) : [],
+    // 0.610, Colin's mockup: Compare once, at the starters' end; the accounts a quiet unboxed line; one left edge.
+    compareInRow: starters?.querySelector('.lc-buildhead__compare')?.innerText.trim() ?? null,
+    boxed: head ? (() => { const s = getComputedStyle(head); return s.backgroundColor !== 'rgba(0, 0, 0, 0)' || s.borderLeftWidth !== '0px' })() : null,
+    edges: [document.querySelector('.lc-hometeam__head'), head?.querySelector('.lc-agenthead__label'), starters?.querySelector('.lc-agenthead__label')].map((el) => el ? Math.round(el.getBoundingClientRect().left) : null),
+    intro: document.querySelector('.lc-intro') !== null,
+    teamHead: document.querySelector('.lc-hometeam__head')?.innerText.replace(/\\s+/g, ' ').trim() ?? null,
     composer: document.querySelector('form.command-dock textarea')?.value ?? ''
   })
 })()`)))
@@ -96,7 +102,11 @@ try {
     say(`  at ${String(w)}x${String(h)}: ${JSON.stringify(seen)}`)
     // The label is drawn in capitals by its style; the words are what is checked.
     check(`at ${String(w)} the strip is labelled Connected accounts, with its note and marks`, /^connected accounts$/i.test(seen.label ?? '') && /^\d+ ready$/.test(seen.note ?? '') && seen.marks > 0, JSON.stringify([seen.label, seen.note, seen.marks]))
-    check(`at ${String(w)} Compare models is still a press in the strip`, seen.compare.includes('Compare models'), JSON.stringify(seen.compare))
+    check(`at ${String(w)} Compare models is offered once, at the end of the starters' row`, seen.compareInRow === 'Compare models' && !seen.compare.includes('Compare models'), JSON.stringify([seen.compareInRow, seen.compare]))
+    check(`at ${String(w)} the accounts are a quiet line, not a boxed card`, seen.boxed === false, String(seen.boxed))
+    check(`at ${String(w)} every label starts at one left edge`, seen.edges.every((x) => x !== null && Math.abs(x - seen.edges[0]) <= 1), JSON.stringify(seen.edges))
+    check(`at ${String(w)} the first-run sentence is not on a team's Home`, seen.intro === false, String(seen.intro))
+    check(`at ${String(w)} the team's heading counts the team`, /^your team\s*4$/i.test(seen.teamHead ?? ''), JSON.stringify(seen.teamHead))
     check(`at ${String(w)} the starters are one row of three chips`, seen.links.length === 3 && seen.lineBox !== null && seen.lineBox.h < 44, JSON.stringify([seen.links, seen.lineBox]))
     check(`at ${String(w)} the chips name what each makes`, JSON.stringify(seen.links) === JSON.stringify(['Landing page', 'Sales dashboard', 'Arcade game']), JSON.stringify(seen.links))
   }

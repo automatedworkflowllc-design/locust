@@ -906,7 +906,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
      * reading the next record. On a quiet SSD that is 2 ms a token and
      * invisible. Under contention -- a second teammate streaming, the gate,
      * Chrome -- it is tens of milliseconds a token, every token paying its
-     * own, 300 to 1,000 fsyncs a turn (the Fable review of 2026-10-05, on
+     * own, 300 to 1,000 fsyncs a turn (the Fable review of 2026-10-04, on
      * Colin's own ledgers). Records are now read and normalized while an
      * append is in flight, and when it lands, everything that arrived goes in
      * one append. On a quiet disk nothing changes. Under contention the

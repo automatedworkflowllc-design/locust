@@ -23,7 +23,9 @@ const CLAUDE_TOOL_WORDS: readonly (readonly [RegExp, string])[] = [
   [/^(grep|grep_?search|ripgrep|codebase_?search|semsearch)$/i, 'Grep'],
   [/^(glob|find_?by_?name|file_?search|list_?dir|list_?directory|listdir|ls)$/i, 'Glob'],
   [/^(web_?search|search_?web|websearch)$/i, 'WebSearch'],
-  [/^(fetch|web_?fetch|read_?url(_?content)?|url_?content)$/i, 'WebFetch']
+  [/^(fetch|web_?fetch|read_?url(_?content)?|url_?content)$/i, 'WebFetch'],
+  // Codex's image tool (0.610): "imageGeneration" on a row read as a program's name.
+  [/^(image_?generation|image_?gen|generate_?image)$/i, 'Image']
 ]
 
 export function fileToolWord(tool: string): string {

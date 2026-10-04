@@ -48,7 +48,8 @@ describe('a stretch with nothing said', () => {
     ]
     const lines = buildThread(events, { running: false }).flatMap((item) => (item.type === 'steps' ? [stepsLine(item.details, true).segments[0]!.text] : []))
     // A thought with no words folds into the line it sits in (0.571): r3 adds no line.
-    expect(lines).toEqual(['Inspecting the config: read config.json, searched for port', 'Running the tests: ran 2 commands'])
+    // The headline is the line alone (0.610), as a described command's description is Claude Code's; the counts are in the rows.
+    expect(lines).toEqual(['Inspecting the config', 'Running the tests'])
   })
 
   it('leaves a turn with no thinking reported as one line between what was said (Claude Code without thinking)', () => {

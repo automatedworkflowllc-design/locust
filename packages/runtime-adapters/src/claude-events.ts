@@ -988,8 +988,11 @@ export function createClaudeEventNormalizer(
                 itemId,
                 toolKind: "tool_use",
                 name: open.name,
-                ...(target === undefined ? {} : { command: target }),
-                ...(title === undefined ? {} : { title }),
+                // Bounded as every other adapter bounds them (0.610): Fable 5.1 wrote a page through one Bash
+                // heredoc, a command of 29,322 characters, past the ledger's 16,384; the ledger refused the event
+                // and the run was stopped ("Mission event is not readable by the ledger reader", 2026-10-04).
+                ...(target === undefined ? {} : { command: boundedMessageText(target) }),
+                ...(title === undefined ? {} : { title: boundedMessageText(title) }),
                 ...(background ? { background: true } : {}),
                 phase: "started",
                 evidence,
@@ -1039,8 +1042,8 @@ export function createClaudeEventNormalizer(
             itemId,
             toolKind: "tool_use",
             name: open.name,
-            ...(open.target === undefined ? {} : { command: open.target }),
-            ...(open.title === undefined ? {} : { title: open.title }),
+            ...(open.target === undefined ? {} : { command: boundedMessageText(open.target) }),
+            ...(open.title === undefined ? {} : { title: boundedMessageText(open.title) }),
             ...(open.background === true ? { background: true } : {}),
             phase: "completed",
             status: "result too large to keep",
@@ -1084,8 +1087,8 @@ export function createClaudeEventNormalizer(
             itemId,
             toolKind: "tool_use",
             name: open?.name ?? "tool",
-            ...(open?.target === undefined ? {} : { command: open.target }),
-            ...(open?.title === undefined ? {} : { title: open.title }),
+            ...(open?.target === undefined ? {} : { command: boundedMessageText(open.target) }),
+            ...(open?.title === undefined ? {} : { title: boundedMessageText(open.title) }),
             ...(open?.background === true ? { background: true } : {}),
             phase: "completed",
             // Refused is not failed: it never ran. The reason rides along.

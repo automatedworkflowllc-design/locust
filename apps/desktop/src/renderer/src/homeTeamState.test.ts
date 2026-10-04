@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import type { FaceActivity } from './faceState.js'
-import { lastWorkedPhrase, teamCardState } from './homeTeamState.js'
+import { lastWorkedPhrase, teamCardState, waitingLine } from './homeTeamState.js'
+import type { NeedsYouItem } from './needsYou.js'
 import type { TeammateStatusView } from './status.js'
 
 /*
@@ -42,5 +43,23 @@ describe('what a team card says beside the name', () => {
 
   it('says nothing for a teammate the app has no view of', () => {
     expect(teamCardState(undefined)).toBeUndefined()
+  })
+})
+
+describe('what a waiting card says under the name (0.610)', () => {
+  const approval = (what: string, over: Partial<{ asking: boolean; command: boolean }> = {}): NeedsYouItem =>
+    ({ kind: 'approval', key: 'a', missionId: 'm', teammateId: 't', name: 'Casper', what, asking: false, command: false, ...over }) as NeedsYouItem
+  it('says the command it wants to run', () => {
+    expect(waitingLine(approval('pnpm test', { command: true }))).toBe('Wants to run pnpm test')
+  })
+  it('says the question it asks, as asked', () => {
+    expect(waitingLine(approval('Which folder?', { asking: true }))).toBe('Which folder?')
+    expect(waitingLine({ kind: 'decision', key: 'd', missionId: 'm', teammateId: 't', name: 'Casper', what: 'Ship it?' })).toBe('Ship it?')
+  })
+  it('says an approval that is not a command plainly', () => {
+    expect(waitingLine(approval('edit FirstLaunch.tsx'))).toBe('Wants your approval: edit FirstLaunch.tsx')
+  })
+  it('says nothing for memory suggestions', () => {
+    expect(waitingLine({ kind: 'memory', key: 'memory', count: 2 })).toBeUndefined()
   })
 })

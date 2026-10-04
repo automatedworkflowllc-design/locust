@@ -1,6 +1,18 @@
 import { faceLabel } from './faceState.js'
+import type { NeedsYouItem } from './needsYou.js'
 import type { TeammateStatusView } from './status.js'
 import { agoLabel } from './teammateWork.js'
+
+/**
+ * What a waiting teammate's card says under the name (0.610): the question,
+ * or the action it wants to take -- "Wants to run pnpm test" -- in the place
+ * the role usually has. One line; the card cuts it with an ellipsis.
+ */
+export function waitingLine(item: NeedsYouItem): string | undefined {
+  if (item.kind === 'memory') return undefined
+  if (item.kind === 'decision' || item.asking) return item.what
+  return item.command ? `Wants to run ${item.what}` : `Wants your approval: ${item.what}`
+}
 
 /** What a team card says beside the name, in which colour, and how it is read aloud. */
 export interface TeamCardState {
@@ -15,7 +27,7 @@ const lowerFirst = (text: string): string => (/^[A-Z][a-z]/.test(text) ? `${text
  * What an idle teammate last did, for the card's hover (0.609): "last worked
  * 3 hours ago", or "no work yet" before a first conversation. It was drawn
  * beside the name in 0.606 ("3h ago", "no work yet") and read as debris
- * (Colin, 2026-10-05: "looks trashy as well"); the card is calm when the
+ * (Colin, 2026-10-04: "looks trashy as well"); the card is calm when the
  * teammate is, and the fact is a hover away.
  */
 export function lastWorkedPhrase(lastAt: string | undefined, now: Date = new Date()): string {

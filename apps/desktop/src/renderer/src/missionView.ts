@@ -466,6 +466,12 @@ export function activityEntries(
         entries.push({ kind: 'tool', key: `item_${String(index)}`, name: looked === 'plan' ? 'Updated the plan' : 'Checked on a command', tool: undefined, settled: detail.settled, failed })
         return
       }
+      // A tool the app has words for reads as what it did (0.610): Codex's image tool was the row "imageGeneration done".
+      const known = detail.kind === 'edit' ? undefined : toolWords(detail.tool ?? detail.name)
+      if (known !== undefined) {
+        entries.push({ kind: 'tool', key: `item_${String(index)}`, name: `${known.did(1).charAt(0).toUpperCase()}${known.did(1).slice(1)}`, tool: undefined, settled: detail.settled, failed })
+        return
+      }
       entries.push({
         kind: detail.kind === 'edit' ? 'unreported' : 'tool',
         key: `item_${String(index)}`,
@@ -1436,11 +1442,50 @@ export function shellCommandText(command: string): string {
   const inner = match[1]!.trim()
   // The host quotes the whole command; unwrap one matched layer, and undo the
   // doubling that quoting introduced.
+  const doubleQuoted = inner.startsWith('"') && inner.endsWith('"')
   const unquoted =
-    (inner.startsWith('"') && inner.endsWith('"')) || (inner.startsWith("'") && inner.endsWith("'"))
+    doubleQuoted || (inner.startsWith("'") && inner.endsWith("'"))
       ? inner.slice(1, -1)
       : inner
+  /*
+   * AND THE BACKSLASHES (0.610). Codex reports a Windows command with every
+   * backslash escaped, its own powershell.exe path included -- the row read
+   * `Get-Content 'C:\\Users\\<home>\\.codex\\skills\\...'` (Colin's screenshot,
+   * 2026-10-04). When every backslash in the quoted payload is one half of an
+   * escape pair, the payload was escaped as a whole and is shown as the shell
+   * got it; one lone backslash means it was not, and it is shown as sent.
+   */
+  const unescaped = doubleQuoted ? withoutEscapes(unquoted) : undefined
+  if (unescaped !== undefined) return unescaped.replace(/''/g, "'").trim()
   return unquoted.replace(/\\"/g, '"').replace(/""/g, '"').replace(/''/g, "'").trim()
+}
+
+/** A doubled backslash to one, and an escaped quote to a quote -- when every backslash in the text is half of such a pair; else undefined. */
+function withoutEscapes(text: string): string | undefined {
+  if (!text.includes('\\')) return undefined
+  let out = ''
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index]!
+    if (character !== '\\') { out += character; continue }
+    const next = text[index + 1]
+    if (next !== '\\' && next !== '"') return undefined
+    out += next
+    index += 1
+  }
+  return out
+}
+
+/**
+ * A runtime's own tool names, said as words (0.610). Codex's image tool read
+ * "Using imageGeneration" on the live line (Colin's screenshot, 2026-10-04):
+ * a name written for a program, not a person.
+ */
+const TOOL_WORDS: readonly { readonly pattern: RegExp; readonly doing: string; readonly did: (count: number) => string }[] = [
+  { pattern: /^(image_?generation|image_?gen|generate_?image)$/i, doing: 'Generating an image', did: (count) => (count === 1 ? 'made an image' : `made ${String(count)} images`) }
+]
+
+export function toolWords(tool: string): (typeof TOOL_WORDS)[number] | undefined {
+  return TOOL_WORDS.find((entry) => entry.pattern.test(tool.trim()))
 }
 
 /**
@@ -2059,7 +2104,7 @@ export function liveActionLine(detail: ActivityDetail, workspacePath?: string): 
     case 'plan': return 'Updating the plan'
     case 'wait': return 'Waiting for a command'
     case 'code': return 'Running code'
-    default: return `Using ${clip(detail.tool ?? detail.name, 40)}`
+    default: return toolWords(detail.tool ?? detail.name)?.doing ?? `Using ${clip(detail.tool ?? detail.name, 40)}`
   }
 }
 
@@ -2210,7 +2255,12 @@ export function stepsLine(details: readonly ActivityDetail[], finished: boolean,
       case 'created':
       case 'edited':
       case 'deleted': word(held.names.length === 1 ? `${kind} ${shortName(held.names[0]!)}` : `${kind} ${pluralize(Math.max(held.names.length, 1), 'file')}`, held.names.length === 1 ? `${kind} a file` : `${kind} ${pluralize(Math.max(held.names.length, 1), 'file')}`, held.names.length === 1 ? `${kind} ${held.names[0]!}` : `${kind} ${pluralize(Math.max(held.names.length, 1), 'file')}`); break
-      case 'tool': word(held.names.length === 1 ? (held.count === 1 ? `used ${held.names[0]!}` : `used ${held.names[0]!} ${String(held.count)} times`) : pluralize(held.count, 'other tool call'), held.names.length === 1 ? (held.count === 1 ? 'used a tool' : `used a tool ${String(held.count)} times`) : pluralize(held.count, 'other tool call')); break
+      case 'tool': {
+        const known = held.names.length === 1 ? toolWords(held.names[0]!) : undefined
+        if (known !== undefined) { word(known.did(held.count)); break }
+        word(held.names.length === 1 ? (held.count === 1 ? `used ${held.names[0]!}` : `used ${held.names[0]!} ${String(held.count)} times`) : pluralize(held.count, 'other tool call'), held.names.length === 1 ? (held.count === 1 ? 'used a tool' : `used a tool ${String(held.count)} times`) : pluralize(held.count, 'other tool call'))
+        break
+      }
       case 'command': {
         const titled = details.filter((detail) => detail.kind === 'shell' && commandLooksAt(detail.name) === undefined)
         const only = titled.length === 1 ? titled[0] : undefined
@@ -2231,21 +2281,30 @@ export function stepsLine(details: readonly ActivityDetail[], finished: boolean,
       }
     }
   }
-  // What it was thinking about leads, where the model said (Codex's headline).
+  /*
+   * THE LINE SAYS WHAT WAS DONE, AS CLAUDE CODE'S DOES (0.610). Colin,
+   * 2026-10-04, with Claude Code's app beside Locust's: "they are being
+   * stacked on one line when claude code doesnt do that". Every Locust line
+   * led with "Thought for 49s," and named things mid-line ("read main",
+   * "edited storm.mjs, searched hul"); Claude Code's say only what was done,
+   * in counts -- "Ran 9 commands, edited 2 files, created a file". So the
+   * thought is the line only when nothing else was done (the rows say it
+   * when the group is opened), and a line that mixes kinds counts and names
+   * nothing; one kind alone keeps its name. Codex's headline -- what a
+   * stretch of its work is for, "Inspecting the config" -- is the line
+   * alone, as a described command's description is Claude Code's whole
+   * line; the counts are in the rows.
+   */
   if (headline !== undefined) {
-    const rest = words.splice(0, words.length).join(', ')
-    const restBrief = briefs.splice(0, briefs.length).join(', ')
-    const restLong = longs.splice(0, longs.length).join(', ')
-    word(rest.length === 0 ? headline : `${headline}: ${rest}`, restBrief.length === 0 ? headline : `${headline}: ${restBrief}`, restLong.length === 0 ? headline : `${headline}: ${restLong}`)
-  } else if (thoughts > 0 && (thoughtMs >= 1_000 || words.length === 0)) {
-    // "Thought" with no length says nothing beside the steps; alone, it is the step.
+    words.splice(0)
+    briefs.splice(0)
+    longs.splice(0)
+    word(headline)
+  } else if (words.length === 0 && thoughts > 0) {
     const thought = thoughtMs >= 1_000 ? `thought for ${durationText(thoughtMs)}` : 'thought'
-    // Alone, and with words but no headline (Cursor's thinking): its first words say what about --
-    // closed. Open, the words are underneath, once (0.594: the line said them and the body said them again).
-    const said = words.length === 0 && options.open !== true ? thoughtText?.replace(/\s+/g, ' ').trim() : undefined
-    words.unshift(said !== undefined && said.length > 0 ? `${thought}: ${clip(said, 70)}` : thought)
-    briefs.unshift(thought)
-    longs.unshift(words[0]!)
+    // Alone, closed: its first words say what about. Open, the words are underneath, once (0.594).
+    const said = options.open !== true ? thoughtText?.replace(/\s+/g, ' ').trim() : undefined
+    word(said !== undefined && said.length > 0 ? `${thought}: ${clip(said, 70)}` : thought, thought)
   }
   /*
    * ONE TITLED COMMAND THAT FAILED is said the way Claude Code says it:
@@ -2258,7 +2317,10 @@ export function stepsLine(details: readonly ActivityDetail[], finished: boolean,
     ? `Failed to ${lowerFirst(lone.title!)}`
     : words.length === 0
       ? pluralize(details.length, 'step')
-      : words.join(', ')
+      // Mixed kinds count and name nothing (0.610, above); one kind alone keeps its name.
+      : words.length > 1
+        ? briefs.join(', ')
+        : words[0]!
   const segments: TraceSegment[] = [{ key: 'what', text: `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}`, ...(loneFailed ? { tone: 'amber' as const } : {}) }]
   if (failed > 0 && !loneFailed) segments.push({ key: 'failed', text: `${String(failed)} failed`, tone: 'amber' })
   if (working > 0) segments.push({ key: 'working', text: `${String(working)} working in the background` })
@@ -3845,7 +3907,8 @@ export function buildThread(
       ? undefined
       : `step ${String(underway + 1)} of ${String(planSteps.steps.length)}`
     // The plan's step under way, when no call is open to say more (OpenCode reports a call once it ends).
-    const planAction = planSteps === undefined || underway < 0 ? undefined : planSteps.steps[underway]?.text.replace(/\s+/g, ' ').trim()
+    // Without its full stop (0.610): "Inspect the screenshot. · step 1 of 3" read as two sentences.
+    const planAction = planSteps === undefined || underway < 0 ? undefined : planSteps.steps[underway]?.text.replace(/\s+/g, ' ').trim().replace(/(?<!\.)\.$/, '')
     /*
      * A TOOL STILL OPEN outranks everything, because it is the most specific
      * true thing about the run: more specific than the turn around it, and

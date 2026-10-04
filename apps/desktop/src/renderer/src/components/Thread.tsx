@@ -412,9 +412,11 @@ export function ThreadItems({
                   details={item.details}
                   runtimeName={undefined}
                   workspacePath={workspacePath}
-                  // The group still growing shows its rows as they land (0.584, `live`);
-                  // one the run has moved past folds back to its line (0.594, `superseded`).
-                  openByDefault={item.live === true}
+                  // The group still growing showed its rows as they landed (0.584, `live`), and one the run had
+                  // moved past folded back (0.594, `superseded`, still honoured for one opened by hand).
+                  // Folded until pressed, the newest too, as Claude Code's groups are (0.610). Colin, 2026-10-04:
+                  // "because that recent row stays open, it give it, its own look ... wont be familiar to claude users".
+                  openByDefault={false}
                   fold={item.superseded === true}
                   {...(onOpenFile === undefined ? {} : { onOpenFile })}
                 />
