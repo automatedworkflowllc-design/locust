@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.588.0 - 2026-10-04
+
+### Fixed
+
+- **Connector rules a Cursor run left behind are taken back.** Since 0.584 a Cursor teammate running outside Auto is lent `Mcp(server:*)` rules in the folder's `.cursor/cli.json` and gives them back when its run ends. A run that was still going when Locust quit or crashed never gave them back, so the next run in that folder had connector access it was never given, and the folder kept a file nobody wrote on purpose. Locust now writes down what it lent (`cursor-connector-holds.json` in its profile) and, when it next starts, takes back exactly those rules: a file or folder the run created goes; anything you wrote stays.
+
 ## 0.587.0 - 2026-10-04
 
 ### New

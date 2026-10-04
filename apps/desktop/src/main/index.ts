@@ -354,7 +354,7 @@ import { roleLabelOf } from '../shared/ipc.js'
 import { isOutboundLink, isWebLink } from '../shared/outbound-links.js'
 import { feedbackUrl } from './report-problem.js'
 import { TESTER_LANE, updateLaneFrom } from './update-lane.js'
-import { allowCursorConnectors } from './cursor-connector-allow.js'
+import { createCursorConnectorKeeper } from './cursor-connector-allow.js'
 import { cursorConfiguredConnectorNames, cursorReadyConnectors } from './cursor-connector-notice.js'
 import { pruneMissionRecords, readStorageReport } from './retention.js'
 import { oneAtATime } from './one-at-a-time.js'
@@ -1769,6 +1769,20 @@ if (!ownsSingleInstanceLock) {
      * else -- no rule, a question, a compound command, a store that cannot
      * be read -- reaches the person as before.
      */
+    /*
+     * The connector rules Cursor runs are given (cursor-connector-allow.ts),
+     * with what is held written to the profile (0.588): a run live when Locust
+     * quit never gave its rules back, and the next start found rules it did
+     * not add. Recovered here, before any run can start.
+     */
+    const cursorHoldsFile = join(app.getPath('userData'), 'cursor-connector-holds.json')
+    const cursorConnectors = createCursorConnectorKeeper(undefined, {
+      read: () => readFile(cursorHoldsFile, 'utf8').catch(() => undefined),
+      write: (text) => writeFile(cursorHoldsFile, text, 'utf8')
+    })
+    void cursorConnectors.recover().then((changed) => {
+      if (changed.length > 0) note('connectors-recovered', `took back the rules an earlier run left in ${changed.join(', ')}`)
+    }).catch((error: unknown) => note('connectors-recovered', `could not take back earlier rules: ${error instanceof Error ? error.message : String(error)}`))
     const approvalRules = createApprovalRuleStore({ rootDirectory: app.getPath('userData') })
     /*
      * THE ONE WAY AN APPROVAL IS ANSWERED (A2.16, widened 0.521). Whichever
@@ -2082,7 +2096,7 @@ if (!ownsSingleInstanceLock) {
           if (changed) sendToWindow({ kind: 'runtime-commands-changed' })
         }).catch((error: unknown) => note('runtime-commands', `could not keep ${runtime}'s commands: ${error instanceof Error ? error.message : String(error)}`))
       },
-      allowConnectors: async (workspace) => allowCursorConnectors(workspace, await cursorConfiguredConnectorNames()),
+      allowConnectors: async (workspace) => cursorConnectors.allow(workspace, await cursorConfiguredConnectorNames()),
       discover: discoverForStart,
       runner: createNodeRuntimeProcessRunner(),
       ledger: missionLedger,
