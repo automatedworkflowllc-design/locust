@@ -1045,7 +1045,7 @@ export function Sidebar({
       <div className="lc-sidebar__nav lc-sidebar__places">
         {/*
           * NO COUNTS (0.609). 0.605 gave each place its count, as rows; the rows
-          * were "too much dead space" (Colin, 2026-10-05). In one row the counts
+          * were "too much dead space" (Colin, 2026-10-04). In one row the counts
           * do not fit beside the words (every word was cut) and on the icon's
           * corner the "14" ran into the "C" of Conversations (the frames of this
           * change). The list below already shows what each holds; the row stays

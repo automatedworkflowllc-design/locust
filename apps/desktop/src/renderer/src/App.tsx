@@ -85,7 +85,8 @@ import { MemoryScreen } from './components/MemoryScreen.js'
 import { isMissionRuntime, runtimeDisplayName } from '../../shared/runtimes.js'
 import type { StartPhase } from '../../shared/ipc.js'
 import { carriedStartPhase, startingLabelOf, withStartPhase } from './startPhase.js'
-import { lastWorkedPhrase, teamCardState } from './homeTeamState.js'
+import { lastWorkedPhrase, teamCardState, waitingLine } from './homeTeamState.js'
+import { glassStatus } from './homeCoverStatus.js'
 import { reviewPairOf } from './review-pair.js'
 import type { EditCheckShown } from './components/EditCheckCard.js'
 import { imageMediaType } from '../../shared/image-files.js'
@@ -6851,6 +6852,7 @@ export default function App(): ReactElement {
     return {
       register: live.register,
       label: live.label,
+      ...(live.action === undefined ? {} : { action: live.action }),
       detail: live.detail,
       startedAt: live.startedAt,
       // The same rule the thread uses: the dots mean waiting on the model
@@ -7618,6 +7620,11 @@ export default function App(): ReactElement {
                 discoveryPhase={runtimeState.phase}
                 tube={tube}
                 swarmCalls={swarmCalls}
+                // Who is working and who waits on you, for the cover's glass (0.610): the same facts the cards say.
+                {...((status) => (status === undefined ? {} : { coverStatus: status }))(runtimeState.phase !== 'ready' ? undefined : glassStatus(
+                  teammates.filter((mate) => viewByTeammate[mate.teammateId]?.status === 'working').map((mate) => mate.name),
+                  teammates.filter((mate) => viewByTeammate[mate.teammateId]?.status === 'approval-needed').map((mate) => mate.name)
+                ))}
                 workspacePath={workspacePath}
                 workspaceMade={workspaceMade}
                 teammateCount={teammates.length}
@@ -7632,7 +7639,15 @@ export default function App(): ReactElement {
                   // Where they stand, beside the name (0.606): the sidebar face's own fact, worded for the card. Idle says nothing (0.609); what they last did is the card's hover.
                   // And nothing until the agents have been looked for: before that every teammate reads as blocked.
                   ...((state) => (state === undefined ? {} : { state }))(runtimeState.phase === 'ready' ? teamCardState(viewByTeammate[mate.teammateId]) : undefined),
-                  lastWorked: lastWorkedPhrase(lastWorkedByTeammate[mate.teammateId])
+                  lastWorked: lastWorkedPhrase(lastWorkedByTeammate[mate.teammateId]),
+                  // What they are doing, for the line under the name while they do it (0.610): the question they wait
+                  // on, else the step under way in their running turn.
+                  ...((doing) => (doing === undefined ? {} : { doing }))((() => {
+                    const waiting = needsYouItems.find((item) => item.kind !== 'memory' && item.teammateId === mate.teammateId)
+                    if (waiting !== undefined) return waitingLine(waiting)
+                    const run = [...runs.values()].find((entry) => liveRunIsActive(entry) && ownerOf(entry) === mate.teammateId && entry.data !== undefined)
+                    return run?.data === undefined ? undefined : liveTurnOf(run.data.missionId)?.action
+                  })())
                 }))}
                 onMessageTeammate={selectTeammate}
                 onChooseFolder={chooseWorkspace}

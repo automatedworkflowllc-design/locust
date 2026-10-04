@@ -1,5 +1,5 @@
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
-import type { ReactElement } from 'react'
+import type { CSSProperties, ReactElement } from 'react'
 
 import type { AvatarSpec } from '../../../shared/avatar.js'
 import type { TeammateHue } from '../../../shared/ipc.js'
@@ -39,6 +39,8 @@ export interface HomeTeammate {
   readonly state?: TeamCardState
   /** What an idle teammate last did, for the card's hover (0.609): "last worked 3 hours ago", "no work yet". */
   readonly lastWorked?: string
+  /** What they are doing now (0.610): the step under way, or what they wait on you for. Shown in the role's place while they do it. */
+  readonly doing?: string
 }
 
 export function HomeTeam({
@@ -58,7 +60,10 @@ export function HomeTeam({
         * teammates, and read as a fourth, empty teammate.
         */}
       <div className="lc-hometeam__top">
-        <h2 className="lc-hometeam__head">Your team</h2>
+        {/* How many, beside the words (0.610): the grid shows two rows of a team that may be larger. */}
+        <h2 className="lc-hometeam__head">
+          Your team<span className="lc-hometeam__count">{String(team.length)}</span>
+        </h2>
         {onNewTeammate !== undefined && (
           <button type="button" className="lc-control lc-control--boxed lc-chipbutton" onClick={onNewTeammate}>
             <Icon name="plus" size={13} />
@@ -67,16 +72,27 @@ export function HomeTeam({
         )}
       </div>
       <div className="lc-hometeam__grid">
-        {team.map((mate) => (
+        {team.map((mate) => {
+          // While they work or wait, the line under the name says what on (0.610); otherwise it is the role.
+          const doing = mate.state !== undefined && mate.state.tone !== 'red' ? mate.doing : undefined
+          return (
           <button
             type="button"
             key={mate.teammateId}
-            className="lc-hometeam__card"
+            className={`lc-hometeam__card${mate.state?.tone === 'live' ? ' is-live' : mate.state?.tone === 'amber' ? ' is-waiting' : ''}`}
             onClick={() => onMessage(mate.teammateId)}
             aria-label={`Message ${mate.name}, ${mate.role}${mate.state !== undefined ? `, ${mate.state.spoken}` : mate.working ? ', working now' : ''}${mate.route === undefined ? '' : `, on ${mate.route}`}`}
             {...(mate.state === undefined && mate.lastWorked !== undefined ? { title: mate.lastWorked } : {})}
           >
-            <TeammateBot hue={mate.hue} avatar={mate.avatar} size={34} teammateId={mate.teammateId} activity={mate.working ? 'working' : 'idle'} />
+            {/*
+              * THE FACE ON A TILE OF ITS TEAMMATE'S COLOUR (0.610). Six grey cards
+              * told teammates apart by a 34px face alone (Colin's mockup,
+              * 2026-10-04). The tile is the teammate's hue, faint, the way the
+              * sidebar and the conversations already wear it.
+              */}
+            <span className="lc-hometeam__tile" style={{ '--lc-tile': `var(--lc-hue-${mate.hue})` } as CSSProperties} aria-hidden="true">
+              <TeammateBot hue={mate.hue} avatar={mate.avatar} size={34} teammateId={mate.teammateId} activity={mate.working ? 'working' : 'idle'} />
+            </span>
             <span className="lc-hometeam__text">
               <span className="lc-hometeam__name">
                 {mate.name}
@@ -90,7 +106,7 @@ export function HomeTeam({
                   ? <span className={`lc-hometeam__state is-${mate.state.tone}`}>{mate.state.word}</span>
                   : mate.working && <span className="lc-hometeam__state is-live">working</span>}
               </span>
-              <span className="lc-hometeam__role">{mate.role}</span>
+              <span className={`lc-hometeam__role${doing === undefined ? '' : ' is-doing'}`} {...(doing === undefined ? {} : { title: doing })}>{doing ?? mate.role}</span>
               {/*
                 * THE MARK SAYS THE RUNTIME; THE WORDS SAY THE MODEL (0.384).
                 *
@@ -118,7 +134,8 @@ export function HomeTeam({
               <Icon name="chevron-right" size={13} />
             </span>
           </button>
-        ))}
+          )
+        })}
       </div>
     </section>
   )

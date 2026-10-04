@@ -54,3 +54,22 @@ describe('the live line of a turn with a plan', () => {
     expect(live?.type === 'live-step' ? live.detail : 'none').toBeUndefined()
   })
 })
+
+describe('the plan step on the live line (0.610)', () => {
+  it('drops the step\'s own full stop: " · step 1 of 3" follows it', () => {
+    const steps = event('plan.updated', { plan: { plan: [
+      { step: 'Inspect the screenshot and relevant visual-design notes.', status: 'in_progress' },
+      { step: 'Generate a mockup...', status: 'pending' }
+    ] } })
+    const items = buildThread([event('run.started', {}), steps], { running: true })
+    const live = items.find((item) => item.type === 'live-step')
+    expect(live?.type === 'live-step' ? [live.action, live.detail] : []).toEqual(['Inspect the screenshot and relevant visual-design notes', 'step 1 of 2'])
+  })
+
+  it('keeps an ellipsis the model wrote', () => {
+    const steps = event('plan.updated', { plan: { plan: [{ step: 'Generate a mockup...', status: 'in_progress' }] } })
+    const items = buildThread([event('run.started', {}), steps], { running: true })
+    const live = items.find((item) => item.type === 'live-step')
+    expect(live?.type === 'live-step' ? live.action : undefined).toBe('Generate a mockup...')
+  })
+})

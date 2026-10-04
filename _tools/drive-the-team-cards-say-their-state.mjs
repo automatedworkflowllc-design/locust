@@ -74,7 +74,7 @@ const check = (what, ok, detail) => {
 /** Each card: the name, the state word and its tone class, and the spoken label. */
 const cards = async () => JSON.parse(String(await drive.evaluate(`JSON.stringify([...document.querySelectorAll('.lc-hometeam__card')].map((card) => {
   const state = card.querySelector('.lc-hometeam__state')
-  return { name: card.querySelector('.lc-hometeam__name')?.firstChild?.textContent?.trim() ?? '', word: state ? state.innerText.trim() : null, tone: state ? [...state.classList].find((c) => c.startsWith('is-')) ?? null : null, aria: card.getAttribute('aria-label') ?? '', title: card.getAttribute('title') ?? '' }
+  return { name: card.querySelector('.lc-hometeam__name')?.firstChild?.textContent?.trim() ?? '', word: state ? state.innerText.trim() : null, tone: state ? [...state.classList].find((c) => c.startsWith('is-')) ?? null : null, aria: card.getAttribute('aria-label') ?? '', title: card.getAttribute('title') ?? '', tile: card.querySelector('.lc-hometeam__tile') !== null, live: card.classList.contains('is-live'), glass: document.querySelector('.lc-cover__claim')?.innerText.replace(/\\s+/g, ' ').trim() ?? '' }
 }))`)))
 const byName = (list, name) => list.find((card) => card.name === name)
 const LIVE = /^(working|thinking|replying|subagent working)$/
@@ -96,6 +96,9 @@ try {
   await drive.capture('Home: the team cards, every teammate idle', async () => JSON.stringify(before))
   say(`  cards: ${JSON.stringify(before)}`)
   check('four cards', before.length === 4, String(before.length))
+  // 0.610, Colin's mockup: each face on a tile of its teammate's colour; the glass says the claim while nothing runs.
+  check('every card sets its face on a tile', before.every((card) => card.tile), JSON.stringify(before.map((card) => card.tile)))
+  check('with nothing running, the glass says the claim', /^autonomous teammates on your own machine$/i.test(before[0]?.glass ?? ''), JSON.stringify(before[0]?.glass))
   check('no idle card says anything beside the name', before.every((card) => card.word === null), JSON.stringify(before.map((card) => card.word)))
   check('Wren\'s hover says she last worked 3 hours ago', byName(before, 'Wren')?.title === 'last worked 3 hours ago', JSON.stringify(byName(before, 'Wren')))
   check('Atlas\'s hover says yesterday, in hours or a day', /^last worked (1 day|\d+ hours) ago$/.test(byName(before, 'Atlas')?.title ?? ''), JSON.stringify(byName(before, 'Atlas')))
@@ -136,6 +139,8 @@ try {
   }
   await drive.capture('Home while Wren works', async () => JSON.stringify(live ?? await cards()))
   check('while she works, her card says the live word in the live colour', live !== undefined && live.tone === 'is-live', JSON.stringify(live))
+  check('and her card stands forward, as working', live?.live === true, JSON.stringify(live))
+  check('and the glass names her working', /wren working/i.test(live?.glass ?? ''), JSON.stringify(live?.glass))
   let rested
   for (let i = 0; i < 240; i += 1) {
     await sleep(1000)
@@ -145,6 +150,7 @@ try {
   }
   await drive.capture('Home after the run', async () => JSON.stringify(rested ?? await cards()))
   check('once the run ends, her card is calm again and its hover says she last worked just now', rested?.word === null && rested?.title === 'last worked just now', JSON.stringify(rested))
+  check('and the glass is back to the claim', /^autonomous teammates on your own machine$/i.test(rested?.glass ?? ''), JSON.stringify(rested?.glass))
   say(failures === 0 ? '\nTHE TEAM CARDS SAY THEIR STATE PASSED' : `\nTHE TEAM CARDS SAY THEIR STATE: ${String(failures)} FAILED`)
 } catch (error) {
   failures += 1

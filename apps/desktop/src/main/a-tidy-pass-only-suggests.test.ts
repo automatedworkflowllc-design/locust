@@ -1,13 +1,14 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import type { CodexMissionUpdate, PublicTeammate, WorkspaceSettings } from '../shared/ipc.js'
 import { memoryFileText } from './memory-file.js'
 import { TIDY_PROMPT } from '../shared/memory-tidy.js'
 import { createMemoryReader } from './memory-reader.js'
 import { SUGGESTION_OUT_OF_DATE, createMemoryStore } from './memory-store.js'
+import type { MemoryStore } from './memory-store.js'
 
 /*
  * A TIDY PASS ONLY SUGGESTS (A1.2).
@@ -18,32 +19,73 @@ import { SUGGESTION_OUT_OF_DATE, createMemoryStore } from './memory-store.js'
  * about words that have since changed is refused when kept -- the hash gate.
  */
 
+/*
+ * What stops a hang, not what the work is allowed to cost. Vitest's own limit
+ * is five seconds, and a test here takes thirty milliseconds -- but every
+ * write the store makes is an fsync, the one thing in this file that can take
+ * seconds when somebody else is using the disk, and two of these timed out at
+ * five seconds in one gate.
+ */
+vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 })
+
 const NOW = '2026-09-24T12:00:00.000Z'
-let root: string | undefined
+// Every folder a test makes, however many that is: a test that reads three
+// replies makes three stores, and one variable held only the last.
+const roots: string[] = []
+// Retried: a folder a virus scanner has only just finished with can refuse to go.
+const removed = (folder: string) => rm(folder, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
 afterEach(async () => {
-  if (root !== undefined) await rm(root, { recursive: true, force: true })
-  root = undefined
+  await Promise.all(roots.splice(0).map(removed))
 })
 
-async function store() {
-  root = await mkdtemp(join(tmpdir(), 'locust-tidy-'))
-  let ids = 0
+const openStore = (root: string, issued = 0) => {
+  let ids = issued
   return createMemoryStore({ rootDirectory: root, now: () => new Date(NOW), createId: () => `id${String(++ids)}` })
+}
+
+async function store() {
+  const root = await mkdtemp(join(tmpdir(), 'locust-tidy-'))
+  roots.push(root)
+  return openStore(root)
 }
 
 const YOU = { name: 'you' }
 const WREN = { teammateId: 'tm_wren', name: 'Wren' }
 const SHOP = { workspaceId: 'ws_shop', workspaceName: 'shop' }
 
-async function seeded() {
-  const memories = await store()
-  const add = async (text: string, extra: Record<string, unknown> = {}) =>
-    (await memories.add({ text, scope: 'workspace', ...SHOP, by: YOU, status: 'kept', ...extra })).memory
+/*
+ * THE FOUR MEMORIES MOST TESTS START FROM, made once.
+ *
+ * Each `add` is a write and an fsync, so starting every test from four of them
+ * put four disk flushes ahead of a test that takes thirty milliseconds. They go
+ * through the store's own `add` ONCE, here, and each test is handed its own
+ * copy of the file that made: the same four memories, the same ids, a store
+ * that carries on counting from id5 -- and none of the waiting.
+ */
+type Memory = Awaited<ReturnType<MemoryStore['add']>>['memory']
+let seed: { readonly file: string; readonly memories: readonly [Memory, Memory, Memory, Memory] } | undefined
+let seedRoot: string | undefined
+beforeAll(async () => {
+  seedRoot = await mkdtemp(join(tmpdir(), 'locust-tidy-seed-'))
+  const memories = openStore(seedRoot)
+  const add = async (text: string) => (await memories.add({ text, scope: 'workspace', ...SHOP, by: YOU, status: 'kept' })).memory
   const a = await add('Deploys go out on Thursdays.')
   const b = await add('We deploy every Thursday.')
   const c = await add('The API is on port 3000.')
   const d = await add('Tests run with npm test.')
-  return { memories, a, b, c, d }
+  seed = { file: await readFile(join(seedRoot, 'memories.json'), 'utf8'), memories: [a, b, c, d] }
+})
+afterAll(async () => {
+  if (seedRoot !== undefined) await removed(seedRoot)
+})
+
+async function seeded() {
+  if (seed === undefined) throw new Error('the four seed memories were not made')
+  const root = await mkdtemp(join(tmpdir(), 'locust-tidy-'))
+  roots.push(root)
+  await writeFile(join(root, 'memories.json'), seed.file, 'utf8')
+  const [a, b, c, d] = seed.memories
+  return { memories: openStore(root, seed.memories.length), a, b, c, d }
 }
 
 describe('suggestions become proposals, and nothing kept changes', () => {

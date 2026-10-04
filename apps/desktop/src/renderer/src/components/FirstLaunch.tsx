@@ -129,6 +129,7 @@ export function FirstLaunch({
   discoveryPhase,
   tube,
   swarmCalls = 0,
+  coverStatus,
   freeStart = 'unknown',
   onUseFree,
   workspacePath,
@@ -177,6 +178,8 @@ export function FirstLaunch({
   readonly tube?: TubePreference
   /** How many times swarm has been turned on this session: the cover flies the swarm for a new one. */
   readonly swarmCalls?: number
+  /** Who is working and who waits on you, for the cover's glass (0.610, glassStatus). */
+  readonly coverStatus?: string
   /** The folder the teammates work in; undefined when none is chosen. */
   readonly workspacePath: string | undefined
   readonly teammateCount: number
@@ -421,7 +424,7 @@ export function FirstLaunch({
     <div className={`lc-empty${scrolled ? ' is-scrolled' : ''}${tight ? ' is-tight' : ''}`} ref={pane}>
       <div className="lc-empty__inner" ref={inner}>
         {/* The design system's cover: the lockup lighting up once the runtimes have answered, and the teammates. */}
-        <HomeCover ready={discoveryPhase === 'ready'} tube={tube ?? 'full'} swarmCalls={swarmCalls} grow={coverGrow} />
+        <HomeCover ready={discoveryPhase === 'ready'} tube={tube ?? 'full'} swarmCalls={swarmCalls} grow={coverGrow} {...(coverStatus === undefined ? {} : { status: coverStatus })} />
 
         {/*
           * The only words on the screen, both carrying information: what
@@ -457,7 +460,8 @@ export function FirstLaunch({
           * and then what. Prose, not mono: this is a list with words around
           * it, not a lockup.
           */}
-        {discoveryPhase === 'ready' && (
+        {/* For a first run only (0.610): on a returning person's Home it was first-run copy above their own team (Colin's mockup, 2026-10-04). */}
+        {discoveryPhase === 'ready' && teammateCount === 0 && (
           <p className="lc-intro">
             {/*
               * One line (Colin, 2026-09-23: "lets make the text under the tv
@@ -749,11 +753,6 @@ export function FirstLaunch({
                     )
                   })}
                 </span>
-                {onCompare !== undefined && (
-                  <button type="button" className="lc-agenthead__more lc-agenthead__compare" title="Ask two or three models the same thing and see the answers side by side" onClick={onCompare}>
-                    Compare models
-                  </button>
-                )}
                 <button type="button" className="lc-agenthead__more" onClick={() => setAgentsOpen(true)}>
                   Show all
                 </button>
@@ -775,7 +774,7 @@ export function FirstLaunch({
                     *
                     * ONE ROW OF CHIPS (0.609). The three cards of 0.460 took
                     * a row of Home; the one line of links of 0.607 read as a
-                    * footnote (Colin, 2026-10-05: "looks trashy compared to
+                    * footnote (Colin, 2026-10-04: "looks trashy compared to
                     * what we had"). A chip each -- the drawn thing on its
                     * tile, the name -- is one line tall and still an object
                     * to press: it puts the words in the box and two models
@@ -798,6 +797,18 @@ export function FirstLaunch({
                       </button>
                     ))}
                   </div>
+                  {/*
+                    * COMPARE, ONCE, BESIDE ITS STARTERS (0.610). It was a button
+                    * in the accounts line and the starters under it -- Compare
+                    * offered twice (Colin's mockup, 2026-10-04). The name stays
+                    * "Compare models": six drives and the composer say it so.
+                    */}
+                  {onCompare !== undefined && (
+                    <button type="button" className="lc-buildhead__compare" title="Ask two or three models the same thing and see the answers side by side" onClick={onCompare}>
+                      Compare models
+                      <Icon name="chevron-right" size={12} />
+                    </button>
+                  )}
                 </div>
               )}
               </>

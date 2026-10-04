@@ -2,12 +2,23 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 import { createTeammateStore, MAX_MISSION_TITLE_LENGTH, MAX_MISSION_TITLES } from './teammate-store.js'
+
+/*
+ * What stops a hang, not what the work is allowed to cost. Every rename is a
+ * write and an fsync, and on this disk an fsync has been seen to take anywhere
+ * from 3 ms to 10 s depending on who else is writing; a limit set to what the
+ * tests cost on a quiet machine fails them for somebody else's I/O. (The two
+ * cap tests, when they filled the roster a rename at a time under a 60 s
+ * limit, timed out in 6 of the 11 recorded runs the gate logs of 10-03 and
+ * 10-04 still show from before this was changed.)
+ */
+vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 })
 
 /**
  * A conversation can be given a name, and the ledger never learns about it.
@@ -106,24 +117,51 @@ describe('bounds, because this file has a size cliff', () => {
     expect((await teammates.missionTitles()).m_1?.length).toBe(MAX_MISSION_TITLE_LENGTH)
   })
 
+  /*
+   * A roster one name short of full, laid down in ONE write.
+   *
+   * These two tests used to fill it the way a person would, a rename at a
+   * time: a thousand writes, each of them an fsync, in a row. Alone that is
+   * eight seconds; in the gate, beside the other workers writing to the same
+   * disk, it was 12 to 55 seconds, and past 60 it is a timeout that says
+   * nothing about the cap. What the cap is about is the LAST place, so the
+   * fixture is sized to that: everything before it is laid down at once, and
+   * the last place -- and the one after it -- go through the store's own
+   * write, which is the code that makes the decision. The names are the
+   * longest allowed, so a full roster here is also the largest this file can
+   * ever be, which the cliff above is the reason for.
+   */
+  const almostFull = async (root: string, title: string) => {
+    const missionTitles = Object.fromEntries(Array.from({ length: MAX_MISSION_TITLES - 1 }, (_, index) => [`m_${String(index)}`, title]))
+    await writeFile(
+      join(root, 'teammates.json'),
+      `${JSON.stringify({ schemaVersion: 1, teammates: [], missionOwners: {}, missionTitles }, null, 2)}\n`,
+      'utf8'
+    )
+  }
+
   it('caps how many conversations may carry one', async () => {
-    const { store: teammates } = await store()
-    for (let index = 0; index < MAX_MISSION_TITLES; index += 1) {
-      await teammates.renameMission(`m_${String(index)}`, `name ${String(index)}`)
-    }
+    const { store: teammates, root } = await store()
+    const longest = 'x'.repeat(MAX_MISSION_TITLE_LENGTH)
+    await almostFull(root, longest)
+    // The last place is there to be taken, and the roster -- every name at its
+    // longest -- still reads: past MAX_FILE_BYTES it would not.
+    await teammates.renameMission('m_last', longest)
+    expect(Object.keys(await teammates.missionTitles())).toHaveLength(MAX_MISSION_TITLES)
     await expect(teammates.renameMission('m_one_too_many', 'nope')).rejects.toThrow()
-  }, 60_000)
+  })
 
   it('still lets an existing one be renamed at the cap', async () => {
     // The bound is on ADDING a conversation to the set, not on editing one
     // already in it -- otherwise hitting the cap would freeze every name.
-    const { store: teammates } = await store()
-    for (let index = 0; index < MAX_MISSION_TITLES; index += 1) {
-      await teammates.renameMission(`m_${String(index)}`, 'first')
-    }
+    const { store: teammates, root } = await store()
+    await almostFull(root, 'first')
+    await teammates.renameMission('m_last', 'first')
+    // Really at the cap: a pass here means something only if the roster is full.
+    expect(Object.keys(await teammates.missionTitles())).toHaveLength(MAX_MISSION_TITLES)
     await expect(teammates.renameMission('m_0', 'second')).resolves.toBeUndefined()
     expect((await teammates.missionTitles()).m_0).toBe('second')
-  }, 60_000)
+  })
 })
 
 describe('the file is read as untrusted, like everything else in it', () => {

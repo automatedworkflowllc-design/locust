@@ -61,7 +61,7 @@ export const ANTIGRAVITY_IDLE_TIMEOUT_MS = 10 * 60_000
 /**
  * HOW OFTEN A LIVE RUN IS LOOKED AT (0.608). Once a second put each of
  * Antigravity's steps on the thread up to a second late, half a second on
- * average -- the longest tail of any runtime (the Fable review, 2026-10-05,
+ * average -- the longest tail of any runtime (the Fable review, 2026-10-04,
  * item 7). Four times a second now, and cheap: the poll stats the transcript
  * first and reads it only when its size or time has moved (`seen`), so a run
  * that is thinking costs four stats a second, not four reads of a file that

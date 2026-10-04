@@ -54,7 +54,7 @@ import { netFileEntries,
   threadPeerCards,
   typedPrompt
 , commandsRun, commandsRunText, HANDOFF_INSTRUCTION_MARKER, isEditCommand, switchOf,
-  stepsLine, displayPath
+  stepsLine, displayPath, liveActionLine
 } from './missionView.js'
 
 const NOW = '2026-08-31T16:00:00.000Z'
@@ -3330,5 +3330,47 @@ describe('the live line while nothing has arrived (0.602)', () => {
     expect(withPhase?.type === 'live-step' ? withPhase.label : undefined).toBe('Reading the folder')
     const plain = buildThread([], { running: true, startedAt: '2026-10-04T20:00:00.000Z' }).find((item) => item.type === 'live-step')
     expect(plain?.type === 'live-step' ? plain.label : undefined).toBe('Starting')
+  })
+})
+
+/*
+ * A CODEX RUN'S LINE AND ROWS READ AS WORDS (0.610). Colin's screenshots of
+ * 2026-10-04: the row read `Get-Content 'C:\\Users\\<home>\\.codex\\...'`, the
+ * live line "Using imageGeneration", and the plan step "Inspect the
+ * screenshot and relevant visual-design notes. · step 1 of 3".
+ */
+describe('a Codex run, said as words', () => {
+  const ESCAPED = '"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe" -Command "Get-Content \'C:\\\\Users\\\\me\\\\.codex\\\\skills\\\\imagegen\\\\SKILL.md\'; Get-Content notes.md"'
+
+  it('shows the command as the shell got it, when Codex escaped every backslash', () => {
+    expect(shellCommandText(ESCAPED)).toBe("Get-Content 'C:\\Users\\me\\.codex\\skills\\imagegen\\SKILL.md'; Get-Content notes.md")
+  })
+
+  it('leaves a command alone when one backslash is not half of a pair', () => {
+    const plain = '"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content C:\\Users\\me\\notes.md"'
+    expect(shellCommandText(plain)).toBe('Get-Content C:\\Users\\me\\notes.md')
+  })
+
+  it('still undoes an escaped quote inside an escaped payload', () => {
+    const quoted = '"C:\\\\Windows\\\\powershell.exe" -Command "rg \\"streak\\" C:\\\\work"'
+    expect(shellCommandText(quoted)).toBe('rg "streak" C:\\work')
+  })
+
+  it('says Codex\'s image tool in words, on the live line and in the steps line', () => {
+    expect(liveActionLine({ kind: 'tool', name: 'imageGeneration', tool: 'imageGeneration', settled: false } as ActivityDetail)).toBe('Generating an image')
+    expect(stepsLine([{ kind: 'tool', name: 'imageGeneration', tool: 'imageGeneration', settled: true } as ActivityDetail], true).segments[0]?.text).toBe('Made an image')
+    expect(stepsLine([
+      { kind: 'tool', name: 'imageGeneration', tool: 'imageGeneration', settled: true },
+      { kind: 'tool', name: 'imageGeneration', tool: 'imageGeneration', settled: true }
+    ] as ActivityDetail[], true).segments[0]?.text).toBe('Made 2 images')
+    // A tool it has no words for is still named, as before.
+    expect(liveActionLine({ kind: 'tool', name: 'fooBar', tool: 'fooBar', settled: false } as ActivityDetail)).toBe('Using fooBar')
+  })
+})
+
+describe('a tool the app has words for, as a row (0.610)', () => {
+  it('reads as what it did, not the program name', () => {
+    const entries = activityEntries([{ kind: 'tool', name: 'imageGeneration', tool: 'imageGeneration', settled: true } as ActivityDetail])
+    expect(entries.map((entry) => entry.kind === 'tool' ? entry.name : '')).toEqual(['Made an image'])
   })
 })

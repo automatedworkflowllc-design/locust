@@ -400,7 +400,8 @@ export function HomeCover({
   ready,
   tube,
   swarmCalls = 0,
-  grow = 1
+  grow = 1,
+  status
 }: {
   /** The runtimes have answered: the loading screen's work is done. */
   readonly ready: boolean
@@ -409,6 +410,11 @@ export function HomeCover({
   readonly swarmCalls?: number
   /** Spare height the page gives the drawing, as a factor (`coverGrowFor`). */
   readonly grow?: number
+  /**
+   * Who is working, and who waits on you, for the glass to say in place of
+   * the claim (glassStatus, homeCoverStatus.ts). Absent: the claim.
+   */
+  readonly status?: string
 }): ReactElement {
   const card = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(() => coverScale(0))
@@ -602,7 +608,7 @@ export function HomeCover({
     const claim = element?.querySelector<HTMLElement>('.lc-cover__claim')
     if (glass === null || glass === undefined || claim === null || claim === undefined || glass.clientWidth === 0) return
     setClaimFits(claim.getBoundingClientRect().width + 24 <= glass.clientWidth)
-  }, [drawn])
+  }, [drawn, status])
   return (
     /*
      * A mono beam goes round the title box WHILE THE RUNTIMES ARE BEING
@@ -630,7 +636,13 @@ export function HomeCover({
                 <span className="lc-cover__scan" aria-hidden="true" />
                 <div className="lc-cover__screen">
                   <PoweredLockup ready={ready} tube={tube} replay={relights} resting={!awake} />
-                  <p className="lc-cover__claim">Autonomous teammates on your own machine</p>
+                  {/*
+                    * THE GLASS SAYS WHO IS WORKING (0.610). Colin's mockup, 2026-10-04:
+                    * "CODEX WORKING · CASPER WAITING ON YOU" on the machine's own glass
+                    * while work runs, the claim when nothing does. The machine was
+                    * always the app's own; now it reports.
+                    */}
+                  <p className={`lc-cover__claim${status === undefined ? '' : ' is-status'}`}>{status ?? 'Autonomous teammates on your own machine'}</p>
                 </div>
               </div>
             </div>
@@ -643,8 +655,9 @@ export function HomeCover({
           const state = mate.key === SLEEPER && sleeper.awake ? 'default' : mate.state
           const beat = beatOf(mate)
           const asleep = mate.part === 'sleeper' && !sleeper.awake
-          // The worker and the thinker are always on; the locust only once it is awake. Amber while it waits on you.
-          const dot = !ready || asleep ? undefined : beat.waiting === true ? 'amber' : 'live'
+          // No presence dot on a character (0.610): "two wear the live dot while your team is idle" (Colin's
+          // mockup, 2026-10-04). Who is really working is said on the glass.
+          const dot: 'amber' | 'live' | undefined = undefined
           const glance = ready && awake ? glanceOf(beat) : undefined
           return (
             <span key={mate.key} className="lc-cover__face" style={{ left: atX(mate.x), top: at(mate.y) }}>
@@ -665,7 +678,7 @@ export function HomeCover({
                   * keys React took the bot's place for the ring and REMOUNTED the bot -- a new
                   * rig, mid-motion, its face spun away (0.562, look-cover.mjs).
                   */}
-                {ready && beat.waiting === true && <span key="ring" className="lc-bot__ring" />}
+                {/* No waiting ring either (0.610): nothing waits on you when a character plays at it. */}
                 <Bot
                   key="bot"
                   type={mate.type}

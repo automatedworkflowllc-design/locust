@@ -5901,7 +5901,7 @@ textarea {
 /* Build and compare (0.448): one quiet line under the agents, its starters as small pills. */
 /* The Compare starters as one row of chips (0.609). The three cards of 0.460
    took a row of Home; the one line of links of 0.607 read as a footnote
-   (Colin, 2026-10-05: "looks trashy compared to what we had"). A chip each
+   (Colin, 2026-10-04: "looks trashy compared to what we had"). A chip each
    -- the drawn thing on its tile (BuildIcon), the name -- is one line tall
    and still an object to press. */
 .lc-buildhead {
@@ -5909,7 +5909,28 @@ textarea {
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 0 10px 0 14px;
+  /* One left edge with the team and the accounts (0.610): 14px in, as the
+     boxed line had it, put three labels at three edges. */
+  padding: 0;
+}
+
+.lc-buildhead__compare {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0 4px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--lc-text-secondary);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  cursor: pointer;
+}
+
+.lc-buildhead__compare:hover,
+.lc-buildhead__compare:focus-visible {
+  color: var(--lc-text-primary);
 }
 
 .lc-buildhead .lc-agenthead__label {
@@ -6047,13 +6068,17 @@ textarea {
   display: none;
 }
 
+/* The accounts as one quiet line under a hairline (0.610), at the column's
+   own edge. Boxed, with the cards' fill and border 8px under the grid, it
+   read as a seventh card (Colin's mockup, 2026-10-04). */
 .lc-agenthead.is-folded {
   align-items: center;
-  margin-top: 0;
-  padding: 10px 10px 10px 14px;
-  border: 1px solid var(--lc-border-card);
-  border-radius: var(--lc-radius-card);
-  background: var(--lc-bg-raised);
+  margin-top: 4px;
+  padding: 12px 0 0;
+  border: 0;
+  border-top: 1px solid var(--lc-border-hairline);
+  border-radius: 0;
+  background: transparent;
 }
 
 /* The ready agents as their marks (0.383), in the words' own quiet colour
@@ -6416,6 +6441,12 @@ textarea {
   gap: var(--lc-space-4);
 }
 
+.lc-hometeam__count {
+  margin-left: 10px;
+  color: var(--lc-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .lc-hometeam__head {
   margin: 0;
   font-family: var(--lc-font-mono);
@@ -6531,25 +6562,73 @@ textarea {
   color: var(--lc-text-name);
 }
 
-/* The state beside the name (0.606; was the lone "working" tag): the live
-   word in the live colour, "waiting on you" amber, what blocks them red.
-   Idle draws nothing (0.609: "3h ago" beside the name read as debris). Cut
-   with an ellipsis before it pushes the name: the role line below already
-   does the same. */
+/* The state beside the name, as a pill (0.610; a mono word in 0.606): the
+   live word with a green dot, "waiting on you" amber, what blocks them red.
+   Idle draws nothing (0.609). The pill gives way before the name does. */
 .lc-hometeam__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-family: var(--lc-font-prose);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
   white-space: nowrap;
-  font-family: var(--lc-font-mono);
-  font-size: var(--lc-text-mono-label);
-  font-weight: 400;
-  letter-spacing: var(--lc-tracking-label);
-  color: var(--lc-text-muted);
+  text-overflow: ellipsis;
 }
-.lc-hometeam__state.is-live { color: var(--lc-lime-text); }
-.lc-hometeam__state.is-amber { color: var(--lc-amber-text); }
-.lc-hometeam__state.is-red { color: var(--lc-red-text); }
+.lc-hometeam__state.is-live {
+  color: var(--lc-text-primary);
+  background: var(--lc-hover-surface-strong);
+}
+.lc-hometeam__state.is-live::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--lc-green);
+}
+.lc-hometeam__state.is-amber {
+  color: var(--lc-amber-text);
+  background: color-mix(in srgb, var(--lc-amber-text) 14%, transparent);
+}
+.lc-hometeam__state.is-red {
+  color: var(--lc-red-text);
+  background: color-mix(in srgb, var(--lc-red-text) 14%, transparent);
+}
+
+/* The face on a tile of the teammate's colour (0.610), faint. HomeTeam sets --lc-tile to the
+   teammate's hue on each tile; the muted text colour here is what a tile without one shows (a
+   default declared, as --lc-cover-k is, rather than a var() fallback, which the token gate refuses). */
+.lc-hometeam__tile {
+  --lc-tile: var(--lc-text-muted);
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--lc-tile) 11%, var(--lc-bg-raised));
+  border: 1px solid color-mix(in srgb, var(--lc-tile) 20%, transparent);
+}
+
+/* A card whose teammate works stands a little forward; one waiting on you is amber. */
+.lc-hometeam__card.is-live {
+  border-color: var(--lc-border-strong);
+}
+.lc-hometeam__card.is-waiting {
+  border-color: color-mix(in srgb, var(--lc-amber-text) 45%, var(--lc-border-card));
+  background: color-mix(in srgb, var(--lc-amber-text) 5%, var(--lc-bg-raised));
+}
+
+/* What they are doing, in the role's place while they do it. */
+.lc-hometeam__role.is-doing {
+  color: var(--lc-text-primary);
+}
 
 .lc-hometeam__role,
 .lc-hometeam__route {
@@ -7716,7 +7795,7 @@ textarea {
      first letters in one row ("Conversa… Ro… Rout… Bo…", the Board's first
      drive). Two rows of two keep the words whole and the right edge used. */
   /* Rows with counts (0.605) were three lines with a lone number at the far
-     right: "too much dead space" (Colin, 2026-10-05). One row again (0.609),
+     right: "too much dead space" (Colin, 2026-10-04). One row again (0.609),
      as 0.488 drew it: with Board in the bottom bar the three words fit side
      by side, and each carries its count as a small badge beside the word. */
   display: flex;

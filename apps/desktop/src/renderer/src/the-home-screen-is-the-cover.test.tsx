@@ -83,9 +83,10 @@ describe('what the home screen draws', () => {
     expect(before).not.toContain('lc-presence')
     expect(before).not.toContain('lc-bot__ring')
     expect(before).not.toContain('lc-cover__zzz')
-    // Then the thinker and the worker are on, and Sable sleeps, unmarked, its z's drifting up.
-    // Working is monochrome since 0.430 (Colin: "we don't really use any lime accents").
-    expect(after.match(/lc-presence--live/g) ?? []).toHaveLength(2)
+    // Then the thinker and the worker play, and Sable sleeps, its z's drifting up -- all three unmarked
+    // (0.610): a presence dot on a character said a state nobody was in ("two wear the live dot while
+    // your team is idle", Colin's mockup, 2026-10-04). Who is working is said on the glass.
+    expect(after).not.toContain('lc-presence')
     // The worker waits on you only in its waiting beat (coverScript), not from the first frame.
     expect(after).not.toContain('lc-bot__ring')
     expect(after).toContain('class="lc-cover__zzz"')
@@ -144,5 +145,15 @@ describe('the three play their parts', () => {
     expect(beatAt(WORKER, 6.5).beat.name).toBe('done')
     expect(beatAt(WORKER, 6).left).toBeCloseTo(0.5)
     expect(beatAt(WORKER, 17 + 6.5).beat.name).toBe('done')
+  })
+})
+
+describe('the cover\'s glass while work runs (0.610)', () => {
+  it('says who is working in place of the claim, and the claim when nothing runs', () => {
+    const working = renderToStaticMarkup(<HomeCover ready tube="full" status="Casper waiting on you · Codex working" />)
+    expect(working).toContain('<p class="lc-cover__claim is-status">Casper waiting on you · Codex working</p>')
+    expect(working).not.toContain('Autonomous teammates on your own machine')
+    const idle = renderToStaticMarkup(<HomeCover ready tube="full" />)
+    expect(idle).toContain('Autonomous teammates on your own machine')
   })
 })

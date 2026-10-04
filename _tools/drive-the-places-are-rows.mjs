@@ -8,7 +8,7 @@
 //
 // Colin, 2026-10-04, on the places as a two-by-two grid: counts, and Board
 // down in the bottom bar beside Settings. 0.605 drew them as three rows with
-// a number at the far right; Colin, 2026-10-05: "too much dead space". So
+// a number at the far right; Colin, 2026-10-04: "too much dead space". So
 // (0.609): three places side by side in ONE row, as 0.488 drew them, every
 // word whole and no counts (beside the words they cut every word; on the
 // icon's corner the 14 ran into the C); the footer reads Settings · Board ·

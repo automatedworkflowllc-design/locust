@@ -25,29 +25,35 @@ describe('a group of steps, in one line', () => {
     expect(line([shell('python ce3.py', { title: 'Add per-column effort chip and CSS', failed: true, exitCode: 2 })])).toBe('[Failed to add per-column effort chip and CSS]')
   })
 
-  it('counts reads and commands the way Claude Code does', () => {
-    expect(line([tool('Read', 'src/a.ts'), tool('Read', 'src/b.ts'), shell('git status')])).toBe('Read 2 files, ran git status')
-    expect(line([shell('npm test'), shell('npm run build'), tool('Read', 'Composer.tsx')])).toBe('Ran 2 commands, read Composer.tsx')
+  it('counts reads and commands the way Claude Code does, naming nothing when it mixes kinds (0.610)', () => {
+    expect(line([tool('Read', 'src/a.ts'), tool('Read', 'src/b.ts'), shell('git status')])).toBe('Read 2 files, ran a command')
+    expect(line([shell('npm test'), shell('npm run build'), tool('Read', 'Composer.tsx')])).toBe('Ran 2 commands, read a file')
+    // One kind alone keeps its name, as Claude Code's does.
+    expect(line([shell('git status')])).toBe('Ran git status')
   })
 
   it('reads a command that only looks as looking (Codex and Cursor send no descriptions)', () => {
-    expect(line([shell("sed -n '1,80p' src/app.ts"), shell('rg effort src'), shell('ls')])).toBe('Read app.ts, searched for effort, listed a folder')
+    expect(line([shell("sed -n '1,80p' src/app.ts"), shell('rg effort src'), shell('ls')])).toBe('Read a file, ran a search, listed a folder')
+    expect(line([shell("sed -n '1,80p' src/app.ts")])).toBe('Read app.ts')
     expect(commandLooksAt('cd repo && cat README.md')).toBe('read')
     // PowerShell chains with `;`: the file is the first command's.
     expect(line([shell('Get-Content "C:\\tmp\\drive.log" -Tail 80; Write-Output "----TERMINAL----"; Get-Content "C:\\x\\"')])).toBe('Read drive.log')
     expect(commandLooksAt('pnpm test')).toBeUndefined()
   })
 
-  it('names what it made and changed', () => {
+  it('names what it made when that is all it did, and counts it beside other steps (0.610)', () => {
     const created: ActivityDetail = {
       kind: 'edit', name: 'ce3.py', tool: 'write', settled: true,
       patch: { text: 'diff --git a/ce3.py b/ce3.py\nnew file mode 100644\n--- /dev/null\n+++ b/ce3.py\n@@ -0,0 +1,2 @@\n+a\n+b\n', truncated: false, added: 2, removed: 0 }
     } as ActivityDetail
-    expect(line([created, shell('python ce3.py'), shell('ls -la'), shell('pnpm tsc')])).toBe('Created ce3.py, ran 2 commands, listed a folder')
+    expect(line([created])).toBe('Created ce3.py')
+    expect(line([created, shell('python ce3.py'), shell('ls -la'), shell('pnpm tsc')])).toBe('Created a file, ran 2 commands, listed a folder')
   })
 
-  it('says how long it thought, first, as Claude Code does', () => {
-    expect(line([{ kind: 'reasoning', name: 'thought', settled: true, output: '', durationMs: 12_000 }, shell('npm test')])).toBe('Thought for 12s, ran npm test')
+  it('says the thought only when nothing else was done: Claude Code\'s lines never lead with it (0.610)', () => {
+    // Colin, 2026-10-04, beside Claude Code's app: "they are being stacked on one line when claude code doesnt do that".
+    expect(line([{ kind: 'reasoning', name: 'thought', settled: true, output: '', durationMs: 12_000 }, shell('npm test')])).toBe('Ran npm test')
+    expect(line([{ kind: 'reasoning', name: 'thought', settled: true, output: '', durationMs: 12_000 }])).toBe('Thought for 12s')
   })
 
   it('never hides what went wrong: failures, silence, refusals in amber after the words', () => {
@@ -130,9 +136,9 @@ describe('a long line fits its row', () => {
   it('offers shorter forms: names give way to counts, then the last phrases to "and N more"', () => {
     const steps = [edited(LONG), shell('cat NOTES.md'), shell('pnpm test'), shell('pnpm tsc'), shell('rg approval src'), shell('ls -la')]
     const built = stepsLine(steps, true)
-    expect(built.segments[0]!.text).toBe('Edited a-full-rule-stor…very-rule.test.ts, read NOTES.md, ran 2 commands, searched for approval, listed a folder')
+    // Mixed kinds count and name nothing (0.610); the names are the hover's.
+    expect(built.segments[0]!.text).toBe('Edited a file, read a file, ran 2 commands, ran a search, listed a folder')
     expect(built.shorter).toEqual([
-      'Edited a file, read a file, ran 2 commands, ran a search, listed a folder',
       'Edited a file, read a file, ran 2 commands, ran a search and 1 more',
       'Edited a file, read a file, ran 2 commands and 2 more',
       'Edited a file, read a file and 3 more',
@@ -144,12 +150,11 @@ describe('a long line fits its row', () => {
     expect(stepsLine([shell('cat NOTES.md')], true).title).toBe('Read NOTES.md')
   })
 
-  it('keeps a thought headline through the shorter forms, and has nothing shorter for a lone failure', () => {
+  it('leaves a thought out of a line with other steps, and has nothing shorter for a lone failure', () => {
     const thought: ActivityDetail = { kind: 'reasoning', name: 'thinking', tool: 'reasoning', settled: true, durationMs: 4_000, output: 'Checking the store first.' } as ActivityDetail
     const built = stepsLine([thought, edited(LONG), shell('pnpm test')], true)
-    expect(built.segments[0]!.text).toBe('Thought for 4s, edited a-full-rule-stor…very-rule.test.ts, ran pnpm test')
-    expect(built.shorter[0]).toBe('Thought for 4s, edited a file, ran a command')
-    expect(built.shorter.at(-1)).toBe('Thought for 4s and 2 more')
+    expect(built.segments[0]!.text).toBe('Edited a file, ran a command')
+    expect(built.shorter).toEqual(['Edited a file and 1 more'])
     expect(stepsLine([shell('pnpm test', { title: 'Run the tests', exitCode: 1, failed: true })], true).shorter).toEqual([])
     expect(stepsLine([], true).shorter).toEqual([])
   })

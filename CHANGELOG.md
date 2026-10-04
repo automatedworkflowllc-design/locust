@@ -11,7 +11,25 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
-## 0.609.0 - 2026-10-05
+## 0.610.0 - 2026-10-04
+
+### Fixed
+
+- **A long command no longer stops a Claude Code run.** A teammate that wrote a whole page through one command, a heredoc tens of kilobytes long, was stopped with "the mission ledger could not be written", because the command was longer than a record holds. The command and its description are now cut to fit, keeping both ends, as every other runtime's already were.
+- **A Codex command reads as the shell got it.** Codex reports a Windows command with every backslash doubled, so a row read `Get-Content 'C:\\Users\\...\\SKILL.md'`. The row now shows `Get-Content 'C:\Users\...\SKILL.md'`, the command that ran. A command that was not escaped that way is shown exactly as sent.
+- **Codex's image tool is said in words.** The live line read "Using imageGeneration"; it now reads "Generating an image", and the steps line says "made an image".
+- **A turn's steps read the way Claude Code's do.** The line under each reply said how long the teammate thought and named files mid-line ("Thought for 49s, read 5 files, ran 2 commands, edited storm.mjs, searched hul"). It now says only what was done, in counts when it mixes kinds ("Read 5 files, ran 2 commands, edited a file, ran a search"), and names a file only when that is all it did. A line with nothing else in it still says "Thought for 12s", and a Codex stretch with a headline says just that ("Inspecting the config"). Every name is in the hover and in the rows when you open it.
+- **The newest group of steps stays folded, as in Claude Code.** It used to stay open and grow while the run worked, so the latest stretch looked different from every other. It is one line like the rest until you press it.
+- **The plan step on the live line has no full stop before the step count.** "Inspect the screenshot. · step 1 of 3" read as two sentences; it is now "Inspect the screenshot · step 1 of 3".
+
+### Changed
+
+- **Home looks like your team.** Each team card puts the teammate's face on a tile of its own colour. While a teammate works, a pill says so ("working", "thinking", "replying") and the line under the name says on what, such as "Editing FirstLaunch.tsx"; while one waits on you the card turns amber and that line says what for, such as "Wants to run pnpm test". An idle card stays calm.
+- **The sign says who is working.** While work runs, the glass under the Locust sign names it, such as "Casper waiting on you · Codex working", and goes back to "Autonomous teammates on your own machine" when nothing runs. The three characters on top no longer wear presence dots, which claimed a state nobody was in.
+- **Home's lower half reads as one column.** The connected accounts are one quiet line under a hairline instead of a boxed panel that looked like a seventh card. "Compare models" moved to the end of the "Try two models on" row, so Compare is offered once, beside its starters. Your team's heading says how many there are, and every label starts at the same left edge.
+- **The first-run sentence is for a first run.** "Your AI agents, on your own accounts. OpenCode works without one." now shows only before you have a team.
+
+## 0.609.0 - 2026-10-04
 
 ### Changed
 
@@ -19,44 +37,44 @@ heading: the home screen then shows it once, as a splash.
 - **The sidebar's places are one row again.** Three rows with a lone number at the far right left the sidebar mostly empty. Conversations, Rooms and Routines sit side by side as they did before the Board joined them, every word whole; Board stays in the bottom bar. The counts are gone: there was no clean place for them in one row, and the list below already shows what each holds.
 - **An idle team card is calm again.** "3h ago" and "no work yet" beside the name read as debris. A card says something only when there is something to say: the live word while the teammate works, "waiting on you", or a sign-in it needs. What an idle teammate last did is the card's hover. While Locust is still looking for your agents, no card claims anything.
 
-## 0.608.0 - 2026-10-05
+## 0.608.0 - 2026-10-04
 
 ### Improved
 
 - **An Antigravity run's words reach the thread sooner.** While an Antigravity run is live, Locust looks at its transcript four times a second instead of once, so each new step shows up to three quarters of a second earlier. Nothing changes when no run is live.
 
-## 0.607.0 - 2026-10-05
+## 0.607.0 - 2026-10-04
 
 ### Changed
 
 - **Home's agent strip is called "Connected accounts".** The line under the sign already said "Your AI agents, on your own accounts"; the strip beneath the team, which lists the agents signed in on this machine, now says what it is from your side of the screen. "7 ready", the marks and "Show all" are unchanged. Settings keeps "AI agents & accounts".
 - **The three "Try two models on" cards are one line.** "Try two models on a landing page, a sales dashboard or an arcade game", each a link that fills the box for a comparison, with "Compare models" still beside the accounts. The three cards took a row of Home for a thing most sessions do not start with.
 
-## 0.606.0 - 2026-10-05
+## 0.606.0 - 2026-10-04
 
 ### Improved
 
 - **Each team card on Home says where that teammate stands.** Beside the name: "working", "thinking" or "replying" while they work, "waiting on you" in amber when a card is asking, what blocks them in red, and, when idle, when they last worked ("2h ago", read aloud as "last worked 2 hours ago"; "no work yet" before a first conversation). The card used to say "working" or nothing, so a teammate waiting on your answer and one idle since Tuesday read the same.
 
-## 0.605.0 - 2026-10-05
+## 0.605.0 - 2026-10-04
 
 ### Changed
 
 - **The sidebar's places are rows, with counts, and Board moved to the bottom bar.** Conversations, Rooms and Routines each take a line of their own with how many they hold at the right (nothing is shown for an empty one). Board sits beside Settings at the bottom: it is a view of the conversations, not a fourth kind of place. The bottom line now reads "7 agents ready"; hovering it still says "7 AI agents ready".
 
-## 0.604.0 - 2026-10-05
+## 0.604.0 - 2026-10-04
 
 ### Fixed
 
 - **The steps line under a reply fits its row in whole phrases.** It used to be cut by the row's edge mid-word ("created a-full-rule-store-keeps-every-rule.test.ts, edited ap…"). A long file name is now cut in the middle with its extension kept ("a-full-rule-stor…very-rule.test.ts"), and when the sentence is still wider than the row, names give way to counts ("edited a file, read a file"), then the last phrases to "and 2 more". The full sentence is the line's hover title, and the rows under it still carry every full name.
 
-## 0.603.0 - 2026-10-05
+## 0.603.0 - 2026-10-04
 
 ### Improved
 
 - **A streaming reply no longer waits on the disk one piece at a time.** Every piece of a reply is written to the conversation's record before it is shown, and each write is a disk sync. The thread used to wait for each sync before reading the next piece, so on a busy disk (another teammate streaming, a build running) every piece paid its own wait, several hundred times a turn. Now the next pieces are read while one write is on the disk, and go in one write when it lands. On a quiet disk nothing changes; on a busy one the stream keeps pace with the runtime and the writes fall to what the disk can do. What is shown is still only what is already on disk.
 
-## 0.602.0 - 2026-10-05
+## 0.602.0 - 2026-10-04
 
 ### Improved
 

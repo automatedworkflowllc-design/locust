@@ -833,7 +833,7 @@ export function LiveRegisterLine({
    * it is doing -- looking for the runtime, briefing it, reading the folder,
    * starting the program -- and the line said only "Starting…" for the
    * whole wait, four to ten seconds on a median start (the Fable review,
-   * 2026-10-05). The phase is the register said more exactly, so it takes
+   * 2026-10-04). The phase is the register said more exactly, so it takes
    * the word's place, in the word's swept type, rather than trailing it as
    * an aside: "Reading the folder…", "Starting OpenCode…". A label that is
    * just "Starting" draws as it always did.

@@ -12,6 +12,8 @@ import type { RunCost } from './cost.js'
 export interface LiveTurn {
   readonly register: 'starting' | 'working' | 'thinking' | 'writing' | 'tool' | 'connector'
   readonly label: string | undefined
+  /** The step under way in words, where there is one: "Editing FirstLaunch.tsx" (0.610, for the team cards). */
+  readonly action?: string
   readonly detail: string | undefined
   readonly startedAt: string
   /** Waiting on the model with nothing to show: the dots. */
