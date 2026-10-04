@@ -11,6 +11,21 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.577.0 - 2026-10-04
+
+### New
+
+- **Plush.** A new choice in Settings > Appearance draws every teammate in
+  soft faux fur instead of plastic. Where a teammate is drawn small, as in
+  the sidebar, the fur is a shorter, combed pile, so it stays a clean plush
+  rather than a fuzzy blur. Off unless you turn it on.
+
+### Fixed
+
+- **The mech's antennae** were drawn as a black scribble between them in
+  the newer avatar library; each antenna is now its own piece. The swarm's
+  antennae are a touch thicker, so both of them always show.
+
 ## 0.576.0 - 2026-10-04
 
 ### Improved
