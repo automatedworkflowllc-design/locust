@@ -11,6 +11,38 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.575.0 - 2026-10-04
+
+### New
+
+- **Save the record.** Right-click a conversation, or use the command
+  palette, and choose "Save the record…" to save the whole conversation as
+  one Markdown file: what was asked, what each agent said, every command
+  with its output, every file change with its diff, hand-offs, and how each
+  turn ended. A tick adds the raw record as JSON beside it. The file says
+  only what Locust recorded, and says so where something was not recorded.
+  Nothing is uploaded; the file is yours to read before you send it.
+- **Start Locust when you sign in to Windows.** A switch in Settings, off
+  until you turn it on. Locust then starts in the tray with no window, so
+  your routines run after a restart without opening the app.
+- **Keep Locust running when the window is closed.** Also in Settings and
+  off by default: closing the window hides Locust to the tray, and routines
+  carry on.
+
+### Improved
+
+- **A routine whose time passed while Locust was closed says it was
+  missed,** with Run now, instead of starting by surprise when you open
+  Locust.
+
+### Fixed
+
+- **Codex config warnings are shown.** Codex sends them with a summary
+  rather than a message, and Locust dropped them.
+- **Cursor's reconnects are said in words.** A run where Cursor lost its
+  connection showed "Unhandled Cursor record: connection" and "retry"; it
+  now says Cursor is reconnecting and then picking the turn back up.
+
 ## 0.574.0 - 2026-10-03
 
 ### Improved
