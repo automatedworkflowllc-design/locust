@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.576.0 - 2026-10-04
+
+### Improved
+
+- **Every approval you answer is now kept with the conversation.** Locust
+  recorded a call you declined, but nothing of one you allowed, or of who
+  answered: you on the card, or a rule you saved. Now each card you answer
+  is written down with its turn: what it asked, your answer, who gave it,
+  and anything you said with it. "Save the record" lists them, so the file
+  shows what you let a teammate do. Conversations from before this build
+  keep saying what they could not record.
+
 ## 0.575.0 - 2026-10-04
 
 ### New
