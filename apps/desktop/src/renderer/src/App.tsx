@@ -4050,7 +4050,21 @@ export default function App(): ReactElement {
        * Mimo, and the next message went to Mimo as "a fresh session". The
        * kept column's model is the one the conversation now continues on.
        */
-      if (kept !== undefined) changeRoute({ runtime: kept.route.runtime as MissionRuntimeId, model: kept.route.model })
+      if (kept !== undefined) {
+        changeRoute({ runtime: kept.route.runtime as MissionRuntimeId, model: kept.route.model })
+        /*
+         * ...AT ITS OWN EFFORT (0.612). Arena round 2's reveal, 2026-10-04: "You
+         * kept Sonnet 5.5 · High; the conversation carries on with it", and the
+         * chat box beneath it said Medium. changeRoute carries the CHAT BOX's
+         * effort over to a new model, as a person's pick should; here the
+         * effort that ran is the kept column's, so that is the one carried, by
+         * the same rule (the model's default when it does not offer it). The
+         * mode is not: a compare's Auto worked in copies, and the conversation
+         * goes on in the folder itself, at the chat box's own mode.
+         */
+        const keptFamily = modelFamily(models, kept.route.runtime as MissionRuntimeId, kept.route.model)
+        setEffort(effortAfterRouteChange(kept.route.effort, keptFamily?.supportedEfforts ?? [], keptFamily?.defaultEffort))
+      }
       setComparingId(undefined)
     } finally {
       setKeepingCompare(false)
