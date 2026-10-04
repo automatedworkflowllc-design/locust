@@ -6,13 +6,14 @@
 // fourteen conversations, two rooms, no routines) -- the state Colin's own
 // sidebar is in, not the empty one. Nothing is spent; no runtime starts.
 //
-// Colin, 2026-10-04, on the places as a two-by-two grid ("Conversations ·
-// Rooms / Routines · Board"): rows, with counts, and Board down in the bottom
-// bar beside Settings. So: three places, each a full-width row with its
-// count at the right (none when there is nothing to count); the footer reads
-// Settings · Board · "N agents ready"; the compact rail keeps the places as
-// icons and Board above the gear. The control (the 0.604 package) has four
-// places in two columns and no counts.
+// Colin, 2026-10-04, on the places as a two-by-two grid: counts, and Board
+// down in the bottom bar beside Settings. 0.605 drew them as three rows with
+// a number at the far right; Colin, 2026-10-05: "too much dead space". So
+// (0.609): three places side by side in ONE row, as 0.488 drew them, every
+// word whole and no counts (beside the words they cut every word; on the
+// icon's corner the 14 ran into the C); the footer reads Settings · Board ·
+// "N agents ready"; the compact rail keeps the places stacked as icons and
+// Board above the gear. The control (the 0.608 package) has the three rows.
 
 import { createHash } from 'node:crypto'
 import { mkdir } from 'node:fs/promises'
@@ -91,7 +92,8 @@ const read = async () => JSON.parse(String(await drive.evaluate(`(() => {
   const box = (el) => { const r = el.getBoundingClientRect(); return { x: Math.round(r.left), w: Math.round(r.width), h: Math.round(r.height) } }
   const places = [...document.querySelectorAll('.lc-sidebar__places:not(.lc-sidebar__places--pinned) button')].map((b) => {
     const count = b.querySelector('.lc-sidebar__count')
-    return { label: (b.querySelector('span:not(.lc-sidebar__count)')?.innerText ?? '').trim(), count: count ? count.innerText.trim() : null, ...box(b), countRight: count ? Math.round(count.getBoundingClientRect().right) : null, right: Math.round(b.getBoundingClientRect().right) }
+    const word = b.querySelector('span:not(.lc-sidebar__count)')
+    return { label: (word?.innerText ?? '').trim(), cut: word ? word.scrollWidth > word.clientWidth + 1 : false, count: count ? count.innerText.trim() : null, ...box(b), top: Math.round(b.getBoundingClientRect().top), countRight: count ? Math.round(count.getBoundingClientRect().right) : null, right: Math.round(b.getBoundingClientRect().right) }
   })
   const footer = [...document.querySelectorAll('.lc-sidebar__footer button')].map((b) => ({ label: (b.querySelector('span')?.innerText ?? '').trim(), title: b.getAttribute('title') ?? '', ...box(b) }))
   const status = document.querySelector('.lc-sidebar__footer .lc-connected')
@@ -106,10 +108,11 @@ try {
   await drive.capture('the sidebar at 1440 wide', async () => JSON.stringify(wide))
   say(`  at 1440: ${JSON.stringify(wide)}`)
   check('three places, in this order: Conversations, Rooms, Routines', JSON.stringify(wide.places.map((p) => p.label)) === JSON.stringify(['Conversations', 'Rooms', 'Routines']), JSON.stringify(wide.places.map((p) => p.label)))
-  check('each place is a full-width row (all the same width, wider than half the sidebar)', wide.places.length > 0 && wide.places.every((p) => p.w === wide.places[0].w && p.w > wide.sidebarWidth / 2), JSON.stringify(wide.places.map((p) => p.w)) + ` of ${String(wide.sidebarWidth)}`)
-  check('Conversations counts the fourteen; Rooms the two', wide.places[0]?.count === '14' && wide.places[1]?.count === '2', JSON.stringify(wide.places.map((p) => p.count)))
-  check('Routines, with none, carries no count', wide.places[2]?.count === null, JSON.stringify(wide.places[2]))
-  check('the counts sit at the right edge of their rows', wide.places.filter((p) => p.count !== null).every((p) => p.right - p.countRight <= 16), JSON.stringify(wide.places.map((p) => [p.right, p.countRight])))
+  check('the three places share one row (same top), each narrower than half the sidebar', wide.places.length === 3 && wide.places.every((p) => p.top === wide.places[0].top && p.w < wide.sidebarWidth / 2 && p.w > 40), JSON.stringify(wide.places.map((p) => [p.top, p.w])) + ` of ${String(wide.sidebarWidth)}`)
+  // No counts (0.609): beside the words they cut every word; on the icon's corner the 14 ran into the C.
+  check('the places carry no counts', wide.places.every((p) => p.count === null), JSON.stringify(wide.places.map((p) => p.count)))
+  // The first dev frame of 0.609 had every word cut ("Conversa… Ro… Routi…") once the counts sat beside them.
+  check('no word is cut', wide.places.every((p) => p.cut === false), JSON.stringify(wide.places.map((p) => [p.label, p.cut])))
   check('Board is in the bottom bar, after Settings', JSON.stringify(wide.footer.map((b) => b.label)) === JSON.stringify(['Settings', 'Board']), JSON.stringify(wide.footer))
   check('the footer status says how many agents are ready, whole', wide.status !== null && /^\d+ agents? ready$/.test(wide.status.text) && wide.status.overflow <= 0, JSON.stringify(wide.status))
   check("the status's title keeps the full sentence", wide.status !== null && /^\d+ AI agents? ready$/.test(wide.status.title), JSON.stringify(wide.status?.title))

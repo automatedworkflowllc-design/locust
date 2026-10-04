@@ -85,7 +85,7 @@ import { MemoryScreen } from './components/MemoryScreen.js'
 import { isMissionRuntime, runtimeDisplayName } from '../../shared/runtimes.js'
 import type { StartPhase } from '../../shared/ipc.js'
 import { carriedStartPhase, startingLabelOf, withStartPhase } from './startPhase.js'
-import { teamCardState } from './homeTeamState.js'
+import { lastWorkedPhrase, teamCardState } from './homeTeamState.js'
 import { reviewPairOf } from './review-pair.js'
 import type { EditCheckShown } from './components/EditCheckCard.js'
 import { imageMediaType } from '../../shared/image-files.js'
@@ -7629,8 +7629,10 @@ export default function App(): ReactElement {
                   role: roleLabelOf(mate),
                   ...(mate.route === undefined ? {} : homeRouteOf(mate.route, resolvedModels, models)),
                   working: [...runs.values()].some((run) => liveRunIsActive(run) && ownerOf(run) === mate.teammateId),
-                  // Where they stand, beside the name (0.606): the sidebar face's own fact, worded for the card.
-                  ...((state) => (state === undefined ? {} : { state }))(teamCardState(viewByTeammate[mate.teammateId], lastWorkedByTeammate[mate.teammateId]))
+                  // Where they stand, beside the name (0.606): the sidebar face's own fact, worded for the card. Idle says nothing (0.609); what they last did is the card's hover.
+                  // And nothing until the agents have been looked for: before that every teammate reads as blocked.
+                  ...((state) => (state === undefined ? {} : { state }))(runtimeState.phase === 'ready' ? teamCardState(viewByTeammate[mate.teammateId]) : undefined),
+                  lastWorked: lastWorkedPhrase(lastWorkedByTeammate[mate.teammateId])
                 }))}
                 onMessageTeammate={selectTeammate}
                 onChooseFolder={chooseWorkspace}

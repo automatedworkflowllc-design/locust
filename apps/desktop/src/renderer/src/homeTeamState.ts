@@ -5,24 +5,22 @@ import { agoLabel } from './teammateWork.js'
 /** What a team card says beside the name, in which colour, and how it is read aloud. */
 export interface TeamCardState {
   readonly word: string
-  readonly tone: 'live' | 'amber' | 'red' | 'muted'
+  readonly tone: 'live' | 'amber' | 'red'
   readonly spoken: string
 }
 
 const lowerFirst = (text: string): string => (/^[A-Z][a-z]/.test(text) ? `${text.charAt(0).toLowerCase()}${text.slice(1)}` : text)
 
 /**
- * "3h ago", from the same thresholds as `agoLabel` ("3 hours ago"). The tag
- * sits beside the name in a card a third of the row wide, where "last worked
- * 3 hours ago" was cut to "last worked 3 ho…" (the first dev frame of this
- * change); the full phrase is what the card reads aloud.
+ * What an idle teammate last did, for the card's hover (0.609): "last worked
+ * 3 hours ago", or "no work yet" before a first conversation. It was drawn
+ * beside the name in 0.606 ("3h ago", "no work yet") and read as debris
+ * (Colin, 2026-10-05: "looks trashy as well"); the card is calm when the
+ * teammate is, and the fact is a hover away.
  */
-export function compactAgo(iso: string, now: Date = new Date()): string | undefined {
-  const spoken = agoLabel(iso, now)
-  if (spoken === undefined || spoken === 'just now') return spoken
-  const parts = /^(\d+) (minute|hour|day|week)s? ago$/.exec(spoken)
-  if (parts === null) return spoken
-  return `${parts[1]!}${parts[2]!.charAt(0)} ago`
+export function lastWorkedPhrase(lastAt: string | undefined, now: Date = new Date()): string {
+  const ago = lastAt === undefined ? undefined : agoLabel(lastAt, now)
+  return ago === undefined ? 'no work yet' : `last worked ${ago}`
 }
 
 /**
@@ -33,20 +31,22 @@ export function compactAgo(iso: string, now: Date = new Date()): string | undefi
  * header already draw (`teammateStatusView`) is said once more where a
  * person looks for who to talk to: the live word (working, thinking,
  * replying) in the live colour, "waiting on you" in amber, the sign-in or
- * install in red, and, idle, when they last worked.
+ * install in red. Idle says nothing here (0.609; see `lastWorkedPhrase`).
  */
-export function teamCardState(view: TeammateStatusView | undefined, lastAt: string | undefined, now = new Date()): TeamCardState | undefined {
+export function teamCardState(view: TeammateStatusView | undefined): TeamCardState | undefined {
   if (view === undefined) return undefined
   if (view.status === 'blocked') {
-    const word = lowerFirst(view.label.replace(/ — checking again$/, ''))
-    return { word, tone: view.tone === 'amber' ? 'amber' : 'red', spoken: word }
+    // Still being checked (the amber case): a moment, not a state. Every card
+    // went red-amber "AI agent not answ…" for the seconds after launch while
+    // the strip said "checking 7 on this machine" (a dev frame of 0.609).
+    if (view.tone === 'amber') return undefined
+    const word = lowerFirst(view.label)
+    return { word, tone: 'red', spoken: word }
   }
   if (view.status === 'approval-needed') return { word: 'waiting on you', tone: 'amber', spoken: 'waiting on you' }
   if (view.status === 'working') {
     const word = faceLabel(view.activity)
     return { word, tone: 'live', spoken: `${word} now` }
   }
-  const ago = lastAt === undefined ? undefined : agoLabel(lastAt, now)
-  if (ago === undefined) return { word: 'no work yet', tone: 'muted', spoken: 'no work yet' }
-  return { word: compactAgo(lastAt!, now) ?? ago, tone: 'muted', spoken: `last worked ${ago}` }
+  return undefined
 }

@@ -5,10 +5,10 @@
 // A realistic profile, seeded straight into the ledger (four teammates, a few
 // conversations), Home read at 1440 x 900 and at Colin's 1209 x 770. Nothing
 // is spent; no runtime starts. The strip under the team must be labelled
-// "Connected accounts" with its "N ready" note and marks; the three "Try two
-// models on" cards must be one line of three links; pressing the first fills
-// the box with the landing-page ask and turns Compare on. The control (the
-// 0.606 package) reads "AI agents" and draws three cards.
+// "Connected accounts" with its "N ready" note and marks; the "Try two models
+// on" starters must be one row of three chips (0.609; 0.607's line of links
+// read as a footnote); pressing the first fills the box with the landing-page
+// ask and turns Compare on. The control (the 0.606 package) reads "AI agents".
 
 import { createHash } from 'node:crypto'
 import { mkdir } from 'node:fs/promises'
@@ -72,7 +72,7 @@ const check = (what, ok, detail) => {
 const read = async () => JSON.parse(String(await drive.evaluate(`(() => {
   const head = document.querySelector('.lc-agenthead')
   const box = (el) => { if (!el) return null; const r = el.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top) } }
-  const starters = document.querySelector('.lc-buildline')
+  const starters = document.querySelector('.lc-buildhead')
   return JSON.stringify({
     label: head?.querySelector('.lc-agenthead__label')?.innerText.trim() ?? null,
     note: head?.querySelector('.lc-agenthead__note')?.innerText.trim() ?? null,
@@ -82,7 +82,7 @@ const read = async () => JSON.parse(String(await drive.evaluate(`(() => {
     // the control's record on the 0.606 package is the before.
     line: starters ? starters.innerText.replace(/\\s+/g, ' ').trim() : null,
     lineBox: box(starters),
-    links: starters ? [...starters.querySelectorAll('button')].map((b) => b.innerText.trim()) : [],
+    links: starters ? [...starters.querySelectorAll('.lc-buildchip')].map((b) => b.innerText.replace(/\\s+/g, ' ').trim()) : [],
     composer: document.querySelector('form.command-dock textarea')?.value ?? ''
   })
 })()`)))
@@ -97,16 +97,15 @@ try {
     // The label is drawn in capitals by its style; the words are what is checked.
     check(`at ${String(w)} the strip is labelled Connected accounts, with its note and marks`, /^connected accounts$/i.test(seen.label ?? '') && /^\d+ ready$/.test(seen.note ?? '') && seen.marks > 0, JSON.stringify([seen.label, seen.note, seen.marks]))
     check(`at ${String(w)} Compare models is still a press in the strip`, seen.compare.includes('Compare models'), JSON.stringify(seen.compare))
-    check(`at ${String(w)} the starters are one line of three links`, seen.links.length === 3 && seen.lineBox !== null && seen.lineBox.h < 40, JSON.stringify([seen.links, seen.lineBox]))
-    // The lead is drawn in capitals by its style, like the other section labels; the words are what is checked.
-    check(`at ${String(w)} the line reads as a sentence`, /^try two models on a landing page, a sales dashboard or an arcade game\.?$/i.test(seen.line ?? ''), JSON.stringify(seen.line))
+    check(`at ${String(w)} the starters are one row of three chips`, seen.links.length === 3 && seen.lineBox !== null && seen.lineBox.h < 44, JSON.stringify([seen.links, seen.lineBox]))
+    check(`at ${String(w)} the chips name what each makes`, JSON.stringify(seen.links) === JSON.stringify(['Landing page', 'Sales dashboard', 'Arcade game']), JSON.stringify(seen.links))
   }
   // Pressing the first link fills the box with the landing-page ask, Compare on.
-  await drive.evaluate(`document.querySelector('.lc-buildline button')?.click()`)
+  await drive.evaluate(`document.querySelector('.lc-buildchip')?.click()`)
   await sleep(1200)
   const after = await read()
-  await drive.capture('after pressing "a landing page"', async () => JSON.stringify({ composer: after.composer.slice(0, 120) }))
-  check('pressing "a landing page" fills the box with that ask', /coffee shop/.test(after.composer), after.composer.slice(0, 120))
+  await drive.capture('after pressing the Landing page chip', async () => JSON.stringify({ composer: after.composer.slice(0, 120) }))
+  check('pressing the Landing page chip fills the box with that ask', /coffee shop/.test(after.composer), after.composer.slice(0, 120))
   // Direct, Compare or Blind lives in the chat mode chip (0.451), as drive-build-and-compare reads it.
   const mode = String(await drive.evaluate(`document.querySelector('.lc-control--chatmode')?.getAttribute('aria-label')?.replace('Chat mode: ', '') ?? ''`))
   check('and turns Compare on, as the card did', /compare/i.test(mode), `chat mode: ${mode}`)
