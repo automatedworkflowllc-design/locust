@@ -19,6 +19,15 @@
 // Antigravity's write_to_file. --antigravity runs Wren on Antigravity Flash
 // through its CLI (a real account's quota, so LOCUST_SPEND=1 is required);
 // without it, Wren is on the free OpenCode model and nothing is spent.
+//
+// MEASURED 10/04 on the 0.596 package, Antigravity Flash through its CLI, in
+// the dot-folder: the edit of README.md carried its own diff too
+// (`README.md MODIFIED +1 −0`, every edit row). So today's Antigravity CLI is
+// not the case either; the fourteen rows in Colin's ledger came from an older
+// stream (`step_update` records naming only `TargetFile`). The case that
+// remains free to show is the renderer on seeded Codex events:
+// `drive-a-changed-file-the-host-could-not-read.mjs`. This drive stays as the
+// live control that says which runtimes carry their own change.
 
 import { execFileSync } from 'node:child_process'
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
