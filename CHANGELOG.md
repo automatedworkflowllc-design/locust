@@ -11,6 +11,13 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.600.0 - 2026-10-04
+
+### Fixed
+
+- **The 201st saved approval rule is refused, never silently dropped.** Locust keeps up to 200 saved rules. Adding one past that quietly dropped the oldest rule, which may have been a deny you relied on. Now the 201st is refused with "200 rules is the most Locust keeps; remove one first." and nothing changes; a rule file that already holds more than 200 is read whole.
+- **Home opens a few ledgers at a time.** Listing your conversations opened every ledger file at once, up to two thousand of them, which on a large profile could run out of file handles and read like a corrupt ledger. It now reads sixteen at a time, in the same order as before.
+
 ## 0.599.0 - 2026-10-04
 
 ### Fixed

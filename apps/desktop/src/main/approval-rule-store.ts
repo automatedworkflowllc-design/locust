@@ -84,7 +84,7 @@ export function parsedRuleFile(raw: string): StoredFile {
   // missing field must not become an allow with a default.
   const rules = record.rules.map(parsedRule)
   if (rules.some((rule) => rule === undefined)) throw new Error(UNREADABLE)
-  return { schemaVersion: SCHEMA_VERSION, rules: (rules as StoredRule[]).slice(-MAX_RULES) }
+  return { schemaVersion: SCHEMA_VERSION, rules: rules as StoredRule[] }
 }
 
 export function createApprovalRuleStore(options: { readonly rootDirectory: string; readonly now?: () => Date }): ApprovalRuleStore {
@@ -135,7 +135,8 @@ export function createApprovalRuleStore(options: { readonly rootDirectory: strin
         // The same rule twice is one rule.
         const same = file.rules.find((rule) => rule.effect === candidate.effect && rule.kind === candidate.kind && rule.pattern === candidate.pattern && rule.teammateId === candidate.teammateId && rule.folder === candidate.folder)
         if (same !== undefined) return same
-        await write([...file.rules, candidate].slice(-MAX_RULES))
+        if (file.rules.length >= MAX_RULES) throw new Error(`${MAX_RULES} rules is the most Locust keeps; remove one first.`)
+        await write([...file.rules, candidate])
         return candidate
       }),
     remove: (ruleId) =>

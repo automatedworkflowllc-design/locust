@@ -23,6 +23,31 @@ const WORKROOM = join(ROOT, 'src', 'workroom.ts')
 const MUTATIONS = [
   {
     file: INDEX,
+    name: 'the home list stats every ledger at once',
+    from: `const stamped = await mapLimited(allIds, READ_CONCURRENCY, async (missionId) => {
+          try {
+            const file = await stat(missionPath(rootDirectory, missionId))
+            return { missionId, modifiedAt: file.mtimeMs }
+          } catch {
+            // Unreadable now is likely unreadable in a moment; sort it last
+            // rather than dropping it, so it can still surface its own issue.
+            return { missionId, modifiedAt: 0 }
+          }
+        })`,
+    to: `const stamped = await Promise.all(allIds.map(async (missionId) => {
+          try {
+            const file = await stat(missionPath(rootDirectory, missionId))
+            return { missionId, modifiedAt: file.mtimeMs }
+          } catch {
+            // Unreadable now is likely unreadable in a moment; sort it last
+            // rather than dropping it, so it can still surface its own issue.
+            return { missionId, modifiedAt: 0 }
+          }
+        }))`,
+    expect: 'lists all 40 ledgers in order with no more than 16 reads or stats in flight'
+  },
+  {
+    file: INDEX,
     name: 'a name occupied by something unreadable is skipped in silence',
     from: '        const unreadable = [...occupied, ...held',
     to: '        const unreadable = [...held',
@@ -388,7 +413,7 @@ try {
     if (!caught) problems += 1
     console.error(
       `  [${caught ? 'CAUGHT' : 'SURVIVED'}] ${mutation.name}` +
-      (caught ? '' : `\n            expected "${mutation.expect}" to fail; failures: ${result.failed.join(', ') || 'none'}`)
+      (caught ? `\n            failures: ${result.failed.join(', ')}` : `\n            expected "${mutation.expect}" to fail; failures: ${result.failed.join(', ') || 'none'}`)
     )
   }
 } finally {

@@ -2452,7 +2452,7 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
       // all, which is the part that was wrong.
       let candidateIds = allIds
       if (allIds.length > MAX_MISSION_FILES) {
-        const stamped = await Promise.all(allIds.map(async (missionId) => {
+        const stamped = await mapLimited(allIds, READ_CONCURRENCY, async (missionId) => {
           try {
             const file = await stat(missionPath(rootDirectory, missionId))
             return { missionId, modifiedAt: file.mtimeMs }
@@ -2461,7 +2461,7 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
             // rather than dropping it, so it can still surface its own issue.
             return { missionId, modifiedAt: 0 }
           }
-        }))
+        })
         stamped.sort((left, right) => right.modifiedAt - left.modifiedAt)
         candidateIds = stamped.slice(0, MAX_MISSION_FILES).map((entry) => entry.missionId)
         issues.push(publicIssue(
@@ -2470,8 +2470,8 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
         ))
       }
 
-      const parsed = await Promise.all(candidateIds.map(async (missionId) =>
-        readLedgerFile(missionPath(rootDirectory, missionId), missionId)))
+      const parsed = await mapLimited(candidateIds, READ_CONCURRENCY, async (missionId) =>
+        readLedgerFile(missionPath(rootDirectory, missionId), missionId))
       const missions = parsed
         .flatMap((result) => result.mission === undefined ? [] : [result.mission])
         .sort((left, right) => Date.parse(right.lastUpdatedAt) - Date.parse(left.lastUpdatedAt))
