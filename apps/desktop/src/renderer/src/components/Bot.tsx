@@ -616,15 +616,37 @@ export function withGlyphEyes(
   const sameEyes = (a: EyeGlyphs | undefined, b: EyeGlyphs | undefined): boolean => (a?.join('') ?? '') === (b?.join('') ?? '')
   let leftHidden = false
   let face: DOMMatrix | undefined
+  /*
+   * THE FRONT, AS THE RIG DREW IT (0.577). The rig clips the face to its body
+   * with the body's front layer as the transform, the moment before it moves
+   * to the face. That transform is read there, and the screen is drawn in it:
+   * the plane is the rig's own, whatever its version computes it from (0.2's
+   * cushion shifts the front by the body's thickness at the face, which 0.1's
+   * flat slab did not). `frontPlane` stands in only where no clip was seen.
+   */
+  let front: DOMMatrix | undefined
   if (screen !== undefined) {
+    const clip = own.clip.bind(context) as (...args: unknown[]) => void
     ;(context as unknown as { translate: (x: number, y: number) => void }).translate = (x, y) => {
       face = context.getTransform()
       translate(x, y)
     }
+    ;(context as unknown as { clip: (...args: unknown[]) => void }).clip = (...args) => {
+      // The rig clips to a path it names; the screen's own clips name none.
+      if (args.length > 0) front = context.getTransform()
+      clip(...args)
+    }
   }
-  /** From the face's transform into the plane of the body's front, where the screen is drawn flat. */
+  /** Into the plane of the body's front, in the face's own units, where the screen is drawn flat. */
   const onFront = (): void => {
     if (face === undefined) return
+    if (front !== undefined) {
+      context.setTransform(front)
+      // The context's own translate: the shadowed one would take this for the face's.
+      translate(faceAt.x, faceAt.y)
+      context.scale(faceAt.scale, faceAt.scale)
+      return
+    }
     context.setTransform(face)
     context.transform(...plane)
   }
@@ -801,6 +823,7 @@ export function withGlyphEyes(
       look = { x: pose.lookX + lag.x / 0.9, y: pose.lookY + lag.y / 0.5 }
       leftHidden = pose.yaw < LEFT_EYE_HIDDEN_AT
       face = undefined
+      front = undefined
     },
     /** Whether this frame draws glyphs (or is blinking between them): the rig must then draw its eyes in GLYPH_INK. */
     drawsGlyphs: () => shownPair !== undefined || swap !== undefined

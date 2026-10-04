@@ -43,10 +43,15 @@ class Recorder {
   translate(): void {
     this.calls.push('translate')
   }
+  /** What getTransform answers now; set by a test to stand for the rig's front layer. */
+  current: unknown = { a: 1 }
+  set: unknown[] = []
   getTransform(): unknown {
-    return { a: 1 }
+    return this.current
   }
-  setTransform(): void {}
+  setTransform(matrix?: unknown): void {
+    this.set.push(matrix)
+  }
   transform(): void {}
   scale(): void {}
   save(): void {}
@@ -147,6 +152,25 @@ describe('a screen for a face', () => {
     // A face set low on its body moves with the body's front, not round its own centre.
     const low = frontPlane(0, 0.3, { x: 50, y: 60, scale: 0.95 })
     expect(low[5]).toBeCloseTo((Math.cos(0.3) * 0.95 * 10 - Math.sin(0.3) * 9.75 - 10) / 0.95)
+  })
+
+  it("is drawn in the transform the rig clipped the face to, whatever the rig's version computes it from (0.577)", () => {
+    const context = new Recorder()
+    const painter = withGlyphEyes(context as unknown as CanvasRenderingContext2D, () => ['>', '▮'], { ink: '#1a1a2e', screenOf: '#6fb7d6', pixelsPerUnit: 1 })
+    painter.frame({ yaw: 0.3, pitch: 0, lookX: 0, lookY: 0 }, 0)
+    // As the rig draws a face: clip to the body with its front layer, then move to the face and draw the eyes.
+    const frontLayer = { a: 0.9, tag: 'front' }
+    context.current = frontLayer
+    ;(context as unknown as { clip: (path: unknown) => void }).clip({ body: true })
+    context.current = { a: 1, tag: 'face' }
+    for (let eye = 0; eye < 2; eye += 1) {
+      context.translate()
+      context.strokeStyle = GLYPH_INK
+      context.lineWidth = 12.6
+      context.stroke()
+    }
+    // The visor and both eyes are each drawn from the front layer, never from the face's own transform.
+    expect(context.set.filter((matrix) => matrix === frontLayer).length).toBeGreaterThanOrEqual(3)
   })
 
   it("wears no mouth: the rig's mouth is not drawn on a screen, and is on a face of plastic (0.574)", () => {
