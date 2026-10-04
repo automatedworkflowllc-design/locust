@@ -1,0 +1,135 @@
+# Packaging for Locust.
+#
+# The app is unsigned: there is no certificate, and pretending otherwise would
+# only move the warning somewhere less honest. Windows SmartScreen will say the
+# publisher is unknown on first run, which is exactly what an unsigned build
+# is. NSIS is chosen over a one-file portable exe so the app installs, gets a
+# Start-menu entry and its own icon, and can be uninstalled cleanly.
+appId: com.automatedworkflow.locust
+productName: Locust
+copyright: Copyright © 2026 Automated Workflow
+
+# Where installed copies look for a newer version.
+#
+# A PUBLIC repository holding only installers, deliberately separate from the
+# source. Publishing to the private source repo would mean shipping a token
+# that can read it inside every installed copy, which is not a thing to hand
+# out; and this way the source can stay private while updates still work.
+publish:
+  provider: github
+  owner: automatedworkflowllc-design
+  repo: locust-releases
+  releaseType: release
+
+directories:
+  output: release
+  buildResources: resources
+
+# Chromium's own interface text, in the languages Locust is written in (0.495).
+# Electron ships 55 of these `.pak` files, 49 MB on disk; Locust's interface is
+# English, and Chromium falls back to en-US for any other system language. The
+# spelling dictionaries and dates are not these files.
+electronLanguages:
+  - en-US
+  - en-GB
+
+# `out` is what electron-vite produced; the workspace packages are already
+# bundled into it, so nothing from node_modules needs to ship.
+files:
+  - out/**/*
+  - package.json
+  # The window icon the main process hands BrowserWindow. It was not shipped
+  # until 0.32.0, so the packaged window fell back to Electron's own icon in
+  # the taskbar (Colin, 2026-09-05: "app icon is showing as electron app").
+  - resources/icon-512.png
+  # npm itself, so a machine with no Node.js can still install a coding CLI.
+  - resources/npm/**/*
+
+# npm has to be real files on disk: it spawns, reads its own package.json and
+# writes shims, none of which works from inside the archive.
+asarUnpack:
+  - resources/npm/**/*
+
+# Copied beside app.asar, into process.resourcesPath: the window icon has to
+# be a real file on disk, not a path inside the archive (2026-09-06).
+extraResources:
+  - from: resources/icon.ico
+    to: icon.ico
+  # The macOS menu-bar icon: a small PNG, which macOS can read (an .ico it cannot).
+  - from: resources/icon-32.png
+    to: icon-32.png
+  # Claude Code spawns this as a stdio MCP server, so it has to be a real
+  # file on disk, never a path inside the archive (permission-host.ts).
+  - from: resources/locust-permission-bridge.mjs
+    to: locust-permission-bridge.mjs
+  # What changed, packaged WITH the build it describes -- so the notes and
+  # the bytes cannot disagree, and saying so needs no network.
+  - from: ../../CHANGELOG.md
+    to: CHANGELOG.md
+  # Memory recall's model and the WebAssembly that runs it (memory-recall.ts),
+  # staged by _tools/vendor-recall.mjs. Real files: onnxruntime imports its
+  # loader by URL, which cannot point inside an archive. tokenizer.json stays
+  # behind -- vocab.txt is the part of it the app reads.
+  # Locust's own pet (0.563, pet-library.ts): OpenPets' Hoodie Cat, MIT, its
+  # licence beside it. Real files, read by the host like any other pet's.
+  - from: resources/pets
+    to: pets
+    filter:
+      - hoodie-cat/pet.json
+      - hoodie-cat/spritesheet.webp
+      - hoodie-cat/LICENSE
+  - from: resources/recall
+    to: recall
+    filter:
+      - model.onnx
+      - vocab.txt
+      - ort-wasm-simd-threaded.mjs
+      - ort-wasm-simd-threaded.wasm
+
+# Never ship the caller's mission ledger, smoke profiles, or source maps.
+asar: true
+
+win:
+  icon: resources/icon.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+  # No signing configured on purpose; see the note above.
+  signAndEditExecutable: true
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Locust
+  uninstallDisplayName: Locust
+  artifactName: Locust-${version}-setup.${ext}
+
+linux:
+  # The 512, for the same reason the window uses it: a packager scales down
+  # from what it is given, and the 256 was a downsample already.
+  icon: resources/icon-512.png
+  category: Development
+  target:
+    - AppImage
+
+mac:
+  icon: resources/icon-512.png
+  category: public.app-category.developer-tools
+  # Not signed with a Developer ID yet (that needs an Apple Developer
+  # account). The builder's own signing is skipped, and scripts/adhoc-sign.cjs
+  # signs the app ad hoc instead: unsigned, Apple silicon reports a
+  # downloaded app as "damaged"; ad hoc, it asks once and Open Anyway works.
+  identity: null
+  hardenedRuntime: false
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+  artifactName: Locust-${version}-mac-${arch}.${ext}
+
+afterSign: scripts/adhoc-sign.cjs

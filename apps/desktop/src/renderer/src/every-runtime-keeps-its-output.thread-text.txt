@@ -1,0 +1,116 @@
+## acp/copilot-1.0.88-bash-rejected.jsonl
+1 step 1 declined 0s 1 declined
+
+## acp/copilot-1.0.88-load-approved.jsonl
+Print the required value from the shell ACP-OK-7 PLUM-3 0s ran echo ACP-OK-7
+
+## acp/opencode-1.18.27-bash-rejected.jsonl
+Thought: The user wants me to run a simple shell command: `echo ACP-PROBE`. Th… 1 declined 0s 1 declined
+
+## agy-2026-10-02/ask-command-denied-done.jsonl
+It stopped there. Antigravity was not allowed to run a command in this mode. Edit lets it change files but not run commands; Auto lets it do both. 1 step 1 refused 0s 1 refused
+
+## agy-2026-10-02/ask-command-denied-then-said.jsonl
+It stopped there. Antigravity was not allowed to run a command in this mode. Edit lets it change files but not run commands; Auto lets it do both. 1 step 1 refused I was not allowed to run git status here. 0s 1 refused
+
+## agy-2026-10-02/command-allowed.jsonl
+Ran node -e "console.log(40+2)" 42 0s ran node -e "console.log(40+2)"
+
+## agy-2026-10-02/conversation-not-found.jsonl
+(nothing in the thread)
+
+## agy-2026-10-02/edit-then-command-denied.jsonl
+It stopped there. Antigravity was not allowed to run a command in this mode. Edit lets it change files but not run commands; Auto lets it do both. Edited made.txt 1 refused Edited 1 file C:/Users/person/Documents/locust-scratch/agy-probe/made.txt write_to_file Antigravity did not report the change 0s 1 refused
+
+## agy-2026-10-02/plan-mode-writes-its-plan.jsonl
+Antigravity was not allowed to change files in this mode. Choose Edit or Auto to let it. Read words, edited plan.md I have inspected words (which contains hi ) and prepared the implementation plan without running any commands. Please review the plan in plan.md and let me know if you would like me to proceed with creating greet.js . 1 step 1 refused Edited 1 file C:/Users/person/.gemini/antigravity-cli/brain/462c9e8d-e735-42be-a44a-6ce9f7689a1f/plan.md write_to_file Antigravity did not report the change 0s 2 tool calls 1 refused
+
+## agy-2026-10-02/reads-a-file.jsonl
+Thought for 4s, read note.txt hello from a file DONE 0s 1 tool call
+
+## agy-2026-10-02/unknown-model.jsonl
+(nothing in the thread)
+
+## agy-2026-10-02/write-denied.jsonl
+It stopped there. Antigravity was not allowed to change files in this mode. Choose Edit or Auto to let it. 1 step 1 refused 0s 1 tool call 1 refused
+
+## antigravity/transcript-plain-reply.jsonl
+OK
+
+## antigravity/transcript-write-then-followup.jsonl
+Edited hello.txt DONE DONE Edited 1 file pebble/hello.txt write_to_file Antigravity did not report the change 0s
+
+## claude/background-stopped-with-run.jsonl
+Background task: sleep 8 seconds then write to out.txt I've started the background task that will sleep for 8 seconds and then write "finished" to out.txt. 0s ran sleep 8 && echo finished > out.txt
+
+## codex/approval-declined.jsonl
+I’ll run the requested marker command with the specified approval prompt. 1 step 1 declined APPROVAL_DECLINED 0s 1 declined
+
+## codex/file-change.jsonl
+Edited notes.txt FILE_CHANGED Edited 1 file C:\fixture\codex\notes.txt apply_patch Codex CLI did not report the change 0s
+
+## codex/steer.jsonl
+I’ll run the exact command once, then return its output. Ran Start-Sleep -Seconds 2; Write-Output BE… STEER_ACCEPTED 0s ran Start-Sleep -Seconds 2; Write-Output BEFORE_STEER
+
+## copilot/plain-reply.jsonl
+OK
+
+## copilot/policy-denied.jsonl
+(nothing in the thread)
+
+## copilot/read-only-tools-denied.jsonl
+Used powershell 2 failed Unable to create blocked.txt because file-writing tools are blocked. 0s 2 tool calls Copilot CLI Copilot reported a change to its background tasks.
+
+## copilot/session-first-turn.jsonl
+STORED
+
+## copilot/session-resumed-turn.jsonl
+marmalade-4471
+
+## copilot/write-apply-patch.jsonl
+Edited notes.txt +2 −0 DONE Edited 1 file +2 −0 pebble/cp-write/notes.txt RENAMED +2 −0 0s
+
+## copilot/write-mode-view-then-edit.jsonl
+A Copilot record could not be parsed. Read notes.ts, edited notes.ts +1 −1 DONE Edited 1 file +1 −1 pebble/notes.ts MODIFIED +1 −1 0s 1 tool call
+
+## cursor/read-only-partial.jsonl
+Thought: Reading README.md to summarize the project in one sentence. I'll read the README and summarize the project in one sentence. Read README.md Thought: I'll read the README and provide a one-sentence summary of the projec… Pebble is a tiny CLI timer whose single command, pebble start , counts down 25 minutes and rings a bell. 0s 1 tool call
+
+## cursor/resumed-turn.jsonl
+Thought: The user wants the name of the project I just summarized. The project… Pebble 0s
+
+## cursor/todo-plan.jsonl
+PLAN 3 of 3 done Create a.txt containing alpha Create b.txt containing beta Create c.txt listing the two file names Thought: Creating a three-item todo list via Todowrite. The items are creating… I'll track this as three todos and work through them in order: create a.txt , create b.txt , then create c.txt with those names. Created a.txt +1 −0 Created b.txt +1 −0 Created c.txt +2 −0 Thought: Item 3 is now marked as completed. Thought: All three items are now complete. All three items are done. a.txt contains alpha b.txt contains beta c.txt lists a.txt and b.txt Each todo was marked in progress, then completed, as that file was written. Edited 3 files +4 −0 C:\Users\person\Documents\locust-scratch\plan-probe\a.txt ADDED +1 −0 C:\Users\person\Documents\locust-scratch\plan-probe\b.txt ADDED +1 −0 C:\Users\person\Documents\locust-scratch\plan-probe\c.txt ADDED +2 −0 0s 3 of 3 steps
+
+## cursor/write-mode-shell-rejected.jsonl
+Thought: Creating NOTES.md with the word hello. Running dir to count files. Creating NOTES.md and listing the folder contents. Created NOTES.md, listed a folder 1 failed +1 −0 Thought: The 'dir' command was rejected, likely due to sandbox restrictions. I… Retrying the dir command. Listed a folder 1 failed Listed files matching * in C:\work\scratch, listed a folder 1 failed Listed a folder Listed a folder 1 failed Thought: The `dir` command was rejected. I will provide the file count from th… Done. NOTES.md was created with exactly: hello I tried to run dir , but that command was blocked in this environment. Using an equivalent directory listing instead, this folder contains 2 files : NOTES.md (the file I just created) README.md (already present) Edited 1 file +1 −0 scratch/NOTES.md ADDED +1 −0 0s ran 5 commands · 4 exited non-zero 1 other tool call
+
+## muse/echo-provider-run.jsonl
+echo: Reply with exactly PING
+
+## opencode/compaction-small-context.jsonl
+The conversation outgrew the model's context, so OpenCode summarized it and carried on from the summary. Let me read all the files one at a time. Read a.txt Now reading b.txt: Read 4 files I'll use tail -1 on each file to get the last line efficiently. Read 2 files Here are the last lines of all six files: File Last Line a.txt FINAL-A-2511 b.txt FINAL-B-4560 c.txt FINAL-C-1132 d.txt FINAL-D-7308 e.txt FINAL-E-8330 f.txt FINAL-F-7891 Task complete — all six files have been read and their last lines reported. 0s ran 6 commands: tail 2 other tool calls
+
+## opencode/context-overflow-recovered.jsonl
+The conversation outgrew the model's context, so OpenCode summarized it and carried on from the summary. RECOVERED-ANSWER
+
+## opencode/plan-agent-text-only.jsonl
+In PLAN MODE — read-only, cannot create blocked.txt yet. Plan to execute once in build mode: Verify working directory exists. Create file blocked.txt with content hi . Verify content. Switch to build mode to execute, or I can provide the exact command for you to run.
+
+## opencode/read-only-no-write-tool.jsonl
+I can't create the file — no write tool is available. I'll verify the workspace state. Read oc-deny Cannot comply: no write tool is available in this environment. Available tools are glob , grep , read , skill , task , todowrite , webfetch , websearch — no file-write capability. Verified oc-deny directory contains only deny.err , deny.jsonl , README.md ; blocked.txt was not created. 0s 1 tool call
+
+## opencode/resumed-turn.jsonl
+DONE
+
+## opencode/serve-events.jsonl
+Read README.md, ran echo SERVED First line of the readme 0s ran echo SERVED 1 other tool call
+
+## opencode/todo-plan.jsonl
+PLAN 3 of 3 done create a.txt containing alpha create b.txt containing beta create c.txt listing the two file names Tracking your three files as todos ΓÇö creating them now. First todo queued ΓÇö starting a.txt. Created a.txt +1 −0 a.txt done ΓÇö now creating b.txt. Created b.txt +1 −0 b.txt done ΓÇö creating c.txt with the file list. Created c.txt +2 −0 Done: a.txt contains alpha b.txt contains beta c.txt lists a.txt and b.txt Edited 3 files +4 −0 C:\Users\person\Documents\locust-scratch\plan-probe\a.txt ADDED +1 −0 C:\Users\person\Documents\locust-scratch\plan-probe\b.txt ADDED +1 −0 C:\Users\person\Documents\locust-scratch\plan-probe\c.txt ADDED +2 −0 0s 3 of 3 steps
+
+## opencode/write-mode-edit-with-diff.jsonl
+Fixing that one word — locating your file first. Listed files matching **/notes.ts, read notes.ts, edited notes.ts +1 −1 DONE Edited 1 file +1 −1 pebble/notes.ts MODIFIED +1 −1 0s 2 tool calls
+
+## opencode/write-mode-read-and-write.jsonl
+Creating your notes file. Read a file File location confirmed — writing it now. Created notes.txt +1 −0 DONE Edited 1 file +1 −0 pebble/notes.txt ADDED +1 −0 0s 1 tool call

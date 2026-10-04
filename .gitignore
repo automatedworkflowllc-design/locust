@@ -1,0 +1,34 @@
+node_modules/
+dist/
+out/
+coverage/
+.vite/
+*.log
+
+.env
+.env.*
+!.env.example
+
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+*.tsbuildinfo
+release/
+
+# mutation-control scratch report
+packages/mission-store/mutation-result.json
+# Written by _smoke/run-all.mjs: one run's output, not a record.
+smoke-results.json
+
+# Staged by _tools/vendor-npm.mjs before packaging; not source.
+apps/desktop/resources/npm/
+# Staged by _tools/vendor-recall.mjs: the recall model, 37 MB of binaries.
+apps/desktop/resources/recall/
+
+# orb sample build output
+_tools/orb-samples/bundle.js
+
+# Chromium profile from a local UI run. A session record, not source.
+apps/desktop/_ui-profile/

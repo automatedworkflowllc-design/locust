@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=Geist+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; background: #0B0D0E; }
+  * { box-sizing: border-box; }
+  a { color: #C9F04A; text-decoration: none; }
+  a:hover { color: #E0FB92; }
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #0B0D0E; padding: 48px; display: flex; flex-direction: column; gap: 40px; font-family: Geist, Helvetica, sans-serif; color: #F2EFE9;">
+
+  <div style="display: flex; flex-direction: column; gap: 6px;">
+    <div style="font-size: 19px; font-weight: 500;">Desktop icon — your logo, scaled to fill the tile</div>
+    <div style="font-size: 13.5px; color: #8B9190;">Same artwork, unchanged. It was sitting at roughly half the tile width before; now it spans 90%.</div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="font-family: 'Geist Mono', monospace; font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: #8B9190;">Filled tile — locust-app-icon.svg</div>
+    <div style="display: flex; gap: 34px; align-items: flex-end; padding: 30px; border-radius: 12px; background: #17191A; border: 1px solid rgba(255,255,255,0.07);">
+      <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;"><img src="brand/locust-app-icon-rounded.svg" alt="" style="width: 32px; height: 32px;"><span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #8B9190;">32</span></div>
+      <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;"><img src="brand/locust-app-icon-rounded.svg" alt="" style="width: 48px; height: 48px;"><span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #8B9190;">48</span></div>
+      <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;"><img src="brand/locust-app-icon-rounded.svg" alt="" style="width: 72px; height: 72px;"><span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #8B9190;">72</span></div>
+      <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;"><img src="brand/locust-app-icon-rounded.svg" alt="" style="width: 128px; height: 128px;"><span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #8B9190;">128</span></div>
+      <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;"><img src="brand/locust-app-icon-rounded.svg" alt="" style="width: 224px; height: 224px;"><span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #8B9190;">224</span></div>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="font-family: 'Geist Mono', monospace; font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: #8B9190;">Square, unmasked — locust-app-icon.svg</div>
+    <div style="display: flex; gap: 34px; align-items: flex-end; padding: 30px; border-radius: 12px; background: #17191A; border: 1px solid rgba(255,255,255,0.07);">
+      <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;"><img src="brand/locust-app-icon.svg" alt="" style="width: 48px; height: 48px;"><span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #8B9190;">48</span></div>
+      <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;"><img src="brand/locust-app-icon.svg" alt="" style="width: 128px; height: 128px;"><span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #8B9190;">128</span></div>
+      <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;"><img src="brand/locust-app-icon.svg" alt="" style="width: 224px; height: 224px;"><span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #8B9190;">224</span></div>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="font-family: 'Geist Mono', monospace; font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: #8B9190;">In a dock, against the old proportion</div>
+    <div style="display: flex; gap: 40px; align-items: center; padding: 30px; border-radius: 12px; background: #17191A; border: 1px solid rgba(255,255,255,0.07);">
+      <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
+        <span style="width: 88px; height: 88px; border-radius: 20px; background: #0B0D0E; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;">
+          <img src="brand/locust-mark.svg" alt="" style="width: 46px; height: auto;">
+        </span>
+        <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #8B9190;">before</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
+        <img src="brand/locust-app-icon-rounded.svg" alt="" style="width: 88px; height: 88px;">
+        <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #8B9190;">after</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+</body>
+</html>

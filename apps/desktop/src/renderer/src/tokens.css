@@ -1,0 +1,787 @@
+/*
+ * Locust design tokens. Values are exact from design/locust-desktop/HANDOFF.md.
+ *
+ * Components consume these variables and never literal colors -- a raw hex in a
+ * component is a review defect, and `_qa/token-gate.mjs` fails the build on one.
+ *
+ * The font is vendored rather than fetched. The reference loads Geist from
+ * fonts.googleapis.com; this app denies renderer network egress in packaged
+ * builds and its CSP pins `font-src 'self'`, so a fetched face would silently
+ * fall back to Helvetica on every real install. Same typeface, shipped inside.
+ * Geist is SIL OFL 1.1 -- see assets/fonts/GEIST-LICENSE.txt.
+ */
+
+/*
+ * IBM Plex Sans: the TEAMMATE'S voice, and only that.
+ *
+ * This app already assigns type by who is speaking. Mono is the machine --
+ * paths, ids, phases, receipts. Geist is the app's own voice -- chrome,
+ * labels, controls -- and it is excellent at that: even, geometric, no
+ * distracting rhythm in a 13px chip. Those are exactly the properties that
+ * make a nine-line paragraph read as an even grey field. A teammate's prose
+ * is a third speaker, and it was borrowing the app's voice (design agent,
+ * 2026-09-10, on Colin's "slightly clunky, can't put my finger on it").
+ *
+ * Plex because it was drawn as a family with a mono sibling, so it sits
+ * beside Geist Mono without clashing; it is narrower, so a comfortable
+ * measure holds more words; it is humanist, so a long paragraph has a rhythm
+ * to follow; and it ships a real 500, the only weight used for emphasis.
+ *
+ * Three files, not two: replies can carry `<em>` (agentText.ts turns *text*
+ * into one), and without a real italic Chromium shears the upright, which
+ * looks worse than what it replaces. The unsubsetted build, because replies
+ * carry em dashes, curly quotes, arrows and accented names, and one accented
+ * filename falling back mid-paragraph is a worse defect than the one this
+ * fixes. `font-display: fallback`, since 0.189.0. It was `block` on the
+ * reasoning that the file is on disk and there is nothing to swap from --
+ * but a weight loads when it is first used, `block` hides text in it for up
+ * to three seconds while it does, and Fable measured the first screen's
+ * bold words ("OpenCode needs no account") blank 0.6s after the intro
+ * rendered (pass 1, finding 10). `fallback` caps the blank at 100ms and
+ * then shows the fallback face until the file arrives; not `swap`, which
+ * the guard test forbids for the flash it can draw on a face that IS on
+ * disk.
+ *
+ * SIL Open Font License 1.1, the same as Geist -- IBM-Plex-LICENSE.txt sits
+ * beside the files. Fetched 2026-09-10 from github.com/IBM/plex, master,
+ * packages/plex-sans/fonts/complete/woff2. Bundled, never fetched at run
+ * time: this app's whole claim is that nothing leaves the machine, and a font
+ * request would be the one network call on a screen that promises none.
+ */
+/*
+ * The Anthropic type family: the teammate's voice, and Anthropic's own rule
+ * about how to use it.
+ *
+ * Colin, 2026-09-13: "the actual base text should be whatever claude code
+ * font youre using", then the family's own guidelines, which are explicit --
+ * "Use Anthropic Serif at 20px for all body copy and Anthropic Sans at
+ * 12-16px for UI chrome", and under DON'T, "body must be serif at 20px; sans
+ * is UI chrome only". So the SERIF carries a reply and the sans does not.
+ *
+ * Both are single variable files covering 300-800; every weight in the
+ * package is the same bytes, which is why one file replaces six. There is no
+ * italic in it, so `<em>` synthesises -- the one thing this gives up against
+ * Plex, and `<em>` is rare in a reply where `<strong>` is not.
+ *
+ * MIT, vendored from the `anthropic-fonts` npm package (1.1.0) rather than
+ * lifted out of an installed app, with its LICENSE beside the files. Worth
+ * knowing: that package is published by a third party (`devchauhann/fonts`),
+ * not by Anthropic, so the MIT grant is the repackager's. Colin's call, made
+ * knowingly, on a project that is his own and not yet released.
+ *
+ * Bundled, never fetched: the same rule as Geist and Plex. This app's claim
+ * is that nothing leaves the machine, and a font request would be the one
+ * network call on a screen that promises none.
+ */
+@font-face {
+  font-family: 'Anthropic Serif';
+  src: url('./assets/fonts/AnthropicSerif-Variable.woff2') format('woff2');
+  font-weight: 300 800;
+  font-style: normal;
+  font-display: fallback;
+}
+
+@font-face {
+  font-family: 'Anthropic Sans';
+  src: url('./assets/fonts/AnthropicSans-Variable.woff2') format('woff2');
+  font-weight: 300 800;
+  font-style: normal;
+  font-display: fallback;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  src: url('./assets/fonts/IBMPlexSans-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: fallback;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  src: url('./assets/fonts/IBMPlexSans-Italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: fallback;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  src: url('./assets/fonts/IBMPlexSans-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: fallback;
+}
+
+/*
+ * FIGTREE: the app's own voice, since 0.267.0.
+ *
+ * Colin, 2026-09-22, after two rounds of type trials rendered from the app's
+ * own screens: Geist was the face he wanted gone -- neutral by design, with
+ * no relationship to the mono beside it or the wordmark above it, so the app
+ * read as three voices. He picked direction B: Figtree for everything the app
+ * says, and screen and section titles set the way the wordmark is set, bold
+ * capitals spaced wide (`--lc-title-*` below). Geist Mono and the reply serif
+ * are unchanged.
+ *
+ * Figtree is a geometric sans that stays crisp at 12-13px, where this app
+ * spends most of its time. One variable file per style covers every weight
+ * from 300 to 900, which is how titles get a real 700 without a third file.
+ * The italic is shipped too: two chrome states are set in italic (a connector
+ * that is not ready, the default folder) and Geist had none, so they were
+ * slanted by the browser.
+ *
+ * SIL Open Font License 1.1 -- FIGTREE-LICENSE.txt sits beside the files.
+ * Fetched 2026-09-22 from github.com/erikdkennedy/figtree at commit 032dfa7,
+ * fonts/webfonts/Figtree[wght].woff2 and Figtree-Italic[wght].woff2. 391
+ * characters against Geist's 728, all of Latin that the chrome uses (dashes,
+ * curly quotes, arrows, accented names); Geist stays next in the stack so a
+ * rarer character falls back to it rather than to Helvetica.
+ */
+@font-face {
+  font-family: 'Figtree';
+  src: url('./assets/fonts/Figtree-Variable.woff2') format('woff2');
+  font-weight: 300 900;
+  font-style: normal;
+  font-display: fallback;
+}
+
+@font-face {
+  font-family: 'Figtree';
+  src: url('./assets/fonts/Figtree-Italic-Variable.woff2') format('woff2');
+  font-weight: 300 900;
+  font-style: italic;
+  font-display: fallback;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('./assets/fonts/Geist-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: fallback;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('./assets/fonts/Geist-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: fallback;
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('./assets/fonts/GeistMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: fallback;
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('./assets/fonts/GeistMono-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: fallback;
+}
+
+:root {
+  /* --- Surfaces ------------------------------------------------------- */
+  --lc-bg-app: #0b0d0e;
+  --lc-bg-window: #121415;
+  --lc-bg-chrome: #16191a;
+  --lc-bg-sidebar: #17191a;
+  --lc-bg-raised: #191c1d;
+  --lc-bg-raised-2: #1b1e1f;
+  --lc-bg-selected: #1e2223;
+  --lc-bg-bubble-user: #23282a;
+  --lc-bg-bubble-peer: #202324;
+
+  --lc-bg-field: #1a1d1e;
+  --lc-bg-control: #1d2122;
+
+  --lc-border-hairline: rgba(255, 255, 255, 0.06);
+  --lc-border-control: rgba(255, 255, 255, 0.09);
+  --lc-border-button: rgba(255, 255, 255, 0.12);
+  --lc-border-hover: rgba(255, 255, 255, 0.16);
+  --lc-border-card: rgba(255, 255, 255, 0.07);
+  --lc-border-strong: rgba(255, 255, 255, 0.11);
+  --lc-overlay-scrim: rgba(8, 10, 10, 0.55);
+
+  /* The scroller. Thin, no track, and quiet until pointed at: the default
+     Windows scrollbar is a 17px channel with a painted trough, which reads as
+     a piece of furniture rather than a position indicator (Colin, 2026-09-07:
+     "ours in chat is clunky"). */
+  --lc-scroll-thumb: rgba(255, 255, 255, 0.13);
+  --lc-scroll-thumb-hover: rgba(255, 255, 255, 0.24);
+
+  /* --- Text ------------------------------------------------------------
+   * `--lc-text-muted` is the AA floor for anything
+   * readable. `--lc-text-faint` is for NON-TEXT only (icon strokes, the `/`
+   * separator glyph, hairline marks) -- it measures 4.2-4.4:1 and fails AA on
+   * copy. The two annotation grays from the spec are deliberately absent:
+   * they exist only for documentation captions outside the app window.
+   */
+  --lc-text-primary: #f2efe9;
+  /* The sidebar and headers use a fractionally warmer white in the reference. */
+  --lc-text-name: #f4f1eb;
+  --lc-text-control-fg: #a8adab;
+  --lc-text-secondary: #c7c3bc;
+  --lc-text-muted: #8b9190;
+  --lc-text-faint: #7a807f;
+
+  /* --- Semantics -------------------------------------------------------
+   * Lime is the only near-decorative color, and only for active/ready/live.
+   * Blue, amber, red and violet must carry meaning -- never hierarchy or
+   * delight.
+   */
+  /*
+   * THE ACCENT IS MONOCHROME (0.434). Colin, 2026-09-28: "switch to
+   * monochrome for most things unless green makes sense." These six were the
+   * lime accent (#c9f04a) on every primary button, switch, selection, chip
+   * and the boot screen; they keep their names, so every rule that asks for
+   * "the accent" gets the ivory the rest of the app is drawn in. Where green
+   * MEANS something -- a runtime that is ready, a safe step, a status light
+   * -- the rule asks for --lc-green by name (shell.css). A lime TEAMMATE is
+   * --lc-hue-lime, untouched.
+   */
+  --lc-lime: #f2efe9;
+  --lc-lime-text: #f2efe9;
+  --lc-lime-tint: rgba(242, 239, 233, 0.07);
+  --lc-lime-tint-strong: rgba(242, 239, 233, 0.13);
+  --lc-lime-border: rgba(242, 239, 233, 0.2);
+  --lc-lime-border-strong: rgba(242, 239, 233, 0.38);
+
+  /*
+   * Green is settled: allowed, passed, added, available. Lime is "happening
+   * right now" and nothing else. The two were one colour before, and lime
+   * carrying both meant neither read -- so this split is load-bearing.
+   */
+  --lc-green: #7fc97f;
+  --lc-green-text: #a9dda9;
+  --lc-green-tint: rgba(127, 201, 127, 0.12);
+  --lc-green-border: rgba(127, 201, 127, 0.32);
+
+  --lc-blue: #6ea8fe;
+  --lc-blue-text: #9dc2fb;
+  --lc-blue-tint: rgba(110, 168, 254, 0.12);
+  --lc-blue-border: rgba(110, 168, 254, 0.32);
+
+  --lc-amber: #e9b949;
+  --lc-amber-text: #efc969;
+  --lc-amber-tint: rgba(233, 185, 73, 0.12);
+  --lc-amber-border: rgba(233, 185, 73, 0.32);
+
+  --lc-red: #e4685d;
+  --lc-red-text: #ee9188;
+  --lc-red-tint: rgba(228, 104, 93, 0.12);
+  --lc-red-border: rgba(228, 104, 93, 0.32);
+
+  --lc-violet: #ba96f0;
+  --lc-violet-tint: rgba(186, 150, 240, 0.12);
+  --lc-violet-border: rgba(186, 150, 240, 0.32);
+
+  --lc-neutral: #4a4f4f;
+
+  /* --- Diff --------------------------------------------------------------
+   * Opaque pairs rather than alpha tints, so a row fill does not shift with
+   * whatever surface it lands on and would survive a light theme without
+   * being recomputed. Never lime for additions: a diff records what already
+   * happened, and lime means happening now.
+   */
+  --lc-diff-add-bg: #14251a;
+  --lc-diff-add-mark: #7fc97f;
+  --lc-diff-add-word: #1f4029;
+  --lc-diff-del-bg: #2a1719;
+  --lc-diff-del-mark: #e4685d;
+  --lc-diff-del-word: #4a2429;
+  --lc-diff-hunk-bg: #1a1e20;
+  --lc-diff-surface: #16191a;
+  --lc-diff-gutter: #8b9190;
+  --lc-diff-code: #e7e3dc;
+
+  /* --- Card weight -------------------------------------------------------
+   * Weight tracks two facts, not severity: a card that BLOCKS work is
+   * raised and looks like it is waiting for you; a card about something
+   * that ALREADY HAPPENED is recessed and asks for nothing.
+   */
+  --lc-bg-pending: #1f2020;
+  --lc-bg-terminal: #141617;
+  --lc-shadow-pending: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --lc-shadow-terminal: inset 0 1px 0 rgba(0, 0, 0, 0.35);
+
+  /* --- Teammate avatar hues (8-bit faces) ----------------------------- */
+  --lc-hue-lime: #a9d93f;
+  --lc-hue-lime-face: #151a0c;
+  --lc-hue-blue: #5e9bf0;
+  --lc-hue-blue-face: #0d1520;
+  --lc-hue-violet: #a98be8;
+  --lc-hue-violet-face: #150f1e;
+  --lc-hue-clay: #e4857a;
+  --lc-hue-clay-face: #1e100f;
+  /* Five more, for the bots (Colin, 2026-09-22: "add as much as youd like"):
+     the same weight as the four above, so no two teammates need share one.
+     Pearl is the ghost's white. Each `-face` is the ink a pixel face draws
+     its features in on that chip. */
+  --lc-hue-teal: #54c7b5;
+  --lc-hue-teal-face: #0c1a18;
+  --lc-hue-butter: #e6c85c;
+  --lc-hue-butter-face: #1c170a;
+  --lc-hue-rose: #e78fb3;
+  --lc-hue-rose-face: #1e0f16;
+  --lc-hue-slate: #93a4bd;
+  --lc-hue-slate-face: #11151c;
+  --lc-hue-pearl: #ecebf2;
+  --lc-hue-pearl-face: #16161b;
+
+  /* --- Runtime marks (RuntimeMark.tsx, 0.383) ----------------------------
+   * The marks whose colour is part of the mark: Claude's orange (the hex
+   * Simple Icons records for it) and the three stops of Gemini's sparkle
+   * (Google's own file, 0.384). Every other runtime's mark is drawn in the
+   * colour of the words beside it. */
+  --lc-mark-claude: #d97757;
+  --lc-mark-gemini-violet: #9168c0;
+  --lc-mark-gemini-blue: #5684d1;
+  --lc-mark-gemini-cyan: #1ba1e3;
+
+  /* THE TWO HUES THAT HAD NO TEXT SIBLING.
+   *
+   * Lime, blue, green, amber and red each carry a `-text` variant for type
+   * on a dark surface; violet and clay did not, so two literal hexes lived
+   * in `shell.css` instead -- contrast-checked honestly, and still the one
+   * thing the token gate exists to forbid (static sweep, 2026-09-14, A5).
+   * The ratios measured there are kept exactly; only their home changes.
+   *
+   * Worth finishing now rather than later: the room is a group chat since
+   * the exchange work, so peer names appear far more often and in more
+   * places than when this was two rules. */
+  --lc-violet-text: #c9b8f3;
+
+  /* --- The boot tube ---------------------------------------------------
+   *
+   * A phosphor monitor is a look this palette has no words for: it needs a
+   * warm centre falling to cold corners, a bezel with a light edge and a
+   * dark one, and three transparencies for the glow, the scan lines and the
+   * sweep. Literal hex in `shell.css` would fail the gate that exists to
+   * stop exactly that (static sweep, 2026-09-14, A5), so they live here.
+   *
+   * The greens are the lime already in the system at three strengths, not a
+   * new hue -- the tube is the app's own colour behind glass.
+   */
+  --lc-boot-screen-hot: #141a0f;
+  --lc-boot-screen-mid: #0a0c0a;
+  --lc-boot-screen-cold: #060706;
+  --lc-boot-bezel-hi: #1a1d1e;
+  --lc-boot-bezel-lo: #0e1011;
+  --lc-boot-glow: rgba(201, 234, 74, 0.55);
+  --lc-boot-glow-soft: rgba(201, 234, 74, 0.2);
+  --lc-boot-frame: rgba(201, 234, 74, 0.26);
+  --lc-boot-scan: rgba(0, 0, 0, 0.13);
+  --lc-boot-sweep: rgba(201, 234, 74, 0.045);
+  /* The lockup's own fill. The handoff's ten did not name one, and reusing
+   * `--lc-boot-glow-soft` for it put a 0.20 wash behind the mark -- nearly
+   * ten times too strong, and the logo read as a green slab rather than as
+   * something lit from behind glass (measured on the first drive). */
+  --lc-boot-lockup: rgba(201, 234, 74, 0.022);
+  --lc-clay-text: #f0aea6;
+
+  /* --- Typography ------------------------------------------------------
+   * Weights 400/500 in the chrome, and titles at 700: the handoff's "no bold
+   * headings inside the app" held until Colin chose the wordmark's treatment
+   * for them (2026-09-22). The decision and resume cards have always asked
+   * for 600 and got 500, because Geist shipped only 400 and 500; Figtree's
+   * variable file draws the 600 they asked for.
+   * Floor is 10px and only for uppercase mono labels; everything readable
+   * is >= 12px.
+   */
+  --lc-font-ui: 'Figtree', 'Geist', Helvetica, ui-sans-serif, system-ui, sans-serif;
+  /*
+   * A TITLE IS SET THE WAY THE WORDMARK IS: bold capitals, spaced wide.
+   *
+   * Screen titles (Missions, Rooms, Routines, Team, Memory, Settings) and
+   * the section names inside Settings. Nothing else -- a teammate's name, a
+   * conversation, a dialog's action stay in sentence case, because the
+   * wordmark names places and those are not places. The size is the trial's,
+   * 17px: capitals read larger than the 20px lowercase title they replace.
+   */
+  --lc-title-size: 17px;
+  --lc-title-weight: 700;
+  --lc-title-tracking: 0.14em;
+  --lc-font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /*
+   * The dingbats the working spark turns through (· ✢ ✳ ✶ ✻ ✽), from each
+   * system's own symbol face -- named first, so ✳ never falls back to a
+   * colour emoji face. Nothing bundled: every desktop ships one of these.
+   */
+  --lc-font-symbol: 'Segoe UI Symbol', 'Apple Symbols', 'Noto Sans Symbols 2', 'DejaVu Sans', sans-serif;
+  /* The teammate's voice. Only the reply prose wears it; everything the app says stays in Geist. */
+  /*
+   * THE REPLY'S FACE, and the swap is one token wide.
+   *
+   * Colin, 2026-09-13: "whatever font claude code uses... lets just switch to
+   * that for the main chat text", then "we can keep all the geist mono and
+   * weird sidebar text, but the actual base text should be whatever claude
+   * code font youre using".
+   *
+   * That face is Anthropic Sans. It ships here now, beside Anthropic Serif,
+   * under the MIT licence in assets/fonts/ANTHROPIC-FONTS-LICENSE.txt; the
+   * serif was the reply's face from 3c3f2e2f until Colin, 2026-09-30, with
+   * the Claude app beside him: "can we switch to anthropic sans". Plex stays
+   * the fallback the design agent chose for the teammate's voice (2026-09-10),
+   * so a missing file still reads as a humanist sans, not as Georgia.
+   */
+  --lc-font-prose: 'Anthropic Sans', 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+
+  /*
+   * Two display moments only. Everything was <= 15px before, which read as
+   * density rather than calm; more display sizes would flatten it again.
+   */
+  --lc-text-display: 27px;
+  --lc-text-screen-title: 20px;
+  /* A section inside a screen: one step above the text under it (0.356). */
+  --lc-text-section: 16px;
+  --lc-text-teammate-name: 14.5px;
+  --lc-text-body: 13.5px;
+  /*
+   * The teammate's reply, and only that.
+   *
+   * The app's own chrome stays at 13.5px -- it is dense on purpose, and 12
+   * rules share that token. A REPLY is the one thing on screen a person reads
+   * rather than scans, and at 13.5px Colin read it as "way too small"
+   * (2026-09-10) beside Claude Code, whose prose measures about 14.2px.
+   * Paired with the prose family, which is already the reply's alone.
+   *
+   * 15px IS THE DEFAULT, AND A COUNT DOES NOT GET TO DECIDE THIS.
+   *
+   * 0.198.0 moved this to 18px, and the reasoning was half right in a way
+   * worth leaving on the record. Counted off the rendered line boxes, the
+   * reply at 15px ran 83 characters a line and 111 at the longest, against
+   * the "past ~85 the return sweep breaks" that `shell.css` states in its own
+   * comment. That measurement is real and the fix for it was real -- but the
+   * fix belonged to the MEASURE, which is the `ch` ceiling next door, and I
+   * used it to change the SIZE, which is a different question the count
+   * cannot answer.
+   *
+   * Colin, seeing 18px on his own monitor within the hour: *"go back to the
+   * old text size, this shit looks insane, or you can have it be changeable
+   * in settings"*. He had already said the size was his call; I had the
+   * number and let it decide a taste question anyway.
+   *
+   * So: both. 15px is what he had and what ships, and `ReplyTextSize` in
+   * Settings offers larger for anyone who wants it -- the two rules below.
+   * The 111-character lines are fixed where they belonged, on the ceiling.
+   *
+   * The design agent's argument for a larger serif on a dark ground still
+   * stands on its own terms and is not refuted by this; it is simply not
+   * mine to impose. `docs/PROSE-MEASURE-2026-09-19.md` has every number.
+   */
+  --lc-text-prose: 15px;
+  /*
+   * What the person reads in a conversation beside the reply: their own
+   * message and an ask card (QA-2026-09-29 round 2, N8). At Largest the reply
+   * grew and the card a person must read to decide stayed at 12px. These grow
+   * with the reply size below; the rest of the app's chrome does not.
+   */
+  --lc-text-said: 13.5px;
+  --lc-text-ask: 12px;
+  --lc-text-ask-foot: 10.5px;
+  --lc-text-control: 13px;
+  --lc-text-description: 12px;
+
+  /*
+   * Retired 2026-09-06, design review: three steps nobody could see.
+   *
+   *   --lc-text-label (#8b9190)          -> --lc-text-muted, the same value
+   *   --lc-text-mono-provenance (11.5px) -> --lc-text-mono-caption (11px)
+   *   --lc-text-secondary-size (12.5px)  -> --lc-text-description (12px)
+   *
+   * The first was two names for one colour, which makes every call site a
+   * coin flip and means a future change to "labels" silently moves body copy.
+   * The other two were half-pixel steps inside a scale: imperceptible on
+   * their own, but every component still had to choose, and the choice was
+   * arbitrary in about half the places they appeared. Inconsistent meta
+   * sizing between adjacent rows is what makes a dense screen read as busy
+   * rather than dense.
+   *
+   * Two mono sizes remain (11 machine meta, 10.5 uppercase labels) and three
+   * text sizes (13.5 body, 13 control, 12 supporting).
+   */
+  --lc-text-mono-caption: 11px;
+  --lc-text-mono-label: 10.5px;
+
+  --lc-tracking-label: 0.14em;
+  --lc-tracking-label-wide: 0.16em;
+  --lc-leading-prose: 1.55;
+
+  /* --- Spacing (8px system; 2/4/6 for icon gaps and face internals) ---- */
+  --lc-space-1: 2px;
+  --lc-space-2: 4px;
+  --lc-space-3: 6px;
+  --lc-space-4: 8px;
+  --lc-space-5: 12px;
+  --lc-space-6: 16px;
+  --lc-space-7: 24px;
+  --lc-space-8: 32px;
+
+  /* --- Radii ----------------------------------------------------------- */
+  --lc-radius-control: 7px;
+  --lc-radius-button: 8px;
+  --lc-radius-card: 10px;
+  --lc-radius-popover: 12px;
+
+  /* --- Elevation: popovers and overlays only. Cards use borders. ------- */
+  --lc-shadow-menu: 0 24px 60px rgba(0, 0, 0, 0.6);
+  --lc-shadow-palette: 0 40px 100px rgba(0, 0, 0, 0.65);
+  --lc-shadow-window: 0 32px 80px rgba(0, 0, 0, 0.55);
+
+  /* --- Motion ---------------------------------------------------------- */
+  --lc-motion-press: 120ms;
+  --lc-motion-hover: 140ms;
+  --lc-motion-panel: 180ms;
+  --lc-ease: ease;
+
+  /* --- Layout ---------------------------------------------------------- */
+  /* The window's own title bar: a drag region, so nothing clickable may sit
+     on it -- an overlay starts below it (see .lc-scrim). */
+  --lc-titlebar-height: 38px;
+  --lc-sidebar-width: 268px;
+  --lc-sidebar-rail-width: 64px;
+  --lc-inspector-width: 344px;
+  /*
+   * THE FILE VIEWER IS WIDER THAN THE INSPECTOR, because it is read rather
+   * than scanned.
+   *
+   * THE RULE, which is the part to keep when these numbers next change:
+   * **the viewer is sized by its content's MEASURE, the inspector by its
+   * content's LONGEST ROW.** Two rules, two numbers, one region. The
+   * inspector holds a record -- rows, ids, counts -- and a wider column of
+   * key-value rows is only a longer sweep between a key and its value. The
+   * viewer holds a document, and a document wants 62-68 characters a line.
+   *
+   * THE FIRST VERSION WAS 38vw AND IT WAS WRONG BECAUSE IT WAS A PERCENTAGE.
+   * It came off one screenshot of Colin's Claude Code window, where the panel
+   * is about 40%. A percentage is a different MEASURE at every window size,
+   * so it cannot deliver the one thing a document wants (design agent's
+   * ruling, 2026-09-20).
+   *
+   * SWEPT, NOT REASONED. A paragraph rendered in this column, counted one
+   * character at a time off its line boxes, at 1600x1000:
+   *
+   *   420px -> 55 characters    540px -> 70
+   *   460px -> 58               560px -> 73
+   *   500px -> 64               600px -> 77
+   *   520px -> ~67              680px -> 90
+   *
+   * So 520 is a full measure and the ceiling belongs there. The ruling asked
+   * for 680, on the belief that 560 was still short of a measure -- it is
+   * not, it is 73 characters, already past. The ruling's own principle is
+   * what settles it: past a full measure the panel is not getting better, it
+   * is only taking room from the conversation. Measuring the column is what
+   * turned that from a preference into a number.
+   *
+   * The floor stays a readability floor rather than a measure: 420px renders
+   * 55 characters, which is tight but readable, and below it a markdown file
+   * is not worth half-showing.
+   *
+   * NO DRAG HANDLE, deliberately, and not because it is hard: a handle makes
+   * the measure a user setting, and this whole comment exists because the
+   * measure is not a preference. If one ever ships, the inspector ships one
+   * the same day -- a draggable viewer beside a fixed inspector teaches that
+   * panels move and then breaks the lesson on the next panel.
+   */
+  --lc-viewer-width: clamp(420px, 44vw, 520px);
+  /*
+   * The reading column GROWS with the window, instead of standing still.
+   *
+   * 760px was fixed, so a 1920px window read a 760px column and about 900px
+   * of margin either side -- measured 2026-09-10 with
+   * `_tools/probe-reply-fills-the-window.mjs`, and the thing Colin meant by
+   * "too much dead space especially on your larger testing app".
+   *
+   * The floor keeps every window that is 1650px or narrower exactly as it was
+   * (46vw only overtakes 760px above that), so nothing a person is used to
+   * moves on an ordinary laptop. The ceiling is where the measure stops being
+   * comfortable to read; past it the extra space stays as margin, which is
+   * what Claude Code does too -- its own prose measures about 775px at a
+   * 1431px window.
+   */
+  /*
+   * 68vw, not 46vw (0.515). Colin, 2026-10-01, beside a Claude Code window:
+   * "we seem to have a little more dead space on the side of our
+   * chats/chatbox compared to claude". 46vw only left the 760px floor above
+   * a 1650px window, so an ordinary 1100-1650px window kept ~90px of margin a
+   * side, where Claude keeps ~50-75. 68vw grows the column from ~1120px up
+   * and reaches the same 980px ceiling at ~1440px; narrower is unchanged.
+   */
+  --lc-thread-max-width: clamp(760px, 68vw, 840px);
+  /*
+   * Where one turn ends and the next begins: 22px before a person's message,
+   * against the 12px column gap inside a turn. Named rather than left as a
+   * bare 10px margin, which was the design agent's note on 2026-09-17 -- "the
+   * kind of thing that survives until someone changes --lc-space-5 and the
+   * ratio silently shifts". Expressed as the TOTAL, so the bubble's margin is
+   * derived and a change to the column gap cannot move it.
+   */
+  --lc-thread-turn-gap: 22px;
+  /*
+   * The narrow window's column GROWS too (0.515). 700px fixed left ~130px a
+   * side in a 1024px window's 960px pane (drive-the-column-fills-the-window),
+   * the most dead space at the size where room matters most. 84vw keeps
+   * ~50px a side there, Claude's gutter; 700px stays the floor.
+   */
+  --lc-thread-max-width-compact: clamp(700px, 84vw, 840px);
+
+  /* --- Interaction ----------------------------------------------------- */
+  --lc-hover-surface: rgba(255, 255, 255, 0.06);
+  /* The stop disc's inner glow: libraries.dev's round icon button, a third
+     of a hover's lift. */
+  --lc-stop-glow: rgba(255, 255, 255, 0.02);
+  /* The metal composer, as libraries.dev's metal page draws its chatbox
+     (2026-09-23): the translucent box, its frosted chips, the dark discs. */
+  --lc-chat-bg: rgba(29, 29, 29, 0.7);
+  --lc-chip-bg: rgba(255, 255, 255, 0.04);
+  --lc-chip-bg-hover: rgba(255, 255, 255, 0.07);
+  --lc-chip-ring: rgba(255, 255, 255, 0.02);
+  --lc-chip-highlight: rgba(255, 255, 255, 0.04);
+  --lc-chip-text: #caccd2;
+  --lc-chip-chevron: #8e8e8e;
+  --lc-circle-bg: #1d1d1d;
+  --lc-circle-border: rgba(44, 47, 54, 0.52);
+  --lc-circle-fg: #f8f8f8;
+  /* The gooey +, libraries.dev's plus menu: its liquid surface, and the
+     page's "Figma soft" shadow for it, rebuilt by the library on the merged
+     silhouette. */
+  --lc-plusmenu-fill: #202020;
+  /* The effort control, Claude Code's on the gooey slider: its track, the
+     part up to the level, the stops, and the white pill thumb's liquid. */
+  /* The context ring's circle and its filled part. The circle was the card
+     border colour, 7% white, so the ring read as a bare arc -- a spinner
+     beside the model chip after the run had finished (Yurt's beta report,
+     #8). Drawn whole, it reads as a gauge. */
+  --lc-contextring-track: rgba(255, 255, 255, 0.22);
+  --lc-contextring-fill: rgba(255, 255, 255, 0.68);
+  /* Claude Code's, read off Colin's frame of it (2026-09-24): a track at
+     luminance 52 and a fill at 125 on its panel -- ours was 45 and 68, so the
+     part up to the level barely showed -- 2px dots a quarter white on both,
+     and a pure white thumb whose shadow darkens the fill by about a tenth at
+     its edge, gone 10px out. */
+  --lc-effort-track: rgba(255, 255, 255, 0.1);
+  --lc-effort-fill: rgba(255, 255, 255, 0.36);
+  --lc-effort-dot: rgba(255, 255, 255, 0.25);
+  --lc-effort-dot-passed: rgba(255, 255, 255, 0.25);
+  --lc-effort-thumb: #ffffff;
+  --lc-effort-thumb-lift: 0 0 11px 0 rgba(0, 0, 0, 0.19);
+  --lc-effort-thumb-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.45);
+  --lc-plusmenu-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04) inset, 0 1px 0 0 rgba(255, 255, 255, 0.03) inset, 0 0 0 1px rgba(0, 0, 0, 0.06), 0 2px 6px 0 rgba(0, 0, 0, 0.05), 0 4px 42px 0 rgba(0, 0, 0, 0.24);
+  --lc-hover-surface-strong: rgba(255, 255, 255, 0.07);
+  --lc-hover-border: rgba(255, 255, 255, 0.2);
+  --lc-focus-ring: var(--lc-lime);
+  /*
+   * The SOFT version, for a box you type in.
+   *
+   * A 2px lime edge is right on a small control and wrong on the message
+   * box: Colin, 2026-09-14, "the yellow outline for clicking the chat box
+   * is pointless and clunky". The first attempt kept the lime at a lower
+   * alpha and was still too much -- "you still went overboard with the
+   * color, just make it work exactly as claude code, very subtle".
+   *
+   * So: NO hue at all. Claude Code's field does not colour on focus, it
+   * lightens -- the border comes up a step and the ground barely lifts. The
+   * indicator survives, which is the part that matters, because an
+   * invisible focus ring was the only accessibility defect the static sweep
+   * found; it simply stops announcing itself.
+   */
+  --lc-focus-glow: rgba(255, 255, 255, 0.05);
+  --lc-focus-edge: rgba(255, 255, 255, 0.22);
+  /*
+   * The message box's edge alone, a step up (QA-2026-09-29 round 2, R8): at
+   * 0.22 it was about 2:1 against the page, under the 3:1 a focus indicator
+   * needs. At 0.4 it is 3.8:1 outside the box and 3.5:1 against the box's own
+   * ground -- still one pixel, no hue, no wider glow. Colin, 2026-09-29: run
+   * with the suggestion.
+   */
+  --lc-focus-edge-box: rgba(255, 255, 255, 0.4);
+}
+
+/*
+ * THE REPLY'S SIZE, WHEN THE PERSON HAS CHOSEN ONE.
+ *
+ * `App.tsx` writes `data-replysize` on the root from the stored setting and
+ * does nothing else: the stylesheet owns what each choice MEANS, so no pixel
+ * value is ever computed in TypeScript. Absent -- which is every build before
+ * this one, and any window whose setting has not loaded yet -- is the
+ * `standard` above, so nothing here can leave the reply unsized.
+ *
+ * The measure does not need a rule of its own. The ceiling next door is in
+ * `ch`, which is the face's own zero, so the paragraph box grows with the
+ * type and the characters-per-line stays put: counted at 66ch it is 74 a line
+ * at 15px and 72 at 18px. That is the whole reason the cap is in `ch` rather
+ * than pixels, and it is the first time it has actually been true.
+ */
+:root[data-replysize='large'] {
+  --lc-text-prose: 17px;
+  --lc-text-said: 15px;
+  --lc-text-ask: 13.5px;
+  --lc-text-ask-foot: 11.5px;
+}
+
+:root[data-replysize='largest'] {
+  --lc-text-prose: 19px;
+  --lc-text-said: 17px;
+  --lc-text-ask: 15px;
+  --lc-text-ask-foot: 12.5px;
+}
+
+/*
+ * Keyboard focus only. Never a sticky ring after a mouse click, and no
+ * persistent glow anywhere in the product.
+ */
+.lc-focusable:focus-visible,
+button:focus-visible,
+[role='button']:focus-visible,
+[role='menuitem']:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--lc-focus-ring);
+  outline-offset: 2px;
+}
+
+@keyframes lcPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes lcCaret {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes lcBar {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

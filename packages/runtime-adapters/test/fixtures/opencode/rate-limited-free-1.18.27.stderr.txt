@@ -1,0 +1,2 @@
+timestamp=2026-09-26T18:27:20.168Z level=ERROR run=2a5ca609 message="stream error" providerID=opencode modelID=ling-3.0-flash-fin-free session.id=ses_captured small=false agent=build mode=primary error.error="AI_APICallError: Rate limit exceeded. Please try again later."
+timestamp=2026-09-26T18:27:25.474Z level=ERROR run=2a5ca609 message="stream error" providerID=opencode modelID=ling-3.0-flash-fin-free session.id=ses_captured small=true agent=title mode=primary error.error="AI_RetryError: Failed after 3 attempts. Last error: Rate limit exceeded. Please try again later."

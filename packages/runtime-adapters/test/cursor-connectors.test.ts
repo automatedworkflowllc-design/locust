@@ -1,0 +1,96 @@
+import { describe, expect, it } from "vitest";
+
+import { cursorConnectorSentence, cursorReadyConnectorLine, parseCursorMcpList } from "../src/connectors.js";
+
+/*
+ * Colin, 2026-09-14: "i literally have robinhood working on the cli but cursor
+ * still cant call it." Days of this, and the CLI answers it in one line:
+ *
+ *     robinhood-trading: requires_authentication
+ *
+ * Not an approval problem. Locust passes `--approve-mcps` and the flag still
+ * exists; approval was never what refused the call. The CLI has no token, so
+ * that server's tools reach no run at all. The Cursor IDE app keeps separate
+ * credentials, which is why the same connector works there and nowhere else.
+ */
+const lines = (...rows: readonly string[]): string => rows.join(String.fromCharCode(10));
+
+describe("what the Cursor CLI says about its connectors", () => {
+  it("reads a server and its status", () => {
+    expect(parseCursorMcpList("robinhood-trading: requires_authentication")).toEqual([
+      { name: "robinhood-trading", status: "requires_authentication", needsAuthentication: true },
+    ]);
+  });
+
+  it("keeps a working server, and does not call it unauthenticated", () => {
+    const read = parseCursorMcpList(lines("github: connected", "robinhood-trading: requires_authentication"));
+    expect(read.map((entry) => entry.name)).toEqual(["github", "robinhood-trading"]);
+    expect(read.map((entry) => entry.needsAuthentication)).toEqual([false, true]);
+  });
+
+  it("ignores blank lines and prose", () => {
+    expect(parseCursorMcpList(lines("", "No MCP servers configured.", "   "))).toEqual([]);
+  });
+
+  it("says nothing when every connector is fine", () => {
+    expect(cursorConnectorSentence(parseCursorMcpList("github: connected"))).toBeUndefined();
+    expect(cursorConnectorSentence([])).toBeUndefined();
+  });
+
+  it("names the server and stops short of prescribing a fix", () => {
+    const said = cursorConnectorSentence(parseCursorMcpList("robinhood-trading: requires_authentication"));
+    expect(said).toContain("robinhood-trading");
+    // The distinction that cost the most time.
+    expect(said).toContain("Cursor app does not cover the CLI");
+    /*
+     * It used to end with `cursor-agent mcp login <name>`. Colin ran it, more
+     * than once, and it does nothing -- MEASURED 2026-09-14: that command
+     * persists no credential anywhere on this machine. An app that prescribes
+     * a command which cannot work spends a person's evening for them.
+     */
+    expect(said).not.toContain("mcp login");
+    expect(said).not.toMatch(/run this|in a terminal/i);
+  });
+
+  it("names every waiting server when there are several", () => {
+    const said = cursorConnectorSentence(
+      parseCursorMcpList(lines("a: requires_authentication", "b: connected", "c: requires_authentication")),
+    );
+    expect(said).toContain("a and c");
+    expect(said).not.toContain("b,");
+  });
+});
+
+/*
+ * Colin, 2026-09-14, after the mcp-remote bridge worked: "that worked, i asked
+ * it to try rh local." He had to tell the teammate the connector's name --
+ * because the obvious name on that machine was the BROKEN entry, so a teammate
+ * asked about Robinhood found `robinhood-trading`, read `needsAuth, 0 tools`,
+ * and reported the connector dead. True of the one it checked; false of the
+ * working one sitting beside it.
+ */
+describe("which connectors a teammate is told it has", () => {
+  it("names the ready ones, so nobody has to know a config file", () => {
+    const said = cursorReadyConnectorLine(
+      parseCursorMcpList(lines("robinhood-local: ready", "github: connected")),
+    );
+    expect(said).toContain("robinhood-local");
+    expect(said).toContain("github");
+    expect(said).toContain("Use these exact names");
+  });
+
+  it("never names one that cannot be called", () => {
+    // A name it cannot use is worse than no name: it will try it.
+    const said = cursorReadyConnectorLine(
+      parseCursorMcpList(lines("robinhood-trading: requires_authentication", "robinhood-local: ready")),
+    );
+    expect(said).toContain("robinhood-local");
+    expect(said).not.toContain("robinhood-trading");
+  });
+
+  it("says nothing at all when nothing is ready", () => {
+    expect(cursorReadyConnectorLine(parseCursorMcpList("a: requires_authentication"))).toBeUndefined();
+    expect(cursorReadyConnectorLine(parseCursorMcpList("a: disabled"))).toBeUndefined();
+    expect(cursorReadyConnectorLine([])).toBeUndefined();
+  });
+});

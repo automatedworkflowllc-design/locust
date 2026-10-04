@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lc-tokens.css">
+<style>
+  html, body { margin: 0; background: var(--lc-bg-app); }
+  * { box-sizing: border-box; }
+  a { color: var(--lc-lime); text-decoration: none; }
+  a:hover { color: var(--lc-lime-text); }
+  @keyframes lcPulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+</style>
+</helmet>
+<div style="min-height: 100vh; padding: 36px; display: flex; flex-direction: column; gap: 40px; font-family: var(--lc-font-ui); color: var(--lc-text-primary); font-size: var(--lc-text-body); line-height: var(--lc-leading-prose);">
+
+  <div style="display: flex; flex-direction: column; gap: 9px; max-width: 940px;">
+    <div style="font-size: var(--lc-text-screen-title); font-weight: 500; letter-spacing: -0.015em;">Three placements</div>
+    <div style="font-size: var(--lc-text-description); color: var(--lc-text-muted); text-wrap: pretty;">This is a <span style="font-family: var(--lc-font-mono);">.dc.html</span> — there are drawings below. The header pair is drawn at <strong style="font-weight: 500;">865px</strong>, the content pane with the inspector open, because that is where the truncation actually fires: at the 1209px pane the line has 136px of slack and never clips. Spec: <span style="font-family: var(--lc-font-mono);">docs/THREE-PLACEMENTS-2026-09-14.md</span>.</div>
+    <div style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">Short answers: <strong style="font-weight: 500;">1 —</strong> two registers, and the conversation total is not the only thing to evict. <strong style="font-weight: 500;">2 —</strong> right move, one refinement: near the time marker, not <em>as</em> one. <strong style="font-weight: 500;">3 —</strong> don't build the mirror; the two directions are not symmetric, and the receiving side needs attribution rather than a sentence.</div>
+  </div>
+
+  <!-- ═══════════ 1 · THE HEADER ═══════════ -->
+  <section style="width: 1040px; display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label-wide); text-transform: uppercase; color: var(--lc-text-muted);">1 · The mission line</span>
+      <span style="font-size: var(--lc-text-description); color: var(--lc-text-muted);">Both drawn at 865px — the content pane with the inspector open. Every figure below is measured off this render.</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-text-muted);">SHIPPED · seven facts in 884px of line, ~676px of column</span>
+      <div style="width: 865px; height: 60px; display: flex; align-items: center; gap: 12px; padding: 0 20px; background: var(--lc-bg-chrome); border: 1px solid var(--lc-border-hairline); border-radius: var(--lc-radius-card);">
+        <span style="width: 30px; height: 30px; flex: none; border-radius: 7px; background: var(--lc-hue-blue); border: 1px solid var(--lc-blue-border); display: block;"></span>
+        <span style="min-width: 0; flex: 0 1 auto; overflow: hidden;">
+          <span style="display: flex; align-items: baseline; gap: 7px;"><span style="font-size: var(--lc-text-control); font-weight: 500; color: var(--lc-text-name);">Yurt</span><span style="font-size: var(--lc-text-description); color: var(--lc-text-muted);">Systems · idle</span></span>
+          <span style="display: block; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-caption); color: var(--lc-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Mission · 47e3d956 · Grok 4.6 High · completed · may edit anything on this machine · 12k in · 208 out · conversation 84k in · 3.1k out</span>
+        </span>
+        <span style="margin-left: auto; display: flex; gap: 6px; flex: none;">
+          <span style="height: 26px; padding: 0 10px; display: inline-flex; align-items: center; border: 1px solid var(--lc-border-control); border-radius: var(--lc-radius-control); background: var(--lc-bg-control); font-size: var(--lc-text-description); color: var(--lc-text-control-fg);">Activity</span>
+          <span style="width: 26px; height: 26px; display: inline-grid; place-items: center; border: 1px solid var(--lc-border-control); border-radius: var(--lc-radius-control); color: var(--lc-text-control-fg);">⋯</span>
+        </span>
+      </div>
+      <div style="display: grid; grid-template-columns: 132px 1fr; gap: 6px 16px; font-size: var(--lc-text-description); color: var(--lc-text-secondary); max-width: 1000px;">
+        <span style="color: var(--lc-amber-text); font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label);">TWO SCOPES</span><span style="text-wrap: pretty;">Six facts about one mission, then one about the conversation, in one run-on strip with <span style="font-family: var(--lc-font-mono);">·</span> between all of them. The separator claims they are the same kind of thing. They are not, and the reader has no way to see where the scope changes.</span>
+        <span style="color: var(--lc-amber-text); font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label);">TWO TENSES</span><span style="text-wrap: pretty;"><span style="font-family: var(--lc-font-mono);">completed</span> is the live fact; <span style="font-family: var(--lc-font-mono);">47e3d956</span> and the costs are the durable record. The header is the present-tense surface and the receipt is the past-tense one — this line is doing both jobs.</span>
+        <span style="color: var(--lc-amber-text); font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label);">PROSE IN A STRIP</span><span style="text-wrap: pretty;"><span style="font-family: var(--lc-font-mono);">may edit anything on this machine</span> is 33 characters of sentence in a line of tokens — and the composer's mode chip, 300px below, already names that mode. This is the biggest single reclaim on the line and it is a duplicate.</span>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-green-text);">PROPOSED · four facts, all mission-scoped, all present tense</span>
+      <div style="width: 865px; height: 60px; display: flex; align-items: center; gap: 12px; padding: 0 20px; background: var(--lc-bg-chrome); border: 1px solid var(--lc-border-hairline); border-radius: var(--lc-radius-card);">
+        <span style="width: 30px; height: 30px; flex: none; border-radius: 7px; background: var(--lc-hue-blue); border: 1px solid var(--lc-blue-border); display: block;"></span>
+        <span style="min-width: 0; flex: 0 1 auto; overflow: hidden;">
+          <span style="display: flex; align-items: baseline; gap: 7px;"><span style="font-size: var(--lc-text-control); font-weight: 500; color: var(--lc-text-name);">Yurt</span><span style="font-size: var(--lc-text-description); color: var(--lc-text-muted);">Systems · idle</span></span>
+          <span style="display: block; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-caption); color: var(--lc-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">47e3d956 · Grok 4.6 High · completed · 12k in · 208 out</span>
+        </span>
+        <span style="margin-left: auto; display: flex; align-items: center; gap: 6px; flex: none;">
+          <span style="height: 26px; padding: 0 10px; display: inline-flex; align-items: center; border: 1px solid var(--lc-border-control); border-radius: var(--lc-radius-control); background: var(--lc-bg-control); font-size: var(--lc-text-description); color: var(--lc-text-control-fg);">Activity</span>
+          <span style="width: 26px; height: 26px; display: inline-grid; place-items: center; border: 1px solid var(--lc-border-control); border-radius: var(--lc-radius-control); color: var(--lc-text-control-fg);">⋯</span>
+        </span>
+      </div>
+      <div style="display: grid; grid-template-columns: 132px 1fr; gap: 6px 16px; font-size: var(--lc-text-description); color: var(--lc-text-secondary); max-width: 1000px;">
+        <span style="color: var(--lc-text-muted);">Noun dropped</span><span style="text-wrap: pretty;"><span style="font-family: var(--lc-font-mono);">Mission ·</span> labels the line for someone who has never seen it, once, and costs eight characters on every render after that. An eight-hex id in mono in a header is self-evidently an id.</span>
+        <span style="color: var(--lc-text-muted);">Permission gone</span><span style="text-wrap: pretty;">To nowhere — the composer chip already says it, and the composer is where it is <em>actionable</em>. A permission is a thing you can change; stating it where it cannot be changed is the app talking to itself.</span>
+        <span style="color: var(--lc-text-muted);">Conversation cost</span><span style="text-wrap: pretty;">To the ring. See below.</span>
+        <span style="color: var(--lc-text-muted);">Measured</span><span style="text-wrap: pretty;">55 characters where the strip had 133. The old line renders at <span style="font-family: var(--lc-font-mono);">884px</span> against roughly <span style="font-family: var(--lc-font-mono);">676px</span> of column here, so it clips; this one renders at <span style="font-family: var(--lc-font-mono);">363px</span> and still fits at the 1120 minimum with the inspector open, with room for a longer model name.</span>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-green-text);">WHERE THE CONVERSATION TOTAL GOES · the ring is already the conversation-scoped object</span>
+      <div style="display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap;">
+        <div style="width: 320px; padding: 12px; background: var(--lc-bg-raised-2); border: 1px solid var(--lc-border-strong); border-radius: var(--lc-radius-popover); box-shadow: var(--lc-shadow-menu); display: flex; flex-direction: column; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="width: 26px; height: 26px; flex: none; border-radius: 50%; border: 3px solid var(--lc-bg-control); border-top-color: var(--lc-lime); border-right-color: var(--lc-lime); display: block;"></span>
+            <span style="flex: 1; min-width: 0;">
+              <span style="display: block; font-size: var(--lc-text-control); color: var(--lc-text-name);">Context · 41% used</span>
+              <span style="display: block; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-text-muted);">82k of 200k tokens</span>
+            </span>
+          </div>
+          <div style="height: 1px; background: var(--lc-border-hairline);"></div>
+          <div style="display: grid; grid-template-columns: max-content 1fr; gap: 5px 14px; font-size: var(--lc-text-description);">
+            <span style="color: var(--lc-text-muted);">This conversation</span><span style="font-family: var(--lc-font-mono); color: var(--lc-text-secondary);">84k in · 3.1k out</span>
+            <span style="color: var(--lc-text-muted);">Across 6 missions</span><span style="font-family: var(--lc-font-mono); color: var(--lc-text-secondary);">since 09:14</span>
+          </div>
+        </div>
+        <div style="flex: 1; min-width: 300px; max-width: 640px; font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty; display: flex; flex-direction: column; gap: 7px;">
+          <span>The ring is conversation-scoped, it already draws a conversation-scoped budget, and cost and context are the same <em>kind</em> of fact — how much of a finite thing this conversation has spent. Putting the total anywhere else means two conversation-scoped numbers on one screen in two unrelated places.</span>
+          <span>It also answers the “no discoverable home” worry: a hover already exists, the number is one row inside it, and nobody has to learn a new surface.</span>
+          <span style="color: var(--lc-text-muted);">The receipt keeps stating the mission's own cost as a durable fact. That is not a duplicate of the header — one is “right now”, the other is “on the record”, and they diverge the moment you scroll back to a mission that is not the current one.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ 2 · THE COLD START NOTE ═══════════ -->
+  <section style="width: 940px; display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label-wide); text-transform: uppercase; color: var(--lc-text-muted);">2 · The cold-start note</span>
+      <span style="font-size: var(--lc-text-description); color: var(--lc-green-text);">Right move. One refinement.</span>
+    </div>
+
+    <div style="background: var(--lc-bg-window); border: 1px solid var(--lc-border-card); border-radius: var(--lc-radius-card); padding: 20px;">
+      <div style="max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="flex: 1; height: 1px; background: var(--lc-border-hairline); display: block;"></span>
+          <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label); text-transform: uppercase; color: var(--lc-text-muted);">Today 14:02</span>
+          <span style="flex: 1; height: 1px; background: var(--lc-border-hairline); display: block;"></span>
+        </div>
+        <div style="display: flex; gap: 9px; padding: 2px 0 2px 10px; border-left: 2px solid var(--lc-border-button); font-size: var(--lc-text-description); color: var(--lc-text-muted); max-width: 640px;">
+          <span style="flex: 1; min-width: 0; text-wrap: pretty;">Started without the earlier messages — the turn before this one left no session to resume.</span>
+        </div>
+        <div style="align-self: flex-end; max-width: 70%; padding: 9px 13px; border-radius: var(--lc-radius-card); background: var(--lc-bg-bubble-user); font-size: var(--lc-text-body);">ok pick it back up — where did the adapter land?</div>
+        <div style="display: flex; gap: 12px;">
+          <span style="width: 24px; height: 24px; flex: none; border-radius: 5px; background: var(--lc-hue-blue); border: 1px solid var(--lc-blue-border); display: block; margin-top: 2px;"></span>
+          <span style="flex: 1; min-width: 0; max-width: 90ch; font-size: var(--lc-text-body); line-height: 1.7; color: var(--lc-text-secondary); text-wrap: pretty;">I don't have the earlier turn in context, so tell me which adapter or point me at the file and I'll read it fresh.</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 148px 1fr; gap: 7px 16px; font-size: var(--lc-text-description); color: var(--lc-text-secondary); max-width: 940px;">
+      <span style="color: var(--lc-text-muted);">Why it is right</span><span style="text-wrap: pretty;">The two misreadings both came from adjacency, not wording — a permanent fact sitting in the strip where pending things live. Moving it to the head of the turn fixes both without touching the sentence, and it puts the condition <em>before</em> the reply it explains, so the reader meets the caveat before the thing it qualifies.</span>
+      <span style="color: var(--lc-text-muted);">The refinement</span><span style="text-wrap: pretty;">Near the time marker, not <em>as</em> one. Here is the rule for the three species: <strong style="font-weight: 500;">a marker that describes the boundary between turns is centred and full-width</strong> — time markers, handoff dividers, both of which say “something changed between these two things”. <strong style="font-weight: 500;">A note that describes the turn you are about to read is left-aligned in the standing register</strong>, at the reply's own left edge. Cold start is the second kind: it is not a boundary, it is a property of what follows.</span>
+      <span style="color: var(--lc-text-muted);">What that rules out</span><span style="text-wrap: pretty;">Centring it, dividing with it, or giving it the uppercase mono treatment the time marker wears. If it currently sits inline with <span style="font-family: var(--lc-font-mono);">Today 14:02</span> on the same row, separate them: two facts of different kinds on one line is the defect from §1, in miniature.</span>
+      <span style="color: var(--lc-text-muted);">Memory cards</span><span style="text-wrap: pretty;">Same family, same treatment — that reassignment was already on the review list. Once cold start, memory and soft-limit notices all take the left rule, the third species stops being three species and becomes one: <em>a quiet note about the turn beside it</em>.</span>
+    </div>
+  </section>
+
+  <!-- ═══════════ 3 · WHAT WAS SENT ═══════════ -->
+  <section style="width: 940px; display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label-wide); text-transform: uppercase; color: var(--lc-text-muted);">3 · What a teammate sent</span>
+      <span style="font-size: var(--lc-text-description); color: var(--lc-green-text);">Do not build the mirror. Build the attribution.</span>
+    </div>
+
+    <div style="display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap;">
+      <div style="width: 460px; background: var(--lc-bg-window); border: 1px solid var(--lc-border-card); border-radius: var(--lc-radius-card); padding: 16px;">
+        <div style="border: 1px solid var(--lc-border-card); border-radius: var(--lc-radius-card); background: var(--lc-bg-bubble-peer); overflow: hidden;">
+          <div style="display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--lc-border-hairline);">
+            <span style="width: 20px; height: 20px; flex: none; border-radius: 5px; background: var(--lc-hue-blue); border: 1px solid var(--lc-blue-border); display: block;"></span>
+            <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary);"><span style="color: var(--lc-text-name);">Yurt</span> sent</span>
+            <span style="margin-left: auto; display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: var(--lc-radius-control); border: 1px solid var(--lc-border-control); font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-text-muted);">
+              Open Yurt's conversation
+              <svg aria-hidden="true" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square"><path d="M9 5h10v10M19 5 6 18"></path></svg>
+            </span>
+          </div>
+          <div style="padding: 11px 12px; font-size: var(--lc-text-description); line-height: 1.7; color: var(--lc-text-secondary); text-wrap: pretty;">Cursor Read is blind to anything outside the workspace; Shell can see the files. The tree would need <span style="font-family: var(--lc-font-mono); font-size: 0.92em;">pnpm install</span> before anything runs.</div>
+        </div>
+      </div>
+
+      <div style="flex: 1; min-width: 320px; max-width: 460px; display: flex; flex-direction: column; gap: 8px; font-size: var(--lc-text-description); color: var(--lc-text-secondary);">
+        <span style="text-wrap: pretty;"><strong style="font-weight: 500;">The two directions are not symmetric, which is why the mirror felt wrong to build.</strong> The reverse sentence exists because <em>nothing arrived</em> — an absence cannot explain itself, so it needs a sentence. Here something did arrive. Presence does not need explaining; it needs <em>attributing</em>.</span>
+        <span style="text-wrap: pretty;">So change one word and add one affordance. <span style="font-family: var(--lc-font-mono);">Yurt</span> becomes <span style="font-family: var(--lc-font-mono);">Yurt sent</span>, and the card carries a link to the origin conversation. Together those say “this is a message, chosen and dispatched, and it came from somewhere you can go” — without ever claiming there is more, which is the claim you cannot make without the schema change.</span>
+        <span style="text-wrap: pretty;">It is also <strong style="font-weight: 500;">always true</strong>, so it needs no condition, no inference and no comparison of lengths. Same principle as the receipt ruling: <em>state scope, not absence.</em></span>
+        <span style="color: var(--lc-text-muted); text-wrap: pretty;">And it is not the standing line Colin has twice asked you to remove. Both of those were sentences asserting something <em>might</em> be wrong. This is a label and a link.</span>
+      </div>
+    </div>
+
+    <div style="padding: 14px 16px; border-radius: var(--lc-radius-card); border: 1px solid var(--lc-border-card); background: var(--lc-bg-raised); display: flex; flex-direction: column; gap: 7px; max-width: 940px;">
+      <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label); text-transform: uppercase; color: var(--lc-text-muted);">Check before you scope the schema change</span>
+      <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">When I read the room code for the exchange ruling, <span style="font-family: var(--lc-font-mono);">WorkroomSender</span> carried a <span style="font-family: var(--lc-font-mono);">missionId</span> — I cited it as what makes every room message exactly attributable. If a peer message already carries its sender's mission, the link is free and there is no schema change to weigh. Worth confirming before you price the option you were avoiding.</span>
+      <span style="font-size: var(--lc-text-description); color: var(--lc-text-muted); text-wrap: pretty;">If it genuinely is not there: ship <span style="font-family: var(--lc-font-mono);">Yurt sent</span> alone. One word, no schema, and it is the half that does the work — Colin's complaint was that he thought he was reading Yurt's reply. He was reading Yurt's message.</span>
+    </div>
+  </section>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1290,&quot;height&quot;:1500}}"></script>
+</body>
+</html>

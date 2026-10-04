@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lc-tokens.css">
+<style>
+  html, body { margin: 0; background: var(--lc-bg-app); }
+  * { box-sizing: border-box; }
+  a { color: var(--lc-lime); text-decoration: none; }
+  a:hover { color: var(--lc-lime-text); }
+  @keyframes lcPulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+</style>
+</helmet>
+<div style="min-height: 100vh; padding: 36px; display: flex; flex-direction: column; gap: 40px; font-family: var(--lc-font-ui); color: var(--lc-text-primary); font-size: var(--lc-text-body); line-height: var(--lc-leading-prose);">
+
+  <div style="display: flex; flex-direction: column; gap: 9px; max-width: 940px;">
+    <div style="font-size: var(--lc-text-screen-title); font-weight: 500; letter-spacing: -0.015em;">The room holds the argument</div>
+    <div style="font-size: var(--lc-text-description); color: var(--lc-text-muted); text-wrap: pretty;">On <span style="font-family: var(--lc-font-mono);">tokens.css</span>. Faces from <span style="font-family: var(--lc-font-mono);">shared/avatar.ts</span>. The stopped states are live.</div>
+    <div style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">You wrote: <em>“the answers are a grid of peers; the exchange is a sequence — those are different shapes and I do not think one contains the other naturally.”</em> That is exactly right, and it is the answer: <strong style="font-weight: 500;">neither contains the other, because the grid is wrong once an exchange exists.</strong> A grid asserts simultaneity. The moment message three is a reply to message two, that assertion is false.</div>
+    <div style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">So: one component, one prop, two correct results — the same shape as the plan ruling. <strong style="font-weight: 500;">Did this post produce an exchange?</strong> No → the grid you have, unchanged. Yes → the whole thing is a sequence, first answers included.</div>
+  </div>
+
+  <!-- ═══════════ NO EXCHANGE ═══════════ -->
+  <section style="width: 940px; display: flex; flex-direction: column; gap: 12px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label-wide); text-transform: uppercase; color: var(--lc-green-text);">Post with no exchange · unchanged</span>
+      <span style="font-size: var(--lc-text-description); color: var(--lc-text-muted);">Three independent answers. Nobody replied to anybody. The grid is telling the truth.</span>
+    </div>
+    <div style="background: var(--lc-bg-window); border: 1px solid var(--lc-border-card); border-radius: var(--lc-radius-card); padding: 20px;">
+      <div style="max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px;">
+        <div style="align-self: flex-end; max-width: 70%; padding: 9px 13px; border-radius: var(--lc-radius-card); background: var(--lc-bg-bubble-user); font-size: var(--lc-text-body);">What's the riskiest part of the billing migration?</div>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;">
+          <sc-for list="{{ gridCards }}" as="c" hint-placeholder-count="3">
+            <div style="padding: 12px; border: 1px solid var(--lc-border-card); border-radius: var(--lc-radius-card); background: var(--lc-bg-raised); display: flex; flex-direction: column; gap: 9px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="{{ c.chip }}"><span style="{{ c.box }}"><span style="{{ c.l1 }}"></span><span style="{{ c.l2 }}"></span><span style="{{ c.l3 }}"></span></span></span>
+                <span style="min-width: 0; flex: 1;">
+                  <span style="display: block; font-size: var(--lc-text-control); font-weight: 500; color: var(--lc-text-name);">{{ c.name }}</span>
+                  <span style="display: block; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ c.route }}</span>
+                </span>
+              </div>
+              <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">{{ c.body }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ EXCHANGE ═══════════ -->
+  <section style="width: 940px; display: flex; flex-direction: column; gap: 12px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label-wide); text-transform: uppercase; color: var(--lc-green-text);">Post that became an argument · the grid collapses</span>
+      <span style="font-size: var(--lc-text-description); color: var(--lc-text-muted);">Colin's real post. Every message in time order, first answers included.</span>
+    </div>
+
+    <div style="background: var(--lc-bg-window); border: 1px solid var(--lc-border-card); border-radius: var(--lc-radius-card); padding: 20px;">
+      <div style="max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px;">
+        <div style="align-self: flex-end; max-width: 70%; padding: 9px 13px; border-radius: var(--lc-radius-card); background: var(--lc-bg-bubble-user); font-size: var(--lc-text-body);">can you two argue? doing some testing</div>
+
+        <sc-for list="{{ turns }}" as="t" hint-placeholder-count="5">
+          <div style="{{ t.rowStyle }}">
+            <span style="{{ t.gutterStyle }}"><span style="{{ t.chip }}"><span style="{{ t.box }}"><span style="{{ t.l1 }}"></span><span style="{{ t.l2 }}"></span><span style="{{ t.l3 }}"></span></span></span><span style="{{ t.pipStyle }}"></span></span>
+            <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px;">
+              <span style="{{ t.headStyle }}">
+                <span style="font-size: var(--lc-text-control); font-weight: 500; color: var(--lc-text-name);">{{ t.name }}</span>
+                <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-text-muted);">{{ t.meta }}</span>
+              </span>
+              <span style="{{ t.bodyStyle }}">{{ t.body }}</span>
+            </div>
+          </div>
+        </sc-for>
+
+        <div style="{{ footStyle }}">
+          <span style="flex: 1; min-width: 0; text-wrap: pretty;">{{ footText }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+      <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label); text-transform: uppercase; color: var(--lc-text-muted);">Stopped because</span>
+      <sc-for list="{{ states }}" as="s" hint-placeholder-count="4">
+        <button type="button" onClick="{{ s.onClick }}" style="{{ s.style }}">{{ s.label }}</button>
+      </sc-for>
+    </div>
+    <div style="font-size: var(--lc-text-description); color: var(--lc-text-muted); text-wrap: pretty; max-width: 940px;">{{ stateNote }}</div>
+  </section>
+
+  <!-- ═══════════ THE ANSWERS ═══════════ -->
+  <section style="width: 940px; display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px;">
+      <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label-wide); text-transform: uppercase; color: var(--lc-text-muted);">Your four questions</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 14px;">
+
+      <div style="padding: 15px 17px; border-radius: var(--lc-radius-card); border: 1px solid var(--lc-green-border); background: var(--lc-bg-raised); display: flex; flex-direction: column; gap: 7px;">
+        <span style="font-size: var(--lc-text-control); font-weight: 500; color: var(--lc-text-name);">1 · Not under, not interleaved, not folded — the grid becomes the sequence.</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">All three of your options keep the answer grid and find somewhere to put the rest, which means the reader has to merge two shapes in their head to recover one conversation. <strong style="font-weight: 500;">A grid is a claim: these arrived in parallel and none is a reply to another.</strong> That claim is true for the independent-answers case and false the instant an argument starts — so the honest move is not to house the exchange, it is to stop making the claim.</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">And a fold is wrong for a second reason: a fold means “work, summarised”. This is not work, it is <em>what they said</em>. Said does not collapse — that is the register rule you already enforce.</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">Consecutive messages from one speaker group under a single face, which matters here more than in a normal thread: in a fits-and-starts argument Gem will often say two things while Wren is busy, and drawing that as two speakers is a lie about the rhythm.</span>
+      </div>
+
+      <div style="padding: 15px 17px; border-radius: var(--lc-radius-card); border: 1px solid var(--lc-green-border); background: var(--lc-bg-raised); display: flex; flex-direction: column; gap: 7px;">
+        <span style="font-size: var(--lc-text-control); font-weight: 500; color: var(--lc-text-name);">2 · No — and the worry dissolves rather than being solved.</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">You are right that a card showing a member's <em>first</em> answer above four better ones is showing the least interesting thing they said. But once the post is a sequence there is no first-answer card to fix: the first answer is simply the first item, and it earns its position by being first rather than by being framed.</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">A card is <em>Standing</em> in your register test, and a teammate talking is <em>Said</em>. The answer cards have always been slightly the wrong register; they got away with it while each post produced exactly one utterance per member, because a one-utterance sequence and a card look the same. The argument is what exposed it.</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">Keep the card for the no-exchange case anyway. A grid of three peers genuinely is a different object from a conversation, and it reads better as cards than as three lonely speakers.</span>
+      </div>
+
+      <div style="padding: 15px 17px; border-radius: var(--lc-radius-card); border: 1px solid var(--lc-green-border); background: var(--lc-bg-raised); display: flex; flex-direction: column; gap: 7px;">
+        <span style="font-size: var(--lc-text-control); font-weight: 500; color: var(--lc-text-name);">3 · Two voices, and they are not in competition — one is present tense, one is past.</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">Follow <span style="font-family: var(--lc-font-mono);">ROOM-AT-SCALE</span> exactly for <strong style="font-weight: 500;">waiting for a slot</strong>: it is roster state, it resolves itself, and it belongs in the composer note — <span style="font-family: var(--lc-font-mono); color: var(--lc-text-primary);">Wren is finishing another mission. Their reply is queued.</span> Not amber: nothing is wrong and nobody needs to do anything.</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">But an exchange that <em>ended</em> is a fact about that post, not about the room now — and if you put it in the composer it will be wrong the moment someone scrolls to an older post that stopped for a different reason. So it goes at the foot of its own exchange, in the standing register, once. That is not a second status voice; it is the same split the app already makes between a live mission header and the receipt at the bottom of the thread.</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;"><strong style="font-weight: 500;">Ended without a reply is the exception and it is per-message, not per-exchange.</strong> It belongs in the sequence, in that teammate's slot, attributed to them. In a sequence, <em>absence is information</em> — if you drop the silent turn, the reader sees the argument stop and blames the budget. Draw the gap or they will infer the wrong cause.</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">None of the three is amber. Out of budget is the configured number doing exactly what it was set to do; a rule working as intended is not an alert. It gets a muted rule and a pointer at the composer, the same pattern as the Plan-mode note.</span>
+      </div>
+
+      <div style="padding: 15px 17px; border-radius: var(--lc-radius-card); border: 1px solid var(--lc-green-border); background: var(--lc-bg-raised); display: flex; flex-direction: column; gap: 7px;">
+        <span style="font-size: var(--lc-text-control); font-weight: 500; color: var(--lc-text-name);">4 · Yes — but as the foot of the exchange, not a strip, and with the names removed.</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">In a mission thread the strip is a header because the whole thread <em>is</em> one participant's slice of the exchange. In a room an exchange belongs to a post, there can be several posts, and the facts it carries are about something that has already happened — so it sits under the thing it describes.</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">Drop <span style="font-family: var(--lc-font-mono);">Gem · Wren</span> from it. In the room the participants are the speakers, on screen, with their faces beside every message — naming them again in a summary line underneath is the app repeating itself, which is the note I keep writing. Keep the budget and the cost, which nothing else says.</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">Merge it with the ending: the count and the reason are adjacent facts and two lines saying adjacent facts in the same place is one line. While the argument is live the same line reads <span style="font-family: var(--lc-font-mono);">4 of 6 automatic replies</span> with no reason attached, which doubles as the runway indicator.</span>
+      </div>
+    </div>
+  </section>
+
+  <div style="width: 940px; padding: 16px 18px; border-radius: var(--lc-radius-card); border: 1px solid var(--lc-border-card); background: var(--lc-bg-raised); display: flex; flex-direction: column; gap: 9px;">
+    <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label-wide); text-transform: uppercase; color: var(--lc-text-muted);">Two things you did not ask, and one is a shipping risk</span>
+    <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;"><strong style="font-weight: 500;">A late message under an older post will look like a bug.</strong> If Colin posts twice while an argument from the first post is still running, a reply lands under the older post — above a newer one — and the room appears to have inserted a message into the past. It has not; the record is right. But it needs the disambiguator: a message that arrives after a later post exists shows its time, and no other message needs to. That is the one case where a timestamp is load-bearing rather than decoration.</span>
+    <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;"><strong style="font-weight: 500;">Worth saying plainly: this makes the room a group chat, and that is correct.</strong> The grid was the anomaly — justified for parallel answers and nothing else. Everything you already have supports it: <span style="font-family: var(--lc-font-mono);">exchangeOf</span> gives you the sequence, <span style="font-family: var(--lc-font-mono);">WorkroomSender.missionId</span> attributes every message exactly, and <span style="font-family: var(--lc-font-mono);">RoomPost.missions</span> assigns each one to its post. Nothing here is invented; the data has been sitting in the wrong shape.</span>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1020,&quot;height&quot;:1400}}">
+/* Faces from apps/desktop/src/shared/avatar.ts — real cell tables and seed. */
+const HEADWEAR = [
+  [],
+  [[2, 2], [4, 2], [6, 2], [8, 2], [10, 2], [12, 2], [0, 4], [0, 6], [14, 4], [14, 6]],
+  [[2, 2], [4, 2], [6, 2], [8, 2], [10, 2], [12, 2]],
+  [[4, 2], [6, 2], [8, 2], [10, 2], [0, 4], [0, 6], [14, 4], [14, 6]],
+  [[4, 0], [6, 0], [8, 0], [10, 0], [2, 2], [4, 2], [6, 2], [8, 2], [10, 2], [12, 2]],
+  [[6, 0], [6, 2], [4, 4], [6, 4], [8, 4], [10, 4]]
+];
+const ACCESSORY = [[], [[2, 6], [12, 6]], [[2, 4], [12, 4]]];
+const MOUTH = [
+  [[6, 10], [8, 10]],
+  [[4, 10], [6, 10], [8, 10], [10, 10]],
+  [[6, 10], [8, 10], [6, 12], [8, 12]],
+  [[6, 10], [8, 12]]
+];
+const EYES = [[4, 6], [10, 6]];
+const HUES = {
+  wren: ['--lc-hue-lime', '--lc-hue-lime-face'],
+  gem: ['--lc-hue-violet', '--lc-hue-violet-face'],
+  atlas: ['--lc-hue-blue', '--lc-hue-blue-face']
+};
+
+function seedAvatar(id) {
+  let hash = 2166136261;
+  for (const ch of id) { hash ^= ch.charCodeAt(0); hash = Math.imul(hash, 16777619); }
+  hash ^= hash >>> 16; hash = Math.imul(hash, 0x85ebca6b); hash ^= hash >>> 13;
+  const part = (shift, mod) => ((hash >>> shift) & 0xff) % mod;
+  return { headwear: part(4, 6), accessory: part(12, 3), mouth: part(20, 4) };
+}
+const facePixelSize = (size) => Math.max(2, Math.round((size * 0.72) / 8));
+const chipRadius = (size) => Math.max(4, Math.round(size / 6));
+
+function layer(cells, pixel, color) {
+  const base = cells[0];
+  if (base === undefined) return 'display: none;';
+  const [bx, by] = base;
+  const shadow = cells.slice(1).map(([x, y]) => `${((x - bx) / 2) * pixel}px ${((y - by) / 2) * pixel}px 0 ${color}`).join(', ');
+  return `position: absolute; left: ${(bx / 2) * pixel}px; top: ${(by / 2) * pixel}px; width: ${pixel}px; height: ${pixel}px; background: ${color}; display: block;`
+    + (shadow === '' ? '' : ` box-shadow: ${shadow};`);
+}
+
+function faceStyles(id, size) {
+  const spec = seedAvatar(id);
+  const pixel = facePixelSize(size);
+  const grid = pixel * 8;
+  const [chipVar, faceVar] = HUES[id] ?? HUES.wren;
+  const color = `var(${faceVar})`;
+  return {
+    chip: `position: relative; flex: none; width: ${size}px; height: ${size}px; border-radius: ${chipRadius(size)}px; background: var(${chipVar}); border: 1px solid color-mix(in srgb, var(${chipVar}) 55%, transparent); display: block; overflow: hidden;`,
+    box: `position: absolute; left: ${Math.round((size - grid) / 2) - 1}px; top: ${Math.round((size - grid) / 2) - 1}px; width: ${grid}px; height: ${grid}px; display: block;`,
+    l1: layer([...HEADWEAR[spec.headwear], ...ACCESSORY[spec.accessory]], pixel, color),
+    l2: layer(EYES, pixel, color),
+    l3: layer(MOUTH[spec.mouth], pixel, color)
+  };
+}
+
+const NAMES = { wren: 'Wren', gem: 'Gem', atlas: 'Atlas' };
+const ROUTES = { wren: 'Codex CLI / gpt-5.6', gem: 'Claude Code / sonnet', atlas: 'Copilot CLI / gpt-5' };
+
+/* Colin's real exchange, abbreviated. Each entry is one utterance. */
+const TURNS = [
+  { who: 'wren', body: 'Tabs. A tab is one character that every reader configures to their own width — the file stores intent, the editor stores taste. Spaces hard-code one person\u2019s taste into everyone else\u2019s screen.' },
+  { who: 'gem', body: 'That argument works right up until a line wraps. Alignment past the indent — a continuation inside a call, a comment column — breaks the moment someone\u2019s tab width differs. Spaces are the only thing that survives being read by a stranger.' },
+  { who: 'wren', body: 'Then do not align past the indent. That is a style problem you have chosen to have. Every formatter worth using breaks those lines instead of aligning them, which means your one advantage only applies to code a formatter would have rewritten anyway.' },
+  { who: 'gem', body: 'Every formatter worth using also emits spaces by default, which tells you which way the argument went. And accessibility cuts the other way from how you are using it: a reader who needs a wide indent can set one — in an editor. The file does not have to be the setting.' },
+  /*
+   * Gem speaks twice because Wren was busy. This is the fits-and-starts case
+   * the grouping rule exists for, and the drawing has to contain it or the
+   * rule is argued for and never shown.
+   */
+  { who: 'gem', body: 'One more, since you have not come back: the formatter point is the whole thing. Whatever either of us prefers, the file is written by a tool neither of us configured, so this argument is about what we ask that tool for — not about what the bytes mean.' }
+];
+
+const STATES = {
+  budget: {
+    label: 'out of automatic replies',
+    foot: '6 of 6 automatic replies · 81k in · 2.1k out — post again to continue.',
+    tone: '--lc-border-button',
+    extra: undefined,
+    note: 'Terminal, and it belongs to this post rather than to the room, so it sits at the foot of its own exchange. Not amber: the budget is Colin\u2019s number doing exactly what it was set to do, and a rule working as intended is not an alert. It names the cause and points at the composer, the same pattern as the Plan-mode note.'
+  },
+  waiting: {
+    label: 'waiting for a slot',
+    foot: '4 of 6 automatic replies · 61k in · 1.4k out',
+    tone: '--lc-border-button',
+    extra: { who: 'wren', kind: 'waiting', body: 'Wren is finishing another mission. Their reply is queued.' },
+    note: 'The only one of the three that resolves itself, so it stays roster state and the composer note carries it — per ROOM-AT-SCALE. The in-sequence line here is the placeholder showing whose turn is pending; it disappears when the reply lands, and the foot keeps counting. Note Gem speaking twice above it: that is the grouping rule firing, one face for one speaker.'
+  },
+  silent: {
+    label: 'ended without a reply',
+    foot: '5 of 6 automatic replies · 68k in · 1.6k out',
+    tone: '--lc-border-button',
+    extra: { who: 'wren', kind: 'silent', body: 'Wren\u2019s turn ended without a reply — the runtime finished and wrote nothing back. Nothing was changed.' },
+    note: 'Per-message, not per-exchange, and it must be drawn. In a sequence absence is information: drop the silent turn and the reader sees the argument stop and blames the budget. Informational in tone — nothing failed, and sending again usually works.'
+  },
+  live: {
+    label: 'still going',
+    foot: '4 of 6 automatic replies · 61k in · 1.4k out',
+    tone: '--lc-lime-border',
+    extra: { who: 'wren', kind: 'live', body: 'Wren is writing…' },
+    note: 'While it runs, the foot is just the runway — count and cost, no reason attached, because nothing has stopped. The live speaker appears in place with a pulsing pip rather than as a separate status object.'
+  }
+};
+
+class Component extends DCLogic {
+  state = { which: 'budget' };
+
+  renderVals() {
+    const s = STATES[this.state.which];
+
+    const cards = ['wren', 'gem', 'atlas'].map((id) => {
+      const f = faceStyles(id, 26);
+      return {
+        ...f,
+        name: NAMES[id],
+        route: ROUTES[id],
+        body: {
+          wren: 'The backfill. Everything else is reversible on its own; once the constraint goes on, a bad backfill is a restore.',
+          gem: 'The dispute events — their shape changed in 2026-04 and the fixtures we have predate it, so parity tests pass on stale data.',
+          atlas: 'Nothing technical. The vendor contract renews mid-migration, and the old adapter is what the SLA is written against.'
+        }[id]
+      };
+    });
+
+    // Grouping is computed for every item, the live/waiting one included --
+    // hardcoding `first: true` on the extra produced two stacked faces for one
+    // speaker, which is the exact thing the caption calls a lie about rhythm.
+    const items = TURNS.map((t) => ({ ...t, kind: 'said' }));
+    if (s.extra !== undefined) items.push(s.extra);
+    const seq = items.map((t, i) => ({ ...t, first: i === 0 || items[i - 1].who !== t.who }));
+
+    const turns = seq.map((t) => {
+      const f = faceStyles(t.who, 26);
+      const quiet = t.kind === 'silent' || t.kind === 'waiting';
+      return {
+        rowStyle: `display: flex; gap: 12px; ${t.first ? '' : 'margin-top: -8px;'}`,
+        // Grouped messages keep the gutter and drop the face, so one speaker
+        // saying three things reads as one person, not three.
+        gutterStyle: `position: relative; width: 26px; flex: none; ${t.first ? '' : 'visibility: hidden;'}`,
+        // The live speaker is marked in place, with the same pulsing lime pip
+        // the sidebar uses for a working teammate -- not a separate object.
+        pipStyle: t.kind === 'live'
+          ? 'position: absolute; right: -3px; bottom: -3px; width: 9px; height: 9px; border-radius: 50%; background: var(--lc-lime); border: 2px solid var(--lc-bg-window); display: block; animation: lcPulse 1.6s ease-in-out infinite;'
+          : 'display: none;',
+        chip: f.chip, box: f.box, l1: f.l1, l2: f.l2, l3: f.l3,
+        name: NAMES[t.who],
+        meta: t.kind === 'live' ? 'writing now' : '',
+        headStyle: `display: ${t.first && !quiet ? 'flex' : 'none'}; align-items: baseline; gap: 8px;`,
+        bodyStyle: quiet
+          ? 'padding: 2px 0 2px 10px; border-left: 2px solid var(--lc-border-button); font-size: var(--lc-text-description); color: var(--lc-text-muted); text-wrap: pretty;'
+          : `font-size: var(--lc-text-body); color: var(--lc-text-secondary); line-height: 1.7; max-width: 90ch; text-wrap: pretty;${t.kind === 'live' ? ' opacity: .7;' : ''}`,
+        body: t.body
+      };
+    });
+
+    return {
+      gridCards: cards,
+      turns,
+      footStyle: `display: flex; align-items: center; gap: 9px; margin-left: 38px; padding: 3px 0 3px 10px; border-left: 2px solid var(${s.tone}); font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-caption); color: var(--lc-text-muted);`,
+      footText: s.foot,
+      states: Object.entries(STATES).map(([key, v]) => ({
+        label: v.label,
+        style: `height: 26px; padding: 0 10px; border-radius: var(--lc-radius-control); font-family: var(--lc-font-ui); font-size: var(--lc-text-description); cursor: pointer; ${key === this.state.which
+          ? 'border: 1px solid var(--lc-lime-border); background: var(--lc-lime-tint); color: var(--lc-lime-text);'
+          : 'border: 1px solid var(--lc-border-control); background: var(--lc-bg-control); color: var(--lc-text-control-fg);'}`,
+        onClick: () => this.setState({ which: key })
+      })),
+      stateNote: s.note
+    };
+  }
+}
+</script>
+</body>
+</html>

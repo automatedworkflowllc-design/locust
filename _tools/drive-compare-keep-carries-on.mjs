@@ -1,0 +1,98 @@
+// Compare on a free teammate stays free, and the kept answer is what carries on (0.515).
+//
+//   node _tools/drive-compare-keep-carries-on.mjs [--packaged <exe>] [--tag <name>]
+//
+// A pass on 0.512, office work on a free teammate: Compare put model B on a
+// paid model nobody chose; keeping B left the chat box on the teammate's own
+// model, and the next message went there as "a fresh session". Wren is on a
+// free model. Compare starts on two free ones; B is kept; the chat box must
+// say B's model; the next message must carry on with no fresh-session note.
+// Free models only.
+
+import { join } from 'node:path'
+import { openTeammateScript, recordRoot, say, scratchRepository, sendAndWaitScript, startDrive } from './drive-lib.mjs'
+
+const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
+const packaged = arg('--packaged')
+const tag = arg('--tag') ?? 'local'
+// Wren on the catalogue's first free model, so Compare's B is another free one, and B is kept:
+// the kept model is then never Wren's own. (Ling was down on 2026-10-01; B answers either way.)
+const WREN_MODEL = process.env.LOCUST_FREE_MODEL ?? 'opencode/ling-3.0-flash-fin-free'
+const workspace = await scratchRepository('locust-drive-compare-keep-ws-')
+const drive = await startDrive({
+  ...(packaged === undefined ? {} : { packaged }),
+  name: `compare-keep-carries-on-${tag}`,
+  port: 9823,
+  workspace,
+  outPath: join(recordRoot('compare-keep-carries-on-2026-10-01'), tag),
+  seed: {
+    schemaVersion: 1,
+    teammates: [{ teammateId: 'tm_wren', name: 'Wren', hue: 'violet', role: 'Research & Briefs', createdAt: '2026-09-28T01:00:00.000Z', route: { runtime: 'opencode', model: WREN_MODEL, mode: 'ask' } }],
+    missionOwners: {},
+    settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off' }
+  }
+})
+let failures = 0
+const check = (what, ok, detail) => {
+  if (!ok) failures += 1
+  say(`  [${ok ? 'PASS' : 'FAIL'}] ${what}${detail === undefined ? '' : ` -- ${String(detail).slice(0, 260)}`}`)
+}
+// In Compare each model has its own dropdown; one model, one. Read as 'A vs B' either way.
+const chip = `[...document.querySelectorAll('.lc-control')].filter((b) => b.getAttribute('aria-haspopup') === 'listbox').map((b) => b.innerText.replace(/\\s+/g, ' ').trim()).join(' vs ')`
+
+try {
+  await drive.capture('launch', () => drive.ready())
+  await drive.evaluate(openTeammateScript('Wren'))
+  const picked = String(await drive.capture('Compare picked on a free teammate', () => drive.evaluate(`(async () => {
+    document.querySelector('.lc-control--chatmode')?.click()
+    await new Promise((r) => setTimeout(r, 400))
+    ;[...document.querySelectorAll('.lc-menu [role="menuitemradio"]')].find((el) => /^Compare/.test(el.innerText.trim()))?.click()
+    await new Promise((r) => setTimeout(r, 1500))
+    document.querySelector('.lc-picker') && document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await new Promise((r) => setTimeout(r, 400))
+    return ${chip}
+  })()`)))
+  const [a, b] = picked.split(' vs ')
+  check('Compare starts on two models', a !== undefined && b !== undefined, picked)
+  check('both free, on a free teammate: no paid model nobody chose', /free/i.test(picked) && !/GPT|Claude|Opus|Sonnet|Fable|Grok|Codex/i.test(picked), picked)
+  await drive.capture('asked both', () => drive.evaluate(sendAndWaitScript('Reply with one short sentence about the sea.')))
+  const kept = String(await drive.capture('kept B', () => drive.evaluate(`(async () => {
+    // Both columns settled, and B's Keep pressable: a column still working cannot be kept.
+    const settled = () => {
+      const heads = [...document.querySelectorAll('.lc-compare__head:not(.is-rail)')].map((el) => el.innerText)
+      const keep = [...document.querySelectorAll('.lc-compare__foot button')].filter((b) => b.innerText.trim() === 'Keep this one').at(-1)
+      return heads.length >= 2 && !heads.some((text) => /working|starting/i.test(text)) && keep !== undefined && !keep.disabled
+    }
+    for (let i = 0; i < 480 && !settled(); i += 1) await new Promise((r) => setTimeout(r, 500))
+    const name = [...document.querySelectorAll('.lc-compare__head:not(.is-rail) .lc-compare__name')].map((el) => el.innerText.trim())[1] ?? ''
+    ;[...document.querySelectorAll('.lc-compare__foot button')].filter((b) => b.innerText.trim() === 'Keep this one').at(-1)?.click()
+    for (let i = 0; i < 40 && document.querySelector('.lc-compare'); i += 1) await new Promise((r) => setTimeout(r, 250))
+    await new Promise((r) => setTimeout(r, 1200))
+    return JSON.stringify({ name, chip: ${chip}, gone: document.querySelector('.lc-compare') === null })
+  })()`)))
+  const k = JSON.parse(kept)
+  const word = (k.name.split(/\s+/)[0] ?? '').toLowerCase()
+  check('keeping B leaves an ordinary conversation', k.gone === true, kept)
+  check('and the chat box is on B\'s model, the one kept', word.length > 0 && k.chip.toLowerCase().includes(word), kept)
+  await drive.capture('a follow-up after keeping', () => drive.evaluate(sendAndWaitScript('Reply with just the word NEXT.')))
+  // The reply is what comes AFTER the words asked: they say NEXT too.
+  const after = JSON.parse(String(await drive.evaluate(`(async () => {
+    const asked = 'Reply with just the word NEXT.'
+    const replied = () => {
+      const all = (document.querySelector('.lc-thread')?.innerText ?? '').replace(/\\s+/g, ' ')
+      return all.slice(all.lastIndexOf(asked) + asked.length)
+    }
+    for (let i = 0; i < 240 && !/NEXT/.test(replied()); i += 1) await new Promise((r) => setTimeout(r, 500))
+    return JSON.stringify({
+      notes: [...document.querySelectorAll('.lc-thread .lc-thread__note')].map((el) => el.innerText.replace(/\\s+/g, ' ').trim()),
+      tail: replied().slice(0, 160)
+    })
+  })()`)))
+  check('the next message carries the kept answer on, with no "fresh session"', /NEXT/.test(after.tail) && !after.notes.some((note) => /fresh session/i.test(note)), JSON.stringify(after))
+} catch (error) {
+  failures += 1
+  say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
+} finally {
+  await drive.finish({ intro: `Build: ${packaged ?? 'out/'}. Wren on a free model.`, extra: `Checks failed: ${String(failures)}` })
+}
+if (failures > 0) process.exitCode = 1

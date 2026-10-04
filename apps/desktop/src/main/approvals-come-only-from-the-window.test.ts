@@ -1,0 +1,73 @@
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
+import { describe, expect, it } from 'vitest'
+
+/**
+ * A2.16: APPROVALS NEVER RIDE ON A TEAMMATE'S MESSAGE.
+ *
+ * CHECKED 2026-09-24: an approval -- a Codex action, a Claude Code connector
+ * permission, an Antigravity question -- is answered in exactly one place,
+ * the MISSION_APPROVAL_DECIDE handler, which takes only the app's own window
+ * (`fromOwnWindow`): a person's click. A run the relay started raises its
+ * cards like any other and nothing auto-answers them. Nothing a teammate
+ * writes -- a share, a relayed brief, a returned answer -- reaches `decide`.
+ *
+ * This keeps it that way: every call of `.decide(` in the main process is in
+ * the modules that hold approvals, or in that one handler. A new caller -- a
+ * relay path, a block parser -- fails here and has to say why it may.
+ */
+const MAIN = new URL('.', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')
+const HOLDERS = new Set(['approval-channel.ts', 'permission-host.ts', 'antigravity-mission.ts', 'codex-mission.ts'])
+
+describe('who may answer an approval', () => {
+  it('is only the approval holders and the window handler', () => {
+    const callers = readdirSync(MAIN)
+      .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts'))
+      .filter((name) => /\.decide\(/.test(readFileSync(join(MAIN, name), 'utf8')))
+    expect(callers.filter((name) => !HOLDERS.has(name) && name !== 'index.ts')).toEqual([])
+    // In index.ts, one funnel -- `answerApproval` -- and nothing else calls decide.
+    const index = readFileSync(join(MAIN, 'index.ts'), 'utf8').split('\n')
+    const decides = index.map((line, at) => ({ line, at })).filter(({ line }) => /\.decide\(/.test(line))
+    expect(decides).toHaveLength(1)
+    const funnel = index.findIndex((line) => line.includes('const answerApproval = async'))
+    expect(funnel).toBeGreaterThan(-1)
+    expect(decides[0]!.at - funnel).toBeLessThan(3)
+    /*
+     * 0.521: the funnel is called from exactly three places, each a decision
+     * of the person's -- their click (the window handler), their click on a
+     * card's "don't ask again" (the from-card handler, also window-only), and
+     * a rule they saved (answerByRule). A fourth caller fails here.
+     */
+    const calls = index.map((line, at) => ({ line, at })).filter(({ line }) => /answerApproval\(/.test(line))
+    expect(calls).toHaveLength(3)
+    const enclosing = (at: number): string => {
+      for (let line = at; line >= 0; line -= 1) {
+        const opened = /ipcMain\.handle\((\w+)|const (answerByRule) = /.exec(index[line] ?? '')
+        if (opened !== null) return opened[1] ?? opened[2] ?? ''
+      }
+      return ''
+    }
+    expect(calls.map(({ at }) => enclosing(at)).sort()).toEqual(['APPROVAL_RULE_FROM_CARD_CHANNEL', 'MISSION_APPROVAL_DECIDE_CHANNEL', 'answerByRule'])
+    for (const channel of ['MISSION_APPROVAL_DECIDE_CHANNEL', 'APPROVAL_RULE_FROM_CARD_CHANNEL']) {
+      const handler = index.findIndex((line) => line.includes(`ipcMain.handle(${channel}`))
+      expect(index[handler + 1], channel).toContain('fromOwnWindow(event)')
+    }
+    // And a rule answers only from the person's saved rules, through the evaluator.
+    const byRule = index.findIndex((line) => line.includes('const answerByRule = '))
+    expect(index.slice(byRule, byRule + 8).join('\n')).toContain('approvalRules.list()')
+    expect(index.slice(byRule, byRule + 8).join('\n')).toContain('decideByRules(')
+  })
+})
+
+/*
+ * M31: the window drops an approval card when its run ends. Pinned here,
+ * beside the rule for who may answer one, because the card and the answer are
+ * one contract: a card no run can take must not be offered.
+ */
+describe('an approval card in the window', () => {
+  it('is dropped when its run ends: App applies approvalsOfLiveRuns on every change of runs', () => {
+    const app = readFileSync(join(MAIN, '..', 'renderer', 'src', 'App.tsx'), 'utf8')
+    expect(app).toMatch(/useEffect\(\(\) => \{\s*setApprovals\(\(current\) => approvalsOfLiveRuns\(current, runs\)\)\s*\}, \[runs\]\)/)
+  })
+})

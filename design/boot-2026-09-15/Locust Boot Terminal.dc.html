@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lc-tokens.css">
+<style>
+  html, body { margin: 0; background: var(--lc-bg-app); }
+  * { box-sizing: border-box; }
+  a { color: var(--lc-lime); text-decoration: none; }
+  a:hover { color: var(--lc-lime-text); }
+  @keyframes lcFlicker { 0%,100% { opacity: 1; } 48% { opacity: .94; } 49% { opacity: 1; } 73% { opacity: .975; } 74% { opacity: 1; } }
+  @keyframes lcCaret { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
+  @keyframes lcSweep { 0% { transform: translateY(-12%); } 100% { transform: translateY(112%); } }
+  @keyframes lcIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes lcPulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+  #lcterm::-webkit-scrollbar { width: 0; height: 0; }
+</style>
+</helmet>
+<div style="min-height: 100vh; padding: 32px; display: flex; flex-direction: column; gap: 24px; font-family: var(--lc-font-ui); color: var(--lc-text-primary); font-size: var(--lc-text-body); line-height: var(--lc-leading-prose);">
+
+  <div style="display: flex; flex-direction: column; gap: 9px; max-width: 1000px;">
+    <div style="font-size: var(--lc-text-screen-title); font-weight: 500; letter-spacing: -0.015em;">The boot screen — shipping spec</div>
+    <div style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">Decided: <strong style="font-weight: 500;">monitor bezel, full tube, every launch.</strong> Defaults below are set to that — the other settings are kept so the build can expose Tube as a preference. Implementation in <span style="font-family: var(--lc-font-mono);">docs/BOOT-SCREEN-2026-09-15.md</span>.</div>
+    <div style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">You were right that the end state was the weak part, and the fix turned out not to be a cross-fade into a second component. <strong style="font-weight: 500;">The five runtime rows are the same five rows throughout</strong> — they never move. What happens at the end is that everything which was only ever <em>process</em> goes away: the preamble collapses, the <span style="font-family: var(--lc-font-mono);">$</span> and the <span style="font-family: var(--lc-font-mono);">--version</span> fade off each line, the binary name becomes the product name, and leader dots draw across to the result. Nothing is replaced, so nothing has to be re-found.</div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 9px;">
+    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+      <span style="width: 68px; flex: none; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label); text-transform: uppercase; color: var(--lc-text-muted);">Bezel</span>
+      <sc-for list="{{ bezels }}" as="b" hint-placeholder-count="3">
+        <button type="button" onClick="{{ b.onClick }}" style="{{ b.style }}">{{ b.label }}</button>
+      </sc-for>
+      <span style="width: 16px;"></span>
+      <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label); text-transform: uppercase; color: var(--lc-text-muted);">Tube</span>
+      <sc-for list="{{ levels }}" as="t" hint-placeholder-count="3">
+        <button type="button" onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button>
+      </sc-for>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+      <span style="width: 68px; flex: none; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label); text-transform: uppercase; color: var(--lc-text-muted);">Launch</span>
+      <sc-for list="{{ launches }}" as="l" hint-placeholder-count="2">
+        <button type="button" onClick="{{ l.onClick }}" style="{{ l.style }}">{{ l.label }}</button>
+      </sc-for>
+      <span style="width: 16px;"></span>
+      <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label); text-transform: uppercase; color: var(--lc-text-muted);">Step to</span>
+      <sc-for list="{{ scrub }}" as="s" hint-placeholder-count="3">
+        <button type="button" onClick="{{ s.onClick }}" style="{{ s.style }}">{{ s.label }}</button>
+      </sc-for>
+      <button type="button" onClick="{{ replay }}" style="height: 28px; padding: 0 12px; margin-left: 8px; border-radius: var(--lc-radius-control); border: 1px solid var(--lc-lime-border); background: var(--lc-lime-tint); color: var(--lc-lime-text); font-family: var(--lc-font-ui); font-size: var(--lc-text-description); cursor: pointer;">Replay</button>
+      <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-text-muted);">{{ phaseNote }}</span>
+    </div>
+  </div>
+
+  <!-- ═══════════ THE WINDOW ═══════════ -->
+  <div style="width: 1477px; height: 900px; background: var(--lc-bg-window); border: 1px solid var(--lc-border-strong); border-radius: var(--lc-radius-card); box-shadow: var(--lc-shadow-window); overflow: hidden; display: flex; flex-direction: column;">
+
+    <div style="height: 34px; flex: none; display: flex; align-items: center; padding: 0 12px; background: var(--lc-bg-chrome); border-bottom: 1px solid var(--lc-border-hairline);">
+      <span style="flex: 1;"></span>
+      <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-caption); color: var(--lc-text-muted);">.claude</span>
+      <span style="flex: 1; display: flex; justify-content: flex-end; gap: 10px; color: var(--lc-text-muted);">
+        <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14"></path></svg>
+        <svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16"></rect></svg>
+        <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 6l12 12M18 6 6 18"></path></svg>
+      </span>
+    </div>
+
+    <div style="flex: 1; min-height: 0; display: flex;">
+
+      <nav aria-label="Workspace" style="width: var(--lc-sidebar-width); flex: none; background: var(--lc-bg-sidebar); border-right: 1px solid var(--lc-border-hairline); display: flex; flex-direction: column; min-height: 0;">
+        <div style="padding: 14px 16px 10px; display: flex; align-items: center; gap: 10px;">
+          <img src="brand/locust-mark.svg" alt="" style="width: 26px; height: auto; filter: brightness(0) invert(1); opacity: .92;">
+          <img src="brand/locust-wordmark.svg" alt="Locust" style="width: 92px; height: auto; filter: brightness(0) invert(1); opacity: .92;">
+          <span style="margin-left: auto; width: 24px; height: 24px; display: grid; place-items: center; border: 1px solid var(--lc-border-control); border-radius: var(--lc-radius-control); color: var(--lc-text-control-fg); font-size: 13px;">+</span>
+        </div>
+        <div style="padding: 0 12px 10px;">
+          <div style="height: 32px; display: flex; align-items: center; gap: 8px; padding: 0 10px; border: 1px solid var(--lc-border-control); border-radius: var(--lc-radius-button); color: var(--lc-text-muted); font-size: var(--lc-text-description);">
+            <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg>
+            Search missions
+          </div>
+        </div>
+        <div style="flex: 1; min-height: 0; overflow: hidden; padding: 0 8px; display: flex; flex-direction: column; gap: 2px;">
+          <sc-for list="{{ sidebar }}" as="s" hint-placeholder-count="6">
+            <div style="{{ s.style }}">{{ s.text }}<span style="{{ s.countStyle }}">{{ s.count }}</span></div>
+          </sc-for>
+        </div>
+        <div style="flex: none; border-top: 1px solid var(--lc-border-hairline); padding: 8px 14px; display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; gap: 14px; font-size: var(--lc-text-description); color: var(--lc-text-muted);"><span>Missions</span><span>Team</span><span>Settings</span></div>
+          <div style="display: flex; align-items: center; gap: 7px; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-caption);">
+            <span style="{{ footDotStyle }}"></span><span style="{{ footTextStyle }}">{{ footCount }}</span>
+          </div>
+        </div>
+      </nav>
+
+      <main style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+        <div style="flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 28px;">
+
+          <div style="{{ monitorStyle }}">
+            <div style="{{ screenStyle }}">
+              <span style="{{ scanStyle }}"></span>
+              <span style="{{ sweepStyle }}"></span>
+              <span style="{{ vignetteStyle }}"></span>
+              <span style="{{ glareStyle }}"></span>
+
+              <div style="position: relative; z-index: 2; height: 100%; display: flex; flex-direction: column;">
+                <div style="flex: none; display: flex; justify-content: center; padding: 26px 24px 20px;">
+                  <div style="{{ lockupBoxStyle }}">
+                    <img src="brand/locust-mark.svg" alt="" style="{{ markStyle }}">
+                    <img src="brand/locust-wordmark.svg" alt="Locust" style="{{ wordStyle }}">
+                  </div>
+                </div>
+                <span style="{{ dividerStyle }}"></span>
+
+                <div id="lcterm" ref="{{ termRef }}" style="{{ termStyle }}">
+                  <sc-for list="{{ preamble }}" as="p" hint-placeholder-count="4">
+                    <div style="{{ p.rowStyle }}"><span style="{{ p.keyStyle }}">{{ p.key }}</span><span style="{{ p.valStyle }}">{{ p.val }}</span><span style="{{ p.tagStyle }}">{{ p.tag }}</span></div>
+                  </sc-for>
+
+                  <sc-for list="{{ runtimes }}" as="r" hint-placeholder-count="5">
+                    <div style="{{ r.rowStyle }}">
+                      <span style="{{ r.dotStyle }}"></span>
+                      <span style="{{ r.promptStyle }}">$</span>
+                      <span style="{{ r.nameWrapStyle }}">
+                        <span style="{{ r.binStyle }}">{{ r.bin }}</span>
+                        <span style="{{ r.productStyle }}">{{ r.product }}</span>
+                      </span>
+                      <span style="{{ r.argStyle }}">--version</span>
+                      <span style="{{ r.leaderStyle }}">{{ r.leader }}</span>
+                      <span style="{{ r.waitStyle }}"></span>
+                      <span style="{{ r.elapsedStyle }}">{{ r.elapsed }}</span>
+                      <span style="{{ r.resultStyle }}">{{ r.result }}</span>
+                    </div>
+                  </sc-for>
+
+                  <div style="{{ caretRowStyle }}"><span style="{{ caretPromptStyle }}">{{ progress }}</span><span style="{{ caretStyle }}"></span></div>
+                  <div style="{{ summaryStyle }}">{{ summary }}</div>
+                </div>
+              </div>
+            </div>
+            <span style="{{ ledStyle }}"></span>
+            <span style="{{ standNeckStyle }}"></span>
+            <span style="{{ standFootStyle }}"></span>
+          </div>
+        </div>
+
+        <div style="flex: none; padding: 0 20px 18px;">
+          <div style="max-width: var(--lc-thread-max-width); margin: 0 auto;">
+            <div style="border: 1px solid var(--lc-border-control); border-radius: var(--lc-radius-card); background: var(--lc-bg-field); padding: 13px 14px 10px;">
+              <div style="font-size: var(--lc-text-body); color: var(--lc-text-muted);">{{ placeholder }}</div>
+              <div style="display: flex; align-items: center; gap: 6px; margin-top: 10px;">
+                <span style="height: 26px; padding: 0 9px; display: inline-flex; align-items: center; border: 1px solid var(--lc-border-control); border-radius: var(--lc-radius-control); background: var(--lc-bg-control); font-size: var(--lc-text-description); color: var(--lc-text-control-fg);">Accept edits</span>
+                <span style="height: 26px; padding: 0 9px; display: inline-flex; align-items: center; border: 1px solid var(--lc-border-control); border-radius: var(--lc-radius-control); font-size: var(--lc-text-description); color: var(--lc-text-control-fg);">.claude</span>
+                <span style="margin-left: auto; height: 26px; padding: 0 9px; display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--lc-border-control); border-radius: var(--lc-radius-control); background: var(--lc-bg-control); font-size: var(--lc-text-description); color: var(--lc-text-control-fg);"><span style="{{ routeDotStyle }}"></span>{{ routeLabel }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div style="width: 1477px; padding: 16px 18px; border-radius: var(--lc-radius-card); border: 1px solid var(--lc-border-card); background: var(--lc-bg-raised); display: flex; flex-direction: column; gap: 8px;">
+    <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label-wide); text-transform: uppercase; color: var(--lc-text-muted);">What the settle is doing</span>
+    <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;"><strong style="font-weight: 500;">It is a subtraction, not a transition.</strong> A cross-fade into a second component would ask a new person to re-find five things they had just watched arrive. Instead the runtime rows hold their positions and the process falls away around them: preamble collapses to nothing, <span style="font-family: var(--lc-font-mono);">$</span> and <span style="font-family: var(--lc-font-mono);">--version</span> fade to zero width, leader dots draw in, the status dot appears, and the result slides to the right edge because the space in front of it opened up. Nothing animates <em>into place</em> — place is where it already was.</span>
+    <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;"><strong style="font-weight: 500;">The one swap is the name</strong>, <span style="font-family: var(--lc-font-mono);">claude</span> to <span style="font-family: var(--lc-font-mono);">Claude Code</span>, cross-fading in a fixed-width cell so nothing reflows. That is worth the one exception: the binary name is what the terminal truthfully ran, and the product name is what the rest of the app calls it — so the settle is also the moment the screen hands you back into the app's own vocabulary.</span>
+    <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;"><strong style="font-weight: 500;">Where the honesty rule bites:</strong> if discovery finishes before the settle would have started, there is no settle — the screen simply shows the table. The animation is a way of <em>ending</em> a wait, never a reason to have one. Use <span style="font-family: var(--lc-font-mono);">Step to</span> to sit in each phase, and note that the whole settle is 420ms.</span>
+    <span style="font-size: var(--lc-text-description); color: var(--lc-text-muted); text-wrap: pretty;">Under <span style="font-family: var(--lc-font-mono);">prefers-reduced-motion</span> the settle should be instantaneous rather than removed — the end state is information, so it must still arrive; only the movement goes.</span>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1560,&quot;height&quot;:1200}}">
+/* Preamble: true of the app, and only interesting while you wait. */
+const PRE = [
+  { at: 0,   key: 'locust',    val: '0.122.0 · Windows 11',  tag: '',       tone: 'lime' },
+  { at: 320, key: 'workspace', val: '.claude · git main',    tag: 'clean',  tone: 'plain' },
+  { at: 620, key: 'ledger',    val: '~/.locust/missions',    tag: 'ok',     tone: 'green' },
+  { at: 880, key: 'scanning',  val: 'PATH',                  tag: '5 known', tone: 'plain' }
+];
+
+/* The real probes. `ranAt` is when the command is issued, `gotAt` when it returns. */
+const RUNTIMES = [
+  { ranAt: 1160, gotAt: 1560, bin: 'codex',        product: 'Codex CLI',    result: 'not installed',    tone: 'dim' },
+  { ranAt: 1660, gotAt: 2180, bin: 'claude',       product: 'Claude Code',  result: 'sign-in required', tone: 'amber' },
+  { ranAt: 2280, gotAt: 2900, bin: 'cursor-agent', product: 'Cursor Agent', result: 'ready · 0.42',     tone: 'green' },
+  { ranAt: 3000, gotAt: 3380, bin: 'opencode',     product: 'OpenCode',     result: 'not installed',    tone: 'dim' },
+  { ranAt: 3480, gotAt: 3860, bin: 'copilot',      product: 'Copilot CLI',  result: 'not installed',    tone: 'dim' }
+];
+
+const SETTLE_AT = 4120;   // a beat after the last probe returns
+const SETTLE_MS = 420;
+const TONE = { lime: '--lc-lime-text', green: '--lc-green-text', amber: '--lc-amber-text', dim: '--lc-text-muted', plain: '--lc-text-secondary' };
+const DOT = { green: '--lc-green', amber: '--lc-amber', dim: '--lc-neutral', lime: '--lc-lime', plain: '--lc-neutral' };
+const TUBES = {
+  off:    { label: 'Off',    glow: 0,    scan: 0,    sweep: false, flicker: false },
+  subtle: { label: 'Subtle', glow: 0.4,  scan: 0.06, sweep: true,  flicker: false },
+  full:   { label: 'Full',   glow: 0.85, scan: 0.13, sweep: true,  flicker: true }
+};
+const BEZELS = { none: 'Screen only', monitor: 'Monitor', stand: 'Monitor + stand' };
+const LAUNCH = { first: 'First launch', again: 'Relaunch' };
+const MARKS = { probing: ['Probing', 2560], settling: ['Settling', SETTLE_AT + 140], settled: ['Settled', SETTLE_AT + SETTLE_MS + 400] };
+
+class Component extends DCLogic {
+  state = { t: SETTLE_AT + SETTLE_MS + 400, tube: 'full', bezel: 'monitor', launch: 'again' };
+  termRef = React.createRef();
+
+  /*
+   * The terminal scrolls and stays pinned to the bottom while probing: the
+   * screen is a fixed size and the log is not, and clipping from the bottom
+   * would hide the newest line, which is the only one anybody is waiting for.
+   * Once settled the preamble has collapsed and the content fits, so the pin
+   * is a no-op rather than a fight.
+   */
+  pin() {
+    const el = this.termRef.current;
+    if (el !== null) el.scrollTop = el.scrollHeight;
+  }
+  componentDidUpdate() { this.pin(); }
+  componentDidMount() { this.run(); this.pin(); }
+  componentWillUnmount() { this.stop(); }
+  stop() { if (this.timer !== undefined) { clearInterval(this.timer); this.timer = undefined; } }
+  run() {
+    this.stop();
+    this.setState({ t: 0 });
+    const started = Date.now();
+    this.timer = setInterval(() => {
+      const t = Date.now() - started;
+      this.setState({ t });
+      if (t > SETTLE_AT + SETTLE_MS + 500) this.stop();
+    }, 50);
+  }
+
+  renderVals() {
+    const tube = TUBES[this.state.tube];
+    const t = this.state.t;
+    const bezel = this.state.bezel;
+    const first = this.state.launch === 'first';
+    const settling = t >= SETTLE_AT;
+    const settled = t >= SETTLE_AT + SETTLE_MS;
+    const allIn = t >= 3860;
+
+    const LIME = 'brightness(0) saturate(100%) invert(84%) sepia(52%) saturate(720%) hue-rotate(21deg) brightness(104%) contrast(96%)';
+    const dropGlow = (px, a) => (tube.glow === 0 ? '' : ` drop-shadow(0 0 ${Math.round(px * tube.glow)}px rgba(201,240,74,${(a * tube.glow).toFixed(2)}))`);
+    const textGlow = (v, m) => (tube.glow === 0 ? '' : ` text-shadow: 0 0 ${Math.round(5 * m * tube.glow)}px color-mix(in srgb, var(${v}) ${Math.round(65 * tube.glow)}%, transparent);`);
+    const chip = (on) => `height: 28px; padding: 0 11px; border-radius: var(--lc-radius-control); font-family: var(--lc-font-ui); font-size: var(--lc-text-description); cursor: pointer; ${on
+      ? 'border: 1px solid var(--lc-lime-border); background: var(--lc-lime-tint); color: var(--lc-lime-text);'
+      : 'border: 1px solid var(--lc-border-control); background: var(--lc-bg-control); color: var(--lc-text-control-fg);'}`;
+
+    const EASE = 'cubic-bezier(0.22, 0.61, 0.36, 1)';
+    const MONO = 'font-family: var(--lc-font-mono); font-size: 12.5px; white-space: pre;';
+
+    /* Preamble — visible while probing, collapsed to nothing by the settle. */
+    const preamble = PRE.filter((p) => p.at <= t).map((p) => ({
+      key: p.key,
+      val: p.val,
+      tag: p.tag,
+      rowStyle: `flex: none; display: flex; gap: 9px; align-items: baseline; overflow: hidden; transition: max-height ${SETTLE_MS}ms ${EASE}, opacity 220ms ${EASE}; max-height: ${settling ? 0 : 20}px; opacity: ${settling ? 0 : 1};`,
+      keyStyle: `width: 92px; flex: none; ${MONO} color: var(--lc-lime);${textGlow('--lc-lime', 1)}`,
+      valStyle: `flex: 1; min-width: 0; ${MONO} color: var(${TONE[p.tone]});`,
+      tagStyle: p.tag === '' ? 'display: none;' : `flex: none; ${MONO} color: var(${TONE[p.tone]});`
+    }));
+
+    /*
+     * One row per runtime, from the moment its command is issued to the end.
+     * The row never moves. Settling removes the process -- prompt, argument,
+     * preamble -- and reveals the table that was underneath all along.
+     */
+    const runtimes = RUNTIMES.filter((r) => r.ranAt <= t).map((r) => {
+      const got = r.gotAt <= t;
+      const shrink = `transition: max-width ${SETTLE_MS}ms ${EASE}, opacity 240ms ${EASE}, margin ${SETTLE_MS}ms ${EASE};`;
+      return {
+        bin: r.bin,
+        product: r.product,
+        leader: '·'.repeat(40),
+        result: got ? r.result : '',
+        rowStyle: 'flex: none; display: flex; gap: 8px; align-items: baseline; height: 20px;',
+        dotStyle: `flex: none; border-radius: 50%; background: var(${DOT[r.tone]}); ${shrink} max-width: ${settling ? 6 : 0}px; width: 6px; height: 6px; opacity: ${settling ? 1 : 0}; overflow: hidden; display: block;${settling && r.tone !== 'dim' && tube.glow > 0 ? ` box-shadow: 0 0 ${Math.round(7 * tube.glow)}px var(${DOT[r.tone]});` : ''}`,
+        promptStyle: `flex: none; overflow: hidden; ${MONO} color: var(--lc-lime); ${shrink} max-width: ${settling ? 0 : 10}px; opacity: ${settling ? 0 : 1};${textGlow('--lc-lime', 1)}`,
+        nameWrapStyle: 'position: relative; flex: none; width: 112px; height: 16px; display: block;',
+        binStyle: `position: absolute; left: 0; top: 0; ${MONO} color: var(--lc-lime); transition: opacity 240ms ${EASE}; opacity: ${settling ? 0 : 1};${textGlow('--lc-lime', 1)}`,
+        productStyle: `position: absolute; left: 0; top: 0; ${MONO} color: var(${settling && r.tone !== 'dim' ? '--lc-text-secondary' : '--lc-text-muted'}); transition: opacity 240ms ${EASE} 120ms; opacity: ${settling ? 1 : 0};`,
+        argStyle: `flex: none; overflow: hidden; ${MONO} color: var(--lc-text-muted); ${shrink} max-width: ${settling ? 0 : 84}px; opacity: ${settling ? 0 : 1};`,
+        leaderStyle: `flex: 1; min-width: 0; overflow: hidden; ${MONO} letter-spacing: 2px; color: var(--lc-neutral); transition: opacity 300ms ${EASE} 120ms; opacity: ${settling ? 1 : 0}; text-align: left;`,
+        waitStyle: got || settling
+          ? 'display: none;'
+          : `flex: none; width: 7px; height: 12px; background: var(--lc-lime); opacity: .8; animation: lcPulse 900ms ease-in-out infinite; display: block;${tube.glow === 0 ? '' : ` box-shadow: 0 0 ${Math.round(6 * tube.glow)}px rgba(201,240,74,0.6);`}`,
+        elapsed: got ? '' : `${((t - r.ranAt) / 1000).toFixed(1)}s`,
+        elapsedStyle: got || settling ? 'display: none;' : `flex: none; ${MONO} color: var(--lc-text-muted);`,
+        resultStyle: `flex: none; ${MONO} color: var(${got ? TONE[r.tone] : '--lc-text-muted'}); transition: color 240ms ${EASE};${got && r.tone !== 'dim' ? textGlow(TONE[r.tone], 0.8) : ''}`
+      };
+    });
+
+    const paneRadius = bezel === 'none' ? 'var(--lc-radius-card)' : '12px';
+
+    return {
+      bezels: Object.entries(BEZELS).map(([k, label]) => ({ label, style: chip(k === bezel), onClick: () => this.setState({ bezel: k }) })),
+      levels: Object.entries(TUBES).map(([k, v]) => ({ label: v.label, style: chip(k === this.state.tube), onClick: () => this.setState({ tube: k }) })),
+      launches: Object.entries(LAUNCH).map(([k, label]) => ({ label, style: chip(k === this.state.launch), onClick: () => this.setState({ launch: k }) })),
+      scrub: Object.entries(MARKS).map(([k, [label, at]]) => ({
+        label,
+        style: chip(false),
+        onClick: () => { this.stop(); this.setState({ t: at }); }
+      })),
+      replay: () => this.run(),
+      phaseNote: settled ? 'settled — the answer' : settling ? 'settling · 420ms' : 'probing',
+
+      monitorStyle: bezel === 'none'
+        ? 'position: relative; display: flex; flex-direction: column; align-items: center;'
+        : 'position: relative; display: flex; flex-direction: column; align-items: center; padding: 16px; border-radius: 24px; background: linear-gradient(170deg, #22252600 0%, #1a1d1e 8%, #141617 55%, #0e1011 100%); border: 1px solid rgba(255,255,255,0.08); box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 26px 60px rgba(0,0,0,0.55);',
+      screenStyle: `position: relative; width: ${bezel === 'none' ? 748 : 724}px; height: ${bezel === 'none' ? 520 : 500}px; overflow: hidden; border-radius: ${paneRadius}; border: 1px solid ${bezel === 'none' ? 'var(--lc-border-card)' : 'rgba(0,0,0,0.6)'}; background: radial-gradient(130% 100% at 50% 40%, #141a0f 0%, #0a0c0a 58%, #060706 100%);`
+        + (bezel === 'none' ? '' : ' box-shadow: inset 0 0 0 1px rgba(201,240,74,0.05), inset 0 2px 14px rgba(0,0,0,0.85);')
+        + (tube.flicker ? ' animation: lcFlicker 5s linear infinite;' : ''),
+      scanStyle: tube.scan === 0 ? 'display: none;' : `position: absolute; inset: 0; z-index: 3; pointer-events: none; background: repeating-linear-gradient(to bottom, rgba(0,0,0,${tube.scan}) 0px, rgba(0,0,0,${tube.scan}) 1px, transparent 1px, transparent 3px); display: block;`,
+      sweepStyle: tube.sweep === false ? 'display: none;' : 'position: absolute; left: 0; right: 0; height: 26%; z-index: 4; pointer-events: none; background: linear-gradient(to bottom, transparent, rgba(201,240,74,0.045), transparent); animation: lcSweep 7s linear infinite; display: block;',
+      vignetteStyle: `position: absolute; inset: 0; z-index: 5; pointer-events: none; box-shadow: inset 0 0 80px 26px rgba(0,0,0,${bezel === 'none' ? 0.45 : 0.7}); display: block;`,
+      glareStyle: bezel === 'none' || tube.glow === 0 ? 'display: none;' : 'position: absolute; top: -40%; left: -20%; width: 90%; height: 120%; z-index: 6; pointer-events: none; transform: rotate(18deg); background: linear-gradient(to right, rgba(255,255,255,0.018), transparent 60%); display: block;',
+
+      lockupBoxStyle: `display: flex; flex-direction: column; align-items: center; gap: 13px; padding: 20px 52px 22px; border: 1px solid rgba(201,240,74,${(0.1 + 0.16 * tube.glow).toFixed(3)}); border-radius: var(--lc-radius-card); background: rgba(201,240,74,0.022);`,
+      markStyle: `width: 158px; height: auto; filter: ${LIME}${dropGlow(15, 0.6)};`,
+      wordStyle: `width: 286px; height: auto; filter: ${LIME}${dropGlow(9, 0.4)};`,
+      dividerStyle: `flex: none; height: 1px; margin: 0 22px; background: linear-gradient(to right, transparent, rgba(201,240,74,${tube.glow === 0 ? 0.1 : 0.2}), transparent); display: block;`,
+
+      termRef: this.termRef,
+      termStyle: `flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; padding: 16px 28px 20px; display: flex; flex-direction: column; justify-content: ${settling ? 'center' : 'flex-start'}; gap: 2px;`,
+      preamble,
+      runtimes,
+      caretRowStyle: `flex: none; display: flex; gap: 7px; align-items: center; overflow: hidden; transition: max-height 260ms ${EASE}, opacity 180ms ${EASE}; max-height: ${allIn ? 0 : 20}px; opacity: ${allIn ? 0 : 1};`,
+      caretPromptStyle: `${MONO} color: var(--lc-lime);${textGlow('--lc-lime', 1)}`,
+      progress: `checking ${RUNTIMES.filter((r) => r.ranAt <= t).length} of ${RUNTIMES.length} runtimes `,
+      caretStyle: `width: 7px; height: 13px; background: var(--lc-lime); animation: lcCaret 1s step-end infinite; display: block;${tube.glow === 0 ? '' : ` box-shadow: 0 0 ${Math.round(7 * tube.glow)}px rgba(201,240,74,0.6);`}`,
+      summaryStyle: `flex: none; overflow: hidden; ${MONO} white-space: normal; color: var(--lc-lime-text); text-align: center; transition: max-height ${SETTLE_MS}ms ${EASE}, opacity 300ms ${EASE} 160ms; max-height: ${settling ? 44 : 0}px; opacity: ${settling ? 1 : 0}; padding-top: ${settling ? 12 : 0}px;${textGlow('--lc-lime-text', 1)}`,
+      summary: '1 ready · 1 needs you · nothing pooled, proxied, or sent anywhere you have not connected',
+
+      ledStyle: bezel === 'none' ? 'display: none;' : `position: absolute; right: 22px; bottom: 4px; width: 5px; height: 5px; border-radius: 50%; background: var(${settled ? '--lc-green' : '--lc-lime'}); transition: background 300ms ${EASE}; display: block;${tube.glow === 0 ? '' : ` box-shadow: 0 0 ${Math.round(7 * tube.glow)}px currentColor;`}`,
+      standNeckStyle: bezel === 'stand' ? 'width: 86px; height: 26px; background: linear-gradient(180deg, #17191a, #101213); border: 1px solid rgba(255,255,255,0.06); border-top: 0; border-radius: 0 0 6px 6px; display: block;' : 'display: none;',
+      standFootStyle: bezel === 'stand' ? 'width: 210px; height: 9px; background: linear-gradient(180deg, #1a1d1e, #0d0f10); border: 1px solid rgba(255,255,255,0.06); border-radius: 5px; display: block;' : 'display: none;',
+
+      sidebar: (first
+        ? [['ROOMS', '0'], ['TEAMMATES', '0'], ['MISSIONS', '0'], ['ROUTINES', '0']]
+        : [['ROOMS', '1'], ['TEAMMATES', '2'], ['Jimothy', ''], ['Yurt', ''], ['MISSIONS', '4'], ['Wren asked: a polished sample', ''], ['ROUTINES', '1']]
+      ).map(([text, count]) => ({
+        text,
+        count,
+        style: count !== ''
+          ? 'display: flex; align-items: center; padding: 12px 8px 5px; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label); text-transform: uppercase; color: var(--lc-text-muted);'
+          : 'display: flex; align-items: center; padding: 6px 10px; border-radius: var(--lc-radius-control); font-size: var(--lc-text-description); color: var(--lc-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;',
+        countStyle: count !== '' ? 'margin-left: auto; color: var(--lc-text-muted);' : 'display: none;'
+      })),
+      footDotStyle: `width: 6px; height: 6px; border-radius: 50%; background: var(${settled ? '--lc-green' : '--lc-neutral'}); display: block;`,
+      footTextStyle: `color: var(${settled ? '--lc-text-secondary' : '--lc-text-muted'});`,
+      footCount: settled ? '1 runtime connected · 1 needs you' : 'checking…',
+      placeholder: settled ? 'Describe a mission…' : 'Checking local runtimes…',
+      routeDotStyle: `width: 6px; height: 6px; border-radius: 50%; background: var(${settled ? '--lc-green' : '--lc-neutral'}); display: block;`,
+      routeLabel: settled ? 'Cursor Agent' : 'No runtime'
+    };
+  }
+}
+</script>
+</body>
+</html>

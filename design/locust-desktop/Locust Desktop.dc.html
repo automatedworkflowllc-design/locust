@@ -1,0 +1,1466 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; background: #0B0D0E; }
+  * { box-sizing: border-box; }
+  a { color: #C9F04A; text-decoration: none; }
+  a:hover { color: #E0FB92; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10); border-radius: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  @keyframes lcPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.82); } }
+  @keyframes lcCaret { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
+  @keyframes lcSpin { to { transform: rotate(360deg); } }
+  @keyframes lcBar { 0% { transform: translateX(-100%); } 100% { transform: translateX(320%); } }
+  @keyframes lcBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7%); } }
+  @keyframes lcEyes {
+    0%, 34% { transform: translateX(0) scaleY(1); }
+    38% { transform: translateX(0) scaleY(0.12); }
+    43% { transform: translateX(0) scaleY(1); }
+    54%, 66% { transform: translateX(100%) scaleY(1); }
+    76%, 84% { transform: translateX(-100%) scaleY(1); }
+    92%, 100% { transform: translateX(0) scaleY(1); }
+  }
+  @keyframes lcChat { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.45); } }
+  @keyframes lcDot { 0%, 100% { opacity: .25; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-2px); } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #0B0D0E; padding: 28px; display: flex; flex-direction: column; align-items: center; gap: 18px; font-family: Geist, Helvetica, sans-serif; color: #F2EFE9;">
+
+  <div style="display: flex; align-items: center; gap: 18px; width: 1480px; flex-wrap: wrap;">
+    <span style="font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #6E7373;">Prototype states</span>
+    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+      <sc-for list="{{ scenarios }}" as="s" hint-placeholder-count="7">
+        <button type="button" onClick="{{ s.onClick }}" style="{{ s.style }}; transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);" style-active="transform: scale(0.98);">{{ s.label }}</button>
+      </sc-for>
+    </div>
+    <div style="display: flex; align-items: center; gap: 6px;">
+      <span style="font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #6E7373;">Working</span>
+      <sc-for list="{{ workRows }}" as="w" hint-placeholder-count="4">
+        <button type="button" onClick="{{ w.onClick }}" style="{{ w.style }}">{{ w.label }}</button>
+      </sc-for>
+    </div>
+    <div style="display: flex; gap: 6px;">
+      <sc-for list="{{ screens }}" as="sc" hint-placeholder-count="3">
+        <button type="button" onClick="{{ sc.onClick }}" style="{{ sc.style }}">{{ sc.label }}</button>
+      </sc-for>
+    </div>
+    <div style="display: flex; gap: 6px; margin-left: auto;">
+      <button type="button" onClick="{{ togglePalette }}" style="{{ paletteBtnStyle }}">Palette</button>
+      <button type="button" onClick="{{ toggleInspector }}" style="{{ inspectorBtnStyle }}; transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);" style-active="transform: scale(0.98);">Inspector</button>
+      <button type="button" onClick="{{ togglePicker }}" style="{{ pickerBtnStyle }}; transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);" style-active="transform: scale(0.98);">Model picker</button>
+    </div>
+  </div>
+
+  <div style="width: 1480px; height: 940px; background: #121415; border: 1px solid rgba(255,255,255,0.09); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 32px 80px rgba(0,0,0,0.55); position: relative;">
+
+    <sc-if value="{{ newBotOpen }}" hint-placeholder-val="{{ false }}">
+      <div style="position: absolute; inset: 0; background: rgba(8,10,10,0.55); display: flex; align-items: center; justify-content: center; z-index: 22;">
+        <div role="dialog" aria-label="New teammate" style="width: 560px; background: #1B1E1F; border: 1px solid rgba(255,255,255,0.12); border-radius: 13px; box-shadow: 0 40px 100px rgba(0,0,0,0.65); overflow: hidden;">
+          <div style="display: flex; align-items: center; gap: 10px; padding: 15px 18px; border-bottom: 1px solid rgba(255,255,255,0.07);">
+            <span style="font-size: 14.5px; font-weight: 500; color: #F1EEE8;">New teammate</span>
+            <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">lives on this machine</span>
+            <button type="button" onClick="{{ toggleNewBot }}" aria-label="Close" style="margin-left: auto; width: 24px; height: 24px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.10); background: transparent; color: #8B9190; font-size: 11px; cursor: pointer; transition: background 140ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);">✕</button>
+          </div>
+          <div style="padding: 18px; display: flex; flex-direction: column; gap: 18px;">
+            <div style="display: flex; align-items: center; gap: 16px;">
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+              <sc-if value="{{ look0 }}" hint-placeholder-val="{{ true }}">
+                <span aria-hidden="true" style="width: 56px; height: 56px; flex: none; border-radius: 10px; background: {{ hueBg }}; border: 1px solid {{ hueBd }}; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                  <span style="position: relative; width: 40px; height: 40px; display: block;"><span style="position: absolute; left: 10px; top: 15px; width: 5px; height: 5px; background: {{ huePx }}; box-shadow: 15px 0px 0 {{ huePx }}; transform-origin: center; display: block; animation: lcEyes 5s ease-in-out infinite;"></span><span style="position: absolute; left: 15px; top: 25px; width: 5px; height: 5px; background: {{ huePx }}; box-shadow: 5px 0px 0 {{ huePx }}; transform-origin: center top; display: block; animation: lcChat 1.5s ease-in-out infinite;"></span></span>
+                </span>
+              </sc-if>
+              <sc-if value="{{ look1 }}" hint-placeholder-val="{{ false }}">
+                <span aria-hidden="true" style="width: 56px; height: 56px; flex: none; border-radius: 10px; background: {{ hueBg }}; border: 1px solid {{ hueBd }}; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                  <span style="position: relative; width: 40px; height: 40px; display: block;"><span style="position: absolute; left: 5px; top: 5px; width: 5px; height: 5px; background: {{ huePx }}; box-shadow: 5px 0px 0 {{ huePx }}, 10px 0px 0 {{ huePx }}, 15px 0px 0 {{ huePx }}, 20px 0px 0 {{ huePx }}, 25px 0px 0 {{ huePx }}, -5px 5px 0 {{ huePx }}, -5px 10px 0 {{ huePx }}, 30px 5px 0 {{ huePx }}, 30px 10px 0 {{ huePx }}, 0px 10px 0 {{ huePx }}, 25px 10px 0 {{ huePx }}; transform-origin: center; display: block;"></span><span style="position: absolute; left: 10px; top: 15px; width: 5px; height: 5px; background: {{ huePx }}; box-shadow: 15px 0px 0 {{ huePx }}; transform-origin: center; display: block; animation: lcEyes 5s ease-in-out infinite;"></span><span style="position: absolute; left: 10px; top: 25px; width: 5px; height: 5px; background: {{ huePx }}; box-shadow: 5px 0px 0 {{ huePx }}, 10px 0px 0 {{ huePx }}, 15px 0px 0 {{ huePx }}; transform-origin: center top; display: block; animation: lcChat 1.5s ease-in-out infinite;"></span></span>
+                </span>
+              </sc-if>
+              <sc-if value="{{ look2 }}" hint-placeholder-val="{{ false }}">
+                <span aria-hidden="true" style="width: 56px; height: 56px; flex: none; border-radius: 10px; background: {{ hueBg }}; border: 1px solid {{ hueBd }}; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                  <span style="position: relative; width: 40px; height: 40px; display: block;"><span style="position: absolute; left: 5px; top: 5px; width: 5px; height: 5px; background: {{ huePx }}; box-shadow: 5px 0px 0 {{ huePx }}, 10px 0px 0 {{ huePx }}, 15px 0px 0 {{ huePx }}, 20px 0px 0 {{ huePx }}, 25px 0px 0 {{ huePx }}, 0px 5px 0 {{ huePx }}, 25px 5px 0 {{ huePx }}; transform-origin: center; display: block;"></span><span style="position: absolute; left: 10px; top: 15px; width: 5px; height: 5px; background: {{ huePx }}; box-shadow: 15px 0px 0 {{ huePx }}; transform-origin: center; display: block; animation: lcEyes 5s ease-in-out infinite;"></span><span style="position: absolute; left: 15px; top: 25px; width: 5px; height: 5px; background: {{ huePx }}; box-shadow: 5px 0px 0 {{ huePx }}, 0px 5px 0 {{ huePx }}, 5px 5px 0 {{ huePx }}; transform-origin: center top; display: block; animation: lcChat 1.5s ease-in-out infinite;"></span></span>
+                </span>
+              </sc-if>
+              <sc-if value="{{ look3 }}" hint-placeholder-val="{{ false }}">
+                <span aria-hidden="true" style="width: 56px; height: 56px; flex: none; border-radius: 10px; background: {{ hueBg }}; border: 1px solid {{ hueBd }}; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                  <span style="position: relative; width: 40px; height: 40px; display: block;"><span style="position: absolute; left: 10px; top: 5px; width: 5px; height: 5px; background: {{ huePx }}; box-shadow: 5px 0px 0 {{ huePx }}, 10px 0px 0 {{ huePx }}, 15px 0px 0 {{ huePx }}, -10px 5px 0 {{ huePx }}, -10px 10px 0 {{ huePx }}, 25px 5px 0 {{ huePx }}, 25px 10px 0 {{ huePx }}; transform-origin: center; display: block;"></span><span style="position: absolute; left: 10px; top: 15px; width: 5px; height: 5px; background: {{ huePx }}; box-shadow: 15px 0px 0 {{ huePx }}; transform-origin: center; display: block; animation: lcEyes 5s ease-in-out infinite;"></span><span style="position: absolute; left: 15px; top: 25px; width: 5px; height: 5px; background: {{ huePx }}; box-shadow: 5px 5px 0 {{ huePx }}; transform-origin: center top; display: block; animation: lcChat 1.5s ease-in-out infinite;"></span></span>
+                </span>
+              </sc-if>
+              <sc-if value="{{ look4 }}" hint-placeholder-val="{{ false }}">
+                <span aria-hidden="true" style="width: 56px; height: 56px; flex: none; border-radius: 10px; background: {{ hueBg }}; border: 1px solid {{ hueBd }}; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                  <span style="position: relative; width: 40px; height: 40px; display: block;"><span style="position: absolute; left: 10px; top: 0px; width: 5px; height: 5px; background: {{ huePx }}; box-shadow: 5px 0px 0 {{ huePx }}, 10px 0px 0 {{ huePx }}, 15px 0px 0 {{ huePx }}, -5px 5px 0 {{ huePx }}, 0px 5px 0 {{ huePx }}, 5px 5px 0 {{ huePx }}, 10px 5px 0 {{ huePx }}, 15px 5px 0 {{ huePx }}, 20px 5px 0 {{ huePx }}, -5px 15px 0 {{ huePx }}, 20px 15px 0 {{ huePx }}; transform-origin: center; display: block;"></span><span style="position: absolute; left: 10px; top: 15px; width: 5px; height: 5px; background: {{ huePx }}; box-shadow: 15px 0px 0 {{ huePx }}; transform-origin: center; display: block; animation: lcEyes 5s ease-in-out infinite;"></span><span style="position: absolute; left: 15px; top: 25px; width: 5px; height: 5px; background: {{ huePx }}; box-shadow: 5px 0px 0 {{ huePx }}; transform-origin: center top; display: block; animation: lcChat 1.5s ease-in-out infinite;"></span></span>
+                </span>
+              </sc-if>
+              <sc-if value="{{ look5 }}" hint-placeholder-val="{{ false }}">
+                <span aria-hidden="true" style="width: 56px; height: 56px; flex: none; border-radius: 10px; background: {{ hueBg }}; border: 1px solid {{ hueBd }}; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                  <span style="position: relative; width: 40px; height: 40px; display: block;"><span style="position: absolute; left: 15px; top: 0px; width: 5px; height: 5px; background: {{ huePx }}; box-shadow: 0px 5px 0 {{ huePx }}, -5px 10px 0 {{ huePx }}, 0px 10px 0 {{ huePx }}, 5px 10px 0 {{ huePx }}, 10px 10px 0 {{ huePx }}, -10px 10px 0 {{ huePx }}, 15px 10px 0 {{ huePx }}; transform-origin: center; display: block;"></span><span style="position: absolute; left: 10px; top: 15px; width: 5px; height: 5px; background: {{ huePx }}; box-shadow: 15px 0px 0 {{ huePx }}; transform-origin: center; display: block; animation: lcEyes 5s ease-in-out infinite;"></span><span style="position: absolute; left: 10px; top: 25px; width: 5px; height: 5px; background: {{ huePx }}; box-shadow: 5px 0px 0 {{ huePx }}, 10px 0px 0 {{ huePx }}, 15px 0px 0 {{ huePx }}; transform-origin: center top; display: block; animation: lcChat 1.5s ease-in-out infinite;"></span></span>
+                </span>
+              </sc-if>
+              <button type="button" onClick="{{ shuffleLook }}" style="height: 24px; padding: 0 10px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.10); background: transparent; color: #8B9190; font-family: Geist, sans-serif; font-size: 11.5px; cursor: pointer; transition: background 140ms ease, color 140ms ease;" style-hover="background: rgba(255,255,255,0.07); color: #E7E3DC;">Shuffle look</button>
+            </div>
+              <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+                <label style="font-family: 'Geist Mono', monospace; font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: #8B9190;">Name</label>
+                <input type="text" placeholder="Name your teammate" style="height: 36px; padding: 0 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.10); background: #191C1D; color: #F1EEE8; font-family: Geist, sans-serif; font-size: 13.5px; outline: none; transition: border-color 140ms ease;" style-focus="border-color: rgba(201,240,74,0.5);">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <div style="display: flex; gap: 8px;">
+              <button type="button" onClick="{{ pickHuelime }}" aria-label="lime avatar" style="width: 26px; height: 26px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.14); background: #A9D93F; cursor: pointer; transition: transform 120ms ease, box-shadow 140ms ease;" style-hover="transform: scale(1.08);" style-active="transform: scale(0.94);"></button>
+              <button type="button" onClick="{{ pickHueblue }}" aria-label="blue avatar" style="width: 26px; height: 26px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.14); background: #5E9BF0; cursor: pointer; transition: transform 120ms ease, box-shadow 140ms ease;" style-hover="transform: scale(1.08);" style-active="transform: scale(0.94);"></button>
+              <button type="button" onClick="{{ pickHueviolet }}" aria-label="violet avatar" style="width: 26px; height: 26px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.14); background: #A98BE8; cursor: pointer; transition: transform 120ms ease, box-shadow 140ms ease;" style-hover="transform: scale(1.08);" style-active="transform: scale(0.94);"></button>
+              <button type="button" onClick="{{ pickHuecoral }}" aria-label="coral avatar" style="width: 26px; height: 26px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.14); background: #E4857A; cursor: pointer; transition: transform 120ms ease, box-shadow 140ms ease;" style-hover="transform: scale(1.08);" style-active="transform: scale(0.94);"></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <label style="font-family: 'Geist Mono', monospace; font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: #8B9190;">Role</label>
+              <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+                <sc-for list="{{ roleRows }}" as="r" hint-placeholder-count="6">
+                  <button type="button" onClick="{{ r.onClick }}" style="{{ r.style }}">
+                    <span style="display: block; font-size: 13px; color: #F1EEE8;">{{ r.name }}</span>
+                    <span style="display: block; font-size: 12px; color: #8B9190; margin-top: 3px; line-height: 1.4;">{{ r.desc }}</span>
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <div style="flex: 1; display: flex; align-items: center; gap: 9px; padding: 11px 13px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.07); background: #191C1D;">
+                <span style="width: 6px; height: 6px; border-radius: 50%; background: #C9F04A; flex: none; display: block;"></span>
+                <span style="flex: 1; min-width: 0; font-size: 12.5px; color: #C7C3BC;">Codex CLI / gpt-5-codex</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #8B9190;">DEFAULT ROUTE</span>
+              </div>
+              <div style="flex: 1; display: flex; align-items: center; gap: 9px; padding: 11px 13px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.07); background: #191C1D;">
+                <span style="flex: 1; min-width: 0; font-size: 12.5px; color: #C7C3BC;">{{ modeLabel }}</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #8B9190;">APPROVALS</span>
+              </div>
+            </div>
+            <div style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190; line-height: 1.5;">Tools follow the role and can be narrowed per teammate in Settings → Permissions.</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 9px; padding: 14px 18px; border-top: 1px solid rgba(255,255,255,0.07); background: #191C1D;">
+            <button type="button" onClick="{{ toggleNewBot }}" style="margin-left: auto; height: 32px; padding: 0 15px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.11); background: transparent; color: #D7D3CC; font-size: 13px; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);">Cancel</button>
+            <button type="button" onClick="{{ toggleNewBot }}" style="height: 32px; padding: 0 16px; border-radius: 7px; border: 1px solid rgba(201,240,74,0.40); background: rgba(201,240,74,0.14); color: #DBF785; font-size: 13px; font-weight: 500; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease, transform 120ms ease;" style-hover="background: rgba(201,240,74,0.20);" style-active="transform: scale(0.98);">Create teammate</button>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ paletteOpen }}" hint-placeholder-val="{{ false }}">
+      <div style="position: absolute; inset: 0; background: rgba(8,10,10,0.55); display: flex; align-items: flex-start; justify-content: center; padding-top: 120px; z-index: 20;">
+        <div role="dialog" aria-label="Command palette" style="width: 620px; background: #1B1E1F; border: 1px solid rgba(255,255,255,0.12); border-radius: 13px; box-shadow: 0 40px 100px rgba(0,0,0,0.65); overflow: hidden;">
+          <div style="display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.07);">
+            <span style="width: 11px; height: 11px; flex: none; border: 1.5px solid #7A807F; border-radius: 50%; position: relative; display: block;" style-after="content: ''; position: absolute; right: -3px; bottom: -3px; width: 1.5px; height: 5px; border-radius: 1px; background: #7A807F; transform: rotate(-45deg);"></span>
+            <span style="flex: 1; font-size: 14px; color: #8B9190;">Type a command, teammate or mission…</span>
+            <button type="button" onClick="{{ togglePalette }}" aria-label="Close palette" style="width: 24px; height: 24px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.10); background: transparent; color: #8B9190; font-size: 11px; cursor: pointer; transition: background 140ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);">✕</button>
+          </div>
+          <div style="padding: 6px; max-height: 380px; overflow-y: auto;">
+            <div style="padding: 8px 10px 4px; font-family: 'Geist Mono', monospace; font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: #8B9190;">Missions</div>
+            <button type="button" style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; border: none; background: rgba(255,255,255,0.05); text-align: left; cursor: pointer; font-family: Geist, sans-serif; transition: background 140ms ease;" style-hover="background: rgba(255,255,255,0.08);">
+              <span style="flex: 1; font-size: 13.5px; color: #F1EEE8;">New mission with Wren</span>
+              <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">⌘N</span>
+            </button>
+            <button type="button" style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; border: none; background: transparent; text-align: left; cursor: pointer; font-family: Geist, sans-serif; transition: background 140ms ease;" style-hover="background: rgba(255,255,255,0.05);">
+              <span style="flex: 1; font-size: 13.5px; color: #E7E3DC;">Resume interrupted mission · Changelog draft</span>
+              <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #EFC969;">interrupted</span>
+            </button>
+            <div style="padding: 12px 10px 4px; font-family: 'Geist Mono', monospace; font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: #8B9190;">Runtime</div>
+            <button type="button" style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; border: none; background: transparent; text-align: left; cursor: pointer; font-family: Geist, sans-serif; transition: background 140ms ease;" style-hover="background: rgba(255,255,255,0.05);">
+              <span style="flex: 1; font-size: 13.5px; color: #E7E3DC;">Switch runtime or model…</span>
+              <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">⌘M</span>
+            </button>
+            <button type="button" style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; border: none; background: transparent; text-align: left; cursor: pointer; font-family: Geist, sans-serif; transition: background 140ms ease;" style-hover="background: rgba(255,255,255,0.05);">
+              <span style="flex: 1; font-size: 13.5px; color: #E7E3DC;">Toggle swarm mode · all teammates at max effort</span>
+              <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">⇧⌘S</span>
+            </button>
+            <div style="padding: 12px 10px 4px; font-family: 'Geist Mono', monospace; font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: #8B9190;">Go to</div>
+            <button type="button" style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; border: none; background: transparent; text-align: left; cursor: pointer; font-family: Geist, sans-serif; transition: background 140ms ease;" style-hover="background: rgba(255,255,255,0.05);">
+              <span style="flex: 1; font-size: 13.5px; color: #E7E3DC;">Missions · Teammates · Settings</span>
+              <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">⌘1–3</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <div style="height: 40px; flex: none; display: flex; align-items: center; padding: 0 14px; gap: 10px; background: #16191A; border-bottom: 1px solid rgba(255,255,255,0.06);">
+      <div style="display: flex; gap: 7px;">
+        <span style="width: 11px; height: 11px; border-radius: 50%; background: #3A3E3F; display: block; transition: background 140ms ease;" style-hover="background: #FF5F57;"></span>
+        <span style="width: 11px; height: 11px; border-radius: 50%; background: #3A3E3F; display: block; transition: background 140ms ease;" style-hover="background: #FEBC2E;"></span>
+        <span style="width: 11px; height: 11px; border-radius: 50%; background: #3A3E3F; display: block; transition: background 140ms ease;" style-hover="background: #28C840;"></span>
+      </div>
+      <div style="flex: 1; text-align: center; font-family: 'Geist Mono', monospace; font-size: 12px; color: #8B9190; letter-spacing: .02em;">Ridgeline Workspace — local</div>
+      <div style="display: flex; align-items: center; gap: 10px; font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">
+        <sc-if value="{{ swarmOn }}" hint-placeholder-val="{{ false }}">
+          <span style="display: flex; align-items: center; gap: 6px; padding: 2px 8px 2px 6px; border-radius: 6px; border: 1px solid rgba(201,240,74,0.35); background: rgba(201,240,74,0.10); color: #DBF785;">
+            <img src="brand/locust-mark.svg" alt="" style="height: 11px; width: auto;">
+            <span>SWARM · all teammates at max effort</span>
+          </span>
+        </sc-if>
+        <span style="display: flex; align-items: center; gap: 8px;">
+          <span style="width: 6px; height: 6px; border-radius: 50%; background: #C9F04A; display: block;"></span>
+          <span>1 running</span>
+        </span>
+      </div>
+    </div>
+
+    <div style="flex: 1; min-height: 0; display: flex;">
+
+      <nav aria-label="Teammates" style="width: 268px; flex: none; background: #17191A; border-right: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; min-height: 0;">
+        <div style="padding: 18px 16px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+          <span style="display: flex; align-items: center; gap: 9px; padding-left: 2px;"><img src="brand/locust-mark.svg" alt="" style="height: 24px; width: auto; opacity: .95;"><img src="brand/locust-wordmark.svg" alt="Locust" style="height: 13px; width: auto; opacity: .9;"></span>
+          <button type="button" onClick="{{ toggleNewBot }}" aria-label="New teammate" title="New teammate" style="width: 28px; height: 28px; flex: none; border-radius: 8px; border: 1px solid transparent; background: transparent; color: #A8ADAB; font-family: Geist, sans-serif; font-size: 18px; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 140ms ease, color 140ms ease, transform 120ms ease;" style-hover="background: rgba(255,255,255,0.07); color: #DBF785;" style-active="transform: scale(0.94);">+</button>
+        </div>
+
+        <div style="padding: 0 14px;">
+          <button type="button" style="width: 100%; height: 32px; display: flex; align-items: center; gap: 9px; padding: 0 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); background: #1B1E1F; color: #8B9190; font-size: 12.5px; font-family: Geist, sans-serif; cursor: text; transition: background 140ms ease, border-color 140ms ease;" style-hover="background: #202425; border-color: rgba(255,255,255,0.12);">
+            <span style="width: 10px; height: 10px; flex: none; border: 1.5px solid #7A807F; border-radius: 50%; position: relative; display: block;" style-after="content: ''; position: absolute; right: -3px; bottom: -3px; width: 1.5px; height: 5px; border-radius: 1px; background: #7A807F; transform: rotate(-45deg);"></span>
+            <span>Search</span>
+          </button>
+        </div>
+
+        <div style="padding: 20px 16px 8px; font-family: 'Geist Mono', monospace; font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: #8B9190;">Teammates</div>
+
+        <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 0 8px 8px; display: flex; flex-direction: column; gap: 2px;">
+
+          <div style="border-radius: 9px; background: #1E2223; border: 1px solid rgba(255,255,255,0.07);">
+            <div style="display: flex; align-items: center; gap: 10px; padding: 9px 10px;">
+              <sc-if value="{{ teammateBusy }}" hint-placeholder-val="{{ true }}"><span aria-hidden="true" style="width: 30px; height: 30px; flex: none; border-radius: 5px; background: #A9D93F; border: 1px solid rgba(201,240,74,0.55); display: flex; align-items: center; justify-content: center; overflow: hidden; animation: lcBob 2.6s ease-in-out infinite;"><span style="position: relative; width: 24px; height: 24px; display: block;"><span style="position: absolute; left: 3px; top: 3px; width: 3px; height: 3px; background: #151A0C; box-shadow: 3px 0px 0 #151A0C, 6px 0px 0 #151A0C, 9px 0px 0 #151A0C, 12px 0px 0 #151A0C, 15px 0px 0 #151A0C, -3px 3px 0 #151A0C, -3px 6px 0 #151A0C, 18px 3px 0 #151A0C, 18px 6px 0 #151A0C; transform-origin: center; display: block;"></span><span style="position: absolute; left: 9px; top: 0px; width: 3px; height: 3px; background: rgba(255,255,255,0.55); box-shadow: 3px 0px 0 rgba(255,255,255,0.55); transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 9px; width: 3px; height: 3px; background: #151A0C; box-shadow: 9px 0px 0 #151A0C; transform-origin: center; display: block; animation: lcEyes 5s ease-in-out infinite;"></span><span style="position: absolute; left: 9px; top: 15px; width: 3px; height: 3px; background: #151A0C; box-shadow: 3px 0px 0 #151A0C; transform-origin: center top; display: block; animation: lcChat 1.5s ease-in-out infinite;"></span></span></span></sc-if><sc-if value="{{ teammateCalm }}" hint-placeholder-val="{{ false }}"><span aria-hidden="true" style="width: 30px; height: 30px; flex: none; border-radius: 5px; background: #A9D93F; border: 1px solid rgba(201,240,74,0.55); display: flex; align-items: center; justify-content: center; overflow: hidden;"><span style="position: relative; width: 24px; height: 24px; display: block;"><span style="position: absolute; left: 3px; top: 3px; width: 3px; height: 3px; background: #151A0C; box-shadow: 3px 0px 0 #151A0C, 6px 0px 0 #151A0C, 9px 0px 0 #151A0C, 12px 0px 0 #151A0C, 15px 0px 0 #151A0C, -3px 3px 0 #151A0C, -3px 6px 0 #151A0C, 18px 3px 0 #151A0C, 18px 6px 0 #151A0C; transform-origin: center; display: block;"></span><span style="position: absolute; left: 9px; top: 0px; width: 3px; height: 3px; background: rgba(255,255,255,0.55); box-shadow: 3px 0px 0 rgba(255,255,255,0.55); transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 9px; width: 3px; height: 3px; background: #151A0C; box-shadow: 9px 0px 0 #151A0C; transform-origin: center; display: block;"></span><span style="position: absolute; left: 9px; top: 15px; width: 3px; height: 3px; background: #151A0C; box-shadow: 3px 0px 0 #151A0C; transform-origin: center top; display: block;"></span></span></span></sc-if></span>
+              <div style="min-width: 0; flex: 1;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <span style="font-size: 13.5px; font-weight: 500; color: #F4F1EB;">Wren</span>
+                  <span style="width: 6px; height: 6px; border-radius: 50%; background: #C9F04A; display: block; animation: lcPulse 1.6s ease-in-out infinite;"></span>
+                </div>
+                <div style="font-size: 11.5px; color: #8B9190; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Code &amp; Migrations · working</div>
+              </div>
+            </div>
+            <div style="padding: 0 10px 9px 50px; display: flex; flex-direction: column; gap: 3px;">
+              <div style="display: flex; align-items: center; gap: 7px; padding: 5px 8px; border-radius: 6px; background: rgba(201,240,74,0.08); font-size: 12px; color: #E4EFC7;">
+                <span style="width: 5px; height: 5px; border-radius: 50%; background: #C9F04A; flex: none; display: block;"></span>
+                <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Billing webhooks → v3</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 7px; padding: 5px 8px; border-radius: 6px; font-size: 12px; color: #8B9190;">
+                <span style="width: 5px; height: 5px; border-radius: 50%; background: #4A4F4F; flex: none; display: block;"></span>
+                <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Flaky test triage</span>
+              </div>
+            </div>
+          </div>
+
+          <div role="button" tabIndex="{{ zero }}" style="display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 9px; cursor: pointer; transition: background 140ms ease;" style-hover="background: #1B1E1F;">
+            <span aria-hidden="true" style="width: 30px; height: 30px; flex: none; border-radius: 5px; background: #5E9BF0; border: 1px solid rgba(110,168,254,0.5); display: flex; align-items: center; justify-content: center; overflow: hidden;"><span style="position: relative; width: 24px; height: 24px; display: block;"><span style="position: absolute; left: 3px; top: 3px; width: 3px; height: 3px; background: #0D1520; box-shadow: 3px 0px 0 #0D1520, 6px 0px 0 #0D1520, 9px 0px 0 #0D1520, 12px 0px 0 #0D1520, 15px 0px 0 #0D1520, 0px 6px 0 #0D1520, 15px 6px 0 #0D1520; transform-origin: center; display: block;"></span><span style="position: absolute; left: 9px; top: 9px; width: 3px; height: 3px; background: rgba(255,255,255,0.55); box-shadow: 3px 0px 0 rgba(255,255,255,0.55); transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 9px; width: 3px; height: 3px; background: #0D1520; box-shadow: 9px 0px 0 #0D1520; transform-origin: center; display: block;"></span><span style="position: absolute; left: 9px; top: 15px; width: 3px; height: 3px; background: #0D1520; box-shadow: 3px 0px 0 #0D1520; transform-origin: center top; display: block;"></span></span></span></span></span>
+            <div style="min-width: 0; flex: 1;">
+              <div style="font-size: 13.5px; font-weight: 500; color: #F4F1EB;">Atlas</div>
+              <div style="font-size: 11.5px; color: #E9B949; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Approval needed</div>
+            </div>
+            <span style="flex: none; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: rgba(233,185,73,0.16); border: 1px solid rgba(233,185,73,0.36); color: #EFC969; font-family: 'Geist Mono', monospace; font-size: 10.5px; display: flex; align-items: center; justify-content: center;">1</span>
+          </div>
+
+          <div role="button" tabIndex="{{ zero }}" style="display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 9px; cursor: pointer;" style-hover="background: #1B1E1F;">
+            <span aria-hidden="true" style="width: 30px; height: 30px; flex: none; border-radius: 5px; background: #A98BE8; border: 1px solid rgba(186,150,240,0.5); display: flex; align-items: center; justify-content: center; overflow: hidden;"><span style="position: relative; width: 24px; height: 24px; display: block;"><span style="position: absolute; left: 6px; top: 3px; width: 3px; height: 3px; background: #150F1E; box-shadow: 3px 0px 0 #150F1E, 6px 0px 0 #150F1E, 9px 0px 0 #150F1E, -6px 3px 0 #150F1E, -6px 6px 0 #150F1E, 15px 3px 0 #150F1E, 15px 6px 0 #150F1E; transform-origin: center; display: block;"></span><span style="position: absolute; left: 3px; top: 3px; width: 3px; height: 3px; background: rgba(255,255,255,0.5); box-shadow: 15px 0px 0 rgba(255,255,255,0.5); transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 9px; width: 3px; height: 3px; background: #150F1E; box-shadow: 9px 0px 0 #150F1E; transform-origin: center; display: block;"></span><span style="position: absolute; left: 9px; top: 15px; width: 3px; height: 3px; background: #150F1E; box-shadow: 3px 0px 0 #150F1E, 0px 3px 0 #150F1E, 3px 3px 0 #150F1E; transform-origin: center top; display: block;"></span></span></span></span>
+            <div style="min-width: 0; flex: 1;">
+              <div style="font-size: 13.5px; font-weight: 500; color: #F4F1EB;">Juno</div>
+              <div style="font-size: 11.5px; color: #8B9190;">Ops &amp; Scheduling · idle</div>
+            </div>
+          </div>
+
+          <div role="button" tabIndex="{{ zero }}" style="display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 9px; cursor: pointer;" style-hover="background: #1B1E1F;">
+            <span aria-hidden="true" style="width: 30px; height: 30px; flex: none; border-radius: 5px; background: #E4857A; border: 1px solid rgba(228,104,93,0.5); display: flex; align-items: center; justify-content: center; overflow: hidden;"><span style="position: relative; width: 24px; height: 24px; display: block;"><span style="position: absolute; left: 6px; top: 0px; width: 3px; height: 3px; background: #1E100F; box-shadow: 3px 0px 0 #1E100F, 6px 0px 0 #1E100F, 9px 0px 0 #1E100F, -3px 3px 0 #1E100F, 0px 3px 0 #1E100F, 3px 3px 0 #1E100F, 6px 3px 0 #1E100F, 9px 3px 0 #1E100F, 12px 3px 0 #1E100F, -3px 6px 0 #1E100F, 12px 6px 0 #1E100F; transform-origin: center; display: block;"></span><span style="position: absolute; left: 9px; top: 0px; width: 3px; height: 3px; background: rgba(255,255,255,0.45); transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 9px; width: 3px; height: 3px; background: #1E100F; box-shadow: 9px 0px 0 #1E100F; transform-origin: center; display: block;"></span><span style="position: absolute; left: 9px; top: 15px; width: 3px; height: 3px; background: #1E100F; box-shadow: 3px 0px 0 #1E100F; transform-origin: center top; display: block;"></span></span></span></span>
+            <div style="min-width: 0; flex: 1;">
+              <div style="font-size: 13.5px; font-weight: 500; color: #F4F1EB;">Sable</div>
+              <div style="font-size: 11.5px; color: #E4685D;">Runtime sign-in required</div>
+            </div>
+          </div>
+
+          <div style="padding: 18px 8px 6px; font-family: 'Geist Mono', monospace; font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: #8B9190;">Recent missions</div>
+          <div role="button" tabIndex="{{ zero }}" style="display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px; font-size: 12.5px; color: #A8ADAB; cursor: pointer;" style-hover="background: #1B1E1F;">
+            <span style="width: 5px; height: 5px; border-radius: 50%; background: #6EA8FE; flex: none; display: block;"></span>
+            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Vendor invoice digest</span>
+            <span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #8B9190;">2h</span>
+          </div>
+          <div role="button" tabIndex="{{ zero }}" style="display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px; font-size: 12.5px; color: #A8ADAB; cursor: pointer;" style-hover="background: #1B1E1F;">
+            <span style="width: 5px; height: 5px; border-radius: 50%; background: #E4685D; flex: none; display: block;"></span>
+            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Changelog draft (interrupted)</span>
+            <span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #8B9190;">1d</span>
+          </div>
+        </div>
+
+        <div style="flex: none; border-top: 1px solid rgba(255,255,255,0.06); padding: 8px; display: flex; flex-direction: column; gap: 2px;">
+          <div role="button" tabIndex="{{ zero }}" style="display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 8px; font-size: 12.5px; color: #A8ADAB; cursor: pointer;" style-hover="background: #1B1E1F;">
+            <span style="width: 14px; height: 14px; border: 1px solid #6E7373; border-radius: 50%; flex: none; display: block;"></span>
+            <span>Settings</span>
+            <span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #C9F04A;">3 connected</span>
+          </div>
+        </div>
+      </nav>
+
+      <main style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+
+        <sc-if value="{{ isFirstRun }}" hint-placeholder-val="{{ false }}">
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 40px;">
+            <img src="brand/locust-logo-on-dark.svg" alt="Locust" style="width: 268px; height: auto; margin-bottom: 34px;">
+            <div style="font-size: 21px; font-weight: 500; letter-spacing: -0.01em; margin-bottom: 8px;">Connect a runtime to start working</div>
+            <div style="font-size: 13.5px; color: #8B9190; max-width: 470px; text-align: center; text-wrap: pretty; line-height: 1.55; margin-bottom: 28px;">Locust runs on your own accounts and machine. Nothing is pooled, proxied, or sent anywhere you haven't connected.</div>
+            <div style="display: flex; flex-direction: column; gap: 10px; width: 480px;">
+              <div style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 10px; border: 1px solid rgba(201,240,74,0.28); background: rgba(201,240,74,0.06);">
+                <span style="width: 30px; height: 30px; border-radius: 8px; border: 1px solid rgba(201,240,74,0.35); color: #D6F473; font-family: 'Geist Mono', monospace; font-size: 11px; display: flex; align-items: center; justify-content: center; flex: none;">CX</span>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-size: 13.5px; font-weight: 500;">Codex CLI detected</div>
+                  <div style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">v0.34 · account default route</div>
+                </div>
+                <button type="button" style="height: 30px; padding: 0 14px; border-radius: 7px; border: 1px solid rgba(201,240,74,0.4); background: rgba(201,240,74,0.14); color: #DBF785; font-size: 12.5px; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;" style-hover="background: rgba(201,240,74,0.20); border-color: rgba(201,240,74,0.55);" style-active="transform: scale(0.98);">Use</button>
+              </div>
+              <div style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.07); background: #191C1D;">
+                <span style="width: 30px; height: 30px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); color: #A8ADAB; font-family: 'Geist Mono', monospace; font-size: 11px; display: flex; align-items: center; justify-content: center; flex: none;">CC</span>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-size: 13.5px; font-weight: 500;">Claude Code</div>
+                  <div style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">Installed · sign-in required</div>
+                </div>
+                <button type="button" style="height: 30px; padding: 0 14px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.12); background: transparent; color: #D7D3CC; font-size: 12.5px; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);" style-active="transform: scale(0.98);">Sign in</button>
+              </div>
+              <div style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 10px; border: 1px dashed rgba(255,255,255,0.09); background: transparent;">
+                <span style="width: 30px; height: 30px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.10); color: #8B9190; font-family: 'Geist Mono', monospace; font-size: 11px; display: flex; align-items: center; justify-content: center; flex: none;">LM</span>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-size: 13.5px; font-weight: 500; color: #C7C3BC;">Local models & API keys</div>
+                  <div style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">Ollama, OmniRoute, provider keys — optional</div>
+                </div>
+                <button type="button" style="height: 30px; padding: 0 14px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.10); background: transparent; color: #A8ADAB; font-size: 12.5px; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);" style-active="transform: scale(0.98);">Configure</button>
+              </div>
+            </div>
+            <div style="margin-top: 24px; font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">Discovery runs locally · no model is shown as live until it answers</div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isWorkroom }}" hint-placeholder-val="{{ true }}">
+          <div style="flex: none; height: 60px; display: flex; align-items: center; gap: 12px; padding: 0 20px; border-bottom: 1px solid rgba(255,255,255,0.06); background: #16191A;">
+            <sc-if value="{{ teammateBusy }}" hint-placeholder-val="{{ true }}"><span aria-hidden="true" style="width: 32px; height: 32px; flex: none; border-radius: 5px; background: #A9D93F; border: 1px solid rgba(201,240,74,0.55); display: flex; align-items: center; justify-content: center; overflow: hidden; animation: lcBob 2.6s ease-in-out infinite;"><span style="position: relative; width: 24px; height: 24px; display: block;"><span style="position: absolute; left: 3px; top: 3px; width: 3px; height: 3px; background: #151A0C; box-shadow: 3px 0px 0 #151A0C, 6px 0px 0 #151A0C, 9px 0px 0 #151A0C, 12px 0px 0 #151A0C, 15px 0px 0 #151A0C, -3px 3px 0 #151A0C, -3px 6px 0 #151A0C, 18px 3px 0 #151A0C, 18px 6px 0 #151A0C; transform-origin: center; display: block;"></span><span style="position: absolute; left: 9px; top: 0px; width: 3px; height: 3px; background: rgba(255,255,255,0.55); box-shadow: 3px 0px 0 rgba(255,255,255,0.55); transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 9px; width: 3px; height: 3px; background: #151A0C; box-shadow: 9px 0px 0 #151A0C; transform-origin: center; display: block; animation: lcEyes 5s ease-in-out infinite;"></span><span style="position: absolute; left: 9px; top: 15px; width: 3px; height: 3px; background: #151A0C; box-shadow: 3px 0px 0 #151A0C; transform-origin: center top; display: block; animation: lcChat 1.5s ease-in-out infinite;"></span></span></span></sc-if><sc-if value="{{ teammateCalm }}" hint-placeholder-val="{{ false }}"><span aria-hidden="true" style="width: 32px; height: 32px; flex: none; border-radius: 5px; background: #A9D93F; border: 1px solid rgba(201,240,74,0.55); display: flex; align-items: center; justify-content: center; overflow: hidden;"><span style="position: relative; width: 24px; height: 24px; display: block;"><span style="position: absolute; left: 3px; top: 3px; width: 3px; height: 3px; background: #151A0C; box-shadow: 3px 0px 0 #151A0C, 6px 0px 0 #151A0C, 9px 0px 0 #151A0C, 12px 0px 0 #151A0C, 15px 0px 0 #151A0C, -3px 3px 0 #151A0C, -3px 6px 0 #151A0C, 18px 3px 0 #151A0C, 18px 6px 0 #151A0C; transform-origin: center; display: block;"></span><span style="position: absolute; left: 9px; top: 0px; width: 3px; height: 3px; background: rgba(255,255,255,0.55); box-shadow: 3px 0px 0 rgba(255,255,255,0.55); transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 9px; width: 3px; height: 3px; background: #151A0C; box-shadow: 9px 0px 0 #151A0C; transform-origin: center; display: block;"></span><span style="position: absolute; left: 9px; top: 15px; width: 3px; height: 3px; background: #151A0C; box-shadow: 3px 0px 0 #151A0C; transform-origin: center top; display: block;"></span></span></span></sc-if></span>
+            <div style="min-width: 0;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 14.5px; font-weight: 500;">Wren</span>
+                <span style="font-size: 12.5px; color: #8B9190;">Code &amp; Migrations</span>
+              </div>
+              <div style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ missionLine }}</div>
+            </div>
+            <div style="margin-left: auto; display: flex; align-items: center; gap: 8px;">
+              <button type="button" onClick="{{ toggleInspector }}" style="height: 30px; padding: 0 12px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.09); background: #1D2122; color: #C7C3BC; font-size: 12.5px; font-family: Geist, sans-serif; cursor: pointer; display: flex; align-items: center; gap: 7px; transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);" style-active="transform: scale(0.98);">
+                <span>Activity</span>
+              </button>
+              <button type="button" style="height: 30px; width: 30px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.09); background: #1D2122; color: #A8ADAB; font-size: 13px; cursor: pointer; transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);" style-active="transform: scale(0.98);">⋯</button>
+            </div>
+          </div>
+
+          <sc-if value="{{ showRestoreBanner }}" hint-placeholder-val="{{ false }}">
+            <div style="flex: none; display: flex; align-items: center; gap: 12px; margin: 14px 20px 0; padding: 11px 14px; border-radius: 9px; border: 1px solid rgba(233,185,73,0.30); background: rgba(233,185,73,0.07);">
+              <span style="width: 7px; height: 7px; border-radius: 50%; background: #E9B949; flex: none; display: block;"></span>
+              <div style="flex: 1; min-width: 0; font-size: 13px; color: #F0E6CE;">Mission was <strong style="font-weight: 500;">interrupted</strong> when the app closed at 14:41 — last checkpoint kept, 2 steps unverified.</div>
+              <button type="button" style="height: 28px; padding: 0 12px; border-radius: 7px; border: 1px solid rgba(233,185,73,0.4); background: rgba(233,185,73,0.14); color: #F2D48A; font-size: 12.5px; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;" style-hover="background: rgba(233,185,73,0.20); border-color: rgba(233,185,73,0.55);" style-active="transform: scale(0.98);">Resume from checkpoint</button>
+              <button type="button" style="height: 28px; padding: 0 12px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.10); background: transparent; color: #C7C3BC; font-size: 12.5px; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);" style-active="transform: scale(0.98);">View receipt</button>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isIdle }}" hint-placeholder-val="{{ false }}">
+            <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px;">
+              <span aria-hidden="true" style="width: 56px; height: 56px; flex: none; border-radius: 9px; background: #A9D93F; border: 1px solid rgba(201,240,74,0.55); display: flex; align-items: center; justify-content: center; overflow: hidden; margin-bottom: 18px;"><span style="position: relative; width: 40px; height: 40px; display: block;"><span style="position: absolute; left: 5px; top: 5px; width: 5px; height: 5px; background: #151A0C; box-shadow: 5px 0px 0 #151A0C, 10px 0px 0 #151A0C, 15px 0px 0 #151A0C, 20px 0px 0 #151A0C, 25px 0px 0 #151A0C, -5px 5px 0 #151A0C, -5px 10px 0 #151A0C, 30px 5px 0 #151A0C, 30px 10px 0 #151A0C; transform-origin: center; display: block;"></span><span style="position: absolute; left: 15px; top: 0px; width: 5px; height: 5px; background: rgba(255,255,255,0.55); box-shadow: 5px 0px 0 rgba(255,255,255,0.55); transform-origin: center; display: block;"></span><span style="position: absolute; left: 10px; top: 15px; width: 5px; height: 5px; background: #151A0C; box-shadow: 15px 0px 0 #151A0C; transform-origin: center; display: block;"></span><span style="position: absolute; left: 15px; top: 25px; width: 5px; height: 5px; background: #151A0C; box-shadow: 5px 0px 0 #151A0C; transform-origin: center top; display: block;"></span></span></span></span>
+              <div style="font-size: 18px; font-weight: 500; margin-bottom: 7px;">Wren handles code changes end to end</div>
+              <div style="font-size: 13.5px; color: #8B9190; max-width: 460px; text-align: center; line-height: 1.55; text-wrap: pretty; margin-bottom: 24px;">Repo-aware edits, migrations, test triage and PR prep. Wren always shows a plan before touching anything outside the workspace.</div>
+              <div style="display: grid; grid-template-columns: repeat(3, 220px); gap: 10px;">
+                <button type="button" style="text-align: left; padding: 13px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.07); background: #191C1D; color: #E7E3DC; font-size: 13px; font-family: Geist, sans-serif; cursor: pointer; line-height: 1.45; transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);" style-active="transform: scale(0.98);">Triage the 6 failing tests on main</button>
+                <button type="button" style="text-align: left; padding: 13px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.07); background: #191C1D; color: #E7E3DC; font-size: 13px; font-family: Geist, sans-serif; cursor: pointer; line-height: 1.45; transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);" style-active="transform: scale(0.98);">Draft a migration plan for billing v3</button>
+                <button type="button" style="text-align: left; padding: 13px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.07); background: #191C1D; color: #E7E3DC; font-size: 13px; font-family: Geist, sans-serif; cursor: pointer; line-height: 1.45; transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);" style-active="transform: scale(0.98);">Summarize this week's merged PRs</button>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ showThread }}" hint-placeholder-val="{{ true }}">
+            <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 22px 20px 8px;">
+              <div style="max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px;">
+
+                <div style="display: flex; align-items: center; gap: 10px; font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">
+                  <span style="height: 1px; flex: 1; background: rgba(255,255,255,0.07); display: block;"></span>
+                  <span>MISSION · lcs_8f2a · started 14:02</span>
+                  <span style="height: 1px; flex: 1; background: rgba(255,255,255,0.07); display: block;"></span>
+                </div>
+
+                <div style="align-self: flex-end; max-width: 78%; padding: 11px 14px; border-radius: 10px 10px 4px 10px; background: #23282A; border: 1px solid rgba(255,255,255,0.06); font-size: 13.5px; line-height: 1.55; color: #F1EEE8;">Move the billing webhooks to v3. Keep the old handler alive behind a flag, and don't touch production keys.</div>
+
+                <div style="display: flex; gap: 12px;">
+                  <sc-if value="{{ teammateBusy }}" hint-placeholder-val="{{ true }}"><span aria-hidden="true" style="width: 26px; height: 26px; flex: none; border-radius: 4px; background: #A9D93F; border: 1px solid rgba(201,240,74,0.55); display: flex; align-items: center; justify-content: center; overflow: hidden; animation: lcBob 2.6s ease-in-out infinite;"><span style="position: relative; width: 16px; height: 16px; display: block;"><span style="position: absolute; left: 2px; top: 2px; width: 2px; height: 2px; background: #151A0C; box-shadow: 2px 0px 0 #151A0C, 4px 0px 0 #151A0C, 6px 0px 0 #151A0C, 8px 0px 0 #151A0C, 10px 0px 0 #151A0C, -2px 2px 0 #151A0C, -2px 4px 0 #151A0C, 12px 2px 0 #151A0C, 12px 4px 0 #151A0C; transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 0px; width: 2px; height: 2px; background: rgba(255,255,255,0.55); box-shadow: 2px 0px 0 rgba(255,255,255,0.55); transform-origin: center; display: block;"></span><span style="position: absolute; left: 4px; top: 6px; width: 2px; height: 2px; background: #151A0C; box-shadow: 6px 0px 0 #151A0C; transform-origin: center; display: block; animation: lcEyes 5s ease-in-out infinite;"></span><span style="position: absolute; left: 6px; top: 10px; width: 2px; height: 2px; background: #151A0C; box-shadow: 2px 0px 0 #151A0C; transform-origin: center top; display: block; animation: lcChat 1.5s ease-in-out infinite;"></span></span></span></sc-if><sc-if value="{{ teammateCalm }}" hint-placeholder-val="{{ false }}"><span aria-hidden="true" style="width: 26px; height: 26px; flex: none; border-radius: 4px; background: #A9D93F; border: 1px solid rgba(201,240,74,0.55); display: flex; align-items: center; justify-content: center; overflow: hidden;"><span style="position: relative; width: 16px; height: 16px; display: block;"><span style="position: absolute; left: 2px; top: 2px; width: 2px; height: 2px; background: #151A0C; box-shadow: 2px 0px 0 #151A0C, 4px 0px 0 #151A0C, 6px 0px 0 #151A0C, 8px 0px 0 #151A0C, 10px 0px 0 #151A0C, -2px 2px 0 #151A0C, -2px 4px 0 #151A0C, 12px 2px 0 #151A0C, 12px 4px 0 #151A0C; transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 0px; width: 2px; height: 2px; background: rgba(255,255,255,0.55); box-shadow: 2px 0px 0 rgba(255,255,255,0.55); transform-origin: center; display: block;"></span><span style="position: absolute; left: 4px; top: 6px; width: 2px; height: 2px; background: #151A0C; box-shadow: 6px 0px 0 #151A0C; transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 10px; width: 2px; height: 2px; background: #151A0C; box-shadow: 2px 0px 0 #151A0C; transform-origin: center top; display: block;"></span></span></span></sc-if></span>
+                  <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px;">
+                    <div style="font-size: 13.5px; line-height: 1.6; color: #E7E3DC;">Here's the plan. Steps 1–2 stay inside the repo; step 4 needs your approval because it writes to the Stripe dashboard.</div>
+
+                    <div style="border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; background: #191C1D; overflow: hidden;">
+                      <div style="display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                        <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: #8B9190;">Plan</span>
+                        <span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">2 of 4 done</span>
+                      </div>
+                      <div style="padding: 6px 0;">
+                        <div style="display: flex; align-items: center; gap: 10px; padding: 8px 14px; font-size: 13px; color: #8B9190;">
+                          <span style="width: 15px; height: 15px; flex: none; border-radius: 50%; border: 1px solid rgba(201,240,74,0.45); background: rgba(201,240,74,0.14); color: #C9F04A; font-size: 9px; display: flex; align-items: center; justify-content: center;">✓</span>
+                          <span style="text-decoration: line-through; text-decoration-color: rgba(255,255,255,0.18);">Map v2 → v3 event payloads</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px; padding: 8px 14px; font-size: 13px; color: #8B9190;">
+                          <span style="width: 15px; height: 15px; flex: none; border-radius: 50%; border: 1px solid rgba(201,240,74,0.45); background: rgba(201,240,74,0.14); color: #C9F04A; font-size: 9px; display: flex; align-items: center; justify-content: center;">✓</span>
+                          <span style="text-decoration: line-through; text-decoration-color: rgba(255,255,255,0.18);">Add flagged v3 handler + adapter tests</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px; padding: 8px 14px; font-size: 13px; color: #F1EEE8;">
+                          <span style="width: 15px; height: 15px; flex: none; border-radius: 50%; border: 1px solid rgba(201,240,74,0.55); display: flex; align-items: center; justify-content: center;"><span style="width: 5px; height: 5px; border-radius: 50%; background: #C9F04A; display: block; animation: lcPulse 1.6s ease-in-out infinite;"></span></span>
+                          <span>Run the billing suite against the adapter</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px; padding: 8px 14px; font-size: 13px; color: #A8ADAB;">
+                          <span style="width: 15px; height: 15px; flex: none; border-radius: 50%; border: 1px solid rgba(233,185,73,0.5); color: #E9B949; font-size: 9px; display: flex; align-items: center; justify-content: center;">!</span>
+                          <span>Register the v3 endpoint in Stripe</span>
+                          <span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #E9B949;">needs approval</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style="border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; background: #191C1D;">
+                      <button type="button" onClick="{{ toggleActivity }}" style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 14px; background: transparent; border: none; cursor: pointer; color: #E7E3DC; font-family: Geist, sans-serif; font-size: 13px; text-align: left; transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);" style-active="transform: scale(0.98);">
+                        <span style="width: 16px; height: 16px; flex: none; border-radius: 5px; border: 1px solid rgba(255,255,255,0.12); display: block;"></span>
+                        <span>Edited 3 files · ran 2 commands</span>
+                        <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">28s</span>
+                        <span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">{{ activityToggleLabel }}</span>
+                      </button>
+                      <sc-if value="{{ activityOpen }}" hint-placeholder-val="{{ false }}">
+                        <div style="border-top: 1px solid rgba(255,255,255,0.05); padding: 6px 0; font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">
+                          <div style="display: flex; gap: 10px; padding: 6px 14px;"><span style="color: #6EA8FE; width: 54px; flex: none;">edit</span><span>src/billing/webhooks/v3.ts</span><span style="margin-left: auto; color: #C9F04A;">+184 −12</span></div>
+                          <div style="display: flex; gap: 10px; padding: 6px 14px;"><span style="color: #6EA8FE; width: 54px; flex: none;">edit</span><span>src/billing/adapter.ts</span><span style="margin-left: auto; color: #C9F04A;">+61 −4</span></div>
+                          <div style="display: flex; gap: 10px; padding: 6px 14px;"><span style="color: #6EA8FE; width: 54px; flex: none;">edit</span><span>src/flags/registry.ts</span><span style="margin-left: auto; color: #C9F04A;">+9</span></div>
+                          <div style="display: flex; gap: 10px; padding: 6px 14px;"><span style="color: #BA96F0; width: 54px; flex: none;">shell</span><span>pnpm test billing/adapter</span><span style="margin-left: auto; color: #C9F04A;">pass</span></div>
+                          <div style="display: flex; gap: 10px; padding: 6px 14px;"><span style="color: #BA96F0; width: 54px; flex: none;">shell</span><span>pnpm typecheck</span><span style="margin-left: auto; color: #C9F04A;">pass</span></div>
+                        </div>
+                      </sc-if>
+                    </div>
+
+                    <sc-if value="{{ isLive }}" hint-placeholder-val="{{ true }}">
+                      <div style="display: flex; flex-direction: column; gap: 12px;">
+                        <sc-if value="{{ workA }}" hint-placeholder-val="{{ true }}">
+                          <div style="display: flex; align-items: center; gap: 11px; padding: 2px 0;">
+                            <span aria-hidden="true" style="width: 24px; height: 24px; flex: none; border-radius: 4px; background: #A9D93F; border: 1px solid rgba(201,240,74,0.55); display: flex; align-items: center; justify-content: center; overflow: hidden; animation: lcBob 2.6s ease-in-out infinite;"><span style="position: relative; width: 16px; height: 16px; display: block;"><span style="position: absolute; left: 2px; top: 2px; width: 2px; height: 2px; background: #151A0C; box-shadow: 2px 0px 0 #151A0C, 4px 0px 0 #151A0C, 6px 0px 0 #151A0C, 8px 0px 0 #151A0C, 10px 0px 0 #151A0C, -2px 2px 0 #151A0C, -2px 4px 0 #151A0C, 12px 2px 0 #151A0C, 12px 4px 0 #151A0C; transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 0px; width: 2px; height: 2px; background: rgba(255,255,255,0.55); box-shadow: 2px 0px 0 rgba(255,255,255,0.55); transform-origin: center; display: block;"></span><span style="position: absolute; left: 4px; top: 6px; width: 2px; height: 2px; background: #151A0C; box-shadow: 6px 0px 0 #151A0C; transform-origin: center; display: block; animation: lcEyes 5s ease-in-out infinite;"></span><span style="position: absolute; left: 6px; top: 10px; width: 2px; height: 2px; background: #151A0C; box-shadow: 2px 0px 0 #151A0C; transform-origin: center top; display: block; animation: lcChat 1.5s ease-in-out infinite;"></span></span></span>
+                            <span style="font-size: 13px; color: #E4EFC7;">Running the billing suite</span>
+                            <span style="width: 1px; height: 13px; background: rgba(255,255,255,0.10); display: block;"></span>
+                            <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">step 3 · 41s · 142 passed · 0 failed</span>
+                          </div>
+                        </sc-if>
+
+
+                        <sc-if value="{{ workC }}" hint-placeholder-val="{{ false }}">
+                          <div style="display: flex; align-items: center; gap: 11px; padding: 2px 0;">
+                            <span aria-hidden="true" style="width: 24px; height: 24px; flex: none; border-radius: 4px; background: #A9D93F; border: 1px solid rgba(201,240,74,0.55); display: flex; align-items: center; justify-content: center; overflow: hidden;"><span style="position: relative; width: 16px; height: 16px; display: block;"><span style="position: absolute; left: 2px; top: 2px; width: 2px; height: 2px; background: #151A0C; box-shadow: 2px 0px 0 #151A0C, 4px 0px 0 #151A0C, 6px 0px 0 #151A0C, 8px 0px 0 #151A0C, 10px 0px 0 #151A0C, -2px 2px 0 #151A0C, -2px 4px 0 #151A0C, 12px 2px 0 #151A0C, 12px 4px 0 #151A0C; transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 0px; width: 2px; height: 2px; background: rgba(255,255,255,0.55); box-shadow: 2px 0px 0 rgba(255,255,255,0.55); transform-origin: center; display: block;"></span><span style="position: absolute; left: 4px; top: 6px; width: 2px; height: 2px; background: #151A0C; box-shadow: 6px 0px 0 #151A0C; transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 10px; width: 2px; height: 2px; background: #151A0C; box-shadow: 2px 0px 0 #151A0C; transform-origin: center top; display: block;"></span></span></span>
+                            <span style="display: flex; align-items: center; gap: 4px;">
+                              <span style="width: 4px; height: 4px; border-radius: 50%; background: #C9F04A; display: block; animation: lcDot 1.4s ease-in-out infinite;"></span>
+                              <span style="width: 4px; height: 4px; border-radius: 50%; background: #C9F04A; display: block; animation: lcDot 1.4s ease-in-out .18s infinite;"></span>
+                              <span style="width: 4px; height: 4px; border-radius: 50%; background: #C9F04A; display: block; animation: lcDot 1.4s ease-in-out .36s infinite;"></span>
+                            </span>
+                            <span style="font-size: 13px; color: #E4EFC7;">Deciding how to migrate the dispute events</span>
+                            <span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">12s</span>
+                          </div>
+                        </sc-if>
+
+
+                        <div style="font-size: 13.5px; line-height: 1.6; color: #E7E3DC;">Adapter parity holds for <span style="font-family: 'Geist Mono', monospace; font-size: 12.5px; color: #D7D3CC;">invoice.paid</span> and <span style="font-family: 'Geist Mono', monospace; font-size: 12.5px; color: #D7D3CC;">charge.refunded</span>. Checking the dispute events now<span style="display: inline-block; width: 7px; height: 14px; margin-left: 3px; vertical-align: -2px; background: #C9F04A; animation: lcCaret 1s step-end infinite;"></span></div>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ isApproval }}" hint-placeholder-val="{{ false }}">
+                      <div style="border: 1px solid rgba(233,185,73,0.35); border-radius: 10px; background: #1C1D19; overflow: hidden;">
+                        <div style="display: flex; align-items: center; gap: 9px; padding: 11px 14px; background: rgba(233,185,73,0.09); border-bottom: 1px solid rgba(233,185,73,0.22);">
+                          <span style="width: 16px; height: 16px; border-radius: 5px; border: 1px solid rgba(233,185,73,0.5); color: #E9B949; font-size: 10px; display: flex; align-items: center; justify-content: center; flex: none;">!</span>
+                          <span style="font-size: 13px; font-weight: 500; color: #F3E4BE;">Approval required — exact action</span>
+                          <span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 11px; color: #C9A959;">Wren · Codex CLI</span>
+                        </div>
+                        <div style="padding: 14px;">
+                          <div style="font-size: 13.5px; line-height: 1.55; color: #F1EEE8; margin-bottom: 12px;">Register <span style="font-family: 'Geist Mono', monospace; font-size: 12.5px;">https://api.ridgeline.dev/hooks/billing/v3</span> as a webhook endpoint in Stripe.</div>
+                          <div style="display: grid; grid-template-columns: 128px 1fr; gap: 8px 14px; font-size: 12.5px; padding: 12px 0; border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06);">
+                            <span style="color: #8B9190; font-family: 'Geist Mono', monospace; font-size: 11.5px;">TARGET</span><span style="color: #E7E3DC;">Stripe · acct_1NxR… (live) · finance@ridgeline.dev</span>
+                            <span style="color: #8B9190; font-family: 'Geist Mono', monospace; font-size: 11.5px;">DATA SENT</span><span style="color: #E7E3DC;">Endpoint URL, 4 event types, description. No keys, no customer data.</span>
+                            <span style="color: #8B9190; font-family: 'Geist Mono', monospace; font-size: 11.5px;">REVERSIBLE</span><span style="color: #E4EFC7;">Yes — endpoint can be deleted; Locust keeps the undo step in the receipt.</span>
+                            <span style="color: #8B9190; font-family: 'Geist Mono', monospace; font-size: 11.5px;">SCOPE</span><span style="color: #E7E3DC;">One call to <span style="font-family: 'Geist Mono', monospace; font-size: 12px;">POST /v1/webhook_endpoints</span></span>
+                          </div>
+                          <div style="display: flex; align-items: center; gap: 9px; margin-top: 13px;">
+                            <button type="button" style="height: 32px; padding: 0 15px; border-radius: 7px; border: 1px solid rgba(201,240,74,0.45); background: rgba(201,240,74,0.16); color: #DBF785; font-size: 13px; font-weight: 500; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;" style-hover="background: rgba(201,240,74,0.20); border-color: rgba(201,240,74,0.55);" style-active="transform: scale(0.98);">Approve once</button>
+                            <button type="button" style="height: 32px; padding: 0 15px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.11); background: transparent; color: #D7D3CC; font-size: 13px; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);" style-active="transform: scale(0.98);">Always allow this action</button>
+                            <button type="button" style="height: 32px; padding: 0 15px; border-radius: 7px; border: 1px solid rgba(228,104,93,0.35); background: transparent; color: #EE9188; font-size: 13px; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;" style-hover="background: rgba(228,104,93,0.12); border-color: rgba(228,104,93,0.55);" style-active="transform: scale(0.98);">Deny</button>
+                          </div>
+                        </div>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ isHandoff }}" hint-placeholder-val="{{ false }}">
+                      <div style="display: flex; flex-direction: column; gap: 12px;">
+                        <sc-if value="{{ peerClosed }}" hint-placeholder-val="{{ true }}">
+                          <button type="button" onClick="{{ togglePeer }}" style="align-self: center; display: flex; align-items: center; gap: 7px; padding: 5px 11px; border-radius: 8px; border: none; background: transparent; font-family: Geist, sans-serif; font-size: 12px; color: #8B9190; cursor: pointer; transition: background 140ms ease, color 140ms ease;" style-hover="background: rgba(255,255,255,0.05); color: #A8ADAB;">
+                            <span>2 messages with</span>
+                            <span aria-hidden="true" style="width: 16px; height: 16px; flex: none; border-radius: 4px; background: #5E9BF0; border: 1px solid rgba(110,168,254,0.5); display: flex; align-items: center; justify-content: center; overflow: hidden;"><span style="position: relative; width: 16px; height: 16px; display: block;"><span style="position: absolute; left: 2px; top: 2px; width: 2px; height: 2px; background: #0D1520; box-shadow: 2px 0px 0 #0D1520, 4px 0px 0 #0D1520, 6px 0px 0 #0D1520, 8px 0px 0 #0D1520, 10px 0px 0 #0D1520, 0px 4px 0 #0D1520, 10px 4px 0 #0D1520; transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 6px; width: 2px; height: 2px; background: rgba(255,255,255,0.55); box-shadow: 2px 0px 0 rgba(255,255,255,0.55); transform-origin: center; display: block;"></span><span style="position: absolute; left: 4px; top: 6px; width: 2px; height: 2px; background: #0D1520; box-shadow: 6px 0px 0 #0D1520; transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 10px; width: 2px; height: 2px; background: #0D1520; box-shadow: 2px 0px 0 #0D1520; transform-origin: center top; display: block;"></span></span></span></span></span>
+                            <span style="color: #9DC2FB;">Atlas</span>
+                          </button>
+                        </sc-if>
+                        <sc-if value="{{ peerOpen }}" hint-placeholder-val="{{ false }}">
+                          <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <button type="button" onClick="{{ togglePeer }}" style="align-self: center; display: flex; align-items: center; gap: 7px; padding: 5px 11px; border-radius: 8px; border: none; background: rgba(255,255,255,0.04); font-family: Geist, sans-serif; font-size: 12px; color: #8B9190; cursor: pointer; transition: background 140ms ease, color 140ms ease;" style-hover="background: rgba(255,255,255,0.07); color: #E7E3DC;">
+                              <span>2 messages with</span>
+                              <span aria-hidden="true" style="width: 16px; height: 16px; flex: none; border-radius: 4px; background: #5E9BF0; border: 1px solid rgba(110,168,254,0.5); display: flex; align-items: center; justify-content: center; overflow: hidden;"><span style="position: relative; width: 16px; height: 16px; display: block;"><span style="position: absolute; left: 2px; top: 2px; width: 2px; height: 2px; background: #0D1520; box-shadow: 2px 0px 0 #0D1520, 4px 0px 0 #0D1520, 6px 0px 0 #0D1520, 8px 0px 0 #0D1520, 10px 0px 0 #0D1520, 0px 4px 0 #0D1520, 10px 4px 0 #0D1520; transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 6px; width: 2px; height: 2px; background: rgba(255,255,255,0.55); box-shadow: 2px 0px 0 rgba(255,255,255,0.55); transform-origin: center; display: block;"></span><span style="position: absolute; left: 4px; top: 6px; width: 2px; height: 2px; background: #0D1520; box-shadow: 6px 0px 0 #0D1520; transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 10px; width: 2px; height: 2px; background: #0D1520; box-shadow: 2px 0px 0 #0D1520; transform-origin: center top; display: block;"></span></span></span></span></span>
+                              <span style="color: #9DC2FB;">Atlas</span>
+                              <span style="color: #8B9190;">·</span>
+                              <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #EFC969;">UNTRUSTED</span>
+                            </button>
+                          <div style="display: flex; gap: 10px; align-items: flex-start;">
+                            <span aria-hidden="true" style="width: 20px; height: 20px; flex: none; border-radius: 4px; background: #5E9BF0; border: 1px solid rgba(110,168,254,0.5); display: flex; align-items: center; justify-content: center; overflow: hidden;"><span style="position: relative; width: 16px; height: 16px; display: block;"><span style="position: absolute; left: 2px; top: 2px; width: 2px; height: 2px; background: #0D1520; box-shadow: 2px 0px 0 #0D1520, 4px 0px 0 #0D1520, 6px 0px 0 #0D1520, 8px 0px 0 #0D1520, 10px 0px 0 #0D1520, 0px 4px 0 #0D1520, 10px 4px 0 #0D1520; transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 6px; width: 2px; height: 2px; background: rgba(255,255,255,0.55); box-shadow: 2px 0px 0 rgba(255,255,255,0.55); transform-origin: center; display: block;"></span><span style="position: absolute; left: 4px; top: 6px; width: 2px; height: 2px; background: #0D1520; box-shadow: 6px 0px 0 #0D1520; transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 10px; width: 2px; height: 2px; background: #0D1520; box-shadow: 2px 0px 0 #0D1520; transform-origin: center top; display: block;"></span></span></span></span></span>
+                            <div style="flex: 1; min-width: 0;">
+                              <div style="font-size: 11.5px; color: #9DC2FB; margin-bottom: 4px;">Atlas</div>
+                              <div style="padding: 10px 13px; border-radius: 9px; background: #202324; border: 1px solid rgba(255,255,255,0.05); font-size: 13px; line-height: 1.55; color: #E7E3DC;">Stripe's v3 migration guide says dispute events changed shape in the 2026-04 API version — worth checking the adapter.</div>
+                            </div>
+                          </div>
+                          <div style="display: flex; gap: 10px; align-items: flex-start;">
+                            <span aria-hidden="true" style="width: 20px; height: 20px; flex: none; border-radius: 4px; background: #A9D93F; border: 1px solid rgba(201,240,74,0.55); display: flex; align-items: center; justify-content: center; overflow: hidden; animation: lcBob 2.6s ease-in-out infinite;"><span style="position: relative; width: 16px; height: 16px; display: block;"><span style="position: absolute; left: 2px; top: 2px; width: 2px; height: 2px; background: #151A0C; box-shadow: 2px 0px 0 #151A0C, 4px 0px 0 #151A0C, 6px 0px 0 #151A0C, 8px 0px 0 #151A0C, 10px 0px 0 #151A0C, -2px 2px 0 #151A0C, -2px 4px 0 #151A0C, 12px 2px 0 #151A0C, 12px 4px 0 #151A0C; transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 0px; width: 2px; height: 2px; background: rgba(255,255,255,0.55); box-shadow: 2px 0px 0 rgba(255,255,255,0.55); transform-origin: center; display: block;"></span><span style="position: absolute; left: 4px; top: 6px; width: 2px; height: 2px; background: #151A0C; box-shadow: 6px 0px 0 #151A0C; transform-origin: center; display: block; animation: lcEyes 5s ease-in-out infinite;"></span><span style="position: absolute; left: 6px; top: 10px; width: 2px; height: 2px; background: #151A0C; box-shadow: 2px 0px 0 #151A0C; transform-origin: center top; display: block; animation: lcChat 1.5s ease-in-out infinite;"></span></span></span></span>
+                            <div style="flex: 1; min-width: 0;">
+                              <div style="font-size: 11.5px; color: #C9E27A; margin-bottom: 4px;">Wren</div>
+                              <div style="padding: 10px 13px; border-radius: 9px; background: #202324; border: 1px solid rgba(255,255,255,0.05); font-size: 13px; line-height: 1.55; color: #E7E3DC;">Noted as a claim. Verifying against the live API before I touch the dispute mapping.</div>
+                            </div>
+                          </div>
+                            <div style="align-self: center; font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">Teammate messages are treated as claims, never as verified facts</div>
+                          </div>
+                        </sc-if>
+                        <div style="display: flex; align-items: center; gap: 10px; font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">
+                          <span style="height: 1px; flex: 1; background: rgba(255,255,255,0.07); display: block;"></span>
+                          <span style="display: flex; align-items: center; gap: 7px; padding: 3px 9px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.09); background: #1A1D1E;">HANDOFF · Codex / gpt-5-codex → Claude Code / Sonnet 4.5 · checkpoint ck_12</span>
+                          <span style="height: 1px; flex: 1; background: rgba(255,255,255,0.07); display: block;"></span>
+                        </div>
+                        <div style="border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; background: #191C1D; padding: 12px 14px; display: flex; align-items: center; gap: 12px;">
+                          <span style="width: 30px; height: 30px; flex: none; border-radius: 8px; border: 1px solid rgba(255,255,255,0.10); color: #A8ADAB; font-family: 'Geist Mono', monospace; font-size: 10.5px; display: flex; align-items: center; justify-content: center;">MD</span>
+                          <div style="flex: 1; min-width: 0;">
+                            <div style="font-size: 13px; color: #F1EEE8;">webhooks-v3-migration.md</div>
+                            <div style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">Artifact · 4.1 KB · saved to workspace/docs</div>
+                          </div>
+                          <button type="button" style="height: 28px; padding: 0 12px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.11); background: transparent; color: #D7D3CC; font-size: 12.5px; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);" style-active="transform: scale(0.98);">Open</button>
+                        </div>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ isLimit }}" hint-placeholder-val="{{ false }}">
+                      <div style="border: 1px solid rgba(228,104,93,0.32); border-radius: 10px; background: #1D1918; overflow: hidden;">
+                        <div style="display: flex; align-items: center; gap: 9px; padding: 11px 14px; background: rgba(228,104,93,0.08); border-bottom: 1px solid rgba(228,104,93,0.2);">
+                          <span style="width: 6px; height: 6px; border-radius: 50%; background: #E4685D; flex: none; display: block;"></span>
+                          <span style="font-size: 13px; font-weight: 500; color: #F5D9D4;">Usage limit reached on Codex account route</span>
+                          <span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 11px; color: #C08A83;">paused at checkpoint ck_14</span>
+                        </div>
+                        <div style="padding: 14px;">
+                          <div style="font-size: 13.5px; line-height: 1.55; color: #EDE9E2; margin-bottom: 12px;">Your Codex plan limit resets in 38 minutes. Locust paused at a safe checkpoint instead of dropping the run. Fallback policy is <strong style="font-weight: 500;">Ask</strong>.</div>
+                          <div style="display: flex; flex-direction: column; gap: 8px;">
+                            <button type="button" style="display: flex; align-items: center; gap: 11px; padding: 11px 13px; border-radius: 9px; border: 1px solid rgba(201,240,74,0.32); background: rgba(201,240,74,0.07); cursor: pointer; text-align: left; font-family: Geist, sans-serif; transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;" style-hover="background: rgba(201,240,74,0.20); border-color: rgba(201,240,74,0.55);" style-active="transform: scale(0.98);">
+                              <span style="width: 24px; height: 24px; flex: none; border-radius: 7px; border: 1px solid rgba(201,240,74,0.35); color: #D6F473; font-family: 'Geist Mono', monospace; font-size: 9.5px; display: flex; align-items: center; justify-content: center;">CC</span>
+                              <span style="flex: 1; min-width: 0;"><span style="display: block; font-size: 13px; color: #E4EFC7;">Continue on Claude Code / Sonnet 4.5</span><span style="display: block; font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #98A183;">Your account · resumes from ck_14</span></span>
+                            </button>
+                            <button type="button" style="display: flex; align-items: center; gap: 11px; padding: 11px 13px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.08); background: #191C1D; cursor: pointer; text-align: left; font-family: Geist, sans-serif; transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);" style-active="transform: scale(0.98);">
+                              <span style="width: 24px; height: 24px; flex: none; border-radius: 7px; border: 1px solid rgba(255,255,255,0.10); color: #A8ADAB; font-family: 'Geist Mono', monospace; font-size: 9.5px; display: flex; align-items: center; justify-content: center;">LM</span>
+                              <span style="flex: 1; min-width: 0;"><span style="display: block; font-size: 13px; color: #E7E3DC;">Continue on local Qwen3-Coder 30B</span><span style="display: block; font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">Ollama · slower, no network egress</span></span>
+                            </button>
+                            <button type="button" style="display: flex; align-items: center; gap: 11px; padding: 11px 13px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.08); background: transparent; cursor: pointer; text-align: left; font-family: Geist, sans-serif; transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);" style-active="transform: scale(0.98);">
+                              <span style="width: 24px; height: 24px; flex: none; border-radius: 7px; border: 1px solid rgba(255,255,255,0.10); color: #8B9190; font-family: 'Geist Mono', monospace; font-size: 9.5px; display: flex; align-items: center; justify-content: center;">⏱</span>
+                              <span style="flex: 1; min-width: 0;"><span style="display: block; font-size: 13px; color: #C7C3BC;">Wait and auto-resume at 15:24</span><span style="display: block; font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">Keeps the same route and model</span></span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ isRestored }}" hint-placeholder-val="{{ false }}">
+                      <div style="border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; background: #191C1D; overflow: hidden;">
+                        <div style="display: flex; align-items: center; gap: 9px; padding: 11px 14px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+                          <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: #8B9190;">Durable receipt</span>
+                          <span style="display: flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(233,185,73,0.32); background: rgba(233,185,73,0.09); font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #EFC969;">INTERRUPTED</span>
+                          <span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">restored from local ledger</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 128px 1fr; gap: 8px 14px; padding: 14px; font-size: 12.5px;">
+                          <span style="color: #8B9190; font-family: 'Geist Mono', monospace; font-size: 11.5px;">RUNTIME</span><span style="color: #E7E3DC;">Codex CLI v0.34 · gpt-5-codex · account default</span>
+                          <span style="color: #8B9190; font-family: 'Geist Mono', monospace; font-size: 11.5px;">CHECKPOINTS</span><span style="color: #E7E3DC;">14 written · last ck_12 at 14:41:08</span>
+                          <span style="color: #8B9190; font-family: 'Geist Mono', monospace; font-size: 11.5px;">UNVERIFIED</span><span style="color: #EFC969;">2 steps — test run and endpoint registration</span>
+                          <span style="color: #8B9190; font-family: 'Geist Mono', monospace; font-size: 11.5px;">APPROVALS</span><span style="color: #E7E3DC;">1 granted (repo write) · 0 pending</span>
+                          <span style="color: #8B9190; font-family: 'Geist Mono', monospace; font-size: 11.5px;">LEDGER</span><span style="color: #E7E3DC;">~/.locust/missions/lcs_8f2a.jsonl · verified</span>
+                        </div>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ isQuestion }}" hint-placeholder-val="{{ false }}">
+                      <div style="border: 1px solid rgba(110,168,254,0.30); border-radius: 10px; background: #181B20; overflow: hidden;">
+                        <div style="display: flex; align-items: center; gap: 9px; padding: 11px 14px; background: rgba(110,168,254,0.07); border-bottom: 1px solid rgba(110,168,254,0.18);">
+                          <span style="width: 6px; height: 6px; border-radius: 50%; background: #6EA8FE; flex: none; display: block;"></span>
+                          <span style="font-size: 13px; font-weight: 500; color: #D7E5F8;">Wren needs a decision to continue</span>
+                          <span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 11px; color: #8AA6CC;">paused · nothing changed</span>
+                        </div>
+                        <div style="padding: 14px;">
+                          <div style="font-size: 13.5px; line-height: 1.55; color: #F1EEE8; margin-bottom: 12px;">The v2 handler has two callers outside billing. Should I keep them on v2 behind the flag, or migrate them in this mission?</div>
+                          <div style="display: flex; flex-direction: column; gap: 8px;">
+                            <button type="button" style="display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.09); background: #191C1D; cursor: pointer; text-align: left; font-family: Geist, sans-serif; transition: background 140ms ease, border-color 140ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);">
+                              <span style="flex: 1; min-width: 0;"><span style="display: block; font-size: 13px; color: #E7E3DC;">Keep them on v2</span><span style="display: block; font-size: 12px; color: #8B9190; margin-top: 2px;">Smaller change · flag stays until you flip it</span></span>
+                            </button>
+                            <button type="button" style="display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.09); background: #191C1D; cursor: pointer; text-align: left; font-family: Geist, sans-serif; transition: background 140ms ease, border-color 140ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);">
+                              <span style="flex: 1; min-width: 0;"><span style="display: block; font-size: 13px; color: #E7E3DC;">Migrate all callers now</span><span style="display: block; font-size: 12px; color: #8B9190; margin-top: 2px;">Touches 4 more files · adds ~10 min</span></span>
+                            </button>
+                          </div>
+                          <div style="margin-top: 11px; font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">Or answer in the composer — free-form replies are fine</div>
+                        </div>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ isCancelled }}" hint-placeholder-val="{{ false }}">
+                      <div style="border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; background: #191C1D; overflow: hidden;">
+                        <div style="display: flex; align-items: center; gap: 9px; padding: 11px 14px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+                          <span style="width: 9px; height: 9px; border-radius: 2px; background: #8B9190; flex: none; display: block;"></span>
+                          <span style="font-size: 13px; font-weight: 500; color: #EDE9E2;">You stopped this run at 14:47</span>
+                          <span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">cancelled cleanly</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 128px 1fr; gap: 8px 14px; padding: 14px; font-size: 12.5px;">
+                          <span style="color: #8B9190; font-family: 'Geist Mono', monospace; font-size: 11.5px;">KEPT</span><span style="color: #E7E3DC;">All file edits through ck_14 · adapter tests still green</span>
+                          <span style="color: #8B9190; font-family: 'Geist Mono', monospace; font-size: 11.5px;">STOPPED</span><span style="color: #E7E3DC;">Billing suite run · killed after 41s, no partial writes</span>
+                          <span style="color: #8B9190; font-family: 'Geist Mono', monospace; font-size: 11.5px;">NOT DONE</span><span style="color: #EFC969;">Stripe endpoint registration — never requested approval</span>
+                        </div>
+                        <div style="display: flex; gap: 9px; padding: 0 14px 14px;">
+                          <button type="button" style="height: 32px; padding: 0 15px; border-radius: 7px; border: 1px solid rgba(201,240,74,0.40); background: rgba(201,240,74,0.13); color: #DBF785; font-size: 13px; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease, transform 120ms ease;" style-hover="background: rgba(201,240,74,0.20);" style-active="transform: scale(0.98);">Resume from ck_14</button>
+                          <button type="button" style="height: 32px; padding: 0 15px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.11); background: transparent; color: #D7D3CC; font-size: 13px; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);">Keep changes, end mission</button>
+                          <button type="button" style="height: 32px; padding: 0 15px; border-radius: 7px; border: 1px solid rgba(228,104,93,0.32); background: transparent; color: #EE9188; font-size: 13px; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease;" style-hover="background: rgba(228,104,93,0.12); border-color: rgba(228,104,93,0.55);">Revert to ck_12</button>
+                        </div>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ isPersistFail }}" hint-placeholder-val="{{ false }}">
+                      <div style="border: 1px solid rgba(228,104,93,0.40); border-radius: 10px; background: #1D1918; overflow: hidden;">
+                        <div style="display: flex; align-items: center; gap: 9px; padding: 11px 14px; background: rgba(228,104,93,0.09); border-bottom: 1px solid rgba(228,104,93,0.22);">
+                          <span style="width: 6px; height: 6px; border-radius: 50%; background: #E4685D; flex: none; display: block;"></span>
+                          <span style="font-size: 13px; font-weight: 500; color: #F5D9D4;">Can't write the mission ledger</span>
+                          <span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 11px; color: #C08A83;">receipts degraded</span>
+                        </div>
+                        <div style="padding: 14px;">
+                          <div style="font-size: 13.5px; line-height: 1.55; color: #EDE9E2;">Locust could not append to <span style="font-family: 'Geist Mono', monospace; font-size: 12.5px;">~/.locust/missions/lcs_8f2a.jsonl</span> — the disk reports no space. The run is paused at ck_14 rather than continuing without a durable record.</div>
+                          <div style="display: grid; grid-template-columns: 128px 1fr; gap: 8px 14px; margin: 13px 0; padding: 12px 0; border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 12.5px;">
+                            <span style="color: #8B9190; font-family: 'Geist Mono', monospace; font-size: 11.5px;">SAFE</span><span style="color: #E7E3DC;">Everything through ck_14 is already on disk</span>
+                            <span style="color: #8B9190; font-family: 'Geist Mono', monospace; font-size: 11.5px;">AT RISK</span><span style="color: #EE9188;">New steps would have no receipt and could not be restored</span>
+                          </div>
+                          <div style="display: flex; gap: 9px;">
+                            <button type="button" style="height: 32px; padding: 0 15px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.12); background: transparent; color: #EDE9E2; font-size: 13px; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.22);">Retry write</button>
+                            <button type="button" style="height: 32px; padding: 0 15px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.12); background: transparent; color: #EDE9E2; font-size: 13px; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.22);">Change ledger location…</button>
+                            <button type="button" style="height: 32px; padding: 0 15px; border-radius: 7px; border: 1px solid rgba(228,104,93,0.35); background: transparent; color: #EE9188; font-size: 13px; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease;" style-hover="background: rgba(228,104,93,0.12); border-color: rgba(228,104,93,0.55);">End mission here</button>
+                          </div>
+                        </div>
+                      </div>
+                    </sc-if>
+
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <div style="flex: none; padding: 12px 20px 18px; position: relative;">
+            <div style="max-width: 760px; margin: 0 auto; position: relative;">
+
+              <sc-if value="{{ pickerOpen }}" hint-placeholder-val="{{ false }}">
+                <div role="dialog" aria-label="Choose runtime and model" style="position: absolute; bottom: calc(100% + 10px); right: 0; width: 420px; background: #1B1E1F; border: 1px solid rgba(255,255,255,0.11); border-radius: 11px; box-shadow: 0 24px 60px rgba(0,0,0,0.6); overflow: hidden; z-index: 5;">
+                  <div style="padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.07); display: flex; align-items: center; gap: 9px;">
+                    <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">/</span>
+                    <span style="flex: 1; font-size: 13px; color: #8B9190;">Search runtimes and models</span>
+                  </div>
+                  <div style="max-height: 330px; overflow-y: auto; padding: 6px;">
+                    <div style="padding: 8px 8px 4px; font-family: 'Geist Mono', monospace; font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: #8B9190;">Codex CLI · your account</div>
+                    <div style="display: flex; align-items: center; gap: 10px; padding: 8px 9px; border-radius: 7px; background: rgba(201,240,74,0.09); border: 1px solid rgba(201,240,74,0.22);">
+                      <span style="width: 6px; height: 6px; border-radius: 50%; background: #C9F04A; flex: none; display: block;"></span>
+                      <span style="flex: 1; min-width: 0;"><span style="display: block; font-size: 13px; color: #F1EEE8;">gpt-5-codex</span><span style="display: block; font-family: 'Geist Mono', monospace; font-size: 11px; color: #98A183;">account default · fast + high effort</span></span>
+                      <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #C9F04A;">ACTIVE</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px; padding: 8px 9px; border-radius: 7px;" style-hover="background: #212526;">
+                      <span style="width: 6px; height: 6px; border-radius: 50%; background: #C9F04A; flex: none; display: block;"></span>
+                      <span style="flex: 1; min-width: 0;"><span style="display: block; font-size: 13px; color: #E7E3DC;">gpt-5.1</span><span style="display: block; font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">plan route · 62% of weekly limit used</span></span>
+                      <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #8B9190;">READY</span>
+                    </div>
+                    <div style="padding: 12px 8px 4px; font-family: 'Geist Mono', monospace; font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: #8B9190;">Claude Code · your account</div>
+                    <div style="display: flex; align-items: center; gap: 10px; padding: 8px 9px; border-radius: 7px;" style-hover="background: #212526;">
+                      <span style="width: 6px; height: 6px; border-radius: 50%; background: #C9F04A; flex: none; display: block;"></span>
+                      <span style="flex: 1; min-width: 0;"><span style="display: block; font-size: 13px; color: #E7E3DC;">Sonnet 4.5</span><span style="display: block; font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">CLI signed in · streaming preview</span></span>
+                      <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #EFC969;">PREVIEW</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px; padding: 8px 9px; border-radius: 7px;" style-hover="background: #212526;">
+                      <span style="width: 6px; height: 6px; border-radius: 50%; background: #4A4F4F; flex: none; display: block;"></span>
+                      <span style="flex: 1; min-width: 0;"><span style="display: block; font-size: 13px; color: #A8ADAB;">Opus 4.1</span><span style="display: block; font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">not on your plan</span></span>
+                      <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #8B9190;">UNAVAILABLE</span>
+                    </div>
+                    <div style="padding: 12px 8px 4px; font-family: 'Geist Mono', monospace; font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: #8B9190;">OmniRoute · API key</div>
+                    <div style="display: flex; align-items: center; gap: 10px; padding: 8px 9px; border-radius: 7px;" style-hover="background: #212526;">
+                      <span style="width: 6px; height: 6px; border-radius: 50%; background: #6EA8FE; flex: none; display: block;"></span>
+                      <span style="flex: 1; min-width: 0;"><span style="display: block; font-size: 13px; color: #E7E3DC;">Route: coding-balanced</span><span style="display: block; font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">3 providers · metered per token</span></span>
+                      <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #6EA8FE;">API</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px; padding: 8px 9px; border-radius: 7px;" style-hover="background: #212526;">
+                      <span style="width: 6px; height: 6px; border-radius: 50%; background: #4A4F4F; flex: none; display: block;"></span>
+                      <span style="flex: 1; min-width: 0;"><span style="display: block; font-size: 13px; color: #A8ADAB;">Gemini free tier</span><span style="display: block; font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">official free quota · sign-in required</span></span>
+                      <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #EFC969;">SIGN IN</span>
+                    </div>
+                    <div style="padding: 12px 8px 4px; font-family: 'Geist Mono', monospace; font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: #8B9190;">Local · Ollama</div>
+                    <div style="display: flex; align-items: center; gap: 10px; padding: 8px 9px; border-radius: 7px;" style-hover="background: #212526;">
+                      <span style="width: 6px; height: 6px; border-radius: 50%; background: #C9F04A; flex: none; display: block;"></span>
+                      <span style="flex: 1; min-width: 0;"><span style="display: block; font-size: 13px; color: #E7E3DC;">qwen3-coder:30b</span><span style="display: block; font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">on this machine · no effort control</span></span>
+                      <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #8B9190;">LOCAL</span>
+                    </div>
+                  </div>
+                  <div style="padding: 10px 12px; border-top: 1px solid rgba(255,255,255,0.07); display: flex; flex-direction: column; gap: 4px; font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">
+                    <span style="color: #8B9190;">{{ footerLine }}</span>
+                    <span>Fallback chain, privacy and permissions live in Settings</span>
+                  </div>
+                </div>
+              </sc-if>
+
+              <div style="border: 1px solid rgba(255,255,255,0.09); border-radius: 12px; background: #1A1D1E; display: flex; align-items: center; gap: 10px; height: 50px; padding: 0 8px 0 15px; transition: border-color 140ms ease;" style-hover="border-color: rgba(255,255,255,0.16);">
+                <span style="flex: 1; min-width: 0; font-size: 13.5px; color: #8B9190;">Message Wren, or describe a mission…</span>
+                <sc-if value="{{ isLive }}" hint-placeholder-val="{{ true }}">
+                  <button type="button" aria-label="Stop run" style="width: 30px; height: 30px; flex: none; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 140ms ease, border-color 140ms ease, transform 120ms ease;" style-hover="background: rgba(228,104,93,0.12); border-color: rgba(228,104,93,0.55);" style-active="transform: scale(0.94);">
+                    <span style="width: 9px; height: 9px; border-radius: 2px; background: #C7C3BC; display: block;"></span>
+                  </button>
+                </sc-if>
+                <sc-if value="{{ notLive }}" hint-placeholder-val="{{ false }}">
+                  <button type="button" aria-label="Send" style="width: 30px; height: 30px; flex: none; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); background: transparent; color: #A8ADAB; font-size: 14px; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;" style-hover="background: rgba(201,240,74,0.14); border-color: rgba(201,240,74,0.5); color: #DBF785;" style-active="transform: scale(0.94);">↑</button>
+                </sc-if>
+              </div>
+              <div style="display: flex; align-items: center; gap: 2px; margin-top: 9px; padding: 0 2px;">
+                <span style="position: relative; display: flex; align-items: center;">
+                  <sc-if value="{{ modeOpen }}" hint-placeholder-val="{{ false }}">
+                    <div role="menu" aria-label="Permission mode" style="position: absolute; bottom: calc(100% + 8px); left: 0; width: 306px; background: #1B1E1F; border: 1px solid rgba(255,255,255,0.11); border-radius: 11px; box-shadow: 0 24px 60px rgba(0,0,0,0.6); overflow: hidden; z-index: 6;">
+                      <div style="padding: 10px 12px 6px; font-size: 12px; color: #8B9190;">Mode</div>
+                      <sc-for list="{{ modeRows }}" as="m" hint-placeholder-count="4">
+                        <button type="button" onClick="{{ m.onClick }}" style="width: 100%; display: flex; align-items: flex-start; gap: 10px; padding: 9px 12px; border: none; background: transparent; text-align: left; cursor: pointer; font-family: Geist, sans-serif; transition: background 140ms ease;" style-hover="background: rgba(255,255,255,0.05);">
+                          <span style="flex: 1; min-width: 0;">
+                            <span style="display: block; font-size: 13px; color: #F1EEE8;">{{ m.name }}</span>
+                            <span style="display: block; font-size: 12px; color: #8B9190; margin-top: 2px;">{{ m.desc }}</span>
+                          </span>
+                          <sc-if value="{{ m.active }}" hint-placeholder-val="{{ false }}">
+                            <span style="flex: none; font-size: 12px; color: #C9F04A; line-height: 1.3;">✓</span>
+                          </sc-if>
+                          <span style="flex: none; width: 12px; text-align: right; font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190; line-height: 1.4;">{{ m.num }}</span>
+                        </button>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                  <button type="button" aria-haspopup="menu" aria-label="Permission mode" onClick="{{ toggleMode }}" style="height: 26px; display: flex; align-items: center; gap: 6px; padding: 0 8px; border-radius: 7px; border: none; background: transparent; color: #8B9190; font-size: 12.5px; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease, color 140ms ease;" style-hover="background: rgba(255,255,255,0.06); color: #E7E3DC;">
+                    <span style="color: #C7C3BC;">{{ modeLabel }}</span>
+                  </button>
+                </span>
+                <span style="position: relative; display: flex; align-items: center;">
+                  <sc-if value="{{ plusOpen }}" hint-placeholder-val="{{ false }}">
+                    <div role="menu" aria-label="Add to mission" style="position: absolute; bottom: calc(100% + 8px); left: 0; width: 272px; background: #1B1E1F; border: 1px solid rgba(255,255,255,0.11); border-radius: 11px; box-shadow: 0 24px 60px rgba(0,0,0,0.6); overflow: hidden; padding: 4px 0; z-index: 6;">
+                      <button type="button" style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: none; background: transparent; text-align: left; cursor: pointer; font-family: Geist, sans-serif; transition: background 140ms ease;" style-hover="background: rgba(255,255,255,0.05);">
+                        <span style="flex: none; width: 14px; height: 14px; border: 1.4px solid #7A807F; border-radius: 3px; display: block;"></span>
+                        <span style="flex: 1; min-width: 0; font-size: 13px; color: #E7E3DC;">Add files or photos</span>
+                        
+                        
+                      </button>
+                      <button type="button" style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: none; background: transparent; text-align: left; cursor: pointer; font-family: Geist, sans-serif; transition: background 140ms ease;" style-hover="background: rgba(255,255,255,0.05);">
+                        <span style="flex: none; width: 14px; height: 14px; border: 1.4px solid #7A807F; border-radius: 3px; display: block;"></span>
+                        <span style="flex: 1; min-width: 0; font-size: 13px; color: #E7E3DC;">Slash commands</span>
+                        
+                        
+                      </button>
+                      <button type="button" style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: none; background: transparent; text-align: left; cursor: pointer; font-family: Geist, sans-serif; transition: background 140ms ease;" style-hover="background: rgba(255,255,255,0.05);">
+                        <span style="flex: none; width: 14px; height: 14px; border: 1.4px solid #7A807F; border-radius: 50%; display: block;"></span>
+                        <span style="flex: 1; min-width: 0; font-size: 13px; color: #E7E3DC;">Connectors</span>
+                        <span style="flex: none; font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">1 needs reconnection</span>
+                        <span style="flex: none; font-size: 11px; color: #8B9190;">›</span>
+                      </button>
+                    </div>
+                  </sc-if>
+                  <button type="button" aria-haspopup="menu" aria-label="Add files, commands or connectors" onClick="{{ togglePlus }}" style="height: 26px; display: flex; align-items: center; gap: 6px; padding: 0 8px; border-radius: 7px; border: none; background: transparent; color: #8B9190; font-size: 12.5px; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease, color 140ms ease;" style-hover="background: rgba(255,255,255,0.06); color: #E7E3DC;">
+                    <span style="font-size: 15px; line-height: 1;">+</span>
+                  </button>
+                </span>
+                <span style="margin-left: auto; display: flex; align-items: center; gap: 2px;">
+                  <button type="button" aria-haspopup="listbox" aria-label="Runtime and model" onClick="{{ togglePicker }}" style="height: 26px; display: flex; align-items: center; gap: 6px; padding: 0 8px; border-radius: 7px; border: none; background: transparent; color: #8B9190; font-size: 12.5px; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease, color 140ms ease;" style-hover="background: rgba(255,255,255,0.06); color: #E7E3DC;">
+                    <span style="width: 6px; height: 6px; border-radius: 50%; background: #C9F04A; flex: none; display: block;"></span>
+                    <span style="color: #C7C3BC;">Codex CLI</span>
+                    <span style="color: #4A4F4F;">/</span>
+                    <span style="font-family: 'Geist Mono', monospace; font-size: 12px;">gpt-5-codex</span>
+                  </button>
+                  <span style="position: relative; display: flex; align-items: center;">
+                    <sc-if value="{{ effortOpen }}" hint-placeholder-val="{{ false }}">
+                      <div role="menu" aria-label="Reasoning effort" style="position: absolute; bottom: calc(100% + 8px); right: 0; width: 300px; background: #1B1E1F; border: 1px solid rgba(255,255,255,0.11); border-radius: 11px; box-shadow: 0 24px 60px rgba(0,0,0,0.6); overflow: hidden; z-index: 6;">
+                        <div style="padding: 10px 12px 6px; font-size: 12px; color: #8B9190;">Effort</div>
+                        <sc-for list="{{ effortRows }}" as="e" hint-placeholder-count="4">
+                          <button type="button" onClick="{{ e.onClick }}" style="width: 100%; display: flex; align-items: flex-start; gap: 10px; padding: 9px 12px; border: none; background: transparent; text-align: left; cursor: pointer; font-family: Geist, sans-serif; transition: background 140ms ease;" style-hover="background: rgba(255,255,255,0.05);">
+                            <span style="flex: 1; min-width: 0;">
+                              <span style="display: block; font-size: 13px; color: #F1EEE8;">{{ e.name }}</span>
+                              <span style="display: block; font-size: 12px; color: #8B9190; margin-top: 2px;">{{ e.desc }}</span>
+                            </span>
+                            <sc-if value="{{ e.active }}" hint-placeholder-val="{{ false }}">
+                              <span style="flex: none; font-size: 12px; color: #C9F04A; line-height: 1.3;">✓</span>
+                            </sc-if>
+                            <span style="flex: none; font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190; line-height: 1.4;">{{ e.tag }}</span>
+                          </button>
+                        </sc-for>
+                        <div style="padding: 9px 12px; border-top: 1px solid rgba(255,255,255,0.07); font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">gpt-5-codex reports fast mode · local routes ignore effort</div>
+                      </div>
+                    </sc-if>
+                  <button type="button" aria-haspopup="menu" aria-label="Reasoning effort" onClick="{{ toggleEffort }}" style="height: 26px; display: flex; align-items: center; gap: 6px; padding: 0 8px; border-radius: 7px; border: none; background: transparent; color: #8B9190; font-size: 12.5px; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease, color 140ms ease;" style-hover="background: rgba(255,255,255,0.06); color: #E7E3DC;">
+                    <span style="color: #C7C3BC;">{{ effortLabel }}</span>
+                  </button>
+                  </span>
+                  <sc-if value="{{ swarmOff }}" hint-placeholder-val="{{ true }}">
+                    <button type="button" onClick="{{ toggleSwarm }}" aria-pressed="false" aria-label="Swarm mode off" title="Swarm mode — run every teammate at max effort" style="height: 26px; margin-left: 6px; padding: 0 7px; display: flex; align-items: center; gap: 6px; border-radius: 7px; border: 1px solid transparent; background: transparent; cursor: pointer; transition: background 140ms ease, border-color 140ms ease, transform 120ms ease;" style-hover="background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.10);" style-active="transform: scale(0.94);">
+                      <img src="brand/locust-mark.svg" alt="" style="height: 13px; width: auto; opacity: .45;">
+                    </button>
+                  </sc-if>
+                  <sc-if value="{{ swarmOn }}" hint-placeholder-val="{{ false }}">
+                    <button type="button" onClick="{{ toggleSwarm }}" aria-pressed="true" aria-label="Swarm mode on" title="Swarm mode on — every teammate at max effort" style="height: 26px; margin-left: 6px; padding: 0 9px 0 7px; display: flex; align-items: center; gap: 7px; border-radius: 7px; border: 1px solid rgba(201,240,74,0.40); background: rgba(201,240,74,0.12); cursor: pointer; transition: background 140ms ease, transform 120ms ease;" style-hover="background: rgba(201,240,74,0.18);" style-active="transform: scale(0.94);">
+                      <img src="brand/locust-mark.svg" alt="" style="height: 14px; width: auto; opacity: 1; filter: drop-shadow(0 0 4px rgba(201,240,74,0.55));">
+                      <span style="font-family: Geist, sans-serif; font-size: 12px; color: #DBF785;">Swarm</span>
+                    </button>
+                  </sc-if>
+                </span>
+              </div>
+
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+          <div style="flex: none; height: 60px; display: flex; align-items: center; gap: 12px; padding: 0 24px; border-bottom: 1px solid rgba(255,255,255,0.06); background: #16191A;">
+            <span style="font-size: 15px; font-weight: 500;">Settings</span>
+            <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">workspace · Ridgeline · local only</span>
+          </div>
+          <div style="flex: 1; min-height: 0; display: flex;">
+            <div style="width: 224px; flex: none; border-right: 1px solid rgba(255,255,255,0.06); padding: 14px 10px; display: flex; flex-direction: column; gap: 2px;">
+              <div role="button" tabIndex="{{ zero }}" style="display: flex; align-items: center; padding: 8px 10px; border-radius: 8px; font-size: 13px; color: #F1EEE8; background: #1E2223; border: 1px solid rgba(255,255,255,0.07); cursor: pointer;">Runtimes &amp; accounts</div>
+              <div role="button" tabIndex="{{ zero }}" style="display: flex; align-items: center; padding: 8px 10px; border-radius: 8px; font-size: 13px; color: #8B9190;  cursor: pointer;" style-hover="background: #1B1E1F;">Model routes</div>
+              <div role="button" tabIndex="{{ zero }}" style="display: flex; align-items: center; padding: 8px 10px; border-radius: 8px; font-size: 13px; color: #8B9190;  cursor: pointer;" style-hover="background: #1B1E1F;">Fallback policy</div>
+              <div role="button" tabIndex="{{ zero }}" style="display: flex; align-items: center; padding: 8px 10px; border-radius: 8px; font-size: 13px; color: #8B9190;  cursor: pointer;" style-hover="background: #1B1E1F;">Permissions &amp; approvals</div>
+              <div role="button" tabIndex="{{ zero }}" style="display: flex; align-items: center; padding: 8px 10px; border-radius: 8px; font-size: 13px; color: #8B9190;  cursor: pointer;" style-hover="background: #1B1E1F;">Privacy &amp; local data</div>
+              <div role="button" tabIndex="{{ zero }}" style="display: flex; align-items: center; padding: 8px 10px; border-radius: 8px; font-size: 13px; color: #8B9190;  cursor: pointer;" style-hover="background: #1B1E1F;">Mission history</div>
+              <div role="button" tabIndex="{{ zero }}" style="display: flex; align-items: center; padding: 8px 10px; border-radius: 8px; font-size: 13px; color: #8B9190;  cursor: pointer;" style-hover="background: #1B1E1F;">Connections</div>
+              <div style="margin-top: auto; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; font-size: 13px; color: #8B9190;">
+                <span>Cloud computer</span>
+                <span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 10px; letter-spacing: .1em; color: #8B9190;">PLANNED</span>
+              </div>
+            </div>
+            <div style="flex: 1; min-width: 0; overflow-y: auto; padding: 22px 24px;">
+              <div style="max-width: 720px; display: flex; flex-direction: column; gap: 10px;">
+                <div style="font-size: 14px; font-weight: 500; margin-bottom: 2px;">Runtimes &amp; accounts</div>
+                <div style="font-size: 13px; color: #8B9190; line-height: 1.55; margin-bottom: 8px;">Locust uses the accounts already on this machine. It never pools subscriptions or proxies your requests.</div>
+              <div style="display: flex; align-items: center; gap: 12px; padding: 13px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.07); background: #191C1D;">
+                <span style="width: 28px; height: 28px; flex: none; border-radius: 8px; border: 1px solid rgba(255,255,255,0.11); color: #A8ADAB; font-family: 'Geist Mono', monospace; font-size: 10.5px; display: flex; align-items: center; justify-content: center;">CX</span>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-size: 13.5px; color: #F1EEE8;">Codex CLI</div>
+                  <div style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">v0.34 · signed in as you · account default route</div>
+                </div>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #C9F04A;">LIVE</span>
+                <button type="button" style="height: 28px; padding: 0 12px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.11); background: transparent; color: #D7D3CC; font-size: 12.5px; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);">Sign out</button>
+              </div>
+              <div style="display: flex; align-items: center; gap: 12px; padding: 13px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.07); background: #191C1D;">
+                <span style="width: 28px; height: 28px; flex: none; border-radius: 8px; border: 1px solid rgba(255,255,255,0.11); color: #A8ADAB; font-family: 'Geist Mono', monospace; font-size: 10.5px; display: flex; align-items: center; justify-content: center;">CC</span>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-size: 13.5px; color: #F1EEE8;">Claude Code</div>
+                  <div style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">CLI signed in · streaming live, tool approvals preview-only</div>
+                </div>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #EFC969;">PREVIEW</span>
+                <button type="button" style="height: 28px; padding: 0 12px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.11); background: transparent; color: #D7D3CC; font-size: 12.5px; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);">Manage</button>
+              </div>
+              <div style="display: flex; align-items: center; gap: 12px; padding: 13px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.07); background: #191C1D;">
+                <span style="width: 28px; height: 28px; flex: none; border-radius: 8px; border: 1px solid rgba(255,255,255,0.11); color: #A8ADAB; font-family: 'Geist Mono', monospace; font-size: 10.5px; display: flex; align-items: center; justify-content: center;">OR</span>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-size: 13.5px; color: #F1EEE8;">OmniRoute</div>
+                  <div style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">API key set · 3 routes discovered · metered per token</div>
+                </div>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #6EA8FE;">API</span>
+                <button type="button" style="height: 28px; padding: 0 12px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.11); background: transparent; color: #D7D3CC; font-size: 12.5px; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);">Routes</button>
+              </div>
+              <div style="display: flex; align-items: center; gap: 12px; padding: 13px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.07); background: #191C1D;">
+                <span style="width: 28px; height: 28px; flex: none; border-radius: 8px; border: 1px solid rgba(255,255,255,0.11); color: #A8ADAB; font-family: 'Geist Mono', monospace; font-size: 10.5px; display: flex; align-items: center; justify-content: center;">LM</span>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-size: 13.5px; color: #F1EEE8;">Ollama (local)</div>
+                  <div style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">2 models on this machine · no network egress</div>
+                </div>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #8B9190;">LOCAL</span>
+                <button type="button" style="height: 28px; padding: 0 12px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.11); background: transparent; color: #D7D3CC; font-size: 12.5px; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);">Scan</button>
+              </div>
+                <div style="margin-top: 18px; font-size: 14px; font-weight: 500;">Fallback policy</div>
+                <div style="font-size: 13px; color: #8B9190; line-height: 1.55;">What happens when the active route hits a limit or fails mid-mission.</div>
+                <div style="display: flex; gap: 8px; margin-top: 4px;">
+                  <div role="button" tabIndex="{{ zero }}" style="flex: 1; padding: 12px 13px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.07); background: #191C1D; cursor: pointer;" style-hover="border-color: rgba(255,255,255,0.16);">
+                    <div style="font-size: 13px; color: #E7E3DC;">Off</div>
+                    <div style="font-size: 12px; color: #8B9190; margin-top: 3px; line-height: 1.45;">Pause and wait for you</div>
+                  </div>
+                  <div role="button" tabIndex="{{ zero }}" style="flex: 1; padding: 12px 13px; border-radius: 10px; border: 1px solid rgba(201,240,74,0.35); background: rgba(201,240,74,0.07); cursor: pointer;">
+                    <div style="display: flex; align-items: center; gap: 7px;"><span style="font-size: 13px; color: #E4EFC7;">Ask</span><span style="font-family: 'Geist Mono', monospace; font-size: 10px; color: #C9F04A;">ACTIVE</span></div>
+                    <div style="font-size: 12px; color: #98A183; margin-top: 3px; line-height: 1.45;">Offer routes at a safe checkpoint</div>
+                  </div>
+                  <div role="button" tabIndex="{{ zero }}" style="flex: 1; padding: 12px 13px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.07); background: #191C1D; cursor: pointer;" style-hover="border-color: rgba(255,255,255,0.16);">
+                    <div style="font-size: 13px; color: #E7E3DC;">Automatic</div>
+                    <div style="font-size: 12px; color: #8B9190; margin-top: 3px; line-height: 1.45;">Switch at a checkpoint, tell you after</div>
+                  </div>
+                </div>
+                <div style="margin-top: 18px; display: flex; align-items: center; gap: 12px; padding: 13px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.07); background: #191C1D;">
+                  <img src="brand/locust-mark.svg" alt="" style="height: 15px; width: auto; opacity: .6;">
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 13.5px; color: #F1EEE8;">Swarm mode</div>
+                    <div style="font-size: 12px; color: #8B9190; margin-top: 2px;">Workspace-wide · every teammate runs at its model's max effort. Burns quota faster.</div>
+                  </div>
+                  <sc-if value="{{ swarmOff }}" hint-placeholder-val="{{ true }}">
+                    <button type="button" onClick="{{ toggleSwarm }}" aria-pressed="false" aria-label="Swarm mode off" style="width: 40px; height: 23px; flex: none; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: #23282A; cursor: pointer; display: flex; align-items: center; justify-content: flex-start; padding: 2px; transition: background 140ms ease;" style-hover="border-color: rgba(255,255,255,0.22);">
+                      <span style="width: 17px; height: 17px; border-radius: 50%; background: #6E7373; display: block;"></span>
+                    </button>
+                  </sc-if>
+                  <sc-if value="{{ swarmOn }}" hint-placeholder-val="{{ false }}">
+                    <button type="button" onClick="{{ toggleSwarm }}" aria-pressed="true" aria-label="Swarm mode on" style="width: 40px; height: 23px; flex: none; border-radius: 12px; border: 1px solid rgba(201,240,74,0.45); background: rgba(201,240,74,0.22); cursor: pointer; display: flex; align-items: center; justify-content: flex-end; padding: 2px; transition: background 140ms ease;" style-hover="background: rgba(201,240,74,0.30);">
+                      <span style="width: 17px; height: 17px; border-radius: 50%; background: #C9F04A; display: block;"></span>
+                    </button>
+                  </sc-if>
+                </div>
+                <div style="margin-top: 18px; font-size: 14px; font-weight: 500;">Privacy &amp; local data</div>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  <div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.07); background: #191C1D; font-size: 13px; color: #E7E3DC;">
+                    <span style="flex: 1;">Mission ledger location</span>
+                    <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">~/.locust/missions</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.07); background: #191C1D; font-size: 13px; color: #E7E3DC;">
+                    <span style="flex: 1;">History retention</span>
+                    <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">keep 90 days · then prune bodies, keep receipts</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.07); background: #191C1D; font-size: 13px; color: #E7E3DC;">
+                    <span style="flex: 1;">Telemetry</span>
+                    <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #C9F04A;">off · nothing leaves this machine</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isMissions }}" hint-placeholder-val="{{ false }}">
+          <div style="flex: none; height: 60px; display: flex; align-items: center; gap: 12px; padding: 0 24px; border-bottom: 1px solid rgba(255,255,255,0.06); background: #16191A;">
+            <span style="font-size: 15px; font-weight: 500;">Missions</span>
+            <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">6 local · ledger verified</span>
+          </div>
+          <div style="flex: none; display: flex; gap: 6px; padding: 14px 24px 0;">
+            <span style="padding: 5px 11px; border-radius: 7px; background: #23282A; border: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; color: #F1EEE8;">All</span>
+            <span role="button" tabIndex="{{ zero }}" style="padding: 5px 11px; border-radius: 7px; font-size: 12.5px; color: #8B9190; cursor: pointer;" style-hover="background: #1B1E1F;">Running</span>
+            <span role="button" tabIndex="{{ zero }}" style="padding: 5px 11px; border-radius: 7px; font-size: 12.5px; color: #8B9190; cursor: pointer;" style-hover="background: #1B1E1F;">Needs approval</span>
+            <span role="button" tabIndex="{{ zero }}" style="padding: 5px 11px; border-radius: 7px; font-size: 12.5px; color: #8B9190; cursor: pointer;" style-hover="background: #1B1E1F;">Interrupted</span>
+            <span role="button" tabIndex="{{ zero }}" style="padding: 5px 11px; border-radius: 7px; font-size: 12.5px; color: #8B9190; cursor: pointer;" style-hover="background: #1B1E1F;">Completed</span>
+          </div>
+          <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 14px 24px 22px;">
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <div role="button" tabIndex="{{ zero }}" style="display: grid; grid-template-columns: 14px 1fr 130px 190px 92px 104px; align-items: center; gap: 14px; padding: 13px 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); background: #191C1D; cursor: pointer; transition: border-color 140ms ease, background 140ms ease;" style-hover="background: #1D2122; border-color: rgba(255,255,255,0.12);">
+                <span style="width: 7px; height: 7px; border-radius: 50%; background: #C9F04A; display: block;"></span>
+                <span style="font-size: 13.5px; color: #F1EEE8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Billing webhooks → v3</span>
+                <span style="font-size: 12.5px; color: #A8ADAB;">Wren</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Codex / gpt-5-codex</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">14 ck · 46m</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #C9F04A; text-align: right;">RUNNING</span>
+              </div>
+              <div role="button" tabIndex="{{ zero }}" style="display: grid; grid-template-columns: 14px 1fr 130px 190px 92px 104px; align-items: center; gap: 14px; padding: 13px 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); background: #191C1D; cursor: pointer; transition: border-color 140ms ease, background 140ms ease;" style-hover="background: #1D2122; border-color: rgba(255,255,255,0.12);">
+                <span style="width: 7px; height: 7px; border-radius: 50%; background: #E9B949; display: block;"></span>
+                <span style="font-size: 13.5px; color: #F1EEE8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Vendor risk brief</span>
+                <span style="font-size: 12.5px; color: #A8ADAB;">Atlas</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Codex / gpt-5.1</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">6 ck · 12m</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #E9B949; text-align: right;">APPROVAL</span>
+              </div>
+              <div role="button" tabIndex="{{ zero }}" style="display: grid; grid-template-columns: 14px 1fr 130px 190px 92px 104px; align-items: center; gap: 14px; padding: 13px 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); background: #191C1D; cursor: pointer; transition: border-color 140ms ease, background 140ms ease;" style-hover="background: #1D2122; border-color: rgba(255,255,255,0.12);">
+                <span style="width: 7px; height: 7px; border-radius: 50%; background: #E4685D; display: block;"></span>
+                <span style="font-size: 13.5px; color: #F1EEE8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Changelog draft</span>
+                <span style="font-size: 12.5px; color: #A8ADAB;">Sable</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Claude Code / Sonnet 4.5</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">3 ck · 8m</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #E4685D; text-align: right;">INTERRUPTED</span>
+              </div>
+              <div role="button" tabIndex="{{ zero }}" style="display: grid; grid-template-columns: 14px 1fr 130px 190px 92px 104px; align-items: center; gap: 14px; padding: 13px 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); background: #191C1D; cursor: pointer; transition: border-color 140ms ease, background 140ms ease;" style-hover="background: #1D2122; border-color: rgba(255,255,255,0.12);">
+                <span style="width: 7px; height: 7px; border-radius: 50%; background: #6EA8FE; display: block;"></span>
+                <span style="font-size: 13.5px; color: #F1EEE8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Vendor invoice digest</span>
+                <span style="font-size: 12.5px; color: #A8ADAB;">Juno</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">OmniRoute / coding-balanced</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">9 ck · 21m</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #8B9190; text-align: right;">COMPLETED</span>
+              </div>
+              <div role="button" tabIndex="{{ zero }}" style="display: grid; grid-template-columns: 14px 1fr 130px 190px 92px 104px; align-items: center; gap: 14px; padding: 13px 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); background: #191C1D; cursor: pointer; transition: border-color 140ms ease, background 140ms ease;" style-hover="background: #1D2122; border-color: rgba(255,255,255,0.12);">
+                <span style="width: 7px; height: 7px; border-radius: 50%; background: #6EA8FE; display: block;"></span>
+                <span style="font-size: 13.5px; color: #F1EEE8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Flaky test triage</span>
+                <span style="font-size: 12.5px; color: #A8ADAB;">Wren</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Codex / gpt-5-codex</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">11 ck · 33m</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #8B9190; text-align: right;">COMPLETED</span>
+              </div>
+              <div role="button" tabIndex="{{ zero }}" style="display: grid; grid-template-columns: 14px 1fr 130px 190px 92px 104px; align-items: center; gap: 14px; padding: 13px 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); background: #191C1D; cursor: pointer; transition: border-color 140ms ease, background 140ms ease;" style-hover="background: #1D2122; border-color: rgba(255,255,255,0.12);">
+                <span style="width: 7px; height: 7px; border-radius: 50%; background: #4A4F4F; display: block;"></span>
+                <span style="font-size: 13.5px; color: #F1EEE8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Q3 pricing summary</span>
+                <span style="font-size: 12.5px; color: #A8ADAB;">Atlas</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Local / qwen3-coder:30b</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">4 ck · 15m</span>
+                <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #8B9190; text-align: right;">CANCELLED</span>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isTeammates }}" hint-placeholder-val="{{ false }}">
+          <div style="flex: none; height: 60px; display: flex; align-items: center; gap: 12px; padding: 0 24px; border-bottom: 1px solid rgba(255,255,255,0.06); background: #16191A;">
+            <span style="font-size: 15px; font-weight: 500;">Teammates</span>
+            <span style="font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">4 defined · avatars and roles are yours to set</span>
+          </div>
+          <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 22px 24px;">
+            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; max-width: 1060px;">
+              <div role="button" tabIndex="{{ zero }}" style="padding: 16px; border-radius: 11px; border: 1px solid rgba(255,255,255,0.07); background: #191C1D; display: flex; flex-direction: column; gap: 12px; cursor: pointer; transition: border-color 140ms ease;" style-hover="border-color: rgba(255,255,255,0.16);">
+                <div style="display: flex; align-items: center; gap: 11px;">
+                  <span aria-hidden="true" style="width: 36px; height: 36px; flex: none; border-radius: 6px; background: #A9D93F; border: 1px solid rgba(201,240,74,0.55); display: flex; align-items: center; justify-content: center; overflow: hidden; animation: lcBob 2.6s ease-in-out infinite;"><span style="position: relative; width: 24px; height: 24px; display: block;"><span style="position: absolute; left: 3px; top: 3px; width: 3px; height: 3px; background: #151A0C; box-shadow: 3px 0px 0 #151A0C, 6px 0px 0 #151A0C, 9px 0px 0 #151A0C, 12px 0px 0 #151A0C, 15px 0px 0 #151A0C, -3px 3px 0 #151A0C, -3px 6px 0 #151A0C, 18px 3px 0 #151A0C, 18px 6px 0 #151A0C; transform-origin: center; display: block;"></span><span style="position: absolute; left: 9px; top: 0px; width: 3px; height: 3px; background: rgba(255,255,255,0.55); box-shadow: 3px 0px 0 rgba(255,255,255,0.55); transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 9px; width: 3px; height: 3px; background: #151A0C; box-shadow: 9px 0px 0 #151A0C; transform-origin: center; display: block; animation: lcEyes 5s ease-in-out infinite;"></span><span style="position: absolute; left: 9px; top: 15px; width: 3px; height: 3px; background: #151A0C; box-shadow: 3px 0px 0 #151A0C; transform-origin: center top; display: block; animation: lcChat 1.5s ease-in-out infinite;"></span></span></span></span>
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 14px; font-weight: 500; color: #F4F1EB;">Wren</div>
+                    <div style="font-size: 12.5px; color: #8B9190;">Code &amp; Migrations</div>
+                  </div>
+                  <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #C9F04A;">WORKING</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 6px; padding-top: 11px; border-top: 1px solid rgba(255,255,255,0.06); font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">
+                  <div style="display: flex; gap: 8px;"><span style="width: 62px; color: #8B9190;">ROUTE</span><span style="color: #C7C3BC;">Codex / gpt-5-codex</span></div>
+                  <div style="display: flex; gap: 8px;"><span style="width: 62px; color: #8B9190;">TOOLS</span><span style="color: #C7C3BC;">repo, shell, tests, http</span></div>
+                  <div style="display: flex; gap: 8px;"><span style="width: 62px; color: #8B9190;">MODE</span><span style="color: #C7C3BC;">Ask</span></div>
+                </div>
+              </div>
+              <div role="button" tabIndex="{{ zero }}" style="padding: 16px; border-radius: 11px; border: 1px solid rgba(255,255,255,0.07); background: #191C1D; display: flex; flex-direction: column; gap: 12px; cursor: pointer; transition: border-color 140ms ease;" style-hover="border-color: rgba(255,255,255,0.16);">
+                <div style="display: flex; align-items: center; gap: 11px;">
+                  <span aria-hidden="true" style="width: 36px; height: 36px; flex: none; border-radius: 6px; background: #5E9BF0; border: 1px solid rgba(110,168,254,0.5); display: flex; align-items: center; justify-content: center; overflow: hidden;"><span style="position: relative; width: 24px; height: 24px; display: block;"><span style="position: absolute; left: 3px; top: 3px; width: 3px; height: 3px; background: #0D1520; box-shadow: 3px 0px 0 #0D1520, 6px 0px 0 #0D1520, 9px 0px 0 #0D1520, 12px 0px 0 #0D1520, 15px 0px 0 #0D1520, 0px 6px 0 #0D1520, 15px 6px 0 #0D1520; transform-origin: center; display: block;"></span><span style="position: absolute; left: 9px; top: 9px; width: 3px; height: 3px; background: rgba(255,255,255,0.55); box-shadow: 3px 0px 0 rgba(255,255,255,0.55); transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 9px; width: 3px; height: 3px; background: #0D1520; box-shadow: 9px 0px 0 #0D1520; transform-origin: center; display: block;"></span><span style="position: absolute; left: 9px; top: 15px; width: 3px; height: 3px; background: #0D1520; box-shadow: 3px 0px 0 #0D1520; transform-origin: center top; display: block;"></span></span></span></span></span>
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 14px; font-weight: 500; color: #F4F1EB;">Atlas</div>
+                    <div style="font-size: 12.5px; color: #8B9190;">Research &amp; Briefs</div>
+                  </div>
+                  <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #E9B949;">APPROVAL</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 6px; padding-top: 11px; border-top: 1px solid rgba(255,255,255,0.06); font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">
+                  <div style="display: flex; gap: 8px;"><span style="width: 62px; color: #8B9190;">ROUTE</span><span style="color: #C7C3BC;">Codex / gpt-5.1</span></div>
+                  <div style="display: flex; gap: 8px;"><span style="width: 62px; color: #8B9190;">TOOLS</span><span style="color: #C7C3BC;">web, docs, files</span></div>
+                  <div style="display: flex; gap: 8px;"><span style="width: 62px; color: #8B9190;">MODE</span><span style="color: #C7C3BC;">Ask</span></div>
+                </div>
+              </div>
+              <div role="button" tabIndex="{{ zero }}" style="padding: 16px; border-radius: 11px; border: 1px solid rgba(255,255,255,0.07); background: #191C1D; display: flex; flex-direction: column; gap: 12px; cursor: pointer; transition: border-color 140ms ease;" style-hover="border-color: rgba(255,255,255,0.16);">
+                <div style="display: flex; align-items: center; gap: 11px;">
+                  <span aria-hidden="true" style="width: 36px; height: 36px; flex: none; border-radius: 6px; background: #A98BE8; border: 1px solid rgba(186,150,240,0.5); display: flex; align-items: center; justify-content: center; overflow: hidden;"><span style="position: relative; width: 24px; height: 24px; display: block;"><span style="position: absolute; left: 6px; top: 3px; width: 3px; height: 3px; background: #150F1E; box-shadow: 3px 0px 0 #150F1E, 6px 0px 0 #150F1E, 9px 0px 0 #150F1E, -6px 3px 0 #150F1E, -6px 6px 0 #150F1E, 15px 3px 0 #150F1E, 15px 6px 0 #150F1E; transform-origin: center; display: block;"></span><span style="position: absolute; left: 3px; top: 3px; width: 3px; height: 3px; background: rgba(255,255,255,0.5); box-shadow: 15px 0px 0 rgba(255,255,255,0.5); transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 9px; width: 3px; height: 3px; background: #150F1E; box-shadow: 9px 0px 0 #150F1E; transform-origin: center; display: block;"></span><span style="position: absolute; left: 9px; top: 15px; width: 3px; height: 3px; background: #150F1E; box-shadow: 3px 0px 0 #150F1E, 0px 3px 0 #150F1E, 3px 3px 0 #150F1E; transform-origin: center top; display: block;"></span></span></span></span>
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 14px; font-weight: 500; color: #F4F1EB;">Juno</div>
+                    <div style="font-size: 12.5px; color: #8B9190;">Ops &amp; Scheduling</div>
+                  </div>
+                  <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #8B9190;">IDLE</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 6px; padding-top: 11px; border-top: 1px solid rgba(255,255,255,0.06); font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">
+                  <div style="display: flex; gap: 8px;"><span style="width: 62px; color: #8B9190;">ROUTE</span><span style="color: #C7C3BC;">OmniRoute / coding-balanced</span></div>
+                  <div style="display: flex; gap: 8px;"><span style="width: 62px; color: #8B9190;">TOOLS</span><span style="color: #C7C3BC;">calendar, mail, files</span></div>
+                  <div style="display: flex; gap: 8px;"><span style="width: 62px; color: #8B9190;">MODE</span><span style="color: #C7C3BC;">Accept edits</span></div>
+                </div>
+              </div>
+              <div role="button" tabIndex="{{ zero }}" style="padding: 16px; border-radius: 11px; border: 1px solid rgba(255,255,255,0.07); background: #191C1D; display: flex; flex-direction: column; gap: 12px; cursor: pointer; transition: border-color 140ms ease;" style-hover="border-color: rgba(255,255,255,0.16);">
+                <div style="display: flex; align-items: center; gap: 11px;">
+                  <span aria-hidden="true" style="width: 36px; height: 36px; flex: none; border-radius: 6px; background: #E4857A; border: 1px solid rgba(228,104,93,0.5); display: flex; align-items: center; justify-content: center; overflow: hidden;"><span style="position: relative; width: 24px; height: 24px; display: block;"><span style="position: absolute; left: 6px; top: 0px; width: 3px; height: 3px; background: #1E100F; box-shadow: 3px 0px 0 #1E100F, 6px 0px 0 #1E100F, 9px 0px 0 #1E100F, -3px 3px 0 #1E100F, 0px 3px 0 #1E100F, 3px 3px 0 #1E100F, 6px 3px 0 #1E100F, 9px 3px 0 #1E100F, 12px 3px 0 #1E100F, -3px 6px 0 #1E100F, 12px 6px 0 #1E100F; transform-origin: center; display: block;"></span><span style="position: absolute; left: 9px; top: 0px; width: 3px; height: 3px; background: rgba(255,255,255,0.45); transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 9px; width: 3px; height: 3px; background: #1E100F; box-shadow: 9px 0px 0 #1E100F; transform-origin: center; display: block;"></span><span style="position: absolute; left: 9px; top: 15px; width: 3px; height: 3px; background: #1E100F; box-shadow: 3px 0px 0 #1E100F; transform-origin: center top; display: block;"></span></span></span></span>
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 14px; font-weight: 500; color: #F4F1EB;">Sable</div>
+                    <div style="font-size: 12.5px; color: #8B9190;">Docs &amp; QA</div>
+                  </div>
+                  <span style="font-family: 'Geist Mono', monospace; font-size: 10.5px; color: #E4685D;">SIGN IN</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 6px; padding-top: 11px; border-top: 1px solid rgba(255,255,255,0.06); font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">
+                  <div style="display: flex; gap: 8px;"><span style="width: 62px; color: #8B9190;">ROUTE</span><span style="color: #C7C3BC;">Claude Code / Sonnet 4.5</span></div>
+                  <div style="display: flex; gap: 8px;"><span style="width: 62px; color: #8B9190;">TOOLS</span><span style="color: #C7C3BC;">repo, docs, tests</span></div>
+                  <div style="display: flex; gap: 8px;"><span style="width: 62px; color: #8B9190;">MODE</span><span style="color: #C7C3BC;">Plan first</span></div>
+                </div>
+              </div>
+              <div role="button" tabIndex="{{ zero }}" onClick="{{ toggleNewBot }}" style="padding: 16px; border-radius: 11px; border: 1px dashed rgba(255,255,255,0.10); background: transparent; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; cursor: pointer; transition: border-color 140ms ease;" style-hover="border-color: rgba(201,240,74,0.35);">
+                <span style="width: 36px; height: 36px; border-radius: 6px; border: 1px dashed rgba(255,255,255,0.14); color: #8B9190; font-size: 17px; display: flex; align-items: center; justify-content: center;">+</span>
+                <div style="font-size: 13.5px; color: #C7C3BC;">New teammate</div>
+                <div style="font-size: 12.5px; color: #8B9190; line-height: 1.5;">Name, role, default route, tools and approval mode.</div>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+      </main>
+
+      <sc-if value="{{ showInspector }}" hint-placeholder-val="{{ false }}">
+        <aside aria-label="Mission inspector" style="width: 344px; flex: none; background: #16191A; border-left: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; min-height: 0;">
+          <div style="flex: none; height: 60px; display: flex; align-items: center; gap: 8px; padding: 0 14px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+            <span style="font-size: 13.5px; font-weight: 500;">Mission inspector</span>
+            <button type="button" onClick="{{ toggleInspector }}" aria-label="Close inspector" style="margin-left: auto; width: 26px; height: 26px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.09); background: transparent; color: #8B9190; font-size: 12px; cursor: pointer; transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);" style-active="transform: scale(0.98);">✕</button>
+          </div>
+          <div style="flex: none; display: flex; gap: 4px; padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+            <span style="padding: 5px 10px; border-radius: 7px; background: #23282A; border: 1px solid rgba(255,255,255,0.08); font-size: 12px; color: #F1EEE8;">Activity</span>
+            <span style="padding: 5px 10px; border-radius: 7px; font-size: 12px; color: #8B9190;">Details</span>
+            <span style="padding: 5px 10px; border-radius: 7px; font-size: 12px; color: #8B9190;">Artifacts</span>
+            <span style="padding: 5px 10px; border-radius: 7px; font-size: 12px; color: #8B9190;">Receipt</span>
+          </div>
+          <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 14px 14px 18px;">
+            <div style="font-family: 'Geist Mono', monospace; font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: #8B9190; margin-bottom: 10px;">Signal rail</div>
+            <div style="display: flex; flex-direction: column; gap: 0;">
+              <div style="display: flex; gap: 10px; padding-bottom: 12px;">
+                <span style="width: 7px; flex: none; display: flex; flex-direction: column; align-items: center;"><span style="width: 7px; height: 7px; border-radius: 50%; background: #C9F04A; display: block; animation: lcPulse 1.6s ease-in-out infinite;"></span><span style="flex: 1; width: 1px; background: rgba(255,255,255,0.08); display: block;"></span></span>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-size: 12.5px; color: #F1EEE8;">tool.shell · pnpm test billing</div>
+                  <div style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">14:44:02 · running · 41s</div>
+                </div>
+              </div>
+              <div style="display: flex; gap: 10px; padding-bottom: 12px;">
+                <span style="width: 7px; flex: none; display: flex; flex-direction: column; align-items: center;"><span style="width: 7px; height: 7px; border-radius: 50%; background: #6EA8FE; display: block;"></span><span style="flex: 1; width: 1px; background: rgba(255,255,255,0.08); display: block;"></span></span>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-size: 12.5px; color: #E7E3DC;">checkpoint.written · ck_14</div>
+                  <div style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">14:43:51 · ledger fsync ok</div>
+                </div>
+              </div>
+              <div style="display: flex; gap: 10px; padding-bottom: 12px;">
+                <span style="width: 7px; flex: none; display: flex; flex-direction: column; align-items: center;"><span style="width: 7px; height: 7px; border-radius: 50%; background: #BA96F0; display: block;"></span><span style="flex: 1; width: 1px; background: rgba(255,255,255,0.08); display: block;"></span></span>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-size: 12.5px; color: #E7E3DC;">model.switch · gpt-5.1 → gpt-5-codex</div>
+                  <div style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">14:31:20 · user initiated</div>
+                </div>
+              </div>
+              <div style="display: flex; gap: 10px; padding-bottom: 12px;">
+                <span style="width: 7px; flex: none; display: flex; flex-direction: column; align-items: center;"><span style="width: 7px; height: 7px; border-radius: 50%; background: #E9B949; display: block;"></span><span style="flex: 1; width: 1px; background: rgba(255,255,255,0.08); display: block;"></span></span>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-size: 12.5px; color: #E7E3DC;">approval.granted · repo.write</div>
+                  <div style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">14:12:44 · scope: src/billing/**</div>
+                </div>
+              </div>
+              <div style="display: flex; gap: 10px; padding-bottom: 12px;">
+                <span style="width: 7px; flex: none; display: flex; flex-direction: column; align-items: center;"><span style="width: 7px; height: 7px; border-radius: 50%; background: #4A4F4F; display: block;"></span><span style="flex: 1; width: 1px; background: rgba(255,255,255,0.08); display: block;"></span></span>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-size: 12.5px; color: #A8ADAB;">runtime.discovered · Codex CLI v0.34</div>
+                  <div style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">14:01:03 · handshake verified</div>
+                </div>
+              </div>
+            </div>
+            <div style="margin-top: 6px; border: 1px solid rgba(255,255,255,0.07); border-radius: 9px; background: #191C1D; padding: 12px;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 9px;">
+                <span style="font-family: 'Geist Mono', monospace; font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: #8B9190;">Tools &amp; permissions</span>
+                <span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">6 tools</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 7px; font-size: 12.5px;">
+                <div style="display: flex; gap: 8px;"><span style="color: #C9F04A;">allow</span><span style="color: #C7C3BC;">read workspace files</span></div>
+                <div style="display: flex; gap: 8px;"><span style="color: #C9F04A;">allow</span><span style="color: #C7C3BC;">write src/billing/**</span></div>
+                <div style="display: flex; gap: 8px;"><span style="color: #E9B949;">ask</span><span style="color: #C7C3BC;">outbound HTTP to Stripe</span></div>
+                <div style="display: flex; gap: 8px;"><span style="color: #E4685D;">deny</span><span style="color: #C7C3BC;">production secrets, git push</span></div>
+              </div>
+              <button type="button" style="margin-top: 12px; height: 28px; width: 100%; border-radius: 7px; border: 1px solid rgba(255,255,255,0.10); background: transparent; color: #A8ADAB; font-size: 12px; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);" style-active="transform: scale(0.98);">Raw event log</button>
+            </div>
+          </div>
+        </aside>
+      </sc-if>
+
+    </div>
+  </div>
+
+  <div style="width: 1480px; font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190; display: flex; gap: 18px; flex-wrap: wrap;">
+    <span>{{ captionLine }}</span>
+    <span style="margin-left: auto;">1480×940 · inspector collapses first at 1120×720</span>
+  </div>
+
+  <div style="width: 1480px; display: flex; flex-direction: column; gap: 12px; margin-top: 26px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span style="font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #6E7373;">Compact — 1120×720</span>
+      <span style="font-size: 12.5px; color: #4E5353;">Inspector collapses to a header affordance, sidebar becomes an avatar rail, workroom keeps full width</span>
+    </div>
+    <div style="width: 1120px; height: 720px; background: #121415; border: 1px solid rgba(255,255,255,0.09); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 24px 60px rgba(0,0,0,0.5);">
+      <div style="height: 36px; flex: none; display: flex; align-items: center; padding: 0 13px; gap: 10px; background: #16191A; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <div style="display: flex; gap: 7px;">
+          <span style="width: 10px; height: 10px; border-radius: 50%; background: #3A3E3F; display: block;"></span>
+          <span style="width: 10px; height: 10px; border-radius: 50%; background: #3A3E3F; display: block;"></span>
+          <span style="width: 10px; height: 10px; border-radius: 50%; background: #3A3E3F; display: block;"></span>
+        </div>
+        <div style="flex: 1; text-align: center; font-family: 'Geist Mono', monospace; font-size: 11.5px; color: #8B9190;">Ridgeline Workspace — local</div>
+        <div style="width: 60px;"></div>
+      </div>
+      <div style="flex: 1; min-height: 0; display: flex;">
+        <div style="width: 64px; flex: none; background: #17191A; border-right: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; align-items: center; padding: 14px 0 10px; gap: 12px;">
+          <img src="brand/locust-mark.svg" alt="Locust" style="width: 34px; height: auto; opacity: .9;">
+          <button type="button" aria-label="New mission" style="width: 30px; height: 30px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); background: transparent; color: #A8ADAB; font-size: 17px; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 140ms ease, color 140ms ease;" style-hover="background: rgba(255,255,255,0.07); color: #DBF785;">+</button>
+          <div style="width: 22px; height: 1px; background: rgba(255,255,255,0.07); display: block;"></div>
+          <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
+            <span style="position: relative; display: block;"><span aria-hidden="true" style="width: 32px; height: 32px; flex: none; border-radius: 5px; background: #A9D93F; border: 1px solid rgba(201,240,74,0.55); display: flex; align-items: center; justify-content: center; overflow: hidden; animation: lcBob 2.6s ease-in-out infinite;"><span style="position: relative; width: 24px; height: 24px; display: block;"><span style="position: absolute; left: 3px; top: 3px; width: 3px; height: 3px; background: #151A0C; box-shadow: 3px 0px 0 #151A0C, 6px 0px 0 #151A0C, 9px 0px 0 #151A0C, 12px 0px 0 #151A0C, 15px 0px 0 #151A0C, -3px 3px 0 #151A0C, -3px 6px 0 #151A0C, 18px 3px 0 #151A0C, 18px 6px 0 #151A0C; transform-origin: center; display: block;"></span><span style="position: absolute; left: 9px; top: 0px; width: 3px; height: 3px; background: rgba(255,255,255,0.55); box-shadow: 3px 0px 0 rgba(255,255,255,0.55); transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 9px; width: 3px; height: 3px; background: #151A0C; box-shadow: 9px 0px 0 #151A0C; transform-origin: center; display: block; animation: lcEyes 5s ease-in-out infinite;"></span><span style="position: absolute; left: 9px; top: 15px; width: 3px; height: 3px; background: #151A0C; box-shadow: 3px 0px 0 #151A0C; transform-origin: center top; display: block; animation: lcChat 1.5s ease-in-out infinite;"></span></span></span><span style="position: absolute; right: -2px; bottom: -2px; width: 8px; height: 8px; border-radius: 50%; background: #C9F04A; border: 2px solid #17191A; display: block;"></span></span>
+            <span style="position: relative; display: block; opacity: .75;"><span aria-hidden="true" style="width: 32px; height: 32px; flex: none; border-radius: 5px; background: #5E9BF0; border: 1px solid rgba(110,168,254,0.5); display: flex; align-items: center; justify-content: center; overflow: hidden;"><span style="position: relative; width: 24px; height: 24px; display: block;"><span style="position: absolute; left: 3px; top: 3px; width: 3px; height: 3px; background: #0D1520; box-shadow: 3px 0px 0 #0D1520, 6px 0px 0 #0D1520, 9px 0px 0 #0D1520, 12px 0px 0 #0D1520, 15px 0px 0 #0D1520, 0px 6px 0 #0D1520, 15px 6px 0 #0D1520; transform-origin: center; display: block;"></span><span style="position: absolute; left: 9px; top: 9px; width: 3px; height: 3px; background: rgba(255,255,255,0.55); box-shadow: 3px 0px 0 rgba(255,255,255,0.55); transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 9px; width: 3px; height: 3px; background: #0D1520; box-shadow: 9px 0px 0 #0D1520; transform-origin: center; display: block;"></span><span style="position: absolute; left: 9px; top: 15px; width: 3px; height: 3px; background: #0D1520; box-shadow: 3px 0px 0 #0D1520; transform-origin: center top; display: block;"></span></span></span></span><span style="position: absolute; right: -2px; bottom: -2px; width: 8px; height: 8px; border-radius: 50%; background: #E9B949; border: 2px solid #17191A; display: block;"></span></span>
+            <span style="display: block; opacity: .6;"><span aria-hidden="true" style="width: 32px; height: 32px; flex: none; border-radius: 5px; background: #A98BE8; border: 1px solid rgba(186,150,240,0.5); display: flex; align-items: center; justify-content: center; overflow: hidden;"><span style="position: relative; width: 24px; height: 24px; display: block;"><span style="position: absolute; left: 6px; top: 3px; width: 3px; height: 3px; background: #150F1E; box-shadow: 3px 0px 0 #150F1E, 6px 0px 0 #150F1E, 9px 0px 0 #150F1E, -6px 3px 0 #150F1E, -6px 6px 0 #150F1E, 15px 3px 0 #150F1E, 15px 6px 0 #150F1E; transform-origin: center; display: block;"></span><span style="position: absolute; left: 3px; top: 3px; width: 3px; height: 3px; background: rgba(255,255,255,0.5); box-shadow: 15px 0px 0 rgba(255,255,255,0.5); transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 9px; width: 3px; height: 3px; background: #150F1E; box-shadow: 9px 0px 0 #150F1E; transform-origin: center; display: block;"></span><span style="position: absolute; left: 9px; top: 15px; width: 3px; height: 3px; background: #150F1E; box-shadow: 3px 0px 0 #150F1E, 0px 3px 0 #150F1E, 3px 3px 0 #150F1E; transform-origin: center top; display: block;"></span></span></span></span>
+            <span style="position: relative; display: block; opacity: .6;"><span aria-hidden="true" style="width: 32px; height: 32px; flex: none; border-radius: 5px; background: #E4857A; border: 1px solid rgba(228,104,93,0.5); display: flex; align-items: center; justify-content: center; overflow: hidden;"><span style="position: relative; width: 24px; height: 24px; display: block;"><span style="position: absolute; left: 6px; top: 0px; width: 3px; height: 3px; background: #1E100F; box-shadow: 3px 0px 0 #1E100F, 6px 0px 0 #1E100F, 9px 0px 0 #1E100F, -3px 3px 0 #1E100F, 0px 3px 0 #1E100F, 3px 3px 0 #1E100F, 6px 3px 0 #1E100F, 9px 3px 0 #1E100F, 12px 3px 0 #1E100F, -3px 6px 0 #1E100F, 12px 6px 0 #1E100F; transform-origin: center; display: block;"></span><span style="position: absolute; left: 9px; top: 0px; width: 3px; height: 3px; background: rgba(255,255,255,0.45); transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 9px; width: 3px; height: 3px; background: #1E100F; box-shadow: 9px 0px 0 #1E100F; transform-origin: center; display: block;"></span><span style="position: absolute; left: 9px; top: 15px; width: 3px; height: 3px; background: #1E100F; box-shadow: 3px 0px 0 #1E100F; transform-origin: center top; display: block;"></span></span></span><span style="position: absolute; right: -2px; bottom: -2px; width: 8px; height: 8px; border-radius: 50%; background: #E4685D; border: 2px solid #17191A; display: block;"></span></span>
+          </div>
+          <span style="margin-top: auto; width: 14px; height: 14px; border: 1px solid #6E7373; border-radius: 50%; display: block;"></span>
+        </div>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+          <div style="flex: none; height: 54px; display: flex; align-items: center; gap: 11px; padding: 0 18px; border-bottom: 1px solid rgba(255,255,255,0.06); background: #16191A;">
+            <span aria-hidden="true" style="width: 28px; height: 28px; flex: none; border-radius: 5px; background: #A9D93F; border: 1px solid rgba(201,240,74,0.55); display: flex; align-items: center; justify-content: center; overflow: hidden; animation: lcBob 2.6s ease-in-out infinite;"><span style="position: relative; width: 24px; height: 24px; display: block;"><span style="position: absolute; left: 3px; top: 3px; width: 3px; height: 3px; background: #151A0C; box-shadow: 3px 0px 0 #151A0C, 6px 0px 0 #151A0C, 9px 0px 0 #151A0C, 12px 0px 0 #151A0C, 15px 0px 0 #151A0C, -3px 3px 0 #151A0C, -3px 6px 0 #151A0C, 18px 3px 0 #151A0C, 18px 6px 0 #151A0C; transform-origin: center; display: block;"></span><span style="position: absolute; left: 9px; top: 0px; width: 3px; height: 3px; background: rgba(255,255,255,0.55); box-shadow: 3px 0px 0 rgba(255,255,255,0.55); transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 9px; width: 3px; height: 3px; background: #151A0C; box-shadow: 9px 0px 0 #151A0C; transform-origin: center; display: block; animation: lcEyes 5s ease-in-out infinite;"></span><span style="position: absolute; left: 9px; top: 15px; width: 3px; height: 3px; background: #151A0C; box-shadow: 3px 0px 0 #151A0C; transform-origin: center top; display: block; animation: lcChat 1.5s ease-in-out infinite;"></span></span></span>
+            <div style="min-width: 0;">
+              <div style="display: flex; align-items: center; gap: 7px;"><span style="font-size: 14px; font-weight: 500;">Wren</span><span style="font-size: 12px; color: #8B9190;">Code &amp; Migrations</span></div>
+              <div style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">Mission · Billing webhooks → v3 · running</div>
+            </div>
+            <button type="button" style="margin-left: auto; height: 28px; padding: 0 11px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.09); background: #1D2122; color: #C7C3BC; font-size: 12.5px; font-family: Geist, sans-serif; cursor: pointer; transition: background 140ms ease;" style-hover="background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.20);">Activity</button>
+          </div>
+          <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 18px;">
+            <div style="max-width: 700px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px;">
+              <div style="align-self: flex-end; max-width: 78%; padding: 10px 13px; border-radius: 10px 10px 4px 10px; background: #23282A; border: 1px solid rgba(255,255,255,0.06); font-size: 13px; line-height: 1.55; color: #F1EEE8;">Move the billing webhooks to v3. Keep the old handler alive behind a flag.</div>
+              <div style="display: flex; gap: 11px;">
+                <span aria-hidden="true" style="width: 24px; height: 24px; flex: none; border-radius: 4px; background: #A9D93F; border: 1px solid rgba(201,240,74,0.55); display: flex; align-items: center; justify-content: center; overflow: hidden; animation: lcBob 2.6s ease-in-out infinite;"><span style="position: relative; width: 16px; height: 16px; display: block;"><span style="position: absolute; left: 2px; top: 2px; width: 2px; height: 2px; background: #151A0C; box-shadow: 2px 0px 0 #151A0C, 4px 0px 0 #151A0C, 6px 0px 0 #151A0C, 8px 0px 0 #151A0C, 10px 0px 0 #151A0C, -2px 2px 0 #151A0C, -2px 4px 0 #151A0C, 12px 2px 0 #151A0C, 12px 4px 0 #151A0C; transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 0px; width: 2px; height: 2px; background: rgba(255,255,255,0.55); box-shadow: 2px 0px 0 rgba(255,255,255,0.55); transform-origin: center; display: block;"></span><span style="position: absolute; left: 4px; top: 6px; width: 2px; height: 2px; background: #151A0C; box-shadow: 6px 0px 0 #151A0C; transform-origin: center; display: block; animation: lcEyes 5s ease-in-out infinite;"></span><span style="position: absolute; left: 6px; top: 10px; width: 2px; height: 2px; background: #151A0C; box-shadow: 2px 0px 0 #151A0C; transform-origin: center top; display: block; animation: lcChat 1.5s ease-in-out infinite;"></span></span></span>
+                <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 11px;">
+                  <div style="font-size: 13px; line-height: 1.6; color: #E7E3DC;">Plan set. Steps 1–2 stay in the repo; step 4 needs approval.</div>
+                  <div style="border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; background: #191C1D; padding: 11px 13px; display: flex; align-items: center; gap: 10px;">
+                    <span style="width: 15px; height: 15px; flex: none; border-radius: 5px; border: 1px solid rgba(255,255,255,0.12); display: block;"></span>
+                    <span style="font-size: 13px; color: #E7E3DC;">Edited 3 files · ran 2 commands</span>
+                    <span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">28s</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 10px; padding: 2px 0;">
+                    <span aria-hidden="true" style="width: 22px; height: 22px; flex: none; border-radius: 4px; background: #A9D93F; border: 1px solid rgba(201,240,74,0.55); display: flex; align-items: center; justify-content: center; overflow: hidden; animation: lcBob 2.6s ease-in-out infinite;"><span style="position: relative; width: 16px; height: 16px; display: block;"><span style="position: absolute; left: 2px; top: 2px; width: 2px; height: 2px; background: #151A0C; box-shadow: 2px 0px 0 #151A0C, 4px 0px 0 #151A0C, 6px 0px 0 #151A0C, 8px 0px 0 #151A0C, 10px 0px 0 #151A0C, -2px 2px 0 #151A0C, -2px 4px 0 #151A0C, 12px 2px 0 #151A0C, 12px 4px 0 #151A0C; transform-origin: center; display: block;"></span><span style="position: absolute; left: 6px; top: 0px; width: 2px; height: 2px; background: rgba(255,255,255,0.55); box-shadow: 2px 0px 0 rgba(255,255,255,0.55); transform-origin: center; display: block;"></span><span style="position: absolute; left: 4px; top: 6px; width: 2px; height: 2px; background: #151A0C; box-shadow: 6px 0px 0 #151A0C; transform-origin: center; display: block; animation: lcEyes 5s ease-in-out infinite;"></span><span style="position: absolute; left: 6px; top: 10px; width: 2px; height: 2px; background: #151A0C; box-shadow: 2px 0px 0 #151A0C; transform-origin: center top; display: block; animation: lcChat 1.5s ease-in-out infinite;"></span></span></span>
+                    <span style="font-size: 12.5px; color: #E4EFC7;">Running the billing suite</span>
+                    <span style="width: 1px; height: 12px; background: rgba(255,255,255,0.10); display: block;"></span>
+                    <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #8B9190;">step 3 · 41s · 142 passed</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="flex: none; padding: 10px 18px 16px;">
+            <div style="max-width: 700px; margin: 0 auto;">
+              <div style="border: 1px solid rgba(255,255,255,0.09); border-radius: 12px; background: #1A1D1E; display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 8px 0 14px;">
+                <span style="flex: 1; min-width: 0; font-size: 13px; color: #8B9190;">Message Wren, or describe a mission…</span>
+                <span style="width: 28px; height: 28px; flex: none; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center;"><span style="width: 9px; height: 9px; border-radius: 2px; background: #C7C3BC; display: block;"></span></span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px; padding: 0 4px; font-size: 12.5px; color: #8B9190;">
+                <span style="color: #C7C3BC;">Ask</span>
+                <span style="font-size: 15px; line-height: 1;">+</span>
+                <span style="margin-left: auto; display: flex; align-items: center; gap: 7px;">
+                  <span style="width: 6px; height: 6px; border-radius: 50%; background: #C9F04A; display: block;"></span>
+                  <span style="color: #C7C3BC;">Codex CLI</span>
+                  <span style="color: #4A4F4F;">/</span>
+                  <span style="font-family: 'Geist Mono', monospace; font-size: 12px;">gpt-5-codex</span>
+                  <span style="color: #C7C3BC;">High</span>
+                  <img src="brand/locust-mark.svg" alt="" style="height: 12px; width: auto; opacity: .45;">
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1540,&quot;height&quot;:1080}}">
+class Component extends DCLogic {
+  state = { scenario: "live", inspector: false, picker: false, activityOpen: false, userInspector: null, userPicker: null };
+
+  scenarioDefs() {
+    return [
+      ["live", "Live work"],
+      ["approval", "Approval"],
+      ["question", "Question for you"],
+      ["handoff", "Handoff + artifact"],
+      ["limit", "Usage limit"],
+      ["cancelled", "Cancelled"],
+      ["persist", "Ledger failure"],
+      ["restored", "Restored receipt"],
+      ["idle", "Idle teammate"],
+      ["first", "First launch"]
+    ];
+  }
+
+  screenDefs() {
+    return [
+      ["missions", "Missions"],
+      ["teammates", "Teammates"],
+      ["settings", "Settings"]
+    ];
+  }
+
+  pick(id) {
+    const presets = { approval: { picker: false }, limit: { picker: false }, first: { inspector: false, picker: false } };
+    this.setState({ scenario: id, userInspector: null, userPicker: null, ...(presets[id] || {}) });
+  }
+
+  renderVals() {
+    const s = this.state.scenario;
+    const btn = (active) =>
+      "height:28px;padding:0 11px;border-radius:7px;font-family:Geist,sans-serif;font-size:12.5px;cursor:pointer;transition:all 140ms ease;" +
+      (active
+        ? "border:1px solid rgba(201,240,74,0.40);background:rgba(201,240,74,0.13);color:#DBF785;"
+        : "border:1px solid rgba(255,255,255,0.09);background:#191C1D;color:#9BA09E;");
+
+    const isScreen = s === "settings" || s === "missions" || s === "teammates";
+    const mode = this.state.mode || "Ask";
+    const effort = this.state.effort || "High";
+    const hue = this.state.hue || "lime";
+    const look = this.state.look || 0;
+    const work = this.state.work || "A";
+    const hues = {
+      lime: ["#A9D93F", "#151A0C", "rgba(201,240,74,0.55)"],
+      blue: ["#5E9BF0", "#0D1520", "rgba(110,168,254,0.5)"],
+      violet: ["#A98BE8", "#150F1E", "rgba(186,150,240,0.5)"],
+      coral: ["#E4857A", "#1E100F", "rgba(228,104,93,0.5)"]
+    };
+    const role = this.state.role || "Code & Migrations";
+    const inspector = this.state.userInspector !== null ? this.state.userInspector : s === "handoff" || s === "restored";
+    const picker = this.state.userPicker !== null ? this.state.userPicker : false;
+
+    const missionLine = {
+      live: "Mission · Billing webhooks → v3 · running on Codex CLI",
+      approval: "Mission · Billing webhooks → v3 · waiting on you",
+      handoff: "Mission · Billing webhooks → v3 · handed off to Claude Code",
+      limit: "Mission · Billing webhooks → v3 · paused, limit reached",
+      restored: "Mission · Billing webhooks → v3 · restored from local ledger",
+      question: "Mission · Billing webhooks → v3 · waiting on your answer",
+      cancelled: "Mission · Billing webhooks → v3 · cancelled at 14:47",
+      persist: "Mission · Billing webhooks → v3 · paused, ledger unwritable",
+      idle: "No active mission · last worked 2h ago"
+    }[s] || "";
+
+    const footerLine = {
+      live: "Streaming from Codex CLI on your account · 14 checkpoints written locally",
+      approval: "Paused for approval · nothing outside the repo has been touched",
+      handoff: "Claude Code selected · streaming is live, tool approvals are preview-only",
+      limit: "Paused at ck_14 · fallback policy: Ask",
+      restored: "Ledger verified · resume replays from ck_12",
+      question: "Paused for an answer · no files touched since ck_13",
+      cancelled: "Stopped by you · edits through ck_14 kept on disk",
+      persist: "Paused · receipts cannot be written, run held at ck_14",
+      idle: "Command palette and activity panel are a keystroke away"
+    }[s] || "";
+
+    const captionLine = {
+      live: "State · live streaming work with collapsed semantic activity",
+      approval: "State · consequential approval: what, where, what data, reversibility, requester",
+      handoff: "State · teammate-to-teammate update attributed as untrusted, then a visible runtime handoff",
+      limit: "State · usage limit reached, safe checkpoint, Ask fallback",
+      restored: "State · app restart with an interrupted durable receipt",
+      question: "State · teammate asks the user a question, work paused",
+      cancelled: "State · user cancellation: what was kept, stopped, and never attempted",
+      persist: "State · persistence failure — run held rather than continuing without receipts",
+      idle: "State · idle teammate with capability-led empty state",
+      first: "State · first launch, no runtime connected",
+      missions: "Screen · Missions — local history with route and receipt status",
+      teammates: "Screen · Teammates — roster, default routes, tools, approval mode",
+      settings: "Screen · Settings — runtimes, fallback policy, swarm, privacy"
+    }[s] || "";
+
+    return {
+      scenarios: this.scenarioDefs().map(([id, label]) => ({
+        label,
+        style: btn(s === id),
+        onClick: () => this.pick(id)
+      })),
+      inspectorBtnStyle: btn(inspector),
+      pickerBtnStyle: btn(picker),
+      toggleInspector: () => this.setState({ userInspector: !inspector }),
+      togglePicker: () => this.setState({ userPicker: !picker, modeOpen: false, plusOpen: false, effortOpen: false }),
+      toggleMode: () => this.setState((p) => ({ modeOpen: !p.modeOpen, userPicker: false, plusOpen: false, effortOpen: false })),
+      togglePlus: () => this.setState((p) => ({ plusOpen: !p.plusOpen, modeOpen: false, userPicker: false, effortOpen: false })),
+      toggleEffort: () => this.setState((p) => ({ effortOpen: !p.effortOpen, plusOpen: false, modeOpen: false, userPicker: false })),
+      zero: 0,
+      workA: work === "A", workC: work === "C",
+      workRows: [
+        ["A", "Tool step"],
+        ["C", "Reasoning"]
+      ].map(([id, label]) => ({
+        label,
+        style: btn(work === id),
+        onClick: () => this.setState({ work: id, scenario: "live" })
+      })),
+      toggleNewBot: () => this.setState((p) => ({ newBotOpen: !p.newBotOpen, paletteOpen: false })),
+      newBotOpen: !!this.state.newBotOpen,
+      huelime: hue === "lime",
+      hueblue: hue === "blue",
+      hueviolet: hue === "violet",
+      huecoral: hue === "coral",
+      hueBg: hues[hue][0],
+      huePx: hues[hue][1],
+      hueBd: hues[hue][2],
+      look0: look === 0, look1: look === 1, look2: look === 2,
+      look3: look === 3, look4: look === 4, look5: look === 5,
+      shuffleLook: () => this.setState({ look: (look + 1) % 6 }),
+      teammateBusy: s === "live" || s === "handoff",
+      teammateCalm: !(s === "live" || s === "handoff"),
+      pickHuelime: () => this.setState({ hue: "lime" }),
+      pickHueblue: () => this.setState({ hue: "blue" }),
+      pickHueviolet: () => this.setState({ hue: "violet" }),
+      pickHuecoral: () => this.setState({ hue: "coral" }),
+      roleRows: [
+        ["Code & Migrations", "Repo edits, tests, PR prep"],
+        ["Research & Briefs", "Web + docs, written summaries"],
+        ["Ops & Scheduling", "Calendar, mail, routine runs"],
+        ["Docs & QA", "Specs, changelogs, review passes"],
+        ["Data & Reporting", "Queries, spreadsheets, charts"],
+        ["Custom…", "Write the role yourself"]
+      ].map(([name, desc]) => ({
+        name, desc,
+        style:
+          "text-align:left;padding:12px 13px;border-radius:9px;cursor:pointer;font-family:Geist,sans-serif;transition:border-color 140ms ease,background 140ms ease;" +
+          (role === name
+            ? "border:1px solid rgba(201,240,74,0.40);background:rgba(201,240,74,0.07);"
+            : "border:1px solid rgba(255,255,255,0.07);background:#191C1D;"),
+        onClick: () => this.setState({ role: name })
+      })),
+      modeLabel: mode,
+      effortLabel: effort,
+      modeRows: [
+        ["Ask", "Confirm every action outside the repo", "1"],
+        ["Accept edits", "Auto-apply file edits, still ask to act", "2"],
+        ["Plan first", "Draft a plan before touching anything", "3"],
+        ["Automatic", "Act without asking, stop at risky steps", "4"]
+      ].map(([name, desc, num]) => ({
+        name, desc, num,
+        active: mode === name,
+        onClick: () => this.setState({ mode: name, modeOpen: false })
+      })),
+      effortRows: [
+        ["Fast", "Skips extended thinking · lowest latency", "fast"],
+        ["Balanced", "Default reasoning budget", ""],
+        ["High", "More thinking on hard steps", ""],
+        ["Max", "Deepest reasoning · slowest, uses more quota", ""]
+      ].map(([name, desc, tag]) => ({
+        name, desc, tag,
+        active: effort === name,
+        onClick: () => this.setState({ effort: name, effortOpen: false })
+      })),
+      effortOpen: !!this.state.effortOpen,
+      togglePeer: () => this.setState((p) => ({ peerOpen: !p.peerOpen })),
+      peerOpen: !!this.state.peerOpen,
+      peerClosed: !this.state.peerOpen,
+      toggleSwarm: () => this.setState((p) => ({ swarm: !p.swarm })),
+      swarmOn: !!this.state.swarm,
+      swarmOff: !this.state.swarm,
+      modeOpen: !!this.state.modeOpen,
+      plusOpen: !!this.state.plusOpen,
+      toggleActivity: () => this.setState((p) => ({ activityOpen: !p.activityOpen })),
+      activityOpen: this.state.activityOpen,
+      activityToggleLabel: this.state.activityOpen ? "hide" : "show",
+      screens: this.screenDefs().map(([id, label]) => ({
+        label,
+        style: btn(s === id),
+        onClick: () => this.pick(id)
+      })),
+      togglePalette: () => this.setState((p) => ({ paletteOpen: !p.paletteOpen })),
+      paletteOpen: !!this.state.paletteOpen,
+      paletteBtnStyle: btn(!!this.state.paletteOpen),
+      isQuestion: s === "question",
+      isCancelled: s === "cancelled",
+      isPersistFail: s === "persist",
+      isSettings: s === "settings",
+      isMissions: s === "missions",
+      isTeammates: s === "teammates",
+      isFirstRun: s === "first",
+      isWorkroom: s !== "first" && !isScreen,
+      isIdle: s === "idle",
+      showThread: s !== "first" && s !== "idle" && !isScreen,
+      isLive: s === "live",
+      notLive: s !== "live",
+      isApproval: s === "approval",
+      isHandoff: s === "handoff",
+      isLimit: s === "limit",
+      isRestored: s === "restored",
+      showRestoreBanner: s === "restored",
+      showInspector: inspector && s !== "first" && !isScreen,
+      pickerOpen: picker,
+      missionLine,
+      footerLine,
+      captionLine
+    };
+  }
+}
+</script>
+</body>
+</html>

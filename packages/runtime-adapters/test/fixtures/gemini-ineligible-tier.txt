@@ -1,0 +1,20 @@
+Warning: Windows 10 detected. Some UI features like smooth scrolling may be degraded. Windows 11 is recommended for the best experience.
+Warning: True color (24-bit) support not detected. Using a terminal with true color enabled will result in a better visual experience.
+Error authenticating: IneligibleTierError: This client is no longer supported for Gemini Code Assist for individuals. To continue using Gemini, please migrate to the Antigravity suite of products: https://antigravity.google
+    at throwIneligibleOrProjectIdError (file:///C:/Users/<home>/AppData/Roaming/npm/node_modules/@google/gemini-cli/bundle/chunk-MFLFXOVQ.js:310176:11)
+    at _doSetupUser (file:///C:/Users/<home>/AppData/Roaming/npm/node_modules/@google/gemini-cli/bundle/chunk-MFLFXOVQ.js:310165:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  ineligibleTiers: [
+    {
+      reasonCode: 'UNSUPPORTED_CLIENT',
+      reasonMessage: 'This client is no longer supported for Gemini Code Assist for individuals. To continue using Gemini, please migrate to the Antigravity suite of products: https://antigravity.google',
+      tierId: 'free-tier',
+      tierName: 'Gemini Code Assist for individuals'
+    }
+  ]
+}
+Ripgrep is not available. Falling back to GrepTool.
+An unexpected critical error occurred:IneligibleTierError: This client is no longer supported for Gemini Code Assist for individuals. To continue using Gemini, please migrate to the Antigravity suite of products: https://antigravity.google
+    at throwIneligibleOrProjectIdError (file:///C:/Users/<home>/AppData/Roaming/npm/node_modules/@google/gemini-cli/bundle/chunk-MFLFXOVQ.js:310176:11)
+    at _doSetupUser (file:///C:/Users/<home>/AppData/Roaming/npm/node_modules/@google/gemini-cli/bundle/chunk-MFLFXOVQ.js:310165:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)

@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lc-tokens.css">
+<style>
+  html, body { margin: 0; background: var(--lc-bg-app); }
+  * { box-sizing: border-box; }
+  a { color: var(--lc-lime); text-decoration: none; }
+  a:hover { color: var(--lc-lime-text); }
+  @keyframes lcPulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--lc-scroll-thumb); border-radius: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+</style>
+</helmet>
+<div style="min-height: 100vh; padding: 36px; display: flex; flex-direction: column; gap: 44px; font-family: var(--lc-font-ui); color: var(--lc-text-primary); font-size: var(--lc-text-body); line-height: var(--lc-leading-prose);">
+
+  <div style="display: flex; flex-direction: column; gap: 10px; max-width: 1012px;">
+    <div style="font-size: var(--lc-text-screen-title); font-weight: 500; letter-spacing: -0.015em;">Following eight</div>
+    <div style="font-size: var(--lc-text-description); color: var(--lc-text-muted); text-wrap: pretty;">On <span style="font-family: var(--lc-font-mono);">tokens.css</span>, room content at its real 1012px (1280 minus the sidebar). Live where it has states.</div>
+    <div style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">Your last paragraph is the answer and I think you should take it further than you did. <strong style="font-weight: 500;">Nobody watches a room while it runs — so two of your three jobs are not real jobs.</strong> “Is anything wrong” and “who is furthest along” are only questions if someone is present to ask them continuously, and nobody is. What is real is <em>arriving</em>: one question, asked once, on return. That collapses to one line, and one line always fits eight.</div>
+    <div style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">So: no second view, no mode switch. The room keeps the layout you shipped today and gains a <strong style="font-weight: 500;">post header</strong> — derived counts plus the members as an index. And one defect in today's fold, which the counting fixture happened to hide.</div>
+  </div>
+
+  <!-- ═══════════ THE HEADER ═══════════ -->
+  <section style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label-wide); text-transform: uppercase; color: var(--lc-green-text);">The post header</span>
+      <span style="font-size: var(--lc-text-description); color: var(--lc-text-muted);">One line. The glance, and the way to one answer. Live — try the three room states.</span>
+    </div>
+
+    <div style="width: 1012px; display: flex; flex-direction: column; gap: 10px;">
+      <div style="background: var(--lc-bg-window); border: 1px solid var(--lc-border-card); border-radius: var(--lc-radius-card); overflow: hidden;">
+
+        <div style="padding: 14px 16px 12px; border-bottom: 1px solid var(--lc-border-hairline);">
+          <div style="display: flex; align-items: baseline; gap: 12px;">
+            <span style="flex: 1; min-width: 0; font-size: var(--lc-text-body); color: var(--lc-text-primary);">{{ postText }}</span>
+            <span style="flex: none; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-caption); color: var(--lc-text-muted);">19:27</span>
+          </div>
+        </div>
+
+        <!-- the header strip -->
+        <div style="display: flex; align-items: center; gap: 16px; padding: 9px 16px; background: var(--lc-bg-chrome); border-bottom: 1px solid var(--lc-border-hairline);">
+          <span style="flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-caption);">
+            <sc-for list="{{ summary }}" as="seg" hint-placeholder-count="4">
+              <span style="{{ seg.style }}">{{ seg.text }}</span>
+            </sc-for>
+          </span>
+          <span style="flex: none; display: flex; align-items: center; gap: 5px;">
+            <sc-for list="{{ index }}" as="m" hint-placeholder-count="8">
+              <button type="button" title="{{ m.title }}" aria-label="{{ m.title }}" onClick="{{ m.onClick }}" style="{{ m.btnStyle }}">
+                <span style="{{ m.chip }}"><span style="{{ m.box }}"><span style="{{ m.l1 }}"></span><span style="{{ m.l2 }}"></span><span style="{{ m.l3 }}"></span></span></span>
+                <span style="{{ m.pip }}"></span>
+              </button>
+            </sc-for>
+          </span>
+        </div>
+
+        <!-- the answers, as shipped: list past six -->
+        <div style="max-height: 470px; overflow-y: auto; padding: 6px 0;">
+          <sc-for list="{{ answers }}" as="a" hint-placeholder-count="8">
+            <div style="{{ a.rowStyle }}">
+              <div style="display: flex; align-items: center; gap: 9px; padding: 0 16px;">
+                <span style="{{ a.chip }}"><span style="{{ a.box }}"><span style="{{ a.l1 }}"></span><span style="{{ a.l2 }}"></span><span style="{{ a.l3 }}"></span></span></span>
+                <span style="flex: none; font-size: var(--lc-text-control); color: var(--lc-text-name);">{{ a.name }}</span>
+                <span style="flex: none; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-text-muted);">{{ a.route }}</span>
+                <span style="{{ a.phaseStyle }}">{{ a.phase }}</span>
+                <span style="margin-left: auto; flex: none; height: 24px; padding: 0 10px; display: inline-flex; align-items: center; border-radius: var(--lc-radius-control); font-size: var(--lc-text-description); color: var(--lc-text-muted);">Open</span>
+              </div>
+              <div style="{{ a.bodyStyle }}">{{ a.body }}</div>
+              <div style="{{ a.moreStyle }}">{{ a.more }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-text-muted);">ROOM STATE</span>
+        <sc-for list="{{ cases }}" as="c" hint-placeholder-count="3">
+          <button type="button" onClick="{{ c.onClick }}" style="{{ c.style }}">{{ c.label }}</button>
+        </sc-for>
+        <span style="margin-left: 12px; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-text-muted);">then click a face in the strip</span>
+      </div>
+      <div style="font-size: var(--lc-text-description); color: var(--lc-text-muted); text-wrap: pretty;">{{ caseNote }}</div>
+    </div>
+
+    <div style="max-width: 1012px; display: grid; grid-template-columns: 156px 1fr; gap: 8px 16px; font-size: var(--lc-text-description); color: var(--lc-text-secondary);">
+      <span style="color: var(--lc-text-muted);">The counts</span><span style="text-wrap: pretty;">Derived, and they follow the trace line's rule: <strong style="font-weight: 500;">count the ordinary, name the exceptional.</strong> <span style="font-family: var(--lc-font-mono);">8 asked · 6 answered · Otto running · Sable failed</span>. A zero segment is absent, and once more than two share a state they go back to being a number, because four names is a list and a list is not a glance.</span>
+      <span style="color: var(--lc-text-muted);">The index</span><span style="text-wrap: pretty;">Eight faces at 22px with a phase pip: 216px, so it fits at any width the room has and never wraps. It is the answer to <em>“what did Booty actually say”</em> — click and the answer goes to the top of the scroll area. Scroll position by arithmetic, not <span style="font-family: var(--lc-font-mono);">scrollIntoView</span>, which fights the scroll container.</span>
+      <span style="color: var(--lc-text-muted);">Sticky</span><span style="text-wrap: pretty;"><span style="font-family: var(--lc-font-mono);">position: sticky; top: 0</span> within the post, so the glance and the index survive scrolling through eight answers. It is the only sticky thing in the room, and it is 38px.</span>
+      <span style="color: var(--lc-text-muted);">Not a species</span><span style="text-wrap: pretty;">It is chrome on an existing section — the same relationship the workroom header has to its thread. No card, no register, and nothing in it that is not already in the records the cards are read from.</span>
+    </div>
+  </section>
+
+  <!-- ═══════════ WHY NOT TWO VIEWS ═══════════ -->
+  <section style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label-wide); text-transform: uppercase; color: var(--lc-text-muted);">Your three moments, taken one at a time</span>
+    </div>
+
+    <div style="max-width: 1012px; display: flex; flex-direction: column; gap: 12px;">
+      <div style="padding: 15px 17px; border-radius: var(--lc-radius-card); border: 1px solid var(--lc-border-card); background: var(--lc-bg-raised); display: flex; flex-direction: column; gap: 6px;">
+        <span style="font-size: var(--lc-text-control); font-weight: 500; color: var(--lc-text-name);">“Is anything wrong?” — one line, and it is the header</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">This is a real question but it is asked <em>once</em>, on arrival, not continuously — so it does not need a view, it needs a sentence that is true at the moment you look. Eight states fit in one line at any width. The version that needed a screen was the version where you were watching.</span>
+      </div>
+
+      <div style="padding: 15px 17px; border-radius: var(--lc-radius-card); border: 1px solid var(--lc-amber-border); background: var(--lc-bg-raised); display: flex; flex-direction: column; gap: 6px;">
+        <span style="font-size: var(--lc-text-control); font-weight: 500; color: var(--lc-text-name);">“Who is furthest along?” — I would not build this, and I do not think it exists</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">Two problems, and the second is fatal. It is a live question, and nobody is live. And <strong style="font-weight: 500;">progress is not comparable between teammates</strong>: one is writing five hundred lines through nine tool calls, another answers in a sentence: there is no shared denominator, so “further along” has no referent. Astra's own numbers say so — the same room's slowest process ran 108s against a 70s solo baseline, and neither figure is a fraction of anything.</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">A comparison view would therefore have to invent a denominator, which is the mistake the finding refuses twice — the invalid <span style="font-family: var(--lc-font-mono);">peakObservedLive</span> field, and the RAM-derived cap it declines to build. The honest version of the question is <em>who has not finished</em>, and that is a count and two names in the line above.</span>
+      </div>
+
+      <div style="padding: 15px 17px; border-radius: var(--lc-radius-card); border: 1px solid var(--lc-green-border); background: var(--lc-bg-raised); display: flex; flex-direction: column; gap: 6px;">
+        <span style="font-size: var(--lc-text-control); font-weight: 500; color: var(--lc-text-name);">“What did Booty actually say?” — the only one that needed real work, and you did most of it</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">The fold plus Open is right. What was missing was not a better preview but a way to <em>get to</em> Booty among eight — you had to scroll and read names. That is the index, and an index is the cheapest thing on this list to build.</span>
+      </div>
+
+      <div style="padding: 15px 17px; border-radius: var(--lc-radius-card); border: 1px solid var(--lc-border-card); background: var(--lc-bg-raised); display: flex; flex-direction: column; gap: 6px;">
+        <span style="font-size: var(--lc-text-control); font-weight: 500; color: var(--lc-text-name);">So: one layout, not two views</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">The three moments differ in <strong style="font-weight: 500;">depth, not in kind</strong> — glance, then find, then read — and that is progressive disclosure, which one layout does natively and two views do by making you choose a mode before you know what you want. A switch also has to default correctly, and its default would be wrong for whichever moment you arrived in.</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">And the monitoring view already exists: the Missions overview fits eight status rows, per the finding. A second one in the room would be the same eight rows, one screen away from itself.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ THE FOLD DEFECT ═══════════ -->
+  <section style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label-wide); text-transform: uppercase; color: var(--lc-red-text);">A defect in today's fold — and the fixture hid it</span>
+      <span style="font-size: var(--lc-text-description); color: var(--lc-text-muted);">You asked whether the number or the shape is wrong. Neither: the <em>unit</em> is.</span>
+    </div>
+
+    <div style="width: 1012px; display: flex; gap: 20px; align-items: flex-start;">
+      <div style="width: 496px; display: flex; flex-direction: column; gap: 8px;">
+        <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-green-text);">FOLDS · 500 numbers, one per line</span>
+        <div style="padding: 14px; background: var(--lc-bg-window); border: 1px solid var(--lc-border-card); border-radius: var(--lc-radius-card);">
+          <div style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-caption); color: var(--lc-text-secondary); white-space: pre; line-height: 1.5; overflow: hidden;">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12</div>
+          <div style="margin-top: 8px; height: 24px; padding: 0 10px; display: inline-flex; align-items: center; border: 1px solid var(--lc-border-control); border-radius: var(--lc-radius-control); background: var(--lc-bg-control); font-size: var(--lc-text-description); color: var(--lc-text-control-fg);">488 more lines</div>
+        </div>
+        <div style="font-size: var(--lc-text-description); color: var(--lc-text-muted); text-wrap: pretty;">499 newlines, so <span style="font-family: var(--lc-font-mono);">split('\n').length</span> is 500 and the fold fires. This is the shape the measurement drove, and it works.</div>
+      </div>
+
+      <div style="width: 496px; display: flex; flex-direction: column; gap: 8px;">
+        <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-red-text);">DOES NOT FOLD · the same length as prose</span>
+        <div style="padding: 14px; background: var(--lc-bg-window); border: 1px solid var(--lc-red-border); border-radius: var(--lc-radius-card);">
+          <div style="font-size: var(--lc-text-body); color: var(--lc-text-secondary); text-wrap: pretty;">The billing adapter has three problems and they compound. First, the v2 payload mapper assumes every event carries a currency field, which was true until the 2026-04 API version split it into presentment and settlement currency — so anything that came in after that has been silently defaulting to the account currency and the totals have been right by luck. Second, the dispute events changed shape in the same release and the adapter has no branch for the new one, which means a dispute either parses as an empty object or throws depending on whether the amount happens to be present. Third, and this is the one that will bite during the migration, the flag that is supposed to gate the whole thing is read once at module load rather than per request, so flipping it does nothing until the process restarts. I would fix them in that order, because the first is a correctness problem that is already live, the second only affects a code path that fires a few times a week, and the third is not wrong yet but will make the rollout untestable.</div>
+        </div>
+        <div style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;"><strong style="font-weight: 500;">One newline.</strong> <span style="font-family: var(--lc-font-mono);">lines.length</span> is 1, so <span style="font-family: var(--lc-font-mono);">1 &lt;= 12</span> and it renders whole — about seventeen rendered lines at this width, and more as the window narrows. Eight of these is the original problem, unfolded, and the fold cannot see it.</div>
+      </div>
+    </div>
+
+    <div style="max-width: 1012px; display: grid; grid-template-columns: 156px 1fr; gap: 8px 16px; font-size: var(--lc-text-description); color: var(--lc-text-secondary);">
+      <span style="color: var(--lc-text-muted);">The fix</span><span style="text-wrap: pretty;">Bound the <em>height</em>, not the newline count: <span style="font-family: var(--lc-font-mono);">-webkit-line-clamp</span> (or a <span style="font-family: var(--lc-font-mono);">max-height</span> of 12 × the line box) and read <span style="font-family: var(--lc-font-mono);">scrollHeight &gt; clientHeight</span> to decide whether to draw the control at all. A rendered line is what a person sees; a newline is what the runtime happened to type.</span>
+      <span style="color: var(--lc-text-muted);">The copy</span><span style="text-wrap: pretty;">Then <span style="font-family: var(--lc-font-mono);">488 more lines</span> cannot be counted, and should not be — the honest label for a height-bounded fold is <span style="font-family: var(--lc-font-mono); color: var(--lc-text-primary);">Show the rest</span>. It loses a number I would otherwise defend, but the number was only ever available in the case where it was also least needed.</span>
+      <span style="color: var(--lc-text-muted);">Twelve is right</span><span style="text-wrap: pretty;">And it should not shrink to make eight fit. Eight answers at any readable resting height exceed a 700px scroll area, so shrinking the fold buys nothing and costs the preview. The thing that makes eight tractable is the index, not a smaller window onto each one.</span>
+    </div>
+  </section>
+
+  <!-- ═══════════ THE STARTING WINDOW ═══════════ -->
+  <section style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label-wide); text-transform: uppercase; color: var(--lc-text-muted);">The invisible 45 seconds</span>
+      <span style="font-size: var(--lc-text-description); color: var(--lc-text-muted);">Three facts, three rows — and the row exists from the post, not from the notification.</span>
+    </div>
+
+    <div style="width: 1012px; background: var(--lc-bg-window); border: 1px solid var(--lc-border-card); border-radius: var(--lc-radius-card); padding: 6px 0;">
+      <div style="display: flex; align-items: center; gap: 9px; padding: 10px 16px; border-bottom: 1px solid var(--lc-border-hairline);">
+        <span style="width: 22px; height: 22px; flex: none; border-radius: 4px; background: var(--lc-hue-blue); border: 1px solid var(--lc-blue-border); display: block;"></span>
+        <span style="flex: none; font-size: var(--lc-text-control); color: var(--lc-text-name);">Otto</span>
+        <span style="flex: none; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-text-muted);">OpenCode / muse-spark-1.3</span>
+        <span style="flex: none; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-caption); color: var(--lc-text-muted);">asked · 2s</span>
+        <span style="margin-left: auto; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-text-faint);">t + 2s</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 9px; padding: 10px 16px; border-bottom: 1px solid var(--lc-border-hairline);">
+        <span style="width: 22px; height: 22px; flex: none; border-radius: 4px; background: var(--lc-hue-blue); border: 1px solid var(--lc-blue-border); display: block;"></span>
+        <span style="flex: none; font-size: var(--lc-text-control); color: var(--lc-text-name);">Otto</span>
+        <span style="flex: none; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-text-muted);">OpenCode / muse-spark-1.3</span>
+        <span style="flex: none; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-caption); color: var(--lc-amber-text);">asked · 45s · no word back yet</span>
+        <span style="margin-left: auto; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-text-faint);">t + 45s</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 9px; padding: 10px 16px;">
+        <span style="width: 22px; height: 22px; flex: none; border-radius: 4px; background: var(--lc-hue-blue); border: 1px solid var(--lc-blue-border); display: block;"></span>
+        <span style="flex: none; font-size: var(--lc-text-control); color: var(--lc-text-name);">Otto</span>
+        <span style="flex: none; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-text-muted);">OpenCode / muse-spark-1.3</span>
+        <span style="flex: none; display: inline-flex; align-items: center; gap: 6px; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-caption); color: var(--lc-text-secondary);"><span style="width: 5px; height: 5px; border-radius: 50%; background: var(--lc-lime); display: block; animation: lcPulse 1.6s ease-in-out infinite;"></span>running · 52s</span>
+        <span style="margin-left: auto; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); color: var(--lc-text-faint);">first event</span>
+      </div>
+    </div>
+
+    <div style="max-width: 1012px; display: grid; grid-template-columns: 156px 1fr; gap: 8px 16px; font-size: var(--lc-text-description); color: var(--lc-text-secondary);">
+      <span style="color: var(--lc-text-muted);">Three facts</span><span style="text-wrap: pretty;">You are right that they are different, and the naming is where it goes wrong. <span style="font-family: var(--lc-font-mono);">starting</span> is the app's word for its own dispatch loop; the reader's fact is <strong style="font-weight: 500;">we asked and nothing has come back</strong>. So <span style="font-family: var(--lc-font-mono); color: var(--lc-text-primary);">asked</span>, then <span style="font-family: var(--lc-font-mono); color: var(--lc-text-primary);">running</span> at the first event, then the answer. “Nothing yet” is not a third state — it is the absence you are already fixing.</span>
+      <span style="color: var(--lc-text-muted);">The elapsed count</span><span style="text-wrap: pretty;">The whole point, and the same argument as elapsed-seconds-not-a-progress-bar: 2 seconds of silence is normal and 45 is alarming, and the <em>only</em> thing distinguishing them is a number you already have. Without it both are the word “starting” and a person cannot tell a slow launch from a hung one.</span>
+      <span style="color: var(--lc-text-muted);">The threshold</span><span style="text-wrap: pretty;">Past 20s the row adds <span style="font-family: var(--lc-font-mono); color: var(--lc-text-primary);">no word back yet</span> in amber. Amber because a person may want to act, and a sentence rather than a phase change because <em>nothing has changed</em> — the run is not failing, it is quiet, and those are not the same claim. It never becomes red on its own: a launch that never speaks ends as a failure through the normal path, with the runtime's own reason.</span>
+      <span style="color: var(--lc-text-muted);">Where 20 comes from</span><span style="text-wrap: pretty;">Astra's solo write baseline is a 70s process whose first record arrives well inside that; the eight-way case put 45s between process start and notification. So 20s is past normal and well short of the observed bad case — a threshold I would rather you tune once real launches are visible than defend to the second now.</span>
+      <span style="color: var(--lc-text-muted);">The row from t=0</span><span style="text-wrap: pretty;">The important half, and it is yours: the card should exist when the post is made, not when the mission announces itself. Absence is not a state, and it is the one thing on this screen a person actively misreads — an empty room after posting looks like a room that did not post.</span>
+    </div>
+  </section>
+
+  <!-- ═══════════ THE CAP ═══════════ -->
+  <section style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+      <span style="font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-label); letter-spacing: var(--lc-tracking-label-wide); text-transform: uppercase; color: var(--lc-text-muted);">On the number</span>
+      <span style="font-size: var(--lc-text-description); color: var(--lc-text-muted);">You said if presentation is solvable the cap can rise. It is solvable — and it still should not rise for that reason.</span>
+    </div>
+
+    <div style="max-width: 1012px; display: flex; flex-direction: column; gap: 12px;">
+      <div style="padding: 15px 17px; border-radius: var(--lc-radius-card); border: 1px solid var(--lc-border-card); background: var(--lc-bg-raised); display: flex; flex-direction: column; gap: 6px;">
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">The presentation constraint <strong style="font-weight: 500;">is</strong> solvable, and I think the header plus the fold-by-height solves it: eight is legible on arrival, and any one answer is two clicks away. So I am releasing the hold I was implicitly putting on the number.</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">But I do not think that argues for raising it, because <strong style="font-weight: 500;">the binding constraint was never how many answers fit on a screen — it is how many answers to the <em>same question</em> one person can use.</strong> A room posts one thing to everyone, so its output is N answers to be compared, and comparison is the one job no layout removes: eight paragraphs on the same subject is work whether they are drawn well or badly. Twelve would be more of that work, not more capability.</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;">Which points somewhere better. <strong style="font-weight: 500;">Eight teammates working followably already exists in this screen, and it is the board.</strong> Eight <em>tasks</em>, one owner and one state each, is eight status rows — exactly the shape the finding says already works at eight, and the shape where the answers are about different things and never need comparing. If the cap should rise, the argument comes from independent work per teammate, not from a post everyone answers at once.</span>
+      </div>
+
+      <div style="padding: 15px 17px; border-radius: var(--lc-radius-card); border: 1px solid var(--lc-border-card); background: var(--lc-bg-raised); display: flex; flex-direction: column; gap: 6px;">
+        <span style="font-size: var(--lc-text-control); font-weight: 500; color: var(--lc-text-name);">Three things I am not touching</span>
+        <span style="font-size: var(--lc-text-description); color: var(--lc-text-secondary); text-wrap: pretty;"><strong style="font-weight: 500;">Grid to six, list past it</strong> — right, and the reasoning about equal-height cells is the correct diagnosis of a whitespace problem I would have blamed on padding. <strong style="font-weight: 500;">The queue</strong> — right, and the one-new-state reduction in the comment is better than the version I argued for. <strong style="font-weight: 500;">The fold as a control</strong> — right shape, right pattern, right class; only the unit is wrong.</span>
+      </div>
+    </div>
+  </section>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1100,&quot;height&quot;:1400}}">
+/*
+ * Faces from apps/desktop/src/shared/avatar.ts -- the real cell tables, seed
+ * and one-span-per-layer geometry PixelFace.tsx uses, so eight members are
+ * eight distinguishable people rather than eight coloured squares. That is
+ * load-bearing here: the index is only an index if the faces differ.
+ */
+const HEADWEAR = [
+  [],
+  [[2, 2], [4, 2], [6, 2], [8, 2], [10, 2], [12, 2], [0, 4], [0, 6], [14, 4], [14, 6]],
+  [[2, 2], [4, 2], [6, 2], [8, 2], [10, 2], [12, 2]],
+  [[4, 2], [6, 2], [8, 2], [10, 2], [0, 4], [0, 6], [14, 4], [14, 6]],
+  [[4, 0], [6, 0], [8, 0], [10, 0], [2, 2], [4, 2], [6, 2], [8, 2], [10, 2], [12, 2]],
+  [[6, 0], [6, 2], [4, 4], [6, 4], [8, 4], [10, 4]]
+];
+const ACCESSORY = [[], [[2, 6], [12, 6]], [[2, 4], [12, 4]]];
+const MOUTH = [
+  [[6, 10], [8, 10]],
+  [[4, 10], [6, 10], [8, 10], [10, 10]],
+  [[6, 10], [8, 10], [6, 12], [8, 12]],
+  [[6, 10], [8, 12]]
+];
+const EYES = [[4, 6], [10, 6]];
+const HUES = ['lime', 'blue', 'violet', 'clay'];
+
+function seedAvatar(id) {
+  let hash = 2166136261;
+  for (const ch of id) {
+    hash ^= ch.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  hash ^= hash >>> 16;
+  hash = Math.imul(hash, 0x85ebca6b);
+  hash ^= hash >>> 13;
+  const part = (shift, mod) => ((hash >>> shift) & 0xff) % mod;
+  return { headwear: part(4, 6), accessory: part(12, 3), mouth: part(20, 4) };
+}
+
+const facePixelSize = (size) => Math.max(2, Math.round((size * 0.72) / 8));
+const chipRadius = (size) => Math.max(4, Math.round(size / 6));
+
+function layerStyle(cells, pixel, faceVar) {
+  const base = cells[0];
+  if (base === undefined) return 'display: none;';
+  const [bx, by] = base;
+  const shadow = cells
+    .slice(1)
+    .map(([x, y]) => `${((x - bx) / 2) * pixel}px ${((y - by) / 2) * pixel}px 0 var(${faceVar})`)
+    .join(', ');
+  return `position: absolute; left: ${(bx / 2) * pixel}px; top: ${(by / 2) * pixel}px; width: ${pixel}px; height: ${pixel}px; background: var(${faceVar}); display: block;`
+    + (shadow === '' ? '' : ` box-shadow: ${shadow};`);
+}
+
+function faceStyles(id, hue, size) {
+  const spec = seedAvatar(id);
+  const pixel = facePixelSize(size);
+  const grid = pixel * 8;
+  const chipVar = `--lc-hue-${hue}`;
+  const faceVar = `--lc-hue-${hue}-face`;
+  return {
+    chip: `position: relative; flex: none; width: ${size}px; height: ${size}px; border-radius: ${chipRadius(size)}px; background: var(${chipVar}); border: 1px solid color-mix(in srgb, var(${chipVar}) 55%, transparent); display: block; overflow: hidden;`,
+    box: `position: absolute; left: ${Math.round((size - grid) / 2) - 1}px; top: ${Math.round((size - grid) / 2) - 1}px; width: ${grid}px; height: ${grid}px; display: block;`,
+    l1: layerStyle([...HEADWEAR[spec.headwear], ...ACCESSORY[spec.accessory]], pixel, faceVar),
+    l2: layerStyle(EYES, pixel, faceVar),
+    l3: layerStyle(MOUTH[spec.mouth], pixel, faceVar)
+  };
+}
+
+const TONE = { answered: '--lc-green', running: '--lc-lime', asked: '--lc-text-faint', failed: '--lc-red', waiting: '--lc-neutral' };
+
+const SHORT = 'Three problems, and the flag being read at module load is the one that makes the rollout untestable.';
+const LONG = `The billing adapter has three problems and they compound.
+First, the v2 payload mapper assumes every event carries a currency field, which stopped being true when the 2026-04 API version split it into presentment and settlement currency.
+Anything that arrived after that has been defaulting to the account currency, so the totals have been right by luck rather than by logic.
+Second, the dispute events changed shape in the same release and the adapter has no branch for the new one.
+A dispute therefore either parses as an empty object or throws, depending on whether the amount happens to be present.
+Third, and this is the one that will bite during the migration, the flag meant to gate the whole thing is read once at module load rather than per request.
+Flipping it does nothing until the process restarts, which means the rollout cannot be tested the way the plan assumes.
+I would fix them in that order.
+The first is a correctness problem that is already live and silently wrong.
+The second only affects a path that fires a few times a week, so it can wait a day.
+The third is not wrong yet, but it makes everything after it unverifiable.
+Each fix is independent, so they can ship separately.
+None of them needs a migration of its own.
+The parity test should be written before the first one lands, not after.
+That is the only ordering constraint I can see.`;
+
+const MEMBERS = [
+  { id: 'wren', name: 'Wren', route: 'Codex / gpt-5.6' },
+  { id: 'atlas', name: 'Atlas', route: 'Claude Code / sonnet' },
+  { id: 'juno', name: 'Juno', route: 'OpenCode / muse-spark-1.3' },
+  { id: 'sable', name: 'Sable', route: 'Copilot / gpt-5' },
+  { id: 'otto', name: 'Otto', route: 'OpenCode / muse-spark-1.3' },
+  { id: 'pike', name: 'Pike', route: 'Cursor / composer-1' },
+  { id: 'booty', name: 'Booty', route: 'OpenCode / muse-spark-1.3' },
+  { id: 'dell', name: 'Dell', route: 'Codex / gpt-5.6' }
+];
+
+const CASES = {
+  arriving: {
+    label: 'arriving after it ran',
+    post: 'Read src/billing/adapter.ts and tell me what is wrong with it.',
+    phases: ['answered', 'answered', 'answered', 'failed', 'running', 'answered', 'answered', 'answered'],
+    note: 'The case that matters, because it is the only one anybody is present for. One line says eight states; the strip says who; the answers are underneath in the order they were asked.'
+  },
+  live: {
+    label: 'thirty seconds in',
+    post: 'Read src/billing/adapter.ts and tell me what is wrong with it.',
+    phases: ['answered', 'running', 'running', 'asked', 'running', 'asked', 'answered', 'running'],
+    note: 'Nobody is watching this, which is the argument — but if they are, the line is still true and still one line. Note that no two running teammates are comparable: there is no denominator to draw.'
+  },
+  queued: {
+    label: 'two waiting for a slot',
+    post: 'Read src/billing/adapter.ts and tell me what is wrong with it.',
+    phases: ['answered', 'answered', 'running', 'running', 'running', 'running', 'waiting', 'waiting'],
+    note: 'The queue you shipped. Waiting members are in the strip as hollow pips and in your recessed line below — in the strip because the index is the roster, and a name missing from the roster reads as a person who is not in the room.'
+  }
+};
+
+class Component extends DCLogic {
+  state = { which: 'arriving', jumped: undefined };
+
+  renderVals() {
+    const c = CASES[this.state.which];
+    const rows = MEMBERS.map((m, i) => ({ ...m, phase: c.phases[i], hue: HUES[i % HUES.length] }));
+
+    // Count the ordinary, name the exceptional -- the trace line's rule.
+    const by = (p) => rows.filter((r) => r.phase === p);
+    const say = (list) => (list.length === 1 ? list[0].name : `${list.slice(0, -1).map((r) => r.name).join(', ')} and ${list[list.length - 1].name}`);
+    const seg = (text, tone) => ({
+      text,
+      style: `flex: none; color: var(${tone ?? '--lc-text-muted'});`
+    });
+    const asked = rows.filter((r) => r.phase !== 'waiting').length;
+    const answered = by('answered');
+    const running = by('running');
+    const startingUp = by('asked');
+    const failed = by('failed');
+    const waiting = by('waiting');
+
+    const summary = [seg(`${asked} asked`, '--lc-text-secondary')];
+    if (answered.length === asked) summary.push(seg('· all answered', '--lc-green-text'));
+    else if (answered.length > 0) summary.push(seg(`· ${answered.length} answered`));
+    if (running.length > 0) summary.push(seg(running.length <= 2 ? `· ${say(running)} running` : `· ${running.length} running`));
+    if (startingUp.length > 0) summary.push(seg(startingUp.length <= 2 ? `· ${say(startingUp)} not back yet` : `· ${startingUp.length} not back yet`, '--lc-amber-text'));
+    if (failed.length > 0) summary.push(seg(failed.length <= 2 ? `· ${say(failed)} failed` : `· ${failed.length} failed`, '--lc-red-text'));
+    if (waiting.length > 0) summary.push(seg(`· ${waiting.length} waiting for a slot`, '--lc-text-muted'));
+
+    const index = rows.map((r) => {
+      const f = faceStyles(r.id, r.hue, 22);
+      const tone = TONE[r.phase];
+      const hollow = r.phase === 'waiting';
+      return {
+        title: `${r.name} — ${r.phase === 'asked' ? 'asked, no word back yet' : r.phase}`,
+        btnStyle: `position: relative; width: 22px; height: 22px; flex: none; padding: 0; border: none; background: transparent; cursor: pointer; display: block;${this.state.jumped === r.id ? ' outline: 2px solid var(--lc-lime); outline-offset: 2px; border-radius: 6px;' : ''}${hollow ? ' opacity: .5;' : ''}`,
+        chip: f.chip,
+        box: f.box,
+        l1: f.l1,
+        l2: f.l2,
+        l3: f.l3,
+        pip: `position: absolute; right: -2px; bottom: -2px; width: 8px; height: 8px; border-radius: 50%; display: block; border: 2px solid var(--lc-bg-chrome); ${hollow ? `background: transparent; box-shadow: inset 0 0 0 1px var(${tone});` : `background: var(${tone});`}${r.phase === 'running' ? ' animation: lcPulse 1.6s ease-in-out infinite;' : ''}`,
+        onClick: () => this.setState({ jumped: this.state.jumped === r.id ? undefined : r.id })
+      };
+    });
+
+    const answers = rows
+      .filter((r) => r.phase !== 'waiting')
+      .map((r) => {
+        const f = faceStyles(r.id, r.hue, 22);
+        const long = r.id === 'booty' || r.id === 'wren';
+        const body = r.phase === 'answered' ? (long ? LONG.split('\n').slice(0, 12).join('\n') : SHORT) : '';
+        const phaseTone = r.phase === 'failed' ? '--lc-red-text' : r.phase === 'running' ? '--lc-text-secondary' : '--lc-text-muted';
+        return {
+          name: r.name,
+          route: r.route,
+          chip: f.chip,
+          box: f.box,
+          l1: f.l1,
+          l2: f.l2,
+          l3: f.l3,
+          rowStyle: `padding: 10px 0; border-bottom: 1px solid var(--lc-border-hairline);${this.state.jumped === r.id ? ' background: var(--lc-bg-selected);' : ''}`,
+          phase: r.phase === 'asked' ? 'asked · 12s' : r.phase === 'running' ? 'running · 41s' : r.phase,
+          phaseStyle: `flex: none; font-family: var(--lc-font-mono); font-size: var(--lc-text-mono-caption); color: var(${phaseTone});`,
+          bodyStyle: body === ''
+            ? 'display: none;'
+            : `margin: 6px 16px 0; font-size: ${long ? 'var(--lc-text-description)' : 'var(--lc-text-description)'}; color: var(--lc-text-secondary); ${long ? 'white-space: pre-line; ' : ''}text-wrap: pretty;`,
+          body,
+          moreStyle: long && r.phase === 'answered'
+            ? 'margin: 8px 16px 0; height: 24px; padding: 0 10px; display: inline-flex; align-items: center; border: 1px solid var(--lc-border-control); border-radius: var(--lc-radius-control); background: var(--lc-bg-control); font-size: var(--lc-text-description); color: var(--lc-text-control-fg);'
+            : 'display: none;',
+          more: 'Show the rest'
+        };
+      });
+
+    return {
+      postText: c.post,
+      summary,
+      index,
+      answers,
+      caseNote: c.note,
+      cases: Object.entries(CASES).map(([key, v]) => ({
+        label: v.label,
+        style: `height: 26px; padding: 0 10px; border-radius: var(--lc-radius-control); font-family: var(--lc-font-ui); font-size: var(--lc-text-description); cursor: pointer; ${key === this.state.which
+          ? 'border: 1px solid var(--lc-lime-border); background: var(--lc-lime-tint); color: var(--lc-lime-text);'
+          : 'border: 1px solid var(--lc-border-control); background: var(--lc-bg-control); color: var(--lc-text-control-fg);'}`,
+        onClick: () => this.setState({ which: key, jumped: undefined })
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,114 @@
+/**
+ * What would leave this machine, said only where it can be known.
+ *
+ * The approval card answers what would happen, where, and whether it can be
+ * undone. It never said what DATA the action sends — which the design pass
+ * names as the row it is missing, and which is the one question a person
+ * cannot work out for themselves. A file write they can reason about; whether
+ * a shell command phones somewhere they cannot, because the command may be a
+ * script whose contents are not on screen.
+ *
+ * So the rule here is asymmetric, deliberately:
+ *
+ *   - A file change sends NOTHING, and that is provable. The bytes are written
+ *     to a path on this disk. Say so plainly.
+ *   - A command that names a network tool CAN reach the network. Say that it
+ *     can, and say that Locust cannot see what it would send — because it
+ *     cannot.
+ *   - Any other command is UNKNOWN. Never say "nothing leaves this machine"
+ *     about a command, however harmless it looks: `./deploy.sh` is two words
+ *     and can do anything.
+ *
+ * The dangerous direction is the false negative — telling someone nothing is
+ * sent when something is. So the negative is only ever claimed for the one
+ * kind where it is a fact, and the positive is a capability ("can reach"),
+ * never a prediction ("will send").
+ */
+
+/**
+ * Programs that reach the network as their ordinary purpose. Matched as whole
+ * words so `curling` and a file called `wget-notes.md` do not trip it.
+ *
+ * Under-matching here is safe by construction: an unmatched command falls to
+ * "Locust cannot tell", which is the honest answer anyway. Over-matching would
+ * be noise, not danger.
+ */
+const NETWORK_TOOLS = [
+  'curl',
+  'wget',
+  'ssh',
+  'scp',
+  'sftp',
+  'rsync',
+  'nc',
+  'netcat',
+  'telnet',
+  'ftp',
+  'npm',
+  'pnpm',
+  'yarn',
+  'pip',
+  'pip3',
+  'cargo',
+  'gem',
+  'go',
+  'brew',
+  'apt',
+  'docker',
+  'kubectl',
+  'aws',
+  'gcloud',
+  'az',
+  'gh',
+  'git'
+]
+
+const TOOL_PATTERN = new RegExp(`(^|[\\s|&;(<>])(${NETWORK_TOOLS.join('|')})([\\s]|$)`, 'i')
+/** A bare URL in the command is as good as naming a tool. */
+const URL_PATTERN = /\bhttps?:\/\//i
+
+/** Whether this command text names something that reaches the network. */
+export function commandReachesNetwork(command: string): boolean {
+  return TOOL_PATTERN.test(command) || URL_PATTERN.test(command)
+}
+
+/**
+ * The `Data sent` row's text, or undefined when the row should not be drawn.
+ *
+ * `undefined` for a question: answering sends nothing anywhere, and a row
+ * saying so on a card that is only asking would be noise on the one surface
+ * that must stay short.
+ */
+export function dataSentLine(kind: string, command: string): string | undefined {
+  if (kind === 'file-change') {
+    return 'Nothing. The change is written to this machine and sent nowhere.'
+  }
+  // A connector is the one kind whose whole point is to leave this machine.
+  // The input on the card IS what goes; the service it goes to is named in
+  // the summary. No sandbox here reaches the far end of a connector, which
+  // is why the mode never governed one and why this card exists.
+  if (kind === 'connector') {
+    return 'The input above, to the service the connector reaches. It acts there, not on this machine.'
+  }
+  if (kind !== 'command') return undefined
+  return commandReachesNetwork(command)
+    ? 'This command can reach the network. Locust cannot see what it would send — read it above.'
+    : 'Unknown. Locust cannot tell what a command sends; a script can do anything the sandbox allows.'
+}
+
+/**
+ * A FILE OUTSIDE THE PROJECT FOLDER (QA-2026-09-29 round 2, R15).
+ *
+ * Absolute and not under the folder, or relative and climbing out of it.
+ * Compared the way Windows compares paths: separators either way, case aside.
+ */
+export function outsideFolder(file: string, folder: string): boolean {
+  if (folder.length === 0) return false
+  const normal = (value: string): string => value.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+  const path = normal(file)
+  if (!/^(?:[a-z]:)?\//.test(path)) return path.split('/').includes('..')
+  const root = normal(folder)
+  return path !== root && !path.startsWith(`${root}/`)
+}
+
+export const OUTSIDE_NOT_UNDOABLE = 'Not from here — it is outside your project folder, so the project’s version control does not hold it.'

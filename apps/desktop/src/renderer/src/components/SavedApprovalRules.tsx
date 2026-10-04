@@ -1,0 +1,73 @@
+import { useEffect, useState } from 'react'
+import type { ReactElement } from 'react'
+
+import { ruleSentence } from '../../../shared/approval-rules.js'
+import type { PublicApprovalRule } from '../../../shared/ipc.js'
+
+/**
+ * SAVED APPROVALS, in Settings > Teammates (0.521, shared/approval-rules.ts).
+ * Every rule a card's "Yes, and don't ask again" or "Never allow this"
+ * saved, as the sentence it is, with how often it answered a card, and
+ * Remove. A rule that outlives the run is a Settings decision: this is
+ * where it is seen and undone.
+ */
+export function SavedApprovalRules(): ReactElement {
+  const [rules, setRules] = useState<readonly PublicApprovalRule[]>()
+  const [names, setNames] = useState<Readonly<Record<string, string>>>({})
+  const [problem, setProblem] = useState<string>()
+  const [removing, setRemoving] = useState<string>()
+  useEffect(() => {
+    const bridge = window.desktop
+    if (bridge === undefined) return
+    void bridge.listApprovalRules().then((answer) => {
+      if (answer.ok) setRules(answer.rules)
+      else setProblem(answer.message)
+    }).catch(() => setProblem('The saved rules could not be read. Every card asks until they can.'))
+    void bridge.listTeammates().then((answer) => {
+      if (answer.ok) setNames(Object.fromEntries(answer.data.teammates.map((teammate) => [teammate.teammateId, teammate.name])))
+    }).catch(() => undefined)
+  }, [])
+  const remove = (ruleId: string): void => {
+    const bridge = window.desktop
+    if (bridge === undefined) return
+    setRemoving(ruleId)
+    void bridge.removeApprovalRule(ruleId).then((answer) => {
+      if (answer.ok) setRules(answer.rules)
+      else setProblem(answer.message)
+    }).catch(() => setProblem('That rule could not be removed. It still answers cards; try again.')).finally(() => setRemoving(undefined))
+  }
+  return (
+    <>
+      <p className="lc-settings__lede">
+        What a teammate may do without asking, or may never do, as you said on an approval card. Each
+        holds for that teammate in that folder.
+      </p>
+      <p className="lc-settings__note">
+        A rule answers what a teammate asks you about. Some AI agents run what they judge safe without
+        asking, and a rule cannot stop that: for a hard stop, use Ask mode.
+      </p>
+      {problem !== undefined && <p className="lc-settings__note" role="status">{problem}</p>}
+      {rules !== undefined && rules.length === 0 && (
+        <p className="lc-settings__note">
+          None yet. On an approval card, &ldquo;Yes, and don&rsquo;t ask again&rdquo; saves one, and so does &ldquo;Never allow this&rdquo; beside Deny.
+        </p>
+      )}
+      {rules !== undefined && rules.length > 0 && (
+        <div className="lc-settingcard">
+          {rules.map((rule) => (
+            <div className="lc-policyrow" key={rule.ruleId}>
+              <span className={`lc-tag ${rule.effect === 'allow' ? 'lc-tone-lime' : 'lc-tone-red'}`}>{rule.effect === 'allow' ? 'ALLOW' : 'NEVER'}</span>
+              <span className="lc-settings__note lc-savedrule__text">
+                {ruleSentence(rule, rule.teammateId === undefined ? undefined : names[rule.teammateId])}
+                {rule.uses !== undefined && rule.uses > 0 && <span className="lc-savedrule__uses">{` Answered ${String(rule.uses)} ${rule.uses === 1 ? 'card' : 'cards'}.`}</span>}
+              </span>
+              <button type="button" className="lc-ghostbutton" disabled={removing === rule.ruleId} onClick={() => remove(rule.ruleId)}>
+                {removing === rule.ruleId ? 'Removing…' : 'Remove'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  )
+}

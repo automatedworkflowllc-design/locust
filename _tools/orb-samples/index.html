@@ -1,0 +1,40 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Orb samples</title>
+<style>
+  body { margin: 0; background: #0f1012; color: #d7d8da; font: 13px/1.5 ui-sans-serif, system-ui, sans-serif; padding: 28px 32px; }
+  h1 { font-size: 15px; font-weight: 600; margin: 0 0 4px; letter-spacing: .01em; }
+  p.sub { margin: 0 0 26px; color: #85878c; font-size: 12px; }
+  h2 { font-size: 12px; font-weight: 600; color: #9aa0a6; margin: 26px 0 10px; letter-spacing: .06em; text-transform: uppercase; }
+  table { border-collapse: collapse; }
+  td, th { padding: 9px 16px 9px 0; vertical-align: middle; text-align: left; }
+  th { font-size: 11px; font-weight: 500; color: #7c7e83; letter-spacing: .04em; }
+  .row { display: inline-flex; align-items: center; gap: 8px; background: #17181b; border-radius: 999px; padding: 5px 14px 5px 7px; }
+  .word { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: #9aa0a6; letter-spacing: .02em; }
+  .name { font: 11px ui-monospace, monospace; color: #6f7176; }
+  .tag { font: 11px ui-monospace, monospace; color: #c8a24a; }
+  #app canvas { display: block; }
+  .plancard { max-width: 620px; border: 1px solid #26272b; border-radius: 10px; background: #141518; }
+  .planhead { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid #202126;
+    color: #85878c; font: 400 11px 'Geist Mono', ui-monospace, monospace; letter-spacing: .08em; }
+  .planorb { flex: none; display: grid; place-items: center; width: 24px; height: 24px; margin: -6px 0; }
+  .plan { list-style: none; margin: 0; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .planstep { display: flex; align-items: flex-start; gap: 10px;
+    font: 400 13px 'Geist Mono', ui-monospace, monospace; letter-spacing: -.01em; color: #85878c; }
+  .planstep.is-running { color: #e8e9ea; font-weight: 500; }
+  .planstep.is-done { color: #6f7176; }
+  .planmarker { flex: none; width: 20px; display: grid; place-items: center; }
+  .steporb { display: grid; place-items: center; width: 20px; height: 20px; margin: -5px 0; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: #4a4c51; }
+  .tick { color: #7bbf6a; font-size: 12px; }
+  .said { position: relative; color: rgba(215,216,218,.55); font: 400 14px Geist, Helvetica, ui-sans-serif, system-ui, sans-serif; }
+  .said::before {
+    content: attr(data-text); position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent 0%, transparent 40%, #fbfbfb 50%, transparent 60%, transparent 100%);
+    background-size: 400% 100%; background-repeat: no-repeat; background-position: 100% 0;
+    background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    color: transparent; pointer-events: none; white-space: pre;
+    animation: said 2s linear infinite;
+  }
+  @keyframes said { from { background-position: 100% 0 } to { background-position: 0% 0 } }
+</style></head>
+<body><div id="app"></div><script src="./bundle.js"></script></body></html>
