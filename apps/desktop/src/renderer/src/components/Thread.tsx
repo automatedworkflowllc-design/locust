@@ -391,6 +391,9 @@ export function ThreadItems({
         }
         if (item.type === 'steps') {
           // Under the words, at their indent: the steps are part of the reply.
+          const closedLine = stepsLine(item.details, item.finished, workspacePath)
+          // Open, a lone thought's line drops its preview: the words are underneath (0.594).
+          const openLine = stepsLine(item.details, item.finished, workspacePath, { open: true })
           return (
             <div className="lc-agentline" key={item.key}>
               <span className="lc-agentline__gutter" />
@@ -398,9 +401,13 @@ export function ThreadItems({
                 <ActivityCard
                   variant="steps"
                   summary=""
-                  trace={stepsLine(item.details, item.finished, workspacePath).segments}
-                  // Open, a lone thought's line drops its preview: the words are underneath (0.594).
-                  traceOpen={stepsLine(item.details, item.finished, workspacePath, { open: true }).segments}
+                  trace={closedLine.segments}
+                  // The sentence in shorter forms, for a row too narrow for it (0.604).
+                  traceShorter={closedLine.shorter}
+                  traceTitle={closedLine.title}
+                  traceOpen={openLine.segments}
+                  traceOpenShorter={openLine.shorter}
+                  traceOpenTitle={openLine.title}
                   finished={item.finished}
                   details={item.details}
                   runtimeName={undefined}

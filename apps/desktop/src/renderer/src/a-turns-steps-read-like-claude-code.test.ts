@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { commandLooksAt, stepsLine } from './missionView.js'
+import { commandLooksAt, shortName, stepsLine } from './missionView.js'
 import type { ActivityDetail } from './missionView.js'
 
 /**
@@ -99,5 +99,58 @@ describe('a group of steps, in one line', () => {
   it('names a connector and a tool it does not know by their own names', () => {
     expect(line([tool('robinhood', 'get_watchlists')])).toBe('Used robinhood')
     expect(line([tool('WebSearch', 'claude code app'), tool('WebFetch', 'https://example.com')])).toBe('Searched the web, fetched a page')
+  })
+})
+
+/*
+ * THE LINE FITS ITS ROW (0.604). Colin's screenshot of 2026-10-04: "created
+ * a-full-rule-store-keeps-every-rule.test.ts, edited ap…" -- the row's own
+ * end-of-line ellipsis cut the second phrase mid-word while the first name
+ * ran whole. A long name is now cut in the middle with its extension kept, and
+ * the builder offers the sentence in ever shorter forms for the card to fit
+ * to its row: names give way to counts, then the last phrases to "and N more".
+ */
+describe('a long line fits its row', () => {
+  const edited = (name: string): ActivityDetail => ({
+    kind: 'edit', name, tool: 'write', settled: true,
+    patch: { text: `diff --git a/${name} b/${name}\n--- a/${name}\n+++ b/${name}\n@@ -1 +1 @@\n-a\n+b\n`, truncated: false, added: 1, removed: 1 }
+  } as ActivityDetail)
+  const LONG = 'a-full-rule-store-keeps-every-rule.test.ts'
+
+  it('cuts a long file name in the middle and keeps its extension', () => {
+    expect(line([edited(LONG)])).toBe('Edited a-full-rule-stor…very-rule.test.ts')
+    expect(shortName(LONG)).toHaveLength(34)
+    expect(shortName('short.ts')).toBe('short.ts')
+    expect(shortName('exactly-thirty-four-characters.ts')).toBe('exactly-thirty-four-characters.ts')
+    // No extension: still cut in the middle.
+    expect(shortName('a'.repeat(40))).toMatch(/^a+…a+$/)
+    expect(shortName('a'.repeat(40))).toHaveLength(34)
+  })
+
+  it('offers shorter forms: names give way to counts, then the last phrases to "and N more"', () => {
+    const steps = [edited(LONG), shell('cat NOTES.md'), shell('pnpm test'), shell('pnpm tsc'), shell('rg approval src'), shell('ls -la')]
+    const built = stepsLine(steps, true)
+    expect(built.segments[0]!.text).toBe('Edited a-full-rule-stor…very-rule.test.ts, read NOTES.md, ran 2 commands, searched for approval, listed a folder')
+    expect(built.shorter).toEqual([
+      'Edited a file, read a file, ran 2 commands, ran a search, listed a folder',
+      'Edited a file, read a file, ran 2 commands, ran a search and 1 more',
+      'Edited a file, read a file, ran 2 commands and 2 more',
+      'Edited a file, read a file and 3 more',
+      'Edited a file and 4 more'
+    ])
+    for (let i = 1; i < built.shorter.length; i += 1) expect(built.shorter[i]!.length).toBeLessThan(built.shorter[i - 1]!.length)
+    // The hover says every name whole.
+    expect(built.title).toBe(`Edited ${LONG}, read NOTES.md, ran 2 commands, searched for approval, listed a folder`)
+    expect(stepsLine([shell('cat NOTES.md')], true).title).toBe('Read NOTES.md')
+  })
+
+  it('keeps a thought headline through the shorter forms, and has nothing shorter for a lone failure', () => {
+    const thought: ActivityDetail = { kind: 'reasoning', name: 'thinking', tool: 'reasoning', settled: true, durationMs: 4_000, output: 'Checking the store first.' } as ActivityDetail
+    const built = stepsLine([thought, edited(LONG), shell('pnpm test')], true)
+    expect(built.segments[0]!.text).toBe('Thought for 4s, edited a-full-rule-stor…very-rule.test.ts, ran pnpm test')
+    expect(built.shorter[0]).toBe('Thought for 4s, edited a file, ran a command')
+    expect(built.shorter.at(-1)).toBe('Thought for 4s and 2 more')
+    expect(stepsLine([shell('pnpm test', { title: 'Run the tests', exitCode: 1, failed: true })], true).shorter).toEqual([])
+    expect(stepsLine([], true).shorter).toEqual([])
   })
 })
