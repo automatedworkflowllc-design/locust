@@ -220,6 +220,7 @@ export function Sidebar({
   onOpenRoom,
   onOpenRooms,
   onOpenAutomations,
+  onOpenBoard,
   cloudTasks,
   onHome,
   compact = false
@@ -325,6 +326,8 @@ export function Sidebar({
   readonly onOpenRoom: (roomId: string) => void
   readonly onOpenRooms: () => void
   readonly onOpenAutomations: () => void
+  /** The board (0.585): every conversation by what it needs from the person. Its place is drawn when the shell offers it. */
+  readonly onOpenBoard?: () => void
   /**
    * This folder's cloud tasks (0.509), when it has any. A cloud task makes no
    * conversation, so with its panel closed nothing else in the window said it
@@ -1045,6 +1048,12 @@ export function Sidebar({
           <Icon name="clock" size={14} />
           <span>Routines</span>
         </button>
+        {onOpenBoard !== undefined && (
+          <button type="button" onClick={() => { railClose(); onOpenBoard() }} title="Board — every conversation by what it needs from you">
+            <Icon name="columns" size={14} />
+            <span>Board</span>
+          </button>
+        )}
       </div>
       {cloudTasks !== undefined && (
         <div className="lc-sidebar__nav lc-sidebar__places lc-sidebar__places--pinned">

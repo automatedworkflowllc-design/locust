@@ -69,7 +69,7 @@ import { OwnModels } from './OwnModels.js'
 import { routineAwaitsReview } from '../../../shared/routine-recovery.js'
 import { SavedApprovalRules } from './SavedApprovalRules.js'
 
-export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings' | 'rooms' | 'memory' | 'automations'
+export type Screen = 'workroom' | 'missions' | 'teammates' | 'settings' | 'rooms' | 'memory' | 'automations' | 'board'
 
 /**
  * THE header for a list screen. Exported since 2026-09-22 because Routines

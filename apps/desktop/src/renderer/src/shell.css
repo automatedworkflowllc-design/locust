@@ -7611,14 +7611,18 @@ textarea {
      much dead space on the right of it" -- three short words, each with a
      whole line to itself. A menu bar, the places side by side, a thin rule
      between them. The narrow rail below keeps them stacked. */
-  display: flex;
-  flex-direction: row;
+  /* Two by two (0.585): a fourth place, the Board, cut every word to its
+     first letters in one row ("Conversa… Ro… Rout… Bo…", the Board's first
+     drive). Two rows of two keep the words whole and the right edge used. */
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
-  gap: 0;
+  gap: 2px 0;
   padding: var(--lc-space-2) var(--lc-space-3) var(--lc-space-3);
 }
 
-.lc-sidebar__places button + button {
+/* The thin rule between the two columns, on each row's second place. */
+.lc-sidebar__places button:nth-child(even) {
   border-left: 1px solid var(--lc-border-hairline);
   border-radius: 0;
 }
@@ -9564,6 +9568,105 @@ textarea {
 
 .lc-boardsection--finished .lc-boardsection__mark {
   background: var(--lc-green);
+}
+
+/*
+ * THE BOARD OF CONVERSATIONS (0.585, BoardScreen.tsx): the team board's
+ * sections, with a conversation card in each. Done grows into the rest of
+ * the row as Ready does on the team board, and lays its cards out as a grid.
+ */
+.lc-boardsection--to-look-at .lc-boardsection__mark {
+  background: var(--lc-green);
+}
+
+.lc-convboard .lc-boardsection--done {
+  flex: 1 1 256px;
+}
+
+.lc-convgrid {
+  display: grid;
+  gap: var(--lc-space-4);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.lc-boardsection--done .lc-convgrid {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+/* A card is the sidebar row with room to breathe: the face, the title, and
+   one line of state under it. The whole card opens the conversation. */
+.lc-convcard {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: var(--lc-space-4);
+  row-gap: var(--lc-space-2);
+  align-items: center;
+  padding: var(--lc-space-5) var(--lc-space-6);
+  border-radius: var(--lc-radius-card);
+  border: 1px solid var(--lc-border-hairline);
+  background: var(--lc-bg-raised);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.lc-convcard:hover,
+.lc-convcard:focus-visible {
+  border-color: var(--lc-border-strong);
+}
+
+/* `:is()`, not a selector list, and no selector quoted in this comment:
+   the-flat-sidebar-is-written-down.test.ts finds the row's own rules for the
+   nobody and runtime marks by searching this file for their selector text,
+   and a list or a quote here would be found first. */
+.lc-convcard > :is(.lc-bot, .lc-conv__nobody, .lc-conv__runtime) {
+  grid-row: 1 / span 2;
+}
+
+.lc-convcard__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-convcard__meta {
+  display: flex;
+  gap: var(--lc-space-3);
+  min-width: 0;
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+}
+
+.lc-convcard__meta > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-convcard__meta > span + span::before {
+  content: '·';
+  margin-right: var(--lc-space-3);
+}
+
+/* The name reads a touch brighter than the state after it. */
+.lc-convcard__who {
+  color: var(--lc-text-secondary);
+}
+
+/* "under Boss" gives way first when the line is tight: the state matters more. */
+.lc-convcard__under {
+  flex-shrink: 2;
+}
+
+.lc-convcard[data-column='needs-you'] {
+  border-color: var(--lc-amber-tint);
+}
+
+.lc-convcard[data-column='needs-you'] .lc-convcard__state {
+  color: var(--lc-amber-text);
 }
 
 .lc-boardsection--needs-you .lc-boardsection__title {

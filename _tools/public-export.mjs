@@ -159,7 +159,9 @@ export const DOCS_PUBLISHED = [
   'docs/ROADMAP.md',
   'docs/REMAINING-PLAN.md',
   'docs/CROSS_TASK_CONTEXT.md',
-  'docs/DECISION-*.md'
+  'docs/DECISION-*.md',
+  // The code signing policy (0.585): SignPath asks that it be public, linked from the homepage.
+  'docs/CODE-SIGNING.md'
 ]
 
 const EXCLUSION_PATTERNS = EXCLUSIONS.map((glob) => ({ glob, re: compileGlob(glob) }))

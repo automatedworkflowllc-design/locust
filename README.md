@@ -169,6 +169,13 @@ cross-task document carries the current handoff and a paste-ready prompt;
 `docs/REMAINING-PLAN.md` is the ordered list of what is done and what is
 open, and is kept honest about the difference.
 
+## Code signing policy
+
+Locust's Windows installer is not signed yet, so Windows warns when you
+install it. The policy Locust follows to get it signed, and will follow once
+it is, including who approves each release and what is never collected, is in
+[docs/CODE-SIGNING.md](docs/CODE-SIGNING.md).
+
 ## Current scope
 
 The first release runs on the user’s own computer. It will detect installed Codex and Claude CLIs, support API-key and local-model routes, and offer an optional curated OmniRoute integration. Persistent cloud computers come after the local execution, approval, and recovery model is proven.
