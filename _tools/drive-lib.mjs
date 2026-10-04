@@ -404,6 +404,27 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
       }
       return 'discovery never settled; ' + seen
     })()`)
+    /*
+     * And until the window is SHOWN (10/04). The main window is held behind the
+     * splash until discovery is done, and a window not yet shown paints at one
+     * frame a second. Everything above can be true of a window nobody can see
+     * yet -- profile-four-runs and profile-first-open then measured that 1 Hz
+     * as the app's own slowness (0.8-1.3 s "first clicks", two frame gaps of
+     * exactly 1,001 ms, the renderer idle) and the first was reported before
+     * the second explained it. Two frames 60 Hz apart say the window is out;
+     * a window that never shows (a drive with no window) is let go after 15 s.
+     */
+    const shown = await evaluate(`(async () => {
+      const from = performance.now()
+      for (let i = 0; i < 60; i += 1) {
+        const t0 = performance.now()
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+        if (performance.now() - t0 < 100) return 'window shown after ' + String(Math.round(performance.now() - from)) + ' ms'
+        if (performance.now() - from > 15000) return 'window never came to 60 Hz in 15 s'
+      }
+      return 'window never came to 60 Hz'
+    })()`)
+    if (/never/.test(String(shown))) say(`  ${String(shown)}`)
 
     /*
      * Did the app ACCEPT the roster it was seeded with?
