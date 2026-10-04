@@ -2940,6 +2940,8 @@ export function buildThread(
         startedAt: string
         kind: 'turn' | 'reasoning' | 'item'
         register: 'working' | 'thinking' | 'writing' | 'tool'
+        /** The step's own words, held while the line says Writing (0.586), given back when the text is final. */
+        labelBeforeWriting?: string
       }
     | undefined
   let plan: readonly PlanStep[] = []
@@ -3291,10 +3293,34 @@ export function buildThread(
        */
       case 'message.delta': {
         if (runningStep === undefined) break
-        if (runningStep.register !== 'working' && runningStep.register !== 'writing') break
-        runningStep = {
-          ...runningStep,
-          register: event.payload.final === true ? 'working' : 'writing'
+        /*
+         * FROM `working`, AND FROM A THOUGHT LEFT OPEN (0.586). A tool or a
+         * connector is a claim this does not know better than and keeps its
+         * line. A reasoning step the runtime never closed is different: text
+         * arriving IS the model writing, and the thought is over -- Cursor
+         * leaves its thinking step open while the reply streams, and the
+         * Cursor leg of the cross-model pass read the thought where Claude,
+         * Antigravity and OpenCode read Writing. The word follows the
+         * register, and the step's own words are held and come back when the
+         * text is final; a finished thought comes back as plain working.
+         */
+        if (runningStep.register !== 'working' && runningStep.register !== 'writing' && runningStep.register !== 'thinking') break
+        const final = event.payload.final === true
+        if (!final) {
+          runningStep = {
+            ...runningStep,
+            register: 'writing',
+            label: 'Writing',
+            labelBeforeWriting: runningStep.labelBeforeWriting ?? (runningStep.register === 'thinking' ? 'Working' : runningStep.label)
+          }
+        } else {
+          runningStep = {
+            ...runningStep,
+            register: 'working',
+            // A thought that ends on a final message (no streaming before it) is over too.
+            label: runningStep.labelBeforeWriting ?? (runningStep.register === 'thinking' ? 'Working' : runningStep.label),
+            labelBeforeWriting: undefined
+          }
         }
         break
       }

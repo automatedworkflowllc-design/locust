@@ -22,14 +22,18 @@ heading: the home screen then shows it once, as a splash.
   agent gave before any work, such as Copilot's "third-party MCP servers are
   disabled by your organization's policy", was never drawn when no work
   followed. Both are now one line in the conversation, said once.
+- **The working line says Writing while a reply arrives, on every agent.**
+  On Cursor the step's own words, such as "Running the tests", kept leading
+  the line while the reply was already arriving. They come back once the
+  text is complete.
 
 ### Improved
 
-- **A command that stops programs by name is named in more of its
-  spellings:** `tskill`, and PowerShell's CIM and WMI terminate
-  (`Get-CimInstance Win32_Process … | Invoke-CimMethod -MethodName Terminate`,
-  `Get-WmiObject … | % { $_.Terminate() }`). `shutdown /l` now says it signs
-  you out of Windows, closing every program you are running; `shutdown /h`
+- **More spellings of stopping programs by name are named.** `tskill`, and
+  PowerShell's CIM and WMI terminate calls (Get-CimInstance or Get-WmiObject
+  on Win32_Process, piped to Invoke-CimMethod Terminate or to a
+  ForEach-Object that calls Terminate). `shutdown /l` now says it signs you
+  out of Windows, closing every program you are running; `shutdown /h`
   (hibernate) closes nothing and is not named.
 
 ## 0.585.0 - 2026-10-04

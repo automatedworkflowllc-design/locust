@@ -81,6 +81,32 @@ describe('an orb needs a runtime that streams', () => {
     expect(step?.orb).toBe('shaping')
   })
 
+  it('says Writing in words too, over a thought the runtime left open (0.586)', () => {
+    // The Cursor leg of the cross-model pass, 2026-10-04: Cursor's thinking
+    // step stays open while the reply streams, and the line kept the thought
+    // where Claude, Antigravity and OpenCode read Writing. Text arriving is
+    // the model writing; the thought is over.
+    const streaming = liveStep([
+      event('step.started', { stepKind: 'reasoning', itemId: 'r1' }, 0),
+      event('message.delta', { itemId: 'm1', operation: 'append', text: 'All four', final: false }, 1)
+    ])
+    expect(streaming).toMatchObject({ register: 'writing', label: 'Writing' })
+    // Final text: a finished thought comes back as plain working (control).
+    const done = liveStep([
+      event('step.started', { stepKind: 'reasoning', itemId: 'r1' }, 0),
+      event('message.delta', { itemId: 'm1', operation: 'append', text: 'All four pass.', final: true }, 1)
+    ])
+    expect(done).toMatchObject({ register: 'working', label: 'Working' })
+    // A step with its own words gets them back when the text is final.
+    const named = [
+      event('step.started', { stepKind: 'turn', message: 'Running the tests' }, 0),
+      event('message.delta', { itemId: 'm1', operation: 'append', text: 'All four', final: false }, 1)
+    ]
+    expect(liveStep(named)).toMatchObject({ register: 'writing', label: 'Writing' })
+    expect(liveStep([...named, event('message.delta', { itemId: 'm1', operation: 'append', text: ' pass.', final: true }, 2)])).toMatchObject({ register: 'working', label: 'Running the tests' })
+    // An open tool keeps its line: it is still running (the guard above).
+  })
+
   it('goes back to working when the text is complete', () => {
     // A claim that has stopped being true must stop being made -- the same
     // rule that makes the tool orb stop when its tool closes.
