@@ -111,9 +111,6 @@ import { Inspector } from './components/Inspector.js'
 import { FileViewer } from './components/FileViewer.js'
 import { MacUpdateBanner, MissionsScreen, SettingsScreen, TeammatesScreen, UpdateBanner } from './components/Screens.js'
 import { BoardScreen } from './components/BoardScreen.js'
-
-/** The board's trash set (0.585): the sidebar's rows already leave deleted conversations out. */
-const NO_TRASH: ReadonlySet<string> = new Set()
 import { WhatsNewSplash } from './components/WhatsNew.js'
 import type { SettingsPageId } from './settingsPages.js'
 import type { ComparePick, ComparePicking, RouteChoice } from './components/RoutePicker.js'
@@ -203,6 +200,9 @@ import type { TeammateStatusView } from './status.js'
 import { shortAgo } from './railFlyout.js'
 import type { WorktreeRemoval } from './components/WorktreeRow.js'
 import { approvalsOfLiveRuns } from './approvalsOfLiveRuns.js'
+
+/** The board's trash set (0.585): the sidebar's rows already leave deleted conversations out. */
+const NO_TRASH: ReadonlySet<string> = new Set()
 
 /**
  * The Locust shell.

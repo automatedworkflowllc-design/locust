@@ -16,7 +16,8 @@ and takes back after it (inconclusive in Ask); Antigravity by reporting the
 refusals its transcript names after the fact. State is JSON files in the
 profile plus the ledger. The normalized event vocabulary below is the one the
 adapters emit; the packages `contracts` and `runtime-core` that held the
-fallback policy and the hand-off state machine are not imported by the app.
+fallback policy and the hand-off state machine are not imported by the app and
+sit under `attic/`, out of the workspace.
 Mid-run hand-off between runtimes writes a reconciled checkpoint and starts a
 new conversation that records what it continues, as section "Checkpoint and
 handoff protocol" describes. Everything else here is design intent, kept

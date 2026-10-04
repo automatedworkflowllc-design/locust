@@ -221,6 +221,10 @@ function fromPipeline(piped: readonly (readonly string[])[]): CommandReach | und
       if (pattern !== undefined) return full ? matching(pattern) : named(pattern)
     }
     if (verb === 'grep' || verb === 'findstr' || verb === 'select-string') {
+      // An inverted match (`grep -v grep`, `findstr /v`, `-NotMatch`) names what is
+      // left OUT, not what is stopped (0.589): the part before it says that.
+      const inverted = args.some((arg) => arg === '--invert-match' || /^-[a-su-z]*v[a-z]*$/.test(arg) || /^\/v$/i.test(arg) || /^-notmatch$/i.test(arg))
+      if (inverted) continue
       const pattern = args.find((arg) => !arg.startsWith('-') && !arg.startsWith('/'))
       if (pattern !== undefined && pattern !== 'grep') return matching(pattern)
     }

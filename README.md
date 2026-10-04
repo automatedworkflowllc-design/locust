@@ -64,7 +64,7 @@ place to ask, says so where it cannot, and records what happened either way.
 - `apps/desktop` — the Electron + React app: main process (runtimes, ledger, approvals, routines, updates), preload bridge, renderer.
 - `packages/runtime-adapters` — finding installed CLIs without reading their credentials, the process transport, and one event normalizer per runtime, each built from streams measured off the real CLI.
 - `packages/mission-store` — the versioned, append-only mission ledger and its reader.
-- `packages/contracts`, `packages/runtime-core` — an earlier design (routing contracts, fallback policy, a hand-off state machine). Nothing in the app imports them; they are kept for history and will move to `attic/`.
+- `attic/contracts`, `attic/runtime-core` — an earlier design (routing contracts, fallback policy, a hand-off state machine). Nothing in the app imports them; they are out of the workspace and kept for history.
 - `_tools` — the release tools and the drives: scripts that launch the built app over CDP, do what a person does, and keep screenshots as the record.
 - `_smoke` — live smokes against the real CLIs, run by hand.
 - `docs` — `ARCHITECTURE.md` (the September design, with a note on what was built instead), `CODE-SIGNING.md`, the roadmap documents (history), and the assets.

@@ -4,6 +4,7 @@ import type { PublicRoom, PublicTeammate } from '../../../shared/ipc.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { BOT_SIZE } from '../botSizes.js'
 import { conversationBoard, conversationColumn } from '../conversationBoard.js'
+import { conversationKeys } from '../conversationList.js'
 import type { ConversationBoardFacts, ConversationBoardKey, ConversationCard } from '../conversationBoard.js'
 import { isOwnRoute } from '../routeName.js'
 import { agoLabel } from '../teammateWork.js'
@@ -101,7 +102,7 @@ export function BoardScreen({
     ? 'all quiet'
     : [waiting > 0 ? `${String(waiting)} waiting on you` : undefined, working > 0 ? `${String(working)} working` : undefined].filter((part) => part !== undefined).join(' · ') || 'nothing running'
   const quiet = board === undefined
-    ? missions.filter((row) => conversationColumn(row, facts) === 'done' && !trashed.has(row.missionId))
+    ? missions.filter((row) => conversationColumn(row, facts) === 'done' && !conversationKeys(row).some((id) => trashed.has(id)))
     : []
   return (
     <section className="lc-screen lc-board" aria-label="Board">
