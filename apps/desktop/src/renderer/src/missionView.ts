@@ -2940,6 +2940,8 @@ export function buildThread(
         startedAt: string
         kind: 'turn' | 'reasoning' | 'item'
         register: 'working' | 'thinking' | 'writing' | 'tool'
+        /** The step's own words, held while the line says Writing (0.586), given back when the text is final. */
+        labelBeforeWriting?: string
       }
     | undefined
   let plan: readonly PlanStep[] = []
@@ -3291,10 +3293,34 @@ export function buildThread(
        */
       case 'message.delta': {
         if (runningStep === undefined) break
-        if (runningStep.register !== 'working' && runningStep.register !== 'writing') break
-        runningStep = {
-          ...runningStep,
-          register: event.payload.final === true ? 'working' : 'writing'
+        /*
+         * FROM `working`, AND FROM A THOUGHT LEFT OPEN (0.586). A tool or a
+         * connector is a claim this does not know better than and keeps its
+         * line. A reasoning step the runtime never closed is different: text
+         * arriving IS the model writing, and the thought is over -- Cursor
+         * leaves its thinking step open while the reply streams, and the
+         * Cursor leg of the cross-model pass read the thought where Claude,
+         * Antigravity and OpenCode read Writing. The word follows the
+         * register, and the step's own words are held and come back when the
+         * text is final; a finished thought comes back as plain working.
+         */
+        if (runningStep.register !== 'working' && runningStep.register !== 'writing' && runningStep.register !== 'thinking') break
+        const final = event.payload.final === true
+        if (!final) {
+          runningStep = {
+            ...runningStep,
+            register: 'writing',
+            label: 'Writing',
+            labelBeforeWriting: runningStep.labelBeforeWriting ?? (runningStep.register === 'thinking' ? 'Working' : runningStep.label)
+          }
+        } else {
+          runningStep = {
+            ...runningStep,
+            register: 'working',
+            // A thought that ends on a final message (no streaming before it) is over too.
+            label: runningStep.labelBeforeWriting ?? (runningStep.register === 'thinking' ? 'Working' : runningStep.label),
+            labelBeforeWriting: undefined
+          }
         }
         break
       }
@@ -3661,6 +3687,35 @@ export function buildThread(
       ...(foldNotices.length === 0 ? {} : { notices: foldNotices }),
       reportedBy: events.find((event) => event.type.startsWith('tool.'))?.sourceAdapter
     })
+  }
+
+  /*
+   * A TURN WITH NO WORK STILL SAYS WHAT THE RUNTIME SAID (0.586). A notice
+   * that arrives before any work began goes under the fold (`foldNotices`,
+   * above), and a turn with no activity has no fold -- so Copilot's "Third-
+   * party MCP servers are disabled by your organization's Copilot policy"
+   * was never drawn: the golden text read "(nothing in the thread)" for it.
+   * Found in the cross-runtime output pass Colin asked for (2026-10-04).
+   */
+  if (!options.running && activity.length === 0) {
+    // Once the turn has ended: while it runs the live line stands for it, and a
+    // line that came and went with the reply would read as a flicker.
+    foldNotices.forEach((notice, index) => {
+      if (items.some((held) => held.type === 'diagnostic' && noticeKey(held.message) === noticeKey(notice.message))) return
+      items.push({ key: `notice_${String(index)}`, type: 'diagnostic', level: notice.level, message: notice.message })
+    })
+  }
+  /*
+   * A RUN THAT FAILED BEFORE IT SAID ANYTHING NAMES WHY (0.586). `run.failed`
+   * carries the reason -- Antigravity's "could not run it: model no-such-model
+   * is not recognized" -- and it reached the rail and the foot only; with no
+   * activity the thread was blank beside a sidebar saying "failed". Said once:
+   * a diagnostic or a limit card that already carries the sentence is enough.
+   */
+  const failure = options.running ? undefined : events.find((event) => event.type === 'run.failed')
+  const why = failure === undefined ? undefined : failure.payload.message
+  if (failure !== undefined && typeof why === 'string' && why.trim().length > 0 && !items.some((held) => (held.type === 'diagnostic' || held.type === 'limit') && sameSentence(held.message, why))) {
+    items.push({ key: `failed_${failure.id}`, type: 'diagnostic', level: 'error', message: why })
   }
 
   if (options.running) {

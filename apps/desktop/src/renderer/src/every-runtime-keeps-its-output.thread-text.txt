@@ -17,7 +17,7 @@ It stopped there. Antigravity was not allowed to run a command in this mode. Edi
 Ran node -e "console.log(40+2)" 42 0s ran node -e "console.log(40+2)"
 
 ## agy-2026-10-02/conversation-not-found.jsonl
-(nothing in the thread)
+Antigravity CLI does not have this conversation: it began in the Antigravity app. Send it again and it starts fresh, with the conversation so far.
 
 ## agy-2026-10-02/edit-then-command-denied.jsonl
 It stopped there. Antigravity was not allowed to run a command in this mode. Edit lets it change files but not run commands; Auto lets it do both. Edited made.txt 1 refused Edited 1 file C:/Users/person/Documents/locust-scratch/agy-probe/made.txt write_to_file Antigravity did not report the change 0s 1 refused
@@ -29,7 +29,7 @@ Antigravity was not allowed to change files in this mode. Choose Edit or Auto to
 Thought for 4s, read note.txt hello from a file DONE 0s 1 tool call
 
 ## agy-2026-10-02/unknown-model.jsonl
-(nothing in the thread)
+Antigravity could not run it: invalid model selection (--model "no-such-model" --effort ""): model no-such-model is not recognized as a known model or custom model in settings
 
 ## agy-2026-10-02/write-denied.jsonl
 It stopped there. Antigravity was not allowed to change files in this mode. Choose Edit or Auto to let it. 1 step 1 refused 0s 1 tool call 1 refused
@@ -56,7 +56,7 @@ I’ll run the exact command once, then return its output. Ran Start-Sleep -Seco
 OK
 
 ## copilot/policy-denied.jsonl
-(nothing in the thread)
+Third-party MCP servers are disabled by your organization's Copilot policy. Only built-in servers are available. Copilot CLI ended without a terminal result record.
 
 ## copilot/read-only-tools-denied.jsonl
 Used powershell 2 failed Unable to create blocked.txt because file-writing tools are blocked. 0s 2 tool calls Copilot CLI Copilot reported a change to its background tasks.
@@ -86,13 +86,13 @@ PLAN 3 of 3 done Create a.txt containing alpha Create b.txt containing beta Crea
 Thought: Creating NOTES.md with the word hello. Running dir to count files. Creating NOTES.md and listing the folder contents. Created NOTES.md, listed a folder 1 failed +1 −0 Thought: The 'dir' command was rejected, likely due to sandbox restrictions. I… Retrying the dir command. Listed a folder 1 failed Listed files matching * in C:\work\scratch, listed a folder 1 failed Listed a folder Listed a folder 1 failed Thought: The `dir` command was rejected. I will provide the file count from th… Done. NOTES.md was created with exactly: hello I tried to run dir , but that command was blocked in this environment. Using an equivalent directory listing instead, this folder contains 2 files : NOTES.md (the file I just created) README.md (already present) Edited 1 file +1 −0 scratch/NOTES.md ADDED +1 −0 0s ran 5 commands · 4 exited non-zero 1 other tool call
 
 ## muse/echo-provider-run.jsonl
-echo: Reply with exactly PING
+echo: Reply with exactly PING Muse Code's own reminder.agent.verify-reminder did not run: invalid run configuration: provider does not support base instructions
 
 ## opencode/compaction-small-context.jsonl
 The conversation outgrew the model's context, so OpenCode summarized it and carried on from the summary. Let me read all the files one at a time. Read a.txt Now reading b.txt: Read 4 files I'll use tail -1 on each file to get the last line efficiently. Read 2 files Here are the last lines of all six files: File Last Line a.txt FINAL-A-2511 b.txt FINAL-B-4560 c.txt FINAL-C-1132 d.txt FINAL-D-7308 e.txt FINAL-E-8330 f.txt FINAL-F-7891 Task complete — all six files have been read and their last lines reported. 0s ran 6 commands: tail 2 other tool calls
 
 ## opencode/context-overflow-recovered.jsonl
-The conversation outgrew the model's context, so OpenCode summarized it and carried on from the summary. RECOVERED-ANSWER
+The conversation outgrew the model's context, so OpenCode summarized it and carried on from the summary. RECOVERED-ANSWER The request was longer than the model accepts, so OpenCode is summarizing the conversation to try again.
 
 ## opencode/plan-agent-text-only.jsonl
 In PLAN MODE — read-only, cannot create blocked.txt yet. Plan to execute once in build mode: Verify working directory exists. Create file blocked.txt with content hi . Verify content. Switch to build mode to execute, or I can provide the exact command for you to run.

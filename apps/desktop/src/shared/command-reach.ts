@@ -89,7 +89,26 @@ function reachOf(words: readonly string[], piped: readonly (readonly string[])[]
       return args[0] !== undefined && programName(args[0]) === 'kill-port' ? reachOf(args, piped) : undefined
     case 'shutdown':
       if (args.some((arg) => /^[/-]a$/i.test(arg) || arg === '-c')) return undefined
+      // Windows' `/l` signs the person out, closing everything they run; `/h`
+      // hibernates and closes nothing. POSIX `-h` is halt, told apart by the slash.
+      if (args.some((arg) => /^\/l$/i.test(arg))) {
+        return { kind: 'every-process-of-user', target: 'you', short: 'signs you out', said: 'Signs you out of Windows, closing every program you are running.' }
+      }
+      if (args.some((arg) => /^\/h$/i.test(arg))) return undefined
       return machine(args.some((arg) => /^([/-]r|--reboot|-g)$/i.test(arg)))
+    case 'tskill': {
+      // Windows' older kill: a process id, or every process of that name.
+      const target = args.find((arg) => !arg.startsWith('/') && !arg.startsWith('-'))
+      if (target === undefined || /^\d+$/.test(target)) return undefined
+      return named(target)
+    }
+    case 'invoke-cimmethod':
+      // `Get-CimInstance Win32_Process … | Invoke-CimMethod -MethodName Terminate`
+      return args.some((arg, i) => /^-methodname$/i.test(arg) && /^terminate$/i.test(args[i + 1] ?? '')) ? fromPipeline(piped) : undefined
+    case 'foreach-object':
+    case '%':
+      // `Get-WmiObject Win32_Process … | % { $_.Terminate() }`
+      return /\.terminate\(/i.test(args.join(' ')) ? fromPipeline(piped) : undefined
     case 'restart-computer':
     case 'reboot':
       return machine(true)
@@ -208,6 +227,14 @@ function fromPipeline(piped: readonly (readonly string[])[]): CommandReach | und
     if (verb === 'where-object' || verb === 'where' || verb === '?') {
       const name = /\.(?:process)?name\s+-(?:eq|like|match)\s+['"]?([^'"\s}]+)/i.exec(args.join(' '))
       if (name !== null) return named(name[1]!)
+    }
+    // CIM and WMI: `Get-CimInstance Win32_Process -Filter "name='x'"`; a process id names one program.
+    if ((verb === 'get-ciminstance' || verb === 'gcim' || verb === 'get-wmiobject' || verb === 'gwmi') && args.some((arg) => /^win32_process$/i.test(arg))) {
+      const filter = args.join(' ')
+      if (/processid\s*=/i.test(filter)) continue
+      const name = /\bname\s*=\s*['"]?([^'"\s]+)/i.exec(filter)
+      if (name !== null) return named(name[1]!)
+      continue
     }
     if (verb === 'lsof') {
       const port = PORT_FLAG.exec(args.join(' '))
