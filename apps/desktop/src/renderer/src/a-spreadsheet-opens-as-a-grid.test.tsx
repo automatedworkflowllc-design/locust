@@ -105,6 +105,14 @@ describe('a spreadsheet in the conversation', () => {
     expect(producedFiles([seen], 'C:/work').map((file) => file.shown)).toEqual(['monthly_budget.xlsx'])
   })
 
+  it("keeps the teammate's own word on a changed file the host could not read (0.597)", () => {
+    // A report written into a dot-folder workspace: seen changed by name, never read.
+    const html = fold([edit('C:/work/report.md', { tool: 'write_to_file', status: 'reported by the runtime, changed on disk' })])
+    expect(html).toContain('changed · seen on disk')
+    expect(html).toContain('>Write<')
+    expect(html).not.toContain('did not report the change')
+  })
+
   it('still says a runtime did not report a change it did not see on disk', () => {
     expect(fold([edit('C:/work/notes.md', {})])).toContain('OpenCode did not report the change')
   })

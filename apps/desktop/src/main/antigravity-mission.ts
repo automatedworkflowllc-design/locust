@@ -493,8 +493,8 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
       }
       const unreported = new Set(unreportedPaths(changed, run.persisted))
       const patches = await (options.observePatches ?? observedPatches)(options.workspacePath, diskAfter, changed, {}, run.diskBefore)
-      const worth = changed.filter((path) => unreported.has(path) || patches.has(path))
-      if (worth.length === 0) return
+      // Every changed path (0.597): a named one whose text could not be read still gets the word that it changed.
+      const worth = changed
       await persistAndEmit(
         run,
         observedEditEvents({
