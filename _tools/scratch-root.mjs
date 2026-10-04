@@ -38,16 +38,28 @@
 
 import { mkdirSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 /**
- * Outside AppData, and outside the repository.
+ * Outside AppData, outside the repository, and with no instruction file above
+ * it.
  *
  * Not inside the repo: several harnesses `git init` their workspace, and a git
  * repository nested inside this one is a trap for anything that walks the
  * tree. `LOCUST_SCRATCH` overrides it for a machine laid out differently.
+ *
+ * Not under Documents either (2026-10-04). It was `~/Documents/locust-scratch`,
+ * and Documents holds Colin's own CLAUDE.md (his business brief): Claude Code
+ * loads every CLAUDE.md in the folders above the one it works in, so every
+ * live Claude run a drive made in its own folder had that brief in its
+ * context. Arena round 2's first Fable run did -- its session file lists it as
+ * a Project instruction -- which broke the round's rule of no CLAUDE.md in or
+ * above a model's folder. The home folder has none above it.
  */
-export const SCRATCH_ROOT = process.env.LOCUST_SCRATCH ?? join(homedir(), 'Documents', 'locust-scratch')
+export const SCRATCH_ROOT = process.env.LOCUST_SCRATCH ?? join(homedir(), 'locust-scratch')
+
+/** Where the scratch root was until 2026-10-04: still pruned, so it empties on its own. */
+export const LEGACY_SCRATCH_ROOT = join(homedir(), 'Documents', 'locust-scratch')
 
 mkdirSync(SCRATCH_ROOT, { recursive: true })
 
@@ -118,17 +130,17 @@ if (hidden !== undefined) {
  * entry must be a directory, and it must sit directly in the root. Anything
  * a person put here by hand is not touched.
  */
-function pruneOldScratch(days = 2) {
+function pruneOldScratch(root, days = 2) {
   const cutoff = Date.now() - days * 24 * 60 * 60 * 1000
   let entries
   try {
-    entries = readdirSync(SCRATCH_ROOT, { withFileTypes: true })
+    entries = readdirSync(root, { withFileTypes: true })
   } catch {
     return
   }
   for (const entry of entries) {
     if (!entry.isDirectory() || !entry.name.startsWith('locust-')) continue
-    const path = join(SCRATCH_ROOT, entry.name)
+    const path = join(root, entry.name)
     try {
       if (statSync(path).mtimeMs > cutoff) continue
       rmSync(path, { recursive: true, force: true })
@@ -138,4 +150,39 @@ function pruneOldScratch(days = 2) {
   }
 }
 
-pruneOldScratch()
+pruneOldScratch(SCRATCH_ROOT)
+// The old root, by the same rules, until nothing of the harness's is left in it.
+if (LEGACY_SCRATCH_ROOT !== SCRATCH_ROOT) pruneOldScratch(LEGACY_SCRATCH_ROOT)
+
+/**
+ * The instruction files a runtime would read in a run made under `path`: any
+ * CLAUDE.md (Claude Code reads every one from the folder up to the drive's
+ * root) or AGENTS.md (Codex and others) in `path` or a folder above it.
+ * Exported for the warning below and for a drive to check its own workspace.
+ */
+export function instructionFilesAbove(path) {
+  const found = []
+  let at = path
+  for (;;) {
+    for (const name of ['CLAUDE.md', 'AGENTS.md']) {
+      try {
+        if (statSync(join(at, name)).isFile()) found.push(join(at, name))
+      } catch { /* none here */ }
+    }
+    const up = dirname(at)
+    if (up === at) break
+    at = up
+  }
+  return found
+}
+
+const instructions = instructionFilesAbove(SCRATCH_ROOT)
+if (instructions.length > 0) {
+  console.warn(
+    `\n  !! An instruction file sits above the scratch root.\n` +
+      `     ${SCRATCH_ROOT}\n` +
+      `     ${instructions.join('\n     ')}\n\n` +
+      `     Every live run a drive makes in its own folder would read it as the\n` +
+      `     project's instructions. Set LOCUST_SCRATCH to a path with none above it.\n`
+  )
+}

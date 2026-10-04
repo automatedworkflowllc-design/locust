@@ -16,11 +16,12 @@ import { mkdir, mkdtemp, readdir, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
+import { SCRATCH_ROOT } from './scratch-root.mjs'
 import { FREE_ROUTE, say, sleep, startDrive } from './drive-lib.mjs'
 
 const packaged = process.argv.includes('--packaged') ? process.argv[process.argv.indexOf('--packaged') + 1] : undefined
-await mkdir(join(homedir(), 'Documents', 'locust-scratch'), { recursive: true })
-const workspace = await mkdtemp(join(homedir(), 'Documents', 'locust-scratch', 'locust-drive-cursor-nocopy-ws-'))
+await mkdir(join(SCRATCH_ROOT), { recursive: true })
+const workspace = await mkdtemp(join(SCRATCH_ROOT, 'locust-drive-cursor-nocopy-ws-'))
 // Ten files, not 5,001: 0.485 makes no copy at all, so the folder's size no
 // longer matters, and 5,001 fresh files kept the virus scanner busy long
 // enough to hang the start (2026-09-30).

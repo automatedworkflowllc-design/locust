@@ -38,11 +38,11 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 
-import '../_tools/scratch-root.mjs'
+import { SCRATCH_ROOT } from '../_tools/scratch-root.mjs'
 import { git, pickRouteScript, say, sendAndWaitScript, startDrive } from './drive-lib.mjs'
 
 const REPO = resolve(new URL('..', import.meta.url).pathname.slice(1))
-const SCRATCH = process.env.LOCUST_SCRATCH ?? join(homedir(), 'Documents', 'locust-scratch')
+const SCRATCH = SCRATCH_ROOT
 
 /**
  * The tasks, chosen so that each one is genuinely long and none of them can

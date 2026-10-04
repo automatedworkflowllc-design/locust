@@ -18,14 +18,15 @@
 //   4. Locust's ledger holds that command cut to at most 16,384 characters, with the same
 //      start and the same end as the original.
 //
-// The folder is under %LOCALAPPDATA%\Temp, not the drives' scratch folder: Documents holds a
-// CLAUDE.md, and Claude Code loads every CLAUDE.md above the folder it works in.
+// The folder is in the drives' scratch root, which has no CLAUDE.md above it since it moved out of
+// Documents (scratch-root.mjs, 2026-10-04): Claude Code loads every CLAUDE.md above its folder.
 
 import { cp, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 import { recordRoot, say, sleep, startDrive } from './drive-lib.mjs'
+import { SCRATCH_ROOT, instructionFilesAbove } from './scratch-root.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
@@ -36,7 +37,8 @@ const PROMPT = `In this folder, create numbers.html with exactly one Bash comman
 
 Do not generate the rows with a loop, a script or any other command, and do not run anything else. Then reply with the single word: done`
 
-const workspace = await mkdtemp(join(process.env.LOCALAPPDATA ?? join(homedir(), 'AppData', 'Local'), 'Temp', 'locust-long-command-'))
+const workspace = await mkdtemp(join(SCRATCH_ROOT, 'locust-long-command-'))
+if (instructionFilesAbove(workspace).length > 0) throw new Error(`an instruction file sits above ${workspace}: ${instructionFilesAbove(workspace).join(', ')}`)
 const drive = await startDrive({
   name: 'long-command-run', port: 9876, workspace, outPath: OUT, spends: true,
   ...(packaged === undefined ? {} : { packaged }),
