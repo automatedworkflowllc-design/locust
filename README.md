@@ -11,7 +11,7 @@ at each release. Issues and discussion are welcome here; code changes are by
 invitation (see CONTRIBUTING.md).
 
 **Locust** puts Claude Code, Codex, Cursor, OpenCode, GitHub Copilot,
-Antigravity and Muse side by side under one roof. You give a teammate a
+Antigravity and Muse Code side by side under one roof. You give a teammate a
 mission; it runs on your machine, under your own provider accounts, in a
 read-only sandbox unless you say otherwise. Every event is written to an
 append-only local ledger before it reaches the screen, so what you are shown
@@ -118,10 +118,13 @@ daily, weekly, once, or when files in a folder change -- and can keep running
 in the background after the window is closed.
 
 **The Board.** Every conversation in columns by what it needs from you: Needs
-you, Working, Ready to look at, Done -- across every runtime at once.
+you, Working, Ready to look at, Done -- across every runtime at once. It opens
+from the bottom bar, beside Settings.
 
-**Compare.** The same mission on several models at once, each in its own copy
-of the folder, side by side; keep the one you like.
+**Compare.** The same mission on two or three models at once, each in its own
+copy of the folder, side by side; keep the one you like. Blind hides the names
+until you choose. ([Three models building the same game,
+blind](https://locust.lol/arena/).)
 
 **Updates.** The Windows installer updates itself from GitHub Releases with a
 differential download, and Settings says which build you are on. The installer
@@ -149,7 +152,7 @@ Run all checks:
 pnpm check
 ```
 
-This builds every workspace package, runs TypeScript checks, and runs the complete test suite (about 9,300 tests across the desktop app, the adapters and the ledger, as of 0.588).
+This builds every workspace package, runs TypeScript checks, and runs the complete test suite (about 9,500 tests across the desktop app, the adapters and the ledger, as of 0.588).
 
 Green tests are not the evidence here. Each package carries a mutation
 control (`test/mutation-control.mjs`) that breaks one behaviour at a time and
