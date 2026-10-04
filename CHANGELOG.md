@@ -11,6 +11,14 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.596.0 - 2026-10-04
+
+### Fixed
+
+- **A teammate running inside the Antigravity app shows what it changed.** Antigravity's transcript names the file an edit touched and never the change, and the route that runs inside the Antigravity app was the one route that never looked at the disk afterwards. Now it looks at the folder before the agent is told to begin and again when the run ends: a file the agent named gets its change on its own row, one it never named gets a row of its own, and when two Antigravity runs shared the folder the thread says so instead of counting the changes as either's.
+- **Antigravity's rows use Claude Code's words.** A file row read `write_to_file` or `replace_file_content`; it now reads Write or Edit, the way the same work reads on the other runtimes.
+- **A file outside the project folder reads by its last two names.** A row for a file edited in another checkout showed the whole absolute path and nothing else fit on the line. It now shows the last folder and the file, behind an ellipsis, with the whole path when you hold the pointer over it. Files inside the folder read as before.
+
 ## 0.595.0 - 2026-10-04
 
 ### Fixed

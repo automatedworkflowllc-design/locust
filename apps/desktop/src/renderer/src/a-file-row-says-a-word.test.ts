@@ -19,6 +19,13 @@ describe('the word on a file row', () => {
     expect(fileToolWord('read_url_content')).toBe('WebFetch')
   }, 10_000)
 
+  it("says Antigravity's write and edit in Claude Code's words (0.596)", () => {
+    expect(fileToolWord('write_to_file')).toBe('Write')
+    expect(fileToolWord('replace_file_content')).toBe('Edit')
+    expect(fileToolWord('multi_replace_file_content')).toBe('Edit')
+    expect(fileToolWord('view_file_outline')).toBe('Read')
+  }, 10_000)
+
   it("keeps a word with no Claude Code counterpart as it is", () => {
     expect(fileToolWord('edit')).toBe('edit')
     expect(fileToolWord('Write')).toBe('Write')

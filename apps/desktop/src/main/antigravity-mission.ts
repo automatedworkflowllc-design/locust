@@ -13,6 +13,8 @@ import type { AntigravityPendingQuestion, AntigravityQuestionResponse, CascadeAp
 import { createAgentApi, projectIdFor, transcriptPathFor } from './antigravity-host.js'
 import type { AgentApi, AntigravityHost } from './antigravity-host.js'
 import { runtimeThreadIdOf } from './codex-mission.js'
+import { changedPaths, observedEditEvents, observedPatches, sharedTreeNotice, snapshotWorkspace, unreportedPaths } from './disk-observation.js'
+import type { WorkspaceSnapshot } from './disk-observation.js'
 import { createPeerExchange, createTranscriptTracker, publicPeerMessage } from './peer-exchange.js'
 import type { MemoryBriefing } from './peer-exchange.js'
 import type { PeerExchange, TranscriptTracker } from './peer-exchange.js'
@@ -93,6 +95,9 @@ export interface AntigravityMissionOptions {
   /** Test seams. */
   readonly agentApi?: (host: AntigravityHost) => AgentApi
   readonly readTranscript?: (path: string) => Promise<string | undefined>
+  /** The folder before and after a run, and the change behind a path; test seams (codex-mission.ts has the same two). */
+  readonly observeDisk?: (workspacePath: string) => Promise<WorkspaceSnapshot | undefined>
+  readonly observePatches?: typeof observedPatches
   readonly home?: string
   readonly createId?: () => string
   readonly now?: () => Date
@@ -277,6 +282,14 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
     timer: NodeJS.Timeout | undefined
     polling: boolean
     ended: boolean
+    /** The folder as it was before the agent was told to begin; undefined when the host could not look. */
+    readonly diskBefore: WorkspaceSnapshot | undefined
+    /** Every event persisted for this run, for what the agent itself named (unreportedPaths). */
+    readonly persisted: NormalizedRuntimeEvent[]
+    /** The highest sequence persisted; a host note after the run takes the next. */
+    lastSequence: number
+    /** Another Antigravity run was live in this folder at the same time: the disk reading names nobody. */
+    sharedTree: boolean
   }
 
   const runs = new Map<string, LiveRun>()
@@ -433,7 +446,11 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
       throw new LedgerWriteFailed(error)
     }
     run.transcript.track(events)
-    for (const event of events) options.emitEvent(run.runId, run.missionId, event)
+    run.persisted.push(...events)
+    for (const event of events) {
+      if (event.sequence > run.lastSequence) run.lastSequence = event.sequence
+      options.emitEvent(run.runId, run.missionId, event)
+    }
   }
 
   const completion = (run: LiveRun, input: { cancelled?: boolean; stderr?: string }): RuntimeProcessCompletion => ({
@@ -453,6 +470,49 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
     finishedAt: now().toISOString()
   })
 
+  /**
+   * What the run changed on disk, read after it (0.596; codex-mission.ts does
+   * the same for the process transports). Until now this service never looked,
+   * and every Antigravity edit row read "did not report the change" -- the
+   * transcript names the file, never the change. A path the agent named gets
+   * its patch on its own row; one it never named gets a row of its own. From a
+   * folder another Antigravity run shared, a notice instead: the reading cannot
+   * tell one run's writes from the other's.
+   */
+  const observeAfter = async (run: LiveRun): Promise<void> => {
+    if (run.diskBefore === undefined) return
+    try {
+      const diskAfter = await (options.observeDisk ?? snapshotWorkspace)(options.workspacePath)
+      if (diskAfter === undefined) return
+      const changed = changedPaths(run.diskBefore, diskAfter)
+      if (changed.length === 0) return
+      const at = now().toISOString()
+      if (run.sharedTree) {
+        await persistAndEmit(run, [sharedTreeNotice({ runId: run.runId, missionId: run.missionId, sourceAdapter: 'antigravity', nextSequence: run.lastSequence + 1, at, paths: changed })])
+        return
+      }
+      const unreported = new Set(unreportedPaths(changed, run.persisted))
+      const patches = await (options.observePatches ?? observedPatches)(options.workspacePath, diskAfter, changed, {}, run.diskBefore)
+      const worth = changed.filter((path) => unreported.has(path) || patches.has(path))
+      if (worth.length === 0) return
+      await persistAndEmit(
+        run,
+        observedEditEvents({
+          runId: run.runId,
+          missionId: run.missionId,
+          sourceAdapter: 'antigravity',
+          nextSequence: run.lastSequence + 1,
+          paths: worth,
+          at,
+          patches,
+          reported: new Set(changed.filter((path) => !unreported.has(path)))
+        })
+      )
+    } catch {
+      // The receipt stands on Antigravity's own events.
+    }
+  }
+
   const end = async (run: LiveRun, input: { cancelled?: boolean; stderr?: string }): Promise<void> => {
     if (run.ended) return
     run.ended = true
@@ -467,6 +527,7 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
       // learns from the absence of further events, and recovery on next
       // launch reports the mission as interrupted, which is the truth.
     }
+    await observeAfter(run)
     // Share only from a run that finished on its own terms, exactly as the
     // exec path does, and tell the relay what was posted.
     if (input.cancelled !== true && run.transcript.completed && run.peer !== undefined && peerExchange !== undefined) {
@@ -715,6 +776,9 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
         // Antigravity leaves nothing behind; a follow-up must know how far the
         // transcript already reaches before it sends, or it would replay the
         // earlier turns as this one's.
+        // Look at the folder BEFORE the agent is told to begin: the message below
+        // starts it, and what differs when the run ends is read against this.
+        const diskBefore = await (options.observeDisk ?? snapshotWorkspace)(options.workspacePath).catch(() => undefined)
         let conversationId: string
         let fed = 0
         if (priorConversation === undefined) {
@@ -814,8 +878,15 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
           cascade: (options.cascadeApi ?? createCascadeApi)(host),
           asking: undefined,
           polling: false,
-          ended: false
+          ended: false,
+          diskBefore,
+          persisted: [],
+          lastSequence: 0,
+          // Every Antigravity run works in the one folder Antigravity has open, so
+          // two live at once share it, and neither reading can be told from the other's.
+          sharedTree: runs.size > 0
         }
+        for (const other of runs.values()) other.sharedTree = true
         runs.set(runId, run)
         run.timer = setInterval(() => {
           void poll(run)

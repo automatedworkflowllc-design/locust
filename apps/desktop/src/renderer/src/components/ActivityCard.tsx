@@ -16,7 +16,10 @@ import { Fragment, useEffect, useRef, useState, useContext } from 'react'
  * now says what Claude Code's would; a word with no counterpart stays its own.
  */
 const CLAUDE_TOOL_WORDS: readonly (readonly [RegExp, string])[] = [
-  [/^(read|read_?file|readfile|view|view_?file|open_?file|readtoolcall)$/i, 'Read'],
+  [/^(read|read_?file|readfile|view|view_?file|view_?file_?outline|view_?code_?item|open_?file|readtoolcall)$/i, 'Read'],
+  // Antigravity's own names (0.596): rows in Colin's ledger read "write_to_file" and "replace_file_content".
+  [/^(write_?to_?file)$/i, 'Write'],
+  [/^(replace_file_content|multi_replace_file_content)$/i, 'Edit'],
   [/^(grep|grep_?search|ripgrep|codebase_?search|semsearch)$/i, 'Grep'],
   [/^(glob|find_?by_?name|file_?search|list_?dir|list_?directory|listdir|ls)$/i, 'Glob'],
   [/^(web_?search|search_?web|websearch)$/i, 'WebSearch'],
@@ -34,7 +37,7 @@ export function thoughtLine(durationMs: number | undefined): string {
 }
 import type { ReactElement } from 'react'
 
-import { activityCounts, activityEntries, netFileEntries, boundedShellOutput, commandTook, defaultOpenEntry, newPageEntry, foldedToolsLead, foldedToolsNames, relativePath, durationText, thoughtHeadline } from '../missionView.js'
+import { activityCounts, activityEntries, netFileEntries, boundedShellOutput, commandTook, defaultOpenEntry, newPageEntry, foldedToolsLead, foldedToolsNames, relativePath, displayPath, durationText, thoughtHeadline } from '../missionView.js'
 import type { TraceSegment, ActivityDetail, ActivityEntry, PlanStep } from '../missionView.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { DiffView } from './DiffView.js'
@@ -431,7 +434,7 @@ export function ActivityCard({
                   <div className="lc-filerow__line">
                     <button type="button" className="lc-filerow" onClick={() => toggle(entry)} aria-expanded={isOpen(entry)}>
                       <Icon name="file" size={14} />
-                      <span className="lc-filerow__path">{relativePath(entry.file.path, workspacePath)}</span>
+                      <span className="lc-filerow__path" title={entry.file.path}>{displayPath(entry.file.path, workspacePath)}</span>
                       <span className="lc-filerow__status">{entry.file.status}</span>
                       {entry.large && <span className="lc-filerow__status is-large">LARGE</span>}
                       <span className="lc-filerow__result">
@@ -724,7 +727,7 @@ export function ActivityCard({
                 <div className="lc-filerow__line">
                   <div className="lc-filerow is-static">
                     <Icon name="file" size={14} />
-                    <span className="lc-filerow__path">{relativePath(entry.name, workspacePath)}</span>
+                    <span className="lc-filerow__path" title={entry.name}>{displayPath(entry.name, workspacePath)}</span>
                     <span className="lc-filerow__result is-muted">changed · seen on disk</span>
                   </div>
                   {onOpenFile !== undefined && (
@@ -766,9 +769,10 @@ export function ActivityCard({
                     */}
                   <span
                     className={`lc-filerow__path${entry.settled || finished ? '' : ' lc-sweep'}`}
-                    data-text={relativePath(entry.name, workspacePath)}
+                    data-text={displayPath(entry.name, workspacePath)}
+                    title={entry.name}
                   >
-                    {relativePath(entry.name, workspacePath)}
+                    {displayPath(entry.name, workspacePath)}
                   </span>
                   {entry.tool !== undefined && <span className="lc-filerow__status">{fileToolWord(entry.tool)}</span>}
                   {/*
