@@ -6,6 +6,10 @@ A local-first desktop app that runs AI coding agents as a team you can watch,
 on runtimes and models you choose, with a durable record of everything they did.
 (Not the Python load-testing tool of the same name, which is unrelated.)
 
+This repository is a mirror, exported from the private development repository
+at each release. Issues and discussion are welcome here; code changes are by
+invitation (see CONTRIBUTING.md).
+
 **Locust** puts Claude Code, Codex, Cursor, OpenCode, GitHub Copilot and more
 side by side under one roof. You give a teammate a mission; it runs on your
 machine, under your own provider accounts, in a read-only sandbox unless you
