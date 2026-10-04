@@ -6,6 +6,9 @@ import { connectedRuntimeCount, deferredOthersSentence, integrationOf, routeRowS
 import { FREE_START_RUNTIME, installCommand, installSentence, runtimeInstallFacts, signInCommand } from '../../../shared/runtime-install.js'
 import { COVER_HEIGHT, COVER_REACH, HomeCover, coverGrowFor, coverRoomFor, coverScale, homeIsShort } from './HomeCover.js'
 import { HomeTeam } from './HomeTeam.js'
+import { AwayList } from './AwayList.js'
+import type { AwaySummary } from '../../../shared/away.js'
+import type { PublicTeammate } from '../../../shared/ipc.js'
 import { RuntimeMark } from './RuntimeMark.js'
 import { AgentMark } from './AgentMark.js'
 import type { HomeTeammate } from './HomeTeam.js'
@@ -147,7 +150,12 @@ export function FirstLaunch({
   workspaceMade = false,
   team = [],
   onMessageTeammate,
-  onUseTemplate
+  onUseTemplate,
+  away,
+  awayTeammates = [],
+  onOpenAway,
+  onOpenRoutines,
+  onAwaySeen
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
   /** Runtimes whose last run ended on the account's usage limit, with its own words. */
@@ -174,6 +182,12 @@ export function FirstLaunch({
   readonly team?: readonly HomeTeammate[]
   /** Pressing a teammate's card: talk to them. */
   readonly onMessageTeammate?: (teammateId: string) => void
+  /** Since you were away (0.590): what ended while nobody was here, when there is something to say. */
+  readonly away?: AwaySummary
+  readonly awayTeammates?: readonly PublicTeammate[]
+  readonly onOpenAway?: (missionId: string) => void
+  readonly onOpenRoutines?: () => void
+  readonly onAwaySeen?: () => void
   readonly onChooseFolder: () => void
   /** Opens the New teammate form: the home screen's way to the product's core action. */
   readonly onNewTeammate?: () => void
@@ -482,6 +496,11 @@ export function FirstLaunch({
               </>
             )}
           </p>
+        )}
+
+        {/* The morning-after view (0.590): first, because it is what a person back at the window came to see. */}
+        {away !== undefined && onOpenAway !== undefined && onAwaySeen !== undefined && (
+          <AwayList summary={away} teammates={awayTeammates} onOpen={onOpenAway} onSeen={onAwaySeen} {...(onOpenRoutines === undefined ? {} : { onOpenRoutines })} />
         )}
 
         {discoveryPhase === 'ready' && team.length > 0 && onMessageTeammate !== undefined && (

@@ -14,6 +14,10 @@ import {
   MISSION_RESUME_CHANNEL,
   APP_INFO_CHANNEL,
   NEEDS_YOU_COUNT_CHANNEL,
+  AWAY_SINCE_GET_CHANNEL,
+  AWAY_SINCE_CHANNEL,
+  AWAY_SUMMARY_CHANNEL,
+  AWAY_SEEN_CHANNEL,
   RUN_FINISHED_CHANNEL,
   ATTENTION_OPEN_MISSION_CHANNEL,
   APP_CHANGELOG_CHANNEL,
@@ -340,6 +344,18 @@ export type {
 const desktopApi: DesktopApi = {
   platform: process.platform,
   setNeedsYouCount: (count) => ipcRenderer.send(NEEDS_YOU_COUNT_CHANNEL, count),
+  getAwaySince: () => ipcRenderer.invoke(AWAY_SINCE_GET_CHANNEL) as Promise<{ readonly since?: string }>,
+  onAwaySince: (listener) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, payload: { readonly since?: unknown }): void => {
+      if (typeof payload?.since === 'string') listener(payload.since)
+    }
+    ipcRenderer.on(AWAY_SINCE_CHANNEL, wrapped)
+    return () => {
+      ipcRenderer.removeListener(AWAY_SINCE_CHANNEL, wrapped)
+    }
+  },
+  setAwaySummary: (counts) => ipcRenderer.send(AWAY_SUMMARY_CHANNEL, counts),
+  awaySeen: () => ipcRenderer.send(AWAY_SEEN_CHANNEL),
   notifyFinished: (finish) => ipcRenderer.send(RUN_FINISHED_CHANNEL, finish),
   onAttentionOpenMission: (listener: (missionId: string) => void) => {
     const handler = (_event: unknown, missionId: unknown): void => {

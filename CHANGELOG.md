@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.590.0 - 2026-10-04
+
+### New
+
+- **Since you were away.** Come back to Locust after twenty minutes or more and Home opens with what happened while you were gone: runs that finished, runs that failed, routine times that passed while Locust was closed, and how many conversations are waiting on you now. Each row opens its record; "Got it" clears the list. The tray menu carries the same line ("Since you were away: 2 ran · 1 missed") while Locust runs in the background, and clicking it opens the window. Locust keeps the moment you were last at the window in its profile (`away.json`); nothing is sent anywhere.
+
 ## 0.589.0 - 2026-10-04
 
 ### Fixed

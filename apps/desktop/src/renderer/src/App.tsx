@@ -111,6 +111,7 @@ import { Inspector } from './components/Inspector.js'
 import { FileViewer } from './components/FileViewer.js'
 import { MacUpdateBanner, MissionsScreen, SettingsScreen, TeammatesScreen, UpdateBanner } from './components/Screens.js'
 import { BoardScreen } from './components/BoardScreen.js'
+import { awayCounts, sinceYouWereAway } from '../../shared/away.js'
 import { WhatsNewSplash } from './components/WhatsNew.js'
 import type { SettingsPageId } from './settingsPages.js'
 import type { ComparePick, ComparePicking, RouteChoice } from './components/RoutePicker.js'
@@ -2351,6 +2352,19 @@ export default function App(): ReactElement {
   const [finishedUnseen, setFinishedUnseen] = useState<ReadonlySet<string>>(new Set())
   // The same, by conversation, for the board's Ready to look at (0.585): turns whose run ended while the person was elsewhere.
   const [finishedUnseenMissions, setFinishedUnseenMissions] = useState<ReadonlySet<string>>(new Set())
+  /*
+   * SINCE YOU WERE AWAY (0.590, PRD R17): the moment the person was last at
+   * the window, from the main process (main/away.ts) -- at start, and again
+   * when the window comes back after twenty minutes. Undefined: nothing to say.
+   */
+  const [awaySince, setAwaySince] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    void window.desktop?.getAwaySince?.().then((answer) => {
+      if (typeof answer?.since === 'string') setAwaySince(answer.since)
+    }).catch(() => undefined)
+    const off = window.desktop?.onAwaySince?.((since) => setAwaySince(since))
+    return () => off?.()
+  }, [])
   const lookingAtRef = useRef<{ readonly screen: Screen; readonly teammateId: string | undefined; readonly missionId?: string }>({ screen: 'workroom', teammateId: undefined })
   /**
    * Stops pressed before the run had a name, by the key it had at the time.
@@ -6539,6 +6553,18 @@ export default function App(): ReactElement {
   // The board's facts (0.585): which conversations wait on the person, and for what.
   const needsYouMissionIds = useMemo(() => new Set(needsYouItems.flatMap((item) => (item.kind === 'memory' ? [] : [item.missionId]))), [needsYouItems])
   const waitingFor = useMemo(() => new Map(needsYouItems.flatMap((item) => (item.kind === 'memory' ? [] : [[item.missionId, item.what] as const]))), [needsYouItems])
+  // What ended while the person was away (0.590), from the rows already here; the tray gets the counts.
+  const awaySummary = useMemo(
+    () => (awaySince === undefined ? undefined : sinceYouWereAway({ since: awaySince, rows: sidebarMissions, routines, needsYou: needsYouMissionIds })),
+    [awaySince, sidebarMissions, routines, needsYouMissionIds]
+  )
+  useEffect(() => {
+    window.desktop?.setAwaySummary?.(awaySummary === undefined ? null : awayCounts(awaySummary))
+  }, [awaySummary])
+  const awaySeen = (): void => {
+    setAwaySince(undefined)
+    window.desktop?.awaySeen?.()
+  }
   const needsYouCount = needsYouItems.length
   useEffect(() => {
     window.desktop?.setNeedsYouCount?.(needsYouCount)
@@ -7559,6 +7585,7 @@ export default function App(): ReactElement {
                */
 
               <FirstLaunch
+                {...(awaySummary === undefined ? {} : { away: awaySummary, awayTeammates: teammates, onOpenAway: openMission, onOpenRoutines: () => setScreen('automations'), onAwaySeen: awaySeen })}
                 onAddTeamFromCard={() => addTeamFromCard(true)}
                 rosterUnreadable={unreadableStores.includes('teammates')}
                 runtimes={runtimes}

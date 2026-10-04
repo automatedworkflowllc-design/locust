@@ -93,6 +93,9 @@ import { CLOSE_BUTTONS, closeQuestion, hideToTrayOnClose, shouldAskBeforeClosing
 import { BACKGROUND_ARG, createLoginItem } from './login-item.js'
 import { nextRoutineDueLine } from '../shared/routine-schedule.js'
 import { BACKGROUND_FILE, readKeepRunning, writeKeepRunning } from './keep-running.js'
+import { AWAY_FILE, readAttentionMark, writeAttentionMark } from './away.js'
+import { awayCountsFrom, awayLine, wasAway } from '../shared/away.js'
+import type { AwaySummaryCounts } from '../shared/away.js'
 import { createRecentEdits } from './recent-edits.js'
 import { readRuntimeArtifacts } from './runtime-artifacts.js'
 import { relative } from 'node:path'
@@ -190,6 +193,10 @@ import {
   MISSION_RESUME_CHANNEL,
   APP_INFO_CHANNEL,
   NEEDS_YOU_COUNT_CHANNEL,
+  AWAY_SINCE_GET_CHANNEL,
+  AWAY_SINCE_CHANNEL,
+  AWAY_SUMMARY_CHANNEL,
+  AWAY_SEEN_CHANNEL,
   RUN_FINISHED_CHANNEL,
   ATTENTION_OPEN_MISSION_CHANNEL,
   APP_CHANGELOG_CHANNEL,
@@ -6879,6 +6886,61 @@ if (!ownsSingleInstanceLock) {
      * window is elsewhere. The renderer counts; only a small whole number is
      * believed.
      */
+    /*
+     * SINCE YOU WERE AWAY (0.590, PRD R17). The attention mark is the moment
+     * the person was last at the window (main/away.ts): read here, before
+     * anything writes it, so this start knows when the last one was left.
+     * Written when the window loses focus, closes, or Locust quits, and once a
+     * minute while it has focus. The renderer asks for the moment, reduces
+     * what it already holds (shared/away.ts), and hands back the counts the
+     * tray says. A window back after twenty minutes starts a new absence.
+     */
+    const awayFile = join(app.getPath('userData'), AWAY_FILE)
+    let awaySince: string | undefined = wasAway(readAttentionMark(awayFile), new Date())
+    let awayCountsShown: AwaySummaryCounts | null = null
+    const markAttention = (): void => {
+      try {
+        writeAttentionMark(awayFile, new Date().toISOString())
+      } catch (error) {
+        note('away', `could not write the attention mark: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+    let lastBlurAt: string | undefined
+    const attendWindow = (window: BrowserWindow): void => {
+      window.on('blur', () => {
+        lastBlurAt = new Date().toISOString()
+        markAttention()
+      })
+      window.on('focus', () => {
+        const since = wasAway(lastBlurAt, new Date())
+        lastBlurAt = undefined
+        if (since === undefined) return
+        awaySince = since
+        if (!window.isDestroyed()) window.webContents.send(AWAY_SINCE_CHANNEL, { since })
+      })
+      window.on('close', () => markAttention())
+    }
+    const attentionBeat = setInterval(() => {
+      if (BrowserWindow.getAllWindows().some((one) => !one.isDestroyed() && one.isFocused())) markAttention()
+    }, 60_000)
+    app.once('before-quit', () => {
+      clearInterval(attentionBeat)
+      markAttention()
+    })
+    ipcMain.handle(AWAY_SINCE_GET_CHANNEL, (event) => {
+      if (!fromOwnWindow(event) || awaySince === undefined) return {}
+      return { since: awaySince }
+    })
+    ipcMain.on(AWAY_SUMMARY_CHANNEL, (event, raw: unknown) => {
+      if (!windowFromValidSender(event)) return
+      awayCountsShown = awayCountsFrom(raw)
+    })
+    ipcMain.on(AWAY_SEEN_CHANNEL, (event) => {
+      if (!windowFromValidSender(event)) return
+      awaySince = undefined
+      awayCountsShown = null
+      markAttention()
+    })
     let needsYouShown = 0
     const attentionDotImage = nativeImage.createFromBitmap(attentionDot(16), { width: 16, height: 16 })
     ipcMain.on(NEEDS_YOU_COUNT_CHANNEL, (event, raw: unknown) => {
@@ -7011,13 +7073,16 @@ if (!ownsSingleInstanceLock) {
         void routines.list().then((all) => {
           if (tray === undefined) return
           const [openLabel, dueLabel, quitLabel] = trayMenuLabels(nextRoutineDueLine(all, new Date()))
+          // Since you were away (0.590): the counts the renderer handed back, as one line that opens the window.
+          const awayLabel = awayLine(awayCountsShown)
           // Rebuilt only when a label changed (0.587): the beat is every five
           // seconds, and a menu replaced under an open pointer closes it.
-          const labels = `${openLabel}\n${dueLabel}\n${quitLabel}`
+          const labels = `${openLabel}\n${dueLabel}\n${awayLabel ?? ''}\n${quitLabel}`
           if (labels === trayLabels) return
           trayLabels = labels
           tray.setContextMenu(Menu.buildFromTemplate([
             { label: openLabel, click: () => trayOpen() },
+            ...(awayLabel === undefined ? [] : [{ label: awayLabel, click: () => trayOpen() }]),
             { label: dueLabel, enabled: false },
             { label: quitLabel, click: () => { leaveTray(); trayQuit() } }
           ]))
@@ -7097,6 +7162,7 @@ if (!ownsSingleInstanceLock) {
       createWindow(codexMissions, (window) => {
         approvalWindow = window
         guardClose(window)
+        attendWindow(window)
         replayDiscoveryToWindow()
         if (!beginSweep) return
         // The sweep may begin: there is somebody to watch it now.
@@ -7143,6 +7209,7 @@ if (!ownsSingleInstanceLock) {
         createWindow(codexMissions, (window) => {
           approvalWindow = window
           guardClose(window)
+          attendWindow(window)
           replayDiscoveryToWindow()
         })
       }
