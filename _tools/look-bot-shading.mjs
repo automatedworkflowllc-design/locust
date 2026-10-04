@@ -25,7 +25,7 @@ const esbuild = createRequire(require.resolve('vite/package.json'))('esbuild')
 const electron = require('electron')
 const args = process.argv.slice(2)
 const option = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined)
-const out = resolve(args.find((arg, i) => !arg.startsWith('--') && !['--lib', '--shading', '--sizes', '--extra'].includes(args[i - 1])) ?? join(tmpdir(), 'bot-shading.png'))
+const out = resolve(args.find((arg, i) => !arg.startsWith('--') && !['--lib', '--shading', '--sizes', '--extra', '--shapes'].includes(args[i - 1])) ?? join(tmpdir(), 'bot-shading.png'))
 const lib = option('--lib')
 const shading = option('--shading') ?? 'plastic'
 // More of the frame's draw settings, as source: `--extra "lightFront: 70,"` (0.569, tuning fabric for small sizes).
@@ -40,7 +40,7 @@ import { createElement as h } from 'react'
 import { createRoot } from 'react-dom/client'
 import { TeammateBot } from ${src('components/TeammateBot.tsx')}
 
-const SHAPES = ['pill', 'pebble', 'droid', 'cat', 'ghost', 'blob', 'star', 'mech', 'cloud', 'alien']
+const SHAPES = ${JSON.stringify((option('--shapes') ?? 'pill,pebble,droid,cat,ghost,blob,star,mech,cloud,alien').split(','))}
 const HUES = ['lime', 'blue', 'violet', 'amber', 'rose', 'teal', 'clay', 'sky', 'lime', 'violet']
 const SIZES = ${JSON.stringify((option('--sizes') ?? '18,32,44,96').split(',').map(Number))}
 const label = (text) => h('div', { style: { color: '#8a8f98', font: '11px sans-serif', width: 54 } }, text)

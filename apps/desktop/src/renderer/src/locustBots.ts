@@ -113,7 +113,7 @@ export const LOCUST_BOTS: Readonly<Record<LocustBotType, LocustBotShape>> = {
   swarm: {
     name: 'Swarm',
     body: ellipsePath(50, 61, 13, 31) + ellipsePath(50, 31, 18, 15),
-    parts: WINGS + rodPath(46, 22, 35, 3, 1.9) + rodPath(54, 22, 65, 3, 1.9),
+    parts: WINGS + rodPath(46, 22, 35, 3, 2) + rodPath(54, 22, 65, 3, 2),
     partsDepth: 0.55,
     // A small head glances less far, so its eyes stay on it.
     turn: 0.7,

@@ -947,6 +947,22 @@ export function visorOf(outline: Outline, face: BotAvatarFace, path: Path2D): Vi
   return fitted
 }
 
+/**
+ * EACH THIN PART ITS OWN SOLID (0.577, bot-avatars 0.2). The library's mech
+ * keeps both antennae in one path; 0.2 extrudes a single path as one solid,
+ * and the two drew as a black scribble between them. Handed a list, it draws
+ * each piece on its own. Split at each absolute move: every piece of a part
+ * starts with one.
+ */
+export function partPieces(parts: string): readonly string[] {
+  return parts.split(/(?=M)/).map((piece) => piece.trim()).filter((piece) => piece.length > 0)
+}
+
+export function partPaths(parts: string): Path2D | Path2D[] {
+  const pieces = partPieces(parts)
+  return pieces.length === 1 ? new Path2D(pieces[0]) : pieces.map((piece) => new Path2D(piece))
+}
+
 export function outlineOf(type: BotType): Outline {
   if (isLocustBot(type)) {
     const shape = LOCUST_BOTS[type]
@@ -1271,7 +1287,7 @@ function RiggedBot({
     canvas.width = side
     canvas.height = side
     const path = new Path2D(outline.body)
-    const parts = outline.parts === undefined ? undefined : new Path2D(outline.parts)
+    const parts = outline.parts === undefined ? undefined : partPaths(outline.parts)
     warmBotAvatarPlastic(outline.key, path, size * dpr)
     const sim = new BotAvatarSim(seed, state)
     sim.setTurn(outline.turn)

@@ -22,7 +22,7 @@ const out = resolve(process.argv[2] ?? join(tmpdir(), 'glyph-eyes.png'))
 
 const ENTRY = `
 import { BOT_AVATAR_OVERSCAN, BotAvatarSim, autoInk, drawBotAvatarFrame, warmBotAvatarPlastic } from 'bot-avatars'
-import { GLYPH_INK, bodyColorOf, outlineOf, visorOf, withGlyphEyes } from ${JSON.stringify(join(DESKTOP, 'src/renderer/src/components/Bot.tsx').split(String.fromCharCode(92)).join('/'))}
+import { GLYPH_INK, bodyColorOf, outlineOf, partPaths, visorOf, withGlyphEyes } from ${JSON.stringify(join(DESKTOP, 'src/renderer/src/components/Bot.tsx').split(String.fromCharCode(92)).join('/'))}
 
 const SIZE = 100
 const types = [['ghost', '#c7a6ff'], ['droid', '#5b8def'], ['cat', '#ff8c42'], ['swarm', '#7fd17a'], ['prompt', '#6fb7d6']]
@@ -42,7 +42,7 @@ for (const [type, color] of types) {
     const outline = outlineOf(type)
     const body = bodyColorOf(type, color)
     const path = new Path2D(outline.body)
-    const parts = outline.parts === undefined ? undefined : new Path2D(outline.parts)
+    const parts = outline.parts === undefined ? undefined : partPaths(outline.parts)
     warmBotAvatarPlastic(outline.key, path, SIZE)
     const sim = new BotAvatarSim(0.3, 'default')
     const pose = { ...sim.pose, yaw, lookX, eyeOpen: 1, blinkL: 0, blinkR: 0 }
