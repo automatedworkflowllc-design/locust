@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.611.0 - 2026-10-04
+
+### Improved
+
+- **Locust holds still behind other windows.** While another window is in front, every face and every animation in Locust holds where it is, and picks up the moment you come back to it. What a run says keeps arriving the whole time: its text, its steps and its counts. In our measurement, Locust's own work while an answer streamed behind other windows went from about 12% of a 12-core machine to about 3%. The home screen's title characters already rested like this; now everything does.
+
 ## 0.610.0 - 2026-10-04
 
 ### Fixed

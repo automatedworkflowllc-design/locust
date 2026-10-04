@@ -484,6 +484,23 @@ textarea {
 }
 
 /*
+ * BEHIND OTHER WINDOWS, NOTHING MOVES (0.611). While another window is in
+ * front, windowPresence.ts marks the root and every animation holds where it
+ * is -- the pulse, the sweep, the stop beam, the spark -- and picks up the
+ * moment Locust is in front again. A window behind others is still painted,
+ * so these kept the GPU drawing for nobody: a streamed answer measured 13 % of
+ * a 12-core machine behind other windows on 0.610, 3 % with this and the
+ * faces' rest. Held, not removed: what a run says keeps arriving, and a held
+ * pulse still shows which step it is. `!important` because this holds every
+ * animation in the app, whatever rule started it.
+ */
+:root[data-away] *,
+:root[data-away] *::before,
+:root[data-away] *::after {
+  animation-play-state: paused !important;
+}
+
+/*
  * Three nav buttons and the connection count, in a 267px sidebar.
  *
  * MEASURED 2026-09-03, twice. Adding Missions and Teammates put three
