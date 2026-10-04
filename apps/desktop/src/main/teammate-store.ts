@@ -141,7 +141,7 @@ interface StoredFile {
 
 // Relay is ON unless switched off: teammates talking to each other is the
 // point of having more than one, and the hop cap is what bounds the spend.
-const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, interrupt: false, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full', replySize: 'standard', metal: 'silver', metalStrength: 'standard', metalMotion: 'hover', metalBend: false, terminalFaces: true }
+const DEFAULT_SETTINGS: WorkspaceSettings = { swarm: false, relay: true, relayHopCap: DEFAULT_RELAY_HOP_CAP, interrupt: false, memoryMode: DEFAULT_MEMORY_MODE, autoMode: false, askConnectors: false, keepATodoList: true, layout: 'auto', tube: 'full', replySize: 'standard', metal: 'silver', metalStrength: 'standard', metalMotion: 'hover', metalBend: false, terminalFaces: true, plush: false }
 
 /** A layout this build can draw, or the default. Never trusts the file. */
 function parsedLayout(value: unknown): LayoutPreference {
@@ -549,6 +549,7 @@ function parsedFile(text: string): StoredFile {
       : 'full',
     ...parsedMetal(rawSettings),
     terminalFaces: parsedTerminalFaces(rawSettings),
+    plush: typeof rawSettings === 'object' && rawSettings !== null && (rawSettings as Record<string, unknown>).plush === true,
     replySize: typeof rawSettings === 'object' && rawSettings !== null
       ? parsedReplySize((rawSettings as Record<string, unknown>).replySize)
       : 'standard',
@@ -952,6 +953,8 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
             : 'auto',
           ...parsedMetal(settings),
           terminalFaces: parsedTerminalFaces(settings),
+          // Only a literal true: plush is a choice, never a default.
+          plush: (settings as Record<string, unknown>).plush === true,
           replySize: typeof settings === 'object' && settings !== null
             ? parsedReplySize((settings as Record<string, unknown>).replySize)
             : 'standard',

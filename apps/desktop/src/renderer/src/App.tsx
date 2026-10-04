@@ -191,7 +191,7 @@ import { homeRouteOf, isOwnRoute, modelDisplayName, rememberOwnModels, routeChro
 import { FeedbackDialog } from './components/FeedbackDialog.js'
 import { conversationText } from './feedback.js'
 import { withMessageDelta } from '../../shared/messageFragments.js'
-import { setTerminalFaces } from './botLook.js'
+import { setPlush, setTerminalFaces } from './botLook.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
 import type { Handoff } from './glances.js'
 import type { LiveActivity } from './faceState.js'
@@ -726,6 +726,8 @@ export default function App(): ReactElement {
   // Every bot's screen for a face (0.561); the bots read it from botLook, not from props.
   const [terminalFaces, setTerminalFacesShown] = useState(true)
   useEffect(() => setTerminalFaces(terminalFaces), [terminalFaces])
+  const [plush, setPlushShown] = useState(false)
+  useEffect(() => setPlush(plush), [plush])
   const [metalBend, setMetalBend] = useState(true)
   // Declared HERE, right under its state, not a thousand lines down: a
   // helper above it closed over `runtimes` and was called during render,
@@ -1473,6 +1475,15 @@ export default function App(): ReactElement {
       ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, replySize, layout, tube, terminalFaces: next })
       .then((settings) => setTerminalFacesShown(settings.terminalFaces !== false))
       .catch(() => setTerminalFacesShown(before))
+  }
+  /** Plush on or off: shown at once, put back if the disk did not take it (0.577). */
+  const choosePlush = (next: boolean): void => {
+    const before = plush
+    setPlushShown(next)
+    void window.desktop
+      ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, replySize, layout, tube, plush: next })
+      .then((settings) => setPlushShown(settings.plush === true))
+      .catch(() => setPlushShown(before))
   }
   // A3.3: this folder's check after edits, as the host last said it.
   const [checkCommand, setCheckCommand] = useState('')
@@ -2948,6 +2959,7 @@ export default function App(): ReactElement {
       if (settings.metalMotion !== undefined) setMetalMotion(settings.metalMotion)
       if (settings.metalBend !== undefined) setMetalBend(settings.metalBend)
       setTerminalFacesShown(settings.terminalFaces !== false)
+      setPlushShown(settings.plush === true)
         }
       })
       .catch(() => undefined)
@@ -7313,6 +7325,8 @@ export default function App(): ReactElement {
               onMetalChange={chooseMetal}
               terminalFaces={terminalFaces}
               onTerminalFacesChange={chooseTerminalFaces}
+              plush={plush}
+              onPlushChange={choosePlush}
             onSwarmChange={(next) => {
                 // The same write the composer mark performs: optimistic, then
                 // reconciled with what the store actually saved.

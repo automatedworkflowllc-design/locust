@@ -1373,6 +1373,9 @@ function CheckAfterEditsRow({ saved, onSave }: { readonly saved: string; readonl
 }
 
 /** Three bots wearing the Terminal faces choice beside it: at work, in thought, done. */
+/** The bots the Plush row shows, in whichever material is chosen. */
+const PLUSH_PREVIEW: readonly ('cat' | 'cloud' | 'clover')[] = ['cat', 'cloud', 'clover']
+
 const TERMINAL_FACES_PREVIEW: readonly (readonly ['droid' | 'ghost' | 'cat', EyeGlyphs])[] = [
   ['droid', ['>', '▮']],
   ['ghost', ['•', '•']],
@@ -1429,6 +1432,8 @@ export function SettingsScreen({
   onMetalChange,
   terminalFaces = true,
   onTerminalFacesChange,
+  plush = false,
+  onPlushChange,
   onReplySizeChange,
   onTubeChange,
   onSwarmChange,
@@ -1531,6 +1536,9 @@ export function SettingsScreen({
   /** Every bot wears a screen for a face (0.561). */
   readonly terminalFaces?: boolean
   readonly onTerminalFacesChange?: (on: boolean) => void
+  /** Our bots in plush faux fur instead of plastic (0.577). */
+  readonly plush?: boolean
+  readonly onPlushChange?: (on: boolean) => void
   readonly onReplySizeChange: (size: ReplyTextSize) => void
   readonly onAutoModeChange: (autoMode: boolean) => void
   readonly askConnectors: boolean
@@ -2453,6 +2461,46 @@ export function SettingsScreen({
                   aria-checked={terminalFaces === option}
                   className={`lc-button${terminalFaces === option ? ' is-active' : ''}`}
                   onClick={() => onTerminalFacesChange?.(option)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+        )}
+        {shownPage === 'appearance' && (
+        <section className="lc-settings__section lc-settings__section--line" data-setting="plush">
+          <div className="lc-settingline">
+            <div className="lc-settingline__text">
+              <h2 className="lc-settings__heading">Plush</h2>
+              <p className="lc-settings__lede">
+                {plush
+                  ? 'On. Every teammate is soft faux fur, with a shorter pile where it is drawn small.'
+                  : 'Off. Every teammate is smooth plastic.'}
+              </p>
+            </div>
+            <div className="lc-settingline__preview" aria-hidden>
+              {PLUSH_PREVIEW.map((type, i) => (
+                <span key={type} className="lc-settingline__bot" data-bot={type}>
+                  <Bot type={type} size={40} paused seed={0.3 + i * 0.2} />
+                </span>
+              ))}
+            </div>
+            <div className="lc-segmented" role="radiogroup" aria-label="Plush">
+              {(
+                [
+                  [true, 'On'],
+                  [false, 'Off']
+                ] as const
+              ).map(([option, label]) => (
+                <button
+                  key={label}
+                  type="button"
+                  role="radio"
+                  aria-checked={plush === option}
+                  className={`lc-button${plush === option ? ' is-active' : ''}`}
+                  onClick={() => onPlushChange?.(option)}
                 >
                   {label}
                 </button>

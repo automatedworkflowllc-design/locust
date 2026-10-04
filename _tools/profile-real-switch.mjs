@@ -14,7 +14,7 @@
 // the 800 ms after, long tasks, and a CPU profile of the whole run. The
 // screenshots show the person's conversations: keep --out outside the repo.
 
-import { cp, mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -34,6 +34,12 @@ const profile = await mkdtemp(join(tmpdir(), 'locust-real-switch-profile-'))
 await cp(join(source, 'mission-ledger'), join(profile, 'mission-ledger'), { recursive: true })
 for (const file of ['teammates.json', 'folders.json', 'groups.json']) {
   if (existsSync(join(source, file))) await cp(join(source, file), join(profile, file))
+}
+// `--plush` (0.577): the COPY's settings turn Plush on, to measure fur against plastic on the same conversations.
+if (process.argv.includes('--plush') && existsSync(join(profile, 'teammates.json'))) {
+  const roster = JSON.parse(await readFile(join(profile, 'teammates.json'), 'utf8'))
+  roster.settings = { ...(roster.settings ?? {}), plush: true }
+  await writeFile(join(profile, 'teammates.json'), JSON.stringify(roster), 'utf8')
 }
 const workspace = await mkdtemp(join(tmpdir(), 'locust-real-switch-ws-'))
 const drive = await startDrive({ name: 'real-switch', port: 9874, workspace, profilePath: profile, outPath: out, sendsNothing: true, ...(packaged === undefined ? {} : { packaged }) })

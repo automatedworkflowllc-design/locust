@@ -2327,6 +2327,8 @@ export interface WorkspaceSettings {
    * keeps its own eyes. On unless it was switched off.
    */
   readonly terminalFaces?: boolean
+  /** Every one of our bots is plush faux fur instead of plastic (0.577). Off unless chosen. */
+  readonly plush?: boolean
   /**
    * Teammates reply to each other on their own: a share to a teammate starts
    * a run for them, and their answer starts the sender's next turn. On by

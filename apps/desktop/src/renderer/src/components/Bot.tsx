@@ -18,7 +18,7 @@ import type { BotAvatarFace, BotAvatarPose, BotAvatarState, BotAvatarType } from
 import { anchorsOf, anchorVariables, paintedBounds, type BodyBox } from '../botAnchors.js'
 
 import { screenSuits } from '../../../shared/avatar.js'
-import { useTerminalFaces } from '../botLook.js'
+import { usePlush, useTerminalFaces } from '../botLook.js'
 import { LOCUST_BOTS, isLocustBot } from '../locustBots.js'
 import type { LocustBotType } from '../locustBots.js'
 
@@ -900,12 +900,25 @@ function headingOf(sim: BotAvatarSim): number | undefined {
  */
 export const SUPERSAMPLE_AT_OR_BELOW = 32
 
+/*
+ * PLUSH, SMALL (0.577). The library's own fabric is dark and fuzzy at 20-34
+ * px and fine from about 40 (look-bot-shading.mjs, measured 10/03): its
+ * fibres are longer than a pixel there and read as fuzz. Below 40 px on
+ * screen a shorter, combed pile, lit more from the front, stays a clean
+ * plush -- one material from the sidebar to the cover, not plastic in one
+ * place and fur in the other. Colin accepted this 10/03 (Plush optional;
+ * short pile under ~40 px, stock fabric above).
+ */
+export const PLUSH_SHORT_BELOW = 40
+const SHORT_PILE = { length: 0.45, density: 1, fuzz: 0.2, clumps: 0.2, curl: 0.4, gravity: 0.6 }
+const SHORT_PILE_LIGHT_FRONT = 72
+
 export function Bot(props: BotProps): ReactElement {
   if (props.size > SUPERSAMPLE_AT_OR_BELOW) return <RiggedBot {...props} />
   return (
     <span className="lc-bot__supersample" style={{ width: props.size, height: props.size }}>
       <span className="lc-bot__supersample-inner" style={{ width: props.size * 2, height: props.size * 2 }}>
-        <RiggedBot {...props} size={props.size * 2} />
+        <RiggedBot {...props} size={props.size * 2} shownAt={props.size} />
       </span>
     </span>
   )
@@ -1243,8 +1256,9 @@ function RiggedBot({
   glance,
   eyes,
   phosphor,
-  screen: screenChoice
-}: BotProps): ReactElement {
+  screen: screenChoice,
+  shownAt
+}: BotProps & { readonly shownAt?: number }): ReactElement {
   const ref = useRef<HTMLCanvasElement>(null)
   const rig = useRef<BotAvatarSim | null>(null)
   const glyphs = useRef(eyes)
@@ -1256,6 +1270,9 @@ function RiggedBot({
   const screen = outlineOf(type).screen || (terminal && (screenChoice ?? screenSuits(type)))
   // A screen has no mouth (0.574). Colin: "i think we can ditch the smile if we have the screen, it seems to interfere".
   const faceShown: BotAvatarFace | undefined = screen ? 'eyes' : face
+  // Plush on (Settings > Appearance): fur, with a short pile where the bot is small on screen (PLUSH_SHORT_BELOW).
+  const plush = usePlush()
+  const shortPile = plush && (shownAt ?? size) < PLUSH_SHORT_BELOW
   /*
    * CODE EYES ARE A SCREEN'S (0.562). Colin: "maybe also a toggle for the
    * computer eyes as well, or should the computer eyes be exclusive to the
@@ -1288,7 +1305,7 @@ function RiggedBot({
     canvas.height = side
     const path = new Path2D(outline.body)
     const parts = outline.parts === undefined ? undefined : partPaths(outline.parts)
-    warmBotAvatarPlastic(outline.key, path, size * dpr)
+    warmBotAvatarPlastic(outline.key, path, size * dpr, undefined, plush, shortPile ? SHORT_PILE : undefined)
     const sim = new BotAvatarSim(seed, state)
     sim.setTurn(outline.turn)
     // BotAvatar takes `jumpEvery` as a prop; the rig is set the same way, so
@@ -1326,7 +1343,8 @@ function RiggedBot({
         faceScale: outline.faceScale,
         color: body,
         ink: painter.drawsGlyphs() ? GLYPH_INK : ink,
-        shading: 'plastic',
+        shading: plush ? 'fabric' : 'plastic',
+        ...(shortPile ? { fur: SHORT_PILE, lightFront: SHORT_PILE_LIGHT_FRONT } : {}),
         dpr,
         theme: 'dark',
         still
@@ -1398,7 +1416,7 @@ function RiggedBot({
     }
     // A new state eases in on the running rig (below); only a still bot is
     // redrawn from scratch for one.
-  }, [type, size, color, faceShown, seed, paused, paused ? state : undefined, jumpEvery, paused ? eyes?.join('') : undefined, paused ? phosphor : undefined, screen])
+  }, [type, size, color, faceShown, seed, paused, paused ? state : undefined, jumpEvery, paused ? eyes?.join('') : undefined, paused ? phosphor : undefined, screen, plush, shortPile])
 
   useEffect(() => {
     if (!paused) rig.current?.setState(state)
@@ -1448,6 +1466,7 @@ function RiggedBot({
       aria-hidden
       // What it wears, for a drive to read beside the pixels: a screen, or its own eyes.
       data-face={screen ? 'screen' : 'eyes'}
+      data-material={plush ? (shortPile ? 'plush-short' : 'plush') : 'plastic'}
       onClick={interactive ? () => rig.current?.poke() : undefined}
       style={{
         display: 'block',
