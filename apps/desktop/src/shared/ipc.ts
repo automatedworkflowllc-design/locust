@@ -932,6 +932,9 @@ export const DIAGNOSTICS_REVEAL_CHANNEL = 'diagnostics:reveal'
  * can name a destination.
  */
 export const FEEDBACK_CHANNEL = 'diagnostics:feedback'
+/** The private way (0.593, R23): the same report as an email to SUPPORT_ADDRESS, or saved whole as a file. */
+export const FEEDBACK_EMAIL_CHANNEL = 'diagnostics:feedback-email'
+export const FEEDBACK_SAVE_CHANNEL = 'diagnostics:feedback-save'
 
 /** What the Send feedback box hands the host. */
 export interface FeedbackReport {
@@ -3411,6 +3414,10 @@ export interface DesktopApi {
   revealDiagnostics(): Promise<void>
   /** Open the feedback report, filled in, in the person's browser. Names no address. */
   sendFeedback(report: FeedbackReport): Promise<OpenLinkResponse>
+  /** The same report, as an email to the support address (0.593): opens the mail app, filled in. */
+  emailFeedback(report: FeedbackReport): Promise<OpenLinkResponse>
+  /** The same report, whole, saved where the person chooses (0.593). `path` when saved; a cancel is ok with no path. */
+  saveFeedbackFile(report: FeedbackReport): Promise<{ readonly ok: boolean; readonly path?: string; readonly message?: string }>
   /** Where the log is, for the sentence that tells a person what to send. */
   diagnosticsReport(): Promise<DiagnosticsReport>
   /** Open one of the addresses the host allows, in the person's browser. */

@@ -307,6 +307,8 @@ import {
   RUNTIME_COMMANDS_CHANNEL,
   DIAGNOSTICS_REVEAL_CHANNEL,
   FEEDBACK_CHANNEL,
+  FEEDBACK_EMAIL_CHANNEL,
+  FEEDBACK_SAVE_CHANNEL,
   DIAGNOSTICS_REPORT_CHANNEL,
   OPEN_LINK_CHANNEL,
   MAC_RELEASE_CHANNEL,
@@ -359,7 +361,7 @@ import { isMissionRuntime, runtimeDisplayName } from '../shared/runtimes.js'
 import { routeAtStart } from '../shared/route-at-start.js'
 import { roleLabelOf } from '../shared/ipc.js'
 import { isOutboundLink, isWebLink } from '../shared/outbound-links.js'
-import { feedbackUrl } from './report-problem.js'
+import { feedbackUrl, reportFileText, supportMailtoUrl } from './report-problem.js'
 import { TESTER_LANE, updateLaneFrom } from './update-lane.js'
 import { createCursorConnectorKeeper } from './cursor-connector-allow.js'
 import { cursorConfiguredConnectorNames, cursorReadyConnectors } from './cursor-connector-notice.js'
@@ -4105,6 +4107,56 @@ if (!ownsSingleInstanceLock) {
       }
     })
 
+    /*
+     * THE PRIVATE WAYS (0.593, R23). The same report as an email to the
+     * support address -- the mail app opens filled in, the conversation only
+     * while it fits a mailto -- or saved whole as a file the person sends
+     * however they like. The host builds both, as it builds the issue.
+     */
+    const feedbackOf = (report: unknown): { readonly description: string; readonly conversation?: string } | undefined => {
+      const record = (typeof report === 'object' && report !== null ? report : {}) as Record<string, unknown>
+      const description = typeof record.description === 'string' ? record.description : ''
+      if (description.trim().length === 0) return undefined
+      const conversation = typeof record.conversation === 'string' ? record.conversation : undefined
+      return { description, ...(conversation === undefined ? {} : { conversation }) }
+    }
+    const reportFacts = () => ({ version: app.getVersion(), release: release(), arch: process.arch, platform: process.platform })
+    ipcMain.handle(FEEDBACK_EMAIL_CHANNEL, async (event, report: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      const given = feedbackOf(report)
+      if (given === undefined) return { ok: false, message: 'Say what happened first.' } as const
+      try {
+        await shell.openExternal(supportMailtoUrl(reportFacts(), given))
+        return { ok: true } as const
+      } catch {
+        return { ok: false, message: 'Your mail app could not be opened. Save the report as a file instead; what you wrote is still here.' } as const
+      }
+    })
+    ipcMain.handle(FEEDBACK_SAVE_CHANNEL, async (event, report: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      const given = feedbackOf(report)
+      if (given === undefined) return { ok: false, message: 'Say what happened first.' } as const
+      const window = BrowserWindow.fromWebContents(event.sender)
+      if (window === null) return { ok: false, message: 'That request was rejected.' } as const
+      const text = reportFileText(reportFacts(), given)
+      const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ').replace(':', '.')
+      // A drive on a development build names the file itself: a native dialog cannot be driven.
+      const scripted = !app.isPackaged ? process.env.LOCUST_REPORT_PATH : undefined
+      const target = scripted !== undefined && scripted.length > 0
+        ? scripted
+        : (await dialog.showSaveDialog(window, {
+            title: 'Save the report',
+            defaultPath: join(app.getPath('downloads'), `Locust report ${stamp}.txt`),
+            filters: [{ name: 'Text', extensions: ['txt'] }]
+          })).filePath
+      if (target === undefined || target.length === 0) return { ok: true } as const
+      try {
+        await writeFile(target, text, 'utf8')
+        return { ok: true, path: target } as const
+      } catch (error) {
+        return { ok: false, message: `The report could not be written there: ${error instanceof Error ? error.message : String(error)}` } as const
+      }
+    })
     ipcMain.handle(DIAGNOSTICS_REVEAL_CHANNEL, () => {
       shell.showItemInFolder(errorLog())
     })

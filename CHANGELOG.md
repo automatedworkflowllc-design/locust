@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.593.0 - 2026-10-04
+
+### New
+
+- **A private way to reach Locust's makers.** Settings > General has a Help block with the support address (`support@locust.lol`) and the public bug page, and what each carries. The Send feedback box now offers three ways: **Send** opens a public GitHub issue as before, **Email** opens your mail app to the support address with the report filled in (what you wrote, your Locust version and system, and a conversation only if you include it), and **Save as a file** writes the whole report, uncut, to a file you can attach to either -- an email cuts off a long conversation, the file does not. Nothing is sent anywhere until you send it.
+
 ## 0.592.0 - 2026-10-04
 
 ### Fixed
