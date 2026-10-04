@@ -1,4 +1,5 @@
 import type { ReverseChange } from './reverse-diff.js'
+import type { AwaySummaryCounts } from './away.js'
 import type { RemoteControlState } from './claude-remote-control.js'
 import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import type { QueuedMessagesResponse, SavedQueuedMessage } from './queued-messages.js'
@@ -256,6 +257,16 @@ export const APP_INFO_CHANNEL = 'app:info'
 export const NEEDS_YOU_COUNT_CHANNEL = 'attention:needs-you-count'
 /** 0.379: a long run the person started finished; main says it if the window is elsewhere. */
 export const RUN_FINISHED_CHANNEL = 'attention:run-finished'
+/**
+ * SINCE YOU WERE AWAY (0.590, shared/away.ts). The main process keeps the moment
+ * the person was last at the window; the renderer asks for it, is told when a
+ * new absence ends, hands back the counts for the tray, and says when the list
+ * was seen.
+ */
+export const AWAY_SINCE_GET_CHANNEL = 'away:since'
+export const AWAY_SINCE_CHANNEL = 'away:since-changed'
+export const AWAY_SUMMARY_CHANNEL = 'away:summary'
+export const AWAY_SEEN_CHANNEL = 'away:seen'
 /** 0.379: a finished run's toast was clicked -- open its conversation. */
 export const ATTENTION_OPEN_MISSION_CHANNEL = 'attention:open-mission'
 export const APP_CHANGELOG_CHANNEL = 'app:changelog'
@@ -3209,6 +3220,14 @@ export interface DesktopApi {
   readonly platform: string
   /** How many things need the person now: the taskbar shows it (0.379). */
   setNeedsYouCount(count: number): void
+  /** Since you were away (0.590): the last attention mark, if long enough ago to count. */
+  getAwaySince(): Promise<{ readonly since?: string }>
+  /** A new absence ended: the window came back after at least AWAY_MINIMUM_MS. */
+  onAwaySince(listener: (since: string) => void): () => void
+  /** The counts for the tray's line; null when there is nothing to say. */
+  setAwaySummary(counts: AwaySummaryCounts | null): void
+  /** The person saw the list: the mark moves to now and the tray line goes. */
+  awaySeen(): void
   /** A long run the person started finished: said as a toast while the window is elsewhere (0.379). */
   notifyFinished(finish: { readonly title: string; readonly body: string; readonly missionId?: string }): void
   /** A finished run's toast was clicked: the conversation to open. */

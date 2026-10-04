@@ -6294,6 +6294,144 @@ textarea {
   background: var(--lc-hover-surface);
 }
 
+/* --- Home: since you were away (AwayList.tsx, 0.590) ---------------------
+ * The morning-after list: one head line with the counts and Got it, then a
+ * row per run that ended while nobody was here (failed first, then missed
+ * routine slots, then what ran), each a button that opens its record. Drawn
+ * only when there is something to say, so Home keeps its shape otherwise. */
+.lc-away {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+  padding: var(--lc-space-3) var(--lc-space-4);
+  border: 1px solid var(--lc-border-hairline);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-raised);
+}
+
+.lc-away__head {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-3);
+  min-width: 0;
+}
+
+.lc-away__heading {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lc-space-2);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-label);
+  letter-spacing: var(--lc-tracking-label);
+  text-transform: uppercase;
+  color: var(--lc-text-muted);
+  white-space: nowrap;
+}
+
+.lc-away__line {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--lc-text-mono-label);
+  color: var(--lc-text-muted);
+}
+
+.lc-away__seen {
+  flex: 0 0 auto;
+}
+
+.lc-away__waiting {
+  margin: 0;
+  font-size: var(--lc-text-body);
+  color: var(--lc-text-primary);
+}
+
+.lc-away__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lc-away__row {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--lc-space-3);
+  width: 100%;
+  padding: 6px var(--lc-space-2);
+  border: 0;
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  color: var(--lc-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lc-away__row:hover,
+.lc-away__row:focus-visible {
+  background: var(--lc-bg-selected);
+  outline: none;
+}
+
+.lc-away__row:disabled {
+  cursor: default;
+}
+
+.lc-away__mark {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lc-text-muted);
+}
+
+.lc-away__mark--ran {
+  background: var(--lc-green);
+}
+
+.lc-away__mark--failed {
+  background: var(--lc-red);
+}
+
+.lc-away__mark--missed {
+  background: var(--lc-amber);
+}
+
+.lc-away__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--lc-text-body);
+}
+
+.lc-away__meta {
+  display: inline-flex;
+  gap: var(--lc-space-3);
+  font-size: var(--lc-text-mono-label);
+  color: var(--lc-text-muted);
+  white-space: nowrap;
+}
+
+.lc-away__who {
+  color: var(--lc-text-primary);
+}
+
+.lc-away__when {
+  color: var(--lc-text-muted);
+}
+
+.lc-away__more {
+  margin: 0;
+  font-size: var(--lc-text-mono-label);
+  color: var(--lc-text-muted);
+}
+
 /* --- Home: the team, first (HomeTeam.tsx) ------------------------------
  * A card per teammate -- face, name, what they do, the model they run on --
  * and pressing it is talking to them. The label speaks in the same voice as
