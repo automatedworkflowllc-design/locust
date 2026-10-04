@@ -139,6 +139,10 @@ export const EXCLUSIONS = [
   'apps/desktop/_ui-profile/**',
   '**/*.cpuprofile',
   'ASTRA-WORKTREE.md',
+  // The private repo's own workflows (the Mac build drafts a release HERE).
+  // The public repo gets its own CI; a push carrying a workflow also needs a
+  // token with the `workflow` scope, which the release machine does not have.
+  '.github/workflows/**',
   // A Chromium profile a smoke or drive run left in the tree.
   '**/*-profile/**'
 ]
