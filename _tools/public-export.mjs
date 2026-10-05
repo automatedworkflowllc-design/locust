@@ -161,7 +161,9 @@ export const DOCS_PUBLISHED = [
   'docs/CROSS_TASK_CONTEXT.md',
   'docs/DECISION-*.md',
   // The code signing policy (0.585): SignPath asks that it be public, linked from the homepage.
-  'docs/CODE-SIGNING.md'
+  'docs/CODE-SIGNING.md',
+  // What Locust can stop, per AI agent (0.617, the PRD's R9): written from the source Settings draws.
+  'docs/WHAT-LOCUST-CAN-STOP.md'
 ]
 
 const EXCLUSION_PATTERNS = EXCLUSIONS.map((glob) => ({ glob, re: compileGlob(glob) }))

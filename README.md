@@ -95,9 +95,13 @@ run -- `taskkill /IM python.exe`, `kill -9 -1`, a shutdown -- is named for
 what it does and is asked about every time. Approve once and Always are
 session-scoped; a rule you choose to save ("Yes, and don't ask again") is
 listed in Settings with how many cards it answered, and can be removed one at
-a time or all at once. Where a runtime offers no place to ask (Cursor in Auto,
-Antigravity's after-the-fact refusals), the card is not pretended; the record
-says what happened.
+a time or all at once. A saved rule that says no wins over an Always, and the
+record names who decided each card: you, your rule, or your earlier Always.
+Where a runtime offers no place to ask (Cursor and Muse never do; Antigravity
+reports its refusals after the fact), the card is not pretended; the record
+says what happened. Which AI agents ask first, in which modes, and so what
+Locust can stop, is in [docs/WHAT-LOCUST-CAN-STOP.md](docs/WHAT-LOCUST-CAN-STOP.md),
+written from the same list Settings > AI agents shows.
 
 **The record.** Every conversation is an append-only ledger: each event,
 each card and its answer, each hand-off, written before the screen shows it.
