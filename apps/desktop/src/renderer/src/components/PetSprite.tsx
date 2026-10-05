@@ -21,11 +21,13 @@ import {
   GLANCE_HOLD_MS,
   GLYPH_SHAPES,
   POWER_ON_S,
+  SCREEN_PAD,
   SCREEN_RESTING_EYES,
   SETTLED_FRAMES,
   faceChanges,
   firstBoot,
   glyphMotion,
+  glyphReach,
   powerOnEyes,
   powerOnLight,
   sameHue,
@@ -339,6 +341,13 @@ export const PET_BLINK_S = 0.17
 /** How long his eyes take to ease to rest once he has finished his move and is asked to keep still. */
 export const EYES_REST_S = 0.4
 
+/** How a glass looks: its hue, an outline where there is ink, how dark beside a bot's visor (1). */
+export interface GlassLook {
+  readonly glass: string
+  readonly ink?: string
+  readonly dark?: number
+}
+
 /** A rounded rectangle's path. */
 function roundedRect(context: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
   const k = Math.max(0, Math.min(r, w / 2, h / 2))
@@ -357,14 +366,17 @@ function roundedRect(context: CanvasRenderingContext2D, x: number, y: number, w:
  * lighter at the top, a soft sheen over its top half and a fine lit rim.
  * `unit` is the canvas pixels of a face unit, for the rim's weight.
  */
-export function paintGlass(context: CanvasRenderingContext2D, rect: ScreenRect, face: PetScreenFace, ink: number, unit: number): void {
-  const corner = Math.min(rect.w, rect.h) * GLASS_CORNER
-  context.fillStyle = face.ink
-  roundedRect(context, rect.x - ink, rect.y - ink, rect.w + 2 * ink, rect.h + 2 * ink, corner + ink)
-  context.fill()
+export function paintGlass(context: CanvasRenderingContext2D, rect: ScreenRect, face: GlassLook, ink: number, unit: number, corners = GLASS_CORNER): void {
+  const corner = Math.min(rect.w, rect.h) * corners
+  if (face.ink !== undefined) {
+    context.fillStyle = face.ink
+    roundedRect(context, rect.x - ink, rect.y - ink, rect.w + 2 * ink, rect.h + 2 * ink, corner + ink)
+    context.fill()
+  }
+  const dark = face.dark ?? 1
   const ground = context.createLinearGradient(0, rect.y, 0, rect.y + rect.h)
-  ground.addColorStop(0, sameHue(face.glass, 0.42, 0.17))
-  ground.addColorStop(1, sameHue(face.glass, 0.5, 0.08))
+  ground.addColorStop(0, sameHue(face.glass, 0.42, 0.17 * dark))
+  ground.addColorStop(1, sameHue(face.glass, 0.5, 0.08 * dark))
   context.fillStyle = ground
   roundedRect(context, rect.x, rect.y, rect.w, rect.h, corner)
   context.fill()
@@ -382,18 +394,26 @@ export function paintGlass(context: CanvasRenderingContext2D, rect: ScreenRect, 
 }
 
 /** Switching on (POWER_ON_S, Bot's powerOnLight): the line of light across the glass, then its flash. */
-function paintPowerOn(context: CanvasRenderingContext2D, rect: ScreenRect, phase: number, light: { readonly lit: string; readonly glow: string }, unit: number): void {
+export function paintPowerOn(
+  context: CanvasRenderingContext2D,
+  rect: ScreenRect,
+  phase: number,
+  light: { readonly lit: string; readonly glow: string },
+  unit: number,
+  corners = GLASS_CORNER,
+  device = 1
+): void {
   const on = powerOnLight(phase)
   const halfWidth = (rect.w / 2) * on.width
   const halfHeight = 0.9 * unit + (rect.h / 2 - 0.9 * unit) * on.height
   if (on.alpha <= 0.001 || halfWidth <= 0.001) return
   context.save()
-  roundedRect(context, rect.x, rect.y, rect.w, rect.h, Math.min(rect.w, rect.h) * GLASS_CORNER)
+  roundedRect(context, rect.x, rect.y, rect.w, rect.h, Math.min(rect.w, rect.h) * corners)
   context.clip()
   context.globalAlpha = on.alpha
   context.fillStyle = light.lit
   context.shadowColor = light.glow
-  context.shadowBlur = 5 * unit
+  context.shadowBlur = 5 * unit * device
   context.fillRect(rect.x + rect.w / 2 - halfWidth, rect.y + rect.h / 2 - halfHeight, halfWidth * 2, halfHeight * 2)
   context.restore()
 }
@@ -418,17 +438,32 @@ export function paintScreenEyes(
   squash: number,
   closedSquash: number,
   light: { readonly lit: string; readonly glow: string },
-  look: number
+  look: number,
+  how: { readonly scale?: number; readonly y?: number; readonly lookY?: number; readonly corners?: number; readonly device?: number } = {}
 ): void {
   const u = glassUnits(rect)
-  const box: VisorBox = { halfWidth: EYES_VISOR.halfWidth, halfHeight: (rect.h / 2) * u, corner: Math.min(rect.w, rect.h) * GLASS_CORNER * u, y: 0 }
-  const { scale, centres } = screenEyeLayout(box, pair, { x: look, y: 0 }, 0)
-  const corner = Math.min(rect.w, rect.h) * GLASS_CORNER
+  const corners = how.corners ?? GLASS_CORNER
+  const box: VisorBox = { halfWidth: EYES_VISOR.halfWidth, halfHeight: (rect.h / 2) * u, corner: Math.min(rect.w, rect.h) * corners * u, y: 0 }
+  const laid = screenEyeLayout(box, pair, { x: look, y: how.lookY ?? 0 }, (how.y ?? 0) * box.halfHeight)
+  // Larger on a glass with room for it (a pet whose whole face was its screen), never past what the glass holds.
+  const larger = Math.max(1, how.scale ?? 1)
+  const reaches = pair
+    .map((glyph) => GLYPH_SHAPES[glyph] ?? GLYPH_SHAPES['•'])
+    .filter((shape): shape is NonNullable<typeof shape> => shape !== undefined)
+    .map(glyphReach)
+  const reachX = Math.max(0, ...reaches.map((reach) => reach.x))
+  const reachY = Math.max(0, ...reaches.map((reach) => reach.y))
+  const roomX = box.halfWidth - SCREEN_PAD
+  const roomY = box.halfHeight - SCREEN_PAD
+  const scale = Math.min(laid.scale * larger, roomY / reachY, (roomX - 0.5) / (2 * reachX))
+  const centres = laid.centres.map(([x, y]) => [Math.sign(x) * Math.min(Math.abs(x) * larger, roomX - reachX * scale), y] as const)
+  const corner = Math.min(rect.w, rect.h) * corners
+  const device = how.device ?? 1
   for (const eye of [0, 1] as const) {
     const shape = GLYPH_SHAPES[pair[eye]] ?? GLYPH_SHAPES['\u2022']
     const motion = motions[eye]
     if (shape === undefined || !motion.shown) continue
-    const [x, y] = centres[eye]
+    const [x, y] = centres[eye] ?? [0, 0]
     context.save()
     roundedRect(context, rect.x, rect.y, rect.w, rect.h, corner)
     context.clip()
@@ -437,7 +472,7 @@ export function paintScreenEyes(
     context.lineJoin = 'round'
     context.strokeStyle = light.lit
     context.shadowColor = light.glow
-    context.shadowBlur = 3.2 / u
+    context.shadowBlur = (3.2 / u) * device
     const weight = traceGlyph(context, shape, motion, scale / u, shape.closed === true ? closedSquash : squash)
     context.lineWidth = (weight * scale) / u
     context.stroke()

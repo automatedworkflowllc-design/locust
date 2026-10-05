@@ -61,18 +61,20 @@
 // from idle back to idle at rest, so the last frame is the first and the film
 // loops: frames start once the screen has switched on and settled.
 //
-// `--pet <spritesheet.webp>` draws, at each size, Codex Buddy's sheet twice as
-// teammates (2026-10-05, petScreens.ts): first AS DRAWN, the pet as every pet
-// is shown (its sheet under another name, so no screen is measured for it),
-// then WITH HIS SCREEN and his moves (petRoutines.ts). Same sheet, same
-// clock, so the two line up frame for frame. The sheet is his maker's: give
-// the copy on this computer (Locust's userData/pets/codex-buddy); nothing of
-// it is kept, and nothing is sent.
+// `--pet <spritesheet.webp>[,<spritesheet.webp>...]` draws, at each size, each
+// pet's sheet twice as teammates (2026-10-05, petScreens.ts, petPuppets.ts):
+// first AS DRAWN, the pet as every pet is shown (its sheet under another name,
+// so nothing is measured for it), then WITH ITS SCREEN -- Codex Buddy's moves
+// (petRoutines.ts), or a puppet on a bot's rig (PetPuppet.tsx). Same sheet,
+// same clock, so the two line up frame for frame; `--drawn off` leaves out the
+// first. Each pet is the folder its sheet is in (Locust's userData/pets/<id>):
+// the sheets are their makers', on this computer; nothing of them is kept, and
+// nothing is sent.
 
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
@@ -82,7 +84,7 @@ const require = createRequire(join(DESKTOP, 'package.json'))
 const esbuild = createRequire(require.resolve('vite/package.json'))('esbuild')
 const electron = require('electron')
 const args = process.argv.slice(2)
-const VALUED = ['--sizes', '--grounds', '--eyes', '--frames', '--every', '--from', '--dpr', '--trace', '--activity', '--motion', '--sequence', '--promo', '--pet', '--bot', '--hue', '--side']
+const VALUED = ['--sizes', '--grounds', '--eyes', '--frames', '--every', '--from', '--dpr', '--trace', '--activity', '--motion', '--sequence', '--promo', '--pet', '--bot', '--hue', '--side', '--drawn']
 const option = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined)
 const out = resolve(args.find((arg, i) => !arg.startsWith('--') && !VALUED.includes(args[i - 1])) ?? join(tmpdir(), 'glyph-eyes.png'))
 const SIZES = (option('--sizes') ?? '110').split(',').map(Number)
@@ -131,8 +133,14 @@ for (const ground of GROUNDS) if (!(ground in GROUND_OF)) throw new Error(`--gro
 if (SIZES.some((size) => !(size > 0)) || !(FRAMES > 0) || !(EVERY > 0) || !(FROM >= 0)) throw new Error('--sizes, --frames, --every and --from take numbers')
 if (!['mixed', 'thinking'].includes(EYES)) throw new Error('--eyes takes mixed or thinking')
 const src = (path) => JSON.stringify(join(DESKTOP, 'src/renderer/src', path).split(String.fromCharCode(92)).join('/'))
-// --pet: his sheet's bytes, handed to the page as the host would hand them (readPetSheet).
-const PET = option('--pet') === undefined ? undefined : (await readFile(resolve(option('--pet')))).toString('base64')
+// --pet: each sheet's bytes, by the pet it is (its folder), handed to the page as the host would hand them (readPetSheet).
+const PET =
+  option('--pet') === undefined
+    ? undefined
+    : await Promise.all(option('--pet').split(',').map(async (sheet) => [basename(dirname(resolve(sheet))), (await readFile(resolve(sheet))).toString('base64')]))
+const DRAWN = option('--drawn') !== 'off'
+// The faces in a row: each pet as drawn (unless --drawn off), then with its screen.
+const PET_FACES = PET === undefined ? undefined : PET.flatMap(([id]) => (DRAWN ? ['as-drawn-' + id, id] : [id]))
 if (PET !== undefined && PROMO !== undefined) throw new Error('--pet or --promo, not both')
 
 // The page's clock, installed before anything of the app runs: time moves only when the tool steps it.
@@ -380,11 +388,11 @@ const Promo = () => {
 }
 const PET = ${JSON.stringify(PET ?? null)}
 if (PET !== null) {
-  const bytes = Uint8Array.from(atob(PET), (c) => c.charCodeAt(0))
-  window.desktop = { readPetSheet: async () => ({ ok: true, data: { bytes, rows: 9 } }) }
+  const sheets = new Map(PET.map(([id, base64]) => [id, Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))]))
+  // As drawn, a pet's sheet under another name: nothing is measured for it.
+  window.desktop = { readPetSheet: async (source, id) => ({ ok: true, data: { bytes: sheets.get(id.replace(/^as-drawn-/, '')), rows: 9 } }) }
 }
-// --pet: as drawn (any other name: no screen is measured for it), then with his screen.
-const PETS = ['as-drawn', 'codex-buddy']
+const PETS = ${JSON.stringify(PET_FACES ?? null)}
 const row = PET !== null ? PETS.map((id) => [id, null, null]) : ${JSON.stringify(EYES)} === 'thinking' ? mixed.map(([type, color]) => [type, color, ['•', '•']]) : mixed
 const SIZES = ${JSON.stringify(SIZES)}
 const GROUNDS = ${JSON.stringify(GROUNDS.map((name) => [name, GROUND_OF[name]]))}
@@ -396,7 +404,7 @@ createRoot(document.getElementById('root')).render(PROMO !== null ? h(Promo) : h
       labelled ? label(ground + ' ' + size) : null,
       row.map(([type, color, eyes], i) => h('span', { key: i, style: { display: 'inline-flex', width: size, height: size, position: 'relative' } },
         PET !== null
-          ? h(Teammate, { hue: 'blue', avatar: { headwear: 0, accessory: 0, mouth: 0, bot: { shape: 'droid', face: 'eyes' }, pet: { source: 'gallery', id: type } }, size, motion: ${JSON.stringify(MOTION)}, teammateId: 'look-pet-' + size })
+          ? h(Teammate, { hue: 'blue', avatar: { headwear: 0, accessory: 0, mouth: 0, bot: { shape: 'droid', face: 'eyes' }, pet: { source: 'gallery', id: type } }, size, motion: ${JSON.stringify(MOTION)}, teammateId: 'look-pet-' + size + '-' + i })
           : shownActivity === undefined
           ? h(Bot, { type, size, color, seed: 0.15 + i * 0.11, jumpEvery: 0, eyes })
           : h(Teammate, { hue: HUES[i], avatar: { headwear: 0, accessory: 0, mouth: 0, bot: { shape: type, face: 'eyes' } }, size, motion: ${JSON.stringify(MOTION)}, teammateId: 'look-' + i })))))))))
@@ -424,7 +432,7 @@ await writeFile(join(work, 'page.html'), `<!doctype html><html class="lc-theme-d
 const widest = Math.max(...SIZES)
 // Padding, the label and the gap after it, five bots and the gaps between, and room for the last one's overscan.
 const labelled = SIZES.length > 1 || GROUNDS.length > 1
-const across = PET === undefined ? 5 : 2
+const across = PET_FACES === undefined ? 5 : PET_FACES.length
 const width = PROMO === 'still' ? STILL_SIDE : PROMO === 'wide' ? 1920 : PROMO === 'tall' ? 1080 : 40 + (labelled ? 92 + Math.max(24, widest * 0.6) : 0) + across * widest + (across - 1) * Math.max(24, widest * 0.6) + widest * 0.3
 const height = PROMO === 'still' ? STILL_SIDE : PROMO === 'wide' ? 1080 : PROMO === 'tall' ? 1920 : GROUNDS.length * SIZES.reduce((sum, size) => sum + size + 2 * Math.max(20, size * 0.4), 0)
 const digits = String(FRAMES - 1).length
@@ -462,7 +470,7 @@ app.whenReady().then(async () => {
     writeFileSync(${JSON.stringify(out)}.replace(/\\.png$/, '-' + String(f).padStart(${digits}, '0') + '.png'), image.toPNG())
     ${TRACE === undefined ? '' : `frames.push({ t: await win.webContents.executeJavaScript('window.__clock.now()'), marks: await win.webContents.executeJavaScript('window.__clock.marks()'), draws: await win.webContents.executeJavaScript('window.__clock.draws()') })`}
   }
-  ${TRACE === undefined ? '' : `writeFileSync(${JSON.stringify(TRACE)}, JSON.stringify({ every: ${EVERY}, from: ${FROM}, sequence: ${JSON.stringify(SEQUENCE ?? null)}, eyes: ${JSON.stringify(EYES)}, terminal: ${JSON.stringify(process.env.TERMINAL !== 'off')}, plush: ${JSON.stringify(process.env.PLUSH === 'on')}, canvases: ${JSON.stringify(GROUNDS.flatMap((ground) => SIZES.flatMap((size) => (PET === undefined ? ['droid', 'ghost', 'cat', 'prompt', 'hopper'] : ['as-drawn', 'codex-buddy']).map((type, bot) => ({ ground, size, bot, type })))))}, frames }))`}
+  ${TRACE === undefined ? '' : `writeFileSync(${JSON.stringify(TRACE)}, JSON.stringify({ every: ${EVERY}, from: ${FROM}, sequence: ${JSON.stringify(SEQUENCE ?? null)}, eyes: ${JSON.stringify(EYES)}, terminal: ${JSON.stringify(process.env.TERMINAL !== 'off')}, plush: ${JSON.stringify(process.env.PLUSH === 'on')}, canvases: ${JSON.stringify(GROUNDS.flatMap((ground) => SIZES.flatMap((size) => (PET_FACES ?? ['droid', 'ghost', 'cat', 'prompt', 'hopper']).map((type, bot) => ({ ground, size, bot, type })))))}, frames }))`}
   process.stdout.write('wrote ' + ${JSON.stringify(out)} + ' (${FRAMES} frames, ${EVERY} ms apart)\\n')
   app.quit()
 }).catch((error) => { process.stderr.write('look-eyes-moving: ' + String(error && error.stack || error) + '\\n'); app.exit(1) })

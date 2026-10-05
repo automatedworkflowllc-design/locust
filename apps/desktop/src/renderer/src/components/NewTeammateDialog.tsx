@@ -352,9 +352,10 @@ export function NewTeammateDialog({
    * choice steps aside while one is worn, and the colour swatches become
    * plain colours: the colour still marks the teammate, it does not tint the
    * pet. A pet whose drawings were measured for a screen (2026-10-05,
-   * petScreens.ts: Codex Buddy) has a choice of its own in its place: the face
-   * its maker drew, or the screen -- offered as a bot's screen is, while
-   * Terminal faces is on.
+   * petScreens.ts: Codex Buddy), or that becomes a puppet with one
+   * (petPuppets.ts: Cabin, Macintosh, Bitty and the rest), has a choice of its
+   * own in its place: as its maker drew it, or the screen -- offered as a
+   * bot's screen is, while Terminal faces is on.
    */
   const { pets, removed: removedPets } = usePetList()
   const wornPet: PetRef | undefined = avatar.pet
@@ -576,7 +577,7 @@ export function NewTeammateDialog({
                   })}
                 </div>
               )}
-              {wornPet !== undefined && wornLook?.status === 'ready' && wornLook.atlas.screen !== undefined && (
+              {wornPet !== undefined && wornLook?.status === 'ready' && (wornLook.atlas.screen !== undefined || wornLook.atlas.puppet !== undefined) && (
                 <div className="lc-lookface" role="radiogroup" aria-label="Face">
                   {(['drawn', 'screen'] as const).map((face) => {
                     const off = face === 'screen' && !terminal
@@ -593,7 +594,7 @@ export function NewTeammateDialog({
                           off
                             ? 'Turn Terminal faces on in Settings > Appearance to give a teammate a screen.'
                             : face === 'drawn'
-                              ? 'The face its maker drew.'
+                              ? 'As its maker drew it.'
                               : 'A screen whose eyes say what it is doing.'
                         }
                         onClick={() =>

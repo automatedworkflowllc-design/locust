@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.645.0 - 2026-10-05
+
+### New
+
+- **The pets you kept wear Locust's terminal eyes and move like teammates.** Cabin, Astro Bot, Meowbot, Macintosh, Bitty, TmuxAI, Rainbow Terminal Cat and Nori now carry the teammates' eyes on dark glass, with their moods, hops, glances and idle moments. A head on a walking body is shown from the neck up, ears and antennae kept. At rest they draw nothing. This shows while Terminal faces is on; pick As drawn in a teammate's look to keep a pet's own face.
+
 ## 0.644.0 - 2026-10-05
 
 ### Fixed

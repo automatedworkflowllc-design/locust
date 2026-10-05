@@ -562,7 +562,7 @@ const INKED_GLYPH_SCALE = 1.12
  */
 const MOTION_REACH = 2
 const MOTION_STRETCH = 1.16
-const SCREEN_PAD = 1.5
+export const SCREEN_PAD = 1.5
 
 /** How far a glyph's ink can reach from its eye's centre, in glyph units, across and down, moving as it does. */
 export function glyphReach(shape: GlyphShape): { readonly x: number; readonly y: number } {
@@ -1455,8 +1455,8 @@ export function blinkNow(sim: BotAvatarSim | null, fire = true): boolean {
   return true
 }
 
-/** The rig's heading without its spins: kept privately by bot-avatars, so read defensively. */
-function headingOf(sim: BotAvatarSim): number | undefined {
+/** The rig's heading without its spins: kept privately by bot-avatars, so read defensively. A pet's puppet reads it too. */
+export function headingOf(sim: BotAvatarSim): number | undefined {
   const heading = (sim as unknown as { readonly baseYaw?: unknown }).baseYaw
   return typeof heading === 'number' && Number.isFinite(heading) ? heading : undefined
 }
@@ -1743,7 +1743,12 @@ export function bodyColorOf(type: BotType, color: string | undefined): string {
 const pointer = { x: Number.NaN, y: Number.NaN }
 let pointerWatched = false
 
-function watchPointer(): void {
+/** Where the pointer is on the page, for a face that follows it (NaN before it has moved); a pet's puppet reads it too. */
+export function pointerNow(): { readonly x: number; readonly y: number } {
+  return pointer
+}
+
+export function watchPointer(): void {
   if (pointerWatched || typeof document === 'undefined') return
   pointerWatched = true
   document.addEventListener(

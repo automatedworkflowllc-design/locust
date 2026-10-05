@@ -37,13 +37,24 @@ export interface ScreenRect {
   readonly h: number
 }
 
-export interface PetScreenFace {
-  readonly id: string
+/**
+ * What a sheet is checked by (screenFits): its drawings' size, how many each
+ * row has, and each drawing's painted edges -- its left and the column after
+ * its right, or (petPuppets.ts) its left, top, right and the row after its
+ * bottom, for a maker who fills every drawing edge to edge, whose sides
+ * alone say little.
+ */
+export interface SheetPrint {
   /** The size of one drawing, in the sheet's pixels. */
   readonly frameWidth: number
   readonly frameHeight: number
   /** How many drawings each row has. */
   readonly counts: readonly number[]
+  readonly edges: readonly (readonly (readonly number[])[])[]
+}
+
+export interface PetScreenFace extends SheetPrint {
+  readonly id: string
   /** The glass's tint (Bot's visor takes a body's colour the same way): his cap's blue. */
   readonly glass: string
   /** Round the glass, as wide as his own lines: his ink. */
@@ -109,20 +120,49 @@ export const EDGE_SLACK = 2
  * drawing's painted edges within EDGE_SLACK of the table's. `data` is the
  * whole sheet's pixels, `width` across.
  */
-export function screenFits(face: PetScreenFace, data: Uint8ClampedArray, width: number, height: number): boolean {
+export function screenFits(face: SheetPrint, data: Uint8ClampedArray, width: number, height: number): boolean {
   if (width !== face.frameWidth * PET_COLUMNS || height !== face.frameHeight * 9) return false
   for (let row = 0; row < face.counts.length; row += 1) {
     const count = face.counts[row] ?? 0
     for (let column = 0; column < PET_COLUMNS; column += 1) {
-      const edges = paintedEdges(data, width, column * face.frameWidth, row * face.frameHeight, face.frameWidth, face.frameHeight)
       const want = column < count ? face.edges[row]?.[column] : undefined
-      // A drawing where the table has none, or none where it has one: not his sheet.
-      if ((want === undefined) !== (edges === undefined)) return false
-      if (want === undefined || edges === undefined) continue
-      if (Math.abs(edges[0] - want[0]) > EDGE_SLACK || Math.abs(edges[1] - want[1]) > EDGE_SLACK) return false
+      const left = column * face.frameWidth
+      const top = row * face.frameHeight
+      const found =
+        want !== undefined && want.length === 4
+          ? paintedBox(data, width, left, top, face.frameWidth, face.frameHeight)
+          : paintedEdges(data, width, left, top, face.frameWidth, face.frameHeight)
+      // A drawing where the table has none, or none where it has one: not the sheet measured.
+      if ((want === undefined) !== (found === undefined)) return false
+      if (want === undefined || found === undefined) continue
+      if (want.some((edge, i) => Math.abs((found[i] ?? Number.NaN) - edge) > EDGE_SLACK || Number.isNaN(found[i] ?? Number.NaN))) return false
     }
   }
   return true
+}
+
+/** A drawing's painted left, top, right and bottom: the first column and row with paint, and the ones after the last; undefined when empty. */
+export function paintedBox(
+  data: Uint8ClampedArray,
+  width: number,
+  left: number,
+  top: number,
+  frameWidth: number,
+  frameHeight: number
+): readonly [number, number, number, number] | undefined {
+  const sides = paintedEdges(data, width, left, top, frameWidth, frameHeight)
+  if (sides === undefined) return undefined
+  const painted = (y: number): boolean => {
+    for (let x = sides[0]; x < sides[1]; x += 1) {
+      if ((data[((top + y) * width + left + x) * 4 + 3] ?? 0) > 128) return true
+    }
+    return false
+  }
+  let first = 0
+  while (first < frameHeight && !painted(first)) first += 1
+  let last = frameHeight - 1
+  while (last > first && !painted(last)) last -= 1
+  return [sides[0], first, sides[1], last + 1]
 }
 
 /** A drawing's painted left edge and the column after its right one (alpha over half), or undefined when it is empty. */
