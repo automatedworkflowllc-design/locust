@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 
 import type { BotAvatarState } from 'bot-avatars'
 
-import type { BotMood, EyeGlyphs, Glance } from './components/Bot.js'
+import type { BotMood, CrtRule, EyeGlyphs, Glance } from './components/Bot.js'
 import { watchCoverActivity } from './useCoverActivity.js'
 
 /**
@@ -189,4 +189,72 @@ export function useIdleMoment(enabled: boolean, seed: number, every: readonly [n
     }
   }, [enabled, awake, seed, least, most])
   return enabled && awake ? moment : undefined
+}
+
+/**
+ * A TEAMMATE AT WORK GOES ROUND ITS FACES (2026-10-05).
+ *
+ * Colin, watching two teammates work at once -- the ghost hopping with `>▮`
+ * beside Flash, a star on Antigravity, holding round eyes for a 24-minute
+ * turn: *"we definitely prefer the hopping and greater than symbol but we can
+ * cycle through them"*, and then: *"i really just want the user to see all the
+ * different animations and versatility and make it feel alive, im not against
+ * having certain animations mean certain things but not at the risk of
+ * limiting ourselves"*.
+ *
+ * So while a run is live -- thinking, working, delegating or replying -- a
+ * face leads with the working face, `>▮` and the hop, and these come round in
+ * turn, each for a beat, the lead between them. What a run is doing this
+ * second is said in words (faceState.ts's faceLabel) and by the orb; the face
+ * says it is at work, and alive. Kept out of the round are the faces that mean
+ * something to look at: `^ ^` (done), `> <` (stuck), the amber of waiting on
+ * you, and the resting bars and the doze.
+ */
+export const WORKING_BEATS: readonly IdleMoment[] = [
+  // Thinking: the dots, and the head looking about with them (Bot's thinkingGlance).
+  { name: 'think', eyes: ['•', '•'], seconds: 3.4 },
+  // Reading something to one side.
+  { name: 'read', eyes: ['o', 'o'], glance: { x: 1, y: 0.3 }, seconds: 2.4 },
+  // Heads down.
+  { name: 'focus', eyes: ['-', '-'], seconds: 2.2 },
+  // An idea: eyes wide, head up.
+  { name: 'idea', eyes: ['o', 'o'], mood: 'perked', seconds: 2 }
+]
+
+/** Seconds of the lead (`>▮` and the hop) between beats, at least and at most: the face you talk to goes round sooner. */
+export const WORKING_LEAD: Readonly<Record<'full' | 'subtle', readonly [number, number]>> = {
+  full: [5, 8],
+  subtle: [8, 13]
+}
+
+/** A face's `count`th beat at work: all of them in turn, from a place of its own, reading to the side it picks. */
+export function workingBeatFor(seed: number, count: number): IdleMoment {
+  const start = Math.floor(seeded(seed, 0, 3) * WORKING_BEATS.length)
+  const chosen = WORKING_BEATS[(start + count) % WORKING_BEATS.length] ?? WORKING_BEATS[0]
+  if (chosen === undefined) return { name: 'think', eyes: ['•', '•'], seconds: 3.4 }
+  return chosen.glance === undefined ? chosen : { ...chosen, glance: { ...chosen.glance, x: seeded(seed, count, 4) < 0.5 ? -1 : 1 } }
+}
+
+/**
+ * WHICH CHANGES COME IN AS THE SCREEN SWITCHING ON AGAIN (2026-10-05, Bot's
+ * CrtChange). Colin: *"the crt tv blinks are a good addition and should be
+ * weaved in/included whenever"*. The whole power-on for the changes worth
+ * looking up for -- starting work, finishing, getting stuck, waiting on you --
+ * and at work a flick for about one beat in three, the face's own beats (by its
+ * seed), so a row of teammates never flickers together. Everything else
+ * blinks: a beat going back to the lead, a moment at rest, you pointing.
+ */
+export const CRT_ON_KEYS: readonly string[] = ['done', 'blocked', 'waiting']
+/** About this share of a face's beats at work come in with a flick. */
+export const CRT_FLICK_SHARE = 1 / 3
+
+export function crtRule(seed: number): CrtRule {
+  return (from, to, count) => {
+    if (to === undefined) return undefined
+    if (CRT_ON_KEYS.includes(to)) return 'on'
+    // Starting work: into the lead from anything but work.
+    if (to === 'working') return from?.startsWith('working') === true ? undefined : 'on'
+    if (to.startsWith('working:')) return seeded(seed, count, 5) < CRT_FLICK_SHARE ? 'flick' : undefined
+    return undefined
+  }
 }

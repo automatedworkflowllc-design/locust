@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { BotAvatarState } from 'bot-avatars'
 
 import { botFor } from '../../../shared/avatar.js'
 import { useTerminalFaces } from '../botLook.js'
-import { MOMENT_EVERY, useIdleMoment, useListening } from '../faceLife.js'
+import { MOMENT_EVERY, WORKING_LEAD, crtRule, useIdleMoment, useListening, workingBeatFor } from '../faceLife.js'
 import type { IdleMoment } from '../faceLife.js'
 import type { FaceActivity } from '../faceState.js'
 import type { GlanceSide } from '../glances.js'
@@ -84,6 +84,20 @@ export interface BotMotion {
  * those"*. The library's jump with no turn in it, at either level: a moment,
  * not a performance, so it is the same size everywhere.
  */
+/**
+ * Whether a teammate is at work: its run live, whatever it is doing this
+ * second. Its face then wears the working face and goes round the rest
+ * (faceLife.ts's WORKING_BEATS); the word beside it says what the run is doing.
+ */
+export function atWork(activity: FaceActivity): boolean {
+  return activity === 'thinking' || activity === 'working' || activity === 'delegating' || activity === 'responding'
+}
+
+/** The state a face wears for what its teammate is doing: at work, the working face; otherwise what it is doing. */
+export function wornActivity(activity: FaceActivity): FaceActivity {
+  return atWork(activity) ? 'working' : activity
+}
+
 function kindOf(activity: FaceActivity): 'work' | 'alive' | 'finished' | 'still' {
   switch (activity) {
     case 'working':
@@ -305,9 +319,21 @@ export interface EverydayFace {
  */
 export function everydayFace(
   activity: FaceActivity,
-  life: { readonly noticed: boolean; readonly listening: boolean; readonly moment: IdleMoment | undefined }
+  life: { readonly noticed: boolean; readonly listening: boolean; readonly moment: IdleMoment | undefined; readonly beat?: IdleMoment | undefined }
 ): EverydayFace {
   const own: EverydayFace = { eyes: eyeGlyphsFor(activity), mood: moodFor(activity), key: activity, lively: false }
+  // At work, a beat of another face (faceLife.ts's WORKING_BEATS), its body easing off the hop for it.
+  const beat = life.beat
+  if (activity === 'working' && beat !== undefined && !life.noticed) {
+    return {
+      eyes: beat.eyes,
+      mood: beat.mood,
+      key: `working:${beat.name}`,
+      state: 'default',
+      ...(beat.glance === undefined ? {} : { glance: beat.glance }),
+      lively: false
+    }
+  }
   if (activity !== 'idle') return life.noticed ? { ...own, lively: true } : own
   if (life.noticed) return { eyes: ['^', '^'], mood: 'glad', key: 'idle:noticed', lively: true }
   if (life.listening) return { eyes: ['o', 'o'], mood: 'perked', key: 'idle:listening', lively: true }
@@ -341,7 +367,9 @@ export function TeammateBot({
 }: TeammateBotProps): ReactElement {
   const bot = botFor(avatar)
   const shownActivity = activity === 'done' && !hopsWhenDone ? 'idle' : activity
-  const { state, paused, jumpEvery, bounces, hops } = botMotion(shownActivity, motion)
+  // At work, whatever its run is doing this second, a face wears the working face and goes round the rest (faceLife.ts's WORKING_BEATS).
+  const worn = wornActivity(shownActivity)
+  const { state, paused, jumpEvery, bounces, hops } = botMotion(worn, motion)
   const color = hueColor(hue)
   const tone = PRESENCE_TONE[presence]
   const seed = seedOf(teammateId ?? name ?? bot.shape)
@@ -390,7 +418,11 @@ export function TeammateBot({
   const atRest = shownActivity === 'idle' && answers
   const listening = useListening(hears && atRest)
   const moment = useIdleMoment(atRest && presenceSized && !noticed && !listening, seed, MOMENT_EVERY[motion], routine?.moment)
-  const face = everydayFace(shownActivity, { noticed: noticed && answers, listening, moment })
+  // At work, a beat of another face now and then, the lead between (WORKING_LEAD): only where a face is a presence, and pointed at it looks at you instead.
+  const beat = useIdleMoment(worn === 'working' && answers && presenceSized && !noticed, seed, WORKING_LEAD[motion], workingBeatFor)
+  const face = everydayFace(worn, { noticed: noticed && answers, listening, moment, beat })
+  // Which of its changes come in as its screen switching on again (faceLife.ts's crtRule).
+  const crt = useMemo(() => crtRule(seed), [seed])
   const notice = (on: boolean): void => {
     if (dwell.current !== undefined) clearTimeout(dwell.current)
     dwell.current = undefined
@@ -399,7 +431,7 @@ export function TeammateBot({
   }
   return (
     <span
-      className={`lc-face lc-bot${bounces && (!wearsPet || puppet !== undefined) ? ' is-bouncing' : ''}${className === undefined ? '' : ` ${className}`}`}
+      className={`lc-face lc-bot${bounces && beat === undefined && (!wearsPet || puppet !== undefined) ? ' is-bouncing' : ''}${className === undefined ? '' : ` ${className}`}`}
       style={{ position: 'relative', display: 'inline-flex', width: size, height: size, flexShrink: 0 }}
       {...(name === undefined ? { 'aria-hidden': true } : { role: 'img', 'aria-label': name, title: name })}
       data-activity={activity}
@@ -407,7 +439,7 @@ export function TeammateBot({
       {...(wearsPet ? { 'data-pet': pet.id } : {})}
       data-motion={motion}
       {...(teammateId === undefined ? {} : { 'data-teammate': teammateId })}
-      {...(face.key === shownActivity ? {} : { 'data-life': face.key })}
+      {...(face.key === worn ? {} : { 'data-life': face.key })}
       {...(presenceSized && answers ? { onPointerEnter: () => notice(true), onPointerLeave: () => notice(false) } : {})}
     >
       {activity === 'waiting' && <span className="lc-bot__ring" />}
@@ -428,8 +460,8 @@ export function TeammateBot({
           {...(face.mood === undefined ? {} : { mood: face.mood })}
           blinkKey={face.key}
           {...((teammateId ?? name) === undefined ? {} : { bootKey: teammateId ?? name })}
-          phosphor={phosphorFor(shownActivity)}
-          {...(flashFor(shownActivity) === undefined ? {} : { flash: flashFor(shownActivity) })}
+          phosphor={phosphorFor(worn)}
+          {...(flashFor(worn) === undefined ? {} : { flash: flashFor(worn) })}
           {...(glance !== undefined ? { glance: GLANCE_TOWARD[glance] } : face.glance === undefined ? {} : { glance: face.glance })}
           {...(jumpEvery === undefined ? {} : { jumpEvery })}
         />
@@ -444,8 +476,8 @@ export function TeammateBot({
             : {
                 screen: {
                   eyes: face.eyes,
-                  phosphor: phosphorFor(shownActivity),
-                  ...(flashFor(shownActivity) === undefined ? {} : { flash: flashFor(shownActivity) }),
+                  phosphor: phosphorFor(worn),
+                  ...(flashFor(worn) === undefined ? {} : { flash: flashFor(worn) }),
                   key: face.key,
                   move: routine.moveFor(face.key, face.glance?.x, motion),
                   rests: paused && glance === undefined && !face.lively
@@ -469,10 +501,11 @@ export function TeammateBot({
           {...(face.eyes === undefined ? {} : { eyes: face.eyes })}
           {...(face.mood === undefined ? {} : { mood: face.mood })}
           blinkKey={face.key}
+          crt={crt}
           {...(teammateId ?? name) === undefined ? {} : { bootKey: teammateId ?? name }}
           {...(bot.screen === undefined ? {} : { screen: bot.screen })}
-          phosphor={phosphorFor(shownActivity)}
-          {...(flashFor(shownActivity) === undefined ? {} : { flash: flashFor(shownActivity) })}
+          phosphor={phosphorFor(worn)}
+          {...(flashFor(worn) === undefined ? {} : { flash: flashFor(worn) })}
           {...(glance !== undefined ? { glance: GLANCE_TOWARD[glance] } : face.glance === undefined ? {} : { glance: face.glance })}
           {...(color === undefined ? {} : { color })}
           {...(jumpEvery === undefined ? {} : { jumpEvery })}

@@ -139,12 +139,24 @@ export function liveActivityOf(events: readonly NormalizedRuntimeEvent[], runnin
       case 'tool.failed':
         openTools.delete(event.payload.itemId)
         openSubagents.delete(event.payload.itemId)
+        streaming = false
         break
       default:
         break
     }
   }
-  if (streaming) return 'responding'
+  /*
+   * TEXT BESIDE A TOOL IS NOT A REPLY (2026-10-05). Antigravity delivers a
+   * planner step's words whole, after the tool calls it makes in that step,
+   * and never says they are final: so one step with a sentence in it held a
+   * teammate on "replying" for the rest of its turn -- 568 s straight through
+   * 200-odd tool calls on Flash (Gemini 3.8 Flash), the run Colin watched with
+   * round eyes for 24 minutes. Across his last 120 runs, 89.5% of Antigravity's
+   * "replying" came after a tool had started; Codex, Cursor and Claude Code
+   * had none. Words that arrive while a tool is open are said beside it, not
+   * to you, and a tool ending puts them down.
+   */
+  if (streaming && openTools.size === 0) return 'responding'
   if (reasoning) return 'thinking'
   if (openSubagents.size > 0) return 'delegating'
   if (openTools.size > 0) return 'working'

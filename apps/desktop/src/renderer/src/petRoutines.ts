@@ -275,7 +275,11 @@ export function buddyMoveFor(key: string, look?: number, level: 'full' | 'subtle
       return STUCK
     case 'idle:look':
       return (look ?? 1) < 0 ? LOOK_LEFT : LOOK_RIGHT
+    // A beat at work (faceLife.ts's WORKING_BEATS): the thinking beat is his thinking; the rest, his lifts go on.
+    case 'working:think':
+      return THINK
     default:
+      if (key.startsWith('working:')) return level === 'subtle' ? WORKOUT_STANDING : WORKOUT
       return key.startsWith('idle:') ? MOMENT_MOVES[key.slice('idle:'.length)] ?? RESTING : RESTING
   }
 }

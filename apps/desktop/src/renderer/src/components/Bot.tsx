@@ -124,6 +124,8 @@ export interface BotProps {
    * no other time. Undefined, it is simply on.
    */
   readonly bootKey?: string
+  /** Which of its changes come in as the screen switching on again (CrtRule); undefined, every one blinks. */
+  readonly crt?: CrtRule
 }
 
 /** The faces whose screens have switched on this session (BotProps.bootKey). */
@@ -799,6 +801,8 @@ export interface EyePaint {
   readonly faceAt?: FaceAt
   /** The second, on this bot's clock, its screen switches on (POWER_ON_S); undefined, it is simply on. */
   readonly bootAt?: () => number | undefined
+  /** How long that switching on takes: POWER_ON_S, or a change's flick (CRT_FLICK_S). */
+  readonly bootSpan?: () => number
   /**
    * What the face is doing (BotProps.blinkKey): a new one is a change the face
    * performs (FaceChange), even when its eyes and their colour stay the same.
@@ -870,6 +874,22 @@ export interface FaceChange {
  * each teammate, as it first appears (Bot's `bootKey`); a still bot is simply on.
  */
 export const POWER_ON_S = 0.9
+
+/**
+ * THE SCREEN SWITCHES ON AGAIN FOR A CHANGE THAT MATTERS (2026-10-05). Colin:
+ * *"the crt tv blinks are a good addition and should be weaved in/included
+ * whenever"*. Not for every change -- a teammate at work changes its eyes every
+ * few seconds, and a power-on that often reads as a fault -- but for the ones
+ * worth looking up for, the screen goes off and comes on again on the new
+ * face: starting work, finishing, getting stuck, waiting on you (`'on'`, all
+ * of POWER_ON_S). And now and then at work, a flick: the same, a beat's worth
+ * (`'flick'`, CRT_FLICK_S). Everything else blinks, as before.
+ */
+export type CrtChange = 'on' | 'flick'
+/** A flick: the screen's power-on, quick. */
+export const CRT_FLICK_S = 0.4
+/** How a face's change comes in, from the face it leaves to the one it brings, the `count`th change: a CRT, or a blink (undefined). */
+export type CrtRule = (from: string | undefined, to: string | undefined, count: number) => CrtChange | undefined
 /** Where in the power-on the line has crossed the glass, the flash has settled, and the eyes start to open. */
 const POWER_LINE = 0.33
 const POWER_FLASH = 0.67
@@ -915,7 +935,8 @@ export interface FaceChanges {
 export function faceChanges(
   wantedNow: () => ShownFace,
   flashNow: () => Phosphor | undefined,
-  bootAt: () => number | undefined = () => undefined
+  bootAt: () => number | undefined = () => undefined,
+  bootSpan: () => number = () => POWER_ON_S
 ): FaceChanges {
   // A face shows what it first appears in at once.
   let shown: ShownFace = wantedNow()
@@ -977,7 +998,7 @@ export function faceChanges(
       }
     }
     const boot = bootAt()
-    const quiet = swap === undefined && (s === 0 || ((flashShown === undefined || flashFade(s - flashAt) >= 1) && (boot === undefined || s - boot >= POWER_ON_S)))
+    const quiet = swap === undefined && (s === 0 || ((flashShown === undefined || flashFade(s - flashAt) >= 1) && (boot === undefined || s - boot >= bootSpan())))
     changeNow = { since, open: swap === undefined, shut: swapShut, quiet, count: changes, eyes: shown.pair }
     return changeNow
   }
@@ -1043,6 +1064,7 @@ export function withGlyphEyes(
 ): {
   readonly frame: (pose: FacePose, seconds: number) => void
   readonly drawsGlyphs: () => boolean
+  readonly shownKey: () => string | undefined
   /** Where the face's change is at this second (FaceChange): read before the pose is worked out; `frame` reads it too. */
   readonly change: (seconds: number) => FaceChange
 } {
@@ -1072,7 +1094,8 @@ export function withGlyphEyes(
   const changes = faceChanges(
     () => ({ pair: eyesNow(), tone: paint.phosphorNow?.() ?? 'cyan', key: paint.keyNow?.() }),
     () => paint.flashNow?.(),
-    () => paint.bootAt?.()
+    () => paint.bootAt?.(),
+    () => paint.bootSpan?.() ?? POWER_ON_S
   )
   let swapShut = 0
   let since = 0
@@ -1181,7 +1204,7 @@ export function withGlyphEyes(
   const booting = (): number | undefined => {
     const at = paint.bootAt?.()
     if (at === undefined || seconds === 0) return undefined
-    const phase = (seconds - at) / POWER_ON_S
+    const phase = (seconds - at) / (paint.bootSpan?.() ?? POWER_ON_S)
     return phase < 1 ? Math.max(0, phase) : undefined
   }
   /**
@@ -1341,7 +1364,9 @@ export function withGlyphEyes(
       front = undefined
     },
     /** Whether this frame draws glyphs (or is blinking between them): the rig must then draw its eyes in GLYPH_INK. */
-    drawsGlyphs: () => changes.shown().pair !== undefined || changes.coming()?.pair !== undefined
+    drawsGlyphs: () => changes.shown().pair !== undefined || changes.coming()?.pair !== undefined,
+    /** What the face shows now (FaceChange's key): the face a change leaves, on the frame it begins. */
+    shownKey: () => changes.shown().key
   }
 }
 
@@ -2020,6 +2045,7 @@ function RiggedBot({
   mood,
   blinkKey,
   bootKey,
+  crt,
   shownAt
 }: BotProps & { readonly shownAt?: number }): ReactElement {
   const ref = useRef<HTMLCanvasElement>(null)
@@ -2034,6 +2060,10 @@ function RiggedBot({
   // A screen's power-on (POWER_ON_S): asked for once a session per face, and when on this bot's clock it begins.
   const bootWanted = useRef(false)
   const bootAt = useRef<number | undefined>(undefined)
+  // How long it runs (POWER_ON_S, or a change's CRT_FLICK_S), and which changes bring one in (BotProps.crt), read at each change.
+  const bootSpan = useRef(POWER_ON_S)
+  const crtRule = useRef(crt)
+  crtRule.current = crt
   // The rig's own clock (seconds it has been stepped), and when a hop's held-back spin returns on it.
   const rigTime = useRef(0)
   const spinBackAt = useRef<number | undefined>(undefined)
@@ -2116,6 +2146,7 @@ function RiggedBot({
       // The face is drawn at size / 100 a unit (times its own scale), at dpr device pixels a CSS pixel.
       pixelsPerUnit: (size / 100) * outline.faceScale * dpr,
       bootAt: () => bootAt.current,
+      bootSpan: () => bootSpan.current,
       keyNow: () => doing.current,
       restNow: () => restNow
     })
@@ -2137,6 +2168,7 @@ function RiggedBot({
       if (bootWanted.current && !still) {
         bootWanted.current = false
         bootAt.current = seconds + seed * 0.35
+        bootSpan.current = POWER_ON_S
       }
       // The face's change first (its eyes shut, swap and open), then what the body does about it.
       const change = painter.change(seconds)
@@ -2147,7 +2179,15 @@ function RiggedBot({
         resting: resting.current
       })
       restNow = rest
-      if (changed) blinkNow(sim, blink)
+      if (changed) {
+        blinkNow(sim, blink)
+        // A change worth looking up for comes in as the screen switching on again (CrtChange); a still bot just changes.
+        const kind = screen && seconds !== 0 ? crtRule.current?.(painter.shownKey(), doing.current, change.count) : undefined
+        if (kind !== undefined) {
+          bootAt.current = seconds
+          bootSpan.current = kind === 'on' ? POWER_ON_S : CRT_FLICK_S
+        }
+      }
       if (hopNow) {
         hopWanted.current = false
         sim.setJump(GLAD_HOP)

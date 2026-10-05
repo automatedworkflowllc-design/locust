@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.648.0 - 2026-10-05
+
+### Improved
+
+- **A teammate at work feels alive.** While a teammate thinks, works or replies, its face leads with the prompt eyes and the hop, then goes round its other faces in between: the thinking dots, a glance to the side, a moment of focus. Each face keeps its own rhythm, so a row of teammates never moves in step. Its screen now flicks on like an old TV when something worth looking at happens: starting work, finishing, getting stuck, or waiting on you. Nothing moves while Locust rests.
+
+### Fixed
+
+- **An Antigravity teammate no longer looks like it is replying through a long run of tools.** Antigravity sends a step's words after that step's tools have started, and Locust read them as the reply, so the face said "replying" for minutes at a time. Words that arrive while a tool is still running are no longer taken as the reply.
+
 ## 0.647.0 - 2026-10-05
 
 ### Fixed

@@ -57,8 +57,11 @@ describe('a subtle bot, everywhere but the conversation', () => {
     const html = renderToStaticMarkup(<TeammateBot hue="pearl" avatar={look} size={26} activity="working" teammateId="tm_yurt" />)
     expect(html).toContain('data-motion="subtle"')
     expect(html).toMatch(/class="lc-face lc-bot is-bouncing"/)
+    // A teammate thinking is at work too (faceLife.ts's WORKING_BEATS, 2026-10-05): it wears the working face.
     const thinking = renderToStaticMarkup(<TeammateBot hue="pearl" avatar={look} size={26} activity="thinking" />)
-    expect(thinking).not.toContain('is-bouncing')
+    expect(thinking).toMatch(/class="lc-face lc-bot is-bouncing"/)
+    const waiting = renderToStaticMarkup(<TeammateBot hue="pearl" avatar={look} size={26} activity="waiting" />)
+    expect(waiting).not.toContain('is-bouncing')
   })
 })
 
