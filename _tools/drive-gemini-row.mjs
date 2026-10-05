@@ -40,6 +40,9 @@ try {
     if (!settings) return 'no Settings button'
     settings.click()
     await new Promise(r => setTimeout(r, 900))
+    // The runtime rows are on the AI agents page in Settings (settingsPages.ts).
+    ;[...document.querySelectorAll('.lc-settings__navitem, button')].find((b) => b.innerText.trim() === 'AI agents')?.click()
+    await new Promise(r => setTimeout(r, 900))
     const rows = [...document.querySelectorAll('.lc-runtimerow')]
     const gemini = rows.find(row => /gemini/i.test(row.textContent ?? ''))
     return JSON.stringify({

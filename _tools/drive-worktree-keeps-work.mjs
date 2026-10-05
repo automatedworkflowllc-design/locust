@@ -70,6 +70,9 @@ try {
   await drive.capture('launch: Wren has an own branch with an uncommitted REPORT.md', () => drive.ready())
   await drive.capture('Settings: the Own branches list', () => drive.evaluate(`(async () => {
     document.querySelector('button[title="Settings (Ctrl 3)"]').click()
+    await new Promise((r) => setTimeout(r, 900))
+    // Own copies (worktrees) are on the Project folder page in Settings (settingsPages.ts).
+    ;[...document.querySelectorAll('.lc-settings__navitem, button')].find((b) => b.innerText.trim() === 'Project folder')?.click()
     for (let i = 0; i < 40; i += 1) {
       await new Promise((r) => setTimeout(r, 250))
       const r = [...document.querySelectorAll('.lc-worktreerow')].find((x) => /Wren/.test(x.textContent))

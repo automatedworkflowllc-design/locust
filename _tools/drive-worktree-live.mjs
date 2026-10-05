@@ -25,6 +25,9 @@ const drive = await startDrive({
 
 const settingsRows = `(async () => {
   if (![...document.querySelectorAll('.lc-settings__heading')].length) document.querySelector('button[title="Settings (Ctrl 3)"]').click()
+  await new Promise(r => setTimeout(r, 900))
+  // Own copies (worktrees) are on the Project folder page in Settings (settingsPages.ts).
+  ;[...document.querySelectorAll('.lc-settings__navitem, button')].find((b) => b.innerText.trim() === 'Project folder')?.click()
   for (let i = 0; i < 40; i += 1) {
     await new Promise(r => setTimeout(r, 250))
     if (document.querySelector('.lc-worktreerow') || i > 12) break

@@ -115,12 +115,13 @@ const MODE = `(async () => {
 const verdicts = []
 try {
   await drive.capture('launch: Wren on the free route', () => drive.ready())
-  await drive.capture('Settings > Runtimes: Your own models', () => drive.evaluate(`(async () => {
+  await drive.capture('Settings > Your own models', () => drive.evaluate(`(async () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: '3', ctrlKey: true, bubbles: true }))
     await new Promise((r) => setTimeout(r, 900))
-    ;[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'AI agents')?.click()
+    // Its own page in Settings (settingsPages.ts); it was a section of AI agents.
+    ;[...document.querySelectorAll('.lc-settings__navitem, button')].find((b) => b.textContent.trim() === 'Your own models')?.click()
     for (let i = 0; i < 20 && !document.querySelector('.lc-ownmodel__form'); i += 1) await new Promise((r) => setTimeout(r, 150))
-    return document.querySelector('.lc-ownmodel__form') ? 'found' : 'no Your own models form on the Runtimes page'
+    return document.querySelector('.lc-ownmodel__form') ? 'found' : 'no Your own models form on the Your own models page'
   })()`))
   await drive.evaluate(type(inputs(1), 'Busy Chat'))
   await drive.evaluate(type(inputs(2), 'busy-1'))
