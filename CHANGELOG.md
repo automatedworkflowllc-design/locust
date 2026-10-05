@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.649.0 - 2026-10-05
+
+### New
+
+- **Copy a change, or the whole file.** A changed file's row in a turn now has Copy beside Open and Show: it copies the whole file as it is now. An opened change has Copy too, at its foot: it copies the code as it reads after the change, without the + and − signs or the removed lines, so it pastes as code. For a new file, that is the whole file.
+
 ## 0.648.0 - 2026-10-05
 
 ### Improved
