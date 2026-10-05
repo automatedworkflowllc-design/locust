@@ -190,6 +190,7 @@ import { ruleCandidateOf, ruledActionOf, ruleSentence } from '../../shared/appro
 import { sequenceOfPost } from './roomExchange.js'
 import type { LiveTurn, RoomExchange, StartingReply } from './roomExchange.js'
 import { isStoppable, stopPress } from './stopPress.js'
+import { workSignature } from './useCoverActivity.js'
 import { isLayoutPreference, resolveLayout } from './layout.js'
 import { decisionReply } from '../../shared/decision.js'
 import { installCommand } from '../../shared/runtime-install.js'
@@ -1321,6 +1322,8 @@ export default function App(): ReactElement {
   }
   /** Every run the shell knows about, keyed by runId (or a pending key until the receipt arrives). */
   const [runs, setRuns] = useState<RunMap>(() => new Map())
+  /** What the Home cover counts as work arriving (0.623): the runs going, not every rebuild of the map. */
+  const coverWork = useMemo(() => workSignature(runs, isStoppable), [runs])
   /** Which run's thread is on screen; undefined shows the addressed teammate's idle state. */
   const [shownKey, setShownKey] = useState<string>()
   const [history, setHistory] = useState<readonly PublicRecoveredMission[]>([])
@@ -7693,7 +7696,7 @@ export default function App(): ReactElement {
                 discoveryPhase={runtimeState.phase}
                 tube={tube}
                 swarmCalls={swarmCalls}
-                coverActivity={runs}
+                coverActivity={coverWork}
                 // Who is working and who waits on you, for the cover's glass (0.610): the same facts the cards say.
                 {...((status) => (status === undefined ? {} : { coverStatus: status }))(runtimeState.phase !== 'ready' ? undefined : glassStatus(
                   teammates.filter((mate) => viewByTeammate[mate.teammateId]?.status === 'working').map((mate) => mate.name),

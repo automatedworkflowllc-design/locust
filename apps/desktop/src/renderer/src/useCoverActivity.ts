@@ -3,6 +3,24 @@ import type { WindowPresence } from './windowPresence.js'
 
 export const COVER_REST_AFTER_MS = 45_000
 
+/**
+ * WHAT COUNTS AS WORK ARRIVING (0.623). The cover was handed the app's whole
+ * map of runs, and that map is rebuilt on routine updates that are not work --
+ * so on the packaged build, with the window focused, Home never rested
+ * (drive-home-rests.mjs: still animating after 50 s untouched). This is the
+ * part that is work: which runs are going, their phase, and how many events
+ * each has. It changes when a run starts, moves or ends, and not otherwise;
+ * with nothing running it is the empty string, for good.
+ */
+export function workSignature(
+  runs: Iterable<readonly [string, { readonly phase: string; readonly events: readonly unknown[] }]>,
+  going: (phase: string) => boolean
+): string {
+  const parts: string[] = []
+  for (const [key, run] of runs) if (going(run.phase)) parts.push(`${key}:${run.phase}:${String(run.events.length)}`)
+  return parts.join('|')
+}
+
 /** One deadline, rather than a polling clock. Input and arriving work extend it. */
 export function watchCoverActivity(changed: (paused: boolean) => void): { touch: () => void; stop: () => void } {
   const motion = window.matchMedia?.('(prefers-reduced-motion: reduce)')
