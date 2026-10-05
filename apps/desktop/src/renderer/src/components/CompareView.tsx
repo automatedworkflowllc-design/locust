@@ -79,6 +79,7 @@ export function CompareView({
   changeLines,
   prompts,
   columns,
+  onOpenFile,
   owner,
   workspacePath,
   keeping,
@@ -106,6 +107,7 @@ export function CompareView({
   /** Each ask, oldest first. */
   readonly prompts: readonly string[]
   readonly columns: readonly CompareColumnView[]
+  readonly onOpenFile?: (path: string, folder?: string) => void
   readonly owner: PublicTeammate | undefined
   readonly workspacePath: string | undefined
   /** A keep is under way: no second one. */
@@ -293,6 +295,7 @@ export function CompareView({
                               faces={false}
                               activity={cell.running ? 'thinking' : 'idle'}
                               workspacePath={column.folder ?? workspacePath}
+                              {...(onOpenFile === undefined ? {} : { onOpenFile: (path: string) => onOpenFile(path, column.folder ?? workspacePath) })}
                               decision={undefined}
                             />
                             </InComparisonCell.Provider>

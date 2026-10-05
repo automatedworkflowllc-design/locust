@@ -1797,7 +1797,7 @@ export default function App(): ReactElement {
   const [viewerRefusal, setViewerRefusal] = useState<string>()
   // Which file it was, for the refusal's heading (0.524): "Could not open that file" named none.
   const [refusedName, setRefusedName] = useState<string>()
-  const openFileInViewer = (path: string): void => {
+  const openFileInViewer = (path: string, imageFolder = workspacePath): void => {
     const bridge = window.desktop
     setViewerRefusal(undefined)
     setRefusedName(path.replace(/[\\/]+$/, '').split(/[\\/]/).pop())
@@ -1838,7 +1838,7 @@ export default function App(): ReactElement {
      */
     if (imageMediaType(full) !== undefined) {
       void bridge
-        .readWorkspaceImage(relativePath(full, workspacePath))
+        .readWorkspaceImage(full, imageFolder)
         .then((answer) => {
           if (answer.ok) {
             setViewingFile({ path: full, text: answer.dataUrl, mode: 'image' })
@@ -7566,6 +7566,7 @@ export default function App(): ReactElement {
               const { prompts, columns } = compareColumnsFor(comparing)
               return (
                 <CompareView
+                  onOpenFile={openFileInViewer}
                   compare={comparing}
                   changeLines={compareChangeLines?.compareId === comparing.compareId ? compareChangeLines.columns : {}}
                   prompts={prompts}

@@ -1116,7 +1116,7 @@ export type WorkspacePageResponse = { readonly ok: true; readonly url: string } 
  * simply is not drawn. `message` exists for a log, not for a card.
  */
 export type WorkspaceImageResponse =
-  | { readonly ok: true; readonly dataUrl: string }
+  | { readonly ok: true; readonly dataUrl: string; readonly path: string }
   | { readonly ok: false; readonly message: string }
 
 /** What came of a reveal. A refusal names why, in words a card can show. */
@@ -3554,7 +3554,7 @@ export interface DesktopApi {
   /** Point at a part of the running page; answers when it is clicked, or cancelled (0.484). */
   pickInPage(request: PagePickRequest): Promise<PagePickResponse>
   cancelPagePick(pageUrl: string): Promise<void>
-  readWorkspaceImage(path: string): Promise<WorkspaceImageResponse>
+  readWorkspaceImage(path: string, folder?: string): Promise<WorkspaceImageResponse>
   listRooms(): Promise<RoomListResponse>
   createRoom(request: RoomCreateRequest): Promise<RoomMutationResponse>
   removeRoom(roomId: string): Promise<RoomMutationResponse>

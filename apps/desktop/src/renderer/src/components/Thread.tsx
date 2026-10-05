@@ -1,4 +1,5 @@
 import { EditCheckCard } from './EditCheckCard.js'
+import { ThreadImagesContext } from '../threadImages.js'
 import type { EditCheckShown } from './EditCheckCard.js'
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
@@ -80,7 +81,7 @@ function HandedFiles({
   readonly files: readonly { readonly path: string; readonly note?: string }[]
   readonly workspacePath: string | undefined
   /** Open it in the panel beside the conversation. Absent: the name reveals instead. */
-  readonly onOpenFile?: (path: string) => void
+  readonly onOpenFile?: (path: string, folder?: string) => void
 }): ReactElement {
   const [refused, setRefused] = useState<string>()
   const ask = (action: 'revealFile' | 'saveCopy', path: string): void => {
@@ -202,7 +203,7 @@ export function ThreadItems({
    */
   readonly faces?: boolean
   /** Open a handed file in the panel beside the conversation. */
-  readonly onOpenFile?: (path: string) => void
+  readonly onOpenFile?: (path: string, folder?: string) => void
   /** The turn was sent in Plan mode; see `Thread`'s prop of the same name. */
   readonly planMode?: boolean
   readonly owner: PublicTeammate | undefined
@@ -261,7 +262,7 @@ export function ThreadItems({
   // A finished footer line takes Copy at its end (it measured 66px under DONE as its own row, 0.545).
   const footTakesCopy = items.some((one) => one.type === 'activity' && one.finished)
   return (
-    <>
+    <ThreadImagesContext.Provider value={{ folder: workspacePath, onOpenFile: onOpenFile === undefined ? undefined : (path) => onOpenFile(path, workspacePath) }}>
       {items.map((item, index) => {
         if (item.type === 'agent-message') {
           return (
@@ -499,7 +500,7 @@ export function ThreadItems({
           />
         )
       })}
-    </>
+    </ThreadImagesContext.Provider>
   )
 }
 

@@ -101,9 +101,9 @@ import { createRecentEdits } from './recent-edits.js'
 import { readRuntimeArtifacts } from './runtime-artifacts.js'
 import { relative } from 'node:path'
 import { decideReveal, insideOnDisk } from './reveal-file.js'
+import { readWorkspaceImage } from './workspace-image.js'
 import { MAX_ATTACHMENTS } from '../shared/attachments.js'
 import { ATTACHMENT_DIR, attachmentDestination, excludeWith } from './attach-outside.js'
-import { imageMediaType, MAX_PREVIEW_BYTES } from '../shared/image-files.js'
 import { extensionOf, isViewableText, MAX_TEXT_BYTES, viewerMode } from '../shared/text-files.js'
 import { aboutYouSection, MAX_ABOUT_YOU_SUGGESTIONS } from '../shared/about-you.js'
 import { SHEET_EXTENSIONS, csvWorkbook } from '../shared/sheet.js'
@@ -4351,30 +4351,9 @@ if (!ownsSingleInstanceLock) {
      * carries the name; a preview is an extra, and an extra that fails should
      * leave no wreckage on screen.
      */
-    ipcMain.handle(WORKSPACE_IMAGE_CHANNEL, async (event, requested: unknown) => {
+    ipcMain.handle(WORKSPACE_IMAGE_CHANNEL, async (event, requested: unknown, folder: unknown) => {
       if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
-      if (typeof requested !== 'string' || requested.length === 0) {
-        return { ok: false, message: 'No path.' } as const
-      }
-      if (workspacePath === undefined) return { ok: false, message: 'No workspace.' } as const
-      const mediaType = imageMediaType(requested)
-      if (mediaType === undefined) return { ok: false, message: 'Not an image this app draws.' } as const
-      const decision = decideReveal(join(workspacePath, requested), [workspacePath])
-      if (!decision.ok) return { ok: false, message: 'Outside the workspace.' } as const
-      try {
-        // Size is checked BEFORE reading, not after: the point of the cap is
-        // to avoid holding a very large file in memory, and reading it first
-        // to find out how big it is would have already done that.
-        const measured = await stat(decision.path)
-        if (!measured.isFile()) return { ok: false, message: 'Not a file.' } as const
-        if (measured.size > MAX_PREVIEW_BYTES) {
-          return { ok: false, message: 'Too large to preview.' } as const
-        }
-        const bytes = await readFile(decision.path)
-        return { ok: true, dataUrl: `data:${mediaType};base64,${bytes.toString('base64')}` } as const
-      } catch {
-        return { ok: false, message: 'Could not be read.' } as const
-      }
+      return readWorkspaceImage(requested, folder ?? workspacePath, [...(await workedInFolders()), ...(await teammateFolders()), COPY_ROOT])
     })
 
     /*
