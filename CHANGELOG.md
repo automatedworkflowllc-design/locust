@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.643.0 - 2026-10-05
+
+### New
+
+- **Ready-made teammate chains: fix a bug, build a feature, make it faster.** Routines > Start from a template now offers three routines whose steps go to different teammates, the last one checking the work: find the cause, fix it, check the fix; plan, build, review; measure, change the slowest part, measure again. Each step names a job rather than a person, and when you start one Locust proposes a teammate for each from your team (a finding step to Research & Briefs, a building step to Code & Migrations, the check to Docs & QA), shown in the editor where you can change any of them before saving. With one teammate, every step is theirs. The run counts only if the checker approves, and its changes wait in a copy for you to Keep or Discard.
+
 ## 0.642.0 - 2026-10-05
 
 ### New

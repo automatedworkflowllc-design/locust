@@ -77,7 +77,7 @@ describe('the words', () => {
   })
 
   it('previews a template as added, not imported, with no connector list it does not need', () => {
-    const preview: RoutineImportPreview = { token: 't', name: 'Review a file', steps: ['Read {{file}}.'], inputs: [{ key: 'file', label: 'Which file?', kind: 'text', required: true }], handOffRoles: [undefined], connectors: [] }
+    const preview: RoutineImportPreview = { token: 't', name: 'Review a file', steps: ['Read {{file}}.'], inputs: [{ key: 'file', label: 'Which file?', kind: 'text', required: true }], handOffRoles: [undefined], handOffChecks: [false], connectors: [] }
     const html = renderToStaticMarkup(<RoutineImportDialog preview={preview} fromTemplate team={[mate]} onImport={async () => undefined} onCancel={nothing} />)
     expect(html).toContain('aria-label="Add a starter routine"')
     expect(html).toContain('>Review a file</span>')

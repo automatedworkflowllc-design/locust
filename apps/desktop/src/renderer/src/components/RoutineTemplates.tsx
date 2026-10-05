@@ -18,10 +18,10 @@ import { useModal } from '../useModal.js'
 
 const count = (n: number, one: string, many: string): string => (n === 1 ? `1 ${one}` : `${String(n)} ${many}`)
 
-/** "1 step · no questions", "4 steps · 1 question": what a template is before it is opened. */
+/** "1 step · no questions", "4 steps · 1 question", "3 steps · hand-offs · 1 question": what a template is before it is opened. */
 export function templateMeta(template: RoutineTemplateInfo): string {
   const asks = template.asks.length === 0 ? 'no questions' : count(template.asks.length, 'question', 'questions')
-  return `${count(template.steps, 'step', 'steps')} · ${asks}`
+  return `${count(template.steps, 'step', 'steps')} · ${template.chain === true ? 'hand-offs · ' : ''}${asks}`
 }
 
 /** The add row's line: the first few by name, so the row says what is in it. */

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { readFile, stat, writeFile } from 'node:fs/promises'
 import { roleLabelOf } from '../shared/ipc.js'
 import type { PublicTeammate, RoutineExportResponse, RoutineFolderResponse, RoutineImportPreviewResponse, RoutineMutationResponse, RoutineRunResponse, RoutineTemplatesResponse, TeammateRoute } from '../shared/ipc.js'
-import { listRoutineTemplates, readRoutineTemplate } from './routine-templates.js'
+import { listRoutineTemplates, readRoutineTemplate, templateChangesFiles } from './routine-templates.js'
 import { resolveValues } from '../shared/routine-inputs.js'
 import type { RoutineValues } from '../shared/routine-inputs.js'
 import { absolutePathsIn, MAX_ROUTINE_FILE_BYTES, parseRoutineFile, pathsAsInputs, routineFileName, routineFileText, routineToFile } from './routine-file.js'
@@ -28,7 +28,7 @@ export function createRoutineIO(options: {
   const folders = new Set<string>()
   const previews = new Map<string, { file: RoutineFile; workspace: string | undefined; from: 'file' | 'template' }>()
   /** A file read and checked, held under a receipt for the Import that follows: an imported file and a template alike. */
-  const previewOf = (file: RoutineFile, from: 'file' | 'template'): RoutineImportPreviewResponse => {
+  const previewOf = (file: RoutineFile, from: 'file' | 'template', changesFiles = false): RoutineImportPreviewResponse => {
     const token = randomUUID()
     if (previews.size >= 8) previews.delete(previews.keys().next().value!)
     previews.set(token, { file, workspace: options.workspace(), from })
@@ -36,6 +36,8 @@ export function createRoutineIO(options: {
     return { ok: true, data: { preview: {
       token, name: file.name, steps: file.steps, inputs: file.inputs,
       handOffRoles: file.handOffs.map((entry) => entry.role),
+      handOffChecks: file.handOffs.map((entry) => entry.check === true),
+      ...(changesFiles ? { changesFiles: true as const } : {}),
       ...(file.route.runtime === undefined ? {} : { runtime: file.route.runtime }),
       connectors: file.connectors.map((name) => ({ name, present: names.has(name.toLowerCase()) }))
     } } }
@@ -51,7 +53,7 @@ export function createRoutineIO(options: {
     async previewTemplate(id: unknown): Promise<RoutineImportPreviewResponse> {
       if (options.templates === undefined) return rejected('This Locust ships no starter routines.')
       const read = await readRoutineTemplate(options.templates, id)
-      return read.ok ? previewOf(read.file, 'template') : rejected(read.message)
+      return read.ok ? previewOf(read.file, 'template', typeof id === 'string' && templateChangesFiles(id)) : rejected(read.message)
     },
     folderWasChosen: (path: string): boolean => folders.has(path),
     async folder(): Promise<RoutineFolderResponse> {

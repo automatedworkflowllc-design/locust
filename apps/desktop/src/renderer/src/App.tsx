@@ -64,7 +64,7 @@ import type { AboutYouSuggestion } from '../../shared/about-you.js'
 import type { Workbook } from '../../shared/sheet.js'
 import type { OfficeDocument } from '../../shared/office-document.js'
 import type { Spend } from '../../shared/spend.js'
-import { routineDraft, routineStepPhrase } from './routines.js'
+import { chainDraftFrom, routineDraft, routineStepPhrase } from './routines.js'
 import { queueHome, combineQueued, queuedIn, queuedVerdict, requeuedRows, retriedAfterBusy, withoutQueueOf } from './steering.js'
 import type { QueuedRow } from './steering.js'
 import { useConversationQueue } from './useConversationQueue.js'
@@ -1691,6 +1691,10 @@ export default function App(): ReactElement {
     readonly inCopy?: boolean
     /** Its standing goal's fixes, when it has one (0.534). */
     readonly goalTries?: number
+    /** A chain template opened it set to change files (2026-10-05): saved so, unless the person moves it. */
+    readonly forceMode?: MissionMode
+    /** The role a chain template named for each step, shown beside who was proposed. */
+    readonly stepRoles?: readonly (string | undefined)[]
     readonly busy: boolean
     readonly error?: string
   }>()
@@ -5449,7 +5453,7 @@ export default function App(): ReactElement {
     const named = teammates.find((entry) => entry.teammateId === owner)?.route
     const inherited = named ?? dialog.route ?? { runtime: 'codex' as const, model: 'account-default', mode: 'ask' as const }
     // "Only read" is Ask; "Change files" from a read-only mode is Edit; otherwise the mode stays as it was.
-    const chosenMode: MissionMode | undefined = input.readsOnly === undefined ? undefined : input.readsOnly ? 'ask' : 'accept-edits'
+    const chosenMode: MissionMode | undefined = input.readsOnly === undefined ? dialog.routineId === undefined ? dialog.forceMode : undefined : input.readsOnly ? 'ask' : 'accept-edits'
     const route = chosenMode === undefined ? inherited : { ...inherited, mode: chosenMode }
     if (dialog.routineId === undefined && owner === undefined) {
       setRoutineDialog({ ...dialog, busy: false, error: 'Choose which teammate runs this routine.' })
@@ -5545,7 +5549,20 @@ export default function App(): ReactElement {
     void window.desktop?.previewRoutineTemplate(id).then((answer) => {
       if (!answer.ok) { setRoutineNotice(answer.error.message); return }
       setTemplatePicker(false)
-      if (answer.data.preview !== undefined) setRoutineImport({ ...answer.data.preview, fromTemplate: true })
+      const preview = answer.data.preview
+      if (preview === undefined) return
+      /*
+       * A CHAIN opens in the editor, not in the preview that gives every step
+       * to one teammate: its steps name roles, a teammate is proposed for each
+       * from this roster, and the person sees and changes who takes what
+       * before anything is saved. The ones that change files open set to
+       * change them, in a copy that waits for Keep or Discard.
+       */
+      if (preview.handOffChecks.some((checks) => checks)) {
+        setRoutineDialog({ ...chainDraftFrom(preview, teammates, { ...composerRoute, mode }), learnedFrom: [], truncated: false, busy: false })
+        return
+      }
+      setRoutineImport({ ...preview, fromTemplate: true })
     }).catch(() => setRoutineNotice('That template could not be opened. Try it again from Routines.'))
   }
   const [routineExport, setRoutineExport] = useState<{ routineId: string; flagged: readonly RoutineFlaggedPath[] }>()
@@ -9123,6 +9140,7 @@ export default function App(): ReactElement {
           // A hand-off chain (0.435): who takes each step, from the whole team.
           team={teammates}
           {...(routineDialog.handOffs === undefined ? {} : { initialHandOffs: routineDialog.handOffs })}
+          {...(routineDialog.stepRoles === undefined ? {} : { initialStepRoles: routineDialog.stepRoles })}
           truncated={routineDialog.truncated}
           editing={routineDialog.routineId !== undefined}
           fresh={routineDialog.routineId === undefined && routineDialog.learnedFrom.length === 0}

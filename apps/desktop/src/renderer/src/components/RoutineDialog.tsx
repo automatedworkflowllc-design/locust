@@ -41,6 +41,7 @@ export function RoutineDialog({
   initialSchedule,
   team,
   initialHandOffs,
+  initialStepRoles,
   truncated,
   routeLabel,
   busy,
@@ -98,6 +99,8 @@ export function RoutineDialog({
   readonly team?: readonly PublicTeammate[]
   /** Who takes each step of a saved routine, in step order. */
   readonly initialHandOffs?: readonly RoutineHandOff[]
+  /** The role a chain template named for each step, shown beside who was proposed for it. */
+  readonly initialStepRoles?: readonly (string | undefined)[]
   /** The conversation had more turns than a routine may hold, and the draft was cut. */
   readonly truncated: boolean
   /** The route this will replay on, in the words the picker uses. */
@@ -141,6 +144,8 @@ export function RoutineDialog({
   const [handOffs, setHandOffs] = useState<readonly RoutineHandOff[]>(
     initialSteps.map((_, index) => initialHandOffs?.[index] ?? {})
   )
+  // The role a chain template named for each step, kept in step with every add and remove.
+  const [stepRoles, setStepRoles] = useState<readonly (string | undefined)[]>(initialStepRoles ?? [])
   const [schedule, setSchedule] = useState<RoutineSchedule | undefined>(initialSchedule)
   // The watched folder as typed, kept while it is not yet a valid one (0.522).
   const [filesFolder, setFilesFolder] = useState(initialSchedule?.kind === 'files' ? initialSchedule.folder : 'inbox')
@@ -153,7 +158,8 @@ export function RoutineDialog({
   // Who runs the routine, and so who takes a step nobody else is named for.
   const ownerId = teammate?.teammateId ?? (runner.length > 0 ? runner : undefined)
   const ownerName = teammate?.name ?? chooseFrom?.find((entry) => entry.teammateId === runner)?.name
-  const canHandOff = team !== undefined && team.length > 1
+  // A chain from a template keeps its checker even for one teammate: every step is theirs, and the last still has to approve.
+  const canHandOff = team !== undefined && (team.length > 1 || (initialHandOffs ?? []).some((entry) => entry.check === true))
   const setHandOff = (index: number, change: RoutineHandOff): void => {
     setHandOffs(steps.map((_, at) => (at === index ? change : handOffs[at] ?? {})))
   }
@@ -423,6 +429,7 @@ export function RoutineDialog({
                     onClick={() => {
                       setSteps(steps.filter((_, at) => at !== index))
                       setHandOffs(handOffs.filter((_, at) => at !== index))
+                      setStepRoles(stepRoles.filter((_, at) => at !== index))
                     }}
                   >
                     Remove
@@ -463,6 +470,7 @@ export function RoutineDialog({
                         />
                         Checker: must approve
                       </label>
+                      {stepRoles[index] !== undefined && <span className="lc-routinestep__role lc-mono">Role: {stepRoles[index]}</span>}
                     </div>
                   )}
                   {tooLong !== undefined && (
@@ -486,6 +494,7 @@ export function RoutineDialog({
               onClick={() => {
                 setSteps([...steps, ''])
                 setHandOffs([...steps.map((_, at) => handOffs[at] ?? {}), {}])
+                setStepRoles([...steps.map((_, at) => stepRoles[at]), undefined])
               }}
             >
               Add a step

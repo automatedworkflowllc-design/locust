@@ -93,11 +93,31 @@ for (const name of readdirSync(out)) {
 }
 rmSync(exported, { recursive: true, force: true })
 
+/*
+ * A RELEASE ON THE PUBLIC COPY TOO (0.643). Its sidebar said "0 releases"
+ * while locust-releases was at 0.641: a copy that looked abandoned. Each
+ * export now makes a release there with the version's tag, pointing at the
+ * installers, which stay on locust-releases. One already there is left as it
+ * is, so a second run of the same export changes nothing.
+ */
+const RELEASES = 'automatedworkflowllc-design/locust-releases'
+function ensurePublicRelease() {
+  const repoName = MIRROR_URL.replace(/^https:\/\/github\.com\//, '').replace(/\.git$/, '')
+  if (run('gh', ['release', 'view', version, '--repo', repoName], { allowFailure: true }).status === 0) {
+    console.log(`Release ${version} is already on ${repoName}.`)
+    return
+  }
+  const notes = `Locust ${version}. Installers for Windows and Mac: https://github.com/${RELEASES}/releases/tag/${version}\n\nWhat changed: https://github.com/${RELEASES}/blob/main/CHANGELOG.md`
+  run('gh', ['release', 'create', version, '--repo', repoName, '--target', 'main', '--title', `Locust ${version}`, '--notes', notes])
+  console.log(`RELEASE MADE: ${version} on ${repoName}`)
+}
+
 // 4. Commit and push, as the first export was committed.
 run('git', ['add', '-A'], { cwd: mirror })
 const staged = run('git', ['diff', '--cached', '--stat'], { cwd: mirror }).stdout.trim()
 if (staged.length === 0) {
   console.log('The mirror already matches this release.')
+  ensurePublicRelease()
   process.exit(0)
 }
 console.log(staged.split('\n').at(-1))
@@ -108,3 +128,4 @@ const local = run('git', ['rev-parse', 'HEAD'], { cwd: mirror }).stdout.trim()
 const published = run('git', ['ls-remote', 'origin', 'refs/heads/main'], { cwd: mirror }).stdout.split(/\s/)[0]
 if (published !== local) throw new Error(`Pushed ${local.slice(0, 8)} but the mirror's main is ${String(published).slice(0, 8)}`)
 console.log(`MIRROR PUBLISHED: Locust ${version} at ${local.slice(0, 8)}`)
+ensurePublicRelease()

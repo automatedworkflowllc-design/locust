@@ -2053,6 +2053,10 @@ export interface RoutineImportPreview {
   readonly inputs: readonly RoutineInput[]
   /** The role of whoever took each step where it was made; absent where it was the routine's own teammate. */
   readonly handOffRoles: readonly (string | undefined)[]
+  /** Which step checks the work, one per step; a chain is a routine with one (it opens in the editor, a teammate proposed for each role). */
+  readonly handOffChecks: readonly boolean[]
+  /** A starter routine that changes files, as the editor should open it: changing them, in a copy. */
+  readonly changesFiles?: true
   readonly runtime?: string
   /** Each connector the steps name, and whether this machine has it. */
   readonly connectors: readonly { readonly name: string; readonly present: boolean }[]
@@ -2067,6 +2071,8 @@ export interface RoutineTemplateInfo {
   readonly steps: number
   /** What it will ask for when it runs, by label. */
   readonly asks: readonly string[]
+  /** The steps go to different teammates and the last one checks: a chain, opened in the editor. */
+  readonly chain?: true
 }
 export type RoutineTemplatesResponse =
   | { readonly ok: true; readonly data: { readonly templates: readonly RoutineTemplateInfo[] } }
