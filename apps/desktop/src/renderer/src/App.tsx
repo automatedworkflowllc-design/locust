@@ -198,7 +198,7 @@ import { splitAttachments, withAttachments } from '../../shared/attachments.js'
 // Only `heldFor`: this file has its own `ownerOf` for live runs, which is a
 // different question from who owns a recorded mission.
 import { conversationKeys, heldFor, routineOf } from './conversationList.js'
-import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, routeAfterKeep, effortIsInModelId, modelFamily, listedAsMission, modeFacts, modeRunsOn, modesFor, modeUnavailableReason, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, runtimeReach, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, nextFreeModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
+import { collapseConversations, staleChecking, defaultEffort, defaultRoute, effortAfterRouteChange, routeAfterKeep, effortIsInModelId, modelFamily, listedAsMission, modeFacts, modeRunsOn, modesFor, modeUnavailableReason, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, runtimeReach, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, nextFreeModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
 import { homeRouteOf, isOwnRoute, modelDisplayName, rememberOwnModels, routeChrome, routeModelName } from './routeName.js'
 import { restoreNoticeLine } from './backupWords.js'
 import { FeedbackDialog } from './components/FeedbackDialog.js'
@@ -692,6 +692,12 @@ function missionTitle(prompt: string): string {
 
 /** Discovery is asked again while a runtime is still CHECKING, and on focus after this gap. */
 const RUNTIME_RECHECK_MS = 15_000
+/**
+ * How long after an answer that crossed a finished check the held answer is
+ * read again (0.639, staleChecking): long enough for the host to have stored
+ * the late answer -- it does so a tick after it says the check finished.
+ */
+const LATE_ANSWER_REREAD_MS = 400
 const RUNTIME_RECHECK_MIN_GAP_MS = 10_000
 /**
  * Whether a sweep could learn anything: an installed runtime that is not
@@ -2849,6 +2855,13 @@ export default function App(): ReactElement {
     let unanswered = true
     // The latest answer, so a re-ask can name the runtimes it is for.
     let known: readonly PublicRuntimeStatus[] = []
+    /*
+     * Which agents' checks have FINISHED, by the host's word (0.639): an
+     * answer that still calls one of them "being checked" crossed that
+     * finish, and the held answer is read once more (staleChecking).
+     */
+    const finishedChecks = new Set<string>()
+    let rereadSoon: ReturnType<typeof setTimeout> | undefined
     // A Sign in window was opened: the next return to this window asks at
     // once, whatever the gap, because that is when the answer changes.
     let signInOpened = false
@@ -2867,6 +2880,7 @@ export default function App(): ReactElement {
           lastCheckedAt = response.data.checkedAt
           known = response.data.runtimes
           unanswered = worthAskingAgain(response.data.runtimes)
+          readAgainIfStale()
         }
         setRuntimeState(
           response.ok
@@ -2908,6 +2922,41 @@ export default function App(): ReactElement {
     let lastAsked = Date.now()
     // `everything` drops the host's caches too, npm included. Only Check
     // again passes it: the automatic sweeps stay as cheap as they were.
+    /*
+     * The held answer, read again: no agent named, so the host asks nothing
+     * new -- it returns what it holds, which has the late answer in it.
+     */
+    function readHeld(): void {
+      const desktop = window.desktop
+      if (desktop === undefined) return
+      void desktop
+        .getLocalRuntimes()
+        .then((response) => {
+          if (!active || !response.ok) return
+          lastCheckedAt = response.data.checkedAt
+          known = response.data.runtimes
+          unanswered = worthAskingAgain(response.data.runtimes)
+          readAgainIfStale()
+          setRuntimeState((held) => ({
+            phase: 'ready',
+            runtimes: keepWhatWasKnown(held.phase === 'ready' ? held.runtimes : [], response.data.runtimes),
+            npmPresent: response.data.npmPresent,
+            npmIsBundled: response.data.npmIsBundled,
+            npmDidNotAnswer: response.data.npmDidNotAnswer
+          }))
+        })
+        .catch(() => undefined)
+    }
+    function readAgainIfStale(): void {
+      const stale = staleChecking(known, finishedChecks)
+      if (stale.length === 0 || rereadSoon !== undefined) return
+      // Once per finish: a NEW check of the same agent says so with its own finish.
+      for (const id of stale) finishedChecks.delete(id)
+      rereadSoon = setTimeout(() => {
+        rereadSoon = undefined
+        if (active) readHeld()
+      }, LATE_ANSWER_REREAD_MS)
+    }
     const askAgain = (everything = false): void => {
       if (!active || gaveUp) return
       lastAsked = Date.now()
@@ -2939,6 +2988,7 @@ export default function App(): ReactElement {
           const fresh = response.data.checkedAt !== lastCheckedAt
           lastCheckedAt = response.data.checkedAt
           known = response.data.runtimes
+          readAgainIfStale()
           // A re-check must not make the screen go backwards: a probe that
           // has not answered yet keeps whatever the last sweep established.
           setRuntimeState((held) => ({
@@ -2948,8 +2998,20 @@ export default function App(): ReactElement {
             npmIsBundled: response.data.npmIsBundled,
             npmDidNotAnswer: response.data.npmDidNotAnswer
           }))
+          /*
+           * A CHECK STILL RUNNING IS NOT A CLI THAT WILL NOT ANSWER (0.639).
+           *
+           * Since 0.634 an agent the sweep went on without is `checking`, and
+           * its own finish brings the answer (the late watch below). Counted
+           * here, it spent this give-up budget: on a busy machine three slow
+           * agents answered late one after another, each re-ask still found
+           * OpenCode being checked, the window gave up -- and when OpenCode
+           * answered twenty seconds in, `askAgain` returned at once and its
+           * models said CHECKING for good (measured, packaged 0.638 and 0.639,
+           * the CPU loaded; probe-picker-after-a-late-check.mjs).
+           */
           const stillChecking = response.data.runtimes.some(
-            (entry) => entry.installed && (entry.status === 'probe-failed' || entry.status === 'offline')
+            (entry) => entry.installed && entry.checking !== true && (entry.status === 'probe-failed' || entry.status === 'offline')
           )
           unanswered = worthAskingAgain(response.data.runtimes)
           if (!stillChecking) return
@@ -3007,7 +3069,15 @@ export default function App(): ReactElement {
     const stopLateWatch =
       bridge.onDiscoveryEvent?.((event) => {
         if (event.kind !== 'probe.finished') return
-        if (known.some((entry) => entry.id === event.id && entry.checking === true && entry.status !== 'ready')) askAgain()
+        /*
+         * Its answer is stored when the host says it finished (a tick after),
+         * so read what the host holds: no agent is asked again -- asking
+         * started a NEW check of an agent that had just answered -- and the
+         * read is not stopped by the give-up budget, which this answer is
+         * exactly the end of (0.639).
+         */
+        finishedChecks.add(event.id)
+        readAgainIfStale()
       }) ?? (() => undefined)
 
     void bridge
@@ -3211,6 +3281,7 @@ export default function App(): ReactElement {
     return () => {
       active = false
       clearTimeout(firstRecheck)
+      if (rereadSoon !== undefined) clearTimeout(rereadSoon)
       window.removeEventListener('focus', onFocus)
       stopLateWatch()
       window.removeEventListener(SIGN_IN_OPENED_EVENT, onSignInOpened)

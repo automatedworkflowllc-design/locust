@@ -31,8 +31,9 @@ describe('a sweep that cannot learn is not run', () => {
     // Locust only lists (`planned`) is never waited on.
     expect(APP).toContain("entry.installed && entry.status !== 'ready' && integrationOf(entry.id) !== 'planned'")
     expect(APP).toContain('return unreadyRuntimes(runtimes).length > 0')
-    // Once from the launch answer, once from every re-check.
-    expect(APP.split('unanswered = worthAskingAgain(response.data.runtimes)').length - 1).toBe(2)
+    // Once from the launch answer, once from every re-check, and once from
+    // the held answer read again when a late check crossed the list (0.639).
+    expect(APP.split('unanswered = worthAskingAgain(response.data.runtimes)').length - 1).toBe(3)
   })
 
   it('names the runtimes it is waiting on, so only those are asked', () => {
