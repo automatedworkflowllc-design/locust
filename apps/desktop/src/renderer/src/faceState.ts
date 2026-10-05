@@ -1,4 +1,5 @@
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
+import { byHelper } from '../../shared/tool-kinds.js'
 
 /**
  * What a teammate's face is doing, and the one place it is decided.
@@ -128,6 +129,8 @@ export function liveActivityOf(events: readonly NormalizedRuntimeEvent[], runnin
         else if (event.payload.stepKind === 'turn') turnOpen = false
         break
       case 'tool.started':
+        // A helper's own calls are the helper's; the face says the teammate is delegating.
+        if (byHelper(event.payload)) break
         openTools.add(event.payload.itemId)
         if (SUBAGENT_TOOL.test(event.payload.name)) openSubagents.add(event.payload.itemId)
         reasoning = false

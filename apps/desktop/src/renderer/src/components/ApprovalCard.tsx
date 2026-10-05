@@ -177,9 +177,16 @@ export function ApprovalCard({
   request,
   onDecide,
   onAnswer,
-  busy
+  busy,
+  askedBy
 }: {
   readonly request: MissionApprovalRequest
+  /**
+   * The helper that asked, when the teammate did not ask itself: "the
+   * Explore helper of Wren" (helper visibility, `helperAskedBy`). Absent:
+   * the teammate asked, and the card reads as it always has.
+   */
+  readonly askedBy?: string
   /** `reason`: why a denial was made, when the person said (0.374). */
   readonly onDecide: (decision: MissionApprovalDecision, reason?: string) => void
   /**
@@ -317,6 +324,12 @@ export function ApprovalCard({
       </div>
 
       <dl className="lc-receipt">
+        {askedBy !== undefined && (
+          <>
+            <dt>Asked by</dt>
+            <dd>{askedBy}</dd>
+          </>
+        )}
         <dt>Action</dt>
         <dd>{request.summary}</dd>
         {request.detail.length > 0 && (

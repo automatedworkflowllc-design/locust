@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.625.0 - 2026-10-05
+
+### New
+
+- **See what a helper did.** When a Claude Code teammate sends out a helper (its Agent tool), the helper's row now says how many calls it made and opens onto them -- what it read, searched, ran and changed -- one step in, the way Claude Code shows them. They stay out of the teammate's own counts and its live line. A card a helper raises says which helper asked. What a helper reports back reads as words beside its row, without its Markdown marks. Codex and Copilot do not say which calls were a helper's, so their helpers read as before. A conversation's record now marks a helper's calls as the helper's (record version 22); older records read exactly as they did.
+
 ## 0.624.0 - 2026-10-05
 
 ### Changed

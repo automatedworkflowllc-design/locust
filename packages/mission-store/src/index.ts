@@ -26,7 +26,7 @@ import type { CheckpointReason, ReconciledCheckpoint } from './checkpoint.js'
  */
 export type MissionRecordedMode = "ask" | "plan" | "accept-edits" | "approve-each" | "auto";
 
-export const MISSION_LEDGER_SCHEMA_VERSION = 21 as const
+export const MISSION_LEDGER_SCHEMA_VERSION = 22 as const
 
 /**
  * Versions this reader accepts, each a strict subset of the next, so all are
@@ -154,8 +154,16 @@ export const MISSION_LEDGER_SCHEMA_VERSION = 21 as const
  * itself and the ledger held nothing of them. A v20 reader stops at an
  * approval whose answerer it does not know, and drops the rest of the turn
  * with it, so the number moves; a v20 mission cannot take one.
+ *
+ * v21 -> v22 adds `parentItemId` to a tool event: the call was made by a
+ * helper the teammate sent out, not by the teammate (helper visibility,
+ * 2026-10-05). A v21 reader keeps a tool event with a field it does not know,
+ * so it would not stop -- it would draw every Read and Grep the helper made
+ * as the teammate's own, and count them in the teammate's work. The number
+ * moves so that reader refuses the file rather than misstate it. The field
+ * is optional, so every older ledger reads as it did, with no child rows.
  */
-export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21] as const
+export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22] as const
 
 export type MissionLedgerSchemaVersion =
   (typeof SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS)[number]
@@ -1223,6 +1231,8 @@ function isToolPayload(value: JsonObject): boolean {
     // reason its own transcript reads in sentences. Optional, so every record
     // written before this stays valid.
     && isOptionalText(value.title)
+    // The helper that made the call (v22), by the item id of its own row.
+    && (value.parentItemId === undefined || isNonemptyText(value.parentItemId, 512))
     && (value.output === undefined || isRedactedJson(value.output))
     && (value.exitCode === undefined || Number.isSafeInteger(value.exitCode))
     && isOptionalText(value.status, 512)

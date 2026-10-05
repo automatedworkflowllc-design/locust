@@ -337,6 +337,15 @@ function fromSubagent(parsed: JsonObject): boolean {
   return typeof parsed.parent_tool_use_id === "string" && parsed.parent_tool_use_id.length > 0;
 }
 
+/**
+ * The helper a record belongs to: the id of the Agent call that sent it out,
+ * which is also the item id of the helper's own row (helper visibility,
+ * 2026-10-05). Undefined for the teammate's own records.
+ */
+function helperCallOf(parsed: JsonObject): string | undefined {
+  return fromSubagent(parsed) ? identityValue(parsed.parent_tool_use_id) : undefined;
+}
+
 /** "5-hour", "7-day", "7-day opus": a window key in words. */
 function windowName(key: string | undefined): string {
   if (key === undefined || key.length === 0) return "usage";
@@ -483,7 +492,7 @@ export function createClaudeEventNormalizer(
   const now = context.now ?? (() => new Date());
 
   /** Text buffers per content block index, so a replace can be recognised. */
-  const openTools = new Map<string, { name: string; target?: string; title?: string; background?: boolean }>();
+  const openTools = new Map<string, { name: string; target?: string; title?: string; background?: boolean; parent?: string }>();
   /** A subagent's type and one-line summary, by the Agent tool call that started it. */
   const subagentKinds = new Map<string, string>();
   const subagentSummaries = new Map<string, string>();
@@ -872,12 +881,16 @@ export function createClaudeEventNormalizer(
         if (blockType === "tool_use") {
           const itemId = identityValue(block.id) ?? `block_${String(inner.index ?? 0)}`;
           const name = identityValue(block.name) ?? "tool";
-          openTools.set(itemId, { name });
+          // Measured not to happen (a helper's calls arrive whole, below), but
+          // a helper's call that did stream a start is still the helper's.
+          const parent = helperCallOf(parsed);
+          openTools.set(itemId, { name, ...(parent === undefined ? {} : { parent }) });
           return [
             emit("tool.started", {
               itemId,
               toolKind: "tool_use",
               name,
+              ...(parent === undefined ? {} : { parentItemId: parent }),
               phase: "started",
               evidence,
             }),
@@ -947,7 +960,43 @@ export function createClaudeEventNormalizer(
        * does -- it is the answer the person is left with. What the subagent
        * found reaches the thread through its Agent call's row.
        */
-      if (fromSubagent(parsed)) return [];
+      /*
+       * A HELPER'S OWN CALLS ARE ITS ROW'S CHILDREN (helper visibility,
+       * 2026-10-05). Colin: "users are probably going to want to inspect when
+       * one of the 'helpers/agents' is sent out." Its calls were read here
+       * only to be dropped, so the helper's row said what it was asked and
+       * what it came back with, and nothing it did in between. They never
+       * stream a start (MEASURED, Haiku, 2026-10-02): this complete message
+       * is the first and only word on each, so each opens here, named, with
+       * the Agent call that sent the helper out as its parent. Its words
+       * still stay out (above); only its calls are kept.
+       */
+      if (fromSubagent(parsed)) {
+        const parent = helperCallOf(parsed)!;
+        const opened: NormalizedRuntimeEvent[] = [];
+        for (const block of content) {
+          if (!isObject(block) || stringValue(block.type) !== "tool_use") continue;
+          const itemId = identityValue(block.id);
+          if (itemId === undefined || openTools.has(itemId)) continue;
+          const name = identityValue(block.name) ?? "tool";
+          const target = claudeToolTarget(name, block.input);
+          const title = claudeToolTitle(name, block.input);
+          openTools.set(itemId, { name, parent, ...(target === undefined ? {} : { target }), ...(title === undefined ? {} : { title }) });
+          opened.push(
+            emit("tool.started", {
+              itemId,
+              toolKind: "tool_use",
+              name,
+              parentItemId: parent,
+              ...(target === undefined ? {} : { command: boundedMessageText(target) }),
+              ...(title === undefined ? {} : { title: boundedMessageText(title) }),
+              phase: "started",
+              evidence,
+            }),
+          );
+        }
+        return opened;
+      }
       // The same record carries every tool_use block with its input filled
       // in, which is the first point the target is knowable.
       const restated: NormalizedRuntimeEvent[] = [];
@@ -994,6 +1043,9 @@ export function createClaudeEventNormalizer(
                 ...(target === undefined ? {} : { command: boundedMessageText(target) }),
                 ...(title === undefined ? {} : { title: boundedMessageText(title) }),
                 ...(background ? { background: true } : {}),
+                // The helper's type while it works, not only once it reports:
+                // its row and a card it raises can name it (helper visibility).
+                ...(helperType === undefined ? {} : { status: helperType }),
                 phase: "started",
                 evidence,
               }),
@@ -1045,6 +1097,7 @@ export function createClaudeEventNormalizer(
             ...(open.target === undefined ? {} : { command: boundedMessageText(open.target) }),
             ...(open.title === undefined ? {} : { title: boundedMessageText(open.title) }),
             ...(open.background === true ? { background: true } : {}),
+            ...(open.parent === undefined ? {} : { parentItemId: open.parent }),
             phase: "completed",
             status: "result too large to keep",
             output: `The result was too large to keep${kb === undefined ? "" : ` (${String(kb)} KB)`}. The teammate read it; Locust keeps results up to 256 KB.`,
@@ -1066,12 +1119,12 @@ export function createClaudeEventNormalizer(
         const open = openTools.get(itemId);
         /*
          * A SUBAGENT'S OWN TOOL, ENDING (0.543, the 0.536 review RUN-01).
-         * MEASURED on a Haiku run: a subagent's calls never stream a start --
-         * its assistant records are skipped above -- but its results came
-         * through here as completions of a call nobody opened, named `tool`,
-         * and the Activity panel drew each as a bare "tool" row. Its work is
-         * the Agent row's; a result for a call this conversation never made
-         * is not this conversation's.
+         * MEASURED on a Haiku run: a subagent's calls never stream a start,
+         * and their results came through here as completions of a call nobody
+         * opened, named `tool`, which the Activity panel drew as bare "tool"
+         * rows. Its calls are opened above now, as children of its row
+         * (helper visibility), and end here as children; a result for a call
+         * nobody opened is still nobody's.
          */
         if (open === undefined && fromSubagent(parsed)) continue;
         openTools.delete(itemId);
@@ -1090,6 +1143,7 @@ export function createClaudeEventNormalizer(
             ...(open?.target === undefined ? {} : { command: boundedMessageText(open.target) }),
             ...(open?.title === undefined ? {} : { title: boundedMessageText(open.title) }),
             ...(open?.background === true ? { background: true } : {}),
+            ...(open?.parent === undefined ? {} : { parentItemId: open.parent }),
             phase: "completed",
             // Refused is not failed: it never ran. The reason rides along.
             ...(refusedFor !== undefined

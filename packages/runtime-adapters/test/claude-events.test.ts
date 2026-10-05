@@ -205,10 +205,14 @@ describe("trap 1: the answer arrives twice", () => {
 
   it("never ends a subagent's own tool as a nameless call of the teammate's (0.543, RUN-01)", () => {
     // MEASURED shape, Haiku, 2026-10-02: the subagent's Read arrives as an
-    // assistant tool_use (skipped) and then a user tool_result for that id.
+    // assistant tool_use and then a user tool_result for that id. Since helper
+    // visibility (2026-10-05) it ends as the HELPER's named call, under its row.
     const claude = normalizer();
     claude.accept(record({ type: "assistant", parent_tool_use_id: "toolu_agent", message: { id: "msg_sub", content: [{ type: "tool_use", id: "toolu_sub_read", name: "Read", input: { file_path: "one.txt" } }] } }));
-    expect(claude.accept(record({ type: "user", parent_tool_use_id: "toolu_agent", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "toolu_sub_read", content: "a" }] } }))).toEqual([]);
+    const [ended] = claude.accept(record({ type: "user", parent_tool_use_id: "toolu_agent", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "toolu_sub_read", content: "a" }] } }));
+    expect(ended).toMatchObject({ type: "tool.completed", payload: { itemId: "toolu_sub_read", name: "Read", command: "one.txt", parentItemId: "toolu_agent" } });
+    // A helper's result for a call nobody opened is still nobody's.
+    expect(claude.accept(record({ type: "user", parent_tool_use_id: "toolu_agent", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "toolu_never_opened", content: "b" }] } }))).toEqual([]);
   });
 });
 

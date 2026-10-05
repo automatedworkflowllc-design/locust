@@ -214,6 +214,9 @@ export function createPermissionHost(options: {
     if (registered === undefined) return deny('this request did not come from a Locust run.')
     const toolName = typeof asked.toolName === 'string' && asked.toolName.length > 0 ? asked.toolName : 'a tool'
     const input = asked.input ?? {}
+    // Which call is asking, as Claude Code names it: the thread finds the
+    // call's row by it, and a helper's call names its helper on the card.
+    const toolUseId = typeof asked.toolUseId === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(asked.toolUseId) ? asked.toolUseId : undefined
     /*
      * EVERY REQUEST IS RAISED (0.616, shared/who-decides.ts). This host used
      * to answer a tool it had been told "always" about by itself, before the
@@ -235,7 +238,8 @@ export function createPermissionHost(options: {
       alwaysKey: `claude:${alwaysKeyOf(toolName)}`,
       runtime: 'claude',
       cwd: registered.cwd,
-      requestedAt: now().toISOString()
+      requestedAt: now().toISOString(),
+      ...(toolUseId === undefined ? {} : { toolUseId })
     })
     return decided
   }

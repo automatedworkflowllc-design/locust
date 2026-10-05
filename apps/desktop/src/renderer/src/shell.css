@@ -10252,6 +10252,13 @@ textarea {
 }
 .lc-filerow__result.is-stalled { color: var(--lc-amber-text); }
 
+/* A helper's own calls, folded under its row one step in (helper visibility). */
+.lc-helper__count { flex: none; }
+.lc-helper__calls {
+  margin-left: calc(14px + var(--lc-space-5));
+  border-left: 1px solid var(--lc-border-hairline);
+}
+
 /* The sidebar's mark for a teammate waiting on its own subagent (§2). */
 .lc-teammate__delegating {
   display: inline-flex;

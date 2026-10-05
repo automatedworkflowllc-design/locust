@@ -14,7 +14,7 @@ import type {
 } from '../../../shared/ipc.js'
 import type { TurnVersions } from '../missionView.js'
 import type { RewindPutBackResponse } from '../../../shared/ipc.js'
-import { activityEntries, buildThread, cancellationSummary, editedFiles, decisionStanding, errorAlreadyShown, foldNoticeKeys, lastPlanOf, modeRefusedATool, readPlan, relativePath, sentAgainBy, stepsLine, stoppedBeforeSaying, terminalSeamBefore, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
+import { activityEntries, buildThread, cancellationSummary, editedFiles, decisionStanding, errorAlreadyShown, foldNoticeKeys, helperAskedBy, lastPlanOf, modeRefusedATool, readPlan, relativePath, sentAgainBy, stepsLine, stoppedBeforeSaying, terminalSeamBefore, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
 import type { GroupBoundary, GroupLeaving, LiveStarter, TurnSwitch } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
 import { folderName, ranOnLine } from '../ranOn.js'
@@ -1556,6 +1556,11 @@ onResume,
           <ApprovalCard
             key={request.approvalId}
             request={request}
+            {...(() => {
+              // A helper's request names the helper (helper visibility).
+              const askedBy = helperAskedBy(request.toolUseId, events, peers.self?.name)
+              return askedBy === undefined ? {} : { askedBy }
+            })()}
             busy={decidingIds.includes(request.approvalId)}
             onDecide={(decision, reason) => onDecide(request.approvalId, decision, reason)}
             onAnswer={(answers) => onAnswerQuestion(request.approvalId, answers)}

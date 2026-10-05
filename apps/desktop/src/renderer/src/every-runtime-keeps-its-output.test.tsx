@@ -176,13 +176,13 @@ const flat = (html: string): string =>
 const drawn = (items: readonly ThreadItem[], running: boolean): string =>
   flat(renderToStaticMarkup(<ThreadItems items={items} owner={undefined} activity={running ? 'working' : 'idle'} workspacePath="C:/work" decision={undefined} />))
 
-type Payload = { itemId?: string; toolKind?: string; operation?: string; text?: string; message?: string }
+type Payload = { itemId?: string; toolKind?: string; operation?: string; text?: string; message?: string; parentItemId?: string }
 const payloadOf = (event: NormalizedRuntimeEvent): Payload => event.payload as unknown as Payload
 const TOOL_EVENT = new Set(['tool.started', 'tool.completed', 'tool.failed'])
 const SETTLED = new Set(['tool.completed', 'tool.failed'])
 /** A host's own disk observation can join the runtime's row for the same file; it is not a call the runtime made. */
-const runtimeCalls = (events: readonly NormalizedRuntimeEvent[], settledOnly: boolean): Set<string> =>
-  new Set(events.filter((event) => (settledOnly ? SETTLED : TOOL_EVENT).has(event.type) && payloadOf(event).toolKind !== 'observed_edit').map((event) => String(payloadOf(event).itemId)))
+const runtimeCalls = (events: readonly NormalizedRuntimeEvent[], settledOnly: boolean, byHelper = false): Set<string> =>
+  new Set(events.filter((event) => (settledOnly ? SETTLED : TOOL_EVENT).has(event.type) && payloadOf(event).toolKind !== 'observed_edit' && (payloadOf(event).parentItemId !== undefined) === byHelper).map((event) => String(payloadOf(event).itemId)))
 /** What the runtime said, message by message, as the checkpoint summary rebuilds it. */
 const saidIn = (events: readonly NormalizedRuntimeEvent[]): string[] => {
   const said = new Map<string, string>()
@@ -225,6 +225,8 @@ describe.each(RECORDINGS)('$name, through the thread', (recording) => {
 
   it('draws every call it made as one row', () => {
     expect(rowsIn(items).length).toBe(runtimeCalls(events, false).size)
+    // A helper's own calls are rows under its row, not the teammate's (ledger v22).
+    expect(rowsIn(items).flatMap((detail) => detail.children ?? []).length).toBe(runtimeCalls(events, false, true).size)
   })
 
   it(ending === 'run.failed' ? 'says why it failed' : 'does not read as failed', () => {
