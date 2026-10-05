@@ -1,10 +1,12 @@
 // A hand-off chain: a routine whose steps go to different teammates, the last
 // one checking (0.435).
 //
-//   node _tools/drive-a-hand-off-chain.mjs [--packaged <exe>] [--tag <name>]
+//   node _tools/drive-a-hand-off-chain.mjs [--packaged <exe>] [--tag <name>] [--free]
 //
 // Spends: one short Codex turn (Sable, the checker, on gpt-6-luna, low); Wren
 // and Atlas are on the free OpenCode model. Run with LOCUST_SPEND=1.
+// `--free` puts Sable on the free model too and spends nothing (the app then
+// refuses any paid route itself): the chain to LOOK at, not to judge a model by.
 //
 // From OpenRig's conveyor, which Colin asked to be read for "anything worth
 // yoinking" (2026-09-27). The folder has a bug report and the buggy file. An
@@ -22,6 +24,7 @@ import { git, recordRoot, say, scratchRepository, sleep, startDrive } from './dr
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tag = arg('--tag') ?? 'local'
+const allFree = process.argv.includes('--free')
 const FREE = process.env.LOCUST_FREE_MODEL ?? 'opencode/nemotron-3-ultra-free'
 const OUT = join(recordRoot('a-hand-off-chain-2026-09-28'), `a-hand-off-chain-${tag}`)
 await mkdir(OUT, { recursive: true })
@@ -47,14 +50,14 @@ const ROUTINE = {
   runs: 0
 }
 let drive = await startDrive({
-  name: `hand-off-chain-${tag}`, port: 9771, workspace, outPath: OUT, spends: true, keep: true,
+  name: `hand-off-chain-${tag}`, port: 9771, workspace, outPath: OUT, spends: !allFree, keep: true,
   ...(packaged === undefined ? {} : { packaged }),
   seed: {
     schemaVersion: 1,
     teammates: [
       { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: '2026-09-28T01:00:00.000Z', route: { runtime: 'opencode', model: FREE, mode: 'ask' } },
       { teammateId: 'tm_atlas', name: 'Atlas', hue: 'blue', role: 'Research & Briefs', createdAt: '2026-09-28T01:00:01.000Z', route: { runtime: 'opencode', model: FREE, mode: 'ask' } },
-      { teammateId: 'tm_sable', name: 'Sable', hue: 'clay', role: 'Docs & QA', createdAt: '2026-09-28T01:00:02.000Z', route: { runtime: 'codex', model: 'gpt-6-luna', effort: 'low', mode: 'ask' } }
+      { teammateId: 'tm_sable', name: 'Sable', hue: 'clay', role: 'Docs & QA', createdAt: '2026-09-28T01:00:02.000Z', route: allFree ? { runtime: 'opencode', model: FREE, mode: 'ask' } : { runtime: 'codex', model: 'gpt-6-luna', effort: 'low', mode: 'ask' } }
     ],
     missionOwners: {},
     settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: false }
@@ -112,7 +115,9 @@ try {
     return (document.querySelector('.lc-routinerow:not(.lc-routineadd)')?.innerText ?? '').replace(/\\s+/g, ' ').trim()
   })()`)))
   say(`  card after: ${card}`)
-  check('the card names the chain in step order, the checker marked', /Wren → Atlas → Sable \(checks\)/.test(card), card)
+  // Since 0.493 each teammate carries its model, "Wren (Grok 4.7) → ..."; since 0.636 one shared model is named
+  // once after the chain (", all on ..."), which keeps "(checks)" on the card's line.
+  check('the card names the chain in step order, the checker marked', /Wren( \([^)]*\))? → Atlas( \([^)]*\))? → Sable( \([^)]*\))? \(checks\)/.test(card), card)
 
   await drive.evaluate(`(async () => {
     const row = document.querySelector('.lc-routinerow:not(.lc-routineadd)')

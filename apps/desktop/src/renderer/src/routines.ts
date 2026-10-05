@@ -134,17 +134,34 @@ export function routineChain(
     if (!withModels) return undefined
     return routineRunner(routine.teammateId, team)
   }
-  const nameOf = (id: string): string => (withModels ? routineRunner(id, team) : team.find((teammate) => teammate.teammateId === id)?.name ?? 'someone removed')
-  const links: string[] = []
+  const name = (id: string): string => team.find((teammate) => teammate.teammateId === id)?.name ?? 'someone removed'
+  const steps: { readonly owner: string; readonly check: boolean }[] = []
   let last: string | undefined
   routine.steps.forEach((_, index) => {
     const entry = handOffs[index] ?? {}
     const owner = entry.teammateId ?? routine.teammateId
     if (owner === last && entry.check !== true) return
-    links.push(entry.check === true ? `${nameOf(owner)} (checks)` : nameOf(owner))
+    steps.push({ owner, check: entry.check === true })
     last = owner
   })
-  return links.join(' → ')
+  const link = (step: { readonly owner: string; readonly check: boolean }, label: string): string => (step.check ? `${label} (checks)` : label)
+  if (!withModels) return steps.map((step) => link(step, name(step.owner))).join(' → ')
+  /*
+   * ONE MODEL, NAMED ONCE (0.636). A chain whose teammates all run the same
+   * tool and model said it at every link -- "Wren (Muse Spark 1.3 Contributor
+   * Free) → Atlas (Muse Spark ...) → Sable (Muse Sp..." -- and the card's line
+   * cut off before "(checks)", the one word that says who decides (seen in a
+   * hand-off chain run in Locust itself, 2026-10-05). The same model by two
+   * tools is two routes, so they still read per teammate.
+   */
+  const routes = steps.map((step) => team.find((teammate) => teammate.teammateId === step.owner)?.route)
+  const first = routes[0]
+  const shared = first !== undefined && routes.every((route) => route !== undefined && route.runtime === first.runtime && route.model === first.model)
+  if (shared && steps.length > 1) {
+    const model = first.model === 'account-default' ? `${runtimeDisplayName(first.runtime as MissionRuntimeId)} default` : routeModelName(first.runtime, first.model)
+    return `${steps.map((step) => link(step, name(step.owner))).join(' → ')}, ${steps.length === 2 ? 'both' : 'all'} on ${model}`
+  }
+  return steps.map((step) => link(step, routineRunner(step.owner, team))).join(' → ')
 }
 
 /** A teammate and the model their routine steps run on now: "Wren (Grok 4.7)". */
