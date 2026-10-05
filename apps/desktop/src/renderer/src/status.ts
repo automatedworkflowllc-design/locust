@@ -1382,6 +1382,49 @@ export function effortAfterRouteChange(
 }
 
 /**
+ * KEEP CARRIES THE WHOLE CHOICE (0.622). What the chat box becomes when one
+ * column of a comparison is kept: the column's runtime and model, and the
+ * effort it ran at -- by the rule a model change follows, so a model that
+ * does not offer that effort lands on its own default, and one with no
+ * levels has none. There is no mode in it, on purpose: a comparison's Auto
+ * worked in copies of the folder, and the conversation goes on in the folder
+ * itself, at the chat box's own mode.
+ */
+export function routeAfterKeep(
+  kept: { readonly runtime: string; readonly model: string; readonly effort?: string },
+  models: readonly PublicModel[]
+): { readonly runtime: MissionRuntimeId; readonly model: string; readonly effort: string | undefined } {
+  const family = modelFamily(models, kept.runtime, kept.model)
+  return {
+    runtime: kept.runtime as MissionRuntimeId,
+    model: kept.model,
+    effort: effortAfterRouteChange(kept.effort, family?.supportedEfforts ?? [], family?.defaultEffort)
+  }
+}
+
+/**
+ * The bar's sentence once a column is kept. It says only what is true: which
+ * model the conversation carries on with, and the mode it carries on in --
+ * the chat box's own, not the comparison's. When the comparison ran in Auto
+ * (in copies) and the conversation does not, it says so, so nobody reads
+ * "carries on with it" as "carries on in Auto".
+ */
+export function keptSentence(
+  keptName: string | undefined,
+  conversationMode: MissionMode | undefined,
+  comparisonMode?: MissionMode
+): string {
+  const head = `You kept ${keptName ?? 'one'}; the conversation carries on with it`
+  if (conversationMode === undefined) return `${head}.`
+  const name = modeFacts(conversationMode).name
+  const ranElsewhere =
+    comparisonMode !== undefined && comparisonMode !== conversationMode
+      ? `, not in ${modeFacts(comparisonMode).name} as the comparison did, in copies of your folder`
+      : ''
+  return `${head} in ${name}${ranElsewhere}.`
+}
+
+/**
  * A model id as it should read beside the runtime that serves it.
  *
  * OpenCode aggregates providers, so its ids carry one:
