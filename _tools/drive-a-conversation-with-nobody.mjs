@@ -108,6 +108,9 @@ try {
     })
   })()`))))
   check('opened, it keeps the Claude mark', opened.runtime === 'claude' && opened.empty === false, JSON.stringify(opened))
+  // 0.621, Colin: "lets make the default teammate for now for a basic chat the ghost dude with terminal face".
+  const faces = JSON.parse(String(await drive.capture('a plain chat wears the ghost', () => drive.evaluate(`JSON.stringify([...document.querySelectorAll('.lc-thread [data-bot]')].map((face) => face.getAttribute('data-bot')))`))))
+  check('a plain chat\'s reply wears the ghost, never the swarm', faces.length > 0 && faces.every((shape) => shape === 'ghost'), JSON.stringify(faces))
   // 0.551, Colin: "my message is staying in the chatbox for all chats if unsent".
   const drafts = JSON.parse(String(await drive.capture('a draft stays with its conversation', () => drive.evaluate(`(async () => {
     const field = () => document.querySelector('form.command-dock textarea')

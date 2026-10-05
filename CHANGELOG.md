@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.621.0 - 2026-10-05
+
+### Changed
+
+- **A plain chat wears the ghost with the terminal face.** A conversation with no teammate (a message sent with nobody picked) used to show Locust's own swarm mark beside its replies and on its live "Thinking" row. It now shows the ghost: a dark screen for a face, lit code eyes, the same bot you can pick for any teammate. Colin's call: "he's just so much cleaner and better looking than the locust"; the locust marks stay in the picker and get their own polish later. With Terminal faces off in Settings > Appearance the ghost keeps its own eyes, like every other bot. Teammates you named are untouched; the sidebar and the Board still show a plain chat by its model's logo.
+
 ## 0.620.0 - 2026-10-05
 
 ### Fixed
