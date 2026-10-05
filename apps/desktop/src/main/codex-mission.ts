@@ -2096,6 +2096,7 @@ ${sentPrompt.trim()}`
           // a follow-up in `resumedMissionId`; a first turn has none.
           const prepared = await peerExchange.prepare(sentPrompt, peer, runtime, {
             folder: runFolder,
+            ...(slot?.cwd === undefined ? {} : { ownFolder: slot.cwd }),
             ...((continuation?.missionId ?? resumedMissionId ?? followUpOf) === undefined
               ? {}
               : { previousMissionId: continuation?.missionId ?? resumedMissionId ?? followUpOf }),
@@ -2122,6 +2123,7 @@ ${sentPrompt.trim()}`
            */
           const solo = await peerExchange.briefSolo(sentPrompt, runtime, {
             folder: runFolder,
+            ...(slot?.cwd === undefined ? {} : { ownFolder: slot.cwd }),
             ...((continuation?.missionId ?? resumedMissionId ?? followUpOf) === undefined
               ? {}
               : { previousMissionId: continuation?.missionId ?? resumedMissionId ?? followUpOf }),
