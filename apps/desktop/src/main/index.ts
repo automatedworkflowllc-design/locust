@@ -1722,7 +1722,8 @@ if (!ownsSingleInstanceLock) {
          * had been editing the wrong one. `folderSentences` says each case
          * once (workspace-brief.ts).
          */
-        sections.push(...folderSentences(brief, standsApart, here.name))
+        // By its full path (0.640): the name alone was added to the working folder by a small model.
+        sections.push(...folderSentences(brief, standsApart, here.path))
         // Word and PowerPoint words as text, readable in any mode (0.530, office-words.ts).
         const officeWords = await officeWordsSection(peer?.cwd ?? here.path).catch(() => undefined)
         if (officeWords !== undefined) sections.push(officeWords)

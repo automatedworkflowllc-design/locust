@@ -2245,7 +2245,7 @@ export function SettingsScreen({
                 name, not OpenCode&rsquo;s, that the model list and the chat bar show.
               </p>
               <p>
-                A key is kept only as Windows encrypts it for your account, and never shown again; it is sent to that
+                A key is kept only as your system encrypts it for your account, and never shown again; it is sent to that
                 address and nowhere else. Test asks the address which models it serves, and sends the model one request
                 capped at a single word to see whether it can use tools — so a mistyped name, or a model that can only
                 chat, is caught before a teammate tries it. A model set to chat only talks with its teammates and reads
@@ -3017,8 +3017,9 @@ export function SettingsScreen({
               */}
             <dd>
               The window makes no requests of its own. Locust checks for and downloads its own updates,
-              installs the AI agents you ask it to and keeps Codex CLI and Copilot CLI current, and reads the
-              pet gallery when you open it; each AI agent talks to its own service. A web page a teammate made
+              installs the AI agents you ask it to and keeps Codex CLI and Copilot CLI current, reads the
+              pet gallery when you open it, and asks the address of a model of your own about it when you
+              press Test; each AI agent talks to its own service. A web page a teammate made
               may load libraries and fonts from the common public hosts and reach no other site, so what it
               reads in your folder cannot be sent anywhere. <NetworkListLink />
             </dd>

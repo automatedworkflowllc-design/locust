@@ -20,6 +20,7 @@ until it is listed here.
 | Installing an AI agent | the npm registry (`registry.npmjs.org`, or the one your npm is set to use) | When you press Install for OpenCode, Claude Code, Codex CLI or Copilot CLI |
 | Keeping Codex CLI and Copilot CLI current | the npm registry, and `raw.githubusercontent.com/automatedworkflowllc-design/locust-releases/main/runtime-canary.json` | 45 seconds after the installed Locust starts, then at most every 6 hours |
 | The pet gallery | `openpets.dev`, addresses under `/pets/` only | When you open the gallery, and when you take a pet |
+| Testing one of your own models | the address you gave it in Settings > Your own models | When you press Test |
 | A web page a teammate made, open in the preview | eight public hosts, for libraries and fonts only | While the page is open |
 
 **Its own updates.** A plain request for the files of the newest release in a
@@ -43,6 +44,13 @@ their own connections.
 **The pet gallery.** The catalog of pets and the files of a pet you take, over
 https, from `openpets.dev` under `/pets/` and nowhere else, with no redirects
 followed. What was read is kept on this machine and used again.
+
+**Testing one of your own models.** Test asks the address you gave which
+models it serves (`/models`), then sends the model one chat request, capped at
+a single word and carrying one tool that does nothing, to see whether it can
+use tools. A key you gave goes with both, to that address and nowhere else.
+Nothing of your work is in either request. A teammate's runs on the model go
+through OpenCode, below.
 
 **A web page in the preview.** A page a teammate made runs inside Locust. It may
 load libraries, stylesheets and fonts -- GET and HEAD over https only -- from
@@ -84,5 +92,5 @@ that connector names.
 Locust does not sit between an agent and its service: it reads what the agent
 reports on this machine as it works, and nothing of its network traffic. It
 never sees the agents' sign-ins: each agent keeps its own. A key you give Locust for one of
-your own models is kept on this machine, encrypted by the system, and handed
-only to OpenCode, for that model.
+your own models is kept on this machine, encrypted by the system, sent by Test
+to that model's address, and handed only to OpenCode, for that model.
