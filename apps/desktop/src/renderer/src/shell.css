@@ -10816,6 +10816,17 @@ textarea {
   height: 40px;
 }
 
+/*
+ * A SETTING'S CONTROL IS NEVER CUT (0.635). The On/Off pair clips what
+ * overflows it (`.lc-segmented` has `overflow: hidden`), so as a flex item it
+ * had no minimum width and was the thing that shrank: beside Terminal faces'
+ * long sentence it lost 7px at 1215 wide and half its "Off" at 860. The words
+ * wrap instead; everything beside them keeps its size.
+ */
+.lc-settingline > :not(.lc-settingline__text) {
+  flex: none;
+}
+
 .lc-settings__section--line .lc-settings__more {
   margin: var(--lc-space-3) 0 0;
 }

@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.635.0 - 2026-10-05
+
+### Fixed
+
+- **Settings never cuts a control.** In a narrower window, the On and Off buttons for Terminal faces were cut down to "On" and half an "Off", and they lost a few pixels even at an ordinary width. A setting's words now wrap beside its control, and the control keeps its whole size on every Settings page.
+
 ## 0.634.0 - 2026-10-05
 
 ### Improved
