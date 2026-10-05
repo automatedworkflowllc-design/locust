@@ -36,27 +36,50 @@ export function withMessageDelta(
   events: readonly NormalizedRuntimeEvent[],
   arriving: NormalizedRuntimeEvent
 ): readonly NormalizedRuntimeEvent[] {
-  if (arriving.type !== 'message.delta') return [...events, arriving]
-  const { itemId, operation, text, final } = arriving.payload
-  let at = -1
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    const held = events[index]
-    if (held?.type === 'message.delta' && held.payload.itemId === itemId) {
-      at = index
-      break
-    }
-  }
-  if (at < 0) return [...events, arriving]
-  const held = events[at]
-  if (held?.type !== 'message.delta') return [...events, arriving]
+  return withMessageDeltas(events, [arriving])
+}
+
+/** A durable batch copies the held array once, preserving fragment semantics. */
+export function withMessageDeltas(
+  events: readonly NormalizedRuntimeEvent[],
+  arrivals: readonly NormalizedRuntimeEvent[],
+  cap = Number.POSITIVE_INFINITY
+): readonly NormalizedRuntimeEvent[] {
   const next = [...events]
-  next[at] = {
-    ...held,
-    payload: {
-      ...held.payload,
-      operation: 'replace',
-      text: operation === 'replace' ? text : `${held.payload.text}${text}`,
-      final
+  const append = (event: NormalizedRuntimeEvent): void => {
+    next.push(event)
+    // Match the live cap after EACH arrival, preserving the first event.
+    // A message evicted mid-batch may speak again later in the same batch.
+    if (next.length > cap) next.splice(1, next.length - cap)
+  }
+  for (const arriving of arrivals) {
+    if (arriving.type !== 'message.delta') {
+      append(arriving)
+      continue
+    }
+    const { itemId, operation, text, final } = arriving.payload
+    let at = -1
+    for (let index = next.length - 1; index >= 0; index -= 1) {
+      const held = next[index]
+      if (held?.type === 'message.delta' && held.payload.itemId === itemId) {
+        at = index
+        break
+      }
+    }
+    if (at < 0) {
+      append(arriving)
+      continue
+    }
+    const held = next[at]!
+    if (held.type !== 'message.delta') continue
+    next[at] = {
+      ...held,
+      payload: {
+        ...held.payload,
+        operation: 'replace',
+        text: operation === 'replace' ? text : `${held.payload.text}${text}`,
+        final
+      }
     }
   }
   return next

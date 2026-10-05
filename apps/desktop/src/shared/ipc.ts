@@ -2910,6 +2910,13 @@ export type StartPhase = 'looking' | 'briefing' | 'reading-folder' | 'starting-r
 
 export type CodexMissionUpdate =
   | {
+      /** Durable text fragments, kept in order and applied in one update. */
+      readonly kind: 'message-deltas'
+      readonly runId: string
+      readonly missionId: string
+      readonly events: readonly Extract<NormalizedRuntimeEvent, { readonly type: 'message.delta' }>[]
+    }
+  | {
       /** The start's phase (0.602), sent while the window's run is still "starting" and before it knows its ids. */
       readonly kind: 'start-phase'
       readonly runtime: MissionRuntimeId

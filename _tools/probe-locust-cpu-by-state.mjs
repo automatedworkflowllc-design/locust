@@ -8,16 +8,23 @@
 // (matched by its profile folder) over 5 s in four states -- Home idle, Home while a teammate
 // works, the conversation while it streams, both idle after -- with the renderer's own counts
 // (CDP Performance: style recalcs, layouts, script and task time) and the animations running.
-// Free model only (a streamed answer, no commands): it spends nothing.
+// Free model by default. --codex uses the subscription's actual streaming
+// transport (gpt-6.1-sol, low effort; --model overrides it) and requires LOCUST_SPEND=1.
 
 import { execFileSync } from 'node:child_process'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { FREE_ROUTE, recordRoot, say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
+// A short quiet slot can still measure the streaming budget. Same launch,
+// route, prompt and five-second sample; skip the unrelated Home rest waits.
+const streamingOnly = process.argv.includes('--streaming-only')
+const codex = process.argv.includes('--codex')
+if (codex && process.env.LOCUST_SPEND !== '1') throw new Error('--codex requires LOCUST_SPEND=1')
+const route = codex ? { runtime: 'codex', model: arg('--model') ?? 'gpt-6.1-sol', effort: 'low', mode: 'ask' } : FREE_ROUTE
 const port = Number(arg('--port') ?? 9877)
 const restMs = 46_000 // Sample after the 45-second rest deadline, finishing within 60 seconds.
 // An arena or another suite starting mid-probe invalidates the comparison too.
@@ -33,15 +40,16 @@ await mkdir(OUT, { recursive: true })
 const workspace = await scratchRepository('locust-cpu-ws-')
 const at = '2026-09-10T09:00:00.000Z'
 const team = [
-  { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: at, route: { ...FREE_ROUTE, mode: 'ask' } },
+  { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: at, route: { ...route, mode: 'ask' } },
   { teammateId: 'tm_atlas', name: 'Atlas', hue: 'blue', role: 'Research & Briefs', createdAt: at, route: FREE_ROUTE },
   { teammateId: 'tm_juno', name: 'Juno', hue: 'violet', role: 'Docs & QA', createdAt: at, route: FREE_ROUTE }
 ]
 const drive = await startDrive({
-  name: 'cpu-by-state', port, workspace, outPath: OUT,
+  name: 'cpu-by-state', port, workspace, outPath: OUT, spends: codex,
   ...(packaged === undefined ? {} : { packaged }),
   seed: { schemaVersion: 1, teammates: team, missionOwners: {}, settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: false } }
 })
+say(`CPU probe requested route: ${JSON.stringify(route)}`)
 
 /** This instance's processes' CPU over `seconds`, as a share of the whole machine (Task Manager's measure). */
 const cpu = (seconds) => {
@@ -65,8 +73,27 @@ const metrics = async () => {
   return Object.fromEntries((answer?.result?.metrics ?? []).map((m) => [m.name, m.value]))
 }
 const results = []
+const streamedFragments = async () => {
+  let count = 0
+  const directory = join(drive.profile, 'mission-ledger')
+  for (const name of (await readdir(directory)).filter((name) => name.endsWith('.jsonl'))) {
+    const lines = (await readFile(join(directory, name), 'utf8')).split('\n')
+    for (const line of lines) {
+      try {
+        const record = JSON.parse(line)
+        if (record.event?.type === 'message.delta' && record.event.payload.operation === 'append'
+          && record.event.payload.final === false && record.event.payload.text.length > 0) count += 1
+      } catch { /* an append in progress is read again after the sample */ }
+    }
+  }
+  return count
+}
 const measure = async (state) => {
   assertQuiet()
+  const streaming = state === 'the conversation, streaming'
+  const fragmentsBefore = streaming ? await streamedFragments() : undefined
+  const visibleCharacters = () => drive.evaluate(`[...document.querySelectorAll('.lc-agentline__body')].reduce((sum, element) => sum + element.innerText.length, 0)`)
+  const visibleBefore = streaming ? await visibleCharacters() : undefined
   const canvasFrames = () => drive.evaluate(`JSON.stringify([...document.querySelectorAll('.lc-cover canvas')].map((canvas) => canvas.toDataURL()))`)
   const drawing = await canvasFrames()
   const running = await drive.evaluate(`Boolean(document.querySelector('button[aria-label^="Stop the running"]')) || [...document.querySelectorAll('.lc-hometeam__state')].some((s) => /working|thinking|replying/i.test(s.innerText))`)
@@ -79,11 +106,15 @@ const measure = async (state) => {
   const frozenDrawing = drawing === '[]' ? null : drawing === nextDrawing
   const focused = await drive.evaluate(`document.hasFocus() && !document.hidden`)
   const stillRunning = await drive.evaluate(`Boolean(document.querySelector('button[aria-label^="Stop the running"]')) || [...document.querySelectorAll('.lc-hometeam__state')].some((s) => /working|thinking|replying/i.test(s.innerText))`)
+  const fragmentsAfter = streaming ? await streamedFragments() : undefined
+  const visibleAfter = streaming ? await visibleCharacters() : undefined
   const expectedRunning = /working|streaming/.test(state)
   const valid = focused === true && running === expectedRunning && stillRunning === expectedRunning
+    && (!streaming || (fragmentsBefore > 0 && fragmentsAfter > fragmentsBefore && visibleBefore > 0 && visibleAfter > visibleBefore))
   const per = (name) => Math.round(((after[name] ?? 0) - (before[name] ?? 0)) / 5 * 10) / 10
   const row = {
     state, running, stillRunning, focused, valid, frozenDrawing, cpu: share,
+    ...(streaming ? { fragmentsBefore, fragmentsAfter, visibleBefore, visibleAfter } : {}),
     perSecond: { styleRecalcs: per('RecalcStyleCount'), layouts: per('LayoutCount'), scriptMs: Math.round(per('ScriptDuration') * 1000), taskMs: Math.round(per('TaskDuration') * 1000) },
     animations: animations.length, animationNames: [...new Set(animations)].slice(0, 12)
   }
@@ -104,10 +135,12 @@ try {
   }
   await drive.evaluate(`window.dispatchEvent(new Event('keydown'))`)
   await sleep(3000)
-  await measure('home, idle before rest')
-  await drive.evaluate(`window.dispatchEvent(new Event('keydown'))`)
-  await sleep(restMs)
-  await measure('home, idle at rest')
+  if (!streamingOnly) {
+    await measure('home, idle before rest')
+    await drive.evaluate(`window.dispatchEvent(new Event('keydown'))`)
+    await sleep(restMs)
+    await measure('home, idle at rest')
+  }
   const sent = String(await drive.evaluate(`(async () => {
     const card = [...document.querySelectorAll('.lc-hometeam__card')].find((c) => c.getAttribute('aria-label')?.startsWith('Message Wren'))
     if (!card) return 'no Wren card'
@@ -115,7 +148,7 @@ try {
     await new Promise((r) => setTimeout(r, 800))
     const field = document.querySelector('form.command-dock textarea')
     if (!field) return 'no composer'
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(field, 'Write about 1800 words on how locust swarms form, in plain paragraphs, with no headings.')
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(field, 'Reply in chat with about 1800 words of a fictional story about a swarm of locusts travelling across a field. Use plain paragraphs with no headings. Start the story immediately. Do not use tools, research, a plan, a preface, or explanations. Do not create or edit any file.')
     field.dispatchEvent(new Event('input', { bubbles: true }))
     for (let i = 0; i < 120; i += 1) {
       await new Promise((r) => setTimeout(r, 250))
@@ -126,25 +159,38 @@ try {
   })()`))
   say(`  ${sent}`)
   if (sent !== 'sent') throw new Error(sent)
-  await sleep(1500)
-  await drive.evaluate(`document.querySelector('.lc-brand__lockup')?.click()`)
-  for (let i = 0; i < 60; i += 1) {
-    await sleep(500)
-    if ((await cards()).some((card) => /working|thinking|replying/i.test(card.word ?? ''))) break
+  if (!streamingOnly) {
+    await sleep(1500)
+    await drive.evaluate(`document.querySelector('.lc-brand__lockup')?.click()`)
+    for (let i = 0; i < 60; i += 1) {
+      await sleep(500)
+      if ((await cards()).some((card) => /working|thinking|replying/i.test(card.word ?? ''))) break
+    }
+    await measure('home, a teammate working')
+    await drive.evaluate(`[...document.querySelectorAll('.lc-hometeam__card')].find((c) => c.getAttribute('aria-label')?.startsWith('Message Wren'))?.click()`)
   }
-  await measure('home, a teammate working')
-  await drive.evaluate(`[...document.querySelectorAll('.lc-hometeam__card')].find((c) => c.getAttribute('aria-label')?.startsWith('Message Wren'))?.click()`)
   await sleep(1200)
-  await measure('the conversation, streaming')
-  for (let i = 0; i < 240; i += 1) {
-    if (await drive.evaluate(`Boolean(document.querySelector('button[aria-label^="Stop the running"]'))`) !== true) break
-    await sleep(1000)
+  // A running process may still be thinking. Sample actual text arriving.
+  // Skip a short preface that finishes before the real answer begins.
+  const minimum = codex ? 100 : 1
+  for (let i = 0; i < 300 && await streamedFragments() < minimum; i += 1) {
+    if (i % 25 === 0) assertQuiet()
+    await sleep(200)
   }
-  await sleep(3000)
-  await measure('the conversation, idle after')
-  await drive.evaluate(`document.querySelector('.lc-brand__lockup')?.click()`)
-  await sleep(restMs)
-  await measure('home, idle after')
+  await measure('the conversation, streaming')
+  if (streamingOnly) {
+    say('  streaming-only: Home and idle-after states were not measured')
+  } else {
+    for (let i = 0; i < 240; i += 1) {
+      if (await drive.evaluate(`Boolean(document.querySelector('button[aria-label^="Stop the running"]'))`) !== true) break
+      await sleep(1000)
+    }
+    await sleep(3000)
+    await measure('the conversation, idle after')
+    await drive.evaluate(`document.querySelector('.lc-brand__lockup')?.click()`)
+    await sleep(restMs)
+    await measure('home, idle after')
+  }
 } catch (error) {
   say(`  probe failed: ${error instanceof Error ? error.message : String(error)}`)
   process.exitCode = 1

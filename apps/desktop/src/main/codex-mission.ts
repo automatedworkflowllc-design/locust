@@ -36,6 +36,8 @@ import type {
   RuntimeProcessRun,
   RuntimeProcessRunner, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { workspaceIdFor } from './workspace.js'
+import { createStreamedEventBatcher } from './streamed-event-batches.js'
+import { persistEventUpdates } from './durable-event-updates.js'
 import type { MissionContinuation, MissionLedger, RecoveredMission, Workroom, WorkroomMessage } from '@teammate/mission-store'
 import type { AcpCapabilities, MissionSandbox, OpenCodeProvider, RuntimeCommandInfo, RuntimeCommandSpec } from '@teammate/runtime-adapters'
 import { createHash, randomUUID } from 'node:crypto'
@@ -201,6 +203,8 @@ interface ActiveCodexMission {
   readonly persisted: NormalizedRuntimeEvent[]
   /** When the start's phases began and the first event arrived (0.602); the run's end writes the note. */
   readonly startTiming: StartTiming
+  /** Approval cards flush text already normalized by this consume loop. */
+  flushEvents?: () => Promise<void>
 }
 
 /**
@@ -566,7 +570,7 @@ interface CodexMissionServiceOptions {
    * with it. Claude Code only, and never in Auto.
    */
   readonly permissionHost?: {
-    register(run: { readonly runId: string; readonly missionId: string; readonly cwd: string | null }): Promise<{
+    register(run: { readonly runId: string; readonly missionId: string; readonly cwd: string | null; readonly beforeApproval?: () => Promise<void> }): Promise<{
       readonly configPath: string
       readonly toolName: string
     }>
@@ -673,22 +677,14 @@ async function persistAndEmit(
   ledger: MissionLedger,
   events: ReturnType<CodexEventNormalizer['accept']>
 ): Promise<void> {
-  await ledger.appendEvents(active.missionId, events)
-  // Tracked only once durable, so what a share is read from is what the
-  // ledger holds.
-  active.transcript.track(events)
-  for (const event of events) {
-    if (event.sequence > active.lastSequence) active.lastSequence = event.sequence
-    active.persisted.push(event)
-  }
-  for (const event of events) {
-    safelyEmit(active, {
-      kind: 'event',
-      runId: active.runId,
-      missionId: active.missionId,
-      event
-    })
-  }
+  await persistEventUpdates(ledger, active.runId, active.missionId, events, (durable) => {
+    // Tracked only once durable, so a share reads what the ledger holds.
+    active.transcript.track(durable)
+    for (const event of durable) {
+      if (event.sequence > active.lastSequence) active.lastSequence = event.sequence
+      active.persisted.push(event)
+    }
+  }, (update) => safelyEmit(active, update))
 }
 
 function validPrompt(value: unknown): value is string {
@@ -898,58 +894,20 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
   const consume = async (mission: ActiveCodexMission): Promise<void> => {
     let persistenceFailed = false
     let persistenceReason: string | undefined
-    /*
-     * ONE APPEND ON THE DISK AT A TIME; WHAT ARRIVES MEANWHILE JOINS THE NEXT
-     * (0.603).
-     *
-     * Every durable append is an fsync, and this loop used to await it before
-     * reading the next record. On a quiet SSD that is 2 ms a token and
-     * invisible. Under contention -- a second teammate streaming, the gate,
-     * Chrome -- it is tens of milliseconds a token, every token paying its
-     * own, 300 to 1,000 fsyncs a turn (the Fable review of 2026-10-04, on
-     * Colin's own ledgers). Records are now read and normalized while an
-     * append is in flight, and when it lands, everything that arrived goes in
-     * one append. On a quiet disk nothing changes. Under contention the
-     * appends fall to what the disk can do, the stream never waits on more
-     * than one of them, and a token still reaches the screen only after it is
-     * on disk: persist-before-emit holds per batch, as before.
-     *
-     * Bounded: past `maxWaiting` events the loop waits for the write before
-     * reading on, so a flood backs up into the runner's own bounded queue as
-     * it always did, rather than into memory here.
-     */
     const maxWaiting = options.maxWaitingEvents ?? MAX_WAITING_EVENTS
-    let waiting: NormalizedRuntimeEvent[] = []
-    let writer: Promise<void> | undefined
     let ledgerFailed = false
-    const write = async (): Promise<void> => {
-      try {
-        while (waiting.length > 0 && !ledgerFailed) {
-          const batch = waiting
-          waiting = []
-          try {
-            await persistAndEmit(mission, options.ledger, batch)
-          } catch (error) {
-            persistenceReason = reasonOf(error)
-            options.note?.('ledger-write-failed', `${mission.missionId}: ${persistenceReason ?? 'no message'}`)
-            ledgerFailed = true
-            persistenceFailed = true
-            mission.controller.abort()
-            return
-          }
-          // Best effort, after the durable write: a failure here must not be
-          // reported as the ledger's.
-          await explainADeniedRead(mission, batch).catch(() => undefined)
-        }
-      } finally {
-        // Cleared in the same turn as the last check above, so a push that
-        // follows cannot find a writer that is about to stop.
-        writer = undefined
-      }
-    }
-    const flush = (): void => {
-      if (writer === undefined && waiting.length > 0 && !ledgerFailed) writer = write()
-    }
+    const batches = createStreamedEventBatcher(async (events) => {
+      await persistAndEmit(mission, options.ledger, events)
+      // Best effort, after the durable write; this is not a ledger failure.
+      await explainADeniedRead(mission, events).catch(() => undefined)
+    }, (error) => {
+      persistenceReason = reasonOf(error)
+      options.note?.('ledger-write-failed', `${mission.missionId}: ${persistenceReason ?? 'no message'}`)
+      ledgerFailed = true
+      persistenceFailed = true
+      mission.controller.abort()
+    })
+    mission.flushEvents = () => batches.flush()
     try {
       for await (const record of mission.process.records) {
         try {
@@ -985,9 +943,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           }
           // The first event of the run dates the end of the start (0.602).
           if (events.length > 0) mission.startTiming.firstEventAt ??= Date.now()
-          waiting.push(...events)
-          flush()
-          if (waiting.length >= maxWaiting && writer !== undefined) await writer
+          batches.push(events)
+          if (batches.pendingCount >= maxWaiting) await batches.flush()
           if (ledgerFailed) break
         } catch (error) {
           // Anything else that escapes the guarded steps above: still a
@@ -1004,9 +961,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
     }
     // What was still being written, or waiting to be, lands before the run's
     // end is read -- including what a failing adapter left behind it.
-    if (writer !== undefined) await writer
-    flush()
-    if (writer !== undefined) await writer
+    await batches.flush()
 
     if (persistenceFailed) {
       try {
@@ -1751,6 +1706,10 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         const runId = `run_${createId()}`
         const missionId = `mission_${createId()}`
         const controller = new AbortController()
+        const flushBeforeApproval = async (): Promise<void> => {
+          await active.get(runId)?.flushEvents?.()
+          if (controller.signal.aborted) throw new Error('The run stopped before the approval could be shown.')
+        }
         const createdAt = now().toISOString()
         const routeId =
           runtime === 'claude'
@@ -1897,7 +1856,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           globalThis.process.env.LOCUST_ASK_CONNECTORS === '1' || (await options.askConnectors?.()) === true
         const permissionBridge =
           runtime === 'claude' && effectiveSandbox !== 'full-access' && options.permissionHost !== undefined
-            ? await options.permissionHost.register({ runId, missionId, cwd: runCwd })
+            ? await options.permissionHost.register({ runId, missionId, cwd: runCwd, beforeApproval: flushBeforeApproval })
             : undefined
         /*
          * A MODEL OF THE PERSON'S OWN (0.357) is declared to OpenCode for this
@@ -2349,7 +2308,10 @@ ${sentPrompt.trim()}`
               prompt: runtimePrompt,
               sandbox: policy.sandbox,
               approvalPolicy: policy.approvalPolicy,
-              ...(onRequest === undefined ? {} : { onRequest }),
+              ...(onRequest === undefined ? {} : { onRequest: async (asked) => {
+                await flushBeforeApproval()
+                return onRequest(asked)
+              } }),
               ...(chosenModel === undefined ? {} : { model: chosenModel }),
               ...(route.effort === undefined ? {} : { effort: route.effort }),
               ...(resumeThreadId === undefined ? {} : { resumeThreadId }),
@@ -2374,7 +2336,10 @@ ${sentPrompt.trim()}`
               ...(resumeThreadId === undefined ? {} : { resumeSessionId: resumeThreadId }),
               ...(handler === undefined
                 ? {}
-                : { onPermission: async (asked) => openCodeReplyFor(await handler(openCodePermissionRequest(asked, runCwd))) }),
+                : { onPermission: async (asked) => {
+                  await flushBeforeApproval()
+                  return openCodeReplyFor(await handler(openCodePermissionRequest(asked, runCwd)))
+                } }),
               signal: controller.signal,
               now
             })
@@ -2395,7 +2360,10 @@ ${sentPrompt.trim()}`
               ...(options.onAcpCapabilities === undefined ? {} : { onCapabilities: (capabilities: AcpCapabilities) => options.onAcpCapabilities?.('copilot', capabilities) }),
               ...(handler === undefined
                 ? {}
-                : { onPermission: async (asked) => acpAnswerFor(await handler(acpPermissionRequest(asked, runCwd))) }),
+                : { onPermission: async (asked) => {
+                  await flushBeforeApproval()
+                  return acpAnswerFor(await handler(acpPermissionRequest(asked, runCwd)))
+                } }),
               signal: controller.signal,
               now
             })

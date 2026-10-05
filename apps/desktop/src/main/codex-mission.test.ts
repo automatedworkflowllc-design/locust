@@ -309,7 +309,8 @@ describe('Codex mission service', () => {
     await vi.waitFor(() => {
       expect(updates.some((update) => update.kind === 'event' && update.event.type === 'run.completed')).toBe(true)
     })
-    const eventUpdates = updates.filter((update) => update.kind === 'event')
+    const eventUpdates = updates.flatMap((update) => update.kind === 'event' ? [{ event: update.event }]
+      : update.kind === 'message-deltas' ? update.events.map((event) => ({ event })) : [])
     // The host's own notes (the start-timing note, 0.602) carry no CLI version; the runtime's events all do.
     expect(eventUpdates.filter(({ event }) => (event.payload as { code?: string }).code !== 'host.start-timing').every(({ event }) => event.cliVersion === '0.151.0-alpha.7.2')).toBe(true)
     expect(JSON.stringify(updates)).toContain('Safe result')
@@ -3304,7 +3305,7 @@ describe('stopping a Codex run over app-server', () => {
     expect(response.ok).toBe(true)
     scheduled[0]?.()
     await vi.waitFor(() => {
-      expect(updates.some((update) => update.kind === 'event' && update.event.type === 'message.delta')).toBe(true)
+      expect(updates.some((update) => update.kind === 'message-deltas' && update.events.some((event) => event.type === 'message.delta'))).toBe(true)
     })
 
     const runId = response.ok ? response.data.runId : ''
@@ -3362,7 +3363,7 @@ describe('steering a Codex run over app-server', () => {
     })
     scheduled[0]?.()
     await vi.waitFor(() => {
-      expect(updates.some((update) => update.kind === 'event' && update.event.type === 'message.delta')).toBe(true)
+      expect(updates.some((update) => update.kind === 'message-deltas' && update.events.some((event) => event.type === 'message.delta'))).toBe(true)
     })
     const runId = response.ok ? response.data.runId : ''
 
@@ -3394,6 +3395,30 @@ describe('steering a Codex run over app-server', () => {
  * question outstanding does not leave it outstanding.
  */
 describe('Approve-each is a mode of this service', () => {
+  it('shows pending text durably before an approval card without waiting for the text deadline', async () => {
+    vi.useFakeTimers()
+    try {
+      const order: string[] = []
+      const approvals = createApprovalChannel({ emitApproval: () => { order.push('card') } })
+      const server = fakeAppServer([['item/agentMessage/delta', { itemId: 'answer', delta: 'About to ask.' }]])
+      const { service, scheduled } = scheduledService({ start: vi.fn() }, fakeLedger({
+        appendEvents: async (_id, events) => {
+          if (events.some((event) => event.type === 'message.delta')) order.push('disk')
+        }
+      }), { appServerSpawn: server.spawn, approvals })
+      await service.start('Ask before running a command.', 'codex', 'approve-each', {}, (update) => {
+        if (update.kind === 'message-deltas') order.push('text')
+      })
+      scheduled[0]?.()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(order).toEqual([])
+      server.ask('approval', 'item/commandExecution/requestApproval', { command: 'pnpm build' })
+      await vi.advanceTimersByTimeAsync(0)
+      expect(order).toEqual(['disk', 'text', 'card'])
+      expect(approvals.pendingCount).toBe(1)
+    } finally { vi.useRealTimers() }
+  })
+
   function withApprovals() {
     const raised: MissionApprovalRequest[] = []
     const approvals = createApprovalChannel({
@@ -3707,6 +3732,42 @@ describe('durable write pipelining', () => {
     return { stream, taken, give: (entry: RuntimeJsonlRecord) => push({ record: entry }), end: () => push({ end: true }) }
   }
 
+  it('replays the same paced answer with fewer durable appends and sends while keeping every fragment', async () => {
+    vi.useFakeTimers()
+    try {
+      const appends: NormalizedRuntimeEvent[][] = []
+      const updates: CodexMissionUpdate[] = []
+      const paced = pacedStream()
+      const start = vi.fn((): RuntimeProcessRun => ({ records: paced.stream, completion: Promise.resolve(completion()) })) satisfies RuntimeProcessRunner['start']
+      const { service, scheduled } = scheduledService({ start }, fakeLedger({
+        appendEvents: async (_id, events) => { appends.push([...events]) }
+      }))
+      await service.start('Say a thousand words.', 'codex', 'ask', {}, (update) => { updates.push(update) })
+      scheduled[0]?.()
+      paced.give(record(1, { type: 'thread.started', thread_id: 'thread-stream' }))
+      await vi.advanceTimersByTimeAsync(2)
+      paced.give(record(2, { type: 'turn.started' }))
+      await vi.advanceTimersByTimeAsync(2)
+      const words = Array.from({ length: 1_000 }, (_, index) => `word${String(index)} `)
+      for (const [index, word] of words.entries()) {
+        paced.give(record(index + 3, { type: 'item.updated', item: { id: 'answer', type: 'agent_message', delta: word } }))
+        await vi.advanceTimersByTimeAsync(2)
+      }
+      paced.give(record(1003, { type: 'turn.completed' }))
+      paced.end()
+      await vi.advanceTimersByTimeAsync(0)
+      await service.dispose()
+      const recorded = appends.flat().filter((event) => event.type === 'message.delta')
+      const sent = updates.flatMap((update) => update.kind === 'message-deltas' ? [...update.events] : update.kind === 'event' && update.event.type === 'message.delta' ? [update.event] : [])
+      console.log(`STREAM TURN: ${JSON.stringify({ appends: appends.length, sends: updates.filter((update) => update.kind === 'event' || update.kind === 'message-deltas').length, fragments: recorded.length, characters: words.join('').length })}`)
+      expect(recorded).toHaveLength(1_000)
+      expect(sent).toEqual(recorded)
+      expect(recorded.map((event) => event.payload.text).join('')).toBe(words.join(''))
+      expect(appends.length).toBeLessThan(100)
+      expect(updates.filter((update) => update.kind === 'event' || update.kind === 'message-deltas').length).toBeLessThan(100)
+    } finally { vi.useRealTimers() }
+  })
+
   it('reads and normalizes while an append is on the disk, and writes what arrived in one append when it lands', async () => {
     const appends: NormalizedRuntimeEvent[][] = []
     const emittedAtAppend: string[][] = []
@@ -3720,7 +3781,7 @@ describe('durable write pipelining', () => {
     const paced = pacedStream()
     const start = vi.fn((): RuntimeProcessRun => ({ records: paced.stream, completion: Promise.resolve(completion()) })) satisfies RuntimeProcessRunner['start']
     const { service, scheduled } = scheduledService({ start }, fakeLedger({ appendEvents }))
-    await service.start('Do work.', 'codex', 'ask', {}, (update) => { if (update.kind === 'event') emitted.push(update.event.type) })
+    await service.start('Do work.', 'codex', 'ask', {}, (update) => { if (update.kind === 'event') emitted.push(update.event.type); if (update.kind === 'message-deltas') emitted.push(...update.events.map((event) => event.type)) })
     scheduled[0]?.()
 
     paced.give(record(1, { type: 'thread.started', thread_id: 'thread-live' }))

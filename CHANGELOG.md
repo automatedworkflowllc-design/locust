@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.630.0 - 2026-10-05
+
+### Improved
+
+- **A streaming reply is saved in batches.** A reply arrives in hundreds of small pieces, and Locust wrote each one to the conversation's record, waited for the disk, and sent it to the window on its own: 1,005 writes for a 1,000-piece reply. It now gathers them for at most 50 milliseconds: 45 writes for the same reply, each still on disk before it is shown, in order, nothing lost. A tool starting, an approval card or the run ending sends whatever is waiting first. This does not yet lower what Locust's window costs while a reply streams -- measured, that is the drawing, not the saving -- and that is next.
+
 ## 0.629.0 - 2026-10-05
 
 ### Fixed

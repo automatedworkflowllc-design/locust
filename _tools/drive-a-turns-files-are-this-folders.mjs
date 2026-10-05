@@ -1,13 +1,14 @@
-// A turn's changed files count this folder's, once each (0.629).
+// A turn's files card counts this folder's files, once each (0.629).
 //
 //   node _tools/drive-a-turns-files-are-this-folders.mjs [--packaged <exe>] [--tag <name>]
 //
-// The RPG round's resumed Sonnet column read "Edited 19 files", every row "Claude Code did not report",
-// beside a footer that said one file changed: Writes into a scratch folder outside the compare copy counted
-// as the turn's files, a file written then edited counted twice, and calls cut off by the stop read as
-// Claude Code's failure. This seeds one finished Claude turn of that shape -- four Writes outside the
-// folder, one outside file written then edited, index.html written inside, one Write that never reported --
-// opens it, and reads the turn's foot and rows. Sends nothing.
+// The RPG round's resumed Sonnet column ended on a files card reading "Edited 19 files", each row "Claude
+// Code did not report", beside a footer that said one file changed: Writes into a scratch folder outside the
+// compare copy counted as the turn's files, a file written then edited counted twice, and a call cut off by
+// the stop read as Claude Code's failure. This seeds one finished Claude turn of that shape -- four Writes
+// outside the folder, one outside file written then edited, index.html written inside with its change, and
+// notes.md inside cut off before it reported -- opens it, and reads the files card at the turn's foot (the
+// step rows above it list every call, as they should). Sends nothing.
 
 import { createHash } from 'node:crypto'
 import { mkdtemp } from 'node:fs/promises'
@@ -21,6 +22,15 @@ const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.i
 const packaged = arg('--packaged')
 const tag = arg('--tag') ?? 'local'
 const OUTSIDE = 'C:/locust-drive-elsewhere/scratch'
+const INDEX_PATCH = [
+  'diff --git a/index.html b/index.html',
+  'new file mode 100644',
+  '--- /dev/null',
+  '+++ b/index.html',
+  '@@ -0,0 +1 @@',
+  '+<h1>game</h1>',
+  ''
+].join('\n')
 
 const root = new URL('..', import.meta.url).pathname.slice(1)
 const store = await import(pathToFileURL(join(root, 'packages', 'mission-store', 'dist', 'index.js')).href)
@@ -51,8 +61,10 @@ const events = [
   ...['cdp.mjs', 'play.mjs', 'patch5.mjs', 't3.mjs'].flatMap((name, index) => write(`w${String(index)}`, 'Write', `${OUTSIDE}/${name}`)),
   ...write('same1', 'Write', `${OUTSIDE}/profile.mjs`),
   ...write('same2', 'Edit', `${OUTSIDE}/profile.mjs`),
-  ...write('inside', 'Write', 'index.html'),
-  ...write('cut', 'Write', `${OUTSIDE}/half.mjs`, false),
+  // Inside the folder: index.html with its change, and notes.md cut off by the stop before it reported.
+  event('tool.started', { itemId: 'inside', toolKind: 'file_change', name: 'Write', command: 'index.html', phase: 'started' }),
+  event('tool.completed', { itemId: 'inside', toolKind: 'file_change', name: 'Write', command: 'index.html', phase: 'completed', patch: { text: INDEX_PATCH, truncated: false, added: 1, removed: 0 } }),
+  ...write('cut', 'Write', 'notes.md', false),
   event('message.delta', { itemId: 'm2', operation: 'append', text: 'The game is finished.', final: true })
 ]
 events.push(event('run.completed', { usage: { inputTokens: 900, outputTokens: 90 }, process: { exitCode: 0, signal: null, stderr: '', stderrTruncated: false, recordCount: events.length, inputDeliveryFailed: false, outputLimitExceeded: false, forcedTerminationAttempted: false, terminationUnconfirmed: false, startedAt: at, finishedAt: at } }))
@@ -74,24 +86,31 @@ try {
   await drive.ready()
   await drive.resize(1200, 780)
   await sleep(2500)
-  const seen = JSON.parse(String(await drive.capture('the turn, opened, its rows unfolded', () => drive.evaluate(`(async () => {
+  const seen = JSON.parse(String(await drive.capture('the turn, opened, its files card at the foot', () => drive.evaluate(`(async () => {
     let row
     for (let i = 0; i < 40 && !row; i += 1) {
       row = [...document.querySelectorAll('.lc-conv')].find((one) => /carry on/.test(one.textContent))
       if (!row) await new Promise((r) => setTimeout(r, 500))
     }
     row?.click()
-    for (let i = 0; i < 40 && !document.querySelector('.lc-thread .lc-agentline__body'); i += 1) await new Promise((r) => setTimeout(r, 250))
+    for (let i = 0; i < 40 && !document.querySelector('.lc-thread .lc-turnfoot'); i += 1) await new Promise((r) => setTimeout(r, 250))
     await new Promise((r) => setTimeout(r, 1000))
-    for (const line of document.querySelectorAll('.lc-thread .lc-activity[aria-expanded="false"]')) line.click()
-    await new Promise((r) => setTimeout(r, 1000))
-    const thread = document.querySelector('.lc-thread')?.innerText ?? ''
-    return JSON.stringify({ opened: Boolean(row), edited: /Edited (\\d+) files?/.exec(thread)?.[0] ?? null, stopped: thread.includes('stopped before it reported'), blamed: thread.includes('Claude Code did not report') })
+    for (const line of document.querySelectorAll('.lc-thread .lc-turnfoot .lc-activity[aria-expanded="false"]')) line.click()
+    await new Promise((r) => setTimeout(r, 800))
+    const foot = document.querySelector('.lc-thread .lc-turnfoot')?.innerText ?? ''
+    return JSON.stringify({
+      opened: Boolean(row),
+      edited: /Edited (\\d+) files?/.exec(foot)?.[0] ?? null,
+      stopped: foot.includes('stopped before it reported'),
+      blamed: foot.includes('Claude Code did not report'),
+      outside: foot.includes('cdp.mjs') || foot.includes('profile.mjs')
+    })
   })()`))))
   check('the turn opens', seen.opened === true, JSON.stringify(seen))
-  check('its changed files are this folder\'s, once each: "Edited 1 file"', seen.edited === 'Edited 1 file', JSON.stringify(seen))
-  check('the call cut off by the stop says "stopped before it reported"', seen.stopped === true, JSON.stringify(seen))
-  check('no row blames Claude Code for a call it was stopped in', seen.blamed === false, JSON.stringify(seen))
+  check('the files card counts this folder\'s files, once each: "Edited 2 files"', seen.edited === 'Edited 2 files', JSON.stringify(seen))
+  check('no file from outside the folder is on the card', seen.outside === false, JSON.stringify(seen))
+  check('notes.md, cut off by the stop, says "stopped before it reported"', seen.stopped === true, JSON.stringify(seen))
+  check('nothing on the card blames Claude Code', seen.blamed === false, JSON.stringify(seen))
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
