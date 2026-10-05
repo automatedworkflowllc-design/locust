@@ -201,6 +201,7 @@ describe('reading a cloud session', { timeout: 30_000 }, () => {
     expect(runs[0]!.env.CLAUDE_CODE_CHILD_SESSION).toBeUndefined()
   })
 
+  // Honors the describe block's 30s budget; 15s timed out under load (18.2s measured on Windows git worktree ops).
   it('brought in but no transcript saved (measured, 2 runs of 6): the change is shown, and why there are no words', async () => {
     const w = await world()
     const cloud = createClaudeCloud({ discover: claude, storePath: w.storePath, platform: 'win32', terminal: teleporting(w, { transcript: false }).terminal, claudeHome: w.home })
@@ -209,7 +210,7 @@ describe('reading a cloud session', { timeout: 30_000 }, () => {
     expect(read.exchanges).toEqual([])
     expect(read.diff).toContain('cart.js')
     expect(read.note).toMatch(/did not save its conversation this time\. Check again/)
-  }, 15_000)
+  })
 
   it('not brought in at all: says what Claude Code said, and leaves no worktree behind', async () => {
     const w = await world()
@@ -217,7 +218,7 @@ describe('reading a cloud session', { timeout: 30_000 }, () => {
     const read = await cloud.check(w.id)
     expect(read).toEqual({ ok: false, message: 'Claude Code did not bring the session in: Could not reach Claude' })
     expect(await exists(join(w.repo, '.claude', 'worktrees', w.name))).toBe(false)
-  }, 15_000)
+  })
 
   it('a session archived or deleted (measured 10/03): the worktree Claude Code made first is removed, and it says the session is gone', async () => {
     const w = await world()
@@ -230,7 +231,7 @@ describe('reading a cloud session', { timeout: 30_000 }, () => {
     expect(read.message).not.toMatch(/did not save its conversation/)
     expect(await exists(join(w.repo, '.claude', 'worktrees', w.name))).toBe(false)
     expect(git(w.repo, 'branch', '--list', `worktree-${w.name}`)).toBe('')
-  }, 15_000)
+  })
 
   it('the trust question is left to the person; nothing is answered', async () => {
     const w = await world()
