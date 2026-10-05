@@ -56,6 +56,7 @@ describe('Home keyframes', () => {
   it('one class holds the cover and its descendants including pseudo-elements', () => {
     expect(css).toMatch(/\.lc-cover\.is-paused,\s*\.lc-cover\.is-paused \*,\s*\.lc-cover\.is-paused \*::before,\s*\.lc-cover\.is-paused \*::after\s*\{\s*animation-play-state: paused !important;/)
     expect(readFileSync(`${SRC}components/HomeCover.tsx`, 'utf8')).toContain("paused ? ' is-paused' : ''")
-    expect(readFileSync(`${SRC}App.tsx`, 'utf8')).toContain('coverActivity={runs}')
+    // The runs going, not the whole map (the-cover-counts-only-work): every rebuild of the map kept Home awake.
+    expect(readFileSync(`${SRC}App.tsx`, 'utf8')).toContain('coverActivity={coverWork}')
   })
 })
