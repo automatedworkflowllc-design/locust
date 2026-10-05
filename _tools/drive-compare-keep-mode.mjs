@@ -78,7 +78,16 @@ try {
         box.dispatchEvent(new Event('input', { bubbles: true }))
         await new Promise((r) => setTimeout(r, 700))
       }
-      const row = [...document.querySelectorAll('.lc-picker__row:not(.is-recent)')].find((one) => !one.disabled && new RegExp(${JSON.stringify(want.row)}, 'i').test(one.querySelector('.lc-picker__label')?.textContent ?? ''))
+      // Each row under the runtime heading above it, and only Claude Code's: on 0.622's run the
+      // first "Sonnet 5.5" row was Antigravity's, which answers through another tool entirely.
+      let heading = ''
+      const rows = []
+      for (const el of document.querySelectorAll('.lc-picker__group, .lc-picker__row')) {
+        if (el.classList.contains('lc-picker__group')) { heading = el.textContent.replace(/\\s+/g, ' ').trim(); continue }
+        if (el.classList.contains('is-recent')) continue
+        rows.push({ el, heading })
+      }
+      const row = rows.find((one) => !one.el.disabled && /^Claude Code/i.test(one.heading) && new RegExp(${JSON.stringify(want.row)}, 'i').test(one.el.querySelector('.lc-picker__label')?.textContent ?? ''))?.el
       if (!row) return JSON.stringify({ picked: false, why: 'no row' })
       row.click()
       await new Promise((r) => setTimeout(r, 600))
