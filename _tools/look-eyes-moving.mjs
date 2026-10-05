@@ -60,8 +60,16 @@
 // (x 90-990, y 220-1400). With no --sequence it goes round the legend's faces
 // from idle back to idle at rest, so the last frame is the first and the film
 // loops: frames start once the screen has switched on and settled.
+//
+// `--pet <spritesheet.webp>` draws, at each size, Codex Buddy's sheet twice as
+// teammates (2026-10-05, petScreens.ts): first AS DRAWN, the pet as every pet
+// is shown (its sheet under another name, so no screen is measured for it),
+// then WITH HIS SCREEN and his moves (petRoutines.ts). Same sheet, same
+// clock, so the two line up frame for frame. The sheet is his maker's: give
+// the copy on this computer (Locust's userData/pets/codex-buddy); nothing of
+// it is kept, and nothing is sent.
 
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -74,7 +82,7 @@ const require = createRequire(join(DESKTOP, 'package.json'))
 const esbuild = createRequire(require.resolve('vite/package.json'))('esbuild')
 const electron = require('electron')
 const args = process.argv.slice(2)
-const VALUED = ['--sizes', '--grounds', '--eyes', '--frames', '--every', '--from', '--dpr', '--trace', '--activity', '--motion', '--sequence', '--promo']
+const VALUED = ['--sizes', '--grounds', '--eyes', '--frames', '--every', '--from', '--dpr', '--trace', '--activity', '--motion', '--sequence', '--promo', '--pet', '--bot', '--hue', '--side']
 const option = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined)
 const out = resolve(args.find((arg, i) => !arg.startsWith('--') && !VALUED.includes(args[i - 1])) ?? join(tmpdir(), 'glyph-eyes.png'))
 const SIZES = (option('--sizes') ?? '110').split(',').map(Number)
@@ -83,7 +91,15 @@ const GROUNDS = (option('--grounds') ?? 'page').split(',')
 const ACTIVITIES = ['waiting', 'receiving', 'done', 'blocked', 'thinking', 'working', 'idle', 'delegating', 'responding']
 // --sequence: each activity and the seconds it is held, in order; with no value, the default.
 const PROMO = option('--promo')
-if (PROMO !== undefined && !['wide', 'tall'].includes(PROMO)) throw new Error('--promo takes wide or tall')
+if (PROMO !== undefined && !['wide', 'tall', 'still'].includes(PROMO)) throw new Error('--promo takes wide, tall or still')
+// The promo's teammate (Colin, 2026-10-05: "make the default teammate where you show off the emotions and any
+// other promo the white ghost with terminal face, its clean"): the ghost in its own white -- no hue, as the cover
+// and Settings draw it. --bot and --hue draw another (the first loop's: --bot droid --hue teal).
+const PROMO_BOT = option('--bot') ?? 'ghost'
+const PROMO_HUE = option('--hue') ?? null
+// --promo still: one square frame, the face alone in the middle on a transparent ground, for a deck.
+const STILL_SIDE = Number(option('--side') ?? '1000')
+if (PROMO === 'still' && option('--sequence') === undefined) throw new Error('--promo still takes a --sequence of one activity, e.g. done:3')
 // The legend's round (FaceLegend.tsx's FACE_LEGEND), idle held longer at each end for the loop's seam.
 const PROMO_ROUND = 'idle:3.6,thinking:3.4,working:3,responding:2.8,done:2.4,waiting:3,receiving:2.6,blocked:2.8,idle:3'
 const SEQUENCE_TEXT = option('--sequence') ?? (PROMO === undefined ? undefined : PROMO_ROUND)
@@ -115,6 +131,9 @@ for (const ground of GROUNDS) if (!(ground in GROUND_OF)) throw new Error(`--gro
 if (SIZES.some((size) => !(size > 0)) || !(FRAMES > 0) || !(EVERY > 0) || !(FROM >= 0)) throw new Error('--sizes, --frames, --every and --from take numbers')
 if (!['mixed', 'thinking'].includes(EYES)) throw new Error('--eyes takes mixed or thinking')
 const src = (path) => JSON.stringify(join(DESKTOP, 'src/renderer/src', path).split(String.fromCharCode(92)).join('/'))
+// --pet: his sheet's bytes, handed to the page as the host would hand them (readPetSheet).
+const PET = option('--pet') === undefined ? undefined : (await readFile(resolve(option('--pet')))).toString('base64')
+if (PET !== undefined && PROMO !== undefined) throw new Error('--pet or --promo, not both')
 
 // The page's clock, installed before anything of the app runs: time moves only when the tool steps it.
 const CLOCK = `
@@ -342,16 +361,31 @@ const Caption = ({ size }) => {
   }, [])
   return h('div', { style: { font: '500 ' + size + 'px var(--lc-font-ui, system-ui), sans-serif', color: '#e8e6e1', letterSpacing: '0.01em', lineHeight: 1.1 } }, name)
 }
+const PROMO_BOT = ${JSON.stringify(PROMO_BOT)}
+const PROMO_HUE = ${JSON.stringify(PROMO_HUE)} ?? undefined
 const Promo = () => {
   const tall = PROMO === 'tall'
+  if (PROMO === 'still') {
+    const side = Math.round(${STILL_SIDE} * 0.7)
+    return h('div', { style: { position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent' } },
+      h('span', { style: { display: 'inline-flex', width: side, height: side, position: 'relative' } },
+        h(Teammate, { hue: PROMO_HUE, avatar: { headwear: 0, accessory: 0, mouth: 0, bot: { shape: PROMO_BOT, face: 'eyes' } }, size: side, motion: ${JSON.stringify(MOTION)}, teammateId: 'promo-face', dotless: true })))
+  }
   const face = tall ? 600 : 460
   return h('div', { style: { position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: tall ? 'flex-start' : 'center', paddingTop: tall ? 392 : 0, gap: tall ? 110 : 64, background: '#121415' } },
     h('span', { style: { display: 'inline-flex', width: face, height: face, position: 'relative' } },
-      h(Teammate, { hue: 'teal', avatar: { headwear: 0, accessory: 0, mouth: 0, bot: { shape: 'droid', face: 'eyes' } }, size: face, motion: ${JSON.stringify(MOTION)}, teammateId: 'promo-face', dotless: true })),
+      h(Teammate, { hue: PROMO_HUE, avatar: { headwear: 0, accessory: 0, mouth: 0, bot: { shape: PROMO_BOT, face: 'eyes' } }, size: face, motion: ${JSON.stringify(MOTION)}, teammateId: 'promo-face', dotless: true })),
     h(Caption, { size: tall ? 76 : 60 }),
     h('div', { style: { position: 'absolute', bottom: tall ? 540 : 52, font: '400 ' + (tall ? 30 : 24) + 'px var(--lc-font-mono, ui-monospace), monospace', color: '#8a8f98', letterSpacing: '0.04em' } }, 'locust.lol'))
 }
-const row = ${JSON.stringify(EYES)} === 'thinking' ? mixed.map(([type, color]) => [type, color, ['•', '•']]) : mixed
+const PET = ${JSON.stringify(PET ?? null)}
+if (PET !== null) {
+  const bytes = Uint8Array.from(atob(PET), (c) => c.charCodeAt(0))
+  window.desktop = { readPetSheet: async () => ({ ok: true, data: { bytes, rows: 9 } }) }
+}
+// --pet: as drawn (any other name: no screen is measured for it), then with his screen.
+const PETS = ['as-drawn', 'codex-buddy']
+const row = PET !== null ? PETS.map((id) => [id, null, null]) : ${JSON.stringify(EYES)} === 'thinking' ? mixed.map(([type, color]) => [type, color, ['•', '•']]) : mixed
 const SIZES = ${JSON.stringify(SIZES)}
 const GROUNDS = ${JSON.stringify(GROUNDS.map((name) => [name, GROUND_OF[name]]))}
 const labelled = SIZES.length > 1 || GROUNDS.length > 1
@@ -361,7 +395,9 @@ createRoot(document.getElementById('root')).render(PROMO !== null ? h(Promo) : h
     SIZES.map((size) => h('div', { key: size, style: { display: 'flex', alignItems: 'center', gap: Math.max(24, size * 0.6), padding: Math.max(20, size * 0.4) + 'px 20px' } },
       labelled ? label(ground + ' ' + size) : null,
       row.map(([type, color, eyes], i) => h('span', { key: i, style: { display: 'inline-flex', width: size, height: size, position: 'relative' } },
-        shownActivity === undefined
+        PET !== null
+          ? h(Teammate, { hue: 'blue', avatar: { headwear: 0, accessory: 0, mouth: 0, bot: { shape: 'droid', face: 'eyes' }, pet: { source: 'gallery', id: type } }, size, motion: ${JSON.stringify(MOTION)}, teammateId: 'look-pet-' + size })
+          : shownActivity === undefined
           ? h(Bot, { type, size, color, seed: 0.15 + i * 0.11, jumpEvery: 0, eyes })
           : h(Teammate, { hue: HUES[i], avatar: { headwear: 0, accessory: 0, mouth: 0, bot: { shape: type, face: 'eyes' } }, size, motion: ${JSON.stringify(MOTION)}, teammateId: 'look-' + i })))))))))
 `
@@ -384,12 +420,13 @@ await esbuild.build({
   logLevel: 'warning'
 })
 await writeFile(join(work, 'clock.js'), CLOCK, 'utf8')
-await writeFile(join(work, 'page.html'), `<!doctype html><html class="lc-theme-dark"><head><link rel="stylesheet" href="page.css"></head><body style="background:${GROUND_OF[GROUNDS[0]]};margin:0;overflow:hidden"><div id="root"></div><script src="clock.js"></script><script src="page.js"></script></body></html>`, 'utf8')
+await writeFile(join(work, 'page.html'), `<!doctype html><html class="lc-theme-dark"><head><link rel="stylesheet" href="page.css"></head>${PROMO === 'still' ? '<style>html,body{background:transparent!important}</style>' : ''}<body style="background:${PROMO === 'still' ? 'transparent' : GROUND_OF[GROUNDS[0]]};margin:0;overflow:hidden"><div id="root"></div><script src="clock.js"></script><script src="page.js"></script></body></html>`, 'utf8')
 const widest = Math.max(...SIZES)
 // Padding, the label and the gap after it, five bots and the gaps between, and room for the last one's overscan.
 const labelled = SIZES.length > 1 || GROUNDS.length > 1
-const width = PROMO === 'wide' ? 1920 : PROMO === 'tall' ? 1080 : 40 + (labelled ? 92 + Math.max(24, widest * 0.6) : 0) + 5 * widest + 4 * Math.max(24, widest * 0.6) + widest * 0.3
-const height = PROMO === 'wide' ? 1080 : PROMO === 'tall' ? 1920 : GROUNDS.length * SIZES.reduce((sum, size) => sum + size + 2 * Math.max(20, size * 0.4), 0)
+const across = PET === undefined ? 5 : 2
+const width = PROMO === 'still' ? STILL_SIDE : PROMO === 'wide' ? 1920 : PROMO === 'tall' ? 1080 : 40 + (labelled ? 92 + Math.max(24, widest * 0.6) : 0) + across * widest + (across - 1) * Math.max(24, widest * 0.6) + widest * 0.3
+const height = PROMO === 'still' ? STILL_SIDE : PROMO === 'wide' ? 1080 : PROMO === 'tall' ? 1920 : GROUNDS.length * SIZES.reduce((sum, size) => sum + size + 2 * Math.max(20, size * 0.4), 0)
 const digits = String(FRAMES - 1).length
 await writeFile(join(work, 'main.cjs'), `
 const { app, BrowserWindow } = require('electron')
@@ -399,7 +436,7 @@ app.on('window-all-closed', () => {})
 setTimeout(() => { process.stderr.write('look-eyes-moving: timed out\\n'); app.exit(2) }, 600000)
 app.whenReady().then(async () => {
   // A film's frame is larger than a screen's work area, and Windows holds a window to that: drawn offscreen, it is not.
-  const win = new BrowserWindow({ show: false, useContentSize: true, enableLargerThanScreen: true, width: ${Math.ceil(width)}, height: ${Math.ceil(height)}, webPreferences: { backgroundThrottling: false${PROMO === undefined ? '' : ', offscreen: true'} } })
+  const win = new BrowserWindow({ show: false, useContentSize: true, enableLargerThanScreen: true, width: ${Math.ceil(width)}, height: ${Math.ceil(height)},${PROMO === 'still' ? " transparent: true, backgroundColor: '#00000000'," : ''} webPreferences: { backgroundThrottling: false${PROMO === undefined ? '' : ', offscreen: true'} } })
   ${PROMO === undefined ? '' : `win.setContentSize(${Math.ceil(width)}, ${Math.ceil(height)})`}
   await win.loadFile(${JSON.stringify(join(work, 'page.html'))})
   // Mounted and drawn once, on the page's clock still at its start.
@@ -425,7 +462,7 @@ app.whenReady().then(async () => {
     writeFileSync(${JSON.stringify(out)}.replace(/\\.png$/, '-' + String(f).padStart(${digits}, '0') + '.png'), image.toPNG())
     ${TRACE === undefined ? '' : `frames.push({ t: await win.webContents.executeJavaScript('window.__clock.now()'), marks: await win.webContents.executeJavaScript('window.__clock.marks()'), draws: await win.webContents.executeJavaScript('window.__clock.draws()') })`}
   }
-  ${TRACE === undefined ? '' : `writeFileSync(${JSON.stringify(TRACE)}, JSON.stringify({ every: ${EVERY}, from: ${FROM}, sequence: ${JSON.stringify(SEQUENCE ?? null)}, eyes: ${JSON.stringify(EYES)}, terminal: ${JSON.stringify(process.env.TERMINAL !== 'off')}, plush: ${JSON.stringify(process.env.PLUSH === 'on')}, canvases: ${JSON.stringify(GROUNDS.flatMap((ground) => SIZES.flatMap((size) => ['droid', 'ghost', 'cat', 'prompt', 'hopper'].map((type, bot) => ({ ground, size, bot, type })))))}, frames }))`}
+  ${TRACE === undefined ? '' : `writeFileSync(${JSON.stringify(TRACE)}, JSON.stringify({ every: ${EVERY}, from: ${FROM}, sequence: ${JSON.stringify(SEQUENCE ?? null)}, eyes: ${JSON.stringify(EYES)}, terminal: ${JSON.stringify(process.env.TERMINAL !== 'off')}, plush: ${JSON.stringify(process.env.PLUSH === 'on')}, canvases: ${JSON.stringify(GROUNDS.flatMap((ground) => SIZES.flatMap((size) => (PET === undefined ? ['droid', 'ghost', 'cat', 'prompt', 'hopper'] : ['as-drawn', 'codex-buddy']).map((type, bot) => ({ ground, size, bot, type })))))}, frames }))`}
   process.stdout.write('wrote ' + ${JSON.stringify(out)} + ' (${FRAMES} frames, ${EVERY} ms apart)\\n')
   app.quit()
 }).catch((error) => { process.stderr.write('look-eyes-moving: ' + String(error && error.stack || error) + '\\n'); app.exit(1) })

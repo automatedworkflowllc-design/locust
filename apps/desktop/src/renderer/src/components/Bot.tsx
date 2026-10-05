@@ -129,6 +129,13 @@ export interface BotProps {
 /** The faces whose screens have switched on this session (BotProps.bootKey). */
 const BOOTED = new Set<string>()
 
+/** Whether this face's screen switches on now: the first time it is asked, this session (BotProps.bootKey). A pet's screen asks too. */
+export function firstBoot(bootKey: string | undefined): boolean {
+  if (bootKey === undefined || BOOTED.has(bootKey)) return false
+  BOOTED.add(bootKey)
+  return true
+}
+
 /**
  * HOW A TEAMMATE FEELS, IN ITS BODY (2026-10-05). Colin, of bloub's catalog:
  * "is there any other physics/movement/emotions/animations ... that can be
@@ -363,9 +370,9 @@ export interface HeadGlance {
 /** How much of the rig's own turning a thinking face holds back (HeadGlance.wander). */
 export const THINKING_HUSH = 0.7
 
-const THINKING_CYCLE_S = 4.2
+export const THINKING_CYCLE_S = 4.2
 /** The first half of the loop: the face looks about while the dots hold. */
-const LOOK_ABOUT_S = 2.1
+export const LOOK_ABOUT_S = 2.1
 /** Where the thinking dots rest on the screen, a little up: the bounce's own floor. */
 const DOTS_REST_Y = -0.5
 /** How long a glance takes to land (bloub's gaze lands in 0.24 s; a head is heavier than an eye). */
@@ -880,6 +887,147 @@ export function powerOnEyes(phase: number): number {
   return easeOutQuint((Math.max(0, Math.min(1, phase)) - POWER_FLASH) / (1 - POWER_FLASH))
 }
 
+/** What a face shows: its eyes, their colour, and what it is doing (FaceChange). */
+export interface ShownFace {
+  readonly pair: EyeGlyphs | undefined
+  readonly tone: Phosphor
+  readonly key: string | undefined
+}
+
+/** A face's changes as it performs them (FaceChange): a bot's screen's, and a pet's (PetSprite). */
+export interface FaceChanges {
+  /** Where the face's change is at second `s`, worked out once a frame. */
+  readonly at: (s: number) => FaceChange
+  /** What the face shows now. */
+  readonly shown: () => ShownFace
+  /** What a change under way brings in; undefined, none is under way. */
+  readonly coming: () => ShownFace | undefined
+  /** The flash shown and the second it came in (FLASH_S); undefined, none has. */
+  readonly flash: () => { readonly colour: Phosphor; readonly at: number } | undefined
+}
+
+/**
+ * A face's changes (FaceChange), read from what it is asked to show each
+ * frame: `wantedNow` its eyes, colour and what it is doing, `flashNow` the
+ * flash asked for, `bootAt` the second its screen switches on. One for every
+ * face that performs them, so a pet with a screen changes as a bot does.
+ */
+export function faceChanges(
+  wantedNow: () => ShownFace,
+  flashNow: () => Phosphor | undefined,
+  bootAt: () => number | undefined = () => undefined
+): FaceChanges {
+  // A face shows what it first appears in at once.
+  let shown: ShownFace = wantedNow()
+  // The flash shown (flashNow), and when it came in on this face's clock (FLASH_S): on the first frame that moves, or with a change's new eyes.
+  let flashShown: Phosphor | undefined
+  let flashAt = Number.NEGATIVE_INFINITY
+  // The change under way (FaceChange): when its eyes began to shut, what it brings in, and whether that is in yet.
+  let swap: { readonly start: number; readonly to: ShownFace; readonly in: boolean } | undefined
+  /** 0 open, 1 shut: how far the change-blink has the eyes closed this frame. */
+  let swapShut = 0
+  // When the state shown began (FaceChange.since), how many changes there have been, and the second last read.
+  let since = 0
+  let changes = 0
+  let changedAt = Number.NaN
+  let changeNow: FaceChange = { since: 0, open: true, shut: 0, quiet: true, count: 0, eyes: shown.pair }
+  const sameEyes = (a: EyeGlyphs | undefined, b: EyeGlyphs | undefined): boolean => (a?.join('') ?? '') === (b?.join('') ?? '')
+  const sameShown = (a: ShownFace, b: ShownFace): boolean => sameEyes(a.pair, b.pair) && a.tone === b.tone && a.key === b.key
+  const at = (s: number): FaceChange => {
+    // A still bot, at second 0 every frame, keeps nothing from one frame to the next.
+    if (s === changedAt && s !== 0) return changeNow
+    changedAt = s
+    const wanted = wantedNow()
+    const flash = flashNow()
+    if (s === 0) {
+      // Still: nothing to perform, and nothing flashes.
+      swap = undefined
+      swapShut = 0
+      shown = wanted
+      flashShown = undefined
+      since = 0
+    } else {
+      if (!sameShown(swap?.to ?? shown, wanted)) {
+        // A change. Asked for while one is under way, the lids go on from where they are: still shutting, they shut
+        // on the newest; opening, they shut again from as far open as they have come.
+        const p = swap === undefined ? 1 : (s - swap.start) / SWAP_S
+        swap = { start: swap === undefined || p >= 1 ? s : p < 0.5 ? swap.start : s - (1 - p) * SWAP_S, to: wanted, in: false }
+        changes += 1
+      }
+      if (swap !== undefined) {
+        const p = (s - swap.start) / SWAP_S
+        if (p >= 0.5 && !swap.in) {
+          // Under the shut lids: the new eyes, in their colour, and the state begins as they open...
+          swap = { ...swap, in: true }
+          shown = swap.to
+          since = swap.start + SWAP_S
+          // ...with the flash they come in with, from the moment they come in.
+          if (flash !== flashShown) {
+            flashShown = flash
+            flashAt = swap.start + SWAP_S / 2
+          }
+        }
+        swapShut = p >= 1 ? 0 : p < 0.5 ? p * 2 : (1 - p) * 2
+        if (p >= 1) swap = undefined
+      }
+      // A flash with no change to bring it in comes in at once.
+      if (flash !== flashShown && (swap === undefined || swap.in)) {
+        flashShown = flash
+        flashAt = s
+      }
+    }
+    const boot = bootAt()
+    const quiet = swap === undefined && (s === 0 || ((flashShown === undefined || flashFade(s - flashAt) >= 1) && (boot === undefined || s - boot >= POWER_ON_S)))
+    changeNow = { since, open: swap === undefined, shut: swapShut, quiet, count: changes, eyes: shown.pair }
+    return changeNow
+  }
+  return {
+    at,
+    shown: () => shown,
+    coming: () => swap?.to,
+    flash: () => (flashShown === undefined ? undefined : { colour: flashShown, at: flashAt })
+  }
+}
+
+/** A screen's light at second `s`: its own colour, or a flash easing back to it (FLASH_S). */
+export function screenLight(
+  tone: Phosphor,
+  flash: { readonly colour: Phosphor; readonly at: number } | undefined,
+  s: number
+): { readonly lit: string; readonly glow: string } {
+  const own = PHOSPHOR[tone]
+  if (flash === undefined) return own
+  const k = flashFade(s - flash.at)
+  if (k >= 1) return own
+  return { lit: mixPhosphor(PHOSPHOR[flash.colour].lit, own.lit, k), glow: mixPhosphor(PHOSPHOR[flash.colour].glow, own.glow, k) }
+}
+
+/**
+ * A glyph's strokes as a path at the context's transform (the eye's centre),
+ * moved and squashed by `motion` and a blink, `scale` context units to a
+ * glyph unit. A dot cannot be squashed (it has no length): it blinks into a
+ * dash instead (blinkingDot). Returns the weight to stroke it at, in glyph units.
+ */
+export function traceGlyph(context: CanvasRenderingContext2D, glyph: GlyphShape, motion: GlyphMotion, scale: number, blinkSquash: number): number {
+  const closing = glyph === DOT_GLYPH ? Math.max(0, Math.min(1, (1 - blinkSquash) / 0.92)) : 0
+  const shape = closing > 0 ? blinkingDot(closing) : glyph
+  const squash = closing > 0 ? 1 : blinkSquash
+  context.beginPath()
+  for (const line of shape.lines) {
+    for (let i = 0; i < line.length; i += 2) {
+      const x = ((line[i] ?? 0) * motion.sx + motion.dx) * scale
+      const y = ((line[i + 1] ?? 0) * motion.sy * squash + motion.dy) * scale
+      if (i === 0) context.moveTo(x, y)
+      else context.lineTo(x, y)
+    }
+  }
+  if (shape.ring !== undefined) {
+    const r = shape.ring * scale
+    context.ellipse(motion.dx * scale, motion.dy * scale, r * motion.sx, Math.max(0.3, r * motion.sy * squash), 0, 0, Math.PI * 2)
+  }
+  return shape.weight
+}
+
 /**
  * The context's own `stroke`, `fill` and `translate`, shadowed on this one
  * context (cheaper than wrapping every call of every frame). `frame()` is
@@ -920,26 +1068,14 @@ export function withGlyphEyes(
   let lag = LAG_REST
   let body: { readonly at: number; readonly y: number; readonly vy: number } | undefined
   let seconds = 0
-  /** What a face shows: its eyes, their colour, and what it is doing (FaceChange). */
-  interface Shown {
-    readonly pair: EyeGlyphs | undefined
-    readonly tone: Phosphor
-    readonly key: string | undefined
-  }
-  // A face shows what it first appears in at once.
-  let shown: Shown = { pair: eyesNow(), tone: paint.phosphorNow?.() ?? 'cyan', key: paint.keyNow?.() }
-  // The flash shown (flashNow), and when it came in on this bot's clock (FLASH_S): on the first frame that moves, or with a change's new eyes.
-  let flashShown: Phosphor | undefined
-  let flashAt = Number.NEGATIVE_INFINITY
-  // The change under way (FaceChange): when its eyes began to shut, what it brings in, and whether that is in yet.
-  let swap: { readonly start: number; readonly to: Shown; readonly in: boolean } | undefined
-  /** 0 open, 1 shut: how far the change-blink has the eyes closed this frame. */
+  // The face's changes (faceChanges), and from the last read of them: how shut its change-blink has the eyes, and when the state shown began.
+  const changes = faceChanges(
+    () => ({ pair: eyesNow(), tone: paint.phosphorNow?.() ?? 'cyan', key: paint.keyNow?.() }),
+    () => paint.flashNow?.(),
+    () => paint.bootAt?.()
+  )
   let swapShut = 0
-  // When the state shown began (FaceChange.since), how many changes there have been, and the second last read.
   let since = 0
-  let changes = 0
-  let changedAt = Number.NaN
-  let changeNow: FaceChange = { since: 0, open: true, shut: 0, quiet: true, count: 0, eyes: shown.pair }
   /*
    * A SCREEN'S EYES OPEN WHEN THE BOT WAKES. The rig closes its eyes to sleep
    * and opens them again slowly, over seconds, and a screen's glyphs followed
@@ -958,7 +1094,6 @@ export function withGlyphEyes(
     shutSince ??= seconds
     return seconds - shutSince > BLINK_S ? 1 : open
   }
-  const sameEyes = (a: EyeGlyphs | undefined, b: EyeGlyphs | undefined): boolean => (a?.join('') ?? '') === (b?.join('') ?? '')
   let leftHidden = false
   let face: DOMMatrix | undefined
   /*
@@ -1060,35 +1195,19 @@ export function withGlyphEyes(
    * widest -- at sidebar sizes, a dot that changed size as it turned.
    */
   const drawGlyph = (glyph: GlyphShape, motion: GlyphMotion, scale: number, blinkSquash: number, steady?: number): void => {
-    // A dot cannot be squashed (it has no length): it blinks into a dash instead (blinkingDot).
-    const closing = glyph === DOT_GLYPH ? Math.max(0, Math.min(1, (1 - blinkSquash) / 0.92)) : 0
-    const shape = closing > 0 ? blinkingDot(closing) : glyph
-    const squash = closing > 0 ? 1 : blinkSquash
     context.lineCap = 'round'
     context.lineJoin = 'round'
-    context.lineWidth = shape.weight * scale
     context.strokeStyle = lit
     if (glow !== undefined) {
       context.shadowColor = glow
       context.shadowBlur = 3.2 * paint.pixelsPerUnit
     }
-    context.beginPath()
-    for (const line of shape.lines) {
-      for (let i = 0; i < line.length; i += 2) {
-        const x = ((line[i] ?? 0) * motion.sx + motion.dx) * scale
-        const y = ((line[i + 1] ?? 0) * motion.sy * squash + motion.dy) * scale
-        if (i === 0) context.moveTo(x, y)
-        else context.lineTo(x, y)
-      }
-    }
-    if (shape.ring !== undefined) {
-      const r = shape.ring * scale
-      context.ellipse(motion.dx * scale, motion.dy * scale, r * motion.sx, Math.max(0.3, r * motion.sy * squash), 0, 0, Math.PI * 2)
-    }
+    const weight = traceGlyph(context, glyph, motion, scale, blinkSquash)
+    context.lineWidth = weight * scale
     if (steady !== undefined) {
       // The path is where the plane put it; the stroke's weight is laid on flat.
       context.setTransform(1, 0, 0, 1, 0, 0)
-      context.lineWidth = shape.weight * steady
+      context.lineWidth = weight * steady
     }
     stroke()
   }
@@ -1117,7 +1236,7 @@ export function withGlyphEyes(
     // Switching on, the eyes are dark until the flash has settled, then blink open.
     const booted = boot === undefined ? 1 : powerOnEyes(boot)
     if (booted <= 0) return
-    const pair = shown.pair ?? SCREEN_RESTING_EYES
+    const pair = changes.shown().pair ?? SCREEN_RESTING_EYES
     const { scale, centres } = screenEyeLayout(box, pair, look, paint.eyeY ?? 1)
     // As shut as the more shut of its blinks: one of the rig's, should it fall in a change, joins the change's own.
     const squash = 1 - 0.92 * Math.max(1 - open * booted, swapShut)
@@ -1148,7 +1267,7 @@ export function withGlyphEyes(
       if (drawn === 1) screenEyes(screenOpenness(eyeOpenness(context.lineWidth)))
       return
     }
-    const pair = shown.pair
+    const pair = changes.shown().pair
     const shape = GLYPH_SHAPES[pair?.[left ? 0 : 1] ?? '']
     if (shape === undefined) {
       // Not a glyph we draw: the rig's own eye, in the face's colour.
@@ -1173,55 +1292,12 @@ export function withGlyphEyes(
     context.fillStyle = paint.ink
     return fill(...args)
   }
-  const sameShown = (a: Shown, b: Shown): boolean => sameEyes(a.pair, b.pair) && a.tone === b.tone && a.key === b.key
   /** The face's change at second `s` (FaceChange), worked out once a frame. */
   const change = (s: number): FaceChange => {
-    // A still bot, at second 0 every frame, keeps nothing from one frame to the next.
-    if (s === changedAt && s !== 0) return changeNow
-    changedAt = s
-    const wanted: Shown = { pair: eyesNow(), tone: paint.phosphorNow?.() ?? 'cyan', key: paint.keyNow?.() }
-    const flash = paint.flashNow?.()
-    if (s === 0) {
-      // Still: nothing to perform, and nothing flashes.
-      swap = undefined
-      swapShut = 0
-      shown = wanted
-      flashShown = undefined
-      since = 0
-    } else {
-      if (!sameShown(swap?.to ?? shown, wanted)) {
-        // A change. Asked for while one is under way, the lids go on from where they are: still shutting, they shut
-        // on the newest; opening, they shut again from as far open as they have come.
-        const p = swap === undefined ? 1 : (s - swap.start) / SWAP_S
-        swap = { start: swap === undefined || p >= 1 ? s : p < 0.5 ? swap.start : s - (1 - p) * SWAP_S, to: wanted, in: false }
-        changes += 1
-      }
-      if (swap !== undefined) {
-        const p = (s - swap.start) / SWAP_S
-        if (p >= 0.5 && !swap.in) {
-          // Under the shut lids: the new eyes, in their colour, and the state begins as they open...
-          swap = { ...swap, in: true }
-          shown = swap.to
-          since = swap.start + SWAP_S
-          // ...with the flash they come in with, from the moment they come in.
-          if (flash !== flashShown) {
-            flashShown = flash
-            flashAt = swap.start + SWAP_S / 2
-          }
-        }
-        swapShut = p >= 1 ? 0 : p < 0.5 ? p * 2 : (1 - p) * 2
-        if (p >= 1) swap = undefined
-      }
-      // A flash with no change to bring it in comes in at once.
-      if (flash !== flashShown && (swap === undefined || swap.in)) {
-        flashShown = flash
-        flashAt = s
-      }
-    }
-    const bootAt = paint.bootAt?.()
-    const quiet = swap === undefined && (s === 0 || ((flashShown === undefined || flashFade(s - flashAt) >= 1) && (bootAt === undefined || s - bootAt >= POWER_ON_S)))
-    changeNow = { since, open: swap === undefined, shut: swapShut, quiet, count: changes, eyes: shown.pair }
-    return changeNow
+    const now = changes.at(s)
+    swapShut = now.shut
+    since = now.since
+    return now
   }
   return {
     change,
@@ -1230,17 +1306,10 @@ export function withGlyphEyes(
       seconds = s
       change(s)
       if (screen !== undefined) {
-        const phosphor = PHOSPHOR[shown.tone]
-        lit = phosphor.lit
-        glow = phosphor.glow
         // A flash: its colour as it comes in, easing back to the eyes' own (FLASH_S). A still bot never flashes.
-        if (flashShown !== undefined) {
-          const k = flashFade(s - flashAt)
-          if (k < 1) {
-            lit = mixPhosphor(PHOSPHOR[flashShown].lit, phosphor.lit, k)
-            glow = mixPhosphor(PHOSPHOR[flashShown].glow, phosphor.glow, k)
-          }
-        }
+        const light = screenLight(changes.shown().tone, changes.flash(), s)
+        lit = light.lit
+        glow = light.glow
       }
       // The screen turns with the body's front, all the way (frontPlane).
       plane = frontPlane(pose.yaw, pose.pitch, faceAt)
@@ -1272,7 +1341,7 @@ export function withGlyphEyes(
       front = undefined
     },
     /** Whether this frame draws glyphs (or is blinking between them): the rig must then draw its eyes in GLYPH_INK. */
-    drawsGlyphs: () => shown.pair !== undefined || swap?.to.pair !== undefined
+    drawsGlyphs: () => changes.shown().pair !== undefined || changes.coming()?.pair !== undefined
   }
 }
 
@@ -2001,8 +2070,7 @@ function RiggedBot({
 
   // Declared before the rig's effect, so the very first frame of a face that powers on is already dark.
   useEffect(() => {
-    if (bootKey === undefined || BOOTED.has(bootKey)) return
-    BOOTED.add(bootKey)
+    if (!firstBoot(bootKey)) return
     bootWanted.current = true
   }, [bootKey])
 

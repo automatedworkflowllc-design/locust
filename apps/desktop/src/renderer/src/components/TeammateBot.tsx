@@ -3,11 +3,13 @@ import type { ReactElement } from 'react'
 import type { BotAvatarState } from 'bot-avatars'
 
 import { botFor } from '../../../shared/avatar.js'
+import { useTerminalFaces } from '../botLook.js'
 import { MOMENT_EVERY, useIdleMoment, useListening } from '../faceLife.js'
 import type { IdleMoment } from '../faceLife.js'
 import type { FaceActivity } from '../faceState.js'
 import type { GlanceSide } from '../glances.js'
 import { petStateFor } from '../petMotion.js'
+import { routineFor } from '../petRoutines.js'
 import { usePetLook } from '../pets.js'
 import { Bot } from './Bot.js'
 import type { BotMood, EyeGlyphs, Glance, Phosphor } from './Bot.js'
@@ -361,20 +363,28 @@ export function TeammateBot({
   }
   /*
    * A PET FOR A FACE (0.563): in the bot's box, with the bot's ring, dot and
-   * mark -- "these should be the exact same as teammates". Never a screen or
-   * code eyes ("the new eyes will have to be isolated to our current
-   * sprites"), and no bounce: a pet's own rows are its motion. A pet that
-   * cannot be drawn -- its file gone or unreadable -- shows the bot instead,
-   * never an empty box.
+   * mark -- "these should be the exact same as teammates". No bounce: a pet's
+   * own drawings are its motion. A pet that cannot be drawn -- its file gone
+   * or unreadable -- shows the bot instead, never an empty box.
+   *
+   * Code eyes stayed the bots' own (*"the new eyes will have to be isolated to
+   * our current sprites"*) -- until a pet's drawings were measured for a
+   * screen (2026-10-05, petScreens.ts): Codex Buddy. While Terminal faces is
+   * on, he wears one unless his teammate's look says as drawn (PetRef.screen),
+   * with a bot's eyes and their changes, a bot's everyday life at rest, and
+   * his own moves for each (petRoutines.ts).
    */
   const pet = avatar.pet
   const petNow = usePetLook(pet)
   const wearsPet = pet !== undefined && petNow?.status !== 'missing'
-  // Its everyday life (faceLife.ts): a bot's, not a pet's, whose own rows are its motion.
-  const atRest = shownActivity === 'idle' && !wearsPet
+  const terminal = useTerminalFaces()
+  const routine = wearsPet && terminal && pet.screen !== false && petNow?.status === 'ready' && petNow.atlas.screen !== undefined ? routineFor(pet.id) : undefined
+  // Its everyday life (faceLife.ts): a bot's, and a screen-faced pet's; any other pet's own rows are its motion.
+  const answers = !wearsPet || routine !== undefined
+  const atRest = shownActivity === 'idle' && answers
   const listening = useListening(hears && atRest)
-  const moment = useIdleMoment(atRest && presenceSized && !noticed && !listening, seed, MOMENT_EVERY[motion])
-  const face = everydayFace(shownActivity, { noticed: noticed && !wearsPet, listening, moment })
+  const moment = useIdleMoment(atRest && presenceSized && !noticed && !listening, seed, MOMENT_EVERY[motion], routine?.moment)
+  const face = everydayFace(shownActivity, { noticed: noticed && answers, listening, moment })
   const notice = (on: boolean): void => {
     if (dwell.current !== undefined) clearTimeout(dwell.current)
     dwell.current = undefined
@@ -392,11 +402,31 @@ export function TeammateBot({
       data-motion={motion}
       {...(teammateId === undefined ? {} : { 'data-teammate': teammateId })}
       {...(face.key === shownActivity ? {} : { 'data-life': face.key })}
-      {...(presenceSized && !wearsPet ? { onPointerEnter: () => notice(true), onPointerLeave: () => notice(false) } : {})}
+      {...(presenceSized && answers ? { onPointerEnter: () => notice(true), onPointerLeave: () => notice(false) } : {})}
     >
       {activity === 'waiting' && <span className="lc-bot__ring" />}
       {wearsPet ? (
-        <PetSprite pet={pet} size={size} state={petStateFor(shownActivity)} {...(glance === undefined ? {} : { glance })} />
+        <PetSprite
+          pet={pet}
+          size={size}
+          state={petStateFor(shownActivity)}
+          {...(glance === undefined ? {} : { glance })}
+          {...(routine === undefined
+            ? {}
+            : {
+                screen: {
+                  eyes: face.eyes,
+                  phosphor: phosphorFor(shownActivity),
+                  ...(flashFor(shownActivity) === undefined ? {} : { flash: flashFor(shownActivity) }),
+                  key: face.key,
+                  move: routine.moveFor(face.key, face.glance?.x, motion),
+                  rests: paused && glance === undefined && !face.lively
+                },
+                seed,
+                ...((teammateId ?? name) === undefined ? {} : { bootKey: teammateId ?? name }),
+                ...(motionPresence === undefined ? {} : { motionPresence })
+              })}
+        />
       ) : (
         <Bot
           type={bot.shape}

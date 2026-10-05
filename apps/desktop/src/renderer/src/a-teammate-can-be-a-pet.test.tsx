@@ -17,7 +17,9 @@ import { setPetLook } from './pets.js'
  * teammates" -- and "the new eyes will have to be isolated to our current
  * sprites". So a pet is drawn in a bot's place with a bot's marks (the
  * waiting ring, the presence dot), never with a screen or code eyes, and a
- * pet that cannot be drawn shows the bot instead of an empty box.
+ * pet that cannot be drawn shows the bot instead of an empty box. The one
+ * exception is a pet whose every drawing was measured for a screen, Codex
+ * Buddy (2026-10-05: codex-buddy-wears-a-screen.test.tsx).
  */
 
 const CAT: PetRef = { source: 'bundled', id: 'hoodie-cat' }

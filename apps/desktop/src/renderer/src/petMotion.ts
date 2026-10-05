@@ -23,6 +23,7 @@ import type { GlanceSide } from './glances.js'
  *   - stuck: the failure, twice, then held on its lowest moment, so a stuck
  *     teammate looks stuck until someone helps.
  */
+// A pet whose drawings have been read as moves (petRoutines.ts: Codex Buddy, with his screen) does its own instead.
 export function petStateFor(activity: FaceActivity): PetState {
   switch (activity) {
     case 'thinking':

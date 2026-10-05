@@ -125,6 +125,13 @@ export type PetSource = 'gallery' | 'codex' | 'bundled'
 export interface PetRef {
   readonly source: PetSource
   readonly id: string
+  /**
+   * Wears a screen for a face, where its drawings have been measured for one
+   * (2026-10-05, renderer/src/petScreens.ts: Codex Buddy). Absent: it does
+   * while Terminal faces is on, as a bot whose shape suits one; false: the
+   * face its maker drew. Any other pet has no screen to wear.
+   */
+  readonly screen?: boolean
 }
 
 /** OpenPets' own rule for a pet's id (catalog-validation.ts), 'builtin' being theirs. */
@@ -135,7 +142,11 @@ export function isPetId(value: unknown): value is string {
 export function isPetRef(value: unknown): value is PetRef {
   if (typeof value !== 'object' || value === null) return false
   const record = value as Record<string, unknown>
-  return (record.source === 'gallery' || record.source === 'codex' || record.source === 'bundled') && isPetId(record.id)
+  return (
+    (record.source === 'gallery' || record.source === 'codex' || record.source === 'bundled') &&
+    isPetId(record.id) &&
+    (record.screen === undefined || typeof record.screen === 'boolean')
+  )
 }
 
 export function samePet(a: PetRef | undefined, b: PetRef | undefined): boolean {
@@ -231,7 +242,9 @@ export function cleanAvatar(avatar: AvatarSpec): AvatarSpec {
     ...(avatar.bot === undefined
       ? {}
       : { bot: { shape: avatar.bot.shape, face: avatar.bot.face, ...(typeof avatar.bot.screen === 'boolean' ? { screen: avatar.bot.screen } : {}) } }),
-    ...(avatar.pet === undefined ? {} : { pet: { source: avatar.pet.source, id: avatar.pet.id } })
+    ...(avatar.pet === undefined
+      ? {}
+      : { pet: { source: avatar.pet.source, id: avatar.pet.id, ...(typeof avatar.pet.screen === 'boolean' ? { screen: avatar.pet.screen } : {}) } })
   }
 }
 

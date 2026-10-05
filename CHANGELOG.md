@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.642.0 - 2026-10-05
+
+### New
+
+- **Codex Buddy wears a terminal screen, and lifts in sets.** A teammate drawn as the Codex Buddy pet can now wear the same screen and eyes as Locust's own teammates: his glass over his face, the teammates' eyes on it, blinking as theirs do. While he works he goes round all his lifts in sets (press, curls, squats, bench, pull-ups, a carry); beside a name he keeps to the standing lifts. He waves when you point at him, does a chin-up when he is done, and is stuck under the bench when he cannot run. At the small sizes he is drawn at, he is framed from his cap to his waist so his face can be read. Choose Screen or As drawn in the teammate's look; the screen shows while Terminal faces is on. At rest he draws nothing.
+
 ## 0.641.0 - 2026-10-05
 
 ### Fixed
