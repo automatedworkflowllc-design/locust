@@ -10,6 +10,7 @@ import { Beam } from './Beam.js'
 import { Bot } from './Bot.js'
 import type { BotType, Glance } from './Bot.js'
 import { PoweredLockup } from './PoweredLockup.js'
+import { COVER_REST_AFTER_MS, useCoverActivity } from '../useCoverActivity.js'
 
 /**
  * THE DESIGN SYSTEM'S COVER, ON THE HOME SCREEN.
@@ -241,7 +242,7 @@ export const DOZE_AFTER_MS = 4_000
  * other windows: its bots drawn still, the ghost's float and the waiting ring
  * held. The next pointer, key or wheel wakes it.
  */
-export const REST_AFTER_MS = 30_000
+export const REST_AFTER_MS = COVER_REST_AFTER_MS
 
 export interface Wakefulness {
   readonly awake: boolean
@@ -346,8 +347,9 @@ function reducedMotion(): boolean {
 }
 
 /** The swarm, once: every flight, then it tells the cover it has gone. */
-function SwarmRun({ scale, originX = 0, onGone }: { readonly scale: number; readonly originX?: number; readonly onGone: () => void }): ReactElement {
+function SwarmRun({ scale, originX = 0, onGone, paused, presence }: { readonly scale: number; readonly originX?: number; readonly onGone: () => void; readonly paused: boolean; readonly presence: import('../windowPresence.js').WindowPresence }): ReactElement {
   const flyers = useRef<(HTMLSpanElement | null)[]>([])
+  const flights = useRef<Animation[]>([])
   useEffect(() => {
     const running: Animation[] = []
     for (const [index, flight] of SWARM_FLIGHTS.entries()) {
@@ -366,6 +368,8 @@ function SwarmRun({ scale, originX = 0, onGone }: { readonly scale: number; read
       onGone()
       return undefined
     }
+    flights.current = running
+    if (paused) for (const animation of running) animation.pause()
     let flying = running.length
     for (const animation of running) {
       animation.onfinish = () => {
@@ -378,6 +382,12 @@ function SwarmRun({ scale, originX = 0, onGone }: { readonly scale: number; read
     }
     // One run per mount: the cover gives each run its own key.
   }, [])
+  useEffect(() => {
+    for (const animation of flights.current) {
+      if (paused) animation.pause()
+      else if (animation.playState === 'paused') animation.play()
+    }
+  }, [paused])
   return (
     <span className="lc-cover__swarm" aria-hidden="true" style={originX === 0 ? undefined : { transform: `translateX(${String(originX)}px)` }}>
       {SWARM_FLIGHTS.map((flight, index) => (
@@ -389,7 +399,7 @@ function SwarmRun({ scale, originX = 0, onGone }: { readonly scale: number; read
           }}
           style={{ width: Math.round(flight.size * scale), height: Math.round(flight.size * scale) }}
         >
-          <Bot type="swarm" size={Math.round(flight.size * scale)} state="default" jumpEvery={0} seed={0.11 + index * 0.13} />
+          <Bot type="swarm" size={Math.round(flight.size * scale)} state="default" jumpEvery={0} seed={0.11 + index * 0.13} motionPresence={presence} />
         </span>
       ))}
     </span>
@@ -401,7 +411,8 @@ export function HomeCover({
   tube,
   swarmCalls = 0,
   grow = 1,
-  status
+  status,
+  activity
 }: {
   /** The runtimes have answered: the loading screen's work is done. */
   readonly ready: boolean
@@ -415,6 +426,7 @@ export function HomeCover({
    * the claim (glassStatus, homeCoverStatus.ts). Absent: the claim.
    */
   readonly status?: string
+  readonly activity?: unknown
 }): ReactElement {
   const card = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(() => coverScale(0))
@@ -435,66 +447,8 @@ export function HomeCover({
     if (!reducedMotion()) setSwarmRun(swarmCalls)
   }, [swarmCalls])
   const swarmGone = useCallback(() => setSwarmRun(undefined), [])
-  /*
-   * RESTING WHILE NOBODY IS LOOKING. The three move on every frame, and
-   * plastic is lit per pixel: measured on the built app, about 11% of the
-   * renderer while the home screen is up. A home screen left open behind
-   * other work was paying that for no one. So they rest while the window is
-   * in the background and pick up again when it comes back; a hidden window
-   * already stops them.
-   */
-  const [focused, setFocused] = useState(() => typeof document === 'undefined' || document.hasFocus())
-  useEffect(() => {
-    const wake = (): void => setFocused(true)
-    const rest = (): void => setFocused(false)
-    window.addEventListener('focus', wake)
-    window.addEventListener('blur', rest)
-    // The window is shown, and focused, as the app loads: a focus that lands
-    // between the first render and these listeners is missed by both, and
-    // the loading beam would wait for the next one. Read it now instead.
-    setFocused(document.hasFocus())
-    return () => {
-      window.removeEventListener('focus', wake)
-      window.removeEventListener('blur', rest)
-    }
-  }, [])
-  /*
-   * ...AND WHILE NOBODY IS TOUCHING IT (0.305). A beta tester: "Lowkey my
-   * computer feels noticeably slower while running locust". Measured on
-   * 0.302, the home screen IN FRONT cost 39.6% of one core, for as long as it
-   * was up, whether anyone was there or not. So the cover also rests once no
-   * pointer, key or wheel has touched the window for REST_AFTER_MS. A move
-   * that lands while it is awake only notes the time: nothing re-renders.
-   */
-  const [touched, setTouched] = useState(true)
-  useEffect(() => {
-    let lastTouch = performance.now()
-    let timer: number | undefined
-    const check = (): void => {
-      const idle = performance.now() - lastTouch
-      if (idle >= REST_AFTER_MS) {
-        timer = undefined
-        setTouched(false)
-      } else {
-        timer = window.setTimeout(check, REST_AFTER_MS - idle + 50)
-      }
-    }
-    const touch = (): void => {
-      lastTouch = performance.now()
-      if (timer === undefined) {
-        setTouched(true)
-        timer = window.setTimeout(check, REST_AFTER_MS + 50)
-      }
-    }
-    timer = window.setTimeout(check, REST_AFTER_MS + 50)
-    const events = ['pointermove', 'pointerdown', 'keydown', 'wheel', 'focus'] as const
-    for (const name of events) window.addEventListener(name, touch, { passive: true })
-    return () => {
-      window.clearTimeout(timer)
-      for (const name of events) window.removeEventListener(name, touch)
-    }
-  }, [])
-  const awake = focused && touched
+  const { paused, presence } = useCoverActivity(activity)
+  const awake = !paused
 
   /*
    * THE PARTS' CLOCK. It runs only while the cover does -- ready, in front,
@@ -624,12 +578,12 @@ export function HomeCover({
      * does not wait for the window's focus as the bots do: loading is a few
      * seconds, and a window that is still being shown may not have it yet.
      */
-      <div className={`lc-cover lc-cover--machine${claimFits ? '' : ' is-claimless'}`} ref={card} style={{ '--lc-cover-k': String(drawn) } as CSSProperties}>
+      <div className={`lc-cover lc-cover--machine${paused ? ' is-paused' : ''}${claimFits ? '' : ' is-claimless'}`} ref={card} style={{ '--lc-cover-k': String(drawn) } as CSSProperties}>
         <div
           className="lc-cover__machineslot"
           style={{ left: atX(COVER_MACHINE.x), top: at(COVER_MACHINE.y), width: at(COVER_MACHINE.width), height: at(COVER_MACHINE.height) }}
         >
-          <Beam size="md" strength={0.85} active={!ready} className="lc-coverbeam lc-coverbeam--machine">
+          <Beam size="md" strength={0.85} active={!ready} compositor className="lc-coverbeam lc-coverbeam--machine">
             <div className="lc-cover__machine">
               {/* A click on the glass powers the lockup on again (PoweredLockup's `replay`). */}
               <div className="lc-cover__glass" onClick={ready ? () => setRelights((count) => count + 1) : undefined}>
@@ -648,7 +602,7 @@ export function HomeCover({
             </div>
           </Beam>
         </div>
-        {swarmRun !== undefined && <SwarmRun key={swarmRun} scale={drawn} originX={originX} onGone={swarmGone} />}
+        {swarmRun !== undefined && <SwarmRun key={swarmRun} scale={drawn} originX={originX} onGone={swarmGone} paused={paused} presence={presence} />}
         {COVER_CAST.map((mate, index) => {
           const size = at(FACE)
           const color = mate.hue === undefined ? undefined : hueColor(mate.hue)
@@ -658,7 +612,7 @@ export function HomeCover({
           // No presence dot on a character (0.610): "two wear the live dot while your team is idle" (Colin's
           // mockup, 2026-10-04). Who is really working is said on the glass.
           const dot: 'amber' | 'live' | undefined = undefined
-          const glance = ready && awake ? glanceOf(beat) : undefined
+          const glance = ready ? glanceOf(beat) : undefined
           return (
             <span key={mate.key} className="lc-cover__face" style={{ left: atX(mate.x), top: at(mate.y) }}>
               <span
@@ -684,7 +638,8 @@ export function HomeCover({
                   type={mate.type}
                   size={size}
                   state={ready ? state : 'default'}
-                  paused={!ready || !awake}
+                  paused={!ready || reducedMotion()}
+                  motionPresence={presence}
                   interactive
                   seed={0.2 + index * 0.3}
                   phosphor={beat.phosphor}

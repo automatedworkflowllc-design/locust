@@ -4638,9 +4638,39 @@ textarea {
 }
 
 .lc-coverbeam--machine {
+  position: relative;
   width: 100%;
   height: 100%;
   border-radius: calc(18px * var(--lc-cover-k));
+}
+
+/* Same quiet mono loading light, on a prepainted layer rotated by the compositor. */
+.lc-coverbeam__light {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  pointer-events: none;
+  overflow: hidden;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+.lc-coverbeam__light::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 200%;
+  aspect-ratio: 1;
+  pointer-events: none;
+  background: conic-gradient(from 0deg, transparent 0% 54%, rgba(255, 255, 255, 0.08) 60%, rgba(255, 255, 255, 0.45) 66%, rgba(255, 255, 255, 0.75) 70%, transparent 78% 100%);
+  animation: lcCoverLoading 4s linear infinite;
+}
+
+@keyframes lcCoverLoading {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
 }
 
 .lc-cover__machine {
@@ -4706,6 +4736,14 @@ textarea {
   position: absolute;
   display: block;
   line-height: 0;
+}
+
+/* Hold the current drawing, including the lockup and library CSS, on one class. */
+.lc-cover.is-paused,
+.lc-cover.is-paused *,
+.lc-cover.is-paused *::before,
+.lc-cover.is-paused *::after {
+  animation-play-state: paused !important;
 }
 
 /*
@@ -4803,7 +4841,6 @@ textarea {
   display: block;
   line-height: 0;
   opacity: 0;
-  will-change: transform, opacity;
 }
 
 /*
@@ -5154,6 +5191,33 @@ textarea {
   transform: translateY(-110%);
 }
 
+.lc-lockup__lit {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: inherit;
+  color: var(--lc-lime);
+  filter: drop-shadow(0 0 12px var(--lc-boot-glow-soft));
+  opacity: 0;
+  pointer-events: none;
+}
+
+.lc-lockup.is-powering .lc-lockup__lit {
+  animation: lcLockupGlow 2.6s ease-out both;
+}
+
+.lc-lockup.is-relighting .lc-lockup__lit {
+  animation: lcLockupGlow 2.2s ease-out both;
+}
+
+@keyframes lcLockupGlow {
+  0%, 8% { opacity: 0; }
+  19%, 50% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 .lc-lockup.is-powering {
   animation: lcLockupPower 2.6s ease-out both;
 }
@@ -5176,8 +5240,6 @@ textarea {
 @keyframes lcLockupPower {
   0% {
     opacity: 0;
-    color: var(--lc-lime);
-    filter: drop-shadow(0 0 0 transparent);
   }
   5% {
     opacity: 1;
@@ -5193,42 +5255,25 @@ textarea {
   }
   19% {
     opacity: 1;
-    color: var(--lc-lime);
-    filter: drop-shadow(0 0 12px var(--lc-boot-glow-soft));
-  }
-  55% {
-    color: var(--lc-lime);
-    filter: drop-shadow(0 0 10px var(--lc-boot-glow-soft));
   }
   100% {
     opacity: 1;
-    color: var(--lc-text-primary);
-    filter: drop-shadow(0 0 0 transparent);
   }
 }
 
 /* Again, from lit: it never goes dark, it only catches the lime once more. */
 @keyframes lcLockupRelight {
   0% {
-    color: var(--lc-text-primary);
-    filter: drop-shadow(0 0 0 transparent);
+    opacity: 1;
   }
   10% {
     opacity: 0.8;
   }
   14% {
     opacity: 1;
-    color: var(--lc-lime);
-    filter: drop-shadow(0 0 12px var(--lc-boot-glow-soft));
-  }
-  50% {
-    color: var(--lc-lime);
-    filter: drop-shadow(0 0 10px var(--lc-boot-glow-soft));
   }
   100% {
     opacity: 1;
-    color: var(--lc-text-primary);
-    filter: drop-shadow(0 0 0 transparent);
   }
 }
 
@@ -5260,6 +5305,7 @@ textarea {
   .lc-lockup.is-powering,
   .lc-lockup.is-relighting,
   .lc-lockup .lc-lockup__tube,
+  .lc-lockup .lc-lockup__lit,
   .lc-lockup .lc-lockup__sweep {
     animation: none;
   }

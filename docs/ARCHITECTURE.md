@@ -35,6 +35,17 @@ came from Locust's own window and its top frame (`fromOwnWindow` in
 
 So the window can show, and ask. It cannot do.
 
+Home's decorative cover holds its current frame after 45 seconds without
+pointer, keyboard, wheel or arriving run activity, and immediately while
+unfocused, hidden or under reduced motion (`renderer/src/useCoverActivity.ts`).
+One class on the cover pauses CSS animations; the same hook's presence stops
+canvas frame requests without rebuilding the bots (`components/HomeCover.tsx`,
+`components/Bot.tsx`). Arriving work reaches the hook through `App.tsx` and
+`components/FirstLaunch.tsx`. The cover's keyframes only animate transform and
+opacity; its lime lockup is a prepainted layer faded over the ordinary ink,
+and its loading beam rotates a painted gradient (`shell.css`,
+`components/PoweredLockup.tsx`, `components/Beam.tsx`).
+
 ## The AI agents run their own tools
 
 Locust has no model of its own and runs no code a model wrote

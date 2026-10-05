@@ -130,6 +130,7 @@ export function FirstLaunch({
   tube,
   swarmCalls = 0,
   coverStatus,
+  coverActivity,
   freeStart = 'unknown',
   onUseFree,
   workspacePath,
@@ -180,6 +181,8 @@ export function FirstLaunch({
   readonly swarmCalls?: number
   /** Who is working and who waits on you, for the cover's glass (0.610, glassStatus). */
   readonly coverStatus?: string
+  /** Changes whenever a teammate's live work arrives, including a streaming delta. */
+  readonly coverActivity?: unknown
   /** The folder the teammates work in; undefined when none is chosen. */
   readonly workspacePath: string | undefined
   readonly teammateCount: number
@@ -424,7 +427,7 @@ export function FirstLaunch({
     <div className={`lc-empty${scrolled ? ' is-scrolled' : ''}${tight ? ' is-tight' : ''}`} ref={pane}>
       <div className="lc-empty__inner" ref={inner}>
         {/* The design system's cover: the lockup lighting up once the runtimes have answered, and the teammates. */}
-        <HomeCover ready={discoveryPhase === 'ready'} tube={tube ?? 'full'} swarmCalls={swarmCalls} grow={coverGrow} {...(coverStatus === undefined ? {} : { status: coverStatus })} />
+        <HomeCover ready={discoveryPhase === 'ready'} tube={tube ?? 'full'} swarmCalls={swarmCalls} grow={coverGrow} activity={coverActivity} {...(coverStatus === undefined ? {} : { status: coverStatus })} />
 
         {/*
           * The only words on the screen, both carrying information: what

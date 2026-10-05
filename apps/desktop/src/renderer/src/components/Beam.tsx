@@ -26,7 +26,8 @@ export function Beam({
   size,
   active = true,
   strength,
-  className
+  className,
+  compositor = false
 }: {
   readonly children: ReactNode
   readonly size: 'sm' | 'md'
@@ -34,7 +35,17 @@ export function Beam({
   /** 0-1, the beam's opacity; the content is untouched. */
   readonly strength?: number
   readonly className?: string
+  /** The cover rotates a painted gradient, avoiding animated CSS properties. */
+  readonly compositor?: boolean
 }): ReactElement {
+  if (compositor) {
+    return (
+      <div data-beam="cover" data-active={active && !reducedMotion() ? '' : undefined} className={className}>
+        {children}
+        {active && !reducedMotion() && <span className="lc-coverbeam__light" aria-hidden="true" />}
+      </div>
+    )
+  }
   return (
     <BorderBeam
       size={size}

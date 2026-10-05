@@ -7693,6 +7693,7 @@ export default function App(): ReactElement {
                 discoveryPhase={runtimeState.phase}
                 tube={tube}
                 swarmCalls={swarmCalls}
+                coverActivity={runs}
                 // Who is working and who waits on you, for the cover's glass (0.610): the same facts the cards say.
                 {...((status) => (status === undefined ? {} : { coverStatus: status }))(runtimeState.phase !== 'ready' ? undefined : glassStatus(
                   teammates.filter((mate) => viewByTeammate[mate.teammateId]?.status === 'working').map((mate) => mate.name),

@@ -76,6 +76,8 @@ export interface BotProps {
   readonly state?: BotAvatarState
   /** Still, in the state's resting pose. */
   readonly paused?: boolean
+  /** Hold the current frame and rig while a containing cover rests. */
+  readonly motionPresence?: WindowPresence
   readonly face?: BotAvatarFace
   readonly seed?: number
   /** Eyes follow a nearby pointer, and a click makes it hop. */
@@ -1283,6 +1285,7 @@ function RiggedBot({
   color,
   state = 'default',
   paused = false,
+  motionPresence = WINDOW_PRESENCE,
   face,
   seed = 0.37,
   interactive = false,
@@ -1430,7 +1433,9 @@ function RiggedBot({
           sim.setJump({ spin: botAvatarJumpDefaults.spin })
         }
       },
-      () => onScreen && document.visibilityState !== 'hidden'
+      () => onScreen && document.visibilityState !== 'hidden',
+      undefined,
+      motionPresence
     )
     // The clock drew the first frame already: the bot at rest, where its ring and dot belong.
     anchor()
@@ -1451,7 +1456,7 @@ function RiggedBot({
     }
     // A new state eases in on the running rig (below); only a still bot is
     // redrawn from scratch for one.
-  }, [type, size, color, faceShown, seed, paused, paused ? state : undefined, jumpEvery, paused ? eyes?.join('') : undefined, paused ? phosphor : undefined, screen, plush, shortPile])
+  }, [type, size, color, faceShown, seed, paused, paused ? state : undefined, jumpEvery, paused ? eyes?.join('') : undefined, paused ? phosphor : undefined, screen, plush, shortPile, motionPresence])
 
   useEffect(() => {
     if (!paused) rig.current?.setState(state)
