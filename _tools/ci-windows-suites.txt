@@ -1,0 +1,13 @@
+# The unit suites the Windows CI job runs (.github/workflows/windows-build.yml),
+# one folder per line, each run as `npx vitest run` from that folder.
+#
+# Read by _tools/ci-windows-local.sh, and the workflow runs its suites through
+# that script, so this file is the only list: add a folder here and both the
+# laptop's rehearsal and GitHub's run pick it up.
+#
+# The fast half of _tools/gate.sh: suites that need no display and no model.
+# apps/desktop is left out on purpose -- its suite drives a window
+# (runtime-setup.test.ts) and runs the memory-recall model
+# (memory-recall.test.ts), so it still runs only on the laptop, in the gate.
+packages/runtime-adapters
+packages/mission-store

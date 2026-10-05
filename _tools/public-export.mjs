@@ -165,7 +165,9 @@ export const DOCS_PUBLISHED = [
   // What Locust can stop, per AI agent (0.617, the PRD's R9): written from the source Settings draws.
   'docs/WHAT-LOCUST-CAN-STOP.md',
   // Every connection Locust itself makes (0.618, the PRD's R22); Settings > Privacy links it.
-  'docs/NETWORK.md'
+  'docs/NETWORK.md',
+  // What the mirror's Windows build proves and does not (2026-10-05); windows-build.yml points at it.
+  'docs/CI-WINDOWS.md'
 ]
 
 const EXCLUSION_PATTERNS = EXCLUSIONS.map((glob) => ({ glob, re: compileGlob(glob) }))
