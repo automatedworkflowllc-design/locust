@@ -2,7 +2,7 @@
 //
 //   node _tools/publish-mirror.mjs [--from <commit>] [--mirror <folder>] [--deny <file>]
 //
-// The public copy (automatedworkflowllc-design/locust-app) was a one-commit
+// The public copy (automatedworkflowllc-design/locust) was a one-commit
 // export of 0.577 while main went on to 0.583; the 1.0 PRD (A5): a mirror is
 // only a mirror if it never lags, so this runs after publish-release. It
 // exports `--from` (HEAD) with _tools/public-export.mjs -- the exclusions, the
@@ -22,7 +22,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
-const MIRROR_URL = 'https://github.com/automatedworkflowllc-design/locust-app.git'
+const MIRROR_URL = 'https://github.com/automatedworkflowllc-design/locust.git'
 const KEPT_IN_MIRROR = new Set(['.git', '.github'])
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)

@@ -42,7 +42,7 @@ export const OPENPETS_LINK = 'https://openpets.dev'
 export const OPENPETS_REPORT_LINK = 'mailto:admin@openpets.dev?subject=A%20pet%20on%20openpets.dev'
 
 /** Every connection Locust itself makes, listed (0.618, the PRD's R22): docs/NETWORK.md in the public copy. */
-export const NETWORK_DOC_LINK = 'https://github.com/automatedworkflowllc-design/locust-app/blob/main/docs/NETWORK.md'
+export const NETWORK_DOC_LINK = 'https://github.com/automatedworkflowllc-design/locust/blob/main/docs/NETWORK.md'
 
 export const OUTBOUND_LINKS: readonly string[] = [...new Set([...RUNTIME_LINKS, NODE_LINK, OPENPETS_LINK, OPENPETS_REPORT_LINK, NETWORK_DOC_LINK])]
 

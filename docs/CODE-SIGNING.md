@@ -35,8 +35,8 @@ certificate by SignPath Foundation." Until then nothing here is signed.
 ## How a release is built and signed
 
 1. A release is a commit on `main` of the public repository,
-   `automatedworkflowllc-design/locust-app`, exported from the private
-   development repository at that release.
+   `automatedworkflowllc-design/locust`, where Locust is developed in the
+   open since 0.647.
 2. GitHub Actions builds the installer from that commit on a clean
    `windows-latest` runner (`.github/workflows/ci.yml`). The build uses no
    secrets and signs into no provider.

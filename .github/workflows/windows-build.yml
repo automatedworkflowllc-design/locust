@@ -2,7 +2,7 @@
 #
 # Every Locust release has been cut on one laptop by one session. This makes
 # the same unsigned NSIS installer on GitHub's Windows runner, in the public
-# repository (automatedworkflowllc-design/locust-app) where minutes are free,
+# repository (automatedworkflowllc-design/locust) where minutes are free,
 # so a build nobody's machine touched can be set beside the laptop's -- and,
 # later, signed there (SignPath, applied for). docs/CI-WINDOWS.md says what it
 # proves and what it does not.

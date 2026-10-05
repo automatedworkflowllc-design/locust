@@ -95,7 +95,7 @@ describe('the addresses are the ones the code uses', () => {
     const link = screens.slice(screens.indexOf('function NetworkListLink'), screens.indexOf('function fewNames'))
     expect(link).toContain('openLink(NETWORK_DOC_LINK).then')
     expect(link).toContain('Every connection, listed')
-    expect(read('../shared/outbound-links.ts')).toContain("NETWORK_DOC_LINK = 'https://github.com/automatedworkflowllc-design/locust-app/blob/main/docs/NETWORK.md'")
+    expect(read('../shared/outbound-links.ts')).toContain("NETWORK_DOC_LINK = 'https://github.com/automatedworkflowllc-design/locust/blob/main/docs/NETWORK.md'")
     expect(read('../../../../_tools/public-export.mjs')).toContain("'docs/NETWORK.md'")
   })
 

@@ -2,14 +2,14 @@
 
 `.github/workflows/windows-build.yml` builds Locust's unsigned Windows
 installer on GitHub's `windows-latest` runner, in the public repository
-`automatedworkflowllc-design/locust-app`. It exists so that a build nobody's
+`automatedworkflowllc-design/locust`. It exists so that a build nobody's
 machine touched can be set beside the one the laptop makes, and so that
 signing (SignPath, applied for) has somewhere to happen later
 (`docs/PLAN-2026-10-05-TO-MARKET.md`, section 3 change 1, phase 1).
 
 ## When it runs
 
-- By hand: `gh workflow run windows-build.yml --repo automatedworkflowllc-design/locust-app -f label=v0.620.0`.
+- By hand: `gh workflow run windows-build.yml --repo automatedworkflowllc-design/locust -f label=v0.620.0`.
   The label is only shown in the summary; the version comes from
   `apps/desktop/package.json`.
 - On a pushed tag `v*`. The tag must be `v` plus that version, or the

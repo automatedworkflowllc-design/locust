@@ -9,7 +9,7 @@
 # minutes are free.
 #
 # WHERE THIS FILE GOES. Not in a workflow folder here: this is the master copy.
-# It runs on the PUBLIC mirror (automatedworkflowllc-design/locust-app), whose
+# It runs on the PUBLIC mirror (automatedworkflowllc-design/locust), whose
 # Actions minutes are free; the private repository's are rationed. Put it, by
 # hand, at
 #
