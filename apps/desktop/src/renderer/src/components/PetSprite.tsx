@@ -758,8 +758,20 @@ function cellPixels(atlas: PetAtlas, row: number, column: number): Uint8ClampedA
   return pixels
 }
 
-/** The in-betweens from one drawing to another, if they are ready; asked for, if they are not. */
-function tweensFor(atlas: PetAtlas, from: PetScreenCell, to: PetScreenCell): readonly CanvasImageSource[] | undefined {
+/**
+ * IN-BETWEENS OFF, FOR NOW (2026-10-05). Made from his maker's few drawings,
+ * they still read as a slideshow beside the bots: Colin, "its not good enough
+ * ... make it more fluid like our other teammates". A look ships only when it
+ * is cleaner than what it replaces, so until his own rig replaces them (his
+ * lifts drawn and moved by Locust, on springs, as the bots are), none are
+ * made, none are read from this computer's storage, and his drawings melt
+ * into each other as they did (BUDDY_MELT, with the settle and the breath).
+ */
+export const BUDDY_IN_BETWEENS = false
+
+/** The in-betweens from one drawing to another, if they are ready; asked for, if they are not; never while off. */
+export function tweensFor(atlas: PetAtlas, from: PetScreenCell, to: PetScreenCell): readonly CanvasImageSource[] | undefined {
+  if (!BUDDY_IN_BETWEENS) return undefined
   const made = TWEENS.get(atlas.image) ?? new Map<string, readonly CanvasImageSource[] | 'making'>()
   TWEENS.set(atlas.image, made)
   const pair = `${String(from.row)},${String(from.column)}>${String(to.row)},${String(to.column)}`

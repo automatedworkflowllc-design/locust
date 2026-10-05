@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.653.0 - 2026-10-05
+
+### Changed
+
+- **Codex Buddy's made-up in-between frames are off.** 0.651 drew extra frames between Buddy's own drawings, made on your computer; they were not good enough to keep. Buddy goes back to blending smoothly from one drawing to the next, with his settle and his breathing, and Locust no longer makes or stores those frames. A better way to move him is on its way.
+
 ## 0.652.0 - 2026-10-05
 
 ### Improved
