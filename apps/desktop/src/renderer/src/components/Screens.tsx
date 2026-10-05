@@ -8,7 +8,8 @@ import { SETTINGS_PAGES, matchedHeadings, pageMatches } from '../settingsPages.j
 import { agentCapabilityHeading, agentCapabilityLines } from '../agentCapabilities.js'
 import { ConnectorHealth } from './ConnectorHealth.js'
 import type { SettingsPageId } from '../settingsPages.js'
-import type { LoginItemState, RuntimeUpdatesState, MetalMotion, MetalPreset, MetalStrength } from '../../../shared/ipc.js'
+import type { LoginItemState, RuntimeUpdatesState, MetalMotion, MetalPreset, MetalStrength, ProfileBackupResponse, ProfileRestorePreview, ProfileRestoreResponse } from '../../../shared/ipc.js'
+import { backedUpLine, countsLine, folderName } from '../backupWords.js'
 import { SUPPORT_ADDRESS } from '../../../shared/support.js'
 import type { Spend } from '../../../shared/spend.js'
 import { isOwnRoute, modelDisplayName, routeChrome, routeModelName } from '../routeName.js'
@@ -1093,6 +1094,102 @@ function RetentionControl({
 }
 
 /**
+ * BACK UP AND RESTORE (0.614, main/profile-backup.ts; the PRD's R21).
+ *
+ * A backup is a new folder inside the one picked. A restore is read first, by
+ * the same reader the restore uses, and shown: what the backup holds, what it
+ * replaces. Only then is it asked for, and Locust restarts to apply it before
+ * anything is read. What it replaces is moved aside, never deleted.
+ */
+function BackupControl({
+  onPick,
+  onBackUp,
+  onPreview,
+  onRestore
+}: {
+  readonly onPick: (purpose: 'backup' | 'restore') => Promise<string | undefined>
+  readonly onBackUp: (folder: string) => Promise<ProfileBackupResponse>
+  readonly onPreview: (folder: string) => Promise<ProfileRestorePreview>
+  readonly onRestore: (folder: string) => Promise<ProfileRestoreResponse>
+}): ReactElement {
+  const [state, setState] = useState<
+    | { readonly kind: 'idle' }
+    | { readonly kind: 'working'; readonly what: 'backup' | 'reading' | 'restoring' }
+    | { readonly kind: 'backed-up'; readonly line: string }
+    | { readonly kind: 'preview'; readonly preview: Extract<ProfileRestorePreview, { readonly ok: true }> }
+    | { readonly kind: 'restarting' }
+    | { readonly kind: 'error'; readonly message: string }
+  >({ kind: 'idle' })
+  const backUp = async (): Promise<void> => {
+    const folder = await onPick('backup')
+    if (folder === undefined) return
+    setState({ kind: 'working', what: 'backup' })
+    const result = await onBackUp(folder)
+    setState(result.ok ? { kind: 'backed-up', line: backedUpLine(result, formatBytes(result.bytes)) } : { kind: 'error', message: result.reason })
+  }
+  const read = async (): Promise<void> => {
+    const folder = await onPick('restore')
+    if (folder === undefined) return
+    setState({ kind: 'working', what: 'reading' })
+    const preview = await onPreview(folder)
+    setState(preview.ok ? { kind: 'preview', preview } : { kind: 'error', message: preview.reason })
+  }
+  const restore = async (folder: string): Promise<void> => {
+    setState({ kind: 'working', what: 'restoring' })
+    const answer = await onRestore(folder)
+    setState(answer.ok ? { kind: 'restarting' } : { kind: 'error', message: answer.reason })
+  }
+  const busy = state.kind === 'working' || state.kind === 'restarting'
+  const doing = state.kind === 'working' ? state.what : undefined
+  return (
+    <div className="lc-backup">
+      <div className="lc-backup__row">
+        <button type="button" className="lc-button" disabled={busy} onClick={() => void backUp()}>
+          {doing === 'backup' ? 'Backing up…' : 'Back up…'}
+        </button>
+        <button type="button" className="lc-button" disabled={busy} onClick={() => void read()}>
+          {doing === 'reading' ? 'Reading the backup…' : 'Restore from a backup…'}
+        </button>
+      </div>
+      {state.kind === 'backed-up' && <span className="lc-settings__note">{state.line}</span>}
+      {state.kind === 'preview' && (
+        <div className="lc-backup__plan">
+          <dl className="lc-receipt lc-receipt--flush">
+            <dt>Backup</dt>
+            <dd className="lc-mono">{folderName(state.preview.folder)}</dd>
+            <dt>Made</dt>
+            <dd>
+              {new Date(state.preview.createdAt).toLocaleString()} by Locust {state.preview.appVersion}
+            </dd>
+            <dt>Holds</dt>
+            <dd>
+              {countsLine(state.preview.counts)} · {formatBytes(state.preview.bytes)}
+            </dd>
+            <dt>Replaces</dt>
+            <dd>{countsLine(state.preview.current)}, here now</dd>
+          </dl>
+          <span className="lc-settings__note">
+            Locust restarts to restore it. What is here now is moved aside in its profile folder, not deleted, so this can
+            be undone. Your own model keys are never in a backup, and stay as they are.
+          </span>
+          <div className="lc-backup__row">
+            <button type="button" className="lc-button lc-button--danger" onClick={() => void restore(state.preview.folder)}>
+              Restore and restart
+            </button>
+            <button type="button" className="lc-button" onClick={() => setState({ kind: 'idle' })}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      {doing === 'restoring' && <span className="lc-settings__note">Asking for the restore…</span>}
+      {state.kind === 'restarting' && <span className="lc-settings__note">Restarting to restore…</span>}
+      {state.kind === 'error' && <span className="lc-settings__note lc-tone-red">{state.message}</span>}
+    </div>
+  )
+}
+
+/**
  * The update control.
  *
  * The app checks on its own and downloads on its own; it never installs on
@@ -1455,7 +1552,11 @@ export function SettingsScreen({
   onEmptyTrash,
   changelog,
   initialPage,
-  onPrune
+  onPrune,
+  onPickProfileFolder,
+  onBackUpProfile,
+  onPreviewProfileRestore,
+  onRestoreProfile
 }: {
   readonly runtimes: readonly PublicRuntimeStatus[]
   /** Runtimes whose last run ended on the account's usage limit, with its own words. */
@@ -1572,6 +1673,11 @@ export function SettingsScreen({
   /** The page Settings opens on: What's new, from the splash's "See every version". */
   readonly initialPage?: SettingsPageId
   readonly onPrune: (days: number) => Promise<MissionPruneResponse>
+  /** Back up and restore (0.614): the folder picker, the backup, a restore's preview, the restore. */
+  readonly onPickProfileFolder: (purpose: 'backup' | 'restore') => Promise<string | undefined>
+  readonly onBackUpProfile: (folder: string) => Promise<ProfileBackupResponse>
+  readonly onPreviewProfileRestore: (folder: string) => Promise<ProfileRestorePreview>
+  readonly onRestoreProfile: (folder: string) => Promise<ProfileRestoreResponse>
 }): ReactElement {
   const [page, setPage] = useState<SettingsPageId>(initialPage ?? 'app')
   const [query, setQuery] = useState('')
@@ -2879,6 +2985,21 @@ export function SettingsScreen({
             deletion you did not mean can be undone.
           </p>
           <TrashControl onList={onListTrash} onRestore={onRestoreMission} onEmpty={onEmptyTrash} />
+        </section>
+        )}
+        {shownPage === 'privacy' && (
+        <section className="lc-settings__section">
+          <h2 className="lc-settings__heading">Back up and restore</h2>
+          <p className="lc-settings__lede">
+            A backup is a folder you choose, holding your teammates, routines, memories, saved approvals and
+            conversations. Your own model keys are never in it.
+          </p>
+          <BackupControl
+            onPick={onPickProfileFolder}
+            onBackUp={onBackUpProfile}
+            onPreview={onPreviewProfileRestore}
+            onRestore={onRestoreProfile}
+          />
         </section>
         )}
         {shownPage === 'app' && (

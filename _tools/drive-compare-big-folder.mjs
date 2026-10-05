@@ -14,12 +14,13 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
+import { SCRATCH_ROOT } from './scratch-root.mjs'
 import { say, startDrive } from './drive-lib.mjs'
 
 const packaged = process.argv.includes('--packaged') ? process.argv[process.argv.indexOf('--packaged') + 1] : undefined
 // Under Documents, like every drive folder: never AppData (memory cursorignore-blinds-appdata).
-await mkdir(join(homedir(), 'Documents', 'locust-scratch'), { recursive: true })
-const workspace = await mkdtemp(join(homedir(), 'Documents', 'locust-scratch', 'locust-drive-bigfolder-ws-'))
+await mkdir(join(SCRATCH_ROOT), { recursive: true })
+const workspace = await mkdtemp(join(SCRATCH_ROOT, 'locust-drive-bigfolder-ws-'))
 for (let index = 0; index <= 5000; index += 1) await writeFile(join(workspace, `note-${String(index)}.txt`), '', 'utf8')
 
 const drive = await startDrive({

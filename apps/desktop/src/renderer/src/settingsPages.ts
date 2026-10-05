@@ -118,7 +118,7 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
     label: 'Privacy & data',
     group: 'Locust',
     icon: 'shield',
-    headings: ['Privacy & local data', 'Trash'],
+    headings: ['Privacy & local data', 'Trash', 'Back up and restore'],
     alsoKnownAs: {
       // "ledger" is a word the app itself says to people, in the sentence
       // telling them where the record of a run lives -- and it was the
@@ -126,7 +126,9 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
       'Privacy & local data': ['ledger', 'log', 'logs', 'telemetry', 'privacy', 'where is my data'],
       // "recycle bin" is here because that is what Trash is called on the
       // platform this ships to.
-      Trash: ['deleted', 'delete', 'restore', 'undo', 'recycle', 'recycle bin', 'bin']
+      Trash: ['deleted', 'delete', 'restore', 'undo', 'recycle', 'recycle bin', 'bin'],
+      // The words a person moving to a new laptop would type (0.614).
+      'Back up and restore': ['backup', 'back up', 'export', 'import', 'new laptop', 'move', 'copy', 'save my data', 'transfer']
     }
   },
   {

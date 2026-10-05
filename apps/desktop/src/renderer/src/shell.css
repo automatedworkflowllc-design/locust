@@ -12808,6 +12808,32 @@ textarea {
   background: var(--lc-bg-raised);
 }
 
+/* Back up and restore (0.614): the same shape as its neighbour above -- a row of
+   buttons, and a restore's preview in a raised plan with its two answers. */
+.lc-backup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-4);
+  margin-top: var(--lc-space-4);
+}
+
+.lc-backup__row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--lc-space-3);
+}
+
+.lc-backup__plan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-3);
+  padding: var(--lc-space-4);
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-control);
+  background: var(--lc-bg-raised);
+}
+
 .lc-chip {
   padding: 3px 10px;
   border: 1px solid var(--lc-border-card);

@@ -212,6 +212,11 @@ import {
   APP_UPDATE_STATE_CHANNEL,
   MISSION_DELETE_CHANNEL,
   MISSION_PRUNE_CHANNEL,
+  PROFILE_BACKUP_CHANNEL,
+  PROFILE_LAST_RESTORE_CHANNEL,
+  PROFILE_PICK_FOLDER_CHANNEL,
+  PROFILE_RESTORE_CHANNEL,
+  PROFILE_RESTORE_PREVIEW_CHANNEL,
   MISSION_TRASH_LIST_CHANNEL,
   MISSION_RESTORE_CHANNEL,
   MISSION_TRASH_EMPTY_CHANNEL,
@@ -367,6 +372,7 @@ import { TESTER_LANE, updateLaneFrom } from './update-lane.js'
 import { createCursorConnectorKeeper } from './cursor-connector-allow.js'
 import { cursorConfiguredConnectorNames, cursorReadyConnectors } from './cursor-connector-notice.js'
 import { pruneMissionRecords, readStorageReport } from './retention.js'
+import { applyPendingRestore, countProfile, readBackup, requestRestore, takeLastRestore, writeBackup, type RestoreOutcome } from './profile-backup.js'
 import { oneAtATime } from './one-at-a-time.js'
 import { createUpdateService } from './updates.js'
 import type {
@@ -1343,7 +1349,17 @@ if (!ownsSingleInstanceLock) {
     window.focus()
   })
 
-  void app.whenReady().then(() => {
+  void app.whenReady().then(async () => {
+    /*
+     * A RESTORE ASKED FOR IS APPLIED FIRST (0.614, profile-backup.ts), before
+     * anything below reads the profile: a store holding its old state in
+     * memory would write it back over the restored file. The window then says
+     * what happened, once (PROFILE_LAST_RESTORE_CHANNEL).
+     */
+    const restored = await applyPendingRestore(app.getPath('userData'), { appVersion: app.getVersion(), now: () => new Date() })
+      .catch((error: unknown): RestoreOutcome => ({ ok: false, folder: '', at: new Date().toISOString(), reason: error instanceof Error ? error.message : String(error) }))
+    if (restored !== undefined) note('restore', restored.ok ? `from ${restored.folder}; what it replaced is in ${String(restored.aside)}` : `not applied: ${String(restored.reason)}`)
+  }).then(() => {
     // A slot at or before this is missed. Taken before the window, so a
     // routine whose time already passed does not start at launch.
     const appOpenedAt = new Date()
@@ -6540,6 +6556,71 @@ if (!ownsSingleInstanceLock) {
       // nobody (L8). Emptying the trash drops the owners, as a single delete's.
       return response
     })
+
+    /*
+     * BACK UP AND RESTORE (0.614, profile-backup.ts). The folder is the
+     * person's pick; the backup is a new folder inside it; a restore is read
+     * by the same reader as its preview, refused while a run is going, and
+     * applied at the next start, so Locust restarts once it is written down.
+     */
+    const profileFolderOf = (folder: unknown): string | undefined => (typeof folder === 'string' && isAbsolute(folder) ? folder : undefined)
+    ipcMain.handle(PROFILE_PICK_FOLDER_CHANNEL, async (event, purpose: unknown) => {
+      if (!fromOwnWindow(event)) return undefined
+      /*
+       * `LOCUST_TEST_PICK_FOLDER` is a test seam, as LOCUST_INSTALL_DIR is: a
+       * drive cannot answer a native folder dialog, so it names a FILE whose
+       * text is the folder picked, read at the moment of the pick (an empty or
+       * missing file is a cancel). drive-backup-and-restore.mjs uses it.
+       */
+      const seam = process.env.LOCUST_TEST_PICK_FOLDER
+      if (seam !== undefined && seam.length > 0) {
+        const chosen = (await readFile(seam, 'utf8').catch(() => '')).trim()
+        return chosen.length > 0 ? chosen : undefined
+      }
+      const owner = BrowserWindow.fromWebContents(event.sender)
+      const options: Electron.OpenDialogOptions = {
+        title: purpose === 'restore' ? 'Choose a Locust backup to restore' : 'Choose where to put the backup',
+        buttonLabel: purpose === 'restore' ? 'Restore from here' : 'Back up here',
+        properties: ['openDirectory', 'createDirectory']
+      }
+      const picked = owner === null ? await dialog.showOpenDialog(options) : await dialog.showOpenDialog(owner, options)
+      return picked.canceled ? undefined : picked.filePaths[0]
+    })
+    ipcMain.handle(PROFILE_BACKUP_CHANNEL, async (event, folder: unknown) => {
+      const parent = profileFolderOf(folder)
+      if (!fromOwnWindow(event) || parent === undefined) return { ok: false, reason: 'The backup was refused.' } as const
+      return writeBackup(app.getPath('userData'), parent, { appVersion: app.getVersion(), now: () => new Date() })
+    })
+    ipcMain.handle(PROFILE_RESTORE_PREVIEW_CHANNEL, async (event, folder: unknown) => {
+      const from = profileFolderOf(folder)
+      if (!fromOwnWindow(event) || from === undefined) return { ok: false, reason: 'The restore was refused.' } as const
+      const reading = await readBackup(from, { appVersion: app.getVersion() })
+      if (!reading.ok) return reading
+      return {
+        ok: true,
+        folder: from,
+        appVersion: reading.manifest.appVersion,
+        createdAt: reading.manifest.createdAt,
+        counts: reading.manifest.counts,
+        bytes: reading.bytes,
+        current: await countProfile(app.getPath('userData'))
+      } as const
+    })
+    ipcMain.handle(PROFILE_RESTORE_CHANNEL, async (event, folder: unknown) => {
+      const from = profileFolderOf(folder)
+      if (!fromOwnWindow(event) || from === undefined) return { ok: false, reason: 'The restore was refused.' } as const
+      const liveRuns = new Set([...codexMissions.liveMissionIds(), ...antigravityMissions.liveMissionIds()]).size
+      const asked = await requestRestore(from, app.getPath('userData'), { appVersion: app.getVersion(), liveRuns, now: () => new Date() })
+      if (!asked.ok) return asked
+      note('restore', `asked for, from ${from}; restarting to apply it`)
+      // After the answer reaches the window: it says "restarting" before it goes.
+      setTimeout(() => {
+        app.relaunch()
+        app.exit(0)
+      }, 600)
+      return { ok: true } as const
+    })
+    ipcMain.handle(PROFILE_LAST_RESTORE_CHANNEL, async (event) => (fromOwnWindow(event) ? takeLastRestore(app.getPath('userData')) : undefined))
 
     /**
      * Missions deleted in this session, by id, so a record that returns can

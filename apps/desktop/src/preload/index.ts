@@ -31,6 +31,11 @@ import {
   LOGIN_ITEM_SET_CHANNEL,
   APP_UPDATE_STATE_CHANNEL,
   MISSION_PRUNE_CHANNEL,
+  PROFILE_BACKUP_CHANNEL,
+  PROFILE_LAST_RESTORE_CHANNEL,
+  PROFILE_PICK_FOLDER_CHANNEL,
+  PROFILE_RESTORE_CHANNEL,
+  PROFILE_RESTORE_PREVIEW_CHANNEL,
   MISSION_STORAGE_CHANNEL,
   MISSION_DELETE_CHANNEL,
   MISSION_TRASH_LIST_CHANNEL,
@@ -194,6 +199,10 @@ import type {
   AppUpdateState,
   MissionPruneRequest,
   MissionPruneResponse,
+  ProfileBackupResponse,
+  ProfileRestoreOutcome,
+  ProfileRestorePreview,
+  ProfileRestoreResponse,
   MissionReadResponse,
   TrashListResponse,
   TrashMutationResponse,
@@ -393,6 +402,12 @@ const desktopApi: DesktopApi = {
   },
   pruneMissions: (request: MissionPruneRequest) =>
     ipcRenderer.invoke(MISSION_PRUNE_CHANNEL, request) as Promise<MissionPruneResponse>,
+  pickProfileFolder: (purpose: 'backup' | 'restore') =>
+    ipcRenderer.invoke(PROFILE_PICK_FOLDER_CHANNEL, purpose) as Promise<string | undefined>,
+  backupProfile: (folder: string) => ipcRenderer.invoke(PROFILE_BACKUP_CHANNEL, folder) as Promise<ProfileBackupResponse>,
+  previewProfileRestore: (folder: string) => ipcRenderer.invoke(PROFILE_RESTORE_PREVIEW_CHANNEL, folder) as Promise<ProfileRestorePreview>,
+  restoreProfile: (folder: string) => ipcRenderer.invoke(PROFILE_RESTORE_CHANNEL, folder) as Promise<ProfileRestoreResponse>,
+  takeLastProfileRestore: () => ipcRenderer.invoke(PROFILE_LAST_RESTORE_CHANNEL) as Promise<ProfileRestoreOutcome | undefined>,
   getLocalRuntimes: (fresh?: boolean, only?: readonly string[]) =>
     ipcRenderer.invoke(RUNTIME_DISCOVERY_CHANNEL, fresh === true, only === undefined ? undefined : [...only]) as Promise<RuntimeDiscoveryResponse>,
   getMissionHistory: (known?: Readonly<Record<string, string>>) =>

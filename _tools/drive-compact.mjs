@@ -17,7 +17,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
-import './scratch-root.mjs'
+import { SCRATCH_ROOT } from './scratch-root.mjs'
 import { pickRouteScript, say, scratchRepository, sendAndWaitScript, startDrive, teammateFace } from './drive-lib.mjs'
 
 const WIDTH = 1120
@@ -29,7 +29,7 @@ const workspace = await scratchRepository('locust-drive-compact-ws-')
 // rather than set afterwards. This is the real window at the real minimum --
 // a device-metrics override would change what the page measures without
 // changing the window Electron manages, and the layout is the subject here.
-const profile = join(homedir(), 'Documents', 'locust-scratch', `locust-compact-${String(Date.now())}`)
+const profile = join(SCRATCH_ROOT, `locust-compact-${String(Date.now())}`)
 await mkdir(profile, { recursive: true })
 await writeFile(
   join(profile, 'window.json'),

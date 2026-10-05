@@ -21,6 +21,7 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
+import { SCRATCH_ROOT } from './scratch-root.mjs'
 import { recordRoot, say, sleep, startDrive } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
@@ -30,7 +31,7 @@ const PICKS = (process.env.LOCUST_COMPARE_PICKS ?? 'nemotron-3-ultra-free,mimo-v
 const OUT = join(recordRoot('compare-in-any-folder-2026-10-02'), tag)
 await mkdir(OUT, { recursive: true })
 // Under Documents, like every drive folder: never AppData (memory cursorignore-blinds-appdata).
-await mkdir(join(homedir(), 'Documents', 'locust-scratch'), { recursive: true })
+await mkdir(join(SCRATCH_ROOT), { recursive: true })
 
 let failures = 0
 const check = (what, ok, detail) => {
@@ -96,7 +97,7 @@ const settled = async (drive, label) => {
 
 // 1. A folder too big to copy.
 {
-  const workspace = await mkdtemp(join(homedir(), 'Documents', 'locust-scratch', 'locust-drive-anyfolder-big-'))
+  const workspace = await mkdtemp(join(SCRATCH_ROOT, 'locust-drive-anyfolder-big-'))
   for (let index = 0; index <= 20_000; index += 1) await writeFile(join(workspace, `note-${String(index)}.txt`), '', 'utf8')
   const drive = await startDrive({
     name: `compare-any-folder-big-${tag}`, port: 9873, workspace, outPath: join(OUT, 'big'), keep: process.env.LOCUST_DRIVE_KEEP === '1',
@@ -124,7 +125,7 @@ const settled = async (drive, label) => {
 
 if (process.env.LOCUST_DRIVE_ONLY_BIG !== '1') // 2. A small folder: each in its own copy, and each one's file found where it wrote it.
 {
-  const workspace = await mkdtemp(join(homedir(), 'Documents', 'locust-scratch', 'locust-drive-anyfolder-small-'))
+  const workspace = await mkdtemp(join(SCRATCH_ROOT, 'locust-drive-anyfolder-small-'))
   await writeFile(join(workspace, 'README.md'), '# A small project\n', 'utf8')
   const drive = await startDrive({
     name: `compare-any-folder-small-${tag}`, port: 9874, workspace, outPath: join(OUT, 'small'),
