@@ -14,6 +14,14 @@ it('The off switch explains its lifetime and account requirements.', () => {
   expect(html).toContain('role="switch"'); expect(html).toContain('aria-checked="false"')
   expect(html).toContain('quit Locust'); expect(html).toContain('API keys do not work'); expect(html).toContain('Team and Enterprise owners')
 })
+// 0.619 (Colin, 2026-10-04: "whats going on here? ive never noticed this"): the Off line had a
+// row of its own under the switch, in the label's colour, and read as a second setting.
+it('Off, it reads as one switch: its state opens its own line, and nothing sits under it.', () => {
+  const html = view(off)
+  // The row itself, not the card around it (lc-settingrows).
+  expect(html.match(/class="lc-settingrow[" ]/g)).toHaveLength(1)
+  expect(html).toMatch(/<p class="lc-settings__lede"><span role="status">Off\. When on, you can start Claude Code sessions in this folder from claude\.ai/)
+})
 it('A running switch shows Claude output and errors without summarizing or trimming them.', () => {
   const html = view({ ...off, enabled: true, phase: 'running', stdout: '  first\r\nhttps://claude.ai/code/session_fake\n', stderr: ' exact error\r\n', error: 'spawn ENOENT: exact' })
   expect(html).toContain('aria-checked="true"'); expect(html).toContain('  first\r\nhttps://claude.ai/code/session_fake\n</pre>')

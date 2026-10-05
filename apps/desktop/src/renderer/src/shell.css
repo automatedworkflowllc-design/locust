@@ -10410,6 +10410,31 @@ textarea {
 .lc-settingrow:first-child { border-top: 0; }
 .lc-settingrow:hover { background: var(--lc-hover-surface); }
 
+/* What Claude Code's Remote Control printed (RemoteControlSetting.tsx, 0.619):
+   a row of its own under the switch, only when there is something, read as
+   printed -- and no hover, since nothing here is pressed. */
+.lc-settingrow.lc-remoteoutput {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--lc-space-2);
+}
+.lc-settingrow.lc-remoteoutput:hover { background: transparent; }
+.lc-remoteoutput__label {
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+}
+.lc-remoteoutput__text {
+  margin: 0;
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-secondary);
+}
+
 /* --- Your own models (OwnModels.tsx, 0.357) ------------------------------
  * The kept ones as setting rows -- name, then the model, the address and
  * whether a key is kept, in the machine's voice -- and the form to add one

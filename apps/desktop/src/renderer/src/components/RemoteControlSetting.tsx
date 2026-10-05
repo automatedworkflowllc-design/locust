@@ -27,32 +27,51 @@ export function RemoteControlSetting() {
   }} />
 }
 
+/**
+ * Where the switch stands, as the first words of its line -- "On.", "Off." --
+ * the way every other switch in Settings says it (0.619). This sentence had a
+ * row of its own under the switch, in the label's colour, and read as a
+ * second setting (Colin, 2026-10-04: "whats going on here? ive never noticed
+ * this").
+ */
+export function remoteControlSays(state: RemoteControlState): string {
+  switch (state.phase) {
+    case 'needs-person': return 'Complete setup in the Claude Code terminal, then enable this switch again.'
+    case 'starting': return 'Starting Claude Code…'
+    case 'running': return 'On. Start a session in this folder from claude.ai or the Claude app; what Claude Code prints is below. It stops when you switch it off or quit Locust.'
+    case 'stopping': return 'Waiting for Claude Code to end…'
+    case 'ended': return 'Claude Code ended.'
+    case 'error': return `Claude Code reported a problem${state.exitCode === undefined ? '.' : ` (exit ${state.exitCode ?? 'unknown'}).`}`
+    default: return 'Off. When on, you can start Claude Code sessions in this folder from claude.ai while Locust is open, until you switch it off or quit Locust.'
+  }
+}
+
 export function RemoteControlView({ state, busy, error, onToggle }: {
   readonly state?: RemoteControlState
   readonly busy: boolean
   readonly error?: string
   readonly onToggle: (enabled: boolean) => Promise<void>
 }) {
+  const problem = error ?? state?.error
+  // What Claude Code printed has a row of its own, and only when there is some.
+  const printed = state !== undefined && (state.stdout.length > 0 || state.stderr.length > 0 || state.truncated)
   return <div className="lc-settingrows">
     <div className="lc-settingrow">
       <div className="lc-settingline__text">
         <div>{REMOTE_CONTROL_LABEL}</div>
-        <p className="lc-settings__lede">Start Claude Code sessions in this folder from claude.ai while Locust is open. Requires your claude.ai sign-in; API keys do not work. Team and Enterprise owners must allow Remote Control.</p>
+        {/* One quiet line, the state first: the account it needs follows in the same voice, never brighter. */}
+        <p className="lc-settings__lede">
+          {state !== undefined && <><span role="status">{remoteControlSays(state)}</span>{' '}</>}
+          It needs your claude.ai sign-in; API keys do not work. Team and Enterprise owners must allow Remote Control.
+        </p>
       </div>
       <button type="button" className={`lc-switch${state?.enabled ? ' is-on' : ''}`} role="switch" aria-label={REMOTE_CONTROL_LABEL} aria-checked={state?.enabled ?? false} disabled={busy || state === undefined || state.phase === 'stopping'} onClick={() => { void onToggle(!state?.enabled) }}><span className="lc-switch__knob" /></button>
     </div>
-    <div className="lc-settingrow" style={{ display: 'block' }}>
-      {state !== undefined && <p role="status">{state.phase === 'needs-person'
-        ? 'Complete setup in the Claude Code terminal, then enable this switch again.'
-        : state.phase === 'starting' ? 'Starting Claude Code…'
-        : state.phase === 'running' ? 'Claude Code is running. Its connection information appears below.'
-        : state.phase === 'stopping' ? 'Waiting for Claude Code to end…'
-        : state.phase === 'ended' ? 'Claude Code ended.' : state.phase === 'error' ? `Claude Code reported a problem${state.exitCode === undefined ? '.' : ` (exit ${state.exitCode ?? 'unknown'}).`}`
-        : 'Off. Enabling this lasts until you switch it off or quit Locust.'}</p>}
-      {state?.stdout && <><div>Claude Code output</div><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: 240, overflow: 'auto' }}>{state.stdout}</pre></>}
-      {state?.stderr && <><div>Claude Code errors</div><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: 240, overflow: 'auto' }}>{state.stderr}</pre></>}
-      {(error ?? state?.error) && <pre role="alert" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{error ?? state?.error}</pre>}
-      {state?.truncated && <p>Only the start of what Claude Code printed is shown; the rest was left out.</p>}
-    </div>
+    {(printed || problem !== undefined) && <div className="lc-settingrow lc-remoteoutput">
+      {state?.stdout && <><span className="lc-remoteoutput__label">Claude Code output</span><pre className="lc-remoteoutput__text">{state.stdout}</pre></>}
+      {state?.stderr && <><span className="lc-remoteoutput__label">Claude Code errors</span><pre className="lc-remoteoutput__text">{state.stderr}</pre></>}
+      {problem !== undefined && <pre role="alert" className="lc-remoteoutput__text">{problem}</pre>}
+      {state?.truncated && <p className="lc-settings__note">Only the start of what Claude Code printed is shown; the rest was left out.</p>}
+    </div>}
   </div>
 }
