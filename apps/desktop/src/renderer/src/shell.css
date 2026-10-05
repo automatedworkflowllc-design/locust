@@ -8411,6 +8411,12 @@ textarea {
   align-items: center;
   gap: var(--lc-space-4);
   padding: var(--lc-space-3) 0;
+  /*
+   * Without this a flex/grid column (a Compare cell) will not shrink the row
+   * below its content width, so a long live label paints into the next column
+   * (Colin, 2026-10-05, three-column Blind compare).
+   */
+  min-width: 0;
 }
 
 /*
@@ -8454,17 +8460,15 @@ textarea {
   align-items: center;
   gap: var(--lc-space-3);
   /*
-   * The words keep their width; the note beside them gives way. The label
-   * could shrink under its own words (they never wrap), and in a narrow
-   * Compare column a long tool name -- a whole PowerShell path -- was painted
-   * straight over "Using a tool" (Colin, 2026-09-30, screenshot). The note is
-   * the part with the ellipsis.
+   * The note beside the words still gives way FIRST (flex-shrink is higher on
+   * the meta). Then the words may shrink too: since 0.569 the label carries
+   * the model's own step text, which can be long, and with `flex: none` a
+   * Compare column painted that text into the next column (Colin, 2026-10-05).
+   * Ellipsis here; the full words are the label's `title`.
    */
-  flex: none;
-}
-
-.lc-livestep__meta {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
 }
 
 /*
@@ -8484,6 +8488,9 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: var(--lc-space-3);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   font-family: var(--lc-font-ui);
   font-size: 14px;
   /*
@@ -8503,10 +8510,59 @@ textarea {
   white-space: nowrap;
 }
 
-/* The line is one line. Whatever the runtime called its step gives way
-   before the register or the clock do. */
-.lc-livestep__meta {
+/*
+ * THE LINE IS ONE LINE (0.631): the words, the clock, then the note.
+ *
+ * The words keep their own width and ellipsize only when they alone do not
+ * fit; the clock never shrinks; the note takes whatever room is left. In a
+ * 260px compare column it was all one span that ran into the next column,
+ * and made to shrink, it cut the clock first ("acr… · np…").
+ */
+.lc-livestep__clock {
+  flex: none;
+  white-space: nowrap;
+}
+
+.lc-livestep__clock::before {
+  content: '· ';
+}
+
+/*
+ * THE NOTE SAYS SOMETHING OR IS NOT SHOWN.
+ *
+ * A note cut to a sliver ("·…", "np…") says nothing and reads as a fault,
+ * which is what an ellipsis alone made of it in a 260px compare column. So
+ * the note sits in a box that takes only the room left on the line (`flex:
+ * 1 1 0`: it never pushes the words), one line tall. With room for at least
+ * twelve characters it shows, ellipsized if it must be; with less, it wraps
+ * onto a second line the box clips. The box's empty first item, one line
+ * tall, is what it wraps under -- with no height, the second line would sit
+ * on top of the first and the note would still show.
+ */
+.lc-livestep__note {
+  flex: 1 1 0;
   min-width: 0;
+  /* The row's gap moves inside, onto the note, so a note with no room leaves
+     no gap behind it: the clock sits where it does on a line with no note. */
+  margin-left: calc(-1 * var(--lc-space-4));
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  height: 1lh;
+  overflow: hidden;
+}
+
+.lc-livestep__note::before {
+  content: '';
+  height: 1lh;
+}
+
+.lc-livestep__meta {
+  flex: 0 1 auto;
+  margin-left: var(--lc-space-4);
+  min-width: 12ch;
+  /* The box less the gap it carries, or a long note never fits its line. */
+  max-width: calc(100% - var(--lc-space-4));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -8607,6 +8663,15 @@ textarea {
   .lc-sweep::before {
     display: none;
   }
+}
+
+/* After the base `.lc-sweep` rule on purpose: a selector that ended in
+   `.lc-sweep {` above it broke the-live-word-is-visibly-live's slice. */
+.lc-livestep__register .lc-sweep {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .lc-livestep__meta::before {

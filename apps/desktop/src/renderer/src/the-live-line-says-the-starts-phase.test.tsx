@@ -45,8 +45,10 @@ describe('the live line while a run starts', () => {
     const markup = live('Reading the folder')
     expect(sweep(markup)).toBe('Reading the folder…')
     expect(markup).not.toContain('Starting…')
-    // Not said twice: the phase is the headline, so no aside repeats it.
-    expect(markup.split('Reading the folder').length - 1).toBe(2) // data-text and the text itself
+    // The phase is the headline (data-text + text) and the label's title for
+    // hover when the row ellipsizes — not an aside that repeats it beside the clock.
+    expect(markup.split('Reading the folder').length - 1).toBe(3)
+    expect(markup).toMatch(/lc-livestep__label" title="Reading the folder…"/)
   })
 
   it("names the runtime in the runtime's phase", () => {

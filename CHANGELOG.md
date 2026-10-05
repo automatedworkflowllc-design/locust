@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.631.0 - 2026-10-05
+
+### Fixed
+
+- **A compare column's live line stays in its column.** With three models side by side, a long step -- "Final regression playthroughs across classes and layouts" -- ran out of its column and over the next one. The line now fits at any width. The step's words shorten with an ellipsis only when they alone do not fit, and hovering shows the whole line. The clock now sits right after the words, the way Claude Code shows it, and is never cut. The note after it, the file or command a step is on, shows when there is room for it to say something and is left out when there is not, rather than shrinking to a stray dot. The same line in a plain conversation reads the same way.
+
 ## 0.630.0 - 2026-10-05
 
 ### Improved
