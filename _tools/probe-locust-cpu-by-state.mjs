@@ -12,8 +12,10 @@
 // transport (gpt-6.1-sol, low effort; --model overrides it) and requires LOCUST_SPEND=1.
 
 import { execFileSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { FREE_ROUTE, recordRoot, say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
 
@@ -24,7 +26,26 @@ const packaged = arg('--packaged')
 const streamingOnly = process.argv.includes('--streaming-only')
 const codex = process.argv.includes('--codex')
 if (codex && process.env.LOCUST_SPEND !== '1') throw new Error('--codex requires LOCUST_SPEND=1')
-const route = codex ? { runtime: 'codex', model: arg('--model') ?? 'gpt-6.1-sol', effort: 'low', mode: 'ask' } : FREE_ROUTE
+/*
+ * --fake-claude (0.637): the reply streams from _tools/fake-claude, a stand-in
+ * `claude` that asks no model and spends nothing -- OpenCode's free models
+ * cannot stream (each message arrives whole), so without it the streaming
+ * state could only be measured on a paid route. The app is handed a PATH with
+ * the stand-in's folder first and no folder that holds a real `claude` (the
+ * locator takes any `.exe` on PATH before any `.cmd`); its route is Claude
+ * Code's, so the app's free-only guard has to be lifted (LOCUST_SPEND=1), and
+ * nothing is sent until the app reports the stand-in's own version.
+ */
+const fakeClaude = process.argv.includes('--fake-claude')
+if (fakeClaude && process.env.LOCUST_SPEND !== '1') throw new Error('--fake-claude lifts the free-only guard, so it requires LOCUST_SPEND=1; it spends nothing, and checks that before sending')
+const FAKE_DIR = join(dirname(fileURLToPath(import.meta.url)), 'fake-claude')
+const FAKE_VERSION = '0.0.0-locust-fake'
+const route = codex
+  ? { runtime: 'codex', model: arg('--model') ?? 'gpt-6.1-sol', effort: 'low', mode: 'ask' }
+  : fakeClaude ? { runtime: 'claude', model: 'claude-haiku-4-5', mode: 'ask' } : FREE_ROUTE
+const fakeEnv = fakeClaude
+  ? { PATH: [FAKE_DIR, ...(process.env.PATH ?? '').split(';').filter((dir) => dir !== '' && !existsSync(join(dir, 'claude.exe')) && !existsSync(join(dir, 'claude.cmd')))].join(';') }
+  : {}
 const port = Number(arg('--port') ?? 9877)
 const restMs = 46_000 // Sample after the 45-second rest deadline, finishing within 60 seconds.
 // An arena or another suite starting mid-probe invalidates the comparison too.
@@ -45,7 +66,7 @@ const team = [
   { teammateId: 'tm_juno', name: 'Juno', hue: 'violet', role: 'Docs & QA', createdAt: at, route: FREE_ROUTE }
 ]
 const drive = await startDrive({
-  name: 'cpu-by-state', port, workspace, outPath: OUT, spends: codex,
+  name: 'cpu-by-state', port, workspace, outPath: OUT, spends: codex || fakeClaude, env: fakeEnv,
   ...(packaged === undefined ? {} : { packaged }),
   seed: { schemaVersion: 1, teammates: team, missionOwners: {}, settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: false } }
 })
@@ -55,7 +76,7 @@ say(`CPU probe requested route: ${JSON.stringify(route)}`)
 const cpu = (seconds) => {
   const key = drive.profile.replace(/'/g, "''")
   const script = `
-$ps = @(Get-CimInstance Win32_Process -Filter "Name='Locust.exe'" | Where-Object { $_.CommandLine -like ('*' + '${key}' + '*') })
+$ps = @(Get-CimInstance Win32_Process -Filter "Name='Locust.exe' OR Name='electron.exe'" | Where-Object { $_.CommandLine -like ('*' + '${key}' + '*') })
 $a = @{}; foreach ($p in $ps) { $g = Get-Process -Id $p.ProcessId -ErrorAction SilentlyContinue; if ($g) { $a[[int]$p.ProcessId] = $g.TotalProcessorTime.TotalMilliseconds } }
 Start-Sleep -Seconds ${String(seconds)}
 $cores = [Environment]::ProcessorCount
@@ -140,6 +161,18 @@ try {
     await drive.evaluate(`window.dispatchEvent(new Event('keydown'))`)
     await sleep(restMs)
     await measure('home, idle at rest')
+  }
+  // --css <rules>: an experiment's style sheet, added before the send (what costs what, by turning it off).
+  const extraCss = arg('--css')
+  if (extraCss !== undefined) {
+    await drive.evaluate(`(() => { const style = document.createElement('style'); style.dataset.probe = 'css'; style.textContent = ${JSON.stringify(extraCss)}; document.head.appendChild(style); return 'added' })()`)
+    say(`  experiment css: ${extraCss}`)
+  }
+  if (fakeClaude) {
+    // The stand-in or nothing: the version the app's own discovery read for Claude Code.
+    const seen = String(await drive.evaluate(`window.desktop.discoveryLog().then((log) => JSON.stringify(log.filter((e) => e.kind === 'probe.finished' && e.id === 'claude').map((e) => e.version ?? null)))`))
+    say(`  Claude Code as the app found it: ${seen}`)
+    if (!seen.includes(FAKE_VERSION)) throw new Error(`the app did not find the stand-in claude (it read ${seen}); nothing was sent`)
   }
   const sent = String(await drive.evaluate(`(async () => {
     const card = [...document.querySelectorAll('.lc-hometeam__card')].find((c) => c.getAttribute('aria-label')?.startsWith('Message Wren'))
