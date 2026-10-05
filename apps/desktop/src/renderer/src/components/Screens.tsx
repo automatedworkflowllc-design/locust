@@ -52,6 +52,8 @@ import { Bot } from './Bot.js'
 import type { EyeGlyphs } from './Bot.js'
 import { TeammateBot } from './TeammateBot.js'
 import { RuntimeMark } from './RuntimeMark.js'
+import { WhatLocustCanStop } from './WhatLocustCanStop.js'
+import { WHAT_LOCUST_CAN_STOP_LEDE } from '../../../shared/what-locust-can-stop.js'
 import { keepCurrentNote, offersUpdate, updateLine } from '../agentUpdates.js'
 import { Icon } from './Icon.js'
 import { costCell, costTotal, missionCost, monthSpendLine, sumCosts } from '../cost.js'
@@ -2269,6 +2271,14 @@ export function SettingsScreen({
           </div>
           {/* W8 (0.567): each connector's state, what to do, when it last worked, and a report to copy. */}
           <ConnectorHealth />
+        </section>
+        )}
+        {shownPage === 'runtimes' && (
+        <section className="lc-settings__section">
+          {/* R9 (0.617): which AI agents ask first, so which a card can stop -- the words docs/WHAT-LOCUST-CAN-STOP.md is written from. */}
+          <h2 className="lc-settings__heading">What Locust can stop</h2>
+          <p className="lc-settings__lede">{WHAT_LOCUST_CAN_STOP_LEDE}</p>
+          <WhatLocustCanStop />
         </section>
         )}
         {shownPage === 'runtimes' && (

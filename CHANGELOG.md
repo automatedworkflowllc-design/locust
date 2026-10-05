@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.617.0 - 2026-10-04
+
+### New
+
+- **What Locust can stop.** Settings > AI agents now says, for each AI agent, how much of a run Locust can stop. Codex, OpenCode and Copilot ask before each action in Approve each action. Claude Code asks about connector calls, and in Edit about the commands it does not run on its own. Antigravity asks only its questions. Cursor and Muse never ask. Open a row to see what it asks first, what it does without asking in each mode, and who keeps an Always. The same words are in a document published with Locust's source, written from the same list, so the two cannot disagree.
+
 ## 0.616.0 - 2026-10-04
 
 ### Fixed

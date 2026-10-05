@@ -170,12 +170,15 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
     label: 'AI agents',
     group: 'Agents',
     icon: 'terminal',
-    headings: ['AI agents & accounts', 'When a model hits its limit'],
+    headings: ['AI agents & accounts', 'What Locust can stop', 'When a model hits its limit'],
     alsoKnownAs: {
       // "node" and "npm" are what a person types after the first screen has
       // just talked to them about Node. This is the page about the CLIs that
       // are installed with them.
       'AI agents & accounts': ['runtime', 'runtimes', 'node', 'node.js', 'npm', 'install', 'cli', 'model', 'models', 'sign in', 'account', 'api key', 'remote control', 'phone', 'claude.ai'],
+      // R9 (0.617): which agents ask first, so which a card can stop.
+      // Not 'approve', 'permission', 'ask first' or 'always': Teammates has those.
+      'What Locust can stop': ['approval', 'approvals', 'permissions', 'card', 'cards', 'gate', 'stop', 'safety', 'security'],
       'When a model hits its limit': ['route', 'limit', 'quota', 'rate limit', 'usage', 'fallback']
     }
   },

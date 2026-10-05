@@ -1,0 +1,66 @@
+# What Locust can stop
+
+<!-- Written from apps/desktop/src/shared/what-locust-can-stop.ts. Edit that file, then run
+     `npx vitest run src/main/what-locust-can-stop-is-what-it-asks.test.ts -u` in apps/desktop to rewrite this one. -->
+
+Locust can stop a run only where its AI agent asks first. Where it asks, a card waits for you, your saved rules answer before it reaches you, and the record says who decided. Where it does not, the mode decides what the agent is given.
+
+| AI agent | Can stop | Asks first | Always kept by |
+| --- | --- | --- | --- |
+| Codex CLI | Each action | in Approve each action | Codex CLI |
+| Claude Code | Some actions | connectors, and commands in Edit | Locust |
+| OpenCode | Each action | in Approve each action | Locust |
+| Copilot CLI | Each action | in Approve each action | Locust |
+| Cursor Agent | Nothing | never | — |
+| Antigravity | Questions only | its questions | — |
+| Muse Code | Nothing | never | — |
+
+## Codex CLI
+
+**Asks first.** In Approve each action: every command that does more than read, and every file change, before it runs.
+
+**Without asking.** In Ask and Plan it works in Codex’s own sandbox, where its commands can read but change nothing; in Edit, where they can also change files in this folder. It asks nothing in those modes, or in Auto.
+
+**Always.** Codex keeps an Always itself, for the rest of the run: your saved rules decide what it asks, not what its Always then lets through.
+
+## Claude Code
+
+**Asks first.** In Ask and Plan, every connector call. In Edit, a connector call the teammate was not given (or every one, when “Ask before every connector call” is on), a command it does not run on its own say, and a change to a file outside this folder.
+
+**Without asking.** Reading files, in every mode. In Edit, changes to files in this folder and the commands Claude Code runs on its own say. In Auto, everything.
+
+**Always.** Locust keeps an Always for the rest of the run, and your saved rules come first.
+
+## OpenCode
+
+**Asks first.** In Approve each action: every command, file change, web page and place outside this folder, before it runs.
+
+**Without asking.** Web searches, in every mode. In Ask and Plan, no file changes and no commands; in Edit, commands and the web, and nothing outside this folder. In Auto, everything.
+
+**Always.** Locust keeps an Always for the rest of the run, and your saved rules come first.
+
+## Copilot CLI
+
+**Asks first.** In Approve each action: every command and file change, and each fetch or place outside this folder, before it runs.
+
+**Without asking.** Reading files, in every mode. In Ask and Plan, no file changes and no commands; in Edit, commands and changes in this folder. In Auto, everything.
+
+**Always.** Locust keeps an Always for the rest of the run, and your saved rules come first.
+
+## Cursor Agent
+
+**Asks first.** Nothing: Cursor’s command line has no way to stop and ask Locust.
+
+**Without asking.** In Ask and Plan, Cursor’s own read-only mode. In Edit, changes in this folder, and commands as Cursor’s own settings allow. In Auto, everything.
+
+## Antigravity
+
+**Asks first.** Only its questions, which you answer on a card. It never asks before an action.
+
+**Without asking.** In Ask and Plan, no file changes and no commands; in Edit, file changes and no commands; in Auto, everything. What it refused is listed after the run.
+
+## Muse Code
+
+**Asks first.** Nothing: Muse runs without asking Locust.
+
+**Without asking.** In Ask and Plan, no file changes and no commands. In Edit, changes in this folder, commands inside Muse’s own sandbox, and the web. Auto is not offered.
