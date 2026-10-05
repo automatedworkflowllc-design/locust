@@ -143,7 +143,7 @@ describe("a resumed run's file card", () => {
     expect(html).toContain('Edited 1 file')
     expect(html).toContain('report.md')
     expect(html).not.toContain('did not report')
-    expect(html).not.toContain('stopped before it reported')
+    expect(html).not.toContain('not confirmed')
   })
 
   it('says a Write the turn stopped before settling was stopped, not that Claude Code failed to report', () => {
@@ -167,7 +167,7 @@ describe("a resumed run's file card", () => {
         openByDefault
       />
     )
-    expect(html).toContain('stopped before it reported')
+    expect(html).toContain('not confirmed')
     expect(html).not.toContain('Claude Code did not report')
     expect(html).not.toMatch(/>did not report</)
   })

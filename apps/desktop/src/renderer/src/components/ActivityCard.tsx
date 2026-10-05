@@ -877,12 +877,17 @@ export function ActivityCard({
                     * that failed, and the difference matters — the command may
                     * well have run.
                     */}
-                  <span className={`lc-filerow__result ${entry.settled ? (entry.neverRan !== undefined ? 'is-stalled' : entry.failed ? 'is-failed' : 'is-muted') : finished ? 'is-stalled' : 'is-running'}`}>
+                  <span
+                    className={`lc-filerow__result ${entry.settled ? (entry.neverRan !== undefined ? 'is-stalled' : entry.failed ? 'is-failed' : 'is-muted') : finished ? 'is-stalled' : 'is-running'}`}
+                    {...(!entry.settled && finished && entry.kind === 'unreported' ? { title: `${runtimeName ?? 'The runtime'} started this change and never said it finished. The file may still have changed.` } : {})}
+                  >
                     {!entry.settled
                       // A file call the turn ended without settling was stopped
                       // before it could report -- not a Claude Code failure
-                      // (resumed compare file card, 2026-10-05).
-                      ? finished ? (entry.kind === 'unreported' ? 'stopped before it reported' : 'did not report') : 'still running'
+                      // (resumed compare file card, 2026-10-05). "Not confirmed", not
+                      // "stopped" (0.644): a Cursor turn that completed left four edits
+                      // unclosed in its stream, and the edits had landed.
+                      ? finished ? (entry.kind === 'unreported' ? 'not confirmed' : 'did not report') : 'still running'
                       : entry.neverRan !== undefined
                         ? entry.neverRan
                         : entry.failed

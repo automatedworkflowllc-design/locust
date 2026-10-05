@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.644.0 - 2026-10-05
+
+### Fixed
+
+- **An edit the AI tool never confirmed says "not confirmed", not "stopped".** A turn's list of changed files said "stopped before it reported" for an edit the tool started and never said it had finished. On a Cursor turn that ran to the end, four edits read that way although they had been made. The row now says "not confirmed", and pointing at it explains that the file may still have changed.
+
 ## 0.643.0 - 2026-10-05
 
 ### New
