@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type ReactElement } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState, type CSSProperties, type ReactElement } from 'react'
 
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import type { CompareSlotId, PublicCompare } from '../../../shared/compare.js'
@@ -72,6 +72,20 @@ export function builtPageOf(items: readonly ThreadItem[], workspacePath: string 
     }
   }
   return undefined
+}
+
+/**
+ * WHERE A COLUMN'S WORDS HOLD (2026-10-05). The columns share one scroll, so
+ * a short answer used to leave its column empty for the whole length of a
+ * long one: Colin's three-way compare showed Model A blank beside Model B's
+ * fortieth line. Each cell's body is sticky at this offset from the top of
+ * the scroll: under the heads, when it fits; otherwise far enough up that it
+ * stops with its end at the bottom edge, so its last words stay in view while
+ * a longer column goes on. In pixels; `head` is the sticky heads' height.
+ */
+export function stickAt(head: number, port: number, body: number): number {
+  const GAP = 8
+  return Math.round(Math.min(head + GAP, port - body - GAP))
 }
 
 export function CompareView({
@@ -153,6 +167,51 @@ export function CompareView({
   const focused = columns.some((column) => column.slot === focusedSlot) ? focusedSlot : undefined
   const railed = (slot: CompareSlotId): boolean => focused !== undefined && slot !== focused
   const [copied, setCopied] = useState<CompareSlotId | undefined>(undefined)
+  /*
+   * WHERE EACH COLUMN'S BODY HOLDS, KEPT CURRENT (0.632).
+   *
+   * One ResizeObserver for as long as the scroll is on screen, watching the
+   * scroll, the heads and every cell's body. A running column grows with each
+   * event -- that is a body resizing, which it hears -- and so is a window
+   * resize. A draw only hands it a head or body it has not seen, and lets go
+   * of one that has left. It measures in its own callback, at most once a
+   * frame, reading every size before writing any offset, and writes only an
+   * offset that changed. It was a new observer and a forced layout on every
+   * draw, which in a streaming comparison is every batch of every column.
+   */
+  const stick = useRef<{ readonly port: HTMLDivElement; readonly observer: ResizeObserver; readonly watched: Set<Element> } | undefined>(undefined)
+  const scrollRef = useCallback((port: HTMLDivElement | null) => {
+    stick.current?.observer.disconnect()
+    stick.current = undefined
+    if (port === null || typeof ResizeObserver === 'undefined') return
+    const place = (): void => {
+      const head = port.querySelector('.lc-compare__head')?.getBoundingClientRect().height ?? 0
+      const height = port.clientHeight
+      const bodies = [...port.querySelectorAll<HTMLElement>('.lc-compare__cellbody')]
+      const offsets = bodies.map((body) => `${String(stickAt(head, height, body.offsetHeight))}px`)
+      bodies.forEach((body, index) => {
+        const offset = offsets[index]
+        if (offset !== undefined && body.style.getPropertyValue('--lc-compare-stick') !== offset) body.style.setProperty('--lc-compare-stick', offset)
+      })
+    }
+    const observer = new ResizeObserver(place)
+    observer.observe(port)
+    stick.current = { port, observer, watched: new Set<Element>([port]) }
+  }, [])
+  useLayoutEffect(() => {
+    const held = stick.current
+    if (held === undefined) return
+    for (const element of [...held.watched]) {
+      if (element === held.port || element.isConnected) continue
+      held.observer.unobserve(element)
+      held.watched.delete(element)
+    }
+    for (const element of held.port.querySelectorAll('.lc-compare__head, .lc-compare__cellbody')) {
+      if (held.watched.has(element)) continue
+      held.watched.add(element)
+      held.observer.observe(element)
+    }
+  })
   const copy = (column: CompareColumnView): void => {
     const done = (): void => {
       setCopied(column.slot)
@@ -200,7 +259,7 @@ export function CompareView({
           </button>
         )}
       </div>
-      <div className="lc-compare__scroll">
+      <div className="lc-compare__scroll" ref={scrollRef}>
         <div className="lc-compare__grid">
           {columns.map((column) => railed(column.slot) ? (
             <button
@@ -217,11 +276,12 @@ export function CompareView({
           ) : (
             <div key={`head:${column.slot}`} className={`lc-compare__head${column.slot === kept ? ' is-kept' : ''}`}>
               {!veiled && <RuntimeMark runtime={column.runtime} size={13} />}
-              <span className="lc-compare__name">{column.name}</span>
+              {/* Its runtime is in the hover too: a narrow head gives that word up first (2026-10-05). */}
+              <span className="lc-compare__name" title={veiled ? column.name : `${column.name} · ${column.runtimeName}`}>{column.name}</span>
               {judge?.pick === column.slot && <span className="lc-compare__judgebadge" title="The judge would keep this answer. Its view, not a decision.">Judge's pick</span>}
               {!veiled && (
               <span
-                className="lc-compare__runtime lc-mono"
+                className={`lc-compare__runtime lc-mono${column.copy === true ? ' is-copy' : ''}`}
                 {...(column.copy === true ? { title: `${column.runtimeName} cannot be held read-only on this computer, so it answers in a copy of your folder. Nothing in your folder changes.` } : {})}
               >
                 {column.copy === true ? `${column.runtimeName} · in a copy` : column.runtimeName}
@@ -273,46 +333,48 @@ export function CompareView({
                   const page = copyGone ? undefined : built
                   return (
                     <div key={`cell:${column.slot}:${String(turn)}`} className="lc-compare__cell" aria-label={`${column.name}'s answer`}>
-                      {cell === undefined ? (
-                        <p className="lc-compare__quiet">{turn === 0 && column.refused !== undefined ? column.refused : 'Not asked this.'}</p>
-                      ) : cell.items.length === 0 ? (
-                        <p className="lc-compare__quiet">{cell.running ? 'Starting…' : 'No answer was recorded.'}</p>
-                      ) : (
-                        <>
-                          {copyGone && (
-                            <p className="lc-compare__quiet">{`Its copy was removed when you kept ${columns.find((other) => other.slot === compare.kept?.slot)?.name ?? 'another model'}, so the page it made is no longer on this computer. What it said about it is below.`}</p>
-                          )}
-                          {page !== undefined && (
-                            <div className="lc-compare__page" aria-label={`The page ${column.name} made, running`}>
-                              <PagePreview path={page} name={page.replace(/\\/g, '/').split('/').pop() ?? page} column={{ compareId: compare.compareId, slot: column.slot }} />
-                            </div>
-                          )}
-                          <PinnedPagesContext.Provider value={page === undefined ? NO_PAGES : new Set([page])}>
-                            <InComparisonCell.Provider value={true}>
-                            <ThreadItems
-                              items={cell.items}
-                              owner={owner}
-                              faces={false}
-                              activity={cell.running ? 'thinking' : 'idle'}
-                              workspacePath={column.folder ?? workspacePath}
-                              {...(onOpenFile === undefined ? {} : { onOpenFile: (path: string) => onOpenFile(path, column.folder ?? workspacePath) })}
-                              decision={undefined}
+                      <div className="lc-compare__cellbody">
+                        {cell === undefined ? (
+                          <p className="lc-compare__quiet">{turn === 0 && column.refused !== undefined ? column.refused : 'Not asked this.'}</p>
+                        ) : cell.items.length === 0 ? (
+                          <p className="lc-compare__quiet">{cell.running ? 'Starting…' : 'No answer was recorded.'}</p>
+                        ) : (
+                          <>
+                            {copyGone && (
+                              <p className="lc-compare__quiet">{`Its copy was removed when you kept ${columns.find((other) => other.slot === compare.kept?.slot)?.name ?? 'another model'}, so the page it made is no longer on this computer. What it said about it is below.`}</p>
+                            )}
+                            {page !== undefined && (
+                              <div className="lc-compare__page" aria-label={`The page ${column.name} made, running`}>
+                                <PagePreview path={page} name={page.replace(/\\/g, '/').split('/').pop() ?? page} column={{ compareId: compare.compareId, slot: column.slot }} />
+                              </div>
+                            )}
+                            <PinnedPagesContext.Provider value={page === undefined ? NO_PAGES : new Set([page])}>
+                              <InComparisonCell.Provider value={true}>
+                              <ThreadItems
+                                items={cell.items}
+                                owner={owner}
+                                faces={false}
+                                activity={cell.running ? 'thinking' : 'idle'}
+                                workspacePath={column.folder ?? workspacePath}
+                                {...(onOpenFile === undefined ? {} : { onOpenFile: (path: string) => onOpenFile(path, column.folder ?? workspacePath) })}
+                                decision={undefined}
+                              />
+                              </InComparisonCell.Provider>
+                            </PinnedPagesContext.Provider>
+                          </>
+                        )}
+                        {/* What this column waits on you for, where you are looking: its newest turn. */}
+                        {turn === column.turns.length - 1 && onDecide !== undefined && onAnswer !== undefined &&
+                          (column.approvals ?? []).map((request) => (
+                            <ApprovalCard
+                              key={request.approvalId}
+                              request={request}
+                              busy={(decidingIds ?? []).includes(request.approvalId)}
+                              onDecide={(decision, reason) => onDecide(request.approvalId, decision, reason)}
+                              onAnswer={(answers) => onAnswer(request.approvalId, answers)}
                             />
-                            </InComparisonCell.Provider>
-                          </PinnedPagesContext.Provider>
-                        </>
-                      )}
-                      {/* What this column waits on you for, where you are looking: its newest turn. */}
-                      {turn === column.turns.length - 1 && onDecide !== undefined && onAnswer !== undefined &&
-                        (column.approvals ?? []).map((request) => (
-                          <ApprovalCard
-                            key={request.approvalId}
-                            request={request}
-                            busy={(decidingIds ?? []).includes(request.approvalId)}
-                            onDecide={(decision, reason) => onDecide(request.approvalId, decision, reason)}
-                            onAnswer={(answers) => onAnswer(request.approvalId, answers)}
-                          />
-                        ))}
+                          ))}
+                      </div>
                     </div>
                   )
                 })}
@@ -410,8 +472,15 @@ export function CompareView({
         {columns.map((column) => (
           <div key={`foot:${column.slot}`} className={`lc-compare__foot${railed(column.slot) ? ' is-rail' : ''}`}>
             {!railed(column.slot) && (
+              /*
+               * Each number whole (2026-10-05): in a third of the window the
+               * line was cut to "+1273 -0 in 1 file · 5..." beside Keep. The
+               * parts wrap between them; none is cut.
+               */
               <span className="lc-compare__numbers lc-mono">
-                {[changeLines[column.slot], column.span, veiled ? undefined : column.cost].filter((part) => part !== undefined && part.length > 0).join(' · ')}
+                {[changeLines[column.slot], column.span, veiled ? undefined : column.cost]
+                  .filter((part): part is string => part !== undefined && part.length > 0)
+                  .map((part) => <span key={part} className="lc-compare__part">{part}</span>)}
               </span>
             )}
             {railed(column.slot) ? null : kept === undefined && column.retryable ? (

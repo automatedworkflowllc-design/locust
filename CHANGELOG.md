@@ -11,6 +11,13 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.632.0 - 2026-10-05
+
+### Improved
+
+- **A comparison keeps every column's words in view.** The columns scroll together, so a short answer used to leave its column empty for the whole length of a long one. Now a column that has finished saying everything waits under the names, and a longer one stops with its last words at the bottom, so at the end of the longest answer every column's ending sits side by side.
+- **Nothing in a comparison is cut off.** A column's numbers, such as "+212 -4 in 2 files · 1h 09m", wrap between whole parts instead of trailing off. A narrow column keeps the model's whole name and leaves out the word for its tool, which its logo already shows and its hover names. A turn's closing line wraps instead of silently dropping its last part. The live line starts at the column's edge, like the words under it.
+
 ## 0.631.0 - 2026-10-05
 
 ### Fixed

@@ -85,8 +85,9 @@ describe('a comparison that edits', () => {
 
   it('puts what each changed at its foot, before its time', () => {
     const html = render({ a: changesLine({ files: 2, added: 12, removed: 3 }), b: changesLine({ files: 0, added: 0, removed: 0 }) })
-    expect(html).toContain('+12 −3 in 2 files · 12s')
-    expect(html).toContain('no changes · 12s')
+    // Each its own part since 2026-10-05, so a narrow foot wraps between them (the dot is drawn by shell.css).
+    expect(html).toContain('<span class="lc-compare__part">+12 −3 in 2 files</span><span class="lc-compare__part">12s</span>')
+    expect(html).toContain('<span class="lc-compare__part">no changes</span><span class="lc-compare__part">12s</span>')
   })
 
   it('counts one file as a file', () => {
