@@ -56,7 +56,7 @@ describe('each row is what the run is given', () => {
   it('Codex: asks in Approve each action, and never in the other modes', () => {
     expect(codexAppServerPolicy('workspace-write', 'approve-each').approvalPolicy).toBe('untrusted')
     for (const sandbox of ['read-only', 'workspace-write', 'full-access'] as const) expect(codexAppServerPolicy(sandbox).approvalPolicy, sandbox).toBe('never')
-    expect(row('codex').always).toMatch(/^Codex keeps an Always itself/)
+    expect(row('codex').always).toMatch(/^Locust keeps an Always/)
   })
 
   it('Claude Code: asks in every mode but Auto, and has a shell only in Edit', () => {
@@ -99,7 +99,7 @@ describe('each row is what the run is given', () => {
     expect(source('./permission-host.ts')).toContain('alwaysKey: `claude:${alwaysKeyOf(toolName)}`')
     expect((openCodePermissionRequest({ permission: 'bash', patterns: ['echo hi'], always: ['echo *'], metadata: {} }, 'C:/work').params as Record<string, unknown>).locustAlwaysKey).toBeDefined()
     expect((acpPermissionRequest({ toolCallId: 't', title: 'x', kind: 'execute', command: 'npm test', paths: [], diff: undefined, options: [] }, 'C:/work').params as Record<string, unknown>).locustAlwaysKey).toBeDefined()
-    for (const runtime of ['claude', 'opencode', 'copilot'] as const) expect(row(runtime).always, runtime).toMatch(/^Locust keeps an Always/)
+    for (const runtime of ['codex', 'claude', 'opencode', 'copilot'] as const) expect(row(runtime).always, runtime).toMatch(/^Locust keeps an Always/)
     for (const runtime of ['cursor', 'antigravity', 'muse'] as const) expect(row(runtime).always, runtime).toBeUndefined()
   })
 })

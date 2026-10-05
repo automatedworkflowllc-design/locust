@@ -51,7 +51,7 @@ export const WHAT_LOCUST_CAN_STOP: readonly StopRow[] = [
     reach: 'each-action',
     asks: 'In Approve each action: every command that does more than read, and every file change, before it runs.',
     without: 'In Ask and Plan it works in Codex’s own sandbox, where its commands can read but change nothing; in Edit, where they can also change files in this folder. It asks nothing in those modes, or in Auto.',
-    always: 'Codex keeps an Always itself, for the rest of the run: your saved rules decide what it asks, not what its Always then lets through.'
+    always: KEPT_BY_LOCUST
   },
   {
     runtime: 'claude',

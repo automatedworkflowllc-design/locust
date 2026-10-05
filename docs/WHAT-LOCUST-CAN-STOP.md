@@ -7,7 +7,7 @@ Locust can stop a run only where its AI agent asks first. Where it asks, a card 
 
 | AI agent | Can stop | Asks first | Always kept by |
 | --- | --- | --- | --- |
-| Codex CLI | Each action | in Approve each action | Codex CLI |
+| Codex CLI | Each action | in Approve each action | Locust |
 | Claude Code | Some actions | connectors, and commands in Edit | Locust |
 | OpenCode | Each action | in Approve each action | Locust |
 | Copilot CLI | Each action | in Approve each action | Locust |
@@ -21,7 +21,7 @@ Locust can stop a run only where its AI agent asks first. Where it asks, a card 
 
 **Without asking.** In Ask and Plan it works in Codex’s own sandbox, where its commands can read but change nothing; in Edit, where they can also change files in this folder. It asks nothing in those modes, or in Auto.
 
-**Always.** Codex keeps an Always itself, for the rest of the run: your saved rules decide what it asks, not what its Always then lets through.
+**Always.** Locust keeps an Always for the rest of the run, and your saved rules come first.
 
 ## Claude Code
 

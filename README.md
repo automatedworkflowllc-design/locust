@@ -19,19 +19,24 @@ is what was recorded, and a mission survives a restart.
 
 <table>
 <tr>
-<td><img src="docs/assets/shots/01-home.png" alt="Home screen with six teammates, each on its own AI"><br><sub>Your team. Each teammate keeps its own AI and model.</sub></td>
-<td><img src="docs/assets/shots/02-model-picker.png" alt="The model picker with Claude Code and Codex models"><br><sub>One picker for the models your own accounts offer.</sub></td>
+<td><img src="docs/assets/shots/01-home.png" alt="Locust home: a team of six, each teammate on its own AI and model, and Connected accounts: 7 ready"><br><sub>Your team of six, each teammate on its own AI and model. Connected accounts: 7 ready.</sub></td>
+<td><img src="docs/assets/shots/02-model-picker.png" alt="The model picker, grouped by agent, with Opus 5.5 marked active and Antigravity, Claude Code and other agents’ models listed"><br><sub>One picker for the models your own accounts offer, grouped by agent, with the one in use marked.</sub></td>
 </tr>
 <tr>
-<td><img src="docs/assets/shots/04-approval.png" alt="An approval card before a command runs"><br><sub>In Approve each, nothing runs until you have seen the exact command and where it runs.</sub></td>
-<td><img src="docs/assets/shots/06-finished.png" alt="The finished change with its diff and a new test"><br><sub>The change, the diff and the new test, right in the thread.</sub></td>
+<td><img src="docs/assets/shots/03-run-in-progress.png" alt="A teammate working in Edit mode with a three-step plan card, step 1 under way"><br><sub>A run in progress: a three-step plan, step 1 under way, the live line naming the step and its time.</sub></td>
+<td><img src="docs/assets/shots/04-approval.png" alt="An Approve each card showing the exact command, where it runs, and four answers"><br><sub>Approve each: before a command runs you see the exact command, where it runs, and what Locust can and cannot tell about it.</sub></td>
 </tr>
 <tr>
-<td colspan="2"><img src="docs/assets/shots/05-hand-off.png" alt="A checker on Codex reads the files and approves an OpenCode teammate's diagnosis"><br><sub>A hand-off chain: Wren (OpenCode) diagnoses, Atlas (Codex) checks the code himself and approves.</sub></td>
+<td><img src="docs/assets/shots/05-hand-off.png" alt="A hand-off chain: Atlas on Codex reads the code and writes VERDICT: APPROVED on Wren’s diagnosis"><br><sub>A hand-off chain: Wren (OpenCode) diagnosed the bug; Atlas (Codex) read the code himself and wrote VERDICT: APPROVED.</sub></td>
+<td><img src="docs/assets/shots/06-finished.png" alt="The finished run: plan 3 of 3 done, two files edited, four tests passing"><br><sub>The finished fix: 2 files edited, a test added, four tests passing, in 1m 01s.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/assets/shots/07-blind-compare.png" alt="A blind compare: Model A and Model B answer the same ask side by side with names hidden, and a judge model can be asked"><br><sub>Blind compare: two models on the same ask, names hidden until you keep one. A judge model can be asked which it would keep.</sub></td>
+<td><img src="docs/assets/shots/09-board.png" alt="The Board: conversations in columns by what they need from you, one under Needs you and one under Done"><br><sub>The Board: every conversation by what it needs from you.</sub></td>
 </tr>
 </table>
 
-<sub>Screenshots from the packaged app on a demo profile (0.437; the hand-off from 0.438). The models in the picker are what that account offers; yours come from your own accounts. Taken by `_tools/drive-promo-shots.mjs`, which runs the missions rather than mocking them. The app has moved on since (teammate looks, the Board, saved approval rules); `CHANGELOG.md` has every release.</sub>
+<sub>Screenshots from the packaged app on a fresh demo profile (0.619.0): real runs, no mocks, taken by `_tools/drive-promo-shots.mjs`. The models shown are what that machine’s accounts offer; yours come from your own accounts.</sub>
 
 ## Why this exists
 
@@ -71,7 +76,7 @@ place to ask, says so where it cannot, and records what happened either way.
 
 ## What works now
 
-As of 0.588 (2026-10-04). Everything here runs in the built app and is checked
+As of 0.620 (2026-10-05). Everything here runs in the built app and is checked
 by drives against the packaged build, not by unit tests alone.
 
 **Seven runtimes, side by side.** Claude Code, Codex CLI, Cursor Agent,
@@ -159,7 +164,7 @@ Run all checks:
 pnpm check
 ```
 
-This builds every workspace package, runs TypeScript checks, and runs the complete test suite (about 9,500 tests across the desktop app, the adapters and the ledger, as of 0.588).
+This builds every workspace package, runs TypeScript checks, and runs the complete test suite (about 9,700 tests across the desktop app, the adapters and the ledger, as of 0.620).
 
 Green tests are not the evidence here. Each package carries a mutation
 control (`test/mutation-control.mjs`) that breaks one behaviour at a time and
