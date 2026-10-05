@@ -83,10 +83,14 @@ function OutboundLink({
 }
 
 /**
- * One fixed face for the runtime itself, when a mission belongs to nobody:
- * Locust's own bot, the Swarm -- the mark in flight.
+ * One fixed face for the runtime itself, when a mission belongs to nobody: a
+ * plain chat. It was Locust's own bot, the Swarm -- the mark in flight. Colin,
+ * 2026-10-05: "lets make the default teammate for now for a basic chat the
+ * ghost dude with terminal face, hes just so much cleaner and better looking
+ * than the locust, we will touch the locust up at some point". The ghost suits
+ * a screen (SCREEN_SHAPES), so it wears one while Terminal faces is on.
  */
-const RUNTIME_FACE: AvatarSpec = { ...seedAvatar('locust-runtime'), bot: { shape: 'swarm', face: 'eyes' } }
+const RUNTIME_FACE: AvatarSpec = { ...seedAvatar('locust-runtime'), bot: { shape: 'ghost', face: 'eyes' } }
 
 /**
  * The face beside a mission's turns: the teammate's own when the mission has

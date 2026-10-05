@@ -9,7 +9,7 @@
 // Sends nothing.
 
 import { createHash } from 'node:crypto'
-import { mkdtemp } from 'node:fs/promises'
+import { mkdtemp, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -94,7 +94,9 @@ try {
   check('OpenCode, nobody: the OpenCode mark', by('List')?.runtime === 'opencode', JSON.stringify(by('List')))
   check("Wren's: Wren's face, no mark", by('Wren')?.face === true && by('Wren')?.runtime === null, JSON.stringify(by('Wren')))
   check('no empty box left', rows.every((row) => !row.empty), JSON.stringify(rows.map((row) => row.empty)))
-  check('every mark sits in the face\'s 16px place', rows.filter((row) => row.runtime !== null).every((row) => row.width === 16), JSON.stringify(rows.map((row) => row.width)))
+  // The face's place beside a conversation's name, from the app's own sizes (16 when this was written; 20 since 0.561).
+  const ownerSize = Number(/conversationOwner: (\d+)/.exec(await readFile(join(root, 'apps', 'desktop', 'src', 'renderer', 'src', 'botSizes.ts'), 'utf8'))?.[1])
+  check(`every mark sits in the face's ${String(ownerSize)}px place`, Number.isFinite(ownerSize) && rows.filter((row) => row.runtime !== null).every((row) => row.width === ownerSize), JSON.stringify(rows.map((row) => row.width)))
   // 0.550, Colin on 0.549: opening the conversation put the empty box back.
   const opened = JSON.parse(String(await drive.capture('the opened row', () => drive.evaluate(`(async () => {
     const row = [...document.querySelectorAll('.lc-conv')].find((one) => one.title.startsWith('yo'))
@@ -108,6 +110,9 @@ try {
     })
   })()`))))
   check('opened, it keeps the Claude mark', opened.runtime === 'claude' && opened.empty === false, JSON.stringify(opened))
+  // 0.621, Colin: "lets make the default teammate for now for a basic chat the ghost dude with terminal face".
+  const faces = JSON.parse(String(await drive.capture('a plain chat wears the ghost', () => drive.evaluate(`JSON.stringify([...document.querySelectorAll('.lc-thread [data-bot]')].map((face) => face.getAttribute('data-bot')))`))))
+  check('a plain chat\'s reply wears the ghost, never the swarm', faces.length > 0 && faces.every((shape) => shape === 'ghost'), JSON.stringify(faces))
   // 0.551, Colin: "my message is staying in the chatbox for all chats if unsent".
   const drafts = JSON.parse(String(await drive.capture('a draft stays with its conversation', () => drive.evaluate(`(async () => {
     const field = () => document.querySelector('form.command-dock textarea')
