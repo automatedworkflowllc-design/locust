@@ -10,6 +10,7 @@
 // because a before/after is not a control unless the old thing is re-run.
 
 import { spawn } from 'node:child_process'
+import { existsSync, readdirSync } from 'node:fs'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -17,7 +18,12 @@ import { join } from 'node:path'
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
 const PORT = 9279
-const CODEX_BIN_DIR = 'C:\\Users\\<home>\\AppData\\Local\\OpenAI\\Codex\\bin\\b99306303521e97e'
+// Codex's bin folder is named by a hash that changes with each Codex update:
+// find the one that holds codex.exe instead of naming it.
+const CODEX_BIN_ROOT = 'C:\\Users\\<home>\\AppData\\Local\\OpenAI\\Codex\\bin'
+const CODEX_BIN_DIR = existsSync(CODEX_BIN_ROOT)
+  ? (readdirSync(CODEX_BIN_ROOT).map((name) => join(CODEX_BIN_ROOT, name)).find((dir) => existsSync(join(dir, 'codex.exe'))) ?? '')
+  : ''
 const NPM_DIR = 'C:\\Users\\<home>\\AppData\\Roaming\\npm'
 const CURSOR_DIR = 'C:\\Users\\<home>\\AppData\\Local\\cursor-agent'
 const label = process.argv[2] ?? ''
@@ -78,7 +84,9 @@ try {
     rows.push({ id: s.id, ms: f === undefined ? null : f.at - s.at, endAt: f === undefined ? null : f.at - t0, outcome: f?.outcome?.status ?? f?.outcome ?? '?' })
   }
   const total = Math.max(...rows.map((r) => r.endAt ?? 0))
-  console.log(`[${label}] sweep total ${String(total)} ms`)
+  // The moment the sweep said it was done: what the first screen waits for, and what Antigravity must never extend.
+  const released = log.find((e) => e.kind === 'finished')
+  console.log(`[${label}] sweep total ${String(total)} ms; sweep finished event at ${released === undefined ? '?' : String(released.at - t0)} ms`)
   for (const r of rows.sort((a, b) => (b.ms ?? 0) - (a.ms ?? 0))) {
     console.log(`  ${r.id.padEnd(12)} ${String(r.ms ?? '?').padStart(6)} ms  ${typeof r.outcome === 'string' ? r.outcome : JSON.stringify(r.outcome)}`)
   }

@@ -470,6 +470,9 @@ export function listsItsModelsButListedNone(runtimes: readonly RuntimeDiscovery[
     && entry.readiness === 'ready'
     && (entry.modelHints?.models === undefined || entry.modelHints.models.length === 0)
     && !(entry.id === 'claude' && (entry.modelHints?.aliases?.length ?? 0) > 0))
+    // Antigravity installed and not answered yet: the sweep went on without it
+    // (antigravity-beside.ts), so a list without its models is not the list.
+    || runtimes.some((entry) => entry.id === 'antigravity' && entry.availability === 'available' && entry.readiness === 'unknown')
 }
 
 export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {

@@ -162,6 +162,7 @@ import { createPermissionHost } from './permission-host.js'
 import { chooseFolderCaution, isInsideDirectory, notATeammateFolder, readRememberedWorkspace, resolveWorkspacePath, WORKSPACE_ARGUMENT, writeRememberedWorkspace, workspaceIdFor } from './workspace.js'
 import { createUnwrittenAnswers } from './approval-record-note.js'
 import { createRaisedApprovals } from './raised-approvals.js'
+import { besideTheOthers } from './antigravity-beside.js'
 import { createAntigravityHostProbe } from './antigravity-host.js'
 import { AntigravityStartError, antigravityStartRefusal, createAntigravityMissionService } from './antigravity-mission.js'
 import type { Relay } from './relay.js'
@@ -502,10 +503,69 @@ void acpCapabilities.load().catch(() => undefined)
 // Antigravity has no CLI probe: its readiness is whether the app is open,
 // which the host checks itself and merges into the same sweep.
 const antigravityProbe = createAntigravityHostProbe()
+/**
+ * Antigravity's check answered after the sweep had gone on without it
+ * (antigravity-beside.ts): put its answer where the next read finds it, drop
+ * the answers built on its absence, and let the window know through the log
+ * it already hears (the `probe.finished` below was emitted when it landed).
+ * One tick later, so it never lands before the sweep's own answer is held.
+ */
+let forgetModelCatalog: () => void = () => undefined
+const antigravityAnswered = (record: RuntimeDiscovery): void => {
+  setTimeout(() => {
+    const held = discoveryCache
+    if (held !== undefined) {
+      const there = held.value.some((entry) => entry.id === 'antigravity')
+      discoveryCache = {
+        at: held.at,
+        value: there ? held.value.map((entry) => (entry.id === 'antigravity' ? record : entry)) : [...held.value, record]
+      }
+    }
+    startReadiness.swept([record], Date.now())
+    runtimeDiscovery.invalidate()
+    forgetModelCatalog()
+  }, 0)
+}
 const discoverRuntimes = async (): Promise<readonly RuntimeDiscovery[]> => {
   // Cheap and bounded: a file read that has already been started.
   await runtimeFactsLoaded
-  const [found, antigravity] = await Promise.all([
+  /*
+   * Antigravity's check starts with the rest and is never waited for past
+   * them (antigravity-beside.ts): a slow or hung `agy` does not hold another
+   * agent's row, the first screen, or a Send to another agent.
+   */
+  /*
+   * Announced like everything else: its readiness is whether `agy` answers,
+   * checked by the host rather than by a CLI probe, and being outside the
+   * swept definitions meant it emitted no events at all. It then appeared in
+   * the settled table having never been in the log above it, while Gemini
+   * was in the log and not the table (Colin, 2026-09-14). One list, or the
+   * two disagree in front of somebody.
+   */
+  const antigravityCheck = (async () => {
+    discoveryLog.emit({
+      kind: 'probe.started',
+      id: 'antigravity',
+      bin: 'antigravity',
+      product: 'Antigravity',
+      at: Date.now()
+    })
+    const record = await antigravityProbe.discoveryRecord().catch(() => undefined)
+    discoveryLog.emit({
+      kind: 'probe.finished',
+      id: 'antigravity',
+      at: Date.now(),
+      outcome: record === undefined
+        ? 'missing'
+        : bootOutcome({
+            installed: record.availability === 'available',
+            status: record.readiness === 'ready' ? 'ready' : record.readiness === 'authentication-required' ? 'auth-required' : 'other'
+          }),
+      ...(record?.version?.version === undefined ? {} : { version: record.version.version })
+    })
+    return record
+  })()
+  const beside = await besideTheOthers(
     discoverInstalledRuntimes({
       runner: probeRunner,
       locator: executableLocator,
@@ -569,41 +629,10 @@ const discoverRuntimes = async (): Promise<readonly RuntimeDiscovery[]> => {
         }
       }
     }),
-    /*
-     * Antigravity, announced like everything else.
-     *
-     * Its readiness is whether the app is open, so it is checked by the host
-     * rather than by a CLI probe -- and being outside the swept definitions
-     * meant it emitted no events at all. It then appeared in the settled
-     * table having never been in the log above it, while Gemini was in the
-     * log and not the table (Colin, 2026-09-14). One list, or the two
-     * disagree in front of somebody.
-     */
-    (async () => {
-      discoveryLog.emit({
-        kind: 'probe.started',
-        id: 'antigravity',
-        bin: 'antigravity',
-        product: 'Antigravity',
-        at: Date.now()
-      })
-      const record = await antigravityProbe.discoveryRecord().catch(() => undefined)
-      discoveryLog.emit({
-        kind: 'probe.finished',
-        id: 'antigravity',
-        at: Date.now(),
-        outcome: record === undefined
-          ? 'missing'
-          : bootOutcome({
-              installed: record.availability === 'available',
-              status: record.readiness === 'ready' ? 'ready' : record.readiness === 'authentication-required' ? 'auth-required' : 'other'
-            }),
-        ...(record?.version?.version === undefined ? {} : { version: record.version.version })
-      })
-      return record
-    })()
-  ])
-  return antigravity === undefined ? found : [...found, antigravity]
+    antigravityCheck,
+    { pending: () => antigravityProbe.pendingRecord(), late: antigravityAnswered }
+  )
+  return beside.antigravity === undefined ? beside.others : [...beside.others, beside.antigravity]
 }
 /**
  * The connectors this machine has, read in the background and held.
@@ -743,8 +772,21 @@ const startReadiness = createStartReadiness({
   sweepOnly: new Set(['antigravity'])
 })
 
-/** See start-readiness.ts: a stale answer is refreshed for the starting runtime alone. */
-const discoverForStart = (runtimeId?: string): Promise<readonly RuntimeDiscovery[]> => startReadiness.forStart(runtimeId)
+/**
+ * See start-readiness.ts: a stale answer is refreshed for the starting runtime alone.
+ *
+ * A start ON Antigravity waits for Antigravity's own check if the sweep went
+ * on without it (antigravity-beside.ts) -- that is the one send that has
+ * something to wait for. A start on anything else, and the model list, never do.
+ */
+const discoverForStart = async (runtimeId?: string): Promise<readonly RuntimeDiscovery[]> => {
+  const found = await startReadiness.forStart(runtimeId)
+  if (runtimeId !== 'antigravity') return found
+  const mine = found.find((entry) => entry.id === 'antigravity')
+  if (mine === undefined || mine.readiness !== 'unknown') return found
+  const answer = await antigravityProbe.discoveryRecord().catch(() => undefined)
+  return answer === undefined ? found : found.map((entry) => (entry.id === 'antigravity' ? answer : entry))
+}
 
 /**
  * Can npm be run from here?
@@ -2371,6 +2413,8 @@ if (!ownsSingleInstanceLock) {
       discover: discoverForStart,
       spawn: spawnAppServer
     })
+    // Antigravity answered after the sweep went on without it: the list built without it is no longer the list.
+    forgetModelCatalog = () => modelCatalog.forget()
 
     /*
      * KEEPING THE CODING AGENTS CURRENT (runtime-updates.ts). Colin,
@@ -3338,7 +3382,14 @@ if (!ownsSingleInstanceLock) {
         try {
           await runtimeFactsLoaded
           const wanted = new Set(named)
-          const [asked, antigravity] = await Promise.all([
+          /*
+           * Antigravity is asked only if the held answer is not already a real
+           * one (its late answer is patched into the held list), and is never
+           * waited for past the others (antigravity-beside.ts).
+           */
+          const heldAntigravity = cached.value.find((entry) => entry.id === 'antigravity')
+          const askAntigravity = wanted.has('antigravity') && heldAntigravity?.readiness !== 'ready'
+          const beside = await besideTheOthers(
             discoverInstalledRuntimes({
               runner: probeRunner,
               locator: executableLocator,
@@ -3347,9 +3398,10 @@ if (!ownsSingleInstanceLock) {
               readinessFromVersion: plannedRuntimes(),
               only: wanted
             }),
-            wanted.has('antigravity') ? antigravityProbe.discoveryRecord().catch(() => undefined) : Promise.resolve(undefined)
-          ])
-          const answers = new Map([...asked, ...(antigravity === undefined ? [] : [antigravity])].map((entry) => [entry.id, entry]))
+            askAntigravity ? antigravityProbe.discoveryRecord().catch(() => undefined) : Promise.resolve(undefined),
+            { pending: () => antigravityProbe.pendingRecord(), late: antigravityAnswered }
+          )
+          const answers = new Map([...beside.others, ...(beside.antigravity === undefined ? [] : [beside.antigravity])].map((entry) => [entry.id, entry]))
           discoveryCache = { at: Date.now(), value: cached.value.map((entry) => answers.get(entry.id) ?? entry) }
           startReadiness.swept([...answers.values()], Date.now())
           runtimeDiscovery.invalidate()

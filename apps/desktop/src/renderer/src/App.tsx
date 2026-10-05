@@ -2994,6 +2994,16 @@ export default function App(): ReactElement {
     // So an install can ask for a fresh answer the moment it finishes.
     askDiscoveryAgain.current = askAgain
     window.addEventListener('focus', onFocus)
+    /*
+     * Antigravity's check never holds the sweep up (main/antigravity-beside.ts):
+     * if it answers after the sweep did, its row said "checking" until the
+     * 15-second re-check. The host says when it lands, and this asks once.
+     */
+    const stopAntigravityWatch =
+      bridge.onDiscoveryEvent?.((event) => {
+        if (event.kind !== 'probe.finished' || event.id !== 'antigravity') return
+        if (known.length > 0 && unreadyRuntimes(known).includes('antigravity')) askAgain()
+      }) ?? (() => undefined)
 
     void bridge
       .readWorkspaceSettings()
@@ -3197,6 +3207,7 @@ export default function App(): ReactElement {
       active = false
       clearTimeout(firstRecheck)
       window.removeEventListener('focus', onFocus)
+      stopAntigravityWatch()
       window.removeEventListener(SIGN_IN_OPENED_EVENT, onSignInOpened)
       stopSignInClosed()
       removeMissionListener()
