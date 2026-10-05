@@ -76,6 +76,9 @@ Edited notes.txt +2 −0 DONE Edited 1 file +2 −0 pebble/cp-write/notes.txt RE
 ## copilot/write-mode-view-then-edit.jsonl
 A Copilot record could not be parsed. Read a file, edited a file +1 −1 DONE Edited 1 file +1 −1 pebble/notes.ts MODIFIED +1 −1 0s 1 tool call
 
+## cursor/edit-result-too-large.jsonl
+Edited 4 files Edited 4 files src/app.ts edit result too large to keep src/view.ts edit result too large to keep src/main.ts edit result too large to keep src/notes.ts edit result too large to keep 0s
+
 ## cursor/read-only-partial.jsonl
 Thought: Reading README.md to summarize the project in one sentence. I'll read the README and summarize the project in one sentence. Read README.md Thought: I'll read the README and provide a one-sentence summary of the projec… Pebble is a tiny CLI timer whose single command, pebble start , counts down 25 minutes and rings a bell. 0s 1 tool call
 

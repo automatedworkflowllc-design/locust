@@ -1818,6 +1818,11 @@ describe('the activity card reads the change, not a receipt of it', () => {
     expect(entries[0]?.kind).toBe('unreported')
   })
 
+  it('says an edit whose result was too large to keep, rather than that nobody confirmed it', () => {
+    const entries = activityEntries([{ kind: 'edit', name: 'src/app.ts', tool: 'edit', settled: true, status: 'result too large to keep' }])
+    expect(entries[0]).toMatchObject({ kind: 'unreported', name: 'src/app.ts', settled: true, tooLarge: true })
+  })
+
   it('names the tool on a row whose target is the same path it edited', () => {
     // One call each, because two consecutive plain tool calls now FOLD into a
     // single row (`foldPlainToolRuns`). The naming rule this protects is

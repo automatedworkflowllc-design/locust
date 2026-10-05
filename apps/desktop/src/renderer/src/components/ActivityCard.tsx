@@ -917,9 +917,11 @@ export function ActivityCard({
                         ? entry.neverRan
                         : entry.failed
                         ? 'failed'
-                        : entry.kind === 'tool'
-                          ? 'done'
-                          : `${runtimeName ?? 'the runtime'} did not report the change`}
+                        : 'tooLarge' in entry && entry.tooLarge === true
+                          ? 'result too large to keep'
+                          : entry.kind === 'tool'
+                            ? 'done'
+                            : `${runtimeName ?? 'the runtime'} did not report the change`}
                   </span>
                 </div>
               )}

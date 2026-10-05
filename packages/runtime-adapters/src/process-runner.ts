@@ -31,6 +31,21 @@ function streamJsonUserLine(text: string): string {
  * another turn -- so the runner closes stdin on this record, or the run would
  * never end.
  */
+/**
+ * Call ids named in the first bytes of a record, as the adapter will know them.
+ *
+ * Claude's are one token (`toolu_…`). Cursor's measured ids hold a newline
+ * between two halves, escaped in the JSON line as `\n`; the adapter joins
+ * those halves with `|`. The stand-in has to name that same id, or the open
+ * call never matches and stays unconfirmed. Nothing past the id is kept.
+ */
+function callIdsIn(head: string): string[] {
+  return [...new Set(
+    [...head.matchAll(/"(?:tool_use_id|call_id|callId|toolCallId)"\s*:\s*"((?:\\[nrt]|[A-Za-z0-9_.:-]){1,240})"/g)]
+      .map((match) => match[1]!.replace(/\\n/g, "\n").replace(/\\r/g, "\r").replace(/\\t/g, "\t").replace(/\s+/g, "|")),
+  )];
+}
+
 function isTurnResult(raw: string): boolean {
   if (!raw.includes('"result"')) return false;
   try {
@@ -673,7 +688,7 @@ export function createNodeRuntimeProcessRunner(
         if (spec.oversizedStandIns !== true || outputLimitExceeded) return;
         const start = head.slice(0, 4096);
         const recordType = /^\s*\{\s*"type"\s*:\s*"([a-z_]{1,40})"/.exec(start)?.[1];
-        const callIds = [...new Set([...start.matchAll(/"(?:tool_use_id|call_id|callId|toolCallId)"\s*:\s*"([A-Za-z0-9_.:-]{1,200})"/g)].map((match) => match[1]!))];
+        const callIds = callIdsIn(start);
         const nextSequence = recordCount + 1;
         if (!records.push({ sequence: nextSequence, raw: JSON.stringify({ type: "locust.oversized", bytes, ...(recordType === undefined ? {} : { recordType }), callIds }) })) {
           exceedOutputLimit();

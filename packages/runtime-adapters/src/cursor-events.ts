@@ -199,7 +199,7 @@ export function createCursorEventNormalizer(
     : requireContextText(context.cliVersion, "cliVersion");
   const now = context.now ?? (() => new Date());
 
-  const openTools = new Map<string, { kind: string }>();
+  const openTools = new Map<string, { kind: string; target?: string }>();
   /*
    * The run's todo list, held by id because Cursor sends partial updates.
    *
@@ -549,7 +549,7 @@ export function createCursorEventNormalizer(
       }
 
       if (subtype === "started") {
-        openTools.set(itemId, { kind });
+        openTools.set(itemId, { kind, ...(target === undefined ? {} : { target }) });
         return [
           emit("tool.started", {
             itemId,
@@ -641,6 +641,44 @@ export function createCursorEventNormalizer(
             : `Cursor is retrying${attempt}.`
           : `Cursor's retry: ${subtype ?? "changed"}${attempt}.`;
       return [diagnostic("info", `cursor.${type}`, said, evidence)];
+    }
+
+    /*
+     * A tool result too large to carry (the same stand-in Claude has had
+     * since 0.492). Cursor's edit of a large file completes as one record
+     * holding the file twice. Measured 2026-10-05, two turns: four edits of
+     * index.ts (399 KB) and one of missionView.ts (293 KB) started and never
+     * closed, and those turns dropped four records and one. The small files
+     * in the same turns closed on the same id. The host had thrown the
+     * completion away before this adapter saw it, so the files card read
+     * "not confirmed" on a change that had landed.
+     *
+     * The stand-in names the call and its size, and none of the file. An
+     * open call closes. One that was never opened, or already closed, is
+     * left alone.
+     */
+    if (type === "locust.oversized") {
+      if (parsed.recordType !== "tool_call") return [];
+      const kb = typeof parsed.bytes === "number" && Number.isFinite(parsed.bytes) ? Math.round(parsed.bytes / 1024) : undefined;
+      const events: NormalizedRuntimeEvent[] = [];
+      for (const itemId of Array.isArray(parsed.callIds) ? parsed.callIds.filter((id): id is string => typeof id === "string") : []) {
+        const open = openTools.get(itemId);
+        if (open === undefined) continue;
+        openTools.delete(itemId);
+        events.push(
+          emit("tool.completed", {
+            itemId,
+            toolKind: open.kind,
+            name: open.kind,
+            ...(open.target === undefined ? {} : { command: boundedMessageText(open.target) }),
+            phase: "completed",
+            status: "result too large to keep",
+            output: `The result was too large to keep${kb === undefined ? "" : ` (${String(kb)} KB)`}. Locust keeps results up to 256 KB.`,
+            evidence,
+          }),
+        );
+      }
+      return events;
     }
 
     /*

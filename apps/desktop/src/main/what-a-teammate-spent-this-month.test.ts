@@ -105,6 +105,12 @@ const owners = (): Record<string, string> => {
 }
 
 describe('what a teammate spent this month', () => {
+  /*
+   * Thirty ledgers. Alone this is about two and a half seconds; in the gate,
+   * beside the rest of the suite, it crossed the default five (2026-10-05),
+   * and the gate's own retry of this file still did. Twenty seconds still
+   * fails a hang.
+   */
   it('counts every priced run of the month, not only the newest twenty, and nothing a plan paid for', async () => {
     const ledger = await ledgerWithRuns()
     const totals = await spendByTeammate(ledger, owners(), '2026-09')
@@ -113,13 +119,13 @@ describe('what a teammate spent this month', () => {
     expect(totals?.get('tm_wren')).toEqual({ usd: 14 })
     expect(totals?.has('tm_juno')).toBe(false)
     expect(totals?.size).toBe(1)
-  })
+  }, 20_000)
 
   it('counts a run in the month it ended', async () => {
     const ledger = await ledgerWithRuns()
     expect((await spendByTeammate(ledger, owners(), '2026-08'))?.get('tm_wren')).toEqual({ usd: 1 })
     expect((await spendByTeammate(ledger, owners(), '2026-10'))?.size).toBe(0)
-  })
+  }, 20_000)
 
   it('sends every row its money, including the ones sent without their events', async () => {
     const ledger = await ledgerWithRuns()
@@ -131,5 +137,5 @@ describe('what a teammate spent this month', () => {
     expect(oldest?.money).toEqual({ usd: 1 })
     // A plan's run carries no money on its row either.
     expect(history.data.missions.find((mission) => mission.missionId === id(4))?.money).toBeUndefined()
-  })
+  }, 20_000)
 })

@@ -57,6 +57,30 @@ describe("a dropped record, for a runtime that asked", () => {
   it("leaves nothing for a runtime that did not ask", async () => {
     expect(await recordsFor(false, [bigResult, '{"type":"next"}'])).toEqual(['{"type":"next"}']);
   });
+
+  it("names a Cursor edit by the id its adapter will use, and keeps none of the file", async () => {
+    const id = "call-scrub-a0-0\nfc_scrub_a0_0";
+    const line = JSON.stringify({
+      type: "tool_call",
+      subtype: "completed",
+      call_id: id,
+      tool_call: {
+        editToolCall: {
+          args: { path: "src/app.ts", streamContent: "x" },
+          result: { success: { beforeFullFileContent: `${SECRET} ${"y".repeat(2_000)}`, afterFullFileContent: SECRET } },
+        },
+        toolCallId: id,
+      },
+    });
+    const raws = await recordsFor(true, [line, '{"type":"next"}']);
+    expect(raws).toHaveLength(2);
+    expect(JSON.parse(raws[0]!) as Record<string, unknown>).toMatchObject({
+      type: "locust.oversized",
+      recordType: "tool_call",
+      callIds: ["call-scrub-a0-0|fc_scrub_a0_0"],
+    });
+    expect(raws.join(" ")).not.toContain(SECRET);
+  });
 });
 
 describe("the Claude adapter, given the stand-in", () => {

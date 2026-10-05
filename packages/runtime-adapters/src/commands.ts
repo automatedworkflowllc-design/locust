@@ -1019,7 +1019,18 @@ export function createCursorPrintCommand(
   if (options.resumeThreadId !== undefined) {
     args.push("--resume", requireText(options.resumeThreadId, "Session id"));
   }
-  return baseSpec("cursor", executable, options.workspacePath, args, { sandbox: sandboxArgument(options.sandbox) });
+  return baseSpec("cursor", executable, options.workspacePath, args, {
+    sandbox: sandboxArgument(options.sandbox),
+    /*
+     * An edit of a large file completes as one record that holds the file
+     * twice. Measured 2026-10-05: index.ts (399 KB) four times in one turn
+     * and missionView.ts (293 KB) once in the turn before it. Each completion
+     * was past the 256 KB cap, the host dropped it, and the call stayed open
+     * -- the files card read "not confirmed" on edits that had landed. The
+     * stand-in names the call and none of the file, the way Claude's does.
+     */
+    oversizedStandIns: true,
+  });
 }
 
 /**

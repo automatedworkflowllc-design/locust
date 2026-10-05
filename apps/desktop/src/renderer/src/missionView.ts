@@ -340,6 +340,11 @@ export type ActivityEntry =
       readonly neverRan?: 'declined' | 'refused'
       /** Seen changed on disk by the host rather than reported by the runtime (0.364). */
       readonly observed?: true
+      /**
+       * The runtime did report; the record was past the cap, so the diff is
+       * not here. Said as that, not as a change nobody confirmed.
+       */
+      readonly tooLarge?: true
     }
 
 /**
@@ -506,7 +511,8 @@ export function activityEntries(
         ...(detail.status === 'declined' || detail.status === 'refused' ? { neverRan: detail.status } : {}),
         // Seen changed on disk by the host, not reported by the runtime: a
         // file a command wrote, or one with no text to diff (0.364).
-        ...(detail.kind === 'edit' && /on disk|from disk/.test(detail.status ?? '') ? { observed: true } : {})
+        ...(detail.kind === 'edit' && /on disk|from disk/.test(detail.status ?? '') ? { observed: true } : {}),
+        ...(detail.status === 'result too large to keep' ? { tooLarge: true as const } : {})
       })
       return
     }

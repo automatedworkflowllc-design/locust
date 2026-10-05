@@ -640,3 +640,37 @@ describe("Cursor's plan", () => {
     expect(events.filter((event) => event.type === "plan.updated")).toHaveLength(0);
   });
 });
+
+/*
+ * An edit of a large file completes as one record that holds the file twice.
+ *
+ * Measured 2026-10-05. Two Cursor turns left edits unclosed: four of index.ts
+ * (399 KB) and one of missionView.ts (293 KB). A completion that carries the
+ * file twice is past the 256 KB cap. Those turns dropped four records and
+ * one, and no other record type was unhandled. The small files in the same
+ * turns closed on their own ids. The fixture is that shape with the ids and
+ * paths scrubbed: a start, then the stand-in the host leaves where the
+ * completion was.
+ */
+describe("an edit whose result was too large to keep", () => {
+  it("closes all four, on the id the start opened, and says the result was too large", () => {
+    const { events } = run(fixture("edit-result-too-large.jsonl"));
+    const tools = events.filter((event) => event.type === "tool.started" || event.type === "tool.completed" || event.type === "tool.failed");
+    expect(tools.map((event) => event.type)).toEqual([
+      "tool.started", "tool.completed",
+      "tool.started", "tool.completed",
+      "tool.started", "tool.completed",
+      "tool.started", "tool.completed",
+    ]);
+    const ids = tools.map((event) => (event.payload as { itemId: string }).itemId);
+    expect(new Set(ids).size).toBe(4);
+    expect(ids.every((id) => !id.includes("\n") && id.includes("|"))).toBe(true);
+    for (let i = 0; i < 4; i += 1) expect(ids[i * 2]).toBe(ids[i * 2 + 1]);
+    const closed = tools.filter((event) => event.type === "tool.completed");
+    expect(closed.every((event) => (event.payload as { status?: string }).status === "result too large to keep")).toBe(true);
+    expect(closed.map((event) => (event.payload as { command?: string }).command)).toEqual([
+      "src/app.ts", "src/view.ts", "src/main.ts", "src/notes.ts",
+    ]);
+    expect(events.some((event) => event.type === "run.failed")).toBe(false);
+  });
+});

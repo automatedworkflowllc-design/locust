@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.650.0 - 2026-10-05
+
+### Fixed
+
+- **Cursor's edits of large files are confirmed.** When Cursor finishes editing a file, its message carries the file's text twice, and for a large file that is more than Locust keeps from any one message. Locust set the message aside, so the edit was never marked done and the list of changed files said "not confirmed" for changes that had been made. Such an edit is now closed and marked "result too large to keep", the way Claude Code's large results already were.
+
 ## 0.649.0 - 2026-10-05
 
 ### New

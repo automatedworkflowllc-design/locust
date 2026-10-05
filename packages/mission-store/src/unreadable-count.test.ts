@@ -74,7 +74,13 @@ describe('the count of files that produced no mission', () => {
     const whole = await ledger.listMissions({ limit: 30 })
     expect(whole.missions).toHaveLength(21)
     expect(whole.unreadableCount).toBe(0)
-  })
+    /*
+     * The default five seconds is how long this takes when the rest of the
+     * suite is reading ledgers beside it: the gate measured 5011ms on
+     * 2026-10-05, one millisecond over, four runs in a row. Twenty still
+     * fails a hang.
+     */
+  }, 20_000)
 
   it('does not call a DAMAGED but recovered mission unreadable when it falls off the page', async () => {
     /*
@@ -109,7 +115,7 @@ describe('the count of files that produced no mission', () => {
     const whole = await fresh.listMissions({ limit: 30 })
     expect(whole.missions.some((mission) => mission.metadata.missionId === 'm_00')).toBe(true)
     expect(page.unreadableCount).toBe(0)
-  })
+  }, 20_000)
 
   it('counts a file whose header is unreadable, and only that file', async () => {
     const { root, ledger } = await ledgerOf(1)

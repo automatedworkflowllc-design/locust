@@ -747,6 +747,9 @@ describe("Cursor Agent and Gemini CLI commands", () => {
     ]);
     expect(spec.args).not.toContain("plan");
     expect(spec.args).not.toContain("--force");
+    // A large edit's completion holds the file twice and is past the record
+    // cap. Cursor asks for the same stand-in Claude does, so that call closes.
+    expect(spec.oversizedStandIns).toBe(true);
   });
 
   it("approves the connectors the person already configured, because nobody is here to be asked", () => {
