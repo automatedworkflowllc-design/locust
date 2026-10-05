@@ -47,8 +47,10 @@ describe('the lockup lighting', () => {
   it('powers on from dark, lit lime, and ends in the app ink', () => {
     const power = block('@keyframes lcLockupPower')
     expect(power).toMatch(/0%\s*\{[^}]*opacity: 0/)
-    expect(power).toContain('color: var(--lc-lime)')
-    expect(power).toMatch(/100%\s*\{[^}]*color: var\(--lc-text-primary\)/)
+    expect(block('.lc-lockup__lit {')).toContain('color: var(--lc-lime)')
+    expect(block('.lc-lockup {')).toContain('color: var(--lc-text-primary)')
+    expect(block('@keyframes lcLockupGlow')).toMatch(/100%\s*\{[^}]*opacity: 0/)
+    expect(power).toMatch(/100%\s*\{[^}]*opacity: 1/)
   })
 
   it('relights without ever going dark', () => {

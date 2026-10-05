@@ -161,6 +161,13 @@ export function PoweredLockup({
       <span className="lc-lockup__name" aria-hidden="true">
         Locust
       </span>
+      {/* Paint the lime and glow once; lighting only fades this layer. */}
+      <span className="lc-lockup__lit" aria-hidden="true">
+        <svg className="lc-lockup__mark" viewBox={MARK.viewBox} focusable="false">
+          <path fillRule="evenodd" d={MARK.d} />
+        </svg>
+        <span className="lc-lockup__name">Locust</span>
+      </span>
       <span className="lc-lockup__tube" aria-hidden="true">
         <span className="lc-lockup__scan" />
         <span className="lc-lockup__sweep" />

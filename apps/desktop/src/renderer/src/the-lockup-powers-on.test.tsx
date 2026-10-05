@@ -43,7 +43,10 @@ describe('what the lockup draws', () => {
     expect(html).toContain('aria-label="Locust"')
     // The mark's traced path, with its real outline -- not a placeholder.
     const paths = [...html.matchAll(/<path fill-rule="evenodd" d="([^"]+)"/g)].map((match) => match[1] ?? '')
-    expect(paths).toHaveLength(1)
+    expect(paths).toHaveLength(2)
+    // The second copy is the same mark, painted lime once and faded, hidden from assistive technology.
+    expect(paths[1]).toBe(paths[0])
+    expect(html).toContain('<span class="lc-lockup__lit" aria-hidden="true">')
     expect(paths[0]!.length).toBeGreaterThan(10_000)
     // The name as the cover sets it: type, not the lighter traced wordmark.
     expect(html).toMatch(/<span class="lc-lockup__name" aria-hidden="true">Locust<\/span>/)

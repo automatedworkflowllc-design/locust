@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.623.0 - 2026-10-05
+
+### Improved
+
+- **Locust at rest costs almost nothing.** With Home open and nothing happening, Locust kept drawing animations nobody was watching: about 6% of a 12-core machine. After 45 seconds without a key or the mouse, or while its window is behind another, Home now holds the frame it is on; the first touch, or a teammate's work arriving, starts it again at once. Measured with Locust's own probe: Home at rest went from 6.0% to 0.1%. The animations that remain move only by position and fade, which the graphics card draws without the page redrawing itself.
+
 ## 0.622.0 - 2026-10-05
 
 ### Fixed

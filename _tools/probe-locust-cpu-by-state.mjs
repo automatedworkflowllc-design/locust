@@ -18,6 +18,16 @@ import { FREE_ROUTE, recordRoot, say, scratchRepository, sleep, startDrive } fro
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
+const port = Number(arg('--port') ?? 9877)
+const restMs = 46_000 // Sample after the 45-second rest deadline, finishing within 60 seconds.
+// An arena or another suite starting mid-probe invalidates the comparison too.
+const assertQuiet = () => {
+  const script = `$rows = @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object { $_.ProcessId -ne ${String(process.pid)} -and ($_.CommandLine -match 'vitest|electron-builder' -or ([string]$_.CommandLine).Replace([char]92, [char]47) -match '_tools/(drive|probe|look|capture)[-/]') }); @($rows | ForEach-Object { [int]$_.ProcessId }) | ConvertTo-Json -Compress`
+  const raw = execFileSync('powershell', ['-NoProfile', '-Command', script], { encoding: 'utf8', windowsHide: true }).trim()
+  const pids = raw === '' ? [] : [JSON.parse(raw)].flat()
+  if (pids.length > 0) throw new Error(`Machine is not quiet: other test/build/UI-drive node processes ${pids.join(', ')}. Nothing here is a valid CPU comparison.`)
+}
+assertQuiet()
 const OUT = join(recordRoot('locust-cpu-by-state'), new Date().toISOString().replace(/[:.]/g, '-'))
 await mkdir(OUT, { recursive: true })
 const workspace = await scratchRepository('locust-cpu-ws-')
@@ -28,7 +38,7 @@ const team = [
   { teammateId: 'tm_juno', name: 'Juno', hue: 'violet', role: 'Docs & QA', createdAt: at, route: FREE_ROUTE }
 ]
 const drive = await startDrive({
-  name: 'cpu-by-state', port: 9877, workspace, outPath: OUT,
+  name: 'cpu-by-state', port, workspace, outPath: OUT,
   ...(packaged === undefined ? {} : { packaged }),
   seed: { schemaVersion: 1, teammates: team, missionOwners: {}, settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: false } }
 })
@@ -43,10 +53,11 @@ Start-Sleep -Seconds ${String(seconds)}
 $cores = [Environment]::ProcessorCount
 $out = foreach ($p in $ps) { $g = Get-Process -Id $p.ProcessId -ErrorAction SilentlyContinue; if ($g -and $a.ContainsKey([int]$p.ProcessId)) { $type = 'main'; if ($p.CommandLine -match '--type=([a-z-]+)') { $type = $Matches[1] }; [pscustomobject]@{ type = $type; pct = [Math]::Round((($g.TotalProcessorTime.TotalMilliseconds - $a[[int]$p.ProcessId]) / (${String(seconds)} * 1000)) * 100 / $cores, 1) } } }
 @($out) | ConvertTo-Json -Compress`
-  const raw = execFileSync('powershell', ['-NoProfile', '-Command', script], { encoding: 'utf8' }).trim()
+  const raw = execFileSync('powershell', ['-NoProfile', '-Command', script], { encoding: 'utf8', windowsHide: true }).trim()
   const rows = raw === '' ? [] : [JSON.parse(raw)].flat()
   const by = {}
   for (const row of rows) by[row.type] = Math.round(((by[row.type] ?? 0) + row.pct) * 10) / 10
+  if (rows.length === 0) throw new Error('No Locust processes matched this profile; CPU was not measured')
   return { total: Math.round(rows.reduce((sum, row) => sum + row.pct, 0) * 10) / 10, by }
 }
 const metrics = async () => {
@@ -55,31 +66,48 @@ const metrics = async () => {
 }
 const results = []
 const measure = async (state) => {
+  assertQuiet()
+  const canvasFrames = () => drive.evaluate(`JSON.stringify([...document.querySelectorAll('.lc-cover canvas')].map((canvas) => canvas.toDataURL()))`)
+  const drawing = await canvasFrames()
   const running = await drive.evaluate(`Boolean(document.querySelector('button[aria-label^="Stop the running"]')) || [...document.querySelectorAll('.lc-hometeam__state')].some((s) => /working|thinking|replying/i.test(s.innerText))`)
   const animations = JSON.parse(String(await drive.evaluate(`JSON.stringify(document.getAnimations().filter((a) => a.playState === 'running').map((a) => (a.animationName ?? a.constructor.name) + ' @ ' + String(a.effect?.target?.className?.baseVal ?? a.effect?.target?.className ?? a.effect?.target?.tagName ?? '').slice(0, 50)))`)))
   const before = await metrics()
   const share = cpu(5)
   const after = await metrics()
+  assertQuiet()
+  const nextDrawing = await canvasFrames()
+  const frozenDrawing = drawing === '[]' ? null : drawing === nextDrawing
+  const focused = await drive.evaluate(`document.hasFocus() && !document.hidden`)
+  const stillRunning = await drive.evaluate(`Boolean(document.querySelector('button[aria-label^="Stop the running"]')) || [...document.querySelectorAll('.lc-hometeam__state')].some((s) => /working|thinking|replying/i.test(s.innerText))`)
+  const expectedRunning = /working|streaming/.test(state)
+  const valid = focused === true && running === expectedRunning && stillRunning === expectedRunning
   const per = (name) => Math.round(((after[name] ?? 0) - (before[name] ?? 0)) / 5 * 10) / 10
   const row = {
-    state, running, cpu: share,
+    state, running, stillRunning, focused, valid, frozenDrawing, cpu: share,
     perSecond: { styleRecalcs: per('RecalcStyleCount'), layouts: per('LayoutCount'), scriptMs: Math.round(per('ScriptDuration') * 1000), taskMs: Math.round(per('TaskDuration') * 1000) },
     animations: animations.length, animationNames: [...new Set(animations)].slice(0, 12)
   }
   results.push(row)
   say(`  ${state}: ${JSON.stringify(row)}`)
+  if (!valid) throw new Error(`${state} changed during the sample; this is not a valid measurement of that state`)
 }
 const cards = async () => JSON.parse(String(await drive.evaluate(`JSON.stringify([...document.querySelectorAll('.lc-hometeam__card')].map((card) => ({ name: card.querySelector('.lc-hometeam__name')?.firstChild?.textContent?.trim() ?? '', word: card.querySelector('.lc-hometeam__state')?.innerText.trim() ?? null })))`)))
 try {
   await drive.ready()
   await drive.resize(1440, 900)
+  await drive.send('Page.bringToFront', {})
+  await drive.waitFor(`document.hasFocus() && !document.hidden`, { timeoutMs: 15_000, what: 'probe window in front' })
   await drive.send('Performance.enable', {})
   for (let i = 0; i < 60; i += 1) {
     if (/^\d+ ready$/.test(String(await drive.evaluate(`document.querySelector('.lc-agenthead__note')?.innerText.trim() ?? ''`)))) break
     await sleep(500)
   }
+  await drive.evaluate(`window.dispatchEvent(new Event('keydown'))`)
   await sleep(3000)
-  await measure('home, idle')
+  await measure('home, idle before rest')
+  await drive.evaluate(`window.dispatchEvent(new Event('keydown'))`)
+  await sleep(restMs)
+  await measure('home, idle at rest')
   const sent = String(await drive.evaluate(`(async () => {
     const card = [...document.querySelectorAll('.lc-hometeam__card')].find((c) => c.getAttribute('aria-label')?.startsWith('Message Wren'))
     if (!card) return 'no Wren card'
@@ -87,7 +115,7 @@ try {
     await new Promise((r) => setTimeout(r, 800))
     const field = document.querySelector('form.command-dock textarea')
     if (!field) return 'no composer'
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(field, 'Write about 900 words on how locust swarms form, in plain paragraphs, with no headings.')
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(field, 'Write about 1800 words on how locust swarms form, in plain paragraphs, with no headings.')
     field.dispatchEvent(new Event('input', { bubbles: true }))
     for (let i = 0; i < 120; i += 1) {
       await new Promise((r) => setTimeout(r, 250))
@@ -97,6 +125,7 @@ try {
     return 'Send never enabled'
   })()`))
   say(`  ${sent}`)
+  if (sent !== 'sent') throw new Error(sent)
   await sleep(1500)
   await drive.evaluate(`document.querySelector('.lc-brand__lockup')?.click()`)
   for (let i = 0; i < 60; i += 1) {
@@ -114,10 +143,11 @@ try {
   await sleep(3000)
   await measure('the conversation, idle after')
   await drive.evaluate(`document.querySelector('.lc-brand__lockup')?.click()`)
-  await sleep(3000)
+  await sleep(restMs)
   await measure('home, idle after')
 } catch (error) {
   say(`  probe failed: ${error instanceof Error ? error.message : String(error)}`)
+  process.exitCode = 1
 } finally {
   await writeFile(join(OUT, 'cpu-by-state.json'), JSON.stringify(results, null, 2))
   await drive.finish({ intro: `Build: ${packaged ?? 'out/'}. Locust's own CPU by state.`, extra: JSON.stringify(results, null, 2) })

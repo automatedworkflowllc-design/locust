@@ -85,6 +85,7 @@ describe('the swarm, turned on', () => {
   it('fades in as each one leaves and out as it goes, from its start to its end, at the cover scale', () => {
     const flight = SWARM_FLIGHTS[0]!
     const frames = flightFrames(flight, 0.5)
+    expect(frames.every((frame) => Object.keys(frame).every((property) => ['offset', 'opacity', 'transform'].includes(property)))).toBe(true)
     expect(frames.map((frame) => frame.opacity)).toEqual([0, 1, 1, 1, 0])
     const start = `translate(${String(Math.round((flight.x0 - flight.size / 2) * 0.5))}px, ${String(Math.round((flight.y0 - flight.size / 2) * 0.5))}px)`
     const end = `translate(${String(Math.round((flight.x1 - flight.size / 2) * 0.5))}px, ${String(Math.round((flight.y1 - flight.size / 2) * 0.5))}px)`
