@@ -23,6 +23,7 @@ import { join } from 'node:path'
 
 import { SCRATCH_ROOT } from './scratch-root.mjs'
 import { recordRoot, say, sleep, startDrive } from './drive-lib.mjs'
+import { waitForCompareTerminals } from './compare-terminal-wait.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
@@ -87,17 +88,26 @@ const SHOWN = `JSON.stringify({
   keepTitle: document.querySelector('.lc-compare__foot .lc-primarybutton')?.title ?? '',
   open: document.querySelector('.lc-compare') !== null
 })`
-/** The columns, once both have finished (or five minutes have passed). */
+/** Every column's terminal receipt, never the label of a still-live ledger. */
 const settled = async (drive, label) => {
-  let shown = {}
-  for (let waited = 0; waited < 300_000; waited += 3000) {
-    await sleep(3000)
-    shown = JSON.parse(String(await drive.evaluate(SHOWN)))
-    if (waited > 15_000 && !shown.open) break
-    if (shown.states.length === 2 && shown.states.every((state) => state !== 'working' && state !== 'waiting')) break
+  try {
+    return await waitForCompareTerminals(async () => JSON.parse(String(await drive.evaluate(`(async () => {
+      const shown = JSON.parse(${SHOWN})
+      const listed = await window.desktop.listCompares()
+      const compare = listed.ok ? listed.data.compares.at(-1) : undefined
+      const columns = []
+      for (const slot of compare?.slots ?? []) {
+        const id = slot.missionIds.at(-1)
+        const read = id === undefined ? undefined : await window.desktop.readMission(id)
+        const mission = read?.ok ? read.data.mission : undefined
+        columns.push({ slot: slot.slot, phase: mission?.phase, refused: slot.refused !== undefined,
+          terminal: mission?.events.some(event => ['run.completed', 'run.failed', 'run.cancelled'].includes(event.type)) === true })
+      }
+      return JSON.stringify({ shown, columns })
+    })()`))))
+  } finally {
+    await drive.capture(label, () => drive.evaluate(SHOWN))
   }
-  await drive.capture(label, () => drive.evaluate('1'))
-  return shown
 }
 
 // 1. A folder too big to copy. LOCUST_DRIVE_ONLY_SMALL=1 skips it (20,001 files take a while to write).

@@ -85,6 +85,7 @@ import type { DiffNotesPlace } from './components/DiffNotes.js'
 import { memoryChangedNotice, memoriesOfConversation, noticeWaits, turnsOfConversation } from './conversationMemories.js'
 import { createFrameBatcher } from './streamFrames.js'
 import { missingTranscripts, heldDigests, mergeHistory } from './historyMerge.js'
+import { recoverLiveRuns } from './recoverLiveRuns.js'
 import { savableMissionId } from './savableConversations.js'
 import { MemoryScreen } from './components/MemoryScreen.js'
 import { isMissionRuntime, runtimeDisplayName } from '../../shared/runtimes.js'
@@ -1382,6 +1383,10 @@ export default function App(): ReactElement {
     // What the host kept back is what this window already holds: the same
     // objects, so nothing built from them is built again.
     setHistory((current) => mergeHistory(current, response.data.missions))
+    setRuns((current) => recoverLiveRuns(
+      current, response.data.missions, response.data.liveMissionIds ?? [], pendingUpdatesRef.current,
+      (mission) => reopenedRun(mission, new Map(response.data.missions.map((one) => [one.missionId, one]))), applyMissionUpdate
+    ))
     setUnreadableLedgers(response.data.unreadableCount)
     setTotalMissions(response.data.totalMissions === undefined || response.data.listedMissions === undefined ? undefined : { total: response.data.totalMissions, listed: response.data.listedMissions })
   }
@@ -2439,6 +2444,11 @@ export default function App(): ReactElement {
    */
   const cancelWhenNamedRef = useRef(new Set<string>())
   const pendingUpdatesRef = useRef(new Map<string, CodexMissionUpdate[]>())
+  // Clear only after commit: React may evaluate an updater twice, and each
+  // evaluation must replay the same queued terminal receipt.
+  useEffect(() => {
+    for (const runId of runs.keys()) pendingUpdatesRef.current.delete(runId)
+  }, [runs])
   const pendingKeyCounter = useRef(0)
 
   const liveRun = shownKey === undefined ? undefined : runs.get(shownKey)
@@ -2569,6 +2579,15 @@ export default function App(): ReactElement {
           if (run !== undefined) {
             next ??= new Map(current)
             next.set(update.runId, applyMissionUpdate(run, update))
+            continue
+          }
+          // A run restored by history after a reload can send its next update
+          // after the initial read. Adopt it now, not only the newest run.
+          const recorded = historyRef.current.find((mission) => mission.runId === update.runId)
+          if (recorded !== undefined) {
+            const queued = pendingUpdatesRef.current.get(update.runId) ?? []
+            next ??= new Map(current)
+            next.set(update.runId, [...queued, update].reduce(applyMissionUpdate, reopenedRun(recorded, historyByIdRef.current)))
             continue
           }
           // A run whose start receipt has not come back yet: hold its updates
@@ -3259,12 +3278,11 @@ export default function App(): ReactElement {
         // the chats").
         // The record's phase is always a finished one; what says a run is
         // still under way is the host addressing updates to it.
-        const stillLive = (pendingUpdatesRef.current.get(latest.runId) ?? []).length > 0
+        const stillLive = response.data.liveMissionIds?.includes(latest.missionId) === true || (pendingUpdatesRef.current.get(latest.runId) ?? []).length > 0
         // Any update addressed to it (a run the host still owns) makes it live.
         setRuns((current) => {
           if (current.size > 0) return current
           const queued = pendingUpdatesRef.current.get(latest.runId) ?? []
-          pendingUpdatesRef.current.delete(latest.runId)
           const byId = new Map(response.data.missions.map((mission) => [mission.missionId, mission]))
           return withNewRun(
             current,

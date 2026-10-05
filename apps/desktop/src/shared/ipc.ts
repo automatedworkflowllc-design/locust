@@ -3278,6 +3278,8 @@ export type MissionHistoryResponse =
       readonly ok: true
       readonly data: {
         readonly missions: readonly PublicRecoveredMission[]
+        /** Host-owned processes, separate from a ledger with no terminal receipt yet. */
+        readonly liveMissionIds?: readonly string[]
         /** The folder this window is working in; missions elsewhere are not its own. */
         readonly currentWorkspaceId: string
         readonly issueCount: number

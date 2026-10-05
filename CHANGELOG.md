@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.641.0 - 2026-10-05
+
+### Fixed
+
+- **A comparison still running stays live when its window comes back.** When Locust's window was opened again while a comparison ran (from the tray, or reloaded after an error), a column whose model had not yet reported anything was shown as "interrupted", though the run went on and finished. Every run Locust is still running is now shown as running, and updates that arrived while the window was away are applied in order.
+
 ## 0.640.0 - 2026-10-05
 
 ### Fixed

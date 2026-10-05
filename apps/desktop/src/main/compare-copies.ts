@@ -20,12 +20,30 @@ import type { CompareSlotId } from '../shared/compare.js'
  * cursorignore-blinds-appdata), and never inside the folder itself, where the
  * other columns would find a second set of its files. So: `~/.locust/compare`.
  *
+ * A drive launches Locust with its own scratch profile (`startDrive`), but
+ * copies still landed in the REAL `~/.locust/compare` beside the person's own
+ * (2026-10-05). `LOCUST_COMPARE_ROOT`, when set, is that folder instead --
+ * drives point it inside their profile so copies go away with it. Unset, it
+ * is `~/.locust/compare` as today.
+ *
  * It is a copy of the folder AS IT IS, uncommitted work included, so every
  * column reads the same files -- not a checkout of the last commit. What is
  * rebuilt or fetched rather than written (dependencies, build output, git's
  * own store) is left out, and a folder too big to copy says so instead.
  */
-export const COPY_ROOT = join(homedir(), '.locust', 'compare')
+export const COMPARE_ROOT_ENV = 'LOCUST_COMPARE_ROOT'
+
+/** Where comparison copies live: `LOCUST_COMPARE_ROOT` when set, else `~/.locust/compare`. */
+export function compareRoot(env: NodeJS.ProcessEnv = process.env): string {
+  const set = env[COMPARE_ROOT_ENV]?.trim()
+  return set !== undefined && set.length > 0 ? set : join(homedir(), '.locust', 'compare')
+}
+
+/**
+ * Same folder as `compareRoot()` at first read. Prefer `compareRoot()` when the
+ * value must follow the environment (tests, and every make/read/keep/remove).
+ */
+export const COPY_ROOT = compareRoot()
 /*
  * Raised 0.555, measured on Colin's folders: a project of 11,339 files and
  * 388 MB was refused at 5,000 and 250 MB. A file over MAX_COPIED_FILE_BYTES
@@ -110,7 +128,7 @@ export async function makeCompareCopy(input: CopyRef & {
   readonly root?: string
   readonly limits?: CopyLimits
 }): Promise<string> {
-  const root = input.root ?? COPY_ROOT
+  const root = input.root ?? compareRoot()
   const target = join(root, nameOf(input))
   const made = await lstat(target).then((found) => found.isDirectory(), () => false)
   if (made) return target
@@ -175,7 +193,7 @@ export interface CopyChanges {
  * copy of it instead, and these read what it did against what it was given.
  */
 export async function copyChanges(input: CopyRef & { readonly root?: string }): Promise<CopyChanges> {
-  const root = input.root ?? COPY_ROOT
+  const root = input.root ?? compareRoot()
   const target = join(root, nameOf(input))
   const before = JSON.parse(await readFile(manifestPath(root, input), 'utf8')) as Record<string, string>
   const now = await hashTree(target)
@@ -195,7 +213,7 @@ export type CopyBringIn =
  * person has since changed any of those same files themselves.
  */
 export async function bringInCopy(input: CopyRef & { readonly folder: string; readonly root?: string }): Promise<CopyBringIn> {
-  const root = input.root ?? COPY_ROOT
+  const root = input.root ?? compareRoot()
   const target = join(root, nameOf(input))
   const before = JSON.parse(await readFile(manifestPath(root, input), 'utf8')) as Record<string, string>
   const { changed, deleted } = await copyChanges(input)
@@ -223,14 +241,14 @@ export async function bringInCopy(input: CopyRef & { readonly folder: string; re
 }
 
 /** One named copy and its manifest (0.533). Nothing else under the root is touched. */
-export async function removeNamedCopy(name: string, root: string = COPY_ROOT): Promise<void> {
+export async function removeNamedCopy(name: string, root: string = compareRoot()): Promise<void> {
   const safe = nameOf({ name })
   await rm(join(root, safe), { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   await rm(join(root, `${safe}.manifest.json`), { force: true })
 }
 
 /** Every copy a comparison made. Nothing else under the root is touched. */
-export async function removeCompareCopies(compareId: string, root: string = COPY_ROOT): Promise<void> {
+export async function removeCompareCopies(compareId: string, root: string = compareRoot()): Promise<void> {
   if (!/^cmp_[A-Za-z0-9]{1,40}$/.test(compareId)) return
   const names = await readdir(root).catch(() => [] as string[])
   for (const name of names) {
@@ -250,7 +268,7 @@ export async function copyLineChanges(input: CopyRef & {
   readonly root?: string
   readonly runGit: (args: readonly string[], cwd: string) => Promise<string>
 }): Promise<{ readonly files: number; readonly added?: number; readonly removed?: number }> {
-  const root = input.root ?? COPY_ROOT
+  const root = input.root ?? compareRoot()
   const target = join(root, nameOf(input))
   const { changed, deleted } = await copyChanges(input)
   let added = 0

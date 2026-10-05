@@ -258,6 +258,19 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
   if (process.env.LOCUST_SPEND === '1') delete appEnv.LOCUST_FREE_ONLY
   else appEnv.LOCUST_FREE_ONLY = '1'
   /*
+   * Comparison copies under THIS drive's profile, not the person's ~/.locust/compare.
+   *
+   * Without this, every compare drive wrote cmp_* folders into the real home
+   * compare root beside Colin's own (2026-10-05). The app reads LOCUST_COMPARE_ROOT
+   * once; when unset it stays ~/.locust/compare. A drive that passed its own
+   * LOCUST_COMPARE_ROOT in `env` keeps that.
+   */
+  if (appEnv.LOCUST_COMPARE_ROOT === undefined || String(appEnv.LOCUST_COMPARE_ROOT).trim() === '') {
+    const driveCompare = join(profile, 'compare')
+    await mkdir(driveCompare, { recursive: true })
+    appEnv.LOCUST_COMPARE_ROOT = driveCompare
+  }
+  /*
    * The person's Cursor default, held from before the launch and put back
    * after the app is gone (see cursor-default-hold.mjs). The app's own guard
    * cannot do it here: the drive ends the app before a Cursor run's process
