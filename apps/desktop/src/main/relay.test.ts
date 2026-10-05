@@ -197,6 +197,21 @@ describe('the brief a relayed run is started with', () => {
     expect(prompt).toContain('Stay on what was asked')
   })
 
+  /*
+   * 0.637: a relay run in Locust itself, two teammates on a free model. Wren
+   * asked Booty to reply with exactly the word TANGERINE; Booty declined,
+   * citing the brief's "in complete sentences". The person's own brief
+   * already lets the shape they ask for win; a teammate's now does too.
+   */
+  it("lets the shape the sender asked for win over complete sentences", () => {
+    const prompt = relayPrompt({ sender: WREN, recipient: BOOTY, hop: 1 })
+    const ordinary = prompt.indexOf('in complete sentences')
+    const shape = prompt.indexOf('If Wren said what shape the reply should take')
+    expect(ordinary).toBeGreaterThan(0)
+    expect(shape).toBeGreaterThan(ordinary)
+    expect(prompt).toMatch(/one word, a number, a list -- give it in that shape inside the share block; that shape wins/)
+  })
+
   it('every hop is told that silence is how an exchange finishes', () => {
     for (const hop of [1, 2, 5]) {
       const prompt = relayPrompt({ sender: BOOTY, recipient: WREN, hop })

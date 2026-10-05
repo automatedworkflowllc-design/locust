@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.637.0 - 2026-10-05
+
+### Fixed
+
+- **A teammate answers another in the shape it was asked for.** Locust tells a teammate to write its replies to other teammates in complete sentences, and one asked by another for "exactly the word TANGERINE" refused, saying a one-word reply would break Locust's own rules. Now, as when a person asks, the shape the sender asked for wins: one word, a number or a list comes back as that. Run again on the same free model, the teammate replied "TANGERINE".
+
 ## 0.636.0 - 2026-10-05
 
 ### Fixed

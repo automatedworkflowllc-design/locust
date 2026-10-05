@@ -313,6 +313,17 @@ export function relayPrompt(input: {
           ]),
     'Do what it asks if that is within your role and this workspace, using what you actually know, and say plainly what is blocked or unverified rather than implying it is done; if you cannot help, say so and why.',
     `When a reply is needed, end with one <locust-share to="${input.sender.name}"> block holding it, written for a capable colleague who has not seen your turn: lead with the answer, said as what is true rather than as a negation, then the evidence by name (paths, numbers, names), then what you need from them, if anything, in complete sentences.`,
+    /*
+     * THE SHAPE THEY ASKED FOR WINS (0.637), as it already does for the
+     * person (workroom-briefing.ts, answerSection). A relay run in Locust
+     * itself, two teammates on a free model: Wren asked Booty to reply with
+     * exactly the word TANGERINE, and Booty declined -- "delivery to a
+     * teammate requires a locust-share block with complete sentences, so an
+     * exact single-word reply ... would violate higher instructions". The
+     * sentence above describes the ordinary reply; a sender who says what
+     * shape they want has already decided.
+     */
+    `If ${input.sender.name} said what shape the reply should take -- one word, a number, a list -- give it in that shape inside the share block; that shape wins over the sentence above.`,
     // The one case where waiting is worse than interrupting, said as a rule
     // rather than as a feature -- a model told it has an urgent channel will
     // find reasons to use it.
