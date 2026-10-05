@@ -2936,6 +2936,7 @@ export default function App(): ReactElement {
           lastCheckedAt = response.data.checkedAt
           known = response.data.runtimes
           unanswered = worthAskingAgain(response.data.runtimes)
+          readAgainIfStale()
           setRuntimeState((held) => ({
             phase: 'ready',
             runtimes: keepWhatWasKnown(held.phase === 'ready' ? held.runtimes : [], response.data.runtimes),
@@ -2997,8 +2998,20 @@ export default function App(): ReactElement {
             npmIsBundled: response.data.npmIsBundled,
             npmDidNotAnswer: response.data.npmDidNotAnswer
           }))
+          /*
+           * A CHECK STILL RUNNING IS NOT A CLI THAT WILL NOT ANSWER (0.639).
+           *
+           * Since 0.634 an agent the sweep went on without is `checking`, and
+           * its own finish brings the answer (the late watch below). Counted
+           * here, it spent this give-up budget: on a busy machine three slow
+           * agents answered late one after another, each re-ask still found
+           * OpenCode being checked, the window gave up -- and when OpenCode
+           * answered twenty seconds in, `askAgain` returned at once and its
+           * models said CHECKING for good (measured, packaged 0.638 and 0.639,
+           * the CPU loaded; probe-picker-after-a-late-check.mjs).
+           */
           const stillChecking = response.data.runtimes.some(
-            (entry) => entry.installed && (entry.status === 'probe-failed' || entry.status === 'offline')
+            (entry) => entry.installed && entry.checking !== true && (entry.status === 'probe-failed' || entry.status === 'offline')
           )
           unanswered = worthAskingAgain(response.data.runtimes)
           if (!stillChecking) return
@@ -3056,8 +3069,15 @@ export default function App(): ReactElement {
     const stopLateWatch =
       bridge.onDiscoveryEvent?.((event) => {
         if (event.kind !== 'probe.finished') return
+        /*
+         * Its answer is stored when the host says it finished (a tick after),
+         * so read what the host holds: no agent is asked again -- asking
+         * started a NEW check of an agent that had just answered -- and the
+         * read is not stopped by the give-up budget, which this answer is
+         * exactly the end of (0.639).
+         */
         finishedChecks.add(event.id)
-        if (known.some((entry) => entry.id === event.id && entry.checking === true && entry.status !== 'ready')) askAgain()
+        readAgainIfStale()
       }) ?? (() => undefined)
 
     void bridge

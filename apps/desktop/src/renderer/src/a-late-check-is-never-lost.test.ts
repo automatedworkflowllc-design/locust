@@ -8,15 +8,13 @@ import APP from './App.tsx?raw'
  * A LATE CHECK IS NEVER LOST (0.639).
  *
  * Since 0.634 the first screen waits for no agent past two seconds: a slow one
- * is shown as being checked, and the window asks again when the host says its
- * check finished. Measured on the packaged 0.638 (probe-picker-after-a-late-
- * check.mjs): OpenCode answered two seconds in, and its nine free models in
- * the open picker said CHECKING forty seconds later -- reopened or not -- while
- * the host's own list said ready. The finish crossed the window's list: it came
- * before the window held one, or the window's ask reached the host a tick
- * before the late answer was stored. The window now keeps every finished
- * check and reads the held answer again when a list still calls one of them
- * being checked.
+ * is shown as being checked, and its answer is stored when it lands. On a busy
+ * machine (packaged 0.638 and 0.639, the CPU loaded,
+ * probe-picker-after-a-late-check.mjs) three slow agents answered late one
+ * after another; each re-ask still found OpenCode being checked, and the
+ * window spent its give-up budget on a check that was simply still running.
+ * OpenCode answered twenty seconds in, the window had given up, and its nine
+ * free models said CHECKING for good while the host's own list said ready.
  */
 const entry = (id: PublicRuntimeStatus['id'], checking: boolean, status: PublicRuntimeStatus['status'] = checking ? 'probe-failed' : 'ready'): PublicRuntimeStatus => ({
   id,
@@ -39,10 +37,17 @@ describe('a late check is never lost', () => {
     expect(staleChecking([entry('opencode', false)], new Set(['opencode']))).toEqual([])
   })
 
-  it('is wired: every finish is kept, every answer is reconciled, and the re-read names no agent', () => {
-    expect(APP).toMatch(/if \(event\.kind !== 'probe\.finished'\) return\s+finishedChecks\.add\(event\.id\)/)
-    // The first answer and every re-ask's answer reconcile once `known` is set.
-    expect(APP.match(/known = response\.data\.runtimes\n\s+unanswered = worthAskingAgain\(response\.data\.runtimes\)\n\s+readAgainIfStale\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(1)
+  it('never spends the give-up budget on a check that is still running', () => {
+    expect(APP).toMatch(/const stillChecking = response\.data\.runtimes\.some\(\n\s+\(entry\) => entry\.installed && entry\.checking !== true && \(entry\.status === 'probe-failed' \|\| entry\.status === 'offline'\)/)
+  })
+
+  it('reads the held answer back on a finish: no new check, and past giving up', () => {
+    // A finish is kept and the held answer read -- not `askAgain`, which the
+    // give-up budget stops, and which started a NEW check of the agent.
+    expect(APP).toMatch(/if \(event\.kind !== 'probe\.finished'\) return[\s\S]{0,700}?finishedChecks\.add\(event\.id\)\n\s+readAgainIfStale\(\)/)
+    expect(APP).not.toMatch(/entry\.checking === true && entry\.status !== 'ready'\)\) askAgain\(\)/)
+    // The first answer and the held read reconcile once `known` is set; so does every re-ask's answer.
+    expect(APP.match(/known = response\.data\.runtimes\n\s+unanswered = worthAskingAgain\(response\.data\.runtimes\)\n\s+readAgainIfStale\(\)/g)?.length ?? 0).toBe(2)
     expect(APP).toMatch(/lastCheckedAt = response\.data\.checkedAt\n\s+known = response\.data\.runtimes\n\s+readAgainIfStale\(\)/)
     // A plain read of what the host holds: no names, so it starts no new check.
     expect(APP).toMatch(/function readHeld\(\): void \{[\s\S]{0,200}?\.getLocalRuntimes\(\)\n/)

@@ -15,7 +15,7 @@ heading: the home screen then shows it once, as a splash.
 
 ### Fixed
 
-- **A slow AI tool's models stop saying "checking" once its check is done.** Since 0.634, Locust opens without waiting for the slowest tool, shows that tool as being checked, and updates it when the answer arrives. A few times in a dozen launches, OpenCode's models in the model picker still said "checking" long after OpenCode had answered, so they could not be picked. Locust now notices when the list in the window still calls a finished check "checking", and reads the stored answer again. The cause was not pinned down, because it did not happen again on demand; this closes both ways found for it to happen.
+- **A slow AI tool's models stop saying "checking" once its check is done.** Since 0.634, Locust opens without waiting for the slowest tool, shows that tool as being checked, and updates it when the answer arrives. On a busy computer, when several tools answered late one after another, Locust counted each check that was still running as a tool that would not answer, and stopped asking. When the slowest one, often OpenCode, finally answered, nothing picked it up: its models in the picker said "checking" for good and could not be chosen. A check that is still running no longer counts against a tool, and when a check finishes, Locust reads the stored answer instead of starting the check again.
 
 ## 0.638.0 - 2026-10-05
 

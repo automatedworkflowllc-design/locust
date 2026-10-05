@@ -48,7 +48,9 @@ const READ = `(async () => {
   const log = await window.desktop.discoveryLog()
   const answered = log.filter(e => e.kind === 'probe.finished' && e.id === 'opencode').map(e => e.at)
   const connected = /^(\\d+) AI agent/.exec(document.querySelector('.lc-connected')?.getAttribute('title') ?? '')?.[1] ?? null
-  return JSON.stringify({ open: Boolean(document.querySelector('.lc-picker')), free: free.length, checking: free.filter(r => /CHECKING/.test(r)).length, opencodeAnsweredAt: answered, connected })
+  // Why a row cannot be picked, in its own words (the row's title carries routeRowStatus's detail).
+  const why = [...document.querySelectorAll('.lc-picker__row')].filter((r) => /free/i.test(r.innerText) && /CHECKING/.test(r.innerText)).map((r) => r.getAttribute('title') ?? '')[0] ?? null
+  return JSON.stringify({ open: Boolean(document.querySelector('.lc-picker')), free: free.length, checking: free.filter(r => /CHECKING/.test(r)).length, opencodeAnsweredAt: answered, connected, why })
 })()`
 /** Which read still says OpenCode is being checked: the window's runtime list, or the model catalog. Asked twice only: each ask can start a check. */
 const SOURCES = `(async () => {
@@ -74,6 +76,7 @@ try {
     await sleep(1000)
   }
   say(`  sources at the end: ${String(await drive.evaluate(SOURCES))}`)
+  say(`  WHY AT THE END: ${String(JSON.parse(String(await drive.evaluate(READ))).why)}`)
   // Seconds the open picker still said CHECKING after OpenCode's check had answered.
   say(`  CHECKING_AFTER_ANSWER=${String(series.filter((one) => /\*/.test(one) && /^\d+s:[1-9]/.test(one)).length)}s`)
   say(`  OPEN THE WHOLE TIME (checking/free rows; * = OpenCode's check had answered): ${series.join(' ')}`)
