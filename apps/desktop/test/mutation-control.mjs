@@ -45,6 +45,8 @@ const ROUTINE_RUNNER = join(ROOT, 'src', 'main', 'routine-runner.ts')
 const ROUTINE_STORE = join(ROOT, 'src', 'main', 'routine-store.ts')
 const ROUTINES_VIEW = join(ROOT, 'src', 'renderer', 'src', 'routines.ts')
 const STEERING = join(ROOT, 'src', 'renderer', 'src', 'steering.ts')
+const WHO_DECIDES = join(ROOT, 'src', 'shared', 'who-decides.ts')
+const APPROVAL_RULES = join(ROOT, 'src', 'shared', 'approval-rules.ts')
 
 const MUTATIONS = [
   {
@@ -1271,6 +1273,28 @@ const MUTATIONS = [
     from: '              : { continuesFrom: continuation })',
     to: '              : {})',
     expect: 'starts a NEW mission that records what it continues from'
+  },
+  // ONE DECISION PATH (0.616, the PRD's R8): deny first, whatever was allowed before.
+  {
+    file: WHO_DECIDES,
+    name: 'an earlier Always answers before the saved rules are read',
+    from: "  // 2 and 3. The rules decide first, deny before allow (approval-rules.ts).\n",
+    to: "  if (context.remembered) return { verdict: 'allow', by: 'earlier-always' }\n  // 2 and 3. The rules decide first, deny before allow (approval-rules.ts).\n",
+    expect: 'denies by a saved rule, whatever Always was given earlier in the run'
+  },
+  {
+    file: APPROVAL_RULES,
+    name: 'a saved rule that says no is not checked first',
+    from: "  if (denied !== undefined) return { decision: 'deny', rule: denied }",
+    to: "  if (denied !== undefined && Date.now() < 0) return { decision: 'deny', rule: denied }",
+    expect: 'denies by a saved rule, whatever Always was given earlier in the run'
+  },
+  {
+    file: WHO_DECIDES,
+    name: 'an earlier Always covers a command that reaches other programs',
+    from: "    if (reach === undefined) return { verdict: 'allow', by: 'earlier-always' }",
+    to: "    if (reach === undefined || reach !== undefined) return { verdict: 'allow', by: 'earlier-always' }",
+    expect: 'asks again about a command that reaches other programs, though Always was given, and says why'
   }
 ]
 
@@ -1333,7 +1357,9 @@ const originals = new Map([
   [ROUTINES_VIEW, readFileSync(ROUTINES_VIEW, 'utf8')],
   [STEERING, readFileSync(STEERING, 'utf8')],
   [AGENT_TEXT, readFileSync(AGENT_TEXT, 'utf8')],
-  [TEAMMATE_WORK, readFileSync(TEAMMATE_WORK, 'utf8')]
+  [TEAMMATE_WORK, readFileSync(TEAMMATE_WORK, 'utf8')],
+  [WHO_DECIDES, readFileSync(WHO_DECIDES, 'utf8')],
+  [APPROVAL_RULES, readFileSync(APPROVAL_RULES, 'utf8')]
 ])
 let problems = 0
 

@@ -354,7 +354,8 @@ describe('what the card sends reaches the service', () => {
   it('is what the decide handler reads, and Antigravity is asked too', () => {
     const source = readFileSync(fileURLToPath(new URL('./index.ts', import.meta.url)), 'utf8')
     const at = source.indexOf('ipcMain.handle(MISSION_APPROVAL_DECIDE_CHANNEL')
-    const handler = source.slice(at, at + 1400)
+    // 2400 characters: since 0.616 the handler also keeps an Always under its host's key.
+    const handler = source.slice(at, at + 2400)
     expect(at).toBeGreaterThan(-1)
     expect(handler).toContain('approvalAnswerFrom(answer)')
     // Through the one funnel (0.521), which asks Antigravity too -- after the host's own guard on

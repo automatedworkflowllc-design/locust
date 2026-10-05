@@ -156,7 +156,10 @@ describe("an ACP run", () => {
     expect(records.map((record) => record.raw).join("")).not.toContain("PLUM-3.");
   });
 
-  it("answers by the KIND of option, never says 'always' to the agent, and remembers it for this run itself", async () => {
+  // Since 0.616 the run remembers nothing: an Always was answered here, before
+  // the saved rules were read. Every request goes to the host, which keeps the
+  // Always and decides after the rules (apps/desktop shared/who-decides.ts).
+  it("answers by the KIND of option, never says 'always' to the agent, and asks the host about every request", async () => {
     const asked: AcpPermissionRequest[] = [];
     const ask = (id: number, command: string): Message => ({
       id,
@@ -186,9 +189,10 @@ describe("an ACP run", () => {
     const records = await recordsOf(acp);
     const answers = new Map(agent.sent.filter((message) => message.id !== undefined && message.id >= 100).map((message) => [message.id, message.result]));
     expect(answers.get(100)).toEqual({ outcome: { outcome: "selected", optionId: "yes" } });
-    // Asked once; the second, identical, answered "once" again without a card.
+    // The second, identical, is put to the host too -- once the first was answered, so a
+    // different command may be asked in between -- and answered "once" again.
     expect(answers.get(101)).toEqual({ outcome: { outcome: "selected", optionId: "yes" } });
-    expect(asked.map((request) => request.command)).toEqual(["npm test", "rm -rf build"]);
+    expect(asked.map((request) => request.command).sort()).toEqual(["npm test", "npm test", "rm -rf build"]);
     expect(answers.get(102)).toEqual({ outcome: { outcome: "selected", optionId: "no" } });
     expect(JSON.stringify([...answers.values()])).not.toContain("yes-forever");
     // The refusal is on the record, for the normalizer to call it declined.

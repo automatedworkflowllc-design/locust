@@ -477,11 +477,16 @@ export function ApprovalCard({
               that outlives the run is a Settings decision, not one to take here.
             */}
             {/* What Always lets through, when the route can say (R35). */}
-            {reach !== undefined
+            {/* Asked although Always was given earlier (0.616): the host says why, in place of the general line. */}
+            {request.askedAgain !== undefined
+              ? `Nothing has happened yet. ${request.askedAgain}`
+              : reach !== undefined
               ? 'Nothing has happened yet. A command that reaches beyond this run is asked about every time.'
               : request.alwaysCovers === undefined
                 ? 'Nothing has happened yet. “Always” lasts until this run ends.'
                 : `Nothing has happened yet. “Always” allows ${request.alwaysCovers}, until this run ends.`}
+            {/* Where Locust keeps the Always (0.616), a rule saying no still wins over it; Codex keeps its own. */}
+            {request.askedAgain === undefined && reach === undefined && request.alwaysKey !== undefined && ' Your saved rules still come first.'}
             {/* A saved rule outlives the run, so what it would save is said before it is pressed (0.521). */}
             {rule !== undefined && reach === undefined && ` “Don’t ask again” saves a rule: ${rule.allowSentence} Settings > Teammates lists your rules.`}
           </p>

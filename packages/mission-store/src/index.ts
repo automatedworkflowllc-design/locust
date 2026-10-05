@@ -26,7 +26,7 @@ import type { CheckpointReason, ReconciledCheckpoint } from './checkpoint.js'
  */
 export type MissionRecordedMode = "ask" | "plan" | "accept-edits" | "approve-each" | "auto";
 
-export const MISSION_LEDGER_SCHEMA_VERSION = 20 as const
+export const MISSION_LEDGER_SCHEMA_VERSION = 21 as const
 
 /**
  * Versions this reader accepts, each a strict subset of the next, so all are
@@ -147,8 +147,15 @@ export const MISSION_LEDGER_SCHEMA_VERSION = 20 as const
  * what they let a teammate do. The host answers the card, not the runtime, so
  * it cannot be a runtime event, and a v19 reader stops at a record it cannot
  * name: the number moves for the reason it moved at v5 and v17.
+ *
+ * v20 -> v21 adds a fourth answerer, `earlier-always` (0.616): a request the
+ * person's own Always, pressed on an earlier card of the run, allowed with no
+ * card (the PRD's R8, one decision path). Each host used to answer those
+ * itself and the ledger held nothing of them. A v20 reader stops at an
+ * approval whose answerer it does not know, and drops the rest of the turn
+ * with it, so the number moves; a v20 mission cannot take one.
  */
-export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20] as const
+export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21] as const
 
 export type MissionLedgerSchemaVersion =
   (typeof SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS)[number]
@@ -374,9 +381,11 @@ const MAX_EDIT_CHECK_LINE_LENGTH = 500
 /**
  * A card the person answered (v20). What it asked, in the card's own words;
  * what the answer was; and who gave it -- the person on the card, the person
- * on the card while saving a rule ("Yes, and don't ask again"), or a rule
- * they saved answering it before it reached them. `words` is what was said
- * with it: the person's reason for a denial, or the rule's own sentence.
+ * on the card while saving a rule ("Yes, and don't ask again"), a rule
+ * they saved answering it before it reached them, or (v21) their own Always
+ * on an earlier card of the run. `words` is what was said with it: the
+ * person's reason for a denial, the rule's own sentence, or what the Always
+ * covers.
  * A card nobody answered (the run ended first, or Locust refused it) is not
  * recorded here: the run's own events already say what happened to the call.
  */
@@ -385,7 +394,7 @@ export interface MissionApproval {
   readonly kind: 'command' | 'file-change' | 'question' | 'connector'
   readonly asked: string
   readonly answer: 'allowed' | 'allowed-always' | 'denied' | 'answered'
-  readonly by: 'card' | 'card-saving-a-rule' | 'saved-rule'
+  readonly by: 'card' | 'card-saving-a-rule' | 'saved-rule' | 'earlier-always'
   readonly words?: string
   readonly askedAt: string
   readonly occurredAt: string
@@ -929,7 +938,7 @@ function validateApproval(approval: MissionApproval): MissionApproval {
   if (!['command', 'file-change', 'question', 'connector'].includes(approval.kind)) throw new Error('Approval kind is invalid')
   requireText(approval.asked, 'Approval question', MAX_APPROVAL_ASKED)
   if (!['allowed', 'allowed-always', 'denied', 'answered'].includes(approval.answer)) throw new Error('Approval answer is invalid')
-  if (!['card', 'card-saving-a-rule', 'saved-rule'].includes(approval.by)) throw new Error('Approval answerer is invalid')
+  if (!['card', 'card-saving-a-rule', 'saved-rule', 'earlier-always'].includes(approval.by)) throw new Error('Approval answerer is invalid')
   if (approval.words !== undefined && (typeof approval.words !== 'string' || approval.words.length > MAX_APPROVAL_WORDS)) {
     throw new Error('Approval words are invalid')
   }
@@ -954,11 +963,13 @@ export function boundedApproval(approval: MissionApproval): MissionApproval {
   }
 }
 
-function parsedApproval(value: unknown): MissionApproval | undefined {
+function parsedApproval(value: unknown, schemaVersion: number): MissionApproval | undefined {
   if (!isObject(value)) return undefined
   try {
     const candidate = value as unknown as MissionApproval
     validateApproval(candidate)
+    // A v20 file never held this answerer; one claiming it was not written by a v20 writer.
+    if (candidate.by === 'earlier-always' && schemaVersion < 21) return undefined
     return {
       approvalId: candidate.approvalId,
       kind: candidate.kind,
@@ -1483,7 +1494,7 @@ async function readLedgerFile(path: string, missionId: string): Promise<ParsedLe
       editChecks.push(check)
       lastUpdatedAt = check.occurredAt
     } else if (value.recordType === 'mission.approval') {
-      const approval = parsedApproval(value.approval)
+      const approval = parsedApproval(value.approval, schemaVersion)
       if (schemaVersion < 20 || approval === undefined || value.occurredAt !== approval.occurredAt) {
         issues.push(publicIssue('invalid-record', 'An invalid approval record and its tail were ignored.', missionId))
         break
@@ -2115,6 +2126,9 @@ export function createFileMissionLedger(options: FileMissionLedgerOptions): Miss
           // Same rule as a check result on a pre-v17 file: an older mission
           // cannot take a record its own readers would stop at.
           throw new Error('Mission ledger version cannot hold approvals')
+        }
+        if (approval.by === 'earlier-always' && hydrated.schemaVersion < 21) {
+          throw new Error('Mission ledger version cannot hold an answer by an earlier Always')
         }
         const sequence = hydrated.nextSequence
         const record: ApprovalRecord = {

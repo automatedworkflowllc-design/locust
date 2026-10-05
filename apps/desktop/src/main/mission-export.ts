@@ -46,7 +46,7 @@ export interface RecordSource {
   readonly missingParent?: string
 }
 
-/** The host's own sentence, written by `answerByRule` in index.ts when a saved rule says no. */
+/** The host's own sentence, written by `answerByDecision` in index.ts when a saved rule says no. */
 export const SAVED_RULE_DENIAL = 'A rule the person saved says no:'
 
 /** The section the host writes a reply's words into (handoff.ts), last, under this sentence. */
@@ -218,7 +218,9 @@ const ANSWERED: Record<MissionApproval['answer'], string> = {
 const ANSWERED_BY: Record<MissionApproval['by'], string> = {
   card: 'by the person, on the card',
   'card-saving-a-rule': 'by the person, on the card, saving it as a rule',
-  'saved-rule': 'by a rule the person saved, before the card reached them'
+  'saved-rule': 'by a rule the person saved, before the card reached them',
+  // v21 (0.616): no card was drawn; the person's Always on an earlier one covered it.
+  'earlier-always': 'by the person’s Always on an earlier card of this run, with no card of its own'
 }
 
 /** The cards answered on a turn (ledger v20): what each asked, the answer, and who gave it. */

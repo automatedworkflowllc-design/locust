@@ -28,7 +28,8 @@ import type { CompareSlotId, PublicCompare, PublicCompareSlot } from '../shared/
 import { createCompareStore } from './compare-store.js'
 import { createApprovalRuleStore } from './approval-rule-store.js'
 import { createFileArrivals, POLL_MS } from './routine-file-watch.js'
-import { decideByRules, enforcedAnswer, ruleCandidateOf, ruledActionOf, ruleRefusalFor, ruleSentence } from '../shared/approval-rules.js'
+import { enforcedAnswer, ruleCandidateOf, ruledActionOf, ruleRefusalFor, ruleSentence } from '../shared/approval-rules.js'
+import { createRunAlways, decide } from '../shared/who-decides.js'
 import { judgePrompt } from './compare-judge.js'
 import { keepOutOfGit } from './attachments-for-run.js'
 import { REPLY_PAGE_ROOT, writeReplyPage } from './reply-page.js'
@@ -1817,8 +1818,9 @@ if (!ownsSingleInstanceLock) {
      * host holds the id answers it. Called from exactly three places, each a
      * decision of the person's: their click on the card (the decide handler),
      * their click on "Yes, and don't ask again" / "Never allow this" (the
-     * from-card handler), and a rule they saved answering a card it covers
-     * (answerByRule). Nothing a teammate writes reaches it; the guard test
+     * from-card handler), and the one decision path (answerByDecision, 0.616),
+     * which answers by a rule they saved or by their own Always on an earlier
+     * card of the run. Nothing a teammate writes reaches it; the guard test
      * (approvals-come-only-from-the-window) holds that.
      */
     const answerApproval = async (answer: MissionApprovalAnswer, by: MissionApproval['by'] = 'card', words?: string): Promise<boolean> => {
@@ -1877,37 +1879,55 @@ if (!ownsSingleInstanceLock) {
       const teammateId = owners[request.missionId]
       return { ...(teammateId === undefined ? {} : { teammateId }), ...(request.cwd === null ? {} : { folder: request.cwd }) }
     }
-    const answerByRule = async (request: MissionApprovalRequest): Promise<boolean> => {
+    // The Always answers of each run, under the host's key for each (0.616).
+    const runAlways = createRunAlways()
+    /*
+     * ONE DECISION PATH (0.616, the PRD's R8; shared/who-decides.ts). Every
+     * request every host raises is decided here before a card is drawn: a
+     * saved rule first, no before yes; then an Always given earlier in this
+     * run, never for a command that reaches other programs; then the card.
+     * Rules that cannot be read decide nothing, an earlier Always included:
+     * a rule saying no might be among them, so the card asks.
+     */
+    const answerByDecision = async (request: MissionApprovalRequest): Promise<{ readonly answered: boolean; readonly askedAgain?: string }> => {
       const rules = await approvalRules.list().catch(() => undefined)
-      if (rules === undefined || rules.length === 0) return false
+      if (rules === undefined) return { answered: false }
       const context = await ruleContextOf(request)
-      const verdict = decideByRules(ruledActionOf(request), rules, context)
-      if (verdict.decision === 'ask') return false
-      const roster = context.teammateId === undefined ? [] : await teammates.list().catch(() => [])
-      const sentence = ruleSentence(verdict.rule, roster.find((entry) => entry.teammateId === context.teammateId)?.name)
-      const answer = verdict.decision === 'allow'
-        ? { approvalId: request.approvalId, decision: 'approve-once' as const }
-        : { approvalId: request.approvalId, decision: 'deny' as const, reason: `A rule the person saved says no: ${sentence}` }
+      const remembered = request.alwaysKey !== undefined && runAlways.has(request.runId, request.alwaysKey)
+      const decision = decide(request, { ...context, rules, remembered })
+      if (decision.verdict === 'ask') return { answered: false, ...(decision.why === undefined ? {} : { askedAgain: decision.why }) }
       // After the runtime has finished registering the request it just raised.
       await new Promise((settle) => setTimeout(settle, 0))
+      if (decision.by === 'earlier-always') {
+        // In the record, not the thread: the person chose this on a card already.
+        const words = request.alwaysCovers === undefined ? undefined : `The Always given earlier in this run allows ${request.alwaysCovers}.`
+        return { answered: await answerApproval({ approvalId: request.approvalId, decision: 'approve-once' }, 'earlier-always', words) }
+      }
+      const roster = context.teammateId === undefined ? [] : await teammates.list().catch(() => [])
+      const sentence = ruleSentence(decision.rule, roster.find((entry) => entry.teammateId === context.teammateId)?.name)
+      const answer = decision.verdict === 'allow'
+        ? { approvalId: request.approvalId, decision: 'approve-once' as const }
+        : { approvalId: request.approvalId, decision: 'deny' as const, reason: `A rule the person saved says no: ${sentence}` }
       const answered = await answerApproval(answer, 'saved-rule', sentence)
-      if (!answered) return false
-      await approvalRules.used(verdict.rule.ruleId).catch(() => undefined)
+      if (!answered) return { answered: false }
+      await approvalRules.used(decision.rule.ruleId).catch(() => undefined)
       sendToWindow({
         kind: 'relay-notice',
         runId: request.runId,
         missionId: request.missionId,
         // The rule's own sentence names what it covered; Settings is where it is undone.
-        message: `${verdict.decision === 'allow' ? 'Allowed' : 'Denied'} by your saved rule: ${sentence} Settings > Teammates lists your rules.`
+        message: `${decision.verdict === 'allow' ? 'Allowed' : 'Denied'} by your saved rule: ${sentence} Settings > Teammates lists your rules.`
       })
-      return true
+      return { answered: true }
     }
     const raiseApproval = (request: MissionApprovalRequest): void => {
       void (async () => {
         const context = await ruleContextOf(request).catch(() => ({}) as { teammateId?: string })
         raisedApprovals.remember(request, context.teammateId)
-        if (await answerByRule(request).catch(() => false)) return
-        showApproval(request)
+        const decided: { readonly answered: boolean; readonly askedAgain?: string } = await answerByDecision(request).catch(() => ({ answered: false }))
+        if (decided.answered) return
+        // A card shown although an Always was given says why (a command that reaches other programs).
+        showApproval(decided.askedAgain === undefined ? request : { ...request, askedAgain: decided.askedAgain })
       })()
     }
     const showApproval = (request: MissionApprovalRequest): void => {
@@ -2633,7 +2653,19 @@ if (!ownsSingleInstanceLock) {
       // no longer in the raised map (evicted) is answered as it came.
       const raised = raisedApprovals.get(decided.approvalId)
       const enforced = raised === undefined ? { answer: decided } : enforcedAnswer(raised.request, decided)
-      return { ok: await answerApproval(enforced.answer, undefined, enforced.note) } as const
+      /*
+       * AN ALWAYS IS REMEMBERED HERE (0.616), under the key the host put on the
+       * request, and every later request of the run is decided with it after
+       * the saved rules (answerByDecision). Kept before the answer goes back,
+       * so a request the runtime raises the moment it is released finds it;
+       * let go again if nothing was waiting for the answer.
+       */
+      const alwaysKey = raised?.request.alwaysKey
+      const remembers = alwaysKey !== undefined && 'decision' in enforced.answer && enforced.answer.decision === 'approve-always'
+      if (remembers) runAlways.add(raised!.request.runId, alwaysKey)
+      const answered = await answerApproval(enforced.answer, undefined, enforced.note)
+      if (remembers && !answered) runAlways.remove(raised!.request.runId, alwaysKey)
+      return { ok: answered } as const
     })
 
     const teammates = createTeammateStore({ rootDirectory: app.getPath('userData') })

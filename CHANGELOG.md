@@ -11,6 +11,13 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.616.0 - 2026-10-04
+
+### Fixed
+
+- **"Always" no longer outranks your saved rules.** After you answered a card with "Always allow this session", the run's later requests were allowed before Locust read your saved rules. On Claude Code, an Always on one command covered every command after it, including one a rule of yours forbids and one that stops other programs, which Locust says it asks about every time. Now every request goes through one check, in one order: a rule that says no wins, a command that reaches other programs is asked about again (the card says why), and only then does your Always apply. This covers Claude Code, Copilot and OpenCode. Codex still keeps its own Always for the rest of the session, so your rules apply to what Codex asks, not to what its Always lets through; cards from Codex do not say your rules come first.
+- **The record says when your Always decided.** A request your earlier Always allowed is now written down with its run, and a saved conversation's record lists it as allowed "by the person's Always on an earlier card of this run", beside the cards you answered and the rules that answered for you.
+
 ## 0.615.0 - 2026-10-04
 
 ### New

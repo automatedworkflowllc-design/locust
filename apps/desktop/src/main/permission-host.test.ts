@@ -109,35 +109,42 @@ describe('the permission host', () => {
 
   // QA-2026-09-29 round 2, R35: Always is the TOOL, not the connector. It was
   // the connector, and "list_issues" let "delete_file" through with no card.
-  it('remembers "always" for that tool on that run, and still asks about another tool, even on the same connector', async () => {
+  // Since 0.616 the host remembers nothing (shared/who-decides.ts): it used to
+  // answer a tool it had been told "always" about before the saved rules were
+  // read. Every request is raised, with the tool as the key an Always on it
+  // covers, and the main process decides the later ones after the rules.
+  it('raises every request, even after Always, each with its own tool as the key an Always would cover', async () => {
     const { host, cards } = await hostWithCards()
     const { configPath } = await host.register({ runId: 'run1', missionId: 'm1', cwd: null })
     const token = tokenOf(configPath)
 
     const first = post(host.port, { token, toolName: 'mcp__claude_ai_Robinhood__get_watchlists' })
     await new Promise((r) => setTimeout(r, 30))
-    expect(cards[0]!.alwaysCovers).toBe('get_watchlists on Robinhood again, and no other tool')
+    expect(cards[0]).toMatchObject({ alwaysCovers: 'get_watchlists on Robinhood again, and no other tool', alwaysKey: 'claude:mcp__claude_ai_Robinhood__get_watchlists' })
     host.decide({ approvalId: cards[0]!.approvalId, decision: 'approve-always' })
     expect((await first).behavior).toBe('allow')
 
-    // The same tool again: answered without a card.
-    const again = await post(host.port, { token, toolName: 'mcp__claude_ai_Robinhood__get_watchlists' })
-    expect(again.behavior).toBe('allow')
-    expect(cards).toHaveLength(1)
-
-    // Same connector, a different tool: asks.
-    const other = post(host.port, { token, toolName: 'mcp__claude_ai_Robinhood__get_accounts' })
+    // The same tool again: raised, never answered by the host itself.
+    const again = post(host.port, { token, toolName: 'mcp__claude_ai_Robinhood__get_watchlists' })
     await new Promise((r) => setTimeout(r, 30))
     expect(cards).toHaveLength(2)
+    expect(cards[1]!.alwaysKey).toBe(cards[0]!.alwaysKey)
     host.decide({ approvalId: cards[1]!.approvalId, decision: 'deny' })
+    expect((await again).behavior).toBe('deny')
+
+    // Same connector, a different tool: a key of its own.
+    const other = post(host.port, { token, toolName: 'mcp__claude_ai_Robinhood__get_accounts' })
+    await new Promise((r) => setTimeout(r, 30))
+    expect(cards[2]!.alwaysKey).toBe('claude:mcp__claude_ai_Robinhood__get_accounts')
+    host.decide({ approvalId: cards[2]!.approvalId, decision: 'deny' })
     expect((await other).behavior).toBe('deny')
 
-    // A different connector still asks. Robinhood is not Gmail.
-    const third = post(host.port, { token, toolName: 'mcp__claude_ai_Gmail__list_labels' })
+    // Bash: one key for every command, as its card says.
+    const command = post(host.port, { token, toolName: 'Bash', input: { command: 'npm test' } })
     await new Promise((r) => setTimeout(r, 30))
-    expect(cards).toHaveLength(3)
-    host.decide({ approvalId: cards[2]!.approvalId, decision: 'deny' })
-    expect((await third).behavior).toBe('deny')
+    expect(cards[3]).toMatchObject({ alwaysKey: 'claude:Bash', alwaysCovers: 'every command it runs' })
+    host.decide({ approvalId: cards[3]!.approvalId, decision: 'deny' })
+    expect((await command).behavior).toBe('deny')
   })
 
   it('does not let one run answer for another', async () => {

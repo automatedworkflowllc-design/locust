@@ -2619,6 +2619,16 @@ export interface MissionApprovalRequest {
    */
   readonly alwaysCovers?: string
   /**
+   * What an Always on this card remembers for the run, made by the host that
+   * raised it (0.616, shared/who-decides.ts): `claude:Bash`, an exact command
+   * for Copilot, OpenCode's own patterns. The main process keeps the run's
+   * keys and decides every later request with them, after the saved rules.
+   * Absent where the runtime keeps its own Always (Codex).
+   */
+  readonly alwaysKey?: string
+  /** Why a card is shown although an earlier Always might have covered it (0.616): a command that reaches other programs. */
+  readonly askedAgain?: string
+  /**
    * The card's Data sent and Reversible lines, when the asking route knows
    * better than the kind does (R15, R37): a fetch is not a command, and a
    * file outside the folder is not under its version control.
