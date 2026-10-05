@@ -1,6 +1,6 @@
 // Where a launch spends its time, from the process starting to the app on screen.
 //
-//   node _tools/boot-timing.mjs [label] [--profile <dir>] [--runs N] [--packaged]
+//   node _tools/boot-timing.mjs [label] [--profile <dir>] [--runs N] [--packaged | --exe <Locust.exe>]
 //
 // Colin, 2026-09-22: "look into the probing process since its part of the
 // loading, i want the users to have a seamless, fast experience". This is the
@@ -18,14 +18,14 @@
 // `--profile` reuses a profile so the runtime facts cache is warm, which is
 // every launch after a person's first. Spends nothing: no mission is sent.
 
-import { spawn } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
+import { createServer } from 'node:net'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
-const PACKAGED = join(APP_DIR, 'release', 'win-unpacked', 'Locust.exe')
 const PORT = 9281
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const arg = (name) => {
@@ -35,7 +35,10 @@ const arg = (name) => {
 const label = process.argv[2] !== undefined && !process.argv[2].startsWith('--') ? process.argv[2] : ''
 const runs = Number(arg('--runs') ?? '1')
 const reused = arg('--profile')
-const packaged = process.argv.includes('--packaged')
+const packaged = process.argv.includes('--packaged') || process.argv.includes('--exe')
+// `--exe <Locust.exe>` measures another packaged copy (implies --packaged): a
+// before/after on one machine re-runs the old build after the new one.
+const PACKAGED = arg('--exe') ?? join(APP_DIR, 'release', 'win-unpacked', 'Locust.exe')
 
 async function page(filter) {
   const list = await (await fetch(`http://127.0.0.1:${String(PORT)}/json/list`)).json()
@@ -63,6 +66,8 @@ function connect(url) {
     socket.addEventListener('error', reject, { once: true })
   })
 }
+
+const profileOf = (child) => child.spawnargs.find((a) => a.startsWith('--user-data-dir='))?.slice('--user-data-dir='.length) ?? 'no-such-profile'
 
 async function once(profile) {
   const t0 = Date.now()
@@ -98,10 +103,14 @@ async function once(profile) {
     }
     // And the sweep is read once it has FINISHED: the log is empty until the
     // app window is up, which is what the first run of this script read.
+    // Past the sweep's release too: an agent the sweep did not wait for
+    // (0.629) answers after it, and its check time is still a number worth
+    // having -- a probe with no answer after 30 s prints "?".
     let log = []
-    for (let i = 0; i < 400; i += 1) {
+    for (let i = 0; i < 600; i += 1) {
       log = JSON.parse(await cdp.evaluate(`window.desktop.discoveryLog().then(l => JSON.stringify(l))`))
-      if (log.some((e) => e.kind === 'finished')) break
+      const begun = log.filter((e) => e.kind === 'probe.started')
+      if (log.some((e) => e.kind === 'finished') && begun.every((b) => log.some((e) => e.kind === 'probe.finished' && e.id === b.id))) break
       await sleep(50)
     }
     const started = log.find((e) => e.kind === 'started')
@@ -120,6 +129,24 @@ async function once(profile) {
   } finally {
     child.kill()
     await sleep(800)
+    // Killing the main process leaves its helpers holding the debugging port
+    // for a few seconds, and the next launch then cannot open it ("the app
+    // window never came up", seen from the third launch of a run of three).
+    // Wait until it can be bound again, and until none of this profile's
+    // helper processes is left (a launch that finds them still holding the
+    // profile's lock quits at once).
+    for (let i = 0; i < 300; i += 1) {
+      const free = await new Promise((resolve) => {
+        const probe = createServer()
+        probe.once('error', () => resolve(false))
+        probe.listen(PORT, '127.0.0.1', () => probe.close(() => resolve(true)))
+      })
+      const lingering = await new Promise((resolve) => {
+        execFile('wmic', ['process', 'where', "name='electron.exe' or name='Locust.exe'", 'get', 'CommandLine'], { windowsHide: true }, (_error, stdout) => resolve(String(stdout).includes(profileOf(child))))
+      })
+      if (free && !lingering) break
+      await sleep(100)
+    }
   }
 }
 

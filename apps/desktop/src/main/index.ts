@@ -47,6 +47,7 @@ import {
   createPathExecutableLocator,
   cursorCanEnforceReadOnly,
   discoverInstalledRuntimes,
+  discoverInstalledRuntimesEach,
   killSpawnedTree
 } from '@teammate/runtime-adapters'
 import { boundedApproval, createFileMissionLedger, createFileWorkroom } from '@teammate/mission-store'
@@ -162,7 +163,8 @@ import { createPermissionHost } from './permission-host.js'
 import { chooseFolderCaution, isInsideDirectory, notATeammateFolder, readRememberedWorkspace, resolveWorkspacePath, WORKSPACE_ARGUMENT, writeRememberedWorkspace, workspaceIdFor } from './workspace.js'
 import { createUnwrittenAnswers } from './approval-record-note.js'
 import { createRaisedApprovals } from './raised-approvals.js'
-import { besideTheOthers } from './antigravity-beside.js'
+import { createOutstandingChecks } from './outstanding-checks.js'
+import { FIRST_SCREEN_DEADLINE_MS, keepWhatWasAnswered, settleWithin, type SweepCheck } from './sweep-settle.js'
 import { createAntigravityHostProbe } from './antigravity-host.js'
 import { AntigravityStartError, antigravityStartRefusal, createAntigravityMissionService } from './antigravity-mission.js'
 import type { Relay } from './relay.js'
@@ -504,21 +506,34 @@ void acpCapabilities.load().catch(() => undefined)
 // which the host checks itself and merges into the same sweep.
 const antigravityProbe = createAntigravityHostProbe()
 /**
- * Antigravity's check answered after the sweep had gone on without it
- * (antigravity-beside.ts): put its answer where the next read finds it, drop
- * the answers built on its absence, and let the window know through the log
- * it already hears (the `probe.finished` below was emitted when it landed).
- * One tick later, so it never lands before the sweep's own answer is held.
+ * Checks that have not answered, by agent: the ones the sweep went on without
+ * (sweep-settle.ts). Held so that
+ *  - a start ON that agent waits for its own check and no other,
+ *  - the next sweep joins the check that is going instead of starting a
+ *    second `opencode` or `agy` beside it, and
+ *  - nothing reads one of these as asked (`startReadiness.swept` skips them).
  */
+const outstanding = createOutstandingChecks()
 let forgetModelCatalog: () => void = () => undefined
-const antigravityAnswered = (record: RuntimeDiscovery): void => {
+
+/**
+ * An agent the sweep went on without has answered: put its answer where the
+ * next read finds it, drop the answers built on its absence, and let the
+ * window know through the log it already hears (the `probe.finished` for it
+ * was emitted when it landed). One tick later, so it never lands before the
+ * sweep's own answer is held.
+ */
+const answeredLate = (id: string, record: RuntimeDiscovery | undefined): void => {
   setTimeout(() => {
-    const held = discoveryCache
-    if (held !== undefined) {
-      const there = held.value.some((entry) => entry.id === 'antigravity')
+    // Only one check per agent is ever outstanding, so this is that one.
+    outstanding.delete(id)
+    if (record === undefined) return
+    const cached = discoveryCache
+    if (cached !== undefined) {
+      const there = cached.value.some((entry) => entry.id === id)
       discoveryCache = {
-        at: held.at,
-        value: there ? held.value.map((entry) => (entry.id === 'antigravity' ? record : entry)) : [...held.value, record]
+        at: cached.at,
+        value: there ? cached.value.map((entry) => (entry.id === id ? record : entry)) : [...cached.value, record]
       }
     }
     startReadiness.swept([record], Date.now())
@@ -526,23 +541,17 @@ const antigravityAnswered = (record: RuntimeDiscovery): void => {
     forgetModelCatalog()
   }, 0)
 }
-const discoverRuntimes = async (): Promise<readonly RuntimeDiscovery[]> => {
-  // Cheap and bounded: a file read that has already been started.
-  await runtimeFactsLoaded
-  /*
-   * Antigravity's check starts with the rest and is never waited for past
-   * them (antigravity-beside.ts): a slow or hung `agy` does not hold another
-   * agent's row, the first screen, or a Send to another agent.
-   */
-  /*
-   * Announced like everything else: its readiness is whether `agy` answers,
-   * checked by the host rather than by a CLI probe, and being outside the
-   * swept definitions meant it emitted no events at all. It then appeared in
-   * the settled table having never been in the log above it, while Gemini
-   * was in the log and not the table (Colin, 2026-09-14). One list, or the
-   * two disagree in front of somebody.
-   */
-  const antigravityCheck = (async () => {
+
+/**
+ * Antigravity as a check like the others, announced like everything else: its
+ * readiness is whether `agy` answers, asked by the host rather than by a CLI
+ * probe, and being outside the swept definitions meant it emitted no events at
+ * all. It then appeared in the settled table having never been in the log
+ * above it, while Gemini was in the log and not the table (Colin, 2026-09-14).
+ * One list, or the two disagree in front of somebody.
+ */
+const antigravityCheck = (): SweepCheck => {
+  const result = (async () => {
     discoveryLog.emit({
       kind: 'probe.started',
       id: 'antigravity',
@@ -565,75 +574,121 @@ const discoverRuntimes = async (): Promise<readonly RuntimeDiscovery[]> => {
     })
     return record
   })()
-  const beside = await besideTheOthers(
-    discoverInstalledRuntimes({
-      runner: probeRunner,
-      locator: executableLocator,
-      includeOmniRoute: true,
-      recall: runtimeFacts,
-      /*
-       * A beat between starts you can actually SEE.
-       *
-       * 140ms put all six rows on screen inside 700ms -- less time than the
-       * window itself takes to appear, so the log was complete before
-       * anybody could watch it happen. Colin, with a photo taken at open:
-       * "would be cool if we actually saw the terminal pop all those up."
-       *
-       * The stagger delays each probe's START, never its finish, and they
-       * overlap: the only cost is the last row beginning later than it
-       * otherwise would.
-       *
-       * 240 -> 70 on 2026-09-22, MEASURED: at 240 the sixth row (OpenCode,
-       * the slowest real probe at 2.3 s) did not start until 1.2 s into the
-       * sweep and set the end of it, and the whole launch took 6.6-7.0 s.
-       * Colin, the same day: "i want the users to have a seamless, fast
-       * experience". At 70 the rows still arrive one after another, visibly,
-       * which is the effect he asked for -- over half a second, not two.
-       */
-      staggerMs: 70,
-      // Listed but not runnable here: their sign-in answer is never used,
-      // so it is not asked for (Gemini's was the slowest probe of a launch).
-      readinessFromVersion: plannedRuntimes(),
-      /*
-       * `started` reaches the window BEFORE the subprocess is spawned --
-       * that is the whole contract. A screen told about the start and the
-       * result at the same moment has nothing to draw during the wait, and
-       * the wait is the only thing it exists for.
-       */
-      watch: {
-        started: (runtime) => {
-          discoveryLog.emit({
-            kind: 'probe.started',
-            id: runtime.id,
-            bin: runtime.bin,
-            product: runtime.displayName,
-            at: Date.now()
-          })
-        },
-        finished: (runtime, discovery) => {
-          const installed = discovery.availability === 'available'
-          discoveryLog.emit({
-            kind: 'probe.finished',
-            id: runtime.id,
-            at: Date.now(),
-            outcome: bootOutcome({
-              installed,
-              status: discovery.readiness === 'ready'
-                ? 'ready'
-                : discovery.readiness === 'authentication-required'
-                  ? 'auth-required'
-                  : 'other'
-            }),
-            ...(discovery.version?.version === undefined ? {} : { version: discovery.version.version })
-          })
-        }
-      }
-    }),
-    antigravityCheck,
-    { pending: () => antigravityProbe.pendingRecord(), late: antigravityAnswered }
-  )
-  return beside.antigravity === undefined ? beside.others : [...beside.others, beside.antigravity]
+  return { id: 'antigravity', result, located: Promise.resolve(), pending: () => antigravityProbe.pendingRecord() }
 }
+
+/**
+ * Ask the runtimes (all of them, or the named ones) and release the answer
+ * when every one has answered or FIRST_SCREEN_DEADLINE_MS has passed
+ * (sweep-settle.ts). An agent that is slower is in the answer as installed and
+ * still being checked; its own check carries on and its answer is patched in
+ * (`answeredLate`). So no single agent -- OpenCode at 4-11 s, Antigravity,
+ * whichever is slowest that launch -- holds another agent's row, the first
+ * screen, or a Send to a different agent.
+ */
+const askRuntimes = async (only?: ReadonlySet<string>): Promise<readonly RuntimeDiscovery[]> => {
+  // Cheap and bounded: a file read that has already been started.
+  await runtimeFactsLoaded
+  // A check still going for an agent is joined, not started again.
+  const going = outstanding.values().filter((check) => only === undefined || only.has(check.id))
+  const goingIds = new Set(going.map((check) => check.id))
+  const asking: SweepCheck[] = [...going]
+  const mine = new Set<string>()
+  const cliOnly = only === undefined ? undefined : new Set([...only].filter((id) => id !== 'antigravity'))
+  const cliChecks = cliOnly !== undefined && cliOnly.size === 0
+    ? []
+    : discoverInstalledRuntimesEach({
+        runner: probeRunner,
+        locator: executableLocator,
+        includeOmniRoute: true,
+        recall: runtimeFacts,
+        // Only a full sweep is narrated, one row after another.
+        ...(only === undefined
+          ? {
+              /*
+               * A beat between starts you can actually SEE.
+               *
+               * 140ms put all six rows on screen inside 700ms -- less time than the
+               * window itself takes to appear, so the log was complete before
+               * anybody could watch it happen. Colin, with a photo taken at open:
+               * "would be cool if we actually saw the terminal pop all those up."
+               *
+               * The stagger delays each probe's START, never its finish, and they
+               * overlap: the only cost is the last row beginning later than it
+               * otherwise would.
+               *
+               * 240 -> 70 on 2026-09-22, MEASURED: at 240 the sixth row (OpenCode,
+               * the slowest real probe at 2.3 s) did not start until 1.2 s into the
+               * sweep and set the end of it, and the whole launch took 6.6-7.0 s.
+               * Colin, the same day: "i want the users to have a seamless, fast
+               * experience". At 70 the rows still arrive one after another, visibly,
+               * which is the effect he asked for -- over half a second, not two.
+               */
+              staggerMs: 70,
+              /*
+               * `started` reaches the window BEFORE the subprocess is spawned --
+               * that is the whole contract. A screen told about the start and the
+               * result at the same moment has nothing to draw during the wait, and
+               * the wait is the only thing it exists for.
+               */
+              watch: {
+                started: (runtime: { readonly id: string; readonly displayName: string; readonly bin: string }) => {
+                  discoveryLog.emit({
+                    kind: 'probe.started',
+                    id: runtime.id,
+                    bin: runtime.bin,
+                    product: runtime.displayName,
+                    at: Date.now()
+                  })
+                },
+                finished: (runtime: { readonly id: string }, discovery: RuntimeDiscovery) => {
+                  const installed = discovery.availability === 'available'
+                  discoveryLog.emit({
+                    kind: 'probe.finished',
+                    id: runtime.id,
+                    at: Date.now(),
+                    outcome: bootOutcome({
+                      installed,
+                      status: discovery.readiness === 'ready'
+                        ? 'ready'
+                        : discovery.readiness === 'authentication-required'
+                          ? 'auth-required'
+                          : 'other'
+                    }),
+                    ...(discovery.version?.version === undefined ? {} : { version: discovery.version.version })
+                  })
+                }
+              }
+            }
+          : {}),
+        // Listed but not runnable here: their sign-in answer is never used,
+        // so it is not asked for (Gemini's was the slowest probe of a launch).
+        readinessFromVersion: plannedRuntimes(),
+        ...(cliOnly === undefined ? {} : { only: cliOnly }),
+        ...(goingIds.size === 0 ? {} : { skip: goingIds })
+      })
+  for (const check of cliChecks) {
+    asking.push(check)
+    mine.add(check.id)
+  }
+  if ((only === undefined || only.has('antigravity')) && !goingIds.has('antigravity')) {
+    asking.push(antigravityCheck())
+    mine.add('antigravity')
+  }
+  const order: readonly string[] = discoveryCache?.value.map((entry) => entry.id) ?? []
+  const settled = await settleWithin(asking, {
+    deadlineMs: FIRST_SCREEN_DEADLINE_MS,
+    late: answeredLate
+  })
+  for (const check of asking) if (settled.left.has(check.id)) outstanding.set(check)
+  // The order the last answer had, so a row does not move between sweeps.
+  const rank = (id: string): number => {
+    const at = order.indexOf(id)
+    return at === -1 ? Number.MAX_SAFE_INTEGER : at
+  }
+  return [...keepWhatWasAnswered(settled, discoveryCache?.value ?? [])].sort((left, right) => rank(left.id) - rank(right.id))
+}
+const discoverRuntimes = (): Promise<readonly RuntimeDiscovery[]> => askRuntimes()
 /**
  * The connectors this machine has, read in the background and held.
  *
@@ -708,7 +763,8 @@ const discoverForWork = (): Promise<readonly RuntimeDiscovery[]> => {
   })()
     .then((value) => {
       discoveryCache = { at: Date.now(), value }
-      startReadiness.swept(value, Date.now())
+      // An agent that is still being checked has not been asked yet, as far as a start can tell.
+      startReadiness.swept(value.filter((runtime) => !outstanding.has(runtime.id)), Date.now())
       const ready = value.filter((runtime) => runtime.readiness === 'ready').length
       const needsYou = value.filter((runtime) => runtime.readiness === 'authentication-required').length
       discoveryLog.emit({ kind: 'finished', at: Date.now(), ready, needsYou })
@@ -775,18 +831,12 @@ const startReadiness = createStartReadiness({
 /**
  * See start-readiness.ts: a stale answer is refreshed for the starting runtime alone.
  *
- * A start ON Antigravity waits for Antigravity's own check if the sweep went
- * on without it (antigravity-beside.ts) -- that is the one send that has
- * something to wait for. A start on anything else, and the model list, never do.
+ * A start ON an agent the sweep went on without waits for THAT agent's own
+ * check (sweep-settle.ts) -- the one send that has something to wait for. A
+ * start on any other agent, and the model list, never do.
  */
-const discoverForStart = async (runtimeId?: string): Promise<readonly RuntimeDiscovery[]> => {
-  const found = await startReadiness.forStart(runtimeId)
-  if (runtimeId !== 'antigravity') return found
-  const mine = found.find((entry) => entry.id === 'antigravity')
-  if (mine === undefined || mine.readiness !== 'unknown') return found
-  const answer = await antigravityProbe.discoveryRecord().catch(() => undefined)
-  return answer === undefined ? found : found.map((entry) => (entry.id === 'antigravity' ? answer : entry))
-}
+const discoverForStart = async (runtimeId?: string): Promise<readonly RuntimeDiscovery[]> =>
+  outstanding.forStart(runtimeId, await startReadiness.forStart(runtimeId))
 
 /**
  * Can npm be run from here?
@@ -3381,29 +3431,22 @@ if (!ownsSingleInstanceLock) {
       if (fresh !== true && named.length > 0 && cached !== undefined) {
         try {
           await runtimeFactsLoaded
-          const wanted = new Set(named)
           /*
            * Antigravity is asked only if the held answer is not already a real
-           * one (its late answer is patched into the held list), and is never
-           * waited for past the others (antigravity-beside.ts).
+           * one (a late answer is patched into the held list); an agent whose
+           * check is still going is joined, not asked again; and none of them
+           * holds up the others (askRuntimes, sweep-settle.ts).
            */
-          const heldAntigravity = cached.value.find((entry) => entry.id === 'antigravity')
-          const askAntigravity = wanted.has('antigravity') && heldAntigravity?.readiness !== 'ready'
-          const beside = await besideTheOthers(
-            discoverInstalledRuntimes({
-              runner: probeRunner,
-              locator: executableLocator,
-              includeOmniRoute: true,
-              recall: runtimeFacts,
-              readinessFromVersion: plannedRuntimes(),
-              only: wanted
-            }),
-            askAntigravity ? antigravityProbe.discoveryRecord().catch(() => undefined) : Promise.resolve(undefined),
-            { pending: () => antigravityProbe.pendingRecord(), late: antigravityAnswered }
-          )
-          const answers = new Map([...beside.others, ...(beside.antigravity === undefined ? [] : [beside.antigravity])].map((entry) => [entry.id, entry]))
-          discoveryCache = { at: Date.now(), value: cached.value.map((entry) => answers.get(entry.id) ?? entry) }
-          startReadiness.swept([...answers.values()], Date.now())
+          const wanted = new Set(named)
+          if (cached.value.find((entry) => entry.id === 'antigravity')?.readiness === 'ready') wanted.delete('antigravity')
+          for (const id of [...wanted]) if (outstanding.has(id)) wanted.delete(id)
+          const answers = new Map<string, RuntimeDiscovery>()
+          if (wanted.size > 0) {
+            for (const entry of await askRuntimes(wanted)) answers.set(entry.id, entry)
+          }
+          const latest = discoveryCache ?? cached
+          discoveryCache = { at: Date.now(), value: latest.value.map((entry) => answers.get(entry.id) ?? entry) }
+          startReadiness.swept([...answers.values()].filter((entry) => !outstanding.has(entry.id)), Date.now())
           runtimeDiscovery.invalidate()
           discoveryLog.emit({ kind: 'reasked', ids: [...answers.keys()], at: Date.now() })
         } catch {

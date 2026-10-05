@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.634.0 - 2026-10-05
+
+### Improved
+
+- **Locust opens without waiting on the slowest AI tool.** At launch Locust asks each installed AI tool whether it is ready, and the window waited for the slowest answer: OpenCode alone took up to 11 seconds on some launches. Now it waits two seconds at most. A tool still answering by then shows as being checked, never as signed out or missing, and its row updates by itself when the answer arrives. Starting a run on that tool waits only for that tool's own answer, and a run on any other tool waits for nothing. OpenCode is asked once at launch instead of twice.
+
 ## 0.633.0 - 2026-10-05
 
 ### Improved

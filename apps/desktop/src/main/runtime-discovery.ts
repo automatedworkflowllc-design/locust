@@ -45,7 +45,7 @@ interface RuntimeDiscoveryServiceOptions {
   readonly agentCapabilities?: (runtime: LocalRuntimeId) => PublicRuntimeStatus['agentCapabilities']
 }
 
-function publicStatus(runtime: RuntimeDiscovery): PublicRuntimeStatus {
+export function publicStatus(runtime: RuntimeDiscovery): PublicRuntimeStatus {
   const installed = runtime.availability === 'available'
   // "Ready" does not always mean "signed in". OpenCode's readiness probe is
   // `opencode models`, which answers happily with no account at all -- and on
@@ -81,7 +81,9 @@ function publicStatus(runtime: RuntimeDiscovery): PublicRuntimeStatus {
     ready: status === 'ready',
     status,
     // Antigravity through its own CLI is an ordinary runtime, not the app's unpublished interface (0.541).
-    ...(runtime.id === 'antigravity' && runtime.executable?.commandName === 'agy' ? { throughCli: true as const } : {})
+    ...(runtime.id === 'antigravity' && runtime.executable?.commandName === 'agy' ? { throughCli: true as const } : {}),
+    // The sweep went on without this agent's check (main/sweep-settle.ts).
+    ...(installed && runtime.diagnostics?.some((note) => note.code === 'check-pending') === true ? { checking: true as const } : {})
   }
 }
 
@@ -106,6 +108,8 @@ export function createRuntimeDiscoveryService(
 
   let cached: { readonly expiresAt: number; readonly response: RuntimeDiscoveryResponse } | undefined
   let inFlight: Promise<RuntimeDiscoveryResponse> | undefined
+  /** Bumped by `invalidate()`, so a build that was already running knows it was. */
+  let generation = 0
 
   /*
    * What an ACP agent said it can do is added to EVERY answer, the cached one
@@ -133,30 +137,51 @@ export function createRuntimeDiscoveryService(
       if (cached && currentTime < cached.expiresAt) return Promise.resolve(told(cached.response))
       if (inFlight) return options.agentCapabilities === undefined ? inFlight : inFlight.then(told)
 
-      inFlight = options.probe()
-        .then(async (runtimes): Promise<RuntimeDiscoveryResponse> => ({
+      /*
+       * An invalidation DURING a build is not lost (2026-10-05). An agent the
+       * sweep went on without answers in the middle of it -- the npm questions
+       * below can take seconds -- and `invalidate()` was a no-op because
+       * nothing was cached yet, so the build finished with the list it began
+       * with and kept it for ten seconds: the agent that had answered still
+       * read "checking". Now the build asks for the list again if it was
+       * invalidated while it ran (cheap: the held answer, with the late one in
+       * it), and what it builds is cached only if nothing invalidated it.
+       */
+      const generationAtStart = generation
+      const running: Promise<RuntimeDiscoveryResponse> = (async (): Promise<RuntimeDiscoveryResponse> => {
+        let runtimes = await options.probe()
+        const npmPresent = options.npmPresent === undefined ? true : await options.npmPresent()
+        const npmIsBundled = options.npmIsBundled === undefined ? false : await options.npmIsBundled()
+        const npmDidNotAnswer = options.npmDidNotAnswer === undefined ? false : await options.npmDidNotAnswer()
+        if (generation !== generationAtStart) runtimes = await options.probe()
+        return {
           ok: true,
           data: {
             checkedAt: now().toISOString(),
             runtimes: runtimes.map(publicStatus),
-            npmPresent: options.npmPresent === undefined ? true : await options.npmPresent(),
-            npmIsBundled: options.npmIsBundled === undefined ? false : await options.npmIsBundled(),
-            npmDidNotAnswer: options.npmDidNotAnswer === undefined ? false : await options.npmDidNotAnswer()
+            npmPresent,
+            npmIsBundled,
+            npmDidNotAnswer
           }
-        }))
+        }
+      })()
         .catch(() => discoveryFailed())
         .then((response) => {
-          cached = { expiresAt: now().getTime() + cacheTtlMs, response }
+          if (generation === generationAtStart) cached = { expiresAt: now().getTime() + cacheTtlMs, response }
           return response
         })
         .finally(() => {
-          inFlight = undefined
+          if (inFlight === running) inFlight = undefined
         })
+      inFlight = running
 
       return options.agentCapabilities === undefined ? inFlight : inFlight.then(told)
     },
     invalidate(): void {
       cached = undefined
+      // A build in progress began before whatever changed: the next ask starts its own.
+      inFlight = undefined
+      generation += 1
     }
   }
 }

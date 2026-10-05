@@ -244,11 +244,13 @@ function baseRouteRowStatus(
     // Colin's launch screen said UNAVAILABLE for a runtime that was fine a
     // minute later (2026-09-05). The shell asks again; the tag says so.
     const reason =
-      runtime.status === 'offline'
-        ? 'could not be reached'
-        : runtime.status === 'probe-failed'
-          ? 'did not answer its version probe in time'
-          : 'is not ready'
+      runtime.checking === true
+        ? 'is still being checked'
+        : runtime.status === 'offline'
+          ? 'could not be reached'
+          : runtime.status === 'probe-failed'
+            ? 'did not answer its version probe in time'
+            : 'is not ready'
     return {
       tag: 'CHECKING',
       selectable: false,
