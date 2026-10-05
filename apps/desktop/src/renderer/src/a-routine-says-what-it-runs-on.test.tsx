@@ -26,6 +26,35 @@ describe('the routine row', () => {
     expect(chain).toMatch(/^Wren \(Grok 4\.7[^)]*\) → Sable \([^)]*Nemotron[^)]*\) \(checks\)$/)
   })
 
+  /*
+   * 0.636: a chain run in Locust itself, three teammates on one free model,
+   * read "Wren (Muse Spark 1.3 Contributor Free) → Atlas (Muse Spark ...) →
+   * Sable (Muse Sp..." and the card cut it off before "(checks)".
+   */
+  it('names one shared model once, after the chain, so "(checks)" stays on the line', () => {
+    const muse = { runtime: 'opencode', model: 'opencode/muse-spark-1.3-contributor-free' }
+    const same = [
+      { teammateId: 'tm_wren', name: 'Wren', route: muse },
+      { teammateId: 'tm_atlas', name: 'Atlas', route: muse },
+      { teammateId: 'tm_sable', name: 'Sable', route: muse }
+    ]
+    const chain = routineChain({ teammateId: 'tm_wren', steps: ['a', 'b', 'c'], handOffs: [{}, { teammateId: 'tm_atlas' }, { teammateId: 'tm_sable', check: true }] }, same, true)
+    expect(chain).toMatch(/^Wren → Atlas → Sable \(checks\), all on Muse Spark/)
+    expect(chain?.match(/Muse Spark/g)).toHaveLength(1)
+    const two = routineChain({ teammateId: 'tm_wren', steps: ['a', 'b'], handOffs: [{}, { teammateId: 'tm_sable', check: true }] }, same, true)
+    expect(two).toMatch(/^Wren → Sable \(checks\), both on Muse Spark/)
+  })
+
+  it('still names each model when the routes differ, even one model through two tools', () => {
+    const twoTools = [
+      { teammateId: 'tm_wren', name: 'Wren', route: { runtime: 'claude', model: 'claude-sonnet-5-5' } },
+      { teammateId: 'tm_sable', name: 'Sable', route: { runtime: 'antigravity', model: 'claude-sonnet-5-5' } }
+    ]
+    const chain = routineChain({ teammateId: 'tm_wren', steps: ['a', 'b'], handOffs: [{}, { teammateId: 'tm_sable', check: true }] }, twoTools, true)
+    expect(chain).toMatch(/^Wren \([^)]+\) → Sable \([^)]+\) \(checks\)$/)
+    expect(chain).not.toMatch(/both on|all on/)
+  })
+
   it('names the one teammate of a plain routine with its model too', () => {
     expect(routineChain({ teammateId: 'tm_wren', steps: ['a'] }, team, true)).toMatch(/^Wren \(Grok 4\.7/)
     // As before where models are not asked for.

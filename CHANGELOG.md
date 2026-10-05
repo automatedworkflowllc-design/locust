@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.636.0 - 2026-10-05
+
+### Fixed
+
+- **A hand-off routine's card keeps its checker in view.** When every teammate in a routine's chain runs on the same model, the card named that model at every step, and the line ran out before "(checks)", the part that says who approves the work. It now names a shared model once, after the chain: "Wren → Atlas → Sable (checks), all on Muse Spark 1.3". Teammates on different models, or on one model through different tools, are still named with their own.
+
 ## 0.635.0 - 2026-10-05
 
 ### Fixed
