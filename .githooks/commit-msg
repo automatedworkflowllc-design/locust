@@ -1,0 +1,3 @@
+#!/bin/sh
+# Refuses a commit message carrying something private (_tools/public-guard.mjs).
+exec node "$(git rev-parse --show-toplevel)/_tools/public-guard.mjs" --message "$1"

@@ -1,0 +1,36 @@
+name: Public guard
+
+# What may never reach this public repository: a private path, the owner's
+# account folder name, a key-shaped string. The same check runs before every
+# commit on the owner's machine (.githooks); this is the second net, for every
+# push and pull request. See _tools/public-guard.mjs.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check what this push or pull request adds
+        shell: bash
+        env:
+          BEFORE: ${{ github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [ -n "$BASE" ]; then range="$BASE..$HEAD"
+          elif [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then range="$BEFORE..$HEAD"
+          else range="$HEAD~1..$HEAD"; fi
+          echo "Checking $range"
+          node _tools/public-guard.mjs --range "$range"

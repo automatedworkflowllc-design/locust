@@ -175,7 +175,7 @@ const DOCS_PUBLISHED_PATTERNS = DOCS_PUBLISHED.map((glob) => compileGlob(glob))
 
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.ico', '.icns', '.svg'])
 
-const SCAN_PATTERNS = [
+export const SCAN_PATTERNS = [
   { name: 'sk-', re: /(?<![A-Za-z0-9])sk-[A-Za-z0-9_-]{8,}/g },
   { name: 'ghp_', re: /(?<![A-Za-z0-9])ghp_[A-Za-z0-9]{8,}/g },
   { name: 'AKIA', re: /(?<![A-Za-z0-9])AKIA[A-Z0-9]{8,}/g },
