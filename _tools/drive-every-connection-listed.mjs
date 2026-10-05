@@ -30,8 +30,9 @@ try {
     ;[...document.querySelectorAll('button')].find((b) => b.innerText.replace(/\\s+/g, ' ').trim() === 'Settings')?.click()
     await new Promise((r) => setTimeout(r, 700))
     ;[...document.querySelectorAll('.lc-settings__navitem')].find((b) => /Privacy/.test(b.innerText))?.click()
-    for (let i = 0; i < 40 && ![...document.querySelectorAll('dt')].some((dt) => dt.innerText.trim() === 'Network'); i += 1) await new Promise((r) => setTimeout(r, 250))
-    const dt = [...document.querySelectorAll('dt')].find((d) => d.innerText.trim() === 'Network')
+    // Case-blind: the receipt's labels are drawn in capitals, and innerText reads them so.
+    for (let i = 0; i < 40 && ![...document.querySelectorAll('dt')].some((dt) => /^network$/i.test(dt.innerText.trim())); i += 1) await new Promise((r) => setTimeout(r, 250))
+    const dt = [...document.querySelectorAll('dt')].find((d) => /^network$/i.test(d.innerText.trim()))
     dt?.scrollIntoView({ block: 'center' })
     await new Promise((r) => setTimeout(r, 300))
     const dd = dt?.nextElementSibling
