@@ -28,6 +28,32 @@ const view = (reach: ReturnType<typeof runtimeReach>) =>
   teammateStatusView({ runtime: undefined, ...reach, hasRunningMission: false, pendingApprovals: 0, roleLabel: 'Docs & QA' })
 
 describe('a teammate before the agents on this machine are known', () => {
+  const pending: PublicRuntimeStatus = { ...runtime('opencode', false, true), status: 'probe-failed', checking: true }
+  const ownView = (own: PublicRuntimeStatus, others: readonly PublicRuntimeStatus[] = []) => teammateStatusView({
+    runtime: own, ...runtimeReach([own, ...others], true), hasRunningMission: false, pendingApprovals: 0, roleLabel: 'Docs & QA'
+  })
+
+  it('has no global blocked verdict while the only possible agent is still checking', () => {
+    expect(runtimeReach([pending, runtime('claude', false)], true)).toEqual({ anyRuntimeInstalled: true })
+    expect(view(runtimeReach([pending], true))).toMatchObject({ status: 'idle', activity: 'idle' })
+  })
+
+  it('keeps its pending own agent idle even when another agent is ready', () => {
+    expect(ownView(pending, [runtime('claude', true)])).toMatchObject({ status: 'idle', activity: 'idle', tone: 'muted' })
+  })
+
+  it('keeps a checked unusable own agent blocked while another check is pending', () => {
+    expect(ownView(runtime('claude', false), [pending])).toMatchObject({ status: 'blocked', activity: 'blocked', label: 'AI agent not installed' })
+    expect(ownView(runtime('claude', false, true), [pending])).toMatchObject({ status: 'blocked', activity: 'blocked', label: 'Sign-in needed' })
+  })
+
+  it('returns to idle when a late ready answer replaces a checked failure', () => {
+    const failed: PublicRuntimeStatus = { ...pending, checking: undefined }
+    expect(ownView(failed)).toMatchObject({ status: 'blocked', activity: 'blocked' })
+    expect(ownView(pending)).toMatchObject({ status: 'idle', activity: 'idle' })
+    expect(ownView(runtime('opencode', true))).toMatchObject({ status: 'idle', activity: 'idle' })
+  })
+
   it('is idle, not blocked, while discovery has not answered', () => {
     expect(runtimeReach([], false)).toEqual({})
     expect(view(runtimeReach([], false)).activity).toBe('idle')

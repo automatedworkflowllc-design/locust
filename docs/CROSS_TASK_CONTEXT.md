@@ -273,3 +273,18 @@ Entries since 2026-10-03, newest first. Earlier entries (2026-08-30 to
 - Not run: a live session with a broken config making app-server push a
   `configWarning`; no model calls.
 - Recommended next step: review and merge `exec/codex-warning` into main.
+
+## First-launch teammate faces (2026-10-05)
+
+- Branch: `exec/first-launch-blocked`. In renderer `status.ts`,
+  `runtimeReach` leaves the global unusable verdict unknown while any check
+  is pending, and `teammateStatusView` does not block on a pending own runtime.
+  Checked missing or signed-out runtimes still block; this does not make a
+  pending runtime usable for sending work.
+- Regression tests: `a-teammate-is-not-stuck-while-agents-are-still-being-found.test.ts`.
+  `_tools/control-first-launch-blocked.mjs` checks four deliberate regressions.
+- `_tools/drive-pet-puppets.mjs --startup-only` records fresh-start faces and
+  held discovery answers before `ready()`; `--observe-startup` also runs the
+  full puppet checks. Neither sends a turn. The normal drive is unchanged
+  unless an observation option is supplied.
+- Evidence and verification limits: `docs/REPORT-2026-10-05-first-launch-blocked.md`.

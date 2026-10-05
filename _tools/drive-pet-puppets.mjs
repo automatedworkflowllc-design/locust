@@ -6,7 +6,7 @@
 // puppets again; and a new teammate's look offers Bitty As drawn or Screen,
 // the choice kept through a relaunch.
 //
-//   node _tools/drive-pet-puppets.mjs [--packaged <exe>] [--tag <name>] [--out <dir>] [--pets <folder>]
+//   node _tools/drive-pet-puppets.mjs [--packaged <exe>] [--tag <name>] [--out <dir>] [--pets <folder>] [--observe-startup | --startup-only]
 //
 // Their sheets are their makers' (openpets.dev): never in this repository, and
 // so never in this drive's record either -- the record is kept outside it
@@ -17,7 +17,7 @@
 // out of it. Without a sheet on this computer, pick that pet once in Locust
 // (or run drive-pet-picks.mjs) first. Sends nothing.
 
-import { copyFile, mkdir, mkdtemp, stat } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -224,6 +224,53 @@ const idOf = (name) => `(async () => {
 let drive = await startDrive({ name: `pet-puppets-${tag}`, port: 9937, workspace, outPath: OUT, keep: true, seed, profilePath: profile, env: { CODEX_HOME: codexHome }, sendsNothing: true, ...(packaged === undefined ? {} : { packaged }) })
 let madeId = ''
 try {
+  if (process.argv.includes('--observe-startup') || process.argv.includes('--startup-only')) {
+    // ready() waits past discovery: record the pending answer and the face first.
+    const observeStartup = `(() => {
+      if (window.__launchSamples) return 'already observing'
+      window.__launchSamples = []
+      window.__launchRuntimes = []
+      window.__launchStarted = performance.now()
+      window.__launchTimer = setInterval(() => {
+        window.__launchSamples.push({ ms: Math.round(performance.now() - window.__launchStarted),
+          runtimes: window.__launchRuntimes,
+          faces: [...document.querySelectorAll('.lc-bot[data-teammate] canvas[data-face="pet"]')].map(c => ({
+            id: c.closest('[data-teammate]').dataset.teammate, state: c.dataset.petState, eyes: c.dataset.eyes
+          })) })
+      }, 50)
+      const read = async () => {
+        if (!window.desktop) return
+        const answer = await window.desktop.getLocalRuntimes()
+        if (answer.ok) window.__launchRuntimes = answer.data.runtimes.map(r => ({ id: r.id, checking: r.checking === true, ready: r.ready, status: r.status }))
+      }
+      window.__launchProbeTimer = setInterval(() => { void read() }, 250)
+      void read()
+      return 'observing'
+    })()`
+    await drive.send('Page.addScriptToEvaluateOnNewDocument', { source: observeStartup })
+    const startup = []
+    for (let tick = 0; tick < 120; tick += 1) {
+      await drive.evaluate(observeStartup)
+      await sleep(500)
+      const chunk = await drive.evaluate('JSON.stringify(window.__launchSamples?.splice(0) ?? [])')
+      if (typeof chunk === 'string') startup.push(...JSON.parse(chunk))
+      if (tick >= 39 && startup.some(s => s.runtimes.length > 0 && s.faces.length > 0)) break
+    }
+    await drive.evaluate('clearInterval(window.__launchTimer); clearInterval(window.__launchProbeTimer)')
+    if (!startup.some(s => s.runtimes.length > 0 && s.faces.length > 0)) throw new Error('No startup sample contains both a runtime answer and a face')
+    await writeFile(join(OUT, 'startup.json'), JSON.stringify(startup, null, 2) + '\n', 'utf8')
+    // A completed failure legitimately blocks. A retry of that known failure
+    // is not the first unanswered check: keep it out of this startup count.
+    const answeredAt = startup.findIndex(s => s.runtimes.some(r => r.id === FREE_ROUTE.runtime && !r.checking))
+    const unanswered = answeredAt < 0 ? startup : startup.slice(0, answeredAt)
+    const premature = unanswered.filter(s => s.runtimes.some(r => r.id === FREE_ROUTE.runtime && r.checking) && s.faces.some(f => f.state === 'failed'))
+    say('startup: ' + JSON.stringify({ samples: startup.length, firstAnswerMs: startup[answeredAt]?.ms, blockedBeforeFirstAnswer: premature.length, first: premature[0] }))
+    await drive.capture('First launch after observation', async () => JSON.stringify({ blockedBeforeFirstAnswer: premature.length }))
+    if (process.argv.includes('--startup-only')) {
+      await drive.finish({ intro: 'Fresh launch: pending discovery answers and teammate faces sampled every 50ms. No turn sent.', extra: `Blocked before own runtime first answered: ${premature.length} samples.` })
+      process.exit(0)
+    }
+  }
   await drive.ready()
   // An automated window is not the focused one; a face rightly holds still while the window is behind others.
   await drive.send('Emulation.setFocusEmulationEnabled', { enabled: true })

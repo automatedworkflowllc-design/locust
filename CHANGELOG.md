@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.647.0 - 2026-10-05
+
+### Fixed
+
+- **A first launch no longer shows every teammate stuck.** On a fresh install, while Locust was still checking which AI tools are on the computer, a teammate whose tool had not answered yet showed the stuck face, the one that means it has no AI tool it can use. On a slow first check that was every teammate, for many seconds. A teammate whose tool is still being checked now stays at rest, and shows stuck only once its tool has answered that it cannot run.
+
 ## 0.646.0 - 2026-10-05
 
 ### Fixed

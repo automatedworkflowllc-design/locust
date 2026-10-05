@@ -146,7 +146,13 @@ export function runtimeReach(
   known: boolean
 ): { readonly anyRuntimeUsable?: boolean; readonly anyRuntimeInstalled?: boolean } {
   if (!known) return {}
-  return { anyRuntimeUsable: runtimes.some(runtimeIsUsable), anyRuntimeInstalled: runtimes.some((entry) => entry.installed) }
+  const usable = runtimes.some(runtimeIsUsable)
+  // A partial sweep can prove that one works, but cannot prove none work yet.
+  const pending = runtimes.some((entry) => entry.checking === true)
+  return {
+    ...(usable || !pending ? { anyRuntimeUsable: usable } : {}),
+    anyRuntimeInstalled: runtimes.some((entry) => entry.installed)
+  }
 }
 
 /**
@@ -398,8 +404,10 @@ export function teammateStatusView(input: {
   readonly recentlyDone?: boolean
   readonly recentlyReceived?: boolean
 }): TeammateStatusView {
+  // A pending check proves neither a missing tool nor a sign-in wall.
+  const ownRuntimeBlocked = input.runtime !== undefined && input.runtime.checking !== true && !runtimeIsUsable(input.runtime)
   const activity = teammateActivity({
-    blocked: input.anyRuntimeUsable === false || (input.runtime !== undefined && !runtimeIsUsable(input.runtime)),
+    blocked: input.anyRuntimeUsable === false || ownRuntimeBlocked,
     waitingOnYou: input.pendingApprovals > 0,
     live: input.hasRunningMission ? (input.liveActivity ?? 'working') : 'idle',
     recentlyDone: input.recentlyDone === true,
@@ -429,7 +437,7 @@ export function teammateStatusView(input: {
   // local state. One with no runtime AND no route is simply idle; see
   // `runtimeOfTeammate` for why "no missions yet" used to mean the same
   // thing and should not have.
-  if (input.runtime !== undefined && !runtimeIsUsable(input.runtime)) {
+  if (input.runtime !== undefined && ownRuntimeBlocked) {
     // Same distinction, for the teammate's OWN runtime: absent is not
     // unsigned. `installed` is the runtime's own answer, so this needs
     // nothing passed in.
