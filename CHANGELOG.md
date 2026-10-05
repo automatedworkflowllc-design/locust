@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.633.0 - 2026-10-05
+
+### Improved
+
+- **A teammate's face moves as one creature.** A screen face's thinking dots hold their place and the head does the looking, easing toward where it looks instead of darting about. Every change of state is one blink: the new eyes come in under the closed lids, and only then does the body answer.
+- **A face says how a teammate is doing.** Waiting on you, it watches you with its head tipped. A message arriving makes it look up. Finishing, its eyes flash green as it hops, then settle back to white. Stuck, it winces, `> <`. A screen face switches on like an old monitor the first time it appears, and its dots blink.
+- **A face at rest answers you.** It looks at you while it replies and listens while you type to it. Rest the pointer on a teammate's face and it looks at it. Now and then, while you are using Locust, a resting face has a moment of its own: a look aside, a content squint, a curious tilt, a doze. Behind other windows, after 45 seconds untouched, or with reduced motion on, no face moves on its own.
+- **Settings > Appearance shows what each face means.** "What a face says" walks one teammate through every face, each named under it. Click it for the next.
+
 ## 0.632.0 - 2026-10-05
 
 ### Improved

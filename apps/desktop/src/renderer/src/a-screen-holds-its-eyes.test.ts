@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { EYES_VISOR, GLYPH_SHAPES, MOUTH_VISOR, PHOSPHOR, glyphMotion, screenEyeLayout } from './components/Bot.js'
 import type { EyeGlyphs, VisorBox } from './components/Bot.js'
-import { phosphorFor } from './components/TeammateBot.js'
+import { flashFor, phosphorFor } from './components/TeammateBot.js'
 import type { FaceActivity } from './faceState.js'
 
 /**
@@ -16,7 +16,8 @@ import type { FaceActivity } from './faceState.js'
  * inside the screen's rounded rectangle, and the two eyes never touch.
  */
 
-const PAIRS: readonly EyeGlyphs[] = [['>', '▮'], ['•', '•'], ['^', '^'], ['x', 'x'], ['|', '|'], ['>', '_'], ['-', '-']]
+// `> <` and `o o` since 2026-10-05: the faces of stuck, and of eyes on you (eyeGlyphsFor).
+const PAIRS: readonly EyeGlyphs[] = [['>', '▮'], ['•', '•'], ['^', '^'], ['x', 'x'], ['>', '<'], ['o', 'o'], ['|', '|'], ['>', '_'], ['-', '-']]
 const LOOKS = [
   { x: 0, y: 0 },
   { x: 4.5, y: 0 },
@@ -58,12 +59,13 @@ describe('a screen holds its eyes', () => {
               const motion = glyphMotion(pair.join(''), eye, seconds)
               const [cx, cy] = centres[eye]
               const r = (shape.weight * scale) / 2
-              for (const line of shape.lines) {
-                for (let i = 0; i < line.length; i += 2) {
-                  const x = cx + ((line[i] ?? 0) * motion.sx + motion.dx) * scale
-                  const y = cy + ((line[i + 1] ?? 0) * motion.sy + motion.dy) * scale
-                  if (!inside(box, x, y, r) && outside.length < 5) outside.push(`${name} ${pair.join('')} look ${look.x},${look.y} t=${seconds.toFixed(2)} eye ${eye}: (${x.toFixed(2)}, ${y.toFixed(2)}) r ${r.toFixed(2)}`)
-                }
+              // Every point of every stroke, and of a ring all the way round (`o`, 2026-10-05).
+              const points: [number, number][] = shape.lines.flatMap((line) => Array.from({ length: line.length / 2 }, (_, i): [number, number] => [line[i * 2] ?? 0, line[i * 2 + 1] ?? 0]))
+              if (shape.ring !== undefined) for (let k = 0; k < 24; k += 1) points.push([shape.ring * Math.cos((k / 24) * Math.PI * 2), shape.ring * Math.sin((k / 24) * Math.PI * 2)])
+              for (const [px, py] of points) {
+                const x = cx + (px * motion.sx + motion.dx) * scale
+                const y = cy + (py * motion.sy + motion.dy) * scale
+                if (!inside(box, x, y, r) && outside.length < 5) outside.push(`${name} ${pair.join('')} look ${look.x},${look.y} t=${seconds.toFixed(2)} eye ${eye}: (${x.toFixed(2)}, ${y.toFixed(2)}) r ${r.toFixed(2)}`)
               }
             }
           }
@@ -98,7 +100,13 @@ describe('a screen holds its eyes', () => {
  * teammate". One terminal cyan for every teammate; colour then means a state.
  */
 describe('what a screen glows', () => {
-  it('is cyan at work, in thought and at rest; green done, amber waiting on you, red stuck', () => {
+  /*
+   * Done is the screen's own light, with a green flash (2026-10-05). Colin:
+   * "dont make the eye color lime please just white, if you want work that
+   * into a color change flash or something you can but not the entire static
+   * color".
+   */
+  it('is cyan at work, in thought, at rest and done; amber waiting on you, red stuck; green only as a flash when done', () => {
     const all: readonly FaceActivity[] = ['thinking', 'working', 'delegating', 'responding', 'waiting', 'receiving', 'blocked', 'done', 'idle']
     expect(Object.fromEntries(all.map((activity) => [activity, phosphorFor(activity)]))).toEqual({
       thinking: 'cyan',
@@ -108,8 +116,11 @@ describe('what a screen glows', () => {
       waiting: 'amber',
       receiving: 'cyan',
       blocked: 'red',
-      done: 'green',
+      done: 'cyan',
       idle: 'cyan'
+    })
+    expect(Object.fromEntries(all.map((activity) => [activity, flashFor(activity) ?? null]))).toEqual({
+      thinking: null, working: null, delegating: null, responding: null, waiting: null, receiving: null, blocked: null, done: 'green', idle: null
     })
   })
 

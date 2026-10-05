@@ -14,16 +14,27 @@ import { eyeGlyphsFor } from './components/TeammateBot.js'
  * (waiting on you). Looked at, drawn, at 96 and 32: _tools/look-glyph-eyes.mjs.
  */
 describe('the glyph each state wears', () => {
-  it('is a prompt and a block cursor at work, round eyes in thought, carets when done, crosses when stuck', () => {
+  /*
+   * A SCREEN SPEAKS ASCII (2026-10-05). Colin: "i was referring to the
+   * terminal eye text themselves being/involving ascii". Waiting on you and a
+   * message just in now wear `o o`, eyes on you (the amber ring alone spoke
+   * for waiting before); stuck is `> <`, the face of trying -- crosses read as
+   * dead more than stuck.
+   *
+   * AND `o o` AS IT TALKS TO YOU (2026-10-05). Colin: "we dont want them locked
+   * behind tool calls the user may never use". Answering, it wore the resting
+   * bars; now its eyes are on you while its reply comes in.
+   */
+  it('is a prompt and a block cursor at work, round eyes in thought, carets when done, `> <` when stuck, `o o` on you', () => {
     const all: readonly FaceActivity[] = ['thinking', 'working', 'delegating', 'responding', 'waiting', 'receiving', 'blocked', 'done', 'idle']
     expect(Object.fromEntries(all.map((activity) => [activity, eyeGlyphsFor(activity)?.join('') ?? 'own']))).toEqual({
       thinking: '••',
       working: '>▮',
       delegating: '>▮',
-      responding: 'own',
-      waiting: 'own',
-      receiving: 'own',
-      blocked: 'xx',
+      responding: 'oo',
+      waiting: 'oo',
+      receiving: 'oo',
+      blocked: '><',
       done: '^^',
       idle: 'own'
     })

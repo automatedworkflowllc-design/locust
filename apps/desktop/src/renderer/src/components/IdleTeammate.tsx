@@ -103,7 +103,8 @@ export function IdleTeammate({
   return (
     <div className="lc-empty">
       <div className="lc-empty__inner">
-        <TeammateBot hue={teammate.hue} avatar={teammate.avatar} size={56} />
+        {/* The face you are about to talk to: it listens as you type, and is itself meanwhile (faceLife.ts). */}
+        <TeammateBot hue={teammate.hue} avatar={teammate.avatar} size={56} teammateId={teammate.teammateId} hears />
         <h1>{teammate.name}</h1>
         <p>
           {roleLabelOf(teammate)}

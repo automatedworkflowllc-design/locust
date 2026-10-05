@@ -51,6 +51,7 @@ import { CliArtifacts } from './CliArtifacts.js'
 import { Bot } from './Bot.js'
 import type { EyeGlyphs } from './Bot.js'
 import { TeammateBot } from './TeammateBot.js'
+import { FaceLegend } from './FaceLegend.js'
 import { RuntimeMark } from './RuntimeMark.js'
 import { WhatLocustCanStop } from './WhatLocustCanStop.js'
 import { WHAT_LOCUST_CAN_STOP_LEDE } from '../../../shared/what-locust-can-stop.js'
@@ -2608,6 +2609,21 @@ export function SettingsScreen({
                 </button>
               ))}
             </div>
+          </div>
+        </section>
+        )}
+        {shownPage === 'appearance' && (
+        <section className="lc-settings__section lc-settings__section--line" data-setting="face-legend">
+          <div className="lc-settingline">
+            <div className="lc-settingline__text">
+              <h2 className="lc-settings__heading">What a face says</h2>
+              <p className="lc-settings__lede">
+                {terminalFaces
+                  ? "A teammate's face says what it is doing, and its eyes say it too. This one shows each in turn; click it for the next."
+                  : "A teammate's face says what it is doing. This one shows each in turn; click it for the next. With Terminal faces on, its eyes say it too."}
+              </p>
+            </div>
+            <FaceLegend />
           </div>
         </section>
         )}

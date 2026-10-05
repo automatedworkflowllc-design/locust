@@ -15,6 +15,12 @@ import { glyphMotion } from './components/Bot.js'
  *
  * A face is drawn at most 30 times a second (BOT_FRAMES_PER_SECOND), so the
  * loop is read at 30 a second, across two loops and both eyes.
+ *
+ * AND THEY NO LONGER DART (2026-10-05). The glances moved to the head
+ * (thinkingGlance, a-thinking-face-looks-with-its-head.test.ts): Colin, "the
+ * dots shouldnt move the screen should just rotate with the body". The dots
+ * hold their place while the face looks about, and the bounce is the fastest
+ * they ever move.
  */
 const CYCLE = 4.2
 const FRAME = 1 / 30
@@ -36,23 +42,26 @@ describe('the thinking dots', () => {
     }
   })
 
-  it('never move farther in one frame than a glance darts, at the face\'s 30 frames a second', () => {
-    // The fastest the loop means to move: a glance's dart, 3.2 across in a fifth of its third --
-    // the most either dot moves in any one frame's time while glancing, read every millisecond.
-    let dart = 0
-    for (let t = 0.0005; t < 2.1 - FRAME; t += 0.001) dart = Math.max(dart, step(0, t, t + FRAME), step(1, t, t + FRAME))
-    // Then the whole loop, twice, both eyes: nothing may move faster than that dart.
+  it('never move farther in one frame than the bounce does, at the face\'s 30 frames a second', () => {
+    // The fastest the loop means to move: the bounce, through the whole loader, read every tenth of a millisecond.
+    let bounce = 0
+    for (let t = 2.1; t < CYCLE - FRAME; t += 0.0001) bounce = Math.max(bounce, step(0, t, t + FRAME), step(1, t, t + FRAME))
+    expect(bounce).toBeGreaterThan(0.3)
+    // Then the whole loop, twice, both eyes: nothing may move faster than that bounce.
     for (const eye of [0, 1] as const) {
       for (let t = CYCLE * 0.5; t < CYCLE * 2.5; t += FRAME) {
-        expect(step(eye, t, t + FRAME), `eye ${String(eye)} at ${t.toFixed(3)} s`).toBeLessThanOrEqual(dart + 1e-9)
+        expect(step(eye, t, t + FRAME), `eye ${String(eye)} at ${t.toFixed(3)} s`).toBeLessThanOrEqual(bounce + 1e-9)
       }
     }
   })
 
-  it('still glance, then bounce in turn: the loop itself is kept', () => {
-    // Glancing: up and to either side within the first half.
-    const glancing = [0.5, 1.2, 1.9].map((t) => glyphMotion('••', 0, CYCLE * 3 + t))
-    expect(glancing.some((m) => m.dx < -1) && glancing.some((m) => m.dx > 1)).toBe(true)
+  it('hold still while the face looks about, then bounce in turn: the loop itself is kept', () => {
+    // Looking about: both dots where they rest, together, the whole first half.
+    for (let t = 0.001; t < 2.1; t += 0.01) {
+      const left = glyphMotion('••', 0, CYCLE * 3 + t)
+      expect(left).toEqual(glyphMotion('••', 1, CYCLE * 3 + t))
+      expect(left).toEqual(glyphMotion('••', 0, CYCLE * 3 + 0.5))
+    }
     // Bouncing: through the second half the two dots are at different heights, the right a beat behind the left.
     const apart = [2.3, 2.5, 2.7, 3.1, 3.3, 3.5].map((t) => Math.abs(glyphMotion('••', 0, CYCLE * 3 + t).dy - glyphMotion('••', 1, CYCLE * 3 + t).dy))
     expect(Math.max(...apart)).toBeGreaterThan(0.5)

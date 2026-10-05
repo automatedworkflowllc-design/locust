@@ -7817,6 +7817,8 @@ export default function App(): ReactElement {
                       teammateId={missionOwner.teammateId}
                       activity={workroomOwnerView?.activity ?? 'idle'}
                       hopsWhenDone={false}
+                      // The face you are typing to: it listens (faceLife.ts).
+                      hears
                       /*
                        * The dot comes from the same status as the face.
                        *
