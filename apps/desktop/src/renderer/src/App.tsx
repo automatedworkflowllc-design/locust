@@ -203,7 +203,7 @@ import { homeRouteOf, isOwnRoute, modelDisplayName, rememberOwnModels, routeChro
 import { restoreNoticeLine } from './backupWords.js'
 import { FeedbackDialog } from './components/FeedbackDialog.js'
 import { conversationText } from './feedback.js'
-import { withMessageDelta } from '../../shared/messageFragments.js'
+import { withMessageDelta, withMessageDeltas } from '../../shared/messageFragments.js'
 import { setPlush, setTerminalFaces } from './botLook.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
 import type { Handoff } from './glances.js'
@@ -418,6 +418,14 @@ function applyMissionUpdate(run: LiveRunState, update: CodexMissionUpdate): Live
   // A scheduled routine that would not start has no run to belong to.
   if (update.kind === 'routine-blocked') return live
   if (update.kind === 'routine-recovery-changed') return live
+
+  if (update.kind === 'message-deltas') {
+    return {
+      ...live,
+      events: cappedLiveEvents(withMessageDeltas(live.events, update.events, LIVE_EVENT_CAP)),
+      phase: live.phase === 'starting' ? 'running' : live.phase
+    }
+  }
 
   /*
    * The cap is on THINGS THAT HAPPENED, and a reply is one of them.
@@ -2796,14 +2804,10 @@ export default function App(): ReactElement {
       /*
        * Deltas land once per FRAME, not once per token.
        *
-       * Each update is its own IPC message and so its own task, and React
-       * batches within a task, not across them -- so every `message.delta`
-       * was a full re-render of the thread, and a burst of twenty read as
-       * twenty jolts. Colin, 2026-09-10: "the text seems to come out rather
-       * aggressively or glitchy." Claude Code's own renderer coalesces; this
-       * is that. Only deltas are held; anything else flushes at once with
-       * whatever was ahead of it, so order never changes and a run finishing
-       * is never a frame late. See streamFrames.ts.
+       * Legacy single deltas still use the frame queue. The mission host
+       * already coalesces message-deltas; apply that batch in one update
+       * immediately, without adding another frame to its delivery deadline.
+       * Activity flushes anything ahead of it. See streamFrames.ts.
        */
       // Only an update that belongs to a run goes to a run. The kinds without
       // a runId were all handled and returned above; this is the same fact

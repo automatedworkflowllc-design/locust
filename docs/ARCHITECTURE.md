@@ -152,6 +152,15 @@ issues rather than disappearing. What it is not: tamper evidence at rest. An
 edit made with the app closed reads back clean (`PROJECT.md` has said so since
 2026-08-31, and it is still so).
 
+Streaming text is held for up to 50 ms from the first fragment of a batch
+(`main/streamed-event-batches.ts`). Activity and process exit flush it
+immediately. One append is in flight at a time, with bounded backpressure;
+each unchanged normalized event is still recorded separately in that append.
+Only after the fsync completes does the host send consecutive text fragments
+in one IPC message (`main/durable-event-updates.ts`). The renderer folds that
+batch in one state update, retaining append/replace semantics and the complete
+answer. A write failure stops the run without showing the unwritten batch.
+
 The schema is versioned, at 21 in this build, and every earlier version is
 read (`SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS`): a file's version is fixed by
 its header, and the comment above that list says why each number moved. Three

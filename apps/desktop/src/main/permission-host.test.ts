@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { request } from 'node:http'
 import { dirname } from 'node:path'
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { MissionApprovalRequest } from '../shared/ipc.js'
 import { bridgeConfig, connectorSummary, createPermissionHost, serverPrefixOf } from './permission-host.js'
@@ -61,6 +61,33 @@ function tokenOf(configPath: string): string {
 }
 
 describe('the permission host', () => {
+  it('refuses a Claude approval when its pending text cannot be written', async () => {
+    const { host, cards } = await hostWithCards()
+    const { configPath } = await host.register({ runId: 'run_stream', missionId: 'mission_stream', cwd: 'C:/work',
+      beforeApproval: async () => { throw new Error('disk full') } })
+    const answer = await post(host.port, { token: tokenOf(configPath), toolName: 'Read', input: {} })
+    expect(answer.behavior).toBe('deny')
+    expect(cards).toEqual([])
+  })
+
+  it('waits for pending text before raising a Claude approval and refuses one whose run ended while waiting', async () => {
+    const { host, cards } = await hostWithCards()
+    let release!: () => void
+    let entered = false
+    const flushing = new Promise<void>((resolve) => { release = resolve })
+    const { configPath } = await host.register({ runId: 'run_stream', missionId: 'mission_stream', cwd: 'C:/work', beforeApproval: async () => {
+      entered = true
+      await flushing
+    } })
+    const asked = post(host.port, { token: tokenOf(configPath), toolName: 'Read', input: { file_path: 'notes.md' } })
+    await vi.waitFor(() => { expect(entered).toBe(true) })
+    expect(cards).toEqual([])
+    await host.release('run_stream')
+    release()
+    expect((await asked).behavior).toBe('deny')
+    expect(cards).toEqual([])
+  })
+
   it('refuses a request that carries no token of ours, before reading anything else', async () => {
     const { host, cards } = await hostWithCards()
     const answer = await post(host.port, { token: 'not-ours', toolName: 'mcp__claude_ai_Robinhood__place_equity_order' })

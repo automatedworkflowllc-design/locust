@@ -49,7 +49,7 @@ export interface PermissionHost {
    * Prepare one run: mint its token, write its mcp.json, remember it. The
    * config path goes on the command line; nothing else leaves this process.
    */
-  register(run: { readonly runId: string; readonly missionId: string; readonly cwd: string | null }): Promise<{
+  register(run: { readonly runId: string; readonly missionId: string; readonly cwd: string | null; readonly beforeApproval?: () => Promise<void> }): Promise<{
     readonly configPath: string
     readonly toolName: string
   }>
@@ -67,6 +67,7 @@ interface Registered {
   readonly missionId: string
   readonly cwd: string | null
   readonly configDir: string
+  readonly beforeApproval?: () => Promise<void>
 }
 
 interface Pending {
@@ -212,6 +213,13 @@ export function createPermissionHost(options: {
     // only a process handed a token by this one is a run of ours.
     const registered = typeof asked.token === 'string' ? tokens.get(asked.token) : undefined
     if (registered === undefined) return deny('this request did not come from a Locust run.')
+    try {
+      await registered.beforeApproval?.()
+    } catch {
+      return deny('The run could not write its pending text, so this approval was refused.')
+    }
+    // A run may end while its last text is being fsynced. It no longer asks.
+    if (tokens.get(asked.token as string) !== registered) return deny('The run ended before the approval could be shown.')
     const toolName = typeof asked.toolName === 'string' && asked.toolName.length > 0 ? asked.toolName : 'a tool'
     const input = asked.input ?? {}
     // Which call is asking, as Claude Code names it: the thread finds the
@@ -309,7 +317,7 @@ export function createPermissionHost(options: {
         }),
         'utf8'
       )
-      tokens.set(token, { runId: run.runId, missionId: run.missionId, cwd: run.cwd, configDir })
+      tokens.set(token, { runId: run.runId, missionId: run.missionId, cwd: run.cwd, configDir, ...(run.beforeApproval === undefined ? {} : { beforeApproval: run.beforeApproval }) })
       byRun.set(run.runId, token)
       return { configPath, toolName: PERMISSION_TOOL_NAME }
     },
