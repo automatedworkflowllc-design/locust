@@ -1,6 +1,6 @@
 // A ready-made chain, from the template list to a finished run (2026-10-05).
 //
-//   node _tools/drive-chain-templates.mjs [--look-before] [--no-run] [--tag <name>]
+//   node _tools/drive-chain-templates.mjs [--look-before] [--no-run] [--tag <name>] [--packaged <exe>]
 //
 // Spends nothing: all three teammates are on the free OpenCode model
 // (LOCUST_FREE_MODEL picks another when one is down). The folder has a bug
@@ -28,6 +28,7 @@ const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.i
 const tag = arg('--tag') ?? 'local'
 const lookBefore = process.argv.includes('--look-before')
 const noRun = process.argv.includes('--no-run')
+const packaged = arg('--packaged')
 const OUT = join(recordRoot('a-chain-template-2026-10-05'), `${lookBefore ? 'before' : 'after'}-${tag}`)
 await mkdir(OUT, { recursive: true })
 
@@ -40,6 +41,7 @@ await git(['commit', '-q', '-m', 'cart'], workspace)
 const route = { ...FREE_ROUTE, mode: 'accept-edits' }
 const drive = await startDrive({
   name: `chain-templates-${tag}`, port: 9772, workspace, outPath: OUT, spends: false, keep: true,
+  ...(packaged === undefined ? {} : { packaged }),
   seed: {
     schemaVersion: 1,
     teammates: [
