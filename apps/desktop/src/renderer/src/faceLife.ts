@@ -97,7 +97,8 @@ export function useListening(hears: boolean): boolean {
 
 /** A face's own moment at rest: the eyes it shows, how it feels, where it looks, how long it lasts. */
 export interface IdleMoment {
-  readonly name: 'look' | 'content' | 'curious' | 'doze'
+  /** One of IDLE_MOMENTS' four, or a pet's own (petRoutines.ts: a short set of a lift). */
+  readonly name: string
   readonly eyes: EyeGlyphs
   readonly mood?: BotMood
   /** Its rig's state for the moment: a doze is the rig's own sleep. */
@@ -135,24 +136,29 @@ export function seeded(seed: number, count: number, salt = 0): number {
 }
 
 /** A face's `count`th moment: chosen by its seed, never the one it had last, a look to whichever side it picks. */
-export function momentFor(seed: number, count: number, last: IdleMoment['name'] | undefined): IdleMoment {
+export function momentFor(seed: number, count: number, last: string | undefined): IdleMoment {
   const choices = IDLE_MOMENTS.filter((moment) => moment.name !== last)
   const chosen = choices[Math.floor(seeded(seed, count, 1) * choices.length)] ?? IDLE_MOMENTS[0]
   if (chosen === undefined || chosen.glance === undefined) return chosen ?? { name: 'content', eyes: ['^', '^'], mood: 'glad', seconds: 1.6 }
   return { ...chosen, glance: { ...chosen.glance, x: seeded(seed, count, 2) < 0.5 ? -1 : 1 } }
 }
 
+/** How a face picks its `count`th moment, given the last it had: momentFor, or a pet's own (petRoutines.ts's buddyMoment). */
+export type MomentPick = (seed: number, count: number, last: string | undefined) => IdleMoment
+
 /**
  * The moment a resting face is having now, or undefined: one now and then,
  * `every` seconds apart give or take, while `enabled` and the app is awake
  * (useAwake). The first comes a gap after the face is at rest, never as it
- * gets there.
+ * gets there. `pick` chooses each (read when it is chosen).
  */
-export function useIdleMoment(enabled: boolean, seed: number, every: readonly [number, number]): IdleMoment | undefined {
+export function useIdleMoment(enabled: boolean, seed: number, every: readonly [number, number], pick: MomentPick = momentFor): IdleMoment | undefined {
   const awake = useAwake()
   const [moment, setMoment] = useState<IdleMoment | undefined>(undefined)
   const count = useRef(0)
-  const last = useRef<IdleMoment['name'] | undefined>(undefined)
+  const last = useRef<string | undefined>(undefined)
+  const picking = useRef(pick)
+  picking.current = pick
   const [least, most] = every
   useEffect(() => {
     if (!enabled || !awake) {
@@ -164,7 +170,7 @@ export function useIdleMoment(enabled: boolean, seed: number, every: readonly [n
       const at = count.current
       timer = setTimeout(
         () => {
-          const chosen = momentFor(seed, at, last.current)
+          const chosen = picking.current(seed, at, last.current)
           count.current = at + 1
           last.current = chosen.name
           setMoment(chosen)

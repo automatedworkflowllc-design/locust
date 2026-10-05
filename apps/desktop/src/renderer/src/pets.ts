@@ -5,6 +5,8 @@ import type { PublicPet } from '../../shared/ipc.js'
 import { PET_COLUMNS, PET_NEUTRAL } from '../../shared/pets.js'
 import type { PetRows } from '../../shared/pets.js'
 import { paintedBounds } from './botAnchors.js'
+import { screenFaceFor, screenFits } from './petScreens.js'
+import type { PetScreenFace } from './petScreens.js'
 
 /**
  * THE PETS THE WINDOW HAS READ (0.563): each pet's sheet, decoded once and
@@ -32,6 +34,12 @@ export interface PetAtlas {
    * ground (0.564: Reaper, Cabin, Dot): drawn with a faint light rim.
    */
   readonly dark: boolean
+  /**
+   * The screen it wears for a face, where its drawings have been measured for
+   * one and this is the sheet they were measured on (petScreens.ts): Codex
+   * Buddy's. Absent for every other pet, which keeps the face its maker drew.
+   */
+  readonly screen?: PetScreenFace
 }
 
 /** Below this mean brightness (0-1) of its painted pixels a pet is drawn with a rim. Measured 0.564: Reaper 0.08, Cabin 0.12, Dot and the Yeelight bot 0.20; the next darkest, Meowbot, 0.36 reads unaided. */
@@ -109,6 +117,19 @@ function restingOf(image: CanvasImageSource, rows: PetRows, frameWidth: number, 
   }
 }
 
+/** The screen measured for a pet of this id, when this sheet is the one it was measured on (petScreens.ts's screenFits). */
+function screenOf(image: ImageBitmap, id: string): PetScreenFace | undefined {
+  const face = screenFaceFor(id)
+  if (face === undefined || typeof document === 'undefined') return undefined
+  const canvas = document.createElement('canvas')
+  canvas.width = image.width
+  canvas.height = image.height
+  const context = canvas.getContext('2d', { willReadFrequently: true })
+  if (context === null) return undefined
+  context.drawImage(image, 0, 0)
+  return screenFits(face, context.getImageData(0, 0, image.width, image.height).data, image.width, image.height) ? face : undefined
+}
+
 const reading = new Set<string>()
 
 /** Reads a pet's sheet once; every face wearing it is told when it is ready, or missing. */
@@ -129,7 +150,11 @@ export async function ensurePet(ref: PetRef): Promise<void> {
     const image = await createImageBitmap(new Blob([new Uint8Array(bytes)], { type: 'image/webp' }))
     const frameWidth = image.width / PET_COLUMNS
     const frameHeight = image.height / rows
-    looks.set(key, { status: 'ready', atlas: { image, rows, frameWidth, frameHeight, ...restingOf(image, rows, frameWidth, frameHeight) } })
+    const screen = screenOf(image, ref.id)
+    looks.set(key, {
+      status: 'ready',
+      atlas: { image, rows, frameWidth, frameHeight, ...restingOf(image, rows, frameWidth, frameHeight), ...(screen === undefined ? {} : { screen }) }
+    })
   } catch {
     // It read and would not draw: the last word on a sheet is the window's own decode.
     looks.set(key, { status: 'missing', reason: 'Its sheet is on this computer but would not draw.' })

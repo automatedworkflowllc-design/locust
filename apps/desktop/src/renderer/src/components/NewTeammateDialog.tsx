@@ -351,7 +351,10 @@ export function NewTeammateDialog({
    * is neither, picked as a bot is picked. A pet keeps its own face, so the Eyes / Mouth / Screen
    * choice steps aside while one is worn, and the colour swatches become
    * plain colours: the colour still marks the teammate, it does not tint the
-   * pet.
+   * pet. A pet whose drawings were measured for a screen (2026-10-05,
+   * petScreens.ts: Codex Buddy) has a choice of its own in its place: the face
+   * its maker drew, or the screen -- offered as a bot's screen is, while
+   * Terminal faces is on.
    */
   const { pets, removed: removedPets } = usePetList()
   const wornPet: PetRef | undefined = avatar.pet
@@ -568,6 +571,38 @@ export function NewTeammateDialog({
                         }
                       >
                         {face === 'eyes' ? 'Eyes' : face === 'mouth' ? 'Mouth' : 'Screen'}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+              {wornPet !== undefined && wornLook?.status === 'ready' && wornLook.atlas.screen !== undefined && (
+                <div className="lc-lookface" role="radiogroup" aria-label="Face">
+                  {(['drawn', 'screen'] as const).map((face) => {
+                    const off = face === 'screen' && !terminal
+                    const chosen = face === 'screen' ? terminal && wornPet.screen !== false : !terminal || wornPet.screen === false
+                    return (
+                      <button
+                        key={face}
+                        type="button"
+                        role="radio"
+                        aria-checked={chosen}
+                        className={chosen ? 'is-selected' : undefined}
+                        disabled={off}
+                        title={
+                          off
+                            ? 'Turn Terminal faces on in Settings > Appearance to give a teammate a screen.'
+                            : face === 'drawn'
+                              ? 'The face its maker drew.'
+                              : 'A screen whose eyes say what it is doing.'
+                        }
+                        onClick={() =>
+                          setAvatar((current) =>
+                            current.pet === undefined ? current : { ...current, pet: { source: current.pet.source, id: current.pet.id, screen: face === 'screen' } }
+                          )
+                        }
+                      >
+                        {face === 'drawn' ? 'As drawn' : 'Screen'}
                       </button>
                     )
                   })}
