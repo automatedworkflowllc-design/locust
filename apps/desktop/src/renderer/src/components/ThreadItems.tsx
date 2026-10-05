@@ -885,7 +885,7 @@ export function LiveRegisterLine({
   const aside = [action === undefined ? trimmed : undefined, detail].filter((part) => part !== undefined && part.length > 0)
   return (
     <>
-      <span className="lc-livestep__label">
+      <span className="lc-livestep__label" title={[headline, ...aside].join(' · ')}>
         <span className="lc-livestep__register">
           {/*
             * `data-orb` IS THE SEAM, and the library's `aria-label` is not.
@@ -962,12 +962,25 @@ export function LiveRegisterLine({
           )}
         </span>
       </span>
-      {/* The clock sits beside the words, not at the far edge: "using a tool ·
-          read_file · 57s" reads as one statement about what is happening. */}
-      <span className="lc-rail__meta lc-livestep__meta">
-        {aside.map((part) => `${String(part)} · `)}
-        {elapsed.label}
-      </span>
+      {/*
+        * THE CLOCK SITS RIGHT AFTER THE WORDS, AND THE NOTE COMES LAST (0.631).
+        *
+        * It was "using a tool · read_file · 57s", all in one span. In a narrow
+        * compare column that span ran into the next column, and when it was
+        * made to shrink it ellipsized from its end: the clock went first and
+        * a sliver of the note stayed ("acr… · np…"). Claude Code's own live
+        * line puts the time right after the verb; here too, so the clock
+        * never moves when the note changes and never gives way. The note
+        * shows when there is room for it to say something and not at all
+        * when there is not (the note's box in shell.css), and the words
+        * ellipsize only when they alone do not fit.
+        */}
+      <span className="lc-rail__meta lc-livestep__clock">{elapsed.label}</span>
+      {aside.length > 0 && (
+        <span className="lc-rail__meta lc-livestep__note">
+          <span className="lc-livestep__meta">{aside.map((part) => String(part)).join(' · ')}</span>
+        </span>
+      )}
     </>
   )
 }

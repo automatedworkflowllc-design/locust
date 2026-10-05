@@ -53,7 +53,7 @@ const check = (what, ok, detail) => {
 // The thread as a reader meets it: each thing said, each step line, the live line, the foot.
 const ORDER = `(() => [...document.querySelectorAll('.lc-thread .lc-agentline__body, .lc-thread .lc-livestep, .lc-thread .lc-turnfoot')]
   .map((el) => el.classList.contains('lc-turnfoot') ? 'FOOT'
-    : el.classList.contains('lc-livestep') ? 'LIVE ' + el.innerText.replace(/\\s+/g, ' ').trim().replace(/\\d+s$/, '').slice(0, 40)
+    : el.classList.contains('lc-livestep') ? 'LIVE ' + el.innerText.replace(/\\s+/g, ' ').trim().replace(/(^| )(\\d+m )?\\d+s( |$)/, ' ').trim().slice(0, 40)
     : el.querySelector('.lc-steps__line') ? 'STEPS ' + el.querySelector('.lc-steps__line').innerText.replace(/\\s+/g, ' ').trim() + ' rows=' + String(el.querySelectorAll('.lc-steps__list .lc-filerow').length) + ' open=' + String(el.querySelector('.lc-steps__line').getAttribute('aria-expanded'))
     // A reply still arriving carries the caret (0.581: the live line stays under it).
     : (el.querySelector('.lc-caret') ? 'SAYING ' : 'SAID ') + el.innerText.replace(/\\s+/g, ' ').trim().slice(0, 50))
