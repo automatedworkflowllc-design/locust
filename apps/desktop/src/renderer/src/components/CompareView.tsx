@@ -8,13 +8,14 @@ import type { ThreadItem } from '../missionView.js'
 import { InComparisonCell, PinnedPagesContext } from '../pinnedPages.js'
 import { PagePreview } from './DocPreview.js'
 import { ApprovalCard } from './ApprovalCard.js'
-import type { MissionApprovalDecision, MissionApprovalRequest } from '../../../shared/ipc.js'
+import type { MissionApprovalDecision, MissionApprovalRequest, MissionMode } from '../../../shared/ipc.js'
 import { Icon } from './Icon.js'
 import { ChevronGlyph } from './ChatGlyphs.js'
 import { RuntimeMark } from './RuntimeMark.js'
 import { ThreadItems } from './Thread.js'
 import { WorkingSpark } from './WorkingSpark.js'
 import type { CompareRecordRow } from '../compareRecord.js'
+import { keptSentence } from '../status.js'
 
 /**
  * COMPARE, SIDE BY SIDE (0.441, shared/compare.ts,
@@ -81,6 +82,7 @@ export function CompareView({
   owner,
   workspacePath,
   keeping,
+  conversationMode,
   retrying,
   problem,
   onKeep,
@@ -108,6 +110,8 @@ export function CompareView({
   readonly workspacePath: string | undefined
   /** A keep is under way: no second one. */
   readonly keeping: boolean
+  /** The mode the conversation is in (the chat box's own): what the kept sentence says it carries on in. */
+  readonly conversationMode?: MissionMode
   /** The column being asked again, while it is being started. */
   readonly retrying: CompareSlotId | undefined
   /** What the last keep could not do, said in the bar. */
@@ -185,7 +189,7 @@ export function CompareView({
                         compare.slots.some((column) => column.route.mode === 'auto') ? ' On Auto, a model can still change files outside its copy if it is asked to.' : ''
                       }`
               }`
-            : `You kept ${keptName ?? 'one'}; the conversation carries on with it.`}
+            : keptSentence(keptName, conversationMode, compare.slots.find((column) => column.slot === kept)?.route.mode)}
         </span>
         {problem !== undefined && <span className="lc-compare__problem" role="status">{problem}</span>}
         {onBack !== undefined && (

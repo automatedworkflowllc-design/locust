@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.622.0 - 2026-10-05
+
+### Fixed
+
+- **Keeping a comparison's answer no longer puts your folder in Auto.** A comparison can run in Auto, each model working in its own copy of your folder. When you kept one, the conversation carried on with that model, and opening it read Auto back from the comparison's record, so your next message could run in Auto in your real folder without you choosing it. Keep now carries the model and the effort it ran at; the mode stays your chat box's own, and the bar says which: "You kept Sonnet 5.5 · Max; the conversation carries on with it in Edit, not in Auto as the comparison did, in copies of your folder."
+
 ## 0.621.0 - 2026-10-05
 
 ### Changed

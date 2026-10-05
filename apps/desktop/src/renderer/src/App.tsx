@@ -197,7 +197,7 @@ import { splitAttachments, withAttachments } from '../../shared/attachments.js'
 // Only `heldFor`: this file has its own `ownerOf` for live runs, which is a
 // different question from who owns a recorded mission.
 import { conversationKeys, heldFor, routineOf } from './conversationList.js'
-import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeFacts, modeRunsOn, modesFor, modeUnavailableReason, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, runtimeReach, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, nextFreeModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
+import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, routeAfterKeep, effortIsInModelId, modelFamily, listedAsMission, modeFacts, modeRunsOn, modesFor, modeUnavailableReason, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, runtimeReach, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, nextFreeModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
 import { homeRouteOf, isOwnRoute, modelDisplayName, rememberOwnModels, routeChrome, routeModelName } from './routeName.js'
 import { restoreNoticeLine } from './backupWords.js'
 import { FeedbackDialog } from './components/FeedbackDialog.js'
@@ -4054,6 +4054,7 @@ export default function App(): ReactElement {
     if (!bridge) return
     setKeepingCompare(true)
     setCompareProblem(undefined)
+    const modeBeforeKeep = mode
     try {
       for (const column of compare.slots) {
         if (column.slot === slot) continue
@@ -4080,19 +4081,26 @@ export default function App(): ReactElement {
        * kept column's model is the one the conversation now continues on.
        */
       if (kept !== undefined) {
-        changeRoute({ runtime: kept.route.runtime as MissionRuntimeId, model: kept.route.model })
+        const carried = routeAfterKeep(kept.route, models)
+        changeRoute({ runtime: carried.runtime, model: carried.model })
         /*
          * ...AT ITS OWN EFFORT (0.612). Arena round 2's reveal, 2026-10-04: "You
          * kept Sonnet 5.5 · High; the conversation carries on with it", and the
          * chat box beneath it said Medium. changeRoute carries the CHAT BOX's
          * effort over to a new model, as a person's pick should; here the
          * effort that ran is the kept column's, so that is the one carried, by
-         * the same rule (the model's default when it does not offer it). The
-         * mode is not: a compare's Auto worked in copies, and the conversation
-         * goes on in the folder itself, at the chat box's own mode.
+         * the same rule (the model's default when it does not offer it).
          */
-        const keptFamily = modelFamily(models, kept.route.runtime as MissionRuntimeId, kept.route.model)
-        setEffort(effortAfterRouteChange(kept.route.effort, keptFamily?.supportedEfforts ?? [], keptFamily?.defaultEffort))
+        setEffort(carried.effort)
+        /*
+         * ...BUT NOT ITS MODE (0.622). A compare's Auto worked in copies, and
+         * the conversation goes on in the folder itself, at the chat box's own
+         * mode. Opening the kept mission reads a mode back from its record
+         * (followRouteOf), and for a column that ran in Auto that is Auto: the
+         * real folder, switched silently. So the mode the person had when they
+         * pressed Keep is put back, and the bar says which one it is.
+         */
+        setMode(modeBeforeKeep)
       }
       setComparingId(undefined)
     } finally {
@@ -7562,6 +7570,7 @@ export default function App(): ReactElement {
                   owner={pickedTeammate}
                   workspacePath={workspacePath}
                   keeping={keepingCompare}
+                  conversationMode={mode}
                   retrying={retryingCompare}
                   {...(compareProblem === undefined ? {} : { problem: compareProblem })}
                   onKeep={(slot) => void keepCompareColumn(comparing, slot)}
