@@ -2093,6 +2093,12 @@ export interface PublicRuntimeStatus {
   readonly status: RuntimeProbeStatus
   /** Antigravity runs through Antigravity CLI rather than its app (0.541). */
   readonly throughCli?: true
+  /**
+   * Installed, and its check has not finished: the sweep went on without it so
+   * no slow agent holds the first screen. Not signed out, not missing -- its
+   * answer arrives by itself.
+   */
+  readonly checking?: true
   /** What an Agent Client Protocol agent said it can do, at its last run (W12, 0.566). */
   readonly agentCapabilities?: PublicAgentCapabilities
 }

@@ -87,6 +87,8 @@ export type RuntimeDiagnosticCode =
    * the route while the reason it is only a best guess stays on the record.
    */
   | "readiness-unverifiable"
+  /** Installed, and the check that says more has not finished; shown as such, never as signed out. */
+  | "check-pending"
   | "version-probe-failed"
   | "version-unrecognized"
   | "capability-probe-failed"

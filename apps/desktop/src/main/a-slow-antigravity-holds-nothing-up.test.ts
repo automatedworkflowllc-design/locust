@@ -5,7 +5,6 @@ import { join } from 'node:path'
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { besideTheOthers } from './antigravity-beside.js'
 import { createAntigravityHostProbe } from './antigravity-host.js'
 import { listsItsModelsButListedNone } from './model-catalog.js'
 
@@ -125,70 +124,7 @@ describe("Antigravity's own check", () => {
     expect(pending.readiness).toBe('unknown')
     expect(pending.executable?.commandName).toBe('agy')
     expect(JSON.stringify(pending.diagnostics)).not.toMatch(/sign/i)
-  })
-})
-
-describe('the sweep and Antigravity', () => {
-  const others = [record('ready', 'codex'), record('authentication-required', 'gemini')]
-
-  it('goes on without a hung Antigravity: the others are exactly what they were, and Antigravity reads as not answered yet', async () => {
-    const late: RuntimeDiscovery[] = []
-    const pending = record('unknown')
-    const started = Date.now()
-    const swept = await besideTheOthers(Promise.resolve(others), new Promise<RuntimeDiscovery | undefined>(() => undefined), {
-      pending: () => pending,
-      late: (answer) => late.push(answer)
-    })
-    expect(Date.now() - started).toBeLessThan(1_000)
-    expect(swept.others).toBe(others)
-    expect(swept.antigravity).toBe(pending)
-    expect(swept.leftBehind).toBe(true)
-    expect(late).toEqual([])
-  })
-
-  it('does not slow the others down: their answer arrives when theirs does, whatever Antigravity is doing', async () => {
-    let finishOthers: (value: readonly RuntimeDiscovery[]) => void = () => undefined
-    let answerAntigravity: (value: RuntimeDiscovery) => void = () => undefined
-    const swept = besideTheOthers(
-      new Promise<readonly RuntimeDiscovery[]>((resolve) => { finishOthers = resolve }),
-      new Promise<RuntimeDiscovery | undefined>((resolve) => { answerAntigravity = resolve }),
-      { pending: () => record('unknown'), late: () => undefined }
-    )
-    let done = false
-    void swept.then(() => { done = true })
-    await new Promise((resolve) => setTimeout(resolve, 20))
-    expect(done).toBe(false)
-    finishOthers(others)
-    await swept
-    expect(done).toBe(true)
-    answerAntigravity(record('ready'))
-  })
-
-  it('hands over what Antigravity answers after the sweep has gone on, and only that', async () => {
-    const late: RuntimeDiscovery[] = []
-    let answerAntigravity: (value: RuntimeDiscovery) => void = () => undefined
-    const swept = await besideTheOthers(Promise.resolve(others), new Promise<RuntimeDiscovery | undefined>((resolve) => { answerAntigravity = resolve }), {
-      pending: () => record('unknown'),
-      late: (answer) => late.push(answer)
-    })
-    expect(late).toEqual([])
-    const real = record('ready')
-    answerAntigravity(real)
-    await new Promise((resolve) => setTimeout(resolve, 0))
-    expect(late).toEqual([real])
-    expect(swept.others).toBe(others)
-  })
-
-  it('uses its answer when it was already in by the time the others were, and tells nobody later', async () => {
-    const late: RuntimeDiscovery[] = []
-    const real = record('ready')
-    const swept = await besideTheOthers(new Promise<readonly RuntimeDiscovery[]>((resolve) => setTimeout(() => resolve(others), 20)), Promise.resolve(real), {
-      pending: () => record('unknown'),
-      late: (answer) => late.push(answer)
-    })
-    expect(swept.antigravity).toBe(real)
-    expect(swept.leftBehind).toBe(false)
-    expect(late).toEqual([])
+    expect(pending.diagnostics?.map((note) => note.code)).toEqual(['check-pending'])
   })
 })
 

@@ -53,6 +53,13 @@ interface IntegrationDefinition {
   readonly readyWhen?: (result: CommandResult) => boolean;
   /** A command that prints the runtime's model list, run only once it is ready. */
   readonly modelsArgs?: readonly string[];
+  /**
+   * The model list command also says whether the runtime is ready (OpenCode:
+   * the list it prints IS the readiness answer), so when it is asked, the
+   * plain readiness command is asked only if the list did not answer. One
+   * process start where there were two.
+   */
+  readonly listAnswersReadiness?: true;
   /** How that list is read. Each CLI prints its own shape; none is guessed. */
   readonly parseModels?: (text: string) => RuntimeModelHints | undefined;
   /**
@@ -174,6 +181,15 @@ const DEFINITIONS: readonly IntegrationDefinition[] = [
     // The verbose form carries each model's variants, its reasoning efforts
     // (A6.5). The plain listing above still stands in if it cannot be read.
     modelsArgs: ["models", "--verbose"],
+    /*
+     * ONE `opencode` START, NOT TWO (2026-10-05). The plain `models` (readiness)
+     * and `models --verbose` (the same ids, with each model's efforts) were
+     * both spawned at every sweep, and each start opens OpenCode's whole
+     * runtime: 1.8-2.5 s alone on Colin's machine, 4-11 s beside eight other
+     * probes. The verbose list names every id the plain one does, so its answer
+     * is the readiness answer too; the plain command runs only if it did not.
+     */
+    listAnswersReadiness: true,
     parseModels: parseOpenCodeModelList,
     requiredFeatures: OPENCODE_REQUIRED_FEATURES,
     readyWhen: (result) =>
@@ -540,6 +556,29 @@ export async function missingCredentials(
   }
 }
 
+function notInstalled(definition: IntegrationDefinition): RuntimeDiscovery {
+  return {
+    id: definition.id,
+    kind: definition.kind,
+    displayName: definition.displayName,
+    optional: definition.optional,
+    availability: "unavailable",
+    readiness: "unknown",
+    supportedFeatures: [],
+    requiredFeatures: definition.requiredFeatures,
+    diagnostics: [
+      diagnostic({
+        code: "executable-not-found",
+        severity: definition.optional ? "info" : "warning",
+        message: `${definition.displayName} was not found on PATH.`,
+        resolution: definition.optional
+          ? "Install and enable it only if you want this optional route."
+          : `Install ${definition.displayName} and make its official CLI available on PATH.`,
+      }),
+    ],
+  };
+}
+
 async function discoverOne(
   definition: IntegrationDefinition,
   runner: CommandRunner,
@@ -550,28 +589,7 @@ async function discoverOne(
   readinessFromVersion: boolean,
 ): Promise<RuntimeDiscovery> {
   const executable = await locator.find(definition.commandName);
-  if (!executable) {
-    return {
-      id: definition.id,
-      kind: definition.kind,
-      displayName: definition.displayName,
-      optional: definition.optional,
-      availability: "unavailable",
-      readiness: "unknown",
-      supportedFeatures: [],
-      requiredFeatures: definition.requiredFeatures,
-      diagnostics: [
-        diagnostic({
-          code: "executable-not-found",
-          severity: definition.optional ? "info" : "warning",
-          message: `${definition.displayName} was not found on PATH.`,
-          resolution: definition.optional
-            ? "Install and enable it only if you want this optional route."
-            : `Install ${definition.displayName} and make its official CLI available on PATH.`,
-        }),
-      ],
-    };
-  }
+  if (!executable) return notInstalled(definition);
 
   const diagnostics: RuntimeDiagnostic[] = [];
   /*
@@ -625,15 +643,27 @@ async function discoverOne(
     readinessFromVersion
     || (definition.readinessArgs.length === definition.versionArgs.length
       && definition.readinessArgs.every((arg, index) => arg === definition.versionArgs[index]));
+  const listedAsked: Promise<ProbeOutcome> | undefined =
+    definition.modelsArgs === undefined || sameCommand
+      ? undefined
+      : runProbe(runner, executable, "models", definition.modelsArgs);
+  const readinessAsked: Promise<ProbeOutcome> = readinessIsVersion
+    ? versionAsked
+    : definition.listAnswersReadiness === true && listedAsked !== undefined
+      // The list is the answer when it passes the same test the plain command would.
+      ? listedAsked.then((outcome) =>
+          succeeded(outcome) && (definition.readyWhen?.(outcome.result) ?? true)
+            ? outcome
+            : runProbe(runner, executable, "readiness", definition.readinessArgs),
+        )
+      : runProbe(runner, executable, "readiness", definition.readinessArgs);
   const [versionOutcome, capabilityOutcome, readinessOutcome, listedOutcome] = await Promise.all([
     versionAsked,
     remembered === undefined
       ? runProbe(runner, executable, "capabilities", definition.capabilityArgs)
       : Promise.resolve({ result: { stdout: remembered.capabilityText, stderr: "", exitCode: 0 } } as ProbeOutcome),
-    readinessIsVersion ? versionAsked : runProbe(runner, executable, "readiness", definition.readinessArgs),
-    definition.modelsArgs === undefined || sameCommand
-      ? Promise.resolve(undefined)
-      : runProbe(runner, executable, "models", definition.modelsArgs),
+    readinessAsked,
+    listedAsked ?? Promise.resolve(undefined),
   ]);
   const combinedVersionOutput = succeeded(versionOutcome)
     ? `${versionOutcome.result.stdout}\n${versionOutcome.result.stderr}`
@@ -868,6 +898,11 @@ export interface DiscoverInstalledRuntimesOptions {
    */
   readonly only?: ReadonlySet<string>;
   /**
+   * Do not ask these: a check for them is already going, and a second one
+   * beside it would start the same CLI twice.
+   */
+  readonly skip?: ReadonlySet<string>;
+  /**
    * What the binaries said last time, so a file that has not changed is not
    * asked its version and its help text again. Absent means ask everything,
    * which is what every caller but the app wants.
@@ -904,10 +939,46 @@ export interface DiscoverInstalledRuntimesOptions {
 export async function discoverInstalledRuntimes(
   options: DiscoverInstalledRuntimesOptions,
 ): Promise<readonly RuntimeDiscovery[]> {
+  return Promise.all(discoverInstalledRuntimesEach(options).map((check) => check.result));
+}
+
+/**
+ * One runtime's check, as it is going.
+ *
+ * `discoverInstalledRuntimes` answers when the SLOWEST runtime has, which made
+ * every launch as slow as OpenCode (measured 2026-10-05: 4-11 s, with the
+ * sweep, the first screen and every start behind it). A caller that will not
+ * wait for the slowest asks for the checks themselves: each is its own promise,
+ * and a runtime that has not answered can still be SHOWN -- installed, being
+ * checked -- because the one cheap step, finding the executable, is already done.
+ */
+export interface RuntimeCheck {
+  readonly id: RuntimeIntegrationId;
+  /** The runtime's answer, exactly as `discoverInstalledRuntimes` would carry it. */
+  readonly result: Promise<RuntimeDiscovery>;
+  /**
+   * Settles when the executable has been looked for (a PATH search: tens of
+   * milliseconds), or when the whole check has. After it, `pending()` is true.
+   */
+  readonly located: Promise<void>;
+  /**
+   * What is known before the answer: installed (the file is there), nothing
+   * more. Never signed out, never missing for being slow -- the diagnostic
+   * says the check is still going. A runtime that is not installed has
+   * already answered, so this is only ever asked about one that is.
+   */
+  pending(): RuntimeDiscovery;
+}
+
+export function discoverInstalledRuntimesEach(
+  options: DiscoverInstalledRuntimesOptions,
+): readonly RuntimeCheck[] {
   const definitions = (options.includeOmniRoute === false
     ? DEFINITIONS.filter((definition) => definition.id !== "omniroute")
     : DEFINITIONS
-  ).filter((definition) => options.only === undefined || options.only.has(definition.id));
+  )
+    .filter((definition) => options.only === undefined || options.only.has(definition.id))
+    .filter((definition) => options.skip === undefined || !options.skip.has(definition.id));
   const stagger = options.staggerMs ?? 0;
   const credentialLookup: CredentialLookup = options.credentialLookup ?? {
     homeDirectory: homedir(),
@@ -948,7 +1019,7 @@ export async function discoverInstalledRuntimes(
    * finishes OR after the stagger, whichever comes first -- timed from when
    * that probe actually began.
    */
-  const found: Promise<RuntimeDiscovery>[] = [];
+  const checks: RuntimeCheck[] = [];
   let gate: Promise<void> = Promise.resolve();
   for (const definition of definitions) {
     const mine = gate;
@@ -956,8 +1027,24 @@ export async function discoverInstalledRuntimes(
     gate = new Promise<void>((resolve) => {
       openNext = resolve;
     });
-    found.push(
-      (async () => {
+    // What the PATH search found, kept so a check that is still going can be shown as installed.
+    let foundExecutable: ExecutableLaunch | undefined;
+    let markLocated: () => void = () => undefined;
+    const located = new Promise<void>((resolve) => {
+      markLocated = resolve;
+    });
+    const watchedLocator: ExecutableLocator = {
+      find: async (commandName) => {
+        try {
+          foundExecutable = await options.locator.find(commandName);
+          return foundExecutable;
+        } finally {
+          markLocated();
+        }
+      },
+    };
+    const result = (async () => {
+      try {
         await mine;
         // Before the spawn. A watcher told afterwards learns nothing it
         // could not have read from the result.
@@ -969,7 +1056,7 @@ export async function discoverInstalledRuntimes(
         const running = discoverOne(
           definition,
           options.runner,
-          options.locator,
+          watchedLocator,
           options.recall,
           statFile,
           credentialLookup,
@@ -989,8 +1076,38 @@ export async function discoverInstalledRuntimes(
         const discovery = await running;
         options.watch?.finished({ id: definition.id }, discovery);
         return discovery;
-      })(),
-    );
+      } finally {
+        // Never leave a caller waiting to learn where the file is.
+        markLocated();
+        openNext();
+      }
+    })();
+    checks.push({
+      id: definition.id,
+      result,
+      located,
+      pending: () =>
+        foundExecutable === undefined
+          ? notInstalled(definition)
+          : {
+              id: definition.id,
+              kind: definition.kind,
+              displayName: definition.displayName,
+              optional: definition.optional,
+              availability: "available",
+              readiness: "unknown",
+              executable: foundExecutable,
+              supportedFeatures: [],
+              requiredFeatures: definition.requiredFeatures,
+              diagnostics: [
+                diagnostic({
+                  code: "check-pending",
+                  severity: "info",
+                  message: `${definition.displayName} is installed and is still being checked.`,
+                }),
+              ],
+            },
+    });
   }
-  return Promise.all(found);
+  return checks;
 }

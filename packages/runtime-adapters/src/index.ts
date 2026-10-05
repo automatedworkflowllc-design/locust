@@ -9,7 +9,8 @@ export {
   detectSupportedFeatures,
   OMNIROUTE_REQUIRED_FEATURES,
 } from "./commands.js";
-export { discoverInstalledRuntimes } from "./discovery.js";
+export { discoverInstalledRuntimes, discoverInstalledRuntimesEach } from "./discovery.js";
+export type { RuntimeCheck } from "./discovery.js";
 export type { RuntimeBinaryFacts, RuntimeFactsCache, StatFile } from "./discovery.js";
 export {
   allowRuleFor,

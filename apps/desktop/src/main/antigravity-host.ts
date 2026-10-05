@@ -504,7 +504,7 @@ export function createAntigravityHostProbe(options: AntigravityProbeOptions = {}
       availability: installed ? 'available' : 'unavailable',
       readiness: 'unknown',
       ...(cli === undefined ? {} : { executable: { commandName: 'agy', discoveredPath: cli, executablePath: cli, prefixArgs: [], kind: 'native' } }),
-      diagnostics: [{ code: 'readiness-unverifiable', severity: 'info', message: 'Antigravity is still being checked.' }]
+      diagnostics: [{ code: 'check-pending', severity: 'info', message: 'Antigravity is still being checked.' }]
     } as RuntimeDiscovery
   }
 

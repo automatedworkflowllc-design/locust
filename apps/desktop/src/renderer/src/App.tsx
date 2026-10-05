@@ -2999,14 +2999,15 @@ export default function App(): ReactElement {
     askDiscoveryAgain.current = askAgain
     window.addEventListener('focus', onFocus)
     /*
-     * Antigravity's check never holds the sweep up (main/antigravity-beside.ts):
-     * if it answers after the sweep did, its row said "checking" until the
-     * 15-second re-check. The host says when it lands, and this asks once.
+     * No agent's check holds the sweep up (main/sweep-settle.ts): one that
+     * answers after the sweep did showed "checking" until the 15-second
+     * re-check. The host says when it lands, and this asks once -- only for a
+     * row that is waiting on exactly that answer.
      */
-    const stopAntigravityWatch =
+    const stopLateWatch =
       bridge.onDiscoveryEvent?.((event) => {
-        if (event.kind !== 'probe.finished' || event.id !== 'antigravity') return
-        if (known.length > 0 && unreadyRuntimes(known).includes('antigravity')) askAgain()
+        if (event.kind !== 'probe.finished') return
+        if (known.some((entry) => entry.id === event.id && entry.checking === true && entry.status !== 'ready')) askAgain()
       }) ?? (() => undefined)
 
     void bridge
@@ -3211,7 +3212,7 @@ export default function App(): ReactElement {
       active = false
       clearTimeout(firstRecheck)
       window.removeEventListener('focus', onFocus)
-      stopAntigravityWatch()
+      stopLateWatch()
       window.removeEventListener(SIGN_IN_OPENED_EVENT, onSignInOpened)
       stopSignInClosed()
       removeMissionListener()
