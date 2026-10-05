@@ -4901,9 +4901,33 @@ textarea {
 .lc-bot .lc-presence {
   right: var(--lc-bot-dot-right);
   bottom: var(--lc-bot-dot-bottom);
-  /* Anchored, the dot's CENTRE is the point: pulled back half its own size. */
-  transform: translate(var(--lc-bot-dot-shift), var(--lc-bot-dot-shift));
+  /* Anchored, the dot's CENTRE is the point: pulled back half its own size.
+     The `translate` property, not `transform`, so a pop's `transform: scale()`
+     grows it round that centre instead of carrying the pull-back with it. */
+  translate: var(--lc-bot-dot-shift) var(--lc-bot-dot-shift);
   z-index: 1;
+}
+
+/*
+ * THE DOT POPS WHEN IT CHANGES (2026-10-05). bloub's badge pops to 114%
+ * about 0.3 s in and settles; a teammate's dot does the same as its colour
+ * changes -- someone starts waiting on you, or finishes -- and never as a
+ * face merely appears (TeammateBot sets `is-new` only on a change).
+ */
+.lc-bot .lc-presence.is-new {
+  animation: lcPresencePop 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes lcPresencePop {
+  0% { transform: scale(0.4); opacity: 0; }
+  55% { transform: scale(1.14); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-bot .lc-presence.is-new {
+    animation: none;
+  }
 }
 
 /*
@@ -10794,6 +10818,40 @@ textarea {
 
 .lc-settings__section--line .lc-settings__more {
   margin: var(--lc-space-3) 0 0;
+}
+
+/*
+ * What a face says (2026-10-05, FaceLegend.tsx): one teammate going through
+ * its faces, each named under it, where the other lines keep their previews.
+ * As wide as its longest name, so the line never shifts as the names change.
+ */
+.lc-facelegend {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  margin-left: auto;
+  min-width: 112px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.lc-facelegend:focus-visible {
+  outline: 2px solid var(--lc-focus-ring);
+  outline-offset: 2px;
+}
+
+.lc-facelegend__name {
+  font-size: var(--lc-text-description);
+  line-height: 1.2;
+  color: var(--lc-text-secondary);
+  white-space: nowrap;
 }
 
 /* "How it works", said in sentence case like the rest of the page. */

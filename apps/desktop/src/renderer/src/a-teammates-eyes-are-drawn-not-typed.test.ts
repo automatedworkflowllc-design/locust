@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { EYES_VISOR, GLYPH_INK, GLYPH_SHAPES, PHOSPHOR, fitVisor, glyphMotion, hueOf, visorOutline, SCREEN_RESTING_EYES, eyeOpenness, frontPlane, outlineOf, sameHue, withGlyphEyes } from './components/Bot.js'
+import { EYES_VISOR, GLYPH_INK, GLYPH_SHAPES, PHOSPHOR, fitVisor, glyphMotion, hueOf, visorOutline, SCREEN_RESTING_EYES, eyeOpenness, frontPlane, outlineOf, sameHue, thinkingGlance, withGlyphEyes } from './components/Bot.js'
 import type { EyeGlyphs } from './components/Bot.js'
 import { eyeGlyphsFor } from './components/TeammateBot.js'
 import type { FaceActivity } from './faceState.js'
@@ -211,10 +211,11 @@ describe('eyes that are alive', () => {
   it('in thought, look up and about, then bounce in turn like a reply being typed', () => {
     const left = Array.from({ length: 126 }, (_, i) => glyphMotion('••', 0, 4.2 * 3 + i / 30))
     const right = Array.from({ length: 126 }, (_, i) => glyphMotion('••', 1, 4.2 * 3 + i / 30))
-    // Looking both ways, and up.
-    expect(Math.min(...left.map((m) => m.dx))).toBeLessThan(-1)
-    expect(Math.max(...left.map((m) => m.dx))).toBeGreaterThan(1)
-    expect(Math.min(...left.map((m) => m.dy))).toBeLessThan(-1)
+    // Looking both ways, and up: with the head now (2026-10-05, thinkingGlance), the dots holding their place.
+    const looks = Array.from({ length: 126 }, (_, i) => thinkingGlance(4.2 * 3 + i / 30)).filter((look) => look.mix > 0.99)
+    expect(Math.min(...looks.map((look) => look.yaw))).toBeLessThan(-0.2)
+    expect(Math.max(...looks.map((look) => look.yaw))).toBeGreaterThan(0.2)
+    expect(Math.min(...looks.map((look) => look.pitch))).toBeGreaterThan(0)
     // The bounce: the two dots are not level at the same moment.
     expect(left.some((m, i) => Math.abs(m.dy - (right[i]?.dy ?? 0)) > 0.6)).toBe(true)
     // And never a flat line: a round eye is only squashed so far.
@@ -227,8 +228,20 @@ describe('eyes that are alive', () => {
     }
   })
 
-  it('rest on a still bot, which is drawn at second 0', () => {
-    for (const pair of ['>▮', '••', '^^', 'xx', '||']) expect(glyphMotion(pair, 1, 0)).toEqual({ dx: 0, dy: 0, sx: 1, sy: 1, shown: true })
+  it('set off from where a still bot rests, second 0 of their state: a loop that starts never jumps (2026-10-05)', () => {
+    for (const pair of ['>▮', '••', '^^', 'xx', '><', 'cc', '||']) {
+      for (const eye of [0, 1] as const) {
+        const rest = glyphMotion(pair, eye, 0)
+        const away = glyphMotion(pair, eye, 0.0001)
+        expect(Math.hypot(away.dx - rest.dx, away.dy - rest.dy), `${pair} ${String(eye)}`).toBeLessThan(0.002)
+        expect(away.shown, `${pair} ${String(eye)}`).toBe(rest.shown)
+        // While a change is still opening the eyes on it, its state has not begun: the loop waits where it sets off.
+        expect(glyphMotion(pair, eye, -0.2)).toEqual(rest)
+      }
+    }
+    // At rest, lit, level and upright; the cursor where its typing starts.
+    for (const pair of ['••', '^^', 'xx', '><', 'cc', '||']) expect(glyphMotion(pair, 1, 0)).toMatchObject({ dx: 0, sx: 1, sy: 1, shown: true })
+    expect(glyphMotion('>▮', 1, 0)).toMatchObject({ dy: 0, sx: 1, sy: 1, shown: true })
   })
 
   it('stay small: a glyph never wanders off its eye', () => {

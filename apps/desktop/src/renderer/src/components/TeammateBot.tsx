@@ -1,17 +1,21 @@
+import { useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { BotAvatarState } from 'bot-avatars'
 
 import { botFor } from '../../../shared/avatar.js'
+import { MOMENT_EVERY, useIdleMoment, useListening } from '../faceLife.js'
+import type { IdleMoment } from '../faceLife.js'
 import type { FaceActivity } from '../faceState.js'
 import type { GlanceSide } from '../glances.js'
 import { petStateFor } from '../petMotion.js'
 import { usePetLook } from '../pets.js'
 import { Bot } from './Bot.js'
-import type { EyeGlyphs, Glance, Phosphor } from './Bot.js'
+import type { BotMood, EyeGlyphs, Glance, Phosphor } from './Bot.js'
 import { PetSprite } from './PetSprite.js'
 import { PRESENCE_TONE } from './PixelFace.js'
 import { RuntimeMark } from './RuntimeMark.js'
 import type { PixelFaceProps } from './PixelFace.js'
+import type { WindowPresence } from '../windowPresence.js'
 
 /**
  * A TEAMMATE, AS A BOT -- the face every surface draws since 0.277.
@@ -98,7 +102,8 @@ function kindOf(activity: FaceActivity): 'work' | 'alive' | 'finished' | 'still'
 export function botMotion(activity: FaceActivity, level: BotMotionLevel = 'subtle'): BotMotion {
   const kind = kindOf(activity)
   if (kind === 'finished') return { state: 'default', paused: false, jumpEvery: 0, bounces: false, hops: true }
-  if (level === 'full') return { state: kind === 'work' ? 'working' : 'default', paused: kind === 'still', bounces: false, hops: false }
+  // A face that keeps still never flips when something wakes it -- a glance, you, a moment of its own (faceLife.ts).
+  if (level === 'full') return { state: kind === 'work' ? 'working' : 'default', paused: kind === 'still', ...(kind === 'still' ? { jumpEvery: 0 } : {}), bounces: false, hops: false }
   return { state: 'default', paused: kind === 'still', jumpEvery: 0, bounces: kind === 'work', hops: false }
 }
 
@@ -154,6 +159,13 @@ export interface TeammateBotProps extends PixelFaceProps {
    * big enough for the mark to be a mark.
    */
   readonly runtime?: string
+  /**
+   * Listens while you type in the composer (faceLife.ts's useListening): the
+   * face of the conversation you are typing in, and no other.
+   */
+  readonly hears?: boolean
+  /** When its clock rests, where a surface rests by a rule of its own (Bot's motionPresence): the window's, otherwise. */
+  readonly motionPresence?: WindowPresence
 }
 
 /**
@@ -170,6 +182,22 @@ export interface TeammateBotProps extends PixelFaceProps {
  * work the prompt's cursor is a solid block, not an underscore; in thought the
  * eyes are round and wide open, looking up and about, then bouncing in turn
  * like a reply being typed (Bot.tsx glyphMotion).
+ *
+ * A SCREEN SPEAKS ASCII (2026-10-05). Colin, of the terminal eyes: "i was
+ * referring to the terminal eye text themselves being/involving ascii". The
+ * glyphs always were ASCII, drawn rather than typed (0.560); now they make the
+ * faces a terminal makes. Waiting on you it looks at you, `o o` -- the amber
+ * ring alone said it before, and now the face does too, its head tipped
+ * (BotMood). A message just in, the same wide eyes for the moment. Stuck is
+ * `> <`, the face of trying: crosses read as dead more than stuck.
+ *
+ * AND IT LOOKS AT YOU AS IT TALKS (2026-10-05). Colin: "we want the user to be
+ * able to see how much versatility the eyes have, we dont want them locked
+ * behind tool calls the user may never use". Answering you, a teammate's
+ * screen showed the resting bars, the one face it had that said nothing; and
+ * `o o` came only with an approval or a teammate's message. Now its eyes are
+ * on you while its reply comes in, as they are while you type to it
+ * (faceLife.ts): every exchange shows the faces it has.
  */
 export function eyeGlyphsFor(activity: FaceActivity): EyeGlyphs | undefined {
   switch (activity) {
@@ -181,7 +209,11 @@ export function eyeGlyphsFor(activity: FaceActivity): EyeGlyphs | undefined {
     case 'done':
       return ['^', '^']
     case 'blocked':
-      return ['x', 'x']
+      return ['>', '<']
+    case 'waiting':
+    case 'receiving':
+    case 'responding':
+      return ['o', 'o']
     default:
       return undefined
   }
@@ -189,13 +221,17 @@ export function eyeGlyphsFor(activity: FaceActivity): EyeGlyphs | undefined {
 
 /**
  * What a screen's eyes glow for each state (0.562): the terminal's cyan while
- * it works, thinks or idles; green when it is done, amber while it waits on
- * you (the ring's amber), red when it is stuck. See PHOSPHOR in Bot.tsx.
+ * it works, thinks or idles; amber while it waits on you (the ring's amber),
+ * red when it is stuck. See PHOSPHOR in Bot.tsx.
+ *
+ * DONE IS WHITE, WITH A GREEN FLASH (2026-10-05). Colin: "dont make the eye
+ * color lime please just white, if you want work that into a color change
+ * flash or something you can but not the entire static color". A finished
+ * teammate's eyes stay the screen's own light; the green comes as it
+ * finishes and fades back (flashFor, Bot's FLASH_S).
  */
 export function phosphorFor(activity: FaceActivity): Phosphor {
   switch (activity) {
-    case 'done':
-      return 'green'
     case 'waiting':
       return 'amber'
     case 'blocked':
@@ -205,9 +241,84 @@ export function phosphorFor(activity: FaceActivity): Phosphor {
   }
 }
 
+/** A colour a screen's eyes flash as a state arrives, fading to their own: green as it finishes. */
+export function flashFor(activity: FaceActivity): Phosphor | undefined {
+  return activity === 'done' ? 'green' : undefined
+}
+
+
+/**
+ * HOW IT FEELS, FOR WHAT IT IS DOING (2026-10-05, see BotMood). Waiting on
+ * you, the head tips to one side, curious; a message just in, it perks up;
+ * just finished, it smiles as it hops. The rest is said by its motion.
+ */
+export function moodFor(activity: FaceActivity): BotMood | undefined {
+  switch (activity) {
+    case 'waiting':
+      return 'curious'
+    case 'receiving':
+      return 'perked'
+    case 'done':
+      return 'glad'
+    default:
+      return undefined
+  }
+}
 
 /** Below this a badge is a speck: the mark is not drawn. */
 export const MARKED_FACE_MIN = 24
+
+/**
+ * From this size a face is a PRESENCE, the teammate itself (botSizes.ts):
+ * it notices you and has its moments. Below it, a mark beside a name, it
+ * keeps to saying who.
+ */
+export const PRESENCE_MIN = 28
+
+/** How long a pointer rests on a face before the face notices it: a pass across a list is not a visit. */
+export const NOTICE_DWELL_MS = 220
+
+/** What a face shows this moment, with the everyday life of a face at rest worn over what it is doing. */
+export interface EverydayFace {
+  readonly eyes: EyeGlyphs | undefined
+  readonly mood: BotMood | undefined
+  /** What it is doing, as a change it performs (Bot's blinkKey). */
+  readonly key: string
+  /** Its rig's state for the moment, where that is not its activity's. */
+  readonly state?: BotAvatarState
+  /** Where it looks for the moment (Bot's glance). */
+  readonly glance?: Glance
+  /** Moving though its activity would keep it still: it is answering you, or having a moment. */
+  readonly lively: boolean
+}
+
+/**
+ * A FACE AT REST ANSWERS YOU (2026-10-05, faceLife.ts). What a teammate is
+ * doing always wins: busy, stuck, waiting or done, it says so, and a pointer
+ * on it only turns its head to you. At rest, it answers you before anything
+ * of its own: pointed at, it is glad (`^ ^`, a smile on plastic, cyan: the
+ * green is the finish's); typed to, it listens (`o o`, its head lifted); and
+ * otherwise, now and then, it has a moment of its own (IDLE_MOMENTS).
+ */
+export function everydayFace(
+  activity: FaceActivity,
+  life: { readonly noticed: boolean; readonly listening: boolean; readonly moment: IdleMoment | undefined }
+): EverydayFace {
+  const own: EverydayFace = { eyes: eyeGlyphsFor(activity), mood: moodFor(activity), key: activity, lively: false }
+  if (activity !== 'idle') return life.noticed ? { ...own, lively: true } : own
+  if (life.noticed) return { eyes: ['^', '^'], mood: 'glad', key: 'idle:noticed', lively: true }
+  if (life.listening) return { eyes: ['o', 'o'], mood: 'perked', key: 'idle:listening', lively: true }
+  const moment = life.moment
+  if (moment === undefined) return own
+  return {
+    eyes: moment.eyes,
+    mood: moment.mood,
+    key: `idle:${moment.name}`,
+    ...(moment.state === undefined ? {} : { state: moment.state }),
+    ...(moment.glance === undefined ? {} : { glance: moment.glance }),
+    lively: true
+  }
+}
 
 export function TeammateBot({
   hue,
@@ -221,14 +332,33 @@ export function TeammateBot({
   motion = 'subtle',
   hopsWhenDone = true,
   glance,
-  runtime
+  runtime,
+  hears = false,
+  motionPresence
 }: TeammateBotProps): ReactElement {
   const bot = botFor(avatar)
   const shownActivity = activity === 'done' && !hopsWhenDone ? 'idle' : activity
   const { state, paused, jumpEvery, bounces, hops } = botMotion(shownActivity, motion)
   const color = hueColor(hue)
   const tone = PRESENCE_TONE[presence]
-  const eyes = eyeGlyphsFor(shownActivity)
+  const seed = seedOf(teammateId ?? name ?? bot.shape)
+  const presenceSized = size >= PRESENCE_MIN
+  // A pointer resting on the face (NOTICE_DWELL_MS): it notices you.
+  const [noticed, setNoticed] = useState(false)
+  const dwell = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useEffect(
+    () => () => {
+      if (dwell.current !== undefined) clearTimeout(dwell.current)
+    },
+    []
+  )
+  // The dot pops when its colour changes -- someone starts waiting on you -- never as a face first appears.
+  const dotTone = useRef(tone)
+  const dotChanged = useRef(false)
+  if (dotTone.current !== tone) {
+    dotTone.current = tone
+    dotChanged.current = true
+  }
   /*
    * A PET FOR A FACE (0.563): in the bot's box, with the bot's ring, dot and
    * mark -- "these should be the exact same as teammates". Never a screen or
@@ -240,6 +370,17 @@ export function TeammateBot({
   const pet = avatar.pet
   const petNow = usePetLook(pet)
   const wearsPet = pet !== undefined && petNow?.status !== 'missing'
+  // Its everyday life (faceLife.ts): a bot's, not a pet's, whose own rows are its motion.
+  const atRest = shownActivity === 'idle' && !wearsPet
+  const listening = useListening(hears && atRest)
+  const moment = useIdleMoment(atRest && presenceSized && !noticed && !listening, seed, MOMENT_EVERY[motion])
+  const face = everydayFace(shownActivity, { noticed: noticed && !wearsPet, listening, moment })
+  const notice = (on: boolean): void => {
+    if (dwell.current !== undefined) clearTimeout(dwell.current)
+    dwell.current = undefined
+    if (!on) setNoticed(false)
+    else dwell.current = setTimeout(() => setNoticed(true), NOTICE_DWELL_MS)
+  }
   return (
     <span
       className={`lc-face lc-bot${bounces && !wearsPet ? ' is-bouncing' : ''}${className === undefined ? '' : ` ${className}`}`}
@@ -250,6 +391,8 @@ export function TeammateBot({
       {...(wearsPet ? { 'data-pet': pet.id } : {})}
       data-motion={motion}
       {...(teammateId === undefined ? {} : { 'data-teammate': teammateId })}
+      {...(face.key === shownActivity ? {} : { 'data-life': face.key })}
+      {...(presenceSized && !wearsPet ? { onPointerEnter: () => notice(true), onPointerLeave: () => notice(false) } : {})}
     >
       {activity === 'waiting' && <span className="lc-bot__ring" />}
       {wearsPet ? (
@@ -258,20 +401,27 @@ export function TeammateBot({
         <Bot
           type={bot.shape}
           size={size}
-          state={state}
-          paused={paused && glance === undefined}
+          state={face.state ?? state}
+          paused={paused && glance === undefined && !face.lively}
           face={bot.face}
-          seed={seedOf(teammateId ?? name ?? bot.shape)}
+          seed={seed}
           hop={hops}
-          {...(eyes === undefined ? {} : { eyes })}
+          follows={noticed}
+          {...(motionPresence === undefined ? {} : { motionPresence })}
+          {...(face.eyes === undefined ? {} : { eyes: face.eyes })}
+          {...(face.mood === undefined ? {} : { mood: face.mood })}
+          blinkKey={face.key}
+          {...(teammateId ?? name) === undefined ? {} : { bootKey: teammateId ?? name }}
           {...(bot.screen === undefined ? {} : { screen: bot.screen })}
           phosphor={phosphorFor(shownActivity)}
-          {...(glance === undefined ? {} : { glance: GLANCE_TOWARD[glance] })}
+          {...(flashFor(shownActivity) === undefined ? {} : { flash: flashFor(shownActivity) })}
+          {...(glance !== undefined ? { glance: GLANCE_TOWARD[glance] } : face.glance === undefined ? {} : { glance: face.glance })}
           {...(color === undefined ? {} : { color })}
           {...(jumpEvery === undefined ? {} : { jumpEvery })}
         />
       )}
-      {tone !== undefined && <span className={`lc-presence lc-presence--${tone}`} />}
+      {/* Keyed by its tone, so a dot that changes colour is a new dot, and pops in (shell.css, lcPresencePop). */}
+      {tone !== undefined && <span key={tone} className={`lc-presence lc-presence--${tone}${dotChanged.current ? ' is-new' : ''}`} />}
       {runtime !== undefined && size >= MARKED_FACE_MIN && (
         <span className="lc-bot__mark" data-runtime={runtime}>
           <RuntimeMark runtime={runtime} size={Math.round(size * 0.24)} />

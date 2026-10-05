@@ -53,6 +53,7 @@ import type { ComparePicking } from './RoutePicker.js'
 import { MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS, versusLabel } from '../../../shared/compare.js'
 import type { RouteChoice } from './RoutePicker.js'
 import { RuntimeMark } from './RuntimeMark.js'
+import { noteTyping } from '../faceLife.js'
 
 const MAX_PROMPT_LENGTH = 8_000
 /*
@@ -567,6 +568,8 @@ export function Composer({
   const [refusal, setRefusal] = useState<{ readonly text: string; readonly plain?: boolean; readonly icon?: 'users' }>()
   const type = (next: string): void => {
     setValue(next)
+    // The face you are typing to listens (faceLife.ts).
+    noteTyping()
     // Typing leaves the history. Without this, editing a recalled message and
     // then pressing up again would walk further back and throw the edit away.
     if (recallAt >= 0) setRecallAt(-1)
