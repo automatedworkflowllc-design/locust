@@ -2,6 +2,7 @@
 //
 //   node _tools/drive-an-always-never-outranks-a-rule.mjs [--packaged <exe>] [--tag <name>]
 //   LOCUST_SPEND=1 node _tools/drive-an-always-never-outranks-a-rule.mjs --claude [--tag <name>]
+//   LOCUST_SPEND=1 node _tools/drive-an-always-never-outranks-a-rule.mjs --codex [--tag <name>]
 //
 // Wren -- on OpenCode in Approve each, or on Claude Code in Edit, the mode in
 // which it has a shell -- with one rule saved against the third of four
@@ -32,7 +33,9 @@ import { FREE_ROUTE, recordRoot, say, scratchRepository, sleep, startDrive, team
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const claude = process.argv.includes('--claude')
-const tag = `${claude ? 'claude' : 'opencode'}-${arg('--tag') ?? 'local'}`
+const codex = process.argv.includes('--codex')
+if (claude && codex) throw new Error('Choose one runtime: --claude or --codex.')
+const tag = `${codex ? 'codex' : claude ? 'claude' : 'opencode'}-${arg('--tag') ?? 'local'}`
 const OUT = join(recordRoot('an-always-never-outranks-a-rule-2026-10-04'), tag)
 await mkdir(OUT, { recursive: true })
 const PROGRAM = 'locust-no-such-program.exe'
@@ -46,17 +49,19 @@ const PROGRAM = 'locust-no-such-program.exe'
  */
 // Claude Code runs some commands without asking anyone (`node --version`, in
 // the second Claude run), so Always goes on the first harmless card it raises.
-const COMMANDS = claude
+const COMMANDS = codex
+  ? ['node --version', 'node --version', 'node --print 1+1', `taskkill /IM ${PROGRAM}`]
+  : claude
   ? ['npm --version', 'npm --help', 'node --print 1+1', `taskkill /IM ${PROGRAM}`]
   : ['echo one', 'echo two', 'echo forbidden', `taskkill /IM ${PROGRAM}`]
-const HARMLESS = claude ? [/npm --version/, /npm --help/] : [/echo one/, /echo two/]
-const FORBIDDEN = claude ? /node --print/ : /echo forbidden/
+const HARMLESS = codex ? [/node --version/] : claude ? [/npm --version/, /npm --help/] : [/echo one/, /echo two/]
+const FORBIDDEN = claude || codex ? /node --print/ : /echo forbidden/
 const workspace = await scratchRepository('locust-always-rule-ws-')
 const recordPath = join(OUT, 'saved-record.md')
-const route = claude ? { runtime: 'claude', model: 'haiku', mode: 'accept-edits' } : { ...FREE_ROUTE, mode: 'approve-each' }
-const RULE = { ruleId: 'rule_drive_no_forbidden', effect: 'deny', kind: 'command', pattern: claude ? 'node --print:*' : 'echo forbidden:*', createdAt: '2026-10-04T00:00:00.000Z' }
+const route = codex ? { runtime: 'codex', model: 'gpt-6-luna', effort: 'low', mode: 'approve-each' } : claude ? { runtime: 'claude', model: 'haiku', mode: 'accept-edits' } : { ...FREE_ROUTE, mode: 'approve-each' }
+const RULE = { ruleId: 'rule_drive_no_forbidden', effect: 'deny', kind: 'command', pattern: claude || codex ? 'node --print:*' : 'echo forbidden:*', createdAt: '2026-10-04T00:00:00.000Z' }
 const drive = await startDrive({
-  name: `an-always-never-outranks-a-rule-${tag}`, port: 9796, workspace, outPath: OUT, keep: true, spends: claude, ...(packaged === undefined ? {} : { packaged }),
+  name: `an-always-never-outranks-a-rule-${tag}`, port: 9796, workspace, outPath: OUT, keep: true, spends: claude || codex, ...(packaged === undefined ? {} : { packaged }),
   env: { LOCUST_RECORD_PATH: recordPath },
   files: { 'approval-rules.json': { schemaVersion: 1, rules: [RULE] } },
   seed: { schemaVersion: 1, teammates: [{ teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: '2026-09-27T05:00:00.000Z', route }], missionOwners: {}, settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: false } }
@@ -152,12 +157,13 @@ try {
     }
     if (i > 10 && !(await running())) break
   }
-  const other = HARMLESS.find((pattern) => pattern !== alwaysOn)
+  const other = codex ? HARMLESS[0] : HARMLESS.find((pattern) => pattern !== alwaysOn)
+  const alwaysCard = alwaysOn === undefined ? undefined : cards.find((card) => alwaysOn.test(card.exact))
   await drive.capture('the run ended', () => drive.evaluate(`document.querySelector('.lc-thread')?.innerText.slice(-1500)`))
   say(`  cards: ${JSON.stringify(cards).slice(0, 1500)}`)
-  check('the first harmless card offered Always, and Always was pressed', pressedAlways, JSON.stringify(cards[0]))
-  check(`its key is the ${claude ? 'tool' : 'runtime\'s own pattern'} an Always covers`, claude ? cards[0]?.alwaysKey === 'claude:Bash' : /^opencode:bash:echo \*?/.test(String(cards[0]?.alwaysKey)), cards[0]?.alwaysKey)
-  check('no card for the other harmless command: the earlier Always covered it', other !== undefined && !cards.some((card) => other.test(card.exact)))
+  check('the first harmless card offered Always, and Always was pressed', pressedAlways && alwaysCard?.buttons.includes('Always allow this session'), JSON.stringify(alwaysCard))
+  check(`its key is the ${codex ? 'exact command' : claude ? 'tool' : 'runtime\'s own pattern'} an Always covers`, codex ? alwaysCard !== undefined && alwaysCard.alwaysKey === `codex:command:${alwaysCard.exact}` : claude ? alwaysCard?.alwaysKey === 'claude:Bash' : /^opencode:bash:echo \*?/.test(String(alwaysCard?.alwaysKey)), alwaysCard?.alwaysKey)
+  check('no card for the other harmless command: the earlier Always covered it', other !== undefined && (codex ? cards.filter((card) => other.test(card.exact)).length === 1 : !cards.some((card) => other.test(card.exact))))
   check(`no card for ${COMMANDS[2]}: the saved rule answered it, the Always notwithstanding`, !cards.some((card) => FORBIDDEN.test(card.exact)))
   const taskkill = cards.find((card) => /taskkill/i.test(card.exact))
   if (claude) {
@@ -165,7 +171,7 @@ try {
     check('a card again for the command that reaches other programs, saying why', taskkill !== undefined && taskkill.notes.some((note) => /Asked again, though you chose Always earlier in this run: this command stops every locust-no-such-program\.exe/.test(note)), JSON.stringify(taskkill))
   } else {
     // OpenCode's Always covered `echo *` only: a card for it, as for any command it did not cover.
-    check('a card for the command that reaches other programs, which the Always on echo * never covered', taskkill !== undefined && taskkill.alwaysKey !== cards[0]?.alwaysKey && !taskkill.buttons.includes('Always allow this session'), JSON.stringify(taskkill))
+    check(`a card for the command that reaches other programs, which the Always on ${codex ? 'the harmless command' : 'echo *'} never covered`, taskkill !== undefined && taskkill.alwaysKey !== alwaysCard?.alwaysKey && !taskkill.buttons.includes('Always allow this session'), JSON.stringify(taskkill))
   }
   const approvals = await ledgerApprovals()
   say(`  approvals recorded: ${JSON.stringify(approvals.map((a) => ({ by: a.by, answer: a.answer, asked: String(a.asked).split('\n').at(-1), v: a.schemaVersion })))}`)
@@ -173,7 +179,7 @@ try {
   check('the ledger is v21', approvals.length > 0 && approvals.every((a) => a.schemaVersion === 21), approvals.map((a) => a.schemaVersion).join(','))
   check('the Always: allowed for the session, by the person on the card', alwaysOn !== undefined && of(alwaysOn)?.by === 'card' && of(alwaysOn)?.answer === 'allowed-always', JSON.stringify(alwaysOn === undefined ? null : of(alwaysOn)))
   // OpenCode asks about every command, so the other one is on the record; Claude Code may run it unasked.
-  const later = other === undefined ? undefined : of(other)
+  const later = other === undefined ? undefined : codex ? approvals.filter((approval) => other.test(String(approval.asked))).at(1) : of(other)
   check('the other harmless command: allowed by the Always on an earlier card' + (claude ? ', or run without asking' : ''), later === undefined ? claude : later.by === 'earlier-always' && later.answer === 'allowed', JSON.stringify(later ?? 'not asked'))
   check(`${COMMANDS[2]}: denied by the saved rule`, of(FORBIDDEN)?.by === 'saved-rule' && of(FORBIDDEN)?.answer === 'denied', JSON.stringify(of(FORBIDDEN)))
   check('taskkill: denied by the person, on its own card', of(/taskkill/i)?.by === 'card' && of(/taskkill/i)?.answer === 'denied', JSON.stringify(of(/taskkill/i)))
@@ -198,7 +204,7 @@ try {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
-  await drive.finish({ intro: `Build: ${packaged ?? 'out/'}. Wren on ${claude ? 'Claude Code (Haiku)' : 'a free model'} in ${claude ? 'Edit' : 'Approve each'}, a rule saved against \`${COMMANDS[2]}\`; four commands, the first card answered Always.`, extra: `Checks failed: ${String(failures)}` })
+  await drive.finish({ intro: `Build: ${packaged ?? 'out/'}. Wren on ${codex ? 'Codex (gpt-6-luna, low effort)' : claude ? 'Claude Code (Haiku)' : 'a free model'} in ${claude ? 'Edit' : 'Approve each'}, a rule saved against \`${COMMANDS[2]}\`; four commands, the first card answered Always.`, extra: `Checks failed: ${String(failures)}` })
   say(failures === 0 ? 'AN ALWAYS NEVER OUTRANKS A RULE: PASSED' : `AN ALWAYS NEVER OUTRANKS A RULE: FAILED (${String(failures)})`)
   process.exitCode = failures === 0 ? 0 : 1
 }

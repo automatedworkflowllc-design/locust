@@ -587,6 +587,25 @@ export interface ApprovalChannelOptions {
   readonly now?: () => Date
 }
 
+/** Codex asks again after an Always: Locust remembers the exact action, not the runtime. */
+function codexAlwaysFor(kind: MissionApprovalKind, params: Record<string, unknown>, changes: readonly FileChangeRecord[] | undefined): { key: string; covers: string } | undefined {
+  if (kind === 'command' && typeof params.command === 'string' && params.command.length > 0) {
+    return { key: `codex:command:${params.command}`, covers: 'this same command again' }
+  }
+  if (kind !== 'file-change') return undefined
+  const named = changes ?? (Array.isArray(params.changes) ? params.changes : [])
+  const paths: string[] = []
+  for (const entry of named) {
+    if (typeof entry !== 'object' || entry === null) return undefined
+    const change = entry as Record<string, unknown>
+    if (typeof change.path !== 'string' || change.path.length === 0) return undefined
+    paths.push(change.path)
+    if (typeof change.movePath === 'string' && change.movePath.length > 0) paths.push(change.movePath)
+  }
+  // JSON keeps path boundaries unambiguous, even when a path contains a newline.
+  return paths.length === 0 ? undefined : { key: `codex:files:${JSON.stringify(paths.sort())}`, covers: 'the same change to these files again' }
+}
+
 export function createApprovalChannel(options: ApprovalChannelOptions): ApprovalChannel {
   const createId = options.createId ?? randomUUID
   const now = options.now ?? (() => new Date())
@@ -607,6 +626,7 @@ export function createApprovalChannel(options: ApprovalChannelOptions): Approval
     readonly runtime: MissionRuntimeId | undefined
     /** The item the request is about, when the runtime named one. */
     readonly itemId: string | undefined
+    readonly alwaysKey: string | undefined
     readonly resolve: (value: JsonValue) => void
   }
   const approvals = new Map<string, Pending>()
@@ -669,8 +689,15 @@ export function createApprovalChannel(options: ApprovalChannelOptions): Approval
         }
         const offered = typeof requestParams.unifiedDiff === 'string' ? diffPatchFrom(requestParams.unifiedDiff, run.cwd) : undefined
         const patch = approvalPatchFrom(changes, run.cwd) ?? offered
+        const codexAlways = codex ? codexAlwaysFor(described.kind, requestParams, changes) : undefined
+        const alwaysKey = codex
+          ? codexAlways?.key
+          : typeof requestParams.locustAlwaysKey === 'string' && requestParams.locustAlwaysKey.length > 0
+            ? requestParams.locustAlwaysKey.slice(0, 2_000)
+            : undefined
+        const alwaysCovers = codexAlways?.covers ?? said('alwaysCovers')
         return await new Promise<JsonValue>((resolve) => {
-          approvals.set(approvalId, { runId, missionId, kind: described.kind, runtime: run.runtime, itemId, resolve })
+          approvals.set(approvalId, { runId, missionId, kind: described.kind, runtime: run.runtime, itemId, alwaysKey, resolve })
           options.emitApproval({
             approvalId,
             runId,
@@ -687,11 +714,8 @@ export function createApprovalChannel(options: ApprovalChannelOptions): Approval
             detail: described.detail,
             cwd: described.cwd,
             requestedAt: now().toISOString(),
-            ...(said('alwaysCovers') === undefined ? {} : { alwaysCovers: said('alwaysCovers')! }),
-            // The route's key for an Always (0.616): absent from Codex, which keeps its own.
-            ...(typeof requestParams.locustAlwaysKey === 'string' && requestParams.locustAlwaysKey.length > 0
-              ? { alwaysKey: requestParams.locustAlwaysKey.slice(0, 2_000) }
-              : {}),
+            ...(alwaysCovers === undefined ? {} : { alwaysCovers }),
+            ...(alwaysKey === undefined ? {} : { alwaysKey }),
             ...(said('dataSentSays') === undefined ? {} : { dataSentSays: said('dataSentSays')! }),
             ...(said('reversibleSays') === undefined ? {} : { reversibleSays: said('reversibleSays')! }),
             ...(patch === undefined ? {} : { patch: { text: patch.text, added: patch.added, removed: patch.removed, truncated: patch.truncated } })
@@ -736,7 +760,8 @@ export function createApprovalChannel(options: ApprovalChannelOptions): Approval
       }
       const reason = 'decision' in answer && answer.decision === 'deny' ? answer.reason : undefined
       if (reason === undefined) {
-        pending.resolve(protocolAnswerFor(answer))
+        const codexAlways = (pending.runtime === undefined || pending.runtime === 'codex') && pending.alwaysKey !== undefined && 'decision' in answer && answer.decision === 'approve-always'
+        pending.resolve(protocolAnswerFor(codexAlways ? { ...answer, decision: 'approve-once' } : answer))
         return true
       }
       if (pending.runtime === 'opencode') {

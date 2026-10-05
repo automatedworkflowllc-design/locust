@@ -1,12 +1,16 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+import type { AppServerRequest } from '@teammate/runtime-adapters'
 
 import type { ApprovalRule } from '../shared/approval-rules.js'
 import { createRunAlways, decide } from '../shared/who-decides.js'
 import type { DecidedRequest } from '../shared/who-decides.js'
-import { acpPermissionRequest, describeApproval, openCodePermissionRequest } from './approval-channel.js'
+import { acpPermissionRequest, createApprovalChannel, describeApproval, openCodePermissionRequest } from './approval-channel.js'
+import type { MissionApprovalRequest } from '../shared/ipc.js'
+import type { FileChangeRecord } from './approval-patch.js'
 import { builtInOrConnector } from './permission-host.js'
 
 /**
@@ -24,6 +28,15 @@ const NO_PUSH = rule('deny', 'git push:*')
 const TESTS = rule('allow', 'npm test')
 const command = (detail: string, runtime = 'claude'): DecidedRequest => ({ kind: 'command', summary: 'Run a command', detail, runtime })
 const context = (rules: readonly ApprovalRule[], remembered: boolean) => ({ rules, remembered, folder: FOLDER, teammateId: 'tm_wren' })
+
+async function codexAsked(request: AppServerRequest, changesByItem: ReadonlyMap<string, readonly FileChangeRecord[]> = new Map(), explicitRuntime = true) {
+  const raised: MissionApprovalRequest[] = []
+  const channel = createApprovalChannel({ emitApproval: (request) => raised.push(request) })
+  const handler = channel.requestHandlerFor({ runId: 'run_codex', missionId: 'mission_codex', cwd: FOLDER, changesByItem, ...(explicitRuntime ? { runtime: 'codex' as const } : {}) })
+  const waiting = handler(request)
+  await vi.waitFor(() => expect(raised).toHaveLength(1))
+  return { channel, waiting, request: raised[0]! }
+}
 
 describe('one order, whoever asks', () => {
   it('denies by a saved rule, whatever Always was given earlier in the run', () => {
@@ -82,7 +95,7 @@ describe('the same action gets the same verdict on every path', () => {
 })
 
 describe('what an Always remembers, and where', () => {
-  it('is a key the host puts on the request: a tool, an exact command, OpenCode\'s own patterns; none from Codex', () => {
+  it('is a key the host puts on the request: a tool, an exact command, or OpenCode\'s own patterns', () => {
     const opencode = openCodePermissionRequest({ permission: 'bash', patterns: ['echo SERVED'], always: ['echo *'], metadata: { command: 'echo SERVED' } }, FOLDER)
     expect((opencode.params as Record<string, unknown>).locustAlwaysKey).toBe('opencode:bash:echo *')
     const acp = acpPermissionRequest({ toolCallId: 't1', title: 'Test', kind: 'execute', command: 'npm test', paths: [], diff: undefined, options: [] }, FOLDER)
@@ -90,6 +103,63 @@ describe('what an Always remembers, and where', () => {
     // No patterns at all: nothing to remember it by, so it is asked again.
     const bare = openCodePermissionRequest({ permission: 'bash', patterns: [], metadata: {} }, FOLDER)
     expect((bare.params as Record<string, unknown>).locustAlwaysKey).toBeUndefined()
+  })
+
+  it('gives Codex the exact command key and the same rule, Always, and reach verdicts', async () => {
+    const { channel, waiting, request } = await codexAsked({ id: 1, method: 'item/commandExecution/requestApproval', params: { command: 'git push origin main', cwd: FOLDER } })
+    expect(request).toMatchObject({ alwaysKey: 'codex:command:git push origin main', alwaysCovers: 'this same command again' })
+    const always = createRunAlways()
+    always.add(request.runId, request.alwaysKey!)
+    const remembered = always.has(request.runId, request.alwaysKey!)
+    expect(decide(request, context([NO_PUSH], remembered))).toMatchObject({ verdict: 'deny', by: 'saved-rule' })
+    expect(decide(request, context([rule('allow', 'git push origin main')], remembered))).toMatchObject({ verdict: 'allow', by: 'saved-rule' })
+    expect(decide(request, context([], remembered))).toEqual({ verdict: 'allow', by: 'earlier-always' })
+    expect(decide(request, context([], false))).toEqual({ verdict: 'ask' })
+    channel.release(request.runId)
+    await waiting
+
+    const reaches = await codexAsked({ id: 2, method: 'item/commandExecution/requestApproval', params: { command: 'taskkill /IM locust-no-such-program.exe', cwd: FOLDER } })
+    expect(reaches.request.alwaysKey).toBe('codex:command:taskkill /IM locust-no-such-program.exe')
+    always.add(reaches.request.runId, reaches.request.alwaysKey!)
+    expect(decide(reaches.request, context([], always.has(reaches.request.runId, reaches.request.alwaysKey!)))).toMatchObject({ verdict: 'ask', why: expect.stringContaining('Asked again') })
+    reaches.channel.release(reaches.request.runId)
+    await reaches.waiting
+  })
+
+  it('answers Always on an identified Codex command as accept, including the implicit Codex route', async () => {
+    for (const explicit of [true, false]) {
+      const { channel, waiting, request } = await codexAsked({ id: 1, method: 'item/commandExecution/requestApproval', params: { command: 'node --version' } }, new Map(), explicit)
+      expect(channel.decide({ approvalId: request.approvalId, decision: 'approve-always' })).toBe(true)
+      await expect(waiting).resolves.toEqual({ decision: 'accept' })
+    }
+  })
+
+  it('keeps acceptForSession for a keyless Codex Always', async () => {
+    for (const method of ['item/commandExecution/requestApproval', 'item/fileChange/requestApproval']) {
+      const { channel, waiting, request } = await codexAsked({ id: 1, method, params: {} })
+      expect(request.alwaysKey).toBeUndefined()
+      expect(request.alwaysCovers).toBeUndefined()
+      expect(channel.decide({ approvalId: request.approvalId, decision: 'approve-always' })).toBe(true)
+      await expect(waiting).resolves.toEqual({ decision: 'acceptForSession' })
+    }
+  })
+
+  it('keys Codex file changes by sorted paths, names the scope, and answers Always once', async () => {
+    const change = (path: string): FileChangeRecord => ({ path, kind: 'update', movePath: undefined, diff: '@@ -1 +1 @@\n-old\n+new' })
+    for (const paths of [['z.ts', 'a.ts'], ['a.ts', 'z.ts']]) {
+      const { channel, waiting, request } = await codexAsked({ id: 1, method: 'item/fileChange/requestApproval', params: { itemId: 'item_files' } }, new Map([['item_files', paths.map(change)]]))
+      expect(request).toMatchObject({ alwaysKey: 'codex:files:["a.ts","z.ts"]', alwaysCovers: 'the same change to these files again' })
+      expect(channel.decide({ approvalId: request.approvalId, decision: 'approve-always' })).toBe(true)
+      await expect(waiting).resolves.toEqual({ decision: 'accept' })
+    }
+  })
+
+  it('keeps long Codex command keys exact instead of sharing a truncated prefix', async () => {
+    const command = `${'x'.repeat(2_100)} last-argument`
+    const { channel, waiting, request } = await codexAsked({ id: 1, method: 'item/commandExecution/requestApproval', params: { command } })
+    expect(request.alwaysKey).toBe(`codex:command:${command}`)
+    channel.release(request.runId)
+    await waiting
   })
 
   it('is kept per run, by the main process, bounded', () => {

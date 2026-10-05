@@ -25,9 +25,9 @@
  *      except a command that reaches other programs, which asks again.
  *   5. Anything else: the card asks.
  *
- * Codex keeps its own Always: its app-server is told "for the session" and
- * does not ask again, so what that Always covers never reaches this function.
- * Moving it here is the next step, and it is a change to how Codex runs.
+ * Codex carries an exact-command or sorted-file-path key too, and is told
+ * "once", so its next request comes here. A request naming neither keeps
+ * Codex's own session Always because Locust cannot identify what it covers.
  *
  * Pure: no store, no clock. The main process reads the rules and the run's
  * keys and applies the answer.
@@ -72,7 +72,7 @@ export function decide(request: DecidedRequest, context: DecisionContext): Decis
 /**
  * The keys of the Always answers given in each run, held by the main process.
  * A key is the host's: a tool for Claude Code (`claude:Bash`), an exact
- * command or set of files for Copilot, OpenCode's own patterns. A run id is
+ * command or set of files for Codex and Copilot, OpenCode's own patterns. A run id is
  * never reused, so a finished run's keys answer nothing again; the memory is
  * bounded instead of told when runs end, the least recently used run going
  * first. A key past the bound is not kept: that run is asked again.
