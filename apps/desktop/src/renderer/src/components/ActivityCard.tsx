@@ -42,6 +42,7 @@ import type { ReactElement } from 'react'
 import { activityCounts, activityEntries, netFileEntries, boundedShellOutput, commandTook, defaultOpenEntry, newPageEntry, foldedToolsLead, foldedToolsNames, relativePath, displayPath, durationText, thoughtHeadline } from '../missionView.js'
 import type { TraceSegment, ActivityDetail, ActivityEntry, PlanStep } from '../missionView.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
+import { CopyButton } from './CopyButton.js'
 import { DiffView } from './DiffView.js'
 import { ThreadImage } from './ThreadImage.js'
 import { DocPreview, isNewDocument } from './DocPreview.js'
@@ -50,6 +51,17 @@ import { Icon } from './Icon.js'
 import { AgentText, PlanSteps } from './ThreadItems.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { commandReach } from '../../../shared/command-reach.js'
+
+/** A changed file's whole text, for its row's Copy; refused in words when it cannot be had as text. */
+async function readWholeFile(path: string, workspacePath: string | undefined): Promise<string | { readonly refused: string }> {
+  const absolute = /^(?:[A-Za-z]:[\\/]|[\\/])/.test(path) || workspacePath === undefined ? path : `${workspacePath}/${path}`
+  const read = await window.desktop?.readTextFile(absolute)
+  if (read === undefined) return { refused: 'Locust could not reach that file.' }
+  if (!read.ok) return { refused: read.message }
+  // A spreadsheet or a Word file has no text to copy as it is.
+  if (read.mode === 'table' || read.mode === 'document') return { refused: 'Only a text file can be copied. Open it instead.' }
+  return read.text
+}
 
 /**
  * The disclosure chain for what a teammate did, three rungs deep:
@@ -529,6 +541,19 @@ export function ActivityCard({
                             one row says the two controls do the same thing. */}
                         <Icon name="maximize" size={13} />
                       </button>
+                    )}
+                    {/*
+                      COPY THE FILE (0.649), as a handed file offers it. Colin,
+                      2026-10-05: "if its a file change shouldnt it copy the
+                      file". The whole file as it is now, read when asked; the
+                      opened change's own Copy gives just the changed code.
+                    */}
+                    {entry.file.status !== 'DELETED' && (
+                      <CopyButton
+                        className="lc-filerow__copy"
+                        label={relativePath(entry.file.path, workspacePath)}
+                        text={() => readWholeFile(entry.file.path, workspacePath)}
+                      />
                     )}
                     <button
                       type="button"

@@ -1882,7 +1882,9 @@ textarea {
    found by anyone who does not already know it is there, and this one exists
    BECAUSE it could not be found. */
 .lc-filerow__reveal,
-.lc-filerow__view {
+.lc-filerow__view,
+.lc-filerow__copy,
+.lc-diff__copy {
   flex: none;
   display: flex;
   align-items: center;
@@ -1898,20 +1900,25 @@ textarea {
 }
 
 .lc-filerow__reveal:hover,
-.lc-filerow__view:hover {
+.lc-filerow__view:hover,
+.lc-filerow__copy:hover,
+.lc-diff__copy:hover {
   background: var(--lc-hover-surface);
   color: var(--lc-text-secondary);
 }
 
 .lc-filerow__reveal:focus-visible,
-.lc-filerow__view:focus-visible {
+.lc-filerow__view:focus-visible,
+.lc-filerow__copy:focus-visible,
+.lc-diff__copy:focus-visible {
   outline: 2px solid var(--lc-focus-ring);
   outline-offset: -2px;
 }
 
 /* Sits immediately left of reveal, so the pair reads as one group at the
    row's end rather than two controls with a gap between them. */
-.lc-filerow__view {
+.lc-filerow__view,
+.lc-filerow__copy {
   margin-right: 0;
 }
 
@@ -2304,12 +2311,32 @@ textarea {
 /* The completeness statement. Never absent: silence after the last row
    reads as "that was the whole change". */
 .lc-diff__foot {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   border-top: 1px solid var(--lc-border-hairline);
   font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-muted);
+}
+
+/* A copy button grows to say "Copied" (CopyButton.tsx); the others keep their square. */
+.lc-filerow__copy,
+.lc-diff__copy {
+  width: auto;
+  min-width: 26px;
+  gap: 4px;
+  padding: 0 5px;
+  font-size: var(--lc-text-mono-caption);
+}
+
+/* The opened change's Copy (0.649), at the foot's end so the statement stays centred. */
+.lc-diff__foot .lc-diff__copy {
+  position: absolute;
+  right: var(--lc-space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  margin-right: 0;
 }
 
 .lc-diff__foot > span {

@@ -196,6 +196,19 @@ export function countRows(rows: readonly DiffRow[]): DiffCounts {
   return { added, removed }
 }
 
+/**
+ * THE CODE AS IT READS AFTER THE CHANGE (0.649), for the opened change's Copy.
+ * Colin, 2026-10-05: "if its a code change shouldnt it copy the code". Every
+ * line but the removed ones, without signs or numbers, so it pastes as code;
+ * separate parts of a file are separated by a blank line. A new file's change
+ * is the whole file. Undefined for a deleted file: there is no code after it.
+ */
+export function afterText(file: DiffFile): string | undefined {
+  if (file.status === 'DELETED') return undefined
+  const parts = file.hunks.map((hunk) => hunk.rows.filter((row) => row.kind !== 'del').map((row) => row.text).join('\n')).filter((part) => part.length > 0)
+  return parts.length === 0 ? undefined : parts.join('\n\n')
+}
+
 export function fileCounts(file: DiffFile): DiffCounts {
   return countRows(file.hunks.flatMap((hunk) => hunk.rows))
 }

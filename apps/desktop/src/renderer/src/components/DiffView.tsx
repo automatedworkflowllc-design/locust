@@ -1,9 +1,10 @@
 import { Fragment, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
 
-import { HUNKS_SHOWN_FIRST, completenessOf, foldContext, hunkRange, pairedSpans } from '../diff.js'
+import { HUNKS_SHOWN_FIRST, afterText, completenessOf, foldContext, hunkRange, pairedSpans } from '../diff.js'
 import type { DiffCounts, DiffFile, DiffHunk, DiffRow, WordSpan } from '../diff.js'
 import { diffNoteFor, diffNoteKey, MAX_DIFF_NOTE } from '../diffNotes.js'
+import { CopyButton } from './CopyButton.js'
 import { useDiffNotes } from './DiffNotes.js'
 import type { DiffNotesPlace } from './DiffNotes.js'
 import { Icon } from './Icon.js'
@@ -36,6 +37,7 @@ export function DiffView({
   /** The line a note is being written on, by `diffNoteKey`. */
   const [editing, setEditing] = useState<string>()
   const moreParsed = shownHunks < file.hunks.length
+  const after = useMemo(() => afterText(file), [file])
   // Parsed hunks are offered before the truncation is confessed: a reader
   // should see every line that was recorded, then be told what was not.
   const completeness = completenessOf(file, shownHunks, truncated && !moreParsed)
@@ -52,6 +54,8 @@ export function DiffView({
         />
       ))}
       <div className="lc-diff__foot">
+        {/* Copy, as Claude Code offers it (0.649): the code as it reads after the change. */}
+        {after !== undefined && <CopyButton className="lc-diff__copy" label={`the new code in ${file.path}`} text={after} />}
         {completeness.canExpand ? (
           <button type="button" className="lc-diff__expand" onClick={() => setShownHunks(file.hunks.length)}>
             {completeness.statement}
