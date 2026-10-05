@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.619.0 - 2026-10-04
+
+### Fixed
+
+- **The claude.ai switch reads as one switch.** In Settings > AI agents, the switch that lets you start Claude Code sessions on this computer from claude.ai drew its "Off" sentence in a row of its own, in bright text under a divider, so it read as a second setting. Its state now opens its own line, as on every other switch: "Off. When on, you can start Claude Code sessions in this folder from claude.ai while Locust is open, until you switch it off or quit Locust." While it runs, what Claude Code prints still appears under it.
+
 ## 0.618.0 - 2026-10-04
 
 ### Improved
