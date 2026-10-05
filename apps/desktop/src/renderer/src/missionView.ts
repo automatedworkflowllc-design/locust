@@ -1,7 +1,7 @@
 import type { NormalizedRuntimeEvent, ToolPatch } from '@teammate/runtime-adapters'
 
 import { SUBAGENT_TOOL } from './faceState.js'
-import { READ_TOOL_WORDS, editToolName, isEditCommand, isShellTool } from '../../shared/tool-kinds.js'
+import { READ_TOOL_WORDS, byHelper, editToolName, isEditCommand, isShellTool } from '../../shared/tool-kinds.js'
 import { LARGE_FILE_LINES, fileCounts, parseUnifiedDiff } from './diff.js'
 import type { DiffCounts, DiffFile } from './diff.js'
 
@@ -73,6 +73,13 @@ export interface ActivityDetail {
   readonly output?: string
   /** What work sent to the background is doing now, while it runs (Claude Code's `task_progress`). */
   readonly progress?: string
+  /**
+   * A helper's own calls, in the order it made them (ledger v22, helper
+   * visibility 2026-10-05): what it read, searched, ran and changed between
+   * being sent out and reporting back. Only on a helper's row, and only where
+   * the runtime says which calls were the helper's (Claude Code today).
+   */
+  readonly children?: readonly ActivityDetail[]
 }
 
 /**
@@ -280,6 +287,13 @@ export type ActivityEntry =
       readonly subagentType?: string
       /** Its one-line summary when it reported back. */
       readonly summary?: string
+      /**
+       * The helper's own calls, drawn the way the teammate's are, folded
+       * under its row (helper visibility). Absent where the runtime did not
+       * say what the helper did -- every ledger before v22, and every runtime
+       * but Claude Code -- and the row then reads as it always has.
+       */
+      readonly calls?: readonly ActivityEntry[]
       readonly key: string
       readonly description: string
       readonly settled: boolean
@@ -335,7 +349,9 @@ export type ActivityEntry =
 export function activityEntries(
   details: readonly ActivityDetail[],
   /** The folder this ran in, so one file reported two ways is one row. */
-  workspacePath?: string
+  workspacePath?: string,
+  /** False for a helper's calls, already folded once under its row: each is its own row. */
+  foldPlain = true
 ): readonly ActivityEntry[] {
   const entries: ActivityEntry[] = []
   // An edit some runtimes report twice is still one edit.
@@ -453,6 +469,7 @@ export function activityEntries(
           ...(detail.background === true ? { background: true } : {}),
           ...(detail.backgroundEnded === undefined ? {} : { backgroundEnded: detail.backgroundEnded }),
           ...(detail.progress === undefined ? {} : { progress: detail.progress }),
+          ...(detail.children === undefined || detail.children.length === 0 ? {} : { calls: activityEntries(detail.children, workspacePath, false) }),
           settled: detail.settled,
           failed: detail.failed === true
         })
@@ -518,7 +535,7 @@ export function activityEntries(
       })
     })
   })
-  return foldPlainToolRuns(entries)
+  return foldPlain ? foldPlainToolRuns(entries) : entries
 }
 
 /**
@@ -3032,6 +3049,30 @@ export function buildThread(
    * the news then has to find a row that is no longer open (0.492).
    */
   const closedRows = new Map<string, ActivityDetail>()
+  /**
+   * A HELPER'S OWN CALLS (ledger v22, helper visibility 2026-10-05), by item
+   * id, with the helper row each belongs to. They are kept on that row as its
+   * children and nowhere else: not in the turn's rows, its counts, its live
+   * line. A call whose helper has no row here is dropped, as every helper
+   * call was before v22.
+   */
+  const helperCalls = new Map<string, { readonly parent: string; detail: ActivityDetail }>()
+  const helperRowOf = (parent: string): ActivityDetail | undefined => {
+    const row = openTools.get(parent) ?? backgroundRows.get(parent) ?? closedRows.get(parent)
+    return row?.kind === 'helper' ? row : undefined
+  }
+  /** Put the helper's row back with its children changed, wherever it is held. */
+  const withHelperChildren = (parent: string, change: (children: readonly ActivityDetail[]) => readonly ActivityDetail[]): boolean => {
+    const row = helperRowOf(parent)
+    if (row === undefined) return false
+    const next: ActivityDetail = { ...row, children: change(row.children ?? []) }
+    const index = activity.indexOf(row)
+    if (index >= 0) activity[index] = next
+    if (openTools.get(parent) === row) openTools.set(parent, next)
+    if (backgroundRows.get(parent) === row) backgroundRows.set(parent, next)
+    if (closedRows.get(parent) === row) closedRows.set(parent, next)
+    return true
+  }
   /** The file's own name, however the runtime spelt the path to it. */
   const nameTail = (name: string): string => name.toLowerCase().replace(/\\/g, '/').split('/').at(-1) ?? name
   /*
@@ -3110,6 +3151,31 @@ export function buildThread(
   for (const [eventIndex, event] of events.entries()) {
     switch (event.type) {
       case 'tool.started': {
+        /*
+         * A HELPER'S CALL goes under the helper's row, as Claude Code folds
+         * them under its helper line. It is not the teammate's work: it does
+         * not start the thread's work, take the live line or count.
+         */
+        if (byHelper(event.payload)) {
+          const parent = (event.payload as { readonly parentItemId: string }).parentItemId
+          const mcpChild = mcpToolParts(event.payload.name)
+          const child: ActivityDetail = {
+            kind: toolKindOf(event),
+            name: mcpChild?.tool ?? (event.payload.command === undefined ? undefined : withoutShellWrapper(event.payload.command)) ?? event.payload.name,
+            tool: mcpChild?.server ?? event.payload.name,
+            ...(typeof event.payload.title === 'string' && event.payload.title.length > 0 ? { title: event.payload.title } : {}),
+            settled: false
+          }
+          const held = helperCalls.get(event.payload.itemId)
+          if (held !== undefined) {
+            const was = held.detail
+            held.detail = child
+            withHelperChildren(held.parent, (children) => children.map((entry) => (entry === was ? child : entry)))
+          } else if (withHelperChildren(parent, (children) => [...children, child])) {
+            helperCalls.set(event.payload.itemId, { parent, detail: child })
+          }
+          break
+        }
         workBegan = true
         // The host's disk observation of a path the runtime already named:
         // its patch belongs on the runtime's row, not on a second one.
@@ -3159,6 +3225,9 @@ export function buildThread(
           // Claude Code's Bash tool takes `run_in_background`, and the flag
           // rides on the tool call's own input. Carried, not interpreted.
           ...(event.payload.background === true ? { background: true } : {}),
+          // A helper's type, when its launch already says it (Claude Code,
+          // helper visibility): the row names it while it works.
+          ...(SUBAGENT_TOOL.test(event.payload.name) && typeof event.payload.status === 'string' && event.payload.status.length > 0 ? { status: event.payload.status } : {}),
           settled: false
         }
         /*
@@ -3172,8 +3241,10 @@ export function buildThread(
         const already = openTools.get(event.payload.itemId)
         if (already !== undefined) {
           const at = activity.indexOf(already)
-          openTools.set(event.payload.itemId, detail)
-          if (at !== -1) activity[at] = detail
+          // A helper's calls already under its row stay there.
+          const named: ActivityDetail = already.children === undefined ? detail : { ...detail, children: already.children }
+          openTools.set(event.payload.itemId, named)
+          if (at !== -1) activity[at] = named
           break
         }
         openTools.set(event.payload.itemId, detail)
@@ -3191,6 +3262,25 @@ export function buildThread(
       }
       case 'tool.completed':
       case 'tool.failed': {
+        if (byHelper(event.payload)) {
+          const held = helperCalls.get(event.payload.itemId)
+          if (held === undefined) break
+          const was = held.detail
+          const patch = event.payload.patch
+          const closed: ActivityDetail = {
+            ...was,
+            settled: true,
+            failed: event.type === 'tool.failed',
+            ...(event.payload.exitCode === undefined ? {} : { exitCode: event.payload.exitCode }),
+            ...(event.payload.status === undefined ? {} : { status: event.payload.status }),
+            ...(typeof event.payload.output === 'string' ? { output: event.payload.output } : {}),
+            ...(patch === undefined ? {} : { patch, kind: 'edit' }),
+            ...(event.payload.command === undefined || was.name !== was.tool ? {} : { name: event.payload.command })
+          }
+          held.detail = closed
+          withHelperChildren(held.parent, (children) => children.map((entry) => (entry === was ? closed : entry)))
+          break
+        }
         const open = openTools.get(event.payload.itemId)
         if (open !== undefined) {
           const index = activity.indexOf(open)
@@ -3671,7 +3761,7 @@ export function buildThread(
         if (open !== undefined && open !== id) moved.add(open)
         moved.delete(id)
         open = id
-      } else if (event.type === 'tool.started' && open !== undefined) {
+      } else if (event.type === 'tool.started' && open !== undefined && !byHelper(event.payload)) {
         moved.add(open)
         open = undefined
       }
@@ -4205,6 +4295,8 @@ export function cancellationSummary(
   const seen = new Set<string>()
   const open = new Map<string, string>()
   for (const event of events) {
+    // What the TEAMMATE had in hand; a helper's calls are under its row.
+    if ((event.type === 'tool.started' || event.type === 'tool.completed' || event.type === 'tool.failed') && byHelper(event.payload)) continue
     if (event.type === 'tool.started') {
       open.set(event.payload.itemId, event.payload.command ?? event.payload.name)
     } else if (event.type === 'tool.completed' || event.type === 'tool.failed') {
@@ -4363,6 +4455,8 @@ export function buildSignalRail(
 
   const rows: SignalRow[] = []
   for (const event of events) {
+    // A helper's calls are its row's, in the Activity card; the rail is the teammate's.
+    if ((event.type === 'tool.started' || event.type === 'tool.completed' || event.type === 'tool.failed') && byHelper(event.payload)) continue
     const clock = clockOf(event.occurredAt)
     switch (event.type) {
       case 'run.started':
@@ -5690,3 +5784,33 @@ export function modeRefusedATool(error: string | undefined): boolean {
 
 // Moved to shared/tool-kinds.ts so the host reads a tool the same way (0.364).
 export { editToolName, isEditCommand, isShellTool }
+
+/**
+ * WHO ASKED, when a helper did (helper visibility, 2026-10-05). Claude Code
+ * routes a helper's permission request through the same host as the
+ * teammate's, naming the call that asks; that call's row says whether a
+ * helper made it, and the helper's launch says what kind of helper it is.
+ * Undefined when the teammate asked itself, or the call is not in the record.
+ *
+ * "the Explore helper of Wren"; "a helper of Wren" when the runtime gave no
+ * type; "the Explore helper of this teammate" when the name is not known.
+ */
+export function helperAskedBy(
+  toolUseId: string | undefined,
+  events: readonly NormalizedRuntimeEvent[],
+  teammateName: string | undefined
+): string | undefined {
+  if (toolUseId === undefined) return undefined
+  const call = events.find((event) => event.type === 'tool.started' && event.payload.itemId === toolUseId && byHelper(event.payload))
+  if (call === undefined || call.type !== 'tool.started') return undefined
+  const parent = (call.payload as { readonly parentItemId: string }).parentItemId
+  let helperType: string | undefined
+  for (const event of events) {
+    if (event.type !== 'tool.started' && event.type !== 'tool.completed' && event.type !== 'tool.failed') continue
+    if (event.payload.itemId !== parent || !SUBAGENT_TOOL.test(event.payload.name)) continue
+    const status = event.payload.status
+    if (typeof status === 'string' && status.length > 0 && !/^(error|completed|failed|in_progress|started|cancelled|refused)$/i.test(status)) helperType = status
+  }
+  const whose = teammateName === undefined || teammateName.trim().length === 0 ? 'this teammate' : teammateName.trim()
+  return helperType === undefined ? `a helper of ${whose}` : `the ${helperType} helper of ${whose}`
+}

@@ -2635,6 +2635,14 @@ export interface MissionApprovalRequest {
    */
   readonly dataSentSays?: string
   readonly reversibleSays?: string
+  /**
+   * The call this request is about, by the runtime's own id for it (Claude
+   * Code's `tool_use_id`, which its permission bridge forwards). The thread
+   * matches it to the call's row, and a call made by a helper names that
+   * helper on the card (helper visibility, 2026-10-05). Absent where the
+   * runtime does not say.
+   */
+  readonly toolUseId?: string
 }
 
 export interface ApprovalPatch {

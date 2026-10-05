@@ -6,7 +6,7 @@ import { redactSecrets, toolPatchFrom } from '@teammate/runtime-adapters'
 import type { NormalizedRuntimeEvent, ToolPatch } from '@teammate/runtime-adapters'
 
 import { unifiedPatchText } from '../shared/approval-patch.js'
-import { reportsAChange } from '../shared/tool-kinds.js'
+import { byHelper, reportsAChange } from '../shared/tool-kinds.js'
 import { ownGitArgs } from './git-guard.js'
 
 /**
@@ -347,6 +347,12 @@ export function unreportedPaths(
      * The rule is the thread's own (shared/tool-kinds.ts).
      */
     if (!reportsAChange(event.payload)) continue
+    /*
+     * A helper's edit is drawn under its helper's row, not among the turn's
+     * files (ledger v22), so it does not report the change for the turn: the
+     * host's look at the folder is how the file reaches the turn's files.
+     */
+    if (byHelper(event.payload)) continue
     named.push(event.payload.name.toLowerCase())
     if (event.payload.command !== undefined) named.push(event.payload.command.toLowerCase())
   }

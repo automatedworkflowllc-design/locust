@@ -43,6 +43,9 @@ Edited hello.txt DONE DONE Edited 1 file pebble/hello.txt Write Antigravity did 
 ## claude/background-stopped-with-run.jsonl
 Background task: sleep 8 seconds then write to out.txt I've started the background task that will sleep for 8 seconds and then write "finished" to out.txt. 0s ran sleep 8 && echo finished > out.txt
 
+## claude/helper-calls.jsonl
+Asked a helper: Count files in the working directory Waiting for the agent to count the files in the directory—it's running in the background and I'll report the result when it completes. The C:\work directory contains 5 files. 0s asked 1 subagent
+
 ## codex/approval-declined.jsonl
 I’ll run the requested marker command with the specified approval prompt. 1 step 1 declined APPROVAL_DECLINED 0s 1 declined
 

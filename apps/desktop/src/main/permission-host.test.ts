@@ -86,6 +86,22 @@ describe('the permission host', () => {
     expect(answer).toEqual({ behavior: 'allow', updatedInput: { limit: 5 } })
   })
 
+  it("names the call that asks, so a helper's card can name the helper (helper visibility)", async () => {
+    const { host, cards } = await hostWithCards()
+    const { configPath } = await host.register({ runId: 'run1', missionId: 'm1', cwd: 'C:/work' })
+    const token = tokenOf(configPath)
+    const asked = post(host.port, { token, toolName: 'Bash', input: { command: 'ls' }, toolUseId: 'toolu_0134dcHNk1GH8kL57hFJ7THL' })
+    const odd = post(host.port, { token, toolName: 'Bash', input: { command: 'pwd' }, toolUseId: 'not an id; rm -rf' })
+    await new Promise((r) => setTimeout(r, 30))
+    const card = (command: string): MissionApprovalRequest | undefined => cards.find((each) => each.detail.includes(command))
+    expect(card('ls')?.toolUseId).toBe('toolu_0134dcHNk1GH8kL57hFJ7THL')
+    // Anything that is not an id is not carried.
+    expect(card('pwd')).toBeDefined()
+    expect('toolUseId' in card('pwd')!).toBe(false)
+    cards.forEach((card) => host.decide({ approvalId: card.approvalId, decision: 'deny' }))
+    await Promise.all([asked, odd])
+  })
+
   it('carries a denial to the model with a sentence, not a bare refusal', async () => {
     const { host, cards } = await hostWithCards()
     const { configPath } = await host.register({ runId: 'run1', missionId: 'm1', cwd: null })

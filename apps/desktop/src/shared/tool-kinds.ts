@@ -135,3 +135,13 @@ export function reportsAChange(tool: { readonly name: string; readonly toolKind?
   if (isShellTool(tool.name, tool.toolKind)) return tool.command !== undefined && isEditCommand(tool.command)
   return editToolName(tool.name)
 }
+
+/**
+ * Whether a tool call was made BY A HELPER the teammate sent out rather than
+ * by the teammate (ledger v22, helper visibility 2026-10-05). Its row is drawn
+ * under the helper's, and it stays out of everything that says what the
+ * teammate itself did: the turn's counts, the face, the live line, the rail.
+ */
+export function byHelper(payload: { readonly parentItemId?: unknown }): boolean {
+  return typeof payload.parentItemId === 'string' && payload.parentItemId.length > 0
+}

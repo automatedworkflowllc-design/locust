@@ -551,10 +551,38 @@ export function ActivityCard({
                       <DiffView file={entry.file} truncated={entry.truncated} reported={entry.reported} />
                     ))}
                 </>
+              ) : entry.kind === 'helper' && entry.calls !== undefined && entry.calls.length > 0 ? (
+                /*
+                 * A HELPER THAT SAYS WHAT IT DID (helper visibility,
+                 * 2026-10-05). Colin: "users are probably going to want to
+                 * inspect when one of the 'helpers/agents' is sent out." Its
+                 * calls are counted on its row and fold under it, closed until
+                 * pressed, one step in -- Claude Code's helper line. Closed by
+                 * default whatever the card opens first: they are the helper's
+                 * working, not the teammate's.
+                 */
+                <>
+                  <button type="button" className="lc-filerow is-helper" onClick={() => toggle(entry)} aria-expanded={toggled.get(entry.key) === true}>
+                    <Icon name="users" size={14} />
+                    <span className="lc-filerow__path">{entry.description}</span>
+                    <span className="lc-filerow__status">{entry.subagentType === undefined ? 'subagent' : `${entry.subagentType} subagent`}</span>
+                    <span className="lc-filerow__status lc-helper__count">{helperCallCount(entry.calls)}</span>
+                    <span
+                      className={`lc-filerow__result ${helperTone(entry, finished)}`}
+                      {...(entry.summary === undefined ? {} : { title: entry.summary })}
+                    >
+                      {helperResult(entry, finished)}
+                    </span>
+                    <span className="lc-activity__chev" aria-hidden="true">
+                      <Icon name={toggled.get(entry.key) === true ? 'chevron-down' : 'chevron-right'} size={12} />
+                    </span>
+                  </button>
+                  {toggled.get(entry.key) === true && <HelperCalls calls={entry.calls} finished={finished} workspacePath={workspacePath} />}
+                </>
               ) : entry.kind === 'helper' ? (
-                // A helper the runtime started for itself. What it did inside
-                // is the runtime's business and not reported; what it was
-                // asked, and whether it came back, is.
+                // A helper the runtime started for itself. Where the runtime
+                // does not say what it did inside, what it was asked, and
+                // whether it came back, is all there is to show.
                 <div className="lc-filerow is-static is-helper">
                   <Icon name="users" size={14} />
                   <span className="lc-filerow__path">{entry.description}</span>
@@ -918,15 +946,111 @@ export function ActivityCard({
  * app claiming a report nobody had made. It works in the background, saying
  * what it is doing, until the runtime says it came back.
  */
+/** "1 call", "7 calls": how much a helper did, on its row. */
+export function helperCallCount(calls: readonly ActivityEntry[]): string {
+  return calls.length === 1 ? '1 call' : `${String(calls.length)} calls`
+}
+
+/**
+ * A helper's own calls, under its row, one step in (helper visibility,
+ * 2026-10-05). The rows the teammate's calls use, in their words: what was
+ * read, searched, run or changed, and how it ended. A turn that has ended has
+ * nothing still running in it, so an unsettled call there "did not report",
+ * as the teammate's own rows say.
+ */
+export function HelperCalls({
+  calls,
+  finished,
+  workspacePath
+}: {
+  readonly calls: readonly ActivityEntry[]
+  readonly finished: boolean
+  readonly workspacePath: string | undefined
+}): ReactElement {
+  const ended = (settled: boolean, failed: boolean, neverRan?: string): { readonly word: string; readonly tone: string } =>
+    !settled
+      ? finished ? { word: 'did not report', tone: 'is-stalled' } : { word: 'running', tone: 'is-running' }
+      : neverRan !== undefined ? { word: neverRan, tone: 'is-stalled' } : failed ? { word: 'failed', tone: 'is-failed' } : { word: 'done', tone: 'is-muted' }
+  return (
+    <div className="lc-helper__calls" role="list" aria-label="What the helper did">
+      {calls.map((call) => {
+        if (call.kind === 'file') {
+          return (
+            <div key={call.key} role="listitem" className="lc-filerow is-static">
+              <Icon name="file" size={14} />
+              <span className="lc-filerow__path" title={call.file.path}>{displayPath(call.file.path, workspacePath)}</span>
+              <span className="lc-filerow__status">{call.file.status}</span>
+              <span className="lc-filerow__result">
+                <span className="lc-diff__addmark">+{call.counts.added}</span>
+                <span className="lc-diff__delmark">−{call.counts.removed}</span>
+              </span>
+            </div>
+          )
+        }
+        if (call.kind === 'shell') {
+          const result = ended(call.settled, call.failed, call.refused === undefined ? undefined : call.declined === true ? 'declined' : 'refused')
+          return (
+            <div key={call.key} role="listitem" className="lc-filerow is-shell is-static">
+              <Icon name="terminal" size={14} />
+              <span className="lc-filerow__path lc-mono" title={call.command}>{call.title ?? call.command}</span>
+              <span className={`lc-filerow__result ${result.tone}`}>{result.word}</span>
+            </div>
+          )
+        }
+        if (call.kind === 'tool' || call.kind === 'unreported') {
+          const result = ended(call.settled, call.failed, call.neverRan)
+          return (
+            <div key={call.key} role="listitem" className="lc-filerow is-static">
+              <Icon name={call.kind === 'tool' ? 'activity' : 'file'} size={14} />
+              <span className="lc-filerow__path" title={call.name}>{displayPath(call.name, workspacePath)}</span>
+              {call.tool !== undefined && <span className="lc-filerow__status">{fileToolWord(call.tool)}</span>}
+              <span className={`lc-filerow__result ${result.tone}`}>{result.word}</span>
+            </div>
+          )
+        }
+        if (call.kind === 'helper') {
+          const result = ended(call.settled, call.failed)
+          return (
+            <div key={call.key} role="listitem" className="lc-filerow is-static is-helper">
+              <Icon name="users" size={14} />
+              <span className="lc-filerow__path">{call.description}</span>
+              <span className="lc-filerow__status">{call.subagentType === undefined ? 'subagent' : `${call.subagentType} subagent`}</span>
+              <span className={`lc-filerow__result ${result.tone}`}>{result.word}</span>
+            </div>
+          )
+        }
+        return null
+      })}
+    </div>
+  )
+}
+
 /** A thought's words without the headline its line already shows (0.493). */
 export function withoutHeadline(text: string): string {
   return thoughtHeadline(text) === undefined ? text : text.replace(/^\s*\*\*[^*\n]{2,80}\*\*\s*/, '')
 }
 
+/**
+ * A helper's one-line summary as words (0.625). It is the helper's own text,
+ * often Markdown, set on one line beside its row -- where "**33** files total"
+ * read with its asterisks (the helper drive's frame, 2026-10-05). The marks
+ * go; the words, and code spans' contents, stay.
+ */
+export function plainSummary(text: string): string {
+  return text
+    .replace(/^\s*#{1,6}\s+/, '')
+    .replace(/\*\*([^*\n]+)\*\*/g, '$1')
+    .replace(/__([^_\n]+)__/g, '$1')
+    .replace(/`([^`\n]+)`/g, '$1')
+    .replace(/(^|[\s(])\*([^*\s][^*\n]*?)\*(?=$|[\s).,!?:;])/g, '$1$2')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 export function helperResult(entry: Extract<ActivityEntry, { kind: 'helper' }>, finished: boolean): string {
   if (!entry.settled) return finished ? 'did not report' : 'working on it'
   if (entry.failed) return 'failed'
-  const back = entry.summary === undefined ? 'reported back' : `reported back · ${entry.summary}`
+  const back = entry.summary === undefined ? 'reported back' : `reported back · ${plainSummary(entry.summary)}`
   if (entry.background !== true) return back
   switch (entry.backgroundEnded) {
     case 'completed':

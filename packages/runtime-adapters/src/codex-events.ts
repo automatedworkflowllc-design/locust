@@ -173,6 +173,16 @@ export interface ToolPayload {
    * the desktop then times the call by when its start and end arrived.
    */
   readonly durationMs?: number;
+  /**
+   * The helper this call was made BY, when the teammate did not make it
+   * itself: the item id of the call that sent the helper out (Claude Code's
+   * Agent call, whose id its helper's records carry as `parent_tool_use_id`).
+   * The desktop draws the call under that helper's row and keeps it out of
+   * the teammate's own counts. Absent on every call the teammate made, and
+   * on every runtime that does not say (helper visibility, 2026-10-05;
+   * ledger v22).
+   */
+  readonly parentItemId?: string;
   readonly phase: "started" | "updated" | "completed";
   readonly evidence: CodexEventEvidence;
 }

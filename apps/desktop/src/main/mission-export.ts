@@ -3,7 +3,7 @@ import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
 import { runtimeDisplayName } from '../shared/runtimes.js'
 import { scrubSecrets } from '../shared/secrets.js'
-import { isShellTool, isEditCommand, reportsAChange } from '../shared/tool-kinds.js'
+import { byHelper, isShellTool, isEditCommand, reportsAChange } from '../shared/tool-kinds.js'
 
 /**
  * SAVE THE RECORD: one conversation, as one Markdown file.
@@ -136,6 +136,8 @@ interface Call {
   readonly durationMs?: number
   readonly startedAt: string
   readonly background?: boolean
+  /** Made by a helper the teammate sent out, not by the teammate (ledger v22). */
+  readonly byHelper?: true
   /** A tool.completed or tool.failed was recorded. */
   readonly settled: boolean
   readonly failed: boolean
@@ -163,6 +165,7 @@ function callsIn(events: readonly NormalizedRuntimeEvent[]): readonly Call[] {
       ...(p.patch !== undefined ? { patch: p.patch } : before?.patch !== undefined ? { patch: before.patch } : {}),
       ...(p.durationMs !== undefined ? { durationMs: p.durationMs } : before?.durationMs !== undefined ? { durationMs: before.durationMs } : {}),
       ...(p.background === true || before?.background === true ? { background: true } : {}),
+      ...(byHelper(p) || before?.byHelper === true ? { byHelper: true as const } : {}),
       startedAt: before?.startedAt ?? event.occurredAt,
       settled: settled || before?.settled === true,
       failed: event.type === 'tool.failed' || before?.failed === true
@@ -198,6 +201,12 @@ function duration(ms: number | undefined): string | undefined {
 }
 
 function callState(call: Call): string {
+  // A helper's call is still a call that ran here; the record says whose it was.
+  const by = call.byHelper === true ? ' · made by a helper the teammate sent out' : ''
+  return `${ownCallState(call)}${by}`
+}
+
+function ownCallState(call: Call): string {
   if (isDeclined(call)) return 'declined; it did not run'
   if (isRefused(call)) return 'refused; it did not run'
   if (!call.settled) return 'no result was recorded'
