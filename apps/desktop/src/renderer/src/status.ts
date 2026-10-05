@@ -1724,6 +1724,25 @@ export function runtimeListOrder(
  */
 const NO_ANSWER_YET: ReadonlySet<string> = new Set(['probe-failed', 'offline'])
 
+/**
+ * THE AGENTS AN ANSWER STILL CALLS "BEING CHECKED" WHOSE CHECK HAS FINISHED (0.639).
+ *
+ * Since 0.634 the first screen waits for no agent past two seconds: a slow one
+ * is shown as being checked, and when its check lands the host stores the
+ * answer and the window, told the check finished, asks again. Two orders
+ * lost that: the finish arrived before the window held any list (so it named
+ * nobody being checked), or the window's ask reached the host a tick before
+ * the answer was stored (so it came back "being checked" and nothing else
+ * would ever say otherwise). Measured on the packaged 0.638: OpenCode
+ * answered two seconds in, and its nine free models in the picker said
+ * CHECKING forty seconds later, reopened or not, while the host's own list
+ * said ready. The window keeps the ids whose checks have finished; an answer
+ * that still calls one of them being checked is read again.
+ */
+export function staleChecking(runtimes: readonly PublicRuntimeStatus[], finished: ReadonlySet<string>): readonly string[] {
+  return runtimes.filter((entry) => entry.checking === true && entry.status !== 'ready' && finished.has(entry.id)).map((entry) => entry.id)
+}
+
 export function keepWhatWasKnown(
   previous: readonly PublicRuntimeStatus[],
   next: readonly PublicRuntimeStatus[]

@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.639.0 - 2026-10-05
+
+### Fixed
+
+- **A slow AI tool's models stop saying "checking" once its check is done.** Since 0.634, Locust opens without waiting for the slowest tool, shows that tool as being checked, and updates it when the answer arrives. A few times in a dozen launches, OpenCode's models in the model picker still said "checking" long after OpenCode had answered, so they could not be picked. Locust now notices when the list in the window still calls a finished check "checking", and reads the stored answer again. The cause was not pinned down, because it did not happen again on demand; this closes both ways found for it to happen.
+
 ## 0.638.0 - 2026-10-05
 
 ### Fixed
