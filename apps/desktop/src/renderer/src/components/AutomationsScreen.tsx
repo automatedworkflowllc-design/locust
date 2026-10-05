@@ -1,11 +1,12 @@
 import type { ReactElement } from 'react'
 import { BOT_SIZE } from '../botSizes.js'
 
-import type { PublicFolder, PublicRoutine, PublicTeammate } from '../../../shared/ipc.js'
+import type { PublicFolder, PublicRoutine, PublicTeammate, RoutineTemplateInfo } from '../../../shared/ipc.js'
 import { shortAgo } from '../railFlyout.js'
 import { routineChain, routineRunSummary, routineScheduleSummary, routineStepLabel, routineWaitsForYou } from '../routines.js'
 import { NOTHING_TO_SAVE_YET, savableConversations, turnsLabel } from '../savableConversations.js'
 import { RoutineChanges } from './RoutineChanges.js'
+import { RoutineTemplateList, templatesLine } from './RoutineTemplates.js'
 import type { SavableConversation } from '../savableConversations.js'
 import { Icon } from './Icon.js'
 import { ScreenHeader } from './Screens.js'
@@ -47,6 +48,9 @@ export function AutomationsScreen({
   onNewRoutine,
   onImportRoutine,
   onExportRoutine,
+  templates = [],
+  onUseTemplate,
+  onBrowseTemplates,
   onSettleRoutine,
   folders = [],
   signInOn = false,
@@ -61,6 +65,12 @@ export function AutomationsScreen({
   readonly onNewRoutine?: () => void
   readonly onImportRoutine?: () => void
   readonly onExportRoutine?: (routineId: string) => void
+  /** The starter routines Locust ships (0.615): listed when the shelf is empty, a row away when it is not. */
+  readonly templates?: readonly RoutineTemplateInfo[]
+  /** Open one as an import preview. */
+  readonly onUseTemplate?: (id: string) => void
+  /** The list, in a dialog, for a shelf that already has routines. */
+  readonly onBrowseTemplates?: () => void
   readonly routines: readonly PublicRoutine[]
   /** The folders Locust knows, so a routine's card names the one it runs in (0.512). */
   readonly folders?: readonly PublicFolder[]
@@ -102,6 +112,7 @@ export function AutomationsScreen({
   const scheduled = ordered.filter((routine) => routine.schedule !== undefined).length
   const ownerOf = (routine: PublicRoutine): PublicTeammate | undefined =>
     teammates.find((teammate) => teammate.teammateId === routine.teammateId)
+  const offered = templates.length > 0 && onUseTemplate !== undefined
 
   return (
     <section className="lc-screen lc-automations" aria-label="Routines">
@@ -192,9 +203,10 @@ export function AutomationsScreen({
             /*
              * A brand-new workspace has no finished conversations either, and
              * only then is the old sentence's job gone: there is no gesture to
-             * name because there is nothing to name it about.
+             * name because there is nothing to name it about. With starter
+             * routines to offer (0.615), they are the material instead.
              */
-            <p className="lc-empty__how">{NOTHING_TO_SAVE_YET}</p>
+            offered ? null : <p className="lc-empty__how">{NOTHING_TO_SAVE_YET}</p>
           ) : (
             <div className="lc-savable">
               {/*
@@ -236,6 +248,18 @@ export function AutomationsScreen({
                 )
               })}
               </div>
+            </div>
+          )}
+          {/*
+            * THE STARTER ROUTINES (0.615, the PRD's R16): ready-made jobs, so a
+            * new person's first look at this screen is a list of things a
+            * routine does rather than a sentence about how to make one. Each
+            * opens the import preview; nothing is added until its Add.
+            */}
+          {offered && (
+            <div className="lc-savable">
+              <p className="lc-savable__head">{savable.length === 0 ? 'Start from a template, or press New routine to write your own.' : 'Or start from a template.'}</p>
+              <RoutineTemplateList templates={templates} onUse={onUseTemplate} />
             </div>
           )}
         </div>
@@ -398,6 +422,18 @@ export function AutomationsScreen({
                 <span className="lc-routinerow__meta lc-mono">
                   Right-click any conversation, then Save as routine
                 </span>
+              </span>
+            </button>
+          )}
+          {/* The starter routines stay a row away once the shelf has routines (0.615). */}
+          {onBrowseTemplates !== undefined && templates.length > 0 && (
+            <button type="button" className="lc-routinerow lc-routineadd" onClick={onBrowseTemplates}>
+              <span className="lc-routineadd__plus" aria-hidden="true">
+                <Icon name="plus" size={14} />
+              </span>
+              <span className="lc-routinerow__name">
+                Start from a template
+                <span className="lc-routinerow__meta lc-mono">{templatesLine(templates)}</span>
               </span>
             </button>
           )}
