@@ -31,6 +31,9 @@ const FREE = process.env.LOCUST_FREE_MODEL ?? 'opencode/nemotron-3-ultra-free'
 const WIDTH = Number(arg('--width') ?? 1920)
 const HEIGHT = Number(arg('--height') ?? 1080)
 const SCALE = Number(arg('--scale') ?? 1)
+// --only run,approval re-shoots those sections and leaves the other frames as they are.
+const ONLY = arg('--only')?.split(',').map((name) => name.trim())
+const want = (name) => ONLY === undefined || ONLY.includes(name)
 await mkdir(SHOTS, { recursive: true })
 
 const workspace = 'C:/acme-storefront'
@@ -105,6 +108,17 @@ const type = (text) => `(async () => {
   }
   return 'sent'
 })()`
+// The conversation's mode, from its own control: a frame of an applied fix needs Edit, and
+// the routine's conversation Wren is opened in is in Ask (0.619's run: "5 refused").
+const setMode = (name) => `(async () => {
+  const control = [...document.querySelectorAll('.lc-control')].find((b) => /^(Ask|Edit|Accept edits|Plan|Approve|Auto)\\b/.test(b.innerText))
+  if (!control) return 'no mode control'
+  control.click(); await new Promise((r) => setTimeout(r, 400))
+  const item = [...document.querySelectorAll('[role=menuitemradio]')].find((b) => b.innerText.trim().startsWith(${JSON.stringify(name)}))
+  if (!item || item.disabled) { control.click(); return 'not offered' }
+  item.click(); await new Promise((r) => setTimeout(r, 400))
+  return 'mode: ' + control.innerText.split(/\\s+/).join(' ').trim()
+})()`
 const waitEnd = `(async () => {
   for (let i = 0; i < 900; i += 1) {
     await new Promise((r) => setTimeout(r, 500))
@@ -118,6 +132,7 @@ try {
   await drive.send('Emulation.setDeviceMetricsOverride', { width: WIDTH, height: HEIGHT, deviceScaleFactor: SCALE, mobile: false })
   await sleep(3000)
 
+  if (want('home')) {
   // 1. Home: the cover with the team. Quill picked first, so the composer's
   // chip names a model ("Claude / Opus 5.5"), never "Account Default".
   await drive.evaluate(openTeammateScript('Quill'))
@@ -125,7 +140,9 @@ try {
   await drive.evaluate(`document.querySelector('button.lc-brand__lockup')?.click()`)
   await sleep(4000)
   await shoot('01-home.png', 'Home with six teammates on four runtimes')
+  }
 
+  if (want('picker')) {
   // 2. The model picker, from Quill's composer (Claude Code), searched to show Claude and Codex.
   await drive.evaluate(openTeammateScript('Quill'))
   await sleep(1200)
@@ -138,7 +155,9 @@ try {
   await shoot('02-model-picker.png', `the model picker open (${picker})`)
   await drive.evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`)
   await sleep(600)
+  }
 
+  if (want('handoff')) {
   // 5. A hand-off chain across two runtimes: Wren (OpenCode) diagnoses, Atlas (Codex) checks.
   await drive.evaluate(`(async () => {
     ;[...document.querySelectorAll('.lc-sidebar__nav button')].find((b) => /Routines/.test(b.innerText))?.click()
@@ -159,9 +178,14 @@ try {
     return (document.querySelector('.lc-thread')?.innerText ?? '').replace(/\\s+/g, ' ').slice(-200)
   })()`))
   await shoot('05-hand-off.png', `Atlas (Codex) checks Wren's (OpenCode) step: ${/approved by Atlas/.test(chain) ? 'approved' : /asked for changes|gave no verdict/.test(chain) ? 'NOT approved' : 'verdict not seen'}`)
-  // 3. A run in progress, and 6. its finished result: Wren fixes the bug.
+  }
+
+  if (want('run')) {
+  // 3. A run in progress, and 6. its finished result: Wren fixes the bug, in Edit.
   await drive.evaluate(openTeammateScript('Wren'))
   await sleep(1000)
+  const wrenMode = String(await drive.evaluate(setMode('Edit')))
+  say(`  Wren's conversation: ${wrenMode}`)
   await drive.evaluate(type('Fix the bug in issue.md: make total() in src/cart.py return the right total, and add a test for it in tests/. Keep a short todo list as you go.'))
   const midway = String(await drive.evaluate(`(async () => {
     for (let i = 0; i < 120; i += 1) {
@@ -176,25 +200,36 @@ try {
   await sleep(2500)
   await drive.evaluate(`document.querySelector('.lc-thread')?.scrollTo?.(0, 1e9)`)
   await shoot('06-finished.png', `Wren's run ${wren}: the result`)
+  }
 
+  if (want('approval')) {
   // 4. An approval card: Sable in Approve each asks before running a command.
   await drive.evaluate(openTeammateScript('Sable'))
   await sleep(1000)
-  await drive.evaluate(type('Run python -m pytest -q in this folder and tell me the result in one line.'))
-  const card = String(await drive.evaluate(`(async () => {
-    for (let i = 0; i < 240; i += 1) {
-      await new Promise((r) => setTimeout(r, 500))
-      if (document.querySelector('[role=group][aria-label="Approval required"]')) return 'card'
-      if (i > 10 && !document.querySelector('button[aria-label^="Stop the running"]')) return 'ended without a card'
-    }
-    return 'no card'
-  })()`))
+  const askSable = async () => {
+    await drive.evaluate(type('Run python -m pytest -q in this folder and tell me the result in one line.'))
+    return String(await drive.evaluate(`(async () => {
+      for (let i = 0; i < 240; i += 1) {
+        await new Promise((r) => setTimeout(r, 500))
+        if (document.querySelector('[role=group][aria-label="Approval required"]')) return 'card'
+        if (i > 10 && !document.querySelector('button[aria-label^="Stop the running"]')) return 'ended without a card'
+      }
+      return 'no card'
+    })()`))
+  }
+  let card = await askSable()
+  // OpenCode's serve path failed to come up once (0.619's run: "could not be reached just now"); one more try, said.
+  if (card !== 'card' && /could not be reached/.test(String(await drive.evaluate(`document.querySelector('.lc-thread')?.innerText ?? ''`)))) {
+    say('  OpenCode could not be reached on the first try; asking once more in 20 s')
+    await sleep(20_000)
+    card = await askSable()
+  }
   await shoot('04-approval.png', `Sable asks first (${card})`)
   // 9. The Board, while Sable's card waits: a conversation under "Needs you", the others by state.
   const board = String(await drive.evaluate(`(async () => {
-    document.querySelector('button[aria-label="Board"]')?.click()
+    ;[...document.querySelectorAll('button')].find((b) => b.innerText.trim() === 'Board')?.click()
     await new Promise((r) => setTimeout(r, 1500))
-    return [...document.querySelectorAll('.lc-board__col, [class*=lc-board__column]')].map((col) => col.querySelector('h2, h3, [class*=title]')?.textContent.trim() + ' ' + col.querySelectorAll('[class*=card]').length).join(' | ') || (document.querySelector('.lc-screen__title')?.textContent ?? 'no board')
+    return [...document.querySelectorAll('.lc-boardsection')].map((section) => (section.querySelector('.lc-boardsection__title')?.textContent.trim() ?? '') + ' ' + (section.querySelector('.lc-boardsection__count')?.textContent.trim() ?? '')).join(' | ') || (document.querySelector('.lc-screen__title')?.textContent ?? 'no board')
   })()`))
   await shoot('09-board.png', `the Board while Sable's card waits (${board})`)
   await drive.evaluate(openTeammateScript('Sable'))
@@ -208,7 +243,9 @@ try {
     }
   })()`)
   await drive.evaluate(waitEnd)
+  }
 
+  if (want('blind')) {
   // 7 and 8. A Blind compare: Haiku 4.5 (Claude Code) and GPT-6-Luna (Codex) answer one short
   // ask; the names stay hidden until one answer is kept, then the same view shows them.
   const blind = String(await drive.evaluate(`(async () => {
@@ -261,6 +298,7 @@ try {
     return [...document.querySelectorAll('.lc-compare__head')].map((el) => el.innerText.replace(/\\s+/g, ' ').trim()).join(' | ')
   })()`))
   await shoot('08-blind-revealed.png', `the same compare after one answer was kept, names shown (${revealed})`)
+  }
 
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

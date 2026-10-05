@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.620.0 - 2026-10-05
+
+### Fixed
+
+- **"Always" on Codex goes through your saved rules too.** 0.616 did this for Claude Code, OpenCode and Copilot; Codex kept its own Always for the rest of the run, so a rule of yours that says no never saw what that Always let through. Now an Always you give a Codex card covers exactly that command, or that change to those files, again; Codex asks about each request, Locust answers from your rules first, and the record says when your Always decided. A Codex request that names neither a command nor a file keeps the old behaviour, and the card says so.
+
+### Improved
+
+- **The documents beside the source describe the product as built.** The architecture page, the project page and the contributor notes published with Locust's source said what was planned in September, not what was built; they now say what runs where, how an agent is gated, what the record is, and what was planned and built differently instead.
+
 ## 0.619.0 - 2026-10-04
 
 ### Fixed
