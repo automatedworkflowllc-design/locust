@@ -72,6 +72,9 @@ try {
     return drive.evaluate(`(async () => {
       document.querySelector('button[title="Settings (Ctrl 3)"]').click()
       await new Promise((r) => setTimeout(r, 900))
+      // Check after edits is on the Project folder page in Settings (settingsPages.ts).
+      ;[...document.querySelectorAll('.lc-settings__navitem, button')].find((b) => b.innerText.trim() === 'Project folder')?.click()
+      await new Promise((r) => setTimeout(r, 900))
       const input = document.querySelector('input[aria-label="Check after edits"]')
       if (!input) return 'NO CHECK AFTER EDITS ROW'
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'node check.js')

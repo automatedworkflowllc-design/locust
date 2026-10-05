@@ -13,6 +13,7 @@ import { routineFor } from '../petRoutines.js'
 import { usePetLook } from '../pets.js'
 import { Bot } from './Bot.js'
 import type { BotMood, EyeGlyphs, Glance, Phosphor } from './Bot.js'
+import { PetPuppet } from './PetPuppet.js'
 import { PetSprite } from './PetSprite.js'
 import { PRESENCE_TONE } from './PixelFace.js'
 import { RuntimeMark } from './RuntimeMark.js'
@@ -372,15 +373,20 @@ export function TeammateBot({
    * screen (2026-10-05, petScreens.ts): Codex Buddy. While Terminal faces is
    * on, he wears one unless his teammate's look says as drawn (PetRef.screen),
    * with a bot's eyes and their changes, a bot's everyday life at rest, and
-   * his own moves for each (petRoutines.ts).
+   * his own moves for each (petRoutines.ts). The other pets Colin kept are
+   * puppets on a bot's rig (petPuppets.ts): a teammate wearing one lives as a
+   * bot does, its moods, hops and glances, a screen with a bot's eyes on its face.
    */
   const pet = avatar.pet
   const petNow = usePetLook(pet)
   const wearsPet = pet !== undefined && petNow?.status !== 'missing'
   const terminal = useTerminalFaces()
-  const routine = wearsPet && terminal && pet.screen !== false && petNow?.status === 'ready' && petNow.atlas.screen !== undefined ? routineFor(pet.id) : undefined
+  const atlas = petNow?.status === 'ready' ? petNow.atlas : undefined
+  const screened = wearsPet && terminal && pet.screen !== false
+  const routine = screened && atlas?.screen !== undefined ? routineFor(pet.id) : undefined
+  const puppet = screened && routine === undefined ? atlas?.puppet : undefined
   // Its everyday life (faceLife.ts): a bot's, and a screen-faced pet's; any other pet's own rows are its motion.
-  const answers = !wearsPet || routine !== undefined
+  const answers = !wearsPet || routine !== undefined || puppet !== undefined
   const atRest = shownActivity === 'idle' && answers
   const listening = useListening(hears && atRest)
   const moment = useIdleMoment(atRest && presenceSized && !noticed && !listening, seed, MOMENT_EVERY[motion], routine?.moment)
@@ -393,7 +399,7 @@ export function TeammateBot({
   }
   return (
     <span
-      className={`lc-face lc-bot${bounces && !wearsPet ? ' is-bouncing' : ''}${className === undefined ? '' : ` ${className}`}`}
+      className={`lc-face lc-bot${bounces && (!wearsPet || puppet !== undefined) ? ' is-bouncing' : ''}${className === undefined ? '' : ` ${className}`}`}
       style={{ position: 'relative', display: 'inline-flex', width: size, height: size, flexShrink: 0 }}
       {...(name === undefined ? { 'aria-hidden': true } : { role: 'img', 'aria-label': name, title: name })}
       data-activity={activity}
@@ -405,7 +411,29 @@ export function TeammateBot({
       {...(presenceSized && answers ? { onPointerEnter: () => notice(true), onPointerLeave: () => notice(false) } : {})}
     >
       {activity === 'waiting' && <span className="lc-bot__ring" />}
-      {wearsPet ? (
+      {wearsPet && puppet !== undefined && atlas !== undefined ? (
+        <PetPuppet
+          pet={pet}
+          atlas={atlas}
+          puppet={puppet}
+          size={size}
+          petState={petStateFor(shownActivity)}
+          state={face.state ?? state}
+          paused={paused && glance === undefined && !face.lively}
+          seed={seed}
+          hop={hops}
+          follows={noticed}
+          {...(motionPresence === undefined ? {} : { motionPresence })}
+          {...(face.eyes === undefined ? {} : { eyes: face.eyes })}
+          {...(face.mood === undefined ? {} : { mood: face.mood })}
+          blinkKey={face.key}
+          {...((teammateId ?? name) === undefined ? {} : { bootKey: teammateId ?? name })}
+          phosphor={phosphorFor(shownActivity)}
+          {...(flashFor(shownActivity) === undefined ? {} : { flash: flashFor(shownActivity) })}
+          {...(glance !== undefined ? { glance: GLANCE_TOWARD[glance] } : face.glance === undefined ? {} : { glance: face.glance })}
+          {...(jumpEvery === undefined ? {} : { jumpEvery })}
+        />
+      ) : wearsPet ? (
         <PetSprite
           pet={pet}
           size={size}

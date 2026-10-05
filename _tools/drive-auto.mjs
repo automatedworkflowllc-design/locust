@@ -95,6 +95,9 @@ try {
   await drive.capture('Settings still owns the switch, and still says what it permits', () => drive.evaluate(`(async () => {
     document.querySelector('button[title="Settings (Ctrl 3)"]').click()
     await new Promise(r => setTimeout(r, 900))
+    // Auto mode is on the Teammates page in Settings (settingsPages.ts).
+    ;[...document.querySelectorAll('.lc-settings__navitem, button')].find((b) => b.innerText.trim() === 'Teammates')?.click()
+    await new Promise(r => setTimeout(r, 900))
     const heading = [...document.querySelectorAll('.lc-settings__heading')].find(h => /Auto mode/.test(h.textContent))
     if (!heading) return 'no Auto mode section'
     heading.scrollIntoView({ block: 'start' })
@@ -141,6 +144,9 @@ try {
 
   await drive.capture('switched off in Settings: the composer moves off Auto, and Auto stays offered', () => drive.evaluate(`(async () => {
     document.querySelector('button[title="Settings (Ctrl 3)"]').click()
+    await new Promise(r => setTimeout(r, 900))
+    // Auto mode is on the Teammates page in Settings (settingsPages.ts).
+    ;[...document.querySelectorAll('.lc-settings__navitem, button')].find((b) => b.innerText.trim() === 'Teammates')?.click()
     await new Promise(r => setTimeout(r, 900))
     const heading = [...document.querySelectorAll('.lc-settings__heading')].find(h => /Auto mode/.test(h.textContent))
     heading.closest('.lc-settings__section').querySelector('button[role=switch]').click()

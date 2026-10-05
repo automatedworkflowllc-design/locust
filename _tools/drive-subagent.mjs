@@ -81,6 +81,9 @@ try {
     const tooltip = chip?.title ?? 'no chip'
     document.querySelector('button[title="Settings (Ctrl 3)"]').click()
     await new Promise(r => setTimeout(r, 900))
+    // AI agents & accounts is on the AI agents page in Settings (settingsPages.ts).
+    ;[...document.querySelectorAll('.lc-settings__navitem, button')].find((b) => b.innerText.trim() === 'AI agents')?.click()
+    await new Promise(r => setTimeout(r, 900))
     const heading = [...document.querySelectorAll('.lc-settings__heading')].find(h => /AI agents|Runtimes/.test(h.textContent))
     heading?.scrollIntoView({ block: 'start' })
     await new Promise(r => setTimeout(r, 300))

@@ -38,6 +38,9 @@ const ON_SETTINGS = `(async () => {
   if (!tab) return 'no Settings tab'
   tab.click()
   await new Promise((r) => setTimeout(r, 1400))
+  // Swarm is on the Teammates page in Settings (settingsPages.ts).
+  ;[...document.querySelectorAll('.lc-settings__navitem, button')].find((b) => b.innerText.trim() === 'Teammates')?.click()
+  await new Promise((r) => setTimeout(r, 900))
   const headings = [...document.querySelectorAll('.lc-settings__heading')].map(flat)
   const swarmSwitch = [...document.querySelectorAll('[role=switch]')].filter((el) => {
     const section = el.closest('section, .lc-settings__section, div')
@@ -49,9 +52,12 @@ const ON_SETTINGS = `(async () => {
 
 const TOGGLE = `(async () => {
   const flat = (el) => el.innerText.split(/\\s+/).join(' ').trim()
+  // Swarm is on the Teammates page in Settings (settingsPages.ts).
+  ;[...document.querySelectorAll('.lc-settings__navitem, button')].find((b) => b.innerText.trim() === 'Teammates')?.click()
+  await new Promise((r) => setTimeout(r, 900))
   const heading = [...document.querySelectorAll('.lc-settings__heading')].find((h) => /^Swarm$/i.test(flat(h)))
   if (!heading) return 'no Swarm section'
-  const scope = heading.parentElement
+  const scope = heading.closest('.lc-settings__section, section, .lc-settingline')
   const sw = scope ? scope.querySelector('[role=switch]') : null
   if (!sw) return 'no switch under Swarm'
   const before = sw.getAttribute('aria-checked')

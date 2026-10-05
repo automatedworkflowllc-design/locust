@@ -138,7 +138,8 @@ try {
   // still shows the next face.
   await drive.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] })
   const away = await drive.evaluate(`(async () => {
-    const other = [...document.querySelectorAll('.lc-settings button, .lc-settings a')].find((b) => ['General', 'Teammates', 'Runtimes', 'Privacy'].includes(b.innerText.trim()))
+    // 'AI agents' and 'Privacy & data' in Settings (settingsPages.ts); were 'Runtimes' and 'Privacy'.
+    const other = [...document.querySelectorAll('.lc-settings button, .lc-settings a')].find((b) => ['General', 'Teammates', 'AI agents', 'Privacy & data'].includes(b.innerText.trim()))
     if (!other) return 'no other page'
     other.click()
     await new Promise((r) => setTimeout(r, 700))
