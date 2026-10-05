@@ -11,6 +11,14 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.640.0 - 2026-10-05
+
+### Fixed
+
+- **Test waits for a model of your own, and says what it found.** Tried against a real server, a small model running on a computer's processor took 8 seconds to answer Test's one-word question, and Test gave up after 8: it said the model answered, and nothing about whether it can use tools. Test now gives the model up to a minute and says "Testing…" while it waits. If it still cannot tell, it says so instead of leaving it out.
+- **A run is told its folder by its full path.** Every run is told which folder it works in. Told only the folder's name, a small model asked to make a file "in this folder" added that name to the folder it was already in, and wrote the file one folder too deep. Runs are now told the folder's full path, the same one their AI tool gives them, so there is nothing to add to it.
+- **Every connection Locust makes is listed, Test's included.** Test asks your model's address which models it serves, then sends the model one capped question. The public list of Locust's own connections, and Settings > Privacy & data, now say so. Settings > Your own models said a key is kept "as Windows encrypts it"; on a Mac the keychain does, so it now says "as your system encrypts it".
+
 ## 0.639.0 - 2026-10-05
 
 ### Fixed

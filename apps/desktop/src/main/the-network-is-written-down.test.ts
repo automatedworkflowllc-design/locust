@@ -22,8 +22,12 @@ import { CANARY_VERDICTS_URL } from './runtime-updates.js'
 const read = (path: string): string => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8')
 const NETWORK = read('../../../../docs/NETWORK.md')
 
-/** A line that reaches the network: a fetch, a socket, a server, the updater, the person's browser. */
-const REACHES = /\bfetch\(|\bhttps?\.(?:request|get)\(|\bnet\.(?:request|fetch)\(|new WebSocket\(|createServer\(|from 'electron-updater'|openExternal\(/
+/**
+ * A line that reaches the network: a fetch, a socket, a server, the updater, the person's browser.
+ * A fetch handed in, so a test can stand in for it, is a fetch too: own-models.ts's Test called
+ * `fetcher(` and went unseen until 0.640.
+ */
+const REACHES = /\bfetch(?:er)?\(|\bhttps?\.(?:request|get)\(|\bnet\.(?:request|fetch)\(|new WebSocket\(|createServer\(|from 'electron-updater'|openExternal\(/
 const code = (text: string): string[] => text.split('\n').filter((line) => !/^\s*(?:\/\/|\*|\/\*)/.test(line))
 
 /** Each file that reaches the network, how many places in it do, and the document's words for them. */
@@ -34,7 +38,9 @@ const LISTED: Readonly<Record<string, { readonly places: number; readonly said: 
   'runtime-updates.ts': { places: 1, said: ['Keeping Codex CLI and Copilot CLI current'] },
   'pet-library.ts': { places: 1, said: ['The pet gallery'] },
   'permission-host.ts': { places: 1, said: ['Locust\'s permission host listens on `127.0.0.1` only'] },
-  'antigravity-cascade.ts': { places: 1, said: ['Antigravity\'s own local server, at `127.0.0.1`'] }
+  'antigravity-cascade.ts': { places: 1, said: ['Antigravity\'s own local server, at `127.0.0.1`'] },
+  // Test: the models the address serves, then one capped chat request with a tool.
+  'own-models.ts': { places: 2, said: ['Testing one of your own models', 'When you press Test'] }
 }
 
 describe('every place Locust reaches the network is in docs/NETWORK.md', () => {
@@ -85,7 +91,7 @@ describe('the addresses are the ones the code uses', () => {
     const screens = read('../renderer/src/components/Screens.tsx')
     // One line of words, whatever the source's wrapping.
     const row = screens.slice(screens.indexOf('<dt>Network</dt>'), screens.indexOf('</dd>', screens.indexOf('<dt>Network</dt>'))).replace(/\s+/g, ' ')
-    for (const words of ['checks for and downloads its own updates', 'installs the AI agents you ask it to', 'keeps Codex CLI and Copilot CLI current', 'reads the pet gallery', '<NetworkListLink />']) expect(row, words).toContain(words)
+    for (const words of ['checks for and downloads its own updates', 'installs the AI agents you ask it to', 'keeps Codex CLI and Copilot CLI current', 'reads the pet gallery', 'a model of your own about it when you press Test', '<NetworkListLink />']) expect(row, words).toContain(words)
     const link = screens.slice(screens.indexOf('function NetworkListLink'), screens.indexOf('function fewNames'))
     expect(link).toContain('openLink(NETWORK_DOC_LINK).then')
     expect(link).toContain('Every connection, listed')

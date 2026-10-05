@@ -55,6 +55,31 @@ describe('where a run is told it stands', () => {
     // And the brief reads it as standing apart (index.ts).
     const host = readFileSync(fileURLToPath(new URL('./index.ts', import.meta.url)), 'utf8')
     expect(host).toMatch(/const standsApart = peer\?\.cwd !== undefined \|\| conversation\?\.ownFolder !== undefined/)
-    expect(host).toMatch(/sections\.push\(\.\.\.folderSentences\(brief, standsApart, here\.name\)\)/)
+    expect(host).toMatch(/sections\.push\(\.\.\.folderSentences\(brief, standsApart, here\.path\)\)/)
+  })
+})
+
+/**
+ * THE FOLDER BY ITS FULL PATH (0.640).
+ *
+ * A 3B model on llama.cpp's server, through OpenCode, told `Instructions for
+ * the folder "locust-drive-own-real-ws-wRuWIh"` from inside that folder and
+ * asked for hello.txt "in this folder", wrote
+ * `locust-drive-own-real-ws-wRuWIh/locust-drive-own-real-wRuWIh/hello.txt`
+ * (drive-own-model-real, packaged 0.639): OpenCode's write tool takes a full
+ * path, and the model made one from its working folder plus the name. Told
+ * the full path, which is its working folder, there is nothing to add.
+ */
+describe('a run in the project folder is told the folder by its full path', () => {
+  const folder = 'C:\\Users\\me\\work\\shop'
+
+  it('in its own line, and in its LOCUST.md section', () => {
+    expect(folderSentences(undefined, false, folder).join('\n')).toContain(`You are working in the folder "${folder}".`)
+    expect(folderSentences(brief, false, folder).join('\n')).toContain(`Instructions for the folder "${folder}", from its LOCUST.md.`)
+  })
+
+  it('and a run in its own copy still hears neither', () => {
+    expect(folderSentences(undefined, true, folder).join('\n')).not.toContain(folder)
+    expect(folderSentences(brief, true, folder).join('\n')).not.toContain(folder)
   })
 })

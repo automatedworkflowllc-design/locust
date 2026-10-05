@@ -89,7 +89,8 @@ const type = (selector, value) => `(() => {
 const settingsRuntimes = `(async () => {
   window.dispatchEvent(new KeyboardEvent('keydown', { key: '3', ctrlKey: true, bubbles: true }))
   await new Promise((r) => setTimeout(r, 900))
-  ;[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'AI agents')?.click()
+  // Its own page in Settings (settingsPages.ts); it was a section of AI agents.
+  ;[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Your own models')?.click()
   for (let i = 0; i < 20 && !document.querySelector('.lc-ownmodel__form'); i += 1) await new Promise((r) => setTimeout(r, 150))
   const form = document.querySelector('.lc-ownmodel__form')
   if (!form) return 'no Your own models form on the Runtimes page'
@@ -106,7 +107,7 @@ const pressIn = (scope, label) => `(async () => {
   for (let i = 0; i < 40; i += 1) {
     await new Promise((r) => setTimeout(r, 250))
     const said = document.querySelector('.lc-ownmodel__form .lc-ownmodel__said')?.textContent
-    if (said) return said
+    if (said && !said.startsWith('Testing')) return said
   }
   return 'nothing said'
 })()`

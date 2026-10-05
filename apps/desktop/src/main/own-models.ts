@@ -280,14 +280,23 @@ export function createOwnModelStore(options: {
 export async function testOwnEndpoint(
   input: { readonly baseUrl: string; readonly model: string; readonly key?: string },
   fetcher: typeof fetch = fetch,
-  timeoutMs = 8000
+  timeoutMs = 8000,
+  /*
+   * THE MODEL ITSELF GETS A MINUTE (0.640). Listing is instant; answering is
+   * not. A model on the person's own machine loads on its first request, and
+   * a CPU reads even a short prompt slowly: a real llama.cpp server took 8 s
+   * for this one-word request, past the old shared 8 s, and Test said nothing
+   * about tools at all.
+   */
+  chatTimeoutMs = 60_000
 ): Promise<{ readonly ok: boolean; readonly said: string; readonly tools?: boolean }> {
   const listed = await listedModels(input, fetcher, timeoutMs)
   if (!listed.ok) return listed
-  const tools = await takesTools(input, fetcher, timeoutMs)
+  const tools = await takesTools(input, fetcher, chatTimeoutMs)
   if (tools === false) return { ok: true, said: `${listed.said} It cannot use tools, so it is set to chat only.`, tools: false }
   if (tools === true) return { ok: true, said: `${listed.said} It can use tools.`, tools: true }
-  return listed
+  // Said, not left out: a Test that could not tell must say so.
+  return { ok: false, said: `${listed.said} ${tools.said}, so Test could not tell whether it can use tools.` }
 }
 
 async function listedModels(
@@ -325,14 +334,14 @@ async function listedModels(
  * request carrying one tool, answer capped at a single token. A model or
  * server without tool support refuses it outright -- 400 "does not support
  * tools" is Ollama's wording; vLLM's names `--enable-auto-tool-choice` -- and
- * a teammate's run would end the same way. Undefined when the answer says
- * neither.
+ * a teammate's run would end the same way. When the answer says neither,
+ * what happened instead, in words.
  */
 async function takesTools(
   input: { readonly baseUrl: string; readonly model: string; readonly key?: string },
   fetcher: typeof fetch,
   timeoutMs: number
-): Promise<boolean | undefined> {
+): Promise<boolean | { readonly said: string }> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
@@ -349,9 +358,14 @@ async function takesTools(
     })
     if (response.ok) return true
     const text = await response.text().catch(() => '')
-    return (response.status === 400 || response.status === 422 || response.status === 501) && /tool/i.test(text) ? false : undefined
-  } catch {
-    return undefined
+    if ((response.status === 400 || response.status === 422 || response.status === 501) && /tool/i.test(text)) return false
+    return { said: `A one-word request got ${`${String(response.status)} ${response.statusText}`.trim()} back` }
+  } catch (error) {
+    return {
+      said: controller.signal.aborted
+        ? `It did not answer a one-word request in ${String(Math.round(timeoutMs / 1000))} second${Math.round(timeoutMs / 1000) === 1 ? '' : 's'}`
+        : `A one-word request to it failed (${error instanceof Error ? error.message : String(error)})`
+    }
   } finally {
     clearTimeout(timer)
   }

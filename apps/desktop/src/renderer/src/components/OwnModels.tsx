@@ -17,6 +17,13 @@ import { ArmedButton } from './ArmedButton.js'
  * Test asks the endpoint what it serves, before or after adding -- the
  * mistake worth catching early is a model name the endpoint does not know.
  */
+
+/**
+ * Said while Test waits (0.640): the model gets up to a minute to answer
+ * (own-models.ts), and a minute of nothing reads as a click that did not take.
+ */
+export const OWN_MODEL_TESTING = 'Testing… A model that is starting up can take a minute to answer.'
+
 export function OwnModels({ onChanged }: { readonly onChanged: () => void }): ReactElement {
   const [models, setModels] = useState<readonly PublicOwnModel[]>()
   const [name, setName] = useState('')
@@ -78,18 +85,18 @@ export function OwnModels({ onChanged }: { readonly onChanged: () => void }): Re
               <button
                 type="button"
                 className="lc-button"
+                disabled={testedKept[kept.ownId]?.text === OWN_MODEL_TESTING}
                 onClick={() => {
+                  const tested = (said: { readonly text: string; readonly good: boolean }): void => setTestedKept((held) => ({ ...held, [kept.ownId]: said }))
+                  tested({ text: OWN_MODEL_TESTING, good: true })
                   void window.desktop?.testOwnModel({ ownId: kept.ownId }).then((response) => {
-                    setTestedKept((held) => ({
-                      ...held,
-                      [kept.ownId]: response.ok ? { text: response.data.said, good: response.data.reached } : { text: response.error.message, good: false }
-                    }))
+                    tested(response.ok ? { text: response.data.said, good: response.data.reached } : { text: response.error.message, good: false })
                     // A Test that found out whether it takes tools has set it.
                     if (response.ok && response.data.tools !== undefined) {
                       load()
                       onChanged()
                     }
-                  })
+                  }).catch(() => tested({ text: 'That model could not be tested. It is kept as it was.', good: false }))
                 }}
               >
                 Test
@@ -203,13 +210,13 @@ export function OwnModels({ onChanged }: { readonly onChanged: () => void }): Re
           <button
             type="button"
             className="lc-button"
-            disabled={baseUrl.trim().length === 0 || model.trim().length === 0 || busy}
+            disabled={baseUrl.trim().length === 0 || model.trim().length === 0 || busy || said?.text === OWN_MODEL_TESTING}
             onClick={() => {
-              setSaid(undefined)
+              setSaid({ text: OWN_MODEL_TESTING, good: true })
               void window.desktop?.testOwnModel(typed).then((response) => {
                 setSaid(response.ok ? { text: response.data.said, good: response.data.reached } : { text: response.error.message, good: false })
                 if (response.ok && response.data.tools !== undefined) setChatOnly(!response.data.tools)
-              })
+              }).catch(() => setSaid({ text: 'That model could not be tested. Nothing was added.', good: false }))
             }}
           >
             Test

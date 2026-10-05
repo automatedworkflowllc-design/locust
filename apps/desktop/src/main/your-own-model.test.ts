@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { createOwnModelStore, isOwnRouteModel, ownRouteModel, testOwnEndpoint } from './own-models.js'
 import type { SecretBox } from './own-models.js'
@@ -110,8 +110,65 @@ describe('testing an endpoint', () => {
     }) as unknown as typeof fetch
   const answering = (status: number, body: unknown): typeof fetch => endpoint({ status, body }, { status: 500, body: {} })
 
-  it('says it answered and serves the model', async () => {
-    expect(await testOwnEndpoint({ baseUrl: 'https://x/v1', model: 'acme-70b' }, answering(200, { data: [{ id: 'acme-70b' }] }))).toEqual({ ok: true, said: 'It answered, and serves acme-70b.' })
+  it('says it answered and serves the model -- and, when the one-word request fails, that it could not tell about tools', async () => {
+    expect(await testOwnEndpoint({ baseUrl: 'https://x/v1', model: 'acme-70b' }, answering(200, { data: [{ id: 'acme-70b' }] }))).toEqual({
+      ok: false,
+      said: 'It answered, and serves acme-70b. A one-word request got 500 back, so Test could not tell whether it can use tools.'
+    })
+  })
+
+  /*
+   * A REAL SERVER ON THIS MACHINE (0.640). llama.cpp's server, a 3B model on
+   * a CPU: the list came back at once, the one-word request with a tool in 8
+   * s, past the 8 s the two shared -- and Test said only "It answered, and
+   * serves qwen2.5-3b-instruct.", nothing about tools. The model gets its own
+   * minute, and a Test that cannot tell says so.
+   */
+  describe('a model slow to answer', () => {
+    const listed = { data: [{ id: 'm' }] }
+    /** Lists at once; answers the one-word request after `delayMs`, or never, until it is given up on. */
+    const slow = (delayMs: number | undefined): typeof fetch =>
+      (async (url: string, init?: RequestInit) => {
+        if (url.endsWith('/models')) return new Response(JSON.stringify(listed), { status: 200 })
+        return new Promise<Response>((resolve, reject) => {
+          const timer = delayMs === undefined ? undefined : setTimeout(() => resolve(new Response('{}', { status: 200 })), delayMs)
+          init?.signal?.addEventListener('abort', () => {
+            clearTimeout(timer)
+            reject(new DOMException('This operation was aborted', 'AbortError'))
+          })
+        })
+      }) as unknown as typeof fetch
+
+    it('is waited for past the time the list is given', async () => {
+      expect(await testOwnEndpoint({ baseUrl: 'http://127.0.0.1:8089/v1', model: 'm' }, slow(150), 50)).toEqual({ ok: true, said: 'It answered, and serves m. It can use tools.', tools: true })
+    })
+
+    it('gets a minute by default', async () => {
+      const bounds: number[] = []
+      const timeout = vi.spyOn(globalThis, 'setTimeout')
+      await testOwnEndpoint({ baseUrl: 'http://127.0.0.1:8089/v1', model: 'm' }, slow(10))
+      for (const call of timeout.mock.calls) if (typeof call[1] === 'number') bounds.push(call[1])
+      timeout.mockRestore()
+      expect(bounds).toContain(8000)
+      expect(bounds).toContain(60_000)
+    })
+
+    it('that never answers is said, not left out', async () => {
+      expect(await testOwnEndpoint({ baseUrl: 'http://127.0.0.1:8089/v1', model: 'm' }, slow(undefined), 50, 1000)).toEqual({
+        ok: false,
+        said: 'It answered, and serves m. It did not answer a one-word request in 1 second, so Test could not tell whether it can use tools.'
+      })
+    })
+
+    it('that cannot be reached for the request is said too', async () => {
+      const gone = (async (url: string) => {
+        if (url.endsWith('/models')) return new Response(JSON.stringify(listed), { status: 200 })
+        throw new TypeError('fetch failed')
+      }) as unknown as typeof fetch
+      expect((await testOwnEndpoint({ baseUrl: 'http://127.0.0.1:8089/v1', model: 'm' }, gone)).said).toBe(
+        'It answered, and serves m. A one-word request to it failed (fetch failed), so Test could not tell whether it can use tools.'
+      )
+    })
   })
 
   it('says whether it takes tools, and finds a model that only chats (0.358)', async () => {

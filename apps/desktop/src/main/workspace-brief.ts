@@ -161,8 +161,8 @@ export async function readWorkspaceBrief(
  * The folder is the fact a teammate cannot obtain any other way; its name,
  * role and peers it is already given.
  */
-export function whereSection(workspaceName: string): string {
-  return `You are working in the folder "${workspaceName}". Everything you read or change belongs to it unless you are told otherwise.`
+export function whereSection(folder: string): string {
+  return `You are working in the folder "${folder}". Everything you read or change belongs to it unless you are told otherwise.`
 }
 
 /**
@@ -183,7 +183,7 @@ export function worktreeSection(): string {
  * What a mission is told, before anything else: the folder's own instructions,
  * quoted whole.
  *
- * `workspaceName` is absent for a teammate running in its own worktree, and
+ * `folder` (its full path, 0.640) is absent for a teammate running in its own worktree, and
  * that is not a cosmetic difference. Naming a folder the run is NOT standing
  * in invites the model to go and find it: worktree runs were seen asking for
  * the parent folder, and OpenCode auto-rejects a directory outside its own
@@ -203,17 +203,26 @@ export function worktreeSection(): string {
  * "You are working in the folder arena-rpg" from inside a copy, made that
  * folder there and wrote the game into it, one level down, where Keep and
  * the column's page did not look.
+ *
+ * BY ITS FULL PATH (0.640). A real model of the person's own -- a 3B model
+ * on llama.cpp's server, through OpenCode -- was told `Instructions for the
+ * folder "locust-drive-own-real-ws-…"` while standing in it, asked to create
+ * hello.txt "in this folder", and wrote it to `<folder>/<a folder of that
+ * name>/hello.txt`: OpenCode's write tool takes a full path, and the model
+ * built one from its working folder plus the name it was given. The full
+ * path is the working folder itself, the same one OpenCode states, so there
+ * is nothing left to add to it.
  */
-export function folderSentences(brief: WorkspaceBrief | undefined, standsApart: boolean, folderName: string): readonly string[] {
-  if (brief !== undefined) return [briefSection(brief, standsApart ? undefined : folderName)]
-  return [standsApart ? worktreeSection() : whereSection(folderName)]
+export function folderSentences(brief: WorkspaceBrief | undefined, standsApart: boolean, folder: string): readonly string[] {
+  if (brief !== undefined) return [briefSection(brief, standsApart ? undefined : folder)]
+  return [standsApart ? worktreeSection() : whereSection(folder)]
 }
 
-export function briefSection(brief: WorkspaceBrief, workspaceName: string | undefined): string {
+export function briefSection(brief: WorkspaceBrief, folder: string | undefined): string {
   return [
-    workspaceName === undefined
+    folder === undefined
       ? `Instructions for this project, from its ${WORKSPACE_BRIEF_FILE}. Every teammate on every runtime is given these; follow them as you would your own instruction file. Your missions run in your own copy of the project, so work only inside the folder you were started in.`
-      : `Instructions for the folder "${workspaceName}", from its ${WORKSPACE_BRIEF_FILE}. Every teammate on every runtime is given these; follow them as you would your own instruction file.`,
+      : `Instructions for the folder "${folder}", from its ${WORKSPACE_BRIEF_FILE}. Every teammate on every runtime is given these; follow them as you would your own instruction file.`,
     brief.text,
     ...(brief.truncated ? [`(${WORKSPACE_BRIEF_FILE} is longer than ${String(MAX_BRIEF_LINES)} lines; the rest was not loaded.)`] : [])
   ].join('\n')
