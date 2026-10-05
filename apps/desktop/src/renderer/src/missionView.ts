@@ -1,7 +1,7 @@
 import type { NormalizedRuntimeEvent, ToolPatch } from '@teammate/runtime-adapters'
 
 import { SUBAGENT_TOOL } from './faceState.js'
-import { EVENT_WINDOW, TRIMMED_TURN_LINE } from '../../shared/event-window.js'
+import { EVENT_WINDOW, TRIMMED_TURN_LINE, windowEvents } from '../../shared/event-window.js'
 import { isImagePath } from '../../shared/image-files.js'
 import { READ_TOOL_WORDS, byHelper, editToolName, isEditCommand, isShellTool } from '../../shared/tool-kinds.js'
 import { LARGE_FILE_LINES, fileCounts, parseUnifiedDiff } from './diff.js'
@@ -5787,12 +5787,11 @@ export function runtimeNeverStarted(events: readonly NormalizedRuntimeEvent[]): 
 export const LIVE_EVENT_CAP = EVENT_WINDOW
 
 /**
- * A live run's events, capped -- with the FIRST kept past the cap, as the
- * history projection keeps it (H4): it says the run started, and dropping it
- * from a long Claude or Codex run made a failed turn look as if nothing had.
+ * A live run's events, capped with its opening and newest work kept, as the
+ * history projection keeps them. The first event still proves it started (H4).
  */
 export function cappedLiveEvents<T>(events: readonly T[], cap = LIVE_EVENT_CAP): readonly T[] {
-  return events.length <= cap ? events : [events[0]!, ...events.slice(-(cap - 1))]
+  return windowEvents(events, cap)
 }
 
 /** What a run that never reached its runtime can hold: its failure, and diagnostics. */

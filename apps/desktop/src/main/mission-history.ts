@@ -3,7 +3,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
 import { workspaceIdFor } from './workspace.js'
-import { EVENT_WINDOW } from '../shared/event-window.js'
+import { EVENT_WINDOW, windowEvents } from '../shared/event-window.js'
 import { joinMessageFragments } from '../shared/messageFragments.js'
 import { monthOf, moneyOfRun, sumSpend } from '../shared/spend.js'
 import type { RunMoney, Spend } from '../shared/spend.js'
@@ -240,10 +240,7 @@ export function publicRecoveredMission(
   // Joined BEFORE the window, never after: windowing fragments is what lost
   // the front of a reply. See `joinMessageFragments`.
   const whole = joinMessageFragments(mission.events)
-  const events = whole.length <= MAX_HISTORY_EVENTS
-    ? whole
-    : [whole[0], ...whole.slice(-(MAX_HISTORY_EVENTS - 1))]
-        .filter((event) => event !== undefined)
+  const events = windowEvents(whole, MAX_HISTORY_EVENTS)
   const hostFailureMessage = mission.hostFailures.at(-1)?.message
   const money = amountsOf(moneyOfRun(mission.events))
   return {

@@ -4,6 +4,8 @@ import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 
 import { EVENT_WINDOW, TRIMMED_TURN_LINE } from '../../shared/event-window.js'
 import { LIVE_EVENT_CAP, buildThread, cappedLiveEvents } from './missionView.js'
+import { withLiveEvents } from './liveEvents.js'
+import { windowEvents } from '../../shared/event-window.js'
 
 /**
  * A LONG TURN KEEPS WHAT IT SAID (0.627).
@@ -49,6 +51,7 @@ const run = (): readonly NormalizedRuntimeEvent[] => {
   sequence = 0
   return [
     event('run.started', { evidence: { redacted: true } }),
+    event('plan.updated', { plan: [{ step: 'Read the sample files', status: 'in_progress' }] }),
     ...call(1),
     said('m1', 'Setting up the worktree and reading how the check is wired.'),
     ...Array.from({ length: 40 }, (_, at) => call(2 + at)).flat(),
@@ -81,5 +84,39 @@ describe('a long turn keeps what it said', () => {
     const items = buildThread(run(), { running: true, trimmed: true })
     expect(items[0]).toMatchObject({ type: 'diagnostic', level: 'info', message: TRIMMED_TURN_LINE })
     expect(buildThread(run(), { running: true }).some((item) => item.type === 'diagnostic' && item.message === TRIMMED_TURN_LINE)).toBe(false)
+  })
+
+  it('keeps its opening messages and newest live step after repeated evictions', () => {
+    const all = [...run(), ...Array.from({ length: 500 }, (_, at) => call(100 + at)).flat(), event('tool.started', { itemId: 'newest', toolKind: 'tool_use', name: 'Read', phase: 'started' })]
+    let held = { events: [] as readonly NormalizedRuntimeEvent[], eventsTruncated: false }
+    for (const arriving of all) held = withLiveEvents(held, [arriving])
+    expect(held.events).toHaveLength(3000)
+    expect(held.eventsTruncated).toBe(true)
+    expect(messages(held.events)).toEqual(messages(run()))
+    expect(held.events.at(-1)?.payload).toMatchObject({ itemId: 'newest' })
+    expect(buildThread(held.events, { running: true }).find((item) => item.type === 'plan')).toMatchObject({ steps: [{ text: 'Read the sample files', state: 'running' }] })
+    expect(held.events).toEqual(windowEvents(all))
+  })
+
+  it('joins continued opening prose and preserves its omission flag across batches', () => {
+    const all = [...run(), ...Array.from({ length: 500 }, (_, at) => call(100 + at)).flat()]
+    const initial = withLiveEvents({ events: [] }, all)
+    const next = withLiveEvents(initial, [said('m1', ' Still checking.'), said('new', 'Newest update.')])
+    expect(next.events).toHaveLength(3000)
+    expect(next.eventsTruncated).toBe(true)
+    expect(messages(next.events)[0]).toBe('Setting up the worktree and reading how the check is wired. Still checking.')
+    expect(messages(next.events).at(-1)).toBe('Newest update.')
+    expect(initial.events).not.toEqual(next.events)
+  })
+
+  it('does not call a full or fragment-joined window trimmed until an event is dropped', () => {
+    const all = Array.from({ length: 3000 }, (_, n) => said(`m${String(n)}`, 'word'))
+    const full = withLiveEvents({ events: [] }, all)
+    expect(full.eventsTruncated).toBe(false)
+    const joined = withLiveEvents(full, [said('m0', ' more')])
+    expect(joined.eventsTruncated).toBe(false)
+    const overflow = withLiveEvents(joined, [said('new', 'new')])
+    expect(overflow.eventsTruncated).toBe(true)
+    expect(withLiveEvents(overflow, [said('new', ' more')]).eventsTruncated).toBe(true)
   })
 })

@@ -168,7 +168,7 @@ describe('mission history mapping', () => {
     expect(mapped.events).toHaveLength(MAX_HISTORY_EVENTS)
     expect(mapped.events[0]?.sequence).toBe(1)
     expect(mapped.events.at(-1)?.sequence).toBe(MAX_HISTORY_EVENTS + 1)
-    expect(mapped.events[1]?.sequence).toBe(3)
+    expect(mapped.events[1]?.sequence).toBe(2)
     expect(mapped.eventCount).toBe(MAX_HISTORY_EVENTS + 1)
     expect(mapped.eventsTruncated).toBe(true)
   })
