@@ -1386,6 +1386,19 @@ export function isSetupNote(message: string): boolean {
   return SETUP_NOTES.some((pattern) => pattern.test(message.trim()))
 }
 
+/**
+ * A NOTE KEPT FOR THE RECORD, NEVER SAID (2026-10-05). A usage window is state
+ * the host keeps, not a line in the thread. And how long a start took
+ * ("Started in 6.1 s: looked for Codex 0.2 s, ...", main/start-timing.ts) is a
+ * measurement for whoever makes starts faster, not news for the person who
+ * sent the message: it sat under every answer. Colin: *"it doesnt really have
+ * much purpose ... it should be removed"*. Both stay in the saved record, for
+ * the drives and probes that read it; neither is drawn anywhere.
+ */
+export function keptForTheRecord(code: string): boolean {
+  return /\.usage_window$/.test(code) || code === 'host.start-timing'
+}
+
 /** A run's setup notes, each once, in the order said -- for its runtime's row in Settings. */
 export function setupNotesOf(events: readonly NormalizedRuntimeEvent[]): readonly string[] {
   const notes: string[] = []
@@ -1815,7 +1828,7 @@ export function activityTrace(
   const calls = details.filter((detail) => detail.kind !== 'helper' && detail.kind !== 'edit' && detail.kind !== 'shell' && detail.kind !== 'reasoning').length
     + details.filter((detail) => detail.kind === 'edit' && detail.failed === true).length
   const diagnostics = events.filter(
-    (event): event is Extract<NormalizedRuntimeEvent, { type: 'adapter.diagnostic' }> => event.type === 'adapter.diagnostic' && !/\.usage_window$/.test(event.payload.code)
+    (event): event is Extract<NormalizedRuntimeEvent, { type: 'adapter.diagnostic' }> => event.type === 'adapter.diagnostic' && !keptForTheRecord(event.payload.code)
   )
   // `no files changed` is a claim about the workspace, and it must not be made
   // in the one case where the host has ALREADY said it cannot tell what this
@@ -3671,8 +3684,8 @@ export function buildThread(
         // The adapters already separate these: a `*.runtime_error` is the run
         // in trouble, an item diagnostic is the provider talking about one
         // item. Only the former is worth interrupting an empty thread for.
-        // A usage window is state the host keeps, not a line in the thread.
-        if (/\.usage_window$/.test(event.payload.code)) break
+        // A usage window, how long the start took: kept for the record, not lines in the thread.
+        if (keptForTheRecord(event.payload.code)) break
         // What the host saved on the teammate's branch (0.439) is said when the
         // turn is over: after its work and its answer, never above them. The
         // first packaged drive drew "Saved this turn" under the ask, before
@@ -4587,6 +4600,7 @@ export function buildSignalRail(
         })
         break
       case 'adapter.diagnostic':
+        if (keptForTheRecord(event.payload.code)) break
         rows.push({
           key: event.id,
           name: railLabel(event.payload.message.trim().length > 0 ? event.payload.message : 'A note from the runtime', 96),

@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.652.0 - 2026-10-05
+
+### Improved
+
+- **No more "Started in 6.1 s" under every answer.** Each answer began with a line saying how long the AI tool took to start, which in a side-by-side room was often longer than the answer itself. It no longer shows. Locust still keeps it in the conversation's record.
+
 ## 0.651.0 - 2026-10-05
 
 ### Improved
