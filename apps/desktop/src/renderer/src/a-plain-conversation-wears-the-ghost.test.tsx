@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 
 import { seedAvatar } from '../../shared/avatar.js'
 import type { AvatarSpec } from '../../shared/avatar.js'
-import { AgentAvatar, LiveStepCard } from './components/ThreadItems.js'
+import { AgentAvatar, LiveStepCard, PLAIN_CHAT_FACE } from './components/ThreadItems.js'
+import THREAD_ITEMS from './components/ThreadItems.tsx?raw'
 
 /**
  * A PLAIN CONVERSATION WEARS THE GHOST (0.621).
@@ -27,6 +28,13 @@ describe('a plain conversation wears the ghost', () => {
     const owned = renderToStaticMarkup(<AgentAvatar size={24} teammate={{ hue: 'blue', avatar: atlas }} />)
     expect(owned).toContain('data-bot="droid"')
     expect(owned).not.toContain('data-bot="ghost"')
+  })
+
+  it("wears the ghost's own white, as the cover's ghost does (0.624), on the reply and the live row alike", () => {
+    expect(PLAIN_CHAT_FACE.hue).toBe('pearl')
+    expect(THREAD_ITEMS).toContain('hue={PLAIN_CHAT_FACE.hue} avatar={PLAIN_CHAT_FACE.avatar}')
+    expect(THREAD_ITEMS).toContain('const face = owner ?? PLAIN_CHAT_FACE')
+    expect(THREAD_ITEMS).not.toMatch(/hue[=:] ?['"]lime['"][^\n]*RUNTIME_FACE/)
   })
 
   it('on the live row: the same ghost while nobody\'s conversation thinks', () => {

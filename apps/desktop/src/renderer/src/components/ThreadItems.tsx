@@ -93,6 +93,14 @@ function OutboundLink({
 const RUNTIME_FACE: AvatarSpec = { ...seedAvatar('locust-runtime'), bot: { shape: 'ghost', face: 'eyes' } }
 
 /**
+ * ...IN THE GHOST'S OWN WHITE (0.624). The cover's ghost has no teammate hue,
+ * so it wears its shape's own white (Colin, 2026-09-22: "maybe make the ghost
+ * white"); the plain chat's ghost was lime, the swarm's old colour. Colin, of
+ * matching them: "yeah go white". Pearl is the teammate hue nearest that white.
+ */
+export const PLAIN_CHAT_FACE = { hue: 'pearl', avatar: RUNTIME_FACE } as const
+
+/**
  * The face beside a mission's turns: the teammate's own when the mission has
  * one, otherwise the runtime's fixed face -- a generated-looking avatar for an
  * unnamed agent would imply a teammate that does not exist. Thread faces are
@@ -107,7 +115,7 @@ export function AgentAvatar({
   readonly teammate?: { readonly hue: PixelFaceHueLike; readonly avatar: AvatarSpecLike }
 }): ReactElement {
   return teammate === undefined
-    ? <TeammateBot hue="lime" avatar={RUNTIME_FACE} size={size} />
+    ? <TeammateBot hue={PLAIN_CHAT_FACE.hue} avatar={PLAIN_CHAT_FACE.avatar} size={size} />
     : <TeammateBot hue={teammate.hue} avatar={teammate.avatar} size={size} />
 }
 
@@ -1066,7 +1074,7 @@ export function LiveStepCard({
   // show yet. That covers the reasoning step AND the launch and the gaps
   // between steps, which is most of the time a person spends waiting.
   const thinking = activity === 'thinking' || waiting
-  const face = owner ?? { hue: 'lime' as const, avatar: RUNTIME_FACE }
+  const face = owner ?? PLAIN_CHAT_FACE
   return (
     <div className={`lc-livestep${thinking ? ' is-thinking' : ''}`} data-step-kind={kind} data-register={register}>
       {!showFace ? <span className="lc-livestep__gutter" /> : <TeammateBot

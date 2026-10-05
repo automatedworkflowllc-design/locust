@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.624.0 - 2026-10-05
+
+### Changed
+
+- **A plain chat's ghost is white, like the one on Home.** 0.621 gave a chat with no teammate the ghost with the terminal face, in Locust's lime. The ghost on the Home screen wears its own white; the chat's ghost now matches it, beside every reply and on the live line.
+
 ## 0.623.0 - 2026-10-05
 
 ### Improved
