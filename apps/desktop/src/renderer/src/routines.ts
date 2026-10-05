@@ -1,4 +1,6 @@
-import type { PublicRecoveredMission, PublicRoutine } from '../../shared/ipc.js'
+import type { PublicRecoveredMission, PublicRoutine, PublicTeammate, RoutineHandOff, RoutineImportPreview, TeammateRoute } from '../../shared/ipc.js'
+import { proposedHandOffs } from '../../shared/chain-proposal.js'
+import type { RoutineInput } from '../../shared/routine-inputs.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { splitAttachments } from '../../shared/attachments.js'
 import { nextRunAfter, scheduleLabel } from '../../shared/routine-schedule.js'
@@ -244,4 +246,46 @@ export function routineScheduleSummary(
           ? `next tomorrow ${clock(next)}`
           : `next ${WEEKDAYS[next.getDay()] ?? ''} ${clock(next)}`
   return `${scheduleLabel(routine.schedule)} · ${when}`
+}
+
+/**
+ * A chain template, ready for the editor (2026-10-05): the draft a routine
+ * dialog opens on, with a teammate proposed for each step's role, the first
+ * step's teammate running it, the checking step marked, and -- for the chains
+ * that change files -- the run set to change them, in a copy that waits for
+ * Keep or Discard. Only a proposal: the dialog shows all of it and the person
+ * changes what they like before saving.
+ *
+ * `fallback` is the route a teammate with none of their own would replay on.
+ */
+export function chainDraftFrom(
+  preview: Pick<RoutineImportPreview, 'name' | 'steps' | 'inputs' | 'handOffRoles' | 'handOffChecks' | 'changesFiles'>,
+  team: readonly PublicTeammate[],
+  fallback: TeammateRoute
+): {
+  readonly teammateId: string | undefined
+  readonly name: string
+  readonly steps: readonly string[]
+  readonly inputs: readonly RoutineInput[]
+  readonly handOffs: readonly RoutineHandOff[]
+  /** The role the template named for each step, for the editor to show beside who was proposed. */
+  readonly stepRoles: readonly (string | undefined)[]
+  readonly route?: TeammateRoute
+  readonly inCopy?: true
+  readonly forceMode?: 'accept-edits'
+} {
+  const { owner, handOffs } = proposedHandOffs(preview.steps.map((_, at) => ({ role: preview.handOffRoles[at], check: preview.handOffChecks[at] })), team)
+  const teammate = team.find((entry) => entry.teammateId === owner)
+  const base = teammate === undefined ? undefined : (teammate.route ?? fallback)
+  const changes = preview.changesFiles === true
+  return {
+    teammateId: owner,
+    name: preview.name,
+    steps: preview.steps,
+    inputs: preview.inputs,
+    handOffs,
+    stepRoles: preview.handOffRoles,
+    ...(base === undefined ? {} : { route: changes ? { ...base, mode: 'accept-edits' as const } : base }),
+    ...(changes ? { inCopy: true as const, forceMode: 'accept-edits' as const } : {})
+  }
 }

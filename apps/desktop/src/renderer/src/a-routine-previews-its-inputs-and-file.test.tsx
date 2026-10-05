@@ -37,7 +37,7 @@ describe('routine inputs and files are reviewable before work starts', () => {
     expect(html).toMatch(/disabled=""[^>]*>Save routine<\/button>/)
   })
   it('the import preview names steps, inputs, choices, source roles and present/missing connectors', () => {
-    const preview: RoutineImportPreview = { token: 'token', name: 'Notes', steps: routine.steps, inputs: routine.inputs!, handOffRoles: ['Finance Bro'], runtime: 'opencode', connectors: [{ name: 'available', present: true }, { name: 'needed', present: false }] }
+    const preview: RoutineImportPreview = { token: 'token', name: 'Notes', steps: routine.steps, inputs: routine.inputs!, handOffRoles: ['Finance Bro'], handOffChecks: [false], runtime: 'opencode', connectors: [{ name: 'available', present: true }, { name: 'needed', present: false }] }
     const html = renderToStaticMarkup(<RoutineImportDialog preview={preview} team={[mate]} onImport={async () => undefined} onCancel={nothing} />)
     for (const saying of ['Read {{topic}} in {{folder}}', 'Daily notes', 'Brief, Detailed', 'Finance Bro', 'available · present', 'needed · missing', 'Give routine to', 'with no schedule, and runs nothing']) expect(html).toContain(saying)
     expect(html).toMatch(/disabled=""[^>]*>Import routine<\/button>/)

@@ -28,8 +28,11 @@ export interface RoutineFile {
   readonly name: string
   readonly steps: readonly string[]
   readonly inputs: readonly RoutineInput[]
-  /** One per step. The ROLE of whoever took it where it was made -- never a teammate's id. */
-  readonly handOffs: readonly { readonly role?: string }[]
+  /**
+   * One per step. The ROLE of whoever took it where it was made -- never a
+   * teammate's id -- and whether this step is the one that checks the work.
+   */
+  readonly handOffs: readonly { readonly role?: string; readonly check?: true }[]
   readonly route: { readonly runtime?: string }
   /** Connectors the steps name, so an import can say which this machine lacks. */
   readonly connectors: readonly string[]
@@ -107,9 +110,13 @@ export function routineToFile(
     steps: [...using.steps],
     inputs: keptInputs(using.inputs),
     handOffs: using.steps.map((_, at) => {
-      const who = routine.handOffs?.[at]?.teammateId
-      const role = who === undefined || who === routine.teammateId ? undefined : using.roleOf(who)
-      return role === undefined ? {} : { role }
+      const entry = routine.handOffs?.[at]
+      const who = entry?.teammateId
+      // A chain says its roles for every step, the routine's own teammate's too, so another Locust can propose someone for each.
+      const chain = routine.handOffs?.some((held) => held.check === true) === true
+      const named = who === undefined || who === routine.teammateId ? (chain ? routine.teammateId : undefined) : who
+      const role = named === undefined ? undefined : using.roleOf(named)
+      return { ...(role === undefined ? {} : { role }), ...(entry?.check === true ? { check: true as const } : {}) }
     }),
     route: { runtime: routine.route.runtime },
     connectors: connectorsNamedIn(using.steps, using.connectorNames)
@@ -168,7 +175,7 @@ export function parseRoutineFile(text: string): RoutineFileRead {
   const saying = inputsRefusal(asked, steps)
   if (saying !== undefined) return refuse(`That routine's inputs are not ones Locust can keep. ${saying}`)
   if (!Array.isArray(handOffs) || handOffs.length !== steps.length
-    || !handOffs.every((entry) => isRecord(entry) && Object.keys(entry).every((key) => key === 'role') && (entry.role === undefined || ONE_LINE(entry.role, 60)))) {
+    || !handOffs.every((entry) => isRecord(entry) && Object.keys(entry).every((key) => key === 'role' || key === 'check') && (entry.role === undefined || ONE_LINE(entry.role, 60)) && (entry.check === undefined || entry.check === true))) {
     return refuse('That routine\'s hand-offs do not line up with its steps.')
   }
   if (!isRecord(route) || Object.keys(route).some((key) => key !== 'runtime') || (route.runtime !== undefined && !(typeof route.runtime === 'string' && /^[a-z0-9-]{1,40}$/.test(route.runtime)))) {
@@ -185,7 +192,7 @@ export function parseRoutineFile(text: string): RoutineFileRead {
       name: name.trim(),
       steps: [...steps],
       inputs: keptInputs(asked as readonly RoutineInput[]),
-      handOffs: (handOffs as readonly { readonly role?: string }[]).map((entry) => (entry.role === undefined ? {} : { role: entry.role })),
+      handOffs: (handOffs as readonly { readonly role?: string; readonly check?: true }[]).map((entry) => ({ ...(entry.role === undefined ? {} : { role: entry.role }), ...(entry.check === true ? { check: true as const } : {}) })),
       route: route.runtime === undefined ? {} : { runtime: route.runtime as string },
       connectors: [...(connectors as readonly string[])]
     }

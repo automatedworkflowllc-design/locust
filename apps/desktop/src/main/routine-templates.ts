@@ -11,6 +11,15 @@
  * -- and names no route, no path and no connector; the import makes it an Ask
  * routine of the teammate chosen. The eleventh is the PRD's "Challenge an idea
  * before building it": an architect, then a checker.
+ *
+ * Three more are CHAINS (2026-10-05): fix a bug, build a feature, make it
+ * faster. Each step names a ROLE, not a teammate -- a template cannot know
+ * anyone's roster -- and the last step is marked as the checker. Locust
+ * proposes a teammate for each role (shared/chain-proposal.ts) in the editor,
+ * which is where a chain is opened: the person sees who takes which step and
+ * can change it before anything is saved. They are the ones that change files,
+ * so the editor opens them changing files, in a copy of the folder that waits
+ * for Keep or Discard (`templateChangesFiles`).
  */
 import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -26,6 +35,9 @@ export const TEMPLATE_ORDER = [
   'explain-this-project',
   'find-what-is-unfinished',
   'review-a-file',
+  'fix-a-bug',
+  'build-a-feature',
+  'make-it-faster',
   'plan-a-change',
   'challenge-an-idea',
   'write-a-status-update',
@@ -41,6 +53,9 @@ const WHAT_IT_DOES: Readonly<Record<string, string>> = {
   'explain-this-project': 'What this folder is, how it is laid out and how to run it, for someone new.',
   'find-what-is-unfinished': 'Every TODO and half-done part, grouped by how much it matters.',
   'review-a-file': 'A careful review of one file: bugs, unclear names, missing checks.',
+  'fix-a-bug': 'Find the cause, fix it with the smallest change, and have the fix checked where it broke.',
+  'build-a-feature': 'A plan, the build, and a review of the build against the plan.',
+  'make-it-faster': 'Measure where the time goes, change the slowest part, then measure again.',
   'plan-a-change': 'A step-by-step plan for a change, then the same plan read back sceptically.',
   'challenge-an-idea': 'An architect lists what the idea is missing, plans it, and a checker judges the plan.',
   'write-a-status-update': 'A short update on this project for your team, manager or client.',
@@ -50,6 +65,11 @@ const WHAT_IT_DOES: Readonly<Record<string, string>> = {
   'check-a-spreadsheet': 'Missing values, duplicates and odd numbers in a CSV, and whether to trust it.',
   'find-the-gaps-in-a-document': 'Unsupported claims, missing steps and places a reader would get stuck.'
 }
+
+/** The chains that work on the folder's files rather than only reading it: they open set to change files, in a copy. */
+const CHANGES_FILES: ReadonlySet<string> = new Set(['fix-a-bug', 'build-a-feature', 'make-it-faster'])
+
+export const templateChangesFiles = (id: string): boolean => CHANGES_FILES.has(id)
 
 /** As the window lists it (shared/ipc.ts). */
 export type RoutineTemplate = RoutineTemplateInfo
@@ -76,7 +96,8 @@ export async function listRoutineTemplates(directory: string): Promise<{ readonl
       name: read.file.name,
       summary: WHAT_IT_DOES[id] ?? read.file.steps[0]!.split(/(?<=[.!?])\s/)[0]!.slice(0, 160),
       steps: read.file.steps.length,
-      asks: read.file.inputs.map((input) => input.label)
+      asks: read.file.inputs.map((input) => input.label),
+      ...(read.file.handOffs.some((entry) => entry.check === true) ? { chain: true as const } : {})
     })
   }
   templates.sort((a, b) => rank(a.id) - rank(b.id) || a.name.localeCompare(b.name))

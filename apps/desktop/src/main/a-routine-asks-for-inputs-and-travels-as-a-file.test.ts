@@ -74,7 +74,8 @@ describe('a routine file carries only its portable definition', () => {
       schedule: { kind: 'every', hours: 4 }, handOffs: [{ teammateId: 'tm_private', check: true }] })))
     expect(Object.keys(exported).sort()).toEqual(['format', 'version', 'name', 'steps', 'inputs', 'handOffs', 'route', 'connectors'].sort())
     expect(Object.keys(exported.route)).toEqual(['runtime'])
-    expect(Object.keys(exported.handOffs[0])).toEqual(['role'])
+    // The role and whether the step checks -- both portable; never the teammate (2026-10-05: a chain template carries its checker).
+    expect(Object.keys(exported.handOffs[0])).toEqual(['role', 'check'])
     expect(Object.keys(exported.inputs[0]).sort()).toEqual(['key', 'label', 'kind', 'required', 'default'].sort())
     expect(JSON.stringify(exported)).not.toMatch(/tm_private|mission_private|ws_private|schedule|runs|staged|execution|learnedFrom/)
     expect(parseRoutineFile(JSON.stringify(exported))).toEqual({ ok: true, file: exported })

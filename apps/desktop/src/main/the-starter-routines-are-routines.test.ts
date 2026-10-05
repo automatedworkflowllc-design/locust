@@ -24,8 +24,8 @@ const SHIPPED = fileURLToPath(new URL('../../resources/routines/', import.meta.u
 const files = readdirSync(SHIPPED).filter((name) => name.endsWith(TEMPLATE_SUFFIX))
 
 describe('every starter routine', () => {
-  it('is there: eleven, the ten of R16 and the challenge of its section 7, each in the order offered', () => {
-    expect(files.length).toBe(11)
+  it('is there: fourteen -- the ten of R16, the challenge of its section 7, and three chains -- each in the order offered', () => {
+    expect(files.length).toBe(14)
     expect(files.map((name) => name.slice(0, -TEMPLATE_SUFFIX.length)).sort()).toEqual([...TEMPLATE_ORDER].sort())
   })
 
@@ -38,7 +38,8 @@ describe('every starter routine', () => {
       expect(read.file.connectors, name).toEqual([])
       expect(absolutePathsIn(read.file.steps), name).toEqual([])
       for (const input of read.file.inputs) expect(read.file.steps.some((step) => step.includes(`{{${input.key}}}`)), `${name}: ${input.key}`).toBe(true)
-      // Written for Ask: none tells the teammate to change anything.
+      // Written for Ask: none tells the teammate to change anything -- but a chain's fix and build steps do, and open in a copy (below).
+      if (read.file.handOffs.some((entry) => entry.check === true)) continue
       for (const step of read.file.steps) expect(/\b(edit|write to|modify|delete|commit|push)\b(?! any file)/i.test(step.replace(/do not change (any|the) file/gi, '')), `${name}: ${step.slice(0, 60)}`).toBe(false)
     }
   })
