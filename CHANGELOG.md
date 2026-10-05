@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.626.0 - 2026-10-05
+
+### New
+
+- **Pictures show in the chat.** When a teammate reads an image, the picture appears under that step, the way Claude Code shows it. When it makes or changes one -- a chart, a screenshot, a red square -- a thumbnail sits under the file's name in the list of what changed; press it for the full view. An image a reply links with Markdown (`![a chart](chart.png)`) appears in the reply with its caption. Only pictures inside the conversation's own folder are drawn (a comparison column's copy counts as its folder), never from the web or a network path, at most 8 MB, never SVG; a picture that cannot be shown leaves the file's name exactly as it was.
+
 ## 0.625.0 - 2026-10-05
 
 ### New

@@ -46,6 +46,18 @@ opacity; its lime lockup is a prepainted layer faded over the ordinary ink,
 and its loading beam rotates a painted gradient (`shell.css`,
 `components/PoweredLockup.tsx`, `components/Beam.tsx`).
 
+**Pictures in a thread.** Read-tool rows and changed-file rows add raster
+previews beneath their names; local Markdown images use their alt text as a
+caption (`renderer/src/components/ThreadImage.tsx`, `ActivityCard.tsx`,
+`ThreadItems.tsx`). `ThreadImagesContext` carries the conversation's folder,
+or a comparison column's own copy. `AttachedImage.tsx` asks once per mounted
+path and folder, discards late answers, and retains no cache across threads.
+The host checks both lexical and real-path containment in that selected,
+host-known folder, refuses network paths and SVG, and caps reads at 8 MB
+(`main/workspace-image.ts`, `shared/image-files.ts`). A refused preview leaves
+the named row alone. Pictures keep their proportions within the reply width
+and 320 pixels high; pressing one uses the existing file viewer.
+
 ## The AI agents run their own tools
 
 Locust has no model of its own and runs no code a model wrote

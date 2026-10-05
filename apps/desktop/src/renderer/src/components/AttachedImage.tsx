@@ -2,6 +2,16 @@ import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import { isImagePath } from '../../../shared/image-files.js'
+import type { WorkspaceImageResponse } from '../../../shared/ipc.js'
+
+/** One request per mount/path; a late answer from a closed thread is discarded. */
+export function requestAttachedImage(path: string, folder: string | undefined, read: ((path: string, folder?: string) => Promise<WorkspaceImageResponse>) | undefined, accept: (image: Extract<WorkspaceImageResponse, { ok: true }>) => void): () => void {
+  let live = true
+  if (isImagePath(path) && read !== undefined) {
+    void read(path, folder).then((answer) => { if (live && answer.ok) accept(answer) }).catch(() => undefined)
+  }
+  return () => { live = false }
+}
 
 /**
  * An attached image, drawn as itself.
@@ -29,39 +39,31 @@ import { isImagePath } from '../../../shared/image-files.js'
  *   because a thread with twenty screenshots in it should not keep twenty
  *   copies alive after it is closed.
  */
-export function AttachedImage({ path }: { readonly path: string }): ReactElement | null {
-  const [dataUrl, setDataUrl] = useState<string>()
+export function AttachedImage({ path, folder, render }: {
+  readonly path: string
+  readonly folder?: string | undefined
+  readonly render?: (dataUrl: string, absolutePath: string) => ReactElement
+}): ReactElement | null {
+  const key = `${folder ?? ''}\n${path}`
+  const [image, setImage] = useState<{ key: string; dataUrl: string; path: string }>()
 
   useEffect(() => {
-    if (!isImagePath(path)) return
-    let live = true
-    const bridge = window.desktop
-    if (bridge === undefined) return
-    void bridge
-      .readWorkspaceImage(path)
-      .then((answer) => {
-        // `live` guards the case that matters here: a thread switched away
-        // from while its images are still being read would otherwise set
-        // state on a row that is gone.
-        if (live && answer.ok) setDataUrl(answer.dataUrl)
-      })
-      .catch(() => undefined)
-    return () => {
-      live = false
-    }
-  }, [path])
+    return requestAttachedImage(path, folder, window.desktop?.readWorkspaceImage, (answer) => setImage({ key, dataUrl: answer.dataUrl, path: answer.path }))
+  }, [path, folder])
 
-  if (dataUrl === undefined) return null
+  if (image === undefined || image.key !== key) return null
+  if (render !== undefined) return render(image.dataUrl, image.path)
   return (
     <img
       className="lc-thumb"
-      src={dataUrl}
+      src={image.dataUrl}
       alt={path}
       title={path}
       // The image is drawn at whatever size the CSS says; this pair keeps the
       // browser from reserving the wrong box before it loads.
       loading="lazy"
       decoding="async"
+      onError={() => setImage(undefined)}
     />
   )
 }

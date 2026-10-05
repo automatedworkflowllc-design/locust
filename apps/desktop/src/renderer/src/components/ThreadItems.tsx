@@ -14,6 +14,7 @@ import { TeammateBot } from './TeammateBot.js'
 import { MathTex } from './MathTex.js'
 import type { FaceActivity } from '../faceState.js'
 import { Icon } from './Icon.js'
+import { ThreadImage } from './ThreadImage.js'
 import { ReplyPage } from './ReplyPage.js'
 import { isWholePage } from '../../../shared/reply-page.js'
 
@@ -194,6 +195,7 @@ function inline(text: string): ReactElement {
             </code>
           )
         }
+        if (span.kind === 'image') return <ThreadImage key={`s${String(index)}`} path={span.href} caption={span.text} />
         if (span.kind === 'link') {
           /*
            * A web address is clickable now; anything else still is not.

@@ -76,6 +76,7 @@ export type AgentBlock =
 export type InlineSpan =
   | { readonly kind: 'plain'; readonly text: string }
   | { readonly kind: 'code'; readonly text: string }
+  | { readonly kind: 'image'; readonly text: string; readonly href: string }
   | { readonly kind: 'link'; readonly text: string; readonly href: string }
   | { readonly kind: 'strong'; readonly text: string }
   | { readonly kind: 'em'; readonly text: string }
@@ -590,7 +591,7 @@ const TEX_MACRO = `\\$[ \\t]*\\\\(${Object.keys(TEX_SYMBOLS)
  */
 const INLINE = new RegExp(
   `${
-    /`([^`\n]+)`|\[([^\]\n]+)\]\(([^)\s]+)\)|(?:\*\*|__|\*|_)\[([^\]\n]+)\]\(([^)\s]+)\)(?:\*\*|__|\*|_)|(?:\*\*|(?<![A-Za-z0-9_])__)(?=\S)([^\n]+?\S)(?:\*\*|__(?![A-Za-z0-9_]))|(?<![A-Za-z0-9*_])(?:\*|_)(?=\S)([^\n*_]*?[^\s*_])(?:\*|_)(?![A-Za-z0-9*_])/
+    /`([^`\n]+)`|!?\[([^\]\n]*)\]\(([^)\s]+)\)|(?:\*\*|__|\*|_)\[([^\]\n]+)\]\(([^)\s]+)\)(?:\*\*|__|\*|_)|(?:\*\*|(?<![A-Za-z0-9_])__)(?=\S)([^\n]+?\S)(?:\*\*|__(?![A-Za-z0-9_]))|(?<![A-Za-z0-9*_])(?:\*|_)(?=\S)([^\n*_]*?[^\s*_])(?:\*|_)(?![A-Za-z0-9*_])/
       .source
   }|${TEX_MACRO}|${INLINE_MATH}`,
   'g'
@@ -611,7 +612,7 @@ export function splitInlineCode(text: string): readonly InlineSpan[] {
     if (match[1] !== undefined) {
       spans.push({ kind: 'code', text: match[1] })
     } else if (match[2] !== undefined) {
-      spans.push({ kind: 'link', text: match[2], href: match[3]! })
+      spans.push({ kind: match[0].startsWith('!') ? 'image' : 'link', text: match[2], href: match[3]! })
     } else if (match[4] !== undefined) {
       // `*[label](url)*` -- a link that happened to be italicised. It reads
       // as a link; the italics were decoration on the label.

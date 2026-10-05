@@ -563,8 +563,8 @@ const desktopApi: DesktopApi = {
   openLink: (url: string) => ipcRenderer.invoke(OPEN_LINK_CHANNEL, url) as Promise<OpenLinkResponse>,
   macRelease: () => ipcRenderer.invoke(MAC_RELEASE_CHANNEL) as Promise<MacReleaseAnswer | undefined>,
   previewHandoff: (request: HandoffPreviewRequest) => ipcRenderer.invoke(HANDOFF_PREVIEW_CHANNEL, request) as Promise<HandoffPreview | undefined>,
-  readWorkspaceImage: (path: string) =>
-    ipcRenderer.invoke(WORKSPACE_IMAGE_CHANNEL, path) as Promise<WorkspaceImageResponse>,
+  readWorkspaceImage: (path: string, folder?: string) =>
+    ipcRenderer.invoke(WORKSPACE_IMAGE_CHANNEL, path, folder) as Promise<WorkspaceImageResponse>,
   attachFiles: () => ipcRenderer.invoke(WORKSPACE_ATTACH_CHANNEL) as Promise<AttachFilesResponse>,
   workspaceFiles: () => ipcRenderer.invoke(WORKSPACE_FILES_CHANNEL) as Promise<WorkspaceFilesResponse>,
   attachPasted: (name: string, bytes: Uint8Array) =>

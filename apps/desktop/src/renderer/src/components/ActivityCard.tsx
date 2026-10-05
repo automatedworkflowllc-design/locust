@@ -43,6 +43,7 @@ import { activityCounts, activityEntries, netFileEntries, boundedShellOutput, co
 import type { TraceSegment, ActivityDetail, ActivityEntry, PlanStep } from '../missionView.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { DiffView } from './DiffView.js'
+import { ThreadImage } from './ThreadImage.js'
 import { DocPreview, isNewDocument } from './DocPreview.js'
 import { InComparisonCell, PinnedPagesContext } from '../pinnedPages.js'
 import { Icon } from './Icon.js'
@@ -889,6 +890,9 @@ export function ActivityCard({
                   </span>
                 </div>
               )}
+              {entry.kind === 'file' && entry.file.status !== 'DELETED' && <ThreadImage path={entry.file.path} />}
+              {entry.kind === 'unreported' && !entry.failed && entry.neverRan === undefined && <ThreadImage path={entry.name} />}
+              {entry.kind === 'tool' && !entry.failed && entry.neverRan === undefined && fileToolWord(entry.tool ?? '') === 'Read' && <ThreadImage path={entry.name} />}
             </Fragment>
           ))}
           {capped && (

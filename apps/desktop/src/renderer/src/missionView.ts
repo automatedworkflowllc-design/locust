@@ -1,6 +1,7 @@
 import type { NormalizedRuntimeEvent, ToolPatch } from '@teammate/runtime-adapters'
 
 import { SUBAGENT_TOOL } from './faceState.js'
+import { isImagePath } from '../../shared/image-files.js'
 import { READ_TOOL_WORDS, byHelper, editToolName, isEditCommand, isShellTool } from '../../shared/tool-kinds.js'
 import { LARGE_FILE_LINES, fileCounts, parseUnifiedDiff } from './diff.js'
 import type { DiffCounts, DiffFile } from './diff.js'
@@ -120,7 +121,7 @@ export const FOLDED_TOOL_NAMES_SHOWN = 3
  */
 export function foldPlainToolRuns(entries: readonly ActivityEntry[]): readonly ActivityEntry[] {
   const foldable = (entry: ActivityEntry): boolean =>
-    entry.kind === 'tool' && entry.settled && !entry.failed
+    entry.kind === 'tool' && entry.settled && !entry.failed && !isImagePath(entry.name)
   const out: ActivityEntry[] = []
   let index = 0
   while (index < entries.length) {

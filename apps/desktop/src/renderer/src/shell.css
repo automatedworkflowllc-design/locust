@@ -19320,3 +19320,17 @@ textarea {
   color: var(--lc-text-secondary);
   overflow-wrap: anywhere;
 }
+
+/* Local pictures keep their proportions within a reply or comparison column. */
+.lc-threadimage { display: block; max-width: 100%; margin: 8px 0; }
+.lc-threadimage[hidden] { display: none; }
+.lc-threadimage__open { display: block; max-width: 100%; padding: 0; border: 0; background: none; cursor: pointer; }
+.lc-threadimage__picture { display: block; width: auto; height: auto; max-width: 100%; max-height: 320px; object-fit: contain; border-radius: 4px; }
+.lc-threadimage__caption { display: block; margin-top: 4px; color: var(--lc-text-muted); font-size: 12px; }
+
+/* Under a row it sits under the file's name, not at the card's edge (0.626): the row's padding, its
+   14px icon and the gap after it. The first frame put a red square flush against the card's border. */
+:is(.lc-filerow, .lc-filerow__line) + .lc-threadimage {
+  margin: 2px var(--lc-space-5) var(--lc-space-4) calc(var(--lc-space-5) * 2 + 14px);
+  max-width: calc(100% - var(--lc-space-5) * 3 - 14px);
+}
