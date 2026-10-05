@@ -54,6 +54,7 @@ import { TeammateBot } from './TeammateBot.js'
 import { RuntimeMark } from './RuntimeMark.js'
 import { WhatLocustCanStop } from './WhatLocustCanStop.js'
 import { WHAT_LOCUST_CAN_STOP_LEDE } from '../../../shared/what-locust-can-stop.js'
+import { NETWORK_DOC_LINK } from '../../../shared/outbound-links.js'
 import { keepCurrentNote, offersUpdate, updateLine } from '../agentUpdates.js'
 import { Icon } from './Icon.js'
 import { costCell, costTotal, missionCost, monthSpendLine, sumCosts } from '../cost.js'
@@ -1298,6 +1299,30 @@ function More({ children }: { readonly children: ReactNode }): ReactElement {
       <summary>How it works</summary>
       <div className="lc-settings__moretext">{children}</div>
     </details>
+  )
+}
+
+/**
+ * "Every connection, listed" (0.618, the PRD's R22): docs/NETWORK.md in the
+ * public copy, in the person's browser. If the host will not open it, its own
+ * sentence says why, beside the link (a-refused-link-says-so).
+ */
+function NetworkListLink(): ReactElement {
+  const [refused, setRefused] = useState<string>()
+  return (
+    <>
+      <button
+        type="button"
+        className="lc-linkbutton"
+        onClick={() => {
+          setRefused(undefined)
+          void window.desktop?.openLink(NETWORK_DOC_LINK).then((answer) => setRefused(answer.ok ? undefined : answer.message))
+        }}
+      >
+        Every connection, listed
+      </button>
+      {refused !== undefined && <span className="lc-link__refusal" role="status"> {refused}</span>}
+    </>
   )
 }
 
@@ -2970,11 +2995,16 @@ export function SettingsScreen({
               * window asks nothing, but the app does -- its own updates, and
               * Codex's and Copilot's (Settings > Runtimes has that switch).
               */}
+            {/*
+              * 0.618 (the PRD's R22): it left out the pet gallery and the agents Locust installs,
+              * two of its own connections. docs/NETWORK.md lists every one, and a test keeps it so.
+              */}
             <dd>
-              The window makes no requests of its own. Locust checks for and downloads its own updates, and
-              new Codex CLI and Copilot CLI versions; each coding agent talks to its own provider. A web page a
-              teammate made runs in a frame of its own. It may load libraries and fonts from the common public
-              hosts and reach no other site, so what it reads in your folder cannot be sent anywhere.
+              The window makes no requests of its own. Locust checks for and downloads its own updates,
+              installs the AI agents you ask it to and keeps Codex CLI and Copilot CLI current, and reads the
+              pet gallery when you open it; each AI agent talks to its own service. A web page a teammate made
+              may load libraries and fonts from the common public hosts and reach no other site, so what it
+              reads in your folder cannot be sent anywhere. <NetworkListLink />
             </dd>
           </dl>
           <More>

@@ -1,0 +1,88 @@
+# What Locust sends over the network
+
+Locust itself sends nothing about you or your work to anyone. It has no
+analytics and no usage counts, and when it crashes, the crash dump stays on
+this machine (nothing is uploaded). The AI agents it runs
+connect to their own services, with the accounts you signed them in with:
+that is the work you asked for. This page lists every connection Locust
+itself makes, when it makes it, and what it sends, so you can check it.
+
+It is held to the code by `apps/desktop/src/main/the-network-is-written-down.test.ts`:
+a new place in Locust's main process that reaches the network fails that test
+until it is listed here.
+
+## Locust's own connections
+
+| What | Where | When |
+| --- | --- | --- |
+| Its own updates (Windows) | `github.com/automatedworkflowllc-design/locust-releases` | 8 seconds after it starts, then every 6 hours while it is open, and when you press Check now |
+| Its own updates (Mac) | `api.github.com/repos/automatedworkflowllc-design/locust-releases`, then the disk image you choose | When it checks, and when you choose to update |
+| Installing an AI agent | the npm registry (`registry.npmjs.org`, or the one your npm is set to use) | When you press Install for OpenCode, Claude Code, Codex CLI or Copilot CLI |
+| Keeping Codex CLI and Copilot CLI current | the npm registry, and `raw.githubusercontent.com/automatedworkflowllc-design/locust-releases/main/runtime-canary.json` | 45 seconds after the installed Locust starts, then at most every 6 hours |
+| The pet gallery | `openpets.dev`, addresses under `/pets/` only | When you open the gallery, and when you take a pet |
+| A web page a teammate made, open in the preview | eight public hosts, for libraries and fonts only | While the page is open |
+
+**Its own updates.** A plain request for the files of the newest release in a
+public repository that holds only Locust's installers: `latest.yml`, then the
+parts of the installer that changed. No account, nothing that identifies you
+beyond what any download shows (your IP address, to GitHub). A check is never
+made while a teammate is working; it is tried again 15 minutes later. A copy of
+Locust that is not the installed one never updates itself.
+
+**Installing and updating AI agents.** Locust runs npm, and npm downloads the
+package: `opencode-ai`, `@anthropic-ai/claude-code`, `@openai/codex` or
+`@github/copilot`. Cursor Agent, Muse Code and Antigravity are installed from
+their makers' pages, in your browser. For Codex CLI and Copilot CLI, the
+installed Locust also asks npm for their newest version (one `npm view` each)
+and reads the verdict file above, which can hold a version back. The look runs
+whatever "Update Codex CLI and Copilot CLI on their own" (Settings > AI agents)
+says; the switch decides only whether a version 12 hours old is installed on
+its own. Claude Code, OpenCode and Cursor Agent keep themselves current, with
+their own connections.
+
+**The pet gallery.** The catalog of pets and the files of a pet you take, over
+https, from `openpets.dev` under `/pets/` and nowhere else, with no redirects
+followed. What was read is kept on this machine and used again.
+
+**A web page in the preview.** A page a teammate made runs inside Locust. It may
+load libraries, stylesheets and fonts -- GET and HEAD over https only -- from
+`cdnjs.cloudflare.com`, `cdn.jsdelivr.net`, `unpkg.com`, `esm.sh`,
+`cdn.tailwindcss.com`, `code.jquery.com`, `fonts.googleapis.com` and
+`fonts.gstatic.com`. Everything else it asks of the web is refused, so what it
+reads of your folder stays on this machine.
+
+## What stays on this machine
+
+- **Locust's own window loads nothing from the network** in the installed app:
+  one filter refuses every request it makes, apart from a previewed page's,
+  above. It is refused every device and web permission: camera, microphone,
+  location and the like.
+- **Locust's permission host listens on `127.0.0.1` only.** Claude Code asks it
+  before a connector call or a command, and each run gets its own token. Locust
+  also reads Antigravity's own local server, at `127.0.0.1`.
+- **The spellchecker downloads no dictionary.**
+- **Memory recall** runs a small model that ships with Locust.
+- **A report reaches Locust's makers only when you send it.** Send feedback,
+  and Report a problem in Settings, let you choose: open a public GitHub issue
+  in your browser, open your mail app with the report addressed to Locust's
+  makers, or save it as a file.
+- **Links** (the Locust website, an agent's install page) open in your
+  browser, when you click them. A link inside a previewed page asks you first,
+  since an address can carry what the page read.
+
+## The AI agents' own connections
+
+Each AI agent connects to its own service with the account you signed it in
+with, and sends what that service needs to do the work: your messages, and the
+files and command output the agent reads. Codex CLI talks to OpenAI, Claude
+Code to Anthropic, Copilot CLI to GitHub, Cursor Agent to Cursor, Antigravity
+to Google, Muse Code to Meta, and OpenCode to the provider of the model you
+pick -- for one of your own models, the address you gave it in Settings > Your
+own models. A connector a teammate uses is called by its agent, at the service
+that connector names.
+
+Locust does not sit between an agent and its service: it reads what the agent
+reports on this machine as it works, and nothing of its network traffic. It
+never sees the agents' sign-ins: each agent keeps its own. A key you give Locust for one of
+your own models is kept on this machine, encrypted by the system, and handed
+only to OpenCode, for that model.
