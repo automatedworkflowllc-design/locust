@@ -1,0 +1,95 @@
+# The Windows build, off the laptop (2026-10-05).
+#
+# Every Locust release has been cut on one laptop by one session. This makes
+# the same unsigned NSIS installer on GitHub's Windows runner, in the public
+# repository (automatedworkflowllc-design/locust-app) where minutes are free,
+# so a build nobody's machine touched can be set beside the laptop's -- and,
+# later, signed there (SignPath, applied for). docs/CI-WINDOWS.md says what it
+# proves and what it does not.
+#
+# Written in the private repository and carried to the mirror by hand:
+# publish-mirror.mjs keeps the mirror's own workflows and the export leaves
+# ours out, so nothing here reaches it on its own.
+#
+# The steps are not written out here: each calls _tools/ci-windows-local.sh,
+# the script the laptop runs end to end to rehearse this job, so the two
+# cannot drift. Its suites are listed in _tools/ci-windows-suites.txt.
+#
+# By hand (`gh workflow run windows-build.yml -f label=...`) or on a pushed
+# `v*` tag; never on every push, the package takes minutes. No signing, no
+# secrets, nothing published: the installer, its blockmap and latest.yml are
+# left as this run's artifact for 14 days, and nothing goes to locust-releases.
+# (Artifact storage is not counted against a public repository, unlike the
+# private one mac-build.yml had to stop using artifacts in.)
+
+name: windows-build
+
+on:
+  workflow_dispatch:
+    inputs:
+      label:
+        description: 'A label for this build, shown in the job summary (e.g. v0.620.0 or try-nsis). The version itself comes from apps/desktop/package.json.'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+# One build per ref at a time; a second dispatch waits rather than racing.
+concurrency:
+  group: windows-build-${{ github.ref }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      # A tag build is labelled by its tag; a dispatch by what was typed.
+      CI_LABEL: ${{ github.event_name == 'push' && github.ref_name || inputs.label }}
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: bash _tools/ci-windows-local.sh install
+
+      - name: Typecheck (desktop node and web configs)
+        run: bash _tools/ci-windows-local.sh typecheck
+
+      - name: Unit suites (no display, no model)
+        run: bash _tools/ci-windows-local.sh suites
+
+      - name: Package the unsigned NSIS installer
+        run: bash _tools/ci-windows-local.sh package
+
+      - name: Hash and summary
+        id: hash
+        run: bash _tools/ci-windows-local.sh hash
+
+      - uses: actions/upload-artifact@v4
+        with:
+          # The label stays out of the name: a typed one may hold characters an
+          # artifact name refuses (/, :, ...). The summary carries it.
+          name: Locust-${{ steps.hash.outputs.version }}-windows-${{ github.run_id }}
+          path: |
+            apps/desktop/release/Locust-${{ steps.hash.outputs.version }}-setup.exe
+            apps/desktop/release/Locust-${{ steps.hash.outputs.version }}-setup.exe.blockmap
+            apps/desktop/release/latest.yml
+          if-no-files-found: error
+          retention-days: 14
+          # The installer is already compressed; zipping it again only costs time.
+          compression-level: 0
