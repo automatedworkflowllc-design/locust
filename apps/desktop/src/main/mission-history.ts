@@ -741,6 +741,10 @@ export async function newestTurnOf(ledger: MissionLedger, missionId: string): Pr
   }
 }
 
+export function withLiveMissionIds(response: MissionHistoryResponse, liveMissionIds: readonly string[]): MissionHistoryResponse {
+  return response.ok ? { ...response, data: { ...response.data, liveMissionIds: [...new Set(liveMissionIds)] } } : response
+}
+
 export async function readMissionHistory(
   ledger: MissionLedger,
   workroom?: Workroom,

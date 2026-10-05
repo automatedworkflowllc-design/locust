@@ -23,7 +23,7 @@ import { registerRemoteControlIpc } from './remote-control-ipc.js'
 import { runInPseudoTerminal } from './pseudo-terminal.js'
 import type { Runner } from './cloud-tasks.js'
 import type { ReverseChange } from '../shared/reverse-diff.js'
-import { bringInCopy, COPY_ROOT, copyLineChanges, copyRefusal, makeCompareCopy, removeCompareCopies } from './compare-copies.js'
+import { bringInCopy, compareRoot, copyLineChanges, copyRefusal, makeCompareCopy, removeCompareCopies } from './compare-copies.js'
 import type { CompareSlotId, PublicCompare, PublicCompareSlot } from '../shared/compare.js'
 import { createCompareStore } from './compare-store.js'
 import { createApprovalRuleStore } from './approval-rule-store.js'
@@ -146,7 +146,7 @@ import { changedSince } from './memory-provenance.js'
 const ROUTINE_TICK_MS = 60_000
 const ROUTINE_FIRST_TICK_MS = 15_000
 import type { RoutineRunner } from './routine-runner.js'
-import { readOneMission, deleteMissionRecord, knownDigests, newestTurnOf, readMissionHistory, spendByTeammate } from './mission-history.js'
+import { readOneMission, deleteMissionRecord, knownDigests, newestTurnOf, readMissionHistory, spendByTeammate, withLiveMissionIds } from './mission-history.js'
 import { limitReached, limitRefusal, monthOf } from '../shared/spend.js'
 import { createOwnModelStore, OwnModelRefusal, ownModelAddress, ownModelId, testOwnEndpoint } from './own-models.js'
 import { changelogPaths, entries as changelogEntries, readChangelog, splashEntries } from './changelog.js'
@@ -3106,7 +3106,7 @@ if (!ownsSingleInstanceLock) {
     let routineFolderChosen: (path: string) => boolean = () => false
     const rooms = createRoomStore({ rootDirectory: app.getPath('userData') })
     // Comparisons (0.441, shared/compare.ts), kept beside the rooms, outside the ledger.
-    const compares = createCompareStore({ rootDirectory: app.getPath('userData'), copyRoot: COPY_ROOT })
+    const compares = createCompareStore({ rootDirectory: app.getPath('userData'), copyRoot: compareRoot() })
     // Folder watchers (0.522): routines that run on a new file, polled, inside the project folder.
     const fileArrivals = createFileArrivals({ get projectFolder() { return workspacePath } })
     const routineCopies = createRoutineCopies()
@@ -4332,7 +4332,7 @@ if (!ownsSingleInstanceLock) {
         ...(await workedInFolders()),
         ...(await teammateFolders()),
         ledgerDirectory,
-        COPY_ROOT
+        compareRoot()
       ])
       if (!decision.ok) {
         return {
@@ -4395,7 +4395,7 @@ if (!ownsSingleInstanceLock) {
         ...(await workedInFolders()),
         ...(await teammateFolders()),
         ledgerDirectory,
-        COPY_ROOT
+        compareRoot()
       ])
       if (!decision.ok) {
         return {
@@ -4441,7 +4441,7 @@ if (!ownsSingleInstanceLock) {
      */
     ipcMain.handle(WORKSPACE_IMAGE_CHANNEL, async (event, requested: unknown, folder: unknown) => {
       if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
-      return readWorkspaceImage(requested, folder ?? workspacePath, [...(await workedInFolders()), ...(await teammateFolders()), COPY_ROOT])
+      return readWorkspaceImage(requested, folder ?? workspacePath, [...(await workedInFolders()), ...(await teammateFolders()), compareRoot()])
     })
 
     /*
@@ -4476,7 +4476,7 @@ if (!ownsSingleInstanceLock) {
     const pages = createPageServer({
       // And a comparison's plain copies (0.448), whose pages each column runs.
       // And a reply's own page (0.553), each in a folder of its own.
-      roots: async () => [...(await workedInFolders()), ...(await teammateFolders()), COPY_ROOT, REPLY_PAGE_ROOT],
+      roots: async () => [...(await workedInFolders()), ...(await teammateFolders()), compareRoot(), REPLY_PAGE_ROOT],
       base: () => (workspaceChosen ? workspacePath : undefined)
     })
     protocol.handle(PAGE_SCHEME, (request) => pages.handle(request.url))
@@ -4576,7 +4576,7 @@ if (!ownsSingleInstanceLock) {
         if (compare !== undefined) {
           const name = compareTreeId(compare.compareId, place.slot as CompareSlotId)
           // Both kinds of column live under ~/.locust/compare (0.493); an older git column, under the folder.
-          const copy = compare.changesIn === 'copy' || await stat(join(COPY_ROOT, name)).then(() => true, () => false) ? join(COPY_ROOT, name) : join(workspacePath, COMPARE_TREES_DIRECTORY, name)
+          const copy = compare.changesIn === 'copy' || await stat(join(compareRoot(), name)).then(() => true, () => false) ? join(compareRoot(), name) : join(workspacePath, COMPARE_TREES_DIRECTORY, name)
           const inCopy = join(copy, requested)
           if (await stat(inCopy).then((found) => found.isFile(), () => false)) return pages.urlFor(inCopy)
           /*
@@ -4599,7 +4599,7 @@ if (!ownsSingleInstanceLock) {
       if (typeof requested !== 'string' || requested.length === 0) {
         return { ok: false, message: 'There is no file to open.' } as const
       }
-      const roots = [...(await workedInFolders()), ...(await teammateFolders()), ledgerDirectory, COPY_ROOT]
+      const roots = [...(await workedInFolders()), ...(await teammateFolders()), ledgerDirectory, compareRoot()]
       // A link inside the folder that leads out of it is not the folder's to show (SEC-01).
       const linkedOut = 'That file is a link to somewhere outside the folder your teammates work in, so Locust will not open it.'
       /*
@@ -5424,7 +5424,7 @@ if (!ownsSingleInstanceLock) {
      * was kept, and Keep then refused). Beside the plain copies, where no
      * path leads back.
      */
-    const compareTrees = () => createWorktreeManager({ workspacePath, directory: COPY_ROOT })
+    const compareTrees = () => createWorktreeManager({ workspacePath, directory: compareRoot() })
     const discardCompareTrees = async (compare: PublicCompare): Promise<void> => {
       if (compare.changes !== true || compare.changesIn !== undefined) return
       for (const column of compare.slots) await compareTrees().discard(compareTreeId(compare.compareId, column.slot)).catch(() => undefined)
@@ -6253,7 +6253,7 @@ if (!ownsSingleInstanceLock) {
           note('deleted-mission-returned', back.join(' '))
         }
       }
-      return history
+      return withLiveMissionIds(history, [...codexMissions.liveMissionIds(), ...antigravityMissions.liveMissionIds()])
     })
 
     /*
