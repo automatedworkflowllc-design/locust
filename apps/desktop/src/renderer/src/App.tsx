@@ -24,6 +24,10 @@ import type {
   PublicRuntimeStatus,
   PublicStorageReport,
   MissionPruneResponse,
+  ProfileBackupResponse,
+  ProfileRestoreOutcome,
+  ProfileRestorePreview,
+  ProfileRestoreResponse,
   AppChangelog,
   TrashListResponse,
   TrashMutationResponse,
@@ -194,6 +198,7 @@ import { splitAttachments, withAttachments } from '../../shared/attachments.js'
 import { conversationKeys, heldFor, routineOf } from './conversationList.js'
 import { collapseConversations, defaultEffort, defaultRoute, effortAfterRouteChange, effortIsInModelId, modelFamily, listedAsMission, modeFacts, modeRunsOn, modesFor, modeUnavailableReason, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, runtimeReach, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, nextFreeModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
 import { homeRouteOf, isOwnRoute, modelDisplayName, rememberOwnModels, routeChrome, routeModelName } from './routeName.js'
+import { restoreNoticeLine } from './backupWords.js'
 import { FeedbackDialog } from './components/FeedbackDialog.js'
 import { conversationText } from './feedback.js'
 import { withMessageDelta } from '../../shared/messageFragments.js'
@@ -1232,6 +1237,29 @@ export default function App(): ReactElement {
     if (!bridge) return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'The host is not available.' } }
     return bridge.installUpdate()
   }
+
+  /*
+   * BACK UP AND RESTORE (0.614, main/profile-backup.ts). Each answer is the
+   * host's; with no host, each says so rather than pretending.
+   */
+  const noHost = 'Locust could not reach its own process. Restart it and try again.'
+  const pickProfileFolder = async (purpose: 'backup' | 'restore'): Promise<string | undefined> =>
+    window.desktop === undefined ? undefined : window.desktop.pickProfileFolder(purpose)
+  const backUpProfile = async (folder: string): Promise<ProfileBackupResponse> =>
+    window.desktop === undefined ? { ok: false, reason: noHost } : window.desktop.backupProfile(folder)
+  const previewProfileRestore = async (folder: string): Promise<ProfileRestorePreview> =>
+    window.desktop === undefined ? { ok: false, reason: noHost } : window.desktop.previewProfileRestore(folder)
+  const restoreProfile = async (folder: string): Promise<ProfileRestoreResponse> =>
+    window.desktop === undefined ? { ok: false, reason: noHost } : window.desktop.restoreProfile(folder)
+  // What the last restore did, said once after the restart it needed; kept until dismissed.
+  const [lastRestore, setLastRestore] = useState<ProfileRestoreOutcome>()
+  useEffect(() => {
+    void window.desktop?.takeLastProfileRestore()
+      .then((outcome) => {
+        if (outcome !== undefined) setLastRestore(outcome)
+      })
+      .catch(() => undefined)
+  }, [])
 
   const lastPrunePreview = useRef<{ readonly days: number; readonly missionIds: readonly string[] } | undefined>(undefined)
   /** Ask the host what a prune would do. Nothing is deleted by this. */
@@ -7499,6 +7527,10 @@ export default function App(): ReactElement {
             changelog={changelog}
             {...(settingsLanding === undefined ? {} : { initialPage: settingsLanding })}
               onPrune={prune}
+              onPickProfileFolder={pickProfileFolder}
+              onBackUpProfile={backUpProfile}
+              onPreviewProfileRestore={previewProfileRestore}
+              onRestoreProfile={restoreProfile}
             />
           ) : comparing !== undefined ? (
             (() => {
@@ -8220,6 +8252,15 @@ export default function App(): ReactElement {
             <div className="lc-diagnostic lc-tone-green" role="status">
               <Icon name="check" size={12} />
               <span>{rowNotice}</span>
+            </div>
+          )}
+          {lastRestore !== undefined && (
+            <div className={`lc-diagnostic ${lastRestore.ok ? 'lc-tone-green' : 'lc-tone-amber'} lc-diagnostic--row lc-restored`} role="status">
+              <Icon name={lastRestore.ok ? 'check' : 'shield'} size={12} />
+              <span>{restoreNoticeLine(lastRestore)}</span>
+              <button type="button" className="lc-button" onClick={() => setLastRestore(undefined)}>
+                OK
+              </button>
             </div>
           )}
           {workspaceNotice !== undefined && (

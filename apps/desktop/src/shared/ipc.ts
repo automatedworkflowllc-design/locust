@@ -435,6 +435,61 @@ export type MissionPruneResponse =
       readonly error: { readonly code: 'PRUNE_REFUSED' | 'INTERNAL_ERROR'; readonly message: string }
     }
 
+/*
+ * BACK UP AND RESTORE (0.614, main/profile-backup.ts): a folder with a
+ * manifest, keys never in it; a restore previewed by the same reader, refused
+ * for a newer backup or a live run, and applied at the next start.
+ */
+export const PROFILE_PICK_FOLDER_CHANNEL = 'profile:pick-folder'
+export const PROFILE_BACKUP_CHANNEL = 'profile:backup'
+export const PROFILE_RESTORE_PREVIEW_CHANNEL = 'profile:restore-preview'
+export const PROFILE_RESTORE_CHANNEL = 'profile:restore'
+export const PROFILE_LAST_RESTORE_CHANNEL = 'profile:last-restore'
+
+/** What a profile, or a backup of one, holds, in the person's own nouns. */
+export interface ProfileCounts {
+  readonly teammates: number
+  readonly routines: number
+  readonly memories: number
+  readonly rules: number
+  readonly groups: number
+  readonly rooms: number
+  readonly compares: number
+  readonly folders: number
+  readonly conversations: number
+}
+
+export type ProfileBackupResponse =
+  | { readonly ok: true; readonly folder: string; readonly counts: ProfileCounts; readonly bytes: number; readonly files: number }
+  | { readonly ok: false; readonly reason: string }
+
+export type ProfileRestorePreview =
+  | {
+      readonly ok: true
+      readonly folder: string
+      /** The Locust that made it, and when. */
+      readonly appVersion: string
+      readonly createdAt: string
+      readonly counts: ProfileCounts
+      readonly bytes: number
+      /** What is here now, which the restore would replace. */
+      readonly current: ProfileCounts
+    }
+  | { readonly ok: false; readonly reason: string }
+
+export type ProfileRestoreResponse = { readonly ok: true } | { readonly ok: false; readonly reason: string }
+
+/** What the last restore did, said once after the restart it needed. */
+export interface ProfileRestoreOutcome {
+  readonly ok: boolean
+  readonly folder: string
+  readonly at: string
+  /** Where what it replaced was moved, inside the profile. */
+  readonly aside?: string
+  readonly counts?: ProfileCounts
+  readonly reason?: string
+}
+
 /** What this build is, so a person can say which one they are running. */
 export interface AppInfo {
   readonly name: string
@@ -3271,6 +3326,16 @@ export interface DesktopApi {
   setKeepRunning(keepRunning: boolean): Promise<KeepRunningState>
   onUpdateState(listener: (state: AppUpdateState) => void): () => void
   pruneMissions(request: MissionPruneRequest): Promise<MissionPruneResponse>
+  /** A folder for a backup to go in, or a backup to restore; undefined when the picker was cancelled. */
+  pickProfileFolder(purpose: 'backup' | 'restore'): Promise<string | undefined>
+  /** A new backup folder inside `folder`. */
+  backupProfile(folder: string): Promise<ProfileBackupResponse>
+  /** What restoring `folder` would bring and replace, read by the restore's own reader. */
+  previewProfileRestore(folder: string): Promise<ProfileRestorePreview>
+  /** Written down, then Locust restarts; the restore is applied before anything is read. */
+  restoreProfile(folder: string): Promise<ProfileRestoreResponse>
+  /** What the last restore did, once. */
+  takeLastProfileRestore(): Promise<ProfileRestoreOutcome | undefined>
   /**
    * Ask the machine what it has. `fresh` drops every cached answer first --
    * including whether npm is there, which is otherwise decided once per

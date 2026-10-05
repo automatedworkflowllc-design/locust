@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.614.0 - 2026-10-04
+
+### New
+
+- **Back up and restore.** Settings > Privacy & data now copies your teammates, routines, memories, saved approvals and conversations into a folder you choose, and restores them from one. A restore first shows what the backup holds and what it would replace, then restarts Locust to apply it. What it replaces is moved aside in Locust's profile folder, not deleted, so a restore can be undone. Your own model keys are never in a backup. A restore is refused, and says why, while a run is going, for a backup from a newer Locust, or for a backup whose files have changed since it was made.
+
 ## 0.613.0 - 2026-10-04
 
 ### Fixed
