@@ -1,4 +1,5 @@
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
+import { openingEventCount } from './event-window.js'
 
 /**
  * A reply is ONE thing that happened, not the thousand pieces it arrived in.
@@ -43,14 +44,18 @@ export function withMessageDelta(
 export function withMessageDeltas(
   events: readonly NormalizedRuntimeEvent[],
   arrivals: readonly NormalizedRuntimeEvent[],
-  cap = Number.POSITIVE_INFINITY
+  cap = Number.POSITIVE_INFINITY,
+  onTrim?: () => void
 ): readonly NormalizedRuntimeEvent[] {
   const next = [...events]
   const append = (event: NormalizedRuntimeEvent): void => {
     next.push(event)
-    // Match the live cap after EACH arrival, preserving the first event.
+    // Match the live cap after EACH arrival, preserving the opening.
     // A message evicted mid-batch may speak again later in the same batch.
-    if (next.length > cap) next.splice(1, next.length - cap)
+    if (next.length > cap) {
+      next.splice(openingEventCount(cap), next.length - cap)
+      onTrim?.()
+    }
   }
   for (const arriving of arrivals) {
     if (arriving.type !== 'message.delta') {

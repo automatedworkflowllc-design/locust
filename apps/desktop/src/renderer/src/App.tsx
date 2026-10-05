@@ -162,7 +162,7 @@ import type { ContextMenuItem, ContextMenuState } from './components/ContextMenu
 import { Thread } from './components/Thread.js'
 import { AgentAvatar, REGISTER_WORD } from './components/ThreadItems.js'
 import { TitleBar } from './components/TitleBar.js'
-import { cappedLiveEvents, LIVE_EVENT_CAP,
+import {
   conversationTurns,
   failureMessage,
   failedOnItsLimit,
@@ -204,7 +204,7 @@ import { homeRouteOf, isOwnRoute, modelDisplayName, rememberOwnModels, routeChro
 import { restoreNoticeLine } from './backupWords.js'
 import { FeedbackDialog } from './components/FeedbackDialog.js'
 import { conversationText } from './feedback.js'
-import { withMessageDelta, withMessageDeltas } from '../../shared/messageFragments.js'
+import { withLiveEvents } from './liveEvents.js'
 import { setPlush, setTerminalFaces } from './botLook.js'
 import { DONE_HOP_MS, RECEIVED_GLANCE_MS, liveActivityOf } from './faceState.js'
 import type { Handoff } from './glances.js'
@@ -245,6 +245,7 @@ interface LiveRunState {
   readonly data?: MissionRouteSummary
   readonly phase: LiveRunPhase
   readonly events: readonly NormalizedRuntimeEvent[]
+  readonly eventsTruncated?: boolean
   readonly error?: string
   readonly errorIsPersistence?: boolean
   /**
@@ -423,7 +424,7 @@ function applyMissionUpdate(run: LiveRunState, update: CodexMissionUpdate): Live
   if (update.kind === 'message-deltas') {
     return {
       ...live,
-      events: cappedLiveEvents(withMessageDeltas(live.events, update.events, LIVE_EVENT_CAP)),
+      ...withLiveEvents(live, update.events),
       phase: live.phase === 'starting' ? 'running' : live.phase
     }
   }
@@ -442,7 +443,9 @@ function applyMissionUpdate(run: LiveRunState, update: CodexMissionUpdate): Live
    */
   // H4: the FIRST event is kept past the cap, as the history projection
   // keeps it -- it is how a run is known to have started at all.
-  const events = cappedLiveEvents(withMessageDelta(live.events, update.event))
+  const window = withLiveEvents(live, [update.event])
+  live = { ...live, ...window }
+  const events = window.events
   if (update.event.type === 'run.completed') return { ...live, events, phase: 'completed' }
   if (update.event.type === 'run.cancelled') return { ...live, events, phase: 'cancelled' }
   if (update.event.type === 'run.failed') {
@@ -565,6 +568,7 @@ function restoredLiveRun(mission: PublicRecoveredMission): LiveRunState {
     },
     phase: mission.phase,
     events: mission.events,
+    eventsTruncated: mission.eventsTruncated,
     ...(error === undefined ? {} : { error }),
     restored: true,
     restoredMission: mission,
@@ -3800,6 +3804,7 @@ export default function App(): ReactElement {
          */
         items: buildThread(events, {
           running: phase === 'running' || phase === 'starting',
+          trimmed: live !== undefined && live.events.length > 0 ? live.eventsTruncated === true : recorded?.eventsTruncated === true,
           mayEdit: (live?.data?.sandbox ?? recorded?.sandbox) !== 'read-only',
           ...(workspacePath === undefined ? {} : { workspacePath })
         }),
@@ -4285,7 +4290,7 @@ export default function App(): ReactElement {
     const events = live !== undefined && live.events.length > 0 ? live.events : recorded?.events ?? []
     const running = (live !== undefined && liveRunIsActive(live)) || (live === undefined && recorded === undefined)
     // Its whole thread, drawn as every other reply is (0.554): its steps and its words as they come.
-    const items = buildThread(events, { running, mayEdit: false, ...(workspacePath === undefined ? {} : { workspacePath }) })
+    const items = buildThread(events, { running, trimmed: live !== undefined && live.events.length > 0 ? live.eventsTruncated === true : recorded?.eventsTruncated === true, mayEdit: false, ...(workspacePath === undefined ? {} : { workspacePath }) })
     const answer = items
       .flatMap((item) => (item.type === 'agent-message' && item.text.trim().length > 0 ? [item.text.trim()] : []))
       .join('\n\n')
@@ -4335,7 +4340,7 @@ export default function App(): ReactElement {
         running,
         phase: live?.phase ?? recorded?.phase ?? 'unknown',
         prompt: splitAttachments(live?.prompt ?? recorded?.prompt ?? '').text,
-        items: buildThread(events, { running, mayEdit: false, ...(folder === undefined ? {} : { workspacePath: folder }) })
+        items: buildThread(events, { running, trimmed: live !== undefined && live.events.length > 0 ? live.eventsTruncated === true : recorded?.eventsTruncated === true, mayEdit: false, ...(folder === undefined ? {} : { workspacePath: folder }) })
       }
     }
     const cellsBySlot = compare.slots.map((column) => column.missionIds.map((missionId) => cellOf(missionId, column.folder ?? workspacePath)))
@@ -7111,7 +7116,7 @@ export default function App(): ReactElement {
         // At the cap, the live run holds a window of its events, and what is
         // counted from them is the window's; it says so, as the history does
         // (a B4 lead: this said nothing was cut).
-        eventsTruncated: run.events.length >= LIVE_EVENT_CAP,
+        eventsTruncated: run.eventsTruncated === true,
         integrityIssueCount: 0,
         sandbox: data.sandbox,
         checkpoints: [],
@@ -8318,6 +8323,7 @@ export default function App(): ReactElement {
                 }
                 {...(liveRun.data?.sandbox === undefined ? {} : { sandbox: liveRun.data.sandbox })}
                 events={liveRun.events}
+                eventsTruncated={liveRun.eventsTruncated === true}
                 running={running}
                 {...(busyOffer === undefined ? {} : { busyModel: busyOffer })}
                 {...(limitOffer === undefined ? {} : { limitModel: limitOffer })}

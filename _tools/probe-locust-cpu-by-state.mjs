@@ -37,6 +37,8 @@ if (codex && process.env.LOCUST_SPEND !== '1') throw new Error('--codex requires
  * nothing is sent until the app reports the stand-in's own version.
  */
 const fakeClaude = process.argv.includes('--fake-claude')
+const longTurn = process.argv.includes('--long-turn')
+if (longTurn && !fakeClaude) throw new Error('--long-turn requires the no-spend stand-in --fake-claude')
 if (fakeClaude && process.env.LOCUST_SPEND !== '1') throw new Error('--fake-claude lifts the free-only guard, so it requires LOCUST_SPEND=1; it spends nothing, and checks that before sending')
 const FAKE_DIR = join(dirname(fileURLToPath(import.meta.url)), 'fake-claude')
 const FAKE_VERSION = '0.0.0-locust-fake'
@@ -94,6 +96,35 @@ const metrics = async () => {
   return Object.fromEntries((answer?.result?.metrics ?? []).map((m) => [m.name, m.value]))
 }
 const results = []
+const showOpening = async () => {
+  // Stop its animated follow before framing the opening. The first scroll
+  // consumes any outstanding "our own scroll" flag; the second moves up.
+  await drive.evaluate(`(() => {
+    const thread = document.querySelector('.lc-thread')
+    thread.scrollTop = Math.max(0, thread.scrollTop - 2)
+    thread.dispatchEvent(new Event('scroll', { bubbles: true }))
+    thread.scrollTop = 0
+    thread.dispatchEvent(new Event('scroll', { bubbles: true }))
+  })()`)
+  for (let i = 0; i < 3; i += 1) {
+    await drive.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 700, y: 250, deltaX: 0, deltaY: -10000 })
+    await sleep(150)
+  }
+}
+const eventCounts = async () => {
+  const counts = { events: 0, calls: 0 }
+  for (const name of (await readdir(join(drive.profile, 'mission-ledger'))).filter((name) => name.endsWith('.jsonl'))) {
+    for (const line of (await readFile(join(drive.profile, 'mission-ledger', name), 'utf8')).split('\n')) {
+      try {
+        const event = JSON.parse(line).event
+        if (!event) continue
+        counts.events += 1
+        if (event.type === 'tool.completed') counts.calls += 1
+      } catch { /* an append in progress is read again */ }
+    }
+  }
+  return counts
+}
 const streamedFragments = async () => {
   let count = 0
   const directory = join(drive.profile, 'mission-ledger')
@@ -120,8 +151,18 @@ const measure = async (state) => {
   const running = await drive.evaluate(`Boolean(document.querySelector('button[aria-label^="Stop the running"]')) || [...document.querySelectorAll('.lc-hometeam__state')].some((s) => /working|thinking|replying/i.test(s.innerText))`)
   const animations = JSON.parse(String(await drive.evaluate(`JSON.stringify(document.getAnimations().filter((a) => a.playState === 'running').map((a) => (a.animationName ?? a.constructor.name) + ' @ ' + String(a.effect?.target?.className?.baseVal ?? a.effect?.target?.className ?? a.effect?.target?.tagName ?? '').slice(0, 50)))`)))
   const before = await metrics()
+  if (longTurn && streaming) await drive.evaluate(`(() => {
+    window.locustProbeFrames = { active: true, gaps: [], last: performance.now() }
+    const tick = (now) => { const frames = window.locustProbeFrames; if (!frames.active) return; frames.gaps.push(now - frames.last); frames.last = now; requestAnimationFrame(tick) }
+    requestAnimationFrame(tick)
+  })()`)
   const share = cpu(5)
   const after = await metrics()
+  const frames = longTurn && streaming ? JSON.parse(String(await drive.evaluate(`(() => {
+    const frames = window.locustProbeFrames; frames.active = false
+    const gaps = frames.gaps.slice(1).sort((a, b) => a - b)
+    return JSON.stringify({ count: gaps.length, medianMs: gaps[Math.floor(gaps.length / 2)], p95Ms: gaps[Math.floor(gaps.length * 0.95)], maxMs: gaps.at(-1) })
+  })()`))) : undefined
   assertQuiet()
   const nextDrawing = await canvasFrames()
   const frozenDrawing = drawing === '[]' ? null : drawing === nextDrawing
@@ -135,6 +176,7 @@ const measure = async (state) => {
   const per = (name) => Math.round(((after[name] ?? 0) - (before[name] ?? 0)) / 5 * 10) / 10
   const row = {
     state, running, stillRunning, focused, valid, frozenDrawing, cpu: share,
+    ...(frames === undefined ? {} : { frames }),
     ...(streaming ? { fragmentsBefore, fragmentsAfter, visibleBefore, visibleAfter } : {}),
     perSecond: { styleRecalcs: per('RecalcStyleCount'), layouts: per('LayoutCount'), scriptMs: Math.round(per('ScriptDuration') * 1000), taskMs: Math.round(per('TaskDuration') * 1000) },
     animations: animations.length, animationNames: [...new Set(animations)].slice(0, 12)
@@ -146,7 +188,7 @@ const measure = async (state) => {
 const cards = async () => JSON.parse(String(await drive.evaluate(`JSON.stringify([...document.querySelectorAll('.lc-hometeam__card')].map((card) => ({ name: card.querySelector('.lc-hometeam__name')?.firstChild?.textContent?.trim() ?? '', word: card.querySelector('.lc-hometeam__state')?.innerText.trim() ?? null })))`)))
 try {
   await drive.ready()
-  await drive.resize(1440, 900)
+  await drive.resize(longTurn ? 1200 : 1440, longTurn ? 720 : 900)
   await drive.send('Page.bringToFront', {})
   await drive.waitFor(`document.hasFocus() && !document.hidden`, { timeoutMs: 15_000, what: 'probe window in front' })
   await drive.send('Performance.enable', {})
@@ -181,7 +223,7 @@ try {
     await new Promise((r) => setTimeout(r, 800))
     const field = document.querySelector('form.command-dock textarea')
     if (!field) return 'no composer'
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(field, 'Reply in chat with about 1800 words of a fictional story about a swarm of locusts travelling across a field. Use plain paragraphs with no headings. Start the story immediately. Do not use tools, research, a plan, a preface, or explanations. Do not create or edit any file.')
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(field, ${JSON.stringify(longTurn ? '[locust-fake-long-turn] Simulate 600 Read calls with progress messages, then stream the story. Do not read or change files.' : 'Reply in chat with about 1800 words of a fictional story about a swarm of locusts travelling across a field. Use plain paragraphs with no headings. Start the story immediately. Do not use tools, research, a plan, a preface, or explanations. Do not create or edit any file.')})
     field.dispatchEvent(new Event('input', { bubbles: true }))
     for (let i = 0; i < 120; i += 1) {
       await new Promise((r) => setTimeout(r, 250))
@@ -192,6 +234,18 @@ try {
   })()`))
   say(`  ${sent}`)
   if (sent !== 'sent') throw new Error(sent)
+  if (longTurn) {
+    for (let i = 0; i < 400 && (await eventCounts()).calls < 110; i += 1) await sleep(100)
+    await showOpening()
+    await drive.capture('over 500 events, still running', async () => JSON.stringify(await eventCounts()))
+    for (let i = 0; i < 400 && (await eventCounts()).calls < 600; i += 1) await sleep(100)
+    const counts = await eventCounts()
+    if (counts.events <= 3000 || counts.calls < 600) throw new Error(`Long turn was not reached: ${JSON.stringify(counts)}`)
+    await showOpening()
+    await drive.capture('past 3000 events, still running', async () => JSON.stringify(counts))
+    await drive.evaluate(`document.querySelector('button[aria-label="Go to the newest message"]')?.click()`)
+    say(`  long-turn counts: ${JSON.stringify(counts)}`)
+  }
   if (!streamingOnly) {
     await sleep(1500)
     await drive.evaluate(`document.querySelector('.lc-brand__lockup')?.click()`)
@@ -211,6 +265,7 @@ try {
     await sleep(200)
   }
   await measure('the conversation, streaming')
+  if (longTurn) await drive.capture('after the streaming CPU sample', async () => JSON.stringify(await eventCounts()))
   if (streamingOnly) {
     say('  streaming-only: Home and idle-after states were not measured')
   } else {

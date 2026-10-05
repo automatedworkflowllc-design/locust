@@ -14,6 +14,8 @@
 //   FAKE_CLAUDE_WORDS     words in the reply (default 1800)
 //   FAKE_CLAUDE_DELTA_MS  milliseconds between deltas (default 40)
 //   FAKE_CLAUDE_PER_DELTA words per delta (default 2)
+//   FAKE_CLAUDE_TOOL_CALLS harmless simulated Read calls before the reply (default 0)
+//   FAKE_CLAUDE_TOOL_MS milliseconds between simulated calls (default 20)
 import { randomUUID } from 'node:crypto'
 
 export const FAKE_VERSION = '0.0.0-locust-fake'
@@ -48,13 +50,26 @@ if (args.includes('--help') || args.includes('-h')) {
   process.exit(0)
 }
 
-// A run. Read stdin and ignore it, so a writer never blocks on a full pipe.
-process.stdin.on('data', () => undefined)
+// A run. Read its first input line; the pipe stays open for steer/approval messages.
+// Runtime environment filtering intentionally excludes FAKE_CLAUDE_* variables,
+// so the long-turn drive also selects its mode by a marker in the prompt.
+const prompt = await new Promise((resolve) => {
+  let input = ''
+  let received = false
+  process.stdin.on('data', (chunk) => {
+    if (received) return
+    input += chunk.toString()
+    if (input.includes('\n')) { received = true; resolve(input) }
+  })
+  process.stdin.on('end', () => resolve(input))
+})
 process.stdin.on('error', () => undefined)
 
 const words = Number(process.env.FAKE_CLAUDE_WORDS ?? '1800')
 const deltaMs = Number(process.env.FAKE_CLAUDE_DELTA_MS ?? '40')
 const perDelta = Number(process.env.FAKE_CLAUDE_PER_DELTA ?? '2')
+const toolCalls = Number(process.env.FAKE_CLAUDE_TOOL_CALLS ?? (prompt.includes('[locust-fake-long-turn]') ? '600' : '0'))
+const toolMs = Number(process.env.FAKE_CLAUDE_TOOL_MS ?? '20')
 const modelAt = args.indexOf('--model')
 const model = modelAt === -1 ? 'claude-haiku-4-5' : args[modelAt + 1] ?? 'claude-haiku-4-5'
 const session = randomUUID()
@@ -77,6 +92,24 @@ for (let i = 0; i < text.length; i += perDelta) pieces.push(`${i === 0 ? '' : ' 
 const full = pieces.join('')
 
 line({ type: 'system', subtype: 'init', cwd: process.cwd(), tools: ['Read', 'Glob', 'Grep'], mcp_servers: [], model, permissionMode: 'default', claude_code_version: FAKE_VERSION })
+// These are receipts, not executed tools: no files are read or changed.
+const wholeMessage = (id, content) => line({ type: 'assistant', message: { model, id, type: 'message', role: 'assistant', content, stop_reason: null }, parent_tool_use_id: null })
+if (toolCalls > 0) {
+  wholeMessage('opening', [{ type: 'text', text: 'I will read the sample files, then explain what I found.' }])
+  for (let call = 1; call <= toolCalls; call += 1) {
+    const id = `tool_fake_${call}`
+    const input = { file_path: `sample-${call}.md` }
+    event({ type: 'message_start', message: { model, id: `msg_tool_${call}`, type: 'message', role: 'assistant', content: [] } })
+    event({ type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id, name: 'Read', input: {} } })
+    event({ type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: JSON.stringify(input) } })
+    event({ type: 'content_block_stop', index: 0 })
+    wholeMessage(`msg_tool_${call}`, [{ type: 'tool_use', id, name: 'Read', input }])
+    event({ type: 'message_stop' })
+    line({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: 'Simulated sample contents.', is_error: false }] }, parent_tool_use_id: null })
+    if (call % 40 === 0) wholeMessage(`progress_${call}`, [{ type: 'text', text: `I have checked ${call} sample files. The sample contents agree.` }])
+    await new Promise((resolve) => setTimeout(resolve, toolMs))
+  }
+}
 event({ type: 'message_start', message: { model, id: messageId, type: 'message', role: 'assistant', content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 10, output_tokens: 1 } } })
 event({ type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } })
 

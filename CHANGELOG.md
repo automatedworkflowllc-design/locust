@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.646.0 - 2026-10-05
+
+### Fixed
+
+- **A long turn keeps its opening on screen while it runs.** A turn shows at most a set number of its steps while it runs, and past that it kept only its very first event and the newest ones, so on a long Claude Code turn the plan and the model's first messages dropped off the screen until it finished. It now keeps the opening and the newest work, and says so once at the top when it has left steps out ("This turn is long: some work between its opening and recent updates is kept in its record, not shown here"). Everything is still in the turn's record.
+
 ## 0.645.0 - 2026-10-05
 
 ### New

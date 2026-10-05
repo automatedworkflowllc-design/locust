@@ -15,7 +15,7 @@ import type {
 } from '../../../shared/ipc.js'
 import type { TurnVersions } from '../missionView.js'
 import type { RewindPutBackResponse } from '../../../shared/ipc.js'
-import { LIVE_EVENT_CAP, activityEntries, buildThread, cancellationSummary, editedFiles, decisionStanding, errorAlreadyShown, foldNoticeKeys, helperAskedBy, lastPlanOf, modeRefusedATool, pathInWorkspace, readPlan, relativePath, sentAgainBy, stepsLine, stoppedBeforeSaying, terminalSeamBefore, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
+import { activityEntries, buildThread, cancellationSummary, editedFiles, decisionStanding, errorAlreadyShown, foldNoticeKeys, helperAskedBy, lastPlanOf, modeRefusedATool, pathInWorkspace, readPlan, relativePath, sentAgainBy, stepsLine, stoppedBeforeSaying, terminalSeamBefore, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
 import type { GroupBoundary, GroupLeaving, LiveStarter, TurnSwitch } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
 import { folderName, ranOnLine } from '../ranOn.js'
@@ -868,6 +868,7 @@ export interface ThreadProps {
   /** Where earlier groups' words stopped briefing this conversation; drawn as the join line's mirror. */
   readonly groupLeavings?: readonly GroupLeaving[]
   readonly events: readonly NormalizedRuntimeEvent[]
+  readonly eventsTruncated?: boolean
   /** The live line's words while nothing has arrived (0.602): the start's phase. */
   readonly startingLabel?: string
   readonly running: boolean
@@ -1001,6 +1002,7 @@ onResume,
   workspacePath,
   workspaceId,
   events,
+  eventsTruncated,
   running,
   restoredMission,
   shownMissionId,
@@ -1089,8 +1091,8 @@ onResume,
   }
   const firstShown = firstEarlierTurnShown(earlier.sizes, earlierRows)
   const showEarlier = (): void => setEarlierBudget((current) => ({ identity: shownIdentity, rows: (current.identity === shownIdentity ? current.rows : EARLIER_ROWS_SHOWN) + EARLIER_ROWS_SHOWN }))
-  // More events than are drawn (0.627): the record's window said so, or the live run reached its cap.
-  const trimmed = restoredMission?.eventsTruncated === true || events.length >= LIVE_EVENT_CAP
+  // An actual eviction, not merely reaching the window's size.
+  const trimmed = restoredMission?.eventsTruncated === true || eventsTruncated === true
   const items = buildThread(events, {
     running,
     ...(trimmed ? { trimmed: true } : {}),

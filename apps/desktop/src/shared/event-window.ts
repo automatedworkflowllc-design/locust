@@ -20,5 +20,16 @@
  */
 export const EVENT_WINDOW = 3_000
 
-/** What a turn too long for the window says at its top: its start is kept, not drawn. */
-export const TRIMMED_TURN_LINE = 'This turn is long: its first steps are kept in its record, not drawn here.'
+/** Keep a quarter for the opening plan and prose, and three quarters for recent work. */
+export function openingEventCount(cap: number): number {
+  return Math.max(1, Math.floor(cap / 4))
+}
+
+/** The same opening and newest events on screen, live and recovered. */
+export function windowEvents<T>(events: readonly T[], cap = EVENT_WINDOW): readonly T[] {
+  const opening = openingEventCount(cap)
+  return events.length <= cap ? events : [...events.slice(0, opening), ...(cap > opening ? events.slice(-(cap - opening)) : [])]
+}
+
+/** The record stays whole; a finished turn still uses this display window. */
+export const TRIMMED_TURN_LINE = 'This turn is long: some work between its opening and recent updates is kept in its record, not shown here.'
