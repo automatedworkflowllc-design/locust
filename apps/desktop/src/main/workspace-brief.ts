@@ -192,6 +192,23 @@ export function worktreeSection(): string {
  * teammate is told what is true for it instead: this is the project, you have
  * your own copy, stay in it.
  */
+/**
+ * WHERE A RUN STANDS, SAID ONCE (0.638).
+ *
+ * A run in the project folder is told the folder's name, inside its LOCUST.md
+ * section when there is one (`briefSection`) or on its own line
+ * (`whereSection`). A run that stands APART from it -- a teammate's worktree,
+ * or a comparison column's copy -- is told it has its own copy instead, and
+ * never the project folder's name: an arena round's OpenCode columns, told
+ * "You are working in the folder arena-rpg" from inside a copy, made that
+ * folder there and wrote the game into it, one level down, where Keep and
+ * the column's page did not look.
+ */
+export function folderSentences(brief: WorkspaceBrief | undefined, standsApart: boolean, folderName: string): readonly string[] {
+  if (brief !== undefined) return [briefSection(brief, standsApart ? undefined : folderName)]
+  return [standsApart ? worktreeSection() : whereSection(folderName)]
+}
+
 export function briefSection(brief: WorkspaceBrief, workspaceName: string | undefined): string {
   return [
     workspaceName === undefined

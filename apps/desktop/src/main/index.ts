@@ -128,7 +128,7 @@ import { createRoutineRunner } from './routine-runner.js'
 import { createMemoryStore } from './memory-store.js'
 import { WorktreeHasChangesError, createWorktreeManager, defaultRunGit } from './worktrees.js'
 import { readRuntimeSetup } from './runtime-setup.js'
-import { briefSection, readWorkspaceBrief, whereSection, worktreeSection, groupSection } from './workspace-brief.js'
+import { folderSentences, readWorkspaceBrief, groupSection } from './workspace-brief.js'
 import { createConversationChain, groupBriefFor } from './conversation-chain.js'
 import { createMemoryReader } from './memory-reader.js'
 import { createAttentionReader } from './attention-reader.js'
@@ -1701,36 +1701,28 @@ if (!ownsSingleInstanceLock) {
         // `peer` is absent for a run that belongs to nobody. It stands in the
         // project folder, like any run with no worktree, so every branch
         // below reads an absent peer as "no worktree of its own".
-        if (brief !== undefined) sections.push(briefSection(brief, peer?.cwd === undefined ? here.name : undefined))
-        // And it is told so even when there is no LOCUST.md.
-        //
-        // 0.36.4 fixed worktree runs dying on a directory refusal partly with
-        // one sentence -- "you have your own copy, work only inside the
-        // folder you were started in" -- which lives inside the brief above
-        // and is therefore sent ONLY when the folder happens to have a
-        // LOCUST.md in it. The nine clean runs that measured the fix were
-        // driven on `scratchRepository`, which writes one. A default install
-        // does not have one, so the fix did not reach the person it was for
-        // (QA, 2026-09-06). It is its own line now, because it is a fact
-        // about where the run is, not about the project's instructions.
-        if (peer?.cwd !== undefined && brief === undefined) {
-          sections.push(worktreeSection())
-        }
         /*
-         * And a teammate in the FOLDER, with no LOCUST.md, is told which
-         * folder -- which until now nothing said.
-         *
-         * `briefSection` names it, and only exists when the folder has a
-         * LOCUST.md; `worktreeSection` covers a teammate on its own branch.
-         * The ordinary case -- a default install, no brief, no worktree --
-         * fell between them and said nothing at all. A Cursor teammate
-         * dogfooding the app on 2026-09-15 reported exactly that from the
-         * inside: it had been editing the wrong folder and only knew the
-         * right one from memory.
+         * A run that stands apart from the project folder: a teammate's
+         * worktree, or a comparison column's copy (0.638). Either is told it
+         * has its own copy and never the project folder's name -- an arena
+         * round's OpenCode columns, told "You are working in the folder
+         * arena-rpg" from inside a copy, made that folder there and wrote
+         * the game into it.
          */
-        if (peer?.cwd === undefined && brief === undefined) {
-          sections.push(whereSection(here.name))
-        }
+        const standsApart = peer?.cwd !== undefined || conversation?.ownFolder !== undefined
+        /*
+         * And told where it stands even when there is no LOCUST.md.
+         *
+         * 0.36.4 fixed worktree runs dying on a directory refusal partly with
+         * one sentence -- "you have your own copy, work only inside the
+         * folder you were started in" -- which lived inside the brief and so
+         * reached only a folder with a LOCUST.md (QA, 2026-09-06). And a
+         * teammate in the FOLDER with no LOCUST.md was told nothing about
+         * which folder -- a Cursor teammate dogfooding the app on 2026-09-15
+         * had been editing the wrong one. `folderSentences` says each case
+         * once (workspace-brief.ts).
+         */
+        sections.push(...folderSentences(brief, standsApart, here.name))
         // Word and PowerPoint words as text, readable in any mode (0.530, office-words.ts).
         const officeWords = await officeWordsSection(peer?.cwd ?? here.path).catch(() => undefined)
         if (officeWords !== undefined) sections.push(officeWords)

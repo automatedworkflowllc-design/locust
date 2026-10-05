@@ -39,7 +39,12 @@ const check = (what, ok, detail) => {
   say(`  [${ok ? 'PASS' : 'FAIL'}] ${what}${detail === undefined ? '' : ` -- ${String(detail).slice(0, 500)}`}`)
 }
 
-const ASK = 'Write a file named hello.md that contains one line: hello. Write nothing else, then say in one sentence what you wrote.'
+// LOCUST_DRIVE_ASK / LOCUST_DRIVE_FILE / LOCUST_DRIVE_FOLDER_NAME (0.638): the arena round's shape -- a
+// folder with a project's name and a page to make -- to check a column writes at its copy's root, not
+// in a folder named after the project (OpenCode did, told "You are working in the folder arena-rpg").
+const FILE = process.env.LOCUST_DRIVE_FILE ?? 'hello.md'
+const ASK = process.env.LOCUST_DRIVE_ASK ?? 'Write a file named hello.md that contains one line: hello. Write nothing else, then say in one sentence what you wrote.'
+const FOLDER_NAME = process.env.LOCUST_DRIVE_FOLDER_NAME
 
 /**
  * Two free models, on Auto, changing files: started as Send starts one
@@ -95,8 +100,8 @@ const settled = async (drive, label) => {
   return shown
 }
 
-// 1. A folder too big to copy.
-{
+// 1. A folder too big to copy. LOCUST_DRIVE_ONLY_SMALL=1 skips it (20,001 files take a while to write).
+if (process.env.LOCUST_DRIVE_ONLY_SMALL !== '1') {
   const workspace = await mkdtemp(join(SCRATCH_ROOT, 'locust-drive-anyfolder-big-'))
   for (let index = 0; index <= 20_000; index += 1) await writeFile(join(workspace, `note-${String(index)}.txt`), '', 'utf8')
   const drive = await startDrive({
@@ -125,7 +130,9 @@ const settled = async (drive, label) => {
 
 if (process.env.LOCUST_DRIVE_ONLY_BIG !== '1') // 2. A small folder: each in its own copy, and each one's file found where it wrote it.
 {
-  const workspace = await mkdtemp(join(SCRATCH_ROOT, 'locust-drive-anyfolder-small-'))
+  const holder = await mkdtemp(join(SCRATCH_ROOT, 'locust-drive-anyfolder-small-'))
+  const workspace = FOLDER_NAME === undefined ? holder : join(holder, FOLDER_NAME)
+  if (FOLDER_NAME !== undefined) await mkdir(workspace, { recursive: true })
   await writeFile(join(workspace, 'README.md'), '# A small project\n', 'utf8')
   const drive = await startDrive({
     name: `compare-any-folder-small-${tag}`, port: 9874, workspace, outPath: join(OUT, 'small'),
@@ -140,7 +147,7 @@ if (process.env.LOCUST_DRIVE_ONLY_BIG !== '1') // 2. A small folder: each in its
     say(`  small: ${JSON.stringify(small)}`)
     check('the bar says each changes its own copy, and that on Auto a model can still reach outside it', /Each changes its own copy of your project; only the one you keep comes into your folder\. On Auto, a model can still change files outside its copy if it is asked to\./.test(small.bar), small.bar)
     check('both columns ran', small.heads.length === 2 && small.heads.every((head) => / done$/.test(head)), JSON.stringify(small.heads))
-    check('the folder is untouched while they compare', !existsSync(join(workspace, 'hello.md')), readdirSync(workspace).join(', '))
+    check('the folder is untouched while they compare', !existsSync(join(workspace, FILE)), readdirSync(workspace).join(', '))
     check('no column says a file it wrote is not there', small.notThere === false)
     // Each column's file, read where it wrote it, as its chip reads it.
     const found = JSON.parse(String(await drive.evaluate(`(async () => {
@@ -149,12 +156,12 @@ if (process.env.LOCUST_DRIVE_ONLY_BIG !== '1') // 2. A small folder: each in its
       const out = []
       for (const column of compare?.slots ?? []) {
         if (column.folder === undefined) { out.push({ slot: column.slot, folder: false }); continue }
-        const read = await window.desktop.readTextFile(column.folder + '/hello.md')
+        const read = await window.desktop.readTextFile(column.folder + '/' + ${JSON.stringify(FILE)})
         out.push({ slot: column.slot, ok: read.ok, text: read.ok ? read.text.trim() : read.message })
       }
       return JSON.stringify(out)
     })()`)))
-    check("each column's own file is found in its copy, as its chip looks for it", found.length === 2 && found.every((one) => one.ok === true && /hello/i.test(one.text)), JSON.stringify(found))
+    check("each column's own file is found in its copy, as its chip looks for it", found.length === 2 && found.every((one) => one.ok === true && (FILE === 'hello.md' ? /hello/i.test(one.text) : one.text.length > 0)), JSON.stringify(found.map((one) => ({ ...one, text: String(one.text).slice(0, 60) }))))
   } catch (error) {
     failures += 1
     say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

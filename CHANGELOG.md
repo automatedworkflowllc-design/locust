@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.638.0 - 2026-10-05
+
+### Fixed
+
+- **A comparison column is told it works in its own copy.** When a comparison changes files in a folder that is not a git project, each model works in its own copy of the folder. Each one was still told it was working in the project folder itself, by name. In one comparison, two OpenCode models made a new folder with that name inside their copies and put their work in it, where Keep and the column's page did not look. Each column is now told it has its own copy, as a teammate with its own branch always was.
+
 ## 0.637.0 - 2026-10-05
 
 ### Fixed

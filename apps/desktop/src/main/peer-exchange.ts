@@ -141,6 +141,13 @@ export interface ConversationHint {
   /** The folder the run stands in: its conversation's, which may not be the window's (0.458). */
   readonly folder?: string
   /**
+   * The run's OWN folder, when it stands apart from the project: a comparison
+   * column's copy (0.638). Told so, as a worktree run is -- not the project
+   * folder's name, which a model in a copy took as a folder to make (an arena
+   * round's OpenCode columns wrote `<copy>/<project name>/index.html`).
+   */
+  readonly ownFolder?: string
+  /**
    * The paragraphs of the brief the resumed CLI session already holds, by
    * key (A2.5). Absent for a turn that must be briefed in full.
    */
