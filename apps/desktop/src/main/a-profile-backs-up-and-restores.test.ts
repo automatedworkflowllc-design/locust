@@ -35,7 +35,7 @@ import {
  */
 const folders: string[] = []
 afterEach(async () => {
-  for (const folder of folders.splice(0)) await rm(folder, { recursive: true, force: true })
+  for (const folder of folders.splice(0)) await rm(folder, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 const temp = async (prefix: string): Promise<string> => {
   const folder = await mkdtemp(join(tmpdir(), prefix))
