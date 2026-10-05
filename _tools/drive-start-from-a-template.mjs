@@ -69,17 +69,23 @@ const LAYOUT = `(() => {
   return { rows: rows.length, sideways: pane ? pane.scrollWidth > pane.clientWidth + 1 : 'no pane', clipped, offLine, truncatedNames: names, firstRowTop: first ? Math.round(first.top) : -1, rowHeight: first ? Math.round(first.height) : -1, width: innerWidth, height: innerHeight }
 })()`
 
-// Wait for a run of `routineId` to finish; return the finished mission.
-async function finishedRun(drive, routineId, startedAfter, limit = 300_000) {
+// Wait for the ROUTINE's run to finish, not its first step's: a conversation is
+// "completed" between steps, and a four-step routine is still running then (the
+// first --all pass started the next template at "step 3 of 4", refused). The
+// store counts a run and clears its execution in one write when the last step ends.
+async function finishedRun(drive, routineId, startedAfter, limit = 600_000) {
   let mission
   for (let waited = 0; waited < limit; waited += 2000) {
     await sleep(2000)
+    const routine = (await routinesNow(drive)).find((entry) => entry.routineId === routineId)
     const history = await drive.evaluate('window.desktop.getMissionHistory()')
     const found = history?.ok ? history.data.missions.filter((entry) => entry.startedBy?.routineId === routineId && !startedAfter.has(entry.missionId)) : []
     if (found.length === 0) continue
     const answer = await drive.evaluate(`window.desktop.readMission(${JSON.stringify(found[0].missionId)})`)
     mission = answer?.ok ? answer.data.mission : found[0]
-    if (['completed', 'failed', 'cancelled'].includes(mission.phase)) return mission
+    const counted = (routine?.runs ?? 0) >= 1 && routine?.execution === undefined
+    const stopped = ['failed', 'cancelled'].includes(mission.phase) && routine?.execution?.status !== 'running'
+    if (counted || stopped) return mission
   }
   return mission
 }
@@ -93,12 +99,24 @@ const answerOf = (mission) => {
   }
   return [...items.values()].join('\n\n')
 }
+// Every conversation one routine's run made, oldest first: each step is its own,
+// on the same runtime thread, so a later step reads what an earlier one answered.
+async function runMissions(drive, routineId) {
+  const history = await drive.evaluate('window.desktop.getMissionHistory()')
+  const found = history?.ok ? history.data.missions.filter((entry) => entry.startedBy?.routineId === routineId) : []
+  const read = []
+  for (const entry of found) {
+    const answer = await drive.evaluate(`window.desktop.readMission(${JSON.stringify(entry.missionId)})`)
+    read.push(answer?.ok ? answer.data.mission : entry)
+  }
+  return read.sort((first, second) => String(first.createdAt).localeCompare(String(second.createdAt)))
+}
 // "Each run once on the free OpenCode route with the transcript kept" (the PRD's week 3).
-async function keepTranscript(drive, id, mission) {
+async function keepTranscript(drive, id, missions) {
   const folder = join(drive.out, 'transcripts')
   await mkdir(folder, { recursive: true })
-  const body = [`# ${id}`, '', `- mission: ${String(mission?.missionId)}`, `- route: ${String(mission?.runtime)} / ${String(mission?.model)}`, `- ended: ${String(mission?.phase)}`, '', '## Prompt', '', String(mission?.prompt ?? ''), '', '## Answer', '', answerOf(mission), ''].join('\n')
-  await writeFile(join(folder, `${id}.md`), body, 'utf8')
+  const steps = missions.flatMap((mission, at) => [`## Step ${String(at + 1)} of ${String(missions.length)}: ${String(mission.phase)}`, '', `- mission: ${String(mission.missionId)}`, `- route: ${String(mission.runtime)} / ${String(mission.model)}`, '', '### Prompt', '', String(mission.prompt ?? ''), '', '### Answer', '', answerOf(mission), ''])
+  await writeFile(join(folder, `${id}.md`), [`# ${id}`, '', ...steps].join('\n'), 'utf8')
 }
 
 let drive
@@ -161,7 +179,7 @@ try {
   await drive.evaluate(`[...document.querySelectorAll('.lc-routinerow')].find((row) => row.innerText.includes('Explain this project'))?.querySelector('button.lc-ghostbutton:not(.lc-iconbutton)')?.click()`)
   const ran = await finishedRun(drive, explain.routineId, seen)
   seen.add(ran?.missionId)
-  await keepTranscript(drive, 'explain-this-project', ran)
+  await keepTranscript(drive, 'explain-this-project', await runMissions(drive, explain.routineId))
   await drive.capture('Explain this project ran', () => drive.evaluate(`document.querySelector('.lc-thread')?.innerText.slice(-1500)`))
   check('Explain this project runs on the free route to completion', ran?.phase === 'completed' && ran.runtime === 'opencode' && ran.model === route.model, JSON.stringify({ phase: ran?.phase, runtime: ran?.runtime, model: ran?.model }))
   await toRoutines(drive)
@@ -175,7 +193,7 @@ try {
   await drive.evaluate(`(${click})('Run routine')`)
   const summarized = await finishedRun(drive, summarize.routineId, seen)
   seen.add(summarized?.missionId)
-  await keepTranscript(drive, 'summarize-a-long-text', summarized)
+  await keepTranscript(drive, 'summarize-a-long-text', await runMissions(drive, summarize.routineId))
   await drive.capture('Summarize a long text ran', () => drive.evaluate(`document.querySelector('.lc-thread')?.innerText.slice(-1500)`))
   check('Summarize a long text runs to completion with the text it was given', summarized?.phase === 'completed' && String(summarized.prompt ?? '').includes('November'), JSON.stringify({ phase: summarized?.phase }))
 
@@ -193,11 +211,13 @@ try {
       const values = SAMPLES[id]
       const started = await drive.evaluate(`window.desktop.runRoutine(${JSON.stringify(routine.routineId)}${values === undefined ? '' : `, ${JSON.stringify(values)}`})`)
       if (!started?.ok) { check(`${id}: starts`, false, JSON.stringify(started)); continue }
-      const mission = await finishedRun(drive, routine.routineId, seen)
-      seen.add(mission?.missionId)
-      await keepTranscript(drive, id, mission)
-      const text = answerOf(mission)
-      check(`${id}: runs once on the free route to an answer`, mission?.phase === 'completed' && text.trim().length > 80, `${String(mission?.phase)} · ${text.replace(/\s+/g, ' ').slice(0, 160)}`)
+      await finishedRun(drive, routine.routineId, seen)
+      const missions = await runMissions(drive, routine.routineId)
+      await keepTranscript(drive, id, missions)
+      // Every step ran, each to an answer of its own.
+      const answered = missions.filter((mission) => mission.phase === 'completed' && answerOf(mission).trim().length > 80).length
+      const last = answerOf(missions.at(-1))
+      check(`${id}: every step runs once on the free route to an answer`, missions.length === routine.steps.length && answered === routine.steps.length, `${String(answered)}/${String(routine.steps.length)} steps answered · ${last.replace(/\s+/g, ' ').slice(0, 160)}`)
       // The routine writes nothing: Ask mode, and every template is written to read.
     }
     // Every template is written to read, and each ran in Ask: the folder is as it was.
