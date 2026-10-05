@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.629.0 - 2026-10-05
+
+### Fixed
+
+- **A turn's list of changed files counts this folder's files, once each.** A long run that was stopped and resumed showed "Edited 19 files", each row "Claude Code did not report", beside a footer that said one file changed. Writes into a scratch folder outside the conversation's own no longer count as its files, a file written and then edited is one file, and a call the run was stopped in the middle of says "stopped before it reported" rather than that Claude Code failed to.
+
 ## 0.628.0 - 2026-10-05
 
 ### Improved

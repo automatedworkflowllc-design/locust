@@ -15,7 +15,7 @@ import type {
 } from '../../../shared/ipc.js'
 import type { TurnVersions } from '../missionView.js'
 import type { RewindPutBackResponse } from '../../../shared/ipc.js'
-import { LIVE_EVENT_CAP, activityEntries, buildThread, cancellationSummary, editedFiles, decisionStanding, errorAlreadyShown, foldNoticeKeys, helperAskedBy, lastPlanOf, modeRefusedATool, readPlan, relativePath, sentAgainBy, stepsLine, stoppedBeforeSaying, terminalSeamBefore, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
+import { LIVE_EVENT_CAP, activityEntries, buildThread, cancellationSummary, editedFiles, decisionStanding, errorAlreadyShown, foldNoticeKeys, helperAskedBy, lastPlanOf, modeRefusedATool, pathInWorkspace, readPlan, relativePath, sentAgainBy, stepsLine, stoppedBeforeSaying, terminalSeamBefore, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
 import type { GroupBoundary, GroupLeaving, LiveStarter, TurnSwitch } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
 import { folderName, ranOnLine } from '../ranOn.js'
@@ -523,7 +523,14 @@ function TurnFoot({
   readonly onOpenFile?: (path: string) => void
 }): ReactElement {
   // What changed on disk, not every edit call: one refused was no change.
-  const edits = item.details.filter((detail) => detail.kind === 'edit' && detail.failed !== true)
+  // Paths outside this folder (a scratch tree a resume wrote into) are not
+  // this turn's files -- they inflated "Edited N files" beside a footer that
+  // counted one file in the compare copy (2026-10-05). When EVERY named edit
+  // is outside (a recording drawn against a stub folder), keep them: that is
+  // all there is to show of the turn.
+  const named = item.details.filter((detail) => detail.kind === 'edit' && detail.failed !== true)
+  const inFolder = named.filter((detail) => pathInWorkspace(detail.name, workspacePath))
+  const edits = inFolder.length > 0 ? inFolder : named
   const entries = activityEntries(edits, workspacePath)
   const pathsOf = (seen: boolean): number => new Set(
     entries.flatMap((entry) =>

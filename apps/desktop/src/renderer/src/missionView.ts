@@ -541,22 +541,56 @@ export function activityEntries(
 }
 
 /**
+ * Whether a path is this turn's folder (or a relative name inside it).
+ *
+ * A resume that wrote into a scratch tree outside the compare copy still
+ * named those Writes as edits of the turn; the column foot then said
+ * "Edited 44 files" over a folder that only changed one (2026-10-05).
+ * Outside paths are another folder's story.
+ */
+export function pathInWorkspace(path: string, workspacePath: string | undefined): boolean {
+  if (workspacePath === undefined || workspacePath.length === 0) return true
+  const normalise = (value: string): string => value.replace(/[\\/]+/g, '/').replace(/\/$/, '')
+  const root = normalise(workspacePath)
+  const full = normalise(path)
+  if (full.toLowerCase() === root.toLowerCase()) return true
+  if (full.toLowerCase().startsWith(`${root.toLowerCase()}/`)) return true
+  // Already relative to the folder (a runtime naming a file by its name).
+  if (!/^(?:[a-z]:)?\//i.test(full)) return true
+  // A compare/routine copy of this folder reads as inside once relativePath maps it.
+  const relative = relativePath(path, workspacePath)
+  return relative !== path && !/^(?:[a-z]:)?[\\/]/i.test(relative)
+}
+
+/**
  * ONE ROW PER FILE, for a turn's files (0.494). Where the host looked at the
  * file after the run, its net change -- first state to last -- is the file's
  * row, and the runtime's own step diffs of it are steps, not more of it. Sol's
  * 0.492 pass: "Edited 10 files" over twelve rows, a file edited twice counted
  * twice and the total the sum of both. With no look (a folder too large to
  * walk), each step's diff stays: that is all there is to show.
+ *
+ * Unreported rows (a Write with a path and no diff) used to keep every call:
+ * Write then Edit of the same file was two files on the card (resumed compare,
+ * 2026-10-05). One path is one file, whichever call named it.
  */
 export function netFileEntries(entries: readonly ActivityEntry[], workspacePath?: string): readonly ActivityEntry[] {
   const key = (path: string): string => relativePath(path, workspacePath).replace(/[\\/]+/g, '/').toLowerCase()
   const pathOf = (entry: ActivityEntry): string | undefined =>
     entry.kind === 'file' ? key(entry.file.path) : entry.kind === 'unreported' ? key(entry.name) : undefined
   const netPaths = new Set(entries.flatMap((entry) => (entry.kind === 'file' && entry.net === true ? [key(entry.file.path)] : [])))
-  return entries.filter((entry) => {
+  const withoutSteps = entries.filter((entry) => {
     const path = pathOf(entry)
     if (path === undefined || !netPaths.has(path)) return true
     return entry.kind === 'file' && entry.net === true
+  })
+  const seen = new Set<string>()
+  return withoutSteps.filter((entry) => {
+    const path = pathOf(entry)
+    if (path === undefined) return true
+    if (seen.has(path)) return false
+    seen.add(path)
+    return true
   })
 }
 

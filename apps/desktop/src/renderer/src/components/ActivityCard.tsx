@@ -879,7 +879,10 @@ export function ActivityCard({
                     */}
                   <span className={`lc-filerow__result ${entry.settled ? (entry.neverRan !== undefined ? 'is-stalled' : entry.failed ? 'is-failed' : 'is-muted') : finished ? 'is-stalled' : 'is-running'}`}>
                     {!entry.settled
-                      ? finished ? 'did not report' : 'still running'
+                      // A file call the turn ended without settling was stopped
+                      // before it could report -- not a Claude Code failure
+                      // (resumed compare file card, 2026-10-05).
+                      ? finished ? (entry.kind === 'unreported' ? 'stopped before it reported' : 'did not report') : 'still running'
                       : entry.neverRan !== undefined
                         ? entry.neverRan
                         : entry.failed
