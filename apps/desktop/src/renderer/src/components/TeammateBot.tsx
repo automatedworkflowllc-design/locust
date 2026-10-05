@@ -459,6 +459,7 @@ export function TeammateBot({
           {...(face.eyes === undefined ? {} : { eyes: face.eyes })}
           {...(face.mood === undefined ? {} : { mood: face.mood })}
           blinkKey={face.key}
+          crt={crt}
           {...((teammateId ?? name) === undefined ? {} : { bootKey: teammateId ?? name })}
           phosphor={phosphorFor(worn)}
           {...(flashFor(worn) === undefined ? {} : { flash: flashFor(worn) })}
@@ -480,7 +481,8 @@ export function TeammateBot({
                   ...(flashFor(worn) === undefined ? {} : { flash: flashFor(worn) }),
                   key: face.key,
                   move: routine.moveFor(face.key, face.glance?.x, motion),
-                  rests: paused && glance === undefined && !face.lively
+                  rests: paused && glance === undefined && !face.lively,
+                  crt
                 },
                 seed,
                 ...((teammateId ?? name) === undefined ? {} : { bootKey: teammateId ?? name }),

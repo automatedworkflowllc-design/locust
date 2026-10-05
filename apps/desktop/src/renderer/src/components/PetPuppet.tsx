@@ -13,6 +13,7 @@ import type { PetAtlas } from '../pets.js'
 import { WINDOW_PRESENCE } from '../windowPresence.js'
 import type { WindowPresence } from '../windowPresence.js'
 import {
+  CRT_FLICK_S,
   GLAD_HOP,
   GLANCE_HOLD_MS,
   HOP_MS,
@@ -34,7 +35,7 @@ import {
   stepLag,
   watchPointer
 } from './Bot.js'
-import type { BotMood, EyeGlyphs, Glance, GlyphMotion, Lag, Phosphor } from './Bot.js'
+import type { BotMood, CrtRule, EyeGlyphs, Glance, GlyphMotion, Lag, Phosphor } from './Bot.js'
 import { GLASS_INK, glassUnits, paintGlass, paintPowerOn, paintScreenEyes } from './PetSprite.js'
 
 /**
@@ -71,9 +72,76 @@ const NOD_SHIFT = 2
  */
 export const PUPPET_SQUASH = 0.5
 
-/** The squash and stretch a puppet is drawn with: PUPPET_SQUASH of its pose's. */
-export function puppetScale(pose: BotAvatarPose): { readonly sx: number; readonly sy: number } {
-  return { sx: 1 + (pose.sx - 1) * PUPPET_SQUASH, sy: 1 + (pose.sy - 1) * PUPPET_SQUASH }
+/**
+ * EACH PET MOVES AS WHAT IT IS (2026-10-05). Colin: *"maybe give them their own
+ * unique animations? since some of them would look pretty weird bouncing
+ * around, while others it may work"*. The rig is a bot's: a head that floats,
+ * hops a quarter of its height, squashes to three quarters of it on landing
+ * and leans from its middle. That suits a head; a sushi, a computer on its
+ * feet or a cat lying on its laptop it does not. So each puppet takes the
+ * rig's pose through its own style (petPuppets.ts's PUPPET_MOTION) before it
+ * is drawn: how much of the rise it takes, how much of the squash, how far it
+ * leans, whether it stands on the ground -- never sinking below it, leaning
+ * and squashing about its feet -- and the life of its own a soft body or a
+ * lying one has with each breath.
+ */
+export interface PuppetMotion {
+  /** Of the rig's rise: its float, and its hops. */
+  readonly lift: number
+  /** Of the rig's squash and stretch. */
+  readonly squash: number
+  /** Of its lean, and of its little move toward a turn. */
+  readonly lean: number
+  /** It stands on the ground: never below it, and it leans and squashes about its feet. */
+  readonly grounded: boolean
+  /** A soft body's wobble with each breath, a share of its width. */
+  readonly jiggle?: number
+  /** A lying body's breath: its back rises, a share of its height. */
+  readonly breathe?: number
+}
+
+/** A head, as a bot is: the rig's float, hops and lean, half a screen's squash (PUPPET_SQUASH). */
+export const HEAD_MOTION: PuppetMotion = { lift: 1, squash: PUPPET_SQUASH, lean: 1, grounded: false }
+
+/**
+ * Each kept pet's style. The rig rises 2 units at rest and a quarter of the
+ * box in a hop, and squashes to three quarters of its height on landing
+ * (measured 2026-10-05, bot-avatars 0.2.2).
+ */
+export const PUPPET_MOTION: Readonly<Record<string, PuppetMotion>> = {
+  // Heads: they float and hop as bots do.
+  'astro-bot': HEAD_MOTION,
+  meowbot: HEAD_MOTION,
+  tmuxai: { ...HEAD_MOTION, squash: 0.4 },
+  // A phone: a hard thing, it tilts and lifts and never squashes.
+  'cabin-face': { lift: 0.7, squash: 0, lean: 1, grounded: false },
+  // Little machines on their feet: they rock on them and hop small, hardly giving.
+  macintosh: { lift: 0.45, squash: 0.1, lean: 0.7, grounded: true },
+  bitty: { lift: 0.5, squash: 0.1, lean: 0.9, grounded: true },
+  // A cat lying on its laptop: it never hops; it breathes, and sways a little.
+  'rainbow-terminal-cat': { lift: 0, squash: 0.15, lean: 0.35, grounded: true, breathe: 0.025 },
+  // A sushi: soft, low to the ground, a jelly's squash and wobble, a small boing.
+  nori: { lift: 0.25, squash: 1, lean: 0.5, grounded: true, jiggle: 0.03 }
+}
+
+/** How a puppet moves: its own style, or a head's. */
+export function motionOf(puppet: Puppet): PuppetMotion {
+  return PUPPET_MOTION[puppet.id] ?? HEAD_MOTION
+}
+
+/** The rig's pose as this puppet wears it: its rise, squash and lean by its style, and its own breath. */
+export function puppetPose(pose: BotAvatarPose, motion: PuppetMotion): BotAvatarPose {
+  const breath = Math.max(-1, Math.min(1, pose.breath))
+  const jiggle = (motion.jiggle ?? 0) * breath
+  const rise = (motion.breathe ?? 0) * (breath + 1) * 0.5
+  return {
+    ...pose,
+    y: (motion.grounded ? Math.min(0, pose.y) : pose.y) * motion.lift,
+    sx: 1 + (pose.sx - 1) * motion.squash + jiggle,
+    sy: 1 + (pose.sy - 1) * motion.squash - jiggle + rise,
+    roll: pose.roll * motion.lean,
+    yaw: pose.yaw * motion.lean
+  }
 }
 
 export interface PetPuppetProps {
@@ -97,31 +165,43 @@ export interface PetPuppetProps {
   readonly mood?: BotMood
   readonly blinkKey?: string
   readonly bootKey?: string
+  /** Which of its changes come in as its screen switching on again (Bot's CrtRule); undefined, every one blinks. */
+  readonly crt?: CrtRule
 }
 
 const within = (value: number): number => Math.max(0, Math.min(1, value))
 
 /**
- * Where a puppet's drawing goes in a bot's body box: the canvas transform the
- * rig gives a body (drawBotAvatarFrame) for this pose, in a canvas `side`
- * device pixels across for a box `size` across at `dpr`, with the hint of a
- * turn and a nod. Drawn under it, the window of the drawing is the box's
- * hundred units, -50 to 50 across and down.
+ * Where a puppet's drawing goes in a bot's body box, for a pose it wears
+ * (puppetPose): the canvas transform the rig gives a body (drawBotAvatarFrame),
+ * in a canvas `side` device pixels across for a box `size` across at `dpr`,
+ * with the hint of a turn and a nod. Drawn under it, the window of the drawing
+ * is the box's hundred units, -50 to 50 across and down.
+ *
+ * A head squashes about the box's foot and leans about its middle, as the
+ * rig's bodies do. One that stands on the ground (`feet`, the row its paint
+ * ends at in the box's units) does both about its feet: it rocks on them, and
+ * never lifts off them to lean.
  */
-export function puppetTransform(pose: BotAvatarPose, size: number, dpr: number): readonly [number, number, number, number, number, number] {
+export function puppetTransform(
+  pose: BotAvatarPose,
+  size: number,
+  dpr: number,
+  feet?: number
+): readonly [number, number, number, number, number, number] {
   const side = size * BOT_AVATAR_OVERSCAN * dpr
   const e = (size * dpr) / 100
-  const roll = pose.roll
-  const cos = Math.cos(roll)
-  const sin = Math.sin(roll)
-  const { sx, sy } = puppetScale(pose)
-  const across = sx * e
-  const down = sy * e
-  // Squashed, its foot stays where it is: the lost height comes off its top (the rig's own rule).
-  const foot = 50 * (1 - sy) * e
-  const x = side / 2 + (pose.x + Math.sin(pose.yaw) * TURN_SHIFT) * e - sin * foot
-  const y = side / 2 + BOT_AVATAR_RISE * size * dpr + (pose.y - Math.sin(pose.pitch) * NOD_SHIFT) * e + cos * foot
-  return [cos * across, sin * across, -sin * down, cos * down, x, y]
+  const cos = Math.cos(pose.roll)
+  const sin = Math.sin(pose.roll)
+  // Squashed about `squashAt` (the lost height comes off its top), leaned about `leanAt`.
+  const squashAt = feet ?? 50
+  const leanAt = feet ?? 0
+  const foot = squashAt * (1 - pose.sy)
+  const shiftX = -sin * foot + sin * leanAt
+  const shiftY = cos * foot + leanAt - cos * leanAt
+  const x = side / 2 + (pose.x + Math.sin(pose.yaw) * TURN_SHIFT + shiftX) * e
+  const y = side / 2 + BOT_AVATAR_RISE * size * dpr + (pose.y - Math.sin(pose.pitch) * NOD_SHIFT + shiftY) * e
+  return [cos * pose.sx * e, sin * pose.sx * e, -sin * pose.sy * e, cos * pose.sy * e, x, y]
 }
 
 /** A rectangle of the drawing, in the box's units under puppetTransform. */
@@ -181,7 +261,8 @@ export function PetPuppet({
   flash,
   mood,
   blinkKey,
-  bootKey
+  bootKey,
+  crt
 }: PetPuppetProps): ReactElement {
   const ref = useRef<HTMLCanvasElement>(null)
   const rig = useRef<BotAvatarSim | null>(null)
@@ -200,6 +281,10 @@ export function PetPuppet({
   resting.current = paused
   const bootWanted = useRef(false)
   const bootAt = useRef<number | undefined>(undefined)
+  // How long its screen's switching on runs (POWER_ON_S, or a change's CRT_FLICK_S), and which changes bring one in.
+  const bootSpan = useRef(POWER_ON_S)
+  const crtRule = useRef(crt)
+  crtRule.current = crt
   const rigTime = useRef(0)
   const spinBackAt = useRef<number | undefined>(undefined)
   const hopWanted = useRef(false)
@@ -229,6 +314,9 @@ export function PetPuppet({
       for (const [name, value] of Object.entries(anchorVariables(anchorsOf(puppetBody(puppet))))) host.style.setProperty(name, value)
     }
     canvas.toggleAttribute('data-pet-dark', atlas.dark)
+    // How it moves (PUPPET_MOTION), and, standing, where its feet are in the box.
+    const motion = motionOf(puppet)
+    const feet = motion.grounded ? puppetRect(puppet, 0, puppet.paint[3], 0, 0).y : undefined
 
     const sim = new BotAvatarSim(seed, state)
     if (jumpEvery !== undefined) sim.setJump({ every: jumpEvery })
@@ -238,7 +326,8 @@ export function PetPuppet({
     const changes = faceChanges(
       () => ({ pair: glyphs.current, tone: glowing.current ?? 'cyan', key: doing.current }),
       () => flashed.current,
-      () => bootAt.current
+      () => bootAt.current,
+      () => bootSpan.current
     )
     const answer = bodyConductor(seed, true, frozen, resting.current)
     let stop: (() => void) | undefined
@@ -252,18 +341,17 @@ export function PetPuppet({
     const paint = (pose: BotAvatarPose, s: number, change: ReturnType<typeof changes.at>): void => {
       context.setTransform(1, 0, 0, 1, 0, 0)
       context.clearRect(0, 0, side, side)
-      const matrix = puppetTransform(pose, size, dpr)
+      const matrix = puppetTransform(pose, size, dpr, feet)
       context.setTransform(...matrix)
       context.imageSmoothingEnabled = true
       context.imageSmoothingQuality = 'high'
       context.drawImage(atlas.image, from.x, from.y, from.w, from.h, to.x, to.y, to.w, to.h)
       // Device pixels a unit of the box is, for the glow (a canvas's blur is in device pixels, not the transform's).
-      const scaled = puppetScale(pose)
-      const device = ((size * dpr) / 100) * Math.sqrt(Math.max(0.01, scaled.sx * scaled.sy))
+      const device = ((size * dpr) / 100) * Math.sqrt(Math.max(0.01, pose.sx * pose.sy))
       const unit = 1 / glassUnits(glass)
       paintGlass(context, glass, look, ink, unit, puppet.corner)
       const light = screenLight(changes.shown().tone, changes.flash(), s)
-      const phase = bootAt.current === undefined || s === 0 ? undefined : (s - bootAt.current) / POWER_ON_S
+      const phase = bootAt.current === undefined || s === 0 ? undefined : (s - bootAt.current) / bootSpan.current
       const booting = phase === undefined || phase >= 1 ? undefined : Math.max(0, phase)
       if (booting !== undefined) paintPowerOn(context, glass, booting, light, unit, puppet.corner, device)
       const opened = booting === undefined ? 1 : powerOnEyes(booting)
@@ -306,6 +394,7 @@ export function PetPuppet({
       if (bootWanted.current && !frozen) {
         bootWanted.current = false
         bootAt.current = s + seed * 0.35
+        bootSpan.current = POWER_ON_S
       }
       const change = changes.at(s)
       const { pose, changed, hop: hopNow, rest, settled } = answer.frame(s, change, sim.pose, headingOf(sim), {
@@ -316,14 +405,22 @@ export function PetPuppet({
       })
       restNow = rest
       // A screen's blink is its swap; the rig's own next blink waits as after any blink.
-      if (changed) blinkNow(sim, false)
+      if (changed) {
+        blinkNow(sim, false)
+        // A change worth looking up for comes in as its screen switching on again, as a bot's does (Bot's CrtChange).
+        const kind = s === 0 ? undefined : crtRule.current?.(changes.shown().key, doing.current, change.count)
+        if (kind !== undefined) {
+          bootAt.current = s
+          bootSpan.current = kind === 'on' ? POWER_ON_S : CRT_FLICK_S
+        }
+      }
       if (hopNow) {
         hopWanted.current = false
         sim.setJump(GLAD_HOP)
         sim.poke()
         spinBackAt.current = rigTime.current + HOP_MS / 1000
       }
-      paint(pose, s, change)
+      paint(puppetPose(pose, motion), s, change)
       // Asked to keep still, it rests once it has settled (Bot's SETTLED_FRAMES): its clock stops, the frame left drawn.
       settledFor = settled && spinBackAt.current === undefined && !hopWanted.current ? settledFor + 1 : 0
       if (resting.current && settledFor >= SETTLED_FRAMES && stop !== undefined) {

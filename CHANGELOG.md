@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.651.0 - 2026-10-05
+
+### Improved
+
+- **Pets move like what they are.** Every pet's screen now flicks on like the teammates' do. Each pet moves in its own way: heads float and hop, Cabin stays rigid, Macintosh and Bitty rock on their feet, the cat on its laptop never hops and just breathes, and Nori wobbles like jelly. Codex Buddy's lifts are smooth: Locust makes in-between frames from his own drawings, on your computer, once, and keeps them; it does that work only while Locust is open and in front of you.
+
 ## 0.650.0 - 2026-10-05
 
 ### Fixed

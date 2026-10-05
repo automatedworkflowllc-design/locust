@@ -8,7 +8,11 @@ import type { AvatarSpec, PetRef } from '../../shared/avatar.js'
 import { PET_COLUMNS } from '../../shared/pets.js'
 import { setTerminalFaces } from './botLook.js'
 import { NewTeammateDialog } from './components/NewTeammateDialog.js'
-import { PUPPET_SQUASH, puppetBody, puppetDrawing, puppetRect, puppetTransform } from './components/PetPuppet.js'
+import { HEAD_MOTION, PUPPET_MOTION, PUPPET_SQUASH, motionOf, puppetBody, puppetDrawing, puppetPose, puppetRect, puppetTransform } from './components/PetPuppet.js'
+import { BUDDY_MELT, BUDDY_MELT_MAX_MS, BUDDY_SETTLE, buddyBody, petScreenConductor } from './components/PetSprite.js'
+import type { PetScreenAsk } from './components/PetSprite.js'
+import { crtRule } from './faceLife.js'
+import { RESTING, WORKOUT } from './petRoutines.js'
 import { TeammateBot } from './components/TeammateBot.js'
 import { PET_PUPPETS, puppetFor } from './petPuppets.js'
 import type { PetPuppet } from './petPuppets.js'
@@ -228,7 +232,7 @@ describe('drawn on a bot’s rig', () => {
   it('lands on its foot, squashed half as far as a screen-faced bot', () => {
     const size = 44
     const rest = puppetTransform(pose(), size, 1)
-    const squashed = puppetTransform(pose({ sx: 1.2, sy: 0.8 }), size, 1)
+    const squashed = puppetTransform(puppetPose(pose({ sx: 1.2, sy: 0.8 }), HEAD_MOTION), size, 1)
     // Its foot stays where it was; the height it loses comes off its top.
     expect(place(squashed, 0, 50)[1]).toBeCloseTo(place(rest, 0, 50)[1])
     const height = place(squashed, 0, 50)[1] - place(squashed, 0, -50)[1]
@@ -406,5 +410,145 @@ describe('its teammate’s look', () => {
   it('offers nothing for a pet whose sheet was not measured', () => {
     setPetLook(BITTY, { status: 'ready', atlas: atlas() })
     expect(open(wearing(BITTY))).not.toContain('aria-label="Face"')
+  })
+})
+
+describe('each pet moves as what it is', () => {
+  const rigPose = (changes: Partial<BotAvatarPose> = {}): BotAvatarPose => ({
+    yaw: 0, pitch: 0, roll: 0, x: 0, y: 0, sx: 1, sy: 1, eyeOpen: 1, blinkL: 0, blinkR: 0, lookX: 0, lookY: 0,
+    breath: 0, laugh: 0, whirl: 0, whirlAngle: 0, w: [1, 0, 0], ...changes
+  })
+  const at = (matrix: readonly number[], x: number, y: number): readonly [number, number] => {
+    const [a = 0, b = 0, c = 0, d = 0, e = 0, f = 0] = matrix
+    return [a * x + c * y + e, b * x + d * y + f]
+  }
+  const feetOf = (p: PetPuppet): number => puppetRect(p, 0, p.paint[3], 0, 0).y
+  const STANDING = ['macintosh', 'bitty', 'rainbow-terminal-cat', 'nori']
+
+  it('gives every kept pet a style, heads floating and the rest standing on the ground', () => {
+    expect(Object.keys(PUPPET_MOTION).sort()).toEqual([...KEPT].sort())
+    for (const p of PET_PUPPETS) expect(motionOf(p).grounded, p.id).toBe(STANDING.includes(p.id))
+    for (const id of ['astro-bot', 'meowbot']) expect(motionOf(puppet(id))).toBe(HEAD_MOTION)
+  })
+
+  it('never takes more of the rig than a bot would: no style rises, squashes or leans further', () => {
+    for (const [id, motion] of Object.entries(PUPPET_MOTION)) {
+      expect(motion.lift, id).toBeLessThanOrEqual(1)
+      expect(motion.squash, id).toBeLessThanOrEqual(1)
+      expect(motion.lean, id).toBeLessThanOrEqual(1)
+    }
+  })
+
+  it('keeps one standing on the ground: never below it, and the cat never off it', () => {
+    for (const id of STANDING) {
+      const motion = motionOf(puppet(id))
+      expect(puppetPose(rigPose({ y: 3 }), motion).y, id).toBeCloseTo(0)
+      expect(puppetPose(rigPose({ y: -28 }), motion).y, id).toBeCloseTo(-28 * motion.lift)
+    }
+    expect(puppetPose(rigPose({ y: -28 }), motionOf(puppet('rainbow-terminal-cat'))).y).toBeCloseTo(0)
+    // Hops stay small for the machines on their feet, and smaller for the sushi.
+    for (const id of ['macintosh', 'bitty', 'nori']) expect(motionOf(puppet(id)).lift, id).toBeLessThanOrEqual(0.5)
+  })
+
+  it('rocks one standing on its feet, and squashes it about them: they stay put', () => {
+    for (const id of ['macintosh', 'bitty', 'nori']) {
+      const p = puppet(id)
+      const feet = feetOf(p)
+      const rest = at(puppetTransform(puppetPose(rigPose(), motionOf(p)), 44, 1, feet), 0, feet)
+      const rocked = at(puppetTransform(puppetPose(rigPose({ roll: 0.2 }), motionOf(p)), 44, 1, feet), 0, feet)
+      const landed = at(puppetTransform(puppetPose(rigPose({ sx: 1.25, sy: 0.75 }), motionOf(p)), 44, 1, feet), 0, feet)
+      expect(rocked[0], id).toBeCloseTo(rest[0])
+      expect(rocked[1], id).toBeCloseTo(rest[1])
+      expect(landed[1], id).toBeCloseTo(rest[1])
+    }
+  })
+
+  it('keeps a hard thing hard: the phone never squashes, the machines hardly do, the sushi does', () => {
+    const landing = rigPose({ sx: 1.25, sy: 0.75 })
+    const cabin = puppetPose(landing, motionOf(puppet('cabin-face')))
+    expect([cabin.sx, cabin.sy]).toEqual([1, 1])
+    for (const id of ['macintosh', 'bitty']) expect(puppetPose(landing, motionOf(puppet(id))).sy, id).toBeGreaterThan(0.97)
+    expect(puppetPose(landing, motionOf(puppet('nori'))).sy).toBeLessThan(0.8)
+  })
+
+  it('gives a soft body a wobble and a lying one a breath, and a head neither', () => {
+    const breathing = rigPose({ breath: 1 })
+    const nori = puppetPose(breathing, motionOf(puppet('nori')))
+    expect(nori.sx).toBeGreaterThan(1)
+    expect(nori.sy).toBeLessThan(1)
+    expect(puppetPose(breathing, motionOf(puppet('rainbow-terminal-cat'))).sy).toBeGreaterThan(1)
+    const head = puppetPose(breathing, HEAD_MOTION)
+    expect([head.sx, head.sy]).toEqual([1, 1])
+    expect(PUPPET_SQUASH).toBe(HEAD_MOTION.squash)
+  })
+})
+
+describe('every screen switches on again as a bot’s does', () => {
+  it('Codex Buddy’s, for the changes worth looking up for, and only when asked', () => {
+    const run = (crt: boolean): { idle: number | undefined; done: number | undefined } => {
+      let key = 'idle'
+      const ask = (): PetScreenAsk => ({
+        eyes: key === 'done' ? ['^', '^'] : undefined,
+        phosphor: 'cyan',
+        key,
+        move: RESTING,
+        rests: false,
+        ...(crt ? { crt: crtRule(0.37) } : {})
+      })
+      const conductor = petScreenConductor(CODEX_BUDDY, 0.37, ask, () => undefined)
+      const idle = conductor.frame(5).booting
+      key = 'done'
+      conductor.frame(5.05)
+      return { idle, done: conductor.frame(5.3).booting }
+    }
+    expect(run(true).idle).toBeUndefined()
+    expect(run(true).done).toBeDefined()
+    expect(run(false).done).toBeUndefined()
+  })
+})
+
+describe('Codex Buddy, smoother', () => {
+  const working = (): PetScreenAsk => ({ eyes: ['>', '▮'], phosphor: 'cyan', key: 'working', move: WORKOUT, rests: false })
+
+  it('melts each drawing into the next over most of the time it is held, eased', () => {
+    expect(BUDDY_MELT).toBeGreaterThanOrEqual(0.5)
+    expect(BUDDY_MELT_MAX_MS).toBeGreaterThanOrEqual(200)
+    const conductor = petScreenConductor(CODEX_BUDDY, 0.37, working, () => undefined)
+    // Find a change of drawing, then watch the old one let go.
+    let at = 10
+    let first = conductor.frame(at)
+    while (first.fading === undefined && at < 14) {
+      at += 1 / 30
+      first = conductor.frame(at)
+    }
+    expect(first.fading).toBeDefined()
+    const lefts: number[] = []
+    for (let step = 1; step <= 4 && conductor.frame(at + step / 30).fading !== undefined; step += 1) {
+      lefts.push(conductor.frame(at + step / 30).fading?.left ?? 0)
+    }
+    // Still melting a frame later, and letting go a little at a time, not at once.
+    expect(lefts.length).toBeGreaterThanOrEqual(2)
+    for (let i = 1; i < lefts.length; i += 1) expect(lefts[i]).toBeLessThan(lefts[i - 1] ?? 1)
+  })
+
+  it('lands each pose with a small settle about his feet, gone within a beat', () => {
+    expect(buddyBody(5, 5, true).sy).toBeLessThan(1)
+    expect(1 - buddyBody(5, 5, false).sy).toBeLessThanOrEqual(BUDDY_SETTLE.depth + 1e-9)
+    expect(buddyBody(5 + BUDDY_SETTLE.seconds, 5, false)).toEqual({ sx: 1, sy: 1 })
+    // Still, nothing moves him; at rest, he does not breathe.
+    expect(buddyBody(0, 0, true)).toEqual({ sx: 1, sy: 1 })
+    expect(buddyBody(7.3, undefined, false)).toEqual({ sx: 1, sy: 1 })
+    expect(buddyBody(7.3, undefined, true).sy).not.toBe(1)
+  })
+
+  it('rests only once his last pose has settled, so his clock still stops', () => {
+    let rests = false
+    const ask = (): PetScreenAsk => ({ eyes: undefined, phosphor: 'cyan', key: 'idle', move: RESTING, rests })
+    const conductor = petScreenConductor(CODEX_BUDDY, 0.37, ask, () => undefined)
+    conductor.frame(3)
+    rests = true
+    let settledAt: number | undefined
+    for (let t = 3; t < 8 && settledAt === undefined; t += 1 / 30) if (conductor.frame(t).settled) settledAt = t
+    expect(settledAt).toBeDefined()
   })
 })

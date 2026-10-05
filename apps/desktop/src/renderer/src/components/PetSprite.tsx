@@ -6,10 +6,12 @@ import type { PetState } from '../../../shared/pets.js'
 import { anchorsOf, anchorVariables } from '../botAnchors.js'
 import { seeded } from '../faceLife.js'
 import type { GlanceSide } from '../glances.js'
-import { PET_FADE_MAX_MS, petCellAt, petFadeMs, petGlanceCell, petNextChangeIn } from '../petMotion.js'
+import { petCellAt, petFadeMs, petGlanceCell, petNextChangeIn } from '../petMotion.js'
 import { RESTING, glanceBeat, moveCellAt } from '../petRoutines.js'
 import type { Move } from '../petRoutines.js'
 import { screenAt } from '../petScreens.js'
+import { keepTweens, keptTweens, tweenKey } from '../petTweenStore.js'
+import { TWEEN_MOMENTS, runInSlices, tweenSteps } from '../petTweens.js'
 import type { PetScreenFace, ScreenRect } from '../petScreens.js'
 import { usePetLook } from '../pets.js'
 import type { PetAtlas } from '../pets.js'
@@ -17,6 +19,7 @@ import { WINDOW_PRESENCE } from '../windowPresence.js'
 import type { WindowPresence } from '../windowPresence.js'
 import {
   BLINK_GAP_S,
+  CRT_FLICK_S,
   EYES_VISOR,
   GLANCE_HOLD_MS,
   GLYPH_SHAPES,
@@ -36,7 +39,7 @@ import {
   startBotClock,
   traceGlyph
 } from './Bot.js'
-import type { EyeGlyphs, GlyphMotion, Phosphor, VisorBox } from './Bot.js'
+import type { CrtRule, EyeGlyphs, GlyphMotion, Phosphor, VisorBox } from './Bot.js'
 
 /**
  * A PET, DRAWN IN A TEAMMATE'S FACE'S BOX (0.563).
@@ -299,6 +302,8 @@ export interface PetScreenAsk {
   readonly move: Move
   /** Kept still once its move is done (Bot's paused): its eyes ease to rest and its clock stops. */
   readonly rests: boolean
+  /** Which of its changes come in as its screen switching on again (Bot's CrtRule); undefined, every one blinks. */
+  readonly crt?: CrtRule
 }
 
 /**
@@ -519,6 +524,39 @@ export interface PetScreenCell {
   readonly rect: ScreenRect | undefined
 }
 
+/**
+ * SMOOTHER LIFTS (2026-10-05). Colin, of Codex Buddy: *"maybe try and smooth
+ * out the codex bro animations ... the original was just very choppy"*. His
+ * maker drew a lift in three to five drawings, each held 120 to 520 ms, and
+ * one melted into the next in at most 80 ms: so he snapped from pose to pose.
+ * Now each drawing melts into the next over most of the time it is held
+ * (BUDDY_MELT), eased in and out, so a lift reads as one movement; and his
+ * body has weight between them: each new pose lands with a small settle about
+ * his feet (BUDDY_SETTLE), and while he moves he breathes. His screen goes
+ * with him: it is drawn in the same transform.
+ */
+/** A drawing melts into the next over this share of the time it is held, at most BUDDY_MELT_MAX_MS. */
+export const BUDDY_MELT = 0.6
+export const BUDDY_MELT_MAX_MS = 260
+/** A new pose lands: squashed this share of his height, easing out over this long. */
+export const BUDDY_SETTLE = { depth: 0.022, seconds: 0.18 }
+/** While he moves, his breath: this share of his height, once every this many seconds. */
+export const BUDDY_BREATH = { depth: 0.008, seconds: 2.4 }
+
+/** Eased in and out (smoothstep), 0 to 1. */
+function smooth(t: number): number {
+  const k = Math.max(0, Math.min(1, t))
+  return k * k * (3 - 2 * k)
+}
+
+/** How his body is drawn this frame, about his feet: squashed (`sy`) and widened (`sx`) for a pose landing and his breath. */
+export function buddyBody(s: number, landedAt: number | undefined, moving: boolean): { readonly sx: number; readonly sy: number } {
+  if (s === 0) return { sx: 1, sy: 1 }
+  const settle = landedAt === undefined ? 0 : BUDDY_SETTLE.depth * (1 - smooth((s - landedAt) / BUDDY_SETTLE.seconds))
+  const breath = moving ? BUDDY_BREATH.depth * Math.sin((2 * Math.PI * s) / BUDDY_BREATH.seconds) : 0
+  return { sx: 1 + settle * 0.6, sy: 1 - settle + breath }
+}
+
 /** What his face is at one second (petScreenConductor): the drawings to draw, the glass the eyes are on, and the eyes. */
 export interface PetScreenFrame {
   /** The drawing shown. */
@@ -544,6 +582,8 @@ export interface PetScreenFrame {
   readonly move: string
   /** Nothing on him will change by itself: a face asked to keep still may stop its clock. */
   readonly settled: boolean
+  /** The second the pose shown landed, for its settle (buddyBody); undefined, it has not changed since he appeared. */
+  readonly landedAt: number | undefined
 }
 
 /**
@@ -568,12 +608,16 @@ export function petScreenConductor(
   turnedTo: () => GlanceSide | undefined,
   turns: Map<string, number> = new Map()
 ): { readonly frame: (s: number) => PetScreenFrame; readonly boot: (at: number) => void } {
-  // The second his screen switches on (POWER_ON_S); undefined, it is simply on.
+  // The second his screen switches on, and for how long (POWER_ON_S, or a change's CRT_FLICK_S); undefined, it is simply on.
   let bootAt: number | undefined
+  let bootSpan = POWER_ON_S
+  // How many changes his face had begun at the last frame: a new one may come in as a CRT (PetScreenAsk.crt).
+  let changesSeen = 0
   const changes = faceChanges(
     () => ({ pair: asked().eyes, tone: asked().phosphor, key: asked().key }),
     () => asked().flash,
-    () => bootAt
+    () => bootAt,
+    () => bootSpan
   )
   // His body's move, the face key it answers, since when, and from which beat.
   let body: { readonly key: string | undefined; readonly move: Move; readonly from: number; readonly start: number } | undefined
@@ -590,6 +634,8 @@ export function petScreenConductor(
   }
   let shown: PetScreenCell | undefined
   let shownKey = ''
+  // When the pose shown landed: a new one settles (buddyBody).
+  let landedAt: number | undefined
   // The drawing melting off the one shown: from when, and over how long.
   let fading: (PetScreenCell & { readonly at: number; readonly ms: number }) | undefined
   // When his move was done and he was asked to keep still: his eyes ease to rest from there.
@@ -598,6 +644,15 @@ export function petScreenConductor(
     const change = changes.at(s)
     const showing = changes.shown()
     const now = asked()
+    // A change worth looking up for comes in as his screen switching on again, as a bot's does (Bot's CrtChange).
+    if (change.count !== changesSeen) {
+      changesSeen = change.count
+      const kind = s === 0 ? undefined : now.crt?.(showing.key, now.key, change.count)
+      if (kind !== undefined) {
+        bootAt = s
+        bootSpan = kind === 'on' ? POWER_ON_S : CRT_FLICK_S
+      }
+    }
     // His body answers once his eyes are open on the change: the move asked for the face shown, from its
     // start -- never one asked for a face still to come (asked for before his first frame, he rests until then).
     const answering = now.key === showing.key
@@ -613,12 +668,15 @@ export function petScreenConductor(
     const column = turned?.column ?? own.column
     const key = `${String(row)}:${String(column)}`
     if (shown === undefined || shownKey !== key) {
-      fading = shown !== undefined && s !== 0 ? { ...shown, at: s, ms: Math.min(PET_FADE_MAX_MS, Math.max(1, own.ms / 2)) } : undefined
+      fading = shown !== undefined && s !== 0 ? { ...shown, at: s, ms: Math.min(BUDDY_MELT_MAX_MS, Math.max(1, own.ms * BUDDY_MELT)) } : undefined
+      landedAt = shown !== undefined && s !== 0 && turned === undefined ? s : landedAt
       shown = { row, column, rect: screenAt(face, row, column) }
       shownKey = key
     }
-    const left = fading === undefined ? 0 : 1 - ((s - fading.at) * 1000) / fading.ms
-    if (left <= 0) fading = undefined
+    // Eased: the old drawing lets go slowly, then quickly, then slowly.
+    const melted = fading === undefined ? 1 : smooth(((s - fading.at) * 1000) / fading.ms)
+    const left = 1 - melted
+    if (melted >= 1) fading = undefined
     // His eyes ease to rest once his move is done and he is asked to keep still.
     if (now.rests && (own.settled || s === 0)) restingSince ??= s
     else restingSince = undefined
@@ -633,7 +691,7 @@ export function petScreenConductor(
     }
     // His own blinks while he moves; asked to keep still, none.
     const blink = now.rests ? 0 : petBlinkShut(s, change.since, seed)
-    const phase = bootAt === undefined || s === 0 ? undefined : (s - bootAt) / POWER_ON_S
+    const phase = bootAt === undefined || s === 0 ? undefined : (s - bootAt) / bootSpan
     const booting = phase === undefined || phase >= 1 ? undefined : Math.max(0, phase)
     const opened = booting === undefined ? 1 : powerOnEyes(booting)
     // The glass the eyes are on: where it is between the drawing melting off and the one shown.
@@ -657,15 +715,97 @@ export function petScreenConductor(
       opened,
       look: lookOf(row),
       move: moving.move.name,
-      settled: s === 0 || (change.quiet && fading === undefined && blink === 0 && restK >= 1 && booting === undefined && turned === undefined)
+      landedAt,
+      settled:
+        s === 0 ||
+        (change.quiet && fading === undefined && blink === 0 && restK >= 1 && booting === undefined && turned === undefined &&
+          (landedAt === undefined || s - landedAt >= BUDDY_SETTLE.seconds))
     }
   }
   return {
     frame,
     boot: (at) => {
       bootAt = at
+      bootSpan = POWER_ON_S
     }
   }
+}
+
+/**
+ * The in-betweens made for a sheet's pairs of drawings (petTweens.ts), by the
+ * pair, from one to the other: kept for the session for every face wearing
+ * that sheet, and made once, a slice at a time, the first time a face moves
+ * between the two.
+ */
+const TWEENS = new WeakMap<CanvasImageSource, Map<string, readonly CanvasImageSource[] | 'making'>>()
+const CELLS = new WeakMap<CanvasImageSource, Map<string, Uint8ClampedArray>>()
+
+/** One drawing's pixels, read once. */
+function cellPixels(atlas: PetAtlas, row: number, column: number): Uint8ClampedArray | undefined {
+  const cells = CELLS.get(atlas.image) ?? new Map<string, Uint8ClampedArray>()
+  CELLS.set(atlas.image, cells)
+  const key = `${String(row)},${String(column)}`
+  const known = cells.get(key)
+  if (known !== undefined) return known
+  const canvas = document.createElement('canvas')
+  canvas.width = atlas.frameWidth
+  canvas.height = atlas.frameHeight
+  const context = canvas.getContext('2d', { willReadFrequently: true })
+  if (context === null) return undefined
+  context.drawImage(atlas.image, column * atlas.frameWidth, row * atlas.frameHeight, atlas.frameWidth, atlas.frameHeight, 0, 0, atlas.frameWidth, atlas.frameHeight)
+  const pixels = context.getImageData(0, 0, atlas.frameWidth, atlas.frameHeight).data
+  cells.set(key, pixels)
+  return pixels
+}
+
+/** The in-betweens from one drawing to another, if they are ready; asked for, if they are not. */
+function tweensFor(atlas: PetAtlas, from: PetScreenCell, to: PetScreenCell): readonly CanvasImageSource[] | undefined {
+  const made = TWEENS.get(atlas.image) ?? new Map<string, readonly CanvasImageSource[] | 'making'>()
+  TWEENS.set(atlas.image, made)
+  const pair = `${String(from.row)},${String(from.column)}>${String(to.row)},${String(to.column)}`
+  const known = made.get(pair)
+  if (known === 'making') return undefined
+  if (known !== undefined) return known
+  const a = cellPixels(atlas, from.row, from.column)
+  const b = cellPixels(atlas, to.row, to.column)
+  if (a === undefined || b === undefined) return undefined
+  made.set(pair, 'making')
+  const { frameWidth: w, frameHeight: h } = atlas
+  const resting = (): boolean => WINDOW_PRESENCE.away() || document.visibilityState === 'hidden'
+  const key = tweenKey(a, b)
+  // Kept on this computer from a launch before (petTweenStore.ts): drawn from there, and made only when they are not.
+  void keptTweens(key)
+    .then(async (kept) => {
+      if (kept === undefined || kept.length !== TWEEN_MOMENTS.length) return false
+      made.set(pair, await Promise.all(kept.map((image) => createImageBitmap(image))))
+      return true
+    })
+    .catch(() => false)
+    .then((found) => {
+      if (found) return
+      runInSlices(
+        tweenSteps(a, b, w, h),
+        (frames) => {
+          const canvases = frames.map((pixels) => {
+            const canvas = document.createElement('canvas')
+            canvas.width = w
+            canvas.height = h
+            canvas.getContext('2d')?.putImageData(new ImageData(new Uint8ClampedArray(pixels), w, h), 0, 0)
+            return canvas
+          })
+          made.set(pair, canvases)
+          void Promise.all(canvases.map((canvas) => new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))))
+            .then((images) => {
+              const whole = images.filter((image): image is Blob => image !== null)
+              if (whole.length === canvases.length) void keepTweens(key, whole)
+            })
+            .catch(() => undefined)
+        },
+        undefined,
+        resting
+      )
+    })
+  return undefined
 }
 
 interface ScreenPetProps {
@@ -749,6 +889,8 @@ function ScreenPet({ pet, atlas, face, size, state, ask, still, seed, glance, bo
     let stop: (() => void) | undefined
     let atOnce = false
     let gone = false
+    // Where his feet are on the canvas: his resting paint's bottom, in the window shown.
+    const feetY = Math.min(side, (body.bottom * atlas.frameHeight - shown.top) * k)
     const toCanvas = (rect: ScreenRect): ScreenRect => ({ x: (rect.x - shown.left) * k, y: (rect.y - shown.top) * k, w: rect.w * k, h: rect.h * k })
     const paintCell = (cell: PetScreenCell, alpha: number): void => {
       context.globalAlpha = alpha
@@ -781,10 +923,44 @@ function ScreenPet({ pet, atlas, face, size, state, ask, still, seed, glance, bo
       const now = conductor.frame(s)
       context.setTransform(1, 0, 0, 1, 0, 0)
       context.clearRect(0, 0, side, side)
+      // His body's weight (buddyBody), about his feet: his drawing and his screen in the one transform.
+      const weight = buddyBody(s, now.landedAt, !asked.current.rests)
+      context.setTransform(weight.sx, 0, 0, weight.sy, (side / 2) * (1 - weight.sx), feetY * (1 - weight.sy))
       context.imageSmoothingEnabled = true
       context.imageSmoothingQuality = 'high'
-      paintCell(now.cell, 1)
-      if (now.fading !== undefined) paintCell(now.fading, now.fading.left)
+      // Between two drawings, the in-betweens made for them, each melting into the next; until they are made, a melt.
+      const tweens = now.fading === undefined || s === 0 ? undefined : tweensFor(atlas, now.fading, now.cell)
+      if (now.fading !== undefined && tweens !== undefined) {
+        const steps = tweens.length + 1
+        const at = Math.min(steps - 1e-6, (1 - now.fading.left) * steps)
+        const i = Math.floor(at)
+        const into = at - i
+        const drawing = (n: number): CanvasImageSource | undefined => (n === steps ? undefined : n === 0 ? undefined : tweens[n - 1])
+        const paintTween = (n: number, alpha: number): void => {
+          const image = drawing(n)
+          if (image === undefined) {
+            const cell = n === 0 ? now.fading : now.cell
+            if (cell === undefined) return
+            context.globalAlpha = alpha
+            context.drawImage(atlas.image, cell.column * atlas.frameWidth + fromX, cell.row * atlas.frameHeight + fromY, toX - fromX, toY - fromY, (fromX - shown.left) * k, (fromY - shown.top) * k, (toX - fromX) * k, (toY - fromY) * k)
+            context.globalAlpha = 1
+            return
+          }
+          context.globalAlpha = alpha
+          context.drawImage(image, fromX, fromY, toX - fromX, toY - fromY, (fromX - shown.left) * k, (fromY - shown.top) * k, (toX - fromX) * k, (toY - fromY) * k)
+          context.globalAlpha = 1
+        }
+        paintTween(i + 1, 1)
+        paintTween(i, 1 - into)
+        // One glass, where it is between the two drawings'.
+        if (now.glass !== undefined) {
+          const glass = toCanvas(now.glass)
+          paintGlass(context, glass, face, GLASS_INK * k, 1 / glassUnits(glass))
+        }
+      } else {
+        paintCell(now.cell, 1)
+        if (now.fading !== undefined) paintCell(now.fading, now.fading.left)
+      }
       if (now.glass !== undefined) {
         const glass = toCanvas(now.glass)
         if (now.booting !== undefined) paintPowerOn(context, glass, now.booting, now.light, 1 / glassUnits(glass))
