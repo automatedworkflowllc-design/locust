@@ -2,7 +2,7 @@ import type { MissionLedger, RecoveredMission, WorkroomMessage } from '@teammate
 import { joinMessageFragments } from '../shared/messageFragments.js'
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { describe, expect, it, vi } from 'vitest'
-import { deleteMissionRecord, limitedRuntimesFrom, publicRecoveredMission, readingOfWarning, usageWindowsFrom, withinByteBudget, readMissionHistory } from './mission-history.js'
+import { MAX_HISTORY_EVENTS, deleteMissionRecord, limitedRuntimesFrom, publicRecoveredMission, readingOfWarning, usageWindowsFrom, withinByteBudget, readMissionHistory } from './mission-history.js'
 
 const NOW = '2026-08-31T15:00:00.000Z'
 
@@ -154,22 +154,22 @@ describe('a long reply survives the history window', () => {
 
 describe('mission history mapping', () => {
   it('passes small missions through untruncated with truthful counts', () => {
-    const mission = recovered({ events: Array.from({ length: 500 }, (_, index) => event(index + 1)) })
+    const mission = recovered({ events: Array.from({ length: MAX_HISTORY_EVENTS }, (_, index) => event(index + 1)) })
     const mapped = publicRecoveredMission(mission)
-    expect(mapped.events).toHaveLength(500)
-    expect(mapped.eventCount).toBe(500)
+    expect(mapped.events).toHaveLength(MAX_HISTORY_EVENTS)
+    expect(mapped.eventCount).toBe(MAX_HISTORY_EVENTS)
     expect(mapped.eventsTruncated).toBe(false)
     expect(mapped.integrityIssueCount).toBe(0)
   })
 
   it('windows oversized missions to the first and latest events and says so', () => {
-    const mission = recovered({ events: Array.from({ length: 501 }, (_, index) => event(index + 1)) })
+    const mission = recovered({ events: Array.from({ length: MAX_HISTORY_EVENTS + 1 }, (_, index) => event(index + 1)) })
     const mapped = publicRecoveredMission(mission)
-    expect(mapped.events).toHaveLength(500)
+    expect(mapped.events).toHaveLength(MAX_HISTORY_EVENTS)
     expect(mapped.events[0]?.sequence).toBe(1)
-    expect(mapped.events.at(-1)?.sequence).toBe(501)
+    expect(mapped.events.at(-1)?.sequence).toBe(MAX_HISTORY_EVENTS + 1)
     expect(mapped.events[1]?.sequence).toBe(3)
-    expect(mapped.eventCount).toBe(501)
+    expect(mapped.eventCount).toBe(MAX_HISTORY_EVENTS + 1)
     expect(mapped.eventsTruncated).toBe(true)
   })
 

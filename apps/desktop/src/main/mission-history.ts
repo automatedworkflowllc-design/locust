@@ -3,6 +3,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
 import { workspaceIdFor } from './workspace.js'
+import { EVENT_WINDOW } from '../shared/event-window.js'
 import { joinMessageFragments } from '../shared/messageFragments.js'
 import { monthOf, moneyOfRun, sumSpend } from '../shared/spend.js'
 import type { RunMoney, Spend } from '../shared/spend.js'
@@ -44,7 +45,9 @@ const MAX_HISTORY_MISSIONS = 20
  * many the ledger holds and the Missions header says "the newest N of M".
  */
 const MAX_LISTED_MISSIONS = 2_000
-const MAX_HISTORY_EVENTS = 500
+// The same window the live thread keeps (0.627, shared/event-window.ts): 500 dropped a long run's
+// messages and early steps from the screen while the record still held them.
+export const MAX_HISTORY_EVENTS = EVENT_WINDOW
 const MAX_HISTORY_CHECKPOINTS = 25
 /**
  * Ceiling on one IPC response. The per-mission event window bounds COUNT, not
