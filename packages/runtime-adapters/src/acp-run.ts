@@ -30,8 +30,9 @@ import type { RuntimeCommandSpec } from "./types.js";
  *   (Copilot `allow_once`, OpenCode `once`), so the answer is chosen by the
  *   option's KIND. "Always" is never passed on: whether an agent keeps it
  *   past this run, or in its own settings, is the agent's business and was
- *   not measured -- so Locust remembers it, for this run only, and answers
- *   the same request again with "once" itself.
+ *   not measured -- so Locust remembers it, for this run only. Since 0.616
+ *   the main process does (shared/who-decides.ts), after the saved rules:
+ *   this run asks about every request, and an Always goes back as "once".
  * - One session can move between Locust's two Copilot routes. A session the
  *   print route created loaded over ACP with its history, and the print route
  *   then resumed the session ACP had used, with the ACP turn in it.
@@ -219,8 +220,6 @@ export function startAcpRun(options: AcpRunOptions): AcpRun {
   let prompting = false;
   /** What is waiting to be said once the prompt running now ends. */
   const queued: string[] = [];
-  /** Requests the person said "always" to, answered "once" again without asking. */
-  const always = new Set<string>();
   /**
    * Identical requests are put to the person one at a time. An agent can run
    * tools side by side, and a second card for the same command, raised while
@@ -307,7 +306,6 @@ export function startAcpRun(options: AcpRunOptions): AcpRun {
     };
     return await oneAtATime(signature, async (): Promise<JsonValue> => {
       if (cancelled) return { outcome: { outcome: "cancelled" } };
-      if (signature !== undefined && always.has(signature)) return choose("allow_once");
       let given: AcpPermissionAnswer | undefined = "reject_once";
       if (options.onPermission !== undefined) {
         try {
@@ -318,10 +316,8 @@ export function startAcpRun(options: AcpRunOptions): AcpRun {
       }
       // Stopped while the card was up: ACP asks for exactly this answer.
       if (given === undefined || cancelled) return { outcome: { outcome: "cancelled" } };
-      if (given === "allow_always") {
-        if (signature !== undefined) always.add(signature);
-        return choose("allow_once");
-      }
+      // Remembered by the host, never by the agent: "once" to the agent.
+      if (given === "allow_always") return choose("allow_once");
       return choose(given);
     });
   };

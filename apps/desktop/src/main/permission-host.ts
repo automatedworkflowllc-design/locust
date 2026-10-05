@@ -67,15 +67,11 @@ interface Registered {
   readonly missionId: string
   readonly cwd: string | null
   readonly configDir: string
-  /** Tools the person said "always" to, by name (R35), for this run. */
-  readonly always: Set<string>
 }
 
 interface Pending {
   readonly runId: string
   readonly missionId: string
-  /** The tool that asked (see alwaysKeyOf), so "always" knows what to remember. */
-  readonly prefix: string
   readonly input: unknown
   readonly resolve: (answer: BridgeAnswer) => void
 }
@@ -217,12 +213,18 @@ export function createPermissionHost(options: {
     const registered = typeof asked.token === 'string' ? tokens.get(asked.token) : undefined
     if (registered === undefined) return deny('this request did not come from a Locust run.')
     const toolName = typeof asked.toolName === 'string' && asked.toolName.length > 0 ? asked.toolName : 'a tool'
-    const prefix = alwaysKeyOf(toolName)
     const input = asked.input ?? {}
-    if (registered.always.has(prefix)) return { behavior: 'allow', updatedInput: input }
+    /*
+     * EVERY REQUEST IS RAISED (0.616, shared/who-decides.ts). This host used
+     * to answer a tool it had been told "always" about by itself, before the
+     * saved rules were read: an Always on one Bash card let every later
+     * command through, a rule saying no and a command that stops every
+     * python.exe included. It remembers nothing now; the key below is what an
+     * Always would cover, and the main process decides with it.
+     */
     const approvalId = createId()
     const decided = new Promise<BridgeAnswer>((resolve) => {
-      pending.set(approvalId, { runId: registered.runId, missionId: registered.missionId, prefix, input, resolve })
+      pending.set(approvalId, { runId: registered.runId, missionId: registered.missionId, input, resolve })
     })
     options.emitApproval({
       approvalId,
@@ -230,6 +232,7 @@ export function createPermissionHost(options: {
       missionId: registered.missionId,
       ...builtInOrConnector(toolName, input, registered.cwd ?? ''),
       alwaysCovers: alwaysCoversFor(toolName),
+      alwaysKey: `claude:${alwaysKeyOf(toolName)}`,
       runtime: 'claude',
       cwd: registered.cwd,
       requestedAt: now().toISOString()
@@ -302,7 +305,7 @@ export function createPermissionHost(options: {
         }),
         'utf8'
       )
-      tokens.set(token, { runId: run.runId, missionId: run.missionId, cwd: run.cwd, configDir, always: new Set() })
+      tokens.set(token, { runId: run.runId, missionId: run.missionId, cwd: run.cwd, configDir })
       byRun.set(run.runId, token)
       return { configPath, toolName: PERMISSION_TOOL_NAME }
     },
@@ -322,13 +325,8 @@ export function createPermissionHost(options: {
         waiting.resolve(deny(answer.reason === undefined ? 'Denied in Locust.' : `Denied in Locust. ${deniedSaying(answer.reason)}`))
         return true
       }
-      if (answer.decision === 'approve-always') {
-        // Remembered for THIS run and this TOOL (R35): the same tool answers
-        // itself; any other tool, on this connector or another, still asks.
-        const token = byRun.get(waiting.runId)
-        const registered = token === undefined ? undefined : tokens.get(token)
-        registered?.always.add(waiting.prefix)
-      }
+      // An Always is remembered by the main process, under this request's
+      // `alwaysKey` (0.616); to Claude Code it is this call allowed.
       waiting.resolve({ behavior: 'allow', updatedInput: waiting.input })
       return true
     },

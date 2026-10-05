@@ -92,6 +92,23 @@ describe('a card for a command that reaches beyond its run', () => {
     expect(html).toMatch(/don(&rsquo;|’)t ask again/)
     expect(html).toContain('python *')
   })
+
+  // 0.616: where Locust keeps the Always, the card says a saved rule still comes first; Codex keeps its own.
+  it('says a saved rule still comes first, where Locust keeps the Always', () => {
+    const kept = renderToStaticMarkup(<ApprovalCard request={{ ...asked('npm test'), alwaysCovers: 'every command it runs', alwaysKey: 'claude:Bash' }} onDecide={() => undefined} onAnswer={() => undefined} busy={false} />)
+    expect(kept).toContain('“Always” allows every command it runs, until this run ends. Your saved rules still come first.')
+    const codex = renderToStaticMarkup(<ApprovalCard request={{ ...asked('npm test'), runtime: 'codex' }} onDecide={() => undefined} onAnswer={() => undefined} busy={false} />)
+    expect(codex).toContain('“Always” lasts until this run ends.')
+    expect(codex).not.toContain('saved rules still come first')
+  })
+
+  // 0.616: an Always given earlier in the run covers no command like this one, and the card says so.
+  it('says why it is asked again when Always was given earlier in the run', () => {
+    const why = 'Asked again, though you chose Always earlier in this run: this command stops every python.exe, and such a command is asked about every time.'
+    const html = renderToStaticMarkup(<ApprovalCard request={{ ...asked(ARENA), askedAgain: why }} onDecide={() => undefined} onAnswer={() => undefined} busy={false} />)
+    expect(html).toContain(`Nothing has happened yet. ${why}`)
+    expect(html).not.toContain('Always allow this session')
+  })
 })
 
 describe('the command row', () => {

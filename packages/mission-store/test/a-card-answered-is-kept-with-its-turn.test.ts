@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { boundedApproval, createFileMissionLedger } from '../src/index.js'
+import { MISSION_LEDGER_SCHEMA_VERSION, boundedApproval, createFileMissionLedger } from '../src/index.js'
 import type { MissionApproval, MissionLedgerMetadata } from '../src/index.js'
 
 /*
@@ -76,7 +76,7 @@ describe('a card the person answered is kept on its mission', () => {
     const recovered = await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')
 
     expect(recovered?.approvals).toEqual([ALLOWED, DENIED_BY_RULE])
-    expect(recovered?.schemaVersion).toBe(20)
+    expect(recovered?.schemaVersion).toBe(MISSION_LEDGER_SCHEMA_VERSION)
     expect(recovered?.issues).toEqual([])
   }, 20_000)
 
@@ -117,6 +117,43 @@ describe('a card the person answered is kept on its mission', () => {
     const { ledger } = await ledgerWithMission()
     await expect(ledger.appendApproval('mission_1', { ...ALLOWED, answer: 'maybe' as never })).rejects.toThrow('Approval answer is invalid')
     await expect(ledger.appendApproval('mission_1', { ...ALLOWED, by: 'the teammate' as never })).rejects.toThrow('Approval answerer is invalid')
+  }, 20_000)
+
+  // v21 (0.616, the PRD's R8): a request the person's own Always, on an earlier
+  // card of the run, allowed with no card of its own.
+  const BY_EARLIER_ALWAYS: MissionApproval = {
+    approvalId: 'ap_3',
+    kind: 'command',
+    asked: 'Run a command\necho two',
+    answer: 'allowed',
+    by: 'earlier-always',
+    words: 'The Always given earlier in this run allows every command it runs.',
+    askedAt: '2026-10-04T01:00:20.000Z',
+    occurredAt: '2026-10-04T01:00:20.000Z'
+  }
+
+  it('keeps an answer by an earlier Always on a v21 mission, beside the card that gave it', async () => {
+    const { root, ledger } = await ledgerWithMission()
+    await ledger.appendApproval('mission_1', { ...ALLOWED, answer: 'allowed-always' })
+    await ledger.appendApproval('mission_1', BY_EARLIER_ALWAYS)
+    await ledger.flush()
+    const recovered = await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')
+    expect(recovered?.approvals.map((approval) => approval.by)).toEqual(['card', 'earlier-always'])
+    expect(recovered?.issues).toEqual([])
+  }, 20_000)
+
+  it('refuses an answer by an earlier Always on a v20 mission, whose readers would stop at it', async () => {
+    const { ledger } = await ledgerWithMission(20)
+    await ledger.appendApproval('mission_1', ALLOWED)
+    await expect(ledger.appendApproval('mission_1', BY_EARLIER_ALWAYS)).rejects.toThrow('cannot hold an answer by an earlier Always')
+  }, 20_000)
+
+  it('reads an answer by an earlier Always in a v20 file as damage, not as an answer', async () => {
+    const { root } = await ledgerWithMission(20)
+    await writeFile(join(root, 'mission_1.jsonl'), `${JSON.stringify({ schemaVersion: 20, recordType: 'mission.approval', ledgerSequence: 2, occurredAt: BY_EARLIER_ALWAYS.occurredAt, approval: BY_EARLIER_ALWAYS })}\n`, { flag: 'a' })
+    const recovered = await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')
+    expect(recovered?.approvals).toEqual([])
+    expect(recovered?.issues.map((issue) => issue.code)).toEqual(['invalid-record'])
   }, 20_000)
 
   it('is bounded by the host the way the reader accepts it', () => {

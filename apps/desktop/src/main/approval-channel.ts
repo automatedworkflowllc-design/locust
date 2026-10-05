@@ -225,18 +225,34 @@ export function deniedSaying(reason: string): string {
  * a web fetch -- is a command card that says what it is, because a card that
  * cannot say what would happen is not an approval.
  */
-export function openCodePermissionRequest(
-  permission: {
-    readonly permission: string
-    readonly patterns: readonly string[]
-    /** What OpenCode itself remembers on "always" (R35): said on the card. */
-    readonly always?: readonly string[]
-    readonly metadata: Readonly<Record<string, unknown>>
-    /** Asked by a subagent the run started (R36): said in the card's action. */
-    readonly bySubagent?: boolean
-  },
-  cwd: string
-): AppServerRequest {
+/** What an OpenCode request is, as `openCodePermissionRequest` reads it. */
+interface OpenCodeAsked {
+  readonly permission: string
+  readonly patterns: readonly string[]
+  /** What OpenCode itself remembers on "always" (R35): said on the card. */
+  readonly always?: readonly string[]
+  readonly metadata: Readonly<Record<string, unknown>>
+  /** Asked by a subagent the run started (R36): said in the card's action. */
+  readonly bySubagent?: boolean
+}
+
+/**
+ * The request, and what an Always on it remembers (0.616, shared/who-decides.ts):
+ * OpenCode's own patterns for it, the ones it would have remembered itself --
+ * `echo *` for `echo SERVED` -- so a later `echo other` is covered and a later
+ * `rm` is not. Locust keeps it now, after the saved rules, and OpenCode is
+ * answered "once" (`openCodeReplyFor`). No patterns at all, no key: asked again.
+ */
+export function openCodePermissionRequest(permission: OpenCodeAsked, cwd: string): AppServerRequest {
+  const request = openCodeRequestOf(permission, cwd)
+  const always = (permission.always ?? []).filter((pattern) => pattern.length > 0)
+  const covers = always.length > 0 ? always : permission.patterns.filter((pattern) => pattern.length > 0)
+  if (covers.length === 0) return request
+  const params = (request.params ?? {}) as Record<string, JsonValue>
+  return { ...request, params: { ...params, locustAlwaysKey: `opencode:${permission.permission}:${covers.join('\n')}` } }
+}
+
+function openCodeRequestOf(permission: OpenCodeAsked, cwd: string): AppServerRequest {
   const said = (key: string): string | undefined => {
     const value = permission.metadata[key]
     return typeof value === 'string' && value.length > 0 ? value : undefined
@@ -360,9 +376,11 @@ export function diffPatchFrom(diff: string, cwd: string): ReturnType<typeof tool
 export function openCodeReplyFor(result: JsonValue): 'once' | 'always' | 'reject' | { readonly reply: 'reject'; readonly message: string } {
   const record = typeof result === 'object' && result !== null && !Array.isArray(result) ? (result as { decision?: unknown; reason?: unknown }) : {}
   if (record.decision === 'accept') return 'once'
-  // Session-scoped on Codex; the server here lives for one run, so "always"
-  // lasts exactly as long.
-  if (record.decision === 'acceptForSession') return 'always'
+  // "Once" to OpenCode, since 0.616: Locust remembers the Always itself, under
+  // the request's own patterns, and every later request is decided after the
+  // saved rules (shared/who-decides.ts). Told "always", OpenCode stopped
+  // asking, and a rule saying no never saw the next command.
+  if (record.decision === 'acceptForSession') return 'once'
   // OpenCode's reject carries a message the model reads (measured on
   // 1.18.27), so a reason rides the denial itself (0.374).
   return typeof record.reason === 'string' && record.reason.length > 0 ? { reply: 'reject', message: deniedSaying(record.reason) } : 'reject'
@@ -381,6 +399,21 @@ export function openCodeReplyFor(result: JsonValue): 'once' | 'always' | 'reject
  * folder -- is a command card in the agent's own words and what it names.
  */
 export function acpPermissionRequest(asked: AcpPermissionRequest, cwd: string): AppServerRequest {
+  /*
+   * WHAT AN ALWAYS REMEMBERS (0.616, shared/who-decides.ts): the same command,
+   * or the same files, again -- what the run used to remember itself
+   * (acp-run.ts) before the saved rules were read. Said on the card too.
+   */
+  const target = asked.command ?? (asked.paths.length === 0 ? undefined : asked.paths.join('\n'))
+  const request = acpRequestOf(asked, cwd)
+  if (target === undefined) return request
+  const params = (request.params ?? {}) as Record<string, JsonValue>
+  const covers = asked.command !== undefined ? 'this same command again' : 'the same change to these files again'
+  const card = typeof params.locustCard === 'object' && params.locustCard !== null && !Array.isArray(params.locustCard) ? params.locustCard : {}
+  return { ...request, params: { ...params, locustAlwaysKey: `acp:${asked.kind ?? ''}:${target}`, locustCard: { ...card, alwaysCovers: covers } } }
+}
+
+function acpRequestOf(asked: AcpPermissionRequest, cwd: string): AppServerRequest {
   const base = { cwd, ...(asked.toolCallId === undefined ? {} : { itemId: asked.toolCallId }) }
   const files = asked.paths.map((path) => relativeToFolder(path, cwd)).join(', ')
   if (asked.kind === 'execute') {
@@ -655,6 +688,10 @@ export function createApprovalChannel(options: ApprovalChannelOptions): Approval
             cwd: described.cwd,
             requestedAt: now().toISOString(),
             ...(said('alwaysCovers') === undefined ? {} : { alwaysCovers: said('alwaysCovers')! }),
+            // The route's key for an Always (0.616): absent from Codex, which keeps its own.
+            ...(typeof requestParams.locustAlwaysKey === 'string' && requestParams.locustAlwaysKey.length > 0
+              ? { alwaysKey: requestParams.locustAlwaysKey.slice(0, 2_000) }
+              : {}),
             ...(said('dataSentSays') === undefined ? {} : { dataSentSays: said('dataSentSays')! }),
             ...(said('reversibleSays') === undefined ? {} : { reversibleSays: said('reversibleSays')! }),
             ...(patch === undefined ? {} : { patch: { text: patch.text, added: patch.added, removed: patch.removed, truncated: patch.truncated } })

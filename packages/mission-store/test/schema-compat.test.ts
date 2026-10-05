@@ -127,10 +127,11 @@ describe('ledger schema versions', () => {
     // v18 the terminal starter, a turn brought back from the runtime's own
     // terminal (0.391); v19 the side starter, a question asked on a fork of
     // a conversation's session (0.461); v20 the cards a person answered
-    // (mission.approval, 0.576).
-    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(20)
-    expect(header.schemaVersion).toBe(20)
-    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+    // (mission.approval, 0.576); v21 an answer by the person's own Always on an
+    // earlier card of the run (0.616).
+    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(21)
+    expect(header.schemaVersion).toBe(21)
+    expect(SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
     /*
      * THE PAIR THAT DRIFTED, checked as a pair.
      *
@@ -825,7 +826,7 @@ describe('ledger schema versions', () => {
       join(root, 'mission_1.jsonl'),
       `${JSON.stringify({
         // One past the newest this reader knows. Bump when the schema does.
-        schemaVersion: 21,
+        schemaVersion: 22,
         recordType: 'mission.created',
         ledgerSequence: 1,
         occurredAt: metadata.createdAt,

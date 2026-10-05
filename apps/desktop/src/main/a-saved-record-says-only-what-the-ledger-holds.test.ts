@@ -294,6 +294,11 @@ describe('a saved record of turns that record their cards', () => {
       approvalId: 'ap_3', kind: 'command', asked: 'Run a command\ngit push origin main', answer: 'denied', by: 'saved-rule',
       words: 'never run git push for Wren in this folder.', askedAt: ISO(1, 20), occurredAt: ISO(1, 21)
     })
+    // v21 (0.616): allowed by the person's own Always on an earlier card, with no card of its own.
+    await ledger.appendApproval('mission_one', {
+      approvalId: 'ap_4', kind: 'command', asked: 'Run a command\nnpm run lint', answer: 'allowed', by: 'earlier-always',
+      words: 'The Always given earlier in this run allows every command it runs.', askedAt: ISO(1, 30), occurredAt: ISO(1, 30)
+    })
     await ledger.flush()
     const turns = (await recordTurns((id) => ledger.getMission(id), 'mission_three')).missions
     return record(turns)
@@ -306,6 +311,8 @@ describe('a saved record of turns that record their cards', () => {
     expect(markdown).toContain('- **Denied** by the person, on the card · command')
     expect(markdown).toContain('> Said with the answer: use the build script instead')
     expect(markdown).toContain('- **Denied** by a rule the person saved, before the card reached them · command')
+    expect(markdown).toContain('- **Allowed** by the person’s Always on an earlier card of this run, with no card of its own · command')
+    expect(markdown).toContain('> Said with the answer: The Always given earlier in this run allows every command it runs.')
   })
 
   it('points a declined call at the answer above instead of saying it cannot tell', async () => {

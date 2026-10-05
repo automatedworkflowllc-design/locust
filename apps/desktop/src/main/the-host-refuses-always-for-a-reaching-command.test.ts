@@ -20,7 +20,8 @@ const within = (marker: string, span: number): string => {
 
 describe('the host itself refuses Always and a rule for a command that reaches', () => {
   it("passes every answer from the window through enforcedAnswer before it reaches a holder", () => {
-    const handler = within('ipcMain.handle(MISSION_APPROVAL_DECIDE_CHANNEL', 16)
+    // 32 lines: since 0.616 the handler also keeps an Always under its host's key.
+    const handler = within('ipcMain.handle(MISSION_APPROVAL_DECIDE_CHANNEL', 32)
     expect(handler).toContain('enforcedAnswer(raised.request, decided)')
     expect(handler).toContain('answerApproval(enforced.answer')
     expect(handler).not.toMatch(/answerApproval\(decided\)/)

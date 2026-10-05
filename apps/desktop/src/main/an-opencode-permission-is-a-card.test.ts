@@ -58,8 +58,10 @@ describe("an OpenCode server's permission request", () => {
       .toMatchObject({ params: { command: 'echo SERVED', locustCard: { alwaysCovers: 'anything matching “echo *”' } } })
   })
 
-  it('reads "for the rest of the run" as always, and anything unclear as a refusal', () => {
-    expect(openCodeReplyFor({ decision: 'acceptForSession' })).toBe('always')
+  // 0.616: "for the rest of the run" is remembered by Locust, after the saved
+  // rules (shared/who-decides.ts), so OpenCode is told "once" and keeps asking.
+  it('reads "for the rest of the run" as once, Locust keeping the Always, and anything unclear as a refusal', () => {
+    expect(openCodeReplyFor({ decision: 'acceptForSession' })).toBe('once')
     expect(openCodeReplyFor({ decision: 'reject' })).toBe('reject')
     expect(openCodeReplyFor(null)).toBe('reject')
     expect(openCodeReplyFor({ decision: 'accept', extra: 1 })).toBe('once')
