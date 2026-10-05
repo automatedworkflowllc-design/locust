@@ -15,7 +15,7 @@ import type {
 } from '../../../shared/ipc.js'
 import type { TurnVersions } from '../missionView.js'
 import type { RewindPutBackResponse } from '../../../shared/ipc.js'
-import { activityEntries, buildThread, cancellationSummary, editedFiles, decisionStanding, errorAlreadyShown, foldNoticeKeys, helperAskedBy, lastPlanOf, modeRefusedATool, readPlan, relativePath, sentAgainBy, stepsLine, stoppedBeforeSaying, terminalSeamBefore, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
+import { LIVE_EVENT_CAP, activityEntries, buildThread, cancellationSummary, editedFiles, decisionStanding, errorAlreadyShown, foldNoticeKeys, helperAskedBy, lastPlanOf, modeRefusedATool, readPlan, relativePath, sentAgainBy, stepsLine, stoppedBeforeSaying, terminalSeamBefore, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
 import type { GroupBoundary, GroupLeaving, LiveStarter, TurnSwitch } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
 import { folderName, ranOnLine } from '../ranOn.js'
@@ -1082,8 +1082,11 @@ onResume,
   }
   const firstShown = firstEarlierTurnShown(earlier.sizes, earlierRows)
   const showEarlier = (): void => setEarlierBudget((current) => ({ identity: shownIdentity, rows: (current.identity === shownIdentity ? current.rows : EARLIER_ROWS_SHOWN) + EARLIER_ROWS_SHOWN }))
+  // More events than are drawn (0.627): the record's window said so, or the live run reached its cap.
+  const trimmed = restoredMission?.eventsTruncated === true || events.length >= LIVE_EVENT_CAP
   const items = buildThread(events, {
     running,
+    ...(trimmed ? { trimmed: true } : {}),
     latestTurn: true,
     // What the turn before left the plan at: see `carriedPlan`.
     carriedPlan: lastPlanOf(earlierTurns.at(-1)?.events ?? []),

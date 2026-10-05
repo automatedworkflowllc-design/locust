@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.627.0 - 2026-10-05
+
+### Fixed
+
+- **A long run no longer goes quiet on screen.** Locust drew only the latest 500 of a turn's events, live and when read back from its record, so once a teammate had made sixty-odd tool calls the messages it had already shown, and the groups of steps between them, dropped off the screen, and the counts went down ("edited 3 files" became "edited 2"). A Sonnet run 35 minutes in read as one bar and silence. Locust now draws 3,000, enough for a 90-minute run at Max, measured at about the cost of a frame to draw. A turn longer still says at its top that its first steps are kept in its record, not drawn. The record always kept everything.
+
 ## 0.626.0 - 2026-10-05
 
 ### New

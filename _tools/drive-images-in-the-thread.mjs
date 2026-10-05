@@ -23,12 +23,15 @@ for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
 }
 const header = Buffer.alloc(13); header.writeUInt32BE(width); header.writeUInt32BE(height, 4); header[8] = 8; header[9] = 6
 await writeFile(join(workspace, 'chart.png'), Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]), chunk('IHDR', header), chunk('IDAT', deflateSync(pixels)), chunk('IEND', Buffer.alloc(0))]))
-const route = { runtime: 'claude', model: 'claude-haiku-4-5', mode: 'accept-edits' }
+// Auto, in the drive's own scratch folder: the red square is written by a command, and a drive never
+// answers an approval card itself (2026-10-05: it clicked "Approve once" on a matching card; Colin
+// approved one by hand when the wording did not match). In Auto nothing asks.
+const route = { runtime: 'claude', model: 'claude-haiku-4-5', mode: 'auto' }
 const packaged = process.argv.includes('--packaged') ? process.argv[process.argv.indexOf('--packaged') + 1] : undefined
 const drive = await startDrive({ name: `images-in-thread-${tag}`, port: 9919, workspace, spends: true,
   ...(packaged === undefined ? {} : { packaged }),
   outPath: join(recordRoot('images-in-the-thread-2026-10-05'), tag),
-  seed: { schemaVersion: 1, teammates: [{ teammateId: 'tm_ash', name: 'Ash', hue: 'clay', role: 'Custom', roleTitle: 'Helper', createdAt: '2026-10-05T00:00:00.000Z', route }], missionOwners: {}, settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: false } }
+  seed: { schemaVersion: 1, teammates: [{ teammateId: 'tm_ash', name: 'Ash', hue: 'clay', role: 'Custom', roleTitle: 'Helper', createdAt: '2026-10-05T00:00:00.000Z', route }], missionOwners: {}, settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: true } }
 })
 let failures = 0
 const checks = []
@@ -42,9 +45,6 @@ function send(prompt) {
     document.querySelector('button[aria-label="Send"]')?.click()
     for (let i = 0; i < 480; i++) {
       await new Promise(r => setTimeout(r, 500))
-      const approval = document.querySelector('.lc-approval__title')?.closest('.lc-card')
-      // Only the requested local PNG-writing command may be approved here.
-      if (approval && /node/i.test(approval.innerText) && approval.innerText.includes('red.png')) [...approval.querySelectorAll('button')].find(b => /^Approve once/.test(b.innerText.trim()))?.click()
       if (i > 8 && !document.querySelector('button[aria-label^="Stop the running"]')) break
     }
     for (const line of document.querySelectorAll('.lc-thread .lc-steps__line[aria-expanded="false"], .lc-thread .lc-activity[aria-expanded="false"]')) line.click()
@@ -53,7 +53,7 @@ function send(prompt) {
   })()`
 }
 try {
-  await drive.capture('Ash on Claude Code Haiku 4.5 in Edit', async () => { await drive.ready(); return drive.evaluate(openTeammateScript('Ash')) })
+  await drive.capture('Ash on Claude Code Haiku 4.5 in Auto', async () => { await drive.ready(); return drive.evaluate(openTeammateScript('Ash')) })
   const shownRoute = await drive.evaluate(`document.querySelector('.lc-route')?.innerText ?? document.querySelector('form.command-dock')?.innerText`)
   say(`route shown: ${shownRoute}`)
   await drive.capture('Read chart.png and describe the chart', () => drive.evaluate(send('Read chart.png and tell me in one sentence what it shows.')))
@@ -82,7 +82,10 @@ try {
   })()`))
   const viewer = await drive.evaluate(`(() => { const viewer = document.querySelector('.lc-viewer'); const img = viewer?.querySelector('img'); return { viewer: !!viewer, named: viewer?.getAttribute('aria-label'), painted: !!img && img.complete && img.naturalWidth === 64 && img.naturalHeight === 64 } })()`)
   check('clicking the thumbnail opens red.png in the existing image viewer', viewer.viewer && viewer.painted && /red\.png/.test(viewer.named), JSON.stringify(viewer))
-  check('renderer errors stay at zero', drive.record.every(step => step.errors.length === 0), JSON.stringify(drive.record.map(step => step.errors)))
+  // Electron's own launch line in a packaged build is no error of the app's (as drive-an-always-never-outranks-a-rule.mjs).
+  const LAUNCH_NOISE = /^Electron sandboxed_renderer\.bundle\.js script failed to run|^console\.error$/
+  const errors = drive.record.flatMap((step) => step.errors.flat().map(String)).filter((line) => !LAUNCH_NOISE.test(line.trim()))
+  check("renderer errors stay at zero, beyond Electron's launch line", errors.length === 0, JSON.stringify(errors))
 } catch (error) { check('drive completes', false, String(error)) }
 finally { await drive.finish({ intro: `Base ${tag}. Ash on Claude Code / Haiku 4.5 in Edit. Two requested image turns.`, extra: checks.join('\n\n') }); await writeFile(join(drive.out, 'checks.txt'), checks.join('\n') + '\n') }
 say(`${checks.length - failures}/${checks.length} checks passed`)

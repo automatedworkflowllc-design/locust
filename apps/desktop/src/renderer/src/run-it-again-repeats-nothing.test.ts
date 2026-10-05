@@ -86,7 +86,8 @@ describe('whether a failed run may simply be run again', () => {
 
 describe('a long live run', () => {
   it('H4: keeps its first event past the cap, so a failed turn still reads as started', () => {
-    const long = [event('run.started'), ...Array.from({ length: 700 }, () => event('message.delta')), event('run.failed')]
+    // Past the cap, whatever it is (0.627 moved it from 500 to the shared window).
+    const long = [event('run.started'), ...Array.from({ length: LIVE_EVENT_CAP + 200 }, () => event('message.delta')), event('run.failed')]
     const kept = cappedLiveEvents(long)
     expect(kept).toHaveLength(LIVE_EVENT_CAP)
     expect(kept[0]).toBe(long[0])

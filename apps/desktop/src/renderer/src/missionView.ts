@@ -1,6 +1,7 @@
 import type { NormalizedRuntimeEvent, ToolPatch } from '@teammate/runtime-adapters'
 
 import { SUBAGENT_TOOL } from './faceState.js'
+import { EVENT_WINDOW, TRIMMED_TURN_LINE } from '../../shared/event-window.js'
 import { isImagePath } from '../../shared/image-files.js'
 import { READ_TOOL_WORDS, byHelper, editToolName, isEditCommand, isShellTool } from '../../shared/tool-kinds.js'
 import { LARGE_FILE_LINES, fileCounts, parseUnifiedDiff } from './diff.js'
@@ -2946,6 +2947,12 @@ export interface MissionThreadOptions {
   /** While a run is live the last message shows a streaming caret. */
   readonly running: boolean
   /**
+   * The turn has more events than are drawn (shared/event-window.ts): its first
+   * steps are kept in the record but not here, and the turn says so at its top
+   * rather than reading as if it began where the window does (0.627).
+   */
+  readonly trimmed?: boolean
+  /**
    * When the run was started, so the waiting line can time the launch itself.
    * Without it a run with no events yet has no clock to show, and the line is
    * held back -- which is the lag it exists to remove.
@@ -4229,6 +4236,8 @@ export function buildThread(
   // Ended without the model coming back: what the provider said is still the
   // reason, so it stays, without the claim that a retry is under way (0.551,
   // Boss on 0.550: dropping the whole note lost "Endpoint is unavailable").
+  // Past the window, the turn says its start is kept but not drawn (0.627): it must not read as if it began there.
+  if (options.trimmed === true) items.unshift({ key: 'trimmed', type: 'diagnostic', level: 'info', message: TRIMMED_TURN_LINE })
   if (busyAt >= 0 && options.running !== true) {
     return items.map((item) => {
       if (item.type !== 'diagnostic' || item.retrying !== true) return item
@@ -5740,8 +5749,8 @@ export function runtimeNeverStarted(events: readonly NormalizedRuntimeEvent[]): 
   return events.every((event) => NEVER_STARTED_SHAPES.has(event.type) && event.runtimeThreadId === undefined)
 }
 
-/** How many events a live run keeps in memory; the record keeps them all. */
-export const LIVE_EVENT_CAP = 500
+/** How many events a live run keeps in memory; the record keeps them all. The history's window too (shared/event-window.ts). */
+export const LIVE_EVENT_CAP = EVENT_WINDOW
 
 /**
  * A live run's events, capped -- with the FIRST kept past the cap, as the
