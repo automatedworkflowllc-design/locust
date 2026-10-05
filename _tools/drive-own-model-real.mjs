@@ -202,13 +202,23 @@ const shoot = async (file, title, action) => {
   }
   return said
 }
-// The picker open on the chat box, nothing chosen yet.
+// The picker open on the chat box, from the top: your models first, then each AI tool's.
+// It opens at the chosen row, so this is taken once the model is chosen (it was the free one).
 const OPEN_PICKER = `(async () => {
   const control = [...document.querySelectorAll('.lc-control')].find((b) => b.getAttribute('aria-haspopup') === 'listbox')
   if (!control) return 'no route control'
   control.click()
   await new Promise((r) => setTimeout(r, 900))
+  let list = document.querySelector('.lc-picker__row')
+  while (list && list.scrollHeight <= list.clientHeight) list = list.parentElement
+  list?.scrollTo(0, 0)
+  await new Promise((r) => setTimeout(r, 300))
   return [...document.querySelectorAll('.lc-picker__group')].map((g) => g.textContent.replace(/\\s+/g, ' ').trim()).slice(0, 8).join(' | ')
+})()`
+const CLOSE_PICKER = `(async () => {
+  ;[...document.querySelectorAll('.lc-control')].find((b) => b.getAttribute('aria-haspopup') === 'listbox')?.click()
+  await new Promise((r) => setTimeout(r, 400))
+  return document.querySelector('.lc-picker__input') ? 'still open' : 'closed'
 })()`
 // Test again on the kept row, and what it says there.
 const TEST_KEPT = `(async () => {
@@ -252,8 +262,8 @@ try {
   const keptTested = String(await shoot('1-settings-your-own-models', 'Test again, on the added model', () => drive.evaluate(TEST_KEPT)))
   if (only.has('a')) check('a', 'Test on the added model says the same', keptTested.includes(`It answered, and serves ${MODEL}.`) && /It can use tools\.|set to chat only\./.test(keptTested), keptTested)
   await drive.capture('open Wren', () => drive.evaluate(openWren))
-  say(`  the picker's groups: ${String(await shoot('2-picker-your-models', 'The picker: your model above the rest', () => drive.evaluate(OPEN_PICKER)))}`)
   const picked = String(await drive.capture(`(b) the picker: ${NAME} under Your models`, () => drive.evaluate(pickRouteScript({ group: '/Your models/i', search: NAME.split(/\s+/)[0], row: `/${NAME_PATTERN}/` }))))
+  say(`  the picker's groups: ${String(await shoot('2-picker-your-models', 'The picker again: your model above the rest', () => drive.evaluate(OPEN_PICKER)))}; ${String(await drive.evaluate(CLOSE_PICKER))}`)
   const named = String(await drive.evaluate(`JSON.stringify({
     chip: (document.querySelector('form.command-dock button[aria-haspopup="listbox"]')?.innerText ?? '').replace(/\\s+/g, ' ').trim(),
     header: (document.querySelector('.lc-workroom__role')?.innerText ?? '').replace(/\\s+/g, ' ').trim()
