@@ -60,8 +60,10 @@ export interface AntigravityProbeOptions {
   readonly listeningPorts?: (pid: number) => Promise<readonly number[]>
   /** Test seam: the clock, so a test can step past the TTL. */
   readonly now?: () => number
-  /** Test seam: run the CLI once. */
-  readonly run?: (executable: string, args: readonly string[], env: Readonly<Record<string, string>>) => Promise<{ stdout: string; stderr: string; code: number | null }>
+  /** Test seam: run the CLI once. `timeoutMs` is how long it may take before it is killed. */
+  readonly run?: (executable: string, args: readonly string[], env: Readonly<Record<string, string>>, timeoutMs?: number) => Promise<{ stdout: string; stderr: string; code: number | null; timedOut?: boolean }>
+  /** Test seam: how long `agy` may take to answer the readiness check (default ten seconds, like every other probe). */
+  readonly cliCheckCapMs?: number
 }
 
 // Named from the one table the window reads too (shared/antigravity-models.ts).
@@ -72,6 +74,16 @@ export const ANTIGRAVITY_MODELS = [
 ] as const
 
 const PROBE_TTL_MS = 10_000
+
+/*
+ * How long `agy` may take to answer `--version` and `models` at a sweep.
+ *
+ * Every CLI probe in discovery has had ten seconds (PROBE_TIMEOUT_MS), and
+ * this one ran with the sixty seconds the RUN of a command gets -- so an `agy`
+ * that hung (a model list that waits on a network that is not there) held the
+ * whole sweep, the first screen and every start behind it for a minute.
+ */
+const CLI_CHECK_CAP_MS = 10_000
 
 export function antigravityExecutableCandidates(localAppData: string): readonly string[] {
   return [
@@ -100,16 +112,19 @@ export function parseServerCommandLine(commandLine: string): { readonly csrfToke
 function runCli(
   executable: string,
   args: readonly string[],
-  env: Readonly<Record<string, string>>
-): Promise<{ stdout: string; stderr: string; code: number | null }> {
+  env: Readonly<Record<string, string>>,
+  timeoutMs = 60_000
+): Promise<{ stdout: string; stderr: string; code: number | null; timedOut?: boolean }> {
   return new Promise((resolve) => {
     execFile(
       executable,
       [...args],
-      { env: { ...process.env, ...env }, timeout: 60_000, maxBuffer: 4 * 1024 * 1024, windowsHide: true },
+      { env: { ...process.env, ...env }, timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024, windowsHide: true },
       (error, stdout, stderr) => {
         const code = error === null ? 0 : typeof (error as { code?: unknown }).code === 'number' ? ((error as { code: number }).code) : null
-        resolve({ stdout: String(stdout), stderr: String(stderr), code })
+        // Killed by its own clock: not an answer of any kind, and not "signed out".
+        const timedOut = error !== null && (error as { killed?: unknown }).killed === true
+        resolve({ stdout: String(stdout), stderr: String(stderr), code, ...(timedOut ? { timedOut: true } : {}) })
       }
     )
   })
@@ -211,9 +226,35 @@ function listLanguageServerPidsWindows(): Promise<readonly number[] | undefined>
 const samePids = (left: readonly number[], right: readonly number[]): boolean =>
   left.length === right.length && [...left].sort((a, b) => a - b).every((pid, index) => pid === [...right].sort((a, b) => a - b)[index])
 
+/**
+ * Ask one thing, and stop waiting at `capMs` whatever it does: a clock of this
+ * function's own, because a fake or a wedged runner has no clock of its own.
+ * No answer is `undefined`.
+ */
+async function askWithin<T>(capMs: number, ask: () => Promise<T>): Promise<T | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      ask().catch(() => undefined),
+      new Promise<undefined>((resolve) => {
+        timer = setTimeout(() => resolve(undefined), capMs)
+      })
+    ])
+  } finally {
+    if (timer !== undefined) clearTimeout(timer)
+  }
+}
+
 export function createAntigravityHostProbe(options: AntigravityProbeOptions = {}): {
   probe(): Promise<AntigravityHost | undefined>
+  /** The check itself. Asked twice at once, it is run once: the second caller gets the first one's answer. */
   discoveryRecord(): Promise<RuntimeDiscovery>
+  /**
+   * What to show for Antigravity while its check is still going: installed,
+   * not answered. Never a claim about signing in, and never the last launch's
+   * answer dressed as this one.
+   */
+  pendingRecord(): RuntimeDiscovery
   /** Antigravity CLI (`agy`), when installed (0.540): runs go through it instead of the app. */
   cliPath(): string | undefined
 } {
@@ -332,94 +373,148 @@ export function createAntigravityHostProbe(options: AntigravityProbeOptions = {}
     return value
   }
 
+  /** The check, once. Only `discoveryRecord` starts it. */
+  const check = async (): Promise<RuntimeDiscovery> => {
+    /*
+     * THE CLI FIRST (0.540). Google moved personal accounts from Gemini CLI
+     * to Antigravity CLI on 2026-06-18, and `agy` runs headless with a
+     * stream Locust can read whole -- every tool, the answer, the end of
+     * the run -- where the app route reads its transcript files and has
+     * missed all three. So when it is installed, it is Antigravity here,
+     * with the models it lists, and the app need not be open.
+     */
+    const cli = agyPath()
+    if (cli !== undefined) {
+      /*
+       * BOTH QUESTIONS AT ONCE, EACH ON A TEN-SECOND CLOCK.
+       *
+       * `--version` (0.3-1.3 s) was awaited and THEN `models` (1.8-3.6 s, it
+       * fetches the list from Google's servers), so the check took their sum
+       * -- 3.5-5.0 s of a sweep on Colin's machine, 2026-10-05, where the
+       * slower of the two alone is 1.8-3.6 s. Neither needs the other. And
+       * each is killed at CLI_CHECK_CAP_MS: a `models` that waits on a network
+       * that is not there used to be left running for sixty seconds.
+       */
+      const cap = options.cliCheckCapMs ?? CLI_CHECK_CAP_MS
+      const [version, listed] = await Promise.all([
+        askWithin(cap, () => run(cli, ['--version'], {}, cap)),
+        askWithin(cap, () => run(cli, ['models'], {}, cap))
+      ])
+      // Not answering is not being signed out: the person is told which.
+      const silent = listed === undefined || listed.timedOut === true
+      const models = silent ? undefined : parseAgyModelList(listed.stdout)
+      const raw = version?.stdout.trim().split(/\r?\n/)[0]
+      return {
+        id: 'antigravity',
+        kind: 'agent-runtime',
+        displayName: 'Antigravity',
+        optional: true,
+        supportedFeatures: [],
+        requiredFeatures: [],
+        modelHints: models ?? { aliases: [], efforts: [], models: [] },
+        availability: 'available',
+        readiness: silent ? 'unknown' : models === undefined ? 'authentication-required' : 'ready',
+        executable: { commandName: 'agy', discoveredPath: cli, executablePath: cli, prefixArgs: [], kind: 'native' },
+        ...(raw === undefined ? {} : { version: parseVersion(raw) }),
+        diagnostics: silent
+          ? [{ code: 'readiness-unverifiable', severity: 'warning', message: 'Antigravity CLI did not answer in time.', resolution: 'Locust asks again shortly; if it keeps happening, run agy models in a terminal.' }]
+          : models === undefined
+            ? [{ code: 'authentication-required', severity: 'warning', message: 'Antigravity CLI is installed but could not list its models.', resolution: 'Run agy in a terminal once and sign in with Google.' }]
+            : []
+      } as RuntimeDiscovery
+    }
+    const installed = !hidden() && platform === 'win32' && antigravityExecutableCandidates(localAppData).some((candidate) => existsSync(candidate))
+    const host = installed ? await probe() : undefined
+    const base = {
+      id: 'antigravity' as const,
+      kind: 'agent-runtime' as const,
+      displayName: 'Antigravity',
+      optional: true,
+      supportedFeatures: [],
+      requiredFeatures: [],
+      modelHints: { aliases: [], efforts: [], models: [...ANTIGRAVITY_MODELS] }
+    }
+    if (!installed) {
+      return {
+        ...base,
+        availability: 'unavailable',
+        readiness: 'unknown',
+        diagnostics: [
+          { code: 'executable-not-found', severity: 'info', message: 'Antigravity is not installed on this machine.' }
+        ]
+      }
+    }
+    if (host === undefined) {
+      return {
+        ...base,
+        availability: 'available',
+        readiness: 'unhealthy',
+        diagnostics: [
+          {
+            code: 'readiness-unverifiable',
+            severity: 'warning',
+            message: 'Antigravity is installed but not open. This route drives the agent inside the running app.',
+            resolution: 'Open Antigravity with the workspace folder, then retry discovery.'
+          }
+        ]
+      }
+    }
+    return {
+      ...base,
+      availability: 'available',
+      readiness: 'ready',
+      executable: { commandName: 'language_server', discoveredPath: host.executablePath, executablePath: host.executablePath, prefixArgs: ['agentapi'], kind: 'native' },
+      ...(host.version === undefined ? {} : { version: parseVersion(host.version) }),
+      diagnostics: [
+        {
+          code: 'readiness-unverifiable',
+          severity: 'info',
+          message: `Experimental: runs Antigravity's own agent in a folder Antigravity has open (${String(host.projects.size)} known). It cannot be held read-only.`
+        }
+      ]
+    }
+  }
+
+  /**
+   * One check at a time. A sweep that gave up waiting for a slow `agy` leaves
+   * it running, and the re-check that follows must pick that one up, not start
+   * a second `agy models` beside it.
+   */
+  let checking: Promise<RuntimeDiscovery> | undefined
+  const discoveryRecord = (): Promise<RuntimeDiscovery> => {
+    if (checking !== undefined) return checking
+    const running = check().finally(() => {
+      checking = undefined
+    })
+    checking = running
+    return running
+  }
+
+  const pendingRecord = (): RuntimeDiscovery => {
+    const cli = agyPath()
+    const installed = cli !== undefined || (!hidden() && platform === 'win32' && antigravityExecutableCandidates(localAppData).some((candidate) => existsSync(candidate)))
+    return {
+      id: 'antigravity',
+      kind: 'agent-runtime',
+      displayName: 'Antigravity',
+      optional: true,
+      supportedFeatures: [],
+      requiredFeatures: [],
+      modelHints: { aliases: [], efforts: [], models: [] },
+      availability: installed ? 'available' : 'unavailable',
+      readiness: 'unknown',
+      ...(cli === undefined ? {} : { executable: { commandName: 'agy', discoveredPath: cli, executablePath: cli, prefixArgs: [], kind: 'native' } }),
+      diagnostics: [{ code: 'readiness-unverifiable', severity: 'info', message: 'Antigravity is still being checked.' }]
+    } as RuntimeDiscovery
+  }
+
   return {
     probe,
     cliPath(): string | undefined {
       return agyPath()
     },
-    async discoveryRecord(): Promise<RuntimeDiscovery> {
-      /*
-       * THE CLI FIRST (0.540). Google moved personal accounts from Gemini CLI
-       * to Antigravity CLI on 2026-06-18, and `agy` runs headless with a
-       * stream Locust can read whole -- every tool, the answer, the end of
-       * the run -- where the app route reads its transcript files and has
-       * missed all three. So when it is installed, it is Antigravity here,
-       * with the models it lists, and the app need not be open.
-       */
-      const cli = agyPath()
-      if (cli !== undefined) {
-        const version = await run(cli, ['--version'], {}).catch(() => undefined)
-        const listed = await run(cli, ['models'], {}).catch(() => undefined)
-        const models = listed === undefined ? undefined : parseAgyModelList(listed.stdout)
-        const raw = version?.stdout.trim().split(/\r?\n/)[0]
-        return {
-          id: 'antigravity',
-          kind: 'agent-runtime',
-          displayName: 'Antigravity',
-          optional: true,
-          supportedFeatures: [],
-          requiredFeatures: [],
-          modelHints: models ?? { aliases: [], efforts: [], models: [] },
-          availability: 'available',
-          readiness: models === undefined ? 'authentication-required' : 'ready',
-          executable: { commandName: 'agy', discoveredPath: cli, executablePath: cli, prefixArgs: [], kind: 'native' },
-          ...(raw === undefined ? {} : { version: parseVersion(raw) }),
-          diagnostics: models === undefined
-            ? [{ code: 'authentication-required', severity: 'warning', message: 'Antigravity CLI is installed but could not list its models.', resolution: 'Run agy in a terminal once and sign in with Google.' }]
-            : []
-        } as RuntimeDiscovery
-      }
-      const installed = !hidden() && platform === 'win32' && antigravityExecutableCandidates(localAppData).some((candidate) => existsSync(candidate))
-      const host = installed ? await probe() : undefined
-      const base = {
-        id: 'antigravity' as const,
-        kind: 'agent-runtime' as const,
-        displayName: 'Antigravity',
-        optional: true,
-        supportedFeatures: [],
-        requiredFeatures: [],
-        modelHints: { aliases: [], efforts: [], models: [...ANTIGRAVITY_MODELS] }
-      }
-      if (!installed) {
-        return {
-          ...base,
-          availability: 'unavailable',
-          readiness: 'unknown',
-          diagnostics: [
-            { code: 'executable-not-found', severity: 'info', message: 'Antigravity is not installed on this machine.' }
-          ]
-        }
-      }
-      if (host === undefined) {
-        return {
-          ...base,
-          availability: 'available',
-          readiness: 'unhealthy',
-          diagnostics: [
-            {
-              code: 'readiness-unverifiable',
-              severity: 'warning',
-              message: 'Antigravity is installed but not open. This route drives the agent inside the running app.',
-              resolution: 'Open Antigravity with the workspace folder, then retry discovery.'
-            }
-          ]
-        }
-      }
-      return {
-        ...base,
-        availability: 'available',
-        readiness: 'ready',
-        executable: { commandName: 'language_server', discoveredPath: host.executablePath, executablePath: host.executablePath, prefixArgs: ['agentapi'], kind: 'native' },
-        ...(host.version === undefined ? {} : { version: parseVersion(host.version) }),
-        diagnostics: [
-          {
-            code: 'readiness-unverifiable',
-            severity: 'info',
-            message: `Experimental: runs Antigravity's own agent in a folder Antigravity has open (${String(host.projects.size)} known). It cannot be held read-only.`
-          }
-        ]
-      }
-    }
+    discoveryRecord,
+    pendingRecord
   }
 }
 

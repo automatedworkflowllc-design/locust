@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.628.0 - 2026-10-05
+
+### Improved
+
+- **Locust opens without waiting on Antigravity.** When Locust starts it checks every AI agent on the machine, and the first screen waited for the slowest. Antigravity's check asked its CLI two things one after the other, each allowed a full minute: 3.5 to 5.5 seconds of a normal start, and two minutes plus a false "needs sign-in" when the CLI hung. It now asks both at once on the ten-second clock every other check has; the first screen and every other agent go on without it; its row says it is still being checked, and its answer is filled in when it arrives. A start on Antigravity itself still waits for its own check, and a check that did not answer says so instead of claiming you are signed out.
+
 ## 0.627.0 - 2026-10-05
 
 ### Fixed
