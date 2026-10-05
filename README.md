@@ -101,7 +101,10 @@ Where a runtime offers no place to ask (Cursor and Muse never do; Antigravity
 reports its refusals after the fact), the card is not pretended; the record
 says what happened. Which AI agents ask first, in which modes, and so what
 Locust can stop, is in [docs/WHAT-LOCUST-CAN-STOP.md](docs/WHAT-LOCUST-CAN-STOP.md),
-written from the same list Settings > AI agents shows.
+written from the same list Settings > AI agents shows. Every connection Locust
+itself makes -- its updates, the agents it installs, the pet gallery, a
+previewed page's libraries -- is in [docs/NETWORK.md](docs/NETWORK.md); there
+is no telemetry.
 
 **The record.** Every conversation is an append-only ledger: each event,
 each card and its answer, each hand-off, written before the screen shows it.

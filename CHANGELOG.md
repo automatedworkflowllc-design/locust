@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.618.0 - 2026-10-04
+
+### Improved
+
+- **Every connection Locust makes, written down.** A new page beside Locust's source lists every connection Locust itself makes, when, and what it sends: its own update checks, the AI agents it installs when you ask and keeps current, the pet gallery when you open it, and the libraries a previewed web page may load. It also says what never leaves your computer, and that each AI agent talks only to its own service, with your account. Settings > Privacy & data links to it, and its Network line now names the pet gallery and the agents Locust installs, which it had left out.
+
 ## 0.617.0 - 2026-10-04
 
 ### New

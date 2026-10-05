@@ -163,7 +163,9 @@ export const DOCS_PUBLISHED = [
   // The code signing policy (0.585): SignPath asks that it be public, linked from the homepage.
   'docs/CODE-SIGNING.md',
   // What Locust can stop, per AI agent (0.617, the PRD's R9): written from the source Settings draws.
-  'docs/WHAT-LOCUST-CAN-STOP.md'
+  'docs/WHAT-LOCUST-CAN-STOP.md',
+  // Every connection Locust itself makes (0.618, the PRD's R22); Settings > Privacy links it.
+  'docs/NETWORK.md'
 ]
 
 const EXCLUSION_PATTERNS = EXCLUSIONS.map((glob) => ({ glob, re: compileGlob(glob) }))
