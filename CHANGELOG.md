@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.615.0 - 2026-10-04
+
+### New
+
+- **Start from a template.** Routines now come with eleven ready-made ones: explain this project, find what is unfinished, review a file, plan a change before making it, challenge an idea before building it, write a status update, a weekly report from your notes, summarize a long text, draft a reply, check a spreadsheet, and find the gaps in a document. An empty Routines screen lists them; once you have routines of your own, they are under Start from a template at the end of the list. Choosing one shows its steps and what it will ask you, and nothing is added until you give it to a teammate. Each one reads and answers without changing a file: it is added in Ask, with no schedule, and runs only when you press Run.
+
 ## 0.614.0 - 2026-10-04
 
 ### New

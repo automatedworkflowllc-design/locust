@@ -231,6 +231,15 @@ if (!existsSync(asarPath)) {
    */
   const builderConfig = readFileSync(join(DESKTOP, 'electron-builder.yml'), 'utf8')
   const extra = [...builderConfig.matchAll(/^\s*-\s*from:\s*(\S+)\s+to:\s*(\S+)/gm)]
+  /*
+   * What the app reads from beside the archive, for the markers (0.615). The
+   * starter routines' names live in their own files in routines/, which the
+   * app lists at run time, so "Challenge an idea before building it" was
+   * reported missing from a build that shipped it. Code and data only:
+   * never CHANGELOG.md, which holds every claim and would make each one pass.
+   */
+  const besideText = []
+  const readable = (path) => /\.(json|mjs|js)$/.test(path) && !/CHANGELOG\.md$/i.test(path)
   for (const [, from, to] of extra) {
     const shipped = join(DESKTOP, 'release', 'win-unpacked', 'resources', to)
     const source = join(DESKTOP, from)
@@ -250,15 +259,21 @@ if (!existsSync(asarPath)) {
       if (named.length === 0) bad(`beside the asar: ${to}/`, 'a folder with no filter naming what it must hold')
       else if (wrong.length > 0) bad(`beside the asar: ${to}/`, `missing or different: ${wrong.join(', ')}`)
       else ok(`beside the asar: ${to}/ (${named.join(', ')})`)
+      for (const name of named.filter((entry) => readable(entry) && existsSync(join(shipped, entry)))) {
+        besideText.push({ where: `${to}/${name}`, text: readFileSync(join(shipped, name)).toString('utf8') })
+      }
     } else if (!existsSync(source) || !readFileSync(shipped).equals(readFileSync(source))) {
       bad(`beside the asar: ${to}`, 'differs from its source')
     } else {
       ok(`beside the asar: ${to}`)
+      if (readable(to)) besideText.push({ where: to, text: readFileSync(shipped).toString('utf8') })
     }
   }
 
   for (const marker of markers) {
+    const beside = besideText.find((entry) => entry.text.includes(marker))
     if (asar.includes(marker)) ok(`shipped: ${JSON.stringify(marker)}`)
+    else if (beside !== undefined) ok(`shipped: ${JSON.stringify(marker)} (in ${beside.where})`)
     else bad(`shipped: ${JSON.stringify(marker)}`, 'the changelog claims it and the artefact does not have it')
   }
   if (markers.length === 0) {

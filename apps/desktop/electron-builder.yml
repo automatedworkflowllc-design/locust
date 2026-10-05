@@ -85,6 +85,22 @@ extraResources:
       - vocab.txt
       - ort-wasm-simd-threaded.mjs
       - ort-wasm-simd-threaded.wasm
+  # The starter routines (0.615, routine-templates.ts): ordinary routine files,
+  # read by the reader an import uses. Each named, so a missing one is caught.
+  - from: resources/routines
+    to: routines
+    filter:
+      - explain-this-project.locust-routine.json
+      - find-what-is-unfinished.locust-routine.json
+      - review-a-file.locust-routine.json
+      - plan-a-change.locust-routine.json
+      - challenge-an-idea.locust-routine.json
+      - write-a-status-update.locust-routine.json
+      - weekly-report-from-notes.locust-routine.json
+      - summarize-a-long-text.locust-routine.json
+      - draft-a-reply.locust-routine.json
+      - check-a-spreadsheet.locust-routine.json
+      - find-the-gaps-in-a-document.locust-routine.json
 
 # Never ship the caller's mission ledger, smoke profiles, or source maps.
 asar: true

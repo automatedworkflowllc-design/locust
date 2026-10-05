@@ -585,6 +585,9 @@ export const ROUTINE_FOLDER_CHANNEL = 'routines:chooseFolder'
 export const ROUTINE_EXPORT_CHANNEL = 'routines:export'
 export const ROUTINE_IMPORT_PREVIEW_CHANNEL = 'routines:importPreview'
 export const ROUTINE_IMPORT_CHANNEL = 'routines:import'
+/** The starter routines (0.615, main/routine-templates.ts): the list, and one previewed like an imported file. */
+export const ROUTINE_TEMPLATES_CHANNEL = 'routines:templates'
+export const ROUTINE_TEMPLATE_PREVIEW_CHANNEL = 'routines:templatePreview'
 /**
  * A routine that works in a copy (0.533): its last run's changes, kept (written
  * into the folder), discarded, or the copy opened to look at first.
@@ -2054,6 +2057,20 @@ export interface RoutineImportPreview {
   /** Each connector the steps name, and whether this machine has it. */
   readonly connectors: readonly { readonly name: string; readonly present: boolean }[]
 }
+/** One starter routine as the list offers it (0.615). */
+export interface RoutineTemplateInfo {
+  /** The file's name without its suffix: what the window asks for it by. */
+  readonly id: string
+  readonly name: string
+  /** What it does, in one line. */
+  readonly summary: string
+  readonly steps: number
+  /** What it will ask for when it runs, by label. */
+  readonly asks: readonly string[]
+}
+export type RoutineTemplatesResponse =
+  | { readonly ok: true; readonly data: { readonly templates: readonly RoutineTemplateInfo[] } }
+  | { readonly ok: false; readonly error: { readonly code: 'ROUTINE_REJECTED'; readonly message: string } }
 export type RoutineImportPreviewResponse =
   | { readonly ok: true; readonly data: { readonly preview?: RoutineImportPreview } }
   | { readonly ok: false; readonly error: { readonly code: 'ROUTINE_REJECTED'; readonly message: string } }
@@ -3403,6 +3420,10 @@ export interface DesktopApi {
   exportRoutine(request: RoutineExportRequest): Promise<RoutineExportResponse>
   /** Choose a routine file and read it. Nothing is created and nothing runs (W7). */
   previewRoutineImport(): Promise<RoutineImportPreviewResponse>
+  /** The starter routines Locust ships (0.615). */
+  listRoutineTemplates(): Promise<RoutineTemplatesResponse>
+  /** One of them, previewed as an imported file is, for the same Import. */
+  previewRoutineTemplate(id: string): Promise<RoutineImportPreviewResponse>
   /** Add the previewed routine for a teammate: no schedule, nothing started (W7). */
   importRoutine(request: RoutineImportRequest): Promise<RoutineMutationResponse>
   /** Keep, discard or open a copy routine's waiting changes (0.533). */

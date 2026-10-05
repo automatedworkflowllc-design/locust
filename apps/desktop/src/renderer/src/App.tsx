@@ -73,7 +73,8 @@ import { RoutineDialog } from './components/RoutineDialog.js'
 import { RoutineRunDialog } from './components/RoutineInputs.js'
 import { RoutineExportDialog, RoutineImportDialog } from './components/RoutineFileDialog.js'
 import type { RoutineInput, RoutineValues } from '../../shared/routine-inputs.js'
-import type { RoutineImportPreview, RoutineFlaggedPath } from '../../shared/ipc.js'
+import type { RoutineImportPreview, RoutineFlaggedPath, RoutineTemplateInfo } from '../../shared/ipc.js'
+import { RoutineTemplateDialog } from './components/RoutineTemplates.js'
 import { AutomationsScreen } from './components/AutomationsScreen.js'
 import { TIDY_PROMPT } from '../../shared/memory-tidy.js'
 import { needsYou, needsYouLabel, waitingByTeammate } from './needsYou.js'
@@ -5416,7 +5417,21 @@ export default function App(): ReactElement {
   }, [runs])
   const [routineNotice, setRoutineNotice] = useState<string>()
   const [routineRunFor, setRoutineRunFor] = useState<PublicRoutine>()
-  const [routineImport, setRoutineImport] = useState<RoutineImportPreview>()
+  const [routineImport, setRoutineImport] = useState<RoutineImportPreview & { readonly fromTemplate?: boolean }>()
+  // The starter routines (0.615): read once, the first time Routines opens; they ship with the app.
+  const [routineTemplates, setRoutineTemplates] = useState<readonly RoutineTemplateInfo[]>([])
+  const [templatePicker, setTemplatePicker] = useState(false)
+  useEffect(() => {
+    if (screen !== 'automations' || routineTemplates.length > 0) return
+    void window.desktop?.listRoutineTemplates().then((answer) => { if (answer.ok) setRoutineTemplates(answer.data.templates) }).catch(() => undefined)
+  }, [screen, routineTemplates.length])
+  const openRoutineTemplate = (id: string): void => {
+    void window.desktop?.previewRoutineTemplate(id).then((answer) => {
+      if (!answer.ok) { setRoutineNotice(answer.error.message); return }
+      setTemplatePicker(false)
+      if (answer.data.preview !== undefined) setRoutineImport({ ...answer.data.preview, fromTemplate: true })
+    }).catch(() => setRoutineNotice('That template could not be opened. Try it again from Routines.'))
+  }
   const [routineExport, setRoutineExport] = useState<{ routineId: string; flagged: readonly RoutineFlaggedPath[] }>()
   const exportRoutine = async (routineId: string, paths?: 'input' | 'keep'): Promise<void> => {
     if (!window.desktop) throw new Error('Desktop connection is unavailable.')
@@ -7356,6 +7371,9 @@ export default function App(): ReactElement {
               onSaveRoutine={openSaveRoutine}
               onNewRoutine={openNewRoutine}
               onImportRoutine={previewRoutineImport}
+              templates={routineTemplates}
+              onUseTemplate={openRoutineTemplate}
+              onBrowseTemplates={() => setTemplatePicker(true)}
               onExportRoutine={(id) => { void exportRoutine(id).catch((error: unknown) => setRoutineNotice(error instanceof Error ? error.message : 'That routine could not be exported. Check the destination folder and try again.')) }}
               onSettleRoutine={settleRoutine}
               signInOn={loginItem.openAtLogin}
@@ -8955,12 +8973,13 @@ export default function App(): ReactElement {
       )}
       {routineRunFor !== undefined && <RoutineRunDialog routine={routineRunFor} onRun={(values) => startRoutine(routineRunFor.routineId, values)} onCancel={() => setRoutineRunFor(undefined)} />}
       {routineExport !== undefined && <RoutineExportDialog flagged={routineExport.flagged} onExport={(paths) => exportRoutine(routineExport.routineId, paths)} onCancel={() => setRoutineExport(undefined)} />}
-      {routineImport !== undefined && <RoutineImportDialog preview={routineImport} team={teammates} onCancel={() => setRoutineImport(undefined)} onImport={async (teammateId) => {
+      {templatePicker && <RoutineTemplateDialog templates={routineTemplates} onUse={openRoutineTemplate} onCancel={() => setTemplatePicker(false)} />}
+      {routineImport !== undefined && <RoutineImportDialog preview={routineImport} fromTemplate={routineImport.fromTemplate === true} team={teammates} onCancel={() => setRoutineImport(undefined)} onImport={async (teammateId) => {
         if (!window.desktop) throw new Error('Desktop connection is unavailable.')
         const route = teammates.find((mate) => mate.teammateId === teammateId)?.route ?? { runtime: composerRoute.runtime, model: composerRoute.model, mode: 'ask' as const }
         const answer = await window.desktop.importRoutine({ token: routineImport.token, teammateId, route })
         if (!answer.ok) throw new Error(answer.error.message)
-        setRoutineNotice('Routine imported. It has no schedule and has not run.')
+        setRoutineNotice(routineImport.fromTemplate === true ? `Added ${routineImport.name}. It has no schedule and has not run.` : 'Routine imported. It has no schedule and has not run.')
         await reloadRoutines()
       }} />}
       {routineDialog !== undefined && (

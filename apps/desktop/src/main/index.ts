@@ -257,6 +257,8 @@ import {
   ROUTINE_FOLDER_CHANNEL,
   ROUTINE_EXPORT_CHANNEL,
   ROUTINE_IMPORT_PREVIEW_CHANNEL,
+  ROUTINE_TEMPLATE_PREVIEW_CHANNEL,
+  ROUTINE_TEMPLATES_CHANNEL,
   ROUTINE_IMPORT_CHANNEL,
   ROUTINE_SETTLE_CHANNEL,
   MEMORY_LIST_CHANNEL,
@@ -5851,6 +5853,8 @@ if (!ownsSingleInstanceLock) {
     })
 
     const routineIO = createRoutineIO({
+      // The starter routines, beside the app as the recall model is (0.615, routine-templates.ts).
+      templates: app.isPackaged ? join(process.resourcesPath, 'routines') : join(__dirname, '../../resources/routines'),
       routines, team: () => teammates.list(), connectors: () => connectorReader.names(),
       workspace: () => workspaceChosen ? memoryWorkspaceId : undefined,
       run: (id, values) => routineRunner === undefined ? Promise.resolve(routineRejected('That routine could not be started.')) : routineRunner.run(id, undefined, values),
@@ -5876,6 +5880,8 @@ if (!ownsSingleInstanceLock) {
     ipcMain.handle(ROUTINE_FOLDER_CHANNEL, (event) => routineIORequest(event, () => routineIO.folder()))
     ipcMain.handle(ROUTINE_EXPORT_CHANNEL, (event, request: unknown) => routineIORequest(event, () => routineIO.export(request)))
     ipcMain.handle(ROUTINE_IMPORT_PREVIEW_CHANNEL, (event) => routineIORequest(event, () => routineIO.preview()))
+    ipcMain.handle(ROUTINE_TEMPLATES_CHANNEL, (event) => routineIORequest(event, () => routineIO.templates()))
+    ipcMain.handle(ROUTINE_TEMPLATE_PREVIEW_CHANNEL, (event, id: unknown) => routineIORequest(event, () => routineIO.previewTemplate(id)))
     ipcMain.handle(ROUTINE_IMPORT_CHANNEL, (event, request: unknown) => routineIORequest(event, () => routineIO.import(request)))
 
     ipcMain.handle(ROUTINE_LIST_CHANNEL, async (event) => {

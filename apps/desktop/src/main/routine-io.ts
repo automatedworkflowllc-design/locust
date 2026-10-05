@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { readFile, stat, writeFile } from 'node:fs/promises'
 import { roleLabelOf } from '../shared/ipc.js'
-import type { PublicTeammate, RoutineExportResponse, RoutineFolderResponse, RoutineImportPreviewResponse, RoutineMutationResponse, RoutineRunResponse, TeammateRoute } from '../shared/ipc.js'
+import type { PublicTeammate, RoutineExportResponse, RoutineFolderResponse, RoutineImportPreviewResponse, RoutineMutationResponse, RoutineRunResponse, RoutineTemplatesResponse, TeammateRoute } from '../shared/ipc.js'
+import { listRoutineTemplates, readRoutineTemplate } from './routine-templates.js'
 import { resolveValues } from '../shared/routine-inputs.js'
 import type { RoutineValues } from '../shared/routine-inputs.js'
 import { absolutePathsIn, MAX_ROUTINE_FILE_BYTES, parseRoutineFile, pathsAsInputs, routineFileName, routineFileText, routineToFile } from './routine-file.js'
@@ -21,10 +22,37 @@ export function createRoutineIO(options: {
   readonly pickImport: () => Promise<string | undefined>
   readonly pickExport: (name: string) => Promise<string | undefined>
   readonly run: (id: string, values?: RoutineValues) => Promise<RoutineRunResponse>
+  /** Where the starter routines ship (0.615, routine-templates.ts). */
+  readonly templates?: string
 }) {
   const folders = new Set<string>()
-  const previews = new Map<string, { file: RoutineFile; workspace: string | undefined }>()
+  const previews = new Map<string, { file: RoutineFile; workspace: string | undefined; from: 'file' | 'template' }>()
+  /** A file read and checked, held under a receipt for the Import that follows: an imported file and a template alike. */
+  const previewOf = (file: RoutineFile, from: 'file' | 'template'): RoutineImportPreviewResponse => {
+    const token = randomUUID()
+    if (previews.size >= 8) previews.delete(previews.keys().next().value!)
+    previews.set(token, { file, workspace: options.workspace(), from })
+    const names = new Set(options.connectors().map((name) => name.toLowerCase()))
+    return { ok: true, data: { preview: {
+      token, name: file.name, steps: file.steps, inputs: file.inputs,
+      handOffRoles: file.handOffs.map((entry) => entry.role),
+      ...(file.route.runtime === undefined ? {} : { runtime: file.route.runtime }),
+      connectors: file.connectors.map((name) => ({ name, present: names.has(name.toLowerCase()) }))
+    } } }
+  }
   return {
+    /** The starter routines, in the order they are offered. */
+    async templates(): Promise<RoutineTemplatesResponse> {
+      if (options.templates === undefined) return { ok: true, data: { templates: [] } }
+      const listed = await listRoutineTemplates(options.templates)
+      return { ok: true, data: { templates: listed.templates } }
+    },
+    /** One starter routine, read by the reader an import uses, previewed by its preview. */
+    async previewTemplate(id: unknown): Promise<RoutineImportPreviewResponse> {
+      if (options.templates === undefined) return rejected('This Locust ships no starter routines.')
+      const read = await readRoutineTemplate(options.templates, id)
+      return read.ok ? previewOf(read.file, 'template') : rejected(read.message)
+    },
     folderWasChosen: (path: string): boolean => folders.has(path),
     async folder(): Promise<RoutineFolderResponse> {
       const path = await options.pickFolder()
@@ -73,28 +101,19 @@ export function createRoutineIO(options: {
       if ((await stat(path)).size > MAX_ROUTINE_FILE_BYTES) return rejected('That file is too large to be a routine.')
       const parsed = parseRoutineFile(await readFile(path, 'utf8'))
       if (!parsed.ok) return rejected(parsed.message)
-      const file = parsed.file
-      const token = randomUUID()
-      if (previews.size >= 8) previews.delete(previews.keys().next().value!)
-      previews.set(token, { file, workspace: options.workspace() })
-      const names = new Set(options.connectors().map((name) => name.toLowerCase()))
-      return { ok: true, data: { preview: {
-        token, name: file.name, steps: file.steps, inputs: file.inputs,
-        handOffRoles: file.handOffs.map((entry) => entry.role),
-        ...(file.route.runtime === undefined ? {} : { runtime: file.route.runtime }),
-        connectors: file.connectors.map((name) => ({ name, present: names.has(name.toLowerCase()) }))
-      } } }
+      return previewOf(parsed.file, 'file')
     },
     async import(raw: unknown): Promise<RoutineMutationResponse> {
       const request = record(raw)
       const held = typeof request.token === 'string' ? previews.get(request.token) : undefined
-      if (held === undefined) return rejected('Open the routine file again before importing it.')
-      if (held.workspace !== options.workspace() || held.workspace === undefined) return rejected('Open the project folder and preview the file there before importing it.')
+      if (held === undefined) return rejected('Open the routine again before importing it.')
+      // A routine runs in the folder it is added in, so a template needs one open as a file does.
+      if (held.workspace !== options.workspace() || held.workspace === undefined) return rejected(held.from === 'template' ? 'Choose the folder your teammates work in first: a routine runs in the folder it is added in.' : 'Open the project folder and preview the file there before importing it.')
       const mate = (await options.team()).find((entry) => entry.teammateId === request.teammateId)
       if (mate === undefined) return rejected('Choose a teammate who is still on this team.')
       // Another request may have consumed this receipt while the roster was read.
-      if (previews.get(request.token as string) !== held) return rejected('This preview was already imported. Open the routine file again to import another copy.')
-      if (held.workspace !== options.workspace()) return rejected('The project folder changed. Preview the file in the folder where it belongs.')
+      if (previews.get(request.token as string) !== held) return rejected(held.from === 'template' ? 'This template was already added. Choose it again to add another copy.' : 'This preview was already imported. Open the routine file again to import another copy.')
+      if (held.workspace !== options.workspace()) return rejected(held.from === 'template' ? 'The project folder changed. Choose the template again in the folder it is for.' : 'The project folder changed. Preview the file in the folder where it belongs.')
       // The selected teammate receives every step; source roles are hints in the preview.
       const base = mate.route ?? request.route as TeammateRoute
       const route = { ...base, mode: 'ask' as const }
