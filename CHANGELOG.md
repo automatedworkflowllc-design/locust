@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.659.0 - 2026-10-05
+
+### Improved
+
+- **Codex Buddy moves on a body of his own.** Below his head, Buddy is now drawn by Locust: a shirt with the Codex mark, strong arms on real shoulder and elbow joints, and dumbbells that sway in his hands. He presses, curls, flexes when he is done, waves, and tilts his head toward where he is looking. He is framed head and shoulders, so he stays big even when small, and every weight stays inside his square.
+
 ## 0.658.0 - 2026-10-05
 
 ### Fixed
