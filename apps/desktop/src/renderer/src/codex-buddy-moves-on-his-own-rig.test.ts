@@ -140,7 +140,9 @@ describe('his face', () => {
 })
 
 describe('his motion', () => {
-  it('never jumps: a hand moves at most 11 px of his drawing a frame, and its movement changes by at most 5', () => {
+  // A minute: it simulates every change at two frame rates, and under a drive sweep's load it outlasted vitest's
+  // default 5 s three times on 2026-10-06 (always on time, never wrong, when retried).
+  it('never jumps: a hand moves at most 11 px of his drawing a frame, and its movement changes by at most 5', { timeout: 60_000 }, () => {
     // The most a movement changes is where a change of mind turns back an arm already moving: his spring takes the turn.
     for (const fps of [30, 60]) {
       const { step, change } = motionOf(run(fps, 'sprung', EVERY_CHANGE))
