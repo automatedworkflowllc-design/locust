@@ -109,6 +109,8 @@ describe("OpenCode through its own server (A6.7)", () => {
 
     // The run's own records, in `run --format json`'s words: two steps, two
     // tools, the answer -- and never the person's prompt echoed back.
+    // The answer, finished: this recording's one update before that carries no text yet, and empty text is not
+    // passed on (0.677; a reply that streams is an-opencode-reply-streams and opencode-every-mode-through-its-server).
     expect(types).toEqual(["step_start", "tool_use", "tool_use", "step_finish", "step_start", "text", "step_finish"]);
     // The shell call was put to the person, and their answer went back.
     expect(asked.map((one) => [one.permission, one.metadata.command])).toEqual([["bash", "echo SERVED"]]);
@@ -219,9 +221,12 @@ describe("OpenCode through its own server (A6.7)", () => {
     expect(command.args).not.toContain("--mdns");
   });
 
-  it("turns only settled parts into records", () => {
+  it("turns settled parts into records, and the reply's text while it is written into partial ones (0.677)", () => {
     expect(runRecordFor({ type: "text", text: "the prompt" }, "user")).toBeUndefined();
-    expect(runRecordFor({ type: "text", text: "half", time: { start: 1 } }, "assistant")).toBeUndefined();
+    expect(runRecordFor({ type: "text", text: "half", time: { start: 1 } }, "assistant")?.type).toBe("text_partial");
+    // Not the person's words, nor OpenCode's own notes, while they are written.
+    expect(runRecordFor({ type: "text", text: "half", time: { start: 1 } }, "user")).toBeUndefined();
+    expect(runRecordFor({ type: "text", synthetic: true, text: "Contin", time: { start: 1 } }, "assistant")).toBeUndefined();
     expect(runRecordFor({ type: "text", text: "done", time: { start: 1, end: 2 } }, "assistant")?.type).toBe("text");
     // OpenCode's own continue note arrives on a message of its own; the
     // normalizer needs it to see a compaction.

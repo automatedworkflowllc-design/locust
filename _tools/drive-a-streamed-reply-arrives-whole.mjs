@@ -33,7 +33,9 @@ const check = (what, ok, detail) => {
   if (!ok) failures += 1
   say(`  [${ok ? 'PASS' : 'FAIL'}] ${what}${detail === undefined ? '' : ` -- ${String(detail).slice(0, 400)}`}`)
 }
-const normal = (text) => text.replace(/\s+/g, ' ').trim()
+// As a reader sees it: the record keeps a reply's Markdown (`*a word*`), the screen draws it (2026-10-06: Nemotron's
+// story italicised two phrases, and the screen read four characters shorter than the record, word for word the same).
+const normal = (text) => text.replace(/(\*\*|\*|__|_|`)(?=\S)([^*_`]*?\S)\1/g, '$2').replace(/\s+/g, ' ').trim()
 try {
   await drive.ready()
   await drive.resize(1200, 780)

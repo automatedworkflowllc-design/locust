@@ -290,6 +290,14 @@ export function createOpenCodeEventNormalizer(
   // tools (compaction.ts gives it none), so this is how the summary is found
   // once the note says what it was.
   let stepMessages: string[] = [];
+  /*
+   * A reply AS IT IS WRITTEN (0.677). Through OpenCode's server a text part
+   * arrives while it grows (`text_partial`, opencode-serve-run.ts), and its
+   * finished form after (`text`). Each part keeps one item: what it has said
+   * so far, so only what is new is appended, and the finished text replaces it
+   * whole -- exact, whatever the partial ones carried.
+   */
+  const partItems = new Map<string, { readonly itemId: string; said: string; closed?: true }>();
   let stepUsedTools = false;
   /** A tool that can change something finished before any stop (0.543, the 0.536 review RUN-05). */
   let changedBeforeStop = false;
@@ -380,6 +388,34 @@ export function createOpenCodeEventNormalizer(
       return [emit("step.completed", { stepKind: "turn", evidence })];
     }
 
+    if (type === "text_partial") {
+      const text = stringValue(part.text);
+      const partId = stringValue(part.id);
+      if (text === undefined || partId === undefined || openCodeOwnText(part) !== undefined) return [];
+      let held = partItems.get(partId);
+      if (held?.closed === true) return [];
+      if (held === undefined) {
+        held = { itemId: `msg_${String(messageIndex)}`, said: "" };
+        messageIndex += 1;
+        stepMessages.push(held.itemId);
+        partItems.set(partId, held);
+      }
+      // A part that grows only ever grows; one that was rewritten is replaced.
+      const grew = text.startsWith(held.said);
+      const delta = grew ? text.slice(held.said.length) : text;
+      held.said = text;
+      if (delta.length === 0) return [];
+      return [
+        emit("message.delta", {
+          itemId: held.itemId,
+          operation: grew ? "append" : "replace",
+          text: boundedMessageText(delta),
+          final: false,
+          evidence,
+        }),
+      ];
+    }
+
     if (type === "text") {
       const text = stringValue(part.text);
       if (text === undefined) return [];
@@ -402,11 +438,16 @@ export function createOpenCodeEventNormalizer(
           diagnostic("info", "opencode.context_compacted", OPENCODE_COMPACTED, evidence),
         ];
       }
-      const itemId = `msg_${String(messageIndex)}`;
-      messageIndex += 1;
-      stepMessages.push(itemId);
-      // Complete on arrival: there is no partial output mode to reconcile
-      // with, so the message replaces its item and closes it in one event.
+      // The item its partial text streamed into, when it streamed (0.677); else one of its own.
+      const streamed = stringValue(part.id) === undefined ? undefined : partItems.get(stringValue(part.id)!);
+      const itemId = streamed?.itemId ?? `msg_${String(messageIndex)}`;
+      if (streamed === undefined) {
+        messageIndex += 1;
+        stepMessages.push(itemId);
+      } else {
+        partItems.delete(stringValue(part.id)!);
+      }
+      // Complete on arrival: the message replaces its item and closes it in one event.
       return [
         emit("message.delta", {
           itemId,
@@ -585,7 +626,22 @@ export function createOpenCodeEventNormalizer(
           diagnostic("warning", "opencode.malformed_record", "An OpenCode record was not an object.", malformedEvidence(record)),
         ];
       }
-      return acceptParsed(record, parsed);
+      /*
+       * What streamed before a tool or a step's end is finished (0.677): OpenCode writes a sentence, then calls a
+       * tool, and the server may say the sentence ended only later -- meanwhile it kept its caret, as if still
+       * being written, under a live line naming the tool. Closed here with the words it had; its finished form,
+       * when it comes, replaces them exactly.
+       */
+      const kind = stringValue(parsed.type);
+      const closing: NormalizedRuntimeEvent[] = [];
+      if (kind === "tool_use" || kind === "step_finish") {
+        for (const held of partItems.values()) {
+          if (held.closed === true || held.said.length === 0) continue;
+          held.closed = true;
+          closing.push(emit("message.delta", { itemId: held.itemId, operation: "replace", text: boundedMessageText(held.said), final: true, evidence: evidenceFor(record, parsed, kind) }));
+        }
+      }
+      return closing.length === 0 ? acceptParsed(record, parsed) : [...closing, ...acceptParsed(record, parsed)];
     },
 
     finish(completion: RuntimeProcessCompletion): readonly NormalizedRuntimeEvent[] {

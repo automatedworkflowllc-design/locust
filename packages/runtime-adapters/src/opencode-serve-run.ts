@@ -70,8 +70,13 @@ export interface OpenCodeServeRunOptions {
    * as a message.
    */
   readonly slashCommand?: string;
-  /** Who answers. Absent: every request is refused, never approved. */
+  /** Who answers. Absent: every request is refused, never approved -- unless `approveAll`. */
   readonly onPermission?: (request: OpenCodePermission) => Promise<OpenCodePermissionAnswer>;
+  /**
+   * Auto (0.677): every request the config did not deny is approved, as `run --auto` approves "permissions that are
+   * not explicitly denied". Only for a run in Auto; never with `onPermission`.
+   */
+  readonly approveAll?: boolean;
   readonly signal?: AbortSignal;
   readonly now?: () => Date;
   /** Test seam. */
@@ -107,11 +112,18 @@ export function runRecordFor(
   }
   if (type === "text") {
     const ended = isObject(part.time) && typeof part.time.end === "number";
-    if (!ended) return undefined;
+    // Still being written (0.677): its text so far, for the reply to grow on screen as it is written.
+    if (!ended) return role === "assistant" && part.synthetic !== true ? { type: "text_partial", part } : undefined;
     return role === "assistant" || part.synthetic === true ? { type: "text", part } : undefined;
   }
   return undefined;
 }
+
+/**
+ * How often a growing text part is passed on (0.677): about eight times a second reads as live, and the server
+ * reports every token -- each with the whole text so far.
+ */
+export const PARTIAL_EVERY_MS = 120;
 
 export function startOpenCodeServeRun(options: OpenCodeServeRunOptions): RuntimeProcessRun {
   const now = options.now ?? (() => new Date());
@@ -136,6 +148,35 @@ export function startOpenCodeServeRun(options: OpenCodeServeRunOptions): Runtime
   });
   const roles = new Map<string, string>();
   const emitted = new Set<string>();
+  /** When each part's text was last sent while it grew. */
+  const partialAt = new Map<string, number>();
+  /*
+   * Each part's kind and text so far (0.677). The server streams a part as `message.part.delta` -- its id, the
+   * field, a few characters -- and names its kind only in `message.part.updated` (MEASURED 2026-10-06, OpenCode
+   * 1.18.27: one reply, 208 deltas, 7 updates; the model's reasoning streams the same way and is not the reply).
+   */
+  const parts = new Map<string, { type?: string | undefined; messageID?: string | undefined; synthetic?: boolean; text: string }>();
+  /** What of each part was last passed on while it grew. */
+  const partialSent = new Map<string, string>();
+  const sendPartial = (id: string, now = false): void => {
+    const held = parts.get(id)
+    if (held === undefined || held.type !== "text" || held.synthetic === true) return;
+    if (roles.get(held.messageID ?? "") !== "assistant" || emitted.has(`text:${id}`)) return;
+    if (held.text.length === 0 || partialSent.get(id) === held.text) return;
+    const last = partialAt.get(id) ?? 0;
+    if (!now && Date.now() - last < PARTIAL_EVERY_MS) return;
+    partialAt.set(id, Date.now());
+    partialSent.set(id, held.text);
+    push({ type: "text_partial", part: { id, type: "text", text: held.text, ...(held.messageID === undefined ? {} : { messageID: held.messageID }) } });
+  };
+  /*
+   * Everything held back by the pace, passed on before a tool or a step's end (0.677): the normalizer closes what
+   * streamed when one comes, and closed with the last paced text it kept a reply two characters short of its
+   * finished form -- which the screen, the reply being closed, did not take (drive-a-streamed-reply-arrives-whole).
+   */
+  const flushPartials = (): void => {
+    for (const id of parts.keys()) sendPartial(id, true);
+  };
 
   const child = options.spawn(
     options.command.executablePath,
@@ -206,7 +247,7 @@ export function startOpenCodeServeRun(options: OpenCodeServeRunOptions): Runtime
     let reply: OpenCodePermissionReply = "reject";
     let message = "The person declined this in Locust.";
     try {
-      const answered = options.onPermission === undefined ? "reject" : await options.onPermission(permission);
+      const answered = options.onPermission !== undefined ? await options.onPermission(permission) : options.approveAll === true ? "once" : "reject";
       if (typeof answered === "string") {
         reply = answered;
       } else {
@@ -256,12 +297,39 @@ export function startOpenCodeServeRun(options: OpenCodeServeRunOptions): Runtime
       if (id !== undefined && role !== undefined) roles.set(id, role);
       return;
     }
+    if (type === "message.part.delta") {
+      const id = text(props.partID);
+      const delta = typeof props.delta === "string" ? props.delta : undefined;
+      if (id === undefined || delta === undefined || text(props.field) !== "text") return;
+      const held = parts.get(id) ?? { text: "" };
+      held.text += delta;
+      if (held.messageID === undefined && text(props.messageID) !== undefined) held.messageID = text(props.messageID);
+      parts.set(id, held);
+      sendPartial(id);
+      return;
+    }
     if (type === "message.part.updated" && isObject(props.part)) {
       const part = props.part;
+      // Its kind and, when it says, its whole text so far: what the deltas after it add to.
+      const partId = text(part.id);
+      if (partId !== undefined) {
+        const held = parts.get(partId) ?? { text: "" };
+        held.type = text(part.type);
+        held.messageID = text(part.messageID) ?? held.messageID;
+        held.synthetic = part.synthetic === true;
+        if (typeof part.text === "string" && part.text.length >= held.text.length) held.text = part.text;
+        parts.set(partId, held);
+      }
       const record = runRecordFor(part, roles.get(text(part.messageID) ?? ""));
       if (record === undefined) return;
+      // A part still being written goes the one way partial text goes: paced, and never empty.
+      if (record.type === "text_partial") {
+        if (partId !== undefined) sendPartial(partId);
+        return;
+      }
       const key = `${record.type}:${text(part.id) ?? JSON.stringify(part).slice(0, 80)}`;
       if (emitted.has(key)) return;
+      if (record.type === "tool_use" || record.type === "step_finish") flushPartials();
       emitted.add(key);
       push(record);
       return;
@@ -325,7 +393,8 @@ export function startOpenCodeServeRun(options: OpenCodeServeRunOptions): Runtime
     if (options.resumeSessionId !== undefined) {
       sessionId = options.resumeSessionId;
     } else {
-      const created = await call("/session");
+      // Titled, as `run --title Locust` is (A6.3): untitled, OpenCode names it with a second call to the same model.
+      const created = await call("/session", { title: "Locust" });
       const body: unknown = await created.json().catch(() => undefined);
       sessionId = isObject(body) ? text(body.id) : undefined;
       if (!created.ok || sessionId === undefined) throw new Error("OpenCode's server would not start a session.");
@@ -347,6 +416,9 @@ export function startOpenCodeServeRun(options: OpenCodeServeRunOptions): Runtime
       return;
     }
     const slash = options.model?.indexOf("/") ?? -1;
+    // Marked before it is sent, as a command is (0.677): the turn's idle can come before the send is answered, and
+    // read as not yet prompted it was ignored and the run waited forever. A refused send ends the run below anyway.
+    prompted = true;
     const sent = await call(`/session/${encodeURIComponent(sessionId)}/prompt_async`, {
       parts: [{ type: "text", text: options.prompt }],
       ...(options.model !== undefined && slash > 0
@@ -355,7 +427,6 @@ export function startOpenCodeServeRun(options: OpenCodeServeRunOptions): Runtime
       ...(options.variant === undefined ? {} : { variant: options.variant }),
     });
     if (!sent.ok) throw new Error(`OpenCode's server refused the message (${String(sent.status)}).`);
-    prompted = true;
     await stream;
   };
 

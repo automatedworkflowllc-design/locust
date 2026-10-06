@@ -1813,9 +1813,15 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // command built below are the same decision and are made from the
         // same value.
         const codexStreams = runtime === 'codex' && options.appServerSpawn !== undefined
-        // OpenCode asks only through its server; every other OpenCode mode
-        // stays on `run`, which is what they were measured on.
-        const opencodeServes = runtime === 'opencode' && mode === 'approve-each' && options.opencodeServeSpawn !== undefined
+        /*
+         * OpenCode through its own server, in every mode (0.677). It asks only through the server -- Approve each --
+         * and its replies stream only through it: through `run` a reply arrived once finished, and on the free
+         * models the person read nothing for 20 to 60 seconds, then all of it (the 2026-10-06 sweep). Every other
+         * mode is told on the server exactly what `run` told it (openCodeModeEnv), and answers what OpenCode asks
+         * as `run` did: Auto approves what the config does not deny, the rest refuse. A side question forks its
+         * session, which only `run` does here, so it stays there.
+         */
+        const opencodeServes = runtime === 'opencode' && options.opencodeServeSpawn !== undefined && (mode === 'approve-each' || side === undefined)
         // Copilot asks only over the Agent Client Protocol (0.377); every
         // other Copilot mode stays on `-p`, which is what they were measured on.
         const copilotAcp = runtime === 'copilot' && mode === 'approve-each' && options.acpSpawn !== undefined
@@ -1938,6 +1944,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           if (runtime === 'opencode' && opencodeServes) {
             return createOpenCodeServeCommand(executable, {
               workspacePath: runCwd,
+              // Approve each asks for everything; any other mode, what `run` would have been told.
+              ...(mode === 'approve-each' ? {} : { sandbox: effectiveSandbox }),
               ...(repositoryRoot === undefined ? {} : { repositoryRoot }),
               ...(providers === undefined ? {} : { providers })
             })
@@ -2373,8 +2381,10 @@ ${sentPrompt.trim()}`
           } else if (opencodeServes) {
             // Each thing OpenCode asks becomes the same card Codex's do, and
             // the person's answer goes back as the server's own reply.
-            const handler = options.approvals?.requestHandlerFor({ runId, missionId, cwd: runCwd, changesByItem, runtime: 'opencode' })
+            const handler = mode === 'approve-each' ? options.approvals?.requestHandlerFor({ runId, missionId, cwd: runCwd, changesByItem, runtime: 'opencode' }) : undefined
             process = startOpenCodeServeRun({
+              // Auto approves what its config did not deny, as `run --auto` did (0.677).
+              ...(mode !== 'approve-each' && effectiveSandbox === 'full-access' ? { approveAll: true } : {}),
               spawn: options.opencodeServeSpawn!,
               command,
               prompt: runtimePrompt,

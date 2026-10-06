@@ -1389,6 +1389,37 @@ export const OPENCODE_AUTO_CONFIG = JSON.stringify({
 });
 
 /**
+ * What OpenCode is told for a mode, as environment: its permission config and, for a read-only run, no plugins.
+ * One function for `run` and the server (0.677), so a mode means the same thing on either route.
+ */
+export function openCodeModeEnv(options: { readonly sandbox?: RuntimeCommandOptions["sandbox"]; readonly repositoryRoot?: string; readonly providers?: RuntimeCommandOptions["providers"] }): Readonly<Record<string, string>> {
+  const auto = sandboxArgument(options.sandbox) === "full-access";
+  const readOnly = sandboxArgument(options.sandbox) === "read-only";
+  // A worktree run needs its parent repository; a read-only one still needs
+  // the denials. When both apply the config carries both, because the two
+  // used to be written into the same environment variable and the second
+  // would simply have replaced the first. Auto reaches past both.
+  const config = auto
+    ? OPENCODE_AUTO_CONFIG
+    : options.repositoryRoot !== undefined
+      ? opencodeWorktreeConfig(options.repositoryRoot, readOnly)
+      : readOnly
+        ? OPENCODE_READ_ONLY_CONFIG
+        : OPENCODE_CONFINED_CONFIG;
+  // A6.2: a read-only run loads no plugins. A repo's .opencode/plugin/*.ts
+  // runs in OpenCode's own process, which would put code the repository
+  // chose outside everything the permission config holds back
+  // (OPENCODE_PURE, "run without external plugins"; plugin/index.ts:181).
+  // Only for read-only runs: a run that may edit is already trusted with
+  // the folder, and the person's own plugins are theirs to have there.
+  const configured = withOpenCodeProviders(config, options.providers);
+  return {
+    ...(configured === undefined ? {} : { OPENCODE_CONFIG_CONTENT: configured }),
+    ...(readOnly ? { OPENCODE_PURE: "1" } : {}),
+  };
+}
+
+/**
  * OpenCode in its non-interactive `run` mode.
  *
  * The prompt goes on STDIN. It went in argv until 2026-09-17, on the
@@ -1615,29 +1646,7 @@ export function createOpenCodeRunCommand(
     args.push("--auto");
   }
   requireText(options.prompt ?? "", "Prompt");
-  const readOnly = sandboxArgument(options.sandbox) === "read-only";
-  // A worktree run needs its parent repository; a read-only one still needs
-  // the denials. When both apply the config carries both, because the two
-  // used to be written into the same environment variable and the second
-  // would simply have replaced the first. Auto reaches past both.
-  const config = auto
-    ? OPENCODE_AUTO_CONFIG
-    : options.repositoryRoot !== undefined
-      ? opencodeWorktreeConfig(options.repositoryRoot, readOnly)
-      : readOnly
-        ? OPENCODE_READ_ONLY_CONFIG
-        : OPENCODE_CONFINED_CONFIG;
-  // A6.2: a read-only run loads no plugins. A repo's .opencode/plugin/*.ts
-  // runs in OpenCode's own process, which would put code the repository
-  // chose outside everything the permission config holds back
-  // (OPENCODE_PURE, "run without external plugins"; plugin/index.ts:181).
-  // Only for read-only runs: a run that may edit is already trusted with
-  // the folder, and the person's own plugins are theirs to have there.
-  const configured = withOpenCodeProviders(config, options.providers);
-  const env = {
-    ...(configured === undefined ? {} : { OPENCODE_CONFIG_CONTENT: configured }),
-    ...(readOnly ? { OPENCODE_PURE: "1" } : {}),
-  };
+  const env = openCodeModeEnv(options);
   return baseSpec("opencode", executable, options.workspacePath, args, {
     stdin: "prompt",
     sandbox: sandboxArgument(options.sandbox),
@@ -1667,8 +1676,21 @@ export function createOpenCodeServeCommand(
     readonly repositoryRoot?: string;
     /** The person's own models, as for a run (withOpenCodeProviders). */
     readonly providers?: Readonly<Record<string, OpenCodeProvider>>;
+    /**
+     * Any mode but Approve each (0.677): the server is told what `run` is told for that mode (openCodeModeEnv), so
+     * a reply can stream through it without the mode meaning anything new. Absent: Approve each, which asks for
+     * everything that acts.
+     */
+    readonly sandbox?: RuntimeCommandOptions["sandbox"];
   },
 ): RuntimeCommandSpec {
+  if (options.sandbox !== undefined) {
+    return baseSpec("opencode", executable, options.workspacePath, ["serve", "--port", "0", "--hostname", "127.0.0.1"], {
+      stdin: "protocol",
+      sandbox: sandboxArgument(options.sandbox),
+      env: openCodeModeEnv(options),
+    });
+  }
   const config = JSON.stringify({
     permission: {
       edit: "ask",
