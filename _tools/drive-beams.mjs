@@ -59,6 +59,8 @@ const metric = async () => {
 
 // The cover's own word for whether discovery is done: its bots are drawn
 // still, as `data-state="still"`, until the runtimes have answered.
+// The cover's light turns on the compositor now (lcCoverLoading, Beam's compositor variant), not border-beam's beam-spin.
+const COVER_SPINNING = (a) => /^(beam-spin|lcCoverLoading)/.test(a.name) && a.state === 'running'
 const LOADING = `!!document.querySelector('.lc-cover .lc-bot[data-state="still"]')`
 
 try {
@@ -75,11 +77,25 @@ try {
   })()`, { timeoutMs: 30_000, everyMs: 100, what: 'the beam to come on, or the loading to end' })
   say(`first look: ${firstLook}`)
   if (firstLook === 'beam on') {
-    await sleep(700)
-    const whileLoading = JSON.parse(await drive.evaluate(beamAnimations('.lc-coverbeam')))
+    /*
+     * Watched while the loading lasts, not after a pause: since Locust stopped waiting on the slowest agent
+     * (0.634) the loading can be over inside the 700 ms this used to sleep, and the beam with it (2026-10-06
+     * sweep: "beam on", then nothing to read). Read every 50 ms until the beam is seen running or loading ends.
+     */
+    let whileLoading = []
+    for (let at = 0; at < 60; at += 1) {
+      whileLoading = JSON.parse(await drive.evaluate(beamAnimations('.lc-coverbeam')))
+      // The compositor light turns on its ::before, which getAnimations may not list: read its style too.
+      const light = String(await drive.evaluate(`(() => { const l = document.querySelector('.lc-coverbeam[data-active] .lc-coverbeam__light'); return l ? getComputedStyle(l, '::before').animationName + '|' + getComputedStyle(l, '::before').animationPlayState : '' })()`))
+      if (/^lcCoverLoading[|]running/.test(light)) whileLoading = [...whileLoading, { name: 'lcCoverLoading', pseudo: '::before', state: 'running', duration: 4000 }]
+      if (whileLoading.some(COVER_SPINNING) || !(await drive.evaluate(LOADING))) break
+      await sleep(50)
+    }
     const stillLoading = await drive.evaluate(LOADING)
     say(`while the runtimes are being found (${stillLoading ? 'still' : 'no longer'} loading): ${JSON.stringify(whileLoading)}`)
-    check('while the runtimes are being found, the title box wears a travelling beam', whileLoading.some((a) => a.name.startsWith('beam-spin') && a.state === 'running'), JSON.stringify(whileLoading))
+    // Over before it could be read at all (a warm start finds the agents in a few hundred ms): nothing to judge.
+    if (!stillLoading && whileLoading.length === 0) say('  (not checked: the loading ended before the beam could be read)')
+    else check('while the runtimes are being found, the title box wears a travelling beam', whileLoading.some(COVER_SPINNING), JSON.stringify(whileLoading))
     await clip('title-loading.png', '.lc-coverbeam', 16)
   } else {
     check('the beam came on while the runtimes were still being found', false, firstLook)
