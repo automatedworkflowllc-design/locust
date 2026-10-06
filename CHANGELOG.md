@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.674.0 - 2026-10-06
+
+### New
+
+- **Undo a turn.** When a teammate changes files in your folder, the end of that turn now offers **Undo these changes**. Locust asks first ("Put back the 2 files this turn changed?"), then puts every file back exactly as it was before the turn: edits reverted, new files removed, deleted files returned. A file you changed yourself since then is left alone, and Locust names it and says why. It works in any folder, whether or not it uses Git, and never touches your own repository: the copies live in Locust's own data, are not included in a profile backup, and are kept for each folder's last 60 turns. A folder with more than 20,000 files or 300 MB of files is not copied, and a file over 10 MB is not kept. Locust doesn't offer Undo for those, or for a turn that shared the folder with another teammate's run at the same time.
+
 ## 0.673.0 - 2026-10-06
 
 ### Fixed
