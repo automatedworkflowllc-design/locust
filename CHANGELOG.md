@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.668.0 - 2026-10-06
+
+### Improved
+
+- **Antigravity says what it is doing as it works.** On a long job, Gemini on Antigravity could work for twenty minutes with nothing on screen but "Working...". Locust now asks it, in one line, to say in a short sentence what it is about to do before each step. Measured on the same task: no words between its steps without the line, one before every step with it. Claude Code, Codex and Cursor already do this on their own and are not asked.
+
 ## 0.667.0 - 2026-10-06
 
 ### Fixed

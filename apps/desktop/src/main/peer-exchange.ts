@@ -4,7 +4,7 @@ import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { splitAttachments } from '../shared/attachments.js'
 import type { CodexMissionUpdate, PublicPeerMessage } from '../shared/ipc.js'
 import { boundedShareText, MAX_SHARES_PER_MISSION, parseShareBlocks } from '../shared/peer-share.js'
-import { composeRuntimePrompt, composeSoloPrompt, MAX_INBOUND_MESSAGES, runtimeKeepsATodoList } from './workroom-briefing.js'
+import { composeRuntimePrompt, composeSoloPrompt, MAX_INBOUND_MESSAGES, runtimeKeepsATodoList, runtimeNarratesWhenAsked } from './workroom-briefing.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
 
 /**
@@ -284,6 +284,7 @@ export function createPeerExchange(options: {
           ...(memory === undefined ? {} : { memory }),
           ...(connectors === undefined ? {} : { connectors }),
           keepATodoList: todos,
+          narrate: runtime !== undefined && runtimeNarratesWhenAsked(runtime),
           ...(conversation?.alreadyGiven === undefined ? {} : { alreadyGiven: conversation.alreadyGiven }),
           ...(conversation?.overlap === undefined ? {} : { overlap: conversation.overlap }),
           now: new Date()
@@ -300,6 +301,7 @@ export function createPeerExchange(options: {
           ...(memory === undefined ? {} : { memory }),
           ...(connectors === undefined ? {} : { connectors }),
           keepATodoList: todos,
+          narrate: runtime !== undefined && runtimeNarratesWhenAsked(runtime),
           ...(conversation?.alreadyGiven === undefined ? {} : { alreadyGiven: conversation.alreadyGiven }),
           ...(conversation?.overlap === undefined ? {} : { overlap: conversation.overlap })
         })
@@ -320,6 +322,7 @@ export function createPeerExchange(options: {
         ...(memory === undefined ? {} : { memory }),
         ...(connectors === undefined ? {} : { connectors }),
         keepATodoList: todos,
+        narrate: runtime !== undefined && runtimeNarratesWhenAsked(runtime),
         ...(conversation?.alreadyGiven === undefined ? {} : { alreadyGiven: conversation.alreadyGiven })
       })
       return { runtimePrompt: composed.prompt, given: composed.given }

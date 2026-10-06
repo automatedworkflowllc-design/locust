@@ -99,6 +99,8 @@ export interface RuntimePromptInput {
    * see `RUNTIMES_THAT_KEEP_A_TODO_LIST`.
    */
   readonly keepATodoList?: boolean
+  /** Ask it to say what it is about to do (runtimeNarratesWhenAsked, 0.668). */
+  readonly narrate?: boolean
   /** Connectors this teammate can call, by name. Standing, so it caches. */
   readonly connectors?: string
   /**
@@ -600,6 +602,26 @@ export function runtimeKeepsATodoList(runtime: string): boolean {
  * current, because a list written once at the start and never touched is the
  * failure mode that makes the panel lie.
  */
+/**
+ * The runtimes that work in silence unless asked to say what they are doing
+ * (0.668). Measured 2026-10-06 on Antigravity, Gemini 3.8 Flash, the same
+ * read-only task twice each way: with nothing asked, no words between its
+ * steps (0 of 0, both runs); with the line below, a sentence before each of
+ * its 3 steps, both runs. Colin, of a 23-minute review that showed only
+ * "Working...": "this chat is loaded with outputs but then this one isnt".
+ * Claude Code, Codex and Cursor narrate on their own and are not told.
+ */
+export const RUNTIMES_THAT_NARRATE_WHEN_ASKED: readonly string[] = ['antigravity']
+
+export function runtimeNarratesWhenAsked(runtime: string): boolean {
+  return RUNTIMES_THAT_NARRATE_WHEN_ASKED.includes(runtime)
+}
+
+/** One line: say what comes next before each step, as the person watching reads it. */
+export function narrateSection(): string {
+  return 'As you work, say in one short sentence what you are about to do before each step, so the person watching can follow.'
+}
+
 export function todoSection(): string {
   return [
     'KEEP A TODO LIST for this work, using your own todo tool, and keep it current.',
@@ -638,6 +660,8 @@ export function composeSoloPrompt(input: {
   readonly memory?: string
   readonly connectors?: string
   readonly keepATodoList: boolean
+  /** Ask it to say what it is about to do (runtimeNarratesWhenAsked). */
+  readonly narrate?: boolean
   /** A2.5, as for `composeRuntimePrompt`. */
   readonly alreadyGiven?: ReadonlySet<string>
 }): { readonly prompt: string; readonly given: readonly string[] } {
@@ -645,6 +669,7 @@ export function composeSoloPrompt(input: {
   if (input.memory !== undefined) standing.push(input.memory)
   if (input.connectors !== undefined) standing.push(input.connectors)
   if (input.keepATodoList) standing.push(todoSection())
+  if (input.narrate === true) standing.push(narrateSection())
   standing.push(askSection())
   standing.push(filesSection())
   standing.push(answerSection())
@@ -716,6 +741,7 @@ export function composeRuntimePrompt(input: RuntimePromptInput): RuntimePrompt {
   // turn, so it belongs in the cached prefix rather than ahead of the ask.
   if (input.connectors !== undefined) standing.push(input.connectors)
   if (input.keepATodoList === true) standing.push(todoSection())
+  if (input.narrate === true) standing.push(narrateSection())
   standing.push(askSection())
   standing.push(filesSection())
   standing.push(answerSection())
