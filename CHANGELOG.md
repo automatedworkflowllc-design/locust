@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.662.0 - 2026-10-05
+
+### Improved
+
+- **Codex Buddy lifts more cleanly on a small face.** His shoulder press now finishes with the weights beside his head instead of over his cap, where they crowded him on a card or in the sidebar, and his hammer curls roll the weights in and out more gently.
+
 ## 0.661.0 - 2026-10-05
 
 ### Changed

@@ -209,8 +209,8 @@ export const POSES = {
   rack: { abduct: 1.45, flex: 0.5, bend: 2.6, bendUp: 0.9, grip: P / 2 },
   /** Halfway up, the weights straight above where they started. */
   press: { abduct: 2.15, flex: 0.3, bend: 1.75, bendUp: 1, grip: P / 2 },
-  /** Locked out over his head. */
-  lockout: { abduct: 2.92, flex: 0.15, bend: 0.25, bendUp: 1, grip: P / 2 },
+  /** Pressed up beside his head, his elbows soft: over his cap the weights crowded a small face (0.661). */
+  lockout: { abduct: 2.4, flex: 0.15, bend: 1.1, bendUp: 1, grip: P / 2 },
   /** A double-biceps flex, the weights up beside his head. */
   flex: { abduct: 1.42, flex: 0.1, bend: 2.5, bendUp: 1, grip: P / 2 },
   flexSqueeze: { abduct: 1.48, flex: 0.1, bend: 2.62, bendUp: 1, grip: P / 2 },
@@ -338,10 +338,11 @@ const alternating = (reps: number): readonly Piece[] => {
 const hammer = (reps: number): readonly Piece[] => {
   const hang = both(POSES.hammerLow, 0.6)
   const top = both(POSES.hammer, 1)
-  return [glide(REST, hang, 320), ...times([glide(hang, top, 520), hold(top, 160), glide(top, hang, 640), hold(hang, 160)], reps), glide(hang, REST, 320)]
+  // The roll in and out eased over half a second (0.661): at 320 ms it was the quickest change he made.
+  return [glide(REST, hang, 520), ...times([glide(hang, top, 580), hold(top, 160), glide(top, hang, 700), hold(hang, 160)], reps), glide(hang, REST, 520)]
 }
 
-/** A shoulder press: up to his shoulders, pressed and locked out over his head, back to his shoulders; and down. */
+/** A shoulder press: up to his shoulders, pressed up beside his head (0.661: not over his cap, where it crowded a small face), back to his shoulders; and down. */
 const press = (reps: number): readonly Piece[] => {
   const rack = both(POSES.rack, 2)
   const mid = both(POSES.press, 1.2)
