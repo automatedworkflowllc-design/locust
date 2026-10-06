@@ -96,7 +96,10 @@ for (const name of drives.slice(start)) {
   }
   const child = spawn(process.execPath, [join(tools, name), '--packaged', packaged], {
     cwd: new URL('../', import.meta.url).pathname.slice(1),
-    env: { ...process.env, LOCUST_DRIVE_OUT: join(out, 'captures'), LOCUST_FREE_MODEL: process.env.LOCUST_FREE_MODEL ?? 'opencode/ling-3.0-flash-fin-free', ...(ENV[name.replace(/\.mjs$/, '')] ?? {}) },
+    // The free model is the drives' own (drive-lib FREE_ROUTE) unless LOCUST_FREE_MODEL says otherwise. This forced
+    // Ling 3.0, and on 2026-10-06 Ling 3.0's provider was down ("Endpoint is unavailable", then rate limits): 41 of
+    // the first 83 drives failed on it while Muse Spark answered.
+    env: { ...process.env, LOCUST_DRIVE_OUT: join(out, 'captures'), ...(ENV[name.replace(/\.mjs$/, '')] ?? {}) },
     windowsHide: true
   })
   let text = ''

@@ -10,7 +10,7 @@
 // models and reads the menu: Auto must be unavailable, with the reason, and
 // the chip on Ask. Sends nothing.
 
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -21,7 +21,12 @@ const packaged = process.argv.includes('--packaged') ? process.argv[process.argv
 // Under Documents, like every drive folder: never AppData (memory cursorignore-blinds-appdata).
 await mkdir(join(SCRATCH_ROOT), { recursive: true })
 const workspace = await mkdtemp(join(SCRATCH_ROOT, 'locust-drive-bigfolder-ws-'))
-for (let index = 0; index <= 5000; index += 1) await writeFile(join(workspace, `note-${String(index)}.txt`), '', 'utf8')
+// One more file than the app copies (compare-copies.ts MAX_COPY_FILES, read from the source so the drive cannot fall
+// behind it: it built 5,001 when the limit was raised to 20,000, and the folder fit).
+const limitSource = await readFile(new URL('../apps/desktop/src/main/compare-copies.ts', import.meta.url), 'utf8')
+const MAX_COPY_FILES = Number(/MAX_COPY_FILES = ([\d_]+)/.exec(limitSource)?.[1]?.replace(/_/g, '') ?? NaN)
+if (!Number.isFinite(MAX_COPY_FILES)) throw new Error('MAX_COPY_FILES was not found in compare-copies.ts')
+for (let index = 0; index <= MAX_COPY_FILES; index += 1) await writeFile(join(workspace, `note-${String(index)}.txt`), '', 'utf8')
 
 const drive = await startDrive({
   ...(packaged === undefined ? {} : { packaged }),
@@ -37,7 +42,7 @@ try {
   await drive.ready()
   await drive.resize(1440, 900)
   await new Promise((r) => setTimeout(r, 4000))
-  const menu = JSON.parse(String(await drive.capture('Compare in a folder of 5,001 files: the mode menu', () => drive.evaluate(`(async () => {
+  const menu = JSON.parse(String(await drive.capture('Compare in a folder one file past the copy limit: the mode menu', () => drive.evaluate(`(async () => {
     let button
     for (let i = 0; i < 40 && !button; i += 1) {
       button = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Compare models')
