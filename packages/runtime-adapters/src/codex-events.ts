@@ -3,6 +3,7 @@ import type {
   RuntimeProcessCompletion,
 } from "./process-runner.js";
 import type { MissionRuntimeId } from "./types.js";
+import { providerErrorSentence } from "./provider-error.js";
 
 /** JSON that is safe to place in the product event ledger after redaction. */
 export type RedactedJsonValue =
@@ -253,6 +254,8 @@ interface RunCancelledPayload {
 interface RunFailedPayload {
   readonly kind: CodexRunFailureKind;
   readonly message: string;
+  /** Original, redacted provider error when its display message is translated. */
+  readonly evidence?: CodexEventEvidence;
   readonly runtimeThreadId?: string;
   /**
    * The runtime's session cannot be continued: the next turn must start a
@@ -782,13 +785,14 @@ export function createCodexEventNormalizer(
   const maybeEmitLimit = (
     message: string,
     evidence: CodexEventEvidence,
+    displayMessage = message,
   ): NormalizedRuntimeEvent | undefined => {
     const kind = limitKind(message);
     if (kind === undefined || emittedLimits.has(kind)) return undefined;
     emittedLimits.add(kind);
     return emit("route.limit_detected", {
       kind,
-      message: redactText(message),
+      message: redactText(providerErrorSentence(displayMessage, "codex")),
       evidence,
     });
   };
@@ -966,7 +970,7 @@ export function createCodexEventNormalizer(
       events.push(diagnostic(
         "error",
         "codex.item_error",
-        redactText(message),
+        redactText(providerErrorSentence(message, "codex")),
         evidence,
       ));
     } else if (itemType === "todo_list") {
@@ -1138,15 +1142,15 @@ export function createCodexEventNormalizer(
         sawTurnFailed = true;
         const message = messageFromError(parsed.error) ?? stringValue(parsed.message)
           ?? "Codex reported that the turn failed";
-        lastTerminalMessage = redactText(message);
-        const limit = maybeEmitLimit(message, evidence);
+        lastTerminalMessage = redactText(numberValue(parsed.status ?? parsed.statusCode) !== undefined ? record.raw : message);
+        const limit = maybeEmitLimit(message, evidence, lastTerminalMessage);
         return [
           ...prefixEvents,
           ...(limit === undefined ? [] : [limit]),
           emit("step.failed", {
             stepKind: "turn",
             status: "failed",
-            message: redactText(message),
+            message: redactText(providerErrorSentence(lastTerminalMessage, "codex")),
             evidence,
           }),
         ];
@@ -1158,12 +1162,12 @@ export function createCodexEventNormalizer(
       case "error": {
         const message = stringValue(parsed.message) ?? messageFromError(parsed.error)
           ?? "Codex reported a runtime error";
-        lastTerminalMessage = redactText(message);
-        const limit = maybeEmitLimit(message, evidence);
+        lastTerminalMessage = redactText(numberValue(parsed.status ?? parsed.statusCode) !== undefined || isObject(parsed.error) ? record.raw : message);
+        const limit = maybeEmitLimit(message, evidence, lastTerminalMessage);
         return [
           ...prefixEvents,
           ...(limit === undefined ? [] : [limit]),
-          diagnostic("error", "codex.runtime_error", redactText(message), evidence),
+          diagnostic("error", "codex.runtime_error", providerErrorSentence(lastTerminalMessage, "codex"), evidence),
         ];
       }
       default:
@@ -1230,7 +1234,7 @@ export function createCodexEventNormalizer(
 
     return [emit("run.failed", {
       kind,
-      message,
+      message: providerErrorSentence(message, "codex"),
       ...(runtimeThreadId === undefined ? {} : { runtimeThreadId }),
       runtimeTerminal,
       process,

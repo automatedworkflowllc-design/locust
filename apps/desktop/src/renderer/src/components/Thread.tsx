@@ -5,6 +5,7 @@ import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 
 import type { ReactElement } from 'react'
 
 import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
+import { providerErrorSentence } from '@teammate/runtime-adapters'
 
 import type {
   MissionApprovalDecision,
@@ -1007,7 +1008,7 @@ onResume,
   running,
   restoredMission,
   shownMissionId,
-  error,
+  error: recordedError,
   errorIsPersistence,
   ledgerPath,
   startedAt,
@@ -1022,6 +1023,7 @@ onResume,
   handoff,
   peers
 }: ThreadProps): ReactElement {
+  const error = recordedError === undefined ? undefined : providerErrorSentence(recordedError, events[0]?.sourceAdapter ?? restoredMission?.runtime)
   // What the run was allowed, hoisted so EVERY turn can be told -- not just
   // the newest. `no files changed` existed only on the last turn, so scrolling
   // up in a conversation showed the silence the line exists to break.

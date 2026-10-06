@@ -51,6 +51,20 @@ const APPROVAL_RULES = join(ROOT, 'src', 'shared', 'approval-rules.ts')
 const MUTATIONS = [
   {
     file: VIEW,
+    name: 'a final rate-limit failure keeps its matching temporary warning too',
+    from: "if (event.payload.kind === 'temporary-rate-limit' && endedOn !== undefined && sameSentence(event.payload.message, endedOn.payload.message)) break",
+    to: "if (event.payload.kind === 'temporary-rate-limit' && endedOn === undefined && false) break",
+    expect: 'does not repeat a final rate-limit failure as a temporary warning'
+  },
+  {
+    file: VIEW,
+    name: 'a matching error diagnostic no longer suppresses the duplicate failure card',
+    from: "(item.type === 'diagnostic' && item.level === 'error')) && sameSentence(error, item.message)",
+    to: "(item.type === 'diagnostic' && item.level === 'warning')) && sameSentence(error, item.message)",
+    expect: 'keeps a failed turn readable when its diagnostic was never recorded'
+  },
+  {
+    file: VIEW,
     name: 'the exchange link opens the run that WROTE the message, not the one it reached',
     from: "    mission.peerMessages.some((message) => message.messageId === messageId && message.direction === 'received')",
     to: '    mission.peerMessages.some((message) => message.messageId === messageId)',

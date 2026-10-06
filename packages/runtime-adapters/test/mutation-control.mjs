@@ -26,12 +26,20 @@ const LOCATOR = join(ROOT, 'src', 'path-locator.ts')
 const DISCOVERY = join(ROOT, 'src', 'discovery.ts')
 const CURSOR_EVENTS = join(ROOT, 'src', 'cursor-events.ts')
 const CODEX_EVENTS = join(ROOT, 'src', 'codex-events.ts')
+const PROVIDER_ERROR = join(ROOT, 'src', 'provider-error.ts')
 const OPENCODE_EVENTS = join(ROOT, 'src', 'opencode-events.ts')
 const COPILOT_EVENTS = join(ROOT, 'src', 'copilot-events.ts')
 const PROCESS_RUNNER = join(ROOT, 'src', 'process-runner.ts')
 const ANTIGRAVITY_EVENTS = join(ROOT, 'src', 'antigravity-events.ts')
 
 const MUTATIONS = [
+  {
+    file: PROVIDER_ERROR,
+    name: 'provider JSON is left as raw display text',
+    from: '  const facts = factsOf(message);',
+    to: '  const facts = factsOf("{}");',
+    expect: "reads the provider's direct JSON event and keeps its original object"
+  },
   {
     file: CLAUDE_EVENTS,
     name: 'the completing assistant record replaces an assumed block_0, so an answer streamed elsewhere renders twice',
@@ -583,6 +591,7 @@ function runSuite() {
 }
 
 const originals = new Map([
+  [PROVIDER_ERROR, readFileSync(PROVIDER_ERROR, 'utf8')],
   [LOCATOR, readFileSync(LOCATOR, 'utf8')],
   [DISCOVERY, readFileSync(DISCOVERY, 'utf8')],
   [OPENCODE_EVENTS, readFileSync(OPENCODE_EVENTS, 'utf8')],

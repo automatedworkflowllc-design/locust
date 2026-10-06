@@ -1,4 +1,5 @@
 import type { NormalizedRuntimeEvent, ToolPatch } from '@teammate/runtime-adapters'
+import { providerErrorSentence } from '@teammate/runtime-adapters'
 
 import { SUBAGENT_TOOL } from './faceState.js'
 import { EVENT_WINDOW, TRIMMED_TURN_LINE, windowEvents } from '../../shared/event-window.js'
@@ -3086,6 +3087,20 @@ export function buildThread(
   events: readonly NormalizedRuntimeEvent[],
   options: MissionThreadOptions
 ): readonly ThreadItem[] {
+  // Project display text without changing the recorded events or their evidence.
+  events = events.map((event) => {
+    if (event.type === 'adapter.diagnostic') {
+      return { ...event, payload: { ...event.payload, message: providerErrorSentence(event.payload.message, event.sourceAdapter) } }
+    }
+    if (event.type === 'route.limit_detected') {
+      return { ...event, payload: { ...event.payload, message: providerErrorSentence(event.payload.message, event.sourceAdapter) } }
+    }
+    if (event.type === 'run.failed') {
+      return { ...event, payload: { ...event.payload, message: failureMessage(event.payload, event.sourceAdapter) } }
+    }
+    return event
+  })
+  const endedOn = options.running ? undefined : events.find((event) => event.type === 'run.failed')
   const items: ThreadItem[] = []
   const openTools = new Map<string, ActivityDetail>()
   /**
@@ -3644,6 +3659,8 @@ export function buildThread(
         break
       }
       case 'route.limit_detected': {
+        // A temporary warning that became the final failure is said by that error.
+        if (event.payload.kind === 'temporary-rate-limit' && endedOn !== undefined && sameSentence(event.payload.message, endedOn.payload.message)) break
         /*
          * One usage warning a run: the newest, where the first one stood.
          *
@@ -5299,10 +5316,15 @@ export function failedOnProviderSide(payload: {
 export function failureMessage(payload: {
   readonly message: string
   readonly process?: { readonly stderr?: string; readonly exitCode?: number | null }
-}): string {
+}, runtime?: MissionRuntimeId): string {
+  const readable = providerErrorSentence(payload.message, runtime)
+  if (readable !== payload.message) return readable
   const line = lastStderrLine(payload.process?.stderr)
   if (line === undefined) return payload.message
   const said = messageOfLogLine(line)
+  const readableStderr = providerErrorSentence(said, runtime)
+  if (readableStderr !== said) return readableStderr
+  if (sameSentence(payload.message, said)) return payload.message
   if (EXHAUSTION_PATTERNS.some((pattern) => pattern.test(said))) {
     return `${payload.message} The runtime reported that it is out of capacity right now — its own limit, not this machine's: ${said}`
   }
@@ -5324,8 +5346,8 @@ export function sameSentence(a: string, b: string): boolean {
 }
 
 /**
- * Whether the run-level error card would only repeat a limit card already in
- * the thread. The run's error is the runtime's own last word wrapped in the
+ * Whether the run-level error card would only repeat an error diagnostic or
+ * ending limit card already in the thread. The run's error is the runtime's own last word wrapped in the
  * host's sentence, and for a quota failure that word is the limit message --
  * so the bottom card was the third rendering of one fact (user session 1,
  * 2026-09-05). Only a limit that ENDS the run counts: a slow-down warning is
@@ -5333,7 +5355,7 @@ export function sameSentence(a: string, b: string): boolean {
  */
 export function errorAlreadyShown(items: readonly ThreadItem[], error: string): boolean {
   return items.some(
-    (item) => item.type === 'limit' && item.kind === 'quota-exhausted' && sameSentence(error, item.message)
+    (item) => ((item.type === 'limit' && item.kind === 'quota-exhausted') || (item.type === 'diagnostic' && item.level === 'error')) && sameSentence(error, item.message)
   )
 }
 

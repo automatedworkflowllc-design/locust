@@ -4,6 +4,7 @@ import {
   redactText,
   identityValue,
   isObject,
+  sanitizeJson,
   stringValue,
 } from "./codex-events.js";
 import type {
@@ -16,6 +17,7 @@ import type {
 } from "./codex-events.js";
 import type { AppServerNotification, JsonValue } from "./app-server.js";
 import type { MissionRuntimeId } from "./types.js";
+import { providerErrorSentence } from "./provider-error.js";
 
 /**
  * app-server notifications -> the same product events every other adapter
@@ -629,7 +631,7 @@ export function createAppServerEventNormalizer(
         case "error": {
           const error = isObject(params.error) ? params.error : {};
           const message = boundedMessageText(
-            stringValue(error.message) ?? "The runtime reported an error.",
+            providerErrorSentence(stringValue(error.message) ?? "The runtime reported an error.", "codex"),
           );
           // `willRetry` means the provider intends to continue. Ending the run
           // on it would report a failure the provider is about to recover from.
@@ -672,6 +674,7 @@ export function createAppServerEventNormalizer(
             emit("run.failed", {
               kind,
               message,
+              evidence: { ...evidence(notification), raw: sanitizeJson(error, { redacted: false }) },
               ...(runtimeThreadId === undefined ? {} : { runtimeThreadId }),
               runtimeTerminal: "failed",
               process: {

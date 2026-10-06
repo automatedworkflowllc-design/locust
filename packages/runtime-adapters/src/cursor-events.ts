@@ -22,6 +22,7 @@ import type {
   RuntimeJsonlRecord,
   RuntimeProcessCompletion,
 } from "./process-runner.js";
+import { providerErrorSentence } from "./provider-error.js";
 
 /**
  * Cursor Agent `stream-json` -> product events.
@@ -214,6 +215,7 @@ export function createCursorEventNormalizer(
   let finalized = false;
   let sawResult = false;
   let terminalFailure: string | undefined;
+  let terminalFailureEvidence: CodexEventEvidence | undefined;
   let usage: RedactedJsonValue | undefined;
   /** Which message the next fragment belongs to; closed by a complete message. */
   let messageIndex = 0;
@@ -594,8 +596,9 @@ export function createCursorEventNormalizer(
       const isError = parsed.is_error === true;
       const subtype = stringValue(parsed.subtype) ?? "";
       if (isError || (subtype.length > 0 && subtype !== "success")) {
+        terminalFailureEvidence = evidence;
         terminalFailure = boundedMessageText(
-          stringValue(parsed.result) ?? `Cursor Agent ended with ${subtype || "an error"}.`,
+          providerErrorSentence(stringValue(parsed.result) ?? `Cursor Agent ended with ${subtype || "an error"}.`, "cursor"),
         );
       }
       return [];
@@ -735,6 +738,7 @@ export function createCursorEventNormalizer(
           emit("run.failed", {
             kind: "unknown",
             message: terminalFailure,
+            ...(terminalFailureEvidence === undefined ? {} : { evidence: terminalFailureEvidence }),
             ...thread,
             runtimeTerminal: "failed",
             process,

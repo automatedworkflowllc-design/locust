@@ -15,6 +15,7 @@ import type {
   NormalizedRuntimePayloadMap,
 } from "./codex-events.js";
 import type { RuntimeJsonlRecord, RuntimeProcessCompletion } from "./process-runner.js";
+import { providerErrorSentence } from "./provider-error.js";
 
 /**
  * Antigravity CLI's `--output-format stream-json` -> product events (0.540).
@@ -98,6 +99,7 @@ export function createAgyEventNormalizer(context: AgyInvocationContext): AgyEven
   /** The `result` record, once it arrives. */
   let status: string | undefined;
   let resultError: string | undefined;
+  let resultEvidence: CodexEventEvidence | undefined;
   // The answer arrived whole, then agy's call after it found the service unavailable (0.657).
   let answeredThenUnavailable = false;
   let usage: { readonly inputTokens: number; readonly outputTokens: number } | undefined;
@@ -269,6 +271,7 @@ export function createAgyEventNormalizer(context: AgyInvocationContext): AgyEven
     }
 
     if (kind === "result") {
+      resultEvidence = evidence;
       const result = isObject(parsed.result) ? parsed.result : {};
       runtimeThreadId = runtimeThreadId ?? identityValue(result.conversation_id);
       status = stringValue(result.status) ?? "UNKNOWN";
@@ -350,6 +353,7 @@ export function createAgyEventNormalizer(context: AgyInvocationContext): AgyEven
         emit("run.failed", {
           kind: "process-failed",
           ...(lost ? { sessionEnded: true as const } : {}),
+          ...(resultEvidence === undefined ? {} : { evidence: resultEvidence }),
           message: lost
             ? "Antigravity CLI does not have this conversation: it began in the Antigravity app. Send it again and it starts fresh, with the conversation so far."
             : completion.outputLimitExceeded
@@ -357,7 +361,9 @@ export function createAgyEventNormalizer(context: AgyInvocationContext): AgyEven
             : status === undefined
               ? "Antigravity ended without a record saying the run had finished."
               : resultError !== undefined
-                ? `Antigravity could not run it: ${resultError.split(/\r?\n/)[0]}`
+                ? providerErrorSentence(resultError, "antigravity") !== resultError
+                  ? providerErrorSentence(resultError, "antigravity")
+                  : `Antigravity could not run it: ${resultError.split(/\r?\n/)[0]}`
                 : `Antigravity ended ${status.toLowerCase()}${completion.exitCode === 0 ? "" : ` (exit code ${String(completion.exitCode)})`}.`,
           ...thread,
           runtimeTerminal: status === undefined ? "missing" : status === "SUCCESS" ? "completed" : "failed",

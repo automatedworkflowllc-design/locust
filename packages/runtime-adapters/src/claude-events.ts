@@ -18,6 +18,7 @@ import type {
   RuntimeJsonlRecord,
   RuntimeProcessCompletion,
 } from "./process-runner.js";
+import { providerErrorSentence } from "./provider-error.js";
 
 /**
  * Claude Code JSONL -> product events.
@@ -518,6 +519,7 @@ export function createClaudeEventNormalizer(
   let finalized = false;
   let sawResult = false;
   let terminalFailure: string | undefined;
+  let terminalFailureEvidence: CodexEventEvidence | undefined;
   // What the run cost, as Claude Code itself priced it. Measured 2026-09-03:
   // the `result` record carries `total_cost_usd` and a `usage` block with
   // `input_tokens` / `output_tokens`. Only the numbers travel; the record's
@@ -1219,8 +1221,9 @@ export function createClaudeEventNormalizer(
       const subtype = stringValue(parsed.subtype) ?? "";
       const reason = stringValue(parsed.terminal_reason) ?? subtype;
       if (isError || (subtype.length > 0 && subtype !== "success")) {
+        terminalFailureEvidence = evidence;
         terminalFailure = boundedMessageText(
-          stringValue(parsed.result) ?? `Claude Code ended with ${reason || "an error"}.`,
+          providerErrorSentence(stringValue(parsed.result) ?? `Claude Code ended with ${reason || "an error"}.`, "claude"),
         );
       }
       // What the run was NOT allowed to do.
@@ -1314,6 +1317,7 @@ export function createClaudeEventNormalizer(
           emit("run.failed", {
             kind: "unknown",
             message: terminalFailure,
+            ...(terminalFailureEvidence === undefined ? {} : { evidence: terminalFailureEvidence }),
             ...(runtimeThreadId === undefined ? {} : { runtimeThreadId }),
             runtimeTerminal: "failed",
             process,

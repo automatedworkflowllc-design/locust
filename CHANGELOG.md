@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.666.0 - 2026-10-06
+
+### Fixed
+
+- **A model's error reads as a sentence, once.** When a provider refused a run, Locust could show its raw reply, `{"type":"error","error":{"message":"model 'gpt-6.1-sol' is not enabled ..."}}`, in the conversation and again in the red card. It now says who refused and what to do, for example "OpenAI refused the model gpt-6.1-sol: it is not enabled here right now. Pick another model and send again.", and says it once. Usage limits, rate limits, an overloaded service and sign-in problems each get their own sentence. The provider's own words are still kept in the run's record.
+
 ## 0.665.0 - 2026-10-05
 
 ### Fixed

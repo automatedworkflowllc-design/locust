@@ -450,7 +450,7 @@ function applyMissionUpdate(run: LiveRunState, update: CodexMissionUpdate): Live
   if (update.event.type === 'run.cancelled') return { ...live, events, phase: 'cancelled' }
   if (update.event.type === 'run.failed') {
     // The payload's own sentence plus whatever the runtime actually said.
-    return { ...live, events, phase: 'failed', error: failureMessage(update.event.payload) }
+    return { ...live, events, phase: 'failed', error: failureMessage(update.event.payload, update.event.sourceAdapter) }
   }
   return { ...live, events, phase: live.phase === 'starting' ? 'running' : live.phase }
 }
@@ -551,7 +551,7 @@ function restoredLiveRun(mission: PublicRecoveredMission): LiveRunState {
   const terminalError = mission.events.filter((event) => event.type === 'run.failed').at(-1)
   const error =
     mission.hostFailureMessage ??
-    (terminalError?.type === 'run.failed' ? terminalError.payload.message : undefined) ??
+    (terminalError?.type === 'run.failed' ? failureMessage(terminalError.payload, terminalError.sourceAdapter) : undefined) ??
     (mission.phase === 'interrupted'
       ? 'This run has no terminal receipt and was recovered as interrupted.'
       : undefined)
