@@ -105,6 +105,7 @@ async function summarise() {
   await writeFile(join(out, 'summary.json'), JSON.stringify(results, null, 2), 'utf8')
 }
 
+const RETRY_FIRST = 'opencode/fledge-alpha-free'
 const PAID_REFUSAL = /refusing to run "[^"]+": it spends a paid account/
 const PROVIDER_REFUSED = /Rate limit exceeded|rate[- ]limited|Endpoint is unavailable|provider answered "(?:Too Many Requests|Service Unavailable)/i
 async function runDrive(name, model) {
@@ -164,7 +165,11 @@ for (const name of drives.slice(start)) {
   const failedOn = []
   let run
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    const model = process.env.LOCUST_FREE_MODEL ?? nextFreeModel()
+    // A first run takes the rotation; a run again takes the steadiest free model first (Fledge Alpha answered every
+    // drive asked again on it, 2026-10-06), so a retry tests Locust rather than another model's bad hour.
+    const tried = [...refusedBy, ...failedOn].map((slug) => `opencode/${slug}`)
+    const model = process.env.LOCUST_FREE_MODEL
+      ?? (attempt > 0 && !tried.includes(RETRY_FIRST) ? RETRY_FIRST : nextFreeModel())
     run = await runDrive(name, model)
     if (run.fails === 0 && run.code === 0) break
     if (process.env.LOCUST_FREE_MODEL !== undefined) break
