@@ -54,6 +54,10 @@ if (!existsSync(bundled)) {
 rmSync(DESTINATION, { recursive: true, force: true })
 mkdirSync(dirname(DESTINATION), { recursive: true })
 cpSync(source, DESTINATION, { recursive: true, dereference: true })
+// .bin carries pnpm wrapper shims containing host-specific absolute paths
+// (NODE_PATH and cmd-shim-target). They are unused at runtime (the app invokes
+// bin/npm-cli.js) and make app.asar vary across build environments.
+rmSync(join(DESTINATION, 'node_modules', '.bin'), { recursive: true, force: true })
 
 const version = JSON.parse(readFileSync(join(DESTINATION, 'package.json'), 'utf8')).version
 const count = existsSync(join(DESTINATION, 'node_modules'))

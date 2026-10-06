@@ -44,11 +44,13 @@ files:
   - resources/icon-512.png
   # npm itself, so a machine with no Node.js can still install a coding CLI.
   - resources/npm/**/*
+  - '!resources/npm/node_modules/.bin/**/*'
 
 # npm has to be real files on disk: it spawns, reads its own package.json and
 # writes shims, none of which works from inside the archive.
 asarUnpack:
   - resources/npm/**/*
+  - '!resources/npm/node_modules/.bin/**/*'
 
 # Copied beside app.asar, into process.resourcesPath: the window icon has to
 # be a real file on disk, not a path inside the archive (2026-09-06).
