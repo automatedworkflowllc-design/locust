@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.677.0 - 2026-10-06
+
+### Improved
+
+- **OpenCode replies appear as they're written.** On OpenCode, including the free models, a reply used to arrive all at once when it was finished, often after 20 to 60 seconds of nothing. It now appears word by word, as Claude Code, Codex and Cursor replies do. Every mode means what it meant before: Ask still can't change anything, Edit and Auto still work as they did, and Approve each still asks you first.
+
 ## 0.676.0 - 2026-10-06
 
 ### Fixed
