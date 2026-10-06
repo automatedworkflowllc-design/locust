@@ -176,7 +176,15 @@ const measure = async (state) => {
     const tick = (now) => { const frames = window.locustProbeFrames; if (!frames.active) return; frames.gaps.push(now - frames.last); frames.last = now; requestAnimationFrame(tick) }
     requestAnimationFrame(tick)
   })()`)
+  // --draws: which canvases drew during the sample, by where they sit (each draw begins with a clearRect).
+  if (arg('--draws') !== undefined || process.argv.includes('--draws')) await drive.evaluate(`(() => {
+    const where = (c) => { for (let n = c; n; n = n.parentElement) { const k = String(n.className?.baseVal ?? n.className ?? '').split(' ').find((x) => /^lc-(cover|hometeam|faces|sidebar|thread|livestep|rail|workroom|agentline|activity|composer|plancard)/.test(x)); if (k) return k } return c.isConnected ? 'other' : 'offscreen' }
+    const tally = {}; const proto = CanvasRenderingContext2D.prototype; const original = proto.clearRect
+    window.locustProbeDraws = { tally, restore: () => { proto.clearRect = original } }
+    proto.clearRect = function (...a) { const k = where(this.canvas); tally[k] = (tally[k] ?? 0) + 1; return original.apply(this, a) }
+  })()`)
   const share = cpu(5)
+  const draws = process.argv.includes('--draws') ? JSON.parse(String(await drive.evaluate(`(() => { const d = window.locustProbeDraws; d.restore(); return JSON.stringify(Object.fromEntries(Object.entries(d.tally).map(([k, v]) => [k, Math.round(v / 5)]))) })()`))) : undefined
   const after = await metrics()
   const frames = longTurn && streaming ? JSON.parse(String(await drive.evaluate(`(() => {
     const frames = window.locustProbeFrames; frames.active = false
@@ -199,7 +207,8 @@ const measure = async (state) => {
     ...(frames === undefined ? {} : { frames }),
     ...(streaming ? { fragmentsBefore, fragmentsAfter, visibleBefore, visibleAfter } : {}),
     perSecond: { styleRecalcs: per('RecalcStyleCount'), layouts: per('LayoutCount'), scriptMs: Math.round(per('ScriptDuration') * 1000), taskMs: Math.round(per('TaskDuration') * 1000) },
-    animations: animations.length, animationNames: [...new Set(animations)].slice(0, 12)
+    animations: animations.length, animationNames: [...new Set(animations)].slice(0, 12),
+    ...(draws === undefined ? {} : { drawsPerSecond: draws })
   }
   results.push(row)
   say(`  ${state}: ${JSON.stringify(row)}`)

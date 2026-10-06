@@ -19,7 +19,7 @@ import { anchorsOf, anchorVariables, paintedBounds, type BodyBox } from '../botA
 
 import { screenSuits } from '../../../shared/avatar.js'
 import { usePlush, useTerminalFaces } from '../botLook.js'
-import { DRAWING_BEAT, frameBeat } from '../frameBeat.js'
+import { DRAWING_BEAT, SIDE_DRAWING_BEAT, frameBeat } from '../frameBeat.js'
 import { LOCUST_BOTS, isLocustBot } from '../locustBots.js'
 import type { ChestMark } from '../locustBots.js'
 import type { LocustBotType } from '../locustBots.js'
@@ -87,6 +87,8 @@ export interface BotProps {
   readonly paused?: boolean
   /** Hold the current frame and rig while a containing cover rests. */
   readonly motionPresence?: WindowPresence
+  /** Drawn at half the beat: a face beside a name, not the one you are talking to (SIDE_DRAWING_BEAT, 0.670). */
+  readonly atTheSide?: boolean
   readonly face?: BotAvatarFace
   readonly seed?: number
   /** Eyes follow a nearby pointer, and a click makes it hop. */
@@ -1979,7 +1981,8 @@ export function startBotClock(
   step: (seconds: number) => void,
   showing: () => boolean,
   frames: BotFrames = WINDOW_FRAMES,
-  presence: BotPresence = WINDOW_PRESENCE
+  presence: BotPresence = WINDOW_PRESENCE,
+  atTheSide = false
 ): () => void {
   draw()
   let last = frames.now()
@@ -1987,6 +1990,13 @@ export function startBotClock(
   let stopped = false
   // The window's frames keep the window's one beat (frameBeat.ts); a test's own frames, a beat of their own.
   const beat = frames === WINDOW_FRAMES ? DRAWING_BEAT : frameBeat(BOT_FRAMES_PER_SECOND)
+  /*
+   * A face at the side is DRAWN on half the beat (0.670) but still stepped on
+   * the whole of it: its rig takes at most 0.05 s a step, so a step of a 15th
+   * of a second would have moved it at three quarters of its speed. Stepping
+   * is cheap; drawing and handing the canvas to the GPU is what costs.
+   */
+  const drawBeat = !atTheSide ? undefined : frames === WINDOW_FRAMES ? SIDE_DRAWING_BEAT : frameBeat(BOT_FRAMES_PER_SECOND / 2)
   const tick = (now: number): void => {
     handle = 0
     // A frame off the beat is passed over, and its time goes to the next.
@@ -1995,7 +2005,7 @@ export function startBotClock(
       last = now
       if (showing()) {
         step(seconds)
-        draw()
+        if (drawBeat === undefined || drawBeat.due(now)) draw()
       }
     }
     if (!stopped && !presence.away()) handle = frames.requestAnimationFrame(tick)
@@ -2135,6 +2145,7 @@ function RiggedBot({
   state = 'default',
   paused = false,
   motionPresence = WINDOW_PRESENCE,
+  atTheSide = false,
   face,
   seed = 0.37,
   interactive = false,
@@ -2389,7 +2400,7 @@ function RiggedBot({
        * there when its clock runs again.
        */
       atOnce = motionPresence.away()
-      stop = startBotClock(draw, step, () => onScreen && document.visibilityState !== 'hidden', undefined, motionPresence)
+      stop = startBotClock(draw, step, () => onScreen && document.visibilityState !== 'hidden', undefined, motionPresence, atTheSide)
     }
     wake.current = run
     run()
@@ -2413,7 +2424,7 @@ function RiggedBot({
       rig.current = null
     }
     // A new state, new eyes, keeping still or not: each is performed on the running rig (below), never a rebuilt one.
-  }, [type, size, color, faceShown, seed, screen, plush, shortPile, motionPresence])
+  }, [type, size, color, faceShown, seed, screen, plush, shortPile, motionPresence, atTheSide])
 
   useEffect(() => {
     rig.current?.setState(state)

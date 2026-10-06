@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.670.0 - 2026-10-06
+
+### Improved
+
+- **A conversation uses less of your computer while a reply streams in.** Every moving face was redrawn 30 times a second, including the small ones beside a name, in the sidebar and the conversation's header, which show the same teammate as the face beside the reply. Those now redraw 15 times a second and still move at the same speed; the face you are talking to stays at 30.
+
 ## 0.669.0 - 2026-10-06
 
 ### Fixed

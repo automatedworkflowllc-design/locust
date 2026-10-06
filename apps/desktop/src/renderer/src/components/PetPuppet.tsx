@@ -154,6 +154,8 @@ export interface PetPuppetProps {
   readonly state?: BotAvatarState
   readonly paused?: boolean
   readonly motionPresence?: WindowPresence
+  /** Drawn at half the beat, as a face beside a name (Bot's atTheSide, 0.670). */
+  readonly atTheSide?: boolean
   readonly seed?: number
   readonly follows?: boolean
   readonly jumpEvery?: number
@@ -251,6 +253,7 @@ export function PetPuppet({
   state = 'default',
   paused = false,
   motionPresence = WINDOW_PRESENCE,
+  atTheSide = false,
   seed = 0.37,
   follows = false,
   jumpEvery,
@@ -464,7 +467,7 @@ export function PetPuppet({
       settledFor = 0
       // Woken where its clock may not run, that one frame is drawn still, its new face at once (Bot's).
       atOnce = motionPresence.away()
-      stop = startBotClock(draw, step, () => onScreen && document.visibilityState !== 'hidden', undefined, motionPresence)
+      stop = startBotClock(draw, step, () => onScreen && document.visibilityState !== 'hidden', undefined, motionPresence, atTheSide)
     }
     wake.current = run
     run()
@@ -484,7 +487,7 @@ export function PetPuppet({
       rig.current = null
     }
     // What it is asked to show is performed on the running rig (below), never a rebuilt one.
-  }, [atlas, puppet, size, seed, motionPresence])
+  }, [atlas, puppet, size, seed, motionPresence, atTheSide])
 
   useEffect(() => {
     rig.current?.setState(state)

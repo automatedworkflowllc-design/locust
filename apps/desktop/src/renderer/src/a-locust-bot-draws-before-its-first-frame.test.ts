@@ -83,6 +83,17 @@ describe('a moving Locust bot', () => {
     }
   })
 
+  it('draws at most 15 frames a second at the side, beside a name (0.670), still moving a whole second', () => {
+    const clock = frames()
+    let drawn = 0
+    let moved = 0
+    startBotClock(() => (drawn += 1), (seconds) => (moved += seconds), () => true, clock, undefined, true)
+    for (let frame = 1; frame <= 60; frame += 1) clock.fire((frame * 1000) / 60)
+    expect(drawn - 1).toBeLessThanOrEqual(15)
+    expect(drawn - 1).toBeGreaterThanOrEqual(13)
+    expect(moved).toBeGreaterThan(0.85)
+  })
+
   it('stops when asked, cancelling the frame it was waiting on', () => {
     const clock = frames()
     const stop = startBotClock(() => undefined, () => undefined, () => true, clock)

@@ -39,3 +39,13 @@ export function frameBeat(perSecond: number): FrameBeat {
 
 /** The window's own beat: 30 drawing frames a second, shared by every face and orb. */
 export const DRAWING_BEAT = frameBeat(30)
+
+/**
+ * HALF THE BEAT, FOR A FACE AT THE SIDE (0.670). Measured on packaged 0.669,
+ * a conversation streaming: 10.5-10.8 % of the machine, 6.0 % with its four
+ * faces' canvases hidden -- the face beside the live line, the header's, the
+ * sidebar's and the orb, each redrawn 30 times a second. The face you are
+ * talking to keeps 30; a face beside a name ('subtle': the sidebar, the
+ * header, a card) moves at 15, which at its size reads the same.
+ */
+export const SIDE_DRAWING_BEAT = frameBeat(15)

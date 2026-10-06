@@ -449,6 +449,7 @@ export function TeammateBot({
           atlas={atlas}
           puppet={puppet}
           size={size}
+          atTheSide={motion !== 'full'}
           petState={petStateFor(shownActivity)}
           state={face.state ?? state}
           paused={paused && glance === undefined && !face.lively}
@@ -471,6 +472,7 @@ export function TeammateBot({
           pet={pet}
           size={size}
           state={petStateFor(shownActivity)}
+          atTheSide={motion !== 'full'}
           {...(glance === undefined ? {} : { glance })}
           {...(routine === undefined
             ? {}
@@ -493,6 +495,8 @@ export function TeammateBot({
         <Bot
           type={bot.shape}
           size={size}
+          // A face beside a name draws at half the beat; the one you talk to at the whole (frameBeat.ts, 0.670).
+          atTheSide={motion !== 'full'}
           state={face.state ?? state}
           paused={paused && glance === undefined && !face.lively}
           face={bot.face}

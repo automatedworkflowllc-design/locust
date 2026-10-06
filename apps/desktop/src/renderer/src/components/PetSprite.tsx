@@ -91,6 +91,8 @@ export interface PetSpriteProps {
   readonly bootKey?: string
   /** When its clock rests (Bot's motionPresence): the window's, otherwise. */
   readonly motionPresence?: WindowPresence
+  /** Drawn at half the beat, as a face beside a name (Bot's atTheSide, 0.670). */
+  readonly atTheSide?: boolean
 }
 
 /** Puts the ring and the dot on the pet's body: where its paint is, as fractions of the box. */
@@ -107,7 +109,7 @@ export function anchorToPet(canvas: HTMLCanvasElement, atlas: PetAtlas, left: nu
   anchorToBox(canvas, { left: left + body.left * width, top: body.top, right: left + body.right * width, bottom: body.bottom })
 }
 
-export function PetSprite({ pet, size, state, still = false, glance, screen, seed = 0, bootKey, motionPresence }: PetSpriteProps): ReactElement {
+export function PetSprite({ pet, size, state, still = false, glance, screen, seed = 0, bootKey, motionPresence, atTheSide = false }: PetSpriteProps): ReactElement {
   const ref = useRef<HTMLCanvasElement>(null)
   const look = usePetLook(pet)
   // When the state began, kept across a glance so a jump is not restarted by one.
@@ -252,6 +254,7 @@ export function PetSprite({ pet, size, state, still = false, glance, screen, see
         {...(glance === undefined ? {} : { glance })}
         {...(bootKey === undefined ? {} : { bootKey })}
         {...(motionPresence === undefined ? {} : { motionPresence })}
+        atTheSide={atTheSide}
       />
     )
   }
@@ -714,9 +717,10 @@ interface ScreenPetProps {
   readonly glance?: GlanceSide
   readonly bootKey?: string
   readonly motionPresence?: WindowPresence
+  readonly atTheSide?: boolean
 }
 
-function ScreenPet({ pet, atlas, face, size, state, ask, still, seed, glance, bootKey, motionPresence = WINDOW_PRESENCE }: ScreenPetProps): ReactElement {
+function ScreenPet({ pet, atlas, face, size, state, ask, still, seed, glance, bootKey, motionPresence = WINDOW_PRESENCE, atTheSide = false }: ScreenPetProps): ReactElement {
   const ref = useRef<HTMLCanvasElement>(null)
   // Read at each frame, so a change is performed on the clock he has, never a rebuilt one.
   const asked = useRef(ask)
@@ -855,7 +859,7 @@ function ScreenPet({ pet, atlas, face, size, state, ask, still, seed, glance, bo
       settledFor = 0
       // Woken where his clock may not run (Bot's): that one frame is drawn still, his new face at once.
       atOnce = motionPresence.away()
-      stop = startBotClock(draw, () => undefined, () => onScreen && document.visibilityState !== 'hidden', undefined, motionPresence)
+      stop = startBotClock(draw, () => undefined, () => onScreen && document.visibilityState !== 'hidden', undefined, motionPresence, atTheSide)
     }
     wake.current = run
     run()
@@ -874,7 +878,7 @@ function ScreenPet({ pet, atlas, face, size, state, ask, still, seed, glance, bo
       watch?.disconnect()
     }
     // Something new asked of him is performed on the running clock (wake), never a rebuilt one.
-  }, [atlas, face, size, still, seed, motionPresence])
+  }, [atlas, face, size, still, seed, motionPresence, atTheSide])
 
   return (
     <canvas
