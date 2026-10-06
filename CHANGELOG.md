@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.673.0 - 2026-10-06
+
+### Fixed
+
+- **A teammate's eyes no longer shake in the sidebar and the conversation header.** Since 0.654 those faces are drawn 15 times a second to save power, and the spring that lets a screen's eyes trail the body's hop could not take a step that long: it swung the eyes from one end of the screen to the other on every frame. The spring now takes long frames in short steps. Measured in the app on a working teammate: the eyes swung on 30 to 33 of 38 frames before, and on none after.
+
 ## 0.672.0 - 2026-10-06
 
 ### Fixed

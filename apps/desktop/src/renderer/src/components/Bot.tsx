@@ -699,12 +699,32 @@ const LAG_DAMPING = 22
 const LAG_GAIN = 0.35
 const LAG_MOST = 3
 
+/**
+ * The longest step the spring takes at once (0.673). Stepped in one go over a
+ * 15th of a second -- a face at the side is drawn that often since 0.654, and
+ * the eyes are stepped as they are drawn -- this spring is unstable: its
+ * damping alone (22 x 0.067 > 1) turns the eyes' speed round every step, and
+ * they swung from +3 to -3 and back on every frame (Colin, 2026-10-06: "wrens
+ * eyes are violently shaking in the top and side bar"; measured in the app,
+ * the lag pinned at +/-3 on each draw of every face drawn at 15 a second, and
+ * smooth on every face drawn at 30). A longer frame is taken in steps of at most this.
+ */
+export const LAG_MOST_STEP = 1 / 30
+
 /** One step of the eyes' spring: `kickX`, `kickY` are the change in the body's speed this step (face units a second). */
 export function stepLag(lag: Lag, dt: number, kickX: number, kickY: number): Lag {
-  const vx = lag.vx + (-LAG_SPRING * lag.x - LAG_DAMPING * lag.vx) * dt - kickX * LAG_GAIN
-  const vy = lag.vy + (-LAG_SPRING * lag.y - LAG_DAMPING * lag.vy) * dt - kickY * LAG_GAIN
   const held = (value: number): number => Math.max(-LAG_MOST, Math.min(LAG_MOST, value))
-  return { x: held(lag.x + vx * dt), y: held(lag.y + vy * dt), vx, vy }
+  const steps = Math.max(1, Math.ceil(dt / LAG_MOST_STEP - 1e-9))
+  const each = dt / steps
+  let { x, y, vx, vy } = lag
+  for (let step = 0; step < steps; step += 1) {
+    // The kick is the body's change of speed over the whole frame: it lands once.
+    vx = vx + (-LAG_SPRING * x - LAG_DAMPING * vx) * each - (step === 0 ? kickX * LAG_GAIN : 0)
+    vy = vy + (-LAG_SPRING * y - LAG_DAMPING * vy) * each - (step === 0 ? kickY * LAG_GAIN : 0)
+    x = held(x + vx * each)
+    y = held(y + vy * each)
+  }
+  return { x, y, vx, vy }
 }
 
 /** A colour as red, green, blue: `#rgb`, `#rrggbb`, or `rgb()` as the library's shade gives it. */
