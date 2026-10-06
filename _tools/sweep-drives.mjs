@@ -105,21 +105,14 @@ async function summarise() {
   await writeFile(join(out, 'summary.json'), JSON.stringify(results, null, 2), 'utf8')
 }
 
-for (const name of drives.slice(start)) {
-  const began = Date.now()
-  const skipped = SKIP[name.replace(/\.mjs$/, '')]
-  if (skipped !== undefined) {
-    results.push({ name: name.replace(/\.mjs$/, ''), code: 0, timedOut: false, skipped: true, passes: 0, fails: 0, failedLines: [], ms: 0, note: `skipped: ${skipped}` })
-    await summarise()
-    console.log(`${name}: skipped, ${skipped}`)
-    continue
-  }
+const PROVIDER_REFUSED = /Rate limit exceeded|rate[- ]limited|Endpoint is unavailable|provider answered "(?:Too Many Requests|Service Unavailable)/i
+async function runDrive(name, model) {
   const child = spawn(process.execPath, [join(tools, name), '--packaged', packaged], {
     cwd: new URL('../', import.meta.url).pathname.slice(1),
     // The free model is the drives' own (drive-lib FREE_ROUTE) unless LOCUST_FREE_MODEL says otherwise. This forced
     // Ling 3.0, and on 2026-10-06 Ling 3.0's provider was down ("Endpoint is unavailable", then rate limits): 41 of
     // the first 83 drives failed on it while Muse Spark answered.
-    env: { ...process.env, LOCUST_DRIVE_OUT: join(out, 'captures'), LOCUST_FREE_MODEL: process.env.LOCUST_FREE_MODEL ?? nextFreeModel(), ...(ENV[name.replace(/\.mjs$/, '')] ?? {}) },
+    env: { ...process.env, LOCUST_DRIVE_OUT: join(out, 'captures'), LOCUST_FREE_MODEL: model, ...(ENV[name.replace(/\.mjs$/, '')] ?? {}) },
     windowsHide: true
   })
   let text = ''
@@ -134,10 +127,44 @@ for (const name of drives.slice(start)) {
   clearTimeout(timer)
   await writeFile(join(out, 'logs', name.replace(/\.mjs$/, '.log')), text, 'utf8')
   const lines = text.split(/\r?\n/)
-  const passes = lines.filter((line) => /\bPASS\b/.test(line)).length
-  const fails = lines.filter((line) => /\bFAIL\b/.test(line)).length
-  const failedLines = lines.filter((line) => /(drive|probe) failed:|Error:|TypeError|ReferenceError/.test(line))
-  const note = failedLines[0] ?? lines.filter((line) => /\bFAIL\b/.test(line))[0] ?? ''
+  return {
+    text,
+    code,
+    timedOut,
+    passes: lines.filter((line) => /\bPASS\b/.test(line)).length,
+    fails: lines.filter((line) => /\bFAIL\b/.test(line)).length,
+    failedLines: lines.filter((line) => /(drive|probe) failed:|Error:|TypeError|ReferenceError/.test(line))
+  }
+}
+
+for (const name of drives.slice(start)) {
+  const began = Date.now()
+  const skipped = SKIP[name.replace(/\.mjs$/, '')]
+  if (skipped !== undefined) {
+    results.push({ name: name.replace(/\.mjs$/, ''), code: 0, timedOut: false, skipped: true, passes: 0, fails: 0, failedLines: [], ms: 0, note: `skipped: ${skipped}` })
+    await summarise()
+    console.log(`${name}: skipped, ${skipped}`)
+    continue
+  }
+  /*
+   * A drive that failed because its free model's provider refused (a rate
+   * limit, an endpoint down) says nothing about Locust: on 2026-10-06 four
+   * drives failed that way, each on whichever model the rotation had reached.
+   * Such a drive runs again on the next free model, at most twice, and the
+   * summary says which models were refused. A model forced with
+   * LOCUST_FREE_MODEL is never swapped.
+   */
+  const refusedBy = []
+  let run
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const model = process.env.LOCUST_FREE_MODEL ?? nextFreeModel()
+    run = await runDrive(name, model)
+    if (run.fails === 0 || process.env.LOCUST_FREE_MODEL !== undefined || !PROVIDER_REFUSED.test(run.text)) break
+    refusedBy.push(model.replace(/^opencode\//, ''))
+    console.log(`${name}: ${model} was refused by its provider; again on the next free model`)
+  }
+  const { code, timedOut, passes, fails, failedLines } = run
+  const note = (refusedBy.length > 0 ? `refused by ${refusedBy.join(', ')}; ` : '') + (failedLines[0] ?? run.text.split(/\r?\n/).filter((line) => /\bFAIL\b/.test(line))[0] ?? '')
   results.push({ name: name.replace(/\.mjs$/, ''), code, timedOut, passes, fails, failedLines: failedLines.slice(0, 5), ms: Date.now() - began, note })
   await summarise()
   console.log(`${name}: code ${String(code)}${timedOut ? ' TIMED OUT' : ''}, ${String(passes)} PASS, ${String(fails)} FAIL ${note.slice(0, 120)}`)
