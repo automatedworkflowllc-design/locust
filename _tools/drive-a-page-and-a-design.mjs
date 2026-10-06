@@ -146,7 +146,20 @@ try {
     await new Promise((r) => setTimeout(r, 400))
     const token = 'https://storage.example.com/signed/' + 'a1b2c3d4e5'.repeat(27)
     const para = [...document.querySelectorAll('.lc-thread .lc-para')].pop()
-    const item = [...document.querySelectorAll('.lc-thread .lc-list li')].pop()
+    let item = [...document.querySelectorAll('.lc-thread .lc-list li')].pop()
+    /*
+     * The reply's list was the model's choice: a free model that answers in
+     * one paragraph draws none (Fledge Alpha, 2026-10-06 sweep), and the check
+     * failed on wording, not wrapping. Then a list is drawn the way
+     * ThreadItems draws one (ul.lc-list > li), beside that paragraph.
+     */
+    if (!item && para) {
+      const list = document.createElement('ul')
+      list.className = 'lc-list'
+      item = document.createElement('li')
+      list.append(item)
+      para.after(list)
+    }
     if (para) para.textContent += ' ' + token
     if (item) item.textContent += ' ' + token
     para?.scrollIntoView({ block: 'center' })
