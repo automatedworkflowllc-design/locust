@@ -121,7 +121,10 @@ try {
   const missions = (await readdir(ledger).catch(() => [])).filter((name) => name.endsWith('.jsonl'))
   const texts = await Promise.all(missions.map((name) => readFile(join(ledger, name), 'utf8')))
   const finished = texts.filter((text) => text.includes('pineapple') && text.includes('"run.completed"'))
-  check('its run is in the ledger, completed', finished.length >= 1, `${String(missions.length)} mission file(s)`)
+  // What its provider said, when it refused: the sweep reads this line to run the drive again on another free
+  // model (2026-10-06: Muse Spark answered "Rate limit exceeded" all day, and this drive only said "runs: 0").
+  const refusal = texts.join('\n').match(/Rate limit exceeded[^"\\]*|Endpoint is unavailable[^"\\]*/)?.[0]
+  check('its run is in the ledger, completed', finished.length >= 1, `${String(missions.length)} mission file(s)${refusal === undefined ? '' : `; its provider answered: ${refusal}`}`)
   check('still no window', ((await pages()) ?? []).length === 0)
   const passedAfter = byId(file ?? { routines: [] }, 'rt_passed')
   check('the missed routine still has not run', (passedAfter?.runs ?? 0) === 0)
