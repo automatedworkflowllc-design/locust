@@ -65,6 +65,9 @@ red() {
   exit 1
 }
 
+# The packages, built first (0.668): the desktop imports their dist/, and a
+# change to a package's source was tested by the desktop against the old build.
+(cd "$W" && pnpm -r --filter "./packages/**" run build > "$LOGS/pkg.log" 2>&1) || { tail -20 "$LOGS/pkg.log"; echo "GATE: package build FAILED (full logs kept in $LOGS)"; exit 1; }
 suite ra "$W/packages/runtime-adapters" || red ra adapters
 suite ms "$W/packages/mission-store" || red ms mission-store
 RETRIED=
@@ -83,6 +86,12 @@ if ! suite d "$W/apps/desktop"; then
     red d desktop
   fi
 fi
+
+# The app's own bundles, built (0.668): a renderer import that pulled a Node
+# module into the window (0.666's provider-error) passed every test and both
+# typechecks, and only electron-vite at the ship refused it.
+(cd "$W/apps/desktop" && npx electron-vite build > "$LOGS/build.log" 2>&1) || { grep -E "error|rror during|is not exported" "$LOGS/build.log" | head -10; echo "GATE: app build FAILED (full logs kept in $LOGS)"; exit 1; }
+echo "GATE: app build ok"
 
 if [ -z "$RETRIED" ]; then
   grep -h "Tests " "$LOGS/ra.log" "$LOGS/ms.log" "$LOGS/d.log"
