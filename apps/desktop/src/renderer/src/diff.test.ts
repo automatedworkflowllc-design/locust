@@ -4,6 +4,7 @@ import {
   completenessOf,
   countRows,
   fileCounts,
+  fileRowCounts,
   foldContext,
   hunkRange,
   pairedSpans,
@@ -227,5 +228,40 @@ describe('a file that had no lines before', () => {
   it('but a file edited from its first line is still MODIFIED', () => {
     const edited = ['--- hello.txt', '+++ hello.txt', '@@ -1 +1 @@', '-hi', '+bye', ''].join('\n')
     expect(parseUnifiedDiff(edited)[0]?.status).toBe('MODIFIED')
+  })
+})
+
+describe('counts shown on a file row', () => {
+  it('shows the true reported counts for a truncated large file rewrite', () => {
+    expect(
+      fileRowCounts({
+        counts: { added: 0, removed: 747 },
+        truncated: true,
+        reported: { added: 1700, removed: 1700 },
+        large: true
+      })
+    ).toEqual({ added: 1700, removed: 1700 })
+  })
+
+  it('withholds counts for a truncated diff when true counts cannot be known', () => {
+    expect(
+      fileRowCounts({
+        counts: { added: 0, removed: 747 },
+        truncated: true,
+        reported: undefined,
+        large: true
+      })
+    ).toBeUndefined()
+  })
+
+  it('keeps counts unchanged for a small diff', () => {
+    expect(
+      fileRowCounts({
+        counts: { added: 2, removed: 1 },
+        truncated: false,
+        reported: undefined,
+        large: false
+      })
+    ).toEqual({ added: 2, removed: 1 })
   })
 })

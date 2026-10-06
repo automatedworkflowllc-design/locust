@@ -6,6 +6,7 @@ import { isImagePath } from '../../shared/image-files.js'
 import { READ_TOOL_WORDS, byHelper, editToolName, isEditCommand, isShellTool } from '../../shared/tool-kinds.js'
 import { LARGE_FILE_LINES, fileCounts, parseUnifiedDiff } from './diff.js'
 import type { DiffCounts, DiffFile } from './diff.js'
+export { fileRowCounts } from './diff.js'
 
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 
@@ -524,20 +525,23 @@ export function activityEntries(
       if (seenFiles.has(signature)) return
       seenFiles.add(signature)
       const counts = fileCounts(file)
+      // A single-file patch can be checked against the runtime's own total;
+      // across several files the total belongs to none of them, so it is
+      // withheld rather than repeated on each row as if it were theirs.
+      const reported =
+        patch !== undefined && patch.truncated && files.length === 1
+          ? { added: patch.added, removed: patch.removed }
+          : undefined
+      const totalLines = reported !== undefined ? reported.added + reported.removed : counts.added + counts.removed
+      const large = totalLines > LARGE_FILE_LINES || patch?.truncated === true
       entries.push({
         kind: 'file',
         key: `file_${String(index)}_${String(fileIndex)}`,
         file,
         counts,
         truncated: patch?.truncated === true,
-        // A single-file patch can be checked against the runtime's own total;
-        // across several files the total belongs to none of them, so it is
-        // withheld rather than repeated on each row as if it were theirs.
-        reported:
-          patch !== undefined && patch.truncated && files.length === 1
-            ? { added: patch.added, removed: patch.removed }
-            : undefined,
-        large: counts.added + counts.removed > LARGE_FILE_LINES,
+        reported,
+        large,
         ...(detail.status === 'observed on disk' ? { observed: true as const } : {}),
         ...(/on disk|from disk/.test(detail.status ?? '') ? { net: true as const } : {})
       })

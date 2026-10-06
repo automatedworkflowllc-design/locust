@@ -270,6 +270,27 @@ export const HUNKS_SHOWN_FIRST = 2
 /** A file changing more lines than this opens collapsed whatever its position. */
 export const LARGE_FILE_LINES = 200
 
+/**
+ * The counts shown on a changed file's row.
+ *
+ * For a large change or cut diff, counts are either right or not shown:
+ * - If the true counts can be known (from the tool's own record `reported`,
+ *   or from the full untruncated text), show them.
+ * - If they cannot, show no counts, and let LARGE say it -- never a count
+ *   that is only part of the change.
+ * - For a small diff, the parsed row counts are unchanged.
+ */
+export function fileRowCounts(file: {
+  readonly counts: DiffCounts
+  readonly truncated?: boolean
+  readonly reported?: DiffCounts
+  readonly large?: boolean
+}): DiffCounts | undefined {
+  if (file.reported !== undefined) return file.reported
+  if (file.truncated) return undefined
+  return file.counts
+}
+
 export interface Completeness {
   readonly shownHunks: number
   readonly totalHunks: number

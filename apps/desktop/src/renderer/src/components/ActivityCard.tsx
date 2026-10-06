@@ -39,8 +39,9 @@ export function thoughtLine(durationMs: number | undefined): string {
 }
 import type { ReactElement } from 'react'
 
-import { activityCounts, activityEntries, netFileEntries, boundedShellOutput, commandTook, defaultOpenEntry, newPageEntry, foldedToolsLead, foldedToolsNames, relativePath, displayPath, durationText, thoughtHeadline } from '../missionView.js'
+import { activityEntries, netFileEntries, boundedShellOutput, commandTook, defaultOpenEntry, fileRowCounts, newPageEntry, foldedToolsLead, foldedToolsNames, relativePath, displayPath, durationText, thoughtHeadline } from '../missionView.js'
 import type { TraceSegment, ActivityDetail, ActivityEntry, PlanStep } from '../missionView.js'
+import type { DiffCounts } from '../diff.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { CopyButton } from './CopyButton.js'
 import { DiffView } from './DiffView.js'
@@ -383,10 +384,21 @@ export function ActivityCard({
   }
   // A turn's files: one row per file, its net change where the host looked (0.494).
   const entries = oneRowPerFile ? netFileEntries(activityEntries(details, workspacePath), workspacePath) : activityEntries(details, workspacePath)
-  const counts = oneRowPerFile
-    ? entries.reduce((sum, entry) => (entry.kind === 'file' ? { added: sum.added + entry.counts.added, removed: sum.removed + entry.counts.removed } : sum), { added: 0, removed: 0 })
-    : activityCounts(details, workspacePath)
-  const anyPatch = entries.some((entry) => entry.kind === 'file')
+  const fileEntries = entries.filter((entry): entry is ActivityEntry & { readonly kind: 'file' } => entry.kind === 'file')
+  const rowCountsList = fileEntries.map(fileRowCounts)
+  let counts: DiffCounts | undefined
+  if (fileEntries.length > 0 && rowCountsList.every((c): c is DiffCounts => c !== undefined)) {
+    let added = 0
+    let removed = 0
+    for (const c of rowCountsList) {
+      if (c !== undefined) {
+        added += c.added
+        removed += c.removed
+      }
+    }
+    counts = { added, removed }
+  }
+  const anyPatch = fileEntries.length > 0
   const [toggled, setToggled] = useState<ReadonlyMap<string, boolean>>(() => new Map())
   // A page shown running above, in a comparison's cell, stays folded here (0.450).
   const pinned = useContext(PinnedPagesContext)
@@ -435,7 +447,7 @@ export function ActivityCard({
               {seg.text}
             </span>
           ))}
-          {anyPatch && !inComparison && (
+          {counts !== undefined && !inComparison && (
             <span className="lc-steps__counts lc-mono">
               <span className="lc-diff__addmark">+{counts.added}</span>
               <span className="lc-diff__delmark">−{counts.removed}</span>
@@ -459,7 +471,7 @@ export function ActivityCard({
             ))}
           </span>
         )}
-        {anyPatch && !inComparison && (
+        {counts !== undefined && !inComparison && (
           <span className="lc-activity__counts lc-mono">
             <span className="lc-diff__addmark">+{counts.added}</span>
             <span className="lc-diff__delmark">−{counts.removed}</span>
@@ -501,10 +513,16 @@ export function ActivityCard({
                       <span className="lc-filerow__path" title={entry.file.path}>{displayPath(entry.file.path, workspacePath)}</span>
                       <span className="lc-filerow__status">{entry.file.status}</span>
                       {entry.large && <span className="lc-filerow__status is-large">LARGE</span>}
-                      <span className="lc-filerow__result">
-                        <span className="lc-diff__addmark">+{entry.counts.added}</span>
-                        <span className="lc-diff__delmark">−{entry.counts.removed}</span>
-                      </span>
+                      {(() => {
+                        const counts = fileRowCounts(entry)
+                        if (counts === undefined) return null
+                        return (
+                          <span className="lc-filerow__result">
+                            <span className="lc-diff__addmark">+{counts.added}</span>
+                            <span className="lc-diff__delmark">−{counts.removed}</span>
+                          </span>
+                        )
+                      })()}
                       <span className="lc-activity__chev" aria-hidden="true">
                         <Icon name={isOpen(entry) ? 'chevron-down' : 'chevron-right'} size={12} />
                       </span>
@@ -1019,10 +1037,17 @@ export function HelperCalls({
               <Icon name="file" size={14} />
               <span className="lc-filerow__path" title={call.file.path}>{displayPath(call.file.path, workspacePath)}</span>
               <span className="lc-filerow__status">{call.file.status}</span>
-              <span className="lc-filerow__result">
-                <span className="lc-diff__addmark">+{call.counts.added}</span>
-                <span className="lc-diff__delmark">−{call.counts.removed}</span>
-              </span>
+              {call.large && <span className="lc-filerow__status is-large">LARGE</span>}
+              {(() => {
+                const counts = fileRowCounts(call)
+                if (counts === undefined) return null
+                return (
+                  <span className="lc-filerow__result">
+                    <span className="lc-diff__addmark">+{counts.added}</span>
+                    <span className="lc-diff__delmark">−{counts.removed}</span>
+                  </span>
+                )
+              })()}
             </div>
           )
         }

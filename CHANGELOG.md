@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.655.0 - 2026-10-05
+
+### Fixed
+
+- **A big file's change shows the right line counts.** When a teammate rewrote a long file, the list of changed files could say "+0 −747": the counts came from the part of the change Locust kept, not the whole of it, and read as if lines had only been deleted. A large change now shows the counts its tool reported for the whole change, or, when those are not known, just LARGE with no counts.
+
 ## 0.654.0 - 2026-10-05
 
 ### Improved
