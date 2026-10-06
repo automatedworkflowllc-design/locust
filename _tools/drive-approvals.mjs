@@ -104,7 +104,7 @@ try {
   check('nothing is on disk yet', !(await readFile(join(workspace, 'hello.txt'), 'utf8').then(() => true, () => false)))
   // 0.410, seen in this drive's own capture on 0.409.
   check('a file that does not exist yet is marked ADDED, not MODIFIED', card.status === 'ADDED', card.status)
-  check('the change’s header line is inset from the card’s edges, like the rest of it', card.headInset !== null && card.headInset.left >= 8 && card.headInset.right >= 8, JSON.stringify(card.headInset))
+  check('the change’s header line is inset from the card’s edges, like the rest of it', card.headInset != null && card.headInset.left >= 8 && card.headInset.right >= 8, JSON.stringify(card.headInset))
   check('the title bar says it needs you', /needs you/.test(card.needsYou), card.needsYou)
   const list = String(await drive.capture('the needs-you list', () => drive.evaluate(`(async () => {
     document.querySelector('.lc-needsyou')?.click()
