@@ -57,6 +57,8 @@ try {
   const ledgerDir = join(drive.profile, 'mission-ledger')
   const files = (await readdir(ledgerDir)).filter((name) => name.endsWith('.jsonl'))
   let recorded = ''
+  // How the reply reached the record: its writes, and the seconds between the first and the last.
+  const writes = []
   for (const file of files) {
     const items = new Map()
     for (const line of (await readFile(join(ledgerDir, file), 'utf8')).split('\n')) {
@@ -67,14 +69,25 @@ try {
       if (row.recordType !== 'mission.event' || event?.type !== 'message.delta') continue
       const { itemId, operation, text } = event.payload
       items.set(itemId, operation === 'replace' ? text : `${items.get(itemId) ?? ''}${text}`)
+      writes.push(Date.parse(event.occurredAt))
     }
     const last = [...items.values()].at(-1)
     if (last !== undefined && last.length > recorded.length) recorded = last
   }
+  const spread = writes.length < 2 ? 0 : (Math.max(...writes) - Math.min(...writes)) / 1000
   say(`shown ${String(shown.length)} chars, recorded ${String(recorded.length)} chars, growth ${JSON.stringify(growth.slice(0, 12))}`)
+  say(`  the record: ${String(writes.length)} write(s) of the reply over ${spread.toFixed(1)} s`)
   check('the reply is a real story (over 600 characters)', recorded.length > 600, String(recorded.length))
   check('the reply on screen is the reply in the record, word for word', normal(shown) === normal(recorded), `${normal(shown).slice(0, 80)} | ${normal(recorded).slice(0, 80)}`)
-  check('it grew on screen while it streamed', growth.filter((length) => length > 0).length >= 3, JSON.stringify(growth))
+  /*
+   * Growth only where the reply arrived in pieces. OpenCode's `run` route hands
+   * over a text part once it has ended (only Approve each goes through its
+   * server, which could stream), so a model that answers in one part reaches
+   * the record in one write: Longcat and Fledge Alpha, 2026-10-06, 1 write each.
+   * That is not this drive's question; the batching it guards is.
+   */
+  if (writes.length >= 3) check('it grew on screen while it streamed', growth.filter((length) => length > 0).length >= 3, JSON.stringify(growth))
+  else say(`  (not checked: the runtime sent the reply in ${String(writes.length)} write(s), so there was nothing to watch grow)`)
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
