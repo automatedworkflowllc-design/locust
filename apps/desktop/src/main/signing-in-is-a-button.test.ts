@@ -1,4 +1,4 @@
-import { signInCommand } from '../shared/runtime-install.js'
+import { signInCommand, signInOpenedLine } from '../shared/runtime-install.js'
 import { spawnSync } from 'node:child_process'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -37,7 +37,12 @@ describe('signing in is a button', () => {
     expect(signInArgs('copilot', true)).toEqual([])
     // Antigravity's too (0.553): `agy` opens its sign-in; /logout and /login inside it.
     expect(signInArgs('antigravity', true)).toEqual([])
-    expect(signInCommand('antigravity', true)).toBe('run agy, then type /logout and /login')
+    expect(signInCommand('antigravity', true)).toBe('run agy, then type /logout, then /login, and choose the account')
+    // And once its window is open, the row says the steps, not only the tooltip (0.656):
+    // `agy` opens signed in as it was, so "finish in the window" left Colin looking at a signed-in CLI.
+    expect(signInOpenedLine('antigravity', true)).toBe('In the window that opened, type /logout, then /login, and choose the account.')
+    expect(signInOpenedLine('antigravity')).toBe('Finish in the window that opened.')
+    expect(signInOpenedLine('codex', true)).toBe('Finish in the window that opened.')
     // No account at all: nothing, rather than a guess.
     expect(signInArgs('opencode', true)).toBeUndefined()
   })

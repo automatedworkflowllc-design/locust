@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 
-import { signInCommand } from '../../../shared/runtime-install.js'
+import { signInCommand, signInOpenedLine } from '../../../shared/runtime-install.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { SIGN_IN_OPENED_EVENT } from '../signInEvents.js'
@@ -48,7 +48,7 @@ export function SignInButton({ runtime, again = false }: { readonly runtime: str
   }, [state, runtime])
   if (command === undefined) return null
   if (state === 'opened') {
-    return <span className="lc-runtimecell__signin">Finish in the window that opened.</span>
+    return <span className="lc-runtimecell__signin">{signInOpenedLine(runtime, again)}</span>
   }
   if (typeof state === 'object') {
     return (

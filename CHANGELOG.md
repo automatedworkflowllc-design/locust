@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.656.0 - 2026-10-05
+
+### Fixed
+
+- **Switching Antigravity accounts says how.** Sign in again opens Antigravity still signed in, because switching accounts happens inside it. The steps were only in the button's tooltip. Once the window is open, the row now says them: type /logout, then /login, and choose the account.
+
 ## 0.655.0 - 2026-10-05
 
 ### Fixed

@@ -118,7 +118,7 @@ const FACTS: Readonly<Record<string, RuntimeInstallFacts | undefined>> = {
     install: { kind: 'vendor', url: 'https://antigravity.google/product/antigravity-cli/' },
     signIn: 'agy',
     signInAgain: 'agy',
-    signInAgainNote: 'then type /logout and /login',
+    signInAgainNote: 'then type /logout, then /login, and choose the account',
     account: 'a Google account'
   },
   // Found and signed into like the others, but no mission can run under it --
@@ -176,4 +176,16 @@ export function signInCommand(runtime: string, again = false): string | undefine
   const line = again ? facts?.signInAgain : facts?.signIn
   if (line === undefined) return undefined
   return again && facts?.signInAgainNote !== undefined ? `run ${line}, ${facts.signInAgainNote}` : `run ${line}`
+}
+
+/**
+ * What the row says once the sign-in window is open (0.656). Antigravity's
+ * `agy` opens signed in, as it was: switching accounts is `/logout` then
+ * `/login` inside it. That was only in the button's tooltip, and Colin, 10/05,
+ * switching accounts: "it didnt sign me out it just opened the cli with me
+ * signed in". The steps are said where the person is looking.
+ */
+export function signInOpenedLine(runtime: string, again = false): string {
+  const note = again ? runtimeInstallFacts(runtime)?.signInAgainNote : undefined
+  return note === undefined ? 'Finish in the window that opened.' : `In the window that opened, ${note.replace(/^then /, '')}.`
 }
