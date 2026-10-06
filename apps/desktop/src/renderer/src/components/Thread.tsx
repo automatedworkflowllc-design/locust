@@ -791,6 +791,8 @@ export interface ThreadProps {
   readonly onRunWithEdits?: () => void
   /** Offered only where the runtime never started, so nothing can repeat. */
   readonly onRunAgain?: () => void
+  /** A host-started turn cannot be repeated through the person's composer. */
+  readonly runAgainNote?: string
   /** A stopped run's message, sent again; drawn only when no tool had run. */
   readonly onSendAgain?: () => void
   /** A free model that gave up on its limit: the next one, with the message handed back. */
@@ -990,6 +992,7 @@ export function Thread({
   onOpenVersion,
   onRunWithEdits,
   onRunAgain,
+  runAgainNote,
   onSendAgain,
   limitModel,
   onContinueAfterBusy,
@@ -1752,6 +1755,8 @@ onResume,
             <SignInButton runtime={signInRuntime} />
           </div>
         )}
+
+        {runAgainNote !== undefined && <div className="lc-thread__note" role="note">{runAgainNote}</div>}
 
         {onRunAgain !== undefined && !refusedByMode && (
           /*

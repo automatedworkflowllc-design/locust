@@ -50,6 +50,62 @@ const APPROVAL_RULES = join(ROOT, 'src', 'shared', 'approval-rules.ts')
 
 const MUTATIONS = [
   {
+    file: MISSIONS,
+    name: 'relay-delivery: process launch consumes a waiting message',
+    from: '        scheduleConsume(mission)',
+    to: '        scheduleConsume(mission)\n        await peerExchange?.markDelivered(missionId, delivered)',
+    expect: 'leaves an instantly refused relay message waiting and quotes it on the next run',
+    tests: ['src/main/a-message-waits-until-its-runtime-starts.test.ts']
+  },
+  {
+    file: MISSIONS,
+    name: 'relay-delivery: a started process never marks its messages',
+    from: '      await mission.deliverMessages(events)',
+    to: '      // Deliberately skip the delivery mark.',
+    expect: 'keeps delivery after a relay started and failed, without quoting it again',
+    tests: ['src/main/a-message-waits-until-its-runtime-starts.test.ts']
+  },
+  {
+    file: ANTIGRAVITY,
+    name: 'relay-delivery: opening a hub conversation consumes a waiting message',
+    from: '        }, pollMs)\n        void poll(run)',
+    to: '        }, pollMs)\n        void poll(run)\n        await peerExchange?.markDelivered(missionId, delivered)',
+    expect: 'leaves a silent hub run undelivered and quotes its message on the next run',
+    tests: ['src/main/a-message-waits-until-its-runtime-starts.test.ts']
+  },
+  {
+    file: ANTIGRAVITY,
+    name: 'relay-delivery: a hub step never marks its messages',
+    from: '        await run.deliverMessages(fresh)',
+    to: '        // Deliberately skip the delivery mark.',
+    expect: 'marks a hub message on its first step and keeps it delivered when stopped',
+    tests: ['src/main/a-message-waits-until-its-runtime-starts.test.ts']
+  },
+  {
+    file: VIEW,
+    name: 'relay-delivery: a host briefing is retried through the person composer',
+    from: "  if (kind === 'person') return { onRunAgain: retry }",
+    to: '  if (true) return { onRunAgain: retry }',
+    expect: 'withholds Run it again for a relay and never makes its briefing your bubble',
+    tests: ['src/renderer/src/a-host-started-run-is-not-retried-as-your-message.test.tsx']
+  },
+  {
+    file: VIEW,
+    name: 'relay-delivery: a person loses the never-started retry',
+    from: "  if (kind === 'person') return { onRunAgain: retry }",
+    to: '  if (false) return { onRunAgain: retry }',
+    expect: 'still offers Run it again for your own never-started run',
+    tests: ['src/renderer/src/a-host-started-run-is-not-retried-as-your-message.test.tsx']
+  },
+  {
+    file: VIEW,
+    name: 'relay-delivery: handoffs are treated as person turns',
+    from: "  if (turn.handoff !== undefined || turn.restoredMission?.continuesFrom?.reason === 'route-switch'",
+    to: '  if (false',
+    expect: 'withholds a composer retry for live and recovered handoffs',
+    tests: ['src/renderer/src/a-host-started-run-is-not-retried-as-your-message.test.tsx']
+  },
+  {
     file: VIEW,
     name: 'a final rate-limit failure keeps its matching temporary warning too',
     from: "if (event.payload.kind === 'temporary-rate-limit' && endedOn !== undefined && sameSentence(event.payload.message, endedOn.payload.message)) break",
@@ -1321,7 +1377,11 @@ function runSuite() {
   // prove checks can.
   rmSync(REPORT, { force: true })
   try {
-    execFileSync('npx', ['vitest', 'run', '--reporter', 'json', '--outputFile', 'mutation-result.json'], {
+    // Focus only when every selected mutation names its proving files. Older
+    // controls and an unfiltered sweep still run the entire desktop suite.
+    const tests = selected.every((mutation) => mutation.tests !== undefined)
+      ? [...new Set(selected.flatMap((mutation) => mutation.tests))] : []
+    execFileSync('npx', ['vitest', 'run', ...tests, '--reporter', 'json', '--outputFile', 'mutation-result.json'], {
       cwd: ROOT,
       stdio: 'pipe',
       shell: true
@@ -1342,39 +1402,6 @@ function runSuite() {
   return { failed, unparseable, total: report.numTotalTests ?? 0 }
 }
 
-const originals = new Map([
-  [STATUS, readFileSync(STATUS, 'utf8')],
-  [APPROVALS, readFileSync(APPROVALS, 'utf8')],
-  [HANDOFF, readFileSync(HANDOFF, 'utf8')],
-  [MISSIONS, readFileSync(MISSIONS, 'utf8')],
-  [PEERS, readFileSync(PEERS, 'utf8')],
-  [BRIEFING, readFileSync(BRIEFING, 'utf8')],
-  [SHARE, readFileSync(SHARE, 'utf8')],
-  [DECISION, readFileSync(DECISION, 'utf8')],
-  [RESUME, readFileSync(RESUME, 'utf8')],
-  [CMDLEN, readFileSync(CMDLEN, 'utf8')],
-  [CMDREC, readFileSync(CMDREC, 'utf8')],
-  [VIEW, readFileSync(VIEW, 'utf8')],
-  [TEAMMATES, readFileSync(TEAMMATES, 'utf8')],
-  [CATALOG, readFileSync(CATALOG, 'utf8')],
-  [HISTORY, readFileSync(HISTORY, 'utf8')],
-  [RUNTIMES, readFileSync(RUNTIMES, 'utf8')],
-  [ROSTER, readFileSync(ROSTER, 'utf8')],
-  [UPDATES, readFileSync(UPDATES, 'utf8')],
-  [RELAY, readFileSync(RELAY, 'utf8')],
-  [FACES, readFileSync(FACES, 'utf8')],
-  [ANTIGRAVITY, readFileSync(ANTIGRAVITY, 'utf8')],
-  [COST, readFileSync(COST, 'utf8')],
-  [CATALOG_MODELS, readFileSync(CATALOG_MODELS, 'utf8')],
-  [ROUTINE_RUNNER, readFileSync(ROUTINE_RUNNER, 'utf8')],
-  [ROUTINE_STORE, readFileSync(ROUTINE_STORE, 'utf8')],
-  [ROUTINES_VIEW, readFileSync(ROUTINES_VIEW, 'utf8')],
-  [STEERING, readFileSync(STEERING, 'utf8')],
-  [AGENT_TEXT, readFileSync(AGENT_TEXT, 'utf8')],
-  [TEAMMATE_WORK, readFileSync(TEAMMATE_WORK, 'utf8')],
-  [WHO_DECIDES, readFileSync(WHO_DECIDES, 'utf8')],
-  [APPROVAL_RULES, readFileSync(APPROVAL_RULES, 'utf8')]
-])
 let problems = 0
 
 // An optional substring filter, so one new invariant can be checked in
@@ -1394,9 +1421,14 @@ if (selected.length === 0) {
 }
 if (filter !== undefined) console.error(`filtered to ${selected.length} of ${MUTATIONS.length} mutations`)
 
+// A focused control reads and restores only its targets. An unrelated retired
+// module must not prevent a new invariant from being checked.
+const originals = new Map([...new Set(selected.map((mutation) => mutation.file))]
+  .map((file) => [file, readFileSync(file, 'utf8')]))
+
 try {
   const baseline = runSuite()
-  if (baseline.failed.length > 0) {
+  if (baseline.unparseable || baseline.total <= 0 || baseline.failed.length > 0) {
     console.error(`baseline is not green: ${baseline.failed.join(', ')}`)
     process.exit(1)
   }
@@ -1406,9 +1438,7 @@ try {
     const target = mutation.file
     const original = originals.get(target)
     if (original === undefined) {
-      // Every mutated file must be registered above so it can be restored.
-      // Without this the sweep died on `undefined.includes` and named neither
-      // the file nor the mutation.
+      // A selected target must have a snapshot so it can be restored.
       console.error(`  [SKIP] ${mutation.name} -- ${target} is not in the originals map`)
       problems += 1
       continue

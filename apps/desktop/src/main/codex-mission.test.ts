@@ -1783,12 +1783,12 @@ describe('the workroom around a mission', () => {
     for (let i = 0; i < 20; i += 1) await new Promise((resolve) => setImmediate(resolve))
   }
 
-  it('quotes a waiting message into the prompt as a claim, records it, and marks it delivered only once the run is live', async () => {
+  it('quotes a waiting message into the prompt as a claim, records it, and marks it delivered only once the runtime starts', async () => {
     const { workroom, delivered } = fakeWorkroom({
       unread: async (teammateId) =>
         teammateId === 'tm_wren' ? { messages: [waiting('pnpm check runs everything.')], remaining: 0 } : { messages: [], remaining: 0 }
     })
-    const { service, start, links } = peerService({ run: transcript('Done.'), workroom })
+    const { service, start, links, scheduled } = peerService({ run: transcript('Done.'), workroom })
 
     const response = await service.start('Which command runs the checks?', 'codex', 'ask', {}, () => undefined, undefined, PEER)
 
@@ -1810,6 +1810,8 @@ describe('the workroom around a mission', () => {
         links: [{ direction: 'received', messageId: 'wm_1', peerTeammateId: 'tm_atlas', occurredAt: NOW }]
       }
     ])
+    expect(delivered).toEqual([])
+    await drain(scheduled)
     expect(delivered).toEqual([{ messageIds: ['wm_1'], missionId: 'mission_2' }])
     expect(response.data.peerMessages).toEqual([
       {

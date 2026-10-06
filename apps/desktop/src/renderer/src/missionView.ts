@@ -5841,6 +5841,33 @@ export function runtimeNeverStarted(events: readonly NormalizedRuntimeEvent[]): 
   return events.every((event) => NEVER_STARTED_SHAPES.has(event.type) && event.runtimeThreadId === undefined)
 }
 
+/** Retrying through the composer must preserve whose turn this was. */
+export function runAgainKind(turn: {
+  readonly prompt: string
+  readonly startedBy?: LiveStarter
+  readonly handoff?: unknown
+  readonly restoredMission?: { readonly continuesFrom?: { readonly reason: string } }
+}): 'person' | 'relay' | 'host' {
+  if (turn.startedBy?.kind === 'relay') return 'relay'
+  if (turn.handoff !== undefined || turn.restoredMission?.continuesFrom?.reason === 'route-switch'
+    || briefAskedFor(turn.prompt) !== undefined) return 'host'
+  return turn.startedBy === undefined || turn.startedBy.kind === 'tag' || turn.startedBy.kind === 'terminal'
+    ? 'person' : 'host'
+}
+
+/** A host briefing cannot be retried as a newly typed person message. */
+export function runAgainOffer(turn: Parameters<typeof runAgainKind>[0] & {
+  readonly phase: string
+  readonly events: readonly NormalizedRuntimeEvent[]
+}, running: boolean, retry: () => void): { readonly onRunAgain?: () => void; readonly runAgainNote?: string } {
+  if (running || turn.phase !== 'failed' || !runtimeNeverStarted(turn.events) || turn.prompt.trim().length === 0) return {}
+  const kind = runAgainKind(turn)
+  if (kind === 'person') return { onRunAgain: retry }
+  return { runAgainNote: kind === 'relay'
+    ? "The message is still waiting. It will be answered on this teammate's next run."
+    : 'Locust started this run. Start it again from its original control to keep its context.' }
+}
+
 /** How many events a live run keeps in memory; the record keeps them all. The history's window too (shared/event-window.ts). */
 export const LIVE_EVENT_CAP = EVENT_WINDOW
 

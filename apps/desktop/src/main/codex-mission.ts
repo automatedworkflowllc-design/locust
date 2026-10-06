@@ -37,6 +37,7 @@ import type {
   RuntimeProcessRunner, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import { workspaceIdFor } from './workspace.js'
 import { createStreamedEventBatcher } from './streamed-event-batches.js'
+import { deliverWhenRuntimeStarts } from './runtime-delivery.js'
 import { persistEventUpdates } from './durable-event-updates.js'
 import type { MissionContinuation, MissionLedger, RecoveredMission, Workroom, WorkroomMessage } from '@teammate/mission-store'
 import type { AcpCapabilities, MissionSandbox, OpenCodeProvider, RuntimeCommandInfo, RuntimeCommandSpec } from '@teammate/runtime-adapters'
@@ -208,6 +209,8 @@ interface ActiveCodexMission {
   lastSequence: number
   /** Every event persisted, so the observation can tell reported edits from unreported ones. */
   readonly persisted: NormalizedRuntimeEvent[]
+  /** Called only for durable runtime records, never the host's terminal receipt. */
+  readonly deliverMessages: (events: readonly NormalizedRuntimeEvent[]) => Promise<void>
   /** When the start's phases began and the first event arrived (0.602); the run's end writes the note. */
   readonly startTiming: StartTiming
   /** Approval cards flush text already normalized by this consume loop. */
@@ -905,6 +908,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
     let ledgerFailed = false
     const batches = createStreamedEventBatcher(async (events) => {
       await persistAndEmit(mission, options.ledger, events)
+      await mission.deliverMessages(events)
       // Best effort, after the durable write; this is not a ledger failure.
       await explainADeniedRead(mission, events).catch(() => undefined)
     }, (error) => {
@@ -2460,7 +2464,8 @@ ${sentPrompt.trim()}`
           saidWhyAReadFailed: false,
           lastSequence: 0,
           startTiming: { sentAt, phaseAt },
-          persisted: []
+          persisted: [],
+          deliverMessages: deliverWhenRuntimeStarts(peerExchange, missionId, delivered)
         }
         active.set(runId, mission)
         /*
@@ -2492,10 +2497,6 @@ ${sentPrompt.trim()}`
           }
         }
         scheduleConsume(mission)
-
-        // Marked delivered only now that the run is live, so a start that
-        // failed above never consumed anything.
-        if (peerExchange !== undefined) await peerExchange.markDelivered(missionId, delivered)
 
         return {
           ok: true,

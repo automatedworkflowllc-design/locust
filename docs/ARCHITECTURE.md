@@ -244,10 +244,19 @@ the window is told only that a key is kept.
   (`main/peer-exchange.ts`). The recipient's next turn sees it quoted as a
   claim, dated and attributed, never as an instruction. A cancelled or failed
   run shares nothing.
+  Quoting records a received link, but consumes the waiting message only after
+  a runtime start or work event is durable (`main/runtime-delivery.ts`, called
+  from the process consumer and Antigravity's transcript poller). A process
+  that exits before such an event leaves the message for the next run; a run
+  that starts and then fails keeps it delivered.
 - **The relay** (`main/relay.ts`) lets teammates answer each other with no
   person typing: a share may start the recipient's run, and its answer starts
   the sender's next turn in the thread that asked. A switch in Settings, a hop
   cap, and the rule that a reply with no share starts nothing bound it.
+  A never-started host turn is not offered the composer's "Run it again":
+  relay messages wait for the teammate's next run, and other host turns return
+  to their original control. Person-started turns retain the retry offer
+  (`renderer/src/missionView.ts`, `runAgainOffer`).
 - **Rooms** (`main/room-store.ts`) are a named set of teammates and the posts
   made to all of them. A post starts one ordinary mission per teammate on its
   own route; the room remembers only which missions a post started.

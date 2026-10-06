@@ -16,6 +16,7 @@ import { runtimeThreadIdOf } from './codex-mission.js'
 import { changedPaths, observedEditEvents, observedPatches, sharedTreeNotice, snapshotWorkspace, unreportedPaths } from './disk-observation.js'
 import type { WorkspaceSnapshot } from './disk-observation.js'
 import { createPeerExchange, createTranscriptTracker, publicPeerMessage } from './peer-exchange.js'
+import { deliverWhenRuntimeStarts } from './runtime-delivery.js'
 import type { MemoryBriefing } from './peer-exchange.js'
 import type { PeerExchange, TranscriptTracker } from './peer-exchange.js'
 import type { EndedMission, RelayOrigin, SharingMission } from './relay.js'
@@ -291,6 +292,7 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
     readonly peer: MissionPeerContext | undefined
     readonly relay: RelayOrigin | undefined
     readonly transcript: TranscriptTracker
+    readonly deliverMessages: (events: readonly NormalizedRuntimeEvent[]) => Promise<void>
     readonly normalizer: ReturnType<typeof createAntigravityEventNormalizer>
     readonly transcriptPath: string
     readonly startedAt: string
@@ -635,6 +637,7 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
        */
       if (fresh.length > 0) {
         await persistAndEmit(run, fresh)
+        await run.deliverMessages(fresh)
         noteQuestions(run, fresh)
       }
       if (lines.length > run.fed) {
@@ -890,6 +893,7 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
           peer,
           relay: route.relay,
           transcript: createTranscriptTracker(),
+          deliverMessages: deliverWhenRuntimeStarts(peerExchange, missionId, delivered),
           normalizer: createAntigravityEventNormalizer({
             runId,
             missionId,
@@ -923,7 +927,6 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
           void poll(run)
         }, pollMs)
         void poll(run)
-        if (peerExchange !== undefined) await peerExchange.markDelivered(missionId, delivered)
 
         return {
           runId,

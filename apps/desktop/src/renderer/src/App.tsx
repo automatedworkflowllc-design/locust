@@ -177,7 +177,7 @@ import {
   rootMission,
   startedLabel,
   stitchedHandoff,
-  runtimeNeverStarted, shownPrompt, typedPrompt, buildThread, durationText, runSpanMs, lastActivityAt, relativePath, fileTurns, shellCommandText, turnText, groupBoundary, groupJoins, groupLeavings, latestSetupNotes } from './missionView.js'
+  runAgainOffer, shownPrompt, typedPrompt, buildThread, durationText, runSpanMs, lastActivityAt, relativePath, fileTurns, shellCommandText, turnText, groupBoundary, groupJoins, groupLeavings, latestSetupNotes } from './missionView.js'
 import type { FilePutBack, LiveStarter, ThreadItem, TurnSwitch, TurnVersions } from './missionView.js'
 import { finishedToast } from './finishedToast.js'
 import { folderName, ranOnLine } from './ranOn.js'
@@ -8274,30 +8274,7 @@ export default function App(): ReactElement {
                       }
                     : undefined
                 }
-                onRunAgain={
-                  /*
-                   * Offered only where the runtime NEVER STARTED.
-                   *
-                   * No session was opened, no tool ran, nothing was touched
-                   * -- so pressing this cannot repeat anything, which is the
-                   * only reason it is safe to offer at all. A run that got
-                   * as far as doing something is deliberately excluded:
-                   * whether the half it did matters is the person's call.
-                   *
-                   * The measured case is a Cursor start dying on its own
-                   * config file while a second copy of it held that file
-                   * open (Colin, 2026-09-14). Transient, not his fault, and
-                   * the message he had typed was still exactly right --
-                   * retyping it was the only way forward and should not have
-                   * been.
-                   */
-                  !running
-                  && liveRun.phase === 'failed'
-                  && runtimeNeverStarted(liveRun.events)
-                  && liveRun.prompt.trim().length > 0
-                    ? () => void startMission(liveRun.prompt)
-                    : undefined
-                }
+                {...runAgainOffer(liveRun, running, () => void startMission(liveRun.prompt))}
                 resumeRefusal={resumeRefusal !== undefined && resumeRefusal.missionId === liveRun.restoredMission?.missionId ? resumeRefusal.message : undefined}
                 onResume={
                   // Offered only for a mission that is not running and whose

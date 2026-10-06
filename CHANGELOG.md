@@ -11,6 +11,13 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.667.0 - 2026-10-06
+
+### Fixed
+
+- **A message between teammates is never lost to a run that did not start.** When one teammate wrote to another and the reply's run failed before its agent had started (a refused setting, a sign-in problem), the message was already counted as read and was gone. Now it counts as read only once the agent has actually begun, so it waits for the next run instead.
+- **"Run it again" no longer turns an automatic reply into your message.** On a run Locust started on a teammate's behalf, it re-ran Locust's own instructions as if you had typed them, and they showed as your bubble in the conversation. Such a run now says the message will be answered on the teammate's next run.
+
 ## 0.666.0 - 2026-10-06
 
 ### Fixed
