@@ -29,7 +29,7 @@ if (outPath !== undefined) await mkdir(outPath, { recursive: true })
 
 // Antigravity runs only in a folder it has opened itself; this is the one the
 // smoke uses. The two files are removed again at the end.
-const workspace = 'C:/Users/<home>/Documents/antigravtest'
+const workspace = join(homedir(), 'Documents', 'antigravtest').replace(/\\/g, '/')
 const FILES = [
   { name: 'agy-alpha.txt', marker: 'ALPHA-MARKER-5170' },
   { name: 'agy-bravo.txt', marker: 'BRAVO-MARKER-8823' }

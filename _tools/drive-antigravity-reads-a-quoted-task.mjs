@@ -16,11 +16,12 @@ import { rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { pickRouteScript, recordRoot, say, sleep, startDrive } from './drive-lib.mjs'
+import { homedir } from 'node:os'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tag = arg('--tag') ?? 'local'
-const WORKSPACE = 'C:/Users/<home>/Documents/antigravtest'
+const WORKSPACE = join(homedir(), 'Documents', 'antigravtest').replace(/\\/g, '/')
 const FILE = join(WORKSPACE, 'quoted-task.txt')
 await writeFile(FILE, [
   'Notes copied from another agent\'s log:',

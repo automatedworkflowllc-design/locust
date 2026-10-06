@@ -21,7 +21,7 @@ import { holdCursorDefault } from './cursor-default-hold.mjs'
 import { spawn, execFile, execFileSync } from 'node:child_process'
 import { readFileSync, rmSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 /**
@@ -46,7 +46,7 @@ function endTree(child) {
 
 export const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
-const NPM_DIR = 'C:\\Users\\<home>\\AppData\\Roaming\\npm'
+const NPM_DIR = join(homedir(), 'AppData', 'Roaming', 'npm')
 // LOCUST_FREE_MODEL picks another of OpenCode's free models when this one is
 // down (Muse Spark was, 9/22-9/24); `opencode models | grep free` lists them.
 export const FREE_ROUTE = { runtime: 'opencode', model: process.env.LOCUST_FREE_MODEL ?? 'opencode/muse-spark-1.3-contributor-free', mode: 'accept-edits' }

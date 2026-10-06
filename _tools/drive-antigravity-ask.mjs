@@ -32,6 +32,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { pickRouteScript, say, startDrive, teammateFace } from './drive-lib.mjs'
+import { homedir } from 'node:os'
 
 const WAIT_SECONDS = 150
 
@@ -43,7 +44,7 @@ const WAIT_SECONDS = 150
 // Forward slashes on purpose: Windows accepts them, and a path with no
 // backslashes has no escapes for a shell heredoc to eat on the way in. That
 // has now cost five separate edits in one session.
-const workspace = process.argv[2] ?? 'C:/Users/<home>/Documents/antigravtest'
+const workspace = process.argv[2] ?? join(homedir(), 'Documents', 'antigravtest').replace(/\\/g, '/')
 
 const drive = await startDrive({
   name: 'antigravity-ask',

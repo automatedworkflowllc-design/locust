@@ -28,7 +28,7 @@ import { pickRouteScript, say, sleep, startDrive, recordRoot } from './drive-lib
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
-const WORKSPACE = 'C:/Users/<home>/Documents/antigravtest'
+const WORKSPACE = join(homedir(), 'Documents', 'antigravtest').replace(/\\/g, '/')
 const OUT = join(recordRoot('antigravity-answer-2026-09-23'), packaged === undefined ? 'local' : 'packaged')
 await mkdir(OUT, { recursive: true })
 
