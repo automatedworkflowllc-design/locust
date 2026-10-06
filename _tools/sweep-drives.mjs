@@ -27,6 +27,26 @@ if (packaged === undefined || out === undefined) {
 }
 const only = arg('--only')?.split(',').map((name) => name.trim())
 const from = arg('--from')
+/*
+ * THE FREE MODELS, IN TURN (2026-10-06). One free model for a whole sweep is a
+ * provider asked hundreds of times in a row: Ling 3.0 went "Endpoint is
+ * unavailable" and Muse Spark "Rate limit exceeded" under it, and every drive
+ * after failed for the provider's reason, not Locust's. Each drive takes the
+ * next of the free models the scorecard (_tools/free-model-scorecard.mjs)
+ * found answering, so no one provider carries the sweep.
+ */
+const FREE_MODELS = [
+  'opencode/muse-spark-1.3-contributor-free',
+  'opencode/space-bunny-free',
+  'opencode/nemotron-3-ultra-free',
+  'opencode/fledge-alpha-free',
+  'opencode/longcat-2.5-preview-free',
+  'opencode/nemotron-3.5-lightning-free',
+  'opencode/mimo-v2.6-flash-free',
+  'opencode/ling-3.1-flash-free'
+]
+let freeTurn = 0
+const nextFreeModel = () => FREE_MODELS[freeTurn++ % FREE_MODELS.length]
 const LIMIT_MS = Number(arg('--limit-min') ?? '20') * 60_000
 
 /**
@@ -99,7 +119,7 @@ for (const name of drives.slice(start)) {
     // The free model is the drives' own (drive-lib FREE_ROUTE) unless LOCUST_FREE_MODEL says otherwise. This forced
     // Ling 3.0, and on 2026-10-06 Ling 3.0's provider was down ("Endpoint is unavailable", then rate limits): 41 of
     // the first 83 drives failed on it while Muse Spark answered.
-    env: { ...process.env, LOCUST_DRIVE_OUT: join(out, 'captures'), ...(ENV[name.replace(/\.mjs$/, '')] ?? {}) },
+    env: { ...process.env, LOCUST_DRIVE_OUT: join(out, 'captures'), LOCUST_FREE_MODEL: process.env.LOCUST_FREE_MODEL ?? nextFreeModel(), ...(ENV[name.replace(/\.mjs$/, '')] ?? {}) },
     windowsHide: true
   })
   let text = ''
