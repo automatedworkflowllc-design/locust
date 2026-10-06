@@ -14,6 +14,7 @@ import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { performance } from 'node:perf_hooks'
+import { StringDecoder } from 'node:string_decoder'
 
 export const DEFAULT_SCRATCH = process.env.LOCUST_SCRATCH
   ? join(process.env.LOCUST_SCRATCH, 'free-model-scorecard')
@@ -75,7 +76,44 @@ export function extractTextFromOpenCodeOutput(stdout) {
 /**
  * Run OpenCode in Edit mode with given prompt in cwd.
  */
-export function runOpenCodeJob({ model, prompt, cwd, timeoutMs = DEFAULT_TIMEOUT_MS }) {
+// --print-logs forwards OpenCode's own ERROR log to stderr. The build
+// agent's stream error is emitted on the first rejected provider request,
+// before OpenCode waits to retry. Title-agent errors are not job evidence.
+export function providerLimitFromLine(line, source) {
+  let message
+  let limitedStatus = false
+  if (source === 'stderr') {
+    if (!/message="stream error"/.test(line) || !/(?:^|\s)agent=build(?:\s|$)/.test(line)) return undefined
+    const quoted = /error\.error=("(?:\\.|[^"\\])*")/.exec(line)?.[1]
+    if (quoted === undefined) return undefined
+    try { message = JSON.parse(quoted) } catch { return undefined }
+  } else {
+    try {
+      const event = JSON.parse(line)
+      if (event.type !== 'error') return undefined
+      message = event.error?.data?.message ?? event.error?.message
+      limitedStatus = event.error?.data?.statusCode === 429
+    } catch { return undefined }
+  }
+  if (typeof message !== 'string') return undefined
+  message = message.replace(/^AI_[A-Za-z]+Error:\s*/, '').trim()
+  if (!limitedStatus && !/rate[\s_-]*limit|too many requests|\b429\b|quota(?:[\s_-]+(?:exceeded|exhausted|reached))?|insufficient_quota/i.test(message)) return undefined
+  return { message, source, detectedAt: new Date().toISOString() }
+}
+
+function stopOpenCode(child) {
+  try {
+    if (process.platform === 'win32') {
+      execFileSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' })
+    } else {
+      child.kill('SIGKILL')
+    }
+  } catch {
+    // The close event still owns completion, including an already stopped child.
+  }
+}
+
+export function runOpenCodeJob({ model, prompt, cwd, timeoutMs = DEFAULT_TIMEOUT_MS }, { spawnProcess = spawn, stopProcess = stopOpenCode } = {}) {
   return new Promise((resolve) => {
     const start = performance.now()
     const env = {
@@ -86,7 +124,7 @@ export function runOpenCodeJob({ model, prompt, cwd, timeoutMs = DEFAULT_TIMEOUT
     }
     const isWin = process.platform === 'win32'
     const args = ['run', '--format', 'json', '--print-logs', '--log-level', 'ERROR', '-m', model, '--title', 'Locust']
-    const child = spawn(isWin ? 'cmd.exe' : 'opencode', isWin ? ['/c', 'opencode', ...args] : args, {
+    const child = spawnProcess(isWin ? 'cmd.exe' : 'opencode', isWin ? ['/c', 'opencode', ...args] : args, {
       cwd,
       env,
       stdio: ['pipe', 'pipe', 'pipe']
@@ -95,33 +133,59 @@ export function runOpenCodeJob({ model, prompt, cwd, timeoutMs = DEFAULT_TIMEOUT
     let stdout = ''
     let stderr = ''
     let timedOut = false
+    let rateLimit
+    const buffers = { stdout: '', stderr: '' }
+    const decoders = { stdout: new StringDecoder('utf8'), stderr: new StringDecoder('utf8') }
+
+    const inspect = (line, source) => {
+      if (rateLimit !== undefined) return
+      rateLimit = providerLimitFromLine(line, source)
+      if (rateLimit !== undefined) {
+        clearTimeout(timer)
+        stopProcess(child)
+      }
+    }
+    const consume = (chunk, source) => {
+      const decoded = decoders[source].write(chunk)
+      if (source === 'stdout') stdout += decoded
+      else stderr += decoded
+      buffers[source] += decoded
+      const lines = buffers[source].split(/\r?\n/)
+      buffers[source] = lines.pop()
+      for (const line of lines) inspect(line, source)
+    }
+    const flush = () => {
+      for (const source of ['stdout', 'stderr']) {
+        const tail = decoders[source].end()
+        if (source === 'stdout') stdout += tail
+        else stderr += tail
+        inspect(buffers[source] + tail, source)
+        buffers[source] = ''
+      }
+    }
 
     const timer = setTimeout(() => {
+      // A last log line need not end in a newline.
+      for (const source of ['stdout', 'stderr']) inspect(buffers[source], source)
+      if (rateLimit !== undefined) return
       timedOut = true
-      try {
-        if (process.platform === 'win32') {
-          execFileSync('taskkill', ['/pid', String(child.pid), '/T', '/F'])
-        } else {
-          child.kill('SIGKILL')
-        }
-      } catch {
-        // already stopped
-      }
+      stopProcess(child)
     }, timeoutMs)
 
-    child.stdout.on('data', (chunk) => { stdout += chunk.toString() })
-    child.stderr.on('data', (chunk) => { stderr += chunk.toString() })
+    child.stdout.on('data', (chunk) => { consume(chunk, 'stdout') })
+    child.stderr.on('data', (chunk) => { consume(chunk, 'stderr') })
 
     child.on('error', (err) => {
       clearTimeout(timer)
       const durationMs = Math.round(performance.now() - start)
-      resolve({ status: -1, stdout, stderr, durationMs, timedOut: false, error: err.message })
+      resolve({ status: -1, stdout, stderr, durationMs, timedOut: false, rateLimit, error: err.message })
     })
 
     child.on('close', (code) => {
       clearTimeout(timer)
+      flush()
       const durationMs = Math.round(performance.now() - start)
-      resolve({ status: code, stdout, stderr, durationMs, timedOut })
+      resolve({ status: code, stdout, stderr, durationMs, timedOut: rateLimit === undefined && timedOut, rateLimit })
     })
 
     child.stdin.write(prompt)
@@ -227,11 +291,12 @@ export const JOBS = [
 ]
 
 /**
- * Classify model verdict into good | slow | failing.
+ * Classify model verdict into good | slow | failing | rate-limited.
  */
 export function evaluateModelVerdict(model, jobResults) {
   const passedJobs = []
   const failedJobs = []
+  const rateLimitedJobs = []
   const jobTimesMs = {}
   const jobDetails = {}
   let totalDurationMs = 0
@@ -242,10 +307,14 @@ export function evaluateModelVerdict(model, jobResults) {
     jobDetails[res.id] = {
       passed: res.passed,
       durationMs: res.durationMs,
-      why: res.why
+      why: res.why,
+      state: res.rateLimit !== undefined ? 'rate-limited' : res.passed ? 'passed' : 'failed',
+      rateLimit: res.rateLimit
     }
     if (res.passed) {
       passedJobs.push(res.id)
+    } else if (res.rateLimit !== undefined) {
+      rateLimitedJobs.push(res.id)
     } else {
       failedJobs.push(res.id)
     }
@@ -257,9 +326,12 @@ export function evaluateModelVerdict(model, jobResults) {
 
   let state
   let why
-  if (passedCount < totalCount) {
+  if (failedJobs.length > 0) {
     state = 'failing'
     why = `Passed ${passedCount}/${totalCount} jobs; failed: ${failedJobs.join(', ')}`
+  } else if (rateLimitedJobs.length > 0) {
+    state = 'rate-limited'
+    why = `Passed ${passedCount}/${totalCount} jobs; rate-limited: ${rateLimitedJobs.join(', ')}`
   } else if (averageDurationMs > 60000) {
     state = 'slow'
     why = `Passed ${passedCount}/${totalCount} jobs, but slow (avg ${(averageDurationMs / 1000).toFixed(1)}s/job, total ${(totalDurationMs / 1000).toFixed(1)}s)`
@@ -273,6 +345,7 @@ export function evaluateModelVerdict(model, jobResults) {
     state,
     passedJobs,
     failedJobs,
+    rateLimitedJobs,
     passedCount,
     totalCount,
     jobTimesMs,
@@ -286,6 +359,13 @@ export function evaluateModelVerdict(model, jobResults) {
 /**
  * Run all jobs for a single model.
  */
+export function evaluateJobResult(job, runRes, jobDir, timeoutMs) {
+  if (runRes.rateLimit !== undefined) return { passed: false, why: runRes.rateLimit.message }
+  if (runRes.timedOut) return { passed: false, why: `Timed out after ${timeoutMs}ms` }
+  if (runRes.error !== undefined || runRes.status !== 0) return { passed: false, why: runRes.error ?? `OpenCode exited with status ${String(runRes.status)}` }
+  return job.verify(runRes.stdout, jobDir)
+}
+
 export async function evaluateModel(model, scratchDir, timeoutMs = DEFAULT_TIMEOUT_MS) {
   console.log(`\nEvaluating model: ${model}`)
   const jobResults = []
@@ -298,19 +378,11 @@ export async function evaluateModel(model, scratchDir, timeoutMs = DEFAULT_TIMEO
     process.stdout.write(`  [${job.name}] Running... `)
     const runRes = await runOpenCodeJob({ model, prompt: job.prompt, cwd: jobDir, timeoutMs })
 
-    let passed = false
-    let why = ''
-    if (runRes.timedOut) {
-      passed = false
-      why = `Timed out after ${timeoutMs}ms`
-    } else {
-      const verifyRes = job.verify(runRes.stdout, jobDir)
-      passed = verifyRes.passed
-      why = verifyRes.why
-    }
+    const { passed, why } = evaluateJobResult(job, runRes, jobDir, timeoutMs)
+    writeFileSync(join(jobDir, 'run.json'), `${JSON.stringify(runRes, null, 2)}\n`, 'utf8')
 
     const durationSec = (runRes.durationMs / 1000).toFixed(1)
-    console.log(`${passed ? 'PASS' : 'FAIL'} (${durationSec}s) - ${why}`)
+    console.log(`${runRes.rateLimit !== undefined ? 'RATE-LIMITED' : passed ? 'PASS' : 'FAIL'} (${durationSec}s) - ${why}`)
 
     jobResults.push({
       id: job.id,
@@ -318,6 +390,7 @@ export async function evaluateModel(model, scratchDir, timeoutMs = DEFAULT_TIMEO
       passed,
       durationMs: runRes.durationMs,
       why,
+      rateLimit: runRes.rateLimit,
       timedOut: runRes.timedOut
     })
   }
@@ -351,6 +424,7 @@ async function main() {
   mkdirSync(scratch, { recursive: true })
 
   const models = model ? [model] : getAvailableFreeModels()
+  if (models.some((id) => !/^opencode\/[A-Za-z0-9._-]+-free$/.test(id))) throw new Error('Only OpenCode free models may be benchmarked')
   console.log(`Free Model Scorecard: evaluating ${models.length} model(s)`)
   console.log(`Scratch directory: ${scratch}`)
   console.log(`Per-job timeout: ${(timeoutMs / 1000).toFixed(0)}s`)
@@ -402,14 +476,20 @@ async function main() {
   const tableData = verdicts.map((v) => ({
     Model: v.model.replace('opencode/', ''),
     State: v.state.toUpperCase(),
-    'Write File': v.jobDetails.write_file ? (v.jobDetails.write_file.passed ? `PASS (${(v.jobDetails.write_file.durationMs / 1000).toFixed(1)}s)` : 'FAIL') : 'N/A',
-    'Fix Bug': v.jobDetails.fix_bug ? (v.jobDetails.fix_bug.passed ? `PASS (${(v.jobDetails.fix_bug.durationMs / 1000).toFixed(1)}s)` : 'FAIL') : 'N/A',
-    'Answer Q': v.jobDetails.answer_question ? (v.jobDetails.answer_question.passed ? `PASS (${(v.jobDetails.answer_question.durationMs / 1000).toFixed(1)}s)` : 'FAIL') : 'N/A',
+    'Write File': jobLabel(v.jobDetails.write_file),
+    'Fix Bug': jobLabel(v.jobDetails.fix_bug),
+    'Answer Q': jobLabel(v.jobDetails.answer_question),
     'Total (s)': (v.totalDurationMs / 1000).toFixed(1),
     Why: v.why
   }))
   console.table(tableData)
   console.log(`Total benchmark duration: ${(totalRunMs / 1000).toFixed(1)}s across ${verdicts.length} models\n`)
+}
+
+function jobLabel(detail) {
+  if (detail === undefined) return 'N/A'
+  if (detail.state === 'rate-limited') return 'RATE-LIMITED'
+  return detail.passed ? `PASS (${(detail.durationMs / 1000).toFixed(1)}s)` : 'FAIL'
 }
 
 if (process.argv[1] !== undefined && /free-model-scorecard\.mjs$/.test(process.argv[1])) {

@@ -3,15 +3,127 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'vitest'
+import { EventEmitter } from 'node:events'
+import { PassThrough } from 'node:stream'
 
 import {
   evaluateModelVerdict,
+  evaluateJobResult,
   extractTextFromOpenCodeOutput,
   parseFreeModels,
+  providerLimitFromLine,
+  runOpenCodeJob,
   verifyJobA,
   verifyJobB,
   verifyJobC
 } from './free-model-scorecard.mjs'
+
+const providerWords = 'Rate limit exceeded. Please try again later.'
+const limitLog = `timestamp=2026-09-26T18:27:20.168Z level=ERROR message="stream error" providerID=opencode modelID=example-free agent=build error.error="AI_APICallError: ${providerWords}"`
+
+test('a recorded provider limit is rate-limited with its words and detection time', () => {
+  const limit = providerLimitFromLine(limitLog, 'stderr')
+  assert.equal(limit.message, providerWords)
+  assert.equal(limit.source, 'stderr')
+  assert.ok(Number.isFinite(Date.parse(limit.detectedAt)))
+  const job = { id: 'write_file', verify: () => ({ passed: true, why: 'ok' }) }
+  const result = evaluateJobResult(job, { rateLimit: limit, timedOut: true, status: 1 }, '', 10)
+  assert.equal(result.passed, false)
+  assert.equal(result.why, providerWords)
+  const verdict = evaluateModelVerdict('opencode/example-free', [{ ...result, id: job.id, durationMs: 10, rateLimit: limit }])
+  assert.equal(verdict.state, 'rate-limited')
+  assert.deepEqual(verdict.rateLimitedJobs, ['write_file'])
+  assert.deepEqual(verdict.failedJobs, [])
+  assert.deepEqual(verdict.jobDetails.write_file.rateLimit, limit)
+})
+
+test('a plain timeout remains failing and a verified pass remains good', () => {
+  const job = { id: 'write_file', verify: () => ({ passed: true, why: 'ok' }) }
+  const timeout = evaluateJobResult(job, { timedOut: true, status: null }, '', 10)
+  assert.equal(timeout.passed, false)
+  assert.match(timeout.why, /Timed out/)
+  assert.equal(evaluateModelVerdict('opencode/example-free', [{ ...timeout, id: job.id, durationMs: 10 }]).state, 'failing')
+  const pass = evaluateJobResult(job, { timedOut: false, status: 0, stdout: '' }, '', 10)
+  assert.equal(pass.passed, true)
+  assert.equal(evaluateModelVerdict('opencode/example-free', [{ ...pass, id: job.id, durationMs: 10 }]).state, 'good')
+  assert.equal(evaluateJobResult(job, { status: 1 }, '', 10).passed, false)
+})
+
+test('only provider errors count as limits, including JSON quota errors', () => {
+  assert.equal(providerLimitFromLine(limitLog.replace('agent=build', 'agent=title'), 'stderr'), undefined)
+  assert.equal(providerLimitFromLine(JSON.stringify({ type: 'text', part: { text: providerWords } }), 'stdout'), undefined)
+  assert.equal(providerLimitFromLine(JSON.stringify({ type: 'tool_use', part: { output: providerWords } }), 'stdout'), undefined)
+  assert.equal(providerLimitFromLine(limitLog.replace(providerWords, 'Provider unavailable'), 'stderr'), undefined)
+  assert.equal(providerLimitFromLine('Rate limit exceeded', 'stderr'), undefined)
+  const quota = providerLimitFromLine(JSON.stringify({ type: 'error', error: { data: { message: 'Quota exhausted for this model' } } }), 'stdout')
+  assert.equal(quota.message, 'Quota exhausted for this model')
+  const statusLimit = providerLimitFromLine(JSON.stringify({ type: 'error', error: { data: { statusCode: 429, message: 'Please wait before trying again' } } }), 'stdout')
+  assert.equal(statusLimit.message, 'Please wait before trying again')
+  const quoted = providerLimitFromLine(limitLog.replace(`"AI_APICallError: ${providerWords}"`, JSON.stringify('AI_APICallError: Rate limit exceeded for "free"')), 'stderr')
+  assert.equal(quoted.message, 'Rate limit exceeded for "free"')
+  const mixed = evaluateModelVerdict('opencode/example-free', [
+    { id: 'write_file', passed: false, durationMs: 1, why: 'bad file' },
+    { id: 'fix_bug', passed: false, durationMs: 1, why: quota.message, rateLimit: quota }
+  ])
+  assert.equal(mixed.state, 'failing', 'A real failure is not hidden by a different limited job')
+})
+
+function fakeProcess() {
+  const child = new EventEmitter()
+  child.stdout = new PassThrough()
+  child.stderr = new PassThrough()
+  child.stdin = new PassThrough()
+  return child
+}
+
+test('a split live limit stops the job before its timeout and waits for close', async () => {
+  const child = fakeProcess()
+  let stops = 0
+  let finished = false
+  const run = runOpenCodeJob({ model: 'opencode/example-free', prompt: 'hello', timeoutMs: 1000 }, {
+    spawnProcess: (_command, args) => {
+      assert.ok(args.includes('--print-logs'))
+      assert.ok(args.includes('ERROR'))
+      return child
+    },
+    stopProcess: () => { stops += 1 }
+  }).then((result) => { finished = true; return result })
+  child.stderr.write(limitLog.slice(0, 100))
+  assert.equal(stops, 0)
+  child.stderr.write(limitLog.slice(100) + '\n')
+  assert.equal(stops, 1)
+  await Promise.resolve()
+  assert.equal(finished, false, 'Termination must be observed before returning')
+  child.emit('close', null)
+  const result = await run
+  assert.equal(result.timedOut, false)
+  assert.equal(result.rateLimit.message, providerWords)
+  assert.equal(stops, 1)
+})
+
+test('live timeout, successful output, and an unterminated limit have separate outcomes', async () => {
+  for (const mode of ['timeout', 'pass', 'limit-tail', 'json-limit']) {
+    const child = fakeProcess()
+    let stops = 0
+    const run = runOpenCodeJob({ model: 'opencode/example-free', prompt: 'hello', timeoutMs: 15 }, {
+      spawnProcess: () => child,
+      stopProcess: () => { stops += 1; setImmediate(() => child.emit('close', null)) }
+    })
+    if (mode === 'pass') {
+      child.stdout.write(JSON.stringify({ type: 'text', part: { text: 'The service runs on port 8080.' } }) + '\n')
+      child.emit('close', 0)
+    } else if (mode === 'limit-tail') {
+      child.stderr.write(limitLog)
+    } else if (mode === 'json-limit') {
+      child.stdout.write(JSON.stringify({ type: 'error', error: { data: { message: providerWords } } }) + '\n')
+    }
+    const result = await run
+    assert.equal(result.timedOut, mode === 'timeout')
+    assert.equal(result.rateLimit !== undefined, mode === 'limit-tail' || mode === 'json-limit')
+    assert.equal(stops, mode === 'pass' ? 0 : 1)
+    if (mode === 'pass') assert.equal(verifyJobC(result.stdout, '').passed, true)
+  }
+})
 
 test('parseFreeModels extracts only models ending with -free', () => {
   const sample = [
