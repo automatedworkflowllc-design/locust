@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.664.0 - 2026-10-05
+
+### New
+
+- **"step 2 of 4" opens the plan when the plan has scrolled away.** On a long run, the plan card can be far up the conversation. When it is out of sight, the step count on the live line becomes a small button; press or hover it to see the whole plan, where the run is in it, and what is next. While the plan card is on screen, the step count stays plain, so the plan is never shown twice. It reads the plan the run already has and asks no model for anything.
+
 ## 0.663.0 - 2026-10-05
 
 ### Fixed

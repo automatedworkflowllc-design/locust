@@ -1248,6 +1248,12 @@ export type ThreadItem =
        * because a named step is itself the answer. See `quiet.ts`.
        */
       readonly spoken?: boolean
+      /**
+       * The plan the turn already has, set only when `detail` says "step N of M":
+       * the mini plan that step opens on hover reads these, so nothing new is
+       * fetched or stored.
+       */
+      readonly plan?: readonly PlanStep[]
     }
   | {
       readonly key: string
@@ -4226,6 +4232,12 @@ export function buildThread(
           spoken
         })
       }
+    }
+    // The plan rides on the live line that says "step N of M", for the card that step opens.
+    if (planSteps !== undefined && planAside !== undefined) {
+      const at = items.findIndex((item) => item.type === 'live-step' && item.detail === planAside)
+      const found = at < 0 ? undefined : items[at]
+      if (found !== undefined && found.type === 'live-step') items[at] = { ...found, plan: planSteps.steps }
     }
   }
 

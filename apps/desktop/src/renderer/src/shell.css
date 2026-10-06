@@ -8462,6 +8462,8 @@ textarea {
   align-items: center;
   gap: var(--lc-space-4);
   padding: var(--lc-space-3) 0;
+  /* The anchor of the plan card "step N of M" opens (.lc-livestep__peekcard). */
+  position: relative;
   /*
    * Without this a flex/grid column (a Compare cell) will not shrink the row
    * below its content width, so a long live label paints into the next column
@@ -8727,6 +8729,91 @@ textarea {
 
 .lc-livestep__meta::before {
   content: '· ';
+}
+
+/*
+ * "STEP N OF M" IS A CONTROL when the turn has a plan (the plan peek).
+ *
+ * It must look pressable (Colin, 2026-10-05: "make sure that it looks
+ * interactable"): a dotted underline, the pointer, a brighter ink on hover and
+ * a focus ring from the keyboard. It sits outside the note's clipping box, so
+ * its card is not cut off; the card is anchored to the row (not to the
+ * control) so it stays inside a narrow compare column.
+ */
+.lc-livestep__peek {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: calc(-1 * var(--lc-space-4) + var(--lc-space-3));
+  /* The separator and the control share one clickable word. */
+  white-space: nowrap;
+}
+
+.lc-livestep__step {
+  flex: none;
+  white-space: nowrap;
+}
+
+.lc-livestep__step.is-control {
+  appearance: none;
+  background: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  cursor: pointer;
+  /* A control at a glance, not words to discover by hovering (Colin, 0.664: "the average user wouldnt hover plain
+     text"): a pill with a chevron, as the composer's own pickers are. */
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px 1px 8px;
+  border: 1px solid var(--lc-border-button);
+  border-radius: 999px;
+  line-height: 1.4;
+}
+
+.lc-livestep__step.is-control:hover,
+.lc-livestep__step.is-control[aria-expanded='true'] {
+  color: var(--lc-text-primary);
+  border-color: var(--lc-border-hover);
+}
+
+.lc-livestep__step.is-control:focus-visible {
+  outline: 2px solid var(--lc-focus-ring);
+  outline-offset: 2px;
+}
+
+/* Above the line, never over the chat box (which is below it). The padding
+   under the card is a bridge, so the pointer can cross to it without leaving. */
+.lc-livestep__peekcard {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  width: min(340px, 100%);
+  padding-bottom: var(--lc-space-3);
+  z-index: 6;
+  white-space: normal;
+  text-decoration: none;
+  cursor: default;
+}
+
+.lc-livestep__peekcard .lc-plancard {
+  background: var(--lc-bg-raised-2);
+  border-color: var(--lc-border-strong);
+  box-shadow: var(--lc-shadow-menu);
+  max-height: min(40vh, 280px);
+  overflow-y: auto;
+}
+
+.lc-plancard.is-compact .lc-plancard__head {
+  padding: var(--lc-space-3) var(--lc-space-4);
+}
+
+.lc-plancard.is-compact .lc-plan {
+  padding: var(--lc-space-4) var(--lc-space-4) var(--lc-space-4);
+  gap: var(--lc-space-3);
 }
 
 /*

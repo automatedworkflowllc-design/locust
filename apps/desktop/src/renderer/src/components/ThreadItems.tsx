@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { BOT_SIZE } from '../botSizes.js'
 import type { ReactElement } from 'react'
 import { ORB_BOX, Orb } from './Orb.js'
@@ -586,8 +586,14 @@ export function PlanSteps({
   outcomes,
   underway = false,
   finished = false,
-  stopped = false
+  stopped = false,
+  compact = false
 }: {
+  /**
+   * The small version, for the card "step N of M" opens on the live line: the
+   * same rows and states, with no orbs (the live line already carries one).
+   */
+  readonly compact?: boolean
   readonly steps: readonly PlanStep[]
   readonly doneCount: number
   /** Whether a run happened and these steps have states to report. */
@@ -655,7 +661,7 @@ export function PlanSteps({
      * against the design agent's own frame: "the plan in chat isnt showing
      * up with a border like it did from the design agent".
      */
-    <div className="lc-plancard">
+    <div className={`lc-plancard${compact ? ' is-compact' : ''}`}>
       <div className="lc-plancard__head lc-mono">
         {/*
           * THE RUBIK MOVED UP HERE, at the size it was drawn for.
@@ -680,7 +686,7 @@ export function PlanSteps({
           * Only while something is actually underway: a still rubik on a
           * finished plan would say "active" about a plan that is not.
           */}
-        {underway && (
+        {underway && !compact && (
           <span className="lc-plancard__orb" aria-hidden="true">
             <Orb state="solving" box={PLAN_HEAD_ORB} />
           </span>
@@ -738,6 +744,7 @@ export function PlanSteps({
           <li
             key={`${String(index)}-${step.text}`}
             className={`lc-plan__step is-${step.state}${finished && step.state !== 'done' ? ' is-unreached' : ''}`}
+            {...(compact && step.state === 'running' ? { 'aria-current': 'step' as const } : {})}
           >
             <span className="lc-plan__marker" aria-hidden="true">
               {/*
@@ -755,7 +762,7 @@ export function PlanSteps({
                 */}
               {step.state === 'done' ? (
                 <Icon name="check" size={11} />
-              ) : step.state === 'running' && underway ? (
+              ) : step.state === 'running' && underway && !compact ? (
                 // The orb REPLACES the pulsing pip rather than joining it:
                 // two things pulsing on one row is the row saying "now" twice.
                 <span className="lc-plan__orb" data-orb={PLAN_ORB}>
@@ -772,6 +779,114 @@ export function PlanSteps({
         ))}
       </ul>
     </div>
+  )
+}
+
+/** How long the pointer rests on "step N of M" before the plan opens. */
+export const PLAN_PEEK_DELAY_MS = 250
+
+/**
+ * "STEP N OF M" AS A CONTROL: a small card of the plan, above the live line.
+ *
+ * Colin, 2026-10-05: a plan strays far up the thread, so the steps in the live
+ * line should open a mini plan to check where the run is. It looks pressable
+ * (dotted underline, pointer, focus ring) and is a real button. Hover after a
+ * short delay, focus or a click opens it; Escape, moving away or a click
+ * outside closes it. It reads the plan the turn already has. Nothing runs while
+ * it is closed: the delay timer exists only between the pointer arriving and
+ * the card opening, and the two document listeners only while it is open.
+ */
+/**
+ * WHETHER THE TURN'S PLAN IS OUT OF SIGHT (0.664): the newest whole plan card
+ * in the thread, watched while the live line shows. The peek is for a plan
+ * that has scrolled away; while the card is on screen, a second copy of it
+ * opened over the first (Colin, 2026-10-05: clunky). With no observer to ask
+ * (a test's static render) the plan counts as away.
+ */
+function usePlanAway(wrap: { readonly current: HTMLElement | null }, steps: readonly PlanStep[]): boolean {
+  const [away, setAway] = useState(() => typeof IntersectionObserver === 'undefined')
+  const shape = steps.map((step) => step.text).join('\n')
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return undefined
+    const scope = wrap.current?.closest('.lc-thread') ?? document
+    const cards = [...scope.querySelectorAll('.lc-plancard:not(.is-compact)')]
+    const card = cards.at(-1)
+    if (card === undefined) {
+      setAway(true)
+      return undefined
+    }
+    const watch = new IntersectionObserver(([entry]) => setAway(entry?.isIntersecting !== true), { threshold: 0.6 })
+    watch.observe(card)
+    return () => watch.disconnect()
+  }, [wrap, shape])
+  return away
+}
+
+export function PlanPeek({ label, steps }: { readonly label: string; readonly steps: readonly PlanStep[] }): ReactElement | null {
+  const [open, setOpen] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const wrap = useRef<HTMLSpanElement | null>(null)
+  const id = useId()
+  const clear = (): void => {
+    if (timer.current !== undefined) clearTimeout(timer.current)
+    timer.current = undefined
+  }
+  useEffect(() => clear, [])
+  useEffect(() => {
+    if (!open) return undefined
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    const onDown = (event: MouseEvent): void => {
+      if (wrap.current !== null && event.target instanceof Node && !wrap.current.contains(event.target)) setOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('mousedown', onDown)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('mousedown', onDown)
+    }
+  }, [open])
+  const away = usePlanAway(wrap, steps)
+  // No plan, or its card on screen already: the line keeps its plain words (a span kept for the watch to start from).
+  if (steps.length === 0 || !away) return <span ref={wrap} className="lc-rail__meta lc-livestep__step">{label}</span>
+  const doneCount = steps.filter((step) => step.state === 'done').length
+  return (
+    <span
+      ref={wrap}
+      className="lc-livestep__peek"
+      onMouseEnter={() => {
+        clear()
+        if (!open) timer.current = setTimeout(() => { timer.current = undefined; setOpen(true) }, PLAN_PEEK_DELAY_MS)
+      }}
+      onMouseLeave={() => {
+        clear()
+        setOpen(false)
+      }}
+      onBlur={(event) => {
+        if (event.relatedTarget !== null && !(event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget))) {
+          setOpen(false)
+        }
+      }}
+    >
+      <button
+        type="button"
+        className="lc-rail__meta lc-livestep__step is-control"
+        aria-expanded={open}
+        aria-label={`Show the plan, ${label}`}
+        {...(open ? { 'aria-controls': id } : {})}
+        onFocus={() => setOpen(true)}
+        onClick={() => { clear(); setOpen(true) }}
+      >
+        {label}
+        <Icon name="chevron-down" size={10} />
+      </button>
+      {open && (
+        <span className="lc-livestep__peekcard" id={id} role="region" aria-label="The plan">
+          <PlanSteps steps={steps} doneCount={doneCount} outcomes underway compact />
+        </span>
+      )}
+    </span>
   )
 }
 
@@ -817,7 +932,8 @@ export function LiveRegisterLine({
   detail,
   startedAt,
   orb,
-  thinking
+  thinking,
+  plan
 }: {
   /**
    * The orb, drawn BESIDE THE WORD IT IS ABOUT.
@@ -840,6 +956,8 @@ export function LiveRegisterLine({
   readonly startedAt: string
   /** Draws the dots: waiting on the model with nothing to show yet. */
   readonly thinking: boolean
+  /** The plan the turn already has: "step N of M" opens a small card of it. */
+  readonly plan?: readonly PlanStep[]
 }): ReactElement {
   const elapsed = useElapsed(startedAt)
   /*
@@ -883,6 +1001,9 @@ export function LiveRegisterLine({
    */
   const headline = action !== undefined && action.length > 0 ? action : sweepText(word)
   const aside = [action === undefined ? trimmed : undefined, detail].filter((part) => part !== undefined && part.length > 0)
+  // "step N of M" becomes the plan control when the turn has a plan (it reads the plan the turn already has).
+  const peek = plan !== undefined && plan.length > 0 && detail !== undefined && /^step \d+ of \d+$/.test(detail) ? detail : undefined
+  const rest = peek === undefined ? aside : aside.filter((part) => part !== peek)
   return (
     <>
       <span className="lc-livestep__label" title={[headline, ...aside].join(' · ')}>
@@ -976,9 +1097,11 @@ export function LiveRegisterLine({
         * ellipsize only when they alone do not fit.
         */}
       <span className="lc-rail__meta lc-livestep__clock">{elapsed.label}</span>
-      {aside.length > 0 && (
+      {/* The "step N of M" part, when the turn has a plan to show: a control of its own, outside the note's clipping box. */}
+      {peek !== undefined && <PlanPeek label={peek} steps={plan ?? []} />}
+      {rest.length > 0 && (
         <span className="lc-rail__meta lc-livestep__note">
-          <span className="lc-livestep__meta">{aside.map((part) => String(part)).join(' · ')}</span>
+          <span className="lc-livestep__meta">{rest.map((part) => String(part)).join(' · ')}</span>
         </span>
       )}
     </>
@@ -1049,7 +1172,8 @@ export function LiveStepCard({
   orb,
   owner,
   activity,
-  face: showFace = true
+  face: showFace = true,
+  plan
 }: {
   /**
    * The thinking orb for this step, when one is truthful.
@@ -1081,6 +1205,8 @@ export function LiveStepCard({
   readonly activity: FaceActivity
   /** Off where the face is already on screen beside this line (a room's answer card). */
   readonly face?: boolean
+  /** The plan the turn already has, for the card "step N of M" opens. */
+  readonly plan?: readonly PlanStep[]
 }): ReactElement {
   // The dots meant "a reasoning step is open", which most runtimes never
   // report -- so the nicest signal in the app almost never appeared (Colin,
@@ -1144,6 +1270,7 @@ export function LiveStepCard({
          * older signal goes, or "running" is said five ways instead of four.
          */
         thinking={thinking && orb === undefined}
+        {...(plan === undefined ? {} : { plan })}
       />
     </div>
   )

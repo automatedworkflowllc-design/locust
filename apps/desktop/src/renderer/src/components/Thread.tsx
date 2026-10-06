@@ -453,6 +453,7 @@ export function ThreadItems({
               owner={owner}
               activity={activity}
               face={faces}
+              {...(item.plan === undefined ? {} : { plan: item.plan })}
             />
           )
         }
