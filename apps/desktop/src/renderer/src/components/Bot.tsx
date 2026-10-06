@@ -21,6 +21,7 @@ import { screenSuits } from '../../../shared/avatar.js'
 import { usePlush, useTerminalFaces } from '../botLook.js'
 import { DRAWING_BEAT, frameBeat } from '../frameBeat.js'
 import { LOCUST_BOTS, isLocustBot } from '../locustBots.js'
+import type { ChestMark } from '../locustBots.js'
 import type { LocustBotType } from '../locustBots.js'
 import { WINDOW_PRESENCE } from '../windowPresence.js'
 import type { WindowPresence } from '../windowPresence.js'
@@ -448,6 +449,16 @@ export function easedValue(
   }
 }
 
+/**
+ * The Claude mark's twelve rays, measured off the mark Colin sent (2026-10-05):
+ * each one's direction (degrees clockwise from up), its length (of the mark's
+ * radius) and its width (of the usual), uneven as the mark's are.
+ */
+const CLAUDE_MARK_RAYS: readonly (readonly [number, number, number])[] = [
+  [333, 1, 1.15], [9, 0.89, 0.85], [40, 0.89, 1], [80, 0.87, 0.9], [102, 0.9, 0.95], [131, 0.9, 1],
+  [149, 0.85, 0.9], [185, 0.89, 1], [214, 0.89, 1.05], [237, 0.86, 1], [268, 0.92, 0.95], [302, 0.94, 1]
+]
+
 /** The rig's eye weight is 2.8 shut and 12.6 open, so its weight says how open the eye is. */
 export function eyeOpenness(lineWidth: number): number {
   return Math.max(0, Math.min(1, (lineWidth - 2.8) / 9.8))
@@ -800,6 +811,8 @@ export interface EyePaint {
   readonly eyeY?: number
   /** Where the face sits on the body, for the plane of its front; a centred face of scale 1 when not given. */
   readonly faceAt?: FaceAt
+  /** A mark on the body's front below the face, in the outline's units (Prompt's chest); none when not given. */
+  readonly chestAt?: ChestMark
   /** The second, on this bot's clock, its screen switches on (POWER_ON_S); undefined, it is simply on. */
   readonly bootAt?: () => number | undefined
   /** How long that switching on takes: POWER_ON_S, or a change's flick (CRT_FLICK_S). */
@@ -1253,9 +1266,94 @@ export function withGlyphEyes(
    * drawn flat in its plane, and a glance moves them only as far as the screen
    * has room for.
    */
+  /**
+   * THE MASCOTS' CHESTS (2026-10-05): the Codex mascot's `>_` (Prompt), a pale
+   * tint of the body's colour, and the Claude mark (Spark) -- its sunburst of
+   * tapered rays, uneven in length, round at their tips -- in cream, as each
+   * wears its own; drawn flat in the body's front with the screen, so each
+   * turns and tilts with the body as the screen does. Colin: *"make the codex
+   * logo more legible, bigger if you have to, and make the claude logo better,
+   * its not accurate"*.
+   */
+  const chest = (): void => {
+    const at = paint.chestAt
+    if (at === undefined || face === undefined || screen === undefined) return
+    context.save()
+    onFront()
+    const x = (at.x - faceAt.x) / faceAt.scale
+    const y = (at.y - faceAt.y) / faceAt.scale
+    const h = at.size / faceAt.scale
+    /*
+     * PART OF HIM, NOT A STICKER. Colin: *"make it look like its actually part
+     * of his design and not a sticker put on there"*. So the mark is lit as
+     * the body is: a shade of the body's own colour under it, as if the mark
+     * stands a little proud of him; then the mark, bright where the body's
+     * light falls (top left) and toned toward his colour where it does not,
+     * with a little of the body showing through, so the plush's pile reads
+     * through it.
+     */
+    const mark = (): void => {
+      context.beginPath()
+      if (at.mark === 'prompt') {
+        context.moveTo(x - h * 0.6, y - h * 0.4)
+        context.lineTo(x - h * 0.2, y)
+        context.lineTo(x - h * 0.6, y + h * 0.4)
+        context.moveTo(x + h * 0.1, y + h * 0.4)
+        context.lineTo(x + h * 0.62, y + h * 0.4)
+        return
+      }
+      // The Claude mark: a ray per entry, narrow at its root, its tip cut square with its corners off; a solid middle.
+      const r = h / 2
+      for (const [degrees, reach, width] of CLAUDE_MARK_RAYS) {
+        const angle = ((degrees - 90) * Math.PI) / 180
+        const ux = Math.cos(angle)
+        const uy = Math.sin(angle)
+        const point = (along: number, across: number): readonly [number, number] => [x + ux * along - uy * across, y + uy * along + ux * across]
+        const tip = r * reach
+        const wide = r * 0.11 * width
+        const root = r * 0.085 * width
+        const corner = wide * 0.5
+        const points = [point(0, -root), point(tip - corner, -wide), point(tip, -wide + corner), point(tip, wide - corner), point(tip - corner, wide), point(0, root)]
+        points.forEach(([px, py], i) => (i === 0 ? context.moveTo(px, py) : context.lineTo(px, py)))
+        context.closePath()
+      }
+      context.moveTo(x + r * 0.25, y)
+      context.arc(x, y, r * 0.25, 0, Math.PI * 2)
+    }
+    const paintMark = (style: string | CanvasGradient): void => {
+      if (at.mark === 'prompt') {
+        context.lineWidth = h * 0.27
+        context.lineCap = 'round'
+        context.lineJoin = 'round'
+        context.strokeStyle = style
+        stroke()
+      } else {
+        context.fillStyle = style
+        fill()
+      }
+    }
+    // Its shade: the body's colour, deeper, a touch down and right of it.
+    context.save()
+    // The context's own translate: the shadowed one would take this for the face's.
+    translate(h * 0.04, h * 0.06)
+    mark()
+    paintMark(sameHue(screen, 0.6, 0.26, 0.6))
+    context.restore()
+    // The mark, lit as the body is lit.
+    const light = context.createLinearGradient(x - h * 0.5, y - h * 0.5, x + h * 0.5, y + h * 0.5)
+    const pale = at.mark === 'prompt' ? sameHue(screen, 0.9, 0.92) : 'rgb(255, 243, 230)'
+    light.addColorStop(0, pale)
+    light.addColorStop(0.45, pale)
+    light.addColorStop(1, at.mark === 'prompt' ? sameHue(screen, 0.75, 0.78) : sameHue(screen, 0.6, 0.83))
+    context.globalAlpha = 0.94
+    mark()
+    paintMark(light)
+    context.restore()
+  }
   const screenEyes = (open: number): void => {
     const boot = booting()
     visor(boot)
+    chest()
     if (face === undefined) return
     // Switching on, the eyes are dark until the flash has settled, then blink open.
     const booted = boot === undefined ? 1 : powerOnEyes(boot)
@@ -1656,6 +1754,13 @@ export const SUPERSAMPLE_AT_OR_BELOW = 32
  * short pile under ~40 px, stock fabric above).
  */
 export const PLUSH_SHORT_BELOW = 40
+
+/*
+ * A MASCOT'S CHEST MARK, WHERE IT READS (0.661). Prompt's `>_` and Spark's
+ * asterisk are a few pixels across in the sidebar and on a card: a pale smudge
+ * under the screen, not a mark, up to the Team card (44 px). Drawn from 50 px: the cover.
+ */
+export const CHEST_MARK_FROM = 50
 const SHORT_PILE = { length: 0.45, density: 1, fuzz: 0.2, clumps: 0.2, curl: 0.4, gravity: 0.6 }
 const SHORT_PILE_LIGHT_FRONT = 72
 
@@ -1687,6 +1792,8 @@ export interface Outline {
   readonly faceScale: number
   /** Its face is a dark screen with lit eyes. */
   readonly screen: boolean
+  /** A mark on its chest (Prompt's `>_`, Spark's asterisk): which, where and how big, in the outline's units. */
+  readonly chest?: ChestMark
 }
 
 /** Each shape's screen, by shape and face, measured once against its outline. */
@@ -1735,7 +1842,8 @@ export function outlineOf(type: BotType): Outline {
       faceX: shape.faceX,
       faceY: shape.faceY,
       faceScale: shape.faceScale,
-      screen: shape.screen === true
+      screen: shape.screen === true,
+      ...(shape.chest === undefined ? {} : { chest: shape.chest })
     }
   }
   const preset = botAvatarPresets[type]
@@ -2085,6 +2193,8 @@ function RiggedBot({
   // Plush on (Settings > Appearance): fur, with a short pile where the bot is small on screen (PLUSH_SHORT_BELOW).
   const plush = usePlush()
   const shortPile = plush && (shownAt ?? size) < PLUSH_SHORT_BELOW
+  // A mascot's chest mark only where it can be read (0.661): below 50 px it was a blob under the screen.
+  const chestShown = (shownAt ?? size) >= CHEST_MARK_FROM
   /*
    * CODE EYES ARE A SCREEN'S (0.562). Colin: "maybe also a toggle for the
    * computer eyes as well, or should the computer eyes be exclusive to the
@@ -2124,7 +2234,7 @@ function RiggedBot({
     canvas.width = side
     canvas.height = side
     const path = new Path2D(outline.body)
-    const parts = outline.parts === undefined ? undefined : partPaths(outline.parts)
+    const parts = outline.parts === undefined || outline.parts === '' ? undefined : partPaths(outline.parts)
     warmBotAvatarPlastic(outline.key, path, size * dpr, undefined, plush, shortPile ? SHORT_PILE : undefined)
     const sim = new BotAvatarSim(seed, state)
     sim.setTurn(outline.turn)
@@ -2146,6 +2256,7 @@ function RiggedBot({
       // The rig's eye height for each face (its own `eyes: 1, mouth: -3.5`).
       eyeY: (faceShown ?? outline.face) === 'mouth' ? -3.5 : 1,
       faceAt: { x: outline.faceX, y: outline.faceY, scale: outline.faceScale },
+      ...(outline.chest === undefined || !chestShown ? {} : { chestAt: outline.chest }),
       // The face is drawn at size / 100 a unit (times its own scale), at dpr device pixels a CSS pixel.
       pixelsPerUnit: (size / 100) * outline.faceScale * dpr,
       bootAt: () => bootAt.current,
@@ -2310,7 +2421,7 @@ function RiggedBot({
       rig.current = null
     }
     // A new state, new eyes, keeping still or not: each is performed on the running rig (below), never a rebuilt one.
-  }, [type, size, color, faceShown, seed, screen, plush, shortPile, motionPresence])
+  }, [type, size, color, faceShown, seed, screen, plush, shortPile, chestShown, motionPresence])
 
   useEffect(() => {
     rig.current?.setState(state)

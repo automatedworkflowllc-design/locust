@@ -9,7 +9,7 @@ import { PET_COLUMNS } from '../../shared/pets.js'
 import { setTerminalFaces } from './botLook.js'
 import { NewTeammateDialog } from './components/NewTeammateDialog.js'
 import { HEAD_MOTION, PUPPET_MOTION, PUPPET_SQUASH, motionOf, puppetBody, puppetDrawing, puppetPose, puppetRect, puppetTransform } from './components/PetPuppet.js'
-import { BUDDY_MELT, BUDDY_MELT_MAX_MS, BUDDY_SETTLE, buddyBody, petScreenConductor } from './components/PetSprite.js'
+import { petScreenConductor } from './components/PetSprite.js'
 import type { PetScreenAsk } from './components/PetSprite.js'
 import { crtRule } from './faceLife.js'
 import { RESTING, WORKOUT } from './petRoutines.js'
@@ -507,38 +507,24 @@ describe('every screen switches on again as a bot’s does', () => {
   })
 })
 
-describe('Codex Buddy, smoother', () => {
+describe('Codex Buddy, on his own rig', () => {
   const working = (): PetScreenAsk => ({ eyes: ['>', '▮'], phosphor: 'cyan', key: 'working', move: WORKOUT, rests: false })
 
-  it('melts each drawing into the next over most of the time it is held, eased', () => {
-    expect(BUDDY_MELT).toBeGreaterThanOrEqual(0.5)
-    expect(BUDDY_MELT_MAX_MS).toBeGreaterThanOrEqual(200)
+  it('moves a little every frame while he works, never held and never snapped (buddyRig.ts)', () => {
     const conductor = petScreenConductor(CODEX_BUDDY, 0.37, working, () => undefined)
-    // Find a change of drawing, then watch the old one let go.
-    let at = 10
-    let first = conductor.frame(at)
-    while (first.fading === undefined && at < 14) {
-      at += 1 / 30
-      first = conductor.frame(at)
+    let last = conductor.frame(10).rig
+    let held = 0
+    let biggest = 0
+    for (let at = 10 + 1 / 30; at < 16; at += 1 / 30) {
+      const now = conductor.frame(at).rig
+      const moved = Math.max(...(['left', 'right'] as const).flatMap((side) => (['abduct', 'flex', 'bend'] as const).map((key) => Math.abs(now.pose[side][key] - last.pose[side][key]))))
+      if (moved < 1e-6) held += 1
+      biggest = Math.max(biggest, moved)
+      last = now
     }
-    expect(first.fading).toBeDefined()
-    const lefts: number[] = []
-    for (let step = 1; step <= 4 && conductor.frame(at + step / 30).fading !== undefined; step += 1) {
-      lefts.push(conductor.frame(at + step / 30).fading?.left ?? 0)
-    }
-    // Still melting a frame later, and letting go a little at a time, not at once.
-    expect(lefts.length).toBeGreaterThanOrEqual(2)
-    for (let i = 1; i < lefts.length; i += 1) expect(lefts[i]).toBeLessThan(lefts[i - 1] ?? 1)
-  })
-
-  it('lands each pose with a small settle about his feet, gone within a beat', () => {
-    expect(buddyBody(5, 5, true).sy).toBeLessThan(1)
-    expect(1 - buddyBody(5, 5, false).sy).toBeLessThanOrEqual(BUDDY_SETTLE.depth + 1e-9)
-    expect(buddyBody(5 + BUDDY_SETTLE.seconds, 5, false)).toEqual({ sx: 1, sy: 1 })
-    // Still, nothing moves him; at rest, he does not breathe.
-    expect(buddyBody(0, 0, true)).toEqual({ sx: 1, sy: 1 })
-    expect(buddyBody(7.3, undefined, false)).toEqual({ sx: 1, sy: 1 })
-    expect(buddyBody(7.3, undefined, true).sy).not.toBe(1)
+    // Between sets he stands a breath; otherwise every frame is a new pose, none of them a jump.
+    expect(held).toBeLessThan(60)
+    expect(biggest).toBeLessThan(0.25)
   })
 
   it('rests only once his last pose has settled, so his clock still stops', () => {

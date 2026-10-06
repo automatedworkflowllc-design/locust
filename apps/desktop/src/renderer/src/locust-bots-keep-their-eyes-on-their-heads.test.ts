@@ -57,14 +57,15 @@ describe('the Critter and the Prompt (0.559)', () => {
     // Critter: the block and its two stub arms are body; the four legs are parts.
     expect(subpaths(LOCUST_BOTS.critter.body)).toBe(3)
     expect(subpaths(LOCUST_BOTS.critter.parts)).toBe(4)
-    expect(subpaths(LOCUST_BOTS.prompt.body)).toBe(1)
-    expect(subpaths(LOCUST_BOTS.prompt.parts)).toBe(3)
+    // Prompt (2026-10-05, the Codex mascot): its head (one outline), its body with its legs (one outline) and its two mitts are all body, so the plush furs them all; no parts.
+    expect(subpaths(LOCUST_BOTS.prompt.body)).toBe(4)
+    expect(LOCUST_BOTS.prompt.parts).toBe('')
   })
 
   it('keep the leading eye inside the main block at the widest idle glance, clear of its round corner', () => {
-    // The critter's block runs x 15..85 with corners of 13; the prompt's 12..88 with corners of 18.
+    // The critter's block runs x 15..85 with corners of 13; the prompt's cloud of a head to 83.5, its lobes rounding in.
     expect(leadingEyeX(LOCUST_BOTS.critter)).toBeLessThan(85 - 6)
-    expect(leadingEyeX(LOCUST_BOTS.prompt)).toBeLessThan(88 - 9)
+    expect(leadingEyeX(LOCUST_BOTS.prompt)).toBeLessThan(83.5 - 9)
   })
 })
 

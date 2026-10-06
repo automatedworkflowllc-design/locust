@@ -1,3 +1,4 @@
+import { BUDDY_RIG } from './buddyRig.js'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -7,7 +8,7 @@ import { PET_COLUMNS } from '../../shared/pets.js'
 import { BOT_SIZE } from './botSizes.js'
 import { setTerminalFaces } from './botLook.js'
 import { NewTeammateDialog } from './components/NewTeammateDialog.js'
-import { CLOSE_UNTIL_PX, WHOLE_FROM_PX, petWindow } from './components/PetSprite.js'
+import { CLOSEST_FRAMING, FRAMING_TOP, petWindow } from './components/PetSprite.js'
 import { TeammateBot } from './components/TeammateBot.js'
 import { routineFor } from './petRoutines.js'
 import { CODEX_BUDDY, EDGE_SLACK, paintedEdges, screenAt, screenFaceFor, screenFits } from './petScreens.js'
@@ -112,27 +113,20 @@ describe('his table', () => {
   })
 })
 
-describe('framed by how big he is drawn', () => {
+describe('framed head and shoulders', () => {
   /** His screen's width in a box `size` across, as the box frames him. */
-  const screenWidth = (size: number): number => (37 * size) / petWindow(size, 192, 208).side
+  const screenWidth = (size: number): number => (37 * size) / petWindow(208, BUDDY_RIG.middle).side
 
-  it('closest where he is usually seen, so his face is half as big again as fitted whole', () => {
-    for (const size of [BOT_SIZE.threadLive, BOT_SIZE.sidebarFaces, BOT_SIZE.workroomHeader, BOT_SIZE.rosterCard]) {
-      expect(screenWidth(size) / ((37 * size) / 208), String(size)).toBeGreaterThan(1.4)
+  it('at every size, so his face is half as big again as fitted whole, where he is usually seen and larger', () => {
+    for (const size of [BOT_SIZE.threadLive, BOT_SIZE.sidebarFaces, BOT_SIZE.workroomHeader, BOT_SIZE.rosterCard, 64, 120]) {
+      expect(screenWidth(size) / ((37 * size) / 208), String(size)).toBeGreaterThan(1.6)
     }
-    expect(screenWidth(BOT_SIZE.sidebarFaces)).toBeGreaterThan(8)
+    expect(screenWidth(BOT_SIZE.sidebarFaces)).toBeGreaterThan(9)
+    expect(petWindow(208, BUDDY_RIG.middle)).toEqual({ left: BUDDY_RIG.middle - 208 * CLOSEST_FRAMING / 2, top: FRAMING_TOP, side: 208 * CLOSEST_FRAMING })
   })
 
-  it('easing out as he is drawn larger, and whole from 96 px', () => {
-    const sides = [CLOSE_UNTIL_PX, 56, 64, 80, WHOLE_FROM_PX].map((size) => petWindow(size, 192, 208).side)
-    for (let i = 1; i < sides.length; i += 1) expect(sides[i]).toBeGreaterThan(sides[i - 1] ?? 0)
-    expect(petWindow(WHOLE_FROM_PX, 192, 208)).toEqual({ left: -8, top: 0, side: 208 })
-    expect(petWindow(200, 192, 208).side).toBe(208)
-    expect(petWindow(20, 192, 208)).toEqual(petWindow(CLOSE_UNTIL_PX, 192, 208))
-  })
-
-  it('never cuts his face: on every drawing, his screen is inside the closest window', () => {
-    const shown = petWindow(CLOSE_UNTIL_PX, 192, 208)
+  it('never cuts his face: on every drawing, his screen is inside his window', () => {
+    const shown = petWindow(208, BUDDY_RIG.middle)
     CODEX_BUDDY.cells.forEach((row, r) =>
       row.forEach(([x, y, w, h], c) => {
         const where = `${String(r)},${String(c)}`
@@ -227,12 +221,12 @@ describe('a teammate wearing him', () => {
     expect(html).toContain('aria-label="Buddy"')
   })
 
-  it('lifts everything he has as the face you talk to, and only standing beside a name', () => {
+  it('lifts everything he has, as the face you talk to and beside a name: all of his lifts are standing ones', () => {
     setPetLook(BUDDY, { status: 'ready', atlas: atlas(CODEX_BUDDY) })
     const full = renderToStaticMarkup(<TeammateBot hue="blue" avatar={wearing(BUDDY)} size={96} activity="working" motion="full" />)
     const subtle = renderToStaticMarkup(<TeammateBot hue="blue" avatar={wearing(BUDDY)} size={34} activity="working" />)
     expect(full).toContain('data-move="workout"')
-    expect(subtle).toContain('data-move="workout-standing"')
+    expect(subtle).toContain('data-move="workout"')
   })
 
   it('is drawn as his maker drew him with Terminal faces off, or when his teammate asks for that', () => {

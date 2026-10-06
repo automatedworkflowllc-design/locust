@@ -17,7 +17,7 @@
  *   the face on the head.
  */
 
-export type LocustBotType = 'hopper' | 'swarm' | 'critter' | 'prompt'
+export type LocustBotType = 'hopper' | 'swarm' | 'critter' | 'prompt' | 'spark'
 
 export interface LocustBotShape {
   readonly name: string
@@ -33,6 +33,8 @@ export interface LocustBotShape {
   readonly faceScale: number
   /** Its face is a dark screen, its eyes lit glyphs on it (Bot.tsx). */
   readonly screen?: boolean
+  /** A mark on its chest -- the Codex mascot's prompt, `>_`, or the Claude mascot's asterisk -- where, in the outline's 0 to 100 units, and how big (its height). */
+  readonly chest?: ChestMark
 }
 
 const f =(n: number): number => Math.round(n * 100) / 100
@@ -57,6 +59,24 @@ export function rodPath(ax: number, ay: number, bx: number, by: number, r: numbe
     `A${r} ${r} 0 0 0 ${f(bx - nx)} ${f(by - ny)}L${f(ax - nx)} ${f(ay - ny)}` +
     `A${r} ${r} 0 0 0 ${f(ax + nx)} ${f(ay + ny)}Z`
   )
+}
+
+/** A mascot's chest mark: which, where (the outline's units), and how big. */
+export interface ChestMark {
+  readonly mark: 'prompt' | 'spark'
+  readonly x: number
+  readonly y: number
+  readonly size: number
+}
+
+/** A cloud: a round middle and `lobes` round lobes about it, every one clockwise so they fill as one. */
+export function cloudPath(cx: number, cy: number, core: number, reach: number, lobe: number, lobes = 8, turn = 0.2): string {
+  let path = ellipsePath(cx, cy, core, core)
+  for (let i = 0; i < lobes; i += 1) {
+    const angle = (i / lobes) * Math.PI * 2 + turn
+    path += ellipsePath(f(cx + Math.cos(angle) * reach), f(cy + Math.sin(angle) * reach), lobe, lobe)
+  }
+  return path
 }
 
 /** A rectangle with round corners, clockwise from its top edge, as one filled subpath. */
@@ -92,6 +112,103 @@ const WINGS =
   ellipsePath(73, 44, 25, 8.5, -12) +
   ellipsePath(31, 60, 20, 7.5, -12) +
   ellipsePath(69, 60, 20, 7.5, 12)
+
+/**
+ * The outline of rounds laid together, as ONE path: from `centre`, the
+ * furthest any round reaches along each of `steps` rays -- the outer edge,
+ * with its pinched valleys where two rounds meet. The rig's plastic lights
+ * every subpath's own edge, so rounds laid as separate subpaths show their
+ * seams inside the shape; one outline has none.
+ */
+export function unionOutline(centre: readonly [number, number], rounds: readonly (readonly [x: number, y: number, rx: number, ry: number, turn?: number])[], steps = 180): string {
+  const [cx, cy] = centre
+  const points: string[] = []
+  for (let i = 0; i < steps; i += 1) {
+    const angle = -Math.PI / 2 + (i / steps) * Math.PI * 2
+    const dx = Math.cos(angle)
+    const dy = Math.sin(angle)
+    let reach = 0
+    for (const [x, y, rx, ry, turn = 0] of rounds) {
+      // Where the ray leaves this round (turned `turn` radians): in the round's own frame, solve for t on (ox + t ux)^2 + (oy + t uy)^2 = 1.
+      const cos = Math.cos(-turn)
+      const sin = Math.sin(-turn)
+      const px = cx - x
+      const py = cy - y
+      const ox = (px * cos - py * sin) / rx
+      const oy = (px * sin + py * cos) / ry
+      const ux = (dx * cos - dy * sin) / rx
+      const uy = (dx * sin + dy * cos) / ry
+      const a = ux * ux + uy * uy
+      const b = 2 * (ox * ux + oy * uy)
+      const c = ox * ox + oy * oy - 1
+      const disc = b * b - 4 * a * c
+      if (disc < 0) continue
+      reach = Math.max(reach, (-b + Math.sqrt(disc)) / (2 * a))
+    }
+    points.push(`${i === 0 ? 'M' : 'L'}${f(cx + dx * reach)} ${f(cy + dy * reach)}`)
+  }
+  return `${points.join('')}Z`
+}
+
+/**
+ * THE CODEX MASCOT'S HEAD (its own renders): a rounded square with four
+ * subtle lumps, one at each corner, and a shallow dip between each two --
+ * Colin: *"the other one has like 4 subtle lumps in both pics i sent you"*.
+ * Never a burst of petals, which is the Claude mascot's. One outline.
+ */
+const CODEX_HEAD = unionOutline(
+  [50, 38],
+  [
+    // Its four corners, the lumps...
+    [37, 28, 14, 13],
+    [63, 28, 14, 13],
+    [37, 48, 14, 13],
+    [63, 48, 14, 13],
+    // ...and its middle, filling it out to a square but for a shallow dip mid-side.
+    [50, 38, 25.8, 22.4]
+  ],
+  240
+)
+
+/** Its small body and its two stubby legs, one outline under its head. */
+const CODEX_BODY = unionOutline(
+  [50, 68],
+  [
+    [50, 66.5, 14.5, 11],
+    [50, 71, 13, 9.5],
+    [43.5, 80, 5.8, 6.2],
+    [56.5, 80, 5.8, 6.2]
+  ],
+  180
+)
+
+/** Its mitts, hanging close at its sides: a hair clear of its body, so neither lies over the other. */
+const CODEX_MITTS = ellipsePath(31.4, 67.5, 4.3, 6.8, 12) + ellipsePath(68.6, 67.5, 4.3, 6.8, -12)
+
+/**
+ * THE CLAUDE MASCOT'S BODY (github.com/Minecraft-2048/mascotte-claude's own
+ * board, and Colin's pixel drawing of it): one shape, a flower -- seven round
+ * petals, evenly spaced round its top and its sides -- whose trunk runs down
+ * to its legs, its nub arms low on its sides. One outline. Colin: *"make the
+ * claude logo better, its not accurate"*.
+ */
+const CLAUDE_BURST = unionOutline(
+  [50, 46],
+  [
+    [50, 45, 22, 22],
+    [50, 60, 17, 15],
+    [50, 21, 9.5, 9.5],
+    [35.2, 26.4, 9.5, 9.5],
+    [64.8, 26.4, 9.5, 9.5],
+    [27.3, 40, 9.5, 9.5],
+    [72.7, 40, 9.5, 9.5],
+    [30.1, 55.5, 9.5, 9.5],
+    [69.9, 55.5, 9.5, 9.5],
+    [27.5, 67.5, 5.5, 6.5, 0.6],
+    [72.5, 67.5, 5.5, 6.5, -0.6]
+  ],
+  240
+)
 
 export const LOCUST_BOTS: Readonly<Record<LocustBotType, LocustBotShape>> = {
   hopper: {
@@ -133,6 +250,13 @@ export const LOCUST_BOTS: Readonly<Record<LocustBotType, LocustBotShape>> = {
    *   coding agent's little terminal creature has, in our plastic.
    * - Prompt: a soft terminal window, its three title-bar dots up top, its
    *   face a dark screen with lit eyes (0.560).
+   *
+   * PROMPT, CLOSER TO THE CODEX MASCOT (2026-10-05). Colin: *"rework our
+   * codex teammate to be closer to reality, ours was done a little lazily and
+   * in a hurry"*, with the mascot's own sheet: a puffy cloud of a head -- the
+   * Codex mark's cloud -- wearing a dark screen for a face, a small body under
+   * it with its prompt, `>_`, on its chest, stubby arms and feet. Still in
+   * the teammate's own colour and the rig's plastic, like every teammate.
    */
   critter: {
     name: 'Critter',
@@ -146,18 +270,45 @@ export const LOCUST_BOTS: Readonly<Record<LocustBotType, LocustBotShape>> = {
   },
   prompt: {
     name: 'Prompt',
-    body: roundRectPath(12, 28, 76, 58, 18),
-    parts: ellipsePath(27, 24, 3.8, 3.8) + ellipsePath(38, 24, 3.8, 3.8) + ellipsePath(49, 24, 3.8, 3.8),
+    // Its head: a cumulus -- a wide round head with its bumps along its top and sides, smooth underneath -- and its small body under it.
+    // Its mitts and its feet are body too, not parts: so the plush lays its pile on them as on the rest of it.
+    // Its head, its body with its legs, and its mitts: each one outline, none lying over another but where its head sits on its body.
+    body: CODEX_HEAD + CODEX_BODY + CODEX_MITTS,
+    parts: '',
     partsDepth: 0.5,
     turn: 1,
+    // Its screen is most of its face, low on its head, as the mascot's is.
     faceX: 50,
-    faceY: 58,
-    faceScale: 0.95,
+    faceY: 41,
+    faceScale: 0.76,
     // Colin, 2026-10-03, of the codex mascot: "he also seems to have a screen for a face".
-    screen: true
+    screen: true,
+    chest: { mark: 'prompt', x: 50, y: 67.5, size: 11 }
+  },
+  /*
+   * SPARK, THE CLAUDE MASCOT (2026-10-05). Colin: *"i want you to add this so
+   * we can show some love to claude as well ... and obviously swap in our
+   * terminal face"*, of github.com/Minecraft-2048/mascotte-claude, and *"the
+   * claude code mascot could be a nod to the other side"*. Measured from its
+   * own board, as Prompt was from the Codex mascot's: its starburst of a body,
+   * its screen in the middle of it, the asterisk on its chest under the screen,
+   * its little arms and its stubby legs -- all body, so the Plush furs them.
+   */
+  spark: {
+    name: 'Spark',
+    body: CLAUDE_BURST + ellipsePath(42.5, 79, 5.4, 6.2) + ellipsePath(57.5, 79, 5.4, 6.2),
+    parts: '',
+    partsDepth: 0.5,
+    turn: 1,
+    // Its screen: about two fifths of it across, in its middle.
+    faceX: 50,
+    faceY: 43,
+    faceScale: 0.7,
+    screen: true,
+    chest: { mark: 'spark', x: 50, y: 66, size: 18 }
   }
 }
 
 export function isLocustBot(type: string): type is LocustBotType {
-  return type === 'hopper' || type === 'swarm' || type === 'critter' || type === 'prompt'
+  return type === 'hopper' || type === 'swarm' || type === 'critter' || type === 'prompt' || type === 'spark'
 }

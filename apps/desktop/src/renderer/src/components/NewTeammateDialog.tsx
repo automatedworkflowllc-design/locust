@@ -121,6 +121,7 @@ const SHAPE_NAMES: Readonly<Record<BotShape, string>> = {
   hopper: 'Hopper, a Locust',
   swarm: 'Swarm, a Locust',
   critter: 'Critter',
+  spark: 'Spark',
   prompt: 'Prompt'
 }
 
@@ -333,10 +334,10 @@ export function NewTeammateDialog({
    * remove it alright or have it toggleable in the teammate editor" -- the
    * editor. A screen is offered while Terminal faces is on (Settings >
    * Appearance) and, until the person picks, follows what suits the shape
-   * (`screenSuits`); Prompt's face is always its screen.
+   * (`screenSuits`); the two mascots' faces, Prompt's and Spark's, are always their screens.
    */
   const terminal = useTerminalFaces()
-  const alwaysScreen = look.shape === 'prompt'
+  const alwaysScreen = look.shape === 'prompt' || look.shape === 'spark'
   const wearsScreen = alwaysScreen || (terminal && (look.screen ?? screenSuits(look.shape)))
   const faceChoice: BotFace | 'screen' = wearsScreen ? 'screen' : look.face
   /** The bot with this shape and the face as chosen so far (a screen choice travels with it). */

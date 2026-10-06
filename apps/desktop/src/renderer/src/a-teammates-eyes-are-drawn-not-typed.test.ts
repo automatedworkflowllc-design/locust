@@ -114,9 +114,10 @@ describe('a glyph eye', () => {
 })
 
 describe('a screen for a face', () => {
-  it('is the Prompt bot\'s, and no other shape\'s', () => {
+  it('is the two mascots\', Prompt\'s and Spark\'s (2026-10-05), and no other shape\'s', () => {
     expect(outlineOf('prompt').screen).toBe(true)
-    for (const type of Object.keys(LOCUST_BOTS).filter((type) => type !== 'prompt')) {
+    expect(outlineOf('spark').screen).toBe(true)
+    for (const type of Object.keys(LOCUST_BOTS).filter((type) => type !== 'prompt' && type !== 'spark')) {
       expect(outlineOf(type as keyof typeof LOCUST_BOTS).screen, type).toBe(false)
     }
     expect(outlineOf('droid').screen).toBe(false)

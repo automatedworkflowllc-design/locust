@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.661.0 - 2026-10-05
+
+### Changed
+
+- **Codex Buddy's body is back, and cleaner.** 0.660 took away the body 0.659 gave him; that was a mistake, and it is back: his shirt with the Codex mark, his arms on real joints, his lifts. Touched up: his outlines are a little lighter, the Codex mark a little smaller and still bold, and his curls stay in his picture, so his weights no longer drop out of sight and pop back on every rep.
+
+### New
+
+- **Two agent mascots to pick for a teammate: Prompt and Spark.** Prompt is the Codex mascot, a soft cloud of a head with a screen for a face and `>_` on its chest. Spark is the Claude mascot, a round-petalled star with Claude's mark on its chest. Both wear their screen always, in plastic or plush, and go well with the new Indigo and Coral. A chest mark shows where a bot is big enough to read it; on small faces the screen says enough.
+
 ## 0.660.0 - 2026-10-05
 
 ### Changed

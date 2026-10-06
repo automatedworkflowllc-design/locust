@@ -51,7 +51,9 @@ export const BOT_SHAPES = [
   'swarm',
   // Picked only (0.559): never in DERIVED_SHAPES, so no teammate's face changes for them.
   'critter',
-  'prompt'
+  'prompt',
+  // The Claude mascot (2026-10-05), Prompt's counterpart: picked only, as they are.
+  'spark'
 ] as const
 
 /** The shapes a look is derived from: the first twenty, for good -- a new shape must never move anyone's face. */
@@ -79,7 +81,7 @@ export interface BotSpec {
  * stuck on. So it is each teammate's choice, defaulting to this.
  */
 export const SCREEN_SHAPES: ReadonlySet<BotShape> = new Set<BotShape>([
-  'square', 'ghost', 'circle', 'droid', 'mech', 'hexagon', 'cat', 'pill', 'pebble', 'critter', 'prompt'
+  'square', 'ghost', 'circle', 'droid', 'mech', 'hexagon', 'cat', 'pill', 'pebble', 'critter', 'prompt', 'spark'
 ])
 
 export function screenSuits(shape: string): boolean {

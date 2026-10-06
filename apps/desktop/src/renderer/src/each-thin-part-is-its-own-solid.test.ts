@@ -16,7 +16,7 @@ describe('a shape\'s thin parts', () => {
     expect(partPieces(LOCUST_BOTS.swarm.parts)).toHaveLength(6)
     expect(partPieces(LOCUST_BOTS.hopper.parts)).toHaveLength(6)
     expect(partPieces(LOCUST_BOTS.critter.parts)).toHaveLength(4)
-    expect(partPieces(LOCUST_BOTS.prompt.parts)).toHaveLength(3)
+    expect(partPieces(LOCUST_BOTS.prompt.parts)).toHaveLength(0)
   })
 
   it('lose nothing in the split: the pieces put back together are the path', () => {

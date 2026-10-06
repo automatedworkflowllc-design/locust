@@ -30,10 +30,11 @@ import { TeammateBot, botMotion } from './components/TeammateBot.js'
  */
 
 describe('the shapes', () => {
-  it("are the library's eighteen, then Locust's own two, then the two that nod to the agents", () => {
+  it("are the library's eighteen, then Locust's own two, then the three that nod to the agents", () => {
     expect(BOT_SHAPES.slice(0, 18)).toEqual(botAvatarTypes)
     // Colin, 2026-10-02: "keep the mascots ... just stylize them like our teammates so its not a 1:1".
-    expect(BOT_SHAPES.slice(18)).toEqual(['hopper', 'swarm', 'critter', 'prompt'])
+    // And 2026-10-05: Prompt as the Codex mascot, and Spark, the Claude mascot ("show some love to claude as well").
+    expect(BOT_SHAPES.slice(18)).toEqual(['hopper', 'swarm', 'critter', 'prompt', 'spark'])
   })
 })
 
@@ -139,7 +140,7 @@ describe('the new teammate dialog', () => {
 
   it('offers every shape to choose from, and the face', () => {
     const look = html.slice(html.indexOf('aria-label="Look"'))
-    expect((look.match(/class="lc-look( is-selected)?"/g) ?? []).length).toBe(22)
+    expect((look.match(/class="lc-look( is-selected)?"/g) ?? []).length).toBe(23)
     expect(html).toContain('aria-label="Critter"')
     expect(html).toContain('aria-label="Prompt"')
     expect(html).toContain('aria-label="Hopper, a Locust"')
