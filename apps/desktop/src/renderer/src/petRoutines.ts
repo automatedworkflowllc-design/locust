@@ -193,22 +193,22 @@ const P = Math.PI
 export const POSES = {
   rest: REST_ARM,
   /** A curl at the top: the forearm up toward you, the weight at his chest. */
-  curl: { abduct: 0.16, flex: 0.18, bend: 2.55, bendUp: 0.85, grip: 0 },
+  curl: { abduct: 0.03, flex: 0.18, bend: 2.55, bendUp: 0.85, grip: 0 },
   /** The same with the bar up and down. */
-  hammer: { abduct: 0.16, flex: 0.18, bend: 2.55, bendUp: 0.85, grip: P / 2 },
+  hammer: { abduct: 0.03, flex: 0.18, bend: 2.55, bendUp: 0.85, grip: P / 2 },
   hammerHang: { ...REST_ARM, grip: P / 2 },
-  /** A press's start: the weights at his shoulders, his elbows out. */
-  rack: { abduct: 1.45, flex: 0.5, bend: 2.6, bendUp: 0.9, grip: 0 },
+  /** A press's start: the weights at his shoulders, his elbows out, upright in his hands (a neutral grip: they stay in the picture). */
+  rack: { abduct: 1.45, flex: 0.5, bend: 2.6, bendUp: 0.9, grip: P / 2 },
   /** Halfway up, the weights straight above where they started. */
-  press: { abduct: 2.15, flex: 0.3, bend: 1.75, bendUp: 1, grip: 0 },
+  press: { abduct: 2.15, flex: 0.3, bend: 1.75, bendUp: 1, grip: P / 2 },
   /** Locked out over his head. */
-  lockout: { abduct: 2.92, flex: 0.15, bend: 0.25, bendUp: 1, grip: 0 },
+  lockout: { abduct: 2.92, flex: 0.15, bend: 0.25, bendUp: 1, grip: P / 2 },
   /** A double-biceps flex, the weights up beside his head. */
-  flex: { abduct: 1.42, flex: 0.1, bend: 2.3, bendUp: 1, grip: P / 2 },
-  flexSqueeze: { abduct: 1.48, flex: 0.1, bend: 2.45, bendUp: 1, grip: P / 2 },
+  flex: { abduct: 1.42, flex: 0.1, bend: 2.5, bendUp: 1, grip: P / 2 },
+  flexSqueeze: { abduct: 1.48, flex: 0.1, bend: 2.62, bendUp: 1, grip: P / 2 },
   /** A wave, the forearm one way and the other. */
-  waveIn: { abduct: 1.85, flex: 0.1, bend: 2.2, bendUp: 1, grip: P / 2 },
-  waveOut: { abduct: 1.85, flex: 0.1, bend: 1.72, bendUp: 1, grip: P / 2 },
+  waveIn: { abduct: 1.95, flex: 0.1, bend: 2.4, bendUp: 1, grip: P / 2 },
+  waveOut: { abduct: 1.95, flex: 0.1, bend: 1.95, bendUp: 1, grip: P / 2 },
   /** Thinking: a weight held up by his chin. */
   think: { abduct: 0.3, flex: 0.6, bend: 2.3, bendUp: 0.25, grip: P / 2 },
   /** On the way up to a press: the weight brought in to his chest first, so it never swings wide. */
@@ -216,7 +216,7 @@ export const POSES = {
   /** The same, the bar already rolled up and down: on the way to a flex or a wave, so it rolls by his chest, never out wide. */
   tuckUpright: { abduct: -0.08, flex: 0.65, bend: 2.3, bendUp: 0.6, grip: P / 2 },
   /** Halfway up a curl, as a fidget. */
-  halfCurl: { abduct: 0.15, flex: 0.2, bend: 1.4, bendUp: 0, grip: 0 },
+  halfCurl: { abduct: 0.05, flex: 0.2, bend: 1.4, bendUp: 0, grip: 0 },
   /** Holding the weights heavy, his arms straight: stuck. */
   sag: { abduct: 0.04, flex: 0.02, bend: 0.04, bendUp: 0, grip: 0 }
 } as const satisfies Record<string, ArmPose>
@@ -336,7 +336,7 @@ const press = (reps: number): readonly Piece[] => {
   const rack = both(POSES.rack, 2)
   const mid = both(POSES.press, 1.2)
   const lockout = both(POSES.lockout, 0.5)
-  const tuck = both(POSES.tuck, 1)
+  const tuck = both(POSES.tuckUpright, 1)
   return [through(REST, tuck, rack, 780), hold(rack, 140), ...times([through(rack, mid, lockout, 620), hold(lockout, 220), through(lockout, mid, rack, 700), hold(rack, 160)], reps), through(rack, tuck, REST, 800)]
 }
 
@@ -472,7 +472,7 @@ const strain: Piece = {
   }
 }
 const heavy = both(POSES.sag, 3)
-const stuckTuck = both(POSES.tuck, 1.5)
+const stuckTuck = both(POSES.tuckUpright, 1.5)
 export const STUCK: Move = moveOf('stuck', [through(REST, stuckTuck, stuckRack, 780), strain, glide(stuckPart, stuckRack, 520), through(stuckRack, stuckTuck, heavy, 880)], {
   loops: false,
   holds: true,

@@ -323,12 +323,12 @@ export interface PetScreenAsk {
  * fact he has a body and a logo on his chest"*, then, of him at 34 px, *"the
  * model looks very small and hard to see already even without the bottom half
  * so were gonna have to make it way bigger"*. A bot is a head; he is framed as
- * one is in a portrait, from just above his cap to his upper chest, his face
- * half the box across: his lifts pass through the picture, and a weight held
- * out or overhead goes past its edge, as it would in a close photograph. A
- * square window on his drawing, across his middle.
+ * one is in a portrait, from just above his cap to his chest and the Codex
+ * mark on it, his face half the box across, and every lift he has inside it
+ * (*"make sure the codex logo is legible and the weights arent going out the
+ * frame"*). A square window on his drawing, across his middle.
  */
-export const CLOSEST_FRAMING = 0.5
+export const CLOSEST_FRAMING = 0.55
 /** The window's top, in his drawing's pixels: just above his cap. */
 export const FRAMING_TOP = 6
 

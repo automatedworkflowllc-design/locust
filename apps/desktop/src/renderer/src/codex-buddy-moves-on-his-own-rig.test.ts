@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { HEAD_ROWS, buddyHead, cutHead, eyesOn, faceOf } from './buddyBody.js'
-import { BUDDY_RIG, BuddyRigSim, REST_TARGET, armJoints, headDrop, neckOf } from './buddyRig.js'
+import { BUDDY_RIG, BuddyRigSim, REST_TARGET, armJoints, dumbbellReach, headDrop, neckOf } from './buddyRig.js'
 import type { RigTarget } from './buddyRig.js'
 import { OLD_TWEENS_DATABASE, forgetOldTweens, petWindow } from './components/PetSprite.js'
 import { BUDDY_MOMENTS, FLEX, RESTING, STUCK, THINK, WAIT, WAVE, WORKOUT, WORKOUT_STANDING, handoff, handoffMs, momentMove, movePoseAt } from './petRoutines.js'
@@ -36,13 +36,18 @@ const WINDOW = petWindow(CODEX_BUDDY.frameHeight, BUDDY_RIG.middle)
 interface Hand {
   readonly x: number
   readonly y: number
+  /** How far its weight, where it is in view, is past his window's sides or top, in his drawing's pixels; 0 inside. Below his window it is out of view. */
+  readonly out: number
 }
 
 const handsOf = (target: RigTarget): readonly Hand[] =>
   ([-1, 1] as const).map((side) => {
     const arm = side < 0 ? target.pose.left : target.pose.right
     const joints = armJoints(arm, side, target.pose.dip)
-    return { x: joints.hand.x, y: joints.hand.y }
+    const reach = dumbbellReach(arm, joints)
+    const inView = joints.hand.y - reach.y < WINDOW.top + WINDOW.side
+    const out = inView ? Math.max(0, WINDOW.left - (joints.hand.x - reach.x), joints.hand.x + reach.x - (WINDOW.left + WINDOW.side), WINDOW.top - (joints.hand.y - reach.y)) : 0
+    return { x: joints.hand.x, y: joints.hand.y, out }
   })
 
 /**
@@ -87,6 +92,20 @@ function motionOf(frames: readonly (readonly Hand[])[]): { readonly step: number
   }
   return { step, change }
 }
+
+describe('his weights', () => {
+  it('stay inside his window, wherever they are in view, through every move and every change between them', () => {
+    for (const fps of [30, 60]) {
+      const worst = run(fps, 'sprung', EVERY_CHANGE).flat().reduce((most, hand) => Math.max(most, hand.out), 0)
+      expect(worst, `${String(fps)} fps`).toBe(0)
+    }
+  })
+
+  it('would be caught leaving it: a lateral raise, arms straight out, does', () => {
+    const raise: RigTarget = { pose: { left: { abduct: 1.45, flex: 0.05, bend: 0.2, bendUp: 0, grip: 0 }, right: REST_TARGET.pose.right, dip: 0 }, look: 0 }
+    expect(handsOf(raise)[0]?.out).toBeGreaterThan(10)
+  })
+})
 
 describe('his face', () => {
   /** How far his screen's corners, tilted and dropped with his head, go past his window; 0 inside. */

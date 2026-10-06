@@ -256,7 +256,8 @@ function shorts(dip: number): readonly Piece[] {
  */
 export function drawCodexMark(context: CanvasRenderingContext2D, x: number, y: number, radius: number): void {
   const R = BUDDY_RIG
-  const line = radius * 0.17
+  // Bold enough to read at a bot's size.
+  const line = radius * 0.2
   const cloud = (grow: number): void => {
     context.beginPath()
     const reach = radius * 0.5

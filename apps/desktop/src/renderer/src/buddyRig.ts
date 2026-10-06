@@ -63,7 +63,7 @@ export const BUDDY_RIG = {
   /** His ink round everything, as wide as his maker's lines. */
   ink: 3,
   /** His dumbbells and fists, as large as his own are drawn. */
-  gear: 0.86,
+  gear: 0.8,
   fist: 1.25,
   skin: '#f2bd8f',
   shade: '#d9a273',
@@ -78,7 +78,7 @@ export const BUDDY_RIG = {
   shoe: '#1a161b',
   sole: '#8f8f97',
   /** The Codex mark on his shirt (buddyBody's drawCodexMark): its middle, its size, its colour. */
-  shirtMark: { x: 93.5, y: 101, radius: 13.5 },
+  shirtMark: { x: 93.5, y: 103, radius: 15.5 },
   markColour: '#0c080d',
   /** The ground his shoes stand on. */
   feet: 200,
