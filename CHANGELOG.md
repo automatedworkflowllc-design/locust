@@ -11,6 +11,13 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.672.0 - 2026-10-06
+
+### Fixed
+
+- **A Claude Code edit shows what it changed, in any folder.** Claude Code reports each edit, but Locust never read that report, and worked the change out by looking at the folder after the run. Past what Locust looks at (a file over 64 KB, or a folder with thousands of files, like `.claude`), a Claude edit read "changed" or "did not report the change", with no lines to show. Now each Edit and Write carries Claude Code's own change, line for line.
+- **A failed edit stays a failure.** When an agent's first attempts at an edit failed and a later one landed, the list of steps could show the first failure as the change, and the files card could count the file twice ("Edited 1 file · 1 more changed in the folder"). The steps now say which attempts failed, and the card shows the file once, with the change that landed.
+
 ## 0.671.0 - 2026-10-06
 
 ### Improved

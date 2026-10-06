@@ -66,7 +66,7 @@ try {
   })()`))))
   say(`  dialog: ${JSON.stringify(dialog).slice(0, 700)}`)
   check('Save opens the dialog, named and with its steps filled in', dialog.open && dialog.name.length > 0 && dialog.steps.length > 0, JSON.stringify({ name: dialog.name, steps: dialog.steps }))
-  check('it says Marlow runs it, on the model in plain words', /Marlow runs it on OpenCode \/ [^,.]+ Free, in Ask\./.test(dialog.text), dialog.text.slice(0, 160))
+  check('it says Marlow runs it, on the model in plain words', /Marlow runs it on OpenCode \/ [^,]+? Free, in Ask\./.test(dialog.text), dialog.text.slice(0, 160))
 
   const saved = JSON.parse(String(await drive.capture('saved, daily', () => drive.evaluate(`(async () => {
     const box = document.querySelector('.lc-dialog[aria-label="Save as routine"]')

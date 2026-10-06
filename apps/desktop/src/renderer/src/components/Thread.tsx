@@ -16,7 +16,7 @@ import type {
 } from '../../../shared/ipc.js'
 import type { TurnVersions } from '../missionView.js'
 import type { RewindPutBackResponse } from '../../../shared/ipc.js'
-import { activityEntries, buildThread, cancellationSummary, editedFiles, decisionStanding, errorAlreadyShown, foldNoticeKeys, helperAskedBy, lastPlanOf, modeRefusedATool, pathInWorkspace, readPlan, relativePath, sentAgainBy, stepsLine, stoppedBeforeSaying, terminalSeamBefore, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
+import { activityEntries, buildThread, netFileEntries, cancellationSummary, editedFiles, decisionStanding, errorAlreadyShown, foldNoticeKeys, helperAskedBy, lastPlanOf, modeRefusedATool, pathInWorkspace, readPlan, relativePath, sentAgainBy, stepsLine, stoppedBeforeSaying, terminalSeamBefore, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
 import type { GroupBoundary, GroupLeaving, LiveStarter, TurnSwitch } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
 import { folderName, ranOnLine } from '../ranOn.js'
@@ -533,7 +533,9 @@ function TurnFoot({
   const named = item.details.filter((detail) => detail.kind === 'edit' && detail.failed !== true)
   const inFolder = named.filter((detail) => pathInWorkspace(detail.name, workspacePath))
   const edits = inFolder.length > 0 ? inFolder : named
-  const entries = activityEntries(edits, workspacePath)
+  // Counted over the rows the card draws (0.672): a step standing in for a file the host could not read
+  // was one row under a heading that still counted the host's word for it as "1 more changed".
+  const entries = netFileEntries(activityEntries(edits, workspacePath), workspacePath)
   const pathsOf = (seen: boolean): number => new Set(
     entries.flatMap((entry) =>
       entry.kind === 'file' && (entry.observed === true) === seen ? [relativePath(entry.file.path, workspacePath).toLowerCase()]

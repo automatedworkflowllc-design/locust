@@ -590,10 +590,26 @@ export function netFileEntries(entries: readonly ActivityEntry[], workspacePath?
   const pathOf = (entry: ActivityEntry): string | undefined =>
     entry.kind === 'file' ? key(entry.file.path) : entry.kind === 'unreported' ? key(entry.name) : undefined
   const netPaths = new Set(entries.flatMap((entry) => (entry.kind === 'file' && entry.net === true ? [key(entry.file.path)] : [])))
+  /*
+   * A FILE THE HOST SAW CHANGE BUT COULD NOT READ (0.672): over 64 KB, or in
+   * a folder past its limits. Its row said "changed · seen on disk" with no
+   * counts, beside a step that had reported the change exactly. ONE step that
+   * changed the file is its net change, and stands in for the host's row;
+   * several are not -- each is part of it -- and the host's word stays.
+   */
+  const stepsOf = new Map<string, number>()
+  for (const entry of entries) {
+    if (entry.kind === 'file' && entry.net !== true) stepsOf.set(key(entry.file.path), (stepsOf.get(key(entry.file.path)) ?? 0) + 1)
+  }
+  const unreadPaths = new Set(entries.flatMap((entry) => (entry.kind === 'unreported' && entry.observed === true ? [key(entry.name)] : [])))
   const withoutSteps = entries.filter((entry) => {
     const path = pathOf(entry)
-    if (path === undefined || !netPaths.has(path)) return true
-    return entry.kind === 'file' && entry.net === true
+    if (path === undefined) return true
+    if (netPaths.has(path)) return entry.kind === 'file' && entry.net === true
+    if (unreadPaths.has(path) && (stepsOf.get(path) ?? 0) > 0) {
+      return stepsOf.get(path) === 1 ? entry.kind === 'file' : entry.kind === 'unreported' && entry.observed === true
+    }
+    return true
   })
   const seen = new Set<string>()
   return withoutSteps.filter((entry) => {
@@ -3189,7 +3205,10 @@ export function buildThread(
     return false
   }
   const editRowOf = (observed: string): ActivityDetail | undefined => {
-    const edits = activity.filter((detail) => detail.kind === 'edit')
+    // A failed edit changed nothing (0.672): Haiku's first two Edits of a file
+    // failed, unread, before a third landed, and the host's look at that file
+    // was laid on the first failure -- the row the turn's files card then kept.
+    const edits = activity.filter((detail) => detail.kind === 'edit' && detail.failed !== true)
     const exact = edits.filter((detail) => relative(detail.name) === relative(observed))
     if (exact.length > 0) return exact[0]
     // Anything looser is trusted only when it names exactly one row.

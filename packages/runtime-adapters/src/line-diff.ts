@@ -134,3 +134,18 @@ const ABSOLUTE = /^(?:[A-Za-z]:[\\/]|[\\/])/;
 function side(prefix: string, path: string): string {
   return ABSOLUTE.test(path) ? path : `${prefix}${path}`;
 }
+
+/** One hunk as Claude Code reports it in an edit's `structuredPatch`. */
+export type ReportedHunk = { readonly oldStart: number; readonly oldLines: number; readonly newStart: number; readonly newLines: number; readonly lines: readonly string[] };
+
+/**
+ * A unified diff from hunks a runtime already worked out (0.672, Claude
+ * Code). Its Edit reports `structuredPatch` -- the hunks with their line
+ * numbers and their ` `/`-`/`+` lines -- so nothing is compared again here;
+ * the hunks are only written out under the same headers `unifiedDiffOf` uses.
+ */
+export function unifiedDiffFromHunks(path: string, hunks: readonly ReportedHunk[]): string | undefined {
+  if (hunks.length === 0) return undefined;
+  const body = hunks.flatMap((hunk) => [`@@ -${String(hunk.oldStart)},${String(hunk.oldLines)} +${String(hunk.newStart)},${String(hunk.newLines)} @@`, ...hunk.lines]);
+  return [`--- ${side("a/", path)}`, `+++ ${side("b/", path)}`, ...body].join("\n") + "\n";
+}

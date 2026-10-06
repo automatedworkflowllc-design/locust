@@ -7,9 +7,11 @@ import {
   processEvidence,
   requireContextText,
   stringValue,
+  toolPatchFrom,
 } from "./codex-events.js";
 import type {
   CodexEventEvidence,
+  ToolPatch,
   NormalizedRuntimeEvent,
   NormalizedRuntimeEventType,
   NormalizedRuntimePayloadMap,
@@ -19,6 +21,7 @@ import type {
   RuntimeProcessCompletion,
 } from "./process-runner.js";
 import { providerErrorSentence } from "./provider-error.js";
+import { unifiedDiffFromHunks, unifiedDiffOf, type ReportedHunk } from "./line-diff.js";
 
 /**
  * Claude Code JSONL -> product events.
@@ -206,6 +209,39 @@ export function backgroundEnding(
  * searches, web reads, connector calls -- and not for Read, Write or Edit,
  * which it shows as a line count or a diff, never the file's text.
  */
+/**
+ * WHAT A FILE CALL CHANGED (0.672).
+ *
+ * Every Claude Code Edit and Write read "Claude Code did not report the
+ * change" -- 77 such rows in Colin's own conversations (real-thread sweep,
+ * 2026-10-06) -- while Claude Code had reported it all along: the user record
+ * that answers the call carries `tool_use_result`. MEASURED on Haiku, Claude
+ * Code 2.x, the same day:
+ *   - an Edit: `{ filePath, oldString, newString, originalFile,
+ *     structuredPatch: [{ oldStart, oldLines, newStart, newLines, lines }] }`;
+ *   - a Write of a new file: `{ type: "create", filePath, content,
+ *     structuredPatch: [], originalFile: null }`.
+ * The hunks are written out as they came; a file with no hunks but its whole
+ * text (a new one, or one rewritten) is compared against what it was.
+ */
+export function claudeFilePatch(result: unknown): ToolPatch | undefined {
+  if (!isObject(result)) return undefined;
+  const path = stringValue(result.filePath);
+  if (path === undefined) return undefined;
+  const hunks = Array.isArray(result.structuredPatch)
+    ? result.structuredPatch.filter((hunk): hunk is ReportedHunk =>
+        isObject(hunk)
+        && [hunk.oldStart, hunk.oldLines, hunk.newStart, hunk.newLines].every((value) => typeof value === "number" && Number.isFinite(value))
+        && Array.isArray(hunk.lines) && hunk.lines.every((line) => typeof line === "string"))
+    : [];
+  const unified = hunks.length > 0
+    ? unifiedDiffFromHunks(path, hunks)
+    : typeof result.content === "string" && (result.originalFile === null || typeof result.originalFile === "string")
+      ? unifiedDiffOf(path, result.originalFile, result.content)
+      : undefined;
+  return unified === undefined ? undefined : toolPatchFrom(unified);
+}
+
 export function claudeShowsOutput(name: string | undefined): boolean {
   if (name === undefined) return false;
   if (name.startsWith("mcp__")) return true;
@@ -1154,6 +1190,12 @@ export function createClaudeEventNormalizer(
             // What the subagent came back with, in its own words: the row
             // reads "reported back · 3" instead of only "reported back".
             ...(subagentSummary === undefined ? {} : { output: boundedMessageText(subagentSummary) }),
+            // The change a file call made, from the record that answers it (claudeFilePatch).
+            ...(() => {
+              if (failed || refusedFor !== undefined) return {};
+              const patch = claudeFilePatch(parsed.tool_use_result);
+              return patch === undefined ? {} : { patch };
+            })(),
             // What the step printed, bounded and scrubbed like a message (0.489).
             ...(() => {
               if (refusedFor !== undefined || subagentSummary !== undefined || !claudeShowsOutput(open?.name)) return {};

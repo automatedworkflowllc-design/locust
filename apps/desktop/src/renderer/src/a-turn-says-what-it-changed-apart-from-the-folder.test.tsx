@@ -59,6 +59,20 @@ describe('the foot of a finished turn', () => {
     expect(html).toContain('2 files changed in the folder while it ran')
   })
 
+  it('counts a file the host could not read once, as the step that changed it (0.672)', () => {
+    // The host's look named report.md and could not read it (past 64 KB): its word sits beside the step's diff.
+    const unread = [
+      ...events.slice(0, 6),
+      event('tool.started', { itemId: 'obs-r', toolKind: 'observed_edit', name: 'edit', command: 'report.md', status: 'reported by the runtime, changed on disk', phase: 'started' }),
+      event('tool.completed', { itemId: 'obs-r', toolKind: 'observed_edit', name: 'edit', command: 'report.md', status: 'reported by the runtime, changed on disk', phase: 'completed' })
+    ]
+    const html = renderToStaticMarkup(
+      <ThreadItems items={buildThread(unread, { running: false })} owner={undefined} activity="idle" workspacePath="C:/work" decision={undefined} />
+    )
+    expect(html).toContain('Edited 1 file')
+    expect(html).not.toContain('more changed in the folder')
+  })
+
   it('draws no foot while the turn is still going', () => {
     const html = renderToStaticMarkup(
       <ThreadItems items={buildThread(events.slice(0, 4), { running: true })} owner={undefined} activity="working" workspacePath="C:/work" decision={undefined} />
