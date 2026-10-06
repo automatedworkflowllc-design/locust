@@ -16,6 +16,7 @@ heading: the home screen then shows it once, as a splash.
 ### Improved
 
 - **Antigravity says what it is doing as it works.** On a long job, Gemini on Antigravity could work for twenty minutes with nothing on screen but "Working...". Locust now asks it, in one line, to say in a short sentence what it is about to do before each step. Measured on the same task: no words between its steps without the line, one before every step with it. Claude Code, Codex and Cursor already do this on their own and are not asked.
+- **Antigravity's answer no longer repeats what it said along the way.** Its last message held every sentence of the turn, so a line it had said before a step came back on top of its answer.
 
 ## 0.667.0 - 2026-10-06
 

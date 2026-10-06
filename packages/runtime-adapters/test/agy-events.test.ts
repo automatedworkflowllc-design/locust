@@ -54,6 +54,21 @@ describe("Antigravity CLI's stream", () => {
     expect(events.some((event) => event.type === "run.failed")).toBe(false);
   });
 
+  it("a sentence said before a step is not said again on top of the answer (0.668)", () => {
+    const normalizer = createAgyEventNormalizer({ runId: "run_1", missionId: "mission_1", now: () => new Date("2026-10-02T00:00:00Z") });
+    const step = (index: number, fields: Record<string, unknown>) => JSON.stringify({ event: "step_update", step_update: { conversation_id: "c1", step_index: index, ...fields } });
+    const lines = [
+      '{"event":"init","conversation_id":"c1"}',
+      step(1, { step_type: "agent_response", state: "DONE", text_delta: "I am about to read note.txt." }),
+      step(2, { step_type: "tool", state: "DONE", tool_name: "view_file", tool_info: { parameters: { AbsolutePath: "C:/w/note.txt" } } }),
+      step(3, { step_type: "agent_response", state: "DONE", text_delta: "It says hello. FINISHED" }),
+      '{"event":"result","result":{"conversation_id":"c1","status":"SUCCESS","response":"I am about to read note.txt.\\nIt says hello. FINISHED"}}'
+    ];
+    const events = [...lines.flatMap((raw, index) => normalizer.accept({ sequence: index + 1, raw } as never)), ...normalizer.finish(completion(0))];
+    const final = events.filter((event) => event.type === "message.delta").at(-1);
+    expect(payload<{ text: string; final: boolean; itemId: string }>(final)).toMatchObject({ text: "It says hello. FINISHED", final: true, itemId: "msg_3" });
+  });
+
   it("a 503 with no answer is still a failure", () => {
     const normalizer = createAgyEventNormalizer({ runId: "run_1", missionId: "mission_1", now: () => new Date("2026-10-02T00:00:00Z") });
     const raw = '{"event":"result","result":{"conversation_id":"c1","status":"ERROR","response":"","error":"API error (attempt 1): UNAVAILABLE (code 503): The service is currently unavailable."}}';

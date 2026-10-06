@@ -105,6 +105,8 @@ export function createAgyEventNormalizer(context: AgyInvocationContext): AgyEven
   let usage: { readonly inputTokens: number; readonly outputTokens: number } | undefined;
   /** The message item each agent_response step writes into, newest last. */
   let lastMessageItem: string | undefined;
+  // Each message's words as they arrived, in order: the result's whole reply repeats the earlier ones (0.668).
+  const spokenText = new Map<string, string>();
   const openTools = new Set<number>();
   /** The agent_response steps that wrote words: theirs is writing time, not thought. */
   const spoken = new Set<number>();
@@ -196,6 +198,7 @@ export function createAgyEventNormalizer(context: AgyInvocationContext): AgyEven
       if (text === undefined || text.length === 0) return [];
       spoken.add(index);
       lastMessageItem = `msg_${String(index)}`;
+      spokenText.set(lastMessageItem, (spokenText.get(lastMessageItem) ?? "") + text);
       return [emit("message.delta", { itemId: lastMessageItem, operation: "append", text: boundedMessageText(text), final: false, evidence })];
     }
 
@@ -283,8 +286,26 @@ export function createAgyEventNormalizer(context: AgyInvocationContext): AgyEven
       const events: NormalizedRuntimeEvent[] = [];
       // The whole answer, from agy's own last word, replaces what the deltas built.
       const response = stringValue(result.response);
-      if (response !== undefined && response.trim().length > 0) {
-        events.push(emit("message.delta", { itemId: lastMessageItem ?? "msg_final", operation: "replace", text: boundedMessageText(response), final: true, evidence }));
+      /*
+       * ITS EARLIER WORDS ARE NOT SAID TWICE (0.668). agy's result holds every
+       * sentence of the turn -- "I am about to view quoted-task.txt", then the
+       * answer -- and it replaces the last message, so a sentence already shown
+       * before a step came back on top of the answer. What the earlier
+       * messages said, in order, is taken off its front.
+       */
+      let whole: string | undefined = response;
+      if (whole !== undefined) {
+        let left: string = whole;
+        spokenText.forEach((words: string, itemId: string) => {
+          if (itemId === lastMessageItem) return;
+          const earlier = words.trim();
+          const rest = left.trimStart();
+          if (earlier.length > 0 && rest.startsWith(earlier)) left = rest.slice(earlier.length);
+        });
+        whole = left;
+      }
+      if (whole !== undefined && whole.trim().length > 0) {
+        events.push(emit("message.delta", { itemId: lastMessageItem ?? "msg_final", operation: "replace", text: boundedMessageText(whole.trimStart()), final: true, evidence }));
       }
       const denied = Array.isArray(result.denied_actions)
         ? result.denied_actions.flatMap((entry) => (isObject(entry) && typeof entry.action === "string" ? [entry.action] : []))
