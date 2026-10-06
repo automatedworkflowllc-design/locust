@@ -7,8 +7,9 @@
 // plain reply at the END of the conversation, not where it was edited. Ash
 // answers once; their first message is edited into a long shell count, which
 // starts a second conversation and keeps them busy; back on the first, an
-// edit is sent. It must come back with the reason, its words still in the
-// box, and nothing queued. Spends nothing.
+// edit is sent. Nothing may be queued; since a teammate works two conversations
+// at once, the edit runs at once from where it was edited (until 2026-10-06 this
+// expected it to come back refused). Spends nothing.
 
 import { join } from 'node:path'
 import { FREE_ROUTE, conversationRows, openTeammateScript, recordRoot, say, scratchRepository, sendAndWaitScript, sleep, startDrive } from './drive-lib.mjs'
@@ -79,8 +80,17 @@ try {
   check('the first conversation opens while Ash works on the other', opened === 'opened', opened)
   const edited = JSON.parse(String(await drive.capture('an edit sent while Ash is busy elsewhere', () => drive.evaluate(editAndSend('HERON', 'Reply with the single word OTTER.')))))
   check('the edit is not queued', edited.queued === 0, JSON.stringify(edited))
-  check('it says why it was not sent', /still working/.test(edited.notice), edited.notice)
-  check('and its words are still in the box, still an edit', /OTTER/.test(edited.box) && /Editing an earlier message/.test(edited.banner ?? ''), JSON.stringify({ box: edited.box, banner: edited.banner }))
+  /*
+   * A teammate now works two conversations at once, so the edit is not refused any more: it runs at once, in its
+   * own conversation, from where it was edited -- the end 0.500 was after, by the better road. This drive expected
+   * the refusal ("still working", the words kept in the box) until the 2026-10-06 sweep, where 0.671 and 0.672
+   * both started it beside the long count ("2 running").
+   */
+  await sleep(1500)
+  const thread = String(await drive.evaluate(`document.querySelector('.lc-thread')?.innerText.replace(/\\s+/g, ' ') ?? ''`))
+  check('it runs at once, from where it was edited', /Started again from an edited message/.test(thread) && /Reply with the single word OTTER\./.test(thread) && !/HERON/.test(thread), thread.slice(0, 300))
+  const running = String(await drive.evaluate(`document.querySelector('.lc-titlebar, header')?.innerText ?? document.body.innerText.slice(0, 400)`))
+  check('beside the long count: two running', /2 running/.test(running), running.slice(0, 120))
   // Let the other run go.
   await drive.evaluate(`(async () => {
     const rows = ${conversationRows()}
