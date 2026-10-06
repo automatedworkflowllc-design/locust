@@ -78,7 +78,7 @@ export const BUDDY_RIG = {
   shoe: '#1a161b',
   sole: '#8f8f97',
   /** The Codex mark on his shirt (buddyBody's drawCodexMark): its middle, its size, its colour. */
-  shirtMark: { x: 93.5, y: 103, radius: 15.5 },
+  shirtMark: { x: 93.5, y: 102, radius: 17.5 },
   markColour: '#0c080d',
   /** The ground his shoes stand on. */
   feet: 200,
