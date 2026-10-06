@@ -153,18 +153,30 @@ for (const name of drives.slice(start)) {
    * Such a drive runs again on the next free model, at most twice, and the
    * summary says which models were refused. A model forced with
    * LOCUST_FREE_MODEL is never swapped.
+   *
+   * And ANY failure gets one more run on another model: a free model that is
+   * only slow says nothing a drive can read -- Space Bunny left a routine on
+   * step 1 past the drive's wait, and the same drive passed 6/6 on Fledge
+   * Alpha (2026-10-06). A failure on two models is the one to look at.
    */
   const refusedBy = []
+  const failedOn = []
   let run
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const model = process.env.LOCUST_FREE_MODEL ?? nextFreeModel()
     run = await runDrive(name, model)
-    if (run.fails === 0 || process.env.LOCUST_FREE_MODEL !== undefined || !PROVIDER_REFUSED.test(run.text)) break
-    refusedBy.push(model.replace(/^opencode\//, ''))
-    console.log(`${name}: ${model} was refused by its provider; again on the next free model`)
+    if (run.fails === 0 && run.code === 0) break
+    if (process.env.LOCUST_FREE_MODEL !== undefined) break
+    const refused = PROVIDER_REFUSED.test(run.text)
+    if (!refused && failedOn.length > 0) break
+    ;(refused ? refusedBy : failedOn).push(model.replace(/^opencode\//, ''))
+    console.log(`${name}: failed on ${model}${refused ? ' (refused by its provider)' : ''}; again on the next free model`)
   }
   const { code, timedOut, passes, fails, failedLines } = run
-  const note = (refusedBy.length > 0 ? `refused by ${refusedBy.join(', ')}; ` : '') + (failedLines[0] ?? run.text.split(/\r?\n/).filter((line) => /\bFAIL\b/.test(line))[0] ?? '')
+  const passedLater = fails === 0 && code === 0 && (refusedBy.length > 0 || failedOn.length > 0)
+  const note = (refusedBy.length > 0 ? `refused by ${refusedBy.join(', ')}; ` : '')
+    + (failedOn.length > 0 ? `${passedLater ? 'passed after failing' : 'also failed'} on ${failedOn.join(', ')}; ` : '')
+    + (failedLines[0] ?? run.text.split(/\r?\n/).filter((line) => /\bFAIL\b/.test(line))[0] ?? '')
   results.push({ name: name.replace(/\.mjs$/, ''), code, timedOut, passes, fails, failedLines: failedLines.slice(0, 5), ms: Date.now() - began, note })
   await summarise()
   console.log(`${name}: code ${String(code)}${timedOut ? ' TIMED OUT' : ''}, ${String(passes)} PASS, ${String(fails)} FAIL ${note.slice(0, 120)}`)
