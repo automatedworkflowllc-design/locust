@@ -193,9 +193,9 @@ const P = Math.PI
 export const POSES = {
   rest: REST_ARM,
   /** A curl at the top: the forearm up toward you, the weight at his chest. */
-  curl: { abduct: 0.3, flex: 0.25, bend: 2.4, bendUp: 0, grip: 0 },
+  curl: { abduct: 0.16, flex: 0.18, bend: 2.55, bendUp: 0.85, grip: 0 },
   /** The same with the bar up and down. */
-  hammer: { abduct: 0.3, flex: 0.25, bend: 2.4, bendUp: 0, grip: P / 2 },
+  hammer: { abduct: 0.16, flex: 0.18, bend: 2.55, bendUp: 0.85, grip: P / 2 },
   hammerHang: { ...REST_ARM, grip: P / 2 },
   /** A press's start: the weights at his shoulders, his elbows out. */
   rack: { abduct: 1.45, flex: 0.5, bend: 2.6, bendUp: 0.9, grip: 0 },
@@ -204,7 +204,7 @@ export const POSES = {
   /** Locked out over his head. */
   lockout: { abduct: 2.92, flex: 0.15, bend: 0.25, bendUp: 1, grip: 0 },
   /** A squat's arms: out in front for balance. */
-  squat: { abduct: 0.08, flex: 0.62, bend: 0.25, bendUp: 0, grip: 0 },
+  squat: { abduct: 0.3, flex: 0.06, bend: 0.06, bendUp: 0, grip: P / 2 },
   /** A double-biceps flex, the weights up beside his head. */
   flex: { abduct: 1.42, flex: 0.1, bend: 2.3, bendUp: 1, grip: P / 2 },
   flexSqueeze: { abduct: 1.48, flex: 0.1, bend: 2.45, bendUp: 1, grip: P / 2 },
@@ -344,7 +344,7 @@ const press = (reps: number): readonly Piece[] => {
 
 /** Squats: down with his arms out in front, and up. */
 const squats = (reps: number): readonly Piece[] => {
-  const bottom = both(POSES.squat, 14)
+  const bottom = both(POSES.squat, 13)
   return times([glide(REST, bottom, 820), hold(bottom, 140), glide(bottom, REST, 780), hold(REST, 260)], reps)
 }
 

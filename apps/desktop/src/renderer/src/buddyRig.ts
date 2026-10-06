@@ -62,8 +62,8 @@ export const BUDDY_RIG = {
   /** Where each leg turns, at the hip, and where each ankle stands, pinned: a squat bends the knees between. */
   hip: { left: { x: 81, y: 146 }, right: { x: 106, y: 146 } },
   ankle: { left: { x: 78, y: 186 }, right: { x: 109, y: 186 } },
-  thigh: 21,
-  shin: 21,
+  thigh: 20.2,
+  shin: 20.2,
   /** His ink round everything, as wide as his maker's lines. */
   ink: 3,
   /** His dumbbells and fists, as large as his own are drawn. */
@@ -85,8 +85,33 @@ export const BUDDY_RIG = {
   shirtMark: { x: 93.5, y: 109, radius: 14.5 },
   markColour: '#0c080d',
   /** The ground his shoes stand on. */
-  feet: 200
+  feet: 200,
+  /** His chin's row: where his head meets his shirt. */
+  chin: 78
 } as const
+
+/**
+ * HIS LEAN AS HE SQUATS. A squat drops the hips and brings the chest forward
+ * over the knees; seen from the front his upper body grows shorter and his head
+ * comes down further than his hips: at most this much shorter, at this deep.
+ */
+export const LEAN = { most: 0.16, at: 13 } as const
+
+/** How much shorter his upper body is drawn, his hips dropped `dip`. */
+export function leanOf(dip: number): number {
+  return LEAN.most * Math.max(0, Math.min(1, dip / LEAN.at))
+}
+
+/** Where a point of him drawn standing at height `y` is, his hips dropped `dip`: below his hips, down by the dip; above, leaned. */
+export function bodyY(y: number, dip: number): number {
+  const hips = BUDDY_RIG.hip.left.y
+  return y >= hips ? y + dip : hips + dip - (hips - y) * (1 - leanOf(dip))
+}
+
+/** How far his head moves down, his hips dropped `dip` (his chin's row). */
+export function headDrop(dip: number): number {
+  return bodyY(BUDDY_RIG.chin, dip) - BUDDY_RIG.chin
+}
 
 /** A dumbbell's bar from end to end and its inner plates' height, before `gear` and nearness. */
 export const DUMBBELL = { halfLength: 21.25, halfHeight: 11 } as const
@@ -108,7 +133,7 @@ export interface ArmJoints {
 /** Where an arm's shoulder, elbow and hand are, in 3D, for its pose: `side` -1 the picture's left, 1 its right. */
 export function armJoints(pose: ArmPose, side: -1 | 1, dip: number): ArmJoints {
   const at = side < 0 ? BUDDY_RIG.shoulder.left : BUDDY_RIG.shoulder.right
-  const s = { x: at.x, y: at.y + dip, z: 0 }
+  const s = { x: at.x, y: bodyY(at.y, dip) - shrugOf(pose.abduct), z: 0 }
   // The upper arm: down, swung out by `abduct`, then raised toward you by `flex`.
   const outX = side * Math.sin(pose.abduct)
   const outY = Math.cos(pose.abduct)
@@ -142,15 +167,31 @@ export function legJoints(side: -1 | 1, dip: number): LegJoints {
   const R = BUDDY_RIG
   const h = side < 0 ? R.hip.left : R.hip.right
   const a = side < 0 ? R.ankle.left : R.ankle.right
-  const hip = { x: h.x, y: h.y + dip, z: 0 }
+  // A rep's small effort his body takes (bodyY); only a real squat bends his knees.
+  const hip = { x: h.x, y: h.y + kneeDip(dip), z: 0 }
   const ankle = { x: a.x, y: a.y, z: 0 }
   const span = Math.hypot(ankle.x - hip.x, ankle.y - hip.y)
   const reach = Math.min(span / 2, R.thigh - 1e-6)
   const out = Math.sqrt(Math.max(0, R.thigh * R.thigh - reach * reach))
   const middle = { x: (hip.x + ankle.x) / 2, y: (hip.y + ankle.y) / 2 }
-  // Out over his toes, as a squat's knees go, and toward you.
-  const bow = norm({ x: side * 1, y: 0, z: 0.75 })
+  // Toward you and out over his toes, as a squat's knees go.
+  const bow = norm({ x: side * 1, y: 0, z: 0.55 })
   return { hip, knee: { x: middle.x + bow.x * out, y: middle.y, z: bow.z * out }, ankle }
+}
+
+/** How far his hips drop at his knees for a dip: none for a rep's small effort, then as far as the dip, by the bottom of a squat. */
+export function kneeDip(dip: number): number {
+  const effort = 3
+  if (dip <= effort) return 0
+  const deep = LEAN.at
+  return dip >= deep ? dip : ((dip - effort) / (deep - effort)) ** 1.5 * deep
+}
+
+/** How far his shoulder rises for an arm raised `abduct`: nothing below his shoulder, up to SHRUG over his head. */
+export const SHRUG = 3
+export function shrugOf(abduct: number): number {
+  const k = Math.max(0, Math.min(1, (abduct - 1.5) / 1.3))
+  return SHRUG * k * k * (3 - 2 * k)
 }
 
 /** Nearer, larger: a part toward you by `z` pixels is drawn this much bigger. */
@@ -210,7 +251,19 @@ export const WEIGHT_SWING = { stiffness: 70, damping: 7.5, push: 0.00012 } as co
 export interface RigTarget {
   readonly pose: BuddyPose
   readonly look: number
+  /** His head's tilt, radians (clockwise as the picture is drawn): his springs' own, never asked for. */
+  readonly tilt?: number
 }
+
+/**
+ * HIS HEAD ON ITS NECK. A head that never moves on its body reads as a
+ * mannequin's: his tilts on a loose spring of its own toward where his eyes
+ * look, and is tipped by his arms -- an arm heaving up on one side tips it the
+ * other way and back, as a lift does -- and by his body dropping into a rep.
+ * His screen turns with it. Its stiffness and damping, how far a look tips it,
+ * and how much an arm's or his body's acceleration pushes it.
+ */
+export const HEAD_TILT = { stiffness: 85, damping: 11, perLook: 0.06, armPush: 0.000045, dipPush: 0.00002, most: 0.14 } as const
 
 export const REST_TARGET: RigTarget = { pose: REST_POSE, look: 0 }
 
@@ -222,6 +275,9 @@ export class BuddyRigSim {
   private readonly swings: Readonly<Record<'left' | 'right', Spring>>
   private readonly dip: Spring
   private readonly look: Spring
+  private readonly tilt: Spring
+  /** His hands' heights and his dip at the last two steps, for their accelerations (his head's tilt). */
+  private lifts: { readonly left: [number, number]; readonly right: [number, number]; readonly dip: [number, number] } | undefined
   /** The target the last frame asked for: a frame's steps go from it to the new one, so a coarse clock moves him as a fine one does. */
   private last: RigTarget
   /** Each hand's place across the picture at the last two steps, for its acceleration. */
@@ -239,6 +295,7 @@ export class BuddyRigSim {
     this.swings = { left: new Spring(0, WEIGHT_SWING.stiffness, WEIGHT_SWING.damping), right: new Spring(0, WEIGHT_SWING.stiffness, WEIGHT_SWING.damping) }
     this.dip = new Spring(start.pose.dip, 120, 14)
     this.look = new Spring(start.look, 140, 20)
+    this.tilt = new Spring(start.look * HEAD_TILT.perLook, HEAD_TILT.stiffness, HEAD_TILT.damping)
   }
   private armNow(side: 'left' | 'right'): ArmPose {
     const one = this.arms[side]
@@ -264,6 +321,17 @@ export class BuddyRigSim {
         this.hands[side] = { x0: seen?.x1 ?? x, x1: x, dt }
         this.swings[side].step(0, dt, -WEIGHT_SWING.push * accel * WEIGHT_SWING.stiffness)
       }
+      // His head: toward his look, tipped away from an arm heaving up, and by his body dropping.
+      const ly = armJoints(this.armNow('left'), -1, this.dip.value).hand.y
+      const ry = armJoints(this.armNow('right'), 1, this.dip.value).hand.y
+      const seen = this.lifts
+      let push = 0
+      if (seen !== undefined) {
+        const acc = (now: number, [a, b]: [number, number]): number => (now - 2 * b + a) / (dt * dt)
+        push = HEAD_TILT.armPush * (acc(ly, seen.left) - acc(ry, seen.right)) + HEAD_TILT.dipPush * acc(this.dip.value, seen.dip) * Math.sign(this.look.value || 1)
+      }
+      this.lifts = { left: [seen?.left[1] ?? ly, ly], right: [seen?.right[1] ?? ry, ry], dip: [seen?.dip[1] ?? this.dip.value, this.dip.value] }
+      this.tilt.step(this.look.value * HEAD_TILT.perLook, dt, push * HEAD_TILT.stiffness)
     }
     this.last = target
     return this.now()
@@ -278,6 +346,8 @@ export class BuddyRigSim {
     }
     this.dip.place(target.pose.dip)
     this.look.place(target.look)
+    this.tilt.place(target.look * HEAD_TILT.perLook)
+    this.lifts = undefined
     return this.now()
   }
   /** Every spring at its target and stopped, and the weights hanging still. */
@@ -286,7 +356,7 @@ export class BuddyRigSim {
       for (const key of ARM_KEYS) if (!this.arms[side][key].restsAt(target.pose[side][key])) return false
       if (!this.swings[side].restsAt(0)) return false
     }
-    return this.dip.restsAt(target.pose.dip) && this.look.restsAt(target.look)
+    return this.dip.restsAt(target.pose.dip) && this.look.restsAt(target.look) && this.tilt.restsAt(target.look * HEAD_TILT.perLook)
   }
   /** His pose as drawn: each weight's roll with its swing. */
   now(): RigTarget {
@@ -294,6 +364,12 @@ export class BuddyRigSim {
       const pose = this.armNow(side)
       return { ...pose, grip: pose.grip + this.swings[side].value }
     }
-    return { pose: { left: arm('left'), right: arm('right'), dip: this.dip.value }, look: this.look.value }
+    const tilt = Math.max(-HEAD_TILT.most, Math.min(HEAD_TILT.most, this.tilt.value))
+    return { pose: { left: arm('left'), right: arm('right'), dip: this.dip.value }, look: this.look.value, tilt }
   }
+}
+
+/** Where his head turns on his neck, his hips dropped `dip`: the middle of his collar. */
+export function neckOf(dip: number): { readonly x: number; readonly y: number } {
+  return { x: BUDDY_RIG.middle, y: BUDDY_RIG.chin + headDrop(dip) }
 }

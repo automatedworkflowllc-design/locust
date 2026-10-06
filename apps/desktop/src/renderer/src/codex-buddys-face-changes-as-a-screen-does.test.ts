@@ -109,7 +109,7 @@ describe('a change', () => {
       face.frame(0)
       face.asking.now = ask(key)
       const now = face.frame(0)
-      expect(now.rig, key).toEqual(buddyMoveFor(key).still)
+      expect({ pose: now.rig.pose, look: now.rig.look }, key).toEqual(buddyMoveFor(key).still)
       expect(now.squash, key).toBe(1)
       expect(now.settled, key).toBe(true)
       sameMotion(now.motions[0], glyphMotion(now.pair.join(''), 0, 0))

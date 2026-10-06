@@ -7,8 +7,8 @@ import { anchorsOf, anchorVariables } from '../botAnchors.js'
 import { seeded } from '../faceLife.js'
 import type { GlanceSide } from '../glances.js'
 import { petCellAt, petFadeMs, petGlanceCell, petNextChangeIn } from '../petMotion.js'
-import { buddyHead, drawBuddyArms, drawBuddyBody } from '../buddyBody.js'
-import { BUDDY_RIG, BuddyRigSim } from '../buddyRig.js'
+import { buddyFaceGlass, buddyHead, drawBuddyArms, drawBuddyBody, eyesOn } from '../buddyBody.js'
+import { BUDDY_RIG, BuddyRigSim, headDrop, neckOf } from '../buddyRig.js'
 import type { RigTarget } from '../buddyRig.js'
 import { RESTING, glanceLook, handoff, handoffMs, movePoseAt } from '../petRoutines.js'
 import type { Move } from '../petRoutines.js'
@@ -322,8 +322,10 @@ export interface PetScreenAsk {
  *
  * Closer since his own rig (2026-10-05). Colin: *"we might have to make the
  * model bigger in general to compensate for the fact he has a body and a logo
- * on his chest"*: at his closest, from his cap to his belt, his face and the
- * Codex mark on his shirt a tenth larger again.
+ * on his chest"*, and *"do you think it should be only from the waist up like
+ * the other one to help with the size?"*: at his closest, from his cap to his
+ * belt, his face and the Codex mark on his shirt an eighth larger again (as
+ * close as every lift stays in view); all of him, squats and all, from 96 px.
  */
 export const CLOSEST_FRAMING = 0.6
 /** Drawn this size or smaller, he is framed closest. */
@@ -663,7 +665,7 @@ export function petScreenConductor(
     const opened = booting === undefined ? 1 : powerOnEyes(booting)
     return {
       rig: sprung,
-      glass: plateGlass === undefined ? undefined : { ...plateGlass, y: plateGlass.y + sprung.pose.dip },
+      glass: plateGlass === undefined ? undefined : { ...plateGlass, y: plateGlass.y + headDrop(sprung.pose.dip) },
       pair,
       motions: [loopAt(0), loopAt(1)],
       squash: 1 - 0.92 * Math.max(change.shut, blink, 1 - opened),
@@ -766,6 +768,8 @@ function ScreenPet({ pet, atlas, face, size, state, ask, still, seed, glance, bo
     forgetOldTweens()
     // His head, cut from his sheet once (buddyBody.ts); a sheet that cannot be read is drawn as his maker drew him standing.
     const plate = buddyHead(atlas.image, atlas.frameWidth, atlas.frameHeight)
+    // His face as his screen (buddyBody.ts): its glass in his face's own shape, tinted as a screen's is; where it cannot be found, a screen over it.
+    const faceGlass = plate === undefined ? undefined : buddyFaceGlass(atlas.image, atlas.frameWidth, atlas.frameHeight, { top: sameHue(face.glass, 0.42, 0.17), bottom: sameHue(face.glass, 0.5, 0.08) })
     canvas.dataset.rig = plate === undefined ? 'drawn' : 'on'
     const frozen = still || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
     const conductor = petScreenConductor(
@@ -803,11 +807,17 @@ function ScreenPet({ pet, atlas, face, size, state, ask, still, seed, glance, bo
       inDrawing()
       const { row, column } = BUDDY_RIG.plate
       if (plate === undefined) context.drawImage(atlas.image, column * atlas.frameWidth, row * atlas.frameHeight, atlas.frameWidth, atlas.frameHeight, 0, 0, atlas.frameWidth, atlas.frameHeight)
-      else drawBuddyBody(context, plate, now.rig.pose)
-      context.setTransform(1, 0, 0, 1, 0, 0)
-      if (now.glass !== undefined) {
-        const glass = toCanvas(now.glass)
-        paintGlass(context, glass, face, GLASS_INK * k, 1 / glassUnits(glass))
+      else drawBuddyBody(context, plate, now.rig.pose, now.rig.tilt ?? 0, faceGlass?.glass)
+      // His screen on his head, tilted with it about his neck.
+      const neck = neckOf(now.rig.pose.dip)
+      const nx = (neck.x - shown.left) * k
+      const ny = (neck.y - shown.top) * k
+      const tilt = plate === undefined ? 0 : (now.rig.tilt ?? 0)
+      context.setTransform(Math.cos(tilt), Math.sin(tilt), -Math.sin(tilt), Math.cos(tilt), nx - nx * Math.cos(tilt) + ny * Math.sin(tilt), ny - nx * Math.sin(tilt) - ny * Math.cos(tilt))
+      const eyesAt = faceGlass === undefined ? now.glass : { ...eyesOn(faceGlass.box), y: eyesOn(faceGlass.box).y + headDrop(now.rig.pose.dip) }
+      if (eyesAt !== undefined) {
+        const glass = toCanvas(eyesAt)
+        if (faceGlass === undefined) paintGlass(context, glass, face, GLASS_INK * k, 1 / glassUnits(glass))
         if (now.booting !== undefined) paintPowerOn(context, glass, now.booting, now.light, 1 / glassUnits(glass))
         if (now.opened > 0) paintScreenEyes(context, glass, now.pair, now.motions, now.squash, now.closedSquash, now.light, now.rig.look)
       }

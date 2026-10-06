@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { HEAD_ROWS, buddyHead, cutHead } from './buddyBody.js'
+import { HEAD_ROWS, buddyHead, cutHead, eyesOn, faceOf } from './buddyBody.js'
 import { BUDDY_RIG, BuddyRigSim, REST_TARGET, armJoints, dumbbellReach } from './buddyRig.js'
 import type { RigTarget } from './buddyRig.js'
 import { OLD_TWEENS_DATABASE, forgetOldTweens, petWindow } from './components/PetSprite.js'
@@ -30,13 +30,13 @@ const MOVES: readonly Move[] = [
   ...BUDDY_MOMENTS.map((moment) => momentMove(moment.name)).filter((move): move is Move => move !== undefined)
 ]
 
-/** His closest framing: the window shown at the sizes he is nearly always drawn at. */
-const CLOSEST = petWindow(34, CODEX_BUDDY.frameWidth, CODEX_BUDDY.frameHeight, BUDDY_RIG.middle)
+/** His framings, from his closest (the sizes he is nearly always drawn at) to whole: the windows shown. */
+const WINDOWS = [34, 56, 64, 80, 96].map((size) => petWindow(size, CODEX_BUDDY.frameWidth, CODEX_BUDDY.frameHeight, BUDDY_RIG.middle))
 
 interface Hand {
   readonly x: number
   readonly y: number
-  /** How far its weight is past the closest window's sides or top, in his drawing's pixels; 0 inside. */
+  /** How far its weight, where it is in view, is past a window's sides or top, in his drawing's pixels; 0 inside. Below a window it is out of view. */
   readonly out: number
 }
 
@@ -45,7 +45,11 @@ const handsOf = (target: RigTarget): readonly Hand[] =>
     const arm = side < 0 ? target.pose.left : target.pose.right
     const joints = armJoints(arm, side, target.pose.dip)
     const reach = dumbbellReach(arm, joints)
-    const out = Math.max(0, CLOSEST.left - (joints.hand.x - reach.x), joints.hand.x + reach.x - (CLOSEST.left + CLOSEST.side), CLOSEST.top - (joints.hand.y - reach.y))
+    let out = 0
+    for (const window of WINDOWS) {
+      if (joints.hand.y - reach.y >= window.top + window.side) continue
+      out = Math.max(out, window.left - (joints.hand.x - reach.x), joints.hand.x + reach.x - (window.left + window.side), window.top - (joints.hand.y - reach.y))
+    }
     return { x: joints.hand.x, y: joints.hand.y, out }
   })
 
@@ -93,7 +97,7 @@ function motionOf(frames: readonly (readonly Hand[])[]): { readonly step: number
 }
 
 describe('his weights', () => {
-  it('stay inside his closest framing through every move, and every change between them', () => {
+  it('stay inside every framing he is shown in, wherever they are in view, through every move and every change between them', () => {
     for (const fps of [30, 60]) {
       const worst = run(fps, 'sprung', EVERY_CHANGE).flat().reduce((most, hand) => Math.max(most, hand.out), 0)
       expect(worst, `${String(fps)} fps`).toBe(0)
@@ -166,7 +170,8 @@ describe('at rest', () => {
   it('is placed where he is asked at once on a still face, and is at rest there', () => {
     const sim = new BuddyRigSim()
     const placed = sim.place(STUCK.still)
-    expect(placed).toEqual(STUCK.still)
+    expect({ pose: placed.pose, look: placed.look }).toEqual(STUCK.still)
+    expect(placed.tilt).toBe(0)
     expect(sim.restsAt(STUCK.still)).toBe(true)
     expect(sim.restsAt(REST_TARGET)).toBe(false)
   })
@@ -196,6 +201,37 @@ describe('his head, cut from his drawing (buddyBody.ts)', () => {
     expect(alpha(skin, 95, 78)).toBe(255)
     expect(alpha(skin, 60, 78)).toBe(0)
     expect(alpha(skin, 130, 78)).toBe(0)
+  })
+
+  it('finds his face to be his screen: his skin inside his face’s ink, and his eyes and mouth in it; not his ears, his ink or his fringe', () => {
+    // A face: a skin disc inside an ink ring, two dark eyes and a mouth in it; an ear of skin outside the ring; a fringe of hair across its top.
+    const pixels = filled([30, 30, 34])
+    const paint = (x: number, y: number, rgb: readonly [number, number, number]): void => pixels.set([...rgb, 255], (y * W + x) * 4)
+    for (let y = 30; y < HEAD_ROWS; y += 1) {
+      for (let x = 50; x < 130; x += 1) {
+        const d = Math.hypot(x - 88, y - 60)
+        if (d < 22) paint(x, y, [242, 189, 143])
+        else if (d < 25) paint(x, y, [12, 8, 13])
+        if (Math.hypot(x - 58, y - 60) < 4) paint(x, y, [242, 189, 143])
+      }
+    }
+    for (const [x, y] of [[80, 58], [96, 58], [88, 70]]) for (let dy = -2; dy <= 2; dy += 1) for (let dx = -2; dx <= 2; dx += 1) paint(x + dx, y + dy, [20, 18, 22])
+    for (let x = 70; x < 106; x += 1) for (let y = 38; y < 44; y += 1) paint(x, y, [25, 22, 24])
+    const face = faceOf(pixels) as NonNullable<ReturnType<typeof faceOf>>
+    expect(face).toBeDefined()
+    const on = (x: number, y: number): number => face.mask[y * W + x] ?? -1
+    // His cheeks, and his eyes and mouth, holes in his skin, are his face.
+    for (const [x, y] of [[88, 64], [70, 60], [80, 58], [96, 58], [88, 70]]) expect(on(x as number, y as number), `${String(x)},${String(y)}`).toBe(1)
+    // His ink round it, his ear outside it, his fringe across its top, and beyond it: not.
+    for (const [x, y] of [[88 - 23, 60], [88 + 24, 60], [58, 60], [88, 40], [40, 60]]) expect(on(x as number, y as number), `${String(x)},${String(y)}`).toBe(0)
+    // His eyes on it sit inside it.
+    const eyes = eyesOn(face.box)
+    expect(eyes.x).toBeGreaterThan(face.box.x)
+    expect(eyes.x + eyes.w).toBeLessThan(face.box.x + face.box.w)
+  })
+
+  it('finds no face where there is no skin: he wears a screen over it instead', () => {
+    expect(faceOf(filled([30, 30, 34]))).toBeUndefined()
   })
 
   describe('as the window reads it', () => {
