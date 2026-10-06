@@ -36,7 +36,7 @@ const from = arg('--from')
  * found answering, so no one provider carries the sweep.
  */
 const FREE_MODELS = [
-  'opencode/muse-spark-1.3-contributor-free',
+  // Muse Spark left out 2026-10-06: rate-limited all day, each drive on it waited out OpenCode's retries.
   'opencode/space-bunny-free',
   'opencode/nemotron-3-ultra-free',
   'opencode/fledge-alpha-free',
