@@ -8,12 +8,13 @@
 // (matched by its profile folder) over 5 s in four states -- Home idle, Home while a teammate
 // works, the conversation while it streams, both idle after -- with the renderer's own counts
 // (CDP Performance: style recalcs, layouts, script and task time) and the animations running.
-// Free model by default. --codex uses the subscription's actual streaming
+// Free model by default. --buddy dresses the working teammate as Codex Buddy. --codex uses the subscription's actual streaming
 // transport (gpt-6.1-sol, low effort; --model overrides it) and requires LOCUST_SPEND=1.
 
 import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -48,6 +49,15 @@ const route = codex
 const fakeEnv = fakeClaude
   ? { PATH: [FAKE_DIR, ...(process.env.PATH ?? '').split(';').filter((dir) => dir !== '' && !existsSync(join(dir, 'claude.exe')) && !existsSync(join(dir, 'claude.cmd')))].join(';') }
   : {}
+/*
+ * --buddy (2026-10-05): Wren, the teammate who works, wears Codex Buddy with
+ * his screen (his own rig since 2026-10-05), so his cost at rest and at work
+ * is in the sample. His sheet is his maker's and never in this repository: it
+ * is copied from this computer's Locust (%APPDATA%\@teammate\desktop\pets,
+ * or --sheet <folder>) into the probe's profile, with a scratch CODEX_HOME so
+ * the real ~/.codex/pets is never read.
+ */
+const buddy = process.argv.includes('--buddy')
 const port = Number(arg('--port') ?? 9877)
 const restMs = 46_000 // Sample after the 45-second rest deadline, finishing within 60 seconds.
 // An arena or another suite starting mid-probe invalidates the comparison too.
@@ -62,13 +72,23 @@ const OUT = join(recordRoot('locust-cpu-by-state'), new Date().toISOString().rep
 await mkdir(OUT, { recursive: true })
 const workspace = await scratchRepository('locust-cpu-ws-')
 const at = '2026-09-10T09:00:00.000Z'
+const wearingBuddy = { headwear: 1, accessory: 0, mouth: 0, bot: { shape: 'droid', face: 'eyes' }, pet: { source: 'gallery', id: 'codex-buddy' } }
 const team = [
-  { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: at, route: { ...route, mode: 'ask' } },
+  { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: at, route: { ...route, mode: 'ask' }, ...(buddy ? { avatar: wearingBuddy } : {}) },
   { teammateId: 'tm_atlas', name: 'Atlas', hue: 'blue', role: 'Research & Briefs', createdAt: at, route: FREE_ROUTE },
   { teammateId: 'tm_juno', name: 'Juno', hue: 'violet', role: 'Docs & QA', createdAt: at, route: FREE_ROUTE }
 ]
+const buddyProfile = buddy ? await mkdtemp(join(tmpdir(), 'locust-cpu-buddy-')) : undefined
+const buddyEnv = {}
+if (buddyProfile !== undefined) {
+  const sheet = arg('--sheet') ?? join(process.env.APPDATA ?? '', '@teammate', 'desktop', 'pets', 'codex-buddy')
+  await mkdir(join(buddyProfile, 'pets', 'codex-buddy'), { recursive: true })
+  for (const file of ['spritesheet.webp', 'pet.json']) await copyFile(join(sheet, file), join(buddyProfile, 'pets', 'codex-buddy', file))
+  buddyEnv.CODEX_HOME = await mkdtemp(join(tmpdir(), 'locust-cpu-buddy-codex-'))
+}
 const drive = await startDrive({
-  name: 'cpu-by-state', port, workspace, outPath: OUT, spends: codex || fakeClaude, env: fakeEnv,
+  name: 'cpu-by-state', port, workspace, outPath: OUT, spends: codex || fakeClaude, env: { ...fakeEnv, ...buddyEnv },
+  ...(buddyProfile === undefined ? {} : { profilePath: buddyProfile }),
   ...(packaged === undefined ? {} : { packaged }),
   seed: { schemaVersion: 1, teammates: team, missionOwners: {}, settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: false } }
 })
