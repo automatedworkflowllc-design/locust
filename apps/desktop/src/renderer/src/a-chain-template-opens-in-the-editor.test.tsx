@@ -130,7 +130,7 @@ describe('the draft the editor opens on', () => {
     expect(chainDraftFrom({ ...preview, changesFiles: true }, [bare], fallback).route).toEqual({ runtime: 'codex', model: 'account-default', mode: 'accept-edits' })
   })
 
-  it('has nobody to propose and no route when the roster is empty, and the editor asks who runs it', () => {
+  it('has nobody to propose and no route when the roster is empty (the editor then says to add a teammate first)', () => {
     const draft = chainDraftFrom({ ...preview, changesFiles: true }, [], fallback)
     expect(draft.teammateId).toBeUndefined()
     expect(draft).not.toHaveProperty('route')

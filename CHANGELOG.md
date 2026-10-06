@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.658.0 - 2026-10-05
+
+### Fixed
+
+- **A routine waits for a teammate before it can be saved.** With no teammates yet, a ready-made chain opened in the editor with Save available, and pressing it asked you to choose a teammate from a list that was not there. Save now waits, as the note above it already said: add a teammate first.
+
+### Improved
+
+- **The installer built on GitHub now holds exactly the same app as the one built on our machine.** The only difference was a set of unused helper files that recorded the folder they were built in; they are left out.
+
 ## 0.657.0 - 2026-10-05
 
 ### Fixed

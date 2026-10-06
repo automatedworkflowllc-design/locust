@@ -154,6 +154,9 @@ export function RoutineDialog({
   // ownerless path exists to avoid.
   const [runner, setRunner] = useState<string>('')
   const mustPick = chooseFrom !== undefined && chooseFrom.length > 0 && teammate === undefined
+  // Nobody to pick (0.658): the note says to add a teammate first, so Save waits too. It was live and
+  // answered "Choose which teammate runs this routine" with no list to choose from (Flash's review).
+  const nobodyToRun = chooseFrom !== undefined && chooseFrom.length === 0 && teammate === undefined
   const scheduleKind = schedule?.kind ?? 'off'
   // Who runs the routine, and so who takes a step nobody else is named for.
   const ownerId = teammate?.teammateId ?? (runner.length > 0 ? runner : undefined)
@@ -169,7 +172,7 @@ export function RoutineDialog({
   const tooLongAt = steps.findIndex((step) => stepTooLongNotice(step.trim()) !== undefined)
   // Legacy routines may contain literal braces. Unchanged declarations stay untouched.
   const inputError = inputsRefusal(inputs, editing && initialInputs.length === 0 && !inputsChanged ? undefined : kept)
-  const canSave = name.trim().length > 0 && kept.length > 0 && tooLongAt < 0 && inputError === undefined && !busy && (!mustPick || runner.length > 0)
+  const canSave = name.trim().length > 0 && kept.length > 0 && tooLongAt < 0 && inputError === undefined && !busy && !nobodyToRun && (!mustPick || runner.length > 0)
   // Focus in, Tab held inside, Escape closes, focus back to the opener.
   const box = useRef<HTMLDivElement>(null)
   useModal(box, onCancel)
@@ -376,7 +379,7 @@ export function RoutineDialog({
             * disabled button with no sentence is the failure this whole file
             * keeps being about.
             */}
-          {chooseFrom !== undefined && chooseFrom.length === 0 && teammate === undefined && (
+          {nobodyToRun && (
             <p className="lc-dialog__note lc-mono">
               A routine runs on a teammate&apos;s route, and there are no teammates yet. Add one, then save this again.
             </p>

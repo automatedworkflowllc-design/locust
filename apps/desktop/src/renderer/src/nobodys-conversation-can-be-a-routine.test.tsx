@@ -73,6 +73,9 @@ describe('saving a conversation nobody owns', () => {
   it('says so plainly when there is nobody to pick', () => {
     const html = drawn({ chooseFrom: [] })
     expect(html).toContain('there are no teammates yet')
+    // And Save waits, as the sentence says (0.658): it was live, and answered "Choose which teammate
+    // runs this routine" with no list to choose from.
+    expect(html).toMatch(/<button[^>]*class="lc-primarybutton"[^>]*disabled/)
   })
 
   it('asks nothing when the conversation already has an owner', () => {
