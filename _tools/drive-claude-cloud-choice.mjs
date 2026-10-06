@@ -51,7 +51,9 @@ try {
     await new Promise((r) => setTimeout(r, 500))
     return [...document.querySelectorAll('.lc-menu__item')].map((b) => b.innerText.replace(/\\s+/g, ' ').trim()).join(' | ')
   })()`)))
-  check('Cloud is offered, described as Claude’s cloud', /Cloud Runs in Claude’s cloud, in a Claude Code window of its own/.test(menu) && !/pick one of their models first/.test(menu), menu)
+  // Since 0.556 a task starts out of sight and is read in Locust (0.558): no Claude Code window opens. This drive
+  // was written for 0.538's window and expected its words until the 2026-10-06 sweep.
+  check('Cloud is offered, described as Claude’s cloud', /Cloud Runs in Claude’s cloud; follow it on claude\.ai, tell it more from here, bring it home when it is done/.test(menu) && !/pick one of their models first/.test(menu), menu)
   const chosen = String(await drive.capture('Cloud chosen', () => drive.evaluate(`(async () => {
     ;[...document.querySelectorAll('.lc-menu__item')].find((b) => /^Cloud/.test(b.innerText.trim()))?.click()
     await new Promise((r) => setTimeout(r, 900))
@@ -62,8 +64,10 @@ try {
   })()`)))
   const got = JSON.parse(chosen)
   check('the box asks for a task for Claude’s cloud', got.placeholder === 'Describe a task for Claude’s cloud…', got.placeholder)
-  check('the panel is Claude’s cloud and says what happens, the trust question included', /Claude’s cloud/.test(got.panel) && /Claude Code opens in a window of its own with the task given/.test(got.panel) && /asks whether you trust it: answer in that window/.test(got.panel), got.panel)
-  check('none of Codex Cloud’s warnings', !/Codex Cloud|not on GitHub|Legacy/.test(got.panel), got.panel)
+  check('the panel is Claude’s cloud and says what happens', /Claude’s cloud/.test(got.panel) && /Claude does the work on Anthropic’s machines, not this computer/.test(got.panel) && /Show what it did/.test(got.panel) && /Apply brings the change into this folder/.test(got.panel), got.panel)
+  // The scratch folder is not on GitHub, and Claude's cloud needs a repository too (W6): saying so is right, in its
+  // own words. Codex Cloud's environments are not this route's business.
+  check('none of Codex Cloud’s warnings; its own word that this folder is not on GitHub', !/Codex Cloud|Legacy/.test(got.panel) && /Claude’s cloud works on a copy of a GitHub repository/.test(got.panel), got.panel)
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

@@ -105,6 +105,7 @@ async function summarise() {
   await writeFile(join(out, 'summary.json'), JSON.stringify(results, null, 2), 'utf8')
 }
 
+const PAID_REFUSAL = /refusing to run "[^"]+": it spends a paid account/
 const PROVIDER_REFUSED = /Rate limit exceeded|rate[- ]limited|Endpoint is unavailable|provider answered "(?:Too Many Requests|Service Unavailable)/i
 async function runDrive(name, model) {
   const child = spawn(process.execPath, [join(tools, name), '--packaged', packaged], {
@@ -167,12 +168,21 @@ for (const name of drives.slice(start)) {
     run = await runDrive(name, model)
     if (run.fails === 0 && run.code === 0) break
     if (process.env.LOCUST_FREE_MODEL !== undefined) break
+    // A drive that spends only on some routes (`spends: runtime !== 'opencode'`) passes the filter above and then
+    // refuses, correctly, without LOCUST_SPEND: that is a skip, not a failure to run again.
+    if (PAID_REFUSAL.test(run.text)) break
     const refused = PROVIDER_REFUSED.test(run.text)
     if (!refused && failedOn.length > 0) break
     ;(refused ? refusedBy : failedOn).push(model.replace(/^opencode\//, ''))
     console.log(`${name}: failed on ${model}${refused ? ' (refused by its provider)' : ''}; again on the next free model`)
   }
   const { code, timedOut, passes, fails, failedLines } = run
+  if (PAID_REFUSAL.test(run.text)) {
+    results.push({ name: name.replace(/\.mjs$/, ''), code: 0, timedOut: false, skipped: true, passes: 0, fails: 0, failedLines: [], ms: Date.now() - began, note: 'skipped: it spends a paid account on its default route' })
+    await summarise()
+    console.log(`${name}: skipped, it spends a paid account on its default route`)
+    continue
+  }
   const passedLater = fails === 0 && code === 0 && (refusedBy.length > 0 || failedOn.length > 0)
   const note = (refusedBy.length > 0 ? `refused by ${refusedBy.join(', ')}; ` : '')
     + (failedOn.length > 0 ? `${passedLater ? 'passed after failing' : 'also failed'} on ${failedOn.join(', ')}; ` : '')

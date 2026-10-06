@@ -101,7 +101,9 @@ try {
     return JSON.stringify({
       opened: Boolean(row),
       edited: /Edited (\\d+) files?/.exec(foot)?.[0] ?? null,
-      stopped: foot.includes('stopped before it reported'),
+      // 0.644 says "not confirmed" where this said "stopped before it reported": a Cursor turn that completed left
+      // edits unclosed in its stream, and they had landed (ActivityCard). The row is notes.md's own.
+      stopped: /notes\\.md\\s+Write\\s+not confirmed/.test(foot),
       blamed: foot.includes('Claude Code did not report'),
       outside: foot.includes('cdp.mjs') || foot.includes('profile.mjs')
     })
@@ -109,7 +111,7 @@ try {
   check('the turn opens', seen.opened === true, JSON.stringify(seen))
   check('the files card counts this folder\'s files, once each: "Edited 2 files"', seen.edited === 'Edited 2 files', JSON.stringify(seen))
   check('no file from outside the folder is on the card', seen.outside === false, JSON.stringify(seen))
-  check('notes.md, cut off by the stop, says "stopped before it reported"', seen.stopped === true, JSON.stringify(seen))
+  check('notes.md, cut off by the stop, says "not confirmed"', seen.stopped === true, JSON.stringify(seen))
   check('nothing on the card blames Claude Code', seen.blamed === false, JSON.stringify(seen))
 } catch (error) {
   failures += 1

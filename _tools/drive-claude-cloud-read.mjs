@@ -20,7 +20,10 @@ import { recordRoot, say, sleep, startDrive } from './drive-lib.mjs'
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tag = arg('--tag') ?? 'local'
-const workspace = resolve(import.meta.dirname, '..')
+// A checkout of a GitHub repository that Claude Code already trusts: this one by default, or --workspace. A folder it
+// does not trust makes Claude Code ask, in its own window, and Locust never answers that for the person (2026-10-06:
+// a fresh clone on C: was not trusted, and the window this drive counts opened for the question).
+const workspace = resolve(process.argv.includes('--workspace') ? process.argv[process.argv.indexOf('--workspace') + 1] : resolve(import.meta.dirname, '..'))
 const applied = join(workspace, 'cloud-read-check.txt')
 if (existsSync(applied)) throw new Error(`${applied} is already there; this drive brings it in.`)
 
