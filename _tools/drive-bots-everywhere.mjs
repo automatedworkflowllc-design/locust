@@ -125,9 +125,10 @@ try {
     return JSON.stringify({ looks: grid ? grid.querySelectorAll('.lc-look').length : 0, drawn: grid ? [...grid.querySelectorAll('canvas')].filter((c) => c.width > 0).length : 0, colours: document.querySelectorAll('.lc-hues [role="radio"]').length })
   })()`))
   say(`new teammate dialog: ${JSON.stringify(dialog)}`)
-  // 0.559: twenty-two, with the Critter and the Prompt.
-  check('the Look grid offers all twenty-two shapes, drawn', dialog.looks === 22 && dialog.drawn === 22, JSON.stringify(dialog))
-  check('nine colours', dialog.colours === 9, String(dialog.colours))
+  // 0.559: twenty-two, with the Critter and the Prompt; 0.661: twenty-three, with the Spark. 0.660: eleven colours, with
+  // Indigo and Coral.
+  check('the Look grid offers all twenty-three shapes, drawn', dialog.looks === 23 && dialog.drawn === 23, JSON.stringify(dialog))
+  check('eleven colours', dialog.colours === 11, String(dialog.colours))
   await shoot('03-new-teammate.png')
   // Pick the Swarm, and see the preview take it.
   const picked = await drive.evaluate(`(async () => {
