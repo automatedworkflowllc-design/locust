@@ -18,14 +18,14 @@ import '../_tools/scratch-root.mjs'
 
 import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
 const PORT = Number(process.argv.includes('--port') ? process.argv[process.argv.indexOf('--port') + 1] : 9471)
-const NPM_DIR = 'C:\\Users\\<home>\\AppData\\Roaming\\npm'
-const CURSOR_DIR = 'C:\\Users\\<home>\\AppData\\Local\\cursor-agent'
+const NPM_DIR = join(homedir(), 'AppData', 'Roaming', 'npm')
+const CURSOR_DIR = join(homedir(), 'AppData', 'Local', 'cursor-agent')
 // --runtime cursor --model cursor-grok-4.6-low   (Colin's own models; cheap Cursor models only, on his go)
 // --runtime claude --model haiku                 (one paid Claude run, on his go)
 const RUNTIME = process.argv.includes('--runtime') ? process.argv[process.argv.indexOf('--runtime') + 1] : 'opencode'

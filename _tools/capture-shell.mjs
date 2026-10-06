@@ -10,14 +10,14 @@
 
 import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
 const PORT = 9229
-const CODEX_BIN_DIR = 'C:\\Users\\<home>\\AppData\\Local\\OpenAI\\Codex\\bin\\b99306303521e97e'
-const NPM_DIR = 'C:\\Users\\<home>\\AppData\\Roaming\\npm'
+const CODEX_BIN_DIR = join(homedir(), 'AppData', 'Local', 'OpenAI', 'Codex', 'bin', 'b99306303521e97e')
+const NPM_DIR = join(homedir(), 'AppData', 'Roaming', 'npm')
 // Flags and the output path may come in any order; `--idle` is not a path.
 const positional = process.argv.slice(2).filter((argument) => !argument.startsWith('--'))
 const OUT = resolve(positional[0] ?? join(APP_DIR, '..', '..', 'docs', 'assets', 'shell.png'))

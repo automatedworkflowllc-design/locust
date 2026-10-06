@@ -12,12 +12,12 @@
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
-const NPM_DIR = 'C:\\Users\\<home>\\AppData\\Roaming\\npm'
+const NPM_DIR = join(homedir(), 'AppData', 'Roaming', 'npm')
 const PORT = 9295
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const say = (line) => console.error(line)

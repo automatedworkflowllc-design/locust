@@ -23,10 +23,10 @@
 
 import { DatabaseSync } from 'node:sqlite'
 import { readdirSync, existsSync, writeFileSync, copyFileSync, mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-const CHATS = 'C:/Users/<home>/.cursor/chats'
+const CHATS = join(homedir(), '.cursor', 'chats').replace(/\\/g, '/')
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const find = arg('--find')
 const session = arg('--session')

@@ -12,7 +12,7 @@
 import { spawn } from 'node:child_process'
 import { existsSync, readdirSync } from 'node:fs'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
@@ -20,12 +20,12 @@ const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe
 const PORT = 9279
 // Codex's bin folder is named by a hash that changes with each Codex update:
 // find the one that holds codex.exe instead of naming it.
-const CODEX_BIN_ROOT = 'C:\\Users\\<home>\\AppData\\Local\\OpenAI\\Codex\\bin'
+const CODEX_BIN_ROOT = join(homedir(), 'AppData', 'Local', 'OpenAI', 'Codex', 'bin')
 const CODEX_BIN_DIR = existsSync(CODEX_BIN_ROOT)
   ? (readdirSync(CODEX_BIN_ROOT).map((name) => join(CODEX_BIN_ROOT, name)).find((dir) => existsSync(join(dir, 'codex.exe'))) ?? '')
   : ''
-const NPM_DIR = 'C:\\Users\\<home>\\AppData\\Roaming\\npm'
-const CURSOR_DIR = 'C:\\Users\\<home>\\AppData\\Local\\cursor-agent'
+const NPM_DIR = join(homedir(), 'AppData', 'Roaming', 'npm')
+const CURSOR_DIR = join(homedir(), 'AppData', 'Local', 'cursor-agent')
 const label = process.argv[2] ?? ''
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 

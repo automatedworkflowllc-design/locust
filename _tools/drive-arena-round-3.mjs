@@ -15,10 +15,13 @@
 // copied out byte for byte, and Locust's own record kept, before Keep and before anything
 // opens a page.
 
+// Every invocation also needs --handoff <round-1-handoff.md> for the original prompt.
+
 import { cp, mkdir, mkdtemp, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { requiredPathArgument } from './required-path-argument.mjs'
 
 import { recordRoot, say, sleep, startDrive } from './drive-lib.mjs'
 
@@ -27,10 +30,11 @@ const packaged = arg('--packaged')
 const SEND = process.argv.includes('--send')
 const SET = arg('--set')
 if (SET !== 'paid' && SET !== 'free') throw new Error('--set paid or --set free')
+const handoffPath = requiredPathArgument('--handoff')
 const OUT = join(recordRoot('arena-round-3-2026-10-04'), `${SEND ? 'run' : 'look'}-${SET}`)
 await mkdir(OUT, { recursive: true })
 // Round 1's prompt, exactly: the fenced block under "## The prompt" in its handoff.
-const handoff = await readFile('C:/Users/<home>/Documents/locust-site/arena/HANDOFF-blind-arena-run.md', 'utf8')
+const handoff = await readFile(handoffPath, 'utf8')
 const PROMPT = /## The prompt[\s\S]*?```\r?\n([\s\S]*?)\r?\n```/.exec(handoff)?.[1]
 if (PROMPT === undefined || !PROMPT.startsWith('Make a small arcade game called "Swarm"') || !PROMPT.endsWith('You decide everything else.')) throw new Error('could not read round 1\'s prompt')
 /*

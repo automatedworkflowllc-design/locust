@@ -1,6 +1,6 @@
 // The leaving line, from where the person stands.
 //
-//   node _tools/leaving-line-drive.mjs
+//   node _tools/leaving-line-drive.mjs --fixture <ledger.jsonl> --workspace <original-folder>
 //
 // Seeds a profile with one finished conversation (the 2026-09-14 acceptance
 // fixture) and a groups file recording that the conversation LEFT a group
@@ -15,12 +15,13 @@ import { spawn } from 'node:child_process'
 import { copyFile, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { requiredPathArgument } from './required-path-argument.mjs'
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
 const PORT = 9475
-const FIXTURE = 'C:/Users/<home>/.codex/worktrees/e6a8/locust-astra/docs/acceptance2-20260914/ledgers/mission_4ac0d5fd-b688-4f04-8222-624a155225dd.jsonl'
-const WORKSPACE = 'C:/Users/<home>/Documents/locust-acceptance2-20260914-scratch/beta2-SHmDtV'
+const FIXTURE = requiredPathArgument('--fixture')
+const WORKSPACE = requiredPathArgument('--workspace')
 const MISSION_ID = 'mission_4ac0d5fd-b688-4f04-8222-624a155225dd'
 
 const say = (line) => console.error(line)

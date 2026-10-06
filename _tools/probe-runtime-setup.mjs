@@ -16,7 +16,7 @@ import { join } from 'node:path'
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
-const NPM_DIR = 'C:\\Users\\<home>\\AppData\\Roaming\\npm'
+const NPM_DIR = join(homedir(), 'AppData', 'Roaming', 'npm')
 const PORT = 9294
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const say = (line) => console.error(line)

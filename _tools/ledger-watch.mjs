@@ -18,8 +18,9 @@
 
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { homedir } from 'node:os'
 
-const dir = process.argv[2] ?? 'C:/Users/<home>/AppData/Roaming/@teammate/desktop/mission-ledger'
+const dir = process.argv[2] ?? join(homedir(), 'AppData', 'Roaming', '@teammate', 'desktop', 'mission-ledger').replace(/\\/g, '/')
 
 const BLOCK = /<locust-(share|memory|ask|todo|plan)\b[\s\S]*?<\/locust-\1>/g
 /** What a person would see of a final message once the protocol is taken out. */

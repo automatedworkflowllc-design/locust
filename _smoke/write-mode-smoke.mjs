@@ -17,7 +17,7 @@
 import { execFileSync } from 'node:child_process'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const adapters = await import(
@@ -26,7 +26,7 @@ const adapters = await import(
 const { createCodexExecCommand, createNodeRuntimeProcessRunner, createNodeProbeRunner, createPathExecutableLocator, discoverInstalledRuntimes } =
   adapters
 
-const CODEX_BIN_DIR = 'C:\\Users\\<home>\\AppData\\Local\\OpenAI\\Codex\\bin\\b99306303521e97e'
+const CODEX_BIN_DIR = join(homedir(), 'AppData', 'Local', 'OpenAI', 'Codex', 'bin', 'b99306303521e97e')
 const PROOF = 'locust-write-proof.txt'
 const PROMPT = `Create a file named ${PROOF} in the current directory containing exactly the word WROTE. Do not do anything else.`
 

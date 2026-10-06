@@ -20,13 +20,13 @@
 
 import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { createHash } from 'node:crypto'
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
-const NPM_DIR = 'C:\\Users\\<home>\\AppData\\Roaming\\npm'
+const NPM_DIR = join(homedir(), 'AppData', 'Roaming', 'npm')
 // A `_tools` drive port, from the 9490-9599 range `_smoke/ports.mjs` reserves
 // for them, and not one any other drive in this folder already takes.
 const PORT = 9514

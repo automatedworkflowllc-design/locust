@@ -1,6 +1,6 @@
 // Putting back one turn of a conversation puts the CONVERSATION back.
 //
-//   node _tools/trash-chain-drive.mjs
+//   node _tools/trash-chain-drive.mjs --fixture <ledger.jsonl> --workspace <original-folder>
 //
 // Grok, pass 9, 2026-09-18, on 0.177.0: they seeded a two-turn chain, deleted
 // only the first turn, and put it back. The sidebar then showed TWO rows for
@@ -20,14 +20,15 @@ import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { requiredPathArgument } from './required-path-argument.mjs'
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
-const FIXTURE = 'C:/Users/<home>/.codex/worktrees/e6a8/locust-astra/docs/acceptance2-20260914/ledgers/mission_4ac0d5fd-b688-4f04-8222-624a155225dd.jsonl'
+const FIXTURE = requiredPathArgument('--fixture')
 // The folder whose id the fixture already carries. The sidebar lists THIS
 // folder's work, so a seeded mission stamped with another workspace is
 // filtered out and the drive would pass by drawing nothing.
-const WORKSPACE = 'C:/Users/<home>/Documents/locust-acceptance2-20260914-scratch/beta2-SHmDtV'
+const WORKSPACE = requiredPathArgument('--workspace')
 const PORT = 9487
 
 const PARENT = 'mission_11111111-1111-4111-8111-111111111111'

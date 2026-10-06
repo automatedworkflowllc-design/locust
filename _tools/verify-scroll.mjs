@@ -21,10 +21,11 @@
 // reported nothing to scroll while 2319px of conversation sat above it.
 import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const APP_DIR = 'C:/Users/<home>/Documents/Codex/ai-teammate-platform/apps/desktop/'
+const APP_DIR = fileURLToPath(new URL('../apps/desktop/', import.meta.url))
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
 const PORT = 9301
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -35,7 +36,7 @@ await writeFile(join(workspace, 'status.ts'), 'export const status = "draft";\n'
 
 const child = spawn(ELECTRON, [APP_DIR, `--remote-debugging-port=${String(PORT)}`, `--user-data-dir=${profile}`], {
   cwd: workspace,
-  env: { ...process.env, PATH: `C:\Users\<home>\AppData\Roaming\npm;${process.env.PATH ?? ''}` },
+  env: { ...process.env, PATH: `${join(homedir(), 'AppData', 'Roaming', 'npm')};${process.env.PATH ?? ''}` },
   stdio: ['ignore', 'pipe', 'pipe']
 })
 child.stdout.on('data', () => undefined)

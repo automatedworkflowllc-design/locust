@@ -13,7 +13,7 @@
 
 import { execFileSync, spawn } from 'node:child_process'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const { createAppServerClient } = await import(
@@ -24,8 +24,8 @@ const { createAppServerClient } = await import(
 // the newest of the OpenAI-managed installs. The old hard-coded path died
 // with an update on 2026-09-05 and the smoke spawned nothing.
 import { existsSync, readdirSync, statSync } from 'node:fs'
-const NPM_CODEX = 'C:\\Users\\<home>\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\node_modules\\@openai\\codex-win32-x64\\vendor\\x86_64-pc-windows-msvc\\bin\\codex.exe'
-const OPENAI_BIN = 'C:\\Users\\<home>\\AppData\\Local\\OpenAI\\Codex\\bin'
+const NPM_CODEX = join(homedir(), 'AppData', 'Roaming', 'npm', 'node_modules', '@openai', 'codex', 'node_modules', '@openai', 'codex-win32-x64', 'vendor', 'x86_64-pc-windows-msvc', 'bin', 'codex.exe')
+const OPENAI_BIN = join(homedir(), 'AppData', 'Local', 'OpenAI', 'Codex', 'bin')
 function resolveCodex() {
   if (existsSync(NPM_CODEX)) return NPM_CODEX
   try {

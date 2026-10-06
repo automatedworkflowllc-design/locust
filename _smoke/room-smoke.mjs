@@ -19,14 +19,14 @@
 
 import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { createHash } from 'node:crypto'
 import { portFor } from './ports.mjs'
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
-const NPM_DIR = 'C:\\Users\\<home>\\AppData\\Roaming\\npm'
+const NPM_DIR = join(homedir(), 'AppData', 'Roaming', 'npm')
 const PORT = portFor(import.meta.url)
 const args = process.argv.slice(2)
 const shotAt = args.indexOf('--shot')

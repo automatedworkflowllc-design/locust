@@ -23,15 +23,15 @@ import '../_tools/scratch-root.mjs'
 
 import { spawn } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { portFor } from './ports.mjs'
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
 const PORT = portFor(import.meta.url)
-const CODEX_BIN_DIR = 'C:\\Users\\<home>\\AppData\\Local\\OpenAI\\Codex\\bin\\b99306303521e97e'
-const NPM_DIR = 'C:\\Users\\<home>\\AppData\\Roaming\\npm'
+const CODEX_BIN_DIR = join(homedir(), 'AppData', 'Local', 'OpenAI', 'Codex', 'bin', 'b99306303521e97e')
+const NPM_DIR = join(homedir(), 'AppData', 'Roaming', 'npm')
 
 // Long enough that the run is still going when the switch is made. A prompt
 // that finishes first would leave nothing to hand off, and the test would pass

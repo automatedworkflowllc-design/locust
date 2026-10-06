@@ -33,11 +33,13 @@ import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { homedir } from 'node:os'
+import { fileURLToPath } from 'node:url'
 
 const VBOX = 'C:\\Program Files\\Oracle\\VirtualBox\\VBoxManage.exe'
 const VM = 'LocustCleanMachine'
 const SNAPSHOT = 'clean'
-const VM_DIR = 'C:\\Users\\<home>\\VMs'
+const VM_DIR = join(homedir(), 'VMs')
 const ISO = join(VM_DIR, 'Win11Eval.iso')
 /** Inside the guest. The eval image's own user, made by the unattended install. */
 const GUEST_USER = 'locust'
@@ -233,7 +235,7 @@ const guest = (args) =>
  * looking at the screen once.
  */
 async function install() {
-  const setup = join('C:\\Users\\<home>\\Documents\\Codex\\ai-teammate-platform\\apps\\desktop\\release', 'Locust-Setup.exe')
+  const setup = fileURLToPath(new URL('../apps/desktop/release/Locust-Setup.exe', import.meta.url))
   if (!existsSync(setup)) {
     say(`no installer at ${setup}; run the package step first`)
     process.exitCode = 1

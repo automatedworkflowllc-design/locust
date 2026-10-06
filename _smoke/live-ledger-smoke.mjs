@@ -14,7 +14,7 @@
 // discovery code still does the finding.
 
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
@@ -35,7 +35,7 @@ const {
 } = adapters
 const { createFileMissionLedger } = store
 
-const CODEX_BIN_DIR = 'C:\\Users\\<home>\\AppData\\Local\\OpenAI\\Codex\\bin\\b99306303521e97e'
+const CODEX_BIN_DIR = join(homedir(), 'AppData', 'Local', 'OpenAI', 'Codex', 'bin', 'b99306303521e97e')
 const WORKSPACE = process.cwd()
 const PROMPT = 'Reply with exactly LIVE_LEDGER_OK and nothing else. Do not read files or run tools.'
 

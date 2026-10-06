@@ -17,13 +17,13 @@ import '../_tools/scratch-root.mjs'
 
 import { spawn } from 'node:child_process'
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
 const PORT = 9473
-const CURSOR_DIR = 'C:\\Users\\<home>\\AppData\\Local\\cursor-agent'
+const CURSOR_DIR = join(homedir(), 'AppData', 'Local', 'cursor-agent')
 const MODEL = 'cursor-grok-4.6-low'
 const LABEL = process.argv[process.argv.indexOf('--label') + 1] || 'run'
 const PROMPT = 'Using your robinhood-local connector, call get_indexes and tell me the current S&P 500 level in one line. Read-only: do not place, preview, cancel or modify anything. If the connector call is refused, say exactly what the refusal said.'

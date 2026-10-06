@@ -1,6 +1,6 @@
 // The pass nobody had done (design agent's punch-list, 2026-09-19, last line):
 //
-//   node _tools/crowded-window-drive.mjs
+//   node _tools/crowded-window-drive.mjs --fixture <ledger.jsonl> --workspace <original-folder>
 //
 // 1120x720 -- the smallest window Locust allows -- with everything open at
 // once: a conversation eight turns long, a room of eight teammates in the
@@ -20,14 +20,15 @@ import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { requiredPathArgument } from './required-path-argument.mjs'
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
 const PORT = 9493
-const FIXTURE = 'C:/Users/<home>/.codex/worktrees/e6a8/locust-astra/docs/acceptance2-20260914/ledgers/mission_53ff0015-2289-44c5-9829-9e480926f48c.jsonl'
+const FIXTURE = requiredPathArgument('--fixture')
 const ORIGINAL = 'mission_53ff0015-2289-44c5-9829-9e480926f48c'
 // The folder whose id the fixture carries; the sidebar lists only this folder's work.
-const WORKSPACE = 'C:/Users/<home>/Documents/locust-acceptance2-20260914-scratch/beta2-SHmDtV'
+const WORKSPACE = requiredPathArgument('--workspace')
 const TURNS = 8
 // `--layout wide` forces the full sidebar at 1120 (a person's setting);
 // `compact`, the default, is what `auto` resolves to at this width: the 64px

@@ -24,16 +24,16 @@ import '../_tools/scratch-root.mjs'
 
 import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { portFor } from './ports.mjs'
 
 const APP_DIR = new URL('../apps/desktop/', import.meta.url).pathname.slice(1)
 const ELECTRON = join(APP_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
 const PORT = portFor(import.meta.url)
-const CODEX_BIN_DIR = 'C:\\Users\\<home>\\AppData\\Local\\OpenAI\\Codex\\bin\\b99306303521e97e'
-const NPM_DIR = 'C:\\Users\\<home>\\AppData\\Roaming\\npm'
-const CURSOR_DIR = 'C:\\Users\\<home>\\AppData\\Local\\cursor-agent'
+const CODEX_BIN_DIR = join(homedir(), 'AppData', 'Local', 'OpenAI', 'Codex', 'bin', 'b99306303521e97e')
+const NPM_DIR = join(homedir(), 'AppData', 'Roaming', 'npm')
+const CURSOR_DIR = join(homedir(), 'AppData', 'Local', 'cursor-agent')
 const TARGET = 'notes.ts'
 const PROMPT = `Edit ${TARGET}: change the word "draft" to "final" on the line that has it, and add one new line at the end that reads // reviewed. Change nothing else and do not create any other file.`
 
