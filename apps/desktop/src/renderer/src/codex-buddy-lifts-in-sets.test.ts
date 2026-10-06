@@ -55,27 +55,22 @@ describe('his moves', () => {
   })
 
   it('working, go round every lift he has, a breather after each', () => {
-    expect(WORKOUT.lifts).toEqual(['press', 'curls', 'squats', 'alternating', 'hammer'])
+    expect(WORKOUT.lifts).toEqual(['press', 'curls', 'alternating', 'hammer'])
     expect(WORKOUT.loops).toBe(true)
     const sets = WORKOUT.sets ?? []
-    expect(sets).toHaveLength(5)
+    expect(sets).toHaveLength(4)
     // Each set begins after a breather (or the loop's own end, one), standing, the weights at his sides.
     for (const start of sets) expect(atRest(WORKOUT.at((start - 1 + WORKOUT.ms) % WORKOUT.ms)), `before the set at ${String(start)} ms`).toBe(true)
     // Long enough to see, short enough that a long task shows them all: under a minute round.
-    expect(WORKOUT.ms).toBeGreaterThan(20_000)
+    expect(WORKOUT.ms).toBeGreaterThan(18_000)
     expect(WORKOUT.ms).toBeLessThan(50_000)
   })
 
-  it('beside a name, keep to the lifts he does standing, so he stays where he stands', () => {
+  it('all standing, beside a name or not: no squat, his body never dipping more than a rep’s effort', () => {
     expect(buddyMoveFor('working', undefined, 'subtle')).toBe(WORKOUT_STANDING)
-    expect(buddyMoveFor('responding', undefined, 'subtle')).toBe(WORKOUT_STANDING)
     expect(buddyMoveFor('working', undefined, 'full')).toBe(WORKOUT)
-    expect(WORKOUT_STANDING.lifts).toEqual(['press', 'curls', 'alternating', 'hammer'])
-    // Never a squat: his body never dips more than a rep's effort.
-    for (let t = 0; t < WORKOUT_STANDING.ms; t += 20) expect(WORKOUT_STANDING.at(t).pose.dip).toBeLessThan(3)
-    let deepest = 0
-    for (let t = 0; t < WORKOUT.ms; t += 20) deepest = Math.max(deepest, WORKOUT.at(t).pose.dip)
-    expect(deepest).toBeGreaterThan(10)
+    expect(WORKOUT_STANDING).toBe(WORKOUT)
+    for (const move of ALL) for (let t = 0; t < move.ms; t += 20) expect(move.at(t).pose.dip, move.name).toBeLessThan(3.5)
   })
 
   it('lift in reps: a press goes up over his head and back to his shoulders, three times', () => {

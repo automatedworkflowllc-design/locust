@@ -203,8 +203,6 @@ export const POSES = {
   press: { abduct: 2.15, flex: 0.3, bend: 1.75, bendUp: 1, grip: 0 },
   /** Locked out over his head. */
   lockout: { abduct: 2.92, flex: 0.15, bend: 0.25, bendUp: 1, grip: 0 },
-  /** A squat's arms: out in front for balance. */
-  squat: { abduct: 0.3, flex: 0.06, bend: 0.06, bendUp: 0, grip: P / 2 },
   /** A double-biceps flex, the weights up beside his head. */
   flex: { abduct: 1.42, flex: 0.1, bend: 2.3, bendUp: 1, grip: P / 2 },
   flexSqueeze: { abduct: 1.48, flex: 0.1, bend: 2.45, bendUp: 1, grip: P / 2 },
@@ -342,11 +340,6 @@ const press = (reps: number): readonly Piece[] => {
   return [through(REST, tuck, rack, 780), hold(rack, 140), ...times([through(rack, mid, lockout, 620), hold(lockout, 220), through(lockout, mid, rack, 700), hold(rack, 160)], reps), through(rack, tuck, REST, 800)]
 }
 
-/** Squats: down with his arms out in front, and up. */
-const squats = (reps: number): readonly Piece[] => {
-  const bottom = both(POSES.squat, 13)
-  return times([glide(REST, bottom, 820), hold(bottom, 140), glide(bottom, REST, 780), hold(REST, 260)], reps)
-}
 
 /** A breather between sets: standing, the weights at his sides. */
 const BREATHER: readonly Piece[] = [hold(REST, 900)]
@@ -366,16 +359,20 @@ function workout(name: string, lifts: Readonly<Record<string, readonly Piece[]>>
   return moveOf(name, pieces, { loops: true, sets, lifts: Object.keys(lifts), still: both(POSES.rack, 2) })
 }
 
-/** Working, delegating, answering, as the face you are talking to: every lift he has. */
-export const WORKOUT: Move = workout('workout', { press: press(3), curls: curls(3), squats: squats(3), alternating: alternating(2), hammer: hammer(3) })
+/**
+ * Working, delegating, answering: every lift he has, all of them standing
+ * (Colin, 2026-10-05, of his squats: *"remove the squats from it thats
+ * silly"*).
+ */
+export const WORKOUT: Move = workout('workout', { press: press(3), curls: curls(3), alternating: alternating(2), hammer: hammer(3) })
 
 /**
  * The same, as a face beside a name -- the sidebar, the header -- where a
  * teammate moves less than the one you are talking to (TeammateBot's
- * BotMotionLevel; Colin, 2026-09-23: *"lets tame those two down"*): no squat,
- * so he stays where he stands.
+ * BotMotionLevel; Colin, 2026-09-23: *"lets tame those two down"*): his lifts
+ * already stay where he stands, so it is his workout.
  */
-export const WORKOUT_STANDING: Move = workout('workout-standing', { press: press(3), curls: curls(3), alternating: alternating(2), hammer: hammer(3) })
+export const WORKOUT_STANDING: Move = WORKOUT
 
 /** The dots' loop and its look about (Bot's glyphMotion), in ms. */
 const DOTS_MS = THINKING_CYCLE_S * 1000
@@ -506,7 +503,6 @@ const LOOK_RIGHT: Move = held('look-right', withLook(REST, LOOKING.right), 1800)
 const MOMENT_MOVES: Readonly<Record<string, Move>> = {
   curls: once('curls', curls(2)),
   press: once('press', press(2)),
-  squats: once('squats', squats(2)),
   alternating: once('alternating', alternating(1)),
   hammer: once('hammer', hammer(2)),
   curious: moveOf('curious', [through(REST, withLook(chinWay, 0.5), withLook(chin, 0.5), 560), hold(withLook(chin, 0.5), 880), through(withLook(chin, 0.5), chinWay, REST, 560)], { loops: false, still: withLook(chin, 0.5) }),
@@ -521,7 +517,6 @@ const MOMENTS_AT_REST: readonly IdleMoment[] = [
   { name: 'curls', eyes: EYES_GLAD, mood: 'glad', seconds: 0 },
   { name: 'press', eyes: EYES_WIDE, seconds: 0 },
   { name: 'look', eyes: EYES_WIDE, glance: { x: 1, y: -0.35 }, seconds: 1.8 },
-  { name: 'squats', eyes: EYES_GLAD, mood: 'glad', seconds: 0 },
   { name: 'alternating', eyes: EYES_GLAD, mood: 'glad', seconds: 0 },
   { name: 'curious', eyes: EYES_WIDE, mood: 'curious', seconds: 0 },
   { name: 'hammer', eyes: EYES_GLAD, mood: 'glad', seconds: 0 },

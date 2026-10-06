@@ -1,4 +1,4 @@
-import { BUDDY_RIG, armJoints, bodyY, headDrop, legJoints, nearness, neckOf } from './buddyRig.js'
+import { BUDDY_RIG, armJoints, bodyY, headDrop, nearness, neckOf } from './buddyRig.js'
 import type { ArmJoints, ArmPose, BuddyPose, Vec3 } from './buddyRig.js'
 
 /**
@@ -18,8 +18,8 @@ import type { ArmJoints, ArmPose, BuddyPose, Vec3 } from './buddyRig.js'
  * - his arms built of rounded pieces -- a shoulder, a biceps that swells as
  *   the elbow bends, a forearm thick at the elbow and narrowing to the wrist
  *   -- each arm inked whole and then filled, so its elbow has no seam;
- * - his star shorts following his thighs, his shins and his shoes, his knees
- *   bending as he squats with his shoes where they stand.
+ * - the top of his star shorts (Colin, of the rest: *"do you just want to do
+ *   torso up so we can make it bigger"*: he is framed from his cap to his belt).
  *
  * His arms are drawn over his shirt, never over his shoulders: each turns
  * inside its sleeve, and the sleeve is laid over it again.
@@ -143,8 +143,7 @@ const smooth = (t: number): number => {
  * A LIMB WITH A JOINT, as his maker draws one (his curls and presses, rows 7
  * and 8): straight, it is one shape, inked round as one; bent, its nearer part
  * lies over the farther at the joint with an outline of its own -- the
- * forearm over the biceps at the elbow, the thigh over the shin at the knee --
- * so the joint reads as a joint and not a bend in a hose. The overlap's line
+ * forearm over the biceps at the elbow -- so the joint reads as a joint and not a bend in a hose. The overlap's line
  * grows in as the joint bends (`bend`, 0 straight to 1 well bent), never all
  * at once.
  */
@@ -243,46 +242,9 @@ const STARS: readonly (readonly [number, number, number, number])[] = [
   [70, 151, 4.4, -0.15], [82, 149, 4.6, 0.1], [97, 151, 4.2, -0.05], [110, 150, 4.6, 0.2], [120, 152, 3.6, 0]
 ]
 
-/** His shorts: a waistband and a leg round each thigh, hemmed flat across it. */
+/** His shorts, as far as he is ever framed: their top, under his shirt's hem. */
 function shorts(dip: number): readonly Piece[] {
-  // Down to just under his hips, so it closes between his legs however far he squats.
-  const waist: Piece = { kind: 'poly', points: clockwise([[64.5, bodyY(128, dip)], [122.5, bodyY(128, dip)], [123, 147 + dip], [BUDDY_RIG.middle, 158 + dip], [64, 147 + dip]]) }
-  const legs = ([-1, 1] as const).map((side): Piece => {
-    const { hip, knee } = legJoints(side, dip)
-    const hem = at(hip, knee, 0.62)
-    const ux = hem.x - hip.x
-    const uy = hem.y - hip.y
-    const length = Math.hypot(ux, uy) || 1
-    const nx = -uy / length
-    const ny = ux / length
-    const top = 14.6
-    const bottom = 13.8 * nearness(hem.z)
-    return { kind: 'poly', points: clockwise([[hip.x + nx * top, hip.y + ny * top], [hem.x + nx * bottom, hem.y + ny * bottom], [hem.x - nx * bottom, hem.y - ny * bottom], [hip.x - nx * top, hip.y - ny * top]]) }
-  })
-  return [waist, ...legs]
-}
-
-/** A shoe, flat on the ground, its toe turned out a little: black, a white tongue, a grey sole. */
-function shoe(context: CanvasRenderingContext2D, x: number): void {
-  const R = BUDDY_RIG
-  const box = (left: number, top: number, w: number, h: number, r: number): void => {
-    context.beginPath()
-    context.roundRect(left, top, w, h, r)
-  }
-  context.lineJoin = 'round'
-  context.lineWidth = R.ink
-  context.strokeStyle = R.inkColour
-  box(x - 16.5, 177.5, 33, 18, 9)
-  context.fillStyle = R.shoe
-  context.fill()
-  context.stroke()
-  box(x - 4.5, 179, 9, 3.4, 1.7)
-  context.fillStyle = R.shirt
-  context.fill()
-  box(x - 17.5, 193, 35, 6.5, 3.2)
-  context.fillStyle = R.sole
-  context.fill()
-  context.stroke()
+  return [{ kind: 'poly', points: clockwise([[64.5, bodyY(128, dip)], [122.5, bodyY(128, dip)], [123, 160 + dip], [64, 160 + dip]]) }]
 }
 
 /**
@@ -338,24 +300,13 @@ const armsOf = (pose: BuddyPose): readonly { readonly side: -1 | 1; readonly pos
 
 /**
  * His body in `pose`, at the context's transform (his drawing's pixels), as
- * far as his face: his legs and shoes, his shorts, his shirt and sleeves and
- * the Codex mark, his arms and his sleeves over them, and his head over all.
+ * far as his face: his shorts, his shirt and sleeves and the Codex mark, his
+ * arms and his sleeves over them, and his head over all.
  */
 export function drawBuddyBody(context: CanvasRenderingContext2D, head: CanvasImageSource | undefined, pose: BuddyPose, tilt = 0, faceGlass?: CanvasImageSource): void {
   const R = BUDDY_RIG
   const dip = pose.dip
   const arms = armsOf(pose)
-  // His legs: thighs and shins, then his shoes over his ankles.
-  for (const side of [-1, 1] as const) {
-    const { hip, knee, ankle } = legJoints(side, dip)
-    const calf = at(knee, ankle, 0.35)
-    const thigh: Ring[] = [{ x: hip.x, y: hip.y, r: 10 }, { x: knee.x, y: knee.y, r: 8.6 * nearness(knee.z) }]
-    const shin: Ring[] = [{ x: knee.x, y: knee.y, r: 7.4 * nearness(knee.z) }, { x: calf.x, y: calf.y, r: 7.6 }, { x: ankle.x, y: ankle.y, r: 5.8 }]
-    // The thigh over the shin at the knee, as the knee bends.
-    drawJointed(context, limb(shin), limb(thigh), side, bendAt(hip, knee, ankle) / 1.2, 3)
-  }
-  shoe(context, R.ankle.left.x - 3)
-  shoe(context, R.ankle.right.x + 3)
   // His shorts, their stars kept inside them, and the seam down the middle.
   const short = shorts(dip)
   inked(context, short, R.shorts)

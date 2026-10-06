@@ -7,8 +7,7 @@
  * and production quality"*. So below his head he is Locust's own drawing
  * (buddyBody.ts), on joints in 3D: shoulders that raise each arm out to the
  * side and toward you, elbows that bend the forearm toward you (a curl) or up
- * (a press), hips and knees that bend as he squats with his feet where they
- * stand. A part nearer you is drawn a little larger, so a curl comes toward
+ * (a press). A part nearer you is drawn a little larger, so a curl comes toward
  * you.
  *
  * Every joint moves on a spring, as a bot's body does (bot-avatars'
@@ -59,11 +58,8 @@ export const BUDDY_RIG = {
   shoulder: { left: { x: 62, y: 92 }, right: { x: 125, y: 92 } },
   upper: 28,
   fore: 26,
-  /** Where each leg turns, at the hip, and where each ankle stands, pinned: a squat bends the knees between. */
-  hip: { left: { x: 81, y: 146 }, right: { x: 106, y: 146 } },
-  ankle: { left: { x: 78, y: 186 }, right: { x: 109, y: 186 } },
-  thigh: 20.2,
-  shin: 20.2,
+  /** His hips' height: what he leans about. */
+  hips: 146,
   /** His ink round everything, as wide as his maker's lines. */
   ink: 3,
   /** His dumbbells and fists, as large as his own are drawn. */
@@ -82,7 +78,7 @@ export const BUDDY_RIG = {
   shoe: '#1a161b',
   sole: '#8f8f97',
   /** The Codex mark on his shirt (buddyBody's drawCodexMark): its middle, its size, its colour. */
-  shirtMark: { x: 93.5, y: 109, radius: 14.5 },
+  shirtMark: { x: 93.5, y: 101, radius: 13.5 },
   markColour: '#0c080d',
   /** The ground his shoes stand on. */
   feet: 200,
@@ -104,7 +100,7 @@ export function leanOf(dip: number): number {
 
 /** Where a point of him drawn standing at height `y` is, his hips dropped `dip`: below his hips, down by the dip; above, leaned. */
 export function bodyY(y: number, dip: number): number {
-  const hips = BUDDY_RIG.hip.left.y
+  const hips = BUDDY_RIG.hips
   return y >= hips ? y + dip : hips + dip - (hips - y) * (1 - leanOf(dip))
 }
 
@@ -152,40 +148,7 @@ export function armJoints(pose: ArmPose, side: -1 | 1, dip: number): ArmJoints {
   return { shoulder: s, elbow, hand }
 }
 
-export interface LegJoints {
-  readonly hip: Vec3
-  readonly knee: Vec3
-  readonly ankle: Vec3
-}
 
-/**
- * Where a leg's hip, knee and ankle are for his hips dropped `dip`: the ankle
- * pinned where he stands, the knee wherever thigh and shin meet between --
- * out over his toes and toward you, as a squat's knees go.
- */
-export function legJoints(side: -1 | 1, dip: number): LegJoints {
-  const R = BUDDY_RIG
-  const h = side < 0 ? R.hip.left : R.hip.right
-  const a = side < 0 ? R.ankle.left : R.ankle.right
-  // A rep's small effort his body takes (bodyY); only a real squat bends his knees.
-  const hip = { x: h.x, y: h.y + kneeDip(dip), z: 0 }
-  const ankle = { x: a.x, y: a.y, z: 0 }
-  const span = Math.hypot(ankle.x - hip.x, ankle.y - hip.y)
-  const reach = Math.min(span / 2, R.thigh - 1e-6)
-  const out = Math.sqrt(Math.max(0, R.thigh * R.thigh - reach * reach))
-  const middle = { x: (hip.x + ankle.x) / 2, y: (hip.y + ankle.y) / 2 }
-  // Toward you and out over his toes, as a squat's knees go.
-  const bow = norm({ x: side * 1, y: 0, z: 0.55 })
-  return { hip, knee: { x: middle.x + bow.x * out, y: middle.y, z: bow.z * out }, ankle }
-}
-
-/** How far his hips drop at his knees for a dip: none for a rep's small effort, then as far as the dip, by the bottom of a squat. */
-export function kneeDip(dip: number): number {
-  const effort = 3
-  if (dip <= effort) return 0
-  const deep = LEAN.at
-  return dip >= deep ? dip : ((dip - effort) / (deep - effort)) ** 1.5 * deep
-}
 
 /** How far his shoulder rises for an arm raised `abduct`: nothing below his shoulder, up to SHRUG over his head. */
 export const SHRUG = 3
