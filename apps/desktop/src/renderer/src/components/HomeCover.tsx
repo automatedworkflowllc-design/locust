@@ -180,8 +180,9 @@ interface CoverBot {
  */
 export const COVER_CAST: readonly CoverBot[] = [
   { key: 'wren', type: 'ghost', state: 'default', floats: true, part: 'thinker', x: 245, y: -10 },
-  // Prompt's body ends at 86 of its 100 units (locustBots.ts), so its box sits 7 lower to stand on the bezel.
-  { key: 'atlas', type: 'prompt', hue: 'blue', state: 'default', part: 'worker', x: 432, y: 7 },
+  // Prompt's body ends at 95 of its 100 units since it was grown to fill its box (locustBots.ts, 0.663; 86 before),
+  // so its box sits 4 higher, not 7 lower, to stand on the bezel (at 1120 wide its feet were dipping into it).
+  { key: 'atlas', type: 'prompt', hue: 'blue', state: 'default', part: 'worker', x: 432, y: -4 },
   // The sleeper is Claw'd's critter (0.583). Colin, 2026-10-04, under Plush: "plush looks good on
   // the regular avatars but locust is jagged" -- the Hopper's thin legs and antennae step at this
   // size and take no fur -- "might be worth swapping to claw'd". The swarm still flies past.

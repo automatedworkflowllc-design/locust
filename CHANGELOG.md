@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.669.0 - 2026-10-06
+
+### Fixed
+
+- **Prompt stands on the title screen's machine again.** Since Prompt was drawn bigger in 0.663, the cover still placed him by his old height, so on a narrower window his feet dipped into the LOCUST panel. He stands on its edge again.
+
 ## 0.668.0 - 2026-10-06
 
 ### Improved
