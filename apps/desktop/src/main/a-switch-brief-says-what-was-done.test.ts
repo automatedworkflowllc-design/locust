@@ -120,10 +120,11 @@ describe('the earlier turns', () => {
     const nearFull = 'n'.repeat(MAX_HANDOFF_PROMPT_LENGTH - 1_200)
     const briefing = composeHandoffPrompt('Go.', checkpoint({ assistantSummary: 'I changed tsconfig.' }), 'Claude Code', nearFull, big)!
     expect(briefing).toBeDefined()
-    expect(briefing.omitted).toEqual(['earlier'])
+    // Since 0.671 the earlier turns give way in part: the newest that fit are kept, the rest counted.
+    expect(briefing.omitted).toEqual([])
+    expect(briefing.prompt).toMatch(/- \(\d+ earlier turns? (is|are) not listed here\)/)
     expect(briefing.prompt).toContain('I changed tsconfig.')
     expect(briefing.prompt).toContain(`The person now asks:\n\n${nearFull}`)
-    expect(briefing.prompt.endsWith(omissionNotice(['earlier']))).toBe(true)
     expect(briefing.prompt.length).toBeLessThanOrEqual(MAX_HANDOFF_PROMPT_LENGTH)
   })
 
