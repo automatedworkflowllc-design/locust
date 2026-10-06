@@ -63,9 +63,10 @@ describe('the Critter and the Prompt (0.559)', () => {
   })
 
   it('keep the leading eye inside the main block at the widest idle glance, clear of its round corner', () => {
-    // The critter's block runs x 15..85 with corners of 13; the prompt's cloud of a head to 83.5, its lobes rounding in.
+    // The critter's block runs x 15..85 with corners of 13; the prompt's cloud of a head to 83.5, its lobes rounding in --
+    // drawn 1.26 times larger about x 50 since 0.663 (locustBots' grown), so its edge and its margin with it.
     expect(leadingEyeX(LOCUST_BOTS.critter)).toBeLessThan(85 - 6)
-    expect(leadingEyeX(LOCUST_BOTS.prompt)).toBeLessThan(83.5 - 9)
+    expect(leadingEyeX(LOCUST_BOTS.prompt)).toBeLessThan(50 + (83.5 - 50) * 1.26 - 9 * 1.26)
   })
 })
 

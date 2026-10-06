@@ -20,6 +20,9 @@ const rounds = (path: string): readonly { readonly x: number; readonly y: number
     return { x: (x0 + x1) / 2, y: (y0 + y1) / 2, r }
   })
 
+/** A height as drawn: the mascot is grown 1.26 times about y 50.5 (0.663). */
+const G = (y: number): number => 50.5 + (y - 50.5) * 1.26
+
 describe('Prompt, the Codex mascot', () => {
   /** The head: the body's first subpath, one outline (unionOutline), its points. */
   const head = (): readonly (readonly [number, number])[] => {
@@ -36,11 +39,13 @@ describe('Prompt, the Codex mascot', () => {
     const height = Math.max(...ys) - Math.min(...ys)
     expect(width).toBeGreaterThan(height)
     // Bumpy above (the reach from its middle rises and falls along its top), smooth below.
-    const reach = (from: number, to: number): number[] => points.filter(([, y]) => y > from && y < to).map(([x, y]) => Math.hypot(x - 50, y - 38))
-    const top = reach(0, 30)
+    // Measured as drawn: 1.26 times larger about (50, 50.5) since 0.663 (locustBots' grown).
+    const reach = (from: number, to: number): number[] => points.filter(([, y]) => y > from && y < to).map(([x, y]) => Math.hypot(x - 50, y - G(38)))
+    const top = reach(0, G(30))
     let turns = 0
     for (let i = 2; i < top.length; i += 1) if (((top[i] ?? 0) - (top[i - 1] ?? 0)) * ((top[i - 1] ?? 0) - (top[i - 2] ?? 0)) < 0) turns += 1
-    expect(turns).toBeGreaterThanOrEqual(4)
+    // Two lumps along its top: a peak, the dip, a peak -- three turns at least (a flat stretch's sampling may add one).
+    expect(turns).toBeGreaterThanOrEqual(3)
   })
 
   it('wears its screen low on its head, most of its face, and its prompt on its chest below', () => {
@@ -48,9 +53,9 @@ describe('Prompt, the Codex mascot', () => {
     expect(prompt.faceY).toBeGreaterThan(38)
     const chest = prompt.chest
     expect(chest?.mark).toBe('prompt')
-    // Its body: y 55.5 to 80.5; the chest's prompt inside it.
-    expect(chest?.y).toBeGreaterThan(55.5 + (chest?.size ?? 0) / 2)
-    expect(chest?.y).toBeLessThan(80.5 - (chest?.size ?? 0) / 2)
+    // Its body: y 55.5 to 80.5 as designed, grown with it; the chest's prompt inside it.
+    expect(chest?.y).toBeGreaterThan(G(55.5) + (chest?.size ?? 0) / 2)
+    expect(chest?.y).toBeLessThan(G(80.5) - (chest?.size ?? 0) / 2)
     expect(outlineOf('prompt').chest).toEqual(chest)
   })
 

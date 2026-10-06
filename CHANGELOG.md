@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.663.0 - 2026-10-05
+
+### Fixed
+
+- **Prompt and Spark are as big as the other teammates.** The two mascots were drawn smaller inside their box than every other bot, so on a card they looked half the size of the teammate beside them. Both now fill their box the way the others do, and both wear their chest mark, Codex's `>_` and Claude's asterisk, at every size.
+
 ## 0.662.0 - 2026-10-05
 
 ### Improved

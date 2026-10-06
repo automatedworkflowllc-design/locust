@@ -1754,13 +1754,6 @@ export const SUPERSAMPLE_AT_OR_BELOW = 32
  * short pile under ~40 px, stock fabric above).
  */
 export const PLUSH_SHORT_BELOW = 40
-
-/*
- * A MASCOT'S CHEST MARK, WHERE IT READS (0.661). Prompt's `>_` and Spark's
- * asterisk are a few pixels across in the sidebar and on a card: a pale smudge
- * under the screen, not a mark, up to the Team card (44 px). Drawn from 50 px: the cover.
- */
-export const CHEST_MARK_FROM = 50
 const SHORT_PILE = { length: 0.45, density: 1, fuzz: 0.2, clumps: 0.2, curl: 0.4, gravity: 0.6 }
 const SHORT_PILE_LIGHT_FRONT = 72
 
@@ -2193,8 +2186,6 @@ function RiggedBot({
   // Plush on (Settings > Appearance): fur, with a short pile where the bot is small on screen (PLUSH_SHORT_BELOW).
   const plush = usePlush()
   const shortPile = plush && (shownAt ?? size) < PLUSH_SHORT_BELOW
-  // A mascot's chest mark only where it can be read (0.661): below 50 px it was a blob under the screen.
-  const chestShown = (shownAt ?? size) >= CHEST_MARK_FROM
   /*
    * CODE EYES ARE A SCREEN'S (0.562). Colin: "maybe also a toggle for the
    * computer eyes as well, or should the computer eyes be exclusive to the
@@ -2256,7 +2247,8 @@ function RiggedBot({
       // The rig's eye height for each face (its own `eyes: 1, mouth: -3.5`).
       eyeY: (faceShown ?? outline.face) === 'mouth' ? -3.5 : 1,
       faceAt: { x: outline.faceX, y: outline.faceY, scale: outline.faceScale },
-      ...(outline.chest === undefined || !chestShown ? {} : { chestAt: outline.chest }),
+      // A mascot's chest mark at every size, small as it is on a card (Colin, 0.663: "i know its gonna be small ... but still").
+      ...(outline.chest === undefined ? {} : { chestAt: outline.chest }),
       // The face is drawn at size / 100 a unit (times its own scale), at dpr device pixels a CSS pixel.
       pixelsPerUnit: (size / 100) * outline.faceScale * dpr,
       bootAt: () => bootAt.current,
@@ -2421,7 +2413,7 @@ function RiggedBot({
       rig.current = null
     }
     // A new state, new eyes, keeping still or not: each is performed on the running rig (below), never a rebuilt one.
-  }, [type, size, color, faceShown, seed, screen, plush, shortPile, chestShown, motionPresence])
+  }, [type, size, color, faceShown, seed, screen, plush, shortPile, motionPresence])
 
   useEffect(() => {
     rig.current?.setState(state)

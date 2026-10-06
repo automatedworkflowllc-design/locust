@@ -210,6 +210,53 @@ const CLAUDE_BURST = unionOutline(
   240
 )
 
+
+/**
+ * A SHAPE DRAWN LARGER IN ITS BOX (0.663). The two mascots filled about 70 and
+ * 74 of the box's 100 units where every other bot fills 85 to 90, so on a card
+ * they sat half the size of the teammates beside them (Colin: "his model is
+ * like half the size of the others"). Grown about (ox, oy): its outline (M, L,
+ * A and Z, the commands this file writes), its screen and its chest mark.
+ */
+export function grownPath(path: string, k: number, ox: number, oy: number): string {
+  const tokens = path.match(/[MLAZ]|-?\d*\.?\d+(?:e-?\d+)?/gi) ?? []
+  const out: string[] = []
+  let i = 0
+  const num = (): number => Number(tokens[i++])
+  const x = (v: number): string => String(f(ox + (v - ox) * k))
+  const y = (v: number): string => String(f(oy + (v - oy) * k))
+  while (i < tokens.length) {
+    const command = tokens[i++]
+    if (command === 'M' || command === 'L') {
+      out.push(`${command}${x(num())} ${y(num())}`)
+    } else if (command === 'A') {
+      const rx = num()
+      const ry = num()
+      const turn = num()
+      const large = num()
+      const sweep = num()
+      out.push(`A${f(rx * k)} ${f(ry * k)} ${turn} ${large} ${sweep} ${x(num())} ${y(num())}`)
+    } else if (command === 'Z') {
+      out.push('Z')
+    } else {
+      throw new Error(`grownPath: unexpected ${String(command)}`)
+    }
+  }
+  return out.join('')
+}
+
+function grown(shape: LocustBotShape, k: number, ox: number, oy: number): LocustBotShape {
+  return {
+    ...shape,
+    body: grownPath(shape.body, k, ox, oy),
+    ...(shape.parts === undefined || shape.parts === '' ? {} : { parts: grownPath(shape.parts, k, ox, oy) }),
+    faceX: ox + (shape.faceX - ox) * k,
+    faceY: oy + (shape.faceY - oy) * k,
+    faceScale: shape.faceScale * k,
+    ...(shape.chest === undefined ? {} : { chest: { ...shape.chest, x: ox + (shape.chest.x - ox) * k, y: oy + (shape.chest.y - oy) * k, size: shape.chest.size * k } })
+  }
+}
+
 export const LOCUST_BOTS: Readonly<Record<LocustBotType, LocustBotShape>> = {
   hopper: {
     name: 'Hopper',
@@ -268,7 +315,8 @@ export const LOCUST_BOTS: Readonly<Record<LocustBotType, LocustBotShape>> = {
     faceY: 51,
     faceScale: 0.9
   },
-  prompt: {
+  // Grown to fill its box as the other bots fill theirs (0.663): 15..86 tall becomes 6..95.
+  prompt: grown({
     name: 'Prompt',
     // Its head: a cumulus -- a wide round head with its bumps along its top and sides, smooth underneath -- and its small body under it.
     // Its mitts and its feet are body too, not parts: so the plush lays its pile on them as on the rest of it.
@@ -284,7 +332,7 @@ export const LOCUST_BOTS: Readonly<Record<LocustBotType, LocustBotShape>> = {
     // Colin, 2026-10-03, of the codex mascot: "he also seems to have a screen for a face".
     screen: true,
     chest: { mark: 'prompt', x: 50, y: 67.5, size: 11 }
-  },
+  }, 1.26, 50, 50.5),
   /*
    * SPARK, THE CLAUDE MASCOT (2026-10-05). Colin: *"i want you to add this so
    * we can show some love to claude as well ... and obviously swap in our
@@ -294,7 +342,8 @@ export const LOCUST_BOTS: Readonly<Record<LocustBotType, LocustBotShape>> = {
    * its screen in the middle of it, the asterisk on its chest under the screen,
    * its little arms and its stubby legs -- all body, so the Plush furs them.
    */
-  spark: {
+  // Grown to fill its box (0.663): 11.5..85 tall becomes 3..93.
+  spark: grown({
     name: 'Spark',
     body: CLAUDE_BURST + ellipsePath(42.5, 79, 5.4, 6.2) + ellipsePath(57.5, 79, 5.4, 6.2),
     parts: '',
@@ -306,7 +355,7 @@ export const LOCUST_BOTS: Readonly<Record<LocustBotType, LocustBotShape>> = {
     faceScale: 0.7,
     screen: true,
     chest: { mark: 'spark', x: 50, y: 66, size: 18 }
-  }
+  }, 1.22, 50, 48.3)
 }
 
 export function isLocustBot(type: string): type is LocustBotType {
