@@ -64,6 +64,11 @@ const MAX_PROMPT_LENGTH = 8_000
  * exactly what it says; the sentence now says the rest.
  */
 const AUTO_COMPARE_CONSEQUENCE = 'Each model works in its own copy and runs what it needs without asking; only the one you keep comes into your folder. A copy is not a wall: like Auto anywhere, a model can still change files outside it.'
+/*
+ * A folder too big to copy works in place (0.555) -- and Auto's line still promised each model a copy of its own
+ * there (the 2026-10-06 sweep, drive-compare-big-folder). Said as it is, before anything starts.
+ */
+const AUTO_COMPARE_IN_PLACE = 'This folder is too big to copy, so each model works in the folder itself and runs what it needs without asking: every model\u2019s changes land in your folder as it makes them, whichever one you keep.'
 /** How long after a run starts a Stop press is taken as the second click of a double-click on Start (Q6). */
 const STOP_SETTLE_MS = 600
 
@@ -1913,7 +1918,7 @@ export function Composer({
                   <div className="lc-menu" role="menu" aria-label="What the comparison does">
                     {([
                       [false, 'Ask', 'Each model answers. Nothing in your folder changes.', undefined],
-                      [true, 'Auto', AUTO_COMPARE_CONSEQUENCE, compare?.changesRefusal]
+                      [true, 'Auto', compare?.inPlace === true ? AUTO_COMPARE_IN_PLACE : AUTO_COMPARE_CONSEQUENCE, compare?.changesRefusal]
                     ] as const).map(([edits, name, consequence, refusal]) => (
                       <button
                         key={name}
@@ -2015,7 +2020,7 @@ export function Composer({
                   title={
                     comparing
                       ? compareEdits
-                        ? `Auto: ${AUTO_COMPARE_CONSEQUENCE}`
+                        ? `Auto: ${compare?.inPlace === true ? AUTO_COMPARE_IN_PLACE : AUTO_COMPARE_CONSEQUENCE}`
                         : 'Each model answers. Nothing in your folder changes.'
                       : connectorsNote(route.runtime, effectiveMode, hasConnectors) ?? 'Permission mode'
                   }

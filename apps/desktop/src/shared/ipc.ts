@@ -1210,6 +1210,8 @@ export const COMPARE_RETRY_CHANNEL = 'compare:retry'
 export const COMPARE_CHANGES_CHANNEL = 'compare:changes'
 /** Why a comparison in this folder cannot change files, or nothing when it can (0.457). */
 export const COMPARE_CHANGES_REFUSAL_CHANNEL = 'compare:changes-refusal'
+/** Whether a comparison that edits would work in the folder itself here: not a git project, and too big to copy (0.675). */
+export const COMPARE_IN_PLACE_CHANNEL = 'compare:in-place'
 export type CompareChangesResponse =
   | { readonly ok: true; readonly data: { readonly columns: Partial<Record<CompareSlotId, { readonly files: number; readonly added?: number; readonly removed?: number }>> } }
   | { readonly ok: false; readonly error: { readonly code: 'COMPARE_REFUSED'; readonly message: string } }
@@ -3618,6 +3620,7 @@ export interface DesktopApi {
   addCompareModel(request: CompareAddModelRequest): Promise<CompareResponse>
   compareChanges(compareId: string): Promise<CompareChangesResponse>
   compareChangesRefusal(): Promise<string | undefined>
+  compareWorksInPlace(): Promise<boolean>
   listCompares(): Promise<CompareListResponse>
   updateRoomTask(request: RoomTaskRequest): Promise<RoomTaskResponse>
   listMemories(): Promise<MemoryListResponse>

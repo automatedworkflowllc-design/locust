@@ -1,14 +1,14 @@
-// A folder too big to copy: Compare says so before anything is sent (0.457).
+// A folder too big to copy: Compare says what Auto will do there, before anything is sent (0.457, 0.675).
 //
 //   node _tools/drive-compare-big-folder.mjs [--packaged <exe>]
 //
 // Colin, 2026-09-29: Compare in Auto, in his `.claude` (a plain folder, far
 // more than 5,000 files). Both columns came back "could not start: this folder
-// is too big to copy", each with a Try again that could only fail the same
-// way. The Compare menu was drawn to grey Auto out with a reason; nothing gave
-// it one. This opens Compare in a plain folder of 5,001 files, picks two free
-// models and reads the menu: Auto must be unavailable, with the reason, and
-// the chip on Ask. Sends nothing.
+// is too big to copy". 0.457 greyed Auto out there; 0.555 let it work in the
+// folder itself instead -- while Auto's line went on promising each model a copy
+// of its own (2026-10-06 sweep). This opens Compare in a plain folder one file
+// past the copy limit and reads the menu: Auto is offered, says the models work
+// in the folder itself, and the chip starts on Ask. Sends nothing.
 
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
@@ -41,6 +41,10 @@ const check = (what, ok, detail) => {
 try {
   await drive.ready()
   await drive.resize(1440, 900)
+  // As the window a person is using: a drive's window never has focus, and unfocused, Compare models sometimes did not
+  // turn Compare on at all (2026-10-06: about half the runs read the ordinary mode menu; focused, ten of ten did).
+  await drive.send('Emulation.setFocusEmulationEnabled', { enabled: true })
+  await drive.send('Page.bringToFront')
   await new Promise((r) => setTimeout(r, 4000))
   const menu = JSON.parse(String(await drive.capture('Compare in a folder one file past the copy limit: the mode menu', () => drive.evaluate(`(async () => {
     let button
@@ -55,7 +59,11 @@ try {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(box, 'free')
     box.dispatchEvent(new Event('input', { bubbles: true }))
     await new Promise((r) => setTimeout(r, 700))
-    for (const row of [...document.querySelectorAll('.lc-picker__row:not(.is-recent)')].filter((row) => !row.disabled).slice(0, 2)) {
+    // Compare models starts with recent models already ticked (prefills): tick more only up to two. Clicking the
+    // first two rows regardless unticked a prefilled one, and the comparison fell to one model and switched off
+    // (2026-10-06: half the runs read the ordinary mode menu).
+    for (const row of [...document.querySelectorAll('.lc-picker__row:not(.is-recent)')].filter((row) => !row.disabled && row.getAttribute('aria-pressed') !== 'true')) {
+      if (document.querySelectorAll('.lc-picker__row[aria-pressed="true"]').length >= 2) break
       row.click()
       await new Promise((r) => setTimeout(r, 250))
     }
@@ -69,7 +77,7 @@ try {
     const auto = [...document.querySelectorAll('.lc-menu[aria-label="What the comparison does"] .lc-menu__item')].find((item) => item.querySelector('.lc-menu__name')?.textContent.trim() === 'Auto')
     return JSON.stringify({ opened: true, label, autoDisabled: auto?.disabled ?? null, autoSays: auto?.querySelector('.lc-menu__desc')?.textContent ?? '' })
   })()`))))
-  check('Auto is unavailable in a folder too big to copy, and says why', menu.autoDisabled === true && /too big to copy/.test(menu.autoSays), JSON.stringify(menu))
+  check('Auto is offered, and says the models work in the folder itself, not a copy', menu.autoDisabled === false && /too big to copy, so each model works in the folder itself/.test(menu.autoSays) && !/its own copy/.test(menu.autoSays), JSON.stringify(menu))
   check('the comparison is on Ask, not Auto', menu.label === 'Ask', menu.label)
 } catch (error) {
   failures += 1

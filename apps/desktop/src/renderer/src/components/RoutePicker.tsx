@@ -48,6 +48,8 @@ export interface ComparePicking {
   readonly onChanges?: (changes: boolean) => void
   /** Why this folder cannot compare changes (not a git project), or nothing. */
   readonly changesRefusal?: string
+  /** The folder is too big to copy, so a comparison that edits works in it directly (0.675): Auto says so. */
+  readonly inPlace?: boolean
   /** Hide the names until one is kept (0.449). */
   readonly blind?: boolean
   readonly onBlind?: (blind: boolean) => void

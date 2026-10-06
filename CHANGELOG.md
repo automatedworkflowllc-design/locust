@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.675.0 - 2026-10-06
+
+### Fixed
+
+- **Compare says where the models will work, before you start.** In a folder too big to copy, a comparison that makes changes works in the folder itself, but the Auto option still promised that each model would work in its own copy. It now says what will happen: each model works in the folder itself, and every model's changes land there, whichever one you keep.
+
 ## 0.674.0 - 2026-10-06
 
 ### New

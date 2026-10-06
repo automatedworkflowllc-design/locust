@@ -348,6 +348,7 @@ import {
   COMPARE_ADD_MODEL_CHANNEL,
   COMPARE_CHANGES_CHANNEL,
   COMPARE_CHANGES_REFUSAL_CHANNEL,
+  COMPARE_IN_PLACE_CHANNEL,
   COMPARE_LIST_CHANNEL,
   RUNTIME_DISCOVERY_EVENT_CHANNEL,
   RUNTIME_DISCOVERY_LOG_CHANNEL,
@@ -5767,6 +5768,10 @@ if (!ownsSingleInstanceLock) {
     })
     // Nothing refuses a comparison that edits now (0.555): a folder too big to copy works in place.
     ipcMain.handle(COMPARE_CHANGES_REFUSAL_CHANNEL, () => undefined)
+    // ...but said before it starts (0.675): Auto's line promised each model its own copy where there would be none.
+    ipcMain.handle(COMPARE_IN_PLACE_CHANNEL, async (event) =>
+      fromOwnWindow(event) && !(await compareTrees().probe()).repository && (await copyRefusal(workspacePath)) !== undefined
+    )
     ipcMain.handle(COMPARE_CHANGES_CHANNEL, async (event, compareId: unknown) => {
       if (!fromOwnWindow(event)) return compareRefused('The request was rejected.')
       const compare = await compares.get(compareId).catch(() => undefined)

@@ -1723,6 +1723,7 @@ export default function App(): ReactElement {
    * already set to change files goes back to answering.
    */
   const [compareChangesRefusal, setCompareChangesRefusal] = useState<string>()
+  const [compareInPlace, setCompareInPlace] = useState(false)
   /** The next comparison hides the names until one is kept (0.449). */
   const [compareBlind, setCompareBlind] = useState(false)
   /** What each column of the comparison on screen has changed, when it edits. */
@@ -2318,6 +2319,9 @@ export default function App(): ReactElement {
   useEffect(() => {
     if (!compareOn) return
     let current = true
+    void window.desktop?.compareWorksInPlace?.().then((inPlace) => {
+      if (current) setCompareInPlace(inPlace === true)
+    }).catch(() => undefined)
     void window.desktop?.compareChangesRefusal().then((refusal) => {
       if (!current) return
       setCompareChangesRefusal(refusal)
@@ -4062,6 +4066,7 @@ export default function App(): ReactElement {
         changes: compareChanges,
         onChanges: setCompareChanges,
         ...(compareChangesRefusal === undefined ? {} : { changesRefusal: compareChangesRefusal }),
+        ...(compareInPlace ? { inPlace: true } : {}),
         blind: compareBlind,
         onBlind: setCompareBlind,
         record: compareRecord(compares),
