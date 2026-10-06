@@ -931,8 +931,10 @@ export function enterCompareScript() {
 export function comparePickScript(index, pick) {
   return `(async () => {
     if (document.querySelector('.lc-picker__input') === null) {
+      // That column's chip, or, past the columns there are, "+" -- as a person adds the next model.
       const chip = document.querySelectorAll('.lc-slotgroup')[${String(index)}]?.querySelector('.lc-control--slot')
-      if (!chip) return JSON.stringify({ picked: false, why: 'no column chip' })
+        ?? document.querySelector('.lc-control--addslot')
+      if (!chip) return JSON.stringify({ picked: false, why: 'no column chip and no add button' })
       chip.click()
       for (let i = 0; i < 20 && !document.querySelector('.lc-picker__input'); i += 1) await new Promise((r) => setTimeout(r, 150))
     }

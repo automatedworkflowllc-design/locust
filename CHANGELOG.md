@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.678.0 - 2026-10-06
+
+### Fixed
+
+- **Compare lets you pick two models from the start.** The first time you used Compare, with no recent models to start from, the model list closed after your first pick, though it said "Pick two or three models". You then had to find the + to add a second. The list now stays open until you've picked two. The + button also says "Add a second model" when only one is picked, not "Add a third model".
+
 ## 0.677.0 - 2026-10-06
 
 ### Improved

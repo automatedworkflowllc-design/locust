@@ -873,7 +873,13 @@ export function Composer({
   // Compare (0.441): the ticked models, or the comparison on screen, speak for the route chip.
   const comparing = asking !== undefined || (compare?.on === true && compare.picks.length > 0)
   /** Setting up a comparison (not asking one on screen): a chip per model, as Arena (0.460). */
+  /*
+   * Not while the picker is open on fewer than two (0.678): the chips took its place at the first tick, the
+   * picker it was anchored in went with them, and "Pick two or three models ... Done" closed after one -- on a
+   * first launch, with nothing recent to start from, the second model was then only to be had through "+".
+   */
   const slotsShown = asking === undefined && compare?.on === true && compare.picks.length > 0 && !running
+    && !(pickerOpen && compare.picks.length < MIN_COMPARE_SLOTS)
   /*
    * COMPARE CHANGES (0.445): while models are being picked, the mode chip
    * chooses between answers (Ask) and changes (Edit, each model in its own
@@ -2238,8 +2244,9 @@ export function Composer({
                     <button
                       type="button"
                       className="lc-control lc-control--boxed lc-control--addslot"
-                      aria-label="Add a third model"
-                      title="Add a third model"
+                      // The one after those picked (0.678): with one picked it said "a third".
+                      aria-label={`Add a ${compare.picks.length === 1 ? 'second' : 'third'} model`}
+                      title={`Add a ${compare.picks.length === 1 ? 'second' : 'third'} model`}
                       onClick={() => setSlotPicker(slotPicker === 'add' ? undefined : 'add')}
                     >
                       <Icon name="plus" size={13} />

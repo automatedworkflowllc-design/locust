@@ -16,12 +16,12 @@
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { recordRoot, say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
+import { recordRoot, say, scratchRepository, sleep, startDrive, comparePick, comparePickScript } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tag = arg('--tag') ?? 'local'
-const PICKS = (process.env.LOCUST_COMPARE_PICKS ?? 'nemotron-3-ultra-free,mimo-v2.6-flash-free').split(',')
+const PICKS = (process.env.LOCUST_COMPARE_PICKS ?? 'nemotron-3-ultra-free,fledge-alpha-free').split(',')
 const OUT = join(recordRoot('compare-column-actions-2026-09-28'), `compare-column-actions-${tag}`)
 await mkdir(OUT, { recursive: true })
 
@@ -58,13 +58,6 @@ try {
     box.dispatchEvent(new Event('input', { bubbles: true }))
     await new Promise((r) => setTimeout(r, 700))
     const labels = []
-    for (const want of ${JSON.stringify(PICKS)}) {
-      const row = [...document.querySelectorAll('.lc-picker__row:not(.is-recent)')].find((one) => !one.disabled && one.querySelector('.lc-picker__label')?.textContent.trim() === want)
-      if (!row) continue
-      row.click()
-      labels.push(want)
-      await new Promise((r) => setTimeout(r, 250))
-    }
     ;[...document.querySelectorAll('.lc-picker__foot--compare button')].find((b) => b.textContent.trim() === 'Done')?.click()
     await new Promise((r) => setTimeout(r, 500))
     const field = document.querySelector('form.command-dock textarea')
@@ -81,6 +74,13 @@ try {
     }
     return JSON.stringify({ labels, both, heads: ${HEADS} })
   })()`))))
+  // Ticked one at a time through drive-lib (2026-10-06): the picker names rows by display name, draws only those
+  // in view, and closes after a pick, leaving a chip per column -- comparePickScript handles all three.
+  for (const [index, id] of PICKS.entries()) {
+    const got = JSON.parse(String(await drive.evaluate(comparePickScript(index, comparePick(id)))))
+    if (got.picked) started.labels = [...(started.labels ?? []), got.label]
+    else say(`  pick ${id}: ${got.why}`)
+  }
   say(`  started: ${JSON.stringify(started)}`)
   check('two free models tick, and both columns are answering', started.labels?.length === 2 && started.both === true, JSON.stringify(started))
 } catch (error) {
@@ -123,7 +123,8 @@ try {
       await new Promise((r) => setTimeout(r, 400))
     }
     let working = 0
-    for (let i = 0; i < 1200; i += 1) {
+    // Under the 400 s a single evaluate is given (drive-lib): past it the drive read "undefined", not the columns.
+    for (let i = 0; i < 700; i += 1) {
       await new Promise((r) => setTimeout(r, 500))
       const states = [...document.querySelectorAll('.lc-compare__state')].map((el) => el.textContent.trim())
       working = Math.max(working, states.filter((state) => state === 'working').length)

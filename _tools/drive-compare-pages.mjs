@@ -16,12 +16,12 @@ import { existsSync, readFileSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { recordRoot, say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
+import { recordRoot, say, scratchRepository, sleep, startDrive, comparePick, comparePickScript } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tag = arg('--tag') ?? 'local'
-const PICKS = (process.env.LOCUST_COMPARE_PICKS ?? 'nemotron-3-ultra-free,mimo-v2.6-flash-free').split(',')
+const PICKS = (process.env.LOCUST_COMPARE_PICKS ?? 'nemotron-3-ultra-free,fledge-alpha-free').split(',')
 const OUT = join(recordRoot('compare-pages-2026-09-28'), `compare-pages-${tag}`)
 await mkdir(OUT, { recursive: true })
 
@@ -57,22 +57,25 @@ try {
     setInput.call(box, 'free')
     box.dispatchEvent(new Event('input', { bubbles: true }))
     await new Promise((r) => setTimeout(r, 700))
-    const labels = []
-    for (const want of ${JSON.stringify(PICKS)}) {
-      const row = [...document.querySelectorAll('.lc-picker__row:not(.is-recent)')].find((one) => !one.disabled && one.querySelector('.lc-picker__label')?.textContent.trim() === want)
-      if (!row) continue
-      row.click()
-      labels.push(want)
-      await new Promise((r) => setTimeout(r, 250))
-    }
+    return JSON.stringify({ labels: [] })
+  })()`)))
+  // Ticked one at a time through drive-lib (2026-10-06): the picker names rows by display name, draws only those
+  // in view, and closes after a pick, leaving a chip per column -- comparePickScript handles all three.
+  for (const [index, id] of PICKS.entries()) {
+    const got = JSON.parse(String(await drive.evaluate(comparePickScript(index, comparePick(id)))))
+    if (got.picked) picked.labels = [...(picked.labels ?? []), got.label]
+    else say(`  pick ${id}: ${got.why}`)
+  }
+  // Then, with the models in, the comparison's mode: Auto.
+  picked.mode = String(await drive.evaluate(`(async () => {
     ;[...document.querySelectorAll('.lc-picker__foot--compare button')].find((b) => b.textContent.trim() === 'Done')?.click()
     await new Promise((r) => setTimeout(r, 500))
     document.querySelector('button[aria-label="Permission mode"]')?.click()
     await new Promise((r) => setTimeout(r, 400))
     ;[...document.querySelectorAll('.lc-menu[aria-label="What the comparison does"] .lc-menu__item')].find((item) => item.querySelector('.lc-menu__name')?.textContent.trim() === 'Auto')?.click()
     await new Promise((r) => setTimeout(r, 400))
-    return JSON.stringify({ labels, mode: document.querySelector('button[aria-label="Permission mode"]')?.textContent.trim() ?? '' })
-  })()`)))
+    return document.querySelector('button[aria-label="Permission mode"]')?.textContent.trim() ?? ''
+  })()`))
   check('two free models, in Auto', picked.labels?.length === 2 && picked.mode === 'Auto', JSON.stringify(picked))
 
   const built = JSON.parse(String(await drive.capture('Both pages running side by side, each in its column', () => drive.evaluate(`(async () => {
@@ -82,7 +85,8 @@ try {
     field.dispatchEvent(new Event('input', { bubbles: true }))
     await new Promise((r) => setTimeout(r, 300))
     document.querySelector('button[aria-label="Send"]')?.click()
-    for (let i = 0; i < 1600; i += 1) {
+    // Under the 400 s one evaluate is given (drive-lib).
+    for (let i = 0; i < 700; i += 1) {
       await new Promise((r) => setTimeout(r, 500))
       const states = [...document.querySelectorAll('.lc-compare__state')].map((el) => el.textContent.trim())
       if (i > 6 && states.length === 2 && states.every((state) => state !== 'working' && state !== 'waiting')) break

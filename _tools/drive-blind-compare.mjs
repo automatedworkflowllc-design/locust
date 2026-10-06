@@ -85,7 +85,8 @@ try {
     field.dispatchEvent(new Event('input', { bubbles: true }))
     await new Promise((r) => setTimeout(r, 300))
     document.querySelector('button[aria-label="Send"]')?.click()
-    for (let i = 0; i < 1200; i += 1) {
+    // Under the 400 s a single evaluate is given (drive-lib): past it the drive read "undefined", not the columns.
+    for (let i = 0; i < 700; i += 1) {
       await new Promise((r) => setTimeout(r, 500))
       const states = [...document.querySelectorAll('.lc-compare__state')].map((el) => el.textContent.trim())
       if (i > 6 && states.length === 2 && states.every((state) => state !== 'working' && state !== 'waiting')) break

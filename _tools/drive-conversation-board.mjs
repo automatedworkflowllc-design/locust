@@ -63,7 +63,8 @@ const check = (what, ok, detail) => {
   if (!ok) failures += 1
   say(`  [${ok ? 'PASS' : 'FAIL'}] ${what}${detail === undefined ? '' : ` -- ${detail}`}`)
 }
-const OPEN_BOARD = `(() => { const b = [...document.querySelectorAll('.lc-sidebar__places button')].find((el) => el.innerText.trim() === 'Board'); if (!b) return 'no Board button'; b.click(); return 'opened' })()`
+// Board lives in the sidebar's foot beside Settings since 0.605, not among its places.
+const OPEN_BOARD = `(() => { const b = [...document.querySelectorAll('.lc-sidebar__nav button, .lc-sidebar__places button')].find((el) => el.innerText.trim() === 'Board'); if (!b) return 'no Board button'; b.click(); return 'opened' })()`
 const BOARD = `JSON.stringify((() => {
   const board = document.querySelector('.lc-board')
   if (!board) return { shown: false }
@@ -83,7 +84,7 @@ try {
   await drive.resize(1440, 900)
   await sleep(2500)
   // 1. Quiet.
-  check('the sidebar has a Board place', String(await drive.evaluate(OPEN_BOARD)) === 'opened')
+  check('the sidebar has a Board button', String(await drive.evaluate(OPEN_BOARD)) === 'opened')
   await sleep(600)
   const quiet = JSON.parse(String(await drive.capture('the board, quiet', () => drive.evaluate(BOARD))))
   check('quiet: it says so, and lists the finished conversation under Done', quiet.shown && /all quiet/.test(quiet.meta) && column(quiet, 'Done')?.cards.some((card) => /Summarise yesterday/.test(card.title)), JSON.stringify(quiet).slice(0, 240))
