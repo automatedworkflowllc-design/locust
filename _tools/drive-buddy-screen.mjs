@@ -82,8 +82,7 @@ const faces = (scope = 'body') => `(async () => {
       screen: canvas?.dataset.screen ?? '',
       move: canvas?.dataset.move ?? '',
       eyes: canvas?.dataset.eyes ?? '',
-      rig: canvas?.dataset.rig ?? '',
-      lift: canvas?.dataset.lift ?? '',
+      cell: canvas?.dataset.cell ?? '',
       size: Math.round(box.width),
       painted
     }
@@ -206,7 +205,6 @@ try {
 
   check('the Team screen opens', (await drive.evaluate(team)) === 'team')
   const roster = await read('.lc-rostergrid')
-  check('wearing the screen, he moves on his own rig: his body cut from his sheet, his arms drawn by Locust', roster.tm_buddy?.rig === 'on', JSON.stringify(roster.tm_buddy))
   check('on the Team screen, the same: his screen on one card, his own face on the other', roster.tm_buddy?.screen === 'on' && roster.tm_drawn?.screen === '' && roster.tm_buddy.size >= 28, JSON.stringify(roster))
 
   // At rest he draws nothing; pointed at, he wakes -- a wave, glad eyes -- and then rests again.

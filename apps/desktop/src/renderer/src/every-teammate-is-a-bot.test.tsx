@@ -152,8 +152,8 @@ describe('the new teammate dialog', () => {
     expect(html.indexOf('Shuffle look')).toBeGreaterThan(html.indexOf('class="lc-lookhead"'))
   })
 
-  it('has nine colours', () => {
+  it('has eleven colours (Indigo and Coral, 0.660)', () => {
     const colours = html.slice(html.indexOf('aria-label="Avatar colour"'), html.indexOf('class="lc-lookhead"'))
-    expect((colours.match(/role="radio"/g) ?? []).length).toBe(9)
+    expect((colours.match(/role="radio"/g) ?? []).length).toBe(11)
   })
 })

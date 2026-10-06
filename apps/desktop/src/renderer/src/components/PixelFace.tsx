@@ -64,7 +64,9 @@ const HUE_VARIABLE: Readonly<Record<PixelFaceHue, string>> = {
   butter: '--lc-hue-butter',
   rose: '--lc-hue-rose',
   slate: '--lc-hue-slate',
-  pearl: '--lc-hue-pearl'
+  pearl: '--lc-hue-pearl',
+  indigo: '--lc-hue-indigo',
+  coral: '--lc-hue-coral'
 }
 
 const FACE_VARIABLE: Readonly<Record<PixelFaceHue, string>> = {
@@ -76,7 +78,9 @@ const FACE_VARIABLE: Readonly<Record<PixelFaceHue, string>> = {
   butter: '--lc-hue-butter-face',
   rose: '--lc-hue-rose-face',
   slate: '--lc-hue-slate-face',
-  pearl: '--lc-hue-pearl-face'
+  pearl: '--lc-hue-pearl-face',
+  indigo: '--lc-hue-indigo-face',
+  coral: '--lc-hue-coral-face'
 }
 
 export const PRESENCE_TONE: Readonly<Record<FacePresence, string | undefined>> = {

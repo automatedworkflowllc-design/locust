@@ -76,7 +76,7 @@ const MAX_FILE_BYTES = 1_000_000
 export const TEAMMATES_UNREADABLE = 'TEAMMATES_UNREADABLE'
 const SCHEMA_VERSION = 1 as const
 
-export const TEAMMATE_HUES: readonly TeammateHue[] = ['lime', 'blue', 'violet', 'clay', 'teal', 'butter', 'rose', 'slate', 'pearl']
+export const TEAMMATE_HUES: readonly TeammateHue[] = ['lime', 'blue', 'violet', 'clay', 'teal', 'butter', 'rose', 'slate', 'pearl', 'indigo', 'coral']
 
 export const TEAMMATE_ROLES: readonly TeammateRole[] = [
   'Code & Migrations',

@@ -68,7 +68,9 @@ const HUES: readonly { readonly hue: TeammateHue; readonly label: string }[] = [
   { hue: 'butter', label: 'Butter' },
   { hue: 'rose', label: 'Rose' },
   { hue: 'slate', label: 'Slate' },
-  { hue: 'pearl', label: 'Pearl' }
+  { hue: 'pearl', label: 'Pearl' },
+  { hue: 'indigo', label: 'Indigo' },
+  { hue: 'coral', label: 'Coral' }
 ]
 
 /**

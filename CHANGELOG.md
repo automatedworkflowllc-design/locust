@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.660.0 - 2026-10-05
+
+### Changed
+
+- **Codex Buddy is drawn as his maker drew him again.** 0.659 gave him a body drawn by Locust below his head; next to his own drawing it was heavier and busier, so it is gone. He is back to his own art, with his screen face, his settle and his breathing.
+
+### New
+
+- **Two more teammate colours: Indigo and Coral.** Close to Codex's blue and Claude's coral, for the agent mascots on their way.
+
 ## 0.659.0 - 2026-10-05
 
 ### Improved

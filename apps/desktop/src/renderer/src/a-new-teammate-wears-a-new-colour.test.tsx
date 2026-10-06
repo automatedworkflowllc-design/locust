@@ -17,7 +17,7 @@ describe("a new teammate's colour", () => {
     expect(freshHue(['lime'])).toBe('blue')
     expect(freshHue(['lime', 'blue', 'violet'])).toBe('clay')
     expect(freshHue(['blue'])).toBe('lime')
-    const everyOne = ['lime', 'blue', 'violet', 'clay', 'teal', 'butter', 'rose', 'slate', 'pearl'] as const
+    const everyOne = ['lime', 'blue', 'violet', 'clay', 'teal', 'butter', 'rose', 'slate', 'pearl', 'indigo', 'coral'] as const
     expect(freshHue(everyOne)).toBe('lime')
     expect(freshHue([...everyOne, 'lime'])).toBe('blue')
   })

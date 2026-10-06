@@ -1359,7 +1359,7 @@ export const MISSION_APPROVAL_WITHDRAWN_CHANNEL = 'mission-approval:withdrawn'
 
 export type LocalRuntimeId = 'codex' | 'claude' | 'cursor' | 'gemini' | 'opencode' | 'copilot' | 'antigravity' | 'muse' | 'omniroute'
 
-export type TeammateHue = 'lime' | 'blue' | 'violet' | 'clay' | 'teal' | 'butter' | 'rose' | 'slate' | 'pearl'
+export type TeammateHue = 'lime' | 'blue' | 'violet' | 'clay' | 'teal' | 'butter' | 'rose' | 'slate' | 'pearl' | 'indigo' | 'coral'
 
 export type TeammateRole =
   | 'Code & Migrations'

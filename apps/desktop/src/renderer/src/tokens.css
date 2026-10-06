@@ -334,6 +334,12 @@
   --lc-hue-slate-face: #11151c;
   --lc-hue-pearl: #ecebf2;
   --lc-hue-pearl-face: #16161b;
+  /* Two more for the agent mascots (Colin, 2026-10-05): Codex's indigo and
+     Claude's coral, each close to its maker's own colour. */
+  --lc-hue-indigo: #3f5be8;
+  --lc-hue-indigo-face: #0b0f24;
+  --lc-hue-coral: #e0603c;
+  --lc-hue-coral-face: #1f0d08;
 
   /* --- Runtime marks (RuntimeMark.tsx, 0.383) ----------------------------
    * The marks whose colour is part of the mark: Claude's orange (the hex
