@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.654.0 - 2026-10-05
+
+### Improved
+
+- **Home uses less of your computer while a teammate works.** Every moving face on Home is drawn 30 times a second, but each one kept its own count of when, so together they made the window redraw nearly 60 times a second. They now all draw in the same moments: the window redraws 30 times a second, and every face moves exactly as before.
+
 ## 0.653.0 - 2026-10-05
 
 ### Changed

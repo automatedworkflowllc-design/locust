@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { MODE_DRAWS, ThinkingOrb, resolvePreset } from 'thinking-orbs'
+import { DRAWING_BEAT } from '../frameBeat.js'
 
 import type { OrbState } from 'thinking-orbs'
 import type { ReactElement } from 'react'
@@ -202,13 +203,9 @@ function PaintedDown({
      * more than React and the reply's text together. Its time is still the
      * clock's, so it moves at the same speed; it is only drawn less often.
      */
-    let drawnAt = 0
-    const every = 1000 / ORB_FRAMES_PER_SECOND - 1
+    // On the window's one beat with the bots (frameBeat.ts, 0.654): drawn in the same frames as they are.
     const loop = (now: number): void => {
-      if (now - drawnAt >= every) {
-        drawnAt = now
-        frame((performance.now() / 1000) * speed)
-      }
+      if (DRAWING_BEAT.due(now)) frame((performance.now() / 1000) * speed)
       if (running) handle = requestAnimationFrame(loop)
     }
     const start = (): void => {

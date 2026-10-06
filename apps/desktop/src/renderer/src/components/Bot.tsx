@@ -19,6 +19,7 @@ import { anchorsOf, anchorVariables, paintedBounds, type BodyBox } from '../botA
 
 import { screenSuits } from '../../../shared/avatar.js'
 import { usePlush, useTerminalFaces } from '../botLook.js'
+import { DRAWING_BEAT, frameBeat } from '../frameBeat.js'
 import { LOCUST_BOTS, isLocustBot } from '../locustBots.js'
 import type { LocustBotType } from '../locustBots.js'
 import { WINDOW_PRESENCE } from '../windowPresence.js'
@@ -1840,6 +1841,13 @@ export interface BotFrames {
  */
 export const BOT_FRAMES_PER_SECOND = 30
 
+/** The window's own animation frames, which keep the window's one drawing beat (frameBeat.ts). */
+const WINDOW_FRAMES: BotFrames = {
+  requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
+  cancelAnimationFrame: (handle) => window.cancelAnimationFrame(handle),
+  now: () => performance.now()
+}
+
 /**
  * Whether the window is in front, for a bot's clock (0.611): windowPresence.ts.
  * The cover already rested behind other windows (HomeCover, 0.305); the faces
@@ -1869,24 +1877,19 @@ export function startBotClock(
   draw: () => void,
   step: (seconds: number) => void,
   showing: () => boolean,
-  frames: BotFrames = {
-    requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
-    cancelAnimationFrame: (handle) => window.cancelAnimationFrame(handle),
-    now: () => performance.now()
-  },
+  frames: BotFrames = WINDOW_FRAMES,
   presence: BotPresence = WINDOW_PRESENCE
 ): () => void {
   draw()
   let last = frames.now()
   let handle = 0
   let stopped = false
-  // A millisecond of slack, so a 60 Hz screen's second frame (33.3 ms) is not
-  // turned away for arriving a hair early.
-  const every = 1000 / BOT_FRAMES_PER_SECOND - 1
+  // The window's frames keep the window's one beat (frameBeat.ts); a test's own frames, a beat of their own.
+  const beat = frames === WINDOW_FRAMES ? DRAWING_BEAT : frameBeat(BOT_FRAMES_PER_SECOND)
   const tick = (now: number): void => {
     handle = 0
-    // A frame too soon after the last is passed over, and its time goes to the next.
-    if (now - last >= every) {
+    // A frame off the beat is passed over, and its time goes to the next.
+    if (beat.due(now)) {
       const seconds = Math.min(0.05, (now - last) / 1000)
       last = now
       if (showing()) {
