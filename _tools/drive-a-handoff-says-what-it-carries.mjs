@@ -4,10 +4,14 @@
 //
 // Product ideas, round four: the brief a new runtime starts from drops whole
 // sections to fit, and nothing showed that before the switch. A seeded
-// conversation finished on OpenCode; its teammate is now on Codex, so the
-// next message is a handoff. Typing a short reply must say what goes (the
-// task and its last reply); a long one must say what is left out to fit.
-// Nothing is sent.
+// conversation finished on OpenCode; the box is moved to Codex, so the next
+// message is a handoff. Typing a short reply must say what goes (the task and
+// its last reply); a long one must say what is left out to fit. Nothing is
+// sent.
+//
+// Since 0.552 each chat keeps its own model: reopening the conversation puts
+// the box back on OpenCode whatever the teammate is on now, so the drive moves
+// the box itself, as a person switching models mid-conversation does.
 
 import { createHash } from 'node:crypto'
 import { mkdtemp } from 'node:fs/promises'
@@ -15,7 +19,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-import { recordRoot, say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
+import { pickRouteScript, recordRoot, say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
@@ -80,6 +84,9 @@ try {
     await new Promise((r) => setTimeout(r, 1500))
   })()`)
   await sleep(500)
+  const moved = String(await drive.evaluate(pickRouteScript({ group: '/codex/i' })))
+  say(`   the box moved: ${moved}`)
+  check('the box can be moved to Codex', /Codex/.test(moved), moved)
   const short = String(await drive.capture('a short reply, typed', () => drive.evaluate(typeAndRead('Now make it a table'))))
   check('the note says where it goes, in plain words', /Your next message goes to Codex CLI with a summary of this conversation, not OpenCode's memory of it\./.test(short), short)
   check('and what it carries: the task and its last reply', /It carries the task and its last reply\./.test(short) && !/Left out/.test(short), short)
