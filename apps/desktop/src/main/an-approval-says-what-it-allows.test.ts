@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { createApprovalChannel, openCodePermissionRequest } from './approval-channel.js'
 import { alwaysCoversFor, builtInOrConnector } from './permission-host.js'
@@ -52,8 +52,9 @@ describe('an approval card', () => {
     void handler({ id: 7, method: 'item/fileChange/requestApproval', params: { itemId: 'item_1', cwd: 'C:/work' } })
     // The loop reads the item a few milliseconds later, as it did in the QA sweep at 0-3 ms.
     setTimeout(() => changesByItem.set('item_1', [{ path: 'C:/work/approved.txt', kind: 'add', movePath: undefined, diff: 'hello\n' }]), 5)
-    await new Promise((settle) => setTimeout(settle, 120))
-    expect(raised[0]).toMatchObject({ kind: 'file-change', summary: 'Change 1 file' })
-    expect(raised[0]?.patch?.text).toContain('+hello')
+    await vi.waitFor(() => {
+      expect(raised[0]).toMatchObject({ kind: 'file-change', summary: 'Change 1 file' })
+      expect(raised[0]?.patch?.text).toContain('+hello')
+    })
   })
 })

@@ -1,5 +1,5 @@
 import type { MissionLedger } from '@teammate/mission-store'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import type { AgentApi, AntigravityHost } from './antigravity-host.js'
 import { antigravityExecutableCandidates, createAntigravityHostProbe, parseServerCommandLine, transcriptPathFor } from './antigravity-host.js'
@@ -215,15 +215,17 @@ describe('a mission through Antigravity', () => {
 
     // The agent works; lines arrive over time.
     h.transcript.lines = WRITE_LINES.slice(0, 4)
-    await settle()
-    expect(h.emitted.some((event) => event.type === 'tool.started' && event.payload.name === 'write_to_file')).toBe(true)
+    await vi.waitFor(() => {
+      expect(h.emitted.some((event) => event.type === 'tool.started' && event.payload.name === 'write_to_file')).toBe(true)
+    })
     expect(h.service.has(mission.runId)).toBe(true)
 
     h.transcript.lines = WRITE_LINES
-    await settle()
-    const types = h.emitted.map((event) => event.type)
-    expect(types).toContain('message.delta')
-    expect(types.at(-1)).toBe('run.completed')
+    await vi.waitFor(() => {
+      const types = h.emitted.map((event) => event.type)
+      expect(types).toContain('message.delta')
+      expect(types.at(-1)).toBe('run.completed')
+    })
     expect(h.emitted.at(-1)?.payload.runtimeThreadId ?? (h.emitted.at(-1) as { runtimeThreadId?: string }).runtimeThreadId).toBeDefined()
     expect(h.service.has(mission.runId)).toBe(false)
     // Persisted before emitted, and nothing private in what was persisted.
@@ -273,8 +275,9 @@ describe('a mission through Antigravity', () => {
       JSON.stringify({ step_index: 5, source: 'SYSTEM', type: 'SYSTEM_MESSAGE', status: 'DONE', created_at: NOW, content: '<SYSTEM_MESSAGE>what did you reply?</SYSTEM_MESSAGE>' }),
       JSON.stringify({ step_index: 6, source: 'MODEL', type: 'PLANNER_RESPONSE', status: 'DONE', created_at: NOW, content: 'DONE' })
     ]
-    await settle()
-    expect(emitted.map((event) => event.type).at(-1)).toBe('run.completed')
+    await vi.waitFor(() => {
+      expect(emitted.map((event) => event.type).at(-1)).toBe('run.completed')
+    })
     expect(appended.length).toBeGreaterThan(0)
   })
 
@@ -293,10 +296,11 @@ describe('a mission through Antigravity', () => {
     // A tool is open (step 2 calls `write_to_file`) and nothing follows it.
     const h = harness({ lines: WRITE_LINES.slice(0, 3), askingNoticeMs: 15, idleTimeoutMs: 100_000 })
     const mission = await h.service.start('hi', undefined, {})
-    await settle(10)
-    const said = h.notices.map((notice) => notice.message).join(' | ')
-    expect(said).toMatch(/write_to_file/)
-    expect(said).toMatch(/its own window/i)
+    await vi.waitFor(() => {
+      const said = h.notices.map((notice) => notice.message).join(' | ')
+      expect(said).toMatch(/write_to_file/)
+      expect(said).toMatch(/its own window/i)
+    })
     // NOT an ending: the run is still being watched.
     expect(h.service.has(mission.runId)).toBe(true)
     expect(h.emitted.map((event) => event.type)).not.toContain('run.failed')
@@ -305,7 +309,10 @@ describe('a mission through Antigravity', () => {
   it('says it once, not on every tick', async () => {
     const h = harness({ lines: WRITE_LINES.slice(0, 3), askingNoticeMs: 15, idleTimeoutMs: 100_000 })
     await h.service.start('hi', undefined, {})
-    await settle(20)
+    await vi.waitFor(() => {
+      expect(h.notices).toHaveLength(1)
+    })
+    await settle(5)
     expect(h.notices).toHaveLength(1)
   })
 
@@ -315,9 +322,10 @@ describe('a mission through Antigravity', () => {
     // never fire and nothing said so -- Builder.io's §6.4 in miniature.
     const h = harness({ lines: WRITE_LINES.slice(0, 3), idleTimeoutMs: 200 })
     await h.service.start('hi', undefined, {})
-    await settle(14)
-    expect(h.notices.length).toBeGreaterThan(0)
-    expect(h.notices[0]?.message).toMatch(/write_to_file/)
+    await vi.waitFor(() => {
+      expect(h.notices.length).toBeGreaterThan(0)
+      expect(h.notices[0]?.message).toMatch(/write_to_file/)
+    })
   })
 
   it('says nothing while the agent is still writing', async () => {
@@ -332,19 +340,20 @@ describe('a mission through Antigravity', () => {
   it('gives up when the agent writes nothing for too long, as a failure and not a completion', async () => {
     const h = harness({ lines: [], idleTimeoutMs: 20 })
     const mission = await h.service.start('hi', undefined, {})
-    await settle(10)
-    expect(h.service.has(mission.runId)).toBe(false)
-    expect(h.emitted.map((event) => event.type).at(-1)).toBe('run.failed')
+    await vi.waitFor(() => {
+      expect(h.service.has(mission.runId)).toBe(false)
+      expect(h.emitted.map((event) => event.type).at(-1)).toBe('run.failed')
+    })
   })
 
   it('stopping stops the watch and says the agent may still be working', async () => {
     const h = harness({ lines: WRITE_LINES.slice(0, 3) })
     const mission = await h.service.start('hi', undefined, {})
-    await settle(3)
     expect(h.service.cancel(mission.runId)).toBe(true)
-    await settle(3)
-    expect(h.service.has(mission.runId)).toBe(false)
-    expect(h.emitted.map((event) => event.type).at(-1)).toBe('run.cancelled')
+    await vi.waitFor(() => {
+      expect(h.service.has(mission.runId)).toBe(false)
+      expect(h.emitted.map((event) => event.type).at(-1)).toBe('run.cancelled')
+    })
     expect(h.service.cancel(mission.runId)).toBe(false)
   })
 
@@ -399,8 +408,9 @@ describe('when the ledger refuses a receipt', () => {
   it('ends the run and says so, instead of polling on with nobody recording', async () => {
     const test = harness({ lines: WRITE_LINES, refuseAppend: true })
     await test.service.start('Write hello.txt', undefined, {})
-    await settle()
-    expect(test.updates.some((update) => update.kind === 'persistence-error')).toBe(true)
+    await vi.waitFor(() => {
+      expect(test.updates.some((update) => update.kind === 'persistence-error')).toBe(true)
+    })
   })
 
   // A B4 lead from the code review, settled: a run ended this way never said
@@ -410,8 +420,9 @@ describe('when the ledger refuses a receipt', () => {
     const ended: string[] = []
     const test = harness({ lines: WRITE_LINES, refuseAppend: true, ended })
     const mission = await test.service.start('Write hello.txt', undefined, {})
-    await settle()
-    expect(ended).toEqual([mission.missionId])
+    await vi.waitFor(() => {
+      expect(ended).toEqual([mission.missionId])
+    })
   })
 
   it('does NOT advance past events it failed to write', async () => {
@@ -423,7 +434,9 @@ describe('when the ledger refuses a receipt', () => {
      */
     const test = harness({ lines: WRITE_LINES, refuseAppend: true })
     await test.service.start('Write hello.txt', undefined, {})
-    await settle()
+    await vi.waitFor(() => {
+      expect(test.updates.some((update) => update.kind === 'persistence-error')).toBe(true)
+    })
     expect(test.appended).toHaveLength(0)
     expect(test.emitted).toHaveLength(0)
   })
@@ -433,8 +446,9 @@ describe('when the ledger refuses a receipt', () => {
     // that ended every run it started.
     const test = harness({ lines: WRITE_LINES })
     await test.service.start('Write hello.txt', undefined, {})
-    await settle()
-    expect(test.appended.length).toBeGreaterThan(0)
+    await vi.waitFor(() => {
+      expect(test.appended.length).toBeGreaterThan(0)
+    })
     expect(test.updates.some((update) => update.kind === 'persistence-error')).toBe(false)
   })
 })
@@ -468,11 +482,14 @@ describe('what an Antigravity run changed on disk', () => {
     expect(looked).toEqual([WORKSPACE])
     expect(h.api.calls[0]?.kind).toBe('new')
     h.transcript.lines = WRITE_LINES
-    await settle()
-    expect(looked).toEqual([WORKSPACE, WORKSPACE])
+    await vi.waitFor(() => {
+      expect(looked).toEqual([WORKSPACE, WORKSPACE])
+      const all = h.appended.flatMap((entry) => entry.events) as unknown as Sequenced[]
+      const completed = all.findIndex((event) => event.type === 'run.completed')
+      expect(completed).toBeGreaterThan(0)
+    })
     const all = h.appended.flatMap((entry) => entry.events) as unknown as Sequenced[]
     const completed = all.findIndex((event) => event.type === 'run.completed')
-    expect(completed).toBeGreaterThan(0)
     const observed = all.slice(completed + 1)
     expect(observed.map((event) => event.type)).toEqual(['tool.started', 'tool.completed'])
     // write_to_file named hello.txt, so the observation is that row's patch, not a second row.
@@ -489,17 +506,19 @@ describe('what an Antigravity run changed on disk', () => {
     const quiet = harness({ lines: [], observeDisk: async () => { looksMade += 1; return new Map() }, observePatches: async () => { throw new Error('nothing to read') } })
     await quiet.service.start('make hello.txt', undefined, { model: 'flash' })
     quiet.transcript.lines = WRITE_LINES
-    await settle()
-    expect(looksMade).toBe(2)
-    expect(quiet.appended.flatMap((entry) => entry.events).at(-1)?.type).toBe('run.completed')
+    await vi.waitFor(() => {
+      expect(looksMade).toBe(2)
+      expect(quiet.appended.flatMap((entry) => entry.events).at(-1)?.type).toBe('run.completed')
+    })
 
     let blindLooks = 0
     const blind = harness({ lines: [], observeDisk: async () => { blindLooks += 1; return undefined } })
     await blind.service.start('make hello.txt', undefined, { model: 'flash' })
     blind.transcript.lines = WRITE_LINES
-    await settle()
-    expect(blindLooks).toBe(1)
-    expect(blind.appended.flatMap((entry) => entry.events).at(-1)?.type).toBe('run.completed')
+    await vi.waitFor(() => {
+      expect(blindLooks).toBe(1)
+      expect(blind.appended.flatMap((entry) => entry.events).at(-1)?.type).toBe('run.completed')
+    })
   })
 
   it('from a folder two Antigravity runs shared, says the reading names nobody rather than counting it', async () => {
@@ -510,9 +529,11 @@ describe('what an Antigravity run changed on disk', () => {
     await h.service.start('make hello.txt', wren, { model: 'flash' })
     await h.service.start('make hello.txt', booty, { model: 'flash' })
     h.transcript.lines = WRITE_LINES
-    await settle()
+    await vi.waitFor(() => {
+      const all = h.appended.flatMap((entry) => entry.events)
+      expect(all.some((event) => event.type === 'adapter.diagnostic' && event.payload.code === 'host.shared_workspace')).toBe(true)
+    })
     const all = h.appended.flatMap((entry) => entry.events)
-    expect(all.some((event) => event.type === 'adapter.diagnostic' && event.payload.code === 'host.shared_workspace')).toBe(true)
     expect(all.some((event) => event.payload.toolKind === 'observed_edit')).toBe(false)
   })
 })
@@ -533,16 +554,18 @@ describe('how often a live Antigravity run is read', () => {
     const stats: { size: number; mtimeMs: number }[] = [{ size: 10, mtimeMs: 1 }]
     const h = harness({ lines: [], statTranscript: async () => stats[0] })
     await h.service.start('Fix the build.', undefined, {})
-    await settle(10)
+    await vi.waitFor(() => {
+      expect(h.reads.length).toBeGreaterThan(0)
+    })
     const afterFirst = h.reads.length
-    expect(afterFirst).toBeGreaterThan(0)
     // Twenty-odd polls at 5 ms, the file unmoved: no further read.
     await settle(10)
     expect(h.reads.length).toBe(afterFirst)
     // The file grew: one read, then quiet again.
     stats[0] = { size: 12, mtimeMs: 2 }
-    await settle(6)
-    expect(h.reads.length).toBe(afterFirst + 1)
+    await vi.waitFor(() => {
+      expect(h.reads.length).toBe(afterFirst + 1)
+    })
     await settle(6)
     expect(h.reads.length).toBe(afterFirst + 1)
   })
@@ -550,7 +573,8 @@ describe('how often a live Antigravity run is read', () => {
   it('reads every time when the file cannot be stated, as before', async () => {
     const h = harness({ lines: [], statTranscript: async () => undefined })
     await h.service.start('Fix the build.', undefined, {})
-    await settle(8)
-    expect(h.reads.length).toBeGreaterThan(3)
+    await vi.waitFor(() => {
+      expect(h.reads.length).toBeGreaterThan(3)
+    })
   })
 })

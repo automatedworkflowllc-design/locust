@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import type { MissionLedger } from '@teammate/mission-store'
 
@@ -230,8 +230,9 @@ describe('a teammate on Antigravity that asks', () => {
     const { service, transcript, raised } = harness(cascade)
     const run = await service.start('Ask me to choose.', undefined, {})
     transcript.lines.push(ASKS)
-    await settle()
-    expect(raised).toHaveLength(1)
+    await vi.waitFor(() => {
+      expect(raised).toHaveLength(1)
+    })
     const card = raised[0]!
     expect(card).toMatchObject({ runId: run.runId, missionId: run.missionId, runtime: 'antigravity', kind: 'question', blocking: true, skippable: true, summary: 'Asking folder organization preference' })
     expect(card.answerIn).toBeUndefined()
@@ -247,7 +248,9 @@ describe('a teammate on Antigravity that asks', () => {
     const { service, transcript, raised } = harness(cascade)
     await service.start('Ask me to choose.', undefined, {})
     transcript.lines.push(ASKS)
-    await settle()
+    await vi.waitFor(() => {
+      expect(raised).toHaveLength(1)
+    })
     const ok = await service.decide({ approvalId: raised[0]!.approvalId, answers: { '0': [OPTIONS[0]!.text] } })
     expect(ok).toBe(true)
     expect(cascade.answers).toEqual([[{ selectedOptionIds: ['1'] }]])
@@ -261,7 +264,9 @@ describe('a teammate on Antigravity that asks', () => {
     const { service, transcript, raised } = harness(cascade)
     await service.start('Ask me to choose.', undefined, {})
     transcript.lines.push(ASKS)
-    await settle()
+    await vi.waitFor(() => {
+      expect(raised).toHaveLength(1)
+    })
     await service.decide({ approvalId: raised[0]!.approvalId, answers: { '0': ['keep it flat'] } })
     expect(cascade.answers[0]).toEqual([{ selectedOptionIds: [], writeIn: 'keep it flat' }])
     await service.dispose()
@@ -270,7 +275,9 @@ describe('a teammate on Antigravity that asks', () => {
     const other = harness(second)
     await other.service.start('Ask me to choose.', undefined, {})
     other.transcript.lines.push(ASKS)
-    await settle()
+    await vi.waitFor(() => {
+      expect(other.raised).toHaveLength(1)
+    })
     await other.service.decide({ approvalId: other.raised[0]!.approvalId, answers: { '0': [] } })
     expect(second.answers[0]).toEqual([{ selectedOptionIds: [], skipped: true }])
     await other.service.dispose()
@@ -280,10 +287,13 @@ describe('a teammate on Antigravity that asks', () => {
     const { service, transcript, raised, withdrawn } = harness(fakeCascade(true))
     await service.start('Ask me to choose.', undefined, {})
     transcript.lines.push(ASKS)
-    await settle()
+    await vi.waitFor(() => {
+      expect(raised).toHaveLength(1)
+    })
     transcript.lines.push(ANSWER_ARRIVES)
-    await settle()
-    expect(withdrawn).toEqual([raised[0]!.approvalId])
+    await vi.waitFor(() => {
+      expect(withdrawn).toEqual([raised[0]!.approvalId])
+    })
     await service.dispose()
   })
 
@@ -291,8 +301,9 @@ describe('a teammate on Antigravity that asks', () => {
     const { service, transcript, raised, notices } = harness(fakeCascade(true), { idleTimeoutMs: 40 })
     const run = await service.start('Ask me to choose.', undefined, {})
     transcript.lines.push(ASKS)
-    await settle(20)
-    expect(raised).toHaveLength(1)
+    await vi.waitFor(() => {
+      expect(raised).toHaveLength(1)
+    })
     expect(service.has(run.runId)).toBe(true)
     expect(notices.some((message) => /might|without reporting/i.test(message))).toBe(false)
     await service.dispose()
@@ -303,9 +314,10 @@ describe('a teammate on Antigravity that asks', () => {
     const { service, transcript, raised } = harness(cascade)
     await service.start('Ask me to choose.', undefined, {})
     transcript.lines.push(ASKS)
-    await settle(20)
-    expect(cascade.looks).toBe(3)
-    expect(raised).toHaveLength(1)
+    await vi.waitFor(() => {
+      expect(cascade.looks).toBe(3)
+      expect(raised).toHaveLength(1)
+    })
     expect(raised[0]).toMatchObject({ answerIn: 'Antigravity', kind: 'question' })
     expect(raised[0]!.skippable).toBeUndefined()
     // There is nothing here to answer it with.
@@ -317,10 +329,13 @@ describe('a teammate on Antigravity that asks', () => {
     const { service, transcript, raised, withdrawn } = harness(fakeCascade(true))
     const run = await service.start('Ask me to choose.', undefined, {})
     transcript.lines.push(ASKS)
-    await settle()
+    await vi.waitFor(() => {
+      expect(raised).toHaveLength(1)
+    })
     service.cancel(run.runId)
-    await settle(4)
-    expect(withdrawn).toEqual([raised[0]!.approvalId])
+    await vi.waitFor(() => {
+      expect(withdrawn).toEqual([raised[0]!.approvalId])
+    })
   })
 
   it('says so in the thread when Antigravity would not take the answer, and keeps the card', async () => {
@@ -331,7 +346,9 @@ describe('a teammate on Antigravity that asks', () => {
     const { service, transcript, raised, notices, withdrawn } = harness(cascade)
     await service.start('Ask me to choose.', undefined, {})
     transcript.lines.push(ASKS)
-    await settle()
+    await vi.waitFor(() => {
+      expect(raised).toHaveLength(1)
+    })
     expect(await service.decide({ approvalId: raised[0]!.approvalId, answers: { '0': [OPTIONS[0]!.text] } })).toBe(false)
     expect(notices.some((message) => message.includes('step 8 is not waiting for an interaction') && message.includes("Antigravity's own window"))).toBe(true)
     expect(withdrawn).toEqual([])

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import type { MissionLedger } from '@teammate/mission-store'
 import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
@@ -109,9 +109,10 @@ describe('a long Antigravity answer', () => {
     const { cascade, asked } = cascadeWith(async () => plannerTextsIn(STEPS))
     const { service, recorded } = harness(cascade, [USER, answer(`${BEFORE}\n<truncated 1066 bytes>\n${AFTER}`)])
     await service.start('Who takes what?', undefined, {})
-    await settle()
-    expect(answerText(recorded)).toBe(WHOLE)
-    expect(asked).toEqual([12])
+    await vi.waitFor(() => {
+      expect(answerText(recorded)).toBe(WHOLE)
+      expect(asked).toEqual([12])
+    })
     await service.dispose()
   })
 
@@ -121,8 +122,9 @@ describe('a long Antigravity answer', () => {
     })
     const { service, recorded } = harness(cascade, [USER, answer(`${BEFORE}\n<truncated 1066 bytes>\n${AFTER}`)])
     await service.start('Who takes what?', undefined, {})
-    await settle()
-    expect(answerText(recorded)).toBe(`${BEFORE}\n<truncated 1066 bytes>\n${AFTER}`)
+    await vi.waitFor(() => {
+      expect(answerText(recorded)).toBe(`${BEFORE}\n<truncated 1066 bytes>\n${AFTER}`)
+    })
     await service.dispose()
   })
 
@@ -130,8 +132,9 @@ describe('a long Antigravity answer', () => {
     const { cascade, asked } = cascadeWith(async () => [WHOLE])
     const { service, recorded } = harness(cascade, [USER, answer('A short, whole answer.')])
     await service.start('Who takes what?', undefined, {})
-    await settle()
-    expect(answerText(recorded)).toBe('A short, whole answer.')
+    await vi.waitFor(() => {
+      expect(answerText(recorded)).toBe('A short, whole answer.')
+    })
     expect(asked).toEqual([])
     await service.dispose()
   })
