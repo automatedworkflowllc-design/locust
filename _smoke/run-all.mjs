@@ -24,9 +24,13 @@ const ROOT = join(HERE, '..')
 /** Longer than any smoke should need; a smoke past this is a finding itself. */
 const TIMEOUT_MS = 15 * 60 * 1000
 
+// `--only a,b` and `--only=a,b` alike: the usage line above says the first, and a run given it once
+// ignored it and ran EVERY smoke, the paid runtimes' too (2026-10-06).
 const argument = (name) => {
   const found = process.argv.find((entry) => entry.startsWith(`--${name}=`))
-  return found === undefined ? undefined : found.slice(name.length + 3)
+  if (found !== undefined) return found.slice(name.length + 3)
+  const at = process.argv.indexOf(`--${name}`)
+  return at === -1 ? undefined : process.argv[at + 1]
 }
 const only = argument('only')?.split(',').map((entry) => entry.trim()).filter(Boolean)
 const skip = (argument('skip')?.split(',').map((entry) => entry.trim()).filter(Boolean)) ?? []
@@ -37,6 +41,12 @@ const all = (await readdir(HERE))
   .sort()
 
 const chosen = all.filter((name) => (only === undefined || only.includes(name)) && !skip.includes(name))
+// Every smoke at once runs the paid runtimes too (Claude, Codex, Cursor, Copilot, Antigravity, Muse):
+// only on purpose. A run with no --only must say LOCUST_SPEND=1.
+if (only === undefined && process.env.LOCUST_SPEND !== '1') {
+  console.error('Running every smoke includes paid runtimes. Name the ones to run with --only a,b, or set LOCUST_SPEND=1 to run them all.')
+  process.exit(2)
+}
 
 const say = (line) => console.error(line)
 say(`running ${String(chosen.length)} of ${String(all.length)} smokes`)
