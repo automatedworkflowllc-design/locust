@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.665.0 - 2026-10-05
+
+### Fixed
+
+- **A teammate on Antigravity can answer another teammate on its own again.** A teammate saved with a Gemini model and no effort level started its automatic replies without one, and Antigravity refused them: "requires --effort". Such a reply now runs at Medium, Antigravity's own middle setting, as a run you start yourself already did.
+
 ## 0.664.0 - 2026-10-05
 
 ### New

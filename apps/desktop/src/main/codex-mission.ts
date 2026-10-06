@@ -100,7 +100,14 @@ export function agyRoute(model: string | undefined, effort: string | undefined):
   const variant = /^(.*)-(low|medium|high|max)$/.exec(model)
   const base = tier?.model ?? (variant === null ? model : variant[1]!)
   const named = tier?.effort ?? (variant === null ? undefined : variant[2])
-  const chosen = effort ?? named
+  /*
+   * A GEMINI MODEL ALWAYS GOES WITH AN EFFORT (0.665). agy refuses one without:
+   * "--model gemini-3.8-flash requires --effort (available: low, medium,
+   * high)". The picker always sends one, but a teammate saved with the bare
+   * model id did not -- Colin's Flash, answering Bro automatically, failed so
+   * on 10/05. Medium, agy's own middle, where nothing was chosen.
+   */
+  const chosen = effort ?? named ?? (/^gemini-/.test(base) ? 'medium' : undefined)
   return { model: base, ...(chosen === undefined ? {} : { effort: chosen }) }
 }
 import { FREE_ONLY_REFUSAL, isFreeRoute } from './free-routes.js'

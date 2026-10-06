@@ -22,6 +22,10 @@ describe('Antigravity through its CLI', () => {
     expect(agyRoute('gemini-3.8-flash-low', undefined)).toEqual({ model: 'gemini-3.8-flash', effort: 'low' })
     expect(agyRoute('gemini-3.8-flash-low', 'high')).toEqual({ model: 'gemini-3.8-flash', effort: 'high' })
     expect(agyRoute('claude-opus-4-6-thinking', undefined)).toEqual({ model: 'claude-opus-4-6-thinking' })
+    // A Gemini model saved bare goes with Medium (0.665): agy refuses one with no effort, and a teammate's
+    // automatic reply sent none ("--model gemini-3.8-flash requires --effort").
+    expect(agyRoute('gemini-3.8-flash', undefined)).toEqual({ model: 'gemini-3.8-flash', effort: 'medium' })
+    expect(agyRoute('gemini-3.8-flash', 'low')).toEqual({ model: 'gemini-3.8-flash', effort: 'low' })
     expect(agyRoute(undefined, undefined)).toEqual({})
   })
 })
