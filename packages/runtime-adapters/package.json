@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./provider-error": {
+      "types": "./dist/provider-error.d.ts",
+      "default": "./dist/provider-error.js"
     }
   },
   "scripts": {

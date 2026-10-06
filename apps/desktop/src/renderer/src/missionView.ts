@@ -1,5 +1,5 @@
 import type { NormalizedRuntimeEvent, ToolPatch } from '@teammate/runtime-adapters'
-import { providerErrorSentence } from '@teammate/runtime-adapters'
+import { providerErrorSentence } from '@teammate/runtime-adapters/provider-error'
 
 import { SUBAGENT_TOOL } from './faceState.js'
 import { EVENT_WINDOW, TRIMMED_TURN_LINE, windowEvents } from '../../shared/event-window.js'

@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
-import { providerErrorSentence } from '@teammate/runtime-adapters'
+import { providerErrorSentence } from '@teammate/runtime-adapters/provider-error'
 import { buildThread, errorAlreadyShown, failureMessage } from './missionView.js'
 import { Thread } from './components/Thread.js'
 

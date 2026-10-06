@@ -5,7 +5,7 @@ import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 
 import type { ReactElement } from 'react'
 
 import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
-import { providerErrorSentence } from '@teammate/runtime-adapters'
+import { providerErrorSentence } from '@teammate/runtime-adapters/provider-error'
 
 import type {
   MissionApprovalDecision,
