@@ -179,6 +179,14 @@ try {
       const control = [...document.querySelectorAll('.lc-control')].find((b) => b.getAttribute('aria-haspopup') === 'listbox')
       if (control && document.querySelector('.lc-picker') === null) control.click()
       await new Promise((r) => setTimeout(r, 1000))
+      // Searched for, as a person would: the picker opens on the box's own runtime (Claude here), and Codex's rows
+      // further down are not all drawn until they are scrolled to or searched for (2026-10-06: none were read).
+      const search = document.querySelector('.lc-picker__input')
+      if (search && search.value !== 'GPT-6') {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(search, 'GPT-6')
+        search.dispatchEvent(new Event('input', { bubbles: true }))
+        await new Promise((r) => setTimeout(r, 600))
+      }
       const rows = [...document.querySelectorAll('.lc-picker__row')].map((r) => r.textContent.replace(/\\s+/g, ' ').trim())
       if (rows.some((t) => /GPT-6-Sol/.test(t))) return JSON.stringify(rows.filter((t) => /GPT/.test(t)))
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
