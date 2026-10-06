@@ -54,6 +54,25 @@ export function chosenLeaveOut(value: unknown): readonly string[] {
   return DROPPABLE_SECTION_NAMES.filter((name) => sent.includes(name))
 }
 
+/** A section of the handoff brief; `shrink` gives a smaller one that fits `room`, keeping whole items. */
+export interface HandoffSection {
+  readonly name: string
+  readonly text: string
+  readonly shrink?: (room: number) => string | undefined
+}
+
+/**
+ * The most recent items of `lines` whose section fits `room`, at least one;
+ * `text` makes the section from the items kept and how many were left out.
+ */
+function newestThatFit(lines: readonly string[], room: number, text: (kept: readonly string[], left: number) => string): string | undefined {
+  for (let keep = lines.length - 1; keep >= 1; keep -= 1) {
+    const candidate = text(lines.slice(lines.length - keep), lines.length - keep)
+    if (candidate.length <= room) return candidate
+  }
+  return undefined
+}
+
 function bullets(lines: readonly string[]): string {
   return lines.map((line) => `- ${line}`).join('\n')
 }
@@ -89,7 +108,7 @@ function sectionsFor(
   earlier: readonly EarlierTurn[] = [],
   taskFile?: string,
   ended?: string
-): readonly { readonly name: string; readonly text: string }[] {
+): readonly HandoffSection[] {
   /*
    * SAID AS IT HAPPENED (QA-2026-09-29 round 2, N4). A person who replied on
    * another runtime after a clean finish -- nothing in flight -- got "another
@@ -105,7 +124,7 @@ function sectionsFor(
   const task = taskFile === undefined
     ? originalPrompt
     : `${originalPrompt.slice(0, TASK_QUOTED_CHARS).trimEnd()}…\n\n[That is only its start. The whole of it, as written, is in the file \`${taskFile}\` you were handed above. Read that file before you do anything else.]`
-  const sections: { readonly name: string; readonly text: string }[] = [
+  const sections: HandoffSection[] = [
     {
       name: 'task',
       text: clean
@@ -124,11 +143,14 @@ function sectionsFor(
    * already settled with the person, not a transcript.
    */
   if (earlier.length > 0) {
+    const turnLines = earlier.map((turn) => `Asked: "${clipped(turn.asked, ASKED_CHARS)}"${turn.answered === undefined || turn.answered.trim().length === 0 ? ' -- no reply was recorded.' : ` -- answered: "${clipped(turn.answered, ANSWERED_CHARS)}"`}`)
+    const earlierText = (kept: readonly string[], left: number): string =>
+      'Earlier in this conversation, oldest first:\n'
+      + [...(left === 0 ? [] : [`- (${String(left)} earlier ${left === 1 ? 'turn is' : 'turns are'} not listed here)`]), bullets(kept)].join('\n')
     sections.push({
       name: 'earlier',
-      text:
-        'Earlier in this conversation, oldest first:\n'
-        + bullets(earlier.map((turn) => `Asked: "${clipped(turn.asked, ASKED_CHARS)}"${turn.answered === undefined || turn.answered.trim().length === 0 ? ' -- no reply was recorded.' : ` -- answered: "${clipped(turn.answered, ANSWERED_CHARS)}"`}`))
+      text: earlierText(turnLines, 0),
+      shrink: (room) => newestThatFit(turnLines, room, (kept, left) => earlierText(kept, left))
     })
   }
 
@@ -153,18 +175,23 @@ function sectionsFor(
     const unnamed = checkpoint.settledActions.length - names.length
     // A full list was cut to its most recent entries: the rest WERE recorded (0.567).
     const capped = names.length >= MAX_SETTLED_NAMES
+    const settledText = (shown: readonly string[], dropped: number): string =>
+      'These actions reported finishing before the stop:\n'
+      + [
+        ...(shown.length === 0 ? [] : [bullets(shown)]),
+        ...(dropped > 0
+          ? [`- and ${String(dropped + (capped ? unnamed : 0))} earlier ${dropped + (capped ? unnamed : 0) === 1 ? 'action' : 'actions'}, not listed here`]
+          : []),
+        ...(unnamed > 0 && !(dropped > 0 && capped)
+          ? [capped
+            ? `- and ${String(unnamed)} earlier ${unnamed === 1 ? 'action' : 'actions'}, not listed here`
+            : `- ${String(unnamed)} ${shown.length === 0 ? '' : 'other '}${unnamed === 1 ? 'action' : 'actions'} whose details were not recorded`]
+          : [])
+      ].join('\n')
     sections.push({
       name: 'settled',
-      text:
-        'These actions reported finishing before the stop:\n'
-        + [
-          ...(names.length === 0 ? [] : [bullets(names)]),
-          ...(unnamed > 0
-            ? [capped
-              ? `- and ${String(unnamed)} earlier ${unnamed === 1 ? 'action' : 'actions'}, not listed here`
-              : `- ${String(unnamed)} ${names.length === 0 ? '' : 'other '}${unnamed === 1 ? 'action' : 'actions'} whose details were not recorded`]
-            : [])
-        ].join('\n')
+      text: settledText(names, 0),
+      ...(names.length < 2 ? {} : { shrink: (room: number) => newestThatFit(names, room, settledText) })
     })
   }
 
@@ -309,6 +336,22 @@ export function composeHandoffPrompt(
     if (section === undefined) continue
     const cost = section.text.length + 2
     if (used + cost > budget) {
+      /*
+       * KEPT IN PART, NEWEST FIRST (0.671). A long run's finished steps, or a
+       * long conversation's earlier turns, were dropped whole when the whole
+       * list did not fit -- the next agent was told nothing of what was done
+       * (Colin's Flash hand-off, 10/05: "Left out of the summary to fit: the
+       * steps it finished"). Whole items only, the most recent kept, and the
+       * section says how many earlier ones it leaves out.
+       */
+      const smaller = section.shrink?.(budget - used - 2)
+      if (smaller !== undefined) {
+        const at = sections.indexOf(section)
+        sections.splice(at, 1, { name, text: smaller })
+        keptNames.add(name)
+        used += smaller.length + 2
+        continue
+      }
       omitted.push(name)
       continue
     }

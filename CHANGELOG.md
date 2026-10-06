@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.671.0 - 2026-10-06
+
+### Improved
+
+- **Switching agents mid-task carries what was already done.** When you hand a conversation to another agent, Locust tells it what the first one finished. On a long run that list did not fit, so it was left out whole and the new agent knew nothing of the work behind it. Now the most recent finished steps that fit are kept, with a line saying how many earlier ones are not listed. The same goes for the earlier messages of a long conversation.
+
 ## 0.670.0 - 2026-10-06
 
 ### Improved

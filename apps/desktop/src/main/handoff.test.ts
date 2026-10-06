@@ -69,6 +69,21 @@ describe('the briefing a continuation starts with', () => {
     expect(carried!.taskClipped).toBe(true)
   })
 
+  // 0.671: Colin's Flash hand-off said "Left out of the summary to fit: the steps it finished" -- the whole list, dropped.
+  it('keeps the newest finished steps that fit, and says how many earlier ones it leaves out', () => {
+    const names = Array.from({ length: 120 }, (_, i) => `Ran npm test, pass ${String(i + 1)} of the suite with a long name to take room`)
+    const long = checkpoint({ settledActions: names, settledNames: names } as Partial<ReconciledCheckpoint>)
+    const carried = composeHandoffPrompt(`Fix it. ${'t'.repeat(3_000)}`, long, 'Cursor', `Carry on. ${'n'.repeat(1_500)}`)
+    expect(carried).toBeDefined()
+    expect(carried!.prompt.length).toBeLessThanOrEqual(MAX_HANDOFF_PROMPT_LENGTH)
+    expect(carried!.omitted).not.toContain('settled')
+    expect(carried!.kept).toContain('settled')
+    // The newest is there; the oldest is counted, not listed.
+    expect(carried!.prompt).toContain('pass 120 of the suite')
+    expect(carried!.prompt).not.toContain('pass 1 of the suite')
+    expect(carried!.prompt).toMatch(/- and \d+ earlier actions, not listed here/)
+  })
+
   // 0.517: the preview under the box reads these, so they must be the sections actually in the prompt.
   it('names the sections it carried, in reading order, and only those', () => {
     const whole = composeHandoffPrompt('Add a chart', checkpoint(), 'Claude Code', 'Now make it blue', [{ asked: 'Start', answered: 'Started' }])
