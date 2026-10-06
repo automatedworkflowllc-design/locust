@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.657.0 - 2026-10-05
+
+### Fixed
+
+- **An Antigravity answer that arrived whole is no longer shown as a failed run.** Twice tonight Antigravity finished its whole answer, and only then did its last call to Google come back "service unavailable" (code 503). Locust showed the finished run as "The run could not continue". It now shows the run as finished, with a line saying what happened, and to send "continue" if the answer was not finished. A 503 before any answer is still a failure.
+
 ## 0.656.0 - 2026-10-05
 
 ### Fixed
@@ -27,7 +33,7 @@ heading: the home screen then shows it once, as a splash.
 
 ### Improved
 
-- **Home uses less of your computer while a teammate works.** Every moving face on Home is drawn 30 times a second, but each one kept its own count of when, so together they made the window redraw nearly 60 times a second. They now all draw in the same moments: the window redraws 30 times a second, and every face moves exactly as before.
+- **Home redraws half as often while a teammate works.** Every moving face on Home is drawn 30 times a second, but each one kept its own count of when, so together they made the window redraw nearly 60 times a second. They now all draw in the same moments: the window redraws 30 times a second, and every face moves exactly as before. (Corrected in 0.657: this first said Home uses less of your computer. Measured since, the saving is too small to show; the cost is in drawing the faces, not in how often the window redraws.)
 
 ## 0.653.0 - 2026-10-05
 

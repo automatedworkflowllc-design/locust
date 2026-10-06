@@ -7,6 +7,9 @@ Print the required value from the shell ACP-OK-7 PLUM-3 0s ran echo ACP-OK-7
 ## acp/opencode-1.18.27-bash-rejected.jsonl
 Thought: The user wants me to run a simple shell command: `echo ACP-PROBE`. Th… 1 declined 0s 1 declined
 
+## agy-2026-10-02/answered-then-unavailable.jsonl
+Google's service was unavailable for Antigravity's last call, after this answer (code 503). The answer and its changes are kept. If it was not finished, send "continue". Read note.txt hello from a file DONE 0s 1 tool call
+
 ## agy-2026-10-02/ask-command-denied-done.jsonl
 It stopped there. Antigravity was not allowed to run a command in this mode. Edit lets it change files but not run commands; Auto lets it do both. 1 step 1 refused 0s 1 refused
 

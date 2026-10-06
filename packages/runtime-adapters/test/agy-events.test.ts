@@ -43,6 +43,25 @@ describe("Antigravity CLI's stream", () => {
     expect(payload<{ usage: unknown }>(done).usage).toEqual({ inputTokens: 20836, outputTokens: 173 });
   });
 
+  it("the answer arrived whole, then the service was unavailable: finished, with a line saying so (0.657)", () => {
+    const { events } = run("answered-then-unavailable", 1);
+    const final = events.filter((event) => event.type === "message.delta").at(-1);
+    expect(payload<{ text: string; final: boolean }>(final)).toMatchObject({ text: "hello from a file\nDONE\n", final: true });
+    const said = events.find((event) => event.type === "adapter.diagnostic");
+    expect(payload<{ level: string; code: string; message: string }>(said)).toMatchObject({ level: "warning", code: "antigravity.unavailable_after_answer" });
+    expect(payload<{ message: string }>(said).message).toMatch(/send "continue"/);
+    expect(events.at(-1)!.type).toBe("run.completed");
+    expect(events.some((event) => event.type === "run.failed")).toBe(false);
+  });
+
+  it("a 503 with no answer is still a failure", () => {
+    const normalizer = createAgyEventNormalizer({ runId: "run_1", missionId: "mission_1", now: () => new Date("2026-10-02T00:00:00Z") });
+    const raw = '{"event":"result","result":{"conversation_id":"c1","status":"ERROR","response":"","error":"API error (attempt 1): UNAVAILABLE (code 503): The service is currently unavailable."}}';
+    const events = [...normalizer.accept({ sequence: 1, raw } as never), ...normalizer.finish(completion(1))];
+    expect(events.at(-1)!.type).toBe("run.failed");
+    expect(events.some((event) => event.type === "adapter.diagnostic" && payload<{ code: string }>(event).code === "antigravity.unavailable_after_answer")).toBe(false);
+  });
+
   it("a write in the default mode is refused, its row says so, and the person is told how to allow it", () => {
     const { events } = run("write-denied");
     expect(types(events.filter((event) => event.type.startsWith("tool.")))).toEqual(["tool.started", "tool.failed"]);

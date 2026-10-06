@@ -98,6 +98,8 @@ export function createAgyEventNormalizer(context: AgyInvocationContext): AgyEven
   /** The `result` record, once it arrives. */
   let status: string | undefined;
   let resultError: string | undefined;
+  // The answer arrived whole, then agy's call after it found the service unavailable (0.657).
+  let answeredThenUnavailable = false;
   let usage: { readonly inputTokens: number; readonly outputTokens: number } | undefined;
   /** The message item each agent_response step writes into, newest last. */
   let lastMessageItem: string | undefined;
@@ -289,6 +291,20 @@ export function createAgyEventNormalizer(context: AgyInvocationContext): AgyEven
       // agy ends the turn at a refusal, with no reply (0.541): say it stopped there.
       const stopped = response === undefined || response.trim().length === 0;
       if (said !== undefined) events.push(diagnostic("warning", "antigravity.denied_actions", stopped ? `It stopped there. ${said}` : said, evidence));
+      /*
+       * THE SERVICE FAILED AFTER THE ANSWER (0.657). Colin's Flash runs, 10/05,
+       * twice in 15 minutes: the whole report streamed, the turn closed, and
+       * agy's result said FAILED, "API error (attempt 1): UNAVAILABLE (code
+       * 503)" -- one more call to Google after the answer, which agy does not
+       * retry as it retries the calls inside a run. Locust drew a finished run
+       * as "The run could not continue". With the answer in the result, the
+       * run is shown finished, and the line says what happened and what to do
+       * if it was not.
+       */
+      if (status !== "SUCCESS" && !stopped && resultError !== undefined && /\bUNAVAILABLE\b|\b503\b/.test(resultError)) {
+        answeredThenUnavailable = true;
+        events.push(diagnostic("warning", "antigravity.unavailable_after_answer", "Google's service was unavailable for Antigravity's last call, after this answer (code 503). The answer and its changes are kept. If it was not finished, send \"continue\".", evidence));
+      }
       if (turnOpen) {
         turnOpen = false;
         events.push(emit("step.completed", { stepKind: "turn", evidence }));
@@ -323,7 +339,7 @@ export function createAgyEventNormalizer(context: AgyInvocationContext): AgyEven
       const process = processEvidence(completion);
       const thread = runtimeThreadId === undefined ? {} : { runtimeThreadId };
       if (completion.cancelled) return [...ending, emit("run.cancelled", { ...thread, process })];
-      if (status === "SUCCESS" && completion.exitCode === 0) {
+      if ((status === "SUCCESS" && completion.exitCode === 0) || (answeredThenUnavailable && !completion.outputLimitExceeded)) {
         return [...ending, emit("run.completed", { ...thread, ...(usage === undefined ? {} : { usage }), process })];
       }
       // A conversation Antigravity CLI does not have (one the app began, 0.541):
