@@ -54,7 +54,7 @@ import { boundedApproval, createFileMissionLedger, createFileWorkroom } from '@t
 import { retireSetAsideMessages } from './set-aside-messages.js'
 import { MAC_RELEASES_API, newerMacRelease } from './mac-release.js'
 import { createMacUpdater, macSelfUpdateTarget } from './mac-self-update.js'
-import type { AppChangelog, AppChangelogEntry, CodexMissionStartResponse, WorkspaceSettings } from '../shared/ipc.js'
+import type { AppChangelog, AppChangelogEntry, CodexMissionStartResponse, TurnUndoState, WorkspaceSettings } from '../shared/ipc.js'
 import type { MissionApproval, MissionLedger, Workroom } from '@teammate/mission-store'
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 import { spawn } from 'node:child_process'
@@ -99,6 +99,7 @@ import { AWAY_FILE, readAttentionMark, writeAttentionMark } from './away.js'
 import { awayCountsFrom, awayLine, wasAway } from '../shared/away.js'
 import type { AwaySummaryCounts } from '../shared/away.js'
 import { createRecentEdits } from './recent-edits.js'
+import { createCheckpoints, createTurnRecords } from './checkpoints.js'
 import { readRuntimeArtifacts } from './runtime-artifacts.js'
 import { relative } from 'node:path'
 import { decideReveal, insideOnDisk } from './reveal-file.js'
@@ -233,6 +234,8 @@ import {
   RUNTIME_UPDATES_CHANNEL,
   RUNTIME_UPDATES_EVENT_CHANNEL,
   RUNTIME_UPDATES_NOW_CHANNEL,
+  TURN_UNDO_STATE_CHANNEL,
+  TURN_UNDO_CHANNEL,
   RUNTIME_UPDATES_SET_CHANNEL,
   RUNTIME_INSTALL_PROGRESS_CHANNEL,
   RUNTIME_SIGN_IN_CHANNEL,
@@ -498,6 +501,10 @@ const executableLocator = process.env.LOCUST_HIDE_RUNTIMES === '1'
  * simply probes, which is what every sweep did before this existed.
  */
 const runtimeFacts = createRuntimeFactsStore({ rootDirectory: app.getPath('userData') })
+// Undo a turn (0.674): each folder's kept states, and each turn's record of its way back. In the profile,
+// never in the person's folder; not in a profile backup (BACKED_UP_FOLDERS names what is).
+const checkpoints = createCheckpoints({ root: join(app.getPath('userData'), 'checkpoints') })
+const turnRecords = createTurnRecords(join(app.getPath('userData'), 'checkpoints', 'turns.json'))
 const runtimeFactsLoaded = runtimeFacts.load().catch(() => undefined)
 // What an ACP agent said it can do at its last run (W12), for Settings > AI agents.
 const acpCapabilities = createAcpCapabilitiesStore({ rootDirectory: app.getPath('userData') })
@@ -2163,6 +2170,8 @@ if (!ownsSingleInstanceLock) {
       catchUpTerminal: catchUp,
       // A2.9: the overlap note -- who else changed the files a teammate did, lately.
       recentEdits: createRecentEdits(),
+      checkpoints,
+      turnRecords,
       // A scripted launch spends nothing unless told to (free-routes.ts).
       freeRoutesOnly: freeRoutesOnly(process.argv, process.env),
       spendRefusal,
@@ -2505,6 +2514,20 @@ if (!ownsSingleInstanceLock) {
         })
       }
     })
+    // Undo a turn (0.674). Ids in, states out; only a run Locust recorded can be undone.
+    ipcMain.handle(TURN_UNDO_STATE_CHANNEL, async (event, runIds: unknown) => {
+      if (!fromOwnWindow(event) || !Array.isArray(runIds)) return {}
+      const states: Record<string, TurnUndoState> = {}
+      for (const runId of runIds.filter((id): id is string => typeof id === 'string').slice(0, 200)) {
+        states[runId] = await turnRecords.state(runId, checkpoints).catch((): TurnUndoState => ({ kind: 'none' }))
+      }
+      return states
+    })
+    ipcMain.handle(TURN_UNDO_CHANNEL, (event, runId: unknown) =>
+      fromOwnWindow(event) && typeof runId === 'string'
+        ? turnRecords.undo(runId, checkpoints, () => new Date()).catch((): TurnUndoState => ({ kind: 'none' }))
+        : ({ kind: 'none' } as TurnUndoState)
+    )
     ipcMain.handle(RUNTIME_UPDATES_CHANNEL, (event) =>
       fromOwnWindow(event) ? runtimeUpdates.state().then(toldHere) : { automatic: false, checkedAt: undefined, agents: [] }
     )
@@ -2516,6 +2539,12 @@ if (!ownsSingleInstanceLock) {
     ipcMain.handle(RUNTIME_UPDATES_NOW_CHANNEL, (event, runtime: unknown) =>
       (fromOwnWindow(event) && typeof runtime === 'string' ? runtimeUpdates.updateNow(runtime) : runtimeUpdates.state()).then(toldHere)
     )
+    /*
+     * Undo a turn (0.674): the window's folder is kept once, a while after launch, so its first turn does not
+     * wait for every file to be copied in (13 s for Locust's own checkout; 0.5 s a look once kept). Quietly:
+     * a folder too large to keep says so to its turns, not here.
+     */
+    setTimeout(() => void checkpoints.take(workspacePath).catch(() => undefined), 15_000)
     if (agentsMayUpdate) {
       setTimeout(() => void runtimeUpdates.tick(), FIRST_LOOK_AFTER_MS)
       setInterval(() => void runtimeUpdates.tick(), 60 * 60 * 1000)

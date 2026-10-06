@@ -62,6 +62,7 @@ import type { FileChangeRecord } from './approval-patch.js'
 import { composeColdFollowUp, composeHandoffPrompt, howTurnEnded } from './handoff.js'
 import type { EarlierTurn } from './handoff.js'
 import { changedPaths, observedEditEvents, observedPatches, sharedTreeNotice, snapshotWorkspace, unreportedPaths } from './disk-observation.js'
+import type { Checkpoint, Checkpoints, TurnRecords } from './checkpoints.js'
 import { startTimingNote } from './start-timing.js'
 import type { StartTiming } from './start-timing.js'
 import type { RecentEdits } from './recent-edits.js'
@@ -171,6 +172,8 @@ interface ActiveCodexMission {
    * 2026-09-05). Undefined outside a repository, or for a read-only run.
    */
   readonly diskBefore: WorkspaceSnapshot | undefined
+  /** The folder as Locust kept it before the run (0.674, undo a turn); undefined when none was kept. */
+  readonly checkpointBefore: Checkpoint | undefined
   /** Where the run happened: the teammate's worktree, or the folder. */
   readonly cwd: string
   /**
@@ -481,6 +484,9 @@ interface CodexMissionServiceOptions {
   readonly observeDisk?: (workspacePath: string) => Promise<WorkspaceSnapshot | undefined>
   /** A2.9: what each teammate's writing runs changed lately, per folder, for the overlap note. */
   readonly recentEdits?: RecentEdits
+  /** Undo a turn (0.674): where the folder is kept before and after a writing run, and each turn's record of it. */
+  readonly checkpoints?: Checkpoints
+  readonly turnRecords?: TurnRecords
   /** Test seam: what `.cursorignore` says, if anything. See cursor-visibility.ts. */
   /** Test seam: what the Cursor CLI says about its connectors. */
   readonly readCursorIgnore?: (path: string) => Promise<string | undefined>
@@ -1092,6 +1098,28 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         }
       } catch {
         // The receipt stands on the runtime's own events.
+      }
+    }
+
+    // Undo a turn (0.674): the folder as the run left it, kept, and the turn's way back recorded. Best effort: a
+    // record that cannot be made costs the run nothing, and the turn simply offers no undo.
+    if (mission.checkpointBefore?.ok === true && options.checkpoints !== undefined && options.turnRecords !== undefined) {
+      try {
+        const after = await options.checkpoints.take(mission.cwd)
+        if (after.ok) {
+          await options.checkpoints.hold(mission.cwd, `${mission.runId}-before`, mission.checkpointBefore.commit)
+          await options.checkpoints.hold(mission.cwd, `${mission.runId}-after`, after.commit)
+          await options.turnRecords.put(mission.runId, {
+            workspace: mission.cwd,
+            before: mission.checkpointBefore.commit,
+            after: after.commit,
+            at: now().toISOString(),
+            notKept: [...new Set([...mission.checkpointBefore.notKept, ...after.notKept])],
+            ...(mission.sharedTree ? { shared: true as const } : {})
+          })
+        }
+      } catch {
+        // No way back for this turn; the turn itself stands.
       }
     }
 
@@ -2280,6 +2308,7 @@ ${sentPrompt.trim()}`
         }
 
         let diskBefore: WorkspaceSnapshot | undefined
+        let checkpointBefore: Checkpoint | undefined
         let process: RuntimeProcessRun
         let steer: ((text: string) => Promise<boolean>) | undefined
         try {
@@ -2298,7 +2327,13 @@ ${sentPrompt.trim()}`
           // a read-only run has nothing to observe, and asking git for every
           // question would be paying for an answer nobody reads.
           if (effectiveSandbox !== 'read-only') say('reading-folder')
-          diskBefore = effectiveSandbox === 'read-only' ? undefined : await (options.observeDisk ?? snapshotWorkspace)(runCwd)
+          // And the folder as it stands, kept, so the turn can be undone (0.674). Only the folder itself: a
+          // teammate's worktree or a comparison's copy has Keep and Discard for that.
+          const keeps = effectiveSandbox !== 'read-only' && options.checkpoints !== undefined && runCwd === runFolder
+          ;[diskBefore, checkpointBefore] = await Promise.all([
+            effectiveSandbox === 'read-only' ? undefined : (options.observeDisk ?? snapshotWorkspace)(runCwd),
+            keeps ? options.checkpoints!.take(runCwd) : undefined
+          ])
           // Asked again once that look returns: git can take a while, and a
           // window closed or an app quit meanwhile must not get a run spawned
           // behind it (L5). The catch below records this as the reason.
@@ -2458,6 +2493,7 @@ ${sentPrompt.trim()}`
           model: chosenModel,
           relay,
           diskBefore,
+          checkpointBefore,
           cwd: runCwd,
           sharedTree: false,
           settled: false,
@@ -2484,9 +2520,9 @@ ${sentPrompt.trim()}`
          */
         // Whoever else is writing in this same folder right now: neither of
         // us can be credited with what the tree looks like afterwards.
-        if (mission.diskBefore !== undefined) {
+        if (mission.diskBefore !== undefined || mission.checkpointBefore !== undefined) {
           for (const other of active.values()) {
-            if (other.runId === runId || other.cwd !== runCwd || other.diskBefore === undefined) continue
+            if (other.runId === runId || other.cwd !== runCwd || (other.diskBefore === undefined && other.checkpointBefore === undefined)) continue
             // Still in `active` is not the same as still running. A run whose
             // process has exited is not sharing anything with this one, and
             // treating it as though it were is what put the notice on every

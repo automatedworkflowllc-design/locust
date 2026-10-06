@@ -1198,6 +1198,8 @@ export type ThreadItem =
        * can name it. Read off the events, never assumed.
        */
       readonly reportedBy: MissionRuntimeId | undefined
+      /** The run this turn was, so its foot can offer to undo what it changed (0.674). */
+      readonly runId?: string
     }
   | {
       readonly key: string
@@ -4032,7 +4034,9 @@ export function buildThread(
       finished: !options.running,
       details: activity,
       ...(foldNotices.length === 0 ? {} : { notices: foldNotices }),
-      reportedBy: events.find((event) => event.type.startsWith('tool.'))?.sourceAdapter
+      reportedBy: events.find((event) => event.type.startsWith('tool.'))?.sourceAdapter,
+      // The turn's own run: the last event's, since a continuation is drawn with the run before it stitched in front.
+      ...(events.at(-1)?.runId === undefined ? {} : { runId: events.at(-1)!.runId })
     })
   }
 

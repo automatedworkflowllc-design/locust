@@ -59,6 +59,8 @@ import {
   RUNTIME_UPDATES_CHANNEL,
   RUNTIME_UPDATES_EVENT_CHANNEL,
   RUNTIME_UPDATES_NOW_CHANNEL,
+  TURN_UNDO_STATE_CHANNEL,
+  TURN_UNDO_CHANNEL,
   RUNTIME_UPDATES_SET_CHANNEL,
   RUNTIME_DISCOVERY_CHANNEL,
   RUNTIME_DISCOVERY_EVENT_CHANNEL,
@@ -309,6 +311,7 @@ import type {
   KeepRunningState,
   LoginItemState,
   RuntimeUpdatesState,
+  TurnUndoState,
   RuntimeInstallResponse,
   RuntimeSignInResponse,
   OpenInTerminalResponse,
@@ -517,6 +520,9 @@ const desktopApi: DesktopApi = {
     ipcRenderer.invoke(RUNTIME_UPDATES_SET_CHANNEL, automatic === true) as Promise<RuntimeUpdatesState>,
   updateRuntimeNow: (runtime: string) =>
     ipcRenderer.invoke(RUNTIME_UPDATES_NOW_CHANNEL, runtime) as Promise<RuntimeUpdatesState>,
+  turnUndoStates: (runIds: readonly string[]) =>
+    ipcRenderer.invoke(TURN_UNDO_STATE_CHANNEL, [...runIds]) as Promise<Readonly<Record<string, TurnUndoState>>>,
+  undoTurn: (runId: string) => ipcRenderer.invoke(TURN_UNDO_CHANNEL, runId) as Promise<TurnUndoState>,
   onRuntimeUpdates: (listener: (state: RuntimeUpdatesState) => void) => {
     const handler = (_event: unknown, state: RuntimeUpdatesState): void => listener(state)
     ipcRenderer.on(RUNTIME_UPDATES_EVENT_CHANNEL, handler)

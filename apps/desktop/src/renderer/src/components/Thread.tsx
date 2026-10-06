@@ -23,6 +23,7 @@ import { folderName, ranOnLine } from '../ranOn.js'
 import { useFollowBottom } from '../useFollowBottom.js'
 import { JumpToBottom } from './JumpToBottom.js'
 import { CopyButton } from './CopyButton.js'
+import { TurnUndo } from './TurnUndo.js'
 import { ledgerFailureRows, ledgerFailureSentence } from '../ledgerFailure.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { liveActivityOf } from '../faceState.js'
@@ -585,6 +586,8 @@ function TurnFoot({
         ))}
         {replyText !== undefined && <CopyButton className="lc-agentline__copy" label="this reply" text={replyText} />}
       </div>
+      {/* Undo a turn (0.674): offered only when Locust kept the folder from before it, and only once it is over. */}
+      {item.finished && item.runId !== undefined && changed > 0 && <TurnUndo runId={item.runId} />}
       {/*
         * What the runtime said about this turn before its work began, under
         * the totals, each naming who said it. Muted whatever level the runtime

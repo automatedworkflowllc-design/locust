@@ -19677,3 +19677,64 @@ textarea {
   margin: 2px var(--lc-space-5) var(--lc-space-4) calc(var(--lc-space-5) * 2 + 14px);
   max-width: calc(100% - var(--lc-space-5) * 3 - 14px);
 }
+
+/*
+ * Undo a turn (0.674): one quiet line under the turn's totals. The ask is a
+ * text control in the totals' own size and colour, lit on hover; asking turns
+ * it into a sentence with two buttons, and undoing into what was done.
+ */
+.lc-turnundo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--lc-space-2) var(--lc-space-3);
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
+}
+.lc-turnundo__ask,
+.lc-turnundo__go,
+.lc-turnundo__cancel {
+  padding: 3px 6px;
+  border: 0;
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  color: var(--lc-text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+.lc-turnundo__ask {
+  margin-left: -6px;
+}
+.lc-turnundo__ask:hover,
+.lc-turnundo__ask:focus-visible,
+.lc-turnundo__cancel:hover,
+.lc-turnundo__cancel:focus-visible {
+  background: var(--lc-bg-control);
+  color: var(--lc-text-secondary);
+}
+.lc-turnundo.is-asking {
+  color: var(--lc-text-secondary);
+}
+.lc-turnundo__actions {
+  display: inline-flex;
+  gap: var(--lc-space-2);
+}
+.lc-turnundo__go {
+  background: var(--lc-bg-control);
+  color: var(--lc-text-primary);
+}
+.lc-turnundo__go:hover,
+.lc-turnundo__go:focus-visible {
+  color: var(--lc-text-primary);
+  outline: 1px solid var(--lc-border-strong);
+}
+.lc-turnundo__go:disabled,
+.lc-turnundo__cancel:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.lc-turnundo__left {
+  flex-basis: 100%;
+  margin: 0;
+  padding-left: var(--lc-space-4);
+}

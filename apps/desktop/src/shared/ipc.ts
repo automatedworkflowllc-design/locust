@@ -647,6 +647,25 @@ export const RUNTIME_UPDATES_NOW_CHANNEL = 'runtime-updates:now'
 /** Pushed when an update starts, lands or fails. */
 export const RUNTIME_UPDATES_EVENT_CHANNEL = 'runtime-updates:changed'
 
+/**
+ * Undo a turn (0.674): what each finished turn can take back, and taking it back.
+ * Only run ids cross the bridge; the folder and what was kept stay in the main process.
+ */
+export const TURN_UNDO_STATE_CHANNEL = 'turn-undo:state'
+export const TURN_UNDO_CHANNEL = 'turn-undo:undo'
+
+export interface TurnUndoLeftAlone {
+  readonly path: string
+  readonly why: string
+}
+
+/** What a turn can say about its way back. */
+export type TurnUndoState =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'shared' }
+  | { readonly kind: 'ready'; readonly files: number; readonly notKept: readonly string[] }
+  | { readonly kind: 'undone'; readonly at: string; readonly restored: readonly string[]; readonly leftAlone: readonly TurnUndoLeftAlone[] }
+
 export type RuntimeUpdateStatus =
   | { readonly kind: 'current' }
   /**
@@ -3481,6 +3500,10 @@ export interface DesktopApi {
   setRuntimeUpdates(automatic: boolean): Promise<RuntimeUpdatesState>
   /** Update this one now: the person pressed Update on its row. */
   updateRuntimeNow(runtime: string): Promise<RuntimeUpdatesState>
+  /** Undo a turn (0.674): each run's way back, by run id. */
+  turnUndoStates(runIds: readonly string[]): Promise<Readonly<Record<string, TurnUndoState>>>
+  /** Puts back what the run changed, where the files are still as it left them. */
+  undoTurn(runId: string): Promise<TurnUndoState>
   /** An update started, landed or failed. Returns the unsubscribe. */
   onRuntimeUpdates(listener: (state: RuntimeUpdatesState) => void): () => void
   /** Open the runtime's sign-in in its own window. */
