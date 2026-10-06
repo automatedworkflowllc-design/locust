@@ -57,12 +57,24 @@ export function ease(t: number): number {
   return k * k * (3 - 2 * k)
 }
 
+/**
+ * How far a weight has rolled `k` of the way from one grip to another: late
+ * as it rolls up from across, early as it rolls back -- so it turns while his
+ * hand is up and clear, never while it hangs by his side, where a weight
+ * turned on end would reach out past the picture.
+ */
+export function rollAt(from: number, to: number, k: number): number {
+  const t = Math.max(0, Math.min(1, k))
+  const share = Math.abs(to) >= Math.abs(from) ? t * t : 1 - (1 - t) * (1 - t)
+  return from + (to - from) * share
+}
+
 const mixArm = (a: ArmPose, b: ArmPose, k: number): ArmPose => ({
   abduct: a.abduct + (b.abduct - a.abduct) * k,
   flex: a.flex + (b.flex - a.flex) * k,
   bend: a.bend + (b.bend - a.bend) * k,
   bendUp: a.bendUp + (b.bendUp - a.bendUp) * k,
-  grip: a.grip + (b.grip - a.grip) * k
+  grip: rollAt(a.grip, b.grip, k)
 })
 
 /**
@@ -108,7 +120,8 @@ function smoothWay(points: readonly ArmPose[], k: number): ArmPose {
     last = next
   }
   const total = along[WAY_SAMPLES] ?? 0
-  if (total <= 0) return curveAt(points, k)
+  // Going nowhere: exactly where it is.
+  if (total <= 1e-9) return points[0] as ArmPose
   const want = k * total
   let i = 1
   while (i < WAY_SAMPLES && (along[i] ?? 0) < want) i += 1
@@ -147,10 +160,11 @@ const through = (from: RigTarget, via: RigTarget, to: RigTarget, ms: number): Pi
     if (k >= 1) return to
     const t = ease(k)
     const near = (a: number, b: number, c: number): number => (1 - t) * (1 - t) * a + 2 * (1 - t) * t * b + t * t * c
-    return {
-      pose: { left: smoothWay([from.pose.left, via.pose.left, to.pose.left], t), right: smoothWay([from.pose.right, via.pose.right, to.pose.right], t), dip: near(from.pose.dip, via.pose.dip, to.pose.dip) },
-      look: near(from.look, via.look, to.look)
-    }
+    // The weight rolls on its way to the pose between, and from it: turned by the time his hand is in by his chest.
+    const roll = (side: 'left' | 'right'): number =>
+      t < 0.5 ? rollAt(from.pose[side].grip, via.pose[side].grip, t * 2) : rollAt(via.pose[side].grip, to.pose[side].grip, (t - 0.5) * 2)
+    const arm = (side: 'left' | 'right'): ArmPose => ({ ...smoothWay([from.pose[side], via.pose[side], to.pose[side]], t), grip: roll(side) })
+    return { pose: { left: arm('left'), right: arm('right'), dip: near(from.pose.dip, via.pose.dip, to.pose.dip) }, look: near(from.look, via.look, to.look) }
   }
 })
 const times = (pieces: readonly Piece[], n: number): readonly Piece[] => Array.from({ length: n }, () => pieces).flat()
@@ -184,25 +198,25 @@ export const POSES = {
   hammer: { abduct: 0.3, flex: 0.25, bend: 2.4, bendUp: 0, grip: P / 2 },
   hammerHang: { ...REST_ARM, grip: P / 2 },
   /** A press's start: the weights at his shoulders, his elbows out. */
-  rack: { abduct: 1.6, flex: 0.5, bend: 2.35, bendUp: 0.9, grip: 0 },
+  rack: { abduct: 1.45, flex: 0.5, bend: 2.6, bendUp: 0.9, grip: 0 },
   /** Halfway up, the weights straight above where they started. */
-  press: { abduct: 2.0, flex: 0.3, bend: 1.75, bendUp: 1, grip: 0 },
+  press: { abduct: 2.15, flex: 0.3, bend: 1.75, bendUp: 1, grip: 0 },
   /** Locked out over his head. */
-  lockout: { abduct: 2.8, flex: 0.15, bend: 0.25, bendUp: 1, grip: 0 },
+  lockout: { abduct: 2.92, flex: 0.15, bend: 0.25, bendUp: 1, grip: 0 },
   /** A squat's arms: out in front for balance. */
-  squat: { abduct: 0.15, flex: 0.75, bend: 0.3, bendUp: 0, grip: 0 },
+  squat: { abduct: 0.08, flex: 0.62, bend: 0.25, bendUp: 0, grip: 0 },
   /** A double-biceps flex, the weights up beside his head. */
-  flex: { abduct: 1.35, flex: 0.1, bend: 2.1, bendUp: 1, grip: P / 2 },
-  flexSqueeze: { abduct: 1.4, flex: 0.1, bend: 2.3, bendUp: 1, grip: P / 2 },
+  flex: { abduct: 1.42, flex: 0.1, bend: 2.3, bendUp: 1, grip: P / 2 },
+  flexSqueeze: { abduct: 1.48, flex: 0.1, bend: 2.45, bendUp: 1, grip: P / 2 },
   /** A wave, the forearm one way and the other. */
-  waveIn: { abduct: 1.85, flex: 0.1, bend: 1.95, bendUp: 1, grip: P / 2 },
-  waveOut: { abduct: 1.85, flex: 0.1, bend: 1.4, bendUp: 1, grip: P / 2 },
+  waveIn: { abduct: 1.85, flex: 0.1, bend: 2.2, bendUp: 1, grip: P / 2 },
+  waveOut: { abduct: 1.85, flex: 0.1, bend: 1.72, bendUp: 1, grip: P / 2 },
   /** Thinking: a weight held up by his chin. */
   think: { abduct: 0.3, flex: 0.6, bend: 2.3, bendUp: 0.25, grip: P / 2 },
   /** On the way up to a press: the weight brought in to his chest first, so it never swings wide. */
-  tuck: { abduct: 0.2, flex: 0.7, bend: 2.4, bendUp: 0.7, grip: 0 },
+  tuck: { abduct: -0.08, flex: 0.65, bend: 2.4, bendUp: 0.7, grip: 0 },
   /** The same, the bar already rolled up and down: on the way to a flex or a wave, so it rolls by his chest, never out wide. */
-  tuckUpright: { abduct: 0.3, flex: 0.7, bend: 2.2, bendUp: 0.6, grip: P / 2 },
+  tuckUpright: { abduct: -0.08, flex: 0.65, bend: 2.3, bendUp: 0.6, grip: P / 2 },
   /** Halfway up a curl, as a fidget. */
   halfCurl: { abduct: 0.15, flex: 0.2, bend: 1.4, bendUp: 0, grip: 0 },
   /** Holding the weights heavy, his arms straight: stuck. */
@@ -224,7 +238,7 @@ export const REST: RigTarget = REST_TARGET
  */
 const LADDER: readonly ArmPose[] = [POSES.rest, POSES.tuck, POSES.rack, POSES.press, POSES.lockout]
 /** How long a handoff takes: at least, more by how far his arms go (in radians of their joints), and at most. */
-export const HANDOFF_MS = { base: 260, perJoint: 150, most: 900 } as const
+export const HANDOFF_MS = { base: 280, perJoint: 210, most: 1150 } as const
 
 const nearestRung = (arm: ArmPose): number => {
   let best = 0
@@ -245,11 +259,24 @@ function armWay(from: ArmPose, to: ArmPose): readonly ArmPose[] {
   return [from, ...rungs, to]
 }
 
-/** `k` (0 to 1) of the way along an arm's way, smoothly; its weight rolls evenly the whole way. */
+/**
+ * `k` (0 to 1) of the way along an arm's way, smoothly. Its weight rolls as
+ * his hand passes his chest (POSES.tuck), the one place a weight turned
+ * corner-on (at its widest) has room: over the stretch either side of it, or,
+ * on a way that does not pass his chest, rolling all the way along it.
+ */
 function alongWay(way: readonly ArmPose[], k: number): ArmPose {
   const first = way[0] as ArmPose
   const last = way[way.length - 1] as ArmPose
-  return { ...smoothWay(way, k), grip: first.grip + (last.grip - first.grip) * k }
+  const chest = way.indexOf(POSES.tuck)
+  let share = ease(k)
+  if (chest > 0 && chest < way.length - 1) {
+    const lengths = way.slice(1).map((pose, i) => jointGap(way[i] as ArmPose, pose))
+    const total = lengths.reduce((sum, one) => sum + one, 0) || 1
+    const at = lengths.slice(0, chest).reduce((sum, one) => sum + one, 0) / total
+    share = ease((k - (at - 0.18)) / 0.36)
+  }
+  return { ...smoothWay(way, k), grip: first.grip + (last.grip - first.grip) * share }
 }
 
 /** How far an arm goes on its way, by its joints. */
@@ -370,14 +397,15 @@ const lookAbout = (): readonly Piece[] => [
   glide(withLook(REST, 0.8), REST, LOOK_MS * 0.2)
 ]
 const chin = each(REST_ARM, POSES.think, 0.4)
+const chinWay = each(REST_ARM, POSES.tuckUpright, 0.3)
 const slowCurl = each(POSES.curl, REST_ARM, 0.6)
 export const THINK: Move = moveOf(
   'think',
   [
     ...lookAbout(),
-    glide(REST, chin, BUSY_MS * 0.3),
+    through(REST, chinWay, chin, BUSY_MS * 0.3),
     hold(chin, BUSY_MS * 0.4),
-    glide(chin, REST, BUSY_MS * 0.3),
+    through(chin, chinWay, REST, BUSY_MS * 0.3),
     ...lookAbout(),
     glide(REST, slowCurl, BUSY_MS * 0.4),
     hold(slowCurl, BUSY_MS * 0.2),
@@ -481,7 +509,7 @@ const MOMENT_MOVES: Readonly<Record<string, Move>> = {
   squats: once('squats', squats(2)),
   alternating: once('alternating', alternating(1)),
   hammer: once('hammer', hammer(2)),
-  curious: held('curious', each(REST_ARM, POSES.think, 0.4, 0.5), 2000),
+  curious: moveOf('curious', [through(REST, withLook(chinWay, 0.5), withLook(chin, 0.5), 560), hold(withLook(chin, 0.5), 880), through(withLook(chin, 0.5), chinWay, REST, 560)], { loops: false, still: withLook(chin, 0.5) }),
   doze: held('doze', both(REST_ARM, 0.8), 2600)
 }
 

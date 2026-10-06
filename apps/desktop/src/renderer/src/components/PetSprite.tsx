@@ -7,7 +7,8 @@ import { anchorsOf, anchorVariables } from '../botAnchors.js'
 import { seeded } from '../faceLife.js'
 import type { GlanceSide } from '../glances.js'
 import { petCellAt, petFadeMs, petGlanceCell, petNextChangeIn } from '../petMotion.js'
-import { BUDDY_RIG, BuddyRigSim, buddyPlate, drawBuddyArms, drawBuddyBody } from '../buddyRig.js'
+import { buddyHead, drawBuddyArms, drawBuddyBody } from '../buddyBody.js'
+import { BUDDY_RIG, BuddyRigSim } from '../buddyRig.js'
 import type { RigTarget } from '../buddyRig.js'
 import { RESTING, glanceLook, handoff, handoffMs, movePoseAt } from '../petRoutines.js'
 import type { Move } from '../petRoutines.js'
@@ -317,9 +318,14 @@ export interface PetScreenAsk {
  * So the closer the smaller: from his cap to his waist at 44 px and under --
  * his face half as big again, his arms and weights in view -- easing out to
  * his knees at 64 (the New teammate preview) and to all of him from 96. A
- * square window on his drawing, from its top, across its middle.
+ * square window on his drawing, from its top, across his middle.
+ *
+ * Closer since his own rig (2026-10-05). Colin: *"we might have to make the
+ * model bigger in general to compensate for the fact he has a body and a logo
+ * on his chest"*: at his closest, from his cap to his belt, his face and the
+ * Codex mark on his shirt a tenth larger again.
  */
-export const CLOSEST_FRAMING = 0.675
+export const CLOSEST_FRAMING = 0.6
 /** Drawn this size or smaller, he is framed closest. */
 export const CLOSE_UNTIL_PX = 44
 /** Drawn this size or larger, he is framed whole. */
@@ -332,10 +338,10 @@ export interface PetWindow {
   readonly side: number
 }
 
-export function petWindow(size: number, frameWidth: number, frameHeight: number): PetWindow {
+export function petWindow(size: number, frameWidth: number, frameHeight: number, middle = frameWidth / 2): PetWindow {
   const t = Math.max(0, Math.min(1, (size - CLOSE_UNTIL_PX) / (WHOLE_FROM_PX - CLOSE_UNTIL_PX)))
   const side = frameHeight * (CLOSEST_FRAMING + (1 - CLOSEST_FRAMING) * t)
-  return { left: (frameWidth - side) / 2, top: 0, side }
+  return { left: middle - side / 2, top: 0, side }
 }
 
 /** A screen's corners, as a fraction of its shorter side (a bot's visor's, 12 of 35). */
@@ -746,7 +752,7 @@ function ScreenPet({ pet, atlas, face, size, state, ask, still, seed, glance, bo
     canvas.width = side
     canvas.height = side
     // The part of his drawing shown (petWindow), and the canvas pixels a pixel of his drawing is.
-    const shown = petWindow(size, atlas.frameWidth, atlas.frameHeight)
+    const shown = petWindow(size, atlas.frameWidth, atlas.frameHeight, BUDDY_RIG.middle)
     const k = side / shown.side
     const within = (value: number): number => Math.max(0, Math.min(1, value))
     const body = atlas.body
@@ -758,8 +764,8 @@ function ScreenPet({ pet, atlas, face, size, state, ask, still, seed, glance, bo
     })
     canvas.toggleAttribute('data-pet-dark', atlas.dark)
     forgetOldTweens()
-    // His body, cut from his sheet once (buddyRig.ts); a sheet that cannot be read is drawn as his maker drew him standing.
-    const plate = buddyPlate(atlas.image, atlas.frameWidth, atlas.frameHeight)
+    // His head, cut from his sheet once (buddyBody.ts); a sheet that cannot be read is drawn as his maker drew him standing.
+    const plate = buddyHead(atlas.image, atlas.frameWidth, atlas.frameHeight)
     canvas.dataset.rig = plate === undefined ? 'drawn' : 'on'
     const frozen = still || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
     const conductor = petScreenConductor(
@@ -807,7 +813,7 @@ function ScreenPet({ pet, atlas, face, size, state, ask, still, seed, glance, bo
       }
       if (plate !== undefined) {
         inDrawing()
-        drawBuddyArms(context, plate, now.rig.pose)
+        drawBuddyArms(context, now.rig.pose)
         context.setTransform(1, 0, 0, 1, 0, 0)
       }
       canvas.dataset.eyes = now.pair.join('')

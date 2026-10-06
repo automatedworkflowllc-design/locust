@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { BUDDY_RIG, BuddyRigSim, REST_TARGET, armJoints, buddyPlate, cleanPlate, dumbbellReach } from './buddyRig.js'
+import { HEAD_ROWS, buddyHead, cutHead } from './buddyBody.js'
+import { BUDDY_RIG, BuddyRigSim, REST_TARGET, armJoints, dumbbellReach } from './buddyRig.js'
 import type { RigTarget } from './buddyRig.js'
 import { OLD_TWEENS_DATABASE, forgetOldTweens, petWindow } from './components/PetSprite.js'
 import { BUDDY_MOMENTS, FLEX, RESTING, STUCK, THINK, WAIT, WAVE, WORKOUT, WORKOUT_STANDING, handoff, handoffMs, momentMove, movePoseAt } from './petRoutines.js'
@@ -30,7 +31,7 @@ const MOVES: readonly Move[] = [
 ]
 
 /** His closest framing: the window shown at the sizes he is nearly always drawn at. */
-const CLOSEST = petWindow(34, CODEX_BUDDY.frameWidth, CODEX_BUDDY.frameHeight)
+const CLOSEST = petWindow(34, CODEX_BUDDY.frameWidth, CODEX_BUDDY.frameHeight, BUDDY_RIG.middle)
 
 interface Hand {
   readonly x: number
@@ -106,11 +107,12 @@ describe('his weights', () => {
 })
 
 describe('his motion', () => {
-  it('never jumps: a hand moves at most 11 px of his drawing a frame, and its movement changes by at most 3.5', () => {
+  it('never jumps: a hand moves at most 11 px of his drawing a frame, and its movement changes by at most 5', () => {
+    // The most a movement changes is where a change of mind turns back an arm already moving: his spring takes the turn.
     for (const fps of [30, 60]) {
       const { step, change } = motionOf(run(fps, 'sprung', EVERY_CHANGE))
       expect(step, `${String(fps)} fps`).toBeLessThan((11 * 30) / fps)
-      expect(change, `${String(fps)} fps`).toBeLessThan((3.5 * 30 * 30) / (fps * fps))
+      expect(change, `${String(fps)} fps`).toBeLessThan((5 * 30 * 30) / (fps * fps))
     }
   })
 
@@ -170,7 +172,7 @@ describe('at rest', () => {
   })
 })
 
-describe('his body, cut from his drawing', () => {
+describe('his head, cut from his drawing (buddyBody.ts)', () => {
   const W = 192
   const H = 208
   /** A drawing filled with one colour, opaque. */
@@ -181,29 +183,19 @@ describe('his body, cut from his drawing', () => {
   }
   const alpha = (pixels: Uint8ClampedArray, x: number, y: number): number => pixels[(y * W + x) * 4 + 3] ?? -1
 
-  it('keeps him along his own outline, row by row, and nothing outside it where his arms hung', () => {
-    const plate = cleanPlate(filled([255, 255, 255]))
-    // His shirt, shorts and legs are kept; beside them, where his arms and weights were, is gone.
-    for (const [x, y] of [[90, 110], [70, 120], [116, 120], [67, 140], [127, 140], [66, 165]]) expect(alpha(plate, x as number, y as number), `${String(x)},${String(y)}`).toBe(255)
-    for (const [x, y] of [[69, 120], [117, 120], [66, 140], [128, 140], [40, 150], [160, 150], [65, 165]]) expect(alpha(plate, x as number, y as number), `${String(x)},${String(y)}`).toBe(0)
-    // Above his arms and below his knees, his maker's drawing is as it was.
-    for (const [x, y] of [[20, 50], [180, 90], [20, 190]]) expect(alpha(plate, x as number, y as number)).toBe(255)
+  it('keeps his cap to his chin, and nothing of him below: his body is drawn', () => {
+    const head = cutHead(filled([40, 90, 200]))
+    for (const [x, y] of [[90, 10], [40, 50], [150, 60], [95, 78]]) expect(alpha(head, x as number, y as number), `${String(x)},${String(y)}`).toBe(255)
+    for (const [x, y] of [[90, HEAD_ROWS], [90, 120], [60, 190]]) expect(alpha(head, x as number, y as number), `${String(x)},${String(y)}`).toBe(0)
   })
 
-  it('takes his arms’ skin out from under his sleeves, but never his shirt', () => {
-    const plate = cleanPlate(filled([242, 189, 143]))
-    expect(alpha(plate, 50, 97)).toBe(0)
-    expect(alpha(plate, 140, 97)).toBe(0)
-    expect(alpha(plate, 90, 97)).toBe(255)
-    // Not skin (his shirt's white): kept.
-    expect(alpha(cleanPlate(filled([250, 250, 250])), 50, 97)).toBe(255)
-  })
-
-  it('makes the right of his shorts, hidden behind his weight, the mirror of their left', () => {
-    const pixels = filled([0, 0, 0])
-    pixels.set([255, 120, 0, 255], (140 * W + 80) * 4)
-    const plate = cleanPlate(pixels)
-    expect([...plate.slice((140 * W + 114) * 4, (140 * W + 114) * 4 + 4)]).toEqual([255, 120, 0, 255])
+  it('takes his shirt from under his chin -- its white anywhere, anything beside his chin -- and leaves his chin', () => {
+    expect(alpha(cutHead(filled([250, 250, 250])), 95, 76)).toBe(0)
+    expect(alpha(cutHead(filled([250, 250, 250])), 95, 60)).toBe(255)
+    const skin = cutHead(filled([242, 189, 143]))
+    expect(alpha(skin, 95, 78)).toBe(255)
+    expect(alpha(skin, 60, 78)).toBe(0)
+    expect(alpha(skin, 130, 78)).toBe(0)
   })
 
   describe('as the window reads it', () => {
@@ -221,9 +213,9 @@ describe('his body, cut from his drawing', () => {
         }
       })
       const sheet = {} as CanvasImageSource
-      const plate = buddyPlate(sheet, W, H)
-      expect(plate).toBeDefined()
-      expect(buddyPlate(sheet, W, H)).toBe(plate)
+      const head = buddyHead(sheet, W, H)
+      expect(head).toBeDefined()
+      expect(buddyHead(sheet, W, H)).toBe(head)
       expect(made).toBe(1)
       vi.stubGlobal('document', {
         createElement: () => ({
@@ -237,7 +229,7 @@ describe('his body, cut from his drawing', () => {
           })
         })
       })
-      expect(buddyPlate({} as CanvasImageSource, W, H)).toBeUndefined()
+      expect(buddyHead({} as CanvasImageSource, W, H)).toBeUndefined()
       expect(BUDDY_RIG.plate).toEqual({ row: 8, column: 0 })
     })
   })
