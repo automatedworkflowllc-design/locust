@@ -17,12 +17,13 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { git, recordRoot, say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
+import { comparePick, comparePickScript, compareDoneScript, enterCompareScript, git, recordRoot, say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tag = arg('--tag') ?? 'local'
-const PICKS = (process.env.LOCUST_COMPARE_PICKS ?? 'nemotron-3-ultra-free,mimo-v2.6-flash-free').split(',')
+// Mimo was rate-limited through 2026-10-06; Fledge Alpha answered every drive asked of it that day.
+const PICKS = (process.env.LOCUST_COMPARE_PICKS ?? 'nemotron-3-ultra-free,fledge-alpha-free').split(',')
 const OUT = join(recordRoot('compare-changes-2026-09-28'), `compare-changes-${tag}`)
 await mkdir(OUT, { recursive: true })
 
@@ -42,6 +43,7 @@ const copies = () => execFileSync('git', ['worktree', 'list', '--porcelain'], { 
 const insideFolder = () => copies().filter((path) => flat(path).startsWith(`${flat(workspace)}/`))
 
 const drive = await startDrive({
+  focused: true,
   name: `compare-changes-${tag}`, port: 9779, workspace, outPath: OUT,
   ...(packaged === undefined ? {} : { packaged }),
   seed: { schemaVersion: 1, teammates: [], missionOwners: {}, settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: false } }
@@ -57,30 +59,18 @@ try {
   await drive.resize(1440, 900)
   await sleep(4000)
 
+  // Compare set up as a person does it, through drive-lib's helpers (2026-10-06: the picker names rows by display
+  // name and draws only those in view, and Compare models may arrive with models already in the box).
+  const entered = JSON.parse(String(await drive.evaluate(enterCompareScript())))
+  const labels = []
+  for (const [index, id] of PICKS.entries()) {
+    const got = JSON.parse(String(await drive.evaluate(comparePickScript(index, comparePick(id)))))
+    if (got.picked) labels.push(got.label)
+    else say(`  pick ${id}: ${got.why} (entered: ${entered.how})`)
+  }
+  await drive.evaluate(compareDoneScript())
   const picked = JSON.parse(String(await drive.capture('Two free models ticked; the mode chip set to Edit', () => drive.evaluate(`(async () => {
-    let button
-    for (let i = 0; i < 40 && !button; i += 1) {
-      button = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Compare models')
-      if (!button) await new Promise((r) => setTimeout(r, 500))
-    }
-    if (!button) return JSON.stringify({ button: false })
-    button.click()
-    await new Promise((r) => setTimeout(r, 900))
-    const box = document.querySelector('.lc-picker__input')
-    const setInput = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
-    setInput.call(box, 'free')
-    box.dispatchEvent(new Event('input', { bubbles: true }))
-    await new Promise((r) => setTimeout(r, 700))
-    const labels = []
-    for (const want of ${JSON.stringify(PICKS)}) {
-      const row = [...document.querySelectorAll('.lc-picker__row:not(.is-recent)')].find((one) => !one.disabled && one.querySelector('.lc-picker__label')?.textContent.trim() === want)
-      if (!row) continue
-      row.click()
-      labels.push(want)
-      await new Promise((r) => setTimeout(r, 250))
-    }
-    ;[...document.querySelectorAll('.lc-picker__foot--compare button')].find((b) => b.textContent.trim() === 'Done')?.click()
-    await new Promise((r) => setTimeout(r, 500))
+    const labels = ${JSON.stringify(labels)}
     const chip = document.querySelector('button[aria-label="Permission mode"]')
     const before = chip?.textContent.trim() ?? ''
     const chipDisabled = chip?.disabled ?? true

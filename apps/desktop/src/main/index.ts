@@ -5615,9 +5615,10 @@ if (!ownsSingleInstanceLock) {
           brought = result.kind === 'brought' ? result.files : []
         }
         const kept = await compares.keep(compareId, slot as CompareSlotId, brought)
-        // The copies were for comparing; the conversation goes on in the folder.
-        await removeCompareCopies(compareId).catch(() => undefined)
+        // The copies were for comparing; the conversation goes on in the folder. The worktrees go first, through
+        // git, while their folders still say which branch each was on; then anything left of the folders (0.676).
         await discardCompareTrees(kept)
+        await removeCompareCopies(compareId).catch(() => undefined)
         return { ok: true, data: { compare: kept, refused: [] } } as const
       } catch (error) {
         return compareRefused(error instanceof Error ? error.message : 'That column could not be kept.')
@@ -6851,8 +6852,8 @@ if (!ownsSingleInstanceLock) {
         const trashed = new Set(held.map((entry) => entry.missionId))
         for (const compare of comparesGoneWith(await compares.list().catch(() => [] as readonly PublicCompare[]), trashed)) {
           await compares.remove(compare.compareId).catch(() => undefined)
-          await removeCompareCopies(compare.compareId).catch(() => undefined)
           await discardCompareTrees(compare)
+          await removeCompareCopies(compare.compareId).catch(() => undefined)
         }
         note('trash-emptied', String(gone))
         return { ok: true, data: { count: gone } } as const

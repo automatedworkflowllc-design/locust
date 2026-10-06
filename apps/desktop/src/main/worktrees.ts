@@ -58,6 +58,19 @@ const WORKTREE_CHECKOUT_TIMEOUT_MS = 15 * 60_000
 export const WORKTREE_DIR = join('.locust', 'worktrees')
 export { BRANCH_PREFIX, branchNameFor, distinctBranchNameFor } from '../shared/worktree-name.js'
 
+/** The branch git records for the worktree at `path` (`git worktree list --porcelain`), or '' when it records none. */
+export function recordedBranchOf(porcelain: string, path: string): string {
+  const same = (a: string): boolean => resolve(a).toLowerCase() === resolve(path).toLowerCase()
+  for (const block of porcelain.split(/\r?\n\r?\n/)) {
+    const lines = block.split(/\r?\n/)
+    const at = lines.find((line) => line.startsWith('worktree '))?.slice('worktree '.length)
+    if (at === undefined || !same(at)) continue
+    const ref = lines.find((line) => line.startsWith('branch '))?.slice('branch '.length) ?? ''
+    return ref.replace(/^refs\/heads\//, '')
+  }
+  return ''
+}
+
 export interface WorktreeInfo {
   readonly teammateId: string
   readonly path: string
@@ -734,7 +747,13 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
 
     async discard(teammateId) {
       const path = resolve(root, trees, safeTeammateDirectory(teammateId))
+      /*
+       * Its branch, from git's own record of the tree when the folder is already gone (0.676). Asked only of the
+       * folder, a tree whose folder had been removed first answered nothing, and its branch stayed in the person's
+       * repository: every comparison kept in a git project left two `locust/compare-...` branches behind.
+       */
       const branch = await runGit(['symbolic-ref', '--short', '-q', 'HEAD'], path).then((out) => out.trim(), () => '')
+        || await runGit(['worktree', 'list', '--porcelain'], root).then((out) => recordedBranchOf(out, path), () => '')
       await runGit(['worktree', 'remove', '--force', path], root).catch(async () => {
         // Not a tree git knows (half-made, or already gone): its folder, then git's own record.
         await rm(path, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(() => undefined)

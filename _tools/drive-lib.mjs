@@ -181,7 +181,7 @@ export function assertMaySpend(name) {
   process.exit(1)
 }
 
-export async function startDrive({ name, port, workspace, seed, files = {}, env = {}, keep = false, profilePath, outPath, stepFrom = 0, spends = false, sendsNothing = false, packaged, launchElsewhere = false }) {
+export async function startDrive({ name, port, workspace, seed, files = {}, env = {}, keep = false, profilePath, outPath, stepFrom = 0, spends = false, sendsNothing = false, packaged, launchElsewhere = false, focused = false }) {
   if (spends) assertMaySpend(name)
   try {
     const already = await fetch(`http://127.0.0.1:${String(port)}/json/list`, { signal: AbortSignal.timeout(1500) })
@@ -386,6 +386,16 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
 
   /** Wait until discovery has finished, so the first step is the real first screen. */
   const ready = async () => {
+    /*
+     * `focused`: the window behaves as the one a person is using (2026-10-06). A drive's window never has focus, and
+     * Compare models then sometimes did not turn Compare on at all -- half the runs of every compare drive, an
+     * automation artifact (with focus emulated, ten of ten engaged). Opt-in: drives about a window in the
+     * background (faces holding still, the cost at rest) must stay unfocused.
+     */
+    if (focused) {
+      await send('Emulation.setFocusEmulationEnabled', { enabled: true })
+      await send('Page.bringToFront')
+    }
     const settled = await evaluate(`(async () => {
       for (let i = 0; i < 240; i += 1) {
         const field = document.querySelector('form.command-dock textarea')
@@ -886,5 +896,77 @@ export function sendAndWaitScript(text, { waitSeconds = 360, settle = true } = {
     }
     await new Promise(r => setTimeout(r, 800))
     return 'finished: ' + (document.querySelector('.lc-thread')?.innerText.replace(/\\s+/g, ' ').slice(-300) ?? '')
+  })()`
+}
+
+/**
+ * COMPARE, the way a person sets it up (2026-10-06): the chat mode chip, then Compare. It opens a picker to tick
+ * models ("Pick two or three models"), or -- with models already in the box -- goes straight to a chip per column.
+ * Resolves to JSON `{ how: 'picker' | 'columns' | <why not> }`. Lifted from drive-compare-answers, the one compare
+ * drive whose picking still worked once the picker named rows by display name and drew only the rows in view.
+ */
+export function enterCompareScript() {
+  return `(async () => {
+    const chip = document.querySelector('.lc-control--chatmode')
+    if (!chip) return JSON.stringify({ how: 'no chat mode chip' })
+    chip.click()
+    await new Promise((r) => setTimeout(r, 400))
+    const item = [...document.querySelectorAll('[role="menu"][aria-label="Direct or compare"] [role="menuitemradio"], [role="menu"][aria-label="Direct or compare"] button')].find((b) => /^Compare/.test(b.innerText.trim()))
+    if (!item) return JSON.stringify({ how: 'no Compare item' })
+    item.click()
+    for (let i = 0; i < 40; i += 1) {
+      await new Promise((r) => setTimeout(r, 150))
+      if (document.querySelector('.lc-picker__input')) return JSON.stringify({ how: 'picker' })
+      if (document.querySelector('.lc-slotgroup')) return JSON.stringify({ how: 'columns' })
+    }
+    return JSON.stringify({ how: 'neither a picker nor columns' })
+  })()`
+}
+
+/**
+ * One model for column `index`: in the open picker, or through that column's own chip. `pick` is `{ search, row }`:
+ * what is typed into the search, and a regular expression over the row's label. Resolves to JSON
+ * `{ picked, label?, why? }`. Use `comparePick('nemotron-3-ultra-free')` to make a pick from a free model's id.
+ */
+export function comparePickScript(index, pick) {
+  return `(async () => {
+    if (document.querySelector('.lc-picker__input') === null) {
+      const chip = document.querySelectorAll('.lc-slotgroup')[${String(index)}]?.querySelector('.lc-control--slot')
+      if (!chip) return JSON.stringify({ picked: false, why: 'no column chip' })
+      chip.click()
+      for (let i = 0; i < 20 && !document.querySelector('.lc-picker__input'); i += 1) await new Promise((r) => setTimeout(r, 150))
+    }
+    const box = document.querySelector('.lc-picker__input')
+    if (!box) return JSON.stringify({ picked: false, why: 'no search box' })
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(box, ${JSON.stringify(pick.search)})
+    box.dispatchEvent(new Event('input', { bubbles: true }))
+    const wanted = new RegExp(${JSON.stringify(pick.row)}, 'i')
+    let row
+    for (let i = 0; i < 20 && !row; i += 1) {
+      await new Promise((r) => setTimeout(r, 200))
+      row = [...document.querySelectorAll('.lc-picker__row:not(.is-recent)')].find((one) => !one.disabled && wanted.test(one.querySelector('.lc-picker__label')?.textContent ?? ''))
+    }
+    if (!row) return JSON.stringify({ picked: false, why: 'no row' })
+    const label = row.querySelector('.lc-picker__label')?.textContent.trim() ?? ''
+    if (row.getAttribute('aria-pressed') !== 'true') row.click()
+    await new Promise((r) => setTimeout(r, 500))
+    return JSON.stringify({ picked: true, label })
+  })()`
+}
+
+/** A free OpenCode model's id as a pick: searched by its first word, matched by its words in order ("Mimo V2.6 Flash"). */
+export function comparePick(id) {
+  const words = id.replace(/^opencode\//, '').replace(/-free$/, '').split('-')
+  return { search: words[0], row: '^' + words.map((word) => word.replace(/[.*+?^$()|[\]\\{}]/g, (c) => '\\' + c)).join('.*') }
+}
+
+/** Done in the picker, if it is open, and the columns' chips as they read after. Resolves to JSON `{ chips }`. */
+export function compareDoneScript() {
+  return `(async () => {
+    const done = [...document.querySelectorAll('.lc-picker__foot--compare button')].find((b) => b.textContent.trim() === 'Done')
+    if (done && !done.disabled) done.click()
+    for (let i = 0; i < 20 && !document.querySelector('.lc-slotgroup'); i += 1) await new Promise((r) => setTimeout(r, 150))
+    await new Promise((r) => setTimeout(r, 400))
+    return JSON.stringify({ chips: [...document.querySelectorAll('.lc-slotgroup .lc-control--slot')].map((c) => c.innerText.replace(/\\s+/g, ' ').trim()) })
   })()`
 }

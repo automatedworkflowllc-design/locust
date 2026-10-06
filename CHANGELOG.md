@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.676.0 - 2026-10-06
+
+### Fixed
+
+- **Keeping a comparison no longer leaves branches in your project.** In a Git project, each model in a comparison works on its own branch. When you kept one answer, Locust removed the copies but left both `locust/compare-…` branches behind, so every comparison you kept added two branches to your repository. They're now removed with the copies. Branches left by earlier versions stay until you delete them (`git branch -D locust/compare-…`).
+
 ## 0.675.0 - 2026-10-06
 
 ### Fixed

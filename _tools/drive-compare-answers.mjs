@@ -35,6 +35,7 @@ await mkdir(OUT, { recursive: true })
 
 const workspace = await scratchRepository('locust-drive-compare-ws-')
 const drive = await startDrive({
+  focused: true,
   name: `compare-answers-${tag}`, port: 9776, workspace, outPath: OUT, spends: SPENDS,
   ...(packaged === undefined ? {} : { packaged }),
   seed: {

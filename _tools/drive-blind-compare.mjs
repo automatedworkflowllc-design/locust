@@ -24,6 +24,7 @@ await mkdir(OUT, { recursive: true })
 
 const workspace = await scratchRepository('locust-drive-blind-ws-')
 const drive = await startDrive({
+  focused: true,
   name: `blind-compare-${tag}`, port: 9784, workspace, outPath: OUT,
   ...(packaged === undefined ? {} : { packaged }),
   seed: { schemaVersion: 1, teammates: [], missionOwners: {}, settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: false } }

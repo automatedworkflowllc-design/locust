@@ -27,6 +27,7 @@ await mkdir(OUT, { recursive: true })
 
 const workspace = await scratchRepository('locust-drive-compare-pages-ws-')
 const drive = await startDrive({
+  focused: true,
   name: `compare-pages-${tag}`, port: 9780, workspace, outPath: OUT,
   ...(packaged === undefined ? {} : { packaged }),
   seed: { schemaVersion: 1, teammates: [], missionOwners: {}, settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: false } }
