@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.695.0 - 2026-10-07
+
+### Fixed
+
+- **A large file changed in a plain folder shows what changed.** In a folder that is not a git repository, Locust keeps a file's text from before a turn only up to 64 KB, so a one-line change to a larger file read "changed · seen on disk", for any agent that does not report its own changes. Locust now compares it against the copy it already keeps for Undo, and shows the lines added and removed.
+
+### Faster
+
+- **A folder too big for Undo no longer slows every turn.** Finding out that a folder is too big to keep a copy of means looking at every file in it, about a third of a second each turn in a large folder, only to reach the same answer. Locust now remembers that answer for ten minutes.
+
 ## 0.694.0 - 2026-10-07
 
 ### Fixed
