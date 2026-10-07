@@ -184,7 +184,9 @@ const measure = async (state) => {
     const where = (c) => { for (let n = c; n; n = n.parentElement) { const k = String(n.className?.baseVal ?? n.className ?? '').split(' ').find((x) => /^lc-(cover|hometeam|faces|sidebar|thread|livestep|rail|workroom|agentline|activity|composer|plancard)/.test(x)); if (k) return k } return c.isConnected ? 'other' : 'offscreen' }
     const tally = {}; const proto = CanvasRenderingContext2D.prototype; const original = proto.clearRect
     window.locustProbeDraws = { tally, restore: () => { proto.clearRect = original } }
-    proto.clearRect = function (...a) { const k = where(this.canvas); tally[k] = (tally[k] ?? 0) + 1; return original.apply(this, a) }
+    // Each canvas counted on its own (#n, its size after), so one canvas clearing twice a draw reads apart from two canvases.
+    const ids = new WeakMap(); let next = 0
+    proto.clearRect = function (...a) { if (!ids.has(this.canvas)) ids.set(this.canvas, next++); const k = where(this.canvas) + '#' + ids.get(this.canvas) + ' ' + this.canvas.width + 'x' + this.canvas.height + (this.canvas.isConnected ? '' : ' detached'); tally[k] = (tally[k] ?? 0) + 1; return original.apply(this, a) }
   })()`)
   const share = cpu(SAMPLE_SECONDS)
   const draws = process.argv.includes('--draws') ? JSON.parse(String(await drive.evaluate(`(() => { const d = window.locustProbeDraws; d.restore(); return JSON.stringify(Object.fromEntries(Object.entries(d.tally).map(([k, v]) => [k, Math.round(v / ${String(SAMPLE_SECONDS)})]))) })()`))) : undefined
