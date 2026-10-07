@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { createBackgroundRuns } from './claude-background-runs.js'
 import type { BackgroundAgent } from './claude-background.js'
@@ -70,11 +70,13 @@ describe('a background turn comes back', () => {
     // Waiting for the person: said, and nothing brought in.
     state.agents = [{ id: 'ad39859a', kind: 'background', state: 'blocked', waitingFor: 'permission prompt', sessionId: 'ad39859a-5d0f-4439-8dc5-2f147a5b4cf6' }]
     await watch.tick()
-    expect((await runs.list())[0]).toMatchObject({ state: 'blocked', waitingFor: 'permission prompt' })
+    await vi.waitFor(async () => expect((await runs.list())[0]).toMatchObject({ state: 'blocked', waitingFor: 'permission prompt' }), { timeout: 5_000 })
     expect(brought).toEqual([])
     state.agents = [{ id: 'ad39859a', kind: 'background', state: 'done', sessionId: 'ad39859a-5d0f-4439-8dc5-2f147a5b4cf6' }]
     await watch.tick()
-    expect(brought.map((run) => run.id)).toEqual(['ad39859a'])
+    // Waited for, not timed: bringing it in and saving run on their own clock.
+    await vi.waitFor(() => expect(brought.map((run) => run.id)).toEqual(['ad39859a']), { timeout: 5_000 })
+    await vi.waitFor(async () => expect((JSON.parse(await readFile(path, 'utf8')) as BackgroundRun[])[0]?.broughtIn).toBe('mission_back'), { timeout: 5_000 })
     const kept = JSON.parse(await readFile(path, 'utf8')) as BackgroundRun[]
     expect(kept[0]).toMatchObject({ state: 'done', broughtIn: 'mission_back' })
     expect(kept[0]?.waitingFor).toBeUndefined()
@@ -94,8 +96,8 @@ describe('a background turn comes back', () => {
     expect(watch.held.ids).toEqual(['ad39859a'])
     state.agents = [{ id: 'ad39859a', kind: 'background', state: 'done', sessionId: 'ad39859a-1111' }]
     await watch.tick()
-    expect(brought).toEqual(['ad39859a'])
-    expect((await again.list())[0]).toMatchObject({ broughtIn: 'mission_new', sessionId: 'ad39859a-1111' })
+    await vi.waitFor(() => expect(brought).toEqual(['ad39859a']), { timeout: 5_000 })
+    await vi.waitFor(async () => expect((await again.list())[0]).toMatchObject({ broughtIn: 'mission_new', sessionId: 'ad39859a-1111' }), { timeout: 5_000 })
   })
 
   it('an untrusted folder is said as such, and nothing is kept', async () => {
@@ -121,6 +123,7 @@ describe('a background turn comes back', () => {
     expect((await runs.list()).length).toBe(1)
     state.agents = [{ id: 'ad39859a', kind: 'background', state: 'stopped' }]
     await watch.tick()
+    await vi.waitFor(async () => expect((await runs.list())[0]?.state).toBe('stopped'), { timeout: 5_000 })
     await runs.dismiss('ad39859a')
     expect(await runs.list()).toEqual([])
   })
