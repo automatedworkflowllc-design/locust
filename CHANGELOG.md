@@ -11,6 +11,26 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.683.0 - 2026-10-06
+
+### Fixed
+
+A second AI model reviewed this week's new code and tried to break it. These are the fixes it led to.
+
+- **Commit is stricter about what it commits.**
+  - It commits exactly the files it showed you. If the folder changed after you opened the panel, nothing is committed and you're asked to look again.
+  - The file list can now show every file, not just the first six.
+  - A file Locust keeps for itself is never included, even one that was already staged.
+  - If your hook refuses the commit, Locust leaves your staging alone when it changed while the hook ran, and tells you so.
+  - A branch name that could be mistaken for a git option is refused.
+  - A failed checkout hook no longer leaves you on a half-made branch.
+  - Pull requests are offered only for remotes that really are on GitHub.
+- **The stray-log cleanup from 0.681 is more careful.** It reads every line it would remove first. It never touches a log another program wrote to in the meantime, and never follows a link.
+- **A merge Locust couldn't check for conflict markers is no longer called ready to land,** and Land waits until it can check.
+- **Opening Locust a second time** no longer clears skill files that a running teammate is using.
+- **In Compare:** after you keep a model's answer, a page it made opens from your folder even when the model named it by its full path in its own copy.
+- **A review note's label** shows the file's path within the folder, not the whole path.
+
 ## 0.682.0 - 2026-10-06
 
 ### Added
