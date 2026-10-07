@@ -1,0 +1,53 @@
+name: Something is wrong
+description: Locust did something it should not, or did not do something it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please leave out API keys, passwords and anything private from your project:
+        issues are public. For a security problem, email support@locust.lol instead (see SECURITY.md).
+  - type: input
+    id: version
+    attributes:
+      label: Locust version
+      description: Settings shows it at the top, for example "Locust 0.691.0".
+      placeholder: 0.691.0
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Computer
+      options:
+        - Windows
+        - Mac
+    validations:
+      required: true
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Which AI agent was running, if any
+      multiple: true
+      options:
+        - Claude Code
+        - Codex
+        - Cursor
+        - Copilot
+        - OpenCode
+        - Antigravity
+        - Muse Code
+        - None, it was Locust itself
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you saw, and what you expected instead. A screenshot helps.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log (optional)
+      description: In Settings > General > Report a problem, press "Show the log". It records what happened, never what was said. Paste the part around the problem.
+      render: text

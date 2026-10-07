@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: A security problem
+    url: https://github.com/automatedworkflowllc-design/locust/blob/main/SECURITY.md
+    about: Please report it privately by email, not in a public issue.
+  - name: Download Locust
+    url: https://locust.lol
+    about: The latest installer for Windows and Mac.
