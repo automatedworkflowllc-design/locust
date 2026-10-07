@@ -77,7 +77,8 @@ import { chosenLeaveOut, howTurnEnded } from './handoff.js'
 import { officeWordsSection } from './office-words.js'
 import { createRoutineCopies } from './routine-copy.js'
 import { openInTerminal, terminalRequestFor } from './open-in-terminal.js'
-import { createTerminalCatchUp, createTerminalImports, createTranscriptReader, transcriptPathFor } from './terminal-catch-up.js'
+import { catchUpTerminal, createTerminalCatchUp, createTerminalImports, createTranscriptReader, transcriptPathFor } from './terminal-catch-up.js'
+import type { CatchUpFacts } from './terminal-catch-up.js'
 import { importSession, listImportableSessions } from './session-import.js'
 import type { ImportableSession } from './session-import.js'
 import { readTextChunk, withTextChunk } from './png-text.js'
@@ -2162,7 +2163,7 @@ if (!ownsSingleInstanceLock) {
       claudeHome: process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.claude'),
       codexHome: process.env.CODEX_HOME ?? join(homedir(), '.codex')
     }
-    const catchUp = createTerminalCatchUp({
+    const catchUpFacts = {
       ledger: missionLedger,
       newestTurnOf: (missionId) => newestTurnOf(missionLedger, missionId),
       liveMissionIds: () => [...codexMissions.liveMissionIds(), ...antigravityMissions.liveMissionIds()],
@@ -2172,9 +2173,10 @@ if (!ownsSingleInstanceLock) {
         codexHome: process.env.CODEX_HOME ?? join(homedir(), '.codex')
       }),
       imports: terminalImports,
-      ownerOf: async (id) => (await teammates.missionOwners())[id],
-      assign: (teammateId, id) => teammates.assignMission(teammateId, id)
-    })
+      ownerOf: async (id: string) => (await teammates.missionOwners())[id],
+      assign: (teammateId: string, id: string) => teammates.assignMission(teammateId, id)
+    } satisfies CatchUpFacts
+    const catchUp = createTerminalCatchUp(catchUpFacts)
     // Each runtime's own slash commands, as its CLI last listed them (0.426).
     const runtimeCommands = createRuntimeCommands({ file: join(app.getPath('userData'), 'runtime-commands.json') })
     // Cursor saves a run's --model as the person's own default; put back after (0.431).
@@ -4170,18 +4172,36 @@ if (!ownsSingleInstanceLock) {
         child.on('exit', (code) => done(code ?? 1))
       })
     }
+    const backgroundSessionOf = async (conversation: string): Promise<string | undefined> => {
+      const newest = await newestTurnOf(missionLedger, conversation).catch(() => conversation)
+      const mission = await missionLedger.getMission(newest).catch(() => undefined)
+      return mission === undefined || mission.metadata.runtime !== 'claude' ? undefined : runtimeThreadIdOf(mission)
+    }
     const backgroundRuns = createBackgroundRuns({
       file: join(app.getPath('userData'), 'claude-background.json'),
       claude: claudeCommand,
-      sessionOf: async (conversation) => {
-        const newest = await newestTurnOf(missionLedger, conversation).catch(() => conversation)
-        const mission = await missionLedger.getMission(newest).catch(() => undefined)
-        return mission === undefined || mission.metadata.runtime !== 'claude' ? undefined : runtimeThreadIdOf(mission)
-      },
+      sessionOf: (conversation) => backgroundSessionOf(conversation),
       bringIn: async (run) => {
         if (run.conversation !== undefined) {
-          const caught = await catchUp(run.conversation)
-          return caught.imported > 0 ? { missionId: caught.latestMissionId } : { refused: 'Its turn was not found in Claude Code\'s record of the conversation.' }
+          const conversation = run.conversation
+          /*
+           * Its own session, when Claude Code forked one: MEASURED 2026-10-06, a finished background session stays
+           * alive (idle), and `--resume` of a session still alive "starts a copy" under a new id -- the turn is in
+           * the copy, not in the conversation's session. And a few tries: the transcript's last lines can land a
+           * moment after `claude agents` says done.
+           */
+          const ownSession = run.sessionId
+          const conversationSession = await backgroundSessionOf(conversation)
+          const read = (): Promise<{ readonly imported: number; readonly latestMissionId: string }> =>
+            ownSession !== undefined && ownSession !== conversationSession
+              ? catchUpTerminal(conversation, { ...catchUpFacts, sessionOf: () => ownSession })
+              : catchUp(conversation)
+          for (let attempt = 0; attempt < 5; attempt += 1) {
+            const caught = await read()
+            if (caught.imported > 0) return { missionId: caught.latestMissionId }
+            await new Promise((resolve) => setTimeout(resolve, 1_500))
+          }
+          return { refused: 'Its turn was not found in Claude Code\'s record of the conversation.' }
         }
         if (run.sessionId === undefined) return { refused: 'Claude Code never said which session it was.' }
         const imported = await importSession({ runtime: 'claude', sessionId: run.sessionId, cwd: run.folder, title: run.prompt.slice(0, 80) }, {
@@ -4199,7 +4219,8 @@ if (!ownsSingleInstanceLock) {
       },
       onChange: () => sendToWindow({ kind: 'background-changed' })
     })
-    void backgroundRuns.resume().catch(() => undefined)
+    // Picked up once the window has loaded (see openMain): a run that ended while Locust was closed comes back to a
+    // window that is listening, not into a message nobody hears.
     backgroundForShutdown = backgroundRuns
     const publicRun = (run: BackgroundRun): PublicBackgroundRun => {
       const { folder: _folder, sessionId: _session, ...rest } = run
@@ -7629,6 +7650,7 @@ if (!ownsSingleInstanceLock) {
         approvalWindow = window
         guardClose(window)
         attendWindow(window)
+        window.webContents.once('did-finish-load', () => setTimeout(() => void backgroundForShutdown?.resume().catch(() => undefined), 1_500))
         replayDiscoveryToWindow()
         if (!beginSweep) return
         // The sweep may begin: there is somebody to watch it now.

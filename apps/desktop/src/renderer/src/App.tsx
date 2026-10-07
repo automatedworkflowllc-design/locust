@@ -2569,16 +2569,20 @@ export default function App(): ReactElement {
     })
   }
 
-  const refreshHistory = (): void => {
+  /** The history read again; resolves once it is applied (W10: a turn that came back is opened after, not before). */
+  const refreshHistoryNow = async (): Promise<void> => {
     const bridge = window.desktop
     if (!bridge) return
-    void bridge
+    await bridge
       .getMissionHistory(heldDigests(historyRef.current))
       .then((response) => {
         seedLimitsFrom(response)
         applyHistory(response)
       })
       .catch(() => undefined)
+  }
+  const refreshHistory = (): void => {
+    void refreshHistoryNow()
   }
 
   useEffect(() => {
@@ -2744,14 +2748,19 @@ export default function App(): ReactElement {
           setBackgroundRuns((before) => {
             const back = runs.filter((run) => run.broughtIn !== undefined && !before.some((old) => old.id === run.id && old.broughtIn !== undefined))
             if (back.length > 0) {
-              refreshHistory()
-              // The conversation on screen is the one it came back into: shown again, with the turn in it.
-              const shown = liveRunRef.current?.data?.missionId
-              const into = back.find((run) => run.conversation !== undefined && run.conversation === shown)
-              if (into?.broughtIn !== undefined) {
-                const turn = into.broughtIn
-                setTimeout(() => openMissionRef.current(turn), 0)
-              }
+              // The conversation on screen is the one it came back into: shown again, with the turn in it --
+              // once the history holds that turn, or there is nothing new to open.
+              // Whose it is first (catch-up gave it the conversation's teammate), then the history. The conversation
+              // on screen follows it by itself once the history holds it (the effect beside openMissionRef).
+              void Promise.all([
+                window.desktop?.listTeammates().then((roster) => {
+                  if (roster.ok) {
+                    setMissionOwners(roster.data.missionOwners)
+                    setMissionTitles(roster.data.missionTitles)
+                  }
+                }).catch(() => undefined),
+                refreshHistoryNow()
+              ])
             }
             return runs
           })
@@ -6888,6 +6897,37 @@ export default function App(): ReactElement {
   // Its toast, clicked, opens the conversation it finished in.
   const openMissionRef = useRef<(missionId: string) => void>(() => undefined)
   openMissionRef.current = openMission
+  /*
+   * THE CONVERSATION ON SCREEN FOLLOWS A TURN THAT CAME BACK FROM THE BACKGROUND (W10). Whenever the history or the
+   * list of returned turns changes: a returned turn of THIS conversation -- the same first turn, walked back through
+   * `continuesFrom` -- that is not on screen yet is opened, so it shows where it belongs. Timing-free on purpose:
+   * the drive found the turn arriving before the conversation was opened as often as after.
+   */
+  const followedTurns = useRef(new Set<string>())
+  useEffect(() => {
+    const live = liveRunRef.current
+    if (live === undefined || liveRunIsActive(live) || backgroundTurnIds.size === 0) return
+    const firstOf = (id: string): string => {
+      let at = id
+      for (let step = 0; step < 500; step += 1) {
+        const before = historyById.get(at)?.continuesFrom?.missionId
+        if (before === undefined || before === at) return at
+        at = before
+      }
+      return at
+    }
+    const shownIds = [live.data?.missionId, live.restoredMission?.missionId, ...(live.earlierTurns ?? []).map((turn) => turn.missionId)].filter((id): id is string => id !== undefined)
+    if (shownIds.length === 0) return
+    const shownFirst = firstOf(shownIds[0]!)
+    const newer = [...backgroundTurnIds]
+      .filter((id) => historyById.has(id) && !shownIds.includes(id) && !followedTurns.current.has(id) && firstOf(id) === shownFirst)
+      .sort((left, right) => Date.parse(historyById.get(right)?.createdAt ?? '') - Date.parse(historyById.get(left)?.createdAt ?? ''))
+    if (newer[0] === undefined) return
+    // Once each: a person who then opens an earlier turn on purpose is not pulled forward again.
+    for (const id of newer) followedTurns.current.add(id)
+    openMission(newer[0])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- follows the history, the returned turns and the conversation opened, not every render's new openMission
+  }, [historyById, backgroundTurnIds, liveRun?.data?.missionId, liveRun?.restoredMission?.missionId])
   useEffect(() => window.desktop?.onAttentionOpenMission?.((missionId) => openMissionRef.current(missionId)), [])
   // The conversation on screen, by its root, is where notes on its diffs live.
   const notesMissionId = liveRun?.data?.missionId

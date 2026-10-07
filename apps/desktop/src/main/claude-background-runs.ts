@@ -112,6 +112,13 @@ export function createBackgroundRuns(facts: BackgroundFacts) {
     if (run.broughtIn !== undefined || run.notBroughtIn !== undefined) return
     const back = await facts.bringIn(run).catch((error: unknown) => ({ refused: error instanceof Error ? error.message : 'It could not be brought back.' }))
     await update(run.id, 'missionId' in back ? { broughtIn: back.missionId } : { notBroughtIn: back.refused })
+    /*
+     * Done, and its turn is in the conversation: Claude Code's session is stopped, not left idle. MEASURED
+     * 2026-10-06: a finished background session stays alive, and the conversation's next turn -- `--resume` of a
+     * session still alive -- went into a COPY under a new id. Stopped, the conversation stays one session; Claude
+     * Code keeps its conversation (`claude stop --help`).
+     */
+    if ('missionId' in back && run.state === 'done' && SESSION_ID.test(run.id)) await facts.claude(['stop', run.id], run.folder).catch(() => undefined)
   }
   const listAgents = async (): Promise<readonly BackgroundAgent[]> => {
     const where = (await load())[0]?.folder ?? process.cwd()

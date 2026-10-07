@@ -34,7 +34,8 @@ const check = (what, ok, detail) => {
   if (!ok) failures += 1
   say(`  [${ok ? 'PASS' : 'FAIL'}] ${what}${detail === undefined ? '' : ` -- ${String(detail).slice(0, 400)}`}`)
 }
-const agents = () => new Promise((resolve) => execFile('claude', ['agents', '--json', '--all'], { windowsHide: true }, (_error, stdout) => {
+// Through a shell: on Windows `claude` is often a script shim, which execFile alone cannot start.
+const agents = () => new Promise((resolve) => execFile('claude', ['agents', '--json', '--all'], { windowsHide: true, shell: true }, (_error, stdout) => {
   try { resolve(JSON.parse(String(stdout))) } catch { resolve([]) }
 }))
 const pickBackground = `(async () => {
@@ -60,6 +61,8 @@ const send = (text) => `(async () => {
 })()`
 const panel = `JSON.stringify([...document.querySelectorAll('aside[aria-label="In the background"] .lc-cloudtask')].map((card) => ({ prompt: card.querySelector('.lc-cloudtask__prompt')?.innerText ?? '', state: card.querySelector('.lc-cloudtask__state')?.innerText ?? '' })))`
 const thread = `document.querySelector('.lc-thread')?.innerText ?? ''`
+// What the record holds: each turn's id, its words and how it started.
+const historyProbe = `window.desktop.getMissionHistory().then((answer) => JSON.stringify((answer.ok ? (answer.data.missions ?? []) : []).map((m) => [String(m.missionId).slice(8, 16), String(m.prompt ?? '').slice(0, 30), m.startedBy?.kind ?? null])))`
 const ids = []
 // Claude Code renames a session once it starts ("create hello.txt file"), so a run is found by the id Locust kept.
 const keptRuns = async (profile) => JSON.parse(await readFile(join(profile, 'claude-background.json'), 'utf8').catch(() => '[]'))
@@ -82,14 +85,26 @@ try {
   }
   await drive.capture('The panel: done, and back in the conversation', () => drive.evaluate(panel))
   check('the panel followed it to done, and says its answer is in the conversation', /Done\. Its answer is in the conversation/.test(cards[0]?.state ?? ''), JSON.stringify(cards))
-  const after = String(await drive.capture('The conversation: In the background, two', () => drive.evaluate(thread)))
-  check('the conversation shows it under "In the background", with its answer', /In the background/.test(after) && /\btwo\b/i.test(after), after.slice(-300))
+  let after = ''
+  for (let i = 0; i < 20; i += 1) {
+    after = String(await drive.evaluate(thread))
+    if (/in the background/i.test(after) && /two/i.test(after)) break
+    await sleep(750)
+  }
+  await drive.capture('The conversation: In the background, two', () => drive.evaluate(thread))
+  say(`  history after two: ${String(await drive.evaluate(historyProbe))}`)
+  check('the conversation shows it under "In the background", with its answer', /in the background/i.test(after) && /\btwo\b/i.test(after), after.slice(-300))
+  const header = String(await drive.evaluate(`document.querySelector('.lc-workroom__header')?.innerText ?? ''`))
+  check("it is still Ash's conversation", /^Ash\b/.test(header), header.slice(0, 120))
   for (const run of await keptRuns(profilePath)) ids.push(run.id)
+  say(`  profile ${profilePath}; kept after two: ${JSON.stringify(await keptRuns(profilePath))}`)
   // The point of it: send, and close Locust at once.
   say(`  ${String(await drive.evaluate(pickBackground))}`)
-  say(`  ${String(await drive.evaluate(send('Reply with exactly the word three.')))}`)
+  say(`  third send: ${String(await drive.evaluate(send('Reply with exactly the word three.')))}`)
   // Until Locust has it on its list -- then closed at once.
   for (let i = 0; i < 30 && !(await keptRuns(profilePath)).some((run) => /word three/.test(run.prompt)); i += 1) await sleep(500)
+  say(`  kept runs before closing: ${JSON.stringify((await keptRuns(profilePath)).map((run) => [run.id, run.prompt, run.state]))}`)
+  say(`  panel: ${String(await drive.evaluate(panel))}`)
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
@@ -107,7 +122,7 @@ for (let i = 0; i < 60 && threeId !== undefined && three?.state !== 'done'; i +=
 check('with Locust closed, Claude Code finished the turn on its own', three?.state === 'done', JSON.stringify(three ?? {}))
 if (threeId !== undefined && !ids.includes(threeId)) ids.push(threeId)
 
-drive = await startDrive({ name: `background-turn-${tag}-again`, port: 9821, workspace, outPath: join(OUT, 'after-relaunch'), profilePath, stepFrom: 4, spends: true, ...(packaged === undefined ? {} : { packaged }) })
+drive = await startDrive({ name: `background-turn-${tag}-again`, port: 9821, workspace, outPath: join(OUT, 'after-relaunch'), profilePath, stepFrom: 4, spends: true, keep: true, ...(packaged === undefined ? {} : { packaged }) })
 try {
   await drive.ready()
   await drive.resize(1300, 860)
@@ -120,6 +135,12 @@ try {
   }
   await drive.capture('Opened again: the turn is in the conversation', () => drive.evaluate(thread))
   check('opened again, Locust brought the finished turn into the conversation by itself', /\bthree\b/i.test(seen), seen.slice(-300))
+  await drive.evaluate(`[...document.querySelectorAll('.lc-sidebar .lc-conv, .lc-sidebar [data-mission-id]')][0]?.click()`)
+  await sleep(2000)
+  say(`  after clicking the row again: ${String(await drive.evaluate(thread)).replace(/\s+/g, ' ').slice(-200)}`)
+  say(`  owners after reopening: ${String(await drive.evaluate("window.desktop.listTeammates().then((r) => JSON.stringify(r.ok ? Object.entries(r.data.missionOwners).map(([m, t]) => [m.slice(8, 16), t]) : r))"))}`)
+  say(`  kept after reopening: ${JSON.stringify(await keptRuns(profilePath))}`)
+  say(`  history after reopening: ${String(await drive.evaluate(historyProbe))}`)
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
@@ -127,6 +148,6 @@ try {
   await drive.finish({ intro: 'Opened again on the same profile.', extra: `Checks failed: ${String(failures)}` })
 }
 // Claude Code's own list, left as it was found.
-for (const id of ids) await new Promise((resolve) => execFile('claude', ['rm', id], { windowsHide: true }, () => resolve(undefined)))
+for (const id of ids) await new Promise((resolve) => execFile('claude', ['rm', id], { windowsHide: true, shell: true }, () => resolve(undefined)))
 say(failures === 0 ? 'ALL CHECKS PASSED' : `${String(failures)} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)
