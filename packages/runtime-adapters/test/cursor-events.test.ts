@@ -68,8 +68,9 @@ function messages(events: readonly NormalizedRuntimeEvent[]): ReadonlyMap<string
 }
 
 describe("Cursor's final result carries per-run tokens", () => {
-  it("keeps input, output, cache read and cache write counts from the fixture", () => {
-    const { events } = run(fixture("result-with-cache-usage.jsonl"));
+  it("keeps input, output, cache read and cache write counts from the result line", () => {
+    // Inline, not a fixture file: every file under fixtures/ is replayed as a whole run elsewhere, and this is one line.
+    const { events } = run([JSON.stringify({ type: "result", subtype: "success", is_error: false, usage: { inputTokens: 120, outputTokens: 45, cacheReadTokens: 3000, cacheWriteTokens: 240 } })]);
     expect(events.at(-1)?.type).toBe("run.completed");
     expect(events.at(-1)?.payload).toMatchObject({ usage: {
       inputTokens: 120, outputTokens: 45, cacheReadTokens: 3000, cacheWriteTokens: 240,
