@@ -34,6 +34,13 @@ import { ownGitArgs } from './git-guard.js'
 export const MAX_KEPT_FILES = 20_000
 export const MAX_KEPT_FILE_BYTES = 10 * 1024 * 1024
 export const MAX_KEPT_BYTES = 300 * 1024 * 1024
+/**
+ * How long a folder found too big to keep is believed (0.695). Finding out
+ * lists and stats every file: 0.35 s a turn in a 300 MB folder (measured
+ * 2026-10-07), paid again on every turn only to say the same thing. A folder
+ * that shrinks gets Undo back within this.
+ */
+export const TOO_BIG_REMEMBERED_MS = 10 * 60_000
 /** How many turns a folder keeps a way back from; older ones are let go. */
 export const KEPT_TURNS_PER_FOLDER = 60
 const GIT_TIMEOUT_MS = 60_000
@@ -91,6 +98,8 @@ export interface Checkpoints {
 export interface CheckpointOptions {
   /** Where the stores live: a folder in the profile. */
   readonly root: string
+  /** Test seam: the clock that times how long a too-big folder is believed. */
+  readonly now?: () => number
   /** Test seam: run git with this store and work tree; resolves stdout. */
   readonly runGit?: (args: readonly string[], options: { readonly input?: string; readonly env?: Readonly<Record<string, string>> }) => Promise<string>
 }
@@ -138,14 +147,23 @@ export function createCheckpoints(options: CheckpointOptions): Checkpoints {
   const git = (store: string, workspace: string, args: readonly string[], extra: { readonly input?: string; readonly env?: Readonly<Record<string, string>> } = {}) =>
     run([`--git-dir=${store}`, `--work-tree=${resolve(workspace)}`, ...args], extra)
 
+  const now = options.now ?? Date.now
+  const tooBig = new Map<string, { readonly until: number; readonly why: string }>()
+  const refuse = (store: string, why: string): { readonly ok: false; readonly why: string } => {
+    tooBig.set(store, { until: now() + TOO_BIG_REMEMBERED_MS, why })
+    return { ok: false, why }
+  }
+
   return {
     async take(workspace) {
       const store = storeFor(options.root, workspace)
+      const known = tooBig.get(store)
+      if (known !== undefined && now() < known.until) return { ok: false, why: known.why }
       try {
         await ensure(store)
         // What git would not ignore: the folder's own .gitignore and the person's global excludes apply.
         const listed = (await git(store, workspace, ['ls-files', '--others', '--exclude-standard', '-z'])).split('\0').filter((path) => path.length > 0)
-        if (listed.length > MAX_KEPT_FILES) return { ok: false, why: `This folder has more than ${MAX_KEPT_FILES.toLocaleString('en-US')} files, too many to keep a copy of before each turn.` }
+        if (listed.length > MAX_KEPT_FILES) return refuse(store, `This folder has more than ${MAX_KEPT_FILES.toLocaleString('en-US')} files, too many to keep a copy of before each turn.`)
         const kept: { readonly path: string; readonly size: number; readonly mtimeMs: number }[] = []
         const notKept: string[] = []
         let bytes = 0
@@ -166,7 +184,7 @@ export function createCheckpoints(options: CheckpointOptions): Checkpoints {
             continue
           }
           bytes += info.size
-          if (bytes > MAX_KEPT_BYTES) return { ok: false, why: `This folder holds more than ${String(MAX_KEPT_BYTES / 1024 / 1024)} MB of files, too much to keep a copy of before each turn.` }
+          if (bytes > MAX_KEPT_BYTES) return refuse(store, `This folder holds more than ${String(MAX_KEPT_BYTES / 1024 / 1024)} MB of files, too much to keep a copy of before each turn.`)
           kept.push({ path, size: info.size, mtimeMs: info.mtimeMs })
         }
         const index = join(store, `index-${String(process.pid)}-${String(Date.now())}`)
