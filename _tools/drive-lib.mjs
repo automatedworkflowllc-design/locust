@@ -332,7 +332,12 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
   socket.addEventListener('message', (event) => {
     const message = JSON.parse(event.data)
     if (message.method === 'Runtime.exceptionThrown') consoleErrors.push(message.params?.exceptionDetails?.text ?? 'exception')
-    if (message.method === 'Runtime.consoleAPICalled' && message.params?.type === 'error') consoleErrors.push(String(message.params.args?.[0]?.value ?? 'console.error'))
+    // Every argument, not the first: Electron's "sandboxed_renderer.bundle.js script failed to run" names the
+    // preload's real error only in the second (2026-10-07, seen intermittently at launch).
+    if (message.method === 'Runtime.consoleAPICalled' && message.params?.type === 'error') {
+      const said = (message.params.args ?? []).map((arg) => String(arg?.value ?? arg?.description ?? '')).filter((text) => text.length > 0).join(' | ')
+      consoleErrors.push(said.length > 0 ? said.slice(0, 2_000) : 'console.error')
+    }
     const waiter = pending.get(message.id)
     if (waiter) { pending.delete(message.id); waiter(message) }
   })
