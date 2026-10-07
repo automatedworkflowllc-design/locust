@@ -617,9 +617,20 @@ export function runtimeNarratesWhenAsked(runtime: string): boolean {
   return RUNTIMES_THAT_NARRATE_WHEN_ASKED.includes(runtime)
 }
 
-/** One line: say what comes next before each step, as the person watching reads it. */
+/**
+ * One line: now and then, what it is doing (0.682).
+ *
+ * It said "before each step" (0.668), and Antigravity took that literally: 70
+ * sentences for 69 steps in one of Colin's runs (counted 2026-10-06), where
+ * Codex, on its own, says something every five to ten. Colin asked whether a
+ * line from Locust should shape a model at all; the answer kept the line --
+ * every harness asks for this, Claude Code's own included -- and made it ask
+ * for Codex's rhythm, not a sentence per step. MEASURED 2026-10-06, the same
+ * 17-step task (drive-a-quiet-runtime-narrates): 10 breaks to speak with the
+ * old line, 3 with this one.
+ */
 export function narrateSection(): string {
-  return 'As you work, say in one short sentence what you are about to do before each step, so the person watching can follow.'
+  return 'As you work, say in one short sentence what you are doing whenever you start on something new, so the person watching can follow. There is no need to announce every step.'
 }
 
 export function todoSection(): string {
