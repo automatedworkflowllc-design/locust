@@ -6,7 +6,7 @@ import { setVoiceState } from '../voiceLevel.js'
 
 type Phase = 'idle' | 'asking' | 'checking' | 'downloading' | 'opening' | 'recording' | 'transcribing'
 export const VOICE_DOWNLOAD_WORDS = 'Voice typing needs a one-time 41 MB download. It runs on this computer; nothing you say leaves it.'
-export const VOICE_ACCURATE_WORDS = 'Accurate voice typing needs a one-time 69 MB download (68,649,651 bytes, including the runtime). It is slower and runs on this computer; nothing you say leaves it.'
+export const VOICE_ACCURATE_WORDS = 'Accurate voice typing needs a one-time 69 MB download. It is slower than Fast, and it runs on this computer; nothing you say leaves it.'
 export const VOICE_OPENAI_WORDS = 'Voice typing will send your recordings to OpenAI using your API key. OpenAI API charges apply. Allow this for future recordings?'
 export function VoiceButton({ platform, onText, disabled = false, api = typeof window === 'undefined' ? undefined : window.desktop?.voice }: {
   readonly platform: string; readonly onText: (text: string) => void; readonly disabled?: boolean; readonly api?: VoiceApi

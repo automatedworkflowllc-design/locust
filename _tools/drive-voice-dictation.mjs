@@ -56,7 +56,7 @@ try {
   measurements.baselineFocusedCpu = baselineCpu
   await drive.evaluate(`document.querySelector('[aria-label="Voice typing"]').click()`)
   await wait(`!!document.querySelector('[aria-label="Download voice typing"]')`)
-  const consent = accurate ? 'Accurate voice typing needs a one-time 69 MB download (68,649,651 bytes, including the runtime). It is slower and runs on this computer; nothing you say leaves it.' : 'Voice typing needs a one-time 41 MB download. It runs on this computer; nothing you say leaves it.'
+  const consent = accurate ? 'Accurate voice typing needs a one-time 69 MB download. It is slower than Fast, and it runs on this computer; nothing you say leaves it.' : 'Voice typing needs a one-time 41 MB download. It runs on this computer; nothing you say leaves it.'
   check('exact first-use consent words', await drive.evaluate(`document.querySelector('[aria-label="Download voice typing"]').innerText.includes(${JSON.stringify(consent)})`))
   await drive.capture('one-time download consent', () => 'Download and Not now, in place')
   await drive.evaluate(`document.querySelector('[aria-label="Download voice typing"] button:last-child').click()`)
