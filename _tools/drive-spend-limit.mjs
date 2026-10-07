@@ -73,6 +73,19 @@ for (let index = 0; index < 21; index += 1) {
 }
 await pricedRun('mission_wren_new', 'A newer priced run of Wren', 0.01, thisMonth(5))
 await pricedRun('mission_juno', 'A priced run of Juno', 1.5, thisMonth(6))
+// 0.689: Ivy runs on a model of the person's own, which reports tokens and no price.
+{
+  const missionId = 'mission_ivy_own', runId = `run_${missionId}`, at = thisMonth(7)
+  await ledger.createMission({
+    missionId, runId, prompt: 'A run of Ivy on her own model', runtime: 'opencode', model: 'own-gateway/big-model', requestedRouteId: 'opencode',
+    resolvedRouteId: 'opencode-account:default', cliVersion: 'drive', workspaceId, sandbox: 'read-only', executionPolicyVersion: 1, createdAt: at
+  })
+  const event = (sequence, type, payload) => ({ id: `${missionId}_${String(sequence)}`, runId, missionId, sequence, occurredAt: at, sourceAdapter: 'opencode', type, payload })
+  await ledger.appendEvents(missionId, [
+    event(1, 'message.delta', { itemId: 'answer', operation: 'append', text: 'Done.', final: true, evidence: { redacted: true } }),
+    event(2, 'run.completed', { usage: { inputTokens: 1200, outputTokens: 80 }, process: processEvidence(at) })
+  ])
+}
 await ledger.flush()
 
 const LIMIT_SENTENCE = /Wren has reached this month's limit: \$0\.02 of \$0\.01\. Raise the limit by editing Wren, or it starts again on [A-Z][a-z]+ 1\./
@@ -88,9 +101,10 @@ const drive = await startDrive({
     schemaVersion: 1,
     teammates: [
       { teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: new Date(now - 30 * DAY).toISOString(), route: FREE_ROUTE, monthlyLimitUsd: 0.01 },
-      { teammateId: 'tm_juno', name: 'Juno', hue: 'violet', role: 'Research & Briefs', createdAt: new Date(now - 30 * DAY).toISOString(), route: FREE_ROUTE }
+      { teammateId: 'tm_juno', name: 'Juno', hue: 'violet', role: 'Research & Briefs', createdAt: new Date(now - 30 * DAY).toISOString(), route: FREE_ROUTE },
+      { teammateId: 'tm_ivy', name: 'Ivy', hue: 'teal', role: 'Research & Briefs', createdAt: new Date(now - 30 * DAY).toISOString(), route: FREE_ROUTE, monthlyLimitUsd: 5 }
     ],
-    missionOwners: { mission_wren_old: 'tm_wren', mission_wren_new: 'tm_wren', mission_juno: 'tm_juno' },
+    missionOwners: { mission_wren_old: 'tm_wren', mission_wren_new: 'tm_wren', mission_juno: 'tm_juno', mission_ivy_own: 'tm_ivy' },
     settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off' }
   }
 })
@@ -101,7 +115,7 @@ const teamScreen = `(async () => {
   await new Promise((r) => setTimeout(r, 900))
   return [...document.querySelectorAll('.lc-rostercard')].map((card) => {
     const month = card.querySelector('.lc-rostercard__cost')
-    return (card.querySelector('.lc-rostercard__name')?.textContent ?? '?') + ': ' + (month === null ? 'no month row' : month.innerText.replace(/\\s+/g, ' ') + (month.classList.contains('is-reached') ? ' [amber]' : ''))
+    return (card.querySelector('.lc-rostercard__name')?.textContent ?? '?') + ': ' + (month === null ? 'no month row' : month.innerText.replace(/\\s+/g, ' ') + (month.classList.contains('is-reached') ? ' [amber]' : '') + (month.querySelector('.lc-rostercard__unpriced') ? ' [unpriced line: ' + Math.round(month.querySelector('.lc-rostercard__unpriced').getBoundingClientRect().height) + ' px tall, amount ' + Math.round(month.querySelector('dd.lc-mono').getBoundingClientRect().height) + ' px tall, why: ' + month.querySelector('.lc-rostercard__unpriced').getAttribute('title') + ']' : ''))
   }).join(' || ')
 })()`
 
@@ -161,6 +175,7 @@ try {
   const team = await drive.capture('the Team screen: this month, against the limit', () => drive.evaluate(teamScreen))
   // "This month" is drawn in capitals by the stylesheet; innerText reads it so.
   verdicts.push(`card: ${/Wren: Limit reached \$0\.02 of \$0\.01 \[amber\]/i.test(team) && /Juno: This month \$1\.50/i.test(team) ? 'PASS' : 'FAIL'}`)
+  verdicts.push(`unpriced: ${/Ivy: This month \$0\.00 of \$5\.00 1 run with no price/i.test(team) && /\[unpriced line: [0-9]+ px tall, why: A model of your own reports no price/i.test(team) ? 'PASS' : 'FAIL'}`)
   await drive.capture('open Wren', () => drive.evaluate(openWren))
   const refused = await drive.capture('a message to Wren is refused, with the limit in its own words', async () => {
     const sent = await drive.evaluate(sendAndWaitScript('Say OK.', { settle: false }))

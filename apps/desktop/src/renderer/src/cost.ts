@@ -376,7 +376,7 @@ export const UNPRICED_NOTE = 'A model of your own reports no price, so its runs 
 export function monthSpendLine(
   spend: Spend | undefined,
   limitUsd: number | undefined
-): { readonly text: string; readonly reached: boolean; readonly note?: string } | undefined {
+): { readonly text: string; readonly reached: boolean; readonly unpriced?: string; readonly note?: string } | undefined {
   if (limitUsd === undefined) {
     const line = moneyLine(spend)
     return line === undefined ? undefined : { text: line, reached: false }
@@ -386,13 +386,14 @@ export function monthSpendLine(
   // card three across, "$0.02 of $0.01 . limit reached" broke over two lines
   // (the 0.353 drive's Team screen).
   // A model of the person's own reports no price (0.689): its runs are said
-  // beside the dollars, so "$0.00 of $5.00" is never read as "nothing spent".
+  // under the dollars, so "$0.00 of $5.00" is never read as "nothing spent".
+  // Their own line, not tacked on: tacked on, it broke the amount over two
+  // lines on a card three across (the 0.689 packaged drive's Team screen).
   const unpriced = spend?.unpricedRuns ?? 0
-  const runs = unpriced === 0 ? '' : ` · ${String(unpriced)} ${unpriced === 1 ? 'run' : 'runs'} with no price`
   return {
-    text: `${dollars(spend?.usd ?? 0)} of ${dollars(limitUsd)}${requests}${runs}`,
+    text: `${dollars(spend?.usd ?? 0)} of ${dollars(limitUsd)}${requests}`,
     reached: limitReached(spend, limitUsd),
-    ...(unpriced === 0 ? {} : { note: UNPRICED_NOTE })
+    ...(unpriced === 0 ? {} : { unpriced: `${String(unpriced)} ${unpriced === 1 ? 'run' : 'runs'} with no price`, note: UNPRICED_NOTE })
   }
 }
 

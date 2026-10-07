@@ -13935,8 +13935,9 @@ textarea {
    ("$0.42 · 118k tokens") and `not reported` must never truncate. */
 .lc-rostercard__cost {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 10px;
+  gap: 2px 10px;
   margin: 0;
   padding: 7px 10px;
   border-radius: var(--lc-radius-control);
@@ -13971,6 +13972,13 @@ textarea {
 
 .lc-rostercard__cost.is-reached dd {
   color: var(--lc-amber-text);
+}
+
+/* Runs on a model of the person's own, which reports no price (0.689): a
+ * quiet line of its own under the amount, never amber -- they are not spend. */
+.lc-rostercard__cost dd.lc-rostercard__unpriced {
+  flex-basis: 100%;
+  color: var(--lc-text-muted);
 }
 
 /* `not reported`, `never`, `0`: the words stay exactly as written, but a

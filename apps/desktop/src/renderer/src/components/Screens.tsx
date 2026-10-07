@@ -746,7 +746,8 @@ export function TeammatesScreen({
         {month !== undefined && (
           <dl className={`lc-rostercard__cost${month.reached ? ' is-reached' : ''}`}>
             <dt>{month.reached ? 'Limit reached' : 'This month'}</dt>
-            <dd className="lc-mono" {...(month.note === undefined ? {} : { title: month.note })}>{month.text}</dd>
+            <dd className="lc-mono">{month.text}</dd>
+            {month.unpriced !== undefined && <dd className="lc-rostercard__unpriced" title={month.note}>{month.unpriced}</dd>}
           </dl>
         )}
         {work.recent.length > 0 && (

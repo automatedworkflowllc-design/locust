@@ -46,9 +46,11 @@ describe("a teammate's month, on their card", () => {
   })
 
   it('says runs on a model of your own beside the dollars, with why: unpriced, not $0.00 (0.689)', () => {
-    expect(monthSpendLine({ usd: 0.4, unpricedRuns: 2 }, 5)).toEqual({ text: '$0.40 of $5.00 · 2 runs with no price', reached: false, note: UNPRICED_NOTE })
-    expect(monthSpendLine({ unpricedRuns: 1 }, 5)).toEqual({ text: '$0.00 of $5.00 · 1 run with no price', reached: false, note: UNPRICED_NOTE })
-    expect(card({ ...wren, monthlyLimitUsd: 5 }, { tm_wren: { unpricedRuns: 1 } })).toContain(`title="${UNPRICED_NOTE}"`)
+    expect(monthSpendLine({ usd: 0.4, unpricedRuns: 2 }, 5)).toEqual({ text: '$0.40 of $5.00', reached: false, unpriced: '2 runs with no price', note: UNPRICED_NOTE })
+    expect(monthSpendLine({ unpricedRuns: 1 }, 5)).toEqual({ text: '$0.00 of $5.00', reached: false, unpriced: '1 run with no price', note: UNPRICED_NOTE })
+    // Its own line, under the amount, so the amount stays one short line.
+    expect(card({ ...wren, monthlyLimitUsd: 5 }, { tm_wren: { unpricedRuns: 1 } }))
+      .toContain(`<dd class="lc-mono">$0.00 of $5.00</dd><dd class="lc-rostercard__unpriced" title="${UNPRICED_NOTE}">1 run with no price</dd>`)
     // Without a limit there is nothing to read it against: the card stays as it was.
     expect(monthSpendLine({ unpricedRuns: 3 }, undefined)).toBeUndefined()
   })
