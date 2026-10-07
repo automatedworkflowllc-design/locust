@@ -15,7 +15,7 @@ heading: the home screen then shows it once, as a splash.
 
 ### Fixed
 
-- **A model of your own no longer reads as free against a monthly limit.** A model you add in Settings reports no price, so its runs used to count as nothing, and a teammate with a $5.00 limit showed "$0.00 of $5.00" however much its provider billed. The card now counts those runs beside the dollars, for example "$0.40 of $5.00 · 2 runs with no price", and hovering it says why. When you set a limit, it says that these runs are not counted.
+- **A model of your own no longer reads as free against a monthly limit.** A model you add in Settings reports no price, so its runs used to count as nothing, and a teammate with a $5.00 limit showed "$0.00 of $5.00" however much its provider billed. The card now counts those runs on their own line under the dollars, for example "$0.40 of $5.00" and then "2 runs with no price", and hovering that line says why. When you set a limit, it says that these runs are not counted.
 - **The voice glow rises with less voice.** Ordinary speech now lifts it about a quarter higher. Its highest point is unchanged, so it never covers more of the chat box than before.
 
 ## 0.688.0 - 2026-10-07
