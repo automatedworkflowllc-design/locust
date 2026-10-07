@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.681.0 - 2026-10-06
+
+### Fixed
+
+- **No stray `error.log` in your project.** When a GitHub folder was open, Locust checked with Codex whether the folder could use Codex Cloud, and Codex left a debug log named `error.log` in the folder. The log includes your ChatGPT account id. If your project doesn't ignore `*.log` files, a commit could pick it up: the first real pull request opened from the new Commit button carried one. Locust now leaves `error.log` exactly as it found it. It removes one Codex made, and trims only the lines Codex added to one you already had.
+
 ## 0.680.0 - 2026-10-06
 
 ### Added
