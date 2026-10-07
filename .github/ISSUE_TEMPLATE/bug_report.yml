@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         Thanks for reporting. Please leave out API keys, passwords and anything private from your project:
-        issues are public. For a security problem, email support@locust.lol instead (see SECURITY.md).
+        issues are public. For a security problem, report it privately instead (see SECURITY.md).
   - type: input
     id: version
     attributes:

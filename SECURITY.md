@@ -2,9 +2,10 @@
 
 ## Reporting a vulnerability
 
-Report security issues privately by email to support@locust.lol, with
-"Security" in the subject. Please do not open a public issue for a security
-report.
+Report security issues privately through GitHub: on this repository's
+Security tab, choose "Report a vulnerability". Or email support@locust.lol
+with "Security" in the subject. Please do not open a public issue for a
+security report.
 
 ## Code signing
 
