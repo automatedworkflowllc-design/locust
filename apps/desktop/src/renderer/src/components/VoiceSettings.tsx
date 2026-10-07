@@ -8,7 +8,7 @@ export function VoiceSettings({ api = typeof window === 'undefined' ? undefined 
   const [message, setMessage] = useState('')
   useEffect(() => {
     let alive = true
-    void api?.settings?.().then((value) => { if (alive) setSettings(value) }).catch(() => { if (alive) setMessage('Voice typing settings could not be read.') })
+    void api?.settings?.().then((value) => { if (alive) setSettings(value) }).catch(() => { if (alive) setMessage('Voice typing settings could not be read. Voice typing keeps its last choice.') })
     return () => { alive = false }
   }, [api])
   const save = async (change: VoiceSettingsChange): Promise<void> => {
@@ -18,7 +18,7 @@ export function VoiceSettings({ api = typeof window === 'undefined' ? undefined 
       const result = await api.saveSettings(change)
       if (result.ok) { setSettings(result.settings); setMessage(change.key === undefined ? '' : change.key ? 'API key saved on this computer.' : 'API key removed.') }
       else setMessage(result.message)
-    } catch { setMessage('Voice typing settings could not be saved.') }
+    } catch { setMessage('Voice typing settings could not be saved. The previous choice is still in use.') }
     finally { setKey(''); setBusy(false) }
   }
   return <div className="lc-voice-settings">
