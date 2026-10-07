@@ -5,7 +5,7 @@ import { isAbsolute, join } from 'node:path'
 
 import { MAX_GOAL_TRIES } from '../shared/ipc.js'
 import type { PublicRoutine, RoutineGoal, RoutineHandOff, RoutineHistoryEntry, RoutineStaged, TeammateRoute } from '../shared/ipc.js'
-import { validSchedule } from '../shared/routine-schedule.js'
+import { slotPassedDuring, validSchedule } from '../shared/routine-schedule.js'
 import { inputsRefusal, keptInputs, placeholdersIn, undeclaredPlaceholders, validInputs } from '../shared/routine-inputs.js'
 import type { RoutineInput } from '../shared/routine-inputs.js'
 
@@ -518,7 +518,15 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
         // nor leave a completed routine looking like it only started step 1.
         if (staged !== undefined && !validStaged(staged)) throw new Error('Routine copy changes are invalid')
         const { execution: _execution, lastFailed: _lastFailed, missedAt: _missedAt, ...rest } = held
-        const next: PublicRoutine = { ...rest, runs: held.runs + 1, lastRunAt: new Date().toISOString(), ...(staged === undefined ? {} : { staged }), ...(validFailed(failed) ? { lastFailed: failed } : {}) }
+        const endedAt = new Date()
+        // A clock time that passed while this run was going was dropped (0.690):
+        // recorded as missed, so the card says so and offers Run now.
+        const passed = held.schedule === undefined ? undefined : slotPassedDuring(held.schedule, held.execution.startedAt, endedAt)
+        const missed = passed === undefined ? {} : {
+          missedAt: passed.toISOString(),
+          history: [...(held.history ?? []), { kind: 'missed', dueAt: passed.toISOString(), recordedAt: endedAt.toISOString() } satisfies RoutineHistoryEntry].slice(-HISTORY_CAP)
+        }
+        const next: PublicRoutine = { ...rest, runs: held.runs + 1, lastRunAt: endedAt.toISOString(), ...missed, ...(staged === undefined ? {} : { staged }), ...(validFailed(failed) ? { lastFailed: failed } : {}) }
         await write({
           ...file,
           routines: file.routines.map((routine) => (routine.routineId === next.routineId ? next : routine))

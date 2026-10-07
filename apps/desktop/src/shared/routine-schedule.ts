@@ -168,6 +168,25 @@ export function missedSlot(schedule: RoutineSchedule, lastRunAt: string, openedA
   return next
 }
 
+/**
+ * A clock time that came and went while a run was still going (0.690), or
+ * undefined. The runner does not start a routine over its own running copy,
+ * and the run's end then sets its last run to the end -- so that time was
+ * neither run nor recorded (Grok's read of 0.687). The end records it as
+ * missed, as a time that passed while Locust was closed is.
+ *
+ * Only clock times: `every` counts from the last run's end, so a long run
+ * delays the next one rather than dropping it; files are not a time.
+ */
+export function slotPassedDuring(schedule: RoutineSchedule, startedAt: string, endedAt: Date): Date | undefined {
+  if (schedule.kind === 'every' || schedule.kind === 'files') return undefined
+  const start = new Date(startedAt)
+  if (Number.isNaN(start.getTime())) return undefined
+  const next = nextRunAfter(schedule, startedAt, endedAt)
+  if (next === undefined || next.getTime() <= start.getTime() || next.getTime() > endedAt.getTime()) return undefined
+  return next
+}
+
 const pad2 = (value: number): string => String(value).padStart(2, '0')
 
 /**
