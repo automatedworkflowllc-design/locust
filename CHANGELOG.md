@@ -11,6 +11,21 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.684.0 - 2026-10-07
+
+### Added
+
+- **Claude can keep working when you close Locust.** Pick **Background** in the chat type menu (Claude teammates only), then send. Claude Code runs the turn in its own background session, so it keeps going if you close Locust or restart.
+  - **The panel:** a new **In the background** panel shows each run as working, waiting for you, or done.
+  - **Answering it:** when a run needs a yes, **Open it to answer** opens it in Claude Code in a terminal. Locust never answers for you.
+  - **When it finishes:** the turn comes back into its conversation under an "In the background" divider, even if it finished while Locust was closed.
+  - **What does and doesn't apply:** Locust's approval cards and spend limits don't apply to a background run. Claude Code's own permission mode does, set from the mode you picked (Ask, Edit, Approve each or Auto).
+  - **First time in a folder:** Claude Code has to be told once that you trust the folder. Locust offers to open it there for you to answer.
+
+### Changed
+
+- **Antigravity narrates less.** Locust asks it to say what it's doing whenever it starts something new, rather than before every step. On the same task it spoke 3 times instead of 10.
+
 ## 0.683.0 - 2026-10-06
 
 ### Fixed
