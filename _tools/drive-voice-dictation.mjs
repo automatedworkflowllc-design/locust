@@ -9,7 +9,8 @@ import { startDrive, scratchRepository, sleep } from './drive-lib.mjs'
 const workspace = await scratchRepository('voice-workspace-')
 const profile = await mkdtemp(join(tmpdir(), 'voice-profile-'))
 const clip = resolve('_tools/voice-spike/results/clip.wav')
-const drive = await startDrive({ name: 'voice-dictation', port: 9896, workspace, profilePath: profile, keep: true,
+const packaged = process.argv.includes('--packaged') ? process.argv[process.argv.indexOf('--packaged') + 1] : undefined
+const drive = await startDrive({ name: 'voice-dictation', port: 9896, workspace, profilePath: profile, keep: true, ...(packaged === undefined ? {} : { packaged }),
   sendsNothing: true, focused: true,
   extraArgs: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-audio-capture=${clip}`],
   seed: { schemaVersion: 1, teammates: [{ teammateId: 'tm_voice', name: 'Voice', hue: 'clay', role: 'Custom', roleTitle: 'Helper', createdAt: '2026-10-06T00:00:00.000Z', route: { runtime: 'codex', model: 'account-default', mode: 'accept-edits' } }], missionOwners: {}, settings: { swarm: false, relay: false, memoryMode: 'off' } }
