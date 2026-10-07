@@ -80,7 +80,11 @@ try {
   await drive.capture('launch', () => drive.ready())
   await drive.evaluate(openTeammateScript('Ash'))
   const stopped = JSON.parse(String(await drive.capture('stopped 900 ms in', () => drive.evaluate(sendThenStop('Reply with the single word HERON.', 900)))))
-  check('the run was stopped before any tool ran', stopped.sent && stopped.pressedStop && /Stopped before it used any tools/.test(stopped.thread), stopped.thread.slice(-160))
+  // OpenCode reports a tool only once it finishes, so its stop card never promises nothing ran (since 10/03):
+  // it names the uncertainty instead. Either is the honest card for a stop this early.
+  check('the run was stopped before any tool ran, or the card says it cannot know', stopped.sent && stopped.pressedStop
+    && (/Stopped before it used any tools/.test(stopped.thread) || /An unreported OpenCode command may have been running/.test(stopped.thread)), stopped.thread.slice(-160))
+  check('the advice to check the folder is said once', (stopped.thread.match(/folder before sen/g) ?? []).length <= 1, stopped.thread.slice(-200))
   check('and the card offers Send again', stopped.offered)
   check('no reply had come back before the stop', !/HERON/i.test([...stopped.thread.matchAll(/HERON/gi)].length > 1 ? 'HERON' : ''), stopped.thread.slice(-160))
   check('the chat box is empty, as the defect found it', stopped.box === '', JSON.stringify(stopped.box))

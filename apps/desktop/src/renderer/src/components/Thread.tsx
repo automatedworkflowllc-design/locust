@@ -1600,11 +1600,11 @@ onResume,
         {stopped !== undefined && <CancellationCard summary={stopped} stoppedAt={stoppedAt} byPerson={stoppedByPerson} />}
         {stopped !== undefined && stoppedBeforeAnyTool(stopped) && onSendAgain !== undefined && (
           <div className="lc-rerun">
-            <span>
-              {stopped.toolsReportedWhenDone === true
-                ? 'Look at the folder before sending it again: a command it had started may have run.'
-                : 'No tool had run, so sending it again cannot repeat anything.'}
-            </span>
+            {/*
+              * Said once (0.696): on OpenCode the card above already says to check the folder, and this
+              * line said it again in other words, stacked under it (the 0.695 sweep's stop drive).
+              */}
+            {stopped.toolsReportedWhenDone !== true && <span>No tool had run, so sending it again cannot repeat anything.</span>}
             <button type="button" className="lc-button" onClick={onSendAgain}>
               <Icon name="play" size={13} /> Send again
             </button>

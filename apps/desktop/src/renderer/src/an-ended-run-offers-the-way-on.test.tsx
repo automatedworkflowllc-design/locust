@@ -51,7 +51,9 @@ describe('a run stopped before any tool ran', () => {
     expect(html).not.toContain('Stopped before it used any tools')
     expect(html).not.toContain('cannot repeat anything')
     expect(html).toContain('An unreported OpenCode command may have been running when stopped.')
-    expect(html).toContain('Look at the folder before sending it again')
+    // Said once: the card says to check the folder; the Send again line does not say it again (0.696).
+    expect(html.split('check the folder').length - 1).toBe(1)
+    expect(html).not.toContain('Look at the folder before sending it again')
     expect(html).toContain('Send again')
   })
 
