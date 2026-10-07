@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.698.0 - 2026-10-07
+
+### Faster
+
+- **Less work while a reply streams.** The light that travels round the stop button was redrawn on every frame your screen shows, 60 times a second or 144 on a fast laptop screen, while the teammates' faces beside it move at 30. It now moves at 30 as well, and looks the same. While a reply streams, Locust takes about 8% of the machine instead of about 9%.
+
 ## 0.697.0 - 2026-10-07
 
 ### Fixed
