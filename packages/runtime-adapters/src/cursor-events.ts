@@ -663,11 +663,31 @@ export function createCursorEventNormalizer(
     if (type === "locust.oversized") {
       if (parsed.recordType !== "tool_call") return [];
       const kb = typeof parsed.bytes === "number" && Number.isFinite(parsed.bytes) ? Math.round(parsed.bytes / 1024) : undefined;
+      // An edit's own counts and diff, read from the record's head (0.693): the change, without the file twice.
+      const edit = isObject(parsed.edit) ? parsed.edit : undefined;
+      const added = typeof edit?.added === "number" && Number.isSafeInteger(edit.added) && edit.added >= 0 ? edit.added : undefined;
+      const removed = typeof edit?.removed === "number" && Number.isSafeInteger(edit.removed) && edit.removed >= 0 ? edit.removed : undefined;
+      const diff = typeof edit?.diff === "string" ? edit.diff : undefined;
       const events: NormalizedRuntimeEvent[] = [];
       for (const itemId of Array.isArray(parsed.callIds) ? parsed.callIds.filter((id): id is string => typeof id === "string") : []) {
         const open = openTools.get(itemId);
         if (open === undefined) continue;
         openTools.delete(itemId);
+        if (open.kind === "edit" && added !== undefined && removed !== undefined) {
+          const fromDiff = diff === undefined ? undefined : toolPatchFrom(diff);
+          events.push(
+            emit("tool.completed", {
+              itemId,
+              toolKind: open.kind,
+              name: open.kind,
+              ...(open.target === undefined ? {} : { command: boundedMessageText(open.target) }),
+              patch: fromDiff ?? { text: "", added, removed, truncated: true },
+              phase: "completed",
+              evidence,
+            }),
+          );
+          continue;
+        }
         events.push(
           emit("tool.completed", {
             itemId,

@@ -33,7 +33,10 @@ const drive = await startDrive({
   outPath: join(recordRoot('a-claude-edit-shows-its-change-2026-10-06'), tag),
   seed: {
     schemaVersion: 1,
-    teammates: [{ teammateId: 'tm_ash', name: 'Ash', hue: 'clay', role: 'Custom', roleTitle: 'Helper', createdAt: '2026-09-05T05:00:00.000Z', route: { runtime: 'claude', model: 'haiku', mode: 'auto' } }],
+    // --runtime cursor (0.692 night): Cursor's edits, 8 of 73 of which never reported back in Colin's
+    // 10/05 turns. Cursor keeps the person's own model (choosing one rewrites their default).
+    teammates: [{ teammateId: 'tm_ash', name: 'Ash', hue: 'clay', role: 'Custom', roleTitle: 'Helper', createdAt: '2026-09-05T05:00:00.000Z',
+      route: arg('--runtime') === 'cursor' ? { runtime: 'cursor', model: 'account-default', mode: 'auto' } : { runtime: 'claude', model: 'haiku', mode: 'auto' } }],
     missionOwners: {},
     settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: true }
   }
@@ -64,6 +67,10 @@ try {
   check('notes.txt reads as one line changed: +1 -1', /\+1\b/.test(notes) && /[−-]1\b/.test(notes), notes)
   check('hello.md reads as a new file of three lines: +3', /\+3\b/.test(hello), hello)
   check('no row says the change was not reported', rows.length > 0 && !rows.some((row) => /did not report|not confirmed/.test(row)), JSON.stringify(rows))
+  // And the steps: an edit that never reported back reads "1 did not report" on its group's line.
+  const stepLines = JSON.parse(String(await drive.evaluate(`JSON.stringify([...document.querySelectorAll('.lc-thread .lc-steps__line')].map((line) => line.innerText.replace(/\\s+/g, ' ').trim()))`)))
+  say(`      steps: ${JSON.stringify(stepLines).slice(0, 300)}`)
+  check('no step line says a step did not report', !stepLines.some((line) => /did not report/.test(line)), JSON.stringify(stepLines).slice(0, 300))
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

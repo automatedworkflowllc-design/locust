@@ -46,6 +46,38 @@ function callIdsIn(head: string): string[] {
   )];
 }
 
+/**
+ * WHAT AN OVERSIZED EDIT CHANGED, FROM ITS FIRST BYTES (0.693).
+ *
+ * Cursor's edit result carries the whole file twice, before and after: a
+ * one-line change to a 158 KB file arrived as a 323 KB record (measured
+ * 2026-10-07), past the cap, so its counts went with it and the files card
+ * read "changed · seen on disk" instead of "+1 −1". The counts and the diff
+ * come FIRST in the record (`linesAdded` at byte 325, a 243-character
+ * `diffString` at 357, the two copies of the file after), so they are read
+ * from its head and the copies stay out. The diff is the change itself --
+ * what an edit under the cap records anyway -- bounded at 16 KB; a longer
+ * one, or one not closed within the head, is left out and only the counts
+ * travel.
+ */
+export function editReportIn(head: string): { readonly added: number; readonly removed: number; readonly diff?: string } | undefined {
+  if (!head.includes('"editToolCall"')) return undefined;
+  const added = /"linesAdded"\s*:\s*(\d{1,9})/.exec(head)?.[1];
+  const removed = /"linesRemoved"\s*:\s*(\d{1,9})/.exec(head)?.[1];
+  if (added === undefined || removed === undefined) return undefined;
+  const quoted = /"diffString"\s*:\s*"((?:[^"\\]|\\.){0,16384})"/.exec(head)?.[1];
+  let diff: string | undefined;
+  if (quoted !== undefined) {
+    try {
+      const parsed: unknown = JSON.parse(`"${quoted}"`);
+      if (typeof parsed === "string" && parsed.length > 0) diff = parsed;
+    } catch {
+      // A diff that does not read as a string is left out; the counts stand.
+    }
+  }
+  return { added: Number(added), removed: Number(removed), ...(diff === undefined ? {} : { diff }) };
+}
+
 function isTurnResult(raw: string): boolean {
   if (!raw.includes('"result"')) return false;
   try {
@@ -689,8 +721,9 @@ export function createNodeRuntimeProcessRunner(
         const start = head.slice(0, 4096);
         const recordType = /^\s*\{\s*"type"\s*:\s*"([a-z_]{1,40})"/.exec(start)?.[1];
         const callIds = callIdsIn(start);
+        const edit = editReportIn(head.slice(0, 65_536));
         const nextSequence = recordCount + 1;
-        if (!records.push({ sequence: nextSequence, raw: JSON.stringify({ type: "locust.oversized", bytes, ...(recordType === undefined ? {} : { recordType }), callIds }) })) {
+        if (!records.push({ sequence: nextSequence, raw: JSON.stringify({ type: "locust.oversized", bytes, ...(recordType === undefined ? {} : { recordType }), callIds, ...(edit === undefined ? {} : { edit }) }) })) {
           exceedOutputLimit();
           return;
         }
