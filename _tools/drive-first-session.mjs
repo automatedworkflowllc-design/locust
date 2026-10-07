@@ -102,7 +102,7 @@ const quietScript = (waitSeconds) => `(async () => {
   for (let i = 0; i < ${String(waitSeconds * 2)}; i += 1) {
     await new Promise((r) => setTimeout(r, 500))
     const busy = document.querySelector('button[aria-label^="Stop the running"]') !== null
-      || ${teammateRows()}.some((row) => /working|running|starting|replying|listening|thinking|waiting/i.test(row.innerText))
+      || ${teammateRows()}.some((row) => /working|running|starting|replying|listening|thinking|waiting(?! on you)/i.test(row.innerText))
     calm = busy ? 0 : calm + 1
     if (i > 6 && calm >= 8) break
   }
@@ -165,14 +165,16 @@ try {
         return now.map((note) => (note.className.includes('amber') ? 'AMBER ' : note.className.includes('muted') ? 'quiet ' : '') + note.textContent.trim()).join(' | ').slice(0, 700)
       }
       const busy = document.querySelector('button[aria-label^="Stop the running"]') !== null
-        || ${teammateRows()}.some((row) => /working|running|starting|replying|listening|thinking|waiting/i.test(row.innerText))
+        || ${teammateRows()}.some((row) => /working|running|starting|replying|listening|thinking|waiting(?! on you)/i.test(row.innerText))
       if (i > 20 && !busy) return 'no notes while it worked'
       await new Promise((r) => setTimeout(r, 500))
     }
     return 'no notes in time'
   })()`))
   const quiet = await drive.capture('the whole team, once quiet', () => drive.evaluate(quietScript(480)))
-  say(quiet.slice(0, 200))
+  // A teammate that ends by asking reads "waiting on you": stopped, not busy (0.695 sweep: the wait outlived
+  // the evaluate, and `quiet` came back undefined).
+  say(String(quiet ?? 'no answer in time').slice(0, 200))
   await drive.capture(`${mate}'s conversation, at its end`, () => drive.evaluate(`(async () => {
     const face = ${teammateFace(mate)}
     face?.click()
