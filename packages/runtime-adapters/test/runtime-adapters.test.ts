@@ -946,6 +946,37 @@ describe("Cursor Agent and Gemini CLI commands", () => {
     });
   });
 
+  it("resolves the shim of an install that is not global, which points one folder up", async () => {
+    // MEASURED 2026-10-07: the runtime canary installs a new Copilot with
+    // `npm install --prefix <folder>`, and npm writes its shim inside
+    // node_modules\.bin as `%dp0%\..\@github\...`. Only the global shape was
+    // known, so the run fell to cmd.exe and a multi-line prompt was refused.
+    const prefix = "C:\\work\\.scratch\\runtime-canary\\copilot-1.0.93";
+    const bin = `${prefix}\\node_modules\\.bin`;
+    const cmdShim = `${bin}\\copilot.cmd`;
+    const script = `${prefix}\\node_modules\\@github\\copilot\\npm-loader.js`;
+    const node = "C:\\Program Files\\nodejs\\node.exe";
+    const shell = "C:\\Windows\\System32\\cmd.exe";
+    const found = await createPathExecutableLocator({
+      platform: "win32",
+      environment: { PATH: `${bin};C:\\Program Files\\nodejs`, SystemRoot: "C:\\Windows" },
+      isExecutableFile: async (candidate) => candidate === cmdShim || candidate === node || candidate === shell,
+      readDirectory: async () => [],
+      // The exact line npm wrote into that shim.
+      readFile: async (path) =>
+        path === cmdShim
+          ? 'endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\\..\\@github\\copilot\\npm-loader.js" %*\r\n'
+          : undefined,
+    }).find("copilot");
+
+    expect(found).toMatchObject({
+      discoveredPath: cmdShim,
+      executablePath: node,
+      prefixArgs: [script],
+      kind: "node-shim",
+    });
+  });
+
   it("prefers the node.exe npm keeps beside its shim, the way the shim itself does", async () => {
     const ROAMING = "C:\\Users\\x\\AppData\\Roaming";
     const cmdShim = `${ROAMING}\\npm\\opencode.cmd`;

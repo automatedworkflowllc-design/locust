@@ -1,6 +1,6 @@
 // The runtime canary: a new CLI release, through one real turn, before Locust installs it.
 //
-//   LOCUST_SPEND=1 node _tools/runtime-canary.mjs --packaged <Locust.exe> [--runtime codex] [--version <v>] [--force]
+//   LOCUST_SPEND=1 node _tools/runtime-canary.mjs --packaged <Locust.exe> [--runtime codex|copilot] [--version <v>] [--force]
 //
 // Locust updates the coding agents npm installed (runtime-updates.ts: Codex
 // and Copilot) on its own, twelve hours after a release goes out. Twelve hours
@@ -35,10 +35,10 @@ const ROOT = new URL('..', import.meta.url).pathname.slice(1)
 // Beside the checkout, never inside it: the scratch folder the drives already use.
 const SCRATCH = process.env.LOCUST_SCRATCH ?? join(ROOT, '..', '.scratch')
 // The agents Locust keeps current itself, by their npm package and command.
-const AGENTS = { codex: { pkg: '@openai/codex', command: 'codex' } }
+const AGENTS = { codex: { pkg: '@openai/codex', command: 'codex' }, copilot: { pkg: '@github/copilot', command: 'copilot' } }
 const agent = AGENTS[runtime]
 if (packaged === undefined || agent === undefined) {
-  console.log('usage: LOCUST_SPEND=1 node _tools/runtime-canary.mjs --packaged <Locust.exe> [--runtime codex] [--version <v>] [--force]')
+  console.log('usage: LOCUST_SPEND=1 node _tools/runtime-canary.mjs --packaged <Locust.exe> [--runtime codex|copilot] [--version <v>] [--force]')
   process.exit(2)
 }
 if (process.env.LOCUST_SPEND !== '1') {

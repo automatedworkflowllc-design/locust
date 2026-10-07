@@ -74,11 +74,21 @@ pm`
  *
  *   "%_prog%"  "%dp0%\node_modules\@github\copilot\npm-loader.js" %*
  *
- * Only this exact shape is resolved past cmd.exe. A `.cmd` that does anything
+ * An install that is not global (`npm install --prefix <folder>`, or a
+ * project's own) writes the same line from inside `node_modules\.bin`, one
+ * folder up instead of one folder down:
+ *
+ *   "%_prog%"  "%dp0%\..\@github\copilot\npm-loader.js" %*
+ *
+ * MEASURED 2026-10-07 by the runtime canary, which installs a new Copilot into
+ * a folder of its own: that shim was not recognised, the run fell to cmd.exe,
+ * and a multi-line prompt was refused before anything started.
+ *
+ * Only these two shapes are resolved past cmd.exe. A `.cmd` that does anything
  * else is somebody's own script and keeps its shell, because guessing at what
  * a batch file does is how a locator starts running things it did not mean to.
  */
-const NPM_SHIM_SCRIPT = /"%dp0%\\(node_modules\\[^"\r\n]+\.[cm]?js)"\s+%\*/;
+const NPM_SHIM_SCRIPT = /"%dp0%\\((?:node_modules|\.\.)\\[^"\r\n]+\.[cm]?js)"\s+%\*/;
 
 /**
  * The other shape npm writes, for a package whose bin is a native binary:
@@ -88,7 +98,7 @@ const NPM_SHIM_SCRIPT = /"%dp0%\\(node_modules\\[^"\r\n]+\.[cm]?js)"\s+%\*/;
  * OpenCode and Claude Code both ship this way. There is nothing for node to
  * run; the `.exe` is the program, and cmd.exe was only ever in the way.
  */
-const NPM_SHIM_BINARY = /"%dp0%\\(node_modules\\[^"\r\n]+\.exe)"\s+%\*/i;
+const NPM_SHIM_BINARY = /"%dp0%\\((?:node_modules|\.\.)\\[^"\r\n]+\.exe)"\s+%\*/i;
 
 async function defaultReadFile(path: string): Promise<string | undefined> {
   try {
