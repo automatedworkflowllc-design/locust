@@ -35,8 +35,15 @@ const drive = await startDrive({
     schemaVersion: 1,
     // --runtime cursor (0.692 night): Cursor's edits, 8 of 73 of which never reported back in Colin's
     // 10/05 turns. Cursor keeps the person's own model (choosing one rewrites their default).
+    // Every agent (0.693 night): a large file's edit must count its lines on each, as on Claude and Cursor.
     teammates: [{ teammateId: 'tm_ash', name: 'Ash', hue: 'clay', role: 'Custom', roleTitle: 'Helper', createdAt: '2026-09-05T05:00:00.000Z',
-      route: arg('--runtime') === 'cursor' ? { runtime: 'cursor', model: 'account-default', mode: 'auto' } : { runtime: 'claude', model: 'haiku', mode: 'auto' } }],
+      route: ({
+        cursor: { runtime: 'cursor', model: 'account-default', mode: 'auto' },
+        codex: { runtime: 'codex', model: 'account-default', mode: 'auto' },
+        copilot: { runtime: 'copilot', model: 'account-default', mode: 'auto' },
+        antigravity: { runtime: 'antigravity', model: 'account-default', mode: 'auto' },
+        opencode: { runtime: 'opencode', model: 'opencode/nemotron-3-ultra-free', mode: 'auto' }
+      })[arg('--runtime') ?? ''] ?? { runtime: 'claude', model: 'haiku', mode: 'auto' } }],
     missionOwners: {},
     settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: true }
   }
