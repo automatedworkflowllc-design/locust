@@ -101,6 +101,16 @@ export function checkpointSentence(result: CheckpointResult | { readonly kind: '
     : ` Left out, too big to commit: ${result.skipped.map((file) => `${file.path} (${megabytes(file.bytes)})`).join(', ')}.`
   if (result.kind === 'skipped') return `Nothing from this turn was saved on the branch.${left}`
   // Its files are what came in with the merge, not this turn's own work (0.440).
+  /*
+   * Not "it can land now" while markers remain (0.680). The 0.678 sweep: Wren,
+   * asked to resolve cart.py, asked which side to keep instead -- a fair
+   * question -- and the thread said the merge was finished and could land,
+   * under a card saying conflict markers were still in cart.py.
+   */
+  if (result.mergeFinished === true && result.stillMarked !== undefined && result.stillMarked.length > 0) {
+    const many = result.stillMarked.length > 1
+    return `Saved this turn on ${result.branch} as ${result.sha.slice(0, 12)}, but ${fileList(result.stillMarked)} still ${many ? 'have' : 'has'} conflict markers, so it cannot land until ${many ? 'they are' : 'it is'} resolved.${left}`
+  }
   if (result.mergeFinished === true) return `Saved this turn on ${result.branch} as ${result.sha.slice(0, 12)}: the merge is finished, so it can land now.${left}`
   const count = result.files.length
   return `Saved this turn on ${result.branch} as ${result.sha.slice(0, 12)}: ${String(count)} ${count === 1 ? 'file' : 'files'} (${fileList(result.files)}).${left}`

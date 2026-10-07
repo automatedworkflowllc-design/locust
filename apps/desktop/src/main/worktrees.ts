@@ -265,6 +265,8 @@ export type CheckpointResult =
       readonly skipped: readonly { readonly path: string; readonly bytes: number }[]
       /** This commit finished a merge begun to resolve a conflict (0.440): `files` are what came in with it. */
       readonly mergeFinished?: true
+      /** Files the commit holds with conflict markers still in them, which Land refuses (0.680). */
+      readonly stillMarked?: readonly string[]
     }
   /** Only files too big to commit changed. */
   | { readonly kind: 'skipped'; readonly skipped: readonly { readonly path: string; readonly bytes: number }[] }
@@ -636,7 +638,13 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
       ], path, WORKTREE_CHECKOUT_TIMEOUT_MS)
       const sha = (await runGit(['rev-parse', 'HEAD'], path)).trim()
       const branch = (await runGit(['symbolic-ref', '--short', '-q', 'HEAD'], path).catch(() => '')).trim()
-      return { kind: 'committed', sha, branch, files, skipped, ...(merging ? { mergeFinished: true } : {}) }
+      // Land's own rule for an unresolved file (below), read off what was just committed: a turn that asked a
+      // question instead of resolving left its markers in, and the merge is not ready however it was concluded.
+      const stillMarked = merging && files.length > 0
+        ? (await runGit(['grep', '-l', '-E', '-e', '^(<<<<<<<|>>>>>>>)( |$)', 'HEAD', '--', ...files], path).catch(() => ''))
+            .split(/\r?\n/).map((line) => line.replace(/^HEAD:/, '').trim()).filter((line) => line.length > 0)
+        : []
+      return { kind: 'committed', sha, branch, files, skipped, ...(merging ? { mergeFinished: true } : {}), ...(stillMarked.length === 0 ? {} : { stillMarked }) }
     },
 
     async review(teammateId) {

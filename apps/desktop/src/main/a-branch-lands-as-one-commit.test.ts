@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { createWorktreeManager, gitVersionCanLand, landingDraft } from './worktrees.js'
+import { checkpointSentence } from './turn-checkpoint.js'
 
 /**
  * LAND IT (0.440): a teammate's own branch lands on the person's branch as
@@ -141,6 +142,23 @@ describe('a branch lands as one commit', () => {
     expect(saved.kind).toBe('committed')
     if (saved.kind === 'committed') expect(saved.mergeFinished).toBe(true)
     expect((await manager.landPreview(WREN)).block).toBeUndefined()
+  })
+
+  it('a turn that asked instead of resolving does not say the merge can land (0.680)', { timeout: REAL_GIT_TIMEOUT_MS }, async () => {
+    const { root, manager } = await twoTurns()
+    await writeFile(join(root, 'cart.py'), 'def total(items):' + String.fromCharCode(10) + '    return len(items)' + String.fromCharCode(10), 'utf8')
+    await git(['commit', '-q', '-am', 'mine'], root)
+    await manager.startResolving('tm_wren')
+    // The 0.678 sweep: Wren asked which side to keep, and touched nothing.
+    const saved = await manager.checkpoint('tm_wren', turn('Which side?'))
+    expect(saved.kind).toBe('committed')
+    if (saved.kind !== 'committed') return
+    expect(saved.mergeFinished).toBe(true)
+    expect(saved.stillMarked).toEqual(['cart.py'])
+    const said = checkpointSentence(saved) ?? ''
+    expect(said).not.toMatch(/can land now/)
+    expect(said).toMatch(/cart\.py still has conflict markers, so it cannot land until it is resolved/)
+    expect((await manager.landPreview(WREN)).block).toEqual({ kind: 'markers', files: ['cart.py'] })
   })
 
   it('refuses a branch that still carries conflict markers', { timeout: REAL_GIT_TIMEOUT_MS }, async () => {
