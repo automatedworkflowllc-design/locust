@@ -22,6 +22,7 @@ import {
   createPathExecutableLocator,
   discoverInstalledRuntimes,
   parseRuntimeVersion,
+  withoutOpenCodeQuestionTool,
 } from "../src/index.js";
 import type {
   CommandRunner,
@@ -251,6 +252,7 @@ describe("the Auto mode a person switches on", () => {
       repositoryRoot: "C:\\work\\shop",
     });
     expect(JSON.parse(inWorktree.env?.OPENCODE_CONFIG_CONTENT ?? "{}")).toEqual({
+      tools: { question: false },
       permission: { external_directory: "allow" },
     });
   });
@@ -1116,7 +1118,7 @@ describe("OpenCode and Copilot CLI commands", () => {
     // only thing that stops a run editing files -- with it, the write tool is
     // not offered at all. And a read-only run loads no plugins, so a repo's
     // own .opencode/plugin code cannot run outside that config (A6.2).
-    expect(spec.env).toEqual({ OPENCODE_CONFIG_CONTENT: OPENCODE_READ_ONLY_CONFIG, OPENCODE_PURE: "1" });
+    expect(spec.env).toEqual({ OPENCODE_CONFIG_CONTENT: withoutOpenCodeQuestionTool(OPENCODE_READ_ONLY_CONFIG), OPENCODE_PURE: "1" });
     expect(JSON.parse(OPENCODE_READ_ONLY_CONFIG)).toEqual({
       permission: {
         edit: "deny",
@@ -1160,6 +1162,7 @@ describe("OpenCode and Copilot CLI commands", () => {
       repositoryRoot: "C:\\work\\shop",
     });
     expect(JSON.parse(worktree.env?.OPENCODE_CONFIG_CONTENT ?? "{}")).toEqual({
+        tools: { question: false },
         // `.git` and nothing else. Granting the whole parent folder DID let all
       // three teammates finish -- and one of them then wrote its file into the
       // shared folder as well as its own worktree, which is exactly what a
@@ -1188,6 +1191,7 @@ describe("OpenCode and Copilot CLI commands", () => {
       repositoryRoot: "C:\\work\\shop",
     });
     expect(JSON.parse(readOnly.env?.OPENCODE_CONFIG_CONTENT ?? "{}")).toEqual({
+      tools: { question: false },
       permission: {
         edit: "deny",
         write: "deny",
@@ -1249,6 +1253,7 @@ describe("OpenCode and Copilot CLI commands", () => {
     // used to serve this purpose and no longer can, but the control's job is
     // unchanged: prove the parent grant is not handed out unconditionally.
     expect(JSON.parse(inPlace.env?.OPENCODE_CONFIG_CONTENT ?? "{}")).toEqual({
+      tools: { question: false },
       permission: { external_directory: "deny" },
     });
     expect(inPlace.env?.OPENCODE_CONFIG_CONTENT).not.toContain("allow");
@@ -1272,6 +1277,7 @@ describe("OpenCode and Copilot CLI commands", () => {
     // runs of one prompt: unstated -> run never reached its own end; "deny"
     // -> refused cleanly, the model said so, the run finished.
     expect(JSON.parse(spec.env?.OPENCODE_CONFIG_CONTENT ?? "{}")).toEqual({
+      tools: { question: false },
       permission: { external_directory: "deny" },
     });
     // Confinement is stated; nothing about editing inside the folder changed.

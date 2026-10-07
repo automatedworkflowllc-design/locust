@@ -216,6 +216,7 @@ describe("OpenCode through its own server (A6.7)", () => {
   it("asks for every action in its config, and never announces itself on the network", () => {
     const command = createOpenCodeServeCommand(EXECUTABLE, { workspacePath: "C:/work/pebble" });
     expect(JSON.parse(command.env?.OPENCODE_CONFIG_CONTENT ?? "{}")).toEqual({
+      tools: { question: false },
       permission: { edit: "ask", bash: "ask", webfetch: "ask", external_directory: "ask" },
     });
     expect(command.args).not.toContain("--mdns");

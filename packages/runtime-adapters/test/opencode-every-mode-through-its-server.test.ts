@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { OPENCODE_AUTO_CONFIG, OPENCODE_CONFINED_CONFIG, OPENCODE_READ_ONLY_CONFIG, createOpenCodeRunCommand, createOpenCodeServeCommand } from "../src/commands.js";
+import { OPENCODE_AUTO_CONFIG, OPENCODE_CONFINED_CONFIG, OPENCODE_READ_ONLY_CONFIG, createOpenCodeRunCommand, createOpenCodeServeCommand, withoutOpenCodeQuestionTool } from "../src/commands.js";
 import type { AppServerRunProcess } from "../src/codex-app-server-run.js";
 import { createOpenCodeEventNormalizer } from "../src/opencode-events.js";
 import { startOpenCodeServeRun } from "../src/opencode-serve-run.js";
@@ -130,9 +130,9 @@ describe("a mode on the server means what it meant on run", () => {
   }
 
   it("read-only is read-only, loads no plugins; workspace-write stays in the folder; Auto may leave it", () => {
-    expect(createOpenCodeServeCommand(EXECUTABLE, { workspacePath: "C:/w", sandbox: "read-only" }).env).toEqual({ OPENCODE_CONFIG_CONTENT: OPENCODE_READ_ONLY_CONFIG, OPENCODE_PURE: "1" });
-    expect(createOpenCodeServeCommand(EXECUTABLE, { workspacePath: "C:/w", sandbox: "workspace-write" }).env).toEqual({ OPENCODE_CONFIG_CONTENT: OPENCODE_CONFINED_CONFIG });
-    expect(createOpenCodeServeCommand(EXECUTABLE, { workspacePath: "C:/w", sandbox: "full-access" }).env).toEqual({ OPENCODE_CONFIG_CONTENT: OPENCODE_AUTO_CONFIG });
+    expect(createOpenCodeServeCommand(EXECUTABLE, { workspacePath: "C:/w", sandbox: "read-only" }).env).toEqual({ OPENCODE_CONFIG_CONTENT: withoutOpenCodeQuestionTool(OPENCODE_READ_ONLY_CONFIG), OPENCODE_PURE: "1" });
+    expect(createOpenCodeServeCommand(EXECUTABLE, { workspacePath: "C:/w", sandbox: "workspace-write" }).env).toEqual({ OPENCODE_CONFIG_CONTENT: withoutOpenCodeQuestionTool(OPENCODE_CONFINED_CONFIG) });
+    expect(createOpenCodeServeCommand(EXECUTABLE, { workspacePath: "C:/w", sandbox: "full-access" }).env).toEqual({ OPENCODE_CONFIG_CONTENT: withoutOpenCodeQuestionTool(OPENCODE_AUTO_CONFIG) });
   });
 
   const asks = async (approveAll: boolean) => {

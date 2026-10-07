@@ -1436,11 +1436,33 @@ export function openCodeModeEnv(options: { readonly sandbox?: RuntimeCommandOpti
   // (OPENCODE_PURE, "run without external plugins"; plugin/index.ts:181).
   // Only for read-only runs: a run that may edit is already trusted with
   // the folder, and the person's own plugins are theirs to have there.
-  const configured = withOpenCodeProviders(config, options.providers);
+  const configured = withoutOpenCodeQuestionTool(withOpenCodeProviders(config, options.providers));
   return {
-    ...(configured === undefined ? {} : { OPENCODE_CONFIG_CONTENT: configured }),
+    OPENCODE_CONFIG_CONTENT: configured,
     ...(readOnly ? { OPENCODE_PURE: "1" } : {}),
   };
+}
+
+/**
+ * OPENCODE'S OWN QUESTION TOOL, OFF (0.700).
+ *
+ * OpenCode gives a model a `question` tool whenever its client is `app`, `cli`
+ * or `desktop` -- and every command, `serve` included, is `cli` unless told
+ * otherwise. A model asked to check something with the person calls it, the
+ * server says `question.asked`, and the turn waits for a reply on
+ * `/question/{id}/reply` that Locust never sends: the teammate read "Working…"
+ * until the person pressed Stop (drive-needs-you: 11 minutes). MEASURED
+ * 2026-10-07 on `opencode serve` 1.18.27, nemotron-3-ultra-free, the drive's
+ * own prompt: with the tool, 3 of 3 asked through it and were still waiting at
+ * 60-90 s; without it, 3 of 3 finished in 11-23 s. Every other agent asks with
+ * Locust's question block, which ends the turn and draws the question card;
+ * without the tool OpenCode's models do the same. Merged into any tools map
+ * already there (a chat-only model's `"*": false` stays).
+ */
+export function withoutOpenCodeQuestionTool(config: string | undefined): string {
+  const parsed = config === undefined ? {} : (JSON.parse(config) as Record<string, unknown>);
+  const tools = (parsed.tools as Record<string, unknown> | undefined) ?? {};
+  return JSON.stringify({ ...parsed, tools: { ...tools, question: false } });
 }
 
 /**
@@ -1728,7 +1750,7 @@ export function createOpenCodeServeCommand(
   return baseSpec("opencode", executable, options.workspacePath, ["serve", "--port", "0", "--hostname", "127.0.0.1"], {
     stdin: "protocol",
     sandbox: "workspace-write",
-    env: { OPENCODE_CONFIG_CONTENT: withOpenCodeProviders(config, options.providers) ?? config },
+    env: { OPENCODE_CONFIG_CONTENT: withoutOpenCodeQuestionTool(withOpenCodeProviders(config, options.providers) ?? config) },
   });
 }
 

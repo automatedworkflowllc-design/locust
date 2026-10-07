@@ -169,6 +169,7 @@ export {
   createOpenCodeServeCommand,
   createClaudeCommandListCommand,
   withOpenCodeProviders,
+  withoutOpenCodeQuestionTool,
   OPENCODE_READ_ONLY_CONFIG,
   MUSE_REQUIRED_FEATURES,
   OPENCODE_REQUIRED_FEATURES,
