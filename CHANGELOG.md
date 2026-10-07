@@ -15,7 +15,7 @@ heading: the home screen then shows it once, as a splash.
 
 ### Fixed
 
-- **A starting Codex, OpenCode or Copilot turn says it is starting.** While one of these agents got going, the line under your message still said "Reading the folder", a step that had already finished, and then jumped to "Working". It now says "Starting Codex CLI", "Starting OpenCode" or "Starting Copilot CLI" while the agent boots, as Claude Code and Cursor already did, and the turn's details say how long the agent itself took to start.
+- **A starting Codex, OpenCode or Copilot turn says it is starting.** While one of these agents got going, the line under your message still said "Reading the folder", a step that had already finished, and then jumped to "Working". It now says "Starting Codex CLI", "Starting OpenCode" or "Starting Copilot CLI" while the agent boots, as Claude Code and Cursor already did.
 
 ## 0.698.0 - 2026-10-07
 
