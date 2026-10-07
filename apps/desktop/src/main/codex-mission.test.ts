@@ -978,7 +978,7 @@ describe('mission sandbox', () => {
    * step, a room post -- it is refused before anything is recorded, with its
    * own code, so a routine can tell it from a dispatch that may have run.
    */
-  it('refuses a teammate at the monthly limit, whoever started it, before anything is recorded', async () => {
+  it.each([undefined, { kind: 'mcp' as const }])('refuses a teammate at the monthly limit, whoever started it, before anything is recorded (%j)', async (origin) => {
     const createMission = vi.fn<MissionLedger['createMission']>(async () => undefined)
     const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({
       records: records([]),
@@ -993,7 +993,7 @@ describe('mission sandbox', () => {
       }
     })
     const wren: MissionPeerContext = { self: { teammateId: 'tm_wren', name: 'Wren', role: 'Code & Migrations' }, others: [] }
-    const response = await service.start('Fix the typo.', 'codex', 'accept-edits', {}, () => undefined, undefined, wren)
+    const response = await service.start('Fix the typo.', 'codex', origin === undefined ? 'accept-edits' : 'ask', {}, () => undefined, undefined, wren, undefined, undefined, origin)
     expect(response).toMatchObject({ ok: false, error: { code: 'SPEND_LIMIT_REACHED', message: said } })
     expect(start).not.toHaveBeenCalled()
     expect(createMission).not.toHaveBeenCalled()
@@ -1028,6 +1028,16 @@ describe('mission sandbox', () => {
       expect.arrayContaining(['--sandbox', 'read-only'])
     )
     expect(start.mock.calls[0]?.[0]?.args).not.toContain('workspace-write')
+  })
+
+  it('records an MCP-origin Ask run with the actual read-only sandbox', async () => {
+    const createMission = vi.fn<MissionLedger['createMission']>(async () => undefined)
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({ records: records([]), completion: Promise.resolve(completion()) })) satisfies RuntimeProcessRunner['start']
+    const { service } = scheduledService({ start }, fakeLedger({ createMission }))
+    const result = await service.start('Review this.', 'codex', 'ask', {}, () => undefined, undefined, undefined, undefined, undefined, { kind: 'mcp' })
+    expect(result).toMatchObject({ ok: true, data: { sandbox: 'read-only' } })
+    expect(start.mock.calls[0]?.[0]?.args).toEqual(expect.arrayContaining(['--sandbox', 'read-only']))
+    expect(createMission).toHaveBeenCalledWith(expect.objectContaining({ sandbox: 'read-only', mode: 'ask', startedBy: { kind: 'mcp' } }))
   })
 
   it('runs workspace-write only when edits were explicitly accepted', async () => {
@@ -2696,7 +2706,7 @@ describe('what a completed share hands to the relay', () => {
   const ATLAS = { teammateId: 'tm_atlas', name: 'Atlas', role: 'Research & Briefs' }
   const PEER: MissionPeerContext = { self: WREN, others: [ATLAS] }
 
-  it('calls onShared once with the run and exactly the messages it posted, after they are recorded', async () => {
+  it.each([undefined, { kind: 'mcp' as const }])('calls onShared with the origin and exactly the messages it posted, after they are recorded (%j)', async origin => {
     let nextId = 0
     const workroom: Workroom = {
       post: async (input) => ({
@@ -2746,7 +2756,7 @@ describe('what a completed share hands to the relay', () => {
       }
     })
 
-    const response = await service.start('Where do the checks run?', 'codex', 'ask', { model: 'gpt-5-codex' }, () => undefined, undefined, PEER)
+    const response = await service.start('Where do the checks run?', 'codex', 'ask', { model: 'gpt-5-codex' }, () => undefined, undefined, PEER, undefined, undefined, origin)
     expect(response.ok).toBe(true)
     while (scheduled.length > 0) scheduled.shift()!()
     for (let i = 0; i < 20; i += 1) await new Promise((resolve) => setImmediate(resolve))
@@ -2757,7 +2767,8 @@ describe('what a completed share hands to the relay', () => {
       sandbox: 'read-only',
       model: 'gpt-5-codex',
       peer: PEER,
-      relay: undefined
+      relay: undefined,
+      ...(origin === undefined ? {} : { startedBy: origin })
     })
     expect(shared[0]?.posted.map((message) => [message.to.name, message.text])).toEqual([
       ['Atlas', 'The build runs with pnpm check.']

@@ -1415,6 +1415,9 @@ onResume,
         {startedAt !== undefined && (
           <div className="lc-thread__marker lc-mono">Started {startedAt}</div>
         )}
+        {(startedBy?.kind === 'mcp' || earlierTurns.some(turn => turn.startedBy?.kind === 'mcp')) && (
+          <div className="lc-thread__marker lc-mono">Started from another app · Ask mode (read only)</div>
+        )}
 
         {/*
           Every turn the person actually typed, in order. A handed-off run is

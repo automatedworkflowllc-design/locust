@@ -1,4 +1,4 @@
-import type { WorkroomMessage } from '@teammate/mission-store'
+import type { MissionStarter, WorkroomMessage } from '@teammate/mission-store'
 import type { MissionRuntimeId, MissionSandbox } from '@teammate/runtime-adapters'
 
 import type { CodexMissionStartResponse, CodexMissionUpdate, MissionMode } from '../shared/ipc.js'
@@ -422,6 +422,7 @@ export interface SharingMission {
   readonly model: string | undefined
   readonly peer: MissionPeerContext
   readonly relay: RelayOrigin | undefined
+  readonly startedBy?: MissionStarter
 }
 
 export interface RelayOptions {
@@ -1169,6 +1170,14 @@ export function createRelay(options: RelayOptions): Relay {
   return {
     async onShared(mission, posted) {
       if (posted.length === 0) return
+      // The workroom already holds these shares. An external Ask cannot
+      // spend another turn, steer a recipient, or inherit its writing mode.
+      if (mission.startedBy?.kind === 'mcp') {
+        const message = 'Shares from another app are visible in Locust. No teammate was started automatically.'
+        await options.note?.({ missionId: mission.missionId, message }).catch(() => undefined)
+        notify(mission.runId, mission.missionId, message, 'info')
+        return
+      }
       let enabled = false
       try {
         enabled = await options.enabled()

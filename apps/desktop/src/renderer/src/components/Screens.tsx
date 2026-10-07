@@ -5,6 +5,7 @@ import { durationText, runSpanMs, usagePercent, usageWindowSentence } from '../m
 import { WhatsNew } from './WhatsNew.js'
 import { RemoteControlSetting } from './RemoteControlSetting.js'
 import { VoiceSettings } from './VoiceSettings.js'
+import { LocustMcpSettings } from './LocustMcpSettings.js'
 import { SETTINGS_PAGES, matchedHeadings, pageMatches } from '../settingsPages.js'
 import { agentCapabilityHeading, agentCapabilityLines } from '../agentCapabilities.js'
 import { ConnectorHealth } from './ConnectorHealth.js'
@@ -2932,6 +2933,11 @@ export function SettingsScreen({
         </section>
         )}
 
+        {shownPage === 'app' && (
+        <section className="lc-settings__section lc-settings__section--line" data-setting="locust-mcp">
+          <LocustMcpSettings heading={<h2 className="lc-settings__heading">Let your other AI apps use Locust</h2>} />
+        </section>
+        )}
         {shownPage === 'app' && (
         <section className="lc-settings__section lc-settings__section--line" data-setting="voice-typing">
           <div className="lc-settingline">

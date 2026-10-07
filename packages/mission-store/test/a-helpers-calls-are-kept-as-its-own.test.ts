@@ -113,8 +113,8 @@ describe("a helper's calls in the ledger (v22)", () => {
     await ledger.appendEvents('mission_1', WITH_CHILD)
     await ledger.flush()
     const recovered = await createFileMissionLedger({ rootDirectory: root }).getMission('mission_1')
-    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(22)
-    expect(recovered?.schemaVersion).toBe(22)
+    expect(MISSION_LEDGER_SCHEMA_VERSION).toBe(23)
+    expect(recovered?.schemaVersion).toBe(23)
     expect(recovered?.issues).toEqual([])
     expect(childrenOf(recovered?.events ?? [])).toEqual([
       'tool.started toolu_glob under toolu_agent',

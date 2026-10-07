@@ -259,6 +259,24 @@ describe('the brief a relayed run is started with', () => {
 })
 
 describe('relaying a share', () => {
+  it.each([undefined, BUSY])('keeps MCP shares visible without starts, steering, interruptions or deferred handoffs (%j)', async startResult => {
+    const h = harness({ booty: { ...bootyPeer, self: { ...bootyPeer.self, route: { ...BOOTY_ROUTE, mode: 'auto' } } },
+      mayInterrupt: true, steers: true, ...(startResult === undefined ? {} : { startResult }) })
+    const posted = [{ ...message(BOOTY), urgent: true, wantsAnswer: true }]
+    const before = JSON.stringify(posted)
+    await h.relay.onShared(sharing({ sandbox: 'read-only', startedBy: { kind: 'mcp' } }), posted)
+    await h.relay.onRunEnded(ended('mission_wren1', wrenPeer))
+    await h.relay.onRunEnded(ended('mission_booty'))
+    expect(h.starts).toHaveLength(0)
+    expect(h.owners).toHaveLength(0)
+    expect(h.stopped).toHaveLength(0)
+    expect(h.steered).toHaveLength(0)
+    expect(JSON.stringify(posted)).toBe(before)
+    const messageText = 'Shares from another app are visible in Locust. No teammate was started automatically.'
+    expect(h.kept).toEqual([{ missionId: 'mission_wren1', message: messageText }])
+    expect(h.notices).toEqual([expect.objectContaining({ kind: 'relay-notice', message: messageText })])
+  })
+
   it('starts nothing when off, and says so in the thread', async () => {
     const { relay, starts, notices } = harness({ enabled: false })
     await relay.onShared(sharing(), [message(BOOTY)])

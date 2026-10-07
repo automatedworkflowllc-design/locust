@@ -316,6 +316,8 @@ export function publicRecoveredMission(
     // a spread would let a future field ride out to the renderer unreviewed.
     ...(mission.metadata.startedBy === undefined
       ? {}
+      : mission.metadata.startedBy.kind === 'mcp'
+        ? { startedBy: { kind: 'mcp' as const } }
       : mission.metadata.startedBy.kind === 'relay'
         ? { startedBy: { kind: 'relay' as const, hop: mission.metadata.startedBy.hop } }
         : mission.metadata.startedBy.kind === 'routine'

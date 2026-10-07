@@ -64,6 +64,8 @@ const NEVER_COPIED = new Set(['.writable'])
  * that rebuilds itself.
  */
 export const LEFT_OUT: Readonly<Record<string, string>> = {
+  'locust-mcp-connection.json': 'the local MCP server token and address: they belong to this Windows account and are minted again',
+  'locust-mcp.json': 'whether other AI apps can use Locust on this machine: enable again after a restore',
   'own-models.json': 'your own model keys: Windows locks them to this account, so add them again after a restore',
   'voice-settings.json': 'your voice API key and consent: Windows locks the key to this account, so choose voice typing again after a restore',
   'claude-cloud.json': 'cloud sessions, which belong to this machine and its sign-in',

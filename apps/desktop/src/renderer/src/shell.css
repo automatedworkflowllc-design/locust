@@ -10803,6 +10803,12 @@ textarea {
   text-wrap: pretty;
 }
 
+.lc-mcp-setup {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
 /*
  * SETTINGS AS CLAUDE DRAWS ITS OWN (0.393).
  *

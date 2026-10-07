@@ -166,6 +166,8 @@ interface ActiveCodexMission {
   readonly model: string | undefined
   /** Set when the host started this run for a teammate replying on their own. */
   readonly relay: RelayOrigin | undefined
+  /** External-app turns may share visibly, but must not start automatic handoffs. */
+  readonly startedBy?: MissionStarter
   /**
    * `git status` before the process started, for a run allowed to write.
    * Compared with the tree after it ends, so an edit the runtime made through
@@ -1168,7 +1170,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
                 sandbox: mission.sandbox,
                 model: mission.model,
                 peer: mission.peer,
-                relay: mission.relay
+                relay: mission.relay,
+                ...(mission.startedBy === undefined ? {} : { startedBy: mission.startedBy })
               },
               posted
             )
@@ -2528,6 +2531,7 @@ ${sentPrompt.trim()}`
           sandbox: effectiveSandbox,
           model: chosenModel,
           relay,
+          ...(startedBy === undefined ? {} : { startedBy }),
           diskBefore,
           checkpointBefore,
           cwd: runCwd,

@@ -41,6 +41,7 @@ const LISTED: Readonly<Record<string, { readonly places: number; readonly said: 
   'voice-host.ts': { places: 1, said: ["Voice typing's one-time files", 'No account, API key, recording, transcript,'] },
   'voice-openai.ts': { places: 1, said: ['OpenAI voice typing', 'api.openai.com/v1/audio/transcriptions', 'No redirects are followed'] },
   'permission-host.ts': { places: 1, said: ['Locust\'s permission host listens on `127.0.0.1` only'] },
+  'locust-mcp-host.ts': { places: 1, said: ['Let your other AI apps use Locust', 'authenticates the token before reading the request body'] },
   'antigravity-cascade.ts': { places: 1, said: ['Antigravity\'s own local server, at `127.0.0.1`'] },
   // Test: the models the address serves, then one capped chat request with a tool.
   'own-models.ts': { places: 2, said: ['Testing one of your own models', 'When you press Test'] }

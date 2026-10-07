@@ -85,8 +85,9 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
     label: 'General',
     group: 'Locust',
     icon: 'settings',
-    headings: ['Voice typing', 'Startup', 'Updates', 'Report a problem', 'Help'],
+    headings: ['Let your other AI apps use Locust', 'Voice typing', 'Startup', 'Updates', 'Report a problem', 'Help'],
     alsoKnownAs: {
+      'Let your other AI apps use Locust': ['MCP server', 'stdio', 'Claude Code', 'Codex', 'Cursor', 'other apps'],
       'Voice typing': ['dictation', 'microphone', 'speech', 'whisper', 'transcription'],
       Startup: ['login item', 'tray', 'keep running', 'sign-in'],
       Updates: ['version', 'upgrade'],

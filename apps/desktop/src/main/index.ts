@@ -11,6 +11,9 @@ import { createVoiceHost } from './voice-host.js'
 import { voicePermission } from './voice-permission.js'
 import { VOICE_READY, VOICE_DOWNLOAD, VOICE_TRANSCRIBE, VOICE_CANCEL, VOICE_PROGRESS, VOICE_SETTINGS_READ, VOICE_SETTINGS_SAVE, VOICE_OPENAI_CONSENT } from '../shared/voice.js'
 import { createVoiceSettingsStore } from './voice-settings.js'
+import { createLocustMcpHost } from './locust-mcp-host.js'
+import { createLocustMcpTools } from './locust-mcp-tools.js'
+import { LOCUST_MCP_GET, LOCUST_MCP_SET } from '../shared/locust-mcp.js'
 import { createPageServer, fromPagePreview, pageMayReach, PAGE_SCHEME } from './page-preview.js'
 import { CANCEL_SCRIPT, captureRectOf, pageFrameOf, pickInFrame } from './page-pick.js'
 import { createRuntimeCommands } from './runtime-commands.js'
@@ -61,7 +64,7 @@ import { retireSetAsideMessages } from './set-aside-messages.js'
 import { MAC_RELEASES_API, newerMacRelease } from './mac-release.js'
 import { createMacUpdater, macSelfUpdateTarget } from './mac-self-update.js'
 import type { AppChangelog, AppChangelogEntry, CodexMissionStartResponse, TurnUndoState, WorkspaceSettings } from '../shared/ipc.js'
-import type { MissionApproval, MissionLedger, Workroom } from '@teammate/mission-store'
+import type { MissionApproval, MissionLedger, MissionStarter, Workroom } from '@teammate/mission-store'
 import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
 import { spawn } from 'node:child_process'
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync, existsSync, renameSync, statSync, unlinkSync } from 'node:fs'
@@ -1003,6 +1006,7 @@ let ledgerForShutdown: MissionLedger | undefined
 let workroomForShutdown: Workroom | undefined
 let permissionHostForShutdown: { dispose(): Promise<void> } | undefined
 let voiceForShutdown: ReturnType<typeof createVoiceHost> | undefined
+let mcpForShutdown: ReturnType<typeof createLocustMcpHost> | undefined
 let backgroundForShutdown: BackgroundRuns | undefined
 
 /**
@@ -5125,8 +5129,7 @@ if (!ownsSingleInstanceLock) {
       }
     })
 
-    ipcMain.handle(TEAMMATE_LIST_CHANNEL, async (event) => {
-      if (!fromOwnWindow(event)) return teammatesUnavailable
+    const listTeammates = async () => {
       try {
         const [list, missionOwners, missionTitles] = await Promise.all([
           teammates.list(),
@@ -5137,7 +5140,8 @@ if (!ownsSingleInstanceLock) {
       } catch {
         return teammatesUnavailable
       }
-    })
+    }
+    ipcMain.handle(TEAMMATE_LIST_CHANNEL, (event) => fromOwnWindow(event) ? listTeammates() : teammatesUnavailable)
 
     ipcMain.handle(TEAMMATE_CREATE_CHANNEL, async (event, request: unknown) => {
       if (!fromOwnWindow(event)) return teammateRejected('The teammate could not be created.')
@@ -7076,18 +7080,9 @@ if (!ownsSingleInstanceLock) {
       }
     })
 
-    ipcMain.handle(CODEX_MISSION_START_CHANNEL, async (event, request: unknown) => {
-      const owner = BrowserWindow.fromWebContents(event.sender)
-      if (!owner || !event.senderFrame || event.senderFrame.parent !== null) {
-        return {
-          ok: false,
-          error: {
-            code: 'INTERNAL_ERROR',
-            message: 'The Codex mission request was rejected.'
-          }
-        } as const
-      }
-
+    // The window and authenticated MCP clients use the SAME start path,
+    // including workspace, runtime, spend, owner and continuation checks.
+    const startMission = async (request: unknown, emit: (update: CodexMissionUpdate) => void, startedBy?: MissionStarter) => {
       const refused = noWorkspaceRefusal()
       if (refused !== undefined) return refused
       const payload = (typeof request === 'object' && request !== null ? request : {}) as Partial<CodexMissionStartRequest>
@@ -7200,16 +7195,12 @@ if (!ownsSingleInstanceLock) {
           runtime,
           mode,
           { ...(model === undefined ? {} : { model }), ...(effort === undefined ? {} : { effort }) },
-          (update: CodexMissionUpdate) => {
-            if (!owner.isDestroyed() && !owner.webContents.isDestroyed()) {
-              owner.webContents.send(CODEX_MISSION_UPDATE_CHANNEL, update)
-            }
-          },
+          emit,
           undefined,
           peer,
           followUpOf,
           undefined,
-          undefined,
+          startedBy,
           // The person's own message, typed as one of the runtime's commands (0.426).
           runtimeCommands.isCommand(runtime, prompt),
           undefined,
@@ -7239,7 +7230,37 @@ if (!ownsSingleInstanceLock) {
           }
         } as const
       }
+    }
+    ipcMain.handle(CODEX_MISSION_START_CHANNEL, (event, request: unknown) => {
+      const owner = BrowserWindow.fromWebContents(event.sender)
+      if (!owner || !event.senderFrame || event.senderFrame.parent !== null) {
+        return { ok: false, error: { code: 'INTERNAL_ERROR', message: 'The Codex mission request was rejected.' } } as const
+      }
+      return startMission(request, update => {
+        if (!owner.isDestroyed() && !owner.webContents.isDestroyed()) owner.webContents.send(CODEX_MISSION_UPDATE_CHANNEL, update)
+      })
     })
+    const mcpTools = createLocustMcpTools({
+      teammates: listTeammates,
+      busy: id => codexMissions.runIdOwnedBy(id) !== undefined || antigravityMissions.runIdOwnedBy(id) !== undefined,
+      start: async (request, origin) => {
+        const response = await startMission(request, sendToWindow, origin)
+        if (response.ok) sendToWindow({ kind: 'mission-started', runId: response.data.runId, missionId: response.data.missionId,
+          teammateId: request.teammateId, prompt: request.prompt, data: response.data, startedBy: { kind: 'mcp' } })
+        return response
+      },
+      read: id => readOneMission(missionLedger, workroom, id),
+      newest: id => newestTurnOf(missionLedger, id),
+      owner: async id => (await teammates.missionOwners())[id],
+      live: id => codexMissions.hasMission(id) || antigravityMissions.liveMissionIds().includes(id),
+      background: async () => (await backgroundRuns.list()).map(publicRun)
+    })
+    const mcpHost = createLocustMcpHost({ directory: app.getPath('userData'), node: process.execPath,
+      bridge: app.isPackaged ? join(process.resourcesPath, 'locust-mcp-bridge.mjs') : join(__dirname, '../../resources/locust-mcp-bridge.mjs'), call: mcpTools })
+    mcpForShutdown = mcpHost
+    void mcpHost.load().catch(() => note('locust-mcp', 'The local MCP listener could not start. It is off.'))
+    ipcMain.handle(LOCUST_MCP_GET, event => fromOwnWindow(event) ? mcpHost.settings() : { enabled: false })
+    ipcMain.handle(LOCUST_MCP_SET, (event, enabled: unknown) => fromOwnWindow(event) ? mcpHost.setEnabled(enabled) : { enabled: false })
 
     ipcMain.handle(CODEX_MISSION_CANCEL_CHANNEL, (event, request: unknown) => {
       const owner = BrowserWindow.fromWebContents(event.sender)
@@ -7761,6 +7782,7 @@ if (ownsSingleInstanceLock) {
     boundedShutdown({
       deadlineMs: SHUTDOWN_DEADLINE_MS,
       work: async () => {
+        await mcpForShutdown?.dispose()
         await voiceForShutdown?.dispose()
         await remoteControlForShutdown?.dispose()
         await queuedMessagesForShutdown?.flush()

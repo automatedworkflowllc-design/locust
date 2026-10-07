@@ -26,7 +26,7 @@ import type { CheckpointReason, ReconciledCheckpoint } from './checkpoint.js'
  */
 export type MissionRecordedMode = "ask" | "plan" | "accept-edits" | "approve-each" | "auto";
 
-export const MISSION_LEDGER_SCHEMA_VERSION = 22 as const
+export const MISSION_LEDGER_SCHEMA_VERSION = 23 as const
 
 /**
  * Versions this reader accepts, each a strict subset of the next, so all are
@@ -163,7 +163,9 @@ export const MISSION_LEDGER_SCHEMA_VERSION = 22 as const
  * moves so that reader refuses the file rather than misstate it. The field
  * is optional, so every older ledger reads as it did, with no child rows.
  */
-export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22] as const
+// v23 records an Ask-only conversation started from another app through MCP.
+// Earlier readers must refuse that origin rather than call it a person's own turn.
+export const SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23] as const
 
 export type MissionLedgerSchemaVersion =
   (typeof SUPPORTED_MISSION_LEDGER_SCHEMA_VERSIONS)[number]
@@ -278,6 +280,7 @@ export interface MissionCommand {
  * `hop` is which automatic turn of the exchange this is, counting from 1.
  */
 export type MissionStarter =
+  | { readonly kind: 'mcp' }
   | {
       readonly kind: 'relay'
       readonly hop: number
@@ -875,10 +878,8 @@ function validateMetadata(metadata: MissionLedgerMetadata): MissionLedgerMetadat
                 ? starter.question
                 : undefined
     if (
-      (starter.kind !== 'relay' && starter.kind !== 'resume' && starter.kind !== 'routine' && starter.kind !== 'terminal' && starter.kind !== 'side')
-      || counter === undefined
-      || !Number.isSafeInteger(counter)
-      || counter < 1
+      (starter.kind !== 'relay' && starter.kind !== 'resume' && starter.kind !== 'routine' && starter.kind !== 'terminal' && starter.kind !== 'side' && starter.kind !== 'mcp')
+      || (starter.kind !== 'mcp' && (counter === undefined || !Number.isSafeInteger(counter) || counter < 1))
     ) {
       throw new Error('Mission starter is invalid')
     }
@@ -1124,6 +1125,7 @@ function parsedMetadata(
   if (schemaVersion < 19 && candidate.startedBy?.kind === 'side') {
     return undefined
   }
+  if (schemaVersion < 23 && candidate.startedBy?.kind === 'mcp') return undefined
   // And no writer before v7 knew Cursor Agent or Gemini CLI.
   if (schemaVersion < 7 && candidate.runtime !== 'codex' && candidate.runtime !== 'claude') {
     return undefined
