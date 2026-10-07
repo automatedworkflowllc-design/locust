@@ -3523,7 +3523,11 @@ if (!ownsSingleInstanceLock) {
           // A failed partial ask changes nothing; the answer below is the held one.
         }
       }
-      return runtimeDiscovery.get()
+      const answer = await runtimeDiscovery.get()
+      // Cursor's connectors, read in the background as soon as the WINDOW finds Cursor (0.693): the
+      // work-path sweep runs only when a turn starts, so warming there left the first turn waiting.
+      if (answer.ok && answer.data.runtimes.some((runtime) => runtime.id === 'cursor' && runtime.ready)) warmCursorConnectors()
+      return answer
     })
 
     // Every teammate channel validates its sender the same way the mission

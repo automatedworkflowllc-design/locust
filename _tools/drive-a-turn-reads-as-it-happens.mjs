@@ -63,6 +63,9 @@ try {
   await drive.capture('launch', () => drive.ready())
   await drive.resize(1200, 860)
   await drive.evaluate(openTeammateScript('Ash'))
+  // LOCUST_SETTLE_MS: wait before sending, to measure a start the way a person meets it -- Locust open a
+  // while, its background readings done -- rather than seconds after launch (0.692).
+  if (process.env.LOCUST_SETTLE_MS !== undefined) await sleep(Number(process.env.LOCUST_SETTLE_MS))
   // Sample while it runs: the sampler lives in the page, beside the send.
   await drive.evaluate(`(() => { window.__samples = []; window.__sampler = setInterval(() => { window.__samples.push(${ORDER}) }, 500) })()`)
   const sent = await drive.evaluate(sendAndWaitScript('Do these three steps, and before EACH step write one short sentence saying what you are about to do: 1) read README.md, 2) run the shell command: node -e "console.log(6*7)", 3) run the shell command: node -e "console.log(Date.now() > 0)". Then reply with the single word DONE.'))
@@ -88,6 +91,13 @@ try {
     return JSON.stringify(events.filter((e) => e.type === 'step.completed' && (e.payload.stepKind === 'reasoning' || /reasoning/i.test(e.payload.itemType ?? ''))).map((e) => String(e.payload.message ?? '').slice(0, 60)))
   })()`)))
   say(`  thoughts recorded: ${JSON.stringify(thoughts)}`)
+  // Where the seconds before "started" went (0.602's host note): read to measure a start (0.692, Cursor).
+  const startNote = await drive.evaluate(`(async () => {
+    const history = await window.desktop.getMissionHistory()
+    const events = history.ok ? history.data.missions.at(-1)?.events ?? [] : []
+    return events.map((e) => String(e.payload?.message ?? '')).find((m) => m.startsWith('Started in')) ?? 'no start note'
+  })()`)
+  say(`  start: ${String(startNote)}`)
   const live = samples.filter((sample) => sample.some((line) => line.startsWith('LIVE')))
   const both = live.find((sample) => sample.some((line) => line.startsWith('STEPS')) && sample.some((line) => line.startsWith('SAID') || line.startsWith('SAYING')))
   // A model that says nothing until its last word leaves nothing to show steps among (a free OpenCode
