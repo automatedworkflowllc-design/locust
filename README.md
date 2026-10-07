@@ -169,7 +169,7 @@ Run all checks:
 pnpm check
 ```
 
-This builds every workspace package, runs TypeScript checks, and runs the complete test suite (about 9,700 tests across the desktop app, the adapters and the ledger, as of 0.620).
+This builds every workspace package, runs TypeScript checks, and runs the complete test suite (about 10,700 tests across the desktop app, the adapters and the ledger, as of 0.692).
 
 Green tests are not the evidence here. Each package carries a mutation
 control (`test/mutation-control.mjs`) that breaks one behaviour at a time and
