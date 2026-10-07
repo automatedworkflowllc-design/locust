@@ -23,6 +23,7 @@ const workspace = await mkdtemp(join(scratch, 'workspace-'))
 const profile = await mkdtemp(join(scratch, 'profile-'))
 const drive = await startDrive({
   name: 'antigravity-usage-without-a-turn', port: 9557, workspace, profilePath: profile,
+  ...(process.argv.includes('--packaged') ? { packaged: process.argv[process.argv.indexOf('--packaged') + 1] } : {}),
   outPath: join(scratch, new Date().toISOString().replace(/[:.]/g, '-')),
   sendsNothing: true, focused: true,
   seed: { schemaVersion: 1,
