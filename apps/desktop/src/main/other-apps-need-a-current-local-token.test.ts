@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createLocustMcpHost, MCP_CONNECTION_FILE, mcpRequestHandler, mcpSetup, mcpText } from './locust-mcp-host.js'
+import { createLocustMcpHost, MCP_CONNECTION_FILE, mcpRequestHandler, mcpSetup, mcpText, windowsTool } from './locust-mcp-host.js'
 
 const hosts: ReturnType<typeof createLocustMcpHost>[] = []
 const roots: string[] = []
@@ -118,5 +118,13 @@ describe('other apps need a current local token', () => {
     expect((await f.connection()).token === old.token).toBe(false)
     await next.dispose()
     expect((await next.setEnabled(true)).enabled).toBe(false)
+  })
+})
+
+describe("the account-only lock uses Windows' own tools", () => {
+  it('names whoami and icacls by their System32 path, never by a PATH lookup that can find Git\'s coreutils', () => {
+    expect(windowsTool('whoami.exe', { SystemRoot: 'C:\\Windows' })).toBe('C:\\Windows\\System32\\whoami.exe')
+    expect(windowsTool('icacls.exe', { windir: 'D:\\Win' })).toBe('D:\\Win\\System32\\icacls.exe')
+    expect(windowsTool('whoami.exe', {})).toBe('C:\\Windows\\System32\\whoami.exe')
   })
 })

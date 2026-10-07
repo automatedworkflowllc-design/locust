@@ -65,13 +65,23 @@ const run = (file: string, args: string[]): Promise<string> => new Promise((reso
   execFile(file, args, { windowsHide: true, shell: false, timeout: 10_000, maxBuffer: 64 * 1024 }, (error, stdout) => error ? reject(error) : resolve(stdout))
 })
 
+/**
+ * Windows' own tools, by full path. By bare name, a PATH with Git's usr/bin
+ * ahead of System32 -- Git Bash, and many developers' machines -- finds Git's
+ * coreutils `whoami.exe`, which refuses `/user` ("extra operand"), and the
+ * switch could never be turned on (found gating 0.691 from Git Bash).
+ */
+export function windowsTool(name: 'whoami.exe' | 'icacls.exe', env: NodeJS.ProcessEnv = process.env): string {
+  return join(env.SystemRoot ?? env.windir ?? 'C:\\Windows', 'System32', name)
+}
+
 /** mode 0600 is not an ACL on Windows. Remove inherited access before writing a token. */
 export async function privateMcpFile(path: string): Promise<void> {
   if (process.platform !== 'win32') return
-  const identity = await run('whoami.exe', ['/user', '/fo', 'csv', '/nh'])
+  const identity = await run(windowsTool('whoami.exe'), ['/user', '/fo', 'csv', '/nh'])
   const sid = identity.match(/S-1-[0-9-]+/)?.[0]
   if (sid === undefined) throw new Error('Windows account could not be identified')
-  await run('icacls.exe', [path, '/inheritance:r', '/grant:r', `*${sid}:(F)`])
+  await run(windowsTool('icacls.exe'), [path, '/inheritance:r', '/grant:r', `*${sid}:(F)`])
 }
 
 /** Separate from Claude's approvals: off means no socket, not an inert socket. */
