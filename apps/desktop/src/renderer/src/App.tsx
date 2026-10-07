@@ -420,6 +420,8 @@ function applyMissionUpdate(run: LiveRunState, update: CodexMissionUpdate): Live
   if (update.kind === 'memory-changed') return live
   // A runtime's command list is the `/` menu's business (0.426).
   if (update.kind === 'runtime-commands-changed') return live
+  // So is a runtime's model list the picker's (0.697).
+  if (update.kind === 'models-changed') return live
   // Background turns are the panel's business (W10).
   if (update.kind === 'background-changed') return live
   // A scheduled routine that would not start has no run to belong to.
@@ -2740,6 +2742,10 @@ export default function App(): ReactElement {
       }
       if (update.kind === 'runtime-commands-changed') {
         rereadRuntimeCommands()
+        return
+      }
+      if (update.kind === 'models-changed') {
+        readModels()
         return
       }
       // A background turn moved or came back (W10): the list is read again, and so is the conversation it joined.

@@ -1,5 +1,5 @@
 import { createAppServerClient, usageWindowFromSnapshot } from '@teammate/runtime-adapters'
-import type { MissionRuntimeId, RuntimeDiscovery } from '@teammate/runtime-adapters'
+import type { ClaudeListedModel, MissionRuntimeId, RuntimeDiscovery } from '@teammate/runtime-adapters'
 
 import type { PublicModel, ModelCatalogResponse } from '../shared/ipc.js'
 import { CLAUDE_ALIAS_DEFAULTS, CLAUDE_OLDER_MODELS, claudeModelName } from '../shared/claude-models.js'
@@ -36,6 +36,8 @@ export interface ModelCatalogOptions {
   readonly discover: () => Promise<readonly RuntimeDiscovery[]>
   readonly spawn: (executablePath: string, args: readonly string[], env?: Readonly<Record<string, string>>) => AppServerProcess
   readonly now?: () => number
+  /** The models Claude Code's own handshake listed this session, when it has (0.697). */
+  readonly claudeListed?: () => readonly ClaudeListedModel[] | undefined
 }
 
 export interface ModelCatalog {
@@ -175,44 +177,68 @@ export const CLAUDE_ALIASES_MEASURED: readonly string[] = ['haiku']
  * resolves to the newest model of that family on the runtime's side, which is
  * why it is offered as the alias rather than as a version this build guessed.
  */
-export function claudeModelsFrom(runtimes: readonly RuntimeDiscovery[]): readonly PublicModel[] {
+export function claudeModelsFrom(runtimes: readonly RuntimeDiscovery[], listed: readonly ClaudeListedModel[] = []): readonly PublicModel[] {
   const claude = runtimes.find((entry) => entry.id === 'claude')
   const hints = claude?.modelHints
   if (claude?.readiness !== 'ready' || hints === undefined) return []
+  /*
+   * What Claude Code's own picker lists (0.697), when its handshake has
+   * answered: the alias rows by the name and efforts it gives them, and its
+   * fixed versions first among the older ones. Before it answers, and on a
+   * Claude Code too old to list them, the copied table below stands in.
+   */
+  const listedAlias = new Map(listed.filter((model) => !model.value.startsWith('claude-') && model.value !== 'default').map((model) => [model.value, model]))
   const aliases = hints.aliases.length === 0
     ? []
-    : [...hints.aliases, ...CLAUDE_ALIASES_MEASURED.filter((alias) => !hints.aliases.includes(alias))]
+    : [...new Set([...hints.aliases, ...CLAUDE_ALIASES_MEASURED, ...listedAlias.keys()])]
   const current: PublicModel[] = aliases.map((alias) => {
     const family = `${alias.charAt(0).toUpperCase()}${alias.slice(1)}`
     const meant = CLAUDE_ALIAS_DEFAULTS[alias]
+    const own = listedAlias.get(alias)
     return {
       id: alias,
       runtime: 'claude',
-      // The version the alias means, from Claude Code's own model registry
-      // (see shared/claude-models.ts) -- "Opus 5.5", not "Opus". A run that
-      // reports something else wins on its own route (the picker and the
-      // chip read the resolved name first). An alias the table does not
-      // know keeps its own name rather than a made-up version.
-      displayName: (meant === undefined ? undefined : claudeModelName(meant)) ?? family,
+      // The version the alias means: Claude Code's own name for it when it
+      // listed one -- "Haiku 5.5" -- else from the copied model registry
+      // (see shared/claude-models.ts). A run that reports something else
+      // wins on its own route (the picker and the chip read the resolved
+      // name first). An alias neither knows keeps its own name rather than
+      // a made-up version.
+      displayName: own?.displayName ?? (meant === undefined ? undefined : claudeModelName(meant)) ?? family,
       // What the alias is FOR: it moves with the family, which is the one
       // thing a pinned version would not do.
       description: `Always the newest ${family}`,
-      supportedEfforts: hints.efforts
+      supportedEfforts: own === undefined ? hints.efforts : (own.efforts ?? [])
     }
   })
   // The fixed versions, folded under the current ones. Offered only beside
   // advertised aliases: a CLI that names none may not take full names either.
-  const older: PublicModel[] =
-    current.length === 0
-      ? []
-      : CLAUDE_OLDER_MODELS.map((model) => ({
-          id: model.id,
-          runtime: 'claude',
-          displayName: claudeModelName(model.id) ?? model.id,
-          description: 'This version, always',
-          supportedEfforts: model.efforts,
-          older: true
-        }))
+  // A version an alias already means is not repeated, and one version listed
+  // twice (Claude Code's `claude-haiku-4-5-20251001`, the table's own) is
+  // offered once, under Claude Code's id.
+  const meansNow = new Set([
+    ...[...listedAlias.values()].map((model) => claudeModelName(model.resolvedModel) ?? model.resolvedModel),
+    ...aliases.map((alias) => listedAlias.has(alias) ? undefined : claudeModelName(CLAUDE_ALIAS_DEFAULTS[alias] ?? alias)).filter((name): name is string => name !== undefined)
+  ])
+  const fixed = [
+    ...listed.filter((model) => model.value.startsWith('claude-')).map((model) => ({ id: model.value, name: model.displayName, efforts: model.efforts ?? [] })),
+    ...CLAUDE_OLDER_MODELS.map((model) => ({ id: model.id, name: claudeModelName(model.id) ?? model.id, efforts: model.efforts }))
+  ]
+  const offered = new Set<string>()
+  const older: PublicModel[] = current.length === 0
+    ? []
+    : fixed.filter((model) => {
+        if (meansNow.has(model.name) || offered.has(model.name)) return false
+        offered.add(model.name)
+        return true
+      }).map((model) => ({
+        id: model.id,
+        runtime: 'claude',
+        displayName: model.name,
+        description: 'This version, always',
+        supportedEfforts: model.efforts,
+        older: true
+      }))
   return [...current, ...older]
 }
 
@@ -494,7 +520,7 @@ export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {
     // Claude's and Cursor's from what their CLIs advertised at discovery,
     // Codex's from a live server read.
     const advertisedModels = [
-      ...claudeModelsFrom(runtimes),
+      ...claudeModelsFrom(runtimes, options.claudeListed?.() ?? []),
       ...cursorModelsFrom(runtimes),
       ...opencodeModelsFrom(runtimes),
       ...copilotModelsFrom(runtimes),

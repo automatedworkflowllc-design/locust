@@ -30,12 +30,16 @@
  * whose table maps `sonnet` to claude-sonnet-5-5 for an Anthropic account --
  * so a Sonnet run in Locust already ran 5.5 while the picker still read
  * "Sonnet 5". Colin, the same day: "sonnet 5.5 is out (:".
+ *
+ * 2026-10-07: the same again for Haiku 5.5 (Claude Code 2.1.293). Since 0.697
+ * this table is only the fallback: the picker takes the names Claude Code's own
+ * handshake lists (claude-commands.ts), so the next release shows up on its own.
  */
 export const CLAUDE_ALIAS_DEFAULTS: Readonly<Record<string, string>> = {
   fable: 'claude-fable-5-1',
   opus: 'claude-opus-5-5',
   sonnet: 'claude-sonnet-5-5',
-  haiku: 'claude-haiku-4-5'
+  haiku: 'claude-haiku-5-5'
 }
 
 /**
@@ -71,7 +75,9 @@ export const CLAUDE_OLDER_MODELS: readonly ClaudeOlderModel[] = [
   { id: 'claude-fable-5', efforts: FIVE },
   { id: 'claude-sonnet-5', efforts: FIVE },
   { id: 'claude-sonnet-4-6', efforts: FOUR },
-  { id: 'claude-sonnet-4-5', efforts: [] }
+  { id: 'claude-sonnet-4-5', efforts: [] },
+  // Listed by Claude Code 2.1.293 under its full id, with no effort control.
+  { id: 'claude-haiku-4-5-20251001', efforts: [] }
 ]
 
 /**
@@ -93,12 +99,15 @@ export function claudeModelName(id: string): string | undefined {
 
 /**
  * What a Claude route's model reads as: what a finished run on it reported,
- * else what Claude Code's own table says the alias means, else undefined.
+ * else the name Claude Code's own list gives it (`listed`, from the catalog,
+ * 0.697), else what the copied alias table says the alias means, else
+ * undefined.
  */
-export function claudeRouteModelName(model: string, earned?: string): string | undefined {
+export function claudeRouteModelName(model: string, earned?: string, listed?: string): string | undefined {
   if (earned !== undefined) {
     const named = claudeModelName(earned)
     if (named !== undefined) return named
   }
+  if (listed !== undefined && listed.length > 0) return listed
   return claudeModelName(CLAUDE_ALIAS_DEFAULTS[model] ?? model)
 }

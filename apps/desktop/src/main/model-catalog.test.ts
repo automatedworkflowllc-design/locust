@@ -365,7 +365,7 @@ describe('Claude models from what its CLI advertised', () => {
     const haiku = claudeModelsFrom([claude('ready', { aliases: ['opus'], efforts: [] })])
       .filter((model) => model.older !== true)
       .at(-1)
-    expect(haiku?.displayName).toBe('Haiku 4.5')
+    expect(haiku?.displayName).toBe('Haiku 5.5')
   })
 
   it("names the version each alias runs, from Claude Code's own alias table", () => {
@@ -376,7 +376,7 @@ describe('Claude models from what its CLI advertised', () => {
      * (`aliases.<family>.default`) -- see shared/claude-models.ts.
      */
     const models = claudeModelsFrom([claude('ready', { aliases: ['fable', 'opus', 'sonnet'], efforts: [] })])
-    expect(models.filter((model) => model.older !== true).map((model) => model.displayName)).toEqual(['Fable 5.1', 'Opus 5.5', 'Sonnet 5.5', 'Haiku 4.5'])
+    expect(models.filter((model) => model.older !== true).map((model) => model.displayName)).toEqual(['Fable 5.1', 'Opus 5.5', 'Sonnet 5.5', 'Haiku 5.5'])
     // What the alias is for: it moves with its family.
     expect(models[1]?.description).toBe('Always the newest Opus')
     // An alias the table does not know keeps its own name, not a made-up version.
@@ -389,12 +389,45 @@ describe('Claude models from what its CLI advertised', () => {
     const older = models.filter((model) => model.older === true)
     expect(models.findIndex((model) => model.older === true)).toBe(4)
     expect(older.map((model) => model.displayName)).toEqual([
-      'Opus 5', 'Opus 4.8', 'Opus 4.7', 'Opus 4.6', 'Opus 4.5', 'Fable 5', 'Sonnet 5', 'Sonnet 4.6', 'Sonnet 4.5'
+      'Opus 5', 'Opus 4.8', 'Opus 4.7', 'Opus 4.6', 'Opus 4.5', 'Fable 5', 'Sonnet 5', 'Sonnet 4.6', 'Sonnet 4.5', 'Haiku 4.5'
     ])
     // Their levels are their own, not the aliases' advertised ones.
     expect(older.find((model) => model.id === 'claude-sonnet-4-5')?.supportedEfforts).toEqual([])
     // A CLI that names no aliases is given no full names either.
     expect(claudeModelsFrom([claude('ready', { aliases: [], efforts: ['high'] })])).toEqual([])
+  })
+
+  it("names the models the way Claude Code's own picker lists them, once it has (0.697)", () => {
+    /*
+     * Colin, 2026-10-07: "haiku 5.5 is appearing on cursor but not claude on
+     * locust". Claude Code 2.1.293's handshake listed these (trimmed); the copied
+     * table still said Haiku 4.5. A model it lists that the table has never
+     * heard of is offered too, and a version it lists under a dated id is
+     * offered once, under that id.
+     */
+    const listed = [
+      { value: 'default', resolvedModel: 'claude-opus-5-5', displayName: 'Default (recommended)', efforts: ['low', 'high'] },
+      { value: 'opus', resolvedModel: 'claude-opus-5-5', displayName: 'Opus 5.5', efforts: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { value: 'haiku', resolvedModel: 'claude-haiku-6', displayName: 'Haiku 6', efforts: ['low', 'high'] },
+      { value: 'claude-haiku-4-5-20251001', resolvedModel: 'claude-haiku-4-5-20251001', displayName: 'Haiku 4.5' },
+      { value: 'claude-haiku-5-5', resolvedModel: 'claude-haiku-5-5', displayName: 'Haiku 5.5', efforts: ['low', 'high'] }
+    ]
+    const models = claudeModelsFrom([claude('ready', { aliases: ['fable', 'opus', 'sonnet'], efforts: ['low', 'medium', 'high'] })], listed)
+    const current = models.filter((model) => model.older !== true)
+    expect(current.map((model) => [model.id, model.displayName])).toEqual([
+      ['fable', 'Fable 5.1'], ['opus', 'Opus 5.5'], ['sonnet', 'Sonnet 5.5'], ['haiku', 'Haiku 6']
+    ])
+    // Its own levels where it listed the alias; the help's where it did not.
+    expect(current.find((model) => model.id === 'haiku')?.supportedEfforts).toEqual(['low', 'high'])
+    expect(current.find((model) => model.id === 'fable')?.supportedEfforts).toEqual(['low', 'medium', 'high'])
+    const older = models.filter((model) => model.older === true)
+    expect(older.slice(0, 2).map((model) => [model.id, model.displayName])).toEqual([
+      ['claude-haiku-4-5-20251001', 'Haiku 4.5'], ['claude-haiku-5-5', 'Haiku 5.5']
+    ])
+    expect(older.filter((model) => model.displayName === 'Haiku 4.5')).toHaveLength(1)
+    expect(older.find((model) => model.id === 'claude-haiku-4-5-20251001')?.supportedEfforts).toEqual([])
+    // `default` is Locust's account default, never a row of its own.
+    expect(models.some((model) => model.id === 'default')).toBe(false)
   })
 
   it("keeps the account default's levels to the current models", () => {

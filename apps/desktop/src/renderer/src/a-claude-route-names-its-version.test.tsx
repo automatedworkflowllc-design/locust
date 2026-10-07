@@ -31,12 +31,12 @@ describe('how a Claude model id reads', () => {
     expect(claudeModelName('gpt-6')).toBeUndefined()
   })
 
-  it("carries Claude Code's own alias table (2.1.284: Sonnet 5.5)", () => {
+  it("carries Claude Code's own alias table (2.1.293: Haiku 5.5)", () => {
     expect(CLAUDE_ALIAS_DEFAULTS).toEqual({
       fable: 'claude-fable-5-1',
       opus: 'claude-opus-5-5',
       sonnet: 'claude-sonnet-5-5',
-      haiku: 'claude-haiku-4-5'
+      haiku: 'claude-haiku-5-5'
     })
   })
 })
@@ -48,6 +48,13 @@ describe('what a route reads as', () => {
     expect(claudeRouteModelName('opus', 'claude-opus-4-7')).toBe('Opus 4.7')
     // A pinned full id reads as itself.
     expect(claudeRouteModelName('claude-opus-4-8')).toBe('Opus 4.8')
+  })
+
+  it("takes Claude Code's own name for it over the copied table, and a run's report over both (0.697)", () => {
+    // Colin, 2026-10-07: "haiku 5.5 is appearing on cursor but not claude on locust".
+    expect(claudeRouteModelName('haiku', undefined, 'Haiku 6')).toBe('Haiku 6')
+    expect(claudeRouteModelName('haiku', 'claude-haiku-4-5-20251001', 'Haiku 6')).toBe('Haiku 4.5')
+    expect(claudeRouteModelName('haiku', undefined, '')).toBe('Haiku 5.5')
   })
 
   it('names the version on the controls that pick a route, and nothing else changes', () => {

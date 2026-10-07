@@ -3110,6 +3110,8 @@ export type CodexMissionUpdate =
     }
   /** A runtime listed a different set of its own commands; the `/` menu re-reads them (0.426). */
   | { readonly kind: 'runtime-commands-changed' }
+  /** A runtime listed different models of its own (Claude Code's handshake, 0.697); the picker re-reads the catalog. */
+  | { readonly kind: 'models-changed' }
   /** A background turn started, moved or ended (W10): the list is read again. */
   | { readonly kind: 'background-changed' }
   /** A teammate's reply changed the team's memory; the Memory screen and sidebar re-read it. */

@@ -36,6 +36,50 @@ export interface ClaudeCommandsOptions {
   /** How long a list must stand before it is taken. */
   readonly settleMs?: number;
   readonly timeoutMs?: number;
+  /** Told the models the same answer listed, when it listed any (0.697). */
+  readonly onModels?: (models: readonly ClaudeListedModel[]) => void;
+}
+
+/**
+ * ONE MODEL AS CLAUDE CODE'S OWN PICKER LISTS IT (0.697).
+ *
+ * The `initialize` answer carries `models` beside `commands`: what its
+ * `/model` menu offers, by the value `--model` takes, with the model each one
+ * runs and the name it goes by. Measured on 2.1.293, 2026-10-07: `haiku`
+ * resolved to claude-haiku-5-5, "Haiku 5.5", while Locust's copy of the
+ * alias table still said Haiku 4.5 -- Colin: "haiku 5.5 is appearing on
+ * cursor but not claude on locust". Cursor's list is read live; this makes
+ * Claude's the same.
+ */
+export interface ClaudeListedModel {
+  /** What `--model` takes: an alias (`haiku`) or a full id. */
+  readonly value: string;
+  /** The model it runs today. */
+  readonly resolvedModel: string;
+  readonly displayName: string;
+  /** Present only when the model takes an effort. */
+  readonly efforts?: readonly string[];
+}
+
+export function claudeListedModelsFrom(value: unknown): readonly ClaudeListedModel[] {
+  if (!Array.isArray(value)) return [];
+  const listed: ClaudeListedModel[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const { value: id, resolvedModel, displayName, supportsEffort, supportedEffortLevels } = entry as Record<string, unknown>;
+    if (typeof id !== "string" || id.length === 0 || id.length > 200) continue;
+    if (typeof displayName !== "string" || displayName.length === 0 || displayName.length > 200) continue;
+    const efforts = supportsEffort === true && Array.isArray(supportedEffortLevels)
+      ? supportedEffortLevels.filter((level): level is string => typeof level === "string" && /^[a-z]{1,16}$/.test(level))
+      : undefined;
+    listed.push({
+      value: id,
+      resolvedModel: typeof resolvedModel === "string" && resolvedModel.length > 0 ? resolvedModel : id,
+      displayName,
+      ...(efforts === undefined || efforts.length === 0 ? {} : { efforts }),
+    });
+  }
+  return listed;
 }
 
 export function readClaudeCommands(options: ClaudeCommandsOptions): Promise<readonly RuntimeCommandInfo[]> {
@@ -81,10 +125,20 @@ export function readClaudeCommands(options: ClaudeCommandsOptions): Promise<read
         }
         if (typeof record !== "object" || record === null) continue;
         const { type, subtype, commands, response } = record as Record<string, unknown>;
-        // The answer to `initialize`: its list is `response.response.commands`.
-        const answered = type === "control_response" && typeof response === "object" && response !== null
-          ? (response as { readonly response?: { readonly commands?: unknown } }).response?.commands
+        // The answer to `initialize`: its list is `response.response.commands`,
+        // and its models `response.response.models`.
+        const answer = type === "control_response" && typeof response === "object" && response !== null
+          ? (response as { readonly response?: { readonly commands?: unknown; readonly models?: unknown } }).response
           : undefined;
+        const answered = answer?.commands;
+        const models = claudeListedModelsFrom(answer?.models);
+        if (models.length > 0) {
+          try {
+            options.onModels?.(models);
+          } catch {
+            // A listener's trouble is not the command list's.
+          }
+        }
         if (answered === undefined && (type !== "system" || subtype !== "commands_changed")) continue;
         const listed = runtimeCommandsFrom(answered ?? commands);
         if (listed.length === 0) continue;

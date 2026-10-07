@@ -65,7 +65,7 @@ import { MAC_RELEASES_API, newerMacRelease } from './mac-release.js'
 import { createMacUpdater, macSelfUpdateTarget } from './mac-self-update.js'
 import type { AppChangelog, AppChangelogEntry, CodexMissionStartResponse, TurnUndoState, WorkspaceSettings } from '../shared/ipc.js'
 import type { MissionApproval, MissionLedger, MissionStarter, Workroom } from '@teammate/mission-store'
-import type { RuntimeDiscovery } from '@teammate/runtime-adapters'
+import type { ClaudeListedModel, RuntimeDiscovery } from '@teammate/runtime-adapters'
 import { spawn } from 'node:child_process'
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync, existsSync, renameSync, statSync, unlinkSync } from 'node:fs'
 import { copyFile, lstat, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
@@ -2496,10 +2496,26 @@ if (!ownsSingleInstanceLock) {
       }
     })
 
+    /*
+     * The models Claude Code's own picker lists (0.697), from the same
+     * handshake that lists its commands: the names the catalog and every
+     * chip use, so a new Claude model shows up the day Claude Code knows it
+     * (Colin, 2026-10-07: "haiku 5.5 is appearing on cursor but not claude
+     * on locust"). Held for the session; until it answers, the copied table
+     * in shared/claude-models.ts stands in.
+     */
+    let claudeListed: readonly ClaudeListedModel[] | undefined
     const modelCatalog = createModelCatalog({
       discover: discoverForStart,
-      spawn: spawnAppServer
+      spawn: spawnAppServer,
+      claudeListed: () => claudeListed
     })
+    const adoptClaudeListed = (models: readonly ClaudeListedModel[]): void => {
+      if (claudeListed !== undefined && JSON.stringify(claudeListed) === JSON.stringify(models)) return
+      claudeListed = models
+      modelCatalog.forget()
+      sendToWindow({ kind: 'models-changed' })
+    }
     // Antigravity answered after the sweep went on without it: the list built without it is no longer the list.
     forgetModelCatalog = () => modelCatalog.forget()
 
@@ -4754,7 +4770,7 @@ if (!ownsSingleInstanceLock) {
           return
         }
         const commands = runtime === 'claude'
-          ? await readClaudeCommands({ spawn: spawnAppServer, command: createClaudeCommandListCommand(found.executable, { workspacePath }) })
+          ? await readClaudeCommands({ spawn: spawnAppServer, command: createClaudeCommandListCommand(found.executable, { workspacePath }), onModels: adoptClaudeListed })
           : await readOpenCodeCommands({ spawn: spawnAppServer, command: createOpenCodeServeCommand(found.executable, { workspacePath }) })
         if (await runtimeCommands.set(runtime, commands)) sendToWindow({ kind: 'runtime-commands-changed' })
       })().catch((error: unknown) => note('runtime-commands', `could not list ${runtime}'s commands: ${error instanceof Error ? error.message : String(error)}`))

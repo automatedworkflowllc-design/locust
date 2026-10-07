@@ -128,12 +128,20 @@ const OWN_ROUTE_MODEL = /^own-[a-f0-9]{8}\/(.+)$/
  * name -- an alias's version, a description -- never replaces the spelling.
  */
 const catalogSpellings = new Map<string, string>()
+/**
+ * What each Claude alias means today, by the name the catalog gives it (0.697):
+ * Claude Code's own list once its handshake has answered, so `haiku` reads
+ * "Haiku 5.5" on every chip the day Claude Code knows it.
+ */
+const claudeAliasNames = new Map<string, string>()
 const sameName = (a: string): string => a.toLowerCase().replace(/[\s-]+/g, ' ').trim()
 
-export function rememberOwnModels(models: readonly { readonly id: string; readonly displayName: string; readonly own?: true; readonly runtime?: string }[]): void {
+export function rememberOwnModels(models: readonly { readonly id: string; readonly displayName: string; readonly own?: true; readonly runtime?: string; readonly older?: boolean }[]): void {
   ownModelNames.clear()
   catalogSpellings.clear()
+  claudeAliasNames.clear()
   for (const model of models) {
+    if (model.runtime === 'claude' && model.older !== true && !model.id.startsWith('claude-') && model.id !== 'account-default') claudeAliasNames.set(model.id, model.displayName)
     if (model.own === true) ownModelNames.set(model.id, model.displayName)
     // A catalog "name" that is the id, or the id without its provider (OpenCode's
     // `nemotron-3-ultra-free`), is an identifier, not a spelling: never taken.
@@ -200,7 +208,7 @@ export function modelDisplayName(runtime: string, modelId: string): string {
  */
 export function routeModelName(runtime: string, modelId: string, earned?: string): string {
   if (runtime === 'claude') {
-    const named = claudeRouteModelName(modelId, earned)
+    const named = claudeRouteModelName(modelId, earned, claudeAliasNames.get(modelId))
     if (named !== undefined) return named
   }
   // An Antigravity tier by the model it runs -- "Gemini 3.8 Flash", not the

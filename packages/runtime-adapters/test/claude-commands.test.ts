@@ -52,6 +52,27 @@ describe("Claude Code's commands, before any run", () => {
     expect(claude.state.killed).toBe(true);
   });
 
+  it("passes on the models the same answer lists, as 2.1.293 gives them (0.697)", async () => {
+    // Trimmed from the real answer, 2026-10-07: `haiku` had become Haiku 5.5.
+    const answer = `${JSON.stringify({ type: "control_response", response: { subtype: "success", request_id: "locust_commands",
+      response: { commands: [{ name: "review", description: "Review a pull request", argumentHint: "<pr>" }], models: [
+        { value: "haiku", resolvedModel: "claude-haiku-5-5", displayName: "Haiku 5.5", description: "Fastest for quick answers", supportsEffort: true, supportedEffortLevels: ["low", "medium", "high", "xhigh", "max"] },
+        { value: "claude-haiku-4-5-20251001", resolvedModel: "claude-haiku-4-5-20251001", displayName: "Haiku 4.5", description: "Fastest for quick answers" },
+        { value: "", displayName: "nothing to pass" },
+        { value: "opus", displayName: "Opus 5.5", supportsEffort: false, supportedEffortLevels: ["low"] },
+      ] } } })}\n`;
+    const claude = fakeClaude([answer]);
+    const told: unknown[] = [];
+    const command = createClaudeCommandListCommand(EXECUTABLE, { workspacePath: "C:/work/pebble" });
+    const commands = await readClaudeCommands({ spawn: claude.spawn, command, settleMs: 20, onModels: (models) => told.push(models) });
+    expect(commands.map((entry) => entry.name)).toEqual(["review"]);
+    expect(told).toEqual([[
+      { value: "haiku", resolvedModel: "claude-haiku-5-5", displayName: "Haiku 5.5", efforts: ["low", "medium", "high", "xhigh", "max"] },
+      { value: "claude-haiku-4-5-20251001", resolvedModel: "claude-haiku-4-5-20251001", displayName: "Haiku 4.5" },
+      { value: "opus", resolvedModel: "opus", displayName: "Opus 5.5" },
+    ]]);
+  });
+
   it("is started as every run outside Auto is, restricted, and leaves no session behind", () => {
     const command = createClaudeCommandListCommand(EXECUTABLE, { workspacePath: "C:/work/pebble" });
     expect(command.args).toEqual(["--restricted", "--print", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--no-session-persistence"]);
