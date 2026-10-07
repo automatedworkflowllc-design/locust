@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.696.0 - 2026-10-07
+
+### Fixed
+
+- **A stopped OpenCode turn says to check the folder once.** OpenCode reports a step only after it finishes, so when you stop one early Locust cannot promise nothing ran, and the stop card says to check the folder before sending again. The Send again line under it said the same thing again in other words. Now it is said once.
+
 ## 0.695.0 - 2026-10-07
 
 ### Fixed
