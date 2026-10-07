@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
@@ -67,5 +69,14 @@ describe('the stop button', () => {
 
   it('has no beam when there is nothing to stop', () => {
     expect(composer(false)).not.toContain('lc-stopbeam')
+  })
+
+  it("travels at the faces' rate, not the screen's (0.698)", () => {
+    // The light moves by a custom property the compositor cannot animate, so
+    // the button was painted on every frame the screen showed: about 1% of the
+    // machine while a reply streamed (probe-locust-cpu-by-state, 15 s samples).
+    // 59 linear steps a turn of 1.96 s is 30 a second, BOT_FRAMES_PER_SECOND.
+    const css = readFileSync(fileURLToPath(new URL('./shell.css', import.meta.url)), 'utf8')
+    expect(css).toMatch(/\.lc-stopbeam\.lc-stopbeam\[data-active\],\s*\.lc-stopbeam\.lc-stopbeam\[data-fading\]\s*\{\s*animation-timing-function: steps\(59\), ease;/)
   })
 })

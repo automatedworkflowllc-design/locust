@@ -5058,6 +5058,22 @@ textarea {
   --beam-bloom-opacity: 1.5;
 }
 
+/*
+ * THE BEAM AT THE FACES' RATE (0.698). Its light travels by an animated
+ * custom property (`--beam-angle`), which the compositor cannot move: the
+ * whole button is painted again on every frame the screen shows, 60 a second
+ * here and 144 on a gaming laptop's, while the faces beside it are drawn at
+ * 30 (BOT_FRAMES_PER_SECOND). Measured on 0.697 while a reply streams, 15 s
+ * samples: 8.7-9.2% of the machine, 7.9% with these 59 steps a turn of the
+ * package's 1.96 s, 7.5% with no beam at all. Linear steps, so the light keeps
+ * its speed and its look. The second timing is the fade's own, kept. Doubled
+ * class: the package's sheet is added after this one, at the same weight.
+ */
+.lc-stopbeam.lc-stopbeam[data-active],
+.lc-stopbeam.lc-stopbeam[data-fading] {
+  animation-timing-function: steps(59), ease;
+}
+
 .lc-coverbeam {
   align-self: stretch;
   width: 100%;
