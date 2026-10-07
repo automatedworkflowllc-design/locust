@@ -399,7 +399,11 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
     const settled = await evaluate(`(async () => {
       for (let i = 0; i < 240; i += 1) {
         const field = document.querySelector('form.command-dock textarea')
-        if (field && !/Checking local runtimes/.test(field.placeholder)) break
+        // The placeholder while discovery runs reads "Looking for the AI agents on this machine..." since b2bf2c0e
+        // ("Plain words", 2026-10-01, in 0.647.0): "runtime" became "AI agent" in every sentence a person reads. This
+        // kept waiting for the old words, matched at once, and the drive began before the sweep had found any agent --
+        // on a busy machine the composer then had no route, mode or effort control to measure.
+        if (field && !/Checking local runtimes|Looking for the AI agents/.test(field.placeholder)) break
         await new Promise(r => setTimeout(r, 250))
         if (i === 239) return 'discovery never finished'
       }

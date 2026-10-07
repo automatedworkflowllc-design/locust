@@ -83,7 +83,11 @@ try {
     say(`${String(width)}x${String(height)}: ${JSON.stringify(row)}`)
     const order = (row.order ?? []).filter((entry) => entry !== 'lc-composer__context')
     check(`${String(width)}: the row sits inside the box, on one line`, row.inside === true && row.oneLine === true, JSON.stringify(row.heights))
-    check(`${String(width)}: the + first, the mode beside it`, order[0] === 'plus' && order[1] === 'mode', order.join(' | '))
+    // 0.451.0 (CHANGELOG.md, 2026-09-28): "Direct, Compare or Blind, in the message box. A chip beside the
+    // permission mode picks how you ask ... It replaces the switch inside the model picker." The chip sits between the +
+    // and the mode (Composer.tsx: the `Chat mode: ...` button), so the mode is no longer the + 's neighbour: it follows the chip.
+    const modeAt = order.indexOf('mode')
+    check(`${String(width)}: the + first, the chat mode chip, then the mode`, order[0] === 'plus' && (modeAt === 1 || (modeAt === 2 && /^Chat mode: /.test(order[1] ?? ''))), order.join(' | '))
     check(`${String(width)}: the route and the effort together, the send last`, order.indexOf('effort') === order.indexOf('route') + 1 && order[order.length - 1] === 'send', order.join(' | '))
     check(`${String(width)}: nothing past the box's edge`, row.overflow === false)
     check(`${String(width)}: the box is on screen`, row.bottom <= height, `${String(Math.round(row.bottom))} of ${String(height)}`)

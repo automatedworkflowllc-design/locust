@@ -19,7 +19,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-import { FREE_ROUTE, pickRouteScript, recordRoot, say, scratchRepository, startDrive } from './drive-lib.mjs'
+import { FREE_ROUTE, FREE_ROW, pickRouteScript, recordRoot, say, scratchRepository, startDrive } from './drive-lib.mjs'
+
+// B ran on FREE_ROUTE.model (the RUNS table below), which is whichever free model LOCUST_FREE_MODEL names (drive-lib.mjs:
+// "LOCUST_FREE_MODEL picks another of OpenCode's free models when this one is down"). The check named Muse Spark, so the
+// 2026-10-06 sweep -- on Fledge Alpha -- read a correct chat box ("OpenCode / Fledge Alpha Free") as another chat's model.
+// Its name as the picker draws it, from the same words the drive's route picker uses (FREE_ROW).
+const FREE_NAME = new RegExp(FREE_ROW.slice(1, FREE_ROW.lastIndexOf('/')), 'i')
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
@@ -143,7 +149,7 @@ try {
   say(String(await open('List the')))
   const b1 = await box('B opened')
   check('B does not take A\'s Plan', !/plan/i.test(b1.mode ?? ''), JSON.stringify(b1))
-  check('B shows its own model (OpenCode Muse Spark)', /muse/i.test(b1.route ?? ''), JSON.stringify(b1))
+  check(`B shows its own model (OpenCode ${FREE_ROUTE.model.replace(/^opencode\//, '')}), not A's Sonnet`, FREE_NAME.test(b1.route ?? '') && /opencode/i.test(b1.route ?? '') && !/sonnet/i.test(b1.route ?? ''), JSON.stringify(b1))
   say(String(await open('Ash reads')))
   const a3 = await box('A again')
   check('back in A, Plan is still picked', /plan/i.test(a3.mode ?? ''), JSON.stringify(a3))
@@ -171,8 +177,14 @@ try {
   // 5. A model picked for a new chat with nobody is kept, and Ash is untouched.
   const picked = String(await drive.evaluate(pickRouteScript({ group: '/opencode/i', search: 'nemotron', row: '/nemotron/i' })))
   say(picked)
-  await new Promise((r) => setTimeout(r, 1500))
-  const saved = (await roster()).settings?.newChatRoute
+  // The roster is written behind the pick: read it until the pick is in, not once after a fixed 1.5 s (on the sweep's
+  // busy machine the write landed later than that and a correct pick read as unsaved).
+  let saved
+  for (let waited = 0; waited < 15_000; waited += 250) {
+    await new Promise((r) => setTimeout(r, 250))
+    saved = (await roster()).settings?.newChatRoute
+    if (saved !== undefined && /nemotron/i.test(saved.model ?? '')) break
+  }
   check('the new chat\'s model is saved for the next launch', saved !== undefined && /nemotron/i.test(saved.model ?? ''), JSON.stringify(saved))
   say(String(await open('Ash reads')))
   say(String(await home()))
