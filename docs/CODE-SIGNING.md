@@ -1,10 +1,15 @@
 # Code signing policy
 
-**Status (2026-10-04): Locust's Windows installer is not signed yet.** Windows
+**Status (2026-10-07): Locust's Windows installer is not signed yet.** Windows
 shows its "unknown publisher" warning when you install it, because the
 installer carries no trusted signature, not because anything in it is
-unsafe. This page is the policy Locust follows to get it signed, and will
-follow once it is.
+unsafe: choose **More info**, then **Run anyway**. This page is the policy
+Locust follows to get it signed, and will follow once it is.
+
+SignPath Foundation reviewed Locust on 2026-10-05 and asked it to reapply once
+it has more public adoption (stars, forks, independent mentions); the
+foundation signs projects that already have that visibility. Locust will
+reapply then.
 
 ## Why
 

@@ -8,11 +8,12 @@ on runtimes and models you choose, with a durable record of everything they did.
 
 **Download the latest build** at [locust.lol](https://locust.lol) or from the
 [releases page](https://github.com/automatedworkflowllc-design/locust-releases/releases/latest)
-(Windows and Mac).
+(Windows and Mac). The installer is not code-signed yet, so Windows warns that
+it comes from an unknown publisher: choose **More info**, then **Run anyway**
+([why, and the signing policy](docs/CODE-SIGNING.md)).
 
-This repository is a mirror, exported from the private development repository
-at each release. Issues and discussion are welcome here; code changes are by
-invitation (see CONTRIBUTING.md).
+Locust is developed in this repository, and each release is cut from `main`.
+Issues are welcome here; code changes are by invitation (see CONTRIBUTING.md).
 
 **Locust** puts Claude Code, Codex, Cursor, OpenCode, GitHub Copilot,
 Antigravity and Muse Code side by side under one roof. You give a teammate a
