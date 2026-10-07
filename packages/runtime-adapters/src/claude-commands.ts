@@ -11,9 +11,19 @@ import type { RuntimeCommandSpec } from "./types.js";
  * something wrong?" -- he was not). Claude Code announces its list at start
  * and waits for a message before it does anything else
  * (createClaudeCommandListCommand), so it is started, listened to, and
- * stopped: nothing is ever written to it. The list can arrive twice as
- * plugins load, so the last one is kept once it has been quiet a moment.
+ * stopped. The list can arrive twice as plugins load, so the last one is
+ * kept once it has been quiet a moment.
+ *
+ * ASKED, SINCE 2.1.29x (0.694). Claude Code stopped announcing anything
+ * until it hears from its client: 2.1.292 sent nothing at all in 22 s, so
+ * every launch logged "did not list its commands in time" and a Claude
+ * teammate's / menu showed Locust's own commands only. It is now sent the
+ * `initialize` control request its own SDK sends -- a handshake, not a
+ * message: no turn, no model, nothing spent -- and answers with its whole
+ * list (55 on Colin's machine, measured 2026-10-07), then the same
+ * `commands_changed` records as before.
  */
+export const CLAUDE_COMMANDS_REQUEST = `${JSON.stringify({ type: "control_request", request_id: "locust_commands", request: { subtype: "initialize" } })}\n`;
 export interface ClaudeCommandsOptions {
   readonly spawn: (
     executablePath: string,
@@ -50,6 +60,11 @@ export function readClaudeCommands(options: ClaudeCommandsOptions): Promise<read
     };
     const timer = setTimeout(() => end(new Error("Claude Code did not list its commands in time.")), options.timeoutMs ?? 20_000);
     child.onExit(() => end(new Error("Claude Code exited before it listed its commands.")));
+    try {
+      child.write(CLAUDE_COMMANDS_REQUEST);
+    } catch {
+      // An older Claude Code announces its list unasked; the wait below still hears it.
+    }
     child.onData((chunk) => {
       if (settled) return;
       buffer = `${buffer}${chunk}`;
@@ -65,9 +80,13 @@ export function readClaudeCommands(options: ClaudeCommandsOptions): Promise<read
           continue;
         }
         if (typeof record !== "object" || record === null) continue;
-        const { type, subtype, commands } = record as Record<string, unknown>;
-        if (type !== "system" || subtype !== "commands_changed") continue;
-        const listed = runtimeCommandsFrom(commands);
+        const { type, subtype, commands, response } = record as Record<string, unknown>;
+        // The answer to `initialize`: its list is `response.response.commands`.
+        const answered = type === "control_response" && typeof response === "object" && response !== null
+          ? (response as { readonly response?: { readonly commands?: unknown } }).response?.commands
+          : undefined;
+        if (answered === undefined && (type !== "system" || subtype !== "commands_changed")) continue;
+        const listed = runtimeCommandsFrom(answered ?? commands);
         if (listed.length === 0) continue;
         latest = listed;
         if (quiet !== undefined) clearTimeout(quiet);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { readClaudeCommands } from "../src/claude-commands.js";
+import { CLAUDE_COMMANDS_REQUEST, readClaudeCommands } from "../src/claude-commands.js";
 import type { AppServerRunProcess } from "../src/codex-app-server-run.js";
 import { createClaudeCommandListCommand } from "../src/commands.js";
 
@@ -35,9 +35,21 @@ describe("Claude Code's commands, before any run", () => {
     const command = createClaudeCommandListCommand(EXECUTABLE, { workspacePath: "C:/work/pebble" });
     const commands = await readClaudeCommands({ spawn: claude.spawn, command, settleMs: 40 });
     expect(commands.map((entry) => entry.name)).toEqual(["compact", "init", "security-review"]);
-    expect(claude.state.written).toEqual([]);
+    // One line only, the SDK's handshake: never a message, so no turn and nothing spent (0.694).
+    expect(claude.state.written).toEqual([CLAUDE_COMMANDS_REQUEST]);
+    expect(JSON.parse(claude.state.written[0]!)).toEqual({ type: "control_request", request_id: "locust_commands", request: { subtype: "initialize" } });
     expect(claude.state.killed).toBe(true);
     expect(claude.state.cwd).toBe("C:/work/pebble");
+  });
+
+  it("hears the answer to initialize, as 2.1.292 gives it: nothing until asked, then its whole list (0.694)", async () => {
+    const answer = `${JSON.stringify({ type: "control_response", response: { subtype: "success", request_id: "locust_commands",
+      response: { commands: [{ name: "deep-research", description: "Deep research", argumentHint: "" }, { name: "review", description: "Review a pull request", argumentHint: "<pr>" }], agents: [] } } })}\n`;
+    const claude = fakeClaude([answer]);
+    const command = createClaudeCommandListCommand(EXECUTABLE, { workspacePath: "C:/work/pebble" });
+    const commands = await readClaudeCommands({ spawn: claude.spawn, command, settleMs: 20 });
+    expect(commands.map((entry) => entry.name)).toEqual(["deep-research", "review"]);
+    expect(claude.state.killed).toBe(true);
   });
 
   it("is started as every run outside Auto is, restricted, and leaves no session behind", () => {
