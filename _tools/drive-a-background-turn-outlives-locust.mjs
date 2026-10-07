@@ -88,7 +88,7 @@ try {
   let after = ''
   for (let i = 0; i < 20; i += 1) {
     after = String(await drive.evaluate(thread))
-    if (/in the background/i.test(after) && /two/i.test(after)) break
+    if (/in the background/i.test(after) && /\btwo\b/i.test(after)) break
     await sleep(750)
   }
   await drive.capture('The conversation: In the background, two', () => drive.evaluate(thread))

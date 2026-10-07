@@ -8868,7 +8868,7 @@ export default function App(): ReactElement {
             onStop={(id) => void window.desktop?.stopBackground(id)}
             onShow={(missionId) => openMission(missionId)}
             onDismiss={(id) => void window.desktop?.dismissBackground(id).then(() => setBackgroundRuns((current) => current.filter((run) => run.id !== id)))}
-            onSetUp={() => void window.desktop?.setUpBackground().then((answer) => setBackgroundNote(answer.ok ? { text: 'Claude Code is open in a terminal. Answer its question about this folder, then send again.' } : { text: answer.message ?? 'Claude Code could not be opened.' }))}
+            onSetUp={() => void window.desktop?.setUpBackground().then((answer) => setBackgroundNote(answer.ok ? { text: 'Claude Code is open in a terminal. Answer its question about this folder, then send again.' } : { text: answer.message ?? 'Claude Code could not be opened. Nothing was sent; open it in this folder yourself, answer its question, then send again.' }))}
             onClose={() => setBackgroundPanel(false)}
           />
         ) : cloudPanel && screen === 'workroom' ? (
