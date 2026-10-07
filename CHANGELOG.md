@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.692.0 - 2026-10-07
+
+### Faster
+
+- **A Cursor teammate starts about four seconds sooner.** Before each Cursor turn, Locust asks Cursor which connectors it can use, and Cursor takes three to four seconds to answer. That answer was kept for only five minutes, so most turns waited for it again. Locust now answers from the last reading at once, reads a new one in the background, and reads it once as soon as it finds Cursor, so even the first turn of the day does not wait. A connector you have just signed in to is named from the next turn.
+
 ## 0.691.0 - 2026-10-07
 
 ### Added
