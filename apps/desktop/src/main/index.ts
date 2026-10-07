@@ -52,7 +52,8 @@ import {
   cursorCanEnforceReadOnly,
   discoverInstalledRuntimes,
   discoverInstalledRuntimesEach,
-  killSpawnedTree
+  killSpawnedTree,
+  releaseProcessTree
 } from '@teammate/runtime-adapters'
 import { boundedApproval, createFileMissionLedger, createFileWorkroom } from '@teammate/mission-store'
 import { retireSetAsideMessages } from './set-aside-messages.js'
@@ -106,6 +107,10 @@ import { createRecentEdits } from './recent-edits.js'
 import { createCheckpoints, createTurnRecords } from './checkpoints.js'
 import { clearClaudeSkillCopies, prepareClaudeSkills } from './claude-skills.js'
 import { createFolderCommits } from './folder-commit.js'
+import { createBackgroundRuns } from './claude-background-runs.js'
+import type { BackgroundRun, BackgroundRuns } from './claude-background-runs.js'
+import { BACKGROUND_DISMISS_CHANNEL, BACKGROUND_LIST_CHANNEL, BACKGROUND_OPEN_CHANNEL, BACKGROUND_SETUP_CHANNEL, BACKGROUND_START_CHANNEL, BACKGROUND_STOP_CHANNEL } from '../shared/background.js'
+import type { BackgroundStartResponse, PublicBackgroundRun } from '../shared/background.js'
 import { FOLDER_CHANGES_CHANNEL, FOLDER_COMMIT_CHANNEL, type CommitResult, type FolderChanges } from '../shared/folder-commit.js'
 import { readRuntimeArtifacts } from './runtime-artifacts.js'
 import { relative } from 'node:path'
@@ -996,6 +1001,7 @@ let ledgerForShutdown: MissionLedger | undefined
 let workroomForShutdown: Workroom | undefined
 let permissionHostForShutdown: { dispose(): Promise<void> } | undefined
 let voiceForShutdown: ReturnType<typeof createVoiceHost> | undefined
+let backgroundForShutdown: BackgroundRuns | undefined
 
 /**
  * The renderer names no destinations.
@@ -4125,6 +4131,128 @@ if (!ownsSingleInstanceLock) {
       codex: leavingNoLog(launchRunner(codexLaunch, 180_000)),
       git: gitRunner
     })
+
+    /*
+     * CLAUDE WORK THAT KEEPS GOING WHEN LOCUST CLOSES (W10, claude-background-runs.ts).
+     * Claude Code's own `--bg` sessions: Locust starts one, watches it while it lives,
+     * and brings its turn into the conversation when it ends -- also after a relaunch.
+     */
+    const claudeLaunch = async () => {
+      const claude = (await discoverForWork().catch(() => [])).find((entry) => entry.id === 'claude')
+      return claude?.availability === 'available' && claude.readiness === 'ready' ? claude.executable : undefined
+    }
+    // The variables a parent Claude Code session sets for its own children: never handed on (a drive is run from one).
+    const PARENT_SESSION_VARIABLES = ['CLAUDECODE', 'CLAUDE_PID', 'CLAUDE_CODE_ENTRYPOINT', 'CLAUDE_CODE_SESSION_ID', 'CLAUDE_CODE_CHILD_SESSION', 'CLAUDE_CODE_BRIDGE_SESSION_ID', 'CLAUDE_CODE_MESSAGING_SOCKET', 'CLAUDE_CODE_MESSAGING_TOKEN', 'CLAUDE_CODE_SESSION_ATTENDED', 'CLAUDE_CODE_EXECPATH']
+    const claudeCommand = async (args: readonly string[], cwd: string): Promise<{ code: number; stdout: string; stderr: string }> => {
+      const executable = await claudeLaunch()
+      if (executable === undefined) return { code: 127, stdout: '', stderr: 'Claude Code is not installed or not signed in on this computer.' }
+      const env = Object.fromEntries(Object.entries({ ...process.env, ...(executable.env ?? {}) }).filter(([key]) => !PARENT_SESSION_VARIABLES.includes(key)))
+      return new Promise((resolve) => {
+        const child = spawn(executable.executablePath, [...executable.prefixArgs, ...args], { cwd, windowsHide: true, shell: false, env, stdio: ['ignore', 'pipe', 'pipe'] })
+        let stdout = ''
+        let stderr = ''
+        let settled = false
+        // On EXIT, not close: `--bg` hands off to Claude Code's own supervisor, which need not let go of the pipes.
+        const done = (code: number): void => {
+          if (settled) return
+          settled = true
+          clearTimeout(timer)
+          setTimeout(() => resolve({ code, stdout, stderr }), 50)
+        }
+        const timer = setTimeout(() => {
+          if (process.platform === 'win32' && child.pid !== undefined) void releaseProcessTree(child.pid).catch(() => false).finally(() => child.kill())
+          else child.kill()
+          done(124)
+        }, 60_000)
+        child.stdout?.on('data', (chunk: Buffer) => { if (stdout.length < 4_000_000) stdout += chunk.toString('utf8') })
+        child.stderr?.on('data', (chunk: Buffer) => { if (stderr.length < 200_000) stderr += chunk.toString('utf8') })
+        child.on('error', (error) => { stderr += error.message; done(127) })
+        child.on('exit', (code) => done(code ?? 1))
+      })
+    }
+    const backgroundRuns = createBackgroundRuns({
+      file: join(app.getPath('userData'), 'claude-background.json'),
+      claude: claudeCommand,
+      sessionOf: async (conversation) => {
+        const newest = await newestTurnOf(missionLedger, conversation).catch(() => conversation)
+        const mission = await missionLedger.getMission(newest).catch(() => undefined)
+        return mission === undefined || mission.metadata.runtime !== 'claude' ? undefined : runtimeThreadIdOf(mission)
+      },
+      bringIn: async (run) => {
+        if (run.conversation !== undefined) {
+          const caught = await catchUp(run.conversation)
+          return caught.imported > 0 ? { missionId: caught.latestMissionId } : { refused: 'Its turn was not found in Claude Code\'s record of the conversation.' }
+        }
+        if (run.sessionId === undefined) return { refused: 'Claude Code never said which session it was.' }
+        const imported = await importSession({ runtime: 'claude', sessionId: run.sessionId, cwd: run.folder, title: run.prompt.slice(0, 80) }, {
+          ledger: missionLedger,
+          imports: terminalImports,
+          workspaceIdFor,
+          sameFolder: (cwd) => folders.sameAs(cwd),
+          learnFolder: (id, path) => folders.learn([{ id, path }]),
+          nameConversation: (missionId, title) => teammates.renameMission(missionId, title),
+          pathOf: (runtime, sessionId) => transcriptPathFor(runtime, sessionId, sessionPlaces)
+        })
+        if (!imported.ok) return { refused: imported.message }
+        if (run.teammateId !== undefined) await teammates.assignMission(run.teammateId, imported.missionId).catch(() => undefined)
+        return { missionId: imported.missionId }
+      },
+      onChange: () => sendToWindow({ kind: 'background-changed' })
+    })
+    void backgroundRuns.resume().catch(() => undefined)
+    backgroundForShutdown = backgroundRuns
+    const publicRun = (run: BackgroundRun): PublicBackgroundRun => {
+      const { folder: _folder, sessionId: _session, ...rest } = run
+      return rest
+    }
+    ipcMain.handle(BACKGROUND_LIST_CHANNEL, async (event) => (fromOwnWindow(event) ? (await backgroundRuns.list()).map(publicRun) : []))
+    ipcMain.handle(BACKGROUND_START_CHANNEL, async (event, requested: unknown): Promise<BackgroundStartResponse> => {
+      if (!fromOwnWindow(event) || typeof requested !== 'object' || requested === null) return { ok: false, message: 'That request was not understood.' }
+      const asked = requested as Record<string, unknown>
+      const prompt = typeof asked.prompt === 'string' ? asked.prompt : ''
+      if (prompt.trim().length === 0 || prompt.length > MAX_PROMPT_LENGTH) return { ok: false, message: 'A background turn needs a message.' }
+      const mode = asked.mode
+      if (mode !== 'ask' && mode !== 'plan' && mode !== 'accept-edits' && mode !== 'approve-each' && mode !== 'auto') return { ok: false, message: 'That mode is not one a background turn can use.' }
+      // Auto is the person's own switch, checked here as for every run (codex-mission's autoModeAllowed).
+      if (mode === 'auto' && (await teammates.readSettings()).autoMode !== true) return { ok: false, message: 'Auto is off in Settings, so a background turn cannot use it.' }
+      if (freeRoutesOnly(process.argv, process.env) && process.env.LOCUST_SPEND !== '1') return { ok: false, message: 'This window spends nothing, and a background turn runs Claude Code on your plan.' }
+      const text = (key: string): string | undefined => (typeof asked[key] === 'string' && (asked[key] as string).length > 0 && (asked[key] as string).length <= 200 ? (asked[key] as string) : undefined)
+      const conversation = text('conversation')
+      const teammateId = text('teammateId')
+      const model = text('model')
+      const effort = text('effort')
+      const started = await backgroundRuns.start({
+        prompt,
+        folder: workspacePath,
+        sandbox: mode === 'auto' ? 'full-access' : mode === 'accept-edits' || mode === 'approve-each' ? 'workspace-write' : 'read-only',
+        ...(mode === 'approve-each' ? { askEach: true } : {}),
+        ...(conversation === undefined ? {} : { conversation }),
+        ...(teammateId === undefined ? {} : { teammateId }),
+        ...(model === undefined || model === 'account-default' ? {} : { model }),
+        ...(effort === undefined ? {} : { effort })
+      })
+      if (started.ok) note('background-started', `${started.run.id} ${mode}`)
+      return started.ok ? { ok: true, run: publicRun(started.run) } : started
+    })
+    ipcMain.handle(BACKGROUND_STOP_CHANNEL, async (event, id: unknown) => (fromOwnWindow(event) && typeof id === 'string' ? backgroundRuns.stop(id) : false))
+    ipcMain.handle(BACKGROUND_DISMISS_CHANNEL, async (event, id: unknown) => {
+      if (fromOwnWindow(event) && typeof id === 'string') await backgroundRuns.dismiss(id)
+    })
+    const openClaudeTerminal = async (request: { readonly sessionId: string; readonly attach?: true; readonly setup?: true }) => {
+      const launch = await claudeLaunch()
+      if (launch === undefined) return { ok: false, message: 'Claude Code is not installed or not signed in on this computer.' }
+      return openInTerminal({ runtime: 'claude', cwd: workspacePath, launch, title: 'Claude Code', ...request }, {
+        ...(process.env.LOCALAPPDATA === undefined ? {} : { localAppData: process.env.LOCALAPPDATA }),
+        ...(process.env.LOCUST_TERMINAL === 'console' ? { prefer: 'console' as const } : {})
+      })
+    }
+    ipcMain.handle(BACKGROUND_OPEN_CHANNEL, async (event, id: unknown) => {
+      if (!fromOwnWindow(event) || typeof id !== 'string') return { ok: false, message: 'That run cannot be opened.' }
+      const run = (await backgroundRuns.list()).find((entry) => entry.id === id)
+      if (run === undefined) return { ok: false, message: 'That run is not in the list any more.' }
+      return openClaudeTerminal({ sessionId: id, attach: true })
+    })
+    ipcMain.handle(BACKGROUND_SETUP_CHANNEL, async (event) => (fromOwnWindow(event) ? openClaudeTerminal({ sessionId: 'setup', setup: true }) : { ok: false, message: 'That request was rejected.' }))
     const publicTask = <T extends { folder: string }>(task: T): Omit<T, 'folder'> => {
       const { folder: _folder, ...rest } = task
       return rest
@@ -7562,6 +7690,8 @@ if (!ownsSingleInstanceLock) {
 let appQuitting = false
 app.on('before-quit', () => {
   appQuitting = true
+  // Locust stops WATCHING its background turns; Claude Code keeps running them (W10).
+  backgroundForShutdown?.dispose()
 })
 
 app.on('window-all-closed', () => {

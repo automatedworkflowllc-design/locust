@@ -916,6 +916,8 @@ export interface ThreadProps {
   readonly switchedFrom?: TurnSwitch
   /** Set when THIS turn was had in the runtime's own terminal and brought back (0.391). */
   readonly inTerminal?: MissionRuntimeId
+  /** Turns that came back from Claude Code's background sessions (W10): their divider says so, not "terminal". */
+  readonly backgroundTurns?: ReadonlySet<string>
   readonly handoff:
     | {
         readonly from: MissionRuntimeId
@@ -1028,6 +1030,7 @@ onResume,
   cancelled,
   switchedFrom,
   inTerminal,
+  backgroundTurns,
   handoff,
   peers
 }: ThreadProps): ReactElement {
@@ -1439,7 +1442,7 @@ onResume,
               {leavingNotes((beforeTurn) => beforeTurn === index)}
               {joinNotes((beforeTurn) => beforeTurn === index)}
               {turn.switchedFrom !== undefined && <HandoffDivider {...turn.switchedFrom} />}
-              {seam !== undefined && <TerminalDivider seam={seam} />}
+              {seam !== undefined && <TerminalDivider seam={seam} {...(backgroundTurns?.has(turn.missionId) === true ? { background: true } : {})} />}
               {!again && versionNote(turn.versions)}
               {!again && userTurn(turnPromptLine(turn), turnAttachments(turn), () => editedFiles(turn.events, workspacePath), turn.startedBy === undefined && turn.inTerminal === undefined ? turn.missionId : undefined)}
               {cardsFor(index, 'before-work').map(peerCard)}
@@ -1506,7 +1509,7 @@ onResume,
           as if one runtime had answered both turns.
         */}
         {switchedFrom !== undefined && <HandoffDivider {...switchedFrom} />}
-        {currentSeam !== undefined && <TerminalDivider seam={currentSeam} />}
+        {currentSeam !== undefined && <TerminalDivider seam={currentSeam} {...(shownMissionId !== undefined && backgroundTurns?.has(shownMissionId) === true ? { background: true } : {})} />}
         {userTurn(currentLine, turnAttachments({ prompt, ...(startedBy === undefined ? {} : { startedBy }) }), running ? undefined : () => editedFiles(events, workspacePath), !running && startedBy === undefined && inTerminal === undefined ? shownMissionId : undefined)}
 
         {handoff !== undefined && (

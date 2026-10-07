@@ -150,6 +150,8 @@ import { TeammateBot } from './components/TeammateBot.js'
 import { BesideConversation } from './components/BesideConversation.js'
 import { SideChat } from './components/SideChat.js'
 import { CloudTasks } from './components/CloudTasks.js'
+import { BackgroundRuns } from './components/BackgroundRuns.js'
+import type { PublicBackgroundRun } from '../../shared/background.js'
 import { ReviewChanges } from './components/ReviewChanges.js'
 import { CommitChanges } from './components/CommitChanges.js'
 import { ShareTeamDialog } from './components/TeamCard.js'
@@ -418,6 +420,8 @@ function applyMissionUpdate(run: LiveRunState, update: CodexMissionUpdate): Live
   if (update.kind === 'memory-changed') return live
   // A runtime's command list is the `/` menu's business (0.426).
   if (update.kind === 'runtime-commands-changed') return live
+  // Background turns are the panel's business (W10).
+  if (update.kind === 'background-changed') return live
   // A scheduled routine that would not start has no run to belong to.
   if (update.kind === 'routine-blocked') return live
   if (update.kind === 'routine-recovery-changed') return live
@@ -1799,6 +1803,12 @@ export default function App(): ReactElement {
    * menu, this folder's tasks, and the panel beside the conversation.
    */
   const [cloudOn, setCloudOn] = useState(false)
+  /** Background (W10): picked in the chat-type menu, the runs, the panel, and why the last send did not start. */
+  const [backgroundOn, setBackgroundOn] = useState(false)
+  const [backgroundRuns, setBackgroundRuns] = useState<readonly PublicBackgroundRun[]>([])
+  const [backgroundPanel, setBackgroundPanel] = useState(false)
+  const [backgroundNote, setBackgroundNote] = useState<{ readonly text: string; readonly setUp?: true }>()
+  const backgroundTurnIds = useMemo(() => new Set(backgroundRuns.flatMap((run) => (run.broughtIn === undefined ? [] : [run.broughtIn]))), [backgroundRuns])
   const [cloudTasks, setCloudTasks] = useState<readonly PublicCloudTask[]>([])
   const [cloudPanel, setCloudPanel] = useState(false)
   // Claude's cloud (0.538): what was sent from this folder, to find again or bring home.
@@ -2350,6 +2360,7 @@ export default function App(): ReactElement {
     const bridge = window.desktop
     if (bridge === undefined) return
     void bridge.listCloudTasks().then(setCloudTasks).catch(() => undefined)
+    void Promise.resolve().then(() => bridge.backgroundRuns()).then(setBackgroundRuns).catch(() => undefined)
     // Claude's sessions too (0.556), so the header can offer the panel after a restart.
     void Promise.resolve().then(() => bridge.listClaudeCloud()).then(setClaudeCloud).catch(() => undefined)
     void bridge.cloudWhere().then(setCloudWhere).catch(() => undefined)
@@ -2725,6 +2736,26 @@ export default function App(): ReactElement {
       }
       if (update.kind === 'runtime-commands-changed') {
         rereadRuntimeCommands()
+        return
+      }
+      // A background turn moved or came back (W10): the list is read again, and so is the conversation it joined.
+      if (update.kind === 'background-changed') {
+        void window.desktop?.backgroundRuns().then((runs) => {
+          setBackgroundRuns((before) => {
+            const back = runs.filter((run) => run.broughtIn !== undefined && !before.some((old) => old.id === run.id && old.broughtIn !== undefined))
+            if (back.length > 0) {
+              refreshHistory()
+              // The conversation on screen is the one it came back into: shown again, with the turn in it.
+              const shown = liveRunRef.current?.data?.missionId
+              const into = back.find((run) => run.conversation !== undefined && run.conversation === shown)
+              if (into?.broughtIn !== undefined) {
+                const turn = into.broughtIn
+                setTimeout(() => openMissionRef.current(turn), 0)
+              }
+            }
+            return runs
+          })
+        }).catch(() => undefined)
         return
       }
       if (update.kind === 'memory-changed') {
@@ -4091,6 +4122,33 @@ export default function App(): ReactElement {
   /** The send, when a comparison is ticked or on screen; otherwise the ordinary one. */
   const sendOrCompare = async (prompt: string, sendOptions?: { readonly leaveOut?: readonly string[] }): Promise<boolean | string> => {
     const bridge = window.desktop
+    // Background (W10): Claude Code's own session takes the turn; the panel follows it.
+    if (backgroundOn && comparing === undefined && composerRoute.runtime === 'claude') {
+      if (!bridge) return 'Locust is not ready yet. Nothing was sent.'
+      const backgroundEffort = effort !== undefined && (modelFamily(models, 'claude', composerRoute.model)?.supportedEfforts ?? []).includes(effort) ? effort : undefined
+      const continuing = liveRun?.data?.runtime === 'claude' ? liveRun.data.missionId : undefined
+      const sent = await bridge.startBackground({
+        prompt,
+        mode,
+        model: composerRoute.model,
+        ...(backgroundEffort === undefined ? {} : { effort: backgroundEffort }),
+        ...(pickedTeammate === undefined ? {} : { teammateId: pickedTeammate.teammateId }),
+        ...(continuing === undefined ? {} : { conversation: continuing })
+      }).catch(() => undefined)
+      setBackgroundPanel(true)
+      if (sent === undefined) {
+        setBackgroundNote({ text: 'Claude Code could not be reached. Nothing was sent.' })
+        return 'Claude Code could not be reached. Nothing was sent.'
+      }
+      if (!sent.ok) {
+        setBackgroundNote({ text: sent.message, ...(sent.needsTrust === true ? { setUp: true as const } : {}) })
+        return sent.message
+      }
+      setBackgroundNote(undefined)
+      setBackgroundRuns((current) => [sent.run, ...current.filter((run) => run.id !== sent.run.id)])
+      setBackgroundOn(false)
+      return true
+    }
     // Cloud (0.503): the task goes to Codex Cloud, and the panel follows it.
     if (cloudOn && comparing === undefined && composerRoute.runtime === 'claude') {
       if (!bridge) return 'Locust is not ready yet. Nothing was sent.'
@@ -7286,6 +7344,9 @@ export default function App(): ReactElement {
           onOpenAutomations={() => setScreen('automations')}
           onOpenBoard={() => setScreen('board')}
           {...(cloudTasks.length > 0 ? { cloudTasks: { count: cloudTasks.length, onOpen: () => { setScreen('workroom'); setCloudPanel(true) } } } : {})}
+          {...(backgroundRuns.length > 0
+            ? { background: { count: backgroundRuns.filter((run) => run.state === 'working' || run.state === 'blocked' || run.state === 'unknown').length, onOpen: () => { setScreen('workroom'); setCloudPanel(false); setBackgroundPanel(true) } } }
+            : {})}
           missions={sidebarMissions}
           folders={folders}
           {...(workspaceId === undefined ? {} : { currentFolderId: workspaceId })}
@@ -8227,6 +8288,7 @@ export default function App(): ReactElement {
               })()}
               <DiffNotesContext.Provider value={diffNotesPlace}>
               <Thread
+                backgroundTurns={backgroundTurnIds}
                 onOpenFile={openFileInViewer}
                 prompt={liveRun.prompt}
                 startedBy={liveRun.startedBy}
@@ -8573,6 +8635,21 @@ export default function App(): ReactElement {
             onStart={sendOrCompare}
             // Compare (0.441): the picker's switch, and a comparison on screen.
             {...(comparePicking === undefined ? {} : { compare: comparePicking })}
+            {...(composerRoute.runtime === 'claude' && comparing === undefined
+              ? {
+                  background: {
+                    on: backgroundOn,
+                    onMode: (on: boolean) => {
+                      setBackgroundOn(on)
+                      if (on) {
+                        setCloudOn(false)
+                        setCloudPanel(false)
+                        setBackgroundPanel(true)
+                      }
+                    }
+                  }
+                }
+              : {})}
             cloud={{
               on: cloudOn,
               onMode: (on) => {
@@ -8742,6 +8819,17 @@ export default function App(): ReactElement {
               if (bridge === undefined || workspacePath === undefined) return
               void bridge.saveCopy(viewingFile.path).catch(() => undefined)
             }}
+          />
+        ) : backgroundPanel && screen === 'workroom' ? (
+          <BackgroundRuns
+            runs={backgroundRuns}
+            {...(backgroundNote === undefined ? {} : { note: backgroundNote })}
+            onOpen={(id) => void window.desktop?.openBackground(id).then((answer) => { if (!answer.ok && answer.message !== undefined) setBackgroundNote({ text: answer.message }) })}
+            onStop={(id) => void window.desktop?.stopBackground(id)}
+            onShow={(missionId) => openMission(missionId)}
+            onDismiss={(id) => void window.desktop?.dismissBackground(id).then(() => setBackgroundRuns((current) => current.filter((run) => run.id !== id)))}
+            onSetUp={() => void window.desktop?.setUpBackground().then((answer) => setBackgroundNote(answer.ok ? { text: 'Claude Code is open in a terminal. Answer its question about this folder, then send again.' } : { text: answer.message ?? 'Claude Code could not be opened.' }))}
+            onClose={() => setBackgroundPanel(false)}
           />
         ) : cloudPanel && screen === 'workroom' ? (
           <CloudTasks

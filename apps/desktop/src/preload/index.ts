@@ -2,6 +2,16 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { VOICE_READY, VOICE_DOWNLOAD, VOICE_TRANSCRIBE, VOICE_CANCEL, VOICE_PROGRESS } from '../shared/voice.js'
 import { REMOTE_CONTROL_GET_CHANNEL, REMOTE_CONTROL_SET_CHANNEL, type RemoteControlState } from '../shared/claude-remote-control.js'
 import { FOLDER_CHANGES_CHANNEL, FOLDER_COMMIT_CHANNEL, type CommitResult, type FolderChanges } from '../shared/folder-commit.js'
+import {
+  BACKGROUND_DISMISS_CHANNEL,
+  BACKGROUND_LIST_CHANNEL,
+  BACKGROUND_OPEN_CHANNEL,
+  BACKGROUND_SETUP_CHANNEL,
+  BACKGROUND_START_CHANNEL,
+  BACKGROUND_STOP_CHANNEL,
+  type BackgroundStartResponse,
+  type PublicBackgroundRun
+} from '../shared/background.js'
 import { QUEUED_MESSAGES_READ_CHANNEL, QUEUED_MESSAGES_WRITE_CHANNEL } from '../shared/queued-messages.js'
 import type { QueuedMessagesResponse, SavedQueuedMessage } from '../shared/queued-messages.js'
 import type { CompareSlotId } from '../shared/compare.js'
@@ -539,6 +549,12 @@ const desktopApi: DesktopApi = {
   undoTurn: (runId: string) => ipcRenderer.invoke(TURN_UNDO_CHANNEL, runId) as Promise<TurnUndoState>,
   folderChanges: () => ipcRenderer.invoke(FOLDER_CHANGES_CHANNEL) as Promise<FolderChanges>,
   commitFolder: (message, then, shown) => ipcRenderer.invoke(FOLDER_COMMIT_CHANNEL, message, then, [...shown]) as Promise<CommitResult>,
+  backgroundRuns: () => ipcRenderer.invoke(BACKGROUND_LIST_CHANNEL) as Promise<readonly PublicBackgroundRun[]>,
+  startBackground: (request) => ipcRenderer.invoke(BACKGROUND_START_CHANNEL, request) as Promise<BackgroundStartResponse>,
+  stopBackground: (id) => ipcRenderer.invoke(BACKGROUND_STOP_CHANNEL, id) as Promise<boolean>,
+  openBackground: (id) => ipcRenderer.invoke(BACKGROUND_OPEN_CHANNEL, id) as Promise<{ readonly ok: boolean; readonly message?: string }>,
+  setUpBackground: () => ipcRenderer.invoke(BACKGROUND_SETUP_CHANNEL) as Promise<{ readonly ok: boolean; readonly message?: string }>,
+  dismissBackground: (id) => ipcRenderer.invoke(BACKGROUND_DISMISS_CHANNEL, id) as Promise<void>,
   onRuntimeUpdates: (listener: (state: RuntimeUpdatesState) => void) => {
     const handler = (_event: unknown, state: RuntimeUpdatesState): void => listener(state)
     ipcRenderer.on(RUNTIME_UPDATES_EVENT_CHANNEL, handler)

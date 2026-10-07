@@ -77,6 +77,7 @@ export const LEFT_OUT: Readonly<Record<string, string>> = {
   'usage-readings.json': 'usage read from this machine\'s accounts',
   'memory-recall-cache.json': 'a cache that rebuilds itself',
   voice: "voice typing's engine and model, downloaded again when it is next used",
+  'claude-background.json': "Claude turns running in the background on this computer, which Claude Code keeps",
   'claude-skills': 'skills copied for runs in progress, made again for each run',
   checkpoints: 'copies of your folders from before each turn, for Undo: they belong to the folders on this machine, and can hold files like .env',
   'queued-messages.json': 'messages waiting to send from here: a restore never sends anything',

@@ -2,6 +2,7 @@ import type { ReverseChange } from './reverse-diff.js'
 import type { AwaySummaryCounts } from './away.js'
 import type { RemoteControlState } from './claude-remote-control.js'
 import type { CommitResult, CommitThen, FolderChanges } from './folder-commit.js'
+import type { BackgroundStartRequest, BackgroundStartResponse, PublicBackgroundRun } from './background.js'
 import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import type { QueuedMessagesResponse, SavedQueuedMessage } from './queued-messages.js'
 
@@ -3108,6 +3109,8 @@ export type CodexMissionUpdate =
     }
   /** A runtime listed a different set of its own commands; the `/` menu re-reads them (0.426). */
   | { readonly kind: 'runtime-commands-changed' }
+  /** A background turn started, moved or ended (W10): the list is read again. */
+  | { readonly kind: 'background-changed' }
   /** A teammate's reply changed the team's memory; the Memory screen and sidebar re-read it. */
   | {
       readonly kind: 'memory-changed'
@@ -3519,6 +3522,15 @@ export interface DesktopApi {
   folderChanges(): Promise<FolderChanges>
   /** Commit it all as the person, then push or open a pull request when asked. */
   commitFolder(message: string, then: CommitThen, shown: readonly string[]): Promise<CommitResult>
+  /** Background turns (W10): Claude Code runs them, Locust watches. */
+  backgroundRuns(): Promise<readonly PublicBackgroundRun[]>
+  startBackground(request: BackgroundStartRequest): Promise<BackgroundStartResponse>
+  stopBackground(id: string): Promise<boolean>
+  /** `claude attach <id>`, in a terminal: where a waiting run is answered. */
+  openBackground(id: string): Promise<{ readonly ok: boolean; readonly message?: string }>
+  /** Claude Code in the folder, in a terminal, for the person to answer its trust question once. */
+  setUpBackground(): Promise<{ readonly ok: boolean; readonly message?: string }>
+  dismissBackground(id: string): Promise<void>
   /** An update started, landed or failed. Returns the unsubscribe. */
   onRuntimeUpdates(listener: (state: RuntimeUpdatesState) => void): () => void
   /** Open the runtime's sign-in in its own window. */

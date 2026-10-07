@@ -222,6 +222,7 @@ export function Sidebar({
   onOpenAutomations,
   onOpenBoard,
   cloudTasks,
+  background,
   onHome,
   compact = false
 }: {
@@ -334,6 +335,8 @@ export function Sidebar({
    * was there.
    */
   readonly cloudTasks?: { readonly count: number; readonly onOpen: () => void }
+  /** Background turns (W10): how many are still going, and the panel. */
+  readonly background?: { readonly count: number; readonly onOpen: () => void }
   /** Back to the home screen: nothing picked, nothing open. */
   readonly onHome: () => void
   /**
@@ -1070,6 +1073,15 @@ export function Sidebar({
             <Icon name="cloud" size={14} />
             <span>Cloud tasks</span>
             <span className="lc-sidebar__count">{String(cloudTasks.count)}</span>
+          </button>
+        </div>
+      )}
+      {background !== undefined && (
+        <div className="lc-sidebar__nav lc-sidebar__places lc-sidebar__places--pinned">
+          <button type="button" onClick={() => { railClose(); background.onOpen() }} title="In the background -- Claude turns that keep going if you close Locust">
+            <Icon name="clock" size={14} />
+            <span>In the background</span>
+            <span className="lc-sidebar__count">{String(background.count)}</span>
           </button>
         </div>
       )}

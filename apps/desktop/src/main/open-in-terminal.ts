@@ -118,9 +118,18 @@ export interface TerminalRequest {
   readonly title: string
   /** W5: teleport a cloud copy, rather than resume a local conversation. */
   readonly cloudSession?: true
+  /** W10: `claude attach <id>`, a background session, where a waiting one is answered. */
+  readonly attach?: true
+  /** W10: Claude Code itself in the folder, for the person to answer its trust question once. */
+  readonly setup?: true
 }
 
 export function terminalArgsFor(request: TerminalRequest): readonly string[] | undefined {
+  if (request.setup === true) return request.runtime === 'claude' ? [] : undefined
+  if (request.attach === true) {
+    // Hex, as `claude --bg` prints it: never an option, never a shell word.
+    return request.runtime === 'claude' && /^[0-9a-f]{6,64}$/i.test(request.sessionId) ? ['attach', request.sessionId] : undefined
+  }
   if (request.cloudSession === true) {
     return request.runtime === 'claude' && isResumableSessionId(request.sessionId) ? ['--teleport', request.sessionId] : undefined
   }
