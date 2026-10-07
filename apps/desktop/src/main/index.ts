@@ -16,7 +16,7 @@ import { MAX_TAGGED, taggedPrompt } from '../shared/tagging.js'
 import { COMPARE_SLOTS, COMPARE_TREES_DIRECTORY, comparesGoneWith, compareNeedsCopy, compareRefusalOf, compareSlotKey, compareTreeId, MAX_COMPARE_SLOTS, MAX_JUDGE_CRITERIA, MIN_COMPARE_SLOTS } from '../shared/compare.js'
 import { reverseChanges } from '../shared/reverse-diff.js'
 import { createCloudTaskService, launchRunner } from './cloud-task-service.js'
-import { environmentOf, githubRepoOf } from './cloud-tasks.js'
+import { environmentOf, githubRepoOf, leavingNoLog } from './cloud-tasks.js'
 import { createClaudeCloud } from './claude-cloud.js'
 import { createRemoteControl } from './claude-remote-control.js'
 import { registerRemoteControlIpc } from './remote-control-ipc.js'
@@ -4094,10 +4094,11 @@ if (!ownsSingleInstanceLock) {
       })
     })
     // For quick read-only questions: whether an environment exists (0.505).
-    const cloudAsk = launchRunner(codexLaunch, 45_000)
+    // Each leaves the folder's error.log as it found it (0.681, leavingNoLog).
+    const cloudAsk = leavingNoLog(launchRunner(codexLaunch, 45_000))
     const cloudTasks = createCloudTaskService({
       file: join(app.getPath('userData'), 'cloud-tasks.json'),
-      codex: launchRunner(codexLaunch, 180_000),
+      codex: leavingNoLog(launchRunner(codexLaunch, 180_000)),
       git: gitRunner
     })
     const publicTask = <T extends { folder: string }>(task: T): Omit<T, 'folder'> => {

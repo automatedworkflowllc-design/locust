@@ -20,6 +20,9 @@
  * stays in the cloud until Apply -- `codex cloud apply`, into this folder.
  */
 
+import { open, rm, stat, truncate } from 'node:fs/promises'
+import { join } from 'node:path'
+
 /** A command's result; `code` 0 is success. */
 export interface Ran {
   readonly code: number
@@ -161,3 +164,66 @@ export function refusalFor(problem: CloudStartProblem): string {
     ? `Codex Cloud has no environment for ${problem.repo} yet. In the Codex app, open Settings > Legacy Codex Cloud and create one for that repository, then send again.`
     : `Codex Cloud did not start the task: ${problem.said}`
 }
+
+/**
+ * CODEX CLOUD LEAVES NO LOG IN THE FOLDER (0.681).
+ *
+ * `codex cloud` writes its debug log to `error.log` in the directory it runs
+ * in -- startup, the ChatGPT account id, the GitHub origin it parsed. Locust
+ * asks it whether a folder has a cloud environment on its own, whenever a
+ * GitHub folder is open, so every such folder grew one. FOUND 2026-10-06 by
+ * the first real pull request from Commit: it carried error.log beside the
+ * one file the drive wrote. Colin's own repositories each had one, kept out
+ * of git only because they ignore `*.log`.
+ *
+ * The call still runs in the folder (`apply` writes there, and `exec` reads
+ * its origin), and afterwards error.log is as it was: removed if the call
+ * made it, cut back to its old length if the call added to it -- and only
+ * when what was added reads like Codex's own lines, so a log of the person's
+ * that something else wrote meanwhile is never touched. One call per folder
+ * at a time, so two calls never undo each other's measurement.
+ */
+const CODEX_LOG_LINE = /^\[\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|[+-]\d{2}:\d{2})\] [a-z_]+: /
+const queues = new Map<string, Promise<unknown>>()
+
+async function codexOnly(path: string, from: number): Promise<boolean> {
+  const handle = await open(path, 'r').catch(() => undefined)
+  if (handle === undefined) return false
+  try {
+    const size = (await handle.stat()).size
+    const length = Math.min(size - from, 1024 * 1024)
+    if (length <= 0) return false
+    const buffer = Buffer.alloc(length)
+    await handle.read(buffer, 0, length, from)
+    const lines = buffer.toString('utf8').split(/\r?\n/).filter((line) => line.length > 0)
+    return lines.length > 0 && lines.every((line) => CODEX_LOG_LINE.test(line))
+  } finally {
+    await handle.close()
+  }
+}
+
+export function leavingNoLog(run: Runner): Runner {
+  return (args, cwd) => {
+    const go = async (): Promise<Ran> => {
+      const path = join(cwd, 'error.log')
+      const before = await stat(path).then((found) => found.size, () => undefined)
+      try {
+        return await run(args, cwd)
+      } finally {
+        const after = await stat(path).then((found) => found.size, () => undefined)
+        if (after !== undefined && after > (before ?? 0) && (await codexOnly(path, before ?? 0).catch(() => false))) {
+          if (before === undefined) await rm(path, { force: true }).catch(() => undefined)
+          else await truncate(path, before).catch(() => undefined)
+        }
+      }
+    }
+    const previous = queues.get(cwd) ?? Promise.resolve()
+    const next = previous.then(go, go)
+    queues.set(cwd, next.catch(() => undefined))
+    return next
+  }
+}
+
+/** For a test: the log check, alone. */
+export const readsLikeCodexLog = (text: string): boolean =>
+  text.split(/\r?\n/).filter((line) => line.length > 0).every((line) => CODEX_LOG_LINE.test(line))
