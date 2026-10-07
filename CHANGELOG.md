@@ -11,6 +11,13 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.697.0 - 2026-10-07
+
+### Fixed
+
+- **Claude's models have the names Claude Code gives them.** Claude Code moved its Haiku alias to Haiku 5.5 today, and Locust's model picker still read Haiku 4.5 for Claude while Cursor already showed 5.5. Locust now takes Claude's model list from Claude Code itself, in the same quick check that lists its / commands, so the picker and every model chip use Claude Code's own names and settings, and a new Claude model appears the day Claude Code knows it. Haiku 4.5 is still there under the older versions.
+- **An agent installed outside npm's global folder starts like any other.** When a coding agent's command came from a project's own or a separately installed copy, Locust did not recognise its launcher, ran it through cmd.exe instead, and refused any message with more than one line. Locust's own check of new agent releases found this while it tried Copilot 1.0.93; it covers Copilot as well as Codex now.
+
 ## 0.696.0 - 2026-10-07
 
 ### Fixed
