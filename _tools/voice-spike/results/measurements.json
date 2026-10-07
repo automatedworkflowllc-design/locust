@@ -1,0 +1,3146 @@
+{
+  "fixture": {
+    "duration_seconds": 10,
+    "spoken_seconds": 8.79,
+    "bytes": 320044,
+    "sha256": "7e5a179922d91df94b51e9afdcdfbb8e7f9b89b7ed1fec29954507d52f4cf47e",
+    "reference": "Please review the latest changes, check the tests, and tell me which files need attention before we release the new version."
+  },
+  "logical_cpus": 12,
+  "sample_interval_ms": 100,
+  "runs": [
+    {
+      "engine": "sapi",
+      "exit_code": 0,
+      "first_text_ms": 1521.0742999915965,
+      "first_hypothesis_ms": 680.2144999965094,
+      "total_ms": 1565.8502000005683,
+      "cpu_seconds": 1.03125,
+      "peak_cpu_percent_machine": 8.573097897775732,
+      "average_cpu_percent_machine": 5.488232526966424,
+      "peak_working_set_bytes": 106389504,
+      "peak_commit_bytes": 44183552,
+      "host_average_cpu_percent": 61.16838487972509,
+      "transcript": "Please review the latest changers check protests and tell me which wiles need attention before we release the new version",
+      "wer": {
+        "errors": 4,
+        "reference_words": 21,
+        "percent": 19.047619047619047
+      },
+      "stdout": [
+        {
+          "ms": 680.2144999965094,
+          "line": "HYP\t567.535\tthe"
+        },
+        {
+          "ms": 680.250999997952,
+          "line": "HYP\t573.670\tplease"
+        },
+        {
+          "ms": 680.2546999970218,
+          "line": "HYP\t573.710\tplease review"
+        },
+        {
+          "ms": 680.2657999942312,
+          "line": "HYP\t573.717\tplease review the"
+        },
+        {
+          "ms": 706.9188999885228,
+          "line": "HYP\t600.314\tplease review the leader"
+        },
+        {
+          "ms": 722.2898999898462,
+          "line": "HYP\t615.706\tplease review the latest"
+        },
+        {
+          "ms": 731.3645999965956,
+          "line": "HYP\t624.743\tplease review the latest change"
+        },
+        {
+          "ms": 742.4989999999525,
+          "line": "HYP\t635.909\tplease review the latest changes"
+        },
+        {
+          "ms": 765.0824000011198,
+          "line": "HYP\t658.484\tplease review the latest changers"
+        },
+        {
+          "ms": 800.0114999886137,
+          "line": "HYP\t693.370\tplease review the latest changers check"
+        },
+        {
+          "ms": 839.1263999947114,
+          "line": "HYP\t732.518\tplease review the latest changers check boot"
+        },
+        {
+          "ms": 875.3946999931941,
+          "line": "HYP\t768.802\tplease review the latest changers check but a"
+        },
+        {
+          "ms": 926.0233999957563,
+          "line": "HYP\t819.406\tplease review the latest changers check protests"
+        },
+        {
+          "ms": 995.8425999939209,
+          "line": "HYP\t889.238\tplease review the latest changers check protests and"
+        },
+        {
+          "ms": 1026.6848999890499,
+          "line": "HYP\t920.102\tplease review the latest changers check the tests until"
+        },
+        {
+          "ms": 1049.3557999870973,
+          "line": "HYP\t942.735\tplease review the latest changers check the tests until we will"
+        },
+        {
+          "ms": 1057.0967999956338,
+          "line": "HYP\t950.515\tplease review the latest changers check protests and tell me which"
+        },
+        {
+          "ms": 1068.8995999953477,
+          "line": "HYP\t962.308\tplease review the latest changers check protests and tell me which while"
+        },
+        {
+          "ms": 1091.577299986966,
+          "line": "HYP\t984.977\tplease review the latest changers check protests and tell me which wiles knee"
+        },
+        {
+          "ms": 1117.0566999935545,
+          "line": "HYP\t1010.462\tplease review the latest changers check protests and tell me which files needed to"
+        },
+        {
+          "ms": 1139.3741999927443,
+          "line": "HYP\t1032.785\tplease review the latest changers check protests and tell me which wiles need attention"
+        },
+        {
+          "ms": 1170.1987999986159,
+          "line": "HYP\t1063.607\tplease review the latest changers check protests and tell me which wiles need attention to"
+        },
+        {
+          "ms": 1177.403299996513,
+          "line": "HYP\t1070.843\tplease review the latest changers check protests and tell me which wiles need attention before"
+        },
+        {
+          "ms": 1187.8896999987774,
+          "line": "HYP\t1081.305\tplease review the latest changers check protests and tell me which wiles need attention before we're"
+        },
+        {
+          "ms": 1191.8262999970466,
+          "line": "HYP\t1085.276\tplease review the latest changers check protests and tell me which wiles need attention before wearily"
+        },
+        {
+          "ms": 1221.916999988025,
+          "line": "HYP\t1115.318\tplease review the latest changers check protests and tell me which wiles need attention before we release the"
+        },
+        {
+          "ms": 1258.1907999992836,
+          "line": "HYP\t1151.595\tplease review the latest changers check protests and tell me which wiles need attention before we release the nouveau"
+        },
+        {
+          "ms": 1267.259100000956,
+          "line": "HYP\t1160.659\tplease review the latest changers check protests and tell me which wiles need attention before we release the new version"
+        },
+        {
+          "ms": 1521.0742999915965,
+          "line": "TEXT\t1414.383\tPlease review the latest changers check protests and tell me which wiles need attention before we release the new version"
+        },
+        {
+          "ms": 1535.4072999907658,
+          "line": "DONE\t1428.801"
+        }
+      ],
+      "stderr": [],
+      "samples": [
+        {
+          "ms": 52.259899995988235,
+          "cpu_seconds": 0.0,
+          "peak_working_set_bytes": 1552384,
+          "working_set_bytes": 1548288,
+          "peak_commit_bytes": 352256,
+          "host_idle": 8636040781250,
+          "host_total": 11271367500000
+        },
+        {
+          "ms": 161.10589999880176,
+          "cpu_seconds": 0.03125,
+          "peak_working_set_bytes": 16498688,
+          "working_set_bytes": 16424960,
+          "peak_commit_bytes": 13234176,
+          "host_idle": 8636045156250,
+          "host_total": 11271380625000
+        },
+        {
+          "ms": 269.3245999980718,
+          "cpu_seconds": 0.046875,
+          "peak_working_set_bytes": 27725824,
+          "working_set_bytes": 27598848,
+          "peak_commit_bytes": 21766144,
+          "host_idle": 8636054062500,
+          "host_total": 11271393750000
+        },
+        {
+          "ms": 383.8421999971615,
+          "cpu_seconds": 0.078125,
+          "peak_working_set_bytes": 29159424,
+          "working_set_bytes": 29061120,
+          "peak_commit_bytes": 22294528,
+          "host_idle": 8636057031250,
+          "host_total": 11271406875000
+        },
+        {
+          "ms": 485.146299994085,
+          "cpu_seconds": 0.078125,
+          "peak_working_set_bytes": 44572672,
+          "working_set_bytes": 44568576,
+          "peak_commit_bytes": 28647424,
+          "host_idle": 8636060312500,
+          "host_total": 11271418125000
+        },
+        {
+          "ms": 597.6009000005433,
+          "cpu_seconds": 0.171875,
+          "peak_working_set_bytes": 89915392,
+          "working_set_bytes": 89911296,
+          "peak_commit_bytes": 33783808,
+          "host_idle": 8636064687500,
+          "host_total": 11271433125000
+        },
+        {
+          "ms": 702.9263000003994,
+          "cpu_seconds": 0.265625,
+          "peak_working_set_bytes": 96169984,
+          "working_set_bytes": 96165888,
+          "peak_commit_bytes": 39714816,
+          "host_idle": 8636066250000,
+          "host_total": 11271444375000
+        },
+        {
+          "ms": 812.763800000539,
+          "cpu_seconds": 0.375,
+          "peak_working_set_bytes": 96649216,
+          "working_set_bytes": 96645120,
+          "peak_commit_bytes": 39714816,
+          "host_idle": 8636071718750,
+          "host_total": 11271457500000
+        },
+        {
+          "ms": 920.1084999949671,
+          "cpu_seconds": 0.421875,
+          "peak_working_set_bytes": 96944128,
+          "working_set_bytes": 96940032,
+          "peak_commit_bytes": 40333312,
+          "host_idle": 8636073437500,
+          "host_total": 11271470625000
+        },
+        {
+          "ms": 1031.3269999896875,
+          "cpu_seconds": 0.53125,
+          "peak_working_set_bytes": 97136640,
+          "working_set_bytes": 97132544,
+          "peak_commit_bytes": 40333312,
+          "host_idle": 8636078750000,
+          "host_total": 11271483750000
+        },
+        {
+          "ms": 1137.3013999982504,
+          "cpu_seconds": 0.625,
+          "peak_working_set_bytes": 97431552,
+          "working_set_bytes": 97427456,
+          "peak_commit_bytes": 40333312,
+          "host_idle": 8636081875000,
+          "host_total": 11271496875000
+        },
+        {
+          "ms": 1248.7479999981588,
+          "cpu_seconds": 0.734375,
+          "peak_working_set_bytes": 97894400,
+          "working_set_bytes": 97890304,
+          "peak_commit_bytes": 41181184,
+          "host_idle": 8636091093750,
+          "host_total": 11271510000000
+        },
+        {
+          "ms": 1355.0640999892494,
+          "cpu_seconds": 0.84375,
+          "peak_working_set_bytes": 98406400,
+          "working_set_bytes": 98402304,
+          "peak_commit_bytes": 41279488,
+          "host_idle": 8636095468750,
+          "host_total": 11271523125000
+        },
+        {
+          "ms": 1463.935699997819,
+          "cpu_seconds": 0.953125,
+          "peak_working_set_bytes": 106389504,
+          "working_set_bytes": 105996288,
+          "peak_commit_bytes": 43704320,
+          "host_idle": 8636105312500,
+          "host_total": 11271536250000
+        },
+        {
+          "ms": 1566.0697999992408,
+          "cpu_seconds": 1.03125,
+          "peak_working_set_bytes": 106389504,
+          "working_set_bytes": 20480,
+          "peak_commit_bytes": 44183552,
+          "host_idle": 8636111406250,
+          "host_total": 11271549375000
+        }
+      ],
+      "run": 1
+    },
+    {
+      "engine": "whisper",
+      "exit_code": 0,
+      "first_text_ms": 3074.479599992628,
+      "first_hypothesis_ms": null,
+      "total_ms": 3161.1912999942433,
+      "cpu_seconds": 4.03125,
+      "peak_cpu_percent_machine": 18.59281485714809,
+      "average_cpu_percent_machine": 10.626927260005168,
+      "peak_working_set_bytes": 152694784,
+      "peak_commit_bytes": 666034176,
+      "host_average_cpu_percent": 82.83333333333334,
+      "transcript": "Please review the latest changes, check the tests, and tell me which files need attention before we release the new version.",
+      "wer": {
+        "errors": 0,
+        "reference_words": 21,
+        "percent": 0.0
+      },
+      "stdout": [
+        {
+          "ms": 3074.472699998296,
+          "line": ""
+        },
+        {
+          "ms": 3074.479599992628,
+          "line": "[00:00:00.000 --> 00:00:06.040]   Please review the latest changes, check the tests, and tell me which files need attention"
+        },
+        {
+          "ms": 3074.559999993653,
+          "line": "[00:00:06.040 --> 00:00:07.880]   before we release the new version."
+        }
+      ],
+      "stderr": [
+        {
+          "ms": 252.58669999311678,
+          "line": "load_backend: loaded CPU backend from C:\\work\\locust-wt\\voice-spike\\_tools\\voice-spike\\.cache\\native\\ggml-cpu-haswell.dll"
+        },
+        {
+          "ms": 252.6820999919437,
+          "line": "whisper_init_from_file_with_params_no_state: loading model from 'C:\\work\\locust-wt\\voice-spike\\_tools\\voice-spike\\.cache\\ggml-tiny.en-q5_1.bin'"
+        },
+        {
+          "ms": 252.87299999035895,
+          "line": "whisper_init_with_params_no_state: use gpu    = 0"
+        },
+        {
+          "ms": 252.88169999839738,
+          "line": "whisper_init_with_params_no_state: flash attn = 1"
+        },
+        {
+          "ms": 252.8821999876527,
+          "line": "whisper_init_with_params_no_state: gpu_device = 0"
+        },
+        {
+          "ms": 252.88269999145996,
+          "line": "whisper_init_with_params_no_state: dtw        = 0"
+        },
+        {
+          "ms": 252.88329999602865,
+          "line": "whisper_init_with_params_no_state: devices    = 1"
+        },
+        {
+          "ms": 252.88369999907445,
+          "line": "whisper_init_with_params_no_state: backends   = 1"
+        },
+        {
+          "ms": 252.88939999882132,
+          "line": "whisper_model_load: loading model"
+        },
+        {
+          "ms": 252.96649998927023,
+          "line": "whisper_model_load: n_vocab       = 51864"
+        },
+        {
+          "ms": 252.990699998918,
+          "line": "whisper_model_load: n_audio_ctx   = 1500"
+        },
+        {
+          "ms": 252.99169999198057,
+          "line": "whisper_model_load: n_audio_state = 384"
+        },
+        {
+          "ms": 252.99249999807216,
+          "line": "whisper_model_load: n_audio_head  = 6"
+        },
+        {
+          "ms": 252.9933999903733,
+          "line": "whisper_model_load: n_audio_layer = 4"
+        },
+        {
+          "ms": 252.99419999646489,
+          "line": "whisper_model_load: n_text_ctx    = 448"
+        },
+        {
+          "ms": 252.99539999105036,
+          "line": "whisper_model_load: n_text_state  = 384"
+        },
+        {
+          "ms": 252.9960999963805,
+          "line": "whisper_model_load: n_text_head   = 6"
+        },
+        {
+          "ms": 252.99729999096598,
+          "line": "whisper_model_load: n_text_layer  = 4"
+        },
+        {
+          "ms": 252.99809999705758,
+          "line": "whisper_model_load: n_mels        = 80"
+        },
+        {
+          "ms": 252.99889998859726,
+          "line": "whisper_model_load: ftype         = 9"
+        },
+        {
+          "ms": 252.9995999939274,
+          "line": "whisper_model_load: qntvr         = 1"
+        },
+        {
+          "ms": 253.00029999925755,
+          "line": "whisper_model_load: type          = 1 (tiny)"
+        },
+        {
+          "ms": 303.1825999933062,
+          "line": "whisper_model_load: adding 1607 extra tokens"
+        },
+        {
+          "ms": 303.83349998737685,
+          "line": "whisper_model_load: n_langs       = 99"
+        },
+        {
+          "ms": 304.2476999980863,
+          "line": "whisper_model_load:          CPU total size =    31.57 MB"
+        },
+        {
+          "ms": 338.8371999899391,
+          "line": "whisper_model_load: model size    =   31.57 MB"
+        },
+        {
+          "ms": 338.9327999902889,
+          "line": "whisper_backend_init_gpu: no GPU found"
+        },
+        {
+          "ms": 339.6135999937542,
+          "line": "whisper_init_state: kv self size  =    3.15 MB"
+        },
+        {
+          "ms": 341.16939999512397,
+          "line": "whisper_init_state: kv cross size =    9.44 MB"
+        },
+        {
+          "ms": 341.7254999949364,
+          "line": "whisper_init_state: kv pad  size  =    2.36 MB"
+        },
+        {
+          "ms": 343.96249998826534,
+          "line": "whisper_init_state: compute buffer (conv)   =   13.21 MB"
+        },
+        {
+          "ms": 348.454999999376,
+          "line": "whisper_init_state: compute buffer (encode) =   17.72 MB"
+        },
+        {
+          "ms": 350.3414999868255,
+          "line": "whisper_init_state: compute buffer (cross)  =    3.89 MB"
+        },
+        {
+          "ms": 352.5978999969084,
+          "line": "whisper_init_state: compute buffer (decode) =   95.91 MB"
+        },
+        {
+          "ms": 352.6221999927657,
+          "line": "read_audio_data: reading audio data from 'C:\\work\\locust-wt\\voice-spike\\_tools\\voice-spike\\results\\clip.wav' ..."
+        },
+        {
+          "ms": 352.62339998735115,
+          "line": "read_audio_data: trying to decode with miniaudio"
+        },
+        {
+          "ms": 353.41609999886714,
+          "line": ""
+        },
+        {
+          "ms": 353.4481999959098,
+          "line": "system_info: n_threads = 2 / 12 | WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | OPENMP = 1 | REPACK = 1 |"
+        },
+        {
+          "ms": 353.45609999785665,
+          "line": ""
+        },
+        {
+          "ms": 353.4567999886349,
+          "line": "main: processing 'C:\\work\\locust-wt\\voice-spike\\_tools\\voice-spike\\results\\clip.wav' (160000 samples, 10.0 sec), 2 threads, 1 processors, 5 beams + best of 5, lang = en, task = transcribe, timestamps = 1 ..."
+        },
+        {
+          "ms": 353.4573999932036,
+          "line": ""
+        },
+        {
+          "ms": 3075.0622999912594,
+          "line": ""
+        },
+        {
+          "ms": 3075.085599994054,
+          "line": "whisper_print_timings:     load time =    85.91 ms"
+        },
+        {
+          "ms": 3075.086699987878,
+          "line": "whisper_print_timings:     fallbacks =   0 p /   0 h"
+        },
+        {
+          "ms": 3075.091099992278,
+          "line": "whisper_print_timings:      mel time =    21.41 ms"
+        },
+        {
+          "ms": 3075.0966999912634,
+          "line": "whisper_print_timings:   sample time =   174.34 ms /   145 runs (     1.20 ms per run)"
+        },
+        {
+          "ms": 3075.097499997355,
+          "line": "whisper_print_timings:   encode time =  1682.80 ms /     1 runs (  1682.80 ms per run)"
+        },
+        {
+          "ms": 3075.0981999881333,
+          "line": "whisper_print_timings:   decode time =    18.47 ms /     1 runs (    18.47 ms per run)"
+        },
+        {
+          "ms": 3075.1687999872956,
+          "line": "whisper_print_timings:   batchd time =   798.11 ms /   140 runs (     5.70 ms per run)"
+        },
+        {
+          "ms": 3075.180599989835,
+          "line": "whisper_print_timings:   prompt time =     0.00 ms /     1 runs (     0.00 ms per run)"
+        },
+        {
+          "ms": 3075.181499996688,
+          "line": "whisper_print_timings:    total time =  2822.15 ms"
+        }
+      ],
+      "samples": [
+        {
+          "ms": 51.80429999018088,
+          "cpu_seconds": 0.0,
+          "peak_working_set_bytes": 1818624,
+          "working_set_bytes": 1814528,
+          "peak_commit_bytes": 434176,
+          "host_idle": 8636112968750,
+          "host_total": 11271555000000
+        },
+        {
+          "ms": 157.55199998966418,
+          "cpu_seconds": 0.0,
+          "peak_working_set_bytes": 3108864,
+          "working_set_bytes": 3104768,
+          "peak_commit_bytes": 724992,
+          "host_idle": 8636116562500,
+          "host_total": 11271568125000
+        },
+        {
+          "ms": 266.3488999969559,
+          "cpu_seconds": 0.03125,
+          "peak_working_set_bytes": 8720384,
+          "working_set_bytes": 8716288,
+          "peak_commit_bytes": 4825088,
+          "host_idle": 8636119375000,
+          "host_total": 11271581250000
+        },
+        {
+          "ms": 374.42989999544807,
+          "cpu_seconds": 0.171875,
+          "peak_working_set_bytes": 89038848,
+          "working_set_bytes": 89018368,
+          "peak_commit_bytes": 635748352,
+          "host_idle": 8636125937500,
+          "host_total": 11271594375000
+        },
+        {
+          "ms": 484.41819999425206,
+          "cpu_seconds": 0.375,
+          "peak_working_set_bytes": 108343296,
+          "working_set_bytes": 108339200,
+          "peak_commit_bytes": 642637824,
+          "host_idle": 8636129218750,
+          "host_total": 11271607500000
+        },
+        {
+          "ms": 591.0334999935003,
+          "cpu_seconds": 0.515625,
+          "peak_working_set_bytes": 109432832,
+          "working_set_bytes": 109428736,
+          "peak_commit_bytes": 642637824,
+          "host_idle": 8636132812500,
+          "host_total": 11271620625000
+        },
+        {
+          "ms": 700.7759999978589,
+          "cpu_seconds": 0.6875,
+          "peak_working_set_bytes": 120532992,
+          "working_set_bytes": 120528896,
+          "peak_commit_bytes": 642637824,
+          "host_idle": 8636138281250,
+          "host_total": 11271631875000
+        },
+        {
+          "ms": 808.0925999965984,
+          "cpu_seconds": 0.828125,
+          "peak_working_set_bytes": 120532992,
+          "working_set_bytes": 120528896,
+          "peak_commit_bytes": 642637824,
+          "host_idle": 8636139375000,
+          "host_total": 11271645000000
+        },
+        {
+          "ms": 916.7153999878792,
+          "cpu_seconds": 1.046875,
+          "peak_working_set_bytes": 120532992,
+          "working_set_bytes": 120528896,
+          "peak_commit_bytes": 642637824,
+          "host_idle": 8636144843750,
+          "host_total": 11271658125000
+        },
+        {
+          "ms": 1025.2226999873528,
+          "cpu_seconds": 1.203125,
+          "peak_working_set_bytes": 120532992,
+          "working_set_bytes": 120528896,
+          "peak_commit_bytes": 642637824,
+          "host_idle": 8636147500000,
+          "host_total": 11271671250000
+        },
+        {
+          "ms": 1135.0638000003528,
+          "cpu_seconds": 1.390625,
+          "peak_working_set_bytes": 120532992,
+          "working_set_bytes": 120528896,
+          "peak_commit_bytes": 642637824,
+          "host_idle": 8636154375000,
+          "host_total": 11271684375000
+        },
+        {
+          "ms": 1243.9163999952143,
+          "cpu_seconds": 1.59375,
+          "peak_working_set_bytes": 120532992,
+          "working_set_bytes": 120528896,
+          "peak_commit_bytes": 642637824,
+          "host_idle": 8636155468750,
+          "host_total": 11271697500000
+        },
+        {
+          "ms": 1360.8831999881659,
+          "cpu_seconds": 1.734375,
+          "peak_working_set_bytes": 120532992,
+          "working_set_bytes": 120528896,
+          "peak_commit_bytes": 642637824,
+          "host_idle": 8636155468750,
+          "host_total": 11271712343750
+        },
+        {
+          "ms": 1488.7939999898663,
+          "cpu_seconds": 1.9375,
+          "peak_working_set_bytes": 120532992,
+          "working_set_bytes": 120528896,
+          "peak_commit_bytes": 642637824,
+          "host_idle": 8636155468750,
+          "host_total": 11271727500000
+        },
+        {
+          "ms": 1621.3032999949064,
+          "cpu_seconds": 2.09375,
+          "peak_working_set_bytes": 120532992,
+          "working_set_bytes": 120528896,
+          "peak_commit_bytes": 642637824,
+          "host_idle": 8636155468750,
+          "host_total": 11271742031250
+        },
+        {
+          "ms": 1760.3052999911597,
+          "cpu_seconds": 2.234375,
+          "peak_working_set_bytes": 122839040,
+          "working_set_bytes": 122834944,
+          "peak_commit_bytes": 642637824,
+          "host_idle": 8636155468750,
+          "host_total": 11271759375000
+        },
+        {
+          "ms": 2020.6229999894276,
+          "cpu_seconds": 2.328125,
+          "peak_working_set_bytes": 122839040,
+          "working_set_bytes": 122834944,
+          "peak_commit_bytes": 642637824,
+          "host_idle": 8636155468750,
+          "host_total": 11271786718750
+        },
+        {
+          "ms": 2132.4603999964893,
+          "cpu_seconds": 2.515625,
+          "peak_working_set_bytes": 151912448,
+          "working_set_bytes": 151638016,
+          "peak_commit_bytes": 665214976,
+          "host_idle": 8636156718750,
+          "host_total": 11271804375000
+        },
+        {
+          "ms": 2241.7172999994364,
+          "cpu_seconds": 2.703125,
+          "peak_working_set_bytes": 151912448,
+          "working_set_bytes": 151498752,
+          "peak_commit_bytes": 665214976,
+          "host_idle": 8636160625000,
+          "host_total": 11271817500000
+        },
+        {
+          "ms": 2349.873299986939,
+          "cpu_seconds": 2.859375,
+          "peak_working_set_bytes": 151977984,
+          "working_set_bytes": 150667264,
+          "peak_commit_bytes": 665214976,
+          "host_idle": 8636165312500,
+          "host_total": 11271830625000
+        },
+        {
+          "ms": 2456.898499993258,
+          "cpu_seconds": 3.078125,
+          "peak_working_set_bytes": 152305664,
+          "working_set_bytes": 151830528,
+          "peak_commit_bytes": 665419776,
+          "host_idle": 8636168593750,
+          "host_total": 11271843750000
+        },
+        {
+          "ms": 2572.9164999938803,
+          "cpu_seconds": 3.25,
+          "peak_working_set_bytes": 152305664,
+          "working_set_bytes": 151916544,
+          "peak_commit_bytes": 665419776,
+          "host_idle": 8636171250000,
+          "host_total": 11271856875000
+        },
+        {
+          "ms": 2677.9637999861734,
+          "cpu_seconds": 3.484375,
+          "peak_working_set_bytes": 152530944,
+          "working_set_bytes": 152494080,
+          "peak_commit_bytes": 665862144,
+          "host_idle": 8636175312500,
+          "host_total": 11271870000000
+        },
+        {
+          "ms": 2788.4285999898566,
+          "cpu_seconds": 3.609375,
+          "peak_working_set_bytes": 152625152,
+          "working_set_bytes": 152608768,
+          "peak_commit_bytes": 666034176,
+          "host_idle": 8636176250000,
+          "host_total": 11271883125000
+        },
+        {
+          "ms": 2896.3622999872314,
+          "cpu_seconds": 3.8125,
+          "peak_working_set_bytes": 152690688,
+          "working_set_bytes": 152670208,
+          "peak_commit_bytes": 666034176,
+          "host_idle": 8636177343750,
+          "host_total": 11271896250000
+        },
+        {
+          "ms": 3010.0363999954425,
+          "cpu_seconds": 3.890625,
+          "peak_working_set_bytes": 152694784,
+          "working_set_bytes": 152674304,
+          "peak_commit_bytes": 666034176,
+          "host_idle": 8636177343750,
+          "host_total": 11271909375000
+        },
+        {
+          "ms": 3172.284899992519,
+          "cpu_seconds": 3.984375,
+          "peak_working_set_bytes": 152694784,
+          "working_set_bytes": 16445440,
+          "peak_commit_bytes": 666034176,
+          "host_idle": 8636177343750,
+          "host_total": 11271926718750
+        },
+        {
+          "ms": 3176.908399997046,
+          "cpu_seconds": 4.03125,
+          "peak_working_set_bytes": 152694784,
+          "working_set_bytes": 32768,
+          "peak_commit_bytes": 666034176,
+          "host_idle": 8636177343750,
+          "host_total": 11271930000000
+        }
+      ],
+      "run": 1
+    },
+    {
+      "engine": "sapi",
+      "exit_code": 0,
+      "first_text_ms": 2211.4129999972647,
+      "first_hypothesis_ms": 478.83149998961017,
+      "total_ms": 2291.5472999884514,
+      "cpu_seconds": 1.4375,
+      "peak_cpu_percent_machine": 9.077776354298337,
+      "average_cpu_percent_machine": 5.227545015862006,
+      "peak_working_set_bytes": 106188800,
+      "peak_commit_bytes": 44175360,
+      "host_average_cpu_percent": 97.00704225352112,
+      "transcript": "Please review the latest changers check protests and tell me which wiles need attention before we release the new version",
+      "wer": {
+        "errors": 4,
+        "reference_words": 21,
+        "percent": 19.047619047619047
+      },
+      "stdout": [
+        {
+          "ms": 478.83149998961017,
+          "line": "HYP\t297.858\tthe"
+        },
+        {
+          "ms": 478.8586999929976,
+          "line": "HYP\t310.867\tplease"
+        },
+        {
+          "ms": 478.8922999869101,
+          "line": "HYP\t310.900\tplease review"
+        },
+        {
+          "ms": 480.78800000075717,
+          "line": "HYP\t312.791\tplease review the"
+        },
+        {
+          "ms": 646.6981999983545,
+          "line": "HYP\t478.664\tplease review the leader"
+        },
+        {
+          "ms": 678.1138999940595,
+          "line": "HYP\t510.079\tplease review the latest"
+        },
+        {
+          "ms": 698.0674999940675,
+          "line": "HYP\t529.980\tplease review the latest change"
+        },
+        {
+          "ms": 717.0457999891369,
+          "line": "HYP\t549.019\tplease review the latest changes"
+        },
+        {
+          "ms": 762.296899993089,
+          "line": "HYP\t594.251\tplease review the latest changers"
+        },
+        {
+          "ms": 815.6521999917459,
+          "line": "HYP\t647.629\tplease review the latest changers check"
+        },
+        {
+          "ms": 895.8660999924177,
+          "line": "HYP\t727.830\tplease review the latest changers check boot"
+        },
+        {
+          "ms": 997.5368999876082,
+          "line": "HYP\t829.457\tplease review the latest changers check but a"
+        },
+        {
+          "ms": 1042.5949999917066,
+          "line": "HYP\t874.556\tplease review the latest changers check protests"
+        },
+        {
+          "ms": 1153.5236999916378,
+          "line": "HYP\t985.090\tplease review the latest changers check protests and"
+        },
+        {
+          "ms": 1217.4286999943433,
+          "line": "HYP\t1049.401\tplease review the latest changers check the tests until"
+        },
+        {
+          "ms": 1250.1122999965446,
+          "line": "HYP\t1082.072\tplease review the latest changers check the tests until we will"
+        },
+        {
+          "ms": 1264.5040999923367,
+          "line": "HYP\t1096.435\tplease review the latest changers check protests and tell me which"
+        },
+        {
+          "ms": 1282.790400000522,
+          "line": "HYP\t1114.763\tplease review the latest changers check protests and tell me which while"
+        },
+        {
+          "ms": 1323.5935999982757,
+          "line": "HYP\t1155.543\tplease review the latest changers check protests and tell me which wiles knee"
+        },
+        {
+          "ms": 1378.713499987498,
+          "line": "HYP\t1210.684\tplease review the latest changers check protests and tell me which files needed to"
+        },
+        {
+          "ms": 1415.406999993138,
+          "line": "HYP\t1247.366\tplease review the latest changers check protests and tell me which wiles need attention"
+        },
+        {
+          "ms": 1478.6831999954302,
+          "line": "HYP\t1310.650\tplease review the latest changers check protests and tell me which wiles need attention to"
+        },
+        {
+          "ms": 1492.255599994678,
+          "line": "HYP\t1324.209\tplease review the latest changers check protests and tell me which wiles need attention before"
+        },
+        {
+          "ms": 1514.209499990102,
+          "line": "HYP\t1346.166\tplease review the latest changers check protests and tell me which wiles need attention before we're"
+        },
+        {
+          "ms": 1528.6980999953812,
+          "line": "HYP\t1360.636\tplease review the latest changers check protests and tell me which wiles need attention before wearily"
+        },
+        {
+          "ms": 1618.51809998916,
+          "line": "HYP\t1450.471\tplease review the latest changers check protests and tell me which wiles need attention before we release the"
+        },
+        {
+          "ms": 1684.3900999956531,
+          "line": "HYP\t1516.345\tplease review the latest changers check protests and tell me which wiles need attention before we release the nouveau"
+        },
+        {
+          "ms": 1716.434299989487,
+          "line": "HYP\t1548.385\tplease review the latest changers check protests and tell me which wiles need attention before we release the new version"
+        },
+        {
+          "ms": 2211.4129999972647,
+          "line": "TEXT\t2043.278\tPlease review the latest changers check protests and tell me which wiles need attention before we release the new version"
+        },
+        {
+          "ms": 2246.4672999922186,
+          "line": "DONE\t2078.432"
+        }
+      ],
+      "stderr": [],
+      "samples": [
+        {
+          "ms": 77.96869998855982,
+          "cpu_seconds": 0.0,
+          "peak_working_set_bytes": 1777664,
+          "working_set_bytes": 1773568,
+          "peak_commit_bytes": 393216,
+          "host_idle": 8636177500000,
+          "host_total": 11271939375000
+        },
+        {
+          "ms": 180.15439998998772,
+          "cpu_seconds": 0.09375,
+          "peak_working_set_bytes": 15466496,
+          "working_set_bytes": 15458304,
+          "peak_commit_bytes": 12771328,
+          "host_idle": 8636178750000,
+          "host_total": 11271952500000
+        },
+        {
+          "ms": 289.37119999318384,
+          "cpu_seconds": 0.1875,
+          "peak_working_set_bytes": 29061120,
+          "working_set_bytes": 29040640,
+          "peak_commit_bytes": 22265856,
+          "host_idle": 8636181093750,
+          "host_total": 11271965625000
+        },
+        {
+          "ms": 398.0678999942029,
+          "cpu_seconds": 0.296875,
+          "peak_working_set_bytes": 81723392,
+          "working_set_bytes": 81719296,
+          "peak_commit_bytes": 32063488,
+          "host_idle": 8636183125000,
+          "host_total": 11271978750000
+        },
+        {
+          "ms": 664.9231999908807,
+          "cpu_seconds": 0.390625,
+          "peak_working_set_bytes": 95428608,
+          "working_set_bytes": 95338496,
+          "peak_commit_bytes": 37859328,
+          "host_idle": 8636184843750,
+          "host_total": 11272003906250
+        },
+        {
+          "ms": 818.5833999887109,
+          "cpu_seconds": 0.515625,
+          "peak_working_set_bytes": 96378880,
+          "working_set_bytes": 96374784,
+          "peak_commit_bytes": 39530496,
+          "host_idle": 8636184843750,
+          "host_total": 11272027812500
+        },
+        {
+          "ms": 952.324799989583,
+          "cpu_seconds": 0.625,
+          "peak_working_set_bytes": 96669696,
+          "working_set_bytes": 96665600,
+          "peak_commit_bytes": 39915520,
+          "host_idle": 8636185156250,
+          "host_total": 11272044375000
+        },
+        {
+          "ms": 1066.0463999956846,
+          "cpu_seconds": 0.671875,
+          "peak_working_set_bytes": 96825344,
+          "working_set_bytes": 96821248,
+          "peak_commit_bytes": 40099840,
+          "host_idle": 8636185156250,
+          "host_total": 11272057500000
+        },
+        {
+          "ms": 1186.2379999947734,
+          "cpu_seconds": 0.796875,
+          "peak_working_set_bytes": 96956416,
+          "working_set_bytes": 96952320,
+          "peak_commit_bytes": 40099840,
+          "host_idle": 8636185468750,
+          "host_total": 11272072500000
+        },
+        {
+          "ms": 1298.7999999895692,
+          "cpu_seconds": 0.84375,
+          "peak_working_set_bytes": 97173504,
+          "working_set_bytes": 97169408,
+          "peak_commit_bytes": 40099840,
+          "host_idle": 8636185468750,
+          "host_total": 11272085625000
+        },
+        {
+          "ms": 1413.74979999091,
+          "cpu_seconds": 0.921875,
+          "peak_working_set_bytes": 97329152,
+          "working_set_bytes": 97325056,
+          "peak_commit_bytes": 40099840,
+          "host_idle": 8636185468750,
+          "host_total": 11272100625000
+        },
+        {
+          "ms": 1536.2208000005921,
+          "cpu_seconds": 0.984375,
+          "peak_working_set_bytes": 97579008,
+          "working_set_bytes": 97574912,
+          "peak_commit_bytes": 40099840,
+          "host_idle": 8636185468750,
+          "host_total": 11272113750000
+        },
+        {
+          "ms": 1651.1332999943988,
+          "cpu_seconds": 1.046875,
+          "peak_working_set_bytes": 97714176,
+          "working_set_bytes": 97710080,
+          "peak_commit_bytes": 40951808,
+          "host_idle": 8636185468750,
+          "host_total": 11272128750000
+        },
+        {
+          "ms": 1812.342399993213,
+          "cpu_seconds": 1.140625,
+          "peak_working_set_bytes": 98082816,
+          "working_set_bytes": 98078720,
+          "peak_commit_bytes": 40964096,
+          "host_idle": 8636185468750,
+          "host_total": 11272144218750
+        },
+        {
+          "ms": 1980.9988999913912,
+          "cpu_seconds": 1.25,
+          "peak_working_set_bytes": 98164736,
+          "working_set_bytes": 98160640,
+          "peak_commit_bytes": 41013248,
+          "host_idle": 8636185468750,
+          "host_total": 11272165625000
+        },
+        {
+          "ms": 2095.7479999924544,
+          "cpu_seconds": 1.375,
+          "peak_working_set_bytes": 99323904,
+          "working_set_bytes": 99319808,
+          "peak_commit_bytes": 41066496,
+          "host_idle": 8636185468750,
+          "host_total": 11272181250000
+        },
+        {
+          "ms": 2243.575799991959,
+          "cpu_seconds": 1.421875,
+          "peak_working_set_bytes": 106188800,
+          "working_set_bytes": 105660416,
+          "peak_commit_bytes": 43593728,
+          "host_idle": 8636185468750,
+          "host_total": 11272196875000
+        },
+        {
+          "ms": 2293.3457999897655,
+          "cpu_seconds": 1.4375,
+          "peak_working_set_bytes": 106188800,
+          "working_set_bytes": 20480,
+          "peak_commit_bytes": 44175360,
+          "host_idle": 8636185468750,
+          "host_total": 11272205625000
+        }
+      ],
+      "run": 2
+    },
+    {
+      "engine": "whisper",
+      "exit_code": 0,
+      "first_text_ms": 3014.9308999971254,
+      "first_hypothesis_ms": null,
+      "total_ms": 3049.012399991625,
+      "cpu_seconds": 3.9375,
+      "peak_cpu_percent_machine": 21.249637339729798,
+      "average_cpu_percent_machine": 10.761681389059005,
+      "peak_working_set_bytes": 152666112,
+      "peak_commit_bytes": 665915392,
+      "host_average_cpu_percent": 93.26241134751773,
+      "transcript": "Please review the latest changes, check the tests, and tell me which files need attention before we release the new version.",
+      "wer": {
+        "errors": 0,
+        "reference_words": 21,
+        "percent": 0.0
+      },
+      "stdout": [
+        {
+          "ms": 3014.921099995263,
+          "line": ""
+        },
+        {
+          "ms": 3014.9308999971254,
+          "line": "[00:00:00.000 --> 00:00:06.040]   Please review the latest changes, check the tests, and tell me which files need attention"
+        },
+        {
+          "ms": 3014.9527000030503,
+          "line": "[00:00:06.040 --> 00:00:07.880]   before we release the new version."
+        }
+      ],
+      "stderr": [
+        {
+          "ms": 189.05760000052396,
+          "line": "load_backend: loaded CPU backend from C:\\work\\locust-wt\\voice-spike\\_tools\\voice-spike\\.cache\\native\\ggml-cpu-haswell.dll"
+        },
+        {
+          "ms": 189.11130000196863,
+          "line": "whisper_init_from_file_with_params_no_state: loading model from 'C:\\work\\locust-wt\\voice-spike\\_tools\\voice-spike\\.cache\\ggml-tiny.en-q5_1.bin'"
+        },
+        {
+          "ms": 189.32459999632556,
+          "line": "whisper_init_with_params_no_state: use gpu    = 0"
+        },
+        {
+          "ms": 189.3396999948891,
+          "line": "whisper_init_with_params_no_state: flash attn = 1"
+        },
+        {
+          "ms": 189.34050000098068,
+          "line": "whisper_init_with_params_no_state: gpu_device = 0"
+        },
+        {
+          "ms": 189.3411999917589,
+          "line": "whisper_init_with_params_no_state: dtw        = 0"
+        },
+        {
+          "ms": 189.34169999556616,
+          "line": "whisper_init_with_params_no_state: devices    = 1"
+        },
+        {
+          "ms": 189.34559999615885,
+          "line": "whisper_init_with_params_no_state: backends   = 1"
+        },
+        {
+          "ms": 189.34679999074433,
+          "line": "whisper_model_load: loading model"
+        },
+        {
+          "ms": 189.40199998905882,
+          "line": "whisper_model_load: n_vocab       = 51864"
+        },
+        {
+          "ms": 189.42879998940043,
+          "line": "whisper_model_load: n_audio_ctx   = 1500"
+        },
+        {
+          "ms": 189.42969999625348,
+          "line": "whisper_model_load: n_audio_state = 384"
+        },
+        {
+          "ms": 189.43030000082217,
+          "line": "whisper_model_load: n_audio_head  = 6"
+        },
+        {
+          "ms": 189.4307999900775,
+          "line": "whisper_model_load: n_audio_layer = 4"
+        },
+        {
+          "ms": 189.43129999388475,
+          "line": "whisper_model_load: n_text_ctx    = 448"
+        },
+        {
+          "ms": 189.43169999693055,
+          "line": "whisper_model_load: n_text_state  = 384"
+        },
+        {
+          "ms": 189.43250000302214,
+          "line": "whisper_model_load: n_text_head   = 6"
+        },
+        {
+          "ms": 189.43319999380037,
+          "line": "whisper_model_load: n_text_layer  = 4"
+        },
+        {
+          "ms": 189.43369999760762,
+          "line": "whisper_model_load: n_mels        = 80"
+        },
+        {
+          "ms": 189.43420000141487,
+          "line": "whisper_model_load: ftype         = 9"
+        },
+        {
+          "ms": 189.4346999906702,
+          "line": "whisper_model_load: qntvr         = 1"
+        },
+        {
+          "ms": 189.44099999498576,
+          "line": "whisper_model_load: type          = 1 (tiny)"
+        },
+        {
+          "ms": 287.9850000026636,
+          "line": "whisper_model_load: adding 1607 extra tokens"
+        },
+        {
+          "ms": 289.20309999375604,
+          "line": "whisper_model_load: n_langs       = 99"
+        },
+        {
+          "ms": 289.80779999983497,
+          "line": "whisper_model_load:          CPU total size =    31.57 MB"
+        },
+        {
+          "ms": 359.6733000013046,
+          "line": "whisper_model_load: model size    =   31.57 MB"
+        },
+        {
+          "ms": 359.7784000012325,
+          "line": "whisper_backend_init_gpu: no GPU found"
+        },
+        {
+          "ms": 362.0452000031946,
+          "line": "whisper_init_state: kv self size  =    3.15 MB"
+        },
+        {
+          "ms": 365.3113999898778,
+          "line": "whisper_init_state: kv cross size =    9.44 MB"
+        },
+        {
+          "ms": 366.90929999167565,
+          "line": "whisper_init_state: kv pad  size  =    2.36 MB"
+        },
+        {
+          "ms": 370.1117000018712,
+          "line": "whisper_init_state: compute buffer (conv)   =   13.21 MB"
+        },
+        {
+          "ms": 373.42099999659695,
+          "line": "whisper_init_state: compute buffer (encode) =   17.72 MB"
+        },
+        {
+          "ms": 375.9235999896191,
+          "line": "whisper_init_state: compute buffer (cross)  =    3.89 MB"
+        },
+        {
+          "ms": 380.28050000139046,
+          "line": "whisper_init_state: compute buffer (decode) =   95.91 MB"
+        },
+        {
+          "ms": 380.3604999993695,
+          "line": "read_audio_data: reading audio data from 'C:\\work\\locust-wt\\voice-spike\\_tools\\voice-spike\\results\\clip.wav' ..."
+        },
+        {
+          "ms": 380.3775999986101,
+          "line": "read_audio_data: trying to decode with miniaudio"
+        },
+        {
+          "ms": 381.43709998985287,
+          "line": ""
+        },
+        {
+          "ms": 381.4715999906184,
+          "line": "system_info: n_threads = 2 / 12 | WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | OPENMP = 1 | REPACK = 1 |"
+        },
+        {
+          "ms": 381.48899999214336,
+          "line": ""
+        },
+        {
+          "ms": 381.49020000128075,
+          "line": "main: processing 'C:\\work\\locust-wt\\voice-spike\\_tools\\voice-spike\\results\\clip.wav' (160000 samples, 10.0 sec), 2 threads, 1 processors, 5 beams + best of 5, lang = en, task = transcribe, timestamps = 1 ..."
+        },
+        {
+          "ms": 381.4912999951048,
+          "line": ""
+        },
+        {
+          "ms": 3015.473599996767,
+          "line": ""
+        },
+        {
+          "ms": 3015.5088000028627,
+          "line": "whisper_print_timings:     load time =   170.30 ms"
+        },
+        {
+          "ms": 3015.5100999982096,
+          "line": "whisper_print_timings:     fallbacks =   0 p /   0 h"
+        },
+        {
+          "ms": 3015.510799988988,
+          "line": "whisper_print_timings:      mel time =    26.49 ms"
+        },
+        {
+          "ms": 3015.5115999950795,
+          "line": "whisper_print_timings:   sample time =   146.11 ms /   145 runs (     1.01 ms per run)"
+        },
+        {
+          "ms": 3015.512400001171,
+          "line": "whisper_print_timings:   encode time =  1899.82 ms /     1 runs (  1899.82 ms per run)"
+        },
+        {
+          "ms": 3015.5185999901732,
+          "line": "whisper_print_timings:   decode time =     9.11 ms /     1 runs (     9.11 ms per run)"
+        },
+        {
+          "ms": 3015.519199994742,
+          "line": "whisper_print_timings:   batchd time =   531.73 ms /   140 runs (     3.80 ms per run)"
+        },
+        {
+          "ms": 3015.519699998549,
+          "line": "whisper_print_timings:   prompt time =     0.00 ms /     1 runs (     0.00 ms per run)"
+        },
+        {
+          "ms": 3015.5203999893274,
+          "line": "whisper_print_timings:    total time =  2826.04 ms"
+        }
+      ],
+      "samples": [
+        {
+          "ms": 115.39379999157973,
+          "cpu_seconds": 0.015625,
+          "peak_working_set_bytes": 2068480,
+          "working_set_bytes": 2064384,
+          "peak_commit_bytes": 430080,
+          "host_idle": 8636185781250,
+          "host_total": 11272218750000
+        },
+        {
+          "ms": 306.9855999929132,
+          "cpu_seconds": 0.046875,
+          "peak_working_set_bytes": 11145216,
+          "working_set_bytes": 11141120,
+          "peak_commit_bytes": 7376896,
+          "host_idle": 8636185781250,
+          "host_total": 11272241406250
+        },
+        {
+          "ms": 525.6253999978071,
+          "cpu_seconds": 0.140625,
+          "peak_working_set_bytes": 93569024,
+          "working_set_bytes": 93564928,
+          "peak_commit_bytes": 640012288,
+          "host_idle": 8636185781250,
+          "host_total": 11272261562500
+        },
+        {
+          "ms": 667.3005999909947,
+          "cpu_seconds": 0.390625,
+          "peak_working_set_bytes": 109416448,
+          "working_set_bytes": 109412352,
+          "peak_commit_bytes": 642666496,
+          "host_idle": 8636185781250,
+          "host_total": 11272285937500
+        },
+        {
+          "ms": 807.4373999988893,
+          "cpu_seconds": 0.53125,
+          "peak_working_set_bytes": 112619520,
+          "working_set_bytes": 112615424,
+          "peak_commit_bytes": 642666496,
+          "host_idle": 8636185781250,
+          "host_total": 11272302656250
+        },
+        {
+          "ms": 925.2225999953225,
+          "cpu_seconds": 0.71875,
+          "peak_working_set_bytes": 120512512,
+          "working_set_bytes": 120508416,
+          "peak_commit_bytes": 642666496,
+          "host_idle": 8636185781250,
+          "host_total": 11272316250000
+        },
+        {
+          "ms": 1040.4120000021067,
+          "cpu_seconds": 0.8125,
+          "peak_working_set_bytes": 120512512,
+          "working_set_bytes": 120508416,
+          "peak_commit_bytes": 642666496,
+          "host_idle": 8636185781250,
+          "host_total": 11272330000000
+        },
+        {
+          "ms": 1177.1474999986822,
+          "cpu_seconds": 0.96875,
+          "peak_working_set_bytes": 120512512,
+          "working_set_bytes": 120508416,
+          "peak_commit_bytes": 642666496,
+          "host_idle": 8636185781250,
+          "host_total": 11272346250000
+        },
+        {
+          "ms": 1441.6137999942293,
+          "cpu_seconds": 1.125,
+          "peak_working_set_bytes": 120512512,
+          "working_set_bytes": 120508416,
+          "peak_commit_bytes": 642666496,
+          "host_idle": 8636185781250,
+          "host_total": 11272373593750
+        },
+        {
+          "ms": 1603.9870999957202,
+          "cpu_seconds": 1.484375,
+          "peak_working_set_bytes": 120512512,
+          "working_set_bytes": 120508416,
+          "peak_commit_bytes": 642666496,
+          "host_idle": 8636185781250,
+          "host_total": 11272398750000
+        },
+        {
+          "ms": 1774.4724999938626,
+          "cpu_seconds": 1.6875,
+          "peak_working_set_bytes": 120512512,
+          "working_set_bytes": 120508416,
+          "peak_commit_bytes": 642666496,
+          "host_idle": 8636185781250,
+          "host_total": 11272417500000
+        },
+        {
+          "ms": 1936.8594999978086,
+          "cpu_seconds": 1.921875,
+          "peak_working_set_bytes": 120512512,
+          "working_set_bytes": 120508416,
+          "peak_commit_bytes": 642666496,
+          "host_idle": 8636185781250,
+          "host_total": 11272434843750
+        },
+        {
+          "ms": 2071.311499996227,
+          "cpu_seconds": 2.140625,
+          "peak_working_set_bytes": 120512512,
+          "working_set_bytes": 120508416,
+          "peak_commit_bytes": 642666496,
+          "host_idle": 8636185781250,
+          "host_total": 11272454062500
+        },
+        {
+          "ms": 2185.7240999961505,
+          "cpu_seconds": 2.359375,
+          "peak_working_set_bytes": 122818560,
+          "working_set_bytes": 122814464,
+          "peak_commit_bytes": 642666496,
+          "host_idle": 8636185781250,
+          "host_total": 11272468125000
+        },
+        {
+          "ms": 2294.1450999933295,
+          "cpu_seconds": 2.484375,
+          "peak_working_set_bytes": 122818560,
+          "working_set_bytes": 122814464,
+          "peak_commit_bytes": 642666496,
+          "host_idle": 8636186562500,
+          "host_total": 11272481250000
+        },
+        {
+          "ms": 2401.1364999896614,
+          "cpu_seconds": 2.703125,
+          "peak_working_set_bytes": 151961600,
+          "working_set_bytes": 150917120,
+          "peak_commit_bytes": 665010176,
+          "host_idle": 8636187187500,
+          "host_total": 11272494375000
+        },
+        {
+          "ms": 2507.3846000013873,
+          "cpu_seconds": 2.859375,
+          "peak_working_set_bytes": 152023040,
+          "working_set_bytes": 150007808,
+          "peak_commit_bytes": 665255936,
+          "host_idle": 8636190781250,
+          "host_total": 11272505625000
+        },
+        {
+          "ms": 2617.6806000003126,
+          "cpu_seconds": 3.140625,
+          "peak_working_set_bytes": 152416256,
+          "working_set_bytes": 152412160,
+          "peak_commit_bytes": 665493504,
+          "host_idle": 8636196406250,
+          "host_total": 11272520625000
+        },
+        {
+          "ms": 2726.4428999915253,
+          "cpu_seconds": 3.28125,
+          "peak_working_set_bytes": 152477696,
+          "working_set_bytes": 152166400,
+          "peak_commit_bytes": 665915392,
+          "host_idle": 8636197187500,
+          "host_total": 11272531875000
+        },
+        {
+          "ms": 2836.6171999950893,
+          "cpu_seconds": 3.515625,
+          "peak_working_set_bytes": 152657920,
+          "working_set_bytes": 152641536,
+          "peak_commit_bytes": 665915392,
+          "host_idle": 8636201718750,
+          "host_total": 11272545000000
+        },
+        {
+          "ms": 2944.5691000000807,
+          "cpu_seconds": 3.703125,
+          "peak_working_set_bytes": 152666112,
+          "working_set_bytes": 152662016,
+          "peak_commit_bytes": 665915392,
+          "host_idle": 8636203906250,
+          "host_total": 11272558125000
+        },
+        {
+          "ms": 3049.442099989392,
+          "cpu_seconds": 3.9375,
+          "peak_working_set_bytes": 152666112,
+          "working_set_bytes": 32768,
+          "peak_commit_bytes": 665915392,
+          "host_idle": 8636209531250,
+          "host_total": 11272571250000
+        }
+      ],
+      "run": 2
+    },
+    {
+      "engine": "sapi",
+      "exit_code": 0,
+      "first_text_ms": 1233.2912999991095,
+      "first_hypothesis_ms": 326.2576999986777,
+      "total_ms": 1273.8141999871004,
+      "cpu_seconds": 1.203125,
+      "peak_cpu_percent_machine": 10.631787900292158,
+      "average_cpu_percent_machine": 7.870882320803299,
+      "peak_working_set_bytes": 106156032,
+      "peak_commit_bytes": 43642880,
+      "host_average_cpu_percent": 66.91253951527925,
+      "transcript": "Please review the latest changers check protests and tell me which wiles need attention before we release the new version",
+      "wer": {
+        "errors": 4,
+        "reference_words": 21,
+        "percent": 19.047619047619047
+      },
+      "stdout": [
+        {
+          "ms": 326.2576999986777,
+          "line": "HYP\t231.510\tthe"
+        },
+        {
+          "ms": 326.27569999021944,
+          "line": "HYP\t233.546\tplease"
+        },
+        {
+          "ms": 326.27669999783393,
+          "line": "HYP\t233.563\tplease review"
+        },
+        {
+          "ms": 333.8946999865584,
+          "line": "HYP\t241.130\tplease review the"
+        },
+        {
+          "ms": 360.6454999971902,
+          "line": "HYP\t267.863\tplease review the leader"
+        },
+        {
+          "ms": 371.70819999300875,
+          "line": "HYP\t278.947\tplease review the latest"
+        },
+        {
+          "ms": 380.5019999999786,
+          "line": "HYP\t287.729\tplease review the latest change"
+        },
+        {
+          "ms": 392.231299993,
+          "line": "HYP\t299.435\tplease review the latest changes"
+        },
+        {
+          "ms": 408.9110999921104,
+          "line": "HYP\t316.162\tplease review the latest changers"
+        },
+        {
+          "ms": 444.2650999990292,
+          "line": "HYP\t351.502\tplease review the latest changers check"
+        },
+        {
+          "ms": 493.18619999394286,
+          "line": "HYP\t400.419\tplease review the latest changers check boot"
+        },
+        {
+          "ms": 535.8606999943731,
+          "line": "HYP\t443.083\tplease review the latest changers check but a"
+        },
+        {
+          "ms": 556.5363999921829,
+          "line": "HYP\t463.767\tplease review the latest changers check protests"
+        },
+        {
+          "ms": 644.2616999993334,
+          "line": "HYP\t551.482\tplease review the latest changers check protests and"
+        },
+        {
+          "ms": 692.2830999974394,
+          "line": "HYP\t599.504\tplease review the latest changers check the tests until"
+        },
+        {
+          "ms": 714.3819999910193,
+          "line": "HYP\t621.586\tplease review the latest changers check the tests until we will"
+        },
+        {
+          "ms": 722.5982999952976,
+          "line": "HYP\t629.828\tplease review the latest changers check protests and tell me which"
+        },
+        {
+          "ms": 733.6330999969505,
+          "line": "HYP\t640.865\tplease review the latest changers check protests and tell me which while"
+        },
+        {
+          "ms": 758.6134999874048,
+          "line": "HYP\t665.849\tplease review the latest changers check protests and tell me which wiles knee"
+        },
+        {
+          "ms": 777.3197999922559,
+          "line": "HYP\t684.559\tplease review the latest changers check protests and tell me which files needed to"
+        },
+        {
+          "ms": 808.8468999922043,
+          "line": "HYP\t716.068\tplease review the latest changers check protests and tell me which wiles need attention"
+        },
+        {
+          "ms": 845.099999991362,
+          "line": "HYP\t752.338\tplease review the latest changers check protests and tell me which wiles need attention to"
+        },
+        {
+          "ms": 853.5838999960106,
+          "line": "HYP\t760.815\tplease review the latest changers check protests and tell me which wiles need attention before"
+        },
+        {
+          "ms": 861.0296999977436,
+          "line": "HYP\t768.254\tplease review the latest changers check protests and tell me which wiles need attention before we're"
+        },
+        {
+          "ms": 867.655800000648,
+          "line": "HYP\t774.883\tplease review the latest changers check protests and tell me which wiles need attention before wearily"
+        },
+        {
+          "ms": 903.922599987709,
+          "line": "HYP\t811.139\tplease review the latest changers check protests and tell me which wiles need attention before we release the"
+        },
+        {
+          "ms": 943.4574999904726,
+          "line": "HYP\t850.673\tplease review the latest changers check protests and tell me which wiles need attention before we release the nouveau"
+        },
+        {
+          "ms": 956.2654999899678,
+          "line": "HYP\t863.498\tplease review the latest changers check protests and tell me which wiles need attention before we release the new version"
+        },
+        {
+          "ms": 1233.2912999991095,
+          "line": "TEXT\t1140.147\tPlease review the latest changers check protests and tell me which wiles need attention before we release the new version"
+        },
+        {
+          "ms": 1242.8769999969518,
+          "line": "DONE\t1150.134"
+        }
+      ],
+      "stderr": [],
+      "samples": [
+        {
+          "ms": 45.01019998861011,
+          "cpu_seconds": 0.0,
+          "peak_working_set_bytes": 1859584,
+          "working_set_bytes": 1855488,
+          "peak_commit_bytes": 401408,
+          "host_idle": 8636213125000,
+          "host_total": 11272576718750
+        },
+        {
+          "ms": 159.18289999535773,
+          "cpu_seconds": 0.09375,
+          "peak_working_set_bytes": 27713536,
+          "working_set_bytes": 27643904,
+          "peak_commit_bytes": 21749760,
+          "host_idle": 8636215781250,
+          "host_total": 11272590000000
+        },
+        {
+          "ms": 268.8151999900583,
+          "cpu_seconds": 0.21875,
+          "peak_working_set_bytes": 78606336,
+          "working_set_bytes": 78602240,
+          "peak_commit_bytes": 32075776,
+          "host_idle": 8636224531250,
+          "host_total": 11272603125000
+        },
+        {
+          "ms": 376.89919999684207,
+          "cpu_seconds": 0.34375,
+          "peak_working_set_bytes": 96215040,
+          "working_set_bytes": 96210944,
+          "peak_commit_bytes": 39534592,
+          "host_idle": 8636228281250,
+          "host_total": 11272616250000
+        },
+        {
+          "ms": 487.12289999821223,
+          "cpu_seconds": 0.484375,
+          "peak_working_set_bytes": 96612352,
+          "working_set_bytes": 96608256,
+          "peak_commit_bytes": 39944192,
+          "host_idle": 8636234375000,
+          "host_total": 11272629375000
+        },
+        {
+          "ms": 594.5829999982379,
+          "cpu_seconds": 0.609375,
+          "peak_working_set_bytes": 96886784,
+          "working_set_bytes": 96882688,
+          "peak_commit_bytes": 40120320,
+          "host_idle": 8636237812500,
+          "host_total": 11272642500000
+        },
+        {
+          "ms": 704.2198999988614,
+          "cpu_seconds": 0.671875,
+          "peak_working_set_bytes": 96960512,
+          "working_set_bytes": 96956416,
+          "peak_commit_bytes": 40120320,
+          "host_idle": 8636241250000,
+          "host_total": 11272655625000
+        },
+        {
+          "ms": 817.8858999890508,
+          "cpu_seconds": 0.78125,
+          "peak_working_set_bytes": 97304576,
+          "working_set_bytes": 97300480,
+          "peak_commit_bytes": 40120320,
+          "host_idle": 8636247343750,
+          "host_total": 11272668750000
+        },
+        {
+          "ms": 922.0945999986725,
+          "cpu_seconds": 0.875,
+          "peak_working_set_bytes": 97677312,
+          "working_set_bytes": 97673216,
+          "peak_commit_bytes": 40902656,
+          "host_idle": 8636250156250,
+          "host_total": 11272681875000
+        },
+        {
+          "ms": 1036.1047999904258,
+          "cpu_seconds": 0.984375,
+          "peak_working_set_bytes": 98070528,
+          "working_set_bytes": 98066432,
+          "peak_commit_bytes": 40910848,
+          "host_idle": 8636253906250,
+          "host_total": 11272695000000
+        },
+        {
+          "ms": 1140.0781999982428,
+          "cpu_seconds": 1.0625,
+          "peak_working_set_bytes": 98766848,
+          "working_set_bytes": 98762752,
+          "peak_commit_bytes": 40960000,
+          "host_idle": 8636254687500,
+          "host_total": 11272708125000
+        },
+        {
+          "ms": 1252.496599990991,
+          "cpu_seconds": 1.171875,
+          "peak_working_set_bytes": 106156032,
+          "working_set_bytes": 58044416,
+          "peak_commit_bytes": 43642880,
+          "host_idle": 8636261718750,
+          "host_total": 11272721250000
+        },
+        {
+          "ms": 1274.0993999905186,
+          "cpu_seconds": 1.203125,
+          "peak_working_set_bytes": 106156032,
+          "working_set_bytes": 20480,
+          "peak_commit_bytes": 43642880,
+          "host_idle": 8636262187500,
+          "host_total": 11272725000000
+        }
+      ],
+      "run": 3
+    },
+    {
+      "engine": "whisper",
+      "exit_code": 0,
+      "first_text_ms": 3688.6083999997936,
+      "first_hypothesis_ms": null,
+      "total_ms": 3803.228600008879,
+      "cpu_seconds": 4.21875,
+      "peak_cpu_percent_machine": 17.51681053185587,
+      "average_cpu_percent_machine": 9.243790920145564,
+      "peak_working_set_bytes": 152678400,
+      "peak_commit_bytes": 665817088,
+      "host_average_cpu_percent": 89.40027894002789,
+      "transcript": "Please review the latest changes, check the tests, and tell me which files need attention before we release the new version.",
+      "wer": {
+        "errors": 0,
+        "reference_words": 21,
+        "percent": 0.0
+      },
+      "stdout": [
+        {
+          "ms": 3688.5993000032613,
+          "line": ""
+        },
+        {
+          "ms": 3688.6083999997936,
+          "line": "[00:00:00.000 --> 00:00:06.040]   Please review the latest changes, check the tests, and tell me which files need attention"
+        },
+        {
+          "ms": 3688.6326000094414,
+          "line": "[00:00:06.040 --> 00:00:07.880]   before we release the new version."
+        }
+      ],
+      "stderr": [
+        {
+          "ms": 103.91090001212433,
+          "line": "load_backend: loaded CPU backend from C:\\work\\locust-wt\\voice-spike\\_tools\\voice-spike\\.cache\\native\\ggml-cpu-haswell.dll"
+        },
+        {
+          "ms": 103.93100000510458,
+          "line": "whisper_init_from_file_with_params_no_state: loading model from 'C:\\work\\locust-wt\\voice-spike\\_tools\\voice-spike\\.cache\\ggml-tiny.en-q5_1.bin'"
+        },
+        {
+          "ms": 104.07020000275224,
+          "line": "whisper_init_with_params_no_state: use gpu    = 0"
+        },
+        {
+          "ms": 104.08340000140015,
+          "line": "whisper_init_with_params_no_state: flash attn = 1"
+        },
+        {
+          "ms": 104.08400000596885,
+          "line": "whisper_init_with_params_no_state: gpu_device = 0"
+        },
+        {
+          "ms": 104.08460001053754,
+          "line": "whisper_init_with_params_no_state: dtw        = 0"
+        },
+        {
+          "ms": 104.08499999903142,
+          "line": "whisper_init_with_params_no_state: devices    = 1"
+        },
+        {
+          "ms": 104.08550000283867,
+          "line": "whisper_init_with_params_no_state: backends   = 1"
+        },
+        {
+          "ms": 104.08610000740737,
+          "line": "whisper_model_load: loading model"
+        },
+        {
+          "ms": 104.1181000036886,
+          "line": "whisper_model_load: n_vocab       = 51864"
+        },
+        {
+          "ms": 104.1457000101218,
+          "line": "whisper_model_load: n_audio_ctx   = 1500"
+        },
+        {
+          "ms": 104.14750000927597,
+          "line": "whisper_model_load: n_audio_state = 384"
+        },
+        {
+          "ms": 104.1479999985313,
+          "line": "whisper_model_load: n_audio_head  = 6"
+        },
+        {
+          "ms": 104.1484000015771,
+          "line": "whisper_model_load: n_audio_layer = 4"
+        },
+        {
+          "ms": 104.1488000046229,
+          "line": "whisper_model_load: n_text_ctx    = 448"
+        },
+        {
+          "ms": 104.14910000690725,
+          "line": "whisper_model_load: n_text_state  = 384"
+        },
+        {
+          "ms": 104.14950000995304,
+          "line": "whisper_model_load: n_text_head   = 6"
+        },
+        {
+          "ms": 104.15120000834577,
+          "line": "whisper_model_load: n_text_layer  = 4"
+        },
+        {
+          "ms": 104.15160001139157,
+          "line": "whisper_model_load: n_mels        = 80"
+        },
+        {
+          "ms": 104.16040000563953,
+          "line": "whisper_model_load: ftype         = 9"
+        },
+        {
+          "ms": 104.16090000944678,
+          "line": "whisper_model_load: qntvr         = 1"
+        },
+        {
+          "ms": 104.16270000860095,
+          "line": "whisper_model_load: type          = 1 (tiny)"
+        },
+        {
+          "ms": 159.83870001218747,
+          "line": "whisper_model_load: adding 1607 extra tokens"
+        },
+        {
+          "ms": 159.95460000704043,
+          "line": "whisper_model_load: n_langs       = 99"
+        },
+        {
+          "ms": 159.97160000551958,
+          "line": "whisper_model_load:          CPU total size =    31.57 MB"
+        },
+        {
+          "ms": 204.3833000061568,
+          "line": "whisper_model_load: model size    =   31.57 MB"
+        },
+        {
+          "ms": 204.4702999992296,
+          "line": "whisper_backend_init_gpu: no GPU found"
+        },
+        {
+          "ms": 205.15550000709482,
+          "line": "whisper_init_state: kv self size  =    3.15 MB"
+        },
+        {
+          "ms": 209.24870000453666,
+          "line": "whisper_init_state: kv cross size =    9.44 MB"
+        },
+        {
+          "ms": 209.8654000001261,
+          "line": "whisper_init_state: kv pad  size  =    2.36 MB"
+        },
+        {
+          "ms": 212.40960000432096,
+          "line": "whisper_init_state: compute buffer (conv)   =   13.21 MB"
+        },
+        {
+          "ms": 214.54300000914373,
+          "line": "whisper_init_state: compute buffer (encode) =   17.72 MB"
+        },
+        {
+          "ms": 216.44350000133272,
+          "line": "whisper_init_state: compute buffer (cross)  =    3.89 MB"
+        },
+        {
+          "ms": 218.62170001259074,
+          "line": "whisper_init_state: compute buffer (decode) =   95.91 MB"
+        },
+        {
+          "ms": 218.63990000565536,
+          "line": "read_audio_data: reading audio data from 'C:\\work\\locust-wt\\voice-spike\\_tools\\voice-spike\\results\\clip.wav' ..."
+        },
+        {
+          "ms": 218.6465999984648,
+          "line": "read_audio_data: trying to decode with miniaudio"
+        },
+        {
+          "ms": 219.32060000835918,
+          "line": ""
+        },
+        {
+          "ms": 219.34799999871757,
+          "line": "system_info: n_threads = 2 / 12 | WHISPER : VITISAI = 0 | COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | OPENMP = 1 | REPACK = 1 |"
+        },
+        {
+          "ms": 219.3637000018498,
+          "line": ""
+        },
+        {
+          "ms": 219.36500001174863,
+          "line": "main: processing 'C:\\work\\locust-wt\\voice-spike\\_tools\\voice-spike\\results\\clip.wav' (160000 samples, 10.0 sec), 2 threads, 1 processors, 5 beams + best of 5, lang = en, task = transcribe, timestamps = 1 ..."
+        },
+        {
+          "ms": 219.36590000404976,
+          "line": ""
+        },
+        {
+          "ms": 3689.1551000007894,
+          "line": ""
+        },
+        {
+          "ms": 3689.479400010896,
+          "line": "whisper_print_timings:     load time =   100.26 ms"
+        },
+        {
+          "ms": 3689.4967000116594,
+          "line": "whisper_print_timings:     fallbacks =   0 p /   0 h"
+        },
+        {
+          "ms": 3689.5108000026084,
+          "line": "whisper_print_timings:      mel time =    26.65 ms"
+        },
+        {
+          "ms": 3689.5254000119166,
+          "line": "whisper_print_timings:   sample time =   677.18 ms /   145 runs (     4.67 ms per run)"
+        },
+        {
+          "ms": 3689.5389999990584,
+          "line": "whisper_print_timings:   encode time =  1333.14 ms /     1 runs (  1333.14 ms per run)"
+        },
+        {
+          "ms": 3689.552299998468,
+          "line": "whisper_print_timings:   decode time =    11.22 ms /     1 runs (    11.22 ms per run)"
+        },
+        {
+          "ms": 3689.5653000101447,
+          "line": "whisper_print_timings:   batchd time =  1390.90 ms /   140 runs (     9.94 ms per run)"
+        },
+        {
+          "ms": 3689.5782000065083,
+          "line": "whisper_print_timings:   prompt time =     0.00 ms /     1 runs (     0.00 ms per run)"
+        },
+        {
+          "ms": 3689.6490000071935,
+          "line": "whisper_print_timings:    total time =  3585.03 ms"
+        }
+      ],
+      "samples": [
+        {
+          "ms": 60.81310000445228,
+          "cpu_seconds": 0.0,
+          "peak_working_set_bytes": 1957888,
+          "working_set_bytes": 1953792,
+          "peak_commit_bytes": 434176,
+          "host_idle": 8636262187500,
+          "host_total": 11272732500000
+        },
+        {
+          "ms": 183.47910000011325,
+          "cpu_seconds": 0.0625,
+          "peak_working_set_bytes": 29511680,
+          "working_set_bytes": 29507584,
+          "peak_commit_bytes": 42397696,
+          "host_idle": 8636267812500,
+          "host_total": 11272747500000
+        },
+        {
+          "ms": 297.20490000909194,
+          "cpu_seconds": 0.25,
+          "peak_working_set_bytes": 101793792,
+          "working_set_bytes": 101789696,
+          "peak_commit_bytes": 640110592,
+          "host_idle": 8636270781250,
+          "host_total": 11272760625000
+        },
+        {
+          "ms": 405.9927000052994,
+          "cpu_seconds": 0.40625,
+          "peak_working_set_bytes": 109473792,
+          "working_set_bytes": 109469696,
+          "peak_commit_bytes": 642752512,
+          "host_idle": 8636273593750,
+          "host_total": 11272773750000
+        },
+        {
+          "ms": 515.6207000109134,
+          "cpu_seconds": 0.609375,
+          "peak_working_set_bytes": 113065984,
+          "working_set_bytes": 113061888,
+          "peak_commit_bytes": 642752512,
+          "host_idle": 8636276718750,
+          "host_total": 11272786875000
+        },
+        {
+          "ms": 627.4315000046045,
+          "cpu_seconds": 0.78125,
+          "peak_working_set_bytes": 120594432,
+          "working_set_bytes": 120590336,
+          "peak_commit_bytes": 642752512,
+          "host_idle": 8636279218750,
+          "host_total": 11272800000000
+        },
+        {
+          "ms": 731.4982000098098,
+          "cpu_seconds": 1.0,
+          "peak_working_set_bytes": 120594432,
+          "working_set_bytes": 120590336,
+          "peak_commit_bytes": 642752512,
+          "host_idle": 8636284687500,
+          "host_total": 11272813125000
+        },
+        {
+          "ms": 844.474600002286,
+          "cpu_seconds": 1.15625,
+          "peak_working_set_bytes": 120594432,
+          "working_set_bytes": 120590336,
+          "peak_commit_bytes": 642752512,
+          "host_idle": 8636286250000,
+          "host_total": 11272826250000
+        },
+        {
+          "ms": 950.2548000018578,
+          "cpu_seconds": 1.375,
+          "peak_working_set_bytes": 120594432,
+          "working_set_bytes": 120590336,
+          "peak_commit_bytes": 642752512,
+          "host_idle": 8636291093750,
+          "host_total": 11272839375000
+        },
+        {
+          "ms": 1062.3099000076763,
+          "cpu_seconds": 1.5625,
+          "peak_working_set_bytes": 120594432,
+          "working_set_bytes": 120590336,
+          "peak_commit_bytes": 642752512,
+          "host_idle": 8636291718750,
+          "host_total": 11272852500000
+        },
+        {
+          "ms": 1166.304800004582,
+          "cpu_seconds": 1.734375,
+          "peak_working_set_bytes": 120594432,
+          "working_set_bytes": 120590336,
+          "peak_commit_bytes": 642752512,
+          "host_idle": 8636295937500,
+          "host_total": 11272863750000
+        },
+        {
+          "ms": 1283.089900010964,
+          "cpu_seconds": 1.921875,
+          "peak_working_set_bytes": 120594432,
+          "working_set_bytes": 120590336,
+          "peak_commit_bytes": 642752512,
+          "host_idle": 8636297812500,
+          "host_total": 11272878750000
+        },
+        {
+          "ms": 1385.7810000044992,
+          "cpu_seconds": 2.046875,
+          "peak_working_set_bytes": 120594432,
+          "working_set_bytes": 120590336,
+          "peak_commit_bytes": 642752512,
+          "host_idle": 8636298593750,
+          "host_total": 11272890000000
+        },
+        {
+          "ms": 1495.3952000068966,
+          "cpu_seconds": 2.25,
+          "peak_working_set_bytes": 122900480,
+          "working_set_bytes": 122896384,
+          "peak_commit_bytes": 642752512,
+          "host_idle": 8636299687500,
+          "host_total": 11272903125000
+        },
+        {
+          "ms": 1600.002899998799,
+          "cpu_seconds": 2.390625,
+          "peak_working_set_bytes": 142352384,
+          "working_set_bytes": 142348288,
+          "peak_commit_bytes": 661983232,
+          "host_idle": 8636300625000,
+          "host_total": 11272916250000
+        },
+        {
+          "ms": 1714.4036000099732,
+          "cpu_seconds": 2.609375,
+          "peak_working_set_bytes": 152154112,
+          "working_set_bytes": 150114304,
+          "peak_commit_bytes": 665186304,
+          "host_idle": 8636305781250,
+          "host_total": 11272929375000
+        },
+        {
+          "ms": 1818.6048000061419,
+          "cpu_seconds": 2.734375,
+          "peak_working_set_bytes": 152154112,
+          "working_set_bytes": 150315008,
+          "peak_commit_bytes": 665288704,
+          "host_idle": 8636306093750,
+          "host_total": 11272942500000
+        },
+        {
+          "ms": 1931.6957999981241,
+          "cpu_seconds": 2.921875,
+          "peak_working_set_bytes": 152154112,
+          "working_set_bytes": 151896064,
+          "peak_commit_bytes": 665288704,
+          "host_idle": 8636308906250,
+          "host_total": 11272955625000
+        },
+        {
+          "ms": 2039.1281000047456,
+          "cpu_seconds": 3.03125,
+          "peak_working_set_bytes": 152354816,
+          "working_set_bytes": 152334336,
+          "peak_commit_bytes": 665317376,
+          "host_idle": 8636309531250,
+          "host_total": 11272968750000
+        },
+        {
+          "ms": 2146.7780000093626,
+          "cpu_seconds": 3.109375,
+          "peak_working_set_bytes": 152354816,
+          "working_set_bytes": 152334336,
+          "peak_commit_bytes": 665317376,
+          "host_idle": 8636309531250,
+          "host_total": 11272981875000
+        },
+        {
+          "ms": 2253.6790000012843,
+          "cpu_seconds": 3.21875,
+          "peak_working_set_bytes": 152354816,
+          "working_set_bytes": 152334336,
+          "peak_commit_bytes": 665317376,
+          "host_idle": 8636309531250,
+          "host_total": 11272995000000
+        },
+        {
+          "ms": 2437.0786000072258,
+          "cpu_seconds": 3.3125,
+          "peak_working_set_bytes": 152354816,
+          "working_set_bytes": 151293952,
+          "peak_commit_bytes": 665317376,
+          "host_idle": 8636309531250,
+          "host_total": 11273015937500
+        },
+        {
+          "ms": 2703.4361000114586,
+          "cpu_seconds": 3.328125,
+          "peak_working_set_bytes": 152354816,
+          "working_set_bytes": 151285760,
+          "peak_commit_bytes": 665317376,
+          "host_idle": 8636309531250,
+          "host_total": 11273045625000
+        },
+        {
+          "ms": 3024.676500004716,
+          "cpu_seconds": 3.390625,
+          "peak_working_set_bytes": 152354816,
+          "working_set_bytes": 151285760,
+          "peak_commit_bytes": 665317376,
+          "host_idle": 8636309531250,
+          "host_total": 11273074062500
+        },
+        {
+          "ms": 3173.033099999884,
+          "cpu_seconds": 3.640625,
+          "peak_working_set_bytes": 152354816,
+          "working_set_bytes": 151707648,
+          "peak_commit_bytes": 665317376,
+          "host_idle": 8636309531250,
+          "host_total": 11273105625000
+        },
+        {
+          "ms": 3337.0417000114685,
+          "cpu_seconds": 3.703125,
+          "peak_working_set_bytes": 152354816,
+          "working_set_bytes": 151707648,
+          "peak_commit_bytes": 665317376,
+          "host_idle": 8636309531250,
+          "host_total": 11273122812500
+        },
+        {
+          "ms": 3450.022100005299,
+          "cpu_seconds": 3.875,
+          "peak_working_set_bytes": 152354816,
+          "working_set_bytes": 151830528,
+          "peak_commit_bytes": 665317376,
+          "host_idle": 8636309687500,
+          "host_total": 11273138593750
+        },
+        {
+          "ms": 3589.8784000019077,
+          "cpu_seconds": 4.03125,
+          "peak_working_set_bytes": 152678400,
+          "working_set_bytes": 152657920,
+          "peak_commit_bytes": 665817088,
+          "host_idle": 8636309687500,
+          "host_total": 11273152968750
+        },
+        {
+          "ms": 3704.5080000098096,
+          "cpu_seconds": 4.203125,
+          "peak_working_set_bytes": 152678400,
+          "working_set_bytes": 93597696,
+          "peak_commit_bytes": 665817088,
+          "host_idle": 8636309687500,
+          "host_total": 11273169375000
+        },
+        {
+          "ms": 3803.8107000029413,
+          "cpu_seconds": 4.21875,
+          "peak_working_set_bytes": 152678400,
+          "working_set_bytes": 32768,
+          "peak_commit_bytes": 665817088,
+          "host_idle": 8636309687500,
+          "host_total": 11273180625000
+        }
+      ],
+      "run": 3
+    }
+  ],
+  "idle_node_control": {
+    "engine": "idle",
+    "exit_code": 0,
+    "first_text_ms": null,
+    "first_hypothesis_ms": null,
+    "total_ms": 10378.209700007574,
+    "cpu_seconds": 0.0625,
+    "peak_cpu_percent_machine": 2.9094840428048485,
+    "average_cpu_percent_machine": 0.050185277460037564,
+    "peak_working_set_bytes": 53874688,
+    "peak_commit_bytes": 19124224,
+    "host_average_cpu_percent": 77.36280487804879,
+    "transcript": "",
+    "wer": null,
+    "stdout": [],
+    "stderr": [],
+    "samples": [
+      {
+        "ms": 119.61960000917315,
+        "cpu_seconds": 0.0,
+        "peak_working_set_bytes": 37933056,
+        "working_set_bytes": 37928960,
+        "peak_commit_bytes": 1249280,
+        "host_idle": 8636309687500,
+        "host_total": 11273195625000
+      },
+      {
+        "ms": 234.98030001064762,
+        "cpu_seconds": 0.0,
+        "peak_working_set_bytes": 43024384,
+        "working_set_bytes": 43020288,
+        "peak_commit_bytes": 2785280,
+        "host_idle": 8636309687500,
+        "host_total": 11273208750000
+      },
+      {
+        "ms": 369.23950001073536,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636309687500,
+        "host_total": 11273225625000
+      },
+      {
+        "ms": 497.6945000089472,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636309687500,
+        "host_total": 11273240156250
+      },
+      {
+        "ms": 652.0697000087239,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636309687500,
+        "host_total": 11273259062500
+      },
+      {
+        "ms": 766.1124000005657,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636309687500,
+        "host_total": 11273272500000
+      },
+      {
+        "ms": 882.1039000031305,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636310156250,
+        "host_total": 11273287500000
+      },
+      {
+        "ms": 1000.192400009837,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636310156250,
+        "host_total": 11273300625000
+      },
+      {
+        "ms": 1112.5707000028342,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636310468750,
+        "host_total": 11273313750000
+      },
+      {
+        "ms": 1220.8442999981344,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636310468750,
+        "host_total": 11273326875000
+      },
+      {
+        "ms": 1330.5759000068065,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636313125000,
+        "host_total": 11273340000000
+      },
+      {
+        "ms": 1443.0622000072617,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636314375000,
+        "host_total": 11273355000000
+      },
+      {
+        "ms": 1549.1251000057673,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636316875000,
+        "host_total": 11273366250000
+      },
+      {
+        "ms": 1655.6651999999303,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636320781250,
+        "host_total": 11273379375000
+      },
+      {
+        "ms": 1764.8692000075243,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636323593750,
+        "host_total": 11273392500000
+      },
+      {
+        "ms": 1877.8105000092182,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636330937500,
+        "host_total": 11273405625000
+      },
+      {
+        "ms": 1985.9904000040842,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636332656250,
+        "host_total": 11273418750000
+      },
+      {
+        "ms": 2096.75640000205,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636334375000,
+        "host_total": 11273431875000
+      },
+      {
+        "ms": 2206.1874000064563,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636334687500,
+        "host_total": 11273445000000
+      },
+      {
+        "ms": 2313.968100002967,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636339687500,
+        "host_total": 11273458125000
+      },
+      {
+        "ms": 2420.508499999414,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636340781250,
+        "host_total": 11273471250000
+      },
+      {
+        "ms": 2569.1488000011304,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636340937500,
+        "host_total": 11273489062500
+      },
+      {
+        "ms": 2683.2984000066062,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636341406250,
+        "host_total": 11273503125000
+      },
+      {
+        "ms": 2798.998800004483,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636345000000,
+        "host_total": 11273516250000
+      },
+      {
+        "ms": 2900.490700005321,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636346562500,
+        "host_total": 11273529375000
+      },
+      {
+        "ms": 3014.2122999968706,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636348906250,
+        "host_total": 11273542500000
+      },
+      {
+        "ms": 3118.097200000193,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636355468750,
+        "host_total": 11273555625000
+      },
+      {
+        "ms": 3228.6530999990646,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636357656250,
+        "host_total": 11273568750000
+      },
+      {
+        "ms": 3334.0280999982497,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636365312500,
+        "host_total": 11273581875000
+      },
+      {
+        "ms": 3444.3742000003112,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636365937500,
+        "host_total": 11273595000000
+      },
+      {
+        "ms": 3551.8032999971183,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636374531250,
+        "host_total": 11273608125000
+      },
+      {
+        "ms": 3661.411599998246,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636380468750,
+        "host_total": 11273621250000
+      },
+      {
+        "ms": 3767.926600005012,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636384687500,
+        "host_total": 11273632500000
+      },
+      {
+        "ms": 3878.3751000009943,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636391093750,
+        "host_total": 11273645625000
+      },
+      {
+        "ms": 3987.4534999980824,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636391406250,
+        "host_total": 11273658750000
+      },
+      {
+        "ms": 4095.5431000038516,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636399375000,
+        "host_total": 11273671875000
+      },
+      {
+        "ms": 4204.332399996929,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636400937500,
+        "host_total": 11273685000000
+      },
+      {
+        "ms": 4319.298500005971,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636407500000,
+        "host_total": 11273700000000
+      },
+      {
+        "ms": 4421.222400007537,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636410000000,
+        "host_total": 11273711250000
+      },
+      {
+        "ms": 4530.677500006277,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636421562500,
+        "host_total": 11273724375000
+      },
+      {
+        "ms": 4639.0966000035405,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636426406250,
+        "host_total": 11273737500000
+      },
+      {
+        "ms": 4747.806200000923,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636434687500,
+        "host_total": 11273750625000
+      },
+      {
+        "ms": 4854.777900007321,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636442812500,
+        "host_total": 11273763750000
+      },
+      {
+        "ms": 4963.417300008587,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636447343750,
+        "host_total": 11273776875000
+      },
+      {
+        "ms": 5072.860000000219,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636451562500,
+        "host_total": 11273790000000
+      },
+      {
+        "ms": 5182.094000003417,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636452656250,
+        "host_total": 11273803125000
+      },
+      {
+        "ms": 5289.094000007026,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636461406250,
+        "host_total": 11273816250000
+      },
+      {
+        "ms": 5398.802700001397,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636464218750,
+        "host_total": 11273829375000
+      },
+      {
+        "ms": 5507.107099998393,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636473281250,
+        "host_total": 11273842500000
+      },
+      {
+        "ms": 5614.443800004665,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636477500000,
+        "host_total": 11273855625000
+      },
+      {
+        "ms": 5721.745100003318,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636482500000,
+        "host_total": 11273866875000
+      },
+      {
+        "ms": 5830.400300008478,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636492187500,
+        "host_total": 11273880000000
+      },
+      {
+        "ms": 5937.435300002107,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636497031250,
+        "host_total": 11273893125000
+      },
+      {
+        "ms": 6047.69629999646,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636506093750,
+        "host_total": 11273906250000
+      },
+      {
+        "ms": 6156.048800010467,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636509375000,
+        "host_total": 11273919375000
+      },
+      {
+        "ms": 6266.281800009892,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636518125000,
+        "host_total": 11273932500000
+      },
+      {
+        "ms": 6374.625500000548,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636524843750,
+        "host_total": 11273945625000
+      },
+      {
+        "ms": 6483.958900003927,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636531406250,
+        "host_total": 11273958750000
+      },
+      {
+        "ms": 6590.874400004395,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636537968750,
+        "host_total": 11273971875000
+      },
+      {
+        "ms": 6698.818700009724,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636544062500,
+        "host_total": 11273985000000
+      },
+      {
+        "ms": 6806.26260000281,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636553906250,
+        "host_total": 11273998125000
+      },
+      {
+        "ms": 6915.594799997052,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636558906250,
+        "host_total": 11274011250000
+      },
+      {
+        "ms": 7023.508900005254,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636566562500,
+        "host_total": 11274024375000
+      },
+      {
+        "ms": 7133.093099997495,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636570000000,
+        "host_total": 11274037500000
+      },
+      {
+        "ms": 7239.668900001561,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636579062500,
+        "host_total": 11274050625000
+      },
+      {
+        "ms": 7349.421799997799,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636582968750,
+        "host_total": 11274063750000
+      },
+      {
+        "ms": 7459.681599997566,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636585156250,
+        "host_total": 11274076875000
+      },
+      {
+        "ms": 7589.084100007312,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636585156250,
+        "host_total": 11274090312500
+      },
+      {
+        "ms": 7705.075700010639,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636585156250,
+        "host_total": 11274105000000
+      },
+      {
+        "ms": 7843.073600000935,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636585156250,
+        "host_total": 11274121718750
+      },
+      {
+        "ms": 7952.225500004715,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636585156250,
+        "host_total": 11274135000000
+      },
+      {
+        "ms": 8073.543000005884,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636585156250,
+        "host_total": 11274150000000
+      },
+      {
+        "ms": 8236.875200003851,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636585156250,
+        "host_total": 11274168750000
+      },
+      {
+        "ms": 8356.862700005877,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636585312500,
+        "host_total": 11274183750000
+      },
+      {
+        "ms": 8471.23380000994,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636585781250,
+        "host_total": 11274196875000
+      },
+      {
+        "ms": 8608.01700000593,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636585781250,
+        "host_total": 11274213125000
+      },
+      {
+        "ms": 8718.981500001973,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636586875000,
+        "host_total": 11274226875000
+      },
+      {
+        "ms": 8829.092200001469,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636587500000,
+        "host_total": 11274240000000
+      },
+      {
+        "ms": 8938.880900008371,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636587812500,
+        "host_total": 11274253125000
+      },
+      {
+        "ms": 9056.496899997,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636587812500,
+        "host_total": 11274267968750
+      },
+      {
+        "ms": 9189.183199996478,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636587812500,
+        "host_total": 11274283125000
+      },
+      {
+        "ms": 9296.32799999672,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636588125000,
+        "host_total": 11274296250000
+      },
+      {
+        "ms": 9406.693400000222,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636588125000,
+        "host_total": 11274309375000
+      },
+      {
+        "ms": 9527.5060999993,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636588125000,
+        "host_total": 11274324218750
+      },
+      {
+        "ms": 9646.886300004553,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636588125000,
+        "host_total": 11274338750000
+      },
+      {
+        "ms": 9760.487000006833,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636588125000,
+        "host_total": 11274352500000
+      },
+      {
+        "ms": 9873.578200000338,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636588125000,
+        "host_total": 11274365625000
+      },
+      {
+        "ms": 9979.431600004318,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636588125000,
+        "host_total": 11274378750000
+      },
+      {
+        "ms": 10094.800100006978,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636588125000,
+        "host_total": 11274391875000
+      },
+      {
+        "ms": 10275.137300006463,
+        "cpu_seconds": 0.046875,
+        "peak_working_set_bytes": 53784576,
+        "working_set_bytes": 53739520,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636588125000,
+        "host_total": 11274413437500
+      },
+      {
+        "ms": 10378.60520000686,
+        "cpu_seconds": 0.0625,
+        "peak_working_set_bytes": 53874688,
+        "working_set_bytes": 122880,
+        "peak_commit_bytes": 19124224,
+        "host_idle": 8636588125000,
+        "host_total": 11274425625000
+      }
+    ]
+  }
+}
