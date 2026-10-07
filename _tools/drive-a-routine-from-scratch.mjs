@@ -112,7 +112,11 @@ try {
     return JSON.stringify({ rows: JSON.parse(${rows}), text: ${screenText} })
   })()`))))
   say(`  finished: ${JSON.stringify(done).slice(0, 700)}`)
-  check('the row says it ran, and when it runs next', /run 1 time/.test(done.rows[0] ?? '') && /daily|09:00|next/i.test(done.rows[0] ?? ''), done.rows[0])
+  // A free model may end its step by ASKING (0.696 sweep): the routine is then held for review, by design,
+  // and says so -- that path is right too, and is judged as itself.
+  const heldForAQuestion = /waiting for review/.test(done.rows[0] ?? '') && /asked a question/.test(String(done.text ?? ''))
+  if (heldForAQuestion) check('the model ended by asking, so the row says it waits for review and when it runs next', /daily|09:00|next/i.test(done.rows[0] ?? ''), done.rows[0])
+  else check('the row says it ran, and when it runs next', /run 1 time/.test(done.rows[0] ?? '') && /daily|09:00|next/i.test(done.rows[0] ?? ''), done.rows[0])
 
   await drive.evaluate(`[...document.querySelectorAll('.lc-sidebar__nav button')].find((b) => /Routines/.test(b.innerText))?.click()`)
   await drive.resize(1120, 760)

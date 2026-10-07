@@ -52,7 +52,9 @@ const THREAD = `JSON.stringify((() => {
       const last = bodies.at(-1)
       let scroller = last?.parentElement
       while (scroller && !(scroller.scrollHeight > scroller.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(scroller).overflowY))) scroller = scroller.parentElement
-      if (!last || !scroller) return null
+      if (!last) return null
+      // Nothing scrolls: the whole conversation fits, so the newest reply is on screen (0.696 sweep).
+      if (!scroller) { const r = last.getBoundingClientRect(); return r.bottom <= window.innerHeight + 1 && r.top >= 0 }
       const r = last.getBoundingClientRect(); const s = scroller.getBoundingClientRect()
       return r.top >= s.top - 1 && r.bottom <= s.bottom + 1
     })()
