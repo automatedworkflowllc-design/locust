@@ -11,6 +11,13 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.687.0 - 2026-10-07
+
+### Fixed
+
+- **The chat box's menus open again.** In 0.686, the chat type, mode and model menus were cut off and showed only as a sliver above the message box. They open fully again.
+- **The voice glow comes from the chat box itself.** In 0.686 it was attached to the edge of the window, so it looked like it came from the bottom of the app. It now rises from inside the message box, and the box's focus outline stays visible.
+
 ## 0.686.0 - 2026-10-07
 
 ### Added
