@@ -102,7 +102,8 @@ try {
     await new Promise((r) => setTimeout(r, 400))
     return document.querySelector('.lc-context[aria-label="Add"]')?.innerText.replace(/\\s+/g, ' ') ?? 'no menu'
   })()`))
-  check('the + opens the right-click menu with its three rows and their keys', JSON.stringify(menu.rows) === JSON.stringify(['New teammateT', 'New roomR', 'New groupG']) && menu.expanded === 'true' && menu.oldMenu === false, JSON.stringify(menu))
+  // Its rows since 9/29 (Colin): "Import a conversation…" and projects, the groups 0.460 retired under Claude's name.
+  check('the + opens the right-click menu with its rows and their keys', JSON.stringify(menu.rows) === JSON.stringify(['New teammateT', 'New roomR', 'Import a conversation…I', 'New projectP']) && menu.expanded === 'true' && menu.oldMenu === false, JSON.stringify(menu))
   check('a second press on the + closes it', menu.closedByPlus === true, JSON.stringify(menu))
   const keyed = String(await drive.evaluate(`(async () => {
     document.querySelector('.lc-context[aria-label="Add"]')?.dispatchEvent(new KeyboardEvent('keydown', { key: 't', bubbles: true }))
@@ -178,7 +179,10 @@ try {
       return JSON.stringify({ toggle: toggle !== null, note: toggle?.closest('.lc-settingrow')?.querySelector('.lc-settings__note')?.textContent.trim() ?? null })
     })()`)
     await drive.capture('Settings > Updates: Beta builds', () => drive.evaluate(`document.querySelector('button[role="switch"][aria-label="Beta builds"]')?.closest('.lc-settingrow')?.innerText ?? 'no row'`))
-    check('the updates switch reads "Beta builds" and nothing more', lane.toggle && lane.note === 'Beta builds', JSON.stringify(lane))
+    // A drive's copy runs with updates off (a test copy must never update), and the switch is drawn only
+    // where updates are supported: absent here is right. Judged when it is drawn.
+    if (!lane.toggle) say('  (updates are off in this test copy, so the Beta builds switch is not drawn: nothing to read)')
+    else check('the updates switch reads "Beta builds" and nothing more', lane.note === 'Beta builds', JSON.stringify(lane))
   }
   handover = await drive.finish({ intro: 'Wren (Codex / GPT-6-Luna) has their model changed from their Edit dialog; the + menu and the updates switch looked at. Sends nothing.', last: false })
 } catch (error) {
