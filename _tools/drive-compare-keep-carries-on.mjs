@@ -60,17 +60,23 @@ try {
     // Both columns settled, and B's Keep pressable: a column still working cannot be kept.
     const settled = () => {
       const heads = [...document.querySelectorAll('.lc-compare__head:not(.is-rail)')].map((el) => el.innerText)
-      const keep = [...document.querySelectorAll('.lc-compare__foot button')].filter((b) => b.innerText.trim() === 'Keep this one').at(-1)
+      // B's OWN Keep, in B's foot (the second column): the last Keep on the page was A's whenever B had none
+      // to offer, and A was kept while this drive thought B was (0.697, found with a debug build).
+      const keep = [...([...document.querySelectorAll('.lc-compare__foot:not(.is-rail)')][1]?.querySelectorAll('button') ?? [])].find((b) => b.innerText.trim() === 'Keep this one')
       return heads.length >= 2 && !heads.some((text) => /working|starting/i.test(text)) && keep !== undefined && !keep.disabled
     }
     for (let i = 0; i < 480 && !settled(); i += 1) await new Promise((r) => setTimeout(r, 500))
     const name = [...document.querySelectorAll('.lc-compare__head:not(.is-rail) .lc-compare__name')].map((el) => el.innerText.trim())[1] ?? ''
-    ;[...document.querySelectorAll('.lc-compare__foot button')].filter((b) => b.innerText.trim() === 'Keep this one').at(-1)?.click()
+    const bKeep = [...([...document.querySelectorAll('.lc-compare__foot:not(.is-rail)')][1]?.querySelectorAll('button') ?? [])].find((b) => b.innerText.trim() === 'Keep this one')
+    if (!bKeep || bKeep.disabled) return JSON.stringify({ name, chip: ${chip}, gone: false, noKeepForB: true })
+    bKeep.click()
     for (let i = 0; i < 40 && document.querySelector('.lc-compare'); i += 1) await new Promise((r) => setTimeout(r, 250))
     await new Promise((r) => setTimeout(r, 1200))
     return JSON.stringify({ name, chip: ${chip}, gone: document.querySelector('.lc-compare') === null })
   })()`)))
   const k = JSON.parse(kept)
+  // B with nothing to keep (its provider failed) is not this drive's question: said, and stopped.
+  if (k.noKeepForB === true) throw new Error(`B offered no Keep (its answer did not come): ${kept}`)
   const word = (k.name.split(/\s+/)[0] ?? '').toLowerCase()
   check('keeping B leaves an ordinary conversation', k.gone === true, kept)
   check('and the chat box is on B\'s model, the one kept', word.length > 0 && k.chip.toLowerCase().includes(word), kept)
@@ -89,6 +95,11 @@ try {
     })
   })()`)))
   check('the next message carries the kept answer on, with no "fresh session"', /NEXT/.test(after.tail) && !after.notes.some((note) => /fresh session/i.test(note)), JSON.stringify(after))
+  // What the follow-up RAN on, from the record: the chat box's word is only a promise (0.697).
+  const ran = JSON.parse(String(await drive.evaluate(`window.desktop.getMissionHistory().then((h) => JSON.stringify(h.ok ? h.data.missions.slice().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))).slice(0, 4).map((m) => ({ model: m.model, prompt: String(m.prompt).slice(0, 30) })) : []))`)))
+  say(`  newest runs: ${JSON.stringify(ran)}`)
+  const followUp = ran.find((m) => /Reply with just the word NEXT/.test(m.prompt))
+  check("and that next message ran on B's model", word.length > 0 && String(followUp?.model ?? '').toLowerCase().includes(word), JSON.stringify(followUp))
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
