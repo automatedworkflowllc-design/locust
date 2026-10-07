@@ -45,7 +45,7 @@ describe('voice typing is editable and cancellable', () => {
     expect(renderToStaticMarkup(<VoiceButton platform="win32" onText={() => undefined} api={bridge} />)).toContain('aria-label="Voice typing"')
     expect(bridge.ready).not.toHaveBeenCalled()
     expect(mocks.start).not.toHaveBeenCalled()
-    expect(VOICE_DOWNLOAD_WORDS).toBe('Voice typing needs a one-time 37 MB download. It runs on this computer; nothing you say leaves it.')
+    expect(VOICE_DOWNLOAD_WORDS).toBe('Voice typing needs a one-time 41 MB download. It runs on this computer; nothing you say leaves it.')
   })
   it('Esc cancels recording and inserts nothing', async () => {
     const bridge = api(); const insert = vi.fn()

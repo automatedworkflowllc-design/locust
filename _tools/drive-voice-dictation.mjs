@@ -40,7 +40,7 @@ try {
   measurements.baselineFocusedCpu = baselineCpu
   await drive.evaluate(`document.querySelector('[aria-label="Voice typing"]').click()`)
   await wait(`!!document.querySelector('[aria-label="Download voice typing"]')`)
-  check('exact first-use consent words', await drive.evaluate(`document.querySelector('[aria-label="Download voice typing"]').innerText.includes('Voice typing needs a one-time 37 MB download. It runs on this computer; nothing you say leaves it.')`))
+  check('exact first-use consent words', await drive.evaluate(`document.querySelector('[aria-label="Download voice typing"]').innerText.includes('Voice typing needs a one-time 41 MB download. It runs on this computer; nothing you say leaves it.')`))
   await drive.capture('one-time download consent', () => 'Download and Not now, in place')
   await drive.evaluate(`document.querySelector('[aria-label="Download voice typing"] button:last-child').click()`)
   check('Not now downloads nothing', !(await readdir(profile)).includes('voice'))

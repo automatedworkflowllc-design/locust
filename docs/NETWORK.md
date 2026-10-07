@@ -21,6 +21,7 @@ until it is listed here.
 | Keeping Codex CLI and Copilot CLI current | the npm registry, and `raw.githubusercontent.com/automatedworkflowllc-design/locust-releases/main/runtime-canary.json` | 45 seconds after the installed Locust starts, then at most every 6 hours |
 | The pet gallery | `openpets.dev`, addresses under `/pets/` only | When you open the gallery, and when you take a pet |
 | Testing one of your own models | the address you gave it in Settings > Your own models | When you press Test |
+| Voice typing's one-time files | `github.com/ggml-org/whisper.cpp`, `huggingface.co/ggerganov/whisper.cpp`, and their download CDNs | On Windows x64, only when you press Download in the microphone's first-use prompt |
 | A web page a teammate made, open in the preview | eight public hosts, for libraries and fonts only | While the page is open |
 
 **Its own updates.** A plain request for the files of the newest release in a
@@ -52,6 +53,17 @@ use tools. A key you gave goes with both, to that address and nowhere else.
 Nothing of your work is in either request. A teammate's runs on the model go
 through OpenCode, below.
 
+**Voice typing's one-time files.** Download retrieves the pinned Windows x64 CPU
+archive `b5454/whisper-bin-x64.zip` and the pinned `ggml-tiny.en-q5_1.bin` model
+revision `5359861c739e955e79d9a303bcbc70fb988958b1`, following their HTTPS download
+redirects. Every asset has a SHA-256 in the code. The checked runtime and model
+stay in this profile's `voice/` folder. No account, API key, recording, transcript,
+or work goes in these requests; the servers see what any file download reveals,
+including your IP address. No connection is made before Download, and local
+transcription makes no speech-service request. A cancelled download is restarted
+cleanly when you choose Download again. Audio files are transient, removed after
+transcription or cancellation; no recognition process is retained at rest.
+
 **A web page in the preview.** A page a teammate made runs inside Locust. It may
 load libraries, stylesheets and fonts -- GET and HEAD over https only -- from
 `cdnjs.cloudflare.com`, `cdn.jsdelivr.net`, `unpkg.com`, `esm.sh`,
@@ -63,8 +75,9 @@ reads of your folder stays on this machine.
 
 - **Locust's own window loads nothing from the network** in the installed app:
   one filter refuses every request it makes, apart from a previewed page's,
-  above. It is refused every device and web permission: camera, microphone,
-  location and the like.
+  above. On Windows its own main frame may request microphone audio for voice
+  typing after a mic press. Cameras, preview frames, location, and all other
+  device and web permissions remain refused.
 - **Locust's permission host listens on `127.0.0.1` only.** Claude Code asks it
   before a connector call or a command, and each run gets its own token. Locust
   also reads Antigravity's own local server, at `127.0.0.1`.

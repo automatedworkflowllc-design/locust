@@ -4,7 +4,7 @@ import type { VoiceCapture } from '../voiceCapture.js'
 import { Icon } from './Icon.js'
 
 type Phase = 'idle' | 'asking' | 'checking' | 'downloading' | 'opening' | 'recording' | 'transcribing'
-export const VOICE_DOWNLOAD_WORDS = 'Voice typing needs a one-time 37 MB download. It runs on this computer; nothing you say leaves it.'
+export const VOICE_DOWNLOAD_WORDS = 'Voice typing needs a one-time 41 MB download. It runs on this computer; nothing you say leaves it.'
 export function VoiceButton({ platform, onText, disabled = false, api = typeof window === 'undefined' ? undefined : window.desktop?.voice }: {
   readonly platform: string; readonly onText: (text: string) => void; readonly disabled?: boolean; readonly api?: VoiceApi
 }) {
