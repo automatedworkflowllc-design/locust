@@ -89,7 +89,10 @@ try {
     return JSON.stringify({ toggle: true, before, after: { expanded: document.querySelector('.lc-picker__fold')?.getAttribute('aria-expanded'), labels } })
   })()`))
   say(`the fold: ${JSON.stringify(fold.before)} -> opened: ${JSON.stringify(fold.after?.labels?.filter((l) => /Opus 4|Sonnet 4|Fable 5$|Opus 5$/.test(l)))}`)
-  check('older versions are folded, and the fold says how many', fold.toggle && fold.before.expanded === 'false' && fold.before.older === 0 && /Older versions\s*8/.test(fold.before.text), JSON.stringify(fold.before))
+  // CHANGELOG 0.275.0: "Older Claude versions, folded away." The catalogue has gained
+  // another older model since that entry's eight; the fold's live count is not a fixed fixture.
+  const olderCount = Number(/Older versions\s*(\d+)/.exec(fold.before?.text ?? '')?.[1] ?? 0)
+  check('older versions are folded, and the fold says how many', fold.toggle && fold.before.expanded === 'false' && fold.before.older === 0 && olderCount > 0, JSON.stringify(fold.before))
   check('opening it shows them in place', fold.after?.expanded === 'true' && ['Opus 5', 'Opus 4.8', 'Opus 4.7', 'Opus 4.6', 'Opus 4.5', 'Fable 5', 'Sonnet 4.6', 'Sonnet 4.5'].every((name) => fold.after.labels.includes(name)))
   await shoot('03-fold-open.png')
   const picked = await drive.evaluate(`(async () => {

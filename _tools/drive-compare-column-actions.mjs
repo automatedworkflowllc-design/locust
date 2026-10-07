@@ -43,7 +43,7 @@ try {
   await drive.ready()
   await drive.resize(1440, 900)
   await sleep(4000)
-  const started = JSON.parse(String(await drive.capture('Two free models asked; Locust is closed while both are answering', () => drive.evaluate(`(async () => {
+  await drive.evaluate(`(async () => {
     let button
     for (let i = 0; i < 40 && !button; i += 1) {
       button = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Compare models')
@@ -57,7 +57,16 @@ try {
     setInput.call(box, 'free')
     box.dispatchEvent(new Event('input', { bubbles: true }))
     await new Promise((r) => setTimeout(r, 700))
-    const labels = []
+  })()`)
+  // CHANGELOG 0.460.0: "Compare picks its models like Arena." Choose both columns
+  // before sending; choosing them after the ask only edits a later composer, not the run.
+  const labels = []
+  for (const [index, id] of PICKS.entries()) {
+    const got = JSON.parse(String(await drive.evaluate(comparePickScript(index, comparePick(id)))))
+    if (got.picked) labels.push(got.label)
+    else say(`  pick ${id}: ${got.why}`)
+  }
+  const started = JSON.parse(String(await drive.capture('Two free models asked; Locust is closed while both are answering', () => drive.evaluate(`(async () => {
     ;[...document.querySelectorAll('.lc-picker__foot--compare button')].find((b) => b.textContent.trim() === 'Done')?.click()
     await new Promise((r) => setTimeout(r, 500))
     const field = document.querySelector('form.command-dock textarea')
@@ -72,15 +81,8 @@ try {
       const states = [...document.querySelectorAll('.lc-compare__state')].map((el) => el.textContent.trim())
       both = states.length === 2 && states.every((state) => state === 'working')
     }
-    return JSON.stringify({ labels, both, heads: ${HEADS} })
+    return JSON.stringify({ labels: ${JSON.stringify(labels)}, both, heads: ${HEADS} })
   })()`))))
-  // Ticked one at a time through drive-lib (2026-10-06): the picker names rows by display name, draws only those
-  // in view, and closes after a pick, leaving a chip per column -- comparePickScript handles all three.
-  for (const [index, id] of PICKS.entries()) {
-    const got = JSON.parse(String(await drive.evaluate(comparePickScript(index, comparePick(id)))))
-    if (got.picked) started.labels = [...(started.labels ?? []), got.label]
-    else say(`  pick ${id}: ${got.why}`)
-  }
   say(`  started: ${JSON.stringify(started)}`)
   check('two free models tick, and both columns are answering', started.labels?.length === 2 && started.both === true, JSON.stringify(started))
 } catch (error) {

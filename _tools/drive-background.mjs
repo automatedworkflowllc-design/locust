@@ -84,6 +84,10 @@ async function launch(answer, port) {
     say(String(await drive.evaluate(openTeammateScript('Sable'))))
     check('Sable is counting', String(await startCounting(drive)) === 'running')
     await drive.capture('Sable counting, before the close', () => drive.evaluate('document.visibilityState'))
+    // CHANGELOG 0.397.0: "Close the window, keep the work going." ready() emulates focus for
+    // foreground drives; that also forces visibilityState to "visible" after a real native hide.
+    // Restore native visibility before testing what Close actually did.
+    await drive.send('Emulation.setFocusEmulationEnabled', { enabled: false })
     void drive.evaluate('window.desktop.close()').catch(() => undefined)
     await sleep(2500)
     check('Locust is still up after the close', await answers(drive))
@@ -112,6 +116,7 @@ async function launch(answer, port) {
     await drive.resize(1200, 800)
     say(String(await drive.evaluate(openTeammateScript('Sable'))))
     check('control: Sable is counting', String(await startCounting(drive)) === 'running')
+    await drive.send('Emulation.setFocusEmulationEnabled', { enabled: false })
     void drive.evaluate('window.desktop.close()').catch(() => undefined)
     await sleep(2500)
     check('control: Cancel leaves the window open and visible', (await answers(drive)) && String(await drive.evaluate('document.visibilityState')) === 'visible')

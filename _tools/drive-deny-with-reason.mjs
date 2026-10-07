@@ -130,7 +130,10 @@ try {
   check('Wren read the reason and wrote kept.txt instead', existsSync(join(workspace, 'kept.txt')), after.slice(0, 300))
   // The denied call reads as refused, never as a failure (0.375): Codex
   // reports it as a failed script.
-  const fold = String(await drive.evaluate(`(() => (document.querySelector('.lc-activity')?.innerText ?? '').replace(/[ ]+/g, ' '))()`))
+  // CHANGELOG 0.491.0: "What the teammate says and the steps it takes now appear
+  // in the order they happened." The refusal lives in the steps lines; the
+  // separate .lc-activity at the end now summarizes only changed files.
+  const fold = String(await drive.evaluate(`(() => [...document.querySelectorAll('.lc-thread .lc-steps__line')].map(line => line.innerText).join(' ').replace(/[ ]+/g, ' '))()`))
   check('the denied call reads declined or refused, and nothing failed or exited non-zero', /(declined|refused)/.test(fold) && !/(failed|exited non-zero)/.test(fold), fold.slice(0, 240))
   say(failures === 0 ? '\nDENY WITH REASON PASSED' : `\nDENY WITH REASON: ${String(failures)} FAILED`)
 } catch (error) {

@@ -180,7 +180,9 @@ try {
   const offered = picker.tiles.filter((tile) => tile.startsWith('gallery/'))
   check('the look picker offers the 21 picks and the Codex pet under the bots -- not Locust’s bundled cat, not a pet added before 0.564, no gallery', picker.dialog && offered.length === 21 && offered.includes('gallery/robot') && picker.tiles.includes('codex/mochi') && !picker.tiles.includes('bundled/hoodie-cat') && !picker.tiles.includes('gallery/test-cat') && !picker.browse && picker.face, JSON.stringify(picker))
   const picked = JSON.parse(String(await drive.capture('Picked Robot', () => drive.evaluate(pickPet('robot')))))
-  check('picking a pet wears it: the face choice steps aside, the name is the pet’s, the preview is the pet at work', picked.chosen === 'true' && !picked.face && picked.name === 'Robot' && picked.preview === 'pet' && picked.previewState === 'running' && picked.chips === 9, JSON.stringify(picked))
+  // CHANGELOG 0.660.0: "Two more teammate colours: Indigo and Coral." The pet
+  // still offers the full palette: the previous nine plus those two colours.
+  check('picking a pet wears it: the face choice steps aside, the name is the pet’s, the preview is the pet at work', picked.chosen === 'true' && !picked.face && picked.name === 'Robot' && picked.preview === 'pet' && picked.previewState === 'running' && picked.chips === 11, JSON.stringify(picked))
   const made = String(await drive.capture('Created', () => drive.evaluate(create)))
   await sleep(800)
   const id = String(await drive.evaluate(createdId))

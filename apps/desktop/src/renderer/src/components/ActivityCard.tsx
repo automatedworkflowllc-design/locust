@@ -592,7 +592,7 @@ export function ActivityCard({
                         {...(onOpenFile === undefined ? {} : { onOpen: () => onOpenFile(entry.file.path) })}
                       />
                     ) : (
-                      <DiffView file={entry.file} truncated={entry.truncated} reported={entry.reported} />
+                      <DiffView file={entry.file} truncated={entry.truncated} reported={entry.reported} workspacePath={workspacePath} />
                     ))}
                 </>
               ) : entry.kind === 'helper' && entry.calls !== undefined && entry.calls.length > 0 ? (

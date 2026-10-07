@@ -176,7 +176,9 @@ try {
   const approvals = await ledgerApprovals()
   say(`  approvals recorded: ${JSON.stringify(approvals.map((a) => ({ by: a.by, answer: a.answer, asked: String(a.asked).split('\n').at(-1), v: a.schemaVersion })))}`)
   const of = (pattern) => approvals.find((a) => pattern.test(String(a.asked)))
-  check('the ledger is v21', approvals.length > 0 && approvals.every((a) => a.schemaVersion === 21), approvals.map((a) => a.schemaVersion).join(','))
+  // CHANGELOG 0.625.0: "See what a helper did." Helper parent ids moved the ledger to v22;
+  // the approval answerers this drive tests were added in v21 and are still present in later records.
+  check('the ledger supports earlier-always (v21 or later)', approvals.length > 0 && approvals.every((a) => Number.isInteger(a.schemaVersion) && a.schemaVersion >= 21), approvals.map((a) => a.schemaVersion).join(','))
   check('the Always: allowed for the session, by the person on the card', alwaysOn !== undefined && of(alwaysOn)?.by === 'card' && of(alwaysOn)?.answer === 'allowed-always', JSON.stringify(alwaysOn === undefined ? null : of(alwaysOn)))
   // OpenCode asks about every command, so the other one is on the record; Claude Code may run it unasked.
   const later = other === undefined ? undefined : codex ? approvals.filter((approval) => other.test(String(approval.asked))).at(1) : of(other)

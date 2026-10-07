@@ -27,6 +27,7 @@ import { runInPseudoTerminal } from './pseudo-terminal.js'
 import type { Runner } from './cloud-tasks.js'
 import type { ReverseChange } from '../shared/reverse-diff.js'
 import { bringInCopy, compareRoot, copyLineChanges, copyRefusal, makeCompareCopy, removeCompareCopies } from './compare-copies.js'
+import { comparePagePath } from './compare-page-path.js'
 import type { CompareSlotId, PublicCompare, PublicCompareSlot } from '../shared/compare.js'
 import { createCompareStore } from './compare-store.js'
 import { createApprovalRuleStore } from './approval-rule-store.js'
@@ -4641,18 +4642,23 @@ if (!ownsSingleInstanceLock) {
        * Codex name the page they wrote relative to where they ran -- the
        * column's copy -- and it was read from the folder: all three columns of
        * the 0.451 three-way design comparison said "That page is not there"
-       * over pages that were there. OpenCode names it from the folder, which
-       * is why the free-model drives never saw it. Kept, the copy is gone and
-       * the page is the folder's own, so the folder is the fallback.
+       * over pages that were there. Some tool reports name it by its absolute
+       * copy path instead. Kept, the copy is gone and the page is the folder's
+       * own, so either spelling
+       * falls back to the folder, for the kept column alone.
        */
       const place = typeof column === 'object' && column !== null ? (column as { compareId?: unknown; slot?: unknown }) : undefined
-      if (place !== undefined && !isAbsolute(requested) && typeof place.compareId === 'string' && (COMPARE_SLOTS as readonly unknown[]).includes(place.slot)) {
+      let pagePath = requested
+      if (place !== undefined && typeof place.compareId === 'string' && (COMPARE_SLOTS as readonly unknown[]).includes(place.slot)) {
         const compare = await compares.get(place.compareId).catch(() => undefined)
         if (compare !== undefined) {
           const name = compareTreeId(compare.compareId, place.slot as CompareSlotId)
           // Both kinds of column live under ~/.locust/compare (0.493); an older git column, under the folder.
-          const copy = compare.changesIn === 'copy' || await stat(join(compareRoot(), name)).then(() => true, () => false) ? join(compareRoot(), name) : join(workspacePath, COMPARE_TREES_DIRECTORY, name)
-          const inCopy = join(copy, requested)
+          const modernCopy = join(compareRoot(), name)
+          const copy = compare.changesIn === 'copy' || await stat(modernCopy).then(() => true, () => false) ? modernCopy : join(workspacePath, COMPARE_TREES_DIRECTORY, name)
+          const columnPath = comparePagePath(requested, modernCopy) ?? comparePagePath(requested, copy)
+          if (columnPath === undefined) return pages.urlFor(requested)
+          const inCopy = join(copy, columnPath)
           if (await stat(inCopy).then((found) => found.isFile(), () => false)) return pages.urlFor(inCopy)
           /*
            * ONLY THE KEPT COLUMN FALLS BACK TO THE FOLDER (0.571). After Keep the
@@ -4664,9 +4670,10 @@ if (!ownsSingleInstanceLock) {
           if (compare.kept !== undefined && compare.kept.slot !== place.slot) {
             return { ok: false, message: 'Its copy was removed when you kept another model, so this page is no longer on this computer.' } as const
           }
+          pagePath = columnPath
         }
       }
-      return pages.urlFor(requested)
+      return pages.urlFor(pagePath)
     })
 
     ipcMain.handle(WORKSPACE_TEXT_CHANNEL, async (event, requested: unknown) => {

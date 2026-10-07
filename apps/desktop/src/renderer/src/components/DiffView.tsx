@@ -4,6 +4,7 @@ import type { ReactElement } from 'react'
 import { HUNKS_SHOWN_FIRST, afterText, completenessOf, foldContext, hunkRange, pairedSpans } from '../diff.js'
 import type { DiffCounts, DiffFile, DiffHunk, DiffRow, WordSpan } from '../diff.js'
 import { diffNoteFor, diffNoteKey, MAX_DIFF_NOTE } from '../diffNotes.js'
+import { displayPath } from '../missionView.js'
 import { CopyButton } from './CopyButton.js'
 import { useDiffNotes } from './DiffNotes.js'
 import type { DiffNotesPlace } from './DiffNotes.js'
@@ -23,13 +24,15 @@ import { Icon } from './Icon.js'
 export function DiffView({
   file,
   truncated,
-  reported
+  reported,
+  workspacePath
 }: {
   readonly file: DiffFile
   /** The recorded text is shorter than the change the runtime made. */
   readonly truncated: boolean
   /** What the runtime counted across the whole change, before bounding. */
   readonly reported: DiffCounts | undefined
+  readonly workspacePath?: string | undefined
 }): ReactElement {
   const [shownHunks, setShownHunks] = useState(Math.min(HUNKS_SHOWN_FIRST, file.hunks.length))
   // A note can be written here only where it can be sent (DiffNotes.tsx).
@@ -48,6 +51,7 @@ export function DiffView({
           key={`${String(hunk.oldStart)}-${String(hunk.newStart)}-${String(index)}`}
           hunk={hunk}
           path={file.path}
+          labelPath={displayPath(file.path, workspacePath)}
           place={place}
           editing={editing}
           onEdit={setEditing}
@@ -80,12 +84,14 @@ export function DiffView({
 function Hunk({
   hunk,
   path,
+  labelPath,
   place,
   editing,
   onEdit
 }: {
   readonly hunk: DiffHunk
   readonly path: string
+  readonly labelPath: string
   readonly place: DiffNotesPlace | undefined
   readonly editing: string | undefined
   readonly onEdit: (key: string | undefined) => void
@@ -107,6 +113,7 @@ function Hunk({
               row={row}
               spans={spans.get(row)}
               path={path}
+              labelPath={labelPath}
               place={place}
               editing={editing}
               onEdit={onEdit}
@@ -141,6 +148,7 @@ function Row({
   row,
   spans,
   path,
+  labelPath,
   place,
   editing,
   onEdit
@@ -148,6 +156,7 @@ function Row({
   readonly row: DiffRow
   readonly spans: readonly WordSpan[] | undefined
   readonly path: string
+  readonly labelPath: string
   readonly place: DiffNotesPlace | undefined
   readonly editing: string | undefined
   readonly onEdit: (key: string | undefined) => void
@@ -167,7 +176,7 @@ function Row({
           <button
             type="button"
             className="lc-diff__noteadd"
-            aria-label={`Add a note on ${path}, ${where}`}
+            aria-label={`Add a note on ${labelPath}, ${where}`}
             title={`Add a note for ${place.who} on this line`}
             onClick={() => onEdit(key)}
           >

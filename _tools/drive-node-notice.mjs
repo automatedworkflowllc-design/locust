@@ -43,7 +43,10 @@ try {
   await sleep(14_000)
   const home = String(await drive.capture('Home, with a slow npm on the PATH', () => drive.evaluate(`JSON.stringify({ note: document.querySelector('.lc-installnote')?.innerText.replace(/\\s+/g, ' ') ?? '', agents: document.querySelector('.lc-agenthead')?.innerText.replace(/\\s+/g, ' ') ?? '' })`)))
   const seen = JSON.parse(home)
-  check('Home has its agents line', /AI agents/i.test(seen.agents), seen.agents.slice(0, 80))
+  // CHANGELOG 0.610.0: "The connected accounts are one quiet line under a
+  // hairline instead of a boxed panel". Check that current heading and its
+  // ready count, while preserving the slow-npm/no-install-warning assertion.
+  check('Home has its connected accounts line', /CONNECTED ACCOUNTS\s+\d+ ready/i.test(seen.agents), seen.agents.slice(0, 80))
   check('and does not tell a person with npm on their PATH to install Node.js', !/install\s*Node\.js/i.test(seen.note), seen.note || '(no note)')
 } catch (error) {
   failures += 1

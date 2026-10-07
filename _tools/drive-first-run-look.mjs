@@ -60,7 +60,9 @@ try {
     const first = body?.firstElementChild
     return JSON.stringify({ open: body !== null, first: first?.textContent?.trim() ?? null })
   })()`))))
-  check('it opens the form, which says first what a teammate is', form.open === true && /^A teammate is a name, a face and a place to keep missions/.test(form.first ?? ''), JSON.stringify(form))
+  // CHANGELOG 0.526.0: "Missions are called conversations now." The form's
+  // definition keeps its meaning, with the same current name as the sidebar.
+  check('it opens the form, which says first what a teammate is', form.open === true && /^A teammate is a name, a face and a place to keep conversations/.test(form.first ?? ''), JSON.stringify(form))
   await drive.evaluate(`(() => { [...document.querySelectorAll('.lc-dialog button')].find((b) => /^Cancel$/.test(b.textContent.trim()))?.click() })()`)
   await sleep(500)
 
