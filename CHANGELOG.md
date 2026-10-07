@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.686.0 - 2026-10-07
+
+### Added
+
+- **The chat box glows with your voice.** While voice typing listens, a soft glow rises from the bottom of the message box and follows how loudly you speak, so you can see it's hearing you. It stops as soon as you stop listening and uses nothing at rest. The glow is the open-source voice-glow library.
+
 ## 0.685.0 - 2026-10-07
 
 ### Added
