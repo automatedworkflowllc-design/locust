@@ -2280,6 +2280,8 @@ export default function App(): ReactElement {
   const [askConnectors, setAskConnectors] = useState(false)
   /** Ask teammates that can to keep a todo list. See WorkspaceSettings.keepATodoList. */
   const [keepATodoList, setKeepATodoList] = useState(false)
+  /** Lend the person's own skills to Claude Code teammates. See WorkspaceSettings.claudeOwnSkills. */
+  const [claudeOwnSkills, setClaudeOwnSkills] = useState(false)
 
   // Switching Auto off takes it away from a window that was sitting on it,
   // rather than leaving a choice the host would refuse at the next send.
@@ -3121,6 +3123,7 @@ export default function App(): ReactElement {
           setAutoModeKnown(true)
           setAskConnectors(settings.askConnectors === true)
           setKeepATodoList(settings.keepATodoList === true)
+          setClaudeOwnSkills(settings.claudeOwnSkills === true)
           setCheckCommand(settings.checkCommand ?? '')
           setAboutYou(settings.aboutYou ?? '')
           setAboutYouSuggestions(settings.aboutYouSuggestions ?? [])
@@ -7649,6 +7652,14 @@ export default function App(): ReactElement {
                   ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList: next, replySize, layout, tube })
                   .then((settings) => setKeepATodoList(settings.keepATodoList === true))
                   .catch(() => setKeepATodoList(!next))
+              }}
+              claudeOwnSkills={claudeOwnSkills}
+              onClaudeOwnSkillsChange={(next) => {
+                setClaudeOwnSkills(next)
+                void window.desktop
+                  ?.writeWorkspaceSettings({ swarm, relay, relayHopCap, interrupt, memoryMode, autoMode, askConnectors, keepATodoList, replySize, layout, tube, claudeOwnSkills: next })
+                  .then((settings) => setClaudeOwnSkills(settings.claudeOwnSkills === true))
+                  .catch(() => setClaudeOwnSkills(!next))
               }}
               relayHopCap={relayHopCap}
               memoryMode={memoryMode}

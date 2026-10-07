@@ -2453,6 +2453,13 @@ export interface WorkspaceSettings {
   /** Every one of our bots is plush faux fur instead of plastic (0.577). Off unless chosen. */
   readonly plush?: boolean
   /**
+   * A Claude Code teammate may use the person's own skills, from
+   * ~/.claude/skills, as well as the folder's (0.679). Off unless chosen:
+   * those were written for their own sessions. Auto finds them regardless,
+   * since Auto runs as the person.
+   */
+  readonly claudeOwnSkills?: boolean
+  /**
    * Teammates reply to each other on their own: a share to a teammate starts
    * a run for them, and their answer starts the sender's next turn. On by
    * default -- talking to each other is the point of having more than one --

@@ -100,6 +100,7 @@ import { awayCountsFrom, awayLine, wasAway } from '../shared/away.js'
 import type { AwaySummaryCounts } from '../shared/away.js'
 import { createRecentEdits } from './recent-edits.js'
 import { createCheckpoints, createTurnRecords } from './checkpoints.js'
+import { clearClaudeSkillCopies, prepareClaudeSkills } from './claude-skills.js'
 import { readRuntimeArtifacts } from './runtime-artifacts.js'
 import { relative } from 'node:path'
 import { decideReveal, insideOnDisk } from './reveal-file.js'
@@ -506,6 +507,9 @@ const runtimeFacts = createRuntimeFactsStore({ rootDirectory: app.getPath('userD
 // never in the person's folder; not in a profile backup (BACKED_UP_FOLDERS names what is).
 const checkpoints = createCheckpoints({ root: join(app.getPath('userData'), 'checkpoints') })
 const turnRecords = createTurnRecords(join(app.getPath('userData'), 'checkpoints', 'turns.json'))
+/** Skills copied for each Claude run outside Auto (0.679); what a crash left is cleared at launch. */
+const claudeSkillCopies = join(app.getPath('userData'), 'claude-skills')
+void clearClaudeSkillCopies(claudeSkillCopies)
 const runtimeFactsLoaded = runtimeFacts.load().catch(() => undefined)
 // What an ACP agent said it can do at its last run (W12), for Settings > AI agents.
 const acpCapabilities = createAcpCapabilitiesStore({ rootDirectory: app.getPath('userData') })
@@ -2234,6 +2238,9 @@ if (!ownsSingleInstanceLock) {
       // switch reaches the next mission without a restart.
       askConnectors: async () => (await teammates.readSettings()).askConnectors === true,
       keepATodoList: async () => (await teammates.readSettings()).keepATodoList === true,
+      // The folder's skills always; the person's own only when Settings says so, read at run start.
+      claudeSkills: async (workspace) =>
+        prepareClaudeSkills({ scratchRoot: claudeSkillCopies, workspacePath: workspace, ownSkills: (await teammates.readSettings()).claudeOwnSkills === true }),
       readyConnectors: cursorReadyConnectors,
       // Each runtime's own slash commands (0.426, runtime-commands.ts).
       cursorDefaultModel,

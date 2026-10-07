@@ -118,6 +118,7 @@ import { longTaskFile, longTaskFilePath } from './long-task-file.js'
 import { withAttachments } from '../shared/attachments.js'
 import { CODEX_INIT_PROMPT, commandNamed } from './runtime-commands.js'
 import type { CursorDefaultModel } from './cursor-default-model.js'
+import type { PreparedSkills } from './claude-skills.js'
 import { checkpointMessage, checkpointNotice, checkpointSentence, turnOutcomeOf } from './turn-checkpoint.js'
 import type { TurnOutcome } from './turn-checkpoint.js'
 import type { CheckpointMessage, CheckpointResult } from './worktrees.js'
@@ -536,6 +537,12 @@ interface CodexMissionServiceOptions {
   readonly onRuntimeCommands?: (runtime: 'claude' | 'opencode', commands: readonly RuntimeCommandInfo[]) => void
   /** The person's opt-in for a runtime-kept todo list. Absent reads as off. */
   readonly keepATodoList?: () => Promise<boolean>
+  /**
+   * The skills a Claude Code run outside Auto is given, as plugin folders
+   * built for it alone (0.679, claude-skills.ts); `dispose` removes them when
+   * the run's process ends. Absent: no skills beyond Claude Code's own.
+   */
+  readonly claudeSkills?: (workspacePath: string) => Promise<PreparedSkills>
   /** Connectors a Cursor teammate can call, by name, for its briefing. */
   readonly readyConnectors?: () => Promise<string | undefined>
   /**
@@ -1921,6 +1928,19 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           ) as CodexMissionStartResponse
         }
         const providers = own === undefined ? undefined : { [own.id]: own.provider }
+        /*
+         * SKILLS (0.679). `--restricted` keeps a Claude run from finding the
+         * folder's skills or the person's, so they are handed to it as
+         * plugins, copied for this run. Auto finds them itself.
+         */
+        const skills =
+          runtime === 'claude' && effectiveSandbox !== 'full-access' && options.claudeSkills !== undefined
+            ? await options.claudeSkills(runCwd).catch(() => undefined)
+            : undefined
+        const skillPlugins = skills?.plugins.map((plugin) => plugin.dir) ?? []
+        if (skills !== undefined && skills.plugins.length > 0) {
+          options.note?.('skills-given', `${missionId} ${skills.plugins.flatMap((plugin) => plugin.skills).join(' ')}`)
+        }
         let command: RuntimeCommandSpec
         // OpenCode and Copilot take the prompt as an argument, not on stdin,
         // so their argv is built once now with the person's own words -- so a
@@ -2004,6 +2024,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             ? createClaudePrintCommand(executable, {
                 workspacePath: runCwd,
                 ...(permissionBridge === undefined ? {} : { permissionBridge }),
+                ...(skillPlugins.length === 0 ? {} : { skillPlugins }),
                 // Every connector the person's own Claude Code can reach.
                 // Without a named allow rule the tools are offered and every
                 // call is refused, because a printed run has nowhere to put
@@ -2443,6 +2464,7 @@ ${sentPrompt.trim()}`
               say('starting-runtime')
               process = options.runner.start(command, runtimePrompt, { signal: controller.signal })
             } catch (startError) {
+              if (skills !== undefined) void skills.dispose()
               if (cursorGuard !== undefined) void cursorGuard.after().catch(() => undefined)
               if (connectorGrant !== undefined) void connectorGrant.release().catch(() => undefined)
               throw startError
@@ -2454,6 +2476,10 @@ ${sentPrompt.trim()}`
             if (connectorGrant !== undefined) {
               const giveBack = (): void => void connectorGrant.release().catch(() => undefined)
               process.completion.then(giveBack, giveBack)
+            }
+            if (skills !== undefined) {
+              const clear = (): void => void skills.dispose()
+              process.completion.then(clear, clear)
             }
             // A2.10: Claude Code's input stays open while its turn runs, so a
             // message can be handed to it there too.

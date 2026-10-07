@@ -487,6 +487,11 @@ export function activityEntries(
       // A plan update or a wait that names nothing reads as what it did, never
       // as the runtime's tool id: Colin saw Antigravity's bare `manage_task
       // done` (0.541), which was a check on a background command (0.542).
+      const skill = detail.kind === 'edit' ? undefined : skillCalled(detail.tool ?? detail.name, detail.tool === undefined || detail.tool === detail.name ? '' : detail.name)
+      if (skill !== undefined) {
+        entries.push({ kind: 'tool', key: `item_${String(index)}`, name: skillWords(skill, false), tool: undefined, settled: detail.settled, failed })
+        return
+      }
       const looked = detail.kind === 'edit' || (detail.tool !== undefined && detail.tool !== detail.name) ? undefined : toolLooksAt(detail.tool ?? detail.name)
       if (looked === 'plan' || looked === 'wait') {
         entries.push({ kind: 'tool', key: `item_${String(index)}`, name: looked === 'plan' ? 'Updated the plan' : 'Checked on a command', tool: undefined, settled: detail.settled, failed })
@@ -1590,6 +1595,25 @@ export function toolWords(tool: string): (typeof TOOL_WORDS)[number] | undefined
 }
 
 /**
+ * The skill a Skill call ran, as the person would name it (0.679), or
+ * undefined for any other tool; '' when the call named none. Locust carries
+ * a folder's skills as the plugin `project` and the person's own as
+ * `personal` (main/claude-skills.ts), so Claude Code calls them
+ * `project:review` -- a prefix Locust added, and the row leaves it off.
+ * Anyone else's plugin keeps its name: it says where the skill came from.
+ */
+export function skillCalled(tool: string | undefined, target: string): string | undefined {
+  if (tool?.trim().toLowerCase() !== 'skill') return undefined
+  return target.trim().replace(/^(project|personal):/, '')
+}
+
+/** "Used the review skill", or the live line's "Using the review skill". */
+export function skillWords(skill: string, live: boolean): string {
+  const verb = live ? 'Using' : 'Used'
+  return skill.length === 0 ? `${verb} a skill` : `${verb} the ${skill.length > 40 ? `${skill.slice(0, 39)}…` : skill} skill`
+}
+
+/**
  * A path as the person working in this folder would write it.
  *
  * Runtimes report absolute paths, and an activity row is one line wide, so a
@@ -1652,6 +1676,12 @@ export function relativePath(path: string, workspacePath: string | undefined): s
   // reads `answer.txt`, not its copy's home path beside the same file counted twice.
   const routineCopy = /(?:^|\/)\.locust\/routines\/rt_[A-Za-z0-9]+\/(.+)$/.exec(full)
   if (routineCopy?.[1] !== undefined) return routineCopy[1]
+  // A skill's own file, read from the copy Locust made for the run (0.679,
+  // main/claude-skills.ts): it reads as the file it is a copy of -- the
+  // folder's .claude/skills, or ~/.claude/skills for the person's own --
+  // never the profile path of a copy that is gone once the run ends.
+  const skillCopy = /(?:^|\/)claude-skills\/[0-9a-f-]{36}\/(project|personal)\/skills\/(.+)$/i.exec(full)
+  if (skillCopy?.[2] !== undefined) return `${skillCopy[1]!.toLowerCase() === 'personal' ? '~/' : ''}.claude/skills/${skillCopy[2]}`
   // Cursor's own scratch (0.594): it writes a large connector result to a file
   // under its project folder and reads or greps it back. A UUID file name says
   // nothing to a person; what it is does.
@@ -2183,6 +2213,8 @@ export function liveActionLine(detail: ActivityDetail, workspacePath?: string): 
     const verb = entry?.kind === 'file' && entry.file.status === 'ADDED' ? 'Creating' : entry?.kind === 'file' && entry.file.status === 'DELETED' ? 'Deleting' : 'Editing'
     return name === undefined ? 'Editing a file' : `${verb} ${clip(name, 40)}`
   }
+  const skill = skillCalled(detail.tool ?? detail.name, detail.tool === undefined || detail.tool === detail.name ? '' : detail.name)
+  if (skill !== undefined) return skillWords(skill, true)
   const tool = (detail.tool ?? detail.name).toLowerCase()
   // A runtime's own writing tool (Antigravity's write_to_file names the file it writes).
   if (/^(write|write_?to_?file|create_?file|edit|edit_?file|str_?replace\w*|apply_?patch|replace\w*)$/.test(tool)) {
@@ -2318,6 +2350,9 @@ export function stepsLine(details: readonly ActivityDetail[], finished: boolean,
       continue
     }
     if (detail.failed === true) failed += 1
+    // A skill reads as the skill it was (0.679), not "used Skill".
+    const skill = skillCalled(detail.tool ?? detail.name, detail.tool === undefined || detail.tool === detail.name ? '' : detail.name)
+    if (skill !== undefined) { note('skill', skill.length === 0 ? undefined : skill); continue }
     const looked = toolLooksAt(detail.tool)
     // A search tool may name its pattern or the folder it searched (Cursor's grep names the folder).
     const searchedIn = looked === 'search' && /[\\/]/.test(detail.name) ? fileName(detail.name) : undefined
@@ -2352,6 +2387,17 @@ export function stepsLine(details: readonly ActivityDetail[], finished: boolean,
       case 'web': word(held.count === 1 ? 'searched the web' : `searched the web ${String(held.count)} times`); break
       case 'fetch': word(held.count === 1 ? 'fetched a page' : `fetched ${pluralize(held.count, 'page')}`); break
       case 'plan': word('updated the plan'); break
+      case 'skill': {
+        const only = held.names.length === 1 ? held.names[0]! : undefined
+        const again = held.count === 1 ? '' : ` ${String(held.count)} times`
+        const many = `used ${pluralize(Math.max(held.names.length, 1), 'skill')}`
+        word(
+          only !== undefined ? `used the ${clip(only, 32)} skill${again}` : many,
+          held.count === 1 ? 'used a skill' : only !== undefined ? `used a skill${again}` : many,
+          only !== undefined ? `used the ${only} skill${again}` : many
+        )
+        break
+      }
       case 'helper': word(held.count === 1 ? `asked a helper${named === undefined ? '' : `: ${clip(named)}`}` : `asked ${pluralize(held.count, 'helper')}`, held.count === 1 ? 'asked a helper' : `asked ${pluralize(held.count, 'helper')}`); break
       case 'created':
       case 'edited':
@@ -4530,6 +4576,8 @@ export function railToolName(tool: { readonly name: string; readonly toolKind?: 
   if (isShellTool(tool.name, tool.toolKind)) return railLabel(shown === undefined ? 'Ran a command' : `Ran ${shellCommandText(shown)}`)
   const file = shown === undefined ? undefined : (shown.split(/[\\/]/).filter((part) => part.length > 0).at(-1) ?? shown)
   const words = tool.name.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z]+/).filter((word) => word.length > 0)
+  const skill = skillCalled(tool.name, shown ?? '')
+  if (skill !== undefined) return railLabel(skillWords(skill, false))
   if (tool.name === 'file_change' || editToolName(tool.name)) return railLabel(file === undefined ? 'Changed a file' : `Changed ${file}`)
   if (words.includes('websearch') || (words.includes('web') && words.includes('search'))) return railLabel(shown === undefined ? 'Searched the web' : `Searched the web for ${shown}`)
   if (words.some((word) => word === 'search' || word === 'grep' || word === 'find' || word === 'glob')) return railLabel(shown === undefined ? 'Searched' : `Searched for ${shown}`)

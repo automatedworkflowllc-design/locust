@@ -464,6 +464,15 @@ export interface RuntimeCommandOptions {
    * uncommitted change. OpenCode only; every other builder ignores it.
    */
   readonly slashCommand?: string;
+  /**
+   * Claude Code plugin folders that carry the skills this run may use (0.679),
+   * one `--plugin-dir` each. Outside Auto every run is `--restricted`, which
+   * MEASURED 2026-10-04 drops the folder's `.claude/skills` and the person's
+   * own; a plugin named on the command line is the one way a skill still
+   * loads (FINDING-claude-skills-under-restricted.md). Auto runs as the
+   * person and finds them itself, so it is never sent there. Claude Code only.
+   */
+  readonly skillPlugins?: readonly string[];
 }
 
 /** A command name as a runtime lists it: `init`, `security-review`, `plugin:skill`. */
@@ -880,7 +889,11 @@ export function createClaudePrintCommand(
     // with the model, i doubt these models are just gonna randomly start
     // buying crypto."
     "--tools",
-    editing ? "Read,Glob,Grep,Edit,Write,NotebookEdit,Bash,Task,mcp__*" : "Read,Glob,Grep,Task,mcp__*",
+    // Skill runs a skill: instructions, using only the tools listed beside it
+    // (0.679). Without it, "use the review skill" went to the nearest
+    // connector with "skill" in its name, and stopped there for a permission
+    // a printed run cannot give (measured 2026-10-04).
+    editing ? "Read,Glob,Grep,Edit,Write,NotebookEdit,Bash,Task,Skill,mcp__*" : "Read,Glob,Grep,Task,Skill,mcp__*",
     /*
      * The connectors this teammate was given, one allow rule each.
      *
@@ -919,6 +932,17 @@ export function createClaudePrintCommand(
           requireText(options.permissionBridge.toolName, "Permission tool"),
         ]),
   ];
+  if (!auto) {
+    // `--add-dir` too: `--restricted` confines the file tools to the working
+    // directories, and a skill reads the files kept beside its SKILL.md.
+    // MEASURED 2026-10-06 on Haiku in Ask: the skill loaded, and its own
+    // second-word.md was refused, "not permitted to use Read". The folder is
+    // a copy made for this run alone (claude-skills.ts), removed after it.
+    for (const dir of options.skillPlugins ?? []) {
+      const folder = requireText(dir, "Skill folder");
+      args.push("--plugin-dir", folder, "--add-dir", folder);
+    }
+  }
   if (options.model !== undefined) {
     args.push("--model", requireText(options.model, "Model"));
   }

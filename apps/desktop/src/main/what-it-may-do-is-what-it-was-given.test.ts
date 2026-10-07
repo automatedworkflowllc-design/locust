@@ -78,7 +78,16 @@ describe('what the panel says a run may do', () => {
       expect(tools).not.toContain('WebSearch')
       expect(rows).toContain('deny searching the web or opening web pages: it is given no tool for either')
       expect(rows).toContain(tools.includes('Bash') ? 'allow run commands, which can reach anything your account can' : 'deny running commands')
+      // Skills (0.679): the tool, and the skills it is handed as plugins.
+      expect(tools).toContain('Skill')
+      expect(rows).toContain("allow use this folder's skills, and yours when Settings lends them, with only the tools listed here")
+      const handed = createClaudePrintCommand(launch('claude'), { ...options(sandbox), skillPlugins: ['C:/data/claude-skills/run/project'] })
+      expect(handed.args.slice(handed.args.indexOf('--plugin-dir'), handed.args.indexOf('--plugin-dir') + 4)).toEqual(['--plugin-dir', 'C:/data/claude-skills/run/project', '--add-dir', 'C:/data/claude-skills/run/project'])
     }
+    // Auto runs as the person and finds every skill itself; no plugin is named.
+    const auto = createClaudePrintCommand(launch('claude'), { ...options('full-access'), skillPlugins: ['C:/data/x'] })
+    expect(auto.args).not.toContain('--plugin-dir')
+    expect(auto.args[auto.args.indexOf('--tools') + 1]!.split(',')).toContain('Skill')
   })
 
   it('Copilot CLI: commands refused only where its deny list says so, and paths held unless Auto', () => {

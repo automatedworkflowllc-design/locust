@@ -1544,6 +1544,8 @@ export function SettingsScreen({
   askConnectors,
   keepATodoList,
   onKeepATodoListChange,
+  claudeOwnSkills = false,
+  onClaudeOwnSkillsChange,
   onAskConnectorsChange,
   onOwnModelsChanged,
   swarm,
@@ -1677,6 +1679,9 @@ export function SettingsScreen({
   readonly onOwnModelsChanged?: () => void
   readonly keepATodoList: boolean
   readonly onKeepATodoListChange: (keepATodoList: boolean) => void
+  /** A Claude Code teammate may use the person's own skills too (0.679). */
+  readonly claudeOwnSkills?: boolean
+  readonly onClaudeOwnSkillsChange?: (claudeOwnSkills: boolean) => void
   /** The autonomy budget: automatic replies one exchange may use before it waits for a person. */
   readonly relayHopCap: number
   readonly onRelayHopCapChange: (cap: number) => void
@@ -2458,6 +2463,42 @@ export function SettingsScreen({
               Claude Code is never asked. It has no such tool, so the request would be an instruction it
               cannot follow and the board would stay empty with no explanation. This switch does nothing
               for a Claude Code teammate, in either position.
+            </p>
+          </More>
+        </section>
+        )}
+        {shownPage === 'teammates' && (
+        <section className="lc-settings__section lc-settings__section--line" data-setting="claude-skills">
+          <div className="lc-settingline">
+            <div className="lc-settingline__text">
+              <h2 className="lc-settings__heading">Your skills</h2>
+              <p className="lc-settings__lede">
+                {claudeOwnSkills
+                  ? "Lent. Claude Code teammates can use your own skills as well as the folder's."
+                  : "Not lent. Claude Code teammates use the folder's skills, not yours."}
+              </p>
+            </div>
+            <button
+              type="button"
+              className={`lc-switch${claudeOwnSkills ? ' is-on' : ''}`}
+              role="switch"
+              aria-checked={claudeOwnSkills}
+              aria-label={claudeOwnSkills ? 'Stop lending your skills to Claude Code teammates' : 'Lend your skills to Claude Code teammates'}
+              onClick={() => onClaudeOwnSkillsChange?.(!claudeOwnSkills)}
+            >
+              <span className="lc-switch__knob" />
+            </button>
+          </div>
+          <More>
+            <p>
+              A Claude Code teammate can use the skills in the folder's .claude/skills, the way Claude Code
+              does. Your own, in .claude/skills in your home folder, were written for your own sessions, so
+              they are lent only when this is on. It is read each time a run starts.
+            </p>
+            <p>
+              A skill is instructions. It uses only the tools the teammate's mode already gives it, so a
+              teammate in Ask that uses a skill still changes nothing. In Auto a teammate runs as you and
+              finds every skill you have, whichever way this is set.
             </p>
           </More>
         </section>

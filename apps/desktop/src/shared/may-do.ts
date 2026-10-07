@@ -43,6 +43,7 @@ const NO_COMMANDS: MayDoRow = { verdict: 'deny', text: 'running commands' }
 /** A command with nothing around it but the person's own account. */
 const OPEN_COMMANDS: MayDoRow = { verdict: 'allow', wide: true, text: 'run commands, which can reach anything your account can' }
 const THE_WEB: MayDoRow = { verdict: 'allow', wide: true, text: 'search the web and open web pages' }
+const CLAUDE_SKILLS: MayDoRow = { verdict: 'allow', text: "use this folder's skills, and yours when Settings lends them, with only the tools listed here" }
 const NOT_OUTSIDE: MayDoRow = { verdict: 'deny', text: 'opening files outside this folder, other than by running a command' }
 
 /**
@@ -76,8 +77,15 @@ export function whatItMayDo(runtime: MissionRuntimeId, sandbox: MissionSandbox, 
     case 'claude':
       // `--tools` is the whole list: Bash only when the mode may edit, and
       // never WebFetch or WebSearch, in any mode (createClaudePrintCommand).
+      // Skill, with the folder's skills (and the person's own, when Settings
+      // lends them) handed over as plugins (0.679, claude-skills.ts). A skill
+      // is instructions: it uses only the tools named above.
       if (sandbox === 'full-access') return rows(ANY_COMMAND)
-      return rows(sandbox === 'read-only' ? NO_COMMANDS : OPEN_COMMANDS, { verdict: 'deny', text: 'searching the web or opening web pages: it is given no tool for either' })
+      return rows(
+        sandbox === 'read-only' ? NO_COMMANDS : OPEN_COMMANDS,
+        { verdict: 'deny', text: 'searching the web or opening web pages: it is given no tool for either' },
+        CLAUDE_SKILLS
+      )
     case 'opencode':
       // Read-only: edit, write and patch denied, bash "ask" -- which `run`
       // answers with a refusal every time. Edit: external_directory "deny"

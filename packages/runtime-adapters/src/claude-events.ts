@@ -295,6 +295,9 @@ export function claudeToolTarget(name: string, input: unknown): string | undefin
     case "WebFetch":
     case "WebSearch":
       return first("url", "query");
+    case "Skill":
+      // `{"skill":"project:review"}` (0.679, measured 2026-10-04).
+      return first("skill");
     default:
       // Read, Edit, Write, NotebookEdit and anything else that names a file.
       return first("file_path", "path", "notebook_path", "command", "pattern");

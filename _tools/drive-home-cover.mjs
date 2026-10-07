@@ -196,7 +196,10 @@ try {
   const readyLines = log.filter((line) => line.includes('| ready |'))
   if (probingLines.length > 0) check('while probing, the teammates are still and dotless', probingLines.every((line) => /still,still,still dots=0/.test(line) || /nofaces/.test(line)), probingLines.join(' / '))
   else say('  note  probing finished before the watch began; the before-state was not seen on screen')
-  check('once ready, Wren (a white ghost) floats, Atlas waits on you, Sable (a green Locust) sleeps', readyLines.some((line) => /default,default,sleeping dots=2/.test(line)), readyLines.slice(-1)[0])
+  // No presence dot on a cover character since 0.610 (HomeCover.tsx: "two wear the live dot while your team is
+  // idle", Colin): the cast plays parts, so a dot there would claim work nobody is doing. The sweep of 0.678 still
+  // expected two.
+  check('once ready, Wren (a white ghost) floats, Atlas and Sable (a green Locust) at rest, and no character wears a dot', readyLines.some((line) => /default,default,sleeping dots=0/.test(line)), readyLines.slice(-1)[0])
   if (tube === 'full') check('the lockup lit, and lit again', shotPower && shotRelight)
   else check(`tube ${tube}: the lockup never lit`, !shotPower && !shotRelight)
 
