@@ -11,6 +11,14 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.679.0 - 2026-10-06
+
+### Added
+
+- **Claude Code teammates can use skills.** A skill in your folder's `.claude/skills` now works for a Claude Code teammate in every mode, the way it does in Claude Code itself. Ask it to "use the review skill" and it does. Before this, outside Auto, a teammate couldn't see any skill, and the request often went to a connector with "skill" in its name instead. A skill uses only the tools the teammate's mode already gives it, so a teammate in Ask that uses a skill still changes nothing.
+- **Lend your own skills.** Settings > Teammates > Your skills lets Claude Code teammates use the skills in `.claude/skills` in your home folder too. It is off until you switch it on. Auto already runs as you and finds them either way.
+- The thread says "Used the review skill" where it used to show the tool's name. A file the skill reads shows as `.claude/skills/review/…`, not as the temporary copy Locust made for the run.
+
 ## 0.678.0 - 2026-10-06
 
 ### Fixed
