@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import type { VoiceApi } from '../../../shared/voice.js'
+import type { VoiceApi, VoiceMode } from '../../../shared/voice.js'
 import type { VoiceCapture } from '../voiceCapture.js'
 import { Icon } from './Icon.js'
 import { setVoiceState } from '../voiceLevel.js'
 
 type Phase = 'idle' | 'asking' | 'checking' | 'downloading' | 'opening' | 'recording' | 'transcribing'
 export const VOICE_DOWNLOAD_WORDS = 'Voice typing needs a one-time 41 MB download. It runs on this computer; nothing you say leaves it.'
+export const VOICE_ACCURATE_WORDS = 'Accurate voice typing needs a one-time 69 MB download (68,649,651 bytes, including the runtime). It is slower and runs on this computer; nothing you say leaves it.'
+export const VOICE_OPENAI_WORDS = 'Voice typing will send your recordings to OpenAI using your API key. OpenAI API charges apply. Allow this for future recordings?'
 export function VoiceButton({ platform, onText, disabled = false, api = typeof window === 'undefined' ? undefined : window.desktop?.voice }: {
   readonly platform: string; readonly onText: (text: string) => void; readonly disabled?: boolean; readonly api?: VoiceApi
 }) {
@@ -13,6 +15,8 @@ export function VoiceButton({ platform, onText, disabled = false, api = typeof w
   const [seconds, setSeconds] = useState(0)
   const [percent, setPercent] = useState(0)
   const [message, setMessage] = useState('')
+  const [mode, setMode] = useState<VoiceMode>('fast')
+  const selectedMode = useRef<VoiceMode>('fast')
   const current = useRef<Phase>('idle')
   const capture = useRef<VoiceCapture | undefined>(undefined)
   const controller = useRef<AbortController | undefined>(undefined)
@@ -66,7 +70,7 @@ export function VoiceButton({ platform, onText, disabled = false, api = typeof w
     try {
       const wav = await recording.stop()
       if (generation.current !== token) return
-      const result = await api.transcribe(wav)
+      const result = await api.transcribe(wav, selectedMode.current)
       if (generation.current !== token) return
       if (!result.ok) { transition('idle'); setMessage(result.message); return }
       transition('idle')
@@ -92,7 +96,17 @@ export function VoiceButton({ platform, onText, disabled = false, api = typeof w
     const token = ++generation.current
     setMessage(''); transition('checking')
     try {
-      const ready = await api.ready()
+      const settings = await api.settings?.()
+      if (generation.current !== token) return
+      selectedMode.current = settings?.mode ?? 'fast'
+      setMode(selectedMode.current)
+      if (settings?.mode === 'openai') {
+        if (!settings.hasKey) { transition('idle'); setMessage('Add your OpenAI API key in Settings > General. Your message is unchanged.'); return }
+        if (!settings.openaiConsent) { transition('asking'); return }
+        await record(token)
+        return
+      }
+      const ready = await api.ready(selectedMode.current)
       if (generation.current !== token) return
       if (!ready) { transition('asking'); return }
       await record(token)
@@ -104,8 +118,11 @@ export function VoiceButton({ platform, onText, disabled = false, api = typeof w
     transition('downloading'); setPercent(0)
     const unsubscribe = api.onProgress((progress) => { if (generation.current === token) setPercent(Math.max(0, Math.min(100, progress))) })
     try {
-      const result = await api.download()
+      const result = selectedMode.current === 'openai'
+        ? await api.allowOpenAI?.()
+        : await api.download(selectedMode.current)
       if (generation.current !== token) return
+      if (result === undefined) { transition('idle'); setMessage('Voice typing could not start. Your message is unchanged.'); return }
       if (!result.ok) { transition('idle'); setMessage(result.message); return }
       await record(token)
     } catch (error) { fail(error, token) } finally { unsubscribe() }
@@ -119,9 +136,9 @@ export function VoiceButton({ platform, onText, disabled = false, api = typeof w
       <Icon name="mic" size={17} />
       {recording ? <span>{clock}</span> : phase === 'downloading' ? <span>{percent}%</span> : busy ? <span>{phase === 'transcribing' ? 'Typing…' : phase === 'asking' ? '' : 'Starting…'}</span> : null}
     </button>
-    {phase === 'asking' && <div className="lc-voice__ask" role="dialog" aria-label="Download voice typing">
-      <p>{VOICE_DOWNLOAD_WORDS}</p>
-      <button type="button" className="lc-control lc-control--boxed" onClick={() => { void download() }}>Download</button>
+    {phase === 'asking' && <div className="lc-voice__ask" role="dialog" aria-label={mode === 'openai' ? 'Allow OpenAI voice typing' : 'Download voice typing'}>
+      <p>{mode === 'openai' ? VOICE_OPENAI_WORDS : mode === 'accurate' ? VOICE_ACCURATE_WORDS : VOICE_DOWNLOAD_WORDS}</p>
+      <button type="button" className="lc-control lc-control--boxed" onClick={() => { void download() }}>{mode === 'openai' ? 'Allow' : 'Download'}</button>
       <button type="button" className="lc-control" onClick={cancel}>Not now</button>
     </div>}
     {message && <span className="lc-voice__message" role="status">{message}</span>}

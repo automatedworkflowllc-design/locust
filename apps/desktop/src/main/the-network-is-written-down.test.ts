@@ -8,6 +8,7 @@ import { MAC_RELEASES_API } from './mac-release.js'
 import { PAGE_LIBRARY_HOSTS } from './page-preview.js'
 import { REPORT_DESTINATION } from './report-problem.js'
 import { CANARY_VERDICTS_URL } from './runtime-updates.js'
+import { VOICE_OPENAI_URL } from './voice-openai.js'
 
 /**
  * THE NETWORK IS WRITTEN DOWN (0.618; the PRD's R22).
@@ -38,6 +39,7 @@ const LISTED: Readonly<Record<string, { readonly places: number; readonly said: 
   'runtime-updates.ts': { places: 1, said: ['Keeping Codex CLI and Copilot CLI current'] },
   'pet-library.ts': { places: 1, said: ['The pet gallery'] },
   'voice-host.ts': { places: 1, said: ["Voice typing's one-time files", 'No account, API key, recording, transcript,'] },
+  'voice-openai.ts': { places: 1, said: ['OpenAI voice typing', 'api.openai.com/v1/audio/transcriptions', 'No redirects are followed'] },
   'permission-host.ts': { places: 1, said: ['Locust\'s permission host listens on `127.0.0.1` only'] },
   'antigravity-cascade.ts': { places: 1, said: ['Antigravity\'s own local server, at `127.0.0.1`'] },
   // Test: the models the address serves, then one capped chat request with a tool.
@@ -64,6 +66,10 @@ describe('every place Locust reaches the network is in docs/NETWORK.md', () => {
 })
 
 describe('the addresses are the ones the code uses', () => {
+  it('OpenAI voice typing has one fixed HTTPS destination', () => {
+    expect(VOICE_OPENAI_URL).toBe('https://api.openai.com/v1/audio/transcriptions')
+    expect(NETWORK).toContain(VOICE_OPENAI_URL)
+  })
   it('the update feed, the Mac release list, the verdict file, the pet gallery and the report page', () => {
     const feed = read('../../electron-builder.yml')
     const owner = /owner:\s*(\S+)/.exec(feed)![1]

@@ -10905,6 +10905,18 @@ textarea {
   gap: 2px;
 }
 
+.lc-voice-settings {
+  width: 260px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+}
+
+.lc-voice-settings .lc-input {
+  width: 100%;
+}
+
 .lc-settingline .lc-settings__heading {
   margin: 0;
   font-size: var(--lc-text-control);

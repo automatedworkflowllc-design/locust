@@ -1,7 +1,7 @@
 // No AI-agent turns. Real pinned download, fake local mic, editable transcript.
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
-import { mkdtemp, readdir, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { startDrive, scratchRepository, sleep } from './drive-lib.mjs'
@@ -9,8 +9,9 @@ import { startDrive, scratchRepository, sleep } from './drive-lib.mjs'
 const workspace = await scratchRepository('voice-workspace-')
 const profile = await mkdtemp(join(tmpdir(), 'voice-profile-'))
 const clip = resolve('_tools/voice-spike/results/clip.wav')
+const accurate = process.argv.includes('--accurate')
 const packaged = process.argv.includes('--packaged') ? process.argv[process.argv.indexOf('--packaged') + 1] : undefined
-const drive = await startDrive({ name: 'voice-dictation', port: 9896, workspace, profilePath: profile, keep: true, ...(packaged === undefined ? {} : { packaged }),
+const drive = await startDrive({ name: accurate ? 'voice-dictation-accurate' : 'voice-dictation', port: 9896, workspace, profilePath: profile, keep: true, ...(packaged === undefined ? {} : { packaged }),
   sendsNothing: true, focused: true,
   extraArgs: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-audio-capture=${clip}`],
   seed: { schemaVersion: 1, teammates: [{ teammateId: 'tm_voice', name: 'Voice', hue: 'clay', role: 'Custom', roleTitle: 'Helper', createdAt: '2026-10-06T00:00:00.000Z', route: { runtime: 'codex', model: 'account-default', mode: 'accept-edits' } }], missionOwners: {}, settings: { swarm: false, relay: false, memoryMode: 'off' } }
@@ -37,11 +38,26 @@ try {
   await drive.capture('ready, no voice assets loaded', () => drive.ready())
   check('a microphone is drawn', await drive.evaluate(`!!document.querySelector('[aria-label="Voice typing"]')`))
   check('no voice directory before the first press', !(await readdir(profile)).includes('voice'))
+  if (accurate) {
+    await drive.evaluate(`[...document.querySelectorAll('.lc-sidebar__nav button')].find(b => /Settings/.test(b.innerText))?.click()`)
+    await wait(`!!document.querySelector('[aria-label="Voice typing model"]:not(:disabled)')`)
+    check('Fast is the initial setting', await drive.evaluate(`document.querySelector('[aria-label="Voice typing model"]').value === 'fast'`))
+    await drive.evaluate(`(() => { const select=document.querySelector('[aria-label="Voice typing model"]'); select.value='accurate'; select.dispatchEvent(new Event('change',{bubbles:true})); })()`)
+    await wait(`document.querySelector('[aria-label="Voice typing model"]:not(:disabled)')?.value === 'accurate'`)
+    check('Accurate selection persisted without downloading', await drive.evaluate(`window.desktop.voice.settings().then(s => s.mode === 'accurate')`) && !(await readdir(profile)).includes('voice'))
+    await drive.capture('General: selected Accurate, real size and slower wording', () => drive.evaluate(`document.querySelector('[data-setting="voice-typing"]').innerText`))
+    await drive.evaluate(`document.querySelector('[aria-label="Home"]').click()`)
+    await wait(`!!document.querySelector('[aria-label="Voice typing"]')`)
+  }
+  // Home deliberately animates for 45 seconds after mounting/input. Observe
+  // its real resting state, without changing focus or forcing reduced motion.
+  await wait(`!document.querySelector('.lc-cover') || !!document.querySelector('.lc-cover.is-paused')`, 60)
   const baselineCpu = await idleCpu()
   measurements.baselineFocusedCpu = baselineCpu
   await drive.evaluate(`document.querySelector('[aria-label="Voice typing"]').click()`)
   await wait(`!!document.querySelector('[aria-label="Download voice typing"]')`)
-  check('exact first-use consent words', await drive.evaluate(`document.querySelector('[aria-label="Download voice typing"]').innerText.includes('Voice typing needs a one-time 41 MB download. It runs on this computer; nothing you say leaves it.')`))
+  const consent = accurate ? 'Accurate voice typing needs a one-time 69 MB download (68,649,651 bytes, including the runtime). It is slower and runs on this computer; nothing you say leaves it.' : 'Voice typing needs a one-time 41 MB download. It runs on this computer; nothing you say leaves it.'
+  check('exact first-use consent words', await drive.evaluate(`document.querySelector('[aria-label="Download voice typing"]').innerText.includes(${JSON.stringify(consent)})`))
   await drive.capture('one-time download consent', () => 'Download and Not now, in place')
   await drive.evaluate(`document.querySelector('[aria-label="Download voice typing"] button:last-child').click()`)
   check('Not now downloads nothing', !(await readdir(profile)).includes('voice'))
@@ -54,6 +70,7 @@ try {
   check('real download and fake microphone start', await drive.evaluate(`!!document.querySelector('[aria-label="Stop voice typing"]')`), error)
   check('download has only retained runtime/model files', (await readdir(join(profile, 'voice'))).filter((name) => name.endsWith('.exe') || name.endsWith('.dll') || name.endsWith('.bin')).length === 7)
   check('download retains license notices', (await readdir(join(profile, 'voice'))).includes('LICENSE.txt'))
+  if (accurate) check('only the chosen base model is retained', (await readdir(join(profile, 'voice'))).includes('ggml-base.en-q5_1.bin') && !(await readdir(join(profile, 'voice'))).includes('ggml-tiny.en-q5_1.bin'))
   // The glow while the clip is being said (0.686), at three moments: it follows the voice's own level.
   for (const at of [2, 4, 6]) {
     await sleep(2_000)
@@ -79,6 +96,43 @@ try {
   await wait(`document.querySelector('.lc-voice__button')?.getAttribute('aria-pressed') === 'false'`)
   check('Escape leaves draft unchanged', await drive.evaluate(`document.querySelector('form.command-dock textarea').value`) === text)
   check('recording ends on Escape', await drive.evaluate(`document.querySelector('[aria-label="Stop voice typing"]') === null`))
+  if (accurate) {
+    // A deliberately fake key exercises Windows protection and the first-use
+    // dialog. Never allow or record: this drive makes no OpenAI request.
+    await drive.evaluate(`[...document.querySelectorAll('.lc-sidebar__nav button')].find(b => /Settings/.test(b.innerText))?.click()`)
+    await wait(`!!document.querySelector('[aria-label="Voice typing model"]:not(:disabled)')`)
+    await drive.evaluate(`(() => { const select=document.querySelector('[aria-label="Voice typing model"]'); select.value='openai'; select.dispatchEvent(new Event('change',{bubbles:true})); })()`)
+    await wait(`!!document.querySelector('[aria-label="OpenAI voice API key"]:not(:disabled)')`)
+    const fakeKey = 'fake-voice-drive-key'
+    await drive.evaluate(`(() => { const input=document.querySelector('[aria-label="OpenAI voice API key"]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,${JSON.stringify(fakeKey)}); input.dispatchEvent(new Event('input',{bubbles:true})); })()`)
+    await wait(`[...document.querySelectorAll('.lc-voice-settings button')].some(b => b.innerText === 'Save key' && !b.disabled)`)
+    await drive.evaluate(`[...document.querySelectorAll('.lc-voice-settings button')].find(b => b.innerText === 'Save key').click()`)
+    await wait(`!![...document.querySelectorAll('.lc-voice-settings button')].find(b => b.innerText === 'Remove key' && !b.disabled)`)
+    const publicSettings = await drive.evaluate(`window.desktop.voice.settings()`)
+    check('saved key is Windows-encrypted and absent from public settings', publicSettings.hasKey && !JSON.stringify(publicSettings).includes(fakeKey) && !(await readFile(join(profile, 'voice-settings.json'), 'utf8')).includes(fakeKey))
+    check('key entry is empty after save', await drive.evaluate(`document.querySelector('[aria-label="OpenAI voice API key"]').value === ''`))
+    await drive.evaluate(`document.querySelector('[aria-label="Home"]').click()`)
+    await wait(`!!document.querySelector('[aria-label="Voice typing"]')`)
+    // Home starts a new draft. Seed it here, after navigation, so this check
+    // measures cancellation rather than the app's existing Home behavior.
+    await drive.evaluate(`(() => { const box=document.querySelector('form.command-dock textarea'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(box,${JSON.stringify(text)}); box.dispatchEvent(new Event('input',{bubbles:true})); document.querySelector('[aria-label="Voice typing"]').click(); })()`)
+    await wait(`!!document.querySelector('[aria-label="Allow OpenAI voice typing"]')`)
+    check('first cloud recording explains upload and charges before opening the mic', await drive.evaluate(`document.querySelector('[aria-label="Allow OpenAI voice typing"]').innerText.includes('Voice typing will send your recordings to OpenAI using your API key. OpenAI API charges apply. Allow this for future recordings?') && !document.querySelector('[aria-label="Stop voice typing"]')`))
+    await drive.capture('OpenAI first-use consent, fake key, no audio uploaded', () => 'Not now; no recording or upload')
+    await drive.evaluate(`document.querySelector('[aria-label="Allow OpenAI voice typing"] button:last-child').click()`)
+    check('declining cloud consent preserves the draft and does not consent', await drive.evaluate(`document.querySelector('form.command-dock textarea').value`) === text && !(await drive.evaluate(`window.desktop.voice.settings()`)).openaiConsent)
+    await drive.evaluate(`[...document.querySelectorAll('.lc-sidebar__nav button')].find(b => /Settings/.test(b.innerText))?.click()`)
+    await wait(`!![...document.querySelectorAll('.lc-voice-settings button')].find(b => b.innerText === 'Remove key' && !b.disabled)`)
+    await drive.evaluate(`[...document.querySelectorAll('.lc-voice-settings button')].find(b => b.innerText === 'Remove key').click()`)
+    await wait(`!![...document.querySelectorAll('.lc-voice-settings button')].find(b => b.innerText === 'Save key') && !document.querySelector('[aria-label="Voice typing model"]').disabled`)
+    check('fake key removed', !(await drive.evaluate(`window.desktop.voice.settings()`)).hasKey)
+    await drive.evaluate(`(() => { const select=document.querySelector('[aria-label="Voice typing model"]'); select.value='accurate'; select.dispatchEvent(new Event('change',{bubbles:true})); })()`)
+    await wait(`document.querySelector('[aria-label="Voice typing model"]:not(:disabled)')?.value === 'accurate'`)
+    await drive.evaluate(`document.querySelector('[aria-label="Home"]').click()`)
+    await wait(`!!document.querySelector('[aria-label="Voice typing"]')`)
+  }
+  await wait(`!document.querySelector('.lc-cover') || !!document.querySelector('.lc-cover.is-paused')`, 60)
+  check('Home naturally rests while the app stays focused', await drive.evaluate(`document.hasFocus() && (!document.querySelector('.lc-cover') || !!document.querySelector('.lc-cover.is-paused'))`))
   const afterCpu = await idleCpu()
   measurements.afterFocusedCpu = afterCpu
   await drive.send('Emulation.setFocusEmulationEnabled', { enabled: false })

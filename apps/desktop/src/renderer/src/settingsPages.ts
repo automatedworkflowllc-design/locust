@@ -85,8 +85,9 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
     label: 'General',
     group: 'Locust',
     icon: 'settings',
-    headings: ['Startup', 'Updates', 'Report a problem', 'Help'],
+    headings: ['Voice typing', 'Startup', 'Updates', 'Report a problem', 'Help'],
     alsoKnownAs: {
+      'Voice typing': ['dictation', 'microphone', 'speech', 'whisper', 'transcription'],
       Startup: ['login item', 'tray', 'keep running', 'sign-in'],
       Updates: ['version', 'upgrade'],
       'Report a problem': ['bug', 'feedback', 'crash'],

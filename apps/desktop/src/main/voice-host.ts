@@ -2,8 +2,10 @@ import { createHash } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { mkdir, mkdtemp, open, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { VOICE_MAX_BYTES, VOICE_RATE, type VoiceResult } from '../shared/voice.js'
+import { VOICE_MAX_BYTES, VOICE_RATE, isVoiceMode, type VoiceMode, type VoiceResult } from '../shared/voice.js'
 import { VOICE_LICENSE } from '../shared/voice-license.js'
+import type { createVoiceSettingsStore } from './voice-settings.js'
+import { transcribeOpenAI } from './voice-openai.js'
 
 export const VOICE_ARCHIVE = {
   url: 'https://github.com/ggml-org/whisper.cpp/releases/download/b5454/whisper-bin-x64.zip',
@@ -15,6 +17,11 @@ export const VOICE_MODEL = {
   sha256: 'c77c5766f1cef09b6b7d47f21b546cbddd4157886b3b5d6d4f709e91e66c7c2b',
   bytes: 32_166_155
 } as const
+export const VOICE_ACCURATE_MODEL = {
+  url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-base.en-q5_1.bin',
+  sha256: '4baf70dd0d7c4247ba2b81fafd9c01005ac77c2f9ef064e00dcf195d0e2fdd2f',
+  bytes: 59_721_011
+} as const
 export const VOICE_NATIVE = {
   'whisper-cli.exe': '331dba46d6427105d2b802cdbc7eae916ea1c5abf9b0d3b5cfe460d8db8e4366',
   'whisper.dll': '034396d75bb5720c1851674ff64a96192b58f6927b68d334ebd254ce6cad9674',
@@ -24,6 +31,8 @@ export const VOICE_NATIVE = {
   'ggml-cpu-haswell.dll': '1306b1014c8118d27234d8ddc0e66ced1f8c8476bf85071595fd182ea9b7263b'
 } as const
 const MODEL_NAME = 'ggml-tiny.en-q5_1.bin'
+const modelFor = (mode: VoiceMode) => mode === 'accurate' ? VOICE_ACCURATE_MODEL : VOICE_MODEL
+const modelNameFor = (mode: VoiceMode): string => mode === 'accurate' ? 'ggml-base.en-q5_1.bin' : MODEL_NAME
 const digest = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex')
 
 async function verified(path: string, hash: string): Promise<boolean> {
@@ -104,13 +113,24 @@ export function validVoiceWav(input: unknown): input is Uint8Array {
     && (bytes.length - 44) % 2 === 0
 }
 
-export function createVoiceHost(directory: string) {
+export function createVoiceHost(directory: string, options: { readonly store?: ReturnType<typeof createVoiceSettingsStore>; readonly openaiFetch?: typeof fetch } = {}) {
   let active: { controller: AbortController; done: Promise<VoiceResult> } | undefined
   let disposed = false
-  const ready = async (): Promise<boolean> => {
+  const selected = async (requested: unknown): Promise<VoiceMode> => {
+    const mode = (await options.store?.settings())?.mode ?? 'fast'
+    if (requested !== undefined && (!isVoiceMode(requested) || requested !== mode)) throw new Error('Voice typing changed in Settings. Your message is unchanged; press the microphone again.')
+    return mode
+  }
+  const ready = async (requested?: unknown): Promise<boolean> => {
     if (disposed || process.platform !== 'win32' || process.arch !== 'x64') return false
+    let mode: VoiceMode
+    try { mode = await selected(requested) } catch { return false }
+    if (mode === 'openai') {
+      const settings = await options.store?.settings()
+      return settings?.openaiConsent === true && Boolean(await options.store?.key())
+    }
     for (const [name, hash] of Object.entries(VOICE_NATIVE)) if (!(await verified(join(directory, name), hash))) return false
-    return verified(join(directory, MODEL_NAME), VOICE_MODEL.sha256)
+    return verified(join(directory, modelNameFor(mode)), modelFor(mode).sha256)
   }
   const begin = (work: (signal: AbortSignal) => Promise<VoiceResult>): Promise<VoiceResult> => {
     if (disposed || process.platform !== 'win32' || process.arch !== 'x64') return Promise.resolve({ ok: false, message: 'Voice typing is available on Windows x64. Your message is unchanged.' })
@@ -127,15 +147,18 @@ export function createVoiceHost(directory: string) {
   }
   return {
     ready,
-    download: (progress: (percent: number) => void): Promise<VoiceResult> => begin(async (signal) => {
+    download: (progress: (percent: number) => void, requested?: unknown): Promise<VoiceResult> => begin(async (signal) => {
+      const mode = await selected(requested)
+      if (mode === 'openai') return { ok: false, message: 'OpenAI voice typing does not need a download. Your message is unchanged.' }
+      const model = modelFor(mode)
       await mkdir(directory, { recursive: true })
       const timed = AbortSignal.any([signal, AbortSignal.timeout(300_000)])
       const archive = join(directory, 'whisper.zip')
       const extracted = join(directory, 'unpack')
       try {
-        const total = VOICE_ARCHIVE.bytes + VOICE_MODEL.bytes
+        const total = VOICE_ARCHIVE.bytes + model.bytes
         await downloadVoiceFile(VOICE_ARCHIVE, archive, timed, (bytes) => progress(Math.floor(bytes / total * 99)))
-        await downloadVoiceFile(VOICE_MODEL, join(directory, MODEL_NAME), timed, (bytes) => progress(Math.floor((VOICE_ARCHIVE.bytes + bytes) / total * 99)))
+        await downloadVoiceFile(model, join(directory, modelNameFor(mode)), timed, (bytes) => progress(Math.floor((VOICE_ARCHIVE.bytes + bytes) / total * 99)))
         await rm(extracted, { recursive: true, force: true })
         const quote = (value: string): string => "'" + value.replaceAll("'", "''") + "'"
         const command = `Expand-Archive -LiteralPath ${quote(archive)} -DestinationPath ${quote(extracted)} -Force -ErrorAction Stop`
@@ -156,9 +179,15 @@ export function createVoiceHost(directory: string) {
         await rm(archive, { force: true })
       }
     }),
-    transcribe: (input: unknown): Promise<VoiceResult> => begin(async (signal) => {
+    transcribe: (input: unknown, requested?: unknown): Promise<VoiceResult> => begin(async (signal) => {
       if (!validVoiceWav(input)) return { ok: false, message: 'Voice typing needs a recording of at most one minute. Your message is unchanged.' }
-      if (!(await ready())) return { ok: false, message: 'Voice typing needs its checked files. Your message is unchanged; press the microphone to download them again.' }
+      const mode = await selected(requested)
+      if (mode === 'openai') {
+        if ((await options.store?.settings())?.openaiConsent !== true) return { ok: false, message: 'Allow sending audio to OpenAI at the microphone first. Your message is unchanged.' }
+        signal.throwIfAborted()
+        return transcribeOpenAI(input, await options.store?.key(), signal, options.openaiFetch)
+      }
+      if (!(await ready(mode))) return { ok: false, message: 'Voice typing needs its checked files. Your message is unchanged; press the microphone to download them again.' }
       signal.throwIfAborted()
       const temp = await mkdtemp(join(directory, 'recording-'))
       try {
@@ -166,7 +195,7 @@ export function createVoiceHost(directory: string) {
         const file = await open(wav, 'w')
         try { await file.writeFile(input) } finally { await file.close() }
         signal.throwIfAborted()
-        const text = await runVoiceCli(join(directory, 'whisper-cli.exe'), wav, join(directory, MODEL_NAME), { signal })
+        const text = await runVoiceCli(join(directory, 'whisper-cli.exe'), wav, join(directory, modelNameFor(mode)), { signal })
         signal.throwIfAborted()
         return { ok: true, text }
       } finally { await rm(temp, { recursive: true, force: true }) }

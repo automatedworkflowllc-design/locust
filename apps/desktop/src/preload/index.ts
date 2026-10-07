@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { VOICE_READY, VOICE_DOWNLOAD, VOICE_TRANSCRIBE, VOICE_CANCEL, VOICE_PROGRESS } from '../shared/voice.js'
+import { VOICE_READY, VOICE_DOWNLOAD, VOICE_TRANSCRIBE, VOICE_CANCEL, VOICE_PROGRESS, VOICE_SETTINGS_READ, VOICE_SETTINGS_SAVE, VOICE_OPENAI_CONSENT } from '../shared/voice.js'
 import { REMOTE_CONTROL_GET_CHANNEL, REMOTE_CONTROL_SET_CHANNEL, type RemoteControlState } from '../shared/claude-remote-control.js'
 import { FOLDER_CHANGES_CHANNEL, FOLDER_COMMIT_CHANNEL, type CommitResult, type FolderChanges } from '../shared/folder-commit.js'
 import {
@@ -373,9 +373,12 @@ export type {
 
 const desktopApi: DesktopApi = {
   voice: {
-    ready: () => ipcRenderer.invoke(VOICE_READY),
-    download: () => ipcRenderer.invoke(VOICE_DOWNLOAD),
-    transcribe: (wav) => ipcRenderer.invoke(VOICE_TRANSCRIBE, wav),
+    settings: () => ipcRenderer.invoke(VOICE_SETTINGS_READ),
+    saveSettings: (change) => ipcRenderer.invoke(VOICE_SETTINGS_SAVE, change),
+    allowOpenAI: () => ipcRenderer.invoke(VOICE_OPENAI_CONSENT),
+    ready: (mode) => ipcRenderer.invoke(VOICE_READY, mode),
+    download: (mode) => ipcRenderer.invoke(VOICE_DOWNLOAD, mode),
+    transcribe: (wav, mode) => ipcRenderer.invoke(VOICE_TRANSCRIBE, wav, mode),
     cancel: () => ipcRenderer.invoke(VOICE_CANCEL),
     onProgress: (listener) => {
       const receive = (_event: Electron.IpcRendererEvent, percent: number): void => { listener(percent) }

@@ -1,6 +1,7 @@
 # What Locust sends over the network
 
-Locust itself sends nothing about you or your work to anyone. It has no
+Locust sends no analytics or automatic uploads of your work. Optional OpenAI
+voice typing sends recordings only after you choose it and allow it. It has no
 analytics and no usage counts, and when it crashes, the crash dump stays on
 this machine (nothing is uploaded). The AI agents it runs
 connect to their own services, with the accounts you signed them in with:
@@ -22,6 +23,7 @@ until it is listed here.
 | The pet gallery | `openpets.dev`, addresses under `/pets/` only | When you open the gallery, and when you take a pet |
 | Testing one of your own models | the address you gave it in Settings > Your own models | When you press Test |
 | Voice typing's one-time files | `github.com/ggml-org/whisper.cpp`, `huggingface.co/ggerganov/whisper.cpp`, and their download CDNs | On Windows x64, only when you press Download in the microphone's first-use prompt |
+| OpenAI voice typing | `https://api.openai.com/v1/audio/transcriptions` | Only after choosing Your OpenAI account, saving your API key, allowing audio upload, and recording with the microphone |
 | A web page a teammate made, open in the preview | eight public hosts, for libraries and fonts only | While the page is open |
 
 **Its own updates.** A plain request for the files of the newest release in a
@@ -54,7 +56,9 @@ Nothing of your work is in either request. A teammate's runs on the model go
 through OpenCode, below.
 
 **Voice typing's one-time files.** Download retrieves the pinned Windows x64 CPU
-archive `b5454/whisper-bin-x64.zip` and the pinned `ggml-tiny.en-q5_1.bin` model
+archive `b5454/whisper-bin-x64.zip` and the selected pinned model:
+Fast's `ggml-tiny.en-q5_1.bin` (32,166,155 bytes) or Accurate's
+`ggml-base.en-q5_1.bin` (59,721,011 bytes). Both use
 revision `5359861c739e955e79d9a303bcbc70fb988958b1`, following their HTTPS download
 redirects. Every asset has a SHA-256 in the code. The checked runtime and model
 stay in this profile's `voice/` folder. No account, API key, recording, transcript,
@@ -63,6 +67,19 @@ including your IP address. No connection is made before Download, and local
 transcription makes no speech-service request. A cancelled download is restarted
 cleanly when you choose Download again. Audio files are transient, removed after
 transcription or cancellation; no recognition process is retained at rest.
+
+**OpenAI voice typing.** This is off by default. Settings > General says that
+audio goes to OpenAI; the first recording asks permission once. Main sends a
+multipart WAV, `model=gpt-4o-transcribe`, `language=en`, and `response_format=json`
+to `https://api.openai.com/v1/audio/transcriptions`, authenticated with the
+person's own API key. No redirects are followed. No draft, conversation, or
+project files are included. OpenAI API charges apply; a ChatGPT subscription
+does not include API usage. The saved key is encrypted by Windows for this
+account and never returned to the window or included in logs or profile backups.
+Only the transcript or a plain, sanitized error comes back to the window.
+Cancelling aborts the request and discards late text, but cannot recall audio
+already sent to OpenAI. No upload occurs before consent, no request is made at
+rest, and nothing falls back to OpenAI from either local choice.
 
 **A web page in the preview.** A page a teammate made runs inside Locust. It may
 load libraries, stylesheets and fonts -- GET and HEAD over https only -- from

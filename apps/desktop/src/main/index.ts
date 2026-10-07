@@ -9,7 +9,8 @@ import type { SavedWindow } from './window-bounds.js'
 import { app, BrowserWindow, crashReporter, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, powerSaveBlocker, protocol, safeStorage, screen, session, shell, Tray } from 'electron'
 import { createVoiceHost } from './voice-host.js'
 import { voicePermission } from './voice-permission.js'
-import { VOICE_READY, VOICE_DOWNLOAD, VOICE_TRANSCRIBE, VOICE_CANCEL, VOICE_PROGRESS } from '../shared/voice.js'
+import { VOICE_READY, VOICE_DOWNLOAD, VOICE_TRANSCRIBE, VOICE_CANCEL, VOICE_PROGRESS, VOICE_SETTINGS_READ, VOICE_SETTINGS_SAVE, VOICE_OPENAI_CONSENT } from '../shared/voice.js'
+import { createVoiceSettingsStore } from './voice-settings.js'
 import { createPageServer, fromPagePreview, pageMayReach, PAGE_SCHEME } from './page-preview.js'
 import { CANCEL_SCRIPT, captureRectOf, pageFrameOf, pickInFrame } from './page-pick.js'
 import { createRuntimeCommands } from './runtime-commands.js'
@@ -3528,16 +3529,28 @@ if (!ownsSingleInstanceLock) {
       && event.senderFrame.parent === null
 
     // Constructing the host starts no I/O, download, microphone, timer, or sidecar.
-    const voice = createVoiceHost(join(app.getPath('userData'), 'voice'))
+    const voiceSettings = createVoiceSettingsStore(app.getPath('userData'), {
+      available: () => safeStorage.isEncryptionAvailable(),
+      encrypt: (text) => safeStorage.encryptString(text),
+      decrypt: (bytes) => safeStorage.decryptString(bytes)
+    })
+    const voice = createVoiceHost(join(app.getPath('userData'), 'voice'), { store: voiceSettings })
     voiceForShutdown = voice
     const fromVoiceWindow = (event: Electron.IpcMainInvokeEvent): boolean =>
       fromOwnWindow(event) && BrowserWindow.fromWebContents(event.sender) === approvalWindow
     const voiceRefused = { ok: false, message: 'Voice typing could not start here. Your message is unchanged.' } as const
-    ipcMain.handle(VOICE_READY, (event) => fromVoiceWindow(event) ? voice.ready() : false)
-    ipcMain.handle(VOICE_DOWNLOAD, (event) => fromVoiceWindow(event) ? voice.download((percent) => {
+    ipcMain.handle(VOICE_SETTINGS_READ, (event) => fromVoiceWindow(event) ? voiceSettings.settings() : { mode: 'fast', hasKey: false, openaiConsent: false })
+    ipcMain.handle(VOICE_SETTINGS_SAVE, async (event, change: unknown) => {
+      if (!fromVoiceWindow(event)) return voiceRefused
+      await voice.cancel()
+      return voiceSettings.save(change)
+    })
+    ipcMain.handle(VOICE_OPENAI_CONSENT, (event) => fromVoiceWindow(event) ? voiceSettings.consent() : voiceRefused)
+    ipcMain.handle(VOICE_READY, (event, mode: unknown) => fromVoiceWindow(event) ? voice.ready(mode) : false)
+    ipcMain.handle(VOICE_DOWNLOAD, (event, mode: unknown) => fromVoiceWindow(event) ? voice.download((percent) => {
       if (!event.sender.isDestroyed()) event.sender.send(VOICE_PROGRESS, percent)
-    }) : voiceRefused)
-    ipcMain.handle(VOICE_TRANSCRIBE, (event, wav: unknown) => fromVoiceWindow(event) ? voice.transcribe(wav) : voiceRefused)
+    }, mode) : voiceRefused)
+    ipcMain.handle(VOICE_TRANSCRIBE, (event, wav: unknown, mode: unknown) => fromVoiceWindow(event) ? voice.transcribe(wav, mode) : voiceRefused)
     ipcMain.handle(VOICE_CANCEL, (event) => fromVoiceWindow(event) ? voice.cancel() : undefined)
 
     const teammatesUnavailable = {

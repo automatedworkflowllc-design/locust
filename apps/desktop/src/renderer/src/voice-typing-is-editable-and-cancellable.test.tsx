@@ -81,6 +81,32 @@ describe('voice typing is editable and cancellable', () => {
     await vi.waitFor(() => { expect(insert).toHaveBeenCalledExactlyOnceWith('Local words.') })
     expect(mocks.stop).toHaveBeenCalledTimes(1)
   })
+  it('a refused OpenAI key leaves the existing draft alone', async () => {
+    const bridge = api(); const insert = vi.fn()
+    bridge.settings = vi.fn(async () => ({ mode: 'openai' as const, hasKey: true, openaiConsent: true }))
+    bridge.transcribe = vi.fn(async () => ({ ok: false, message: 'OpenAI refused your API key. Your message is unchanged.' }))
+    const element = VoiceButton({ platform: 'win32', api: bridge, onText: insert })!
+    press(element)
+    await vi.waitFor(() => { expect(mocks.start).toHaveBeenCalled() })
+    press(element)
+    await vi.waitFor(() => { expect(bridge.transcribe).toHaveBeenCalled() })
+    await Promise.resolve()
+    expect(insert).not.toHaveBeenCalled()
+    expect(bridge.transcribe).toHaveBeenCalledWith(expect.any(Uint8Array), 'openai')
+    expect(bridge.ready).not.toHaveBeenCalled()
+  })
+  it('unconsented cloud and a missing key never open the microphone', async () => {
+    for (const hasKey of [false, true]) {
+      const bridge = api()
+      bridge.settings = vi.fn(async () => ({ mode: 'openai' as const, hasKey, openaiConsent: false }))
+      const element = VoiceButton({ platform: 'win32', api: bridge, onText: vi.fn() })!
+      press(element)
+      await vi.waitFor(() => { expect(bridge.settings).toHaveBeenCalled() })
+      await Promise.resolve(); await Promise.resolve()
+      expect(mocks.start).not.toHaveBeenCalled()
+      expect(bridge.transcribe).not.toHaveBeenCalled()
+    }
+  })
   it('inserts at the cursor, replaces a selection, and preserves surrounding edits', () => {
     expect(insertVoiceText('before  after', 'words', 7, 7, 8000)).toEqual({ text: 'before words after', cursor: 12 })
     expect(insertVoiceText('before old after', 'new', 7, 10, 8000)).toEqual({ text: 'before new after', cursor: 10 })

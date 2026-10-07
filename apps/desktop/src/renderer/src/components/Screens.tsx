@@ -4,6 +4,7 @@ import { boardSectionOf, teamBoard } from '../teamBoard.js'
 import { durationText, runSpanMs, usagePercent, usageWindowSentence } from '../missionView.js'
 import { WhatsNew } from './WhatsNew.js'
 import { RemoteControlSetting } from './RemoteControlSetting.js'
+import { VoiceSettings } from './VoiceSettings.js'
 import { SETTINGS_PAGES, matchedHeadings, pageMatches } from '../settingsPages.js'
 import { agentCapabilityHeading, agentCapabilityLines } from '../agentCapabilities.js'
 import { ConnectorHealth } from './ConnectorHealth.js'
@@ -2931,6 +2932,17 @@ export function SettingsScreen({
         )}
 
         {shownPage === 'app' && (
+        <section className="lc-settings__section lc-settings__section--line" data-setting="voice-typing">
+          <div className="lc-settingline">
+            <div className="lc-settingline__text">
+              <h2 className="lc-settings__heading">Voice typing</h2>
+              <p className="lc-settings__lede">Fast is local, with a 41 MB first-use download. Accurate is local, with a 69 MB first-use download, and is slower. Your OpenAI account sends audio to OpenAI using your API key; API charges apply.</p>
+            </div>
+            <VoiceSettings />
+          </div>
+        </section>
+        )}
+        {shownPage === 'app' && (
         <section className="lc-settings__section">
           <h2 className="lc-settings__heading">Startup</h2>
           <p className="lc-settings__lede">
@@ -3061,7 +3073,8 @@ export function SettingsScreen({
               installs the AI agents you ask it to and keeps Codex CLI and Copilot CLI current, reads the
               pet gallery when you open it, and asks the address of a model of your own about it when you
               press Test. Voice typing downloads its checked files only when you choose Download;
-              your recording stays on this computer. Each AI agent talks to its own service. A web page a teammate made
+              local recordings stay on this computer. If you choose Your OpenAI account and allow it, voice typing
+              sends recordings to api.openai.com using your API key. Each AI agent talks to its own service. A web page a teammate made
               may load libraries and fonts from the common public hosts and reach no other site, so what it
               reads in your folder cannot be sent anywhere. <NetworkListLink />
             </dd>

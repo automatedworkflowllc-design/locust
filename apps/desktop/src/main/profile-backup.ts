@@ -65,6 +65,7 @@ const NEVER_COPIED = new Set(['.writable'])
  */
 export const LEFT_OUT: Readonly<Record<string, string>> = {
   'own-models.json': 'your own model keys: Windows locks them to this account, so add them again after a restore',
+  'voice-settings.json': 'your voice API key and consent: Windows locks the key to this account, so choose voice typing again after a restore',
   'claude-cloud.json': 'cloud sessions, which belong to this machine and its sign-in',
   'cloud-tasks.json': 'cloud tasks, which belong to this machine and its sign-in',
   'brief-sessions.json': 'each agent\'s own session names, which do not carry to another machine',
