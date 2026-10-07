@@ -62,3 +62,22 @@ jobs:
             apps/desktop/release/*.dmg
           if-no-files-found: error
           retention-days: 7
+      # The Mac images are launched on a real Mac before they reach a release
+      # (2026-10-07). The private repository's mac-build did this; the public
+      # one built the images and never opened them. Minutes are free here.
+      # Launch the arm64 app, run one turn on a free OpenCode model, press
+      # Stop and check nothing it started is left (0.496); then install it in
+      # /Applications, offer it its own disk image as a newer version, press
+      # Restart and install, and check it comes back as the new copy (0.516).
+      # npm runs OpenCode's install script, which fetches its program, only when asked.
+      - name: Install OpenCode for the Mac launch check
+        if: runner.os == 'macOS'
+        run: npm install -g --allow-scripts=opencode-ai opencode-ai
+      - name: Launch, run and Stop on macOS
+        if: runner.os == 'macOS'
+        run: |
+          which opencode && opencode --version
+          node _smoke/mac-stop-smoke.mjs "apps/desktop/release/mac-arm64/Locust.app/Contents/MacOS/Locust"
+      - name: Update itself on macOS
+        if: runner.os == 'macOS'
+        run: node _smoke/mac-update-smoke.mjs apps/desktop/release/mac-arm64/Locust.app "$(ls apps/desktop/release/*-mac-arm64.dmg | head -1)"
