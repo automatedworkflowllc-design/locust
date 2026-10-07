@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.685.0 - 2026-10-07
+
+### Added
+
+- **Antigravity's plan usage on Home.** Antigravity's card now shows how much of your 5-hour and weekly limits is left for Gemini models, and when each resets. It also shows Claude and GPT models when those are lower. Locust reads it from Antigravity's own usage command, which costs no request and doesn't use your login. Claude Code and Codex already showed theirs; Cursor still offers no way to read it without your saved login, so Locust doesn't.
+
 ## 0.684.0 - 2026-10-07
 
 ### Added
