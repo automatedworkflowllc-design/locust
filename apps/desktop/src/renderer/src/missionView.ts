@@ -842,7 +842,7 @@ export function usageWindowSentence(said: string, now: Date = new Date()): strin
   let first = true
   const parts = windows.map((window) => {
     if (window.expired === true) return `the ${window.name} has reset since`
-    const text = `${String(window.percent)}% of the ${window.name}${first ? ' used' : ''}${window.resets === undefined ? '' : `, resets ${window.resets}`}`
+    const text = `${String(window.remaining ?? window.percent)}% of the ${window.name}${window.remaining === undefined ? (first ? ' used' : '') : ' left'}${window.resets === undefined ? '' : `, resets ${window.resets}`}`
     first = false
     return text
   })
@@ -854,6 +854,8 @@ export function usageWindowSentence(said: string, now: Date = new Date()): strin
 export interface UsageWindowReading {
   readonly name: string
   readonly percent: number
+  /** The runtime reported remaining quota; bars and warning tones still use consumption. */
+  readonly remaining?: number
   readonly resets?: string
   /** Its reset time has passed since the reading: what it said is no longer true (0.406). */
   readonly expired?: true
@@ -866,12 +868,14 @@ export interface UsageWindowReading {
 export function usageWindowsOf(said: string, now: Date = new Date()): readonly UsageWindowReading[] {
   // Read from the RAW reading, where a reset is still an instant: whether
   // it has passed is a comparison, and a clock time cannot be compared.
-  return [...said.matchAll(/([^·]+?) window (\d{1,3})% used(?: · resets ([^·]+?))?(?= · |$)/g)].map((match) => {
-    const reset = match[3]?.trim()
+  return [...said.matchAll(/([^·]+?) window (\d{1,3})% (used|left)(?: · resets ([^·]+?))?(?= · |$)/g)].map((match) => {
+    const reset = match[4]?.trim()
     const resetAt = reset === undefined ? Number.NaN : Date.parse(reset)
+    const value = Math.min(100, Number(match[2]))
     return {
       name: `${match[1]!.trim()} window`,
-      percent: Math.min(100, Number(match[2])),
+      percent: match[3] === 'left' ? 100 - value : value,
+      ...(match[3] === 'left' ? { remaining: value } : {}),
       ...(reset === undefined ? {} : { resets: usageWindowLabel(reset) }),
       ...(!Number.isNaN(resetAt) && resetAt <= now.getTime() ? { expired: true as const } : {})
     }

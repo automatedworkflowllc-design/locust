@@ -4,6 +4,7 @@ import type { MissionRuntimeId, RuntimeDiscovery } from '@teammate/runtime-adapt
 import type { PublicModel, ModelCatalogResponse } from '../shared/ipc.js'
 import { CLAUDE_ALIAS_DEFAULTS, CLAUDE_OLDER_MODELS, claudeModelName } from '../shared/claude-models.js'
 import type { AppServerRunProcess as AppServerProcess } from '@teammate/runtime-adapters'
+import { antigravityUsageText, readAntigravityUsage } from './antigravity-usage.js'
 
 /**
  * The model catalog.
@@ -499,11 +500,24 @@ export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {
       ...copilotModelsFrom(runtimes),
       ...antigravityModelsFrom(runtimes)
     ]
+    const antigravity = runtimes.find((entry) => entry.id === 'antigravity')
+    const usage = antigravity?.readiness === 'ready' && antigravity.executable?.commandName === 'agy'
+      ? readAntigravityUsage(antigravity.executable).then(antigravityUsageText).catch(() => undefined)
+      : Promise.resolve(undefined)
+    // Independent of Codex: a missing server or an older method loses no other reading.
+    const withUsage = async (response: ModelCatalogResponse): Promise<ModelCatalogResponse> => {
+      const reading = await usage
+      if (!response.ok || reading === undefined) return response
+      return { ...response, data: { ...response.data, usageWindows: {
+        ...response.data.usageWindows,
+        antigravity: `${reading} · as of ${new Date().toISOString()}`
+      } } }
+    }
     const codex = runtimes.find((entry) => entry.id === 'codex')
     if (codex?.readiness !== 'ready' || codex.executable === undefined) {
-      return advertisedModels.length > 0
+      return withUsage(advertisedModels.length > 0
         ? { ok: true, data: { models: withAccountDefaults(advertisedModels) } }
-        : { ok: false, error: { code: 'MODELS_UNAVAILABLE', message: 'Codex CLI is not ready.' } }
+        : { ok: false, error: { code: 'MODELS_UNAVAILABLE', message: 'Codex CLI is not ready.' } })
     }
 
     const child = options.spawn(codex.executable.executablePath, [
@@ -550,14 +564,14 @@ export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {
       } catch {
         // No reading, and nothing else lost.
       }
-      return { ok: true, data: { models, ...(usageWindows === undefined ? {} : { usageWindows }) } }
+      return withUsage({ ok: true, data: { models, ...(usageWindows === undefined ? {} : { usageWindows }) } })
     } catch {
-      return advertisedModels.length > 0
+      return withUsage(advertisedModels.length > 0
         ? { ok: true, data: { models: withAccountDefaults(advertisedModels) } }
         : {
             ok: false,
             error: { code: 'MODELS_UNAVAILABLE', message: 'The model list could not be read.' }
-          }
+          })
     } finally {
       // Always take the server down. This probe exists to answer one question.
       client.dispose('model catalog read finished')

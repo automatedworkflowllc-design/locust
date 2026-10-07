@@ -67,6 +67,30 @@ function messages(events: readonly NormalizedRuntimeEvent[]): ReadonlyMap<string
   return buffers;
 }
 
+describe("Cursor's final result carries per-run tokens", () => {
+  it("keeps input, output, cache read and cache write counts from the fixture", () => {
+    const { events } = run(fixture("result-with-cache-usage.jsonl"));
+    expect(events.at(-1)?.type).toBe("run.completed");
+    expect(events.at(-1)?.payload).toMatchObject({ usage: {
+      inputTokens: 120, outputTokens: 45, cacheReadTokens: 3000, cacheWriteTokens: 240,
+    } });
+  });
+  it("does not invent token counts when result usage is omitted", () => {
+    const { events } = run([JSON.stringify({ type: "result", subtype: "success", is_error: false })]);
+    expect(events.at(-1)?.type).toBe("run.completed");
+    expect(events.at(-1)?.payload).not.toHaveProperty("usage");
+  });
+  it("preserves explicit zero counts and drops nonnumeric values", () => {
+    const { events } = run([JSON.stringify({ type: "result", subtype: "success", usage: {
+      inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, extra: "not a token count",
+    } })]);
+    expect(events.at(-1)?.payload).toMatchObject({ usage: {
+      inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0,
+    } });
+    expect((events.at(-1)?.payload as { usage?: Record<string, number> }).usage).not.toHaveProperty("extra");
+  });
+});
+
 describe("a read-only Cursor run with partial output, as captured", () => {
   const { cursor, events } = run(fixture("read-only-partial.jsonl"));
 

@@ -60,7 +60,7 @@ export function AgentMark({ runtime, name, state, usage, now = new Date() }: Age
           return (
             <span className={`lc-agentcard__window${tone}`} key={window.name}>
               <span className="lc-agentcard__label">{window.name.charAt(0).toUpperCase() + window.name.slice(1)}</span>
-              <span className="lc-agentcard__percent">{window.percent}%</span>
+              <span className="lc-agentcard__percent">{window.remaining ?? window.percent}%{window.remaining === undefined ? '' : ' left'}</span>
               <span className="lc-agentcard__bar">
                 <span className="lc-agentcard__fill" style={{ width: `${String(window.percent)}%` }} />
               </span>
