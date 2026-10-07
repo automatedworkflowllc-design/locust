@@ -397,7 +397,7 @@ import { isOutboundLink, isWebLink } from '../shared/outbound-links.js'
 import { feedbackUrl, reportFileText, supportMailtoUrl } from './report-problem.js'
 import { TESTER_LANE, updateLaneFrom } from './update-lane.js'
 import { createCursorConnectorKeeper } from './cursor-connector-allow.js'
-import { cursorConfiguredConnectorNames, cursorReadyConnectors } from './cursor-connector-notice.js'
+import { cursorConfiguredConnectorNames, cursorReadyConnectors, warmCursorConnectors } from './cursor-connector-notice.js'
 import { pruneMissionRecords, readStorageReport } from './retention.js'
 import { applyPendingRestore, countProfile, readBackup, requestRestore, takeLastRestore, writeBackup, type RestoreOutcome } from './profile-backup.js'
 import { oneAtATime } from './one-at-a-time.js'
@@ -795,6 +795,8 @@ const discoverForWork = (): Promise<readonly RuntimeDiscovery[]> => {
       const ready = value.filter((runtime) => runtime.readiness === 'ready').length
       const needsYou = value.filter((runtime) => runtime.readiness === 'authentication-required').length
       discoveryLog.emit({ kind: 'finished', at: Date.now(), ready, needsYou })
+      // Cursor's connectors, read once in the background (0.692): its first turn need not wait 3-4 s for them.
+      if (value.some((runtime) => runtime.id === 'cursor' && runtime.readiness === 'ready')) warmCursorConnectors()
       return value
     })
     .finally(() => {

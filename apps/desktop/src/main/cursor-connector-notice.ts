@@ -35,6 +35,8 @@ const TTL_MS = 5 * 60_000
 const TIMEOUT_MS = 8_000
 
 let held: { readonly at: number; readonly text: string } | undefined
+/** The one reading under way, shared by everyone who asks while it runs. */
+let refreshing: Promise<string | undefined> | undefined
 
 /** The listing, or undefined when Cursor could not be asked -- which is not "none". */
 export type McpLister = () => Promise<string | undefined>
@@ -94,15 +96,44 @@ const runCursorMcpList: McpLister = async () => {
  * across missions, because the answer is about the machine rather than the
  * run.
  */
-/** The reading itself, held across missions: it is about the machine. */
+/**
+ * The reading itself, held across missions: it is about the machine.
+ *
+ * NEVER IN A TURN'S WAY ONCE READ (0.692). `cursor-agent mcp list` takes 3-4 s
+ * (measured 2026-10-07), and a reading older than five minutes made the next
+ * Cursor turn wait for a new one -- most turns, since they are rarely five
+ * minutes apart: Cursor's briefing took a median 5.1 s of Colin's starts, where
+ * every other agent's took 0.2-0.5 s. Now an old reading answers at once and a
+ * new one is read behind it; only a machine that has never been read waits,
+ * and `warmCursorConnectors` reads it when Cursor is found, before any turn.
+ * A connector signed in a moment ago is named one turn later, at worst.
+ */
 async function cachedList(lister: McpLister, now: () => number): Promise<string> {
-  const at = now()
-  if (held !== undefined && at - held.at < TTL_MS) return held.text
-  const text = await lister()
+  if (held !== undefined) {
+    if (now() - held.at >= TTL_MS && refreshing === undefined) void refresh(lister, now)
+    return held.text
+  }
+  const text = await (refreshing ?? refresh(lister, now))
   // Only an answer is held; the callers read a throw as "say nothing".
   if (text === undefined) throw new Error('Cursor could not be asked about its connectors')
-  held = { at, text }
   return text
+}
+
+function refresh(lister: McpLister, now: () => number): Promise<string | undefined> {
+  const reading = lister()
+    .catch(() => undefined)
+    .then((text) => {
+      if (text !== undefined) held = { at: now(), text }
+      return text
+    })
+    .finally(() => { if (refreshing === reading) refreshing = undefined })
+  refreshing = reading
+  return reading
+}
+
+/** Read Cursor's connectors now, in the background, so the first turn finds them read. */
+export function warmCursorConnectors(lister: McpLister = runCursorMcpList, now: () => number = Date.now): void {
+  if (held === undefined && refreshing === undefined) void refresh(lister, now)
 }
 
 export async function cursorConnectorsNeedingLogin(
@@ -122,6 +153,7 @@ export async function cursorConnectorsNeedingLogin(
 /** Test seam: forget the held reading. */
 export function forgetCursorConnectorReading(): void {
   held = undefined
+  refreshing = undefined
 }
 
 /**
