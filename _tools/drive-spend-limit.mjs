@@ -175,7 +175,7 @@ try {
   const team = await drive.capture('the Team screen: this month, against the limit', () => drive.evaluate(teamScreen))
   // "This month" is drawn in capitals by the stylesheet; innerText reads it so.
   verdicts.push(`card: ${/Wren: Limit reached \$0\.02 of \$0\.01 \[amber\]/i.test(team) && /Juno: This month \$1\.50/i.test(team) ? 'PASS' : 'FAIL'}`)
-  verdicts.push(`unpriced: ${/Ivy: This month \$0\.00 of \$5\.00 1 run with no price/i.test(team) && /\[unpriced line: [0-9]+ px tall, why: A model of your own reports no price/i.test(team) ? 'PASS' : 'FAIL'}`)
+  verdicts.push(`unpriced: ${/Ivy: This month \$0\.00 of \$5\.00 1 run with no price/i.test(team) && /\[unpriced line: 1[0-9] px tall, amount 1[0-9] px tall, why: A model of your own reports no price/i.test(team) ? 'PASS' : 'FAIL'}`)
   await drive.capture('open Wren', () => drive.evaluate(openWren))
   const refused = await drive.capture('a message to Wren is refused, with the limit in its own words', async () => {
     const sent = await drive.evaluate(sendAndWaitScript('Say OK.', { settle: false }))
