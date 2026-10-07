@@ -1255,7 +1255,7 @@ onResume,
     return (
       <>
         {words !== undefined && <div className="lc-bubble">{words}{edit}</div>}
-        {notes.length > 0 && <SentNotes notes={notes} edited={edited?.()} />}
+        {notes.length > 0 && <SentNotes notes={notes} edited={edited?.()} workspacePath={workspacePath} />}
         {attached.length > 0 && (
           <div className="lc-sentfiles">
             {attached.map((path) => (

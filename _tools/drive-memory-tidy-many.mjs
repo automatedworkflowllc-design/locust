@@ -128,7 +128,9 @@ const SCREEN = `(async () => {
   return JSON.stringify({
     meta: (document.querySelector('.lc-screen__meta')?.textContent ?? '').trim(),
     notice: (document.querySelector('.lc-memory__notice')?.innerText ?? '').replace(/\\s+/g, ' ').trim(),
-    nudge: [...document.querySelectorAll('.lc-memoryform__row .lc-settings__note')].map((note) => note.innerText.trim()).join(' / '),
+    // CHANGELOG 0.423.0: "A note at the top of the Memory screen". Its empty save-status
+    // note precedes the tidy nudge; empty status slots are not nudge text.
+    nudge: [...document.querySelectorAll('.lc-memoryform__row .lc-settings__note')].map((note) => note.innerText.trim()).filter(Boolean).join(' / '),
     waiting,
     firstSection: (document.querySelector('.lc-screen__scroll .lc-settings__heading')?.textContent ?? '').trim()
   })

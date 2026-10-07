@@ -60,7 +60,12 @@ const ask = (text) => drive.evaluate(`(async () => {
     if (i > 6 && !document.querySelector('button[aria-label^="Stop the running"]')) break
   }
   await new Promise((r) => setTimeout(r, 1500))
-  return document.querySelector('.lc-thread')?.innerText.replace(/\\s+/g, ' ').slice(-2000) ?? ''
+  // CHANGELOG 0.34.0: "The fold's one line is now a trace." The clock, steps and tool counts
+  // follow the answer; they are not words the teammate wrote. Test the answer's ending, not the footer.
+  return JSON.stringify({
+    thread: document.querySelector('.lc-thread')?.innerText.replace(/\\s+/g, ' ').slice(-2000) ?? '',
+    reply: [...document.querySelectorAll('.lc-thread .lc-agentline__body')].at(-1)?.innerText.trim() ?? ''
+  })
 })()`)
 try {
   await drive.ready()
@@ -70,8 +75,8 @@ try {
   check('the Memory screen has an About you card, and saving says so', wrote.card && /^Save$/.test(wrote.button) && /Saved/.test(wrote.status), JSON.stringify(wrote))
 
   await drive.evaluate(openTeammateScript('Ada'))
-  const first = String(await drive.capture('Ada, with the note', () => ask('Say hello in one short sentence.')))
-  check('with memory off, Ada is still given the note: her reply ends with CRUMB', /CRUMB\W*$/.test(first), first.slice(-120))
+  const first = JSON.parse(String(await drive.capture('Ada, with the note', () => ask('Say hello in one short sentence.'))))
+  check('with memory off, Ada is still given the note: her reply ends with CRUMB', /CRUMB\W*$/.test(first.reply), first.reply.slice(-120))
 
   const removed = JSON.parse(String(await drive.capture('Memory: About you, removed', () => note(''))))
   check('emptying it offers Remove, and says teammates no longer get it', removed.button === 'Remove' && /Removed/.test(removed.status), JSON.stringify(removed))
@@ -79,9 +84,9 @@ try {
   // A new conversation, so nothing of the first is in its history: from
   // Home, where the message box starts one with the only teammate.
   await drive.evaluate(`(async () => { document.querySelector('.lc-brand__lockup')?.click(); await new Promise((r) => setTimeout(r, 900)) })()`)
-  const second = String(await drive.capture('Ada, after the note is removed', () => ask('Say hello in one short sentence.')))
-  const asked = (second.match(/Say hello in one short sentence/g) ?? []).length
-  check('with the note removed, a new conversation has no CRUMB', asked === 1 && !/CRUMB/.test(second), `${String(asked)} question(s) in view || ${second.slice(-120)}`)
+  const second = JSON.parse(String(await drive.capture('Ada, after the note is removed', () => ask('Say hello in one short sentence.'))))
+  const asked = (second.thread.match(/Say hello in one short sentence/g) ?? []).length
+  check('with the note removed, a new conversation has no CRUMB', asked === 1 && second.reply.length > 0 && !/CRUMB/.test(second.thread), `${String(asked)} question(s) in view || ${second.reply.slice(-120)}`)
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

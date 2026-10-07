@@ -15,7 +15,7 @@
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
-import { homedir, tmpdir } from 'node:os'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { recordRoot, say, sleep, startDrive } from './drive-lib.mjs'
@@ -30,15 +30,17 @@ await mkdir(OUT, { recursive: true })
 // Not a git project: a plain folder, the way Documents\Locust starts.
 const workspace = await mkdtemp(join(tmpdir(), 'locust-drive-build-compare-ws-'))
 await writeFile(join(workspace, 'notes.md'), 'My folder.\n', 'utf8')
-const COPIES = join(homedir(), '.locust', 'compare')
-const copiesNow = () => (existsSync(COPIES) ? readdirSync(COPIES) : [])
-const before = new Set(copiesNow())
 
 const drive = await startDrive({
   name: `build-and-compare-${tag}`, port: 9783, workspace, outPath: OUT,
   ...(packaged === undefined ? {} : { packaged }),
   seed: { schemaVersion: 1, teammates: [], missionOwners: {}, settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: false } }
 })
+// CHANGELOG 0.493.0: "The copies now live outside your folder entirely." The drive's
+// launch isolates that outside root under its own profile, not the person's home directory.
+const COPIES = process.env.LOCUST_COMPARE_ROOT?.trim() || join(drive.profile, 'compare')
+const copiesNow = () => (existsSync(COPIES) ? readdirSync(COPIES) : [])
+const before = new Set(copiesNow())
 let failures = 0
 const check = (what, ok, detail) => {
   if (!ok) failures += 1

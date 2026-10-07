@@ -23,8 +23,6 @@ import { recordRoot, say, scratchRepository, sleep, startDrive } from './drive-l
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const tag = arg('--tag') ?? 'local'
-// one compare per launch: the compare screen hides the conversation list, so a
-// second open cannot find the other row (titles came back empty).
 const only = arg('--columns') ?? 'both'
 const packaged = arg('--packaged')
 const LONG = 'Final regression playthroughs across classes and layouts'
@@ -160,6 +158,11 @@ try {
   if (only === 'both' || only === '2') jobs.push([2, 'two models', 'two'])
   if (only === 'both' || only === '3') jobs.push([3, 'three models', 'three'])
   for (const [wantCells, needle, label] of jobs) {
+    // CHANGELOG 0.414.0: "In a narrow window, where the sidebar becomes a strip of
+    // faces and its search box is hidden". Restore the wide conversation
+    // list after the previous 1000px frame before opening the next fixture.
+    await drive.resize(1200, 780)
+    await sleep(400)
     const opened = await drive.capture(`open ${label}-column compare`, () => openByNeedle(needle))
     say(`  opened ${label}: ${JSON.stringify(opened)}`)
     if (!opened.compare || opened.cells !== wantCells) failures += 1

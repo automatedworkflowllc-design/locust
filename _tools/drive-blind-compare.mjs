@@ -13,7 +13,7 @@
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { recordRoot, say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
+import { comparePick, comparePickScript, recordRoot, say, scratchRepository, sleep, startDrive } from './drive-lib.mjs'
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
@@ -49,22 +49,34 @@ const OPEN_PICKER = `(async () => {
   await new Promise((r) => setTimeout(r, 700))
   return 'open'
 })()`
-const ROWS = `JSON.stringify(Object.fromEntries(${JSON.stringify(PICKS)}.map((want) => [want, [...document.querySelectorAll('.lc-picker__row:not(.is-recent)')].find((one) => one.querySelector('.lc-picker__label')?.textContent.trim() === want)?.querySelector('.lc-picker__detail')?.textContent.trim() ?? ''])))`
+// CHANGELOG 0.196.0: "The model picker reads as names." Search each model separately so a
+// virtualized row is drawn, and match its display name rather than its internal id.
+const ROWS = `(async () => {
+  const records = {}
+  for (const [id, pick] of ${JSON.stringify(PICKS.map(id => [id, comparePick(id)]))}) {
+    const box = document.querySelector('.lc-picker__input')
+    if (!box) return JSON.stringify(records)
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(box, pick.search)
+    box.dispatchEvent(new Event('input', { bubbles: true }))
+    await new Promise(r => setTimeout(r, 500))
+    const wanted = new RegExp(pick.row, 'i')
+    records[id] = [...document.querySelectorAll('.lc-picker__row:not(.is-recent)')].find(one => wanted.test(one.querySelector('.lc-picker__label')?.textContent ?? ''))?.querySelector('.lc-picker__detail')?.textContent.trim() ?? ''
+  }
+  return JSON.stringify(records)
+})()`
 
 try {
   await drive.ready()
   await drive.resize(1440, 900)
   await sleep(4000)
   await drive.evaluate(OPEN_PICKER)
+  const labels = []
+  for (const [index, id] of PICKS.entries()) {
+    const got = JSON.parse(String(await drive.evaluate(comparePickScript(index, comparePick(id)))))
+    if (got.picked) labels.push(got.label)
+    else say(`  pick ${id}: ${got.why}`)
+  }
   const picked = JSON.parse(String(await drive.capture('Two free models ticked, names hidden', () => drive.evaluate(`(async () => {
-    const labels = []
-    for (const want of ${JSON.stringify(PICKS)}) {
-      const row = [...document.querySelectorAll('.lc-picker__row:not(.is-recent)')].find((one) => !one.disabled && one.querySelector('.lc-picker__label')?.textContent.trim() === want)
-      if (!row) continue
-      row.click()
-      labels.push(want)
-      await new Promise((r) => setTimeout(r, 250))
-    }
     // Blind is a chat mode (0.451): the chip, then Blind. The picks are kept.
     ;[...document.querySelectorAll('.lc-picker__foot--compare button')].find((b) => b.textContent.trim() === 'Done')?.click()
     await new Promise((r) => setTimeout(r, 400))
@@ -73,7 +85,7 @@ try {
     ;[...document.querySelectorAll('.lc-menu[aria-label="Direct or compare"] .lc-menu__item')].find((item) => item.querySelector('.lc-menu__name')?.textContent.trim() === 'Blind')?.click()
     await new Promise((r) => setTimeout(r, 400))
     const mode = document.querySelector('.lc-control--chatmode')?.getAttribute('aria-label') ?? ''
-    return JSON.stringify({ labels, blind: mode === 'Chat mode: Blind' ? 'true' : mode, chip: document.querySelector('.lc-control--chatmode')?.innerText.trim() ?? '' })
+    return JSON.stringify({ labels: ${JSON.stringify(labels)}, blind: mode === 'Chat mode: Blind' ? 'true' : mode, chip: document.querySelector('.lc-control--chatmode')?.innerText.trim() ?? '' })
   })()`))))
   say(`  picked: ${JSON.stringify(picked)}`)
   check('two free models, and the chat mode chip on Blind', picked.labels.length === 2 && picked.blind === 'true', JSON.stringify(picked))
@@ -119,9 +131,9 @@ try {
     })
   })()`))))
   say(`  revealed: ${JSON.stringify(revealed)}`)
-  const names = ['Nemotron 3 Ultra Free', 'Mimo V2.6 Flash Free']
-  check('once kept, the conversation and the comparison name both models', /^Compared with (Nemotron 3 Ultra Free|Mimo V2\.6 Flash Free)\./.test(revealed.compared) && revealed.heads.length === 2 && revealed.heads.every((head) => names.includes(head)) && /^You kept (Nemotron 3 Ultra Free|Mimo V2\.6 Flash Free)/.test(revealed.bar), JSON.stringify(revealed))
-  const keptName = /^You kept (.+?);/.exec(revealed.bar)?.[1]
+  const names = picked.labels
+  check('once kept, the conversation and the comparison name both models', names.length === 2 && names.some(name => revealed.compared.startsWith(`Compared with ${name}`)) && revealed.heads.length === 2 && revealed.heads.every(head => names.includes(head.split(' · ')[0])) && names.some(name => revealed.bar.startsWith(`You kept ${name}`)), JSON.stringify(revealed))
+  const keptName = /^You kept (.+?);/.exec(revealed.bar)?.[1]?.split(' · ')[0]
 
   await drive.evaluate(`document.querySelector('.lc-compare__bar .lc-button')?.click()`)
   await sleep(800)
@@ -130,7 +142,7 @@ try {
   await drive.evaluate(OPEN_PICKER)
   const record = JSON.parse(String(await drive.capture('Compare again: each model shows its record', () => drive.evaluate(ROWS))))
   say(`  record: ${JSON.stringify(record)} kept=${String(keptName)}`)
-  const labelOf = (name) => (name === 'Nemotron 3 Ultra Free' ? 'nemotron-3-ultra-free' : 'mimo-v2.6-flash-free')
+  const labelOf = (name) => PICKS[names.indexOf(name)]
   const other = names.find((name) => name !== keptName)
   check('the picker shows each model its record: the kept one 1 of 1, the other 0 of 1', keptName !== undefined && record[labelOf(keptName)] === 'kept 1 of 1' && record[labelOf(other)] === 'kept 0 of 1', JSON.stringify(record))
 } catch (error) {

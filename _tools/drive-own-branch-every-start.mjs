@@ -70,11 +70,14 @@ try {
   })()`)))
   check('Run was pressed', run === 'pressed', run)
   await sleep(8000)
-  const notice = String(await drive.evaluate(`[...document.querySelectorAll('.lc-screen [role="alert"], .lc-screen .lc-claim')].map((el) => el.textContent.trim()).find((text) => /^Not run:/.test(text)) ?? 'nothing'`))
+  // CHANGELOG 0.239.0: "that sentence is what the card shows." Match the
+  // actual branch refusal, not the old "Not run:" wrapper; still require
+  // both the refusal reason and zero missions in the shared folder.
+  const notice = String(await drive.evaluate(`[...document.querySelectorAll('.lc-screen [role="alert"], .lc-screen .lc-claim')].map((el) => el.textContent.trim()).find((text) => /own branch/i.test(text) && /not a git repository/i.test(text)) ?? 'nothing'`))
   await drive.capture('what the Team screen says', () => drive.evaluate(`document.querySelector('.lc-screen')?.innerText.slice(0, 500) ?? ''`))
   const recorded = await missions()
   say(`  missions recorded: ${String(recorded.length)}`)
-  check('the Team screen says the branch could not be made', /^Not run:/.test(notice) && /own branch/i.test(notice), notice)
+  check('the Team screen says the branch could not be made', /own branch/i.test(notice) && /not a git repository/i.test(notice), notice)
   check('no mission was started in the shared folder', recorded.length === 0, `${String(recorded.length)} recorded`)
   say(failures === 0 ? '\nOWN BRANCH EVERY START PASSED' : `\nOWN BRANCH EVERY START: ${String(failures)} FAILED`)
 } catch (error) {

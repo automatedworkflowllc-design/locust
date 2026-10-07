@@ -3,6 +3,7 @@ import type { ReactElement } from 'react'
 import { noteOutcome, noteOutcomeWords } from '../diffNotes.js'
 import type { SentDiffNote } from '../diffNotes.js'
 import type { DiffFile } from '../diff.js'
+import { displayPath } from '../missionView.js'
 
 /**
  * THE NOTES A MESSAGE CARRIED, AND WHAT BECAME OF EACH (0.395, Orca's #5).
@@ -16,7 +17,7 @@ import type { DiffFile } from '../diff.js'
  * `edited` is undefined while the turn is still going: no outcome is said
  * about work that is not finished.
  */
-export function SentNotes({ notes, edited }: { readonly notes: readonly SentDiffNote[]; readonly edited: readonly DiffFile[] | undefined }): ReactElement {
+export function SentNotes({ notes, edited, workspacePath }: { readonly notes: readonly SentDiffNote[]; readonly edited: readonly DiffFile[] | undefined; readonly workspacePath?: string | undefined }): ReactElement {
   return (
     <div className="lc-sentnotes" aria-label={`${String(notes.length)} ${notes.length === 1 ? 'note' : 'notes'} on the changes`}>
       {notes.map((note, index) => {
@@ -24,8 +25,8 @@ export function SentNotes({ notes, edited }: { readonly notes: readonly SentDiff
         return (
           <div className="lc-sentnote" key={`${note.path}:${String(note.line ?? '')}:${String(index)}`}>
             <div className="lc-sentnote__head">
-              <span className="lc-sentnote__place lc-mono">
-                {note.path}
+              <span className="lc-sentnote__place lc-mono" title={note.path}>
+                {displayPath(note.path, workspacePath)}
                 {note.line === undefined ? '' : `:${String(note.line)}`}
               </span>
               {outcome !== undefined && (

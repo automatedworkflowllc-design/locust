@@ -53,7 +53,7 @@ const faces = `(async () => {
     for (let i = 3; i < data.length; i += 4) { if (data[i] >= 230) solid += 1; else if (data[i] > 12) soft += 1 }
     if (solid === 0) continue
     // The canvas is the bot's size times the rig's overscan (BOT_AVATAR_OVERSCAN, 1.5).
-    out.push({ material: canvas.dataset.material, size: Math.round(box.width / 1.5), soft: Math.round((soft / solid) * 1000) / 10 })
+    out.push({ material: canvas.dataset.material, size: Math.round(box.width / 1.5), soft: Math.round((soft / solid) * 1000) / 10, teammate: canvas.closest('[data-teammate]')?.dataset.teammate, sidebar: !!canvas.closest('.lc-sidebar') })
   }
   return JSON.stringify(out)
 })()`
@@ -91,7 +91,8 @@ const summary = (list) => {
     short: by('plush-short').map((f) => f.size),
     full: by('plush').map((f) => f.size),
     softPlastic: median(by('plastic').map((f) => f.soft)),
-    softPlush: median(plush.map((f) => f.soft))
+    softPlush: median(plush.map((f) => f.soft)),
+    wrenSoft: list.find(f => f.sidebar && f.teammate === 'tm_wren')?.soft ?? 0
   }
 }
 
@@ -103,7 +104,7 @@ try {
   await drive.resize(1440, 900)
   await sleep(1500)
   const first = summary(JSON.parse(String(await drive.capture('Off by default: every bot plastic', () => drive.evaluate(faces)))))
-  plasticSoft = first.softPlastic
+  plasticSoft = first.wrenSoft
   check('off by default: every bot is drawn in plastic', first.plush === 0 && first.plastic >= 4, JSON.stringify(first))
   const row = JSON.parse(String(await drive.capture('Settings > Appearance: Plush', () => drive.evaluate(openAppearance))))
   check('Settings > Appearance has Plush, Off', row.row && row.on === 'Off' && /plastic/.test(row.lede), JSON.stringify(row))
@@ -111,7 +112,11 @@ try {
   check('On is taken', on === 'On', on)
   const after = summary(JSON.parse(String(await drive.capture('On: the preview and sidebar, in fur', () => drive.evaluate(faces)))))
   check('on: every bot is plush at once, the small ones in the short pile', after.plastic === 0 && after.plush >= 4 && after.short.every((size) => size < 40) && after.full.every((size) => size >= 40), JSON.stringify(after))
-  check('and it is fur you can see: a softer edge than the plastic had', after.softPlush > plasticSoft * 1.5, `plastic ${String(plasticSoft)} vs plush ${String(after.softPlush)}`)
+  // CHANGELOG 0.577.0: "the fur is a shorter, combed pile" at sidebar size.
+  // Compare the same seeded bot at the same size, not medians across Home's
+  // cards and Settings' different preview shapes and sizes. All bots' material
+  // and the short/full size boundary are still checked above.
+  check('the same sidebar bot has a visibly softer fur edge than its plastic had', plasticSoft > 0 && after.wrenSoft > plasticSoft * 1.5, `plastic ${String(plasticSoft)} vs plush ${String(after.wrenSoft)}`)
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
