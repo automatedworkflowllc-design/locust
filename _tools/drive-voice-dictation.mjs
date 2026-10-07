@@ -131,7 +131,9 @@ try {
     await drive.evaluate(`document.querySelector('[aria-label="Home"]').click()`)
     await wait(`!!document.querySelector('[aria-label="Voice typing"]')`)
   }
-  await wait(`!document.querySelector('.lc-cover') || !!document.querySelector('.lc-cover.is-paused')`, 60)
+  // Home rests 45 s after the LAST input, and the OpenAI steps type and click until just before here:
+  // 60 s ran out once on a busy machine (0.688's third Accurate run), with Home resting in the two before.
+  await wait(`!document.querySelector('.lc-cover') || !!document.querySelector('.lc-cover.is-paused')`, 90)
   check('Home naturally rests while the app stays focused', await drive.evaluate(`document.hasFocus() && (!document.querySelector('.lc-cover') || !!document.querySelector('.lc-cover.is-paused'))`))
   const afterCpu = await idleCpu()
   measurements.afterFocusedCpu = afterCpu

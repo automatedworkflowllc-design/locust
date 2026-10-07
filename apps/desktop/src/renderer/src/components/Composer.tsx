@@ -62,8 +62,10 @@ import type { VoiceState } from '../voiceLevel.js'
  * The microphone's level as the glow reads it. The meter is raw RMS, and ordinary speech sits around 0.05-0.2 of it;
  * the glow is drawn for 0..1 with speech near the top. A square root (loudness as heard) brings speech up without
  * making silence glow. Measured 2026-10-07 on the drive's spoken clip: a faint haze at raw RMS.
+ * 0.689: x2.5, not x2. Colin's raised voice reached only half the box. The ceiling is unchanged, so it
+ * still never climbs higher over the chips; it gets there with less voice.
  */
-const glowLevel = (): number => Math.min(1, Math.sqrt(voiceLevel.get()) * 2)
+const glowLevel = (): number => Math.min(1, Math.sqrt(voiceLevel.get()) * 2.5)
 import { insertVoiceText } from '../../../shared/voice-pcm.js'
 
 const MAX_PROMPT_LENGTH = 8_000
