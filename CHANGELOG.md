@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.694.0 - 2026-10-07
+
+### Fixed
+
+- **Claude Code's own commands are back in the / menu.** Since a recent Claude Code update, it no longer lists its commands until the app talking to it says hello first. Locust kept waiting, gave up, and a Claude teammate's / menu showed only Locust's own commands until a turn had run. Locust now says hello the way Claude's own tools do, which starts no turn and spends nothing, and the menu lists Claude Code's commands from the start.
+
 ## 0.693.0 - 2026-10-07
 
 ### Fixed
