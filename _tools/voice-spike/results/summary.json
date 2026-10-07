@@ -1,0 +1,118 @@
+{
+  "payload_files": [
+    {
+      "name": "ggml-base.dll",
+      "bytes": 693248,
+      "sha256": "bede0d6b2d387236ecd2b5dd676d51c8984b5b6e0ae461a12174e9c01345c5f0"
+    },
+    {
+      "name": "ggml-cpu-haswell.dll",
+      "bytes": 1010688,
+      "sha256": "1306b1014c8118d27234d8ddc0e66ced1f8c8476bf85071595fd182ea9b7263b"
+    },
+    {
+      "name": "ggml-cpu-x64.dll",
+      "bytes": 866816,
+      "sha256": "4b4b05caba40d4309b5d710ef74c59ba190516b8489f27bdb1ba11ae33c6e9d3"
+    },
+    {
+      "name": "ggml.dll",
+      "bytes": 62464,
+      "sha256": "31fe18616d872af9b6134b47a6dff8072ae4ecbe5df0273f4f8dc36766c9db8e"
+    },
+    {
+      "name": "whisper-cli.exe",
+      "bytes": 479744,
+      "sha256": "331dba46d6427105d2b802cdbc7eae916ea1c5abf9b0d3b5cfe460d8db8e4366"
+    },
+    {
+      "name": "whisper.dll",
+      "bytes": 1370112,
+      "sha256": "034396d75bb5720c1851674ff64a96192b58f6927b68d334ebd254ce6cad9674"
+    },
+    {
+      "name": "ggml-tiny.en-q5_1.bin",
+      "bytes": 32166155,
+      "sha256": "c77c5766f1cef09b6b7d47f21b546cbddd4157886b3b5d6d4f709e91e66c7c2b"
+    }
+  ],
+  "whisper_payload_bytes": 36649227,
+  "deflate_zip_proxy_bytes_NOT_nsis_delta": 30817784,
+  "sapi_exe_bytes": 6144,
+  "engines": {
+    "sapi": {
+      "first_text_ms": {
+        "median": 1521.0742999915965,
+        "min": 1233.2912999991095,
+        "max": 2211.4129999972647
+      },
+      "total_ms": {
+        "median": 1565.8502000005683,
+        "min": 1273.8141999871004,
+        "max": 2291.5472999884514
+      },
+      "average_cpu_percent_machine": {
+        "median": 5.488232526966424,
+        "min": 5.227545015862006,
+        "max": 7.870882320803299
+      },
+      "peak_cpu_percent_machine": {
+        "median": 9.077776354298337,
+        "min": 8.573097897775732,
+        "max": 10.631787900292158
+      },
+      "peak_working_set_bytes": {
+        "median": 106188800,
+        "min": 106156032,
+        "max": 106389504
+      },
+      "peak_commit_bytes": {
+        "median": 44175360,
+        "min": 43642880,
+        "max": 44183552
+      },
+      "host_average_cpu_percent": {
+        "median": 66.91253951527925,
+        "min": 61.16838487972509,
+        "max": 97.00704225352112
+      }
+    },
+    "whisper": {
+      "first_text_ms": {
+        "median": 3074.479599992628,
+        "min": 3014.9308999971254,
+        "max": 3688.6083999997936
+      },
+      "total_ms": {
+        "median": 3161.1912999942433,
+        "min": 3049.012399991625,
+        "max": 3803.228600008879
+      },
+      "average_cpu_percent_machine": {
+        "median": 10.626927260005168,
+        "min": 9.243790920145564,
+        "max": 10.761681389059005
+      },
+      "peak_cpu_percent_machine": {
+        "median": 18.59281485714809,
+        "min": 17.51681053185587,
+        "max": 21.249637339729798
+      },
+      "peak_working_set_bytes": {
+        "median": 152678400,
+        "min": 152666112,
+        "max": 152694784
+      },
+      "peak_commit_bytes": {
+        "median": 665915392,
+        "min": 665817088,
+        "max": 666034176
+      },
+      "host_average_cpu_percent": {
+        "median": 89.40027894002789,
+        "min": 82.83333333333334,
+        "max": 93.26241134751773
+      }
+    }
+  }
+}
