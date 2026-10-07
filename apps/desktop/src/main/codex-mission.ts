@@ -1083,7 +1083,12 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           const unreported = new Set(unreportedPaths(changed, mission.persisted))
           const patches = changed.length === 0
             ? new Map<string, ToolPatch>()
-            : await (options.observePatches ?? observedPatches)(mission.cwd, diskAfter, changed, {}, mission.diskBefore)
+            : await (options.observePatches ?? observedPatches)(mission.cwd, diskAfter, changed,
+              // A large file the snapshot could not keep is compared against the turn's own Undo copy (0.695).
+              mission.checkpointBefore?.ok === true && options.checkpoints !== undefined
+                ? { beforeText: (path) => options.checkpoints!.fileAt(mission.cwd, (mission.checkpointBefore as { readonly commit: string }).commit, path) }
+                : {},
+              mission.diskBefore)
           // Every changed path is worth its event (0.597): an unnamed one gets a row, a named one its
           // patch -- or, when its text could not be read, the word that it changed on disk, which the
           // thread lays on the runtime's row in place of "did not report the change".

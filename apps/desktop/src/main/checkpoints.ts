@@ -41,6 +41,8 @@ export const MAX_KEPT_BYTES = 300 * 1024 * 1024
  * that shrinks gets Undo back within this.
  */
 export const TOO_BIG_REMEMBERED_MS = 10 * 60_000
+/** The most of one kept file read back to show what a turn changed in it. */
+export const MAX_READ_BACK_BYTES = 2 * 1024 * 1024
 /** How many turns a folder keeps a way back from; older ones are let go. */
 export const KEPT_TURNS_PER_FOLDER = 60
 const GIT_TIMEOUT_MS = 60_000
@@ -89,6 +91,12 @@ export interface Checkpoints {
   take(workspace: string): Promise<Checkpoint>
   /** The paths that differ between two kept states, relative, with `/`. */
   changed(workspace: string, before: string, after: string): Promise<readonly string[]>
+  /**
+   * One file's text as a kept state holds it, or undefined: not kept, past
+   * MAX_READ_BACK_BYTES, or not text (0.695: the turn's change to a large
+   * file in a plain folder, which the snapshot alone cannot diff).
+   */
+  fileAt(workspace: string, commit: string, path: string): Promise<string | undefined>
   /** Puts back what changed between `before` and `after`, where the file is still as `after` left it. */
   undo(workspace: string, before: string, after: string): Promise<UndoResult>
   /** Keeps `commit` from being let go, under `name` (a run's id), and lets the oldest go past the bound. */
@@ -231,6 +239,20 @@ export function createCheckpoints(options: CheckpointOptions): Checkpoints {
       const store = storeFor(options.root, workspace)
       const out = await git(store, workspace, ['diff-tree', '-r', '--no-renames', '--name-only', '-z', before, after])
       return out.split('\0').filter((path) => path.length > 0)
+    },
+
+    async fileAt(workspace, commit, path) {
+      if (!/^[0-9a-f]{40,64}$/.test(commit) || inside(workspace, path) === undefined) return undefined
+      const store = storeFor(options.root, workspace)
+      const spec = `${commit}:${path.replace(/\\/g, '/')}`
+      try {
+        const size = Number((await git(store, workspace, ['cat-file', '-s', spec])).trim())
+        if (!Number.isFinite(size) || size > MAX_READ_BACK_BYTES) return undefined
+        const text = await git(store, workspace, ['cat-file', '-p', spec])
+        return text.includes('\0') ? undefined : text
+      } catch {
+        return undefined
+      }
     },
 
     async undo(workspace, before, after) {

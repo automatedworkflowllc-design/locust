@@ -122,7 +122,9 @@ try {
   } else {
     check('in a dot-folder every edit row says the host saw it change', edits.length > 0 && edits.every((text) => /changed · seen on disk/.test(text) || /MODIFIED|ADDED|\+\d/.test(text)), shown)
     check('and none says the runtime did not report it', edits.length > 0 && !edits.some((text) => /did not report the change/.test(text)), shown)
-    check("with Wren's own word kept", edits.length > 0 && edits.every((text) => /\b(Write|Edit|write|edit|changed)\b/.test(text)), shown)
+    // Since 0.672/0.693 a step that reported its own change stands in for the host's row, so the row can
+    // read "README.md MODIFIED +2 −0" -- the change itself, better than the word. Either keeps faith.
+    check("with Wren's own word kept, or the change itself", edits.length > 0 && edits.every((text) => /\b(Write|Edit|write|edit|changed)\b/.test(text) || /\b(MODIFIED|ADDED)\b.*\+\d/.test(text)), shown)
   }
   say(failures === 0 ? `\nA CHANGE IN A ${plain ? 'PLAIN' : 'DOT'} FOLDER PASSED` : `\nA CHANGE IN A ${plain ? 'PLAIN' : 'DOT'} FOLDER: ${String(failures)} FAILED`)
 } catch (error) {

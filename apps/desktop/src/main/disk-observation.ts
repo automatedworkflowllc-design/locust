@@ -48,6 +48,26 @@ export interface DiskObservationOptions {
   readonly statOf?: (absolutePath: string) => Promise<{ readonly size: number; readonly mtimeMs: number } | undefined>
   /** Test seam: a folder's entries, for a folder git cannot answer for (0.365). */
   readonly listDirectory?: (directory: string) => Promise<readonly FolderEntry[]>
+  /**
+   * A changed file's text from before the turn, when the snapshot did not
+   * keep it (past MAX_OBSERVED_FILE_BYTES): the turn's Undo checkpoint
+   * (0.695). With it, the file's text now is read up to the same bound.
+   */
+  readonly beforeText?: (path: string) => Promise<string | undefined>
+}
+
+/** The most of a large changed file read when its text from before the turn is known (0.695). */
+export const MAX_COMPARED_FILE_BYTES = 2 * 1024 * 1024
+
+async function readTextUpTo(absolutePath: string, max: number): Promise<string | undefined> {
+  try {
+    if ((await stat(absolutePath)).size > max) return undefined
+    const bytes = await readFile(absolutePath)
+    if (bytes.length > max || bytes.includes(0)) return undefined
+    return bytes.toString('utf8')
+  } catch {
+    return undefined
+  }
 }
 
 /** The most of a file the host will turn into a diff on the runtime's behalf. */
@@ -419,11 +439,19 @@ export async function observedPatches(
     const status = statusOf(entry)
     try {
       if (status === UNTRACKED) {
-        const read = textOf(entry) ?? (await readText(join(workspacePath, path)))
+        let read = textOf(entry) ?? (await readText(join(workspacePath, path)))
+        let found = textOf(before?.get(path))
+        // Past the snapshot's bound before the turn: the checkpoint's copy, if the turn kept one (0.695).
+        if (found === undefined && statusOf(before?.get(path)) === UNTRACKED && options.beforeText !== undefined) {
+          const kept = await options.beforeText(path).catch(() => undefined)
+          if (kept !== undefined) {
+            found = kept
+            read ??= await readTextUpTo(join(workspacePath, path), MAX_COMPARED_FILE_BYTES)
+          }
+        }
         if (read === undefined || read.length === 0) continue
         // Scrubbed before it is drawn or kept, as a reply is (0.489).
         const text = redactSecrets(read)
-        const found = textOf(before?.get(path))
         const earlier = found === undefined ? undefined : redactSecrets(found)
         // There before too, but without its text (past the bounds): what
         // changed in it is unknown, and it is not an add. The row keeps its path.
