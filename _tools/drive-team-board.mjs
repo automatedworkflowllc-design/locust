@@ -117,7 +117,8 @@ try {
   // A live mission is running, not interrupted: the record has no word for
   // running, and its Recent dot was red on the first frames of this board.
   const liveDots = board.filter((section) => section.key === 'needs-you' || section.key === 'working').flatMap((section) => section.dots)
-  check('a live mission’s Recent dot is the running lime, never red', liveDots.length > 0 && liveDots.every((tone) => tone === 'lc-tone-lime'), JSON.stringify(liveDots))
+  // Running has been `lc-tone-live` (monochrome) since 0.430; lime before. The point is never red.
+  check('a live mission’s Recent dot is the running tone, never red', liveDots.length > 0 && liveDots.every((tone) => tone === 'lc-tone-live' || tone === 'lc-tone-lime'), JSON.stringify(liveDots))
   check('only Needs you and Just finished are tinted', (tints['needs-you'] ?? 0) > 0 && (tints.finished ?? 0) > 0 && (tints.working ?? 0) === 0 && (tints.ready ?? 0) === 0, JSON.stringify(tints))
   // Seen: Juno opened, and back to the board.
   await drive.evaluate(openTeammateScript('Juno'))
