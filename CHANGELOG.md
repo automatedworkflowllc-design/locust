@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.691.0 - 2026-10-07
+
+### Added
+
+- **Ask your Locust teammates from Claude Code or Codex.** Settings > General > "Let your other AI apps use Locust" turns on a small local server those apps can add as a tool. From there you can list your teammates, start a conversation with one, send a follow-up, read the reply, and see background runs. It is off by default, and:
+  - it answers only apps on this computer, and only with a key that is locked to your Windows account and replaced every time you turn it on;
+  - every conversation started this way runs in Ask mode (read only), whatever the teammate's usual mode, and never starts another teammate on its own;
+  - those conversations appear in Locust's history, marked as started from another app, and your monthly limits apply;
+  - Locust never changes another app's settings: the switch shows the line to add for Claude Code and for Codex.
+
 ## 0.690.0 - 2026-10-07
 
 ### Fixed
