@@ -11,6 +11,15 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.688.0 - 2026-10-07
+
+### Added
+
+- **Choose how voice typing hears you.** Settings > General > Voice typing has three choices:
+  - **Fast**, the one you had: it runs on this computer after a one-time 41 MB download.
+  - **Accurate**, which also runs on this computer: a larger model with a one-time 69 MB download. It is slower: a ten-second recording takes about three seconds to type.
+  - **Your OpenAI account**, which sends your recordings to OpenAI's transcription model with your own API key. Your OpenAI account is charged for it; a ChatGPT subscription does not include API usage. Locust asks once before the first recording is sent. The key is locked to your Windows account, never shown again, and left out of profile backups.
+
 ## 0.687.0 - 2026-10-07
 
 ### Fixed
