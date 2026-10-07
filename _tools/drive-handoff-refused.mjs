@@ -91,8 +91,14 @@ try {
   })`))))
   say(`  after: ${JSON.stringify(after)}`)
   check('the run is still running', after.running === true)
-  check('nothing was handed over', after.divider === false)
-  check('the chat box says why, and that nothing was stopped', /cannot be held read-only/.test(after.notice) && /Nothing was stopped/.test(after.notice), after.notice || 'no notice')
+  // The premise is gone (found by the 0.695 sweep): since 2026-09-30 Cursor holds a run read-only on
+  // Windows with its own `--mode ask` (cursorCanEnforceReadOnly), so an Ask handoff to Cursor is ALLOWED
+  // and goes through. What still matters is the first check: the run in flight was not lost.
+  if (after.divider === true && after.notice === '') say('  (Cursor can be held read-only now: the handoff went through, so there was nothing to refuse)')
+  else {
+    check('nothing was handed over', after.divider === false)
+    check('the chat box says why, and that nothing was stopped', /cannot be held read-only/.test(after.notice) && /Nothing was stopped/.test(after.notice), after.notice || 'no notice')
+  }
   await drive.capture('stop the run, as the person would', () => drive.evaluate(`(async () => {
     document.querySelector('button[aria-label^="Stop the running"]')?.click()
     await new Promise(r => setTimeout(r, 3000))
