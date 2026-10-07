@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.693.0 - 2026-10-07
+
+### Fixed
+
+- **A Cursor edit to a large file shows what it changed.** Cursor reports each edit together with the whole file, twice, so a one-line change to a large file came to more than Locust keeps from a single step (256 KB). The change was dropped with the rest, and the files card read "changed · seen on disk" instead of "+1 −1". Cursor puts the change itself first, so Locust now keeps the lines added and removed and the change, and still leaves out the two copies of the file.
+
 ## 0.692.0 - 2026-10-07
 
 ### Faster
