@@ -51,7 +51,8 @@ try {
   }
   // Home deliberately animates for 45 seconds after mounting/input. Observe
   // its real resting state, without changing focus or forcing reduced motion.
-  await wait(`!document.querySelector('.lc-cover') || !!document.querySelector('.lc-cover.is-paused')`, 60)
+  // 90 s, as at the end: 45 s after the LAST input, on a machine that may be busy (0.688's early stop).
+  await wait(`!document.querySelector('.lc-cover') || !!document.querySelector('.lc-cover.is-paused')`, 90)
   const baselineCpu = await idleCpu()
   measurements.baselineFocusedCpu = baselineCpu
   await drive.evaluate(`document.querySelector('[aria-label="Voice typing"]').click()`)
