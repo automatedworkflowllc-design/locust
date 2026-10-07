@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.680.0 - 2026-10-06
+
+### Added
+
+- **Commit from the conversation.** When a teammate has changed files in your folder, a Commit button appears at the top of the conversation. It lists the files, drafts a message from what you asked, and commits them as you, with your own git name and hooks. You can also push, or open a pull request when the folder is on GitHub and the GitHub CLI is signed in. A pull request from your main branch goes from a new branch, so main stays where it was. If a hook refuses the commit, what you had staged is left exactly as it was. The button only appears when nothing is running, so a commit never takes half a turn.
+
+### Fixed
+
+- **A merge with conflict markers left in no longer says it can land.** When a teammate asked to resolve a conflict replied with a question instead, the thread said "the merge is finished, so it can land now", while the Land card said markers were still there. It now names the files that still have markers.
+
 ## 0.679.0 - 2026-10-06
 
 ### Added
