@@ -59,6 +59,9 @@ const fakeEnv = fakeClaude
  */
 const buddy = process.argv.includes('--buddy')
 const port = Number(arg('--port') ?? 9877)
+// --seconds <n>: a longer sample (2026-10-07). Five seconds on the same build read 7.5% and 11.3%; an
+// experiment worth 1% needs longer. Pair it with --long-turn, so the reply is still streaming at the end.
+const SAMPLE_SECONDS = Number(arg('--seconds') ?? 5)
 const restMs = 46_000 // Sample after the 45-second rest deadline, finishing within 60 seconds.
 // An arena or another suite starting mid-probe invalidates the comparison too.
 const assertQuiet = () => {
@@ -183,8 +186,8 @@ const measure = async (state) => {
     window.locustProbeDraws = { tally, restore: () => { proto.clearRect = original } }
     proto.clearRect = function (...a) { const k = where(this.canvas); tally[k] = (tally[k] ?? 0) + 1; return original.apply(this, a) }
   })()`)
-  const share = cpu(5)
-  const draws = process.argv.includes('--draws') ? JSON.parse(String(await drive.evaluate(`(() => { const d = window.locustProbeDraws; d.restore(); return JSON.stringify(Object.fromEntries(Object.entries(d.tally).map(([k, v]) => [k, Math.round(v / 5)]))) })()`))) : undefined
+  const share = cpu(SAMPLE_SECONDS)
+  const draws = process.argv.includes('--draws') ? JSON.parse(String(await drive.evaluate(`(() => { const d = window.locustProbeDraws; d.restore(); return JSON.stringify(Object.fromEntries(Object.entries(d.tally).map(([k, v]) => [k, Math.round(v / ${String(SAMPLE_SECONDS)})]))) })()`))) : undefined
   const after = await metrics()
   const frames = longTurn && streaming ? JSON.parse(String(await drive.evaluate(`(() => {
     const frames = window.locustProbeFrames; frames.active = false
@@ -238,6 +241,13 @@ try {
   if (extraCss !== undefined) {
     await drive.evaluate(`(() => { const style = document.createElement('style'); style.dataset.probe = 'css'; style.textContent = ${JSON.stringify(extraCss)}; document.head.appendChild(style); return 'added' })()`)
     say(`  experiment css: ${extraCss}`)
+  }
+  // --js <script>: an experiment run in the page before the send, for a cost no style sheet can reach
+  // (2026-10-07: the faces' canvas glow, by setting shadowBlur to nothing).
+  const extraJs = arg('--js')
+  if (extraJs !== undefined) {
+    await drive.evaluate(`(() => { ${extraJs}; return 'ran' })()`)
+    say(`  experiment js: ${extraJs}`)
   }
   if (fakeClaude) {
     // The stand-in or nothing: the version the app's own discovery read for Claude Code.
