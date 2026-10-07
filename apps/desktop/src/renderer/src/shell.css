@@ -19881,3 +19881,21 @@ textarea {
 .lc-voice__ask, .lc-voice__message { position: absolute; bottom: calc(100% + 12px); right: 0; width: 300px; padding: 12px; border: 1px solid var(--lc-border-control); border-radius: 12px; background: var(--lc-bg-control); color: var(--lc-text-primary); z-index: 30; }
 .lc-voice__ask p { margin: 0 0 10px; }
 .lc-voice__message { font-size: 12px; }
+
+/*
+ * THE VOICE GLOW, AROUND THE BOX ITSELF (0.687).
+ *
+ * voice-glow's wrapper is `overflow: hidden` (its own stylesheet), and in 0.686 it wrapped the whole chat area: every
+ * menu the box opens upward -- chat type, mode, model, effort -- was clipped to a sliver (probe-composer-menus-open:
+ * 0.681 the chat type menu on top, 0.686 hidden). So the wrapper never clips; the glow is cut instead, and only while
+ * it shows: below and beside the box, never above, where the menus open. It also hugs the visible box now, not the
+ * padded area to the window's edge, which made it read as coming from the bottom of the app (Colin, 2026-10-07).
+ * 2px of room keeps the focus outline whole.
+ */
+.lc-composerbeam[data-voice-beam] {
+  overflow: visible !important;
+}
+.lc-composerbeam.is-listening,
+.lc-composerbeam[data-voice-beam][data-fading] {
+  clip-path: inset(-100vh -2px -2px -2px round 22px);
+}

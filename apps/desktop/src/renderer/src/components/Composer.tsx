@@ -1451,13 +1451,12 @@ export function Composer({
   const reflectOnto = useMemo(() => [effortShown ? effortChip : routeChip], [effortShown])
   return (
     /*
-     * THE CHAT BOX GLOWS WITH YOUR VOICE (0.686, voice-glow, MIT). Mounted always, so starting to listen never
+     * THE CHAT BOX GLOWS WITH YOUR VOICE (0.686, voice-glow, MIT) -- around the visible box (0.687), below. Mounted always, so starting to listen never
      * remounts the box under your cursor; `active` only while listening (the button says "Typing…" after), and an inactive
      * beam registers no animation at all (read in its source), so the box at rest costs nothing. The level is
      * voice typing's own meter: the glow never opens the microphone a second time. `reach` 1.5: the box sits ~15 px
      * above the window's edge, and the glow is centered on its bottom edge, so only what rises into the box shows.
      */
-    <VoiceBeam active={voice === 'listening'} level={glowLevel} theme="auto" colorVariant="colorful" reach={1.5}>
     <div className="lc-composer">
       <div className="lc-composer__inner">
         {error !== undefined && (
@@ -1831,6 +1830,7 @@ export function Composer({
         )}
         <form className="command-dock lc-composer__form" onSubmit={submit}>
           {cloud?.on === true && cloud.where === 'claude' && cloud.environment !== undefined && <CloudEnvironmentField {...cloud.environment} />}
+          <VoiceBeam className={`lc-composerbeam${voice === 'listening' ? ' is-listening' : ''}`} active={voice === 'listening'} level={glowLevel} theme="auto" colorVariant="colorful" reach={1.5}>
           <div className="lc-composer__box" onMouseDown={pressBox}>
             <textarea
               ref={field}
@@ -2625,10 +2625,10 @@ export function Composer({
             </div>
           </div>
           </div>
+          </VoiceBeam>
         </form>
       </div>
     </div>
-    </VoiceBeam>
   )
 }
 
