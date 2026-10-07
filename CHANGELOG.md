@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.700.0 - 2026-10-07
+
+### Fixed
+
+- **An OpenCode teammate that asks you something no longer gets stuck.** OpenCode has its own way for a model to ask a question, and Locust never answered it. A teammate that asked that way showed "Working…" until you pressed Stop. OpenCode teammates now ask the way every other teammate does, in their reply, with the question card to answer it.
+
 ## 0.699.0 - 2026-10-07
 
 ### Fixed
