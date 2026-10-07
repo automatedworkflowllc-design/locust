@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { VoiceApi } from '../../../shared/voice.js'
 import type { VoiceCapture } from '../voiceCapture.js'
 import { Icon } from './Icon.js'
+import { setVoiceState } from '../voiceLevel.js'
 
 type Phase = 'idle' | 'asking' | 'checking' | 'downloading' | 'opening' | 'recording' | 'transcribing'
 export const VOICE_DOWNLOAD_WORDS = 'Voice typing needs a one-time 41 MB download. It runs on this computer; nothing you say leaves it.'
@@ -17,6 +18,11 @@ export function VoiceButton({ platform, onText, disabled = false, api = typeof w
   const controller = useRef<AbortController | undefined>(undefined)
   const generation = useRef(0)
   const transition = (next: Phase): void => { current.current = next; setPhase(next) }
+  // The chat box glows while it listens, and while its words are typed (voiceState, 0.686); never left on.
+  useEffect(() => {
+    setVoiceState(phase === 'recording' ? 'listening' : phase === 'transcribing' ? 'processing' : 'off')
+  }, [phase])
+  useEffect(() => () => setVoiceState('off'), [])
   const cancel = (): void => {
     generation.current++
     controller.current?.abort()

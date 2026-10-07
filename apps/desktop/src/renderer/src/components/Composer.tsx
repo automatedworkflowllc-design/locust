@@ -55,6 +55,15 @@ import type { RouteChoice } from './RoutePicker.js'
 import { RuntimeMark } from './RuntimeMark.js'
 import { noteTyping } from '../faceLife.js'
 import { VoiceButton } from './VoiceButton.js'
+import { VoiceBeam } from 'voice-glow'
+import { voiceLevel, voiceState } from '../voiceLevel.js'
+import type { VoiceState } from '../voiceLevel.js'
+/**
+ * The microphone's level as the glow reads it. The meter is raw RMS, and ordinary speech sits around 0.05-0.2 of it;
+ * the glow is drawn for 0..1 with speech near the top. A square root (loudness as heard) brings speech up without
+ * making silence glow. Measured 2026-10-07 on the drive's spoken clip: a faint haze at raw RMS.
+ */
+const glowLevel = (): number => Math.min(1, Math.sqrt(voiceLevel.get()) * 2)
 import { insertVoiceText } from '../../../shared/voice-pcm.js'
 
 const MAX_PROMPT_LENGTH = 8_000
@@ -1435,9 +1444,20 @@ export function Composer({
    * the shader is not handed a new list -- and re-registering -- on every
    * keystroke.
    */
+  // Listening, typing your words, or off: the glow's state (voiceLevel.ts).
+  const [voice, setVoice] = useState<VoiceState>(voiceState.get())
+  useEffect(() => voiceState.subscribe(setVoice), [])
   const effortShown = shownEffort !== undefined && supportedEfforts.length > 0
   const reflectOnto = useMemo(() => [effortShown ? effortChip : routeChip], [effortShown])
   return (
+    /*
+     * THE CHAT BOX GLOWS WITH YOUR VOICE (0.686, voice-glow, MIT). Mounted always, so starting to listen never
+     * remounts the box under your cursor; `active` only while listening (the button says "Typing…" after), and an inactive
+     * beam registers no animation at all (read in its source), so the box at rest costs nothing. The level is
+     * voice typing's own meter: the glow never opens the microphone a second time. `reach` 1.5: the box sits ~15 px
+     * above the window's edge, and the glow is centered on its bottom edge, so only what rises into the box shows.
+     */
+    <VoiceBeam active={voice === 'listening'} level={glowLevel} theme="auto" colorVariant="colorful" reach={1.5}>
     <div className="lc-composer">
       <div className="lc-composer__inner">
         {error !== undefined && (
@@ -2608,6 +2628,7 @@ export function Composer({
         </form>
       </div>
     </div>
+    </VoiceBeam>
   )
 }
 

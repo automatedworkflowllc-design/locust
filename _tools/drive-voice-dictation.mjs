@@ -54,7 +54,13 @@ try {
   check('real download and fake microphone start', await drive.evaluate(`!!document.querySelector('[aria-label="Stop voice typing"]')`), error)
   check('download has only retained runtime/model files', (await readdir(join(profile, 'voice'))).filter((name) => name.endsWith('.exe') || name.endsWith('.dll') || name.endsWith('.bin')).length === 7)
   check('download retains license notices', (await readdir(join(profile, 'voice'))).includes('LICENSE.txt'))
-  await sleep(10_000)
+  // The glow while the clip is being said (0.686), at three moments: it follows the voice's own level.
+  for (const at of [2, 4, 6]) {
+    await sleep(2_000)
+    await drive.capture(`speaking, ${String(at)} s in: the glow`, () => drive.evaluate(`document.querySelector('[aria-label="Stop voice typing"]')?.innerText ?? ''`))
+  }
+  // Stopped before the 10-second clip starts over (the fake device loops it).
+  await sleep(500)
   await drive.capture('recording, visible elapsed time', () => drive.evaluate(`document.querySelector('[aria-label="Stop voice typing"]').innerText`))
   await drive.evaluate(`document.querySelector('[aria-label="Stop voice typing"]').click()`)
   await wait(`!document.querySelector('.lc-voice__button:disabled')`, 120)

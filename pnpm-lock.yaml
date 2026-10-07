@@ -23,6 +23,9 @@ importers:
       electron-updater:
         specifier: ^6.8.9
         version: 6.8.9(supports-color@7.2.0)
+      voice-glow:
+        specifier: 0.3.0
+        version: 0.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
     devDependencies:
       '@teammate/mission-store':
         specifier: workspace:*
@@ -2459,6 +2462,12 @@ packages:
       jsdom:
         optional: true
 
+  voice-glow@0.3.0:
+    resolution: {integrity: sha512-PLw6BMo9WCwniSGjlpX3gr5ReponCDFLis37Q8XLfHMyMfv2DNTNzYS0kkYZKS2ohzdaGq1T5jxCyqwA1jqbIQ==}
+    peerDependencies:
+      react: '>=18.0.0'
+      react-dom: '>=18.0.0'
+
   webcrypto-core@1.9.2:
     resolution: {integrity: sha512-gsXecm82UQNlTBURJGuqOWy1Ww08S3kZUcr3aOJS02Pk0xLtkfeUAVC0u0xhgdonFme80edSJUIJyuvL/7250Q==}
 
@@ -4657,6 +4666,11 @@ snapshots:
       '@types/node': 24.13.3
     transitivePeerDependencies:
       - msw
+
+  voice-glow@0.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
+    dependencies:
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
 
   webcrypto-core@1.9.2:
     dependencies:

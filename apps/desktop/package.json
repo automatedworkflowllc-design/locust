@@ -19,7 +19,8 @@
     "prune:releases": "node scripts/prune-releases.mjs"
   },
   "dependencies": {
-    "electron-updater": "^6.8.9"
+    "electron-updater": "^6.8.9",
+    "voice-glow": "0.3.0"
   },
   "devDependencies": {
     "@teammate/mission-store": "workspace:*",
