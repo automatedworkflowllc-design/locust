@@ -72,6 +72,15 @@ try {
   const final = JSON.parse(String(await drive.capture('finished: the turn as it happened', () => drive.evaluate(`JSON.stringify(${ORDER})`))))
   say(`  ${String(samples.length)} samples while it ran; final:`)
   for (const line of final) say(`      ${line.slice(0, 110)}`)
+  // LOCUST_SAMPLES=1: each DIFFERENT sample in order, to read how a turn grew (0.691, OpenCode's group).
+  if (process.env.LOCUST_SAMPLES === '1') {
+    let previous = ''
+    samples.forEach((sample, index) => {
+      const shown = JSON.stringify(sample)
+      if (shown !== previous) say(`    t=${String(index / 2)}s ${shown.slice(0, 260)}`)
+      previous = shown
+    })
+  }
   // What the runtime said about its thinking, from the record: a thought's words, where it sent any.
   const thoughts = JSON.parse(String(await drive.evaluate(`(async () => {
     const history = await window.desktop.getMissionHistory()
@@ -81,7 +90,11 @@ try {
   say(`  thoughts recorded: ${JSON.stringify(thoughts)}`)
   const live = samples.filter((sample) => sample.some((line) => line.startsWith('LIVE')))
   const both = live.find((sample) => sample.some((line) => line.startsWith('STEPS')) && sample.some((line) => line.startsWith('SAID') || line.startsWith('SAYING')))
-  check('while it worked, its steps were lines among what it said', both !== undefined, JSON.stringify(live.at(-1) ?? []).slice(0, 240))
+  // A model that says nothing until its last word leaves nothing to show steps among (a free OpenCode
+  // model did, 0.691): said, not failed, like the narration check below.
+  const spokeWhileWorking = live.some((sample) => sample.some((line) => line.startsWith('SAID') || line.startsWith('SAYING')))
+  if (!spokeWhileWorking) say('  (the model said nothing while it worked: nothing to show its steps among)')
+  else check('while it worked, its steps were lines among what it said', both !== undefined, JSON.stringify(live.at(-1) ?? []).slice(0, 240))
   const saidFinal = final.filter((line) => line.startsWith('SAID'))
   const stepsFinal = final.filter((line) => line.startsWith('STEPS'))
   // A thought before the first sentence is its own line, and right: it happened first.
@@ -100,7 +113,9 @@ try {
     // Writing, or the plan's step under way: a runtime that reports a plan
     // (Cursor) leads the line with its current step while it narrates, as
     // Claude Code's status line does (0.493). What may not happen is no line.
-    const held = saying.filter((sample) => sample.some((line) => /^LIVE .*(Writing|step \d+ of \d+)/.test(line)))
+    // `step \d+ of`, not `of \d+`: the sampler keeps 40 characters of the live line, and a long
+    // step ("Run node -e ... step 2 of 3") is cut before its count (0.691 Cursor and Codex).
+    const held = saying.filter((sample) => sample.some((line) => /^LIVE .*(Writing|step \d+ of)/.test(line)))
     const missing = saying.filter((sample) => !held.includes(sample))
     for (const sample of missing.slice(0, 3)) say(`  mid-stream without a live line: ${JSON.stringify(sample.filter((line) => /^(SAYING|LIVE)/.test(line))).slice(0, 240)}`)
     check('while a reply arrives, the live line stays: Writing, or the plan step under way', held.length === saying.length, JSON.stringify({ saying: saying.length, writing: writing.length, withPlanStep: held.length - writing.length, example: saying[0] }).slice(0, 300))
@@ -109,7 +124,17 @@ try {
   check('nothing moved when it ended: the live order of what was said is the final order', lastLive.every((line, index) => finalSaid[index] === line), JSON.stringify({ lastLive, finalSaid }))
   // 0.584: the group still growing shows its rows while it works.
   const grew = samples.filter((sample) => sample.some((line) => /^STEPS .* rows=[1-9]/.test(line)))
-  check('while it worked, the growing group showed its rows', grew.length > 0, `${String(grew.length)} of ${String(samples.length)} samples; example: ${JSON.stringify(grew[0] ?? samples.at(-2) ?? [])}`.slice(0, 300))
+  // A model that narrates before EVERY step makes one-step groups, drawn as their line with no rows:
+  // nothing grows (0.594 and 0.691 on Haiku alike). Judged only when some group gathered several steps.
+  const several = final.some((line) => /^STEPS .*\b([2-9]|\d{2,}) (commands|files|searches|steps|reads|edits)\b/i.test(line))
+  // A runtime that reports a step only once it has ENDED (OpenCode) never has a step under way to hold
+  // its group open: the group stays folded and its line grows instead -- "Read README.md", "Read a file,
+  // ran a command", "Read a file, ran 2 commands" -- as Claude Code folds finished steps. That growth,
+  // seen live, is the same promise kept (0.691; the samples are in this drive's LOCUST_SAMPLES=1 output).
+  const lastGroupLines = [...new Set(samples.map((sample) => sample.filter((line) => line.startsWith('STEPS')).at(-1)).filter(Boolean))]
+  const lineGrew = lastGroupLines.length >= 2
+  if (!several) say('  (every group held one step: nothing to grow)')
+  else check('while it worked, the growing group showed its rows, or its line grew step by step', grew.length > 0 || lineGrew, `${String(grew.length)} of ${String(samples.length)} samples with rows; the line read ${JSON.stringify(lastGroupLines.map((line) => line.replace(/ rows=.*$/, '')))}`.slice(0, 300))
   // 0.594: once the run has moved on, a group folds to its line; only the one under way is open.
   const stacked = samples.map((sample) => sample.filter((line) => line.startsWith('STEPS'))).filter((lines) => lines.length >= 2)
   const unfolded = stacked.filter((lines) => lines.slice(0, -1).some((line) => / open=true/.test(line)))
