@@ -11,6 +11,13 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.689.0 - 2026-10-07
+
+### Fixed
+
+- **A model of your own no longer reads as free against a monthly limit.** A model you add in Settings reports no price, so its runs used to count as nothing, and a teammate with a $5.00 limit showed "$0.00 of $5.00" however much its provider billed. The card now counts those runs beside the dollars, for example "$0.40 of $5.00 · 2 runs with no price", and hovering it says why. When you set a limit, it says that these runs are not counted.
+- **The voice glow rises with less voice.** Ordinary speech now lifts it about a quarter higher. Its highest point is unchanged, so it never covers more of the chat box than before.
+
 ## 0.688.0 - 2026-10-07
 
 ### Added
