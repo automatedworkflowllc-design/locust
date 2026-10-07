@@ -6,14 +6,17 @@
 // moment Send is pressed the live line is read every 100 ms until the runtime's
 // first event; the words it showed must include "Briefing" and "Starting
 // OpenCode", in that order, and "Reading the folder" between them (a writing
-// run looks at the tree). When the run ends, Details must carry the host's
-// note: "Started in N s: ... OpenCode took N s to say it had started."
+// run looks at the tree). When the run ends, the saved record must carry the
+// host's note: "Started in N s: ... OpenCode took N s to say it had started."
+// Read from the record since 2026-10-07: Colin had it taken off the thread on
+// 10/05 (keptForTheRecord, missionView.ts), so Details no longer shows it.
 // Measured before 0.602 (the control on an older package): the line reads
 // "Starting" for the whole wait, and no such note exists.
 //
 // Nothing is spent.
 
-import { mkdir } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { FREE_ROUTE, recordRoot, say, scratchRepository, sleep, startDrive, teammateFace } from './drive-lib.mjs'
@@ -25,8 +28,9 @@ const OUT = join(recordRoot('beta-fixes-2026-09-24'), `the-start-says-its-phase-
 await mkdir(OUT, { recursive: true })
 
 const workspace = await scratchRepository('locust-start-phase-ws-')
+const profilePath = await mkdtemp(join(tmpdir(), 'locust-drive-start-phase-profile-'))
 const drive = await startDrive({
-  name: `the-start-says-its-phase-${tag}`, port: 9796, workspace, outPath: OUT, ...(packaged === undefined ? {} : { packaged }),
+  name: `the-start-says-its-phase-${tag}`, port: 9796, workspace, profilePath, outPath: OUT, ...(packaged === undefined ? {} : { packaged }),
   seed: { schemaVersion: 1, teammates: [{ teammateId: 'tm_wren', name: 'Wren', hue: 'lime', role: 'Code & Migrations', createdAt: '2026-09-27T05:00:00.000Z', route: { ...FREE_ROUTE, mode: 'accept-edits' } }], missionOwners: {}, settings: { swarm: false, relay: false, relayHopCap: 2, memoryMode: 'off', autoMode: false } }
 })
 let failures = 0
@@ -77,13 +81,20 @@ try {
   check('the bare word Starting, if it showed at all, was replaced within half a second', bareFor <= 500, `${JSON.stringify(texts)} bare for ${String(bareFor)} ms`)
   for (let i = 0; i < 240 && (await running()); i += 1) await sleep(1000)
   check('the run ended', !(await running()))
-  const note = String(await drive.capture('the record of the start, under Details', () => drive.evaluate(`(async () => {
-    for (const b of [...document.querySelectorAll('.lc-thread button')].filter((b) => /^Details/.test(b.innerText.trim()))) { b.click(); await new Promise((r) => setTimeout(r, 300)) }
-    const text = document.querySelector('.lc-thread')?.innerText.replace(/\\s+/g, ' ') ?? ''
-    const m = /Started in \\d+\\.\\d s: .*?to say it had started\\./.exec(text)
-    return m ? m[0] : 'no start-timing note in the thread: ' + text.slice(-300)
-  })()`)))
-  check("the turn's Details carry the host's note on where the start's seconds went", /^Started in \d+\.\d s: looked for OpenCode \d+\.\d s, briefed \d+\.\d s, read the folder \d+\.\d s; OpenCode took \d+\.\d s to say it had started\.$/.test(note), note)
+  // Written just after the run's end: given a moment, then read from the saved record.
+  let note = 'no start-timing note in the saved record'
+  for (let i = 0; i < 20 && note.startsWith('no '); i += 1) {
+    await sleep(500)
+    const ledger = join(profilePath, 'mission-ledger')
+    for (const file of (await readdir(ledger).catch(() => [])).filter((name) => name.endsWith('.jsonl'))) {
+      for (const line of (await readFile(join(ledger, file), 'utf8').catch(() => '')).split('\n').filter(Boolean)) {
+        const payload = JSON.parse(line).event?.payload
+        if (payload?.code === 'host.start-timing' && typeof payload.message === 'string') note = payload.message
+      }
+    }
+  }
+  await drive.capture('the record of the start, from the saved record', () => JSON.stringify(note))
+  check("the saved record carries the host's note on where the start's seconds went", /^Started in \d+\.\d s: looked for OpenCode \d+\.\d s, briefed \d+\.\d s, read the folder \d+\.\d s; OpenCode took \d+\.\d s to say it had started\.$/.test(note), note)
   // A phase that lasted under 0.3 s is allowed to go unseen (the line is sampled every 100 ms); one that
   // lasted longer must have been on the line. The note says how long each took.
   const secondsOf = (word) => Number(new RegExp(`${word} (\\d+\\.\\d) s`).exec(note)?.[1] ?? '0')

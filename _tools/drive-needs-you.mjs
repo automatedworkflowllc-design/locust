@@ -68,17 +68,20 @@ const CHIP = `(() => (document.querySelector('.lc-needsyou')?.innerText ?? '').r
 const chip = async () => String(await drive.evaluate(CHIP))
 const home = () => drive.evaluate(`(async () => { document.querySelector('.lc-brand__lockup')?.click(); await new Promise(r => setTimeout(r, 800)); return 'home' })()`)
 /**
- * Open the list, and read its rows; the menu is left open. Opened only if it is
- * not already: a row that was never there leaves it open, and a second click
- * shut it -- one model that did not ask read as nine failures (2026-10-07).
+ * Open the list fresh, and read its rows; the menu is left open. A list still
+ * open from an earlier step is closed first: a row that was never there left it
+ * open, a second click shut it, and reading it as it stood showed the rows of
+ * when it opened -- one model that did not ask read as nine failures (2026-10-07).
  */
 const LIST = `(async () => {
   const button = document.querySelector('.lc-needsyou')
   if (button === null) return JSON.stringify({ rows: [] })
-  if (document.querySelector('.lc-context') === null) {
-    button.click()
-    await new Promise(r => setTimeout(r, 500))
+  if (document.querySelector('.lc-context') !== null) {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await new Promise(r => setTimeout(r, 300))
   }
+  button.click()
+  await new Promise(r => setTimeout(r, 500))
   const rows = [...document.querySelectorAll('.lc-context .lc-context__item')].map((row) => (row.querySelector('.lc-context__label')?.textContent ?? row.innerText).trim())
   return JSON.stringify({ rows })
 })()`
