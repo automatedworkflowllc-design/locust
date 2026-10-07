@@ -22,7 +22,7 @@ export interface FolderRemote {
 export type FolderChanges =
   | { readonly kind: 'none'; readonly why: 'not-a-repository' | 'clean' }
   /** Changes git would not let a plain commit take as they are. */
-  | { readonly kind: 'blocked'; readonly why: 'merging' | 'rebasing' | 'detached' | 'conflicted'; readonly files: readonly string[] }
+  | { readonly kind: 'blocked'; readonly why: BlockedWhy; readonly files: readonly string[] }
   | {
       readonly kind: 'changes'
       readonly branch: string
@@ -68,12 +68,16 @@ export function commitDraft(input: { readonly asks: readonly string[]; readonly 
   return `${subject}${body}${trailer}`
 }
 
-export function blockedSentence(why: 'merging' | 'rebasing' | 'detached' | 'conflicted'): string {
+/** Why a plain commit cannot be made here. `branch-name`: a name Locust will not hand to git (Sol's review, 0.683). */
+export type BlockedWhy = 'merging' | 'rebasing' | 'detached' | 'conflicted' | 'branch-name'
+
+export function blockedSentence(why: BlockedWhy): string {
   switch (why) {
     case 'merging': return 'A merge is in progress in this folder. Finish or abort it in git first.'
     case 'rebasing': return 'A rebase is in progress in this folder. Finish or abort it in git first.'
     case 'detached': return 'This folder is not on a branch, so a commit would belong to none. Switch to a branch first.'
     case 'conflicted': return 'Some files still have unresolved conflicts. Resolve them first.'
+    case 'branch-name': return "This branch's name is not one Locust will pass to git (it starts with a dash, or has unusual characters). Rename the branch first."
   }
 }
 

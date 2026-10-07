@@ -186,6 +186,8 @@ export type LandBlock =
   | { readonly kind: 'old-git'; readonly version: string | undefined }
   | { readonly kind: 'unsaved'; readonly files: readonly string[] }
   | { readonly kind: 'markers'; readonly files: readonly string[] }
+  /** git could not say whether conflict markers are left (0.683): not landed on a guess. */
+  | { readonly kind: 'markers-unchecked' }
   | { readonly kind: 'your-changes'; readonly files: readonly string[] }
   | { readonly kind: 'conflicts'; readonly files: readonly string[] }
   | { readonly kind: 'merging' }
@@ -267,6 +269,8 @@ export type CheckpointResult =
       readonly mergeFinished?: true
       /** Files the commit holds with conflict markers still in them, which Land refuses (0.680). */
       readonly stillMarked?: readonly string[]
+      /** git could not say whether any are left (0.683): the thread does not say it can land. */
+      readonly markersUnchecked?: true
     }
   /** Only files too big to commit changed. */
   | { readonly kind: 'skipped'; readonly skipped: readonly { readonly path: string; readonly bytes: number }[] }
@@ -305,6 +309,30 @@ export function statusEntriesOf(porcelainZ: string): readonly { readonly code: s
     if (code[0] === 'R' || code[0] === 'C') i += 1
   }
   return out
+}
+
+/**
+ * The files at `ref` that still hold a conflict marker -- or undefined when git could not say (0.683).
+ *
+ * Sol's review of 0.680: every `git grep` failure (a timeout, an object it could not read) was taken for "no
+ * markers", so a merge could be said to be ready, and Land could land, on a check that never ran. `git grep` exits
+ * 1, saying nothing, when nothing matches; that is "none". Anything else is not an answer.
+ */
+export async function filesWithMarkers(
+  runGit: (args: readonly string[], cwd: string, timeoutMs?: number) => Promise<string>,
+  cwd: string,
+  ref: string,
+  files: readonly string[]
+): Promise<readonly string[] | undefined> {
+  if (files.length === 0) return []
+  try {
+    const said = await runGit(['grep', '-l', '-E', '-e', '^(<<<<<<<|>>>>>>>)( |$)', ref, '--', ...files], cwd)
+    const prefix = `${ref}:`
+    return said.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0).map((line) => (line.startsWith(prefix) ? line.slice(prefix.length) : line))
+  } catch (error) {
+    const { exitCode, stdout } = error as { readonly exitCode?: unknown; readonly stdout?: unknown }
+    return exitCode === 1 && (typeof stdout !== 'string' || stdout.trim().length === 0) ? [] : undefined
+  }
 }
 
 /** One record per commit: sha, subject, date, parents; then its files, one per line (`--name-only`). */
@@ -373,7 +401,7 @@ export function defaultRunGit(args: readonly string[], cwd: string, timeoutMs = 
       clearTimeout(timer)
       if (timedOut) reject(new Error(`git ${args[0] ?? ''}: took longer than ${String(Math.round(timeoutMs / 1000))} s and was stopped.`))
       // With what it printed: `merge-tree` names its conflicts on stdout and exits 1 (0.440).
-      else if (error) reject(Object.assign(new Error(`git ${args[0] ?? ''}: ${String(stderr || error.message).trim().slice(0, 300)}`), { stdout: String(stdout) }))
+      else if (error) reject(Object.assign(new Error(`git ${args[0] ?? ''}: ${String(stderr || error.message).trim().slice(0, 300)}`), { stdout: String(stdout), ...(typeof error.code === 'number' ? { exitCode: error.code } : {}) }))
       else resolvePromise(stdout)
     })
     const timer = setTimeout(() => {
@@ -640,11 +668,16 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
       const branch = (await runGit(['symbolic-ref', '--short', '-q', 'HEAD'], path).catch(() => '')).trim()
       // Land's own rule for an unresolved file (below), read off what was just committed: a turn that asked a
       // question instead of resolving left its markers in, and the merge is not ready however it was concluded.
-      const stillMarked = merging && files.length > 0
-        ? (await runGit(['grep', '-l', '-E', '-e', '^(<<<<<<<|>>>>>>>)( |$)', 'HEAD', '--', ...files], path).catch(() => ''))
-            .split(/\r?\n/).map((line) => line.replace(/^HEAD:/, '').trim()).filter((line) => line.length > 0)
-        : []
-      return { kind: 'committed', sha, branch, files, skipped, ...(merging ? { mergeFinished: true } : {}), ...(stillMarked.length === 0 ? {} : { stillMarked }) }
+      const stillMarked = merging ? await filesWithMarkers(runGit, path, 'HEAD', files) : []
+      return {
+        kind: 'committed',
+        sha,
+        branch,
+        files,
+        skipped,
+        ...(merging ? { mergeFinished: true } : {}),
+        ...(stillMarked === undefined ? { markersUnchecked: true } : stillMarked.length === 0 ? {} : { stillMarked })
+      }
     },
 
     async review(teammateId) {
@@ -793,10 +826,8 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
     const unsaved = statusEntriesOf(await runGit(['status', '--porcelain', '-z', '--untracked-files=all'], path)).map((entry) => entry.path)
     if (unsaved.length > 0) return preview({ kind: 'unsaved', files: unsaved })
     if (files.length === 0) return preview({ kind: 'nothing' })
-    const marked = (await runGit(['grep', '-l', '-E', '-e', '^(<<<<<<<|>>>>>>>)( |$)', branch, '--', ...files], root).catch(() => ''))
-      .split(/\r?\n/)
-      .map((line) => line.trim().replace(new RegExp(`^${branch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:`), ''))
-      .filter((line) => line.length > 0)
+    const marked = await filesWithMarkers(runGit, root, branch, files)
+    if (marked === undefined) return preview({ kind: 'markers-unchecked' })
     if (marked.length > 0) return preview({ kind: 'markers', files: marked })
     const touching = new Set(files)
     const yours = statusEntriesOf(await runGit(['status', '--porcelain', '-z', '--untracked-files=all'], root)).map((entry) => entry.path).filter((file) => touching.has(file))

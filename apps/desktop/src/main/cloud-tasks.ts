@@ -20,7 +20,7 @@
  * stays in the cloud until Apply -- `codex cloud apply`, into this folder.
  */
 
-import { open, rm, stat, truncate } from 'node:fs/promises'
+import { lstat, open, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 
 /** A command's result; `code` 0 is success. */
@@ -186,19 +186,44 @@ export function refusalFor(problem: CloudStartProblem): string {
 const CODEX_LOG_LINE = /^\[\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|[+-]\d{2}:\d{2})\] [a-z_]+: /
 const queues = new Map<string, Promise<unknown>>()
 
-async function codexOnly(path: string, from: number): Promise<boolean> {
-  const handle = await open(path, 'r').catch(() => undefined)
-  if (handle === undefined) return false
+/** More than this was added: not a few Codex lines, and left alone rather than read in part (Sol's review, 0.683). */
+const MOST_CHECKED_BYTES = 1024 * 1024
+
+/**
+ * Takes back what Codex added to error.log -- every added byte read and found to be Codex's, the file a plain file
+ * (never a link), and its size unchanged between the check and the cut. Sol's review of 0.681: the check read at
+ * most 1 MiB and cut the whole tail, and checked through one handle then cut by path, so a line the person's own
+ * program appended meanwhile, or a link swapped in, could be erased unread. Both are refused now: what is cut is
+ * exactly what was read, through the handle that read it.
+ */
+async function takeBackCodexLines(path: string, before: number | undefined): Promise<void> {
+  const link = await lstat(path).catch(() => undefined)
+  if (link === undefined || !link.isFile()) return
+  const from = before ?? 0
+  const added = link.size - from
+  if (added <= 0 || added > MOST_CHECKED_BYTES) return
+  const handle = await open(path, 'r+').catch(() => undefined)
+  if (handle === undefined) return
+  let emptyNow = false
   try {
-    const size = (await handle.stat()).size
-    const length = Math.min(size - from, 1024 * 1024)
-    if (length <= 0) return false
-    const buffer = Buffer.alloc(length)
-    await handle.read(buffer, 0, length, from)
+    const opened = await handle.stat()
+    // The handle is on the file that was looked at, and it has not grown since.
+    if (opened.ino !== link.ino || opened.size !== link.size) return
+    const buffer = Buffer.alloc(added)
+    const { bytesRead } = await handle.read(buffer, 0, added, from)
+    if (bytesRead !== added) return
     const lines = buffer.toString('utf8').split(/\r?\n/).filter((line) => line.length > 0)
-    return lines.length > 0 && lines.every((line) => CODEX_LOG_LINE.test(line))
+    if (lines.length === 0 || !lines.every((line) => CODEX_LOG_LINE.test(line))) return
+    if ((await handle.stat()).size !== link.size) return
+    await handle.truncate(from)
+    emptyNow = before === undefined
   } finally {
     await handle.close()
+  }
+  // A file the call made, now empty and still nobody else's: gone, as it was before.
+  if (emptyNow) {
+    const left = await lstat(path).catch(() => undefined)
+    if (left !== undefined && left.isFile() && left.ino === link.ino && left.size === 0) await rm(path, { force: true }).catch(() => undefined)
   }
 }
 
@@ -206,15 +231,11 @@ export function leavingNoLog(run: Runner): Runner {
   return (args, cwd) => {
     const go = async (): Promise<Ran> => {
       const path = join(cwd, 'error.log')
-      const before = await stat(path).then((found) => found.size, () => undefined)
+      const before = await lstat(path).then((found) => (found.isFile() ? found.size : undefined), () => undefined)
       try {
         return await run(args, cwd)
       } finally {
-        const after = await stat(path).then((found) => found.size, () => undefined)
-        if (after !== undefined && after > (before ?? 0) && (await codexOnly(path, before ?? 0).catch(() => false))) {
-          if (before === undefined) await rm(path, { force: true }).catch(() => undefined)
-          else await truncate(path, before).catch(() => undefined)
-        }
+        await takeBackCodexLines(path, before).catch(() => undefined)
       }
     }
     const previous = queues.get(cwd) ?? Promise.resolve()

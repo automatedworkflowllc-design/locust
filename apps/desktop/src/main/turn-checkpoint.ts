@@ -111,6 +111,9 @@ export function checkpointSentence(result: CheckpointResult | { readonly kind: '
     const many = result.stillMarked.length > 1
     return `Saved this turn on ${result.branch} as ${result.sha.slice(0, 12)}, but ${fileList(result.stillMarked)} still ${many ? 'have' : 'has'} conflict markers, so it cannot land until ${many ? 'they are' : 'it is'} resolved.${left}`
   }
+  if (result.mergeFinished === true && result.markersUnchecked === true) {
+    return `Saved this turn on ${result.branch} as ${result.sha.slice(0, 12)}. Locust could not check it for conflict markers, so it does not say it can land; Land checks again first.${left}`
+  }
   if (result.mergeFinished === true) return `Saved this turn on ${result.branch} as ${result.sha.slice(0, 12)}: the merge is finished, so it can land now.${left}`
   const count = result.files.length
   return `Saved this turn on ${result.branch} as ${result.sha.slice(0, 12)}: ${String(count)} ${count === 1 ? 'file' : 'files'} (${fileList(result.files)}).${left}`

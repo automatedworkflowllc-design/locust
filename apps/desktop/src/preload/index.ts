@@ -538,7 +538,7 @@ const desktopApi: DesktopApi = {
     ipcRenderer.invoke(TURN_UNDO_STATE_CHANNEL, [...runIds]) as Promise<Readonly<Record<string, TurnUndoState>>>,
   undoTurn: (runId: string) => ipcRenderer.invoke(TURN_UNDO_CHANNEL, runId) as Promise<TurnUndoState>,
   folderChanges: () => ipcRenderer.invoke(FOLDER_CHANGES_CHANNEL) as Promise<FolderChanges>,
-  commitFolder: (message, then) => ipcRenderer.invoke(FOLDER_COMMIT_CHANNEL, message, then) as Promise<CommitResult>,
+  commitFolder: (message, then, shown) => ipcRenderer.invoke(FOLDER_COMMIT_CHANNEL, message, then, [...shown]) as Promise<CommitResult>,
   onRuntimeUpdates: (listener: (state: RuntimeUpdatesState) => void) => {
     const handler = (_event: unknown, state: RuntimeUpdatesState): void => listener(state)
     ipcRenderer.on(RUNTIME_UPDATES_EVENT_CHANNEL, handler)

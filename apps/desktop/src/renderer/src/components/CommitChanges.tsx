@@ -33,6 +33,8 @@ export function CommitChanges({
   const [message, setMessage] = useState('')
   const [working, setWorking] = useState<CommitThen>()
   const [result, setResult] = useState<CommitResult>()
+  /** Every file listed, not the first six (Sol's review: the rest could not be seen before committing). */
+  const [allShown, setAllShown] = useState(false)
   const panel = useRef<HTMLDivElement>(null)
 
   const read = useCallback(async (): Promise<void> => {
@@ -72,7 +74,9 @@ export function CommitChanges({
 
   const go = async (then: CommitThen): Promise<void> => {
     setWorking(then)
-    const done = await window.desktop?.commitFolder(message, then).catch((): CommitResult => ({ kind: 'refused', message: 'Locust could not reach git.' }))
+    // The files the person was shown: the host commits those, or refuses if the folder has changed since.
+    const shown = changes?.kind === 'changes' ? changes.files.map((file) => file.path) : []
+    const done = await window.desktop?.commitFolder(message, then, shown).catch((): CommitResult => ({ kind: 'refused', message: 'Locust could not reach git.' }))
     setWorking(undefined)
     setResult(done)
     void read()
@@ -93,6 +97,7 @@ export function CommitChanges({
             return
           }
           setResult(undefined)
+          setAllShown(false)
           setMessage(commitDraft({ asks, ...(teammate === undefined ? {} : { teammate }) }))
           setOpen(true)
           void read()
@@ -117,7 +122,7 @@ export function CommitChanges({
                 <span className="lc-commit__branch">on {changes.branch}</span>
               </div>
               <ul className="lc-commit__files">
-                {changes.files.slice(0, SHOWN_FILES).map((file) => (
+                {(allShown ? changes.files : changes.files.slice(0, SHOWN_FILES)).map((file) => (
                   <li key={file.path} className="lc-commit__file">
                     <span className={`lc-commit__status lc-commit__status--${file.status}`} title={file.status}>
                       {STATUS_LETTER[file.status]}
@@ -125,8 +130,12 @@ export function CommitChanges({
                     <span className="lc-commit__path" title={file.path}>{file.path}</span>
                   </li>
                 ))}
-                {changes.files.length > SHOWN_FILES && (
-                  <li className="lc-commit__more">and {String(changes.files.length - SHOWN_FILES)} more</li>
+                {!allShown && changes.files.length > SHOWN_FILES && (
+                  <li className="lc-commit__more">
+                    <button type="button" className="lc-commit__link" onClick={() => setAllShown(true)}>
+                      and {String(changes.files.length - SHOWN_FILES)} more
+                    </button>
+                  </li>
                 )}
               </ul>
               <label className="lc-commit__label" htmlFor="lc-commit-message">Message</label>

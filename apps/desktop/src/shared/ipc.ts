@@ -1312,7 +1312,7 @@ export const WORKTREE_RESOLVE_CHANNEL = 'worktrees:resolve'
 
 /** Why a branch cannot land now; `busy` is the host's own (a run is live for the teammate). */
 export type PublicLandBlock =
-  | { readonly kind: 'nothing' | 'detached' | 'merging' | 'busy' }
+  | { readonly kind: 'nothing' | 'detached' | 'merging' | 'busy' | 'markers-unchecked' }
   | { readonly kind: 'old-git'; readonly version: string | undefined }
   | { readonly kind: 'unsaved' | 'markers' | 'your-changes' | 'conflicts'; readonly files: readonly string[] }
 
@@ -3518,7 +3518,7 @@ export interface DesktopApi {
   /** Commit (0.680): what the open folder has uncommitted, and whether it can be pushed or proposed. */
   folderChanges(): Promise<FolderChanges>
   /** Commit it all as the person, then push or open a pull request when asked. */
-  commitFolder(message: string, then: CommitThen): Promise<CommitResult>
+  commitFolder(message: string, then: CommitThen, shown: readonly string[]): Promise<CommitResult>
   /** An update started, landed or failed. Returns the unsubscribe. */
   onRuntimeUpdates(listener: (state: RuntimeUpdatesState) => void): () => void
   /** Open the runtime's sign-in in its own window. */

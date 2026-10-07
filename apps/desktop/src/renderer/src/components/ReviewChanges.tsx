@@ -238,6 +238,8 @@ export function landBlockSentence(block: PublicLandBlock, name: string, onto: st
       return `${name}'s folder has changes no turn saved yet (${listed(block.files)}). Send ${name} a message and that turn saves them.`
     case 'markers':
       return `Conflict markers are still in ${listed(block.files)} on ${name}'s branch.`
+    case 'markers-unchecked':
+      return `Locust could not check ${name}'s branch for conflict markers, so it will not land it yet. Read it again.`
     case 'your-changes':
       return `You have unsaved changes in ${listed(block.files)}, which this landing would overwrite. Commit them or set them aside, then read it again.`
     case 'conflicts':

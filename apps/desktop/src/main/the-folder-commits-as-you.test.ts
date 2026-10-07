@@ -104,7 +104,8 @@ describe('the folder commits as you', () => {
     const calls: string[][] = []
     const done = await createFolderCommits({ runNetwork: network(calls) }).commit(folder, 'Fix the cart total', 'push')
     expect(done).toMatchObject({ kind: 'done', pushed: true })
-    expect(calls.find((call) => call[1] === 'push')).toEqual(['git', 'push', 'origin', 'main'])
+    // A full refspec: a branch name can never be read as a flag (0.683).
+    expect(calls.find((call) => call[1] === 'push')).toEqual(['git', 'push', 'origin', 'refs/heads/main:refs/heads/main'])
     expect((await git(['log', '-1', '--format=%s', 'main'], bare)).trim()).toBe('Fix the cart total')
   })
 
@@ -118,7 +119,7 @@ describe('the folder commits as you', () => {
     expect((await git(['rev-parse', 'main'], folder)).trim()).toBe(main)
     expect((await git(['symbolic-ref', '--short', 'HEAD'], folder)).trim()).toBe('locust/fix-the-cart-total')
     expect((await git(['log', '-1', '--format=%s', 'locust/fix-the-cart-total'], bare)).trim()).toBe('Fix the cart total')
-    expect(calls.find((call) => call[0] === 'gh' && call[1] === 'pr')).toEqual(['gh', 'pr', 'create', '--title', 'Fix the cart total', '--body', '- Fix the cart total', '--head', 'locust/fix-the-cart-total', '--base', 'main'])
+    expect(calls.find((call) => call[0] === 'gh' && call[1] === 'pr')).toEqual(['gh', 'pr', 'create', '--title=Fix the cart total', '--body=- Fix the cart total', '--head=locust/fix-the-cart-total', '--base=main'])
   })
 
   it('a refused push keeps the commit and says so', { timeout: TIMEOUT }, async () => {

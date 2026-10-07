@@ -514,7 +514,6 @@ const checkpoints = createCheckpoints({ root: join(app.getPath('userData'), 'che
 const turnRecords = createTurnRecords(join(app.getPath('userData'), 'checkpoints', 'turns.json'))
 /** Skills copied for each Claude run outside Auto (0.679); what a crash left is cleared at launch. */
 const claudeSkillCopies = join(app.getPath('userData'), 'claude-skills')
-void clearClaudeSkillCopies(claudeSkillCopies)
 const runtimeFactsLoaded = runtimeFacts.load().catch(() => undefined)
 // What an ACP agent said it can do at its last run (W12), for Settings > AI agents.
 const acpCapabilities = createAcpCapabilitiesStore({ rootDirectory: app.getPath('userData') })
@@ -984,6 +983,9 @@ const runtimeDiscovery = createRuntimeDiscoveryService({
   }
 })
 const ownsSingleInstanceLock = app.requestSingleInstanceLock()
+// What a crashed run left of its skill copies: cleared by the instance that owns the profile only. A second launch,
+// about to hand over and quit, cleared them before taking the lock and could pull a live run's files away (Sol's review).
+if (ownsSingleInstanceLock) void clearClaudeSkillCopies(claudeSkillCopies)
 let missionServiceForShutdown: CodexMissionService | undefined
 let remoteControlForShutdown: ReturnType<typeof createRemoteControl> | undefined
 let queuedMessagesForShutdown: ReturnType<typeof createQueuedMessageStore> | undefined
@@ -2552,9 +2554,10 @@ if (!ownsSingleInstanceLock) {
         ? folderCommits.changes(workspacePath).catch((): FolderChanges => ({ kind: 'none', why: 'not-a-repository' }))
         : ({ kind: 'none', why: 'not-a-repository' } as FolderChanges)
     )
-    ipcMain.handle(FOLDER_COMMIT_CHANNEL, (event, message: unknown, then: unknown) =>
+    ipcMain.handle(FOLDER_COMMIT_CHANNEL, (event, message: unknown, then: unknown, shown: unknown) =>
       fromOwnWindow(event) && typeof message === 'string' && message.length <= 20_000 && (then === 'commit' || then === 'push' || then === 'pull-request')
-        ? folderCommits.commit(workspacePath, message, then).catch((error: unknown): CommitResult => ({ kind: 'refused', message: error instanceof Error ? error.message : 'The commit could not be made.' }))
+        && Array.isArray(shown) && shown.length <= 100_000 && shown.every((path) => typeof path === 'string' && path.length <= 4_096)
+        ? folderCommits.commit(workspacePath, message, then, shown as string[]).catch((error: unknown): CommitResult => ({ kind: 'refused', message: error instanceof Error ? error.message : 'The commit could not be made.' }))
         : ({ kind: 'refused', message: 'That commit request was not understood.' } as CommitResult)
     )
     ipcMain.handle(RUNTIME_UPDATES_CHANNEL, (event) =>

@@ -6,6 +6,7 @@ import { CHECKPOINT_MAX_FILE_BYTES, defaultRunGit, statusEntriesOf } from './wor
 import { ownGitArgs } from './git-guard.js'
 import type { ChangeStatus, CommitResult, CommitThen, FolderChanges, FolderRemote } from '../shared/folder-commit.js'
 import { blockedSentence } from '../shared/folder-commit.js'
+import { githubRepoOf } from './cloud-tasks.js'
 
 /**
  * COMMIT, PUSH, PULL REQUEST (0.680): the folder's changes, saved in git by
@@ -32,6 +33,10 @@ export interface FolderCommitOptions {
 }
 
 const NETWORK_TIMEOUT_MS = 120_000
+/** A branch name Locust hands to git: never one that starts with a dash or carries anything unusual. */
+const SAFE_BRANCH = /^[A-Za-z0-9_][A-Za-z0-9._/-]{0,199}$/
+const sameFiles = (left: readonly string[], right: readonly string[]): boolean =>
+  left.length === right.length && [...left].sort().every((path, index) => path === [...right].sort()[index])
 /** Never `.locust/`: teammates' branches and comparison copies live there. */
 const NOT_LOCUST = ['--', '.', ':(exclude).locust'] as const
 
@@ -98,7 +103,8 @@ export function createFolderCommits(options: FolderCommitOptions = {}) {
       const known = await runGit(['branch', '-r', '--format=%(refname:short)'], folder).catch(() => '')
       defaultBranch = /^origin\/main$/m.test(known) ? 'main' : /^origin\/master$/m.test(known) ? 'master' : 'main'
     }
-    const github = /(^|[@/])github\.com[:/]/i.test(url)
+    // GitHub by the URL's own host (Sol's review: https://evil.example/github.com/owner/repo.git passed the old test).
+    const github = githubRepoOf(url) !== undefined && SAFE_BRANCH.test(defaultBranch)
     return { name: 'origin', upstream, defaultBranch, pullRequests: github && (await ghSignedIn(folder)) }
   }
 
@@ -119,6 +125,7 @@ export function createFolderCommits(options: FolderCommitOptions = {}) {
     if (entries.length === 0) return { kind: 'none', why: 'clean' }
     const branch = (await runGit(['symbolic-ref', '--short', '-q', 'HEAD'], folder).catch(() => '')).trim()
     if (branch.length === 0) return { kind: 'blocked', why: 'detached', files: [] }
+    if (!SAFE_BRANCH.test(branch)) return { kind: 'blocked', why: 'branch-name', files: [] }
     const remote = await remoteOf(folder, branch)
     return {
       kind: 'changes',
@@ -128,10 +135,14 @@ export function createFolderCommits(options: FolderCommitOptions = {}) {
     }
   }
 
-  const commit = async (folder: string, message: string, then: CommitThen): Promise<CommitResult> => {
+  const commit = async (folder: string, message: string, then: CommitThen, shown?: readonly string[]): Promise<CommitResult> => {
     const now = await changes(folder)
     if (now.kind !== 'changes') {
       return { kind: 'refused', message: now.kind === 'none' ? 'There is nothing to commit in this folder now.' : blockedSentence(now.why) }
+    }
+    // Bound to what the person was shown (Sol's review): a file that changed or appeared since is not taken unseen.
+    if (shown !== undefined && !sameFiles(shown, now.files.map((file) => file.path))) {
+      return { kind: 'refused', message: 'The folder changed since this was opened, so nothing was committed. Look at the list again, then commit.' }
     }
     const text = message.trim()
     if (text.length === 0) return { kind: 'refused', message: 'A commit needs a message.' }
@@ -150,6 +161,12 @@ export function createFolderCommits(options: FolderCommitOptions = {}) {
       try {
         await runGit(['switch', '-q', '-c', name], folder)
       } catch (error) {
+        // A post-checkout hook fails AFTER the switch (Sol's review): back to where it was, the new branch gone.
+        const onNow = (await runGit(['symbolic-ref', '--short', '-q', 'HEAD'], folder).catch(() => '')).trim()
+        if (onNow === name) {
+          await runGit(['switch', '-q', now.branch], folder).catch(() => '')
+          await runGit(['branch', '-q', '-D', name], folder).catch(() => '')
+        }
         return { kind: 'refused', message: `git could not make a branch for the pull request: ${error instanceof Error ? error.message : 'no reason given'}` }
       }
       branch = name
@@ -169,25 +186,35 @@ export function createFolderCommits(options: FolderCommitOptions = {}) {
       return { kind: 'refused', message: `git could not read what is staged: ${error instanceof Error ? error.message : 'no reason given'}` }
     }
     const leftOut: string[] = []
+    let staged: string | undefined
     try {
+      // Already staged under .locust/ (Sol's review): taken off the index, never committed.
+      const locustStaged = (await runGit(['diff', '--cached', '--name-only', '-z', '--', '.locust'], folder)).split('\0').filter((file) => file.length > 0)
+      if (locustStaged.length > 0) await runGit(['reset', '-q', '--', '.locust'], folder)
       await runGit(['add', '-A', ...NOT_LOCUST], folder, 5 * 60_000)
       for (const file of now.files.filter((one) => one.status === 'added')) {
         const bytes = await stat(join(folder, file.path)).then((found) => found.size, () => 0)
         if (bytes > CHECKPOINT_MAX_FILE_BYTES) leftOut.push(file.path)
       }
       if (leftOut.length > 0) await runGit(['reset', '-q', '--', ...leftOut], folder)
+      staged = (await runGit(['write-tree'], folder)).trim()
       await runGit(['commit', '-q', '-m', text], folder, 5 * 60_000)
     } catch (error) {
-      await runGit(['read-tree', saved], folder).catch(() => '')
+      // Put back only if the index is still what Locust staged (Sol's review): a person who staged something else
+      // while a slow hook ran keeps it, and is told.
+      const current = await runGit(['write-tree'], folder).then((tree) => tree.trim(), () => undefined)
+      const ours = staged === undefined || current === staged
+      if (ours) await runGit(['read-tree', saved], folder).catch(() => '')
       await backToStart()
       const said = error instanceof Error ? error.message : ''
+      const kept = ours ? '' : ' What is staged changed while the commit ran, so Locust left it as it is.'
       return {
         kind: 'refused',
-        message: /tell me who you are|user\.email|user\.name/i.test(said)
+        message: (/tell me who you are|user\.email|user\.name/i.test(said)
           ? 'git does not know your name and email yet, so it cannot make the commit as you. Set them with git config user.name and user.email, then commit again.'
           : /nothing (added )?to commit/i.test(said)
             ? 'There was nothing left to commit.'
-            : `Your commit hooks refused the commit: ${said.replace(/^git commit:\s*/, '')}`
+            : `Your commit hooks refused the commit: ${said.replace(/^git commit:\s*/, '')}`) + kept
       }
     }
     const sha = (await runGit(['rev-parse', 'HEAD'], folder)).trim()
@@ -195,7 +222,7 @@ export function createFolderCommits(options: FolderCommitOptions = {}) {
     const done = { kind: 'done' as const, sha, branch, files, leftOut, ...(newBranch === undefined ? {} : { newBranch }) }
     if (then === 'commit') return done
     try {
-      await runNetwork('git', ['push', ...(now.remote?.upstream === true && newBranch === undefined ? [] : ['-u']), 'origin', branch], folder)
+      await runNetwork('git', ['push', ...(now.remote?.upstream === true && newBranch === undefined ? [] : ['-u']), 'origin', `refs/heads/${branch}:refs/heads/${branch}`], folder)
     } catch (error) {
       return { ...done, pushed: false, after: `The push was refused: ${error instanceof Error ? error.message : 'no reason given'}` }
     }
@@ -203,7 +230,8 @@ export function createFolderCommits(options: FolderCommitOptions = {}) {
     const [subject = text, ...rest] = text.split('\n')
     const body = rest.join('\n').trim()
     try {
-      const said = await runNetwork('gh', ['pr', 'create', '--title', subject, '--body', body.length > 0 ? body : subject, '--head', branch, '--base', now.remote!.defaultBranch], folder)
+      // Each value joined to its flag, so none of them can be read as a flag of its own.
+      const said = await runNetwork('gh', ['pr', 'create', `--title=${subject}`, `--body=${body.length > 0 ? body : subject}`, `--head=${branch}`, `--base=${now.remote!.defaultBranch}`], folder)
       const url = /https:\/\/\S+\/pull\/\d+/.exec(said)?.[0]
       return { ...done, pushed: true, ...(url === undefined ? {} : { pullRequestUrl: url }) }
     } catch (error) {
