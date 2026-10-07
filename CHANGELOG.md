@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.682.0 - 2026-10-06
+
+### Added
+
+- **Voice typing (Windows).** A microphone button sits beside Send. Press it, speak, and press it again: your words appear in the message box at the cursor, ready to edit. Nothing is sent until you send it, and Esc cancels.
+  - **It runs on your computer.** Nothing you say leaves it.
+  - **A one-time download, the first time you press it:** about 41 MB, after you agree. It isn't in the installer, and nothing loads until you use it.
+  - **Checked on arrival:** every downloaded file is checked against a known fingerprint, and a file that doesn't match is deleted.
+  - **Access:** the microphone is allowed only for Locust's own window, and only audio.
+
 ## 0.681.0 - 2026-10-06
 
 ### Fixed
