@@ -25,6 +25,7 @@
 # around it: the drive and probe scripts, design mockups, records, test
 # harnesses and build scripts stay in the repository, uncounted.
 _tools/** linguist-detectable=false
+_smoke/** linguist-detectable=false
 design/** linguist-detectable=false
 docs/** linguist-documentation
 apps/desktop/test/** linguist-detectable=false
