@@ -87,7 +87,9 @@ describe('what the fold holds', () => {
       // Sonnet 5 joined the fold when `sonnet` moved on to 5.5 (Claude Code 2.1.284).
       'claude-sonnet-5',
       'claude-sonnet-4-6',
-      'claude-sonnet-4-5'
+      'claude-sonnet-4-5',
+      // Haiku 4.5 joined it when `haiku` moved on to 5.5 (Claude Code 2.1.293), under the id Claude Code lists.
+      'claude-haiku-4-5-20251001'
     ])
     expect(CLAUDE_OLDER_MODELS.some((model) => /claude-3|mythos/.test(model.id))).toBe(false)
   })
