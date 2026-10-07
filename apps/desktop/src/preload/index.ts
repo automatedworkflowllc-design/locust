@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { REMOTE_CONTROL_GET_CHANNEL, REMOTE_CONTROL_SET_CHANNEL, type RemoteControlState } from '../shared/claude-remote-control.js'
+import { FOLDER_CHANGES_CHANNEL, FOLDER_COMMIT_CHANNEL, type CommitResult, type FolderChanges } from '../shared/folder-commit.js'
 import { QUEUED_MESSAGES_READ_CHANNEL, QUEUED_MESSAGES_WRITE_CHANNEL } from '../shared/queued-messages.js'
 import type { QueuedMessagesResponse, SavedQueuedMessage } from '../shared/queued-messages.js'
 import type { CompareSlotId } from '../shared/compare.js'
@@ -524,6 +525,8 @@ const desktopApi: DesktopApi = {
   turnUndoStates: (runIds: readonly string[]) =>
     ipcRenderer.invoke(TURN_UNDO_STATE_CHANNEL, [...runIds]) as Promise<Readonly<Record<string, TurnUndoState>>>,
   undoTurn: (runId: string) => ipcRenderer.invoke(TURN_UNDO_CHANNEL, runId) as Promise<TurnUndoState>,
+  folderChanges: () => ipcRenderer.invoke(FOLDER_CHANGES_CHANNEL) as Promise<FolderChanges>,
+  commitFolder: (message, then) => ipcRenderer.invoke(FOLDER_COMMIT_CHANNEL, message, then) as Promise<CommitResult>,
   onRuntimeUpdates: (listener: (state: RuntimeUpdatesState) => void) => {
     const handler = (_event: unknown, state: RuntimeUpdatesState): void => listener(state)
     ipcRenderer.on(RUNTIME_UPDATES_EVENT_CHANNEL, handler)

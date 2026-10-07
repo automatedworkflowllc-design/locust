@@ -151,6 +151,7 @@ import { BesideConversation } from './components/BesideConversation.js'
 import { SideChat } from './components/SideChat.js'
 import { CloudTasks } from './components/CloudTasks.js'
 import { ReviewChanges } from './components/ReviewChanges.js'
+import { CommitChanges } from './components/CommitChanges.js'
 import { ShareTeamDialog } from './components/TeamCard.js'
 import { RuntimeMark } from './components/RuntimeMark.js'
 import { OpenInTerminalButton, terminalOffer } from './components/OpenInTerminal.js'
@@ -8138,6 +8139,14 @@ export default function App(): ReactElement {
                     >
                       <Icon name="dots" size={13} />
                     </button>
+                  )}
+                  {/* Commit (0.680): the folder's own changes. A teammate on its own branch has Review and Land instead. */}
+                  {workspacePath !== undefined && pickedTeammate?.worktree !== true && liveRun !== undefined && (
+                    <CommitChanges
+                      running={running}
+                      asks={[...(liveRun.earlierTurns ?? []).map((turn) => turn.prompt), liveRun.prompt].map((prompt) => splitAttachments(prompt).text).slice(-5)}
+                      {...(pickedTeammate === undefined ? {} : { teammate: pickedTeammate.name })}
+                    />
                   )}
                   {/* Review changes (0.439): only a teammate on its own branch has one to review. */}
                   {pickedTeammate?.worktree === true && (

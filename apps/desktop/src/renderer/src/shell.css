@@ -19738,3 +19738,138 @@ textarea {
   margin: 0;
   padding-left: var(--lc-space-4);
 }
+
+/* COMMIT (0.680): the folder's changes, from the conversation header. Land's own parts, in a menu's frame. */
+.lc-commitwrap {
+  position: relative;
+}
+
+.lc-commit {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-3);
+  padding: var(--lc-space-4);
+  background: var(--lc-bg-raised-2);
+  border: 1px solid var(--lc-border-strong);
+  border-radius: 11px;
+  box-shadow: var(--lc-shadow-menu);
+  z-index: 20;
+  text-align: left;
+}
+
+.lc-commit__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lc-space-3);
+}
+
+.lc-commit__title {
+  color: var(--lc-text-primary);
+  font-size: var(--lc-text-control);
+  font-weight: 500;
+}
+
+.lc-commit__branch,
+.lc-commit__more,
+.lc-commit__note {
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
+}
+
+.lc-commit__note {
+  margin: 0;
+}
+
+.lc-commit__files {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lc-commit__file {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lc-space-3);
+  min-width: 0;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-secondary);
+}
+
+.lc-commit__status {
+  flex: none;
+  width: 1ch;
+  color: var(--lc-amber-text);
+}
+
+.lc-commit__status--added {
+  color: var(--lc-green-text);
+}
+
+.lc-commit__status--deleted {
+  color: var(--lc-red-text);
+}
+
+.lc-commit__path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-commit__label {
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+}
+
+.lc-commit__message {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  padding: 8px 10px;
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-button);
+  background: var(--lc-bg-chrome);
+  color: var(--lc-text-primary);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  line-height: 1.5;
+}
+
+.lc-commit__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--lc-space-3);
+}
+
+.lc-commit__said {
+  margin: 0;
+  color: var(--lc-text-secondary);
+  font-size: var(--lc-text-description);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.lc-commit__said--refused {
+  color: var(--lc-amber-text);
+}
+
+.lc-commit__link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--lc-lime-text);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}

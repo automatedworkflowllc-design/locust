@@ -101,6 +101,8 @@ import type { AwaySummaryCounts } from '../shared/away.js'
 import { createRecentEdits } from './recent-edits.js'
 import { createCheckpoints, createTurnRecords } from './checkpoints.js'
 import { clearClaudeSkillCopies, prepareClaudeSkills } from './claude-skills.js'
+import { createFolderCommits } from './folder-commit.js'
+import { FOLDER_CHANGES_CHANNEL, FOLDER_COMMIT_CHANNEL, type CommitResult, type FolderChanges } from '../shared/folder-commit.js'
 import { readRuntimeArtifacts } from './runtime-artifacts.js'
 import { relative } from 'node:path'
 import { decideReveal, insideOnDisk } from './reveal-file.js'
@@ -2535,6 +2537,18 @@ if (!ownsSingleInstanceLock) {
       fromOwnWindow(event) && typeof runId === 'string'
         ? turnRecords.undo(runId, checkpoints, () => new Date()).catch((): TurnUndoState => ({ kind: 'none' }))
         : ({ kind: 'none' } as TurnUndoState)
+    )
+    // Commit (0.680): the open folder only -- no path crosses the bridge, and the commit is the person's press.
+    const folderCommits = createFolderCommits()
+    ipcMain.handle(FOLDER_CHANGES_CHANNEL, (event) =>
+      fromOwnWindow(event)
+        ? folderCommits.changes(workspacePath).catch((): FolderChanges => ({ kind: 'none', why: 'not-a-repository' }))
+        : ({ kind: 'none', why: 'not-a-repository' } as FolderChanges)
+    )
+    ipcMain.handle(FOLDER_COMMIT_CHANNEL, (event, message: unknown, then: unknown) =>
+      fromOwnWindow(event) && typeof message === 'string' && message.length <= 20_000 && (then === 'commit' || then === 'push' || then === 'pull-request')
+        ? folderCommits.commit(workspacePath, message, then).catch((error: unknown): CommitResult => ({ kind: 'refused', message: error instanceof Error ? error.message : 'The commit could not be made.' }))
+        : ({ kind: 'refused', message: 'That commit request was not understood.' } as CommitResult)
     )
     ipcMain.handle(RUNTIME_UPDATES_CHANNEL, (event) =>
       fromOwnWindow(event) ? runtimeUpdates.state().then(toldHere) : { automatic: false, checkedAt: undefined, agents: [] }

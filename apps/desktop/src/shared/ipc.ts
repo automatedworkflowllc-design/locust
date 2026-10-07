@@ -1,6 +1,7 @@
 import type { ReverseChange } from './reverse-diff.js'
 import type { AwaySummaryCounts } from './away.js'
 import type { RemoteControlState } from './claude-remote-control.js'
+import type { CommitResult, CommitThen, FolderChanges } from './folder-commit.js'
 import type { MissionRuntimeId, NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
 import type { QueuedMessagesResponse, SavedQueuedMessage } from './queued-messages.js'
 
@@ -3513,6 +3514,10 @@ export interface DesktopApi {
   turnUndoStates(runIds: readonly string[]): Promise<Readonly<Record<string, TurnUndoState>>>
   /** Puts back what the run changed, where the files are still as it left them. */
   undoTurn(runId: string): Promise<TurnUndoState>
+  /** Commit (0.680): what the open folder has uncommitted, and whether it can be pushed or proposed. */
+  folderChanges(): Promise<FolderChanges>
+  /** Commit it all as the person, then push or open a pull request when asked. */
+  commitFolder(message: string, then: CommitThen): Promise<CommitResult>
   /** An update started, landed or failed. Returns the unsubscribe. */
   onRuntimeUpdates(listener: (state: RuntimeUpdatesState) => void): () => void
   /** Open the runtime's sign-in in its own window. */
