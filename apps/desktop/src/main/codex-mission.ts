@@ -2376,6 +2376,15 @@ ${sentPrompt.trim()}`
           // behind it (L5). The catch below records this as the reason.
           if (disposed || startLifecycleVersion !== lifecycleVersion) throw new Error('The Codex mission was stopped before launch.')
           if (codexStreams) {
+            /*
+             * "Starting <runtime>" from here on every route (0.699). Only the
+             * plain-process route below said it, so Codex's app server,
+             * OpenCode's server (every OpenCode mode since 0.677) and
+             * Copilot's ACP went from "Reading the folder" -- done by then --
+             * straight to "Working", and the start's note could not tell the
+             * CLI's own boot from Locust's (drive-the-start-says-its-phase).
+             */
+            say('starting-runtime')
             // The policy is chosen here, not carried in the argv, because on
             // this transport it is JSON on a socket -- so the rule that only
             // a full-access mission may say `danger-full-access` is enforced
@@ -2408,6 +2417,7 @@ ${sentPrompt.trim()}`
             process = streamed
             steer = streamed.steer
           } else if (opencodeServes) {
+            say('starting-runtime')
             // Each thing OpenCode asks becomes the same card Codex's do, and
             // the person's answer goes back as the server's own reply.
             const handler = mode === 'approve-each' ? options.approvals?.requestHandlerFor({ runId, missionId, cwd: runCwd, changesByItem, runtime: 'opencode' }) : undefined
@@ -2431,6 +2441,7 @@ ${sentPrompt.trim()}`
               now
             })
           } else if (copilotAcp) {
+            say('starting-runtime')
             // Each thing Copilot asks becomes the same card Codex's do. A
             // denial's reason -- which ACP's answer has no room for -- and a
             // message to the busy teammate both reach it as its next prompt,
