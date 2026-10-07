@@ -87,14 +87,18 @@ try {
       card.querySelector('.lc-hometeam__name')?.textContent.trim().split(/\\s+/)[0] ?? '',
       card.querySelector('.lc-hometeam__route')?.getAttribute('title') ?? ''
     ])),
-    folded: [...document.querySelectorAll('.lc-agenthead__marks .lc-runtimemark')].map((svg) => svg.getAttribute('aria-label')),
+    // Each folded mark is named on its wrapper, which is what is announced (AgentMark, 0.389); the icon inside is hidden.
+    folded: [...document.querySelectorAll('.lc-agenthead__marks .lc-agentmark')].map((mark) => mark.getAttribute('aria-label')),
     rows: [...document.querySelectorAll('.lc-runtimecell__name .lc-runtimemark')].map((svg) => svg.getAttribute('data-runtime'))
   }`)
   await drive.capture('Home: the team, and the agents on this machine', () => JSON.stringify(home))
   check('every Home card wears its route’s mark', everyoneWearsTheirs(home.cards) && home.cards.every(([, runtime]) => runtime !== null), JSON.stringify(home.cards))
-  check('Home names the model a teammate RUNS: Sonnet 5, Gemini 3.8 Flash -- the mark stands for the runtime', home.lines.Wren === 'Sonnet 5' && home.lines.Boss === 'Gemini 3.8 Flash', JSON.stringify(home.lines))
+  // What `sonnet` runs today, as the app's own catalog names it (Claude Code's list since 0.697): it moved from
+  // Sonnet 5 to 5.5 on 9/28, and a version written here goes stale with the next release.
+  const sonnet = String(await drive.evaluate(`window.desktop.listModels().then((answer) => (answer.ok ? answer.data.models : []).find((m) => m.runtime === 'claude' && m.id === 'sonnet')?.displayName ?? 'no sonnet row')`))
+  check(`Home names the model a teammate RUNS: ${sonnet}, Gemini 3.8 Flash -- the mark stands for the runtime`, /^Sonnet \d/.test(sonnet) && home.lines.Wren === sonnet && home.lines.Boss === 'Gemini 3.8 Flash', JSON.stringify(home.lines))
   // Sonnet reports levels; Antigravity's tiers report none.
-  check('the hover names the whole route, with the level where the model has one', /^Claude · Sonnet 5 · [A-Z]/.test(home.titles.Wren ?? '') && home.titles.Boss === 'Antigravity · Gemini 3.8 Flash', JSON.stringify(home.titles))
+  check('the hover names the whole route, with the level where the model has one', (home.titles.Wren ?? '').startsWith(`Claude · ${sonnet} · `) && home.titles.Boss === 'Antigravity · Gemini 3.8 Flash', JSON.stringify(home.titles))
   check('the agents line shows marks, named, or each agent row has one', home.folded.length > 0 ? home.folded.every((label) => typeof label === 'string' && label.length > 0) : home.rows.length > 0, JSON.stringify(home))
 
   // 2. The Team board.

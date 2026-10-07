@@ -72,15 +72,30 @@ try {
     await new Promise((r) => setTimeout(r, 1000))
     const toggle = document.querySelector('button[role="switch"][aria-label="Beta builds"]')
     const note = toggle?.closest('.lc-settingrow')?.querySelector('.lc-settings__note')?.textContent ?? null
+    // The Network line lives on Privacy & data, beside the storage it describes.
+    ;[...document.querySelectorAll('button, a')].find((b) => /^Privacy & data$/.test((b.textContent ?? '').trim()))?.click()
+    await new Promise((r) => setTimeout(r, 1000))
     const network = [...document.querySelectorAll('dt')].find((dt) => dt.textContent.trim() === 'Network')?.nextElementSibling?.textContent?.replace(/\\s+/g, ' ').trim() ?? null
+    page?.click()
+    await new Promise((r) => setTimeout(r, 800))
     return JSON.stringify({ switch: toggle === null ? null : toggle.getAttribute('aria-checked'), note, network })
   })()`))
   const before = JSON.parse(String(settings))
   // Its words: "Beta builds" since 0.311 (Colin: "wayyy too wordy"); 0.310 said
   // "New versions as they are released"; 0.307-0.309 "One new build a day",
   // untrue once every verified build was the release.
+  check('the Network line names what Locust itself fetches', /checks for and downloads its own updates/.test(before.network ?? '') && /Codex CLI and Copilot CLI current/.test(before.network ?? ''), JSON.stringify(before.network))
+  /*
+   * The switch is drawn only where this copy can update itself (Screens.tsx:
+   * not when updates are 'unsupported'), and a drive's copy never updates
+   * (test-copies-must-never-update): here there is nothing to read, as in
+   * drive-teammate-model. drive-update-lane drives the lane where it exists.
+   */
+  if (before.switch === null) {
+    say('  (updates are off in this test copy, so the Beta builds switch is not drawn: the lane checks are skipped)')
+    throw new Error('SKIP_LANE')
+  }
   check('Settings > Updates has the lane switch, off: releases', before.switch === 'false' && /^(Beta builds|New versions as they are released|One new build a day)/.test(before.note ?? ''), String(settings))
-  check('the Network line names what Locust itself fetches', /checks for and downloads its own updates, and new Codex CLI and Copilot CLI versions/.test(before.network ?? ''), JSON.stringify(before.network))
 
   const flipped = await drive.capture('the switch turned on: every build', () => drive.evaluate(`(async () => {
     document.querySelector('button[role="switch"][aria-label="Beta builds"]')?.click()
@@ -95,7 +110,8 @@ try {
   check('and the choice is saved in the profile', /"everyBuild":true/.test(lane), lane)
   say(failures === 0 ? '\nSTART AND LANE PASSED' : `\nSTART AND LANE: ${String(failures)} FAILED`)
 } catch (error) {
-  say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
+  if (error instanceof Error && error.message === 'SKIP_LANE') say(failures === 0 ? '\nSTART AND LANE PASSED (no lane switch in a test copy)' : `\nSTART AND LANE: ${String(failures)} FAILED`)
+  else say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
   await drive.finish({ intro: 'A fresh profile: where the composer starts; Settings > Updates, the lane switch off then on; the Network line. Sends nothing.' })
 }

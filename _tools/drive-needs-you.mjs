@@ -67,12 +67,18 @@ const check = (what, ok, detail) => {
 const CHIP = `(() => (document.querySelector('.lc-needsyou')?.innerText ?? '').replace(/\\s+/g, ' ').trim())()`
 const chip = async () => String(await drive.evaluate(CHIP))
 const home = () => drive.evaluate(`(async () => { document.querySelector('.lc-brand__lockup')?.click(); await new Promise(r => setTimeout(r, 800)); return 'home' })()`)
-/** Open the list, and read its rows; the menu is left open. */
+/**
+ * Open the list, and read its rows; the menu is left open. Opened only if it is
+ * not already: a row that was never there leaves it open, and a second click
+ * shut it -- one model that did not ask read as nine failures (2026-10-07).
+ */
 const LIST = `(async () => {
   const button = document.querySelector('.lc-needsyou')
   if (button === null) return JSON.stringify({ rows: [] })
-  button.click()
-  await new Promise(r => setTimeout(r, 500))
+  if (document.querySelector('.lc-context') === null) {
+    button.click()
+    await new Promise(r => setTimeout(r, 500))
+  }
   const rows = [...document.querySelectorAll('.lc-context .lc-context__item')].map((row) => (row.querySelector('.lc-context__label')?.textContent ?? row.innerText).trim())
   return JSON.stringify({ rows })
 })()`

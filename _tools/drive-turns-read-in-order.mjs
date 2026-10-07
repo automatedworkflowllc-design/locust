@@ -1,6 +1,6 @@
 // A turn reads in the order it happened (0.491), on REAL turns.
 //
-//   node _tools/drive-turns-read-in-order.mjs [--packaged <exe>] [--tag <name>] [--missions id,id,...]
+//   node _tools/drive-turns-read-in-order.mjs --ledger <folder> [--packaged <exe>] [--tag <name>] [--missions id,id,...]
 //
 // Colin, 2026-09-30: "compared to claude code, ALL of our commands and stuff
 // that would appear batched on screen seem to all get rolled into the bar".
@@ -23,7 +23,15 @@ const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.i
 const packaged = arg('--packaged')
 const tag = arg('--tag') ?? 'local'
 const SCRATCH = process.env.LOCUST_SCRATCH ?? tmpdir()
-const LEDGER = arg('--ledger') ?? join(process.env.APPDATA ?? '', '@teammate', 'desktop', 'mission-ledger')
+/*
+ * Whose record: given by hand, never this machine's own profile by default (2026-10-07). It copies whole
+ * conversations, and the person's profile is read for numbers and keys only; the sweep skips this drive.
+ */
+const LEDGER = arg('--ledger')
+if (LEDGER === undefined) {
+  say('usage: --ledger <a mission-ledger folder of test conversations> -- never the person’s own profile')
+  process.exit(2)
+}
 const MISSIONS = (arg('--missions') ?? '79f6d728-1b1f-48af-9c1e-62b07d8fe40c,cdfab7a8-76f0-4f56-bf8c-02be653c751a,52079851-50bb-4265-a83b-db3c67569766,2f0bffe3-6b25-45c2-b851-474d9977dc01').split(',')
 const OUT = await mkdtemp(join(SCRATCH, `turns-read-in-order-${tag}-`))
 

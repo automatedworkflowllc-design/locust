@@ -86,7 +86,8 @@ try {
   const distinct = [...new Set(seen.seen ?? [])]
   check('the row wears the spark while the run works', seen.spark === true, JSON.stringify(seen.box))
   check('it turns through Claude Code\'s glyphs', distinct.length >= 5 && distinct.every((glyph) => ['·', '✢', '✳', '✶', '✻', '✽'].includes(glyph)), distinct.join(' '))
-  check('in the live lime', seen.color === 'rgb(201, 240, 74)', seen.color)
+  // Monochrome since 0.429 (Colin, 2026-09-28: it was the one coloured thing in the sidebar): the text's own colour.
+  check('in the text colour, not a hue', seen.color === 'rgb(242, 239, 233)', seen.color)
   check('drives still know the row is working', String(await drive.evaluate(`String(${conversationRows()}[0]?.running)`)) === 'true')
   const during = await titleX()
   for (let i = 0; i < 20; i += 1) {

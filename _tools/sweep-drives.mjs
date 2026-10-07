@@ -55,7 +55,8 @@ const LIMIT_MS = Number(arg('--limit-min') ?? '20') * 60_000
  */
 const SKIP = {
   'drive-context-menu': 'needs --reuse <profile>: it opens a profile another drive made',
-  'drive-update-lane': 'needs an OLDER build and --expect-latest / --expect-every: run by hand after a release'
+  'drive-update-lane': 'needs an OLDER build and --expect-latest / --expect-every: run by hand after a release',
+  'drive-turns-read-in-order': 'needs --ledger <folder>: it copies whole conversations, never from the person’s own profile'
 }
 
 /**
