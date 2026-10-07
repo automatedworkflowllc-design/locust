@@ -11,6 +11,14 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.690.0 - 2026-10-07
+
+### Fixed
+
+- **A routine's time that passes while its last run is still going now says Missed.** Locust never starts a second copy of a routine over one that is still running. It used to drop that time without a word. The routine's card now says, for example, "Missed, 08:00 today" with Run now, the same as a time that passed while Locust was closed.
+- **Antigravity usage on Home is read only from agy 1.1.11 or newer.** Older versions could send `/usage` to the model as a message and spend a turn. On an older or unknown version, Home leaves the line out.
+- **A teammate's own branch starts more reliably.** On Windows, long project paths no longer stop it being made. A setup hook in your repository that fails after the branch is ready, such as Git LFS, no longer fails the teammate's start: Locust checks the branch is really there and usable first, and notes the hook's message in its log.
+
 ## 0.689.0 - 2026-10-07
 
 ### Fixed
