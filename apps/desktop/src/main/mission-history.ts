@@ -5,7 +5,7 @@ import { dirname } from 'node:path'
 import { workspaceIdFor } from './workspace.js'
 import { EVENT_WINDOW, windowEvents } from '../shared/event-window.js'
 import { joinMessageFragments } from '../shared/messageFragments.js'
-import { monthOf, moneyOfRun, sumSpend } from '../shared/spend.js'
+import { isOwnModel, monthOf, moneyOfRun, sumSpend, unpricedRunAt } from '../shared/spend.js'
 import type { RunMoney, Spend } from '../shared/spend.js'
 import type { MissionLedger, RecoveredMission, Workroom, WorkroomMessage } from '@teammate/mission-store'
 import type { MissionReadResponse,
@@ -526,6 +526,8 @@ interface CachedLedgerFile {
   readonly eventsTruncated: boolean
   /** What the run cost in money, and when it ended; absent when it reported none. */
   readonly money?: RunMoney
+  /** When a run on a model of the person's own ended with tokens and no price (0.689). */
+  readonly unpricedAt?: string
   /** The whole record, kept only while it is among the newest. */
   full?: RecoveredMission
 }
@@ -587,6 +589,7 @@ async function refreshedLedger(ledger: MissionLedger): Promise<{
       return
     }
     const money = moneyOfRun(mission.events)
+    const unpricedAt = unpricedRunAt(mission.events, isOwnModel(mission.metadata.runtime, mission.metadata.model))
     cache.set(missionId, {
       missionId,
       stamp,
@@ -595,6 +598,7 @@ async function refreshedLedger(ledger: MissionLedger): Promise<{
       eventCount: mission.events.length,
       eventsTruncated: joinMessageFragments(mission.events).length > MAX_HISTORY_EVENTS,
       ...(money === undefined ? {} : { money }),
+      ...(unpricedAt === undefined ? {} : { unpricedAt }),
       full: mission
     })
   }
@@ -629,8 +633,9 @@ export async function spendByTeammate(
   const runs = new Map<string, Spend[]>()
   for (const entry of refreshed.entries) {
     const owner = owners[entry.missionId]
-    if (owner === undefined || entry.money === undefined || monthOf(entry.money.at) !== month) continue
-    runs.set(owner, [...(runs.get(owner) ?? []), entry.money])
+    if (owner === undefined) continue
+    if (entry.money !== undefined && monthOf(entry.money.at) === month) runs.set(owner, [...(runs.get(owner) ?? []), entry.money])
+    if (entry.unpricedAt !== undefined && monthOf(entry.unpricedAt) === month) runs.set(owner, [...(runs.get(owner) ?? []), { unpricedRuns: 1 }])
   }
   const totals = new Map<string, Spend>()
   for (const [teammateId, list] of runs) {

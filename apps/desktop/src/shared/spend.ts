@@ -19,6 +19,14 @@ export interface Spend {
   readonly usd?: number
   /** Copilot's premium requests: shown, never limited here -- GitHub limits their overage itself. */
   readonly premiumRequests?: number
+  /**
+   * Runs on a model of the person's own that used tokens and reported no
+   * price (0.689). Its provider may bill by the token while OpenCode, which
+   * declares it with no price, reports nothing -- so these are counted as
+   * runs, never as dollars, and the card says so rather than "$0.00"
+   * (Grok's read of 0.687, after Paperclip's "unpriced").
+   */
+  readonly unpricedRuns?: number
 }
 
 /** One run's money and the moment it ended, which is the month it counts in. */
@@ -57,16 +65,45 @@ export function moneyOfRun(events: readonly NormalizedRuntimeEvent[]): RunMoney 
   }
 }
 
-/** Added up; undefined when nothing in the list was money. */
+/**
+ * When a run on a model of the person's own ended having used tokens with no
+ * price on its receipt; undefined for every other run. A local model is free
+ * and a paid gateway is not, and the receipt cannot tell them apart.
+ */
+export function unpricedRunAt(events: readonly NormalizedRuntimeEvent[], ownModel: boolean): string | undefined {
+  if (!ownModel) return undefined
+  const completed = events.find((event) => event.type === 'run.completed')
+  if (completed === undefined) return undefined
+  const usage = (completed.payload as { readonly usage?: unknown }).usage
+  if (typeof usage !== 'object' || usage === null) return undefined
+  const record = usage as Record<string, unknown>
+  const money = moneyOfUsage(record)
+  if (money.plan || money.usd !== undefined || money.premiumRequests !== undefined) return undefined
+  const used = (amount(record.inputTokens) ?? 0) + (amount(record.outputTokens) ?? 0)
+  return used > 0 ? completed.occurredAt : undefined
+}
+
+/** Whether a run's model is one the person added in Settings, which OpenCode runs. */
+export function isOwnModel(runtime: unknown, model: unknown): boolean {
+  return runtime === 'opencode' && typeof model === 'string' && model.startsWith('own-')
+}
+
+/** Added up; undefined when nothing in the list was money or an unpriced run. */
 export function sumSpend(list: readonly (Spend | undefined)[]): Spend | undefined {
   let usd: number | undefined
   let premiumRequests: number | undefined
+  let unpricedRuns: number | undefined
   for (const spend of list) {
     if (spend?.usd !== undefined) usd = (usd ?? 0) + spend.usd
     if (spend?.premiumRequests !== undefined) premiumRequests = (premiumRequests ?? 0) + spend.premiumRequests
+    if (spend?.unpricedRuns !== undefined) unpricedRuns = (unpricedRuns ?? 0) + spend.unpricedRuns
   }
-  if (usd === undefined && premiumRequests === undefined) return undefined
-  return { ...(usd === undefined ? {} : { usd }), ...(premiumRequests === undefined ? {} : { premiumRequests }) }
+  if (usd === undefined && premiumRequests === undefined && unpricedRuns === undefined) return undefined
+  return {
+    ...(usd === undefined ? {} : { usd }),
+    ...(premiumRequests === undefined ? {} : { premiumRequests }),
+    ...(unpricedRuns === undefined ? {} : { unpricedRuns })
+  }
 }
 
 /**

@@ -363,6 +363,9 @@ export function moneyLine(cost: RunCost | undefined): string | undefined {
   return costUnit(cost) === 'money' ? costLine(cost) : undefined
 }
 
+/** Why some runs carry no price, said where they are counted. */
+export const UNPRICED_NOTE = 'A model of your own reports no price, so its runs do not count toward the limit. Check its provider for what they cost.'
+
 /**
  * A teammate's month, for their card and their dialog: what they spent, and
  * -- when the person set a limit -- against what. Money, or nothing, as
@@ -373,7 +376,7 @@ export function moneyLine(cost: RunCost | undefined): string | undefined {
 export function monthSpendLine(
   spend: Spend | undefined,
   limitUsd: number | undefined
-): { readonly text: string; readonly reached: boolean } | undefined {
+): { readonly text: string; readonly reached: boolean; readonly note?: string } | undefined {
   if (limitUsd === undefined) {
     const line = moneyLine(spend)
     return line === undefined ? undefined : { text: line, reached: false }
@@ -382,7 +385,15 @@ export function monthSpendLine(
   // Reached is said by the row's LABEL, not tacked onto the amount: on a
   // card three across, "$0.02 of $0.01 . limit reached" broke over two lines
   // (the 0.353 drive's Team screen).
-  return { text: `${dollars(spend?.usd ?? 0)} of ${dollars(limitUsd)}${requests}`, reached: limitReached(spend, limitUsd) }
+  // A model of the person's own reports no price (0.689): its runs are said
+  // beside the dollars, so "$0.00 of $5.00" is never read as "nothing spent".
+  const unpriced = spend?.unpricedRuns ?? 0
+  const runs = unpriced === 0 ? '' : ` · ${String(unpriced)} ${unpriced === 1 ? 'run' : 'runs'} with no price`
+  return {
+    text: `${dollars(spend?.usd ?? 0)} of ${dollars(limitUsd)}${requests}${runs}`,
+    reached: limitReached(spend, limitUsd),
+    ...(unpriced === 0 ? {} : { note: UNPRICED_NOTE })
+  }
 }
 
 export function missionCostTail(input: {

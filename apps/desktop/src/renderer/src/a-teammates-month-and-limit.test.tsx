@@ -5,7 +5,7 @@ import { seedAvatar } from '../../shared/avatar.js'
 import type { PublicRecoveredMission, PublicTeammate } from '../../shared/ipc.js'
 import { NewTeammateDialog, limitHint, parsedLimit } from './components/NewTeammateDialog.js'
 import { TeammatesScreen } from './components/Screens.js'
-import { missionCost, monthSpendLine } from './cost.js'
+import { missionCost, monthSpendLine, UNPRICED_NOTE } from './cost.js'
 
 /**
  * WHAT A TEAMMATE SPENT THIS MONTH, AND THE LIMIT THE PERSON SET (0.353).
@@ -21,7 +21,7 @@ const wren: PublicTeammate = {
   createdAt: '2026-09-01T00:00:00.000Z'
 }
 
-const card = (teammate: PublicTeammate, spend: Record<string, { usd?: number; premiumRequests?: number }>): string =>
+const card = (teammate: PublicTeammate, spend: Record<string, { usd?: number; premiumRequests?: number; unpricedRuns?: number }>): string =>
   renderToStaticMarkup(
     <TeammatesScreen teammates={[teammate]} missions={[]} missionOwners={{}} spendByTeammate={spend} viewByTeammate={{}}
       titleOf={() => ''} onOpenMission={nothing} onNewTeammate={nothing} onEdit={nothing} onRemove={nothing} onMessage={nothing}
@@ -43,6 +43,14 @@ describe("a teammate's month, on their card", () => {
     expect(card(limited, { tm_wren: { usd: 5.02 } })).toContain('lc-rostercard__cost is-reached')
     expect(card(limited, { tm_wren: { usd: 1 } })).toContain('<dt>This month</dt><dd class="lc-mono">$1.00 of $5.00</dd>')
     expect(card(limited, { tm_wren: { usd: 1 } })).not.toContain('is-reached')
+  })
+
+  it('says runs on a model of your own beside the dollars, with why: unpriced, not $0.00 (0.689)', () => {
+    expect(monthSpendLine({ usd: 0.4, unpricedRuns: 2 }, 5)).toEqual({ text: '$0.40 of $5.00 · 2 runs with no price', reached: false, note: UNPRICED_NOTE })
+    expect(monthSpendLine({ unpricedRuns: 1 }, 5)).toEqual({ text: '$0.00 of $5.00 · 1 run with no price', reached: false, note: UNPRICED_NOTE })
+    expect(card({ ...wren, monthlyLimitUsd: 5 }, { tm_wren: { unpricedRuns: 1 } })).toContain(`title="${UNPRICED_NOTE}"`)
+    // Without a limit there is nothing to read it against: the card stays as it was.
+    expect(monthSpendLine({ unpricedRuns: 3 }, undefined)).toBeUndefined()
   })
 
   it('says premium requests beside the dollars, never toward them', () => {

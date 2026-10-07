@@ -46,7 +46,7 @@ export interface TeammateDraft {
  * a limit sees what it is set against.
  */
 export function limitHint(name: string, spent: Spend | undefined, editing: boolean): string {
-  const how = `Checked before each run: once this month's priced runs reach it, ${name} starts nothing until you raise it or the month ends. A run already going finishes. Plans and free models are not priced, so they never count.`
+  const how = `Checked before each run: once this month's priced runs reach it, ${name} starts nothing until you raise it or the month ends. A run already going finishes. Plans and free models are not priced, so they never count. Nor do models of your own, which report no price; ${name}'s card counts those runs.`
   if (!editing || spent?.usd === undefined) return how
   return `${dollars(spent.usd)} spent this month so far. ${how}`
 }
