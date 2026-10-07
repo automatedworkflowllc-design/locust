@@ -80,6 +80,15 @@ try {
   await drive.resize(1440, 900)
   await drive.evaluate(`${teammateFace('Wren')}?.click()`)
   await sleep(800)
+  /*
+   * The window reads the model list at launch, before OpenCode is ready, and again
+   * moments later. Opened in between, the picker had no row for Wren's free model to
+   * open on, and the chat box no effort for it; both read right a few seconds later
+   * (0.698 and 0.699: 24 rows at the first size, 34 at the second). The effort control
+   * appears once the window knows Wren's model: wait for it, so the sizes compare the
+   * layout, not the clock.
+   */
+  await drive.waitFor(`document.querySelector('button[aria-label="Reasoning effort"]') !== null`, { timeoutMs: 60_000, what: "the window knowing Wren's model (its effort control)" })
   for (const [width, height] of [[1440, 900], [1120, 720]]) {
     await drive.resize(width, height)
     await sleep(900)
