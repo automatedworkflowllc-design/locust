@@ -6,12 +6,18 @@ function object(value: unknown): value is Record<string, unknown> {
 }
 
 /** Read only the CLI's built-in usage command, never a prompt or a login file. */
-export function readAntigravityUsage(executable: NonNullable<RuntimeDiscovery['executable']>): Promise<unknown> {
+export function readAntigravityUsage(executable: NonNullable<RuntimeDiscovery['executable']>, version: RuntimeDiscovery['version']): Promise<unknown> {
+  // Before 1.1.11, /usage can be a model prompt rather than a built-in command.
+  // Unknown versions fail closed, before any process is started.
+  if (version === undefined || ![version.major, version.minor, version.patch].every(part => Number.isSafeInteger(part) && part >= 0)
+    || !(version.major > 1 || (version.major === 1 && (version.minor > 1
+      || (version.minor === 1 && (version.patch > 11 || (version.patch === 11 && !version.prerelease))))))
+    || executable.prefixArgs.includes('--disable-slash-commands')) return Promise.resolve(undefined)
   return new Promise((resolve) => {
-    execFile(executable.executablePath, [...executable.prefixArgs, '-p', '/usage', '--output-format', 'json'], {
+    execFile(executable.executablePath, [...executable.prefixArgs, '-p', '/usage', '--output-format', 'json', '--print-timeout', '20s'], {
       windowsHide: true,
       shell: false,
-      timeout: 10_000,
+      timeout: 30_000,
       maxBuffer: 256 * 1024,
       env: { ...process.env, ...executable.env }
     }, (error, stdout) => {

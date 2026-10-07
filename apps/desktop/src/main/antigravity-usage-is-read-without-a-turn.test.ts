@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
-import type { AppServerRunProcess, RuntimeDiscovery } from '@teammate/runtime-adapters'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { parseRuntimeVersion, type AppServerRunProcess, type RuntimeDiscovery } from '@teammate/runtime-adapters'
 
 const exec = vi.hoisted(() => vi.fn())
 vi.mock('node:child_process', () => ({ execFile: exec }))
@@ -14,7 +14,7 @@ const answer = (other = 0.2) => ({ status: 'SUCCESS', num_turns: 0, command: { n
 ] } } })
 const executable = { commandName: 'agy', discoveredPath: '/tools/agy', executablePath: '/tools/agy', prefixArgs: [], kind: 'native' as const, env: { AGY_TEST: 'yes' } }
 const runtime: RuntimeDiscovery = { id: 'antigravity', kind: 'agent-runtime', displayName: 'Antigravity', optional: true,
-  availability: 'available', readiness: 'ready', executable, supportedFeatures: [], requiredFeatures: [], diagnostics: [],
+  availability: 'available', readiness: 'ready', executable, version: parseRuntimeVersion('1.1.11'), supportedFeatures: [], requiredFeatures: [], diagnostics: [],
   modelHints: { models: [{ id: 'gemini-flash', displayName: 'Gemini Flash' }], aliases: [], efforts: [] } }
 
 function codexServer(refuseModels = false) {
@@ -36,7 +36,30 @@ function codexServer(refuseModels = false) {
   return { process, asked }
 }
 
+beforeEach(() => { exec.mockReset() })
+
 describe('Antigravity reports remaining plan windows without a turn', () => {
+  it.each([undefined, 'unknown', '0.9.99', '1.0.99', '1.1.10', '1.1.11-rc.1'])('never runs /usage on an old or unknown version (%s)', async (version) => {
+    exec.mockImplementation((_file, _args, _options, callback) => callback(null, JSON.stringify(answer())))
+    expect(await readAntigravityUsage(executable, version === undefined ? undefined : parseRuntimeVersion(version))).toBeUndefined()
+    expect(exec).not.toHaveBeenCalled()
+  })
+  it.each(['1.1.11', '1.1.11+build.1', '1.1.12', '1.2.0', '2.0.0'])('runs the built-in command on a supported version (%s)', async (version) => {
+    exec.mockImplementationOnce((_file, _args, _options, callback) => callback(null, JSON.stringify(answer())))
+    expect(await readAntigravityUsage(executable, parseRuntimeVersion(version))).toEqual(answer())
+    expect(exec).toHaveBeenCalledOnce()
+  })
+  it('refuses even a discovered prefix that would disable built-in slash commands', async () => {
+    expect(await readAntigravityUsage({ ...executable, prefixArgs: ['--disable-slash-commands'] }, runtime.version)).toBeUndefined()
+    expect(exec).not.toHaveBeenCalled()
+  })
+  it.each([undefined, '1.1.10'])('the catalog keeps models but does not spawn usage without a safe version (%s)', async (version) => {
+    exec.mockImplementation((_file, _args, _options, callback) => callback(null, JSON.stringify(answer())))
+    const result = await createModelCatalog({ discover: async () => [{ ...runtime, version: version === undefined ? undefined : parseRuntimeVersion(version) }], spawn: vi.fn() }).read()
+    expect(result.ok && result.data.models.map(model => model.id)).toContain('gemini-flash')
+    expect(result.ok && result.data.usageWindows).toBeUndefined()
+    expect(exec).not.toHaveBeenCalled()
+  })
   it('puts the short window first and includes the lower Claude and GPT limit', () => {
     expect(antigravityUsageText(answer())).toBe('Gemini: 5-hour window 95% left · resets 2099-10-10T20:49:36.000Z · Gemini: weekly window 67% left · resets 2099-10-10T20:49:36.000Z · Claude and GPT: 5-hour window 100% left · Claude and GPT: weekly window 20% left · resets 2099-10-10T20:49:36.000Z')
   })
@@ -79,13 +102,17 @@ describe('Antigravity reports remaining plan windows without a turn', () => {
   })
   it('uses only the discovered executable and usage argv, with no shell and a bounded hidden process', async () => {
     exec.mockImplementationOnce((_file, _args, _options, callback) => callback(null, JSON.stringify(answer())))
-    expect(await readAntigravityUsage({ ...executable, prefixArgs: ['prefix'] })).toEqual(answer())
-    expect(exec).toHaveBeenLastCalledWith('/tools/agy', ['prefix', '-p', '/usage', '--output-format', 'json'],
-      expect.objectContaining({ windowsHide: true, shell: false, timeout: 10_000, maxBuffer: 256 * 1024, env: expect.objectContaining({ AGY_TEST: 'yes' }) }), expect.any(Function))
+    expect(await readAntigravityUsage({ ...executable, prefixArgs: ['prefix'] }, runtime.version)).toEqual(answer())
+    const [file, args, options] = exec.mock.lastCall!
+    expect(file).toBe('/tools/agy')
+    expect(args).toEqual(['prefix', '-p', '/usage', '--output-format', 'json', '--print-timeout', '20s'])
+    expect(args).not.toContain('--disable-slash-commands')
+    expect({ windowsHide: options.windowsHide, shell: options.shell, timeout: options.timeout, maxBuffer: options.maxBuffer }).toEqual({ windowsHide: true, shell: false, timeout: 30_000, maxBuffer: 256 * 1024 })
+    expect(options.env.AGY_TEST).toBe('yes')
   })
   it.each([['refused', ''], [null, 'not json']])('fails softly on a refused or unreadable CLI response', async (error, stdout) => {
     exec.mockImplementationOnce((_file, _args, _options, callback) => callback(error, stdout))
-    expect(await readAntigravityUsage(executable)).toBeUndefined()
+    expect(await readAntigravityUsage(executable, runtime.version)).toBeUndefined()
   })
   it('keeps the reading and models even when Codex is absent, and caches the read', async () => {
     exec.mockClear()

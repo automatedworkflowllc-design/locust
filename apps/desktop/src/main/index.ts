@@ -2223,7 +2223,7 @@ if (!ownsSingleInstanceLock) {
       // A3.3: the person's check for THIS folder, after a turn that changed files.
       afterEdits: (cwd) => editCheck.after(cwd),
       // 0.439: a commit per turn on the teammate's own branch (turn-checkpoint.ts).
-      checkpointTurn: ({ repositoryRoot, teammateId, message }) => createWorktreeManager({ workspacePath: repositoryRoot }).checkpoint(teammateId, message),
+      checkpointTurn: ({ repositoryRoot, teammateId, message }) => createWorktreeManager({ workspacePath: repositoryRoot, note: detail => note('worktree-add', detail) }).checkpoint(teammateId, message),
       /*
        * Asked at the start of every run, never captured: a connector signed
        * into after launch reaches the next mission without a restart.
@@ -2847,7 +2847,7 @@ if (!ownsSingleInstanceLock) {
      */
     const peerContextFor = async (teammateId: unknown, folder?: string): Promise<MissionPeerContext | undefined> => {
       const project = folder ?? (workspaceChosen ? workspacePath : undefined)
-      const worktrees = project === undefined ? undefined : createWorktreeManager({ workspacePath: project })
+      const worktrees = project === undefined ? undefined : createWorktreeManager({ workspacePath: project, note: detail => note('worktree-add', detail) })
       if (typeof teammateId !== 'string' || teammateId.length === 0) return undefined
       let roster
       try {
@@ -2889,7 +2889,7 @@ if (!ownsSingleInstanceLock) {
       let repositoryRoot: string | undefined
       // Antigravity works in the folder it has open; a worktree would be one it has not.
       if (self.worktree === true && self.route?.runtime !== 'antigravity') {
-        const manager = home === undefined ? worktrees : createWorktreeManager({ workspacePath: home })
+        const manager = home === undefined ? worktrees : createWorktreeManager({ workspacePath: home, note: detail => note('worktree-add', detail) })
         if (manager !== undefined) {
           try {
             cwd = await manager.ensure(self)
@@ -5668,7 +5668,7 @@ if (!ownsSingleInstanceLock) {
      * was kept, and Keep then refused). Beside the plain copies, where no
      * path leads back.
      */
-    const compareTrees = () => createWorktreeManager({ workspacePath, directory: compareRoot() })
+    const compareTrees = () => createWorktreeManager({ workspacePath, directory: compareRoot(), note: detail => note('worktree-add', detail) })
     const discardCompareTrees = async (compare: PublicCompare): Promise<void> => {
       if (compare.changes !== true || compare.changesIn !== undefined) return
       for (const column of compare.slots) await compareTrees().discard(compareTreeId(compare.compareId, column.slot)).catch(() => undefined)
@@ -6728,7 +6728,7 @@ if (!ownsSingleInstanceLock) {
     // no run is live in them. The branch stays either way.
     const worktreesRejected = (message: string) => ({ ok: false, error: { code: 'WORKTREES_UNAVAILABLE', message } }) as const
     // The window's folder's, read live (0.458).
-    const currentWorktrees = () => (workspaceChosen ? createWorktreeManager({ workspacePath }) : undefined)
+    const currentWorktrees = () => (workspaceChosen ? createWorktreeManager({ workspacePath, note: detail => note('worktree-add', detail) }) : undefined)
     const worktreeList = async () => {
       const worktrees = currentWorktrees()
       if (worktrees === undefined) return { ok: true, data: { worktrees: [], reason: 'No project folder is chosen.' } } as const
@@ -6786,7 +6786,7 @@ if (!ownsSingleInstanceLock) {
       if (typeof teammateId !== 'string') return undefined
       const teammate = (await teammates.list()).find((entry) => entry.teammateId === teammateId)
       if (teammate === undefined) return undefined
-      if (teammate.folder !== undefined) return createWorktreeManager({ workspacePath: teammate.folder })
+      if (teammate.folder !== undefined) return createWorktreeManager({ workspacePath: teammate.folder, note: detail => note('worktree-add', detail) })
       return currentWorktrees()
     }
     ipcMain.handle(WORKTREE_REVIEW_CHANNEL, async (event, teammateId: unknown) => {

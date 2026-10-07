@@ -381,6 +381,14 @@ export interface WorktreeManagerOptions {
   readonly directory?: string
   /** Test seam: run git once; resolves stdout, rejects on a non-zero exit. */
   readonly runGit?: (args: readonly string[], cwd: string, timeoutMs?: number) => Promise<string>
+  /** A verified checkout-hook failure is diagnostics, not a teammate start failure. */
+  readonly note?: (detail: string) => void
+}
+
+/** Per add only: never changes the person's Git configuration. */
+export function worktreeAddArgs(path: string, branch: string, branchExists: boolean, platform: NodeJS.Platform = process.platform): readonly string[] {
+  return [...(platform === 'win32' ? ['-c', 'core.longpaths=true'] : []), 'worktree', 'add',
+    ...(branchExists ? [path, branch] : ['-b', branch, path, 'HEAD'])]
 }
 
 /**
@@ -401,7 +409,7 @@ export function defaultRunGit(args: readonly string[], cwd: string, timeoutMs = 
       clearTimeout(timer)
       if (timedOut) reject(new Error(`git ${args[0] ?? ''}: took longer than ${String(Math.round(timeoutMs / 1000))} s and was stopped.`))
       // With what it printed: `merge-tree` names its conflicts on stdout and exits 1 (0.440).
-      else if (error) reject(Object.assign(new Error(`git ${args[0] ?? ''}: ${String(stderr || error.message).trim().slice(0, 300)}`), { stdout: String(stdout), ...(typeof error.code === 'number' ? { exitCode: error.code } : {}) }))
+      else if (error) reject(Object.assign(new Error(`git ${args[0] ?? ''}: ${String(stderr || error.message).trim().slice(0, 300)}`), { stdout: String(stdout), stderr: String(stderr), ...(typeof error.code === 'number' ? { exitCode: error.code } : {}) }))
       else resolvePromise(stdout)
     })
     const timer = setTimeout(() => {
@@ -604,8 +612,22 @@ export function createWorktreeManager(options: WorktreeManagerOptions): Worktree
       // is not copied, and the card says so.
       making.add(path)
       try {
-        if (branchExists) await runGit(['worktree', 'add', path, branch], root, WORKTREE_CHECKOUT_TIMEOUT_MS)
-        else await runGit(['worktree', 'add', '-b', branch, path, 'HEAD'], root, WORKTREE_CHECKOUT_TIMEOUT_MS)
+        await runGit(worktreeAddArgs(path, branch, branchExists), root, WORKTREE_CHECKOUT_TIMEOUT_MS)
+      } catch (error) {
+        // Do not retry an add: a post-checkout hook can fail AFTER Git finishes
+        // making the tree. Accept only Git's recorded path/branch and a usable
+        // HEAD, never a timed-out or still-initializing checkout.
+        const failure = error as { readonly exitCode?: unknown; readonly stderr?: unknown }
+        const finished = typeof failure?.exitCode === 'number' && failure.exitCode > 0 && await (async () => {
+          const listing = await runGit(['worktree', 'list', '--porcelain'], root)
+          if (recordedBranchOf(listing, path) !== branch || !(await stat(join(path, '.git'))).isFile()) return false
+          const admin = await adminDirectoryOf(join(path, '.git'), root)
+          if (admin === undefined || (await readFile(join(admin, 'locked'), 'utf8').catch(() => '')).trim() === 'initializing') return false
+          await runGit(['rev-parse', '--verify', 'HEAD'], path)
+          return true
+        })().catch(() => false)
+        if (!finished) throw error
+        try { options.note?.(`Worktree ${path} on ${branch} is usable despite a checkout-hook failure: ${typeof failure.stderr === 'string' ? failure.stderr.trim() : error instanceof Error ? error.message : 'no stderr available'}`) } catch { /* Logging must not turn a verified tree into a failure. */ }
       } finally {
         making.delete(path)
       }

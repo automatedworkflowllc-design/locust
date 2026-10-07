@@ -502,7 +502,7 @@ export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {
     ]
     const antigravity = runtimes.find((entry) => entry.id === 'antigravity')
     const usage = antigravity?.readiness === 'ready' && antigravity.executable?.commandName === 'agy'
-      ? readAntigravityUsage(antigravity.executable).then(antigravityUsageText).catch(() => undefined)
+      ? readAntigravityUsage(antigravity.executable, antigravity.version).then(antigravityUsageText).catch(() => undefined)
       : Promise.resolve(undefined)
     // Independent of Codex: a missing server or an older method loses no other reading.
     const withUsage = async (response: ModelCatalogResponse): Promise<ModelCatalogResponse> => {
