@@ -2,6 +2,18 @@
 
 Locust includes work from the projects below, under their licences.
 
+## Optional local voice typing
+
+The Windows microphone's first-use Download retrieves whisper.cpp build b5454
+and Whisper tiny.en Q5_1 weights. Neither the executable nor the model ships in
+the installer. Their MIT notices are kept alongside the downloaded files in
+`voice/LICENSE.txt`; the exact notice is in `apps/desktop/src/shared/voice-license.ts`.
+
+- whisper.cpp / ggml: MIT, Copyright (c) 2023-2026 The ggml authors.
+  https://github.com/ggml-org/whisper.cpp/blob/b5454/LICENSE
+- Whisper model: MIT, Copyright (c) 2022 OpenAI.
+  https://github.com/openai/whisper/blob/main/LICENSE
+
 ## OpenPets
 
 - Project: https://github.com/OpenPetsHQ/openpets

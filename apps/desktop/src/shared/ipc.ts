@@ -3369,6 +3369,7 @@ export type MissionDeleteResponse =
     }
 
 export interface DesktopApi {
+  readonly voice?: import('./voice.js').VoiceApi
   readQueuedMessages(): Promise<QueuedMessagesResponse>
   writeQueuedMessages(rows: readonly SavedQueuedMessage[]): Promise<QueuedMessagesResponse>
   readonly platform: string

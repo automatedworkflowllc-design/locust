@@ -3060,7 +3060,8 @@ export function SettingsScreen({
               The window makes no requests of its own. Locust checks for and downloads its own updates,
               installs the AI agents you ask it to and keeps Codex CLI and Copilot CLI current, reads the
               pet gallery when you open it, and asks the address of a model of your own about it when you
-              press Test; each AI agent talks to its own service. A web page a teammate made
+              press Test. Voice typing downloads its checked files only when you choose Download;
+              your recording stays on this computer. Each AI agent talks to its own service. A web page a teammate made
               may load libraries and fonts from the common public hosts and reach no other site, so what it
               reads in your folder cannot be sent anywhere. <NetworkListLink />
             </dd>

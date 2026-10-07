@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import { VOICE_READY, VOICE_DOWNLOAD, VOICE_TRANSCRIBE, VOICE_CANCEL, VOICE_PROGRESS } from '../shared/voice.js'
 import { REMOTE_CONTROL_GET_CHANNEL, REMOTE_CONTROL_SET_CHANNEL, type RemoteControlState } from '../shared/claude-remote-control.js'
 import { FOLDER_CHANGES_CHANNEL, FOLDER_COMMIT_CHANNEL, type CommitResult, type FolderChanges } from '../shared/folder-commit.js'
 import { QUEUED_MESSAGES_READ_CHANNEL, QUEUED_MESSAGES_WRITE_CHANNEL } from '../shared/queued-messages.js'
@@ -361,6 +362,17 @@ export type {
 } from '../shared/ipc.js'
 
 const desktopApi: DesktopApi = {
+  voice: {
+    ready: () => ipcRenderer.invoke(VOICE_READY),
+    download: () => ipcRenderer.invoke(VOICE_DOWNLOAD),
+    transcribe: (wav) => ipcRenderer.invoke(VOICE_TRANSCRIBE, wav),
+    cancel: () => ipcRenderer.invoke(VOICE_CANCEL),
+    onProgress: (listener) => {
+      const receive = (_event: Electron.IpcRendererEvent, percent: number): void => { listener(percent) }
+      ipcRenderer.on(VOICE_PROGRESS, receive)
+      return () => { ipcRenderer.removeListener(VOICE_PROGRESS, receive) }
+    }
+  },
   platform: process.platform,
   setNeedsYouCount: (count) => ipcRenderer.send(NEEDS_YOU_COUNT_CHANNEL, count),
   getAwaySince: () => ipcRenderer.invoke(AWAY_SINCE_GET_CHANNEL) as Promise<{ readonly since?: string }>,

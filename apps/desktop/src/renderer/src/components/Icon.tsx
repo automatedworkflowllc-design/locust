@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
  * glyphs stay identical while everything around them is replaced.
  */
 export type IconName =
+  | 'mic'
   | 'activity'
   | 'thought'
   | 'arrow-up'
@@ -58,6 +59,7 @@ export type IconName =
 
 export function Icon({ name, size = 16 }: { name: IconName; size?: number }): ReactNode {
   const paths: Record<IconName, ReactNode> = {
+    mic: <><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8" /></>,
     activity: <path d="M3 12h3l2.1-6 3.8 12L14 12h7" />,
     // A thought bubble: the cloud, then the two trailing dots that make it a
     // thought and not speech. Colin, 2026-09-17: "use a little thought bubble".

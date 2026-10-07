@@ -7,6 +7,9 @@ import { APP_USER_MODEL_ID, DEVELOPMENT_APP_USER_MODEL_ID, mayShowToasts, repair
 import { openingPlacement, readSavedWindow } from './window-bounds.js'
 import type { SavedWindow } from './window-bounds.js'
 import { app, BrowserWindow, crashReporter, dialog, ipcMain, Menu, nativeImage, nativeTheme, Notification, powerSaveBlocker, protocol, safeStorage, screen, session, shell, Tray } from 'electron'
+import { createVoiceHost } from './voice-host.js'
+import { voicePermission } from './voice-permission.js'
+import { VOICE_READY, VOICE_DOWNLOAD, VOICE_TRANSCRIBE, VOICE_CANCEL, VOICE_PROGRESS } from '../shared/voice.js'
 import { createPageServer, fromPagePreview, pageMayReach, PAGE_SCHEME } from './page-preview.js'
 import { CANCEL_SCRIPT, captureRectOf, pageFrameOf, pickInFrame } from './page-pick.js'
 import { createRuntimeCommands } from './runtime-commands.js'
@@ -989,6 +992,7 @@ let antigravityServiceForShutdown: { dispose(): Promise<void> } | undefined
 let ledgerForShutdown: MissionLedger | undefined
 let workroomForShutdown: Workroom | undefined
 let permissionHostForShutdown: { dispose(): Promise<void> } | undefined
+let voiceForShutdown: ReturnType<typeof createVoiceHost> | undefined
 
 /**
  * The renderer names no destinations.
@@ -1395,6 +1399,7 @@ process.on('unhandledRejection', (reason) => noteTrouble('unhandledRejection', r
  * screen, without either of them having to know about this.
  */
 app.on('render-process-gone', (_event, _contents, details) => {
+  void voiceForShutdown?.cancel()
   // `clean-exit` is a window being closed on purpose; it is not trouble and
   // a log full of it is a log nobody reads.
   if (details.reason === 'clean-exit') return
@@ -1524,13 +1529,15 @@ if (!ownsSingleInstanceLock) {
       }
     }
 
-    // The renderer is untrusted: it gets no device or web-platform permissions,
+    // The renderer gets microphone audio only in its own main frame on Windows;
+    // cameras, subframes and every other device/web permission remain refused,
     // and packaged builds get no network egress at all (the dev server needs
     // loopback HTTP/WebSocket for Vite and HMR, so that stays dev-only).
-    session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
-      callback(false)
+    session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) => {
+      callback(voicePermission(process.platform === 'win32' && contents !== null && approvalWindow !== undefined && BrowserWindow.fromWebContents(contents) === approvalWindow && details.requestingUrl === contents.getURL(), permission, details.isMainFrame, 'mediaTypes' in details ? details.mediaTypes ?? [] : []))
     })
-    session.defaultSession.setPermissionCheckHandler(() => false)
+    session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) =>
+      voicePermission(process.platform === 'win32' && contents !== null && approvalWindow !== undefined && BrowserWindow.fromWebContents(contents) === approvalWindow && details.requestingUrl === contents.getURL(), permission, details.isMainFrame, details.mediaType === undefined ? [] : [details.mediaType]))
     /*
      * THE SPELLCHECKER FETCHES NOTHING (QA-2026-09-29 round 2, R23). Where
      * Electron spellchecks with Hunspell (Linux) it downloads a dictionary
@@ -3507,6 +3514,19 @@ if (!ownsSingleInstanceLock) {
       BrowserWindow.fromWebContents(event.sender) !== null
       && event.senderFrame !== null
       && event.senderFrame.parent === null
+
+    // Constructing the host starts no I/O, download, microphone, timer, or sidecar.
+    const voice = createVoiceHost(join(app.getPath('userData'), 'voice'))
+    voiceForShutdown = voice
+    const fromVoiceWindow = (event: Electron.IpcMainInvokeEvent): boolean =>
+      fromOwnWindow(event) && BrowserWindow.fromWebContents(event.sender) === approvalWindow
+    const voiceRefused = { ok: false, message: 'Voice typing could not start here. Your message is unchanged.' } as const
+    ipcMain.handle(VOICE_READY, (event) => fromVoiceWindow(event) ? voice.ready() : false)
+    ipcMain.handle(VOICE_DOWNLOAD, (event) => fromVoiceWindow(event) ? voice.download((percent) => {
+      if (!event.sender.isDestroyed()) event.sender.send(VOICE_PROGRESS, percent)
+    }) : voiceRefused)
+    ipcMain.handle(VOICE_TRANSCRIBE, (event, wav: unknown) => fromVoiceWindow(event) ? voice.transcribe(wav) : voiceRefused)
+    ipcMain.handle(VOICE_CANCEL, (event) => fromVoiceWindow(event) ? voice.cancel() : undefined)
 
     const teammatesUnavailable = {
       ok: false,
@@ -7535,6 +7555,7 @@ app.on('before-quit', () => {
 })
 
 app.on('window-all-closed', () => {
+  void voiceForShutdown?.cancel()
   if (process.platform === 'darwin') return
   // A quit from the tray is already leaving. Keeping the process up is only
   // for a window that closed while the person asked Locust to stay.
@@ -7565,6 +7586,7 @@ if (ownsSingleInstanceLock) {
     boundedShutdown({
       deadlineMs: SHUTDOWN_DEADLINE_MS,
       work: async () => {
+        await voiceForShutdown?.dispose()
         await remoteControlForShutdown?.dispose()
         await queuedMessagesForShutdown?.flush()
         await missionServiceForShutdown?.dispose()

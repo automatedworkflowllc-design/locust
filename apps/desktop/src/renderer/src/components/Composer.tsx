@@ -54,6 +54,8 @@ import { MAX_COMPARE_SLOTS, MIN_COMPARE_SLOTS, versusLabel } from '../../../shar
 import type { RouteChoice } from './RoutePicker.js'
 import { RuntimeMark } from './RuntimeMark.js'
 import { noteTyping } from '../faceLife.js'
+import { VoiceButton } from './VoiceButton.js'
+import { insertVoiceText } from '../../../shared/voice-pcm.js'
 
 const MAX_PROMPT_LENGTH = 8_000
 /*
@@ -2485,6 +2487,12 @@ export function Composer({
                   <span className="lc-control__effort">Fixed</span>
                 </span>
               )}
+              <VoiceButton key={draftKey ?? ''} platform={platform ?? 'unknown'} disabled={workingNow && queued !== undefined} onText={(text) => {
+                const input = field.current
+                const inserted = insertVoiceText(valueNow.current, text, input?.selectionStart ?? valueNow.current.length, input?.selectionEnd ?? valueNow.current.length, MAX_PROMPT_LENGTH)
+                type(inserted.text)
+                requestAnimationFrame(() => { input?.focus(); input?.setSelectionRange(inserted.cursor, inserted.cursor) })
+              }} />
               {running && !canQueue ? (
                 // A mono beam travels the stop button while the run goes --
                 // Colin: "a loading hue for their stop button ... make it mono

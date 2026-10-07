@@ -37,6 +37,7 @@ const LISTED: Readonly<Record<string, { readonly places: number; readonly said: 
   'mac-self-update.ts': { places: 2, said: ['Its own updates (Mac)', 'then the disk image you choose'] },
   'runtime-updates.ts': { places: 1, said: ['Keeping Codex CLI and Copilot CLI current'] },
   'pet-library.ts': { places: 1, said: ['The pet gallery'] },
+  'voice-host.ts': { places: 1, said: ["Voice typing's one-time files", 'No account, API key, recording, transcript,'] },
   'permission-host.ts': { places: 1, said: ['Locust\'s permission host listens on `127.0.0.1` only'] },
   'antigravity-cascade.ts': { places: 1, said: ['Antigravity\'s own local server, at `127.0.0.1`'] },
   // Test: the models the address serves, then one capped chat request with a tool.

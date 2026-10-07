@@ -19873,3 +19873,9 @@ textarea {
   text-underline-offset: 2px;
   cursor: pointer;
 }
+.lc-voice { position: relative; display: inline-flex; align-items: center; }
+.lc-voice__button { gap: var(--lc-space-2); font-variant-numeric: tabular-nums; }
+.lc-voice__button.is-recording { color: var(--lc-text-primary); background: var(--lc-hover-surface); box-shadow: inset 0 0 0 1px currentColor; }
+.lc-voice__ask, .lc-voice__message { position: absolute; bottom: calc(100% + 12px); right: 0; width: 300px; padding: 12px; border: 1px solid var(--lc-border-control); border-radius: 12px; background: var(--lc-bg-control); color: var(--lc-text-primary); z-index: 30; }
+.lc-voice__ask p { margin: 0 0 10px; }
+.lc-voice__message { font-size: 12px; }
