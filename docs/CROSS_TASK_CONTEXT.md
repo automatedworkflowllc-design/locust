@@ -174,6 +174,41 @@ continue; report exact validation results, and say what was not run.
 
 ## Handoff log
 
+### 2026-10-07 — opt-in MCP access from other AI apps (Codex)
+
+- Scope: `exec/mcp-server`, source commit `5fccf37c`, from desktop 0.689. No version, changelog, dependency,
+  installer, client-config or push changes. All `docs/` changes remain uncommitted
+  as requested; the network inventory update must accompany integration.
+- Built: a separate account-token-authenticated listener on `127.0.0.1`, off by
+  default, and a dependency-free stdio bridge shipped beside the app. Settings >
+  General shows setup text for Claude Code and Codex, never writes their configs,
+  and never sends the token to the renderer. Off closes the listener and revokes
+  the token; re-enabling rotates it. Windows account-only ACL is established on
+  the empty temporary file before any token bytes are written. Profile backup
+  excludes the connection file and opt-in.
+- Tools reuse the window's roster, mission start and ledger readers. Starts and
+  continuations always use Ask, preserve the saved teammate route, and return
+  monthly-limit refusals unchanged. Send/read accept MCP-origin conversations
+  only; a busy turn is reported, never queued. Ledger schema 23 preserves the
+  other-app origin across restarts, with a visible thread marker.
+- Decision from the person: no automatic handoffs from MCP turns. Shares remain
+  posted in the workroom, but the relay never starts, defers, steers or interrupts
+  another teammate because of such a share. The thread records why no automatic
+  reply was started. Ordinary person-origin relay behavior is unchanged.
+- Validation: 37 tests in five new MCP files, five additional cases in existing
+  mission/relay files, and all selected regression/source checks passed. Final
+  unique-file total: 1,285 tests in 21 single-file runs (including the 879-test
+  assertion guard). Runtime-adapters and mission-store builds, desktop build,
+  both desktop type configs, bridge syntax and diff whitespace checks passed.
+  Four temporary mutations failed their named tests, then were restored and
+  their full files rerun green: early body reading, non-loopback bind, Auto
+  starts, and automatic MCP handoffs. Stdio tests launch real Node and Electron
+  processes against the real authenticated listener, with fake mission actions.
+- Not verified: a real Claude Code/Codex/Cursor client, a paid or live model turn,
+  a live desktop UI drive, installer packaging, another Windows user's access,
+  or macOS. The full gate was not run because this handoff requests single-file
+  suites on the shared machine. Existing renderer chunk-size warnings remain.
+
 Entries since 2026-10-03, newest first. Earlier entries (2026-08-30 to
 2026-09-09) are in this file's history in git.
 

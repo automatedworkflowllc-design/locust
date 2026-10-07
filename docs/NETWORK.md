@@ -98,6 +98,18 @@ reads of your folder stays on this machine.
 - **Locust's permission host listens on `127.0.0.1` only.** Claude Code asks it
   before a connector call or a command, and each run gets its own token. Locust
   also reads Antigravity's own local server, at `127.0.0.1`.
+- **Let your other AI apps use Locust** (Settings > General) is off by default.
+  When enabled, a separate listener binds only to `127.0.0.1` and
+  authenticates the token before reading the request body. The local stdio
+  bridge reads this profile's account-only connection file and forwards tool
+  calls over HTTP; it never starts Locust or sends the token off the machine.
+  Turning the switch off closes the listener and revokes the token; enabling
+  it again mints a new one. Teammate conversations started through it run in
+  Ask mode (read only), use the agents' own accounts, apply Locust's monthly
+  limits, and appear in history marked as started from another app. Shares
+  remain visible in Locust, but never start automatic teammate handoffs. Listing
+  teammates, replies and background runs is read only. Running turns are not
+  cancelled when the listener is switched off.
 - **The spellchecker downloads no dictionary.**
 - **Memory recall** runs a small model that ships with Locust.
 - **A report reaches Locust's makers only when you send it.** Send feedback,
