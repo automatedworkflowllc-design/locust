@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.702.0 - 2026-10-08
+
+### Fixed
+
+- **A Claude teammate whose Claude Code isn't signed in says how to fix it, once.** It showed Claude Code's own "Not logged in · Please run /login" twice, naming a command Locust has no place for. It now says to open a terminal, run claude and sign in (with your Claude account, or an Anthropic Console account to pay with an API key), or to add a Claude API key in Settings, Your own models. An API key in your environment is never handed to an agent, so it does not count as signing in.
+
 ## 0.701.0 - 2026-10-07
 
 ### Fixed
