@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.708.0 - 2026-10-08
+
+### Fixed
+
+- **Locust runs on Electron 44.6.** That brings six weeks of fixes from the Electron and Chromium teams: a crash after a very large number of messages between Locust's window and its engine, a crash when a file dialog's window closes at the same moment, a window called unresponsive just after the computer wakes, and security fixes from Chromium. It also ends a rare error in the background error log when a window opens.
+
 ## 0.707.0 - 2026-10-08
 
 ### Improved
