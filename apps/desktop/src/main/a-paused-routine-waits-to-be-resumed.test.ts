@@ -6,7 +6,6 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import type { CodexMissionStartResponse, PublicRoutine } from '../shared/ipc.js'
 import { nextRoutineDueLine, scheduleBase } from '../shared/routine-schedule.js'
-import { routineScheduleSummary } from '../renderer/src/routines.js'
 import { createRoutineRunner } from './routine-runner.js'
 import type { RoutineRunnerOptions } from './routine-runner.js'
 import { createRoutineStore } from './routine-store.js'
@@ -78,9 +77,8 @@ describe('a paused routine waits to be resumed', () => {
     expect(scheduleBase({ createdAt: '2026-10-01T00:00:00.000Z', resumedAt: '2026-10-03T00:00:00.000Z' })).toBe('2026-10-03T00:00:00.000Z')
     expect(scheduleBase({ createdAt: '2026-10-01T00:00:00.000Z' })).toBe('2026-10-01T00:00:00.000Z')
   })
-  it('says "paused" on its chip, and the tray counts it out of "next"', () => {
+  it(`is counted out of the tray's "next routine" line (its chip: renderer/src/a-paused-routine-says-so.test.ts)`, () => {
     const now = new Date(2026, 9, 3, 9, 0)
-    expect(routineScheduleSummary(saved({ paused: true }), now)).toBe('every hour · paused')
     expect(nextRoutineDueLine([saved({ paused: true, lastRunAt: now.toISOString() })], now)).toBe('No routine due')
   })
   it('keeps pause and resume in the routine file, and ignores what is not a yes or no', async () => {
