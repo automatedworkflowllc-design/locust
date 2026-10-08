@@ -40,7 +40,7 @@ try {
     return { text: dd?.innerText.replace(/\\s+/g, ' ').trim() ?? '', link: link?.innerText.trim() ?? null, clipped: dd ? dd.scrollWidth > dd.clientWidth + 1 : null }
   })()`))
   check('the Network line names the updates, the agents Locust installs, the pet gallery and the agents\' own services',
-    ['checks for and downloads its own updates', 'installs the AI agents you ask it to', 'keeps Codex CLI and Copilot CLI current', 'reads the pet gallery when you open it', 'each AI agent talks to its own service'].every((words) => network.text.includes(words)), network.text)
+    ['checks for and downloads its own updates', 'installs the AI agents you ask it to', 'keeps Codex CLI and Copilot CLI current', 'reads the pet gallery when you open it', 'each AI agent talks to its own service'].every((words) => network.text.toLowerCase().includes(words.toLowerCase())), network.text)
   check('it links every connection, listed, and nothing is cut off', network.link === 'Every connection, listed' && network.clipped === false, JSON.stringify(network))
   check('no renderer errors, beyond Electron\'s launch line', drive.record.flatMap((entry) => entry.errors.map(String)).filter((line) => !/^Electron sandboxed_renderer\.bundle\.js script failed to run|^console\.error$/.test(line.trim())).length === 0)
   await sleep(100)

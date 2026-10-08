@@ -56,7 +56,10 @@ const LIMIT_MS = Number(arg('--limit-min') ?? '20') * 60_000
 const SKIP = {
   'drive-context-menu': 'needs --reuse <profile>: it opens a profile another drive made',
   'drive-update-lane': 'needs an OLDER build and --expect-latest / --expect-every: run by hand after a release',
-  'drive-turns-read-in-order': 'needs --ledger <folder>: it copies whole conversations, never from the person’s own profile'
+  'drive-turns-read-in-order': 'needs --ledger <folder>: it copies whole conversations, never from the person’s own profile',
+  'drive-a-pull-request-from-the-conversation': 'needs --repo <a clone of a throwaway GitHub repository>',
+  'drive-cloud-from-a-folder-not-on-github': 'needs --repo <clone>',
+  'drive-cloud-without-an-environment': 'needs --repo <a clone with an environment>'
 }
 
 /**

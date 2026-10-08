@@ -113,7 +113,10 @@ const spread = (values) => (values.length === 0 ? 0 : Math.max(...values) - Math
 try {
   await drive.ready()
   await drive.resize(1120, 720)
-  await drive.waitFor(`!!document.querySelector('.lc-intro')`, { timeoutMs: 40_000, what: 'probing done' })
+  // OpenCode found, so the free route can be picked: the app's own discovery log says so. (It waited for the
+  // first-run intro line, which since 0.610 shows only with no teammates -- and this drive seeds some; the sidebar's
+  // "agents ready" is not drawn at this width, where the sidebar is a rail.)
+  await drive.waitFor(`window.desktop.discoveryLog().then((log) => log.some((entry) => entry.kind === 'probe.finished' && entry.id === 'opencode'))`, { timeoutMs: 40_000, what: 'probing done' })
   await sleep(1500)
 
   const opened = await drive.evaluate(`(async () => {
