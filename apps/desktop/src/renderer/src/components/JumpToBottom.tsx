@@ -31,14 +31,14 @@ export function JumpToBottom({
   readonly working?: boolean
 }): ReactElement | null {
   if (!shown) return null
-  const label = working ? 'Still working. Go to the newest message' : 'Go to the newest message'
   return (
     <button
       type="button"
       className={`lc-jumpdown${working ? ' lc-jumpdown--working' : ''}`}
       onClick={onClick}
-      title={label}
-      aria-label={label}
+      // Inline, not a variable: the harness-selector guard reads the literals an aria-label can hold.
+      title={working ? 'Still working. Go to the newest message' : 'Go to the newest message'}
+      aria-label={working ? 'Still working. Go to the newest message' : 'Go to the newest message'}
     >
       {working && (
         <span className="lc-dots lc-jumpdown__dots" aria-hidden="true">
