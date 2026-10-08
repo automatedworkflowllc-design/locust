@@ -63,9 +63,11 @@ try {
   })()`)))
   check('Run was pressed', run === 'pressed', run)
   await sleep(500)
-  const notice = String(await drive.evaluate(`[...document.querySelectorAll('.lc-screen [role="alert"], .lc-screen .lc-claim')].map((el) => el.textContent.trim()).find((text) => /^Not run:/.test(text)) ?? 'nothing'`))
+  const notice = String(await drive.evaluate(`[...document.querySelectorAll('.lc-screen [role="alert"], .lc-screen .lc-claim')].map((el) => el.textContent.trim()).find((text) => /^Not run:|Nothing was started\./.test(text)) ?? 'nothing'`))
   await drive.capture('what the Team screen says', () => drive.evaluate(`document.querySelector('.lc-screen')?.innerText.slice(0, 400) ?? ''`))
-  check('the Team screen says why it did not run', /^Not run:/.test(notice), notice)
+  // Since W7 (6ca41823, 10/03) the notice is the host's own sentence, which says "Nothing was started."; it
+  // dropped the "Not run:" prefix, which the sentence made redundant. Either says it did not run.
+  check('the Team screen says why it did not run', /^Not run:|Nothing was started\./.test(notice), notice)
   say(failures === 0 ? '\nROUTINE RUN SAYS WHY PASSED' : `\nROUTINE RUN SAYS WHY: ${String(failures)} FAILED`)
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
