@@ -78,6 +78,18 @@ try {
   check('the routine file says paused', (await saved()).rt_digest?.paused === true)
   const header = await drive.evaluate(`document.querySelector('.lc-screen__meta')?.innerText ?? ''`)
   check('the header counts it as paused, not on a schedule', /none on a schedule · 1 paused/.test(header), header)
+  // The row gained a button: at the smallest window and two larger, nothing in a row spills out of it.
+  for (const [width, height] of [[1120, 720], [1440, 900], [1920, 1080]]) {
+    await drive.resize(width, height)
+    await new Promise((resolve) => setTimeout(resolve, 600))
+    const fit = JSON.parse(await drive.capture(`the rows at ${String(width)}x${String(height)}`, () => drive.evaluate(`JSON.stringify([...document.querySelectorAll('.lc-routinerow:not(.lc-routineadd)')].map((row) => {
+      const box = row.getBoundingClientRect()
+      const out = [...row.querySelectorAll('button, .lc-routinerow__sched')].filter((el) => { const r = el.getBoundingClientRect(); return r.right > box.right + 1 || r.left < box.left - 1 }).map((el) => el.getAttribute('aria-label') ?? el.textContent.trim())
+      return { spills: row.scrollWidth > row.clientWidth + 1, out }
+    }))`)))
+    check(`at ${String(width)}x${String(height)} every row holds its buttons and chip`, fit.every((row) => !row.spills && row.out.length === 0), JSON.stringify(fit))
+  }
+  await drive.resize(1215, 800)
 } catch (error) {
   failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
