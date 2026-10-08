@@ -320,12 +320,15 @@ describe('a mission through Antigravity', () => {
     // A caller that shortens the ending must still get one notice. Before
     // this, the 90 s default against a 20 s ending meant the notice could
     // never fire and nothing said so -- Builder.io's §6.4 in miniature.
-    const h = harness({ lines: WRITE_LINES.slice(0, 3), idleTimeoutMs: 200 })
+    // A 1 s ending, waited for up to 5 s. At 200 ms the notice's window (half
+    // the ending to the ending) was 100 ms wide, and under the whole suite's
+    // load a tick stepped over it once (the 0.709 ship gate, 2026-10-08).
+    const h = harness({ lines: WRITE_LINES.slice(0, 3), idleTimeoutMs: 1_000 })
     await h.service.start('hi', undefined, {})
     await vi.waitFor(() => {
       expect(h.notices.length).toBeGreaterThan(0)
       expect(h.notices[0]?.message).toMatch(/write_to_file/)
-    })
+    }, { timeout: 5_000 })
   })
 
   it('says nothing while the agent is still writing', async () => {
