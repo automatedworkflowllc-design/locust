@@ -22,7 +22,7 @@ describe('the report', () => {
 
   it('opens the one destination, as a new report', () => {
     expect(`${url.origin}${url.pathname}`).toBe(REPORT_DESTINATION)
-    expect(REPORT_DESTINATION).toBe('https://github.com/automatedworkflowllc-design/locust-releases/issues/new')
+    expect(REPORT_DESTINATION).toBe('https://github.com/automatedworkflowllc-design/locust/issues/new')
     expect([...url.searchParams.keys()]).toEqual(['body'])
   })
 
