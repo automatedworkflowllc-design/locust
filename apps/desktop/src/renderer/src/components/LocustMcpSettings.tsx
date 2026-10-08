@@ -30,7 +30,8 @@ export function LocustMcpSettings({ heading, api = typeof window === 'undefined'
       </div>
       <button type="button" className={`lc-switch${state?.enabled ? ' is-on' : ''}`} role="switch" aria-label="Let your other AI apps use Locust" aria-checked={state?.enabled === true} disabled={!state || busy} onClick={() => { void toggle() }}><span /></button>
     </div>
-    {state?.enabled && <div className="lc-settingline">
+    {/* A sub-setting of the switch above (0.707): spaced and indented, so it does not read as that line's last sentence. */}
+    {state?.enabled && <div className="lc-settingline lc-settingline--sub">
       <div className="lc-settingline__text">
         <h3 className="lc-settings__heading">Use each teammate's own mode</h3>
         <p className="lc-settings__lede">{state.ownMode

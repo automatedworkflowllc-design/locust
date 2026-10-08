@@ -10983,6 +10983,13 @@ textarea {
   margin: 0;
 }
 
+/* A setting that belongs to the one above it (0.707: "Use each teammate's own mode"). */
+.lc-settingline--sub {
+  margin-top: var(--lc-space-5);
+  padding-left: var(--lc-space-5);
+  border-left: 2px solid var(--lc-border-control);
+}
+
 /* Terminal faces (0.561): three bots wearing the choice, beside it. */
 .lc-settingline__preview {
   display: flex;
