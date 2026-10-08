@@ -98,8 +98,15 @@ export function createLocustMcpHost(options: {
   let server: Server | undefined
   let token: string | undefined
   let disposed = false
+  // Read by every tool call, so a turn started after the switch goes off is Ask.
+  let ownMode = false
   let queue: Promise<unknown> = Promise.resolve()
-  const state = (message?: string): LocustMcpState => ({ enabled: server !== undefined, ...(server === undefined ? {} : setup), ...(message === undefined ? {} : { message }) })
+  const state = (message?: string): LocustMcpState => ({ enabled: server !== undefined, ownMode, ...(server === undefined ? {} : setup), ...(message === undefined ? {} : { message }) })
+  const save = async (): Promise<void> => {
+    await mkdir(options.directory, { recursive: true })
+    await writeFile(settings + '.tmp', JSON.stringify({ enabled: server !== undefined, ownMode }), 'utf8')
+    await rename(settings + '.tmp', settings)
+  }
   const stop = async (): Promise<void> => {
     token = undefined
     const listener = server
@@ -147,22 +154,39 @@ export function createLocustMcpHost(options: {
     load: () => serial(async () => {
       if (disposed || server !== undefined) return state()
       await rm(connection, { force: true }) // a crashed process's token is never reused
-      try { if (JSON.parse(await readFile(settings, 'utf8')).enabled === true) await start() } catch { /* Missing, unreadable or failed setup stays off. */ }
+      try {
+        const saved = JSON.parse(await readFile(settings, 'utf8')) as { readonly enabled?: unknown; readonly ownMode?: unknown }
+        // Only a literal true widens anything; a missing or odd value is Ask.
+        ownMode = saved.ownMode === true
+        if (saved.enabled === true) await start()
+      } catch { /* Missing, unreadable or failed setup stays off. */ }
       return state()
     }),
     setEnabled: (enabled: unknown) => serial(async () => {
       if (disposed || typeof enabled !== 'boolean') return state('That server setting was not changed.')
       try {
         if (enabled) await start(); else await stop()
-        await mkdir(options.directory, { recursive: true })
-        await writeFile(settings + '.tmp', JSON.stringify({ enabled }), 'utf8')
-        await rename(settings + '.tmp', settings)
+        await save()
         return state()
       } catch {
         await stop()
         return state('The local server setting could not be saved. The server is off; no conversation was started.')
       }
     }),
+    setOwnMode: (next: unknown) => serial(async () => {
+      if (disposed || typeof next !== 'boolean') return state('That mode setting was not changed.')
+      const before = ownMode
+      ownMode = next
+      try {
+        await save()
+        return state()
+      } catch {
+        // Not saved means not changed: a restart must not bring back a mode the screen no longer shows.
+        ownMode = before
+        return state('The mode setting could not be saved. It is unchanged.')
+      }
+    }),
+    ownMode: (): boolean => ownMode,
     dispose: async (): Promise<void> => { disposed = true; await queue; await stop() }
   }
 }

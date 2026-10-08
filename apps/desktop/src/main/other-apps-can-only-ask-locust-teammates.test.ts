@@ -6,12 +6,12 @@ import { seedAvatar } from '../shared/avatar.js'
 
 const teammates: TeammateListResponse = { ok: true, data: { teammates: [{ teammateId: 'tm_wren', name: 'Wren', role: 'Custom', roleTitle: 'Reviewer', hue: 'lime', avatar: seedAvatar('tm_wren'), createdAt: '2026-10-07', route: { runtime: 'codex', model: 'model-test', mode: 'auto' } }], missionOwners: {}, missionTitles: {} } }
 const mission = (overrides: Partial<PublicRecoveredMission> = {}): PublicRecoveredMission => ({ missionId: 'mission_1', startedBy: { kind: 'mcp' }, phase: 'completed', events: [], ...overrides }) as PublicRecoveredMission
-function fixture() {
+function fixture(extra: { ownMode?: () => boolean; waiting?: (id: string) => boolean } = {}) {
   const start = vi.fn(async (): Promise<CodexMissionStartResponse> => ({ ok: true, data: { missionId: 'mission_1' } } as CodexMissionStartResponse))
   const read = vi.fn(async (): Promise<MissionReadResponse> => ({ ok: true, data: { mission: mission() } }))
   const background = vi.fn(async () => [])
   const deps = { teammates: vi.fn(async () => teammates), busy: vi.fn(() => true), start, read, newest: vi.fn(async id => id), owner: vi.fn(async () => 'tm_wren'), live: vi.fn(() => false), background }
-  return { ...deps, call: createLocustMcpTools(deps) }
+  return { ...deps, call: createLocustMcpTools({ ...deps, ...extra }) }
 }
 describe('other apps can only ask Locust teammates', () => {
   it('starts a writing teammate in Ask, ignores caller mode/route, and keeps the saved route', async () => {
@@ -29,7 +29,7 @@ describe('other apps can only ask Locust teammates', () => {
   })
   it('lists public teammate identity, route and busy state, but never the stores or keys', async () => {
     const f = fixture()
-    expect(await f.call('list_teammates', {})).toEqual(mcpText(JSON.stringify([{ id: 'tm_wren', name: 'Wren', role: 'Reviewer', runtime: 'codex', model: 'model-test', busy: true }])))
+    expect(await f.call('list_teammates', {})).toEqual(mcpText(JSON.stringify([{ id: 'tm_wren', name: 'Wren', role: 'Reviewer', runtime: 'codex', model: 'model-test', busy: true, runs_in: 'ask' }])))
     expect(f.start).not.toHaveBeenCalled()
   })
   it('continues the newest turn in Ask and returns the stable conversation id', async () => {
@@ -84,5 +84,48 @@ describe('other apps can only ask Locust teammates', () => {
     release({ ok: true, data: { mission: mission() } })
     await first
     expect(f.start).toHaveBeenCalledOnce()
+  })
+})
+
+describe(`with "each teammate's own mode" on (0.703)`, () => {
+  it('starts the teammate in the mode saved in Locust, never one the caller names', async () => {
+    const f = fixture({ ownMode: () => true })
+    const result = await f.call('start_conversation', { teammate: 'Wren', message: 'Fix it.', mode: 'ask' })
+    expect(f.start).toHaveBeenCalledWith({ teammateId: 'tm_wren', prompt: 'Fix it.', mode: 'auto', keepSavedRoute: true }, { kind: 'mcp' })
+    expect(result).toEqual(mcpText(JSON.stringify({ conversation_id: 'mission_1', mode: 'auto' })))
+  })
+  it('reads the switch on every turn: turned off, the next turn is Ask', async () => {
+    let on = true
+    const f = fixture({ ownMode: () => on })
+    await f.call('start_conversation', { teammate: 'Wren', message: 'one' })
+    on = false
+    await f.call('send_message', { conversation_id: 'mission_1', message: 'two' })
+    expect(f.start).toHaveBeenLastCalledWith({ teammateId: 'tm_wren', prompt: 'two', followUpOf: 'mission_1', mode: 'ask', keepSavedRoute: true }, { kind: 'mcp' })
+  })
+  it("continues in the owner's saved mode, and a teammate with no route is Ask", async () => {
+    const f = fixture({ ownMode: () => true })
+    await f.call('send_message', { conversation_id: 'mission_1', message: 'next', mode: 'ask' })
+    expect(f.start).toHaveBeenLastCalledWith({ teammateId: 'tm_wren', prompt: 'next', followUpOf: 'mission_1', mode: 'auto', keepSavedRoute: true }, { kind: 'mcp' })
+    f.teammates.mockResolvedValue({ ok: true, data: { ...(teammates.ok ? teammates.data : { missionOwners: {}, missionTitles: {} }), teammates: [{ ...(teammates.ok ? teammates.data.teammates[0]! : ({} as never)), route: undefined }] } } as TeammateListResponse)
+    await f.call('start_conversation', { teammate: 'Wren', message: 'hi' })
+    expect(f.start).toHaveBeenLastCalledWith({ teammateId: 'tm_wren', prompt: 'hi', mode: 'ask', keepSavedRoute: true }, { kind: 'mcp' })
+  })
+  it('lists the mode a turn would run in', async () => {
+    const f = fixture({ ownMode: () => true })
+    expect(JSON.parse((await f.call('list_teammates', {})).content[0]!.text)[0].runs_in).toBe('auto')
+  })
+  it("passes the host's Auto refusal through as the error, unchanged", async () => {
+    const f = fixture({ ownMode: () => true })
+    const sentence = 'Auto mode is switched off for this workspace. Turn it on in Settings to let a run work outside the workspace folder. Nothing was recorded.'
+    f.start.mockResolvedValue({ ok: false, error: { code: 'RUNTIME_START_FAILED', message: sentence } })
+    expect(await f.call('start_conversation', { teammate: 'Wren', message: 'go' })).toEqual(mcpText(sentence, true))
+  })
+  it("says a card is waiting in Locust's window and offers no way to answer it", async () => {
+    const f = fixture({ ownMode: () => true, waiting: id => id === 'mission_1' })
+    f.live.mockReturnValue(true)
+    const reply = await f.call('read_reply', { conversation_id: 'mission_1' })
+    expect(reply.content[0]!.text).toMatch(/^Waiting for the person to approve or deny an action in Locust's window\. This app cannot answer it/)
+    for (const tool of ['approve', 'answer_approval', 'decide']) expect((await f.call(tool, { conversation_id: 'mission_1', decision: 'approve-once' })).isError).toBe(true)
+    expect(f.start).not.toHaveBeenCalled()
   })
 })

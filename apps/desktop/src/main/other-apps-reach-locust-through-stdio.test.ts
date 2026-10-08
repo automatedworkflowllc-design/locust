@@ -56,8 +56,10 @@ describe('other apps reach Locust through stdio', () => {
     const f = await fixture()
     const answer = await f.rpc('tools/list')
     expect(answer.result.tools.map((tool: { name: string }) => tool.name)).toEqual(['list_teammates', 'start_conversation', 'send_message', 'read_reply', 'list_background_runs'])
-    for (const name of ['start_conversation', 'send_message']) expect(answer.result.tools.find((tool: { name: string }) => tool.name === name).description).toContain('Ask mode (read only)')
-    for (const name of ['start_conversation', 'send_message']) expect(answer.result.tools.find((tool: { name: string }) => tool.name === name).description).toContain('no automatic teammate handoffs')
+    const described = (name: string): string => answer.result.tools.find((tool: { name: string }) => tool.name === name).description
+    expect(described('start_conversation')).toContain('Ask mode (read only), unless the person has turned on')
+    expect(described('start_conversation')).toContain("answered by the person in Locust's window, never from here")
+    for (const name of ['start_conversation', 'send_message']) expect(described(name)).toMatch(/no automatic teammate handoffs/i)
     expect(answer.result.tools[1].description).toContain('monthly limits apply')
     expect(f.call).not.toHaveBeenCalled()
   })

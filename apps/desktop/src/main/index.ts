@@ -13,7 +13,7 @@ import { VOICE_READY, VOICE_DOWNLOAD, VOICE_TRANSCRIBE, VOICE_CANCEL, VOICE_PROG
 import { createVoiceSettingsStore } from './voice-settings.js'
 import { createLocustMcpHost } from './locust-mcp-host.js'
 import { createLocustMcpTools } from './locust-mcp-tools.js'
-import { LOCUST_MCP_GET, LOCUST_MCP_SET } from '../shared/locust-mcp.js'
+import { LOCUST_MCP_GET, LOCUST_MCP_SET, LOCUST_MCP_SET_OWN_MODE } from '../shared/locust-mcp.js'
 import { createPageServer, fromPagePreview, pageMayReach, PAGE_SCHEME } from './page-preview.js'
 import { CANCEL_SCRIPT, captureRectOf, pageFrameOf, pickInFrame } from './page-pick.js'
 import { createRuntimeCommands } from './runtime-commands.js'
@@ -7275,14 +7275,18 @@ if (!ownsSingleInstanceLock) {
       newest: id => newestTurnOf(missionLedger, id),
       owner: async id => (await teammates.missionOwners())[id],
       live: id => codexMissions.hasMission(id) || antigravityMissions.liveMissionIds().includes(id),
-      background: async () => (await backgroundRuns.list()).map(publicRun)
+      background: async () => (await backgroundRuns.list()).map(publicRun),
+      // Called per tool call, after mcpHost below exists.
+      ownMode: () => mcpHost.ownMode(),
+      waiting: id => raisedApprovals.waitingOn(id)
     })
     const mcpHost = createLocustMcpHost({ directory: app.getPath('userData'), node: process.execPath,
       bridge: app.isPackaged ? join(process.resourcesPath, 'locust-mcp-bridge.mjs') : join(__dirname, '../../resources/locust-mcp-bridge.mjs'), call: mcpTools })
     mcpForShutdown = mcpHost
     void mcpHost.load().catch(() => note('locust-mcp', 'The local MCP listener could not start. It is off.'))
-    ipcMain.handle(LOCUST_MCP_GET, event => fromOwnWindow(event) ? mcpHost.settings() : { enabled: false })
-    ipcMain.handle(LOCUST_MCP_SET, (event, enabled: unknown) => fromOwnWindow(event) ? mcpHost.setEnabled(enabled) : { enabled: false })
+    ipcMain.handle(LOCUST_MCP_GET, event => fromOwnWindow(event) ? mcpHost.settings() : { enabled: false, ownMode: false })
+    ipcMain.handle(LOCUST_MCP_SET, (event, enabled: unknown) => fromOwnWindow(event) ? mcpHost.setEnabled(enabled) : { enabled: false, ownMode: false })
+    ipcMain.handle(LOCUST_MCP_SET_OWN_MODE, (event, ownMode: unknown) => fromOwnWindow(event) ? mcpHost.setOwnMode(ownMode) : { enabled: false, ownMode: false })
 
     ipcMain.handle(CODEX_MISSION_CANCEL_CHANNEL, (event, request: unknown) => {
       const owner = BrowserWindow.fromWebContents(event.sender)

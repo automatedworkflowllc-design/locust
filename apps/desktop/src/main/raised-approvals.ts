@@ -24,6 +24,8 @@ export interface RaisedApprovals {
   get(approvalId: string): RaisedApproval | undefined
   /** Its answer is recorded: the card is no longer waiting. */
   forget(approvalId: string): void
+  /** A card of this turn is still waiting (read by the MCP server's read_reply, 0.703). */
+  waitingOn(missionId: string): boolean
   readonly size: number
 }
 
@@ -41,6 +43,10 @@ export function createRaisedApprovals(keep: number = MAX_RAISED_APPROVALS): Rais
     },
     forget(approvalId) {
       raised.delete(approvalId)
+    },
+    waitingOn(missionId) {
+      for (const entry of raised.values()) if (entry.request.missionId === missionId) return true
+      return false
     },
     get size() {
       return raised.size

@@ -15,7 +15,7 @@ import type {
   PublicTeammate
 } from '../../../shared/ipc.js'
 import type { TurnVersions } from '../missionView.js'
-import type { RewindPutBackResponse } from '../../../shared/ipc.js'
+import type { MissionMode, RewindPutBackResponse } from '../../../shared/ipc.js'
 import { activityEntries, buildThread, netFileEntries, cancellationSummary, editedFiles, decisionStanding, errorAlreadyShown, foldNoticeKeys, helperAskedBy, lastPlanOf, modeRefusedATool, pathInWorkspace, readPlan, relativePath, sentAgainBy, stepsLine, stoppedBeforeSaying, terminalSeamBefore, threadMarkers, threadPeerCards, turnAttachments, turnPromptLine, usageWindowLabel } from '../missionView.js'
 import type { GroupBoundary, GroupLeaving, LiveStarter, TurnSwitch } from '../missionView.js'
 import { parseAgentText } from '../agentText.js'
@@ -29,7 +29,7 @@ import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { liveActivityOf } from '../faceState.js'
 import { costLabel, costLineOrWhyNot, runCostOf } from '../cost.js'
 import type { FaceActivity } from '../faceState.js'
-import { checkpointLabel, ledgerVerificationLabel, missionPhaseView, shortMissionId } from '../status.js'
+import { checkpointLabel, ledgerVerificationLabel, missionPhaseView, modeFacts, shortMissionId } from '../status.js'
 import { ActivityCard } from './ActivityCard.js'
 import { MemoryCard } from './MemoryCard.js'
 import { memoriesOfTurn } from '../conversationMemories.js'
@@ -760,12 +760,21 @@ function ReceiptCard({
   )
 }
 
+/** The thread's line for a turn another app started. */
+export function otherAppMarker(mode: MissionMode | undefined): string {
+  if (mode === undefined) return 'Started from another app'
+  if (mode === 'ask') return 'Started from another app · Ask mode (read only)'
+  return `Started from another app · ${modeFacts(mode).name}`
+}
+
 export interface ThreadProps {
   readonly prompt: string
   /** The folder now open, so the receipt names one only for its own missions. */
   readonly workspaceId?: string | undefined
   /** Who started the current turn; a host-briefed one is not the person's words. */
   readonly startedBy?: LiveStarter
+  /** The mode this turn ran in, as its run recorded it: what the "another app" marker names (0.703). */
+  readonly runMode?: MissionMode
   /** Open the run a peer message reached; undefined for one nothing received yet. */
   /** Open a handed file in the panel beside the conversation. */
   readonly onOpenFile?: (path: string) => void
@@ -983,6 +992,7 @@ export function Thread({
   onSendEditCheck,
   stoppedByPerson = false,
   startedBy,
+  runMode,
   onOpenFile,
   onOpenPeerRun,
   earlierTurns,
@@ -1416,7 +1426,10 @@ onResume,
           <div className="lc-thread__marker lc-mono">Started {startedAt}</div>
         )}
         {(startedBy?.kind === 'mcp' || earlierTurns.some(turn => turn.startedBy?.kind === 'mcp')) && (
-          <div className="lc-thread__marker lc-mono">Started from another app · Ask mode (read only)</div>
+          // Another app's turn runs in Ask unless the person turned on each
+          // teammate's own mode (0.703); the marker names the run's own mode,
+          // and claims none it does not know.
+          <div className="lc-thread__marker lc-mono">{otherAppMarker(runMode)}</div>
         )}
 
         {/*

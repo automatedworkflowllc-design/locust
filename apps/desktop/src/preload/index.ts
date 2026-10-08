@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { LOCUST_MCP_GET, LOCUST_MCP_SET } from '../shared/locust-mcp.js'
+import { LOCUST_MCP_GET, LOCUST_MCP_SET, LOCUST_MCP_SET_OWN_MODE } from '../shared/locust-mcp.js'
 import { VOICE_READY, VOICE_DOWNLOAD, VOICE_TRANSCRIBE, VOICE_CANCEL, VOICE_PROGRESS, VOICE_SETTINGS_READ, VOICE_SETTINGS_SAVE, VOICE_OPENAI_CONSENT } from '../shared/voice.js'
 import { REMOTE_CONTROL_GET_CHANNEL, REMOTE_CONTROL_SET_CHANNEL, type RemoteControlState } from '../shared/claude-remote-control.js'
 import { FOLDER_CHANGES_CHANNEL, FOLDER_COMMIT_CHANNEL, type CommitResult, type FolderChanges } from '../shared/folder-commit.js'
@@ -375,7 +375,8 @@ export type {
 const desktopApi: DesktopApi = {
   locustMcp: {
     settings: () => ipcRenderer.invoke(LOCUST_MCP_GET),
-    setEnabled: (enabled) => ipcRenderer.invoke(LOCUST_MCP_SET, enabled)
+    setEnabled: (enabled) => ipcRenderer.invoke(LOCUST_MCP_SET, enabled),
+    setOwnMode: (ownMode) => ipcRenderer.invoke(LOCUST_MCP_SET_OWN_MODE, ownMode)
   },
   voice: {
     settings: () => ipcRenderer.invoke(VOICE_SETTINGS_READ),

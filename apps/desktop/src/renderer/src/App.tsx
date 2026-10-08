@@ -8338,6 +8338,7 @@ export default function App(): ReactElement {
                 onOpenFile={openFileInViewer}
                 prompt={liveRun.prompt}
                 startedBy={liveRun.startedBy}
+                {...(liveRun.data?.mode === undefined ? {} : { runMode: liveRun.data.mode })}
                 planMode={liveRun.plan === true}
                 {...startingLabelOf(liveRun)}
                 onOpenPeerRun={(messageId) => {

@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createLocustMcpHost, MCP_CONNECTION_FILE, mcpRequestHandler, mcpSetup, mcpText, windowsTool } from './locust-mcp-host.js'
+import { createLocustMcpHost, MCP_CONNECTION_FILE, MCP_SETTINGS_FILE, mcpRequestHandler, mcpSetup, mcpText, windowsTool } from './locust-mcp-host.js'
 
 const hosts: ReturnType<typeof createLocustMcpHost>[] = []
 const roots: string[] = []
@@ -31,9 +31,25 @@ const headersOnly = (url: string, token?: string): Promise<number | undefined> =
 })
 
 describe('other apps need a current local token', () => {
+  it("keeps each teammate's own mode off by default, saves the switch, and keeps it across a restart and the server switch", async () => {
+    const f = await fixture(async () => undefined)
+    await f.host.load()
+    expect(f.host.ownMode()).toBe(false)
+    for (const odd of ['true', 1, null]) expect((await f.host.setOwnMode(odd)).message).toBe('That mode setting was not changed.')
+    expect(f.host.ownMode()).toBe(false)
+    expect((await f.host.setOwnMode(true)).ownMode).toBe(true)
+    await f.host.setEnabled(true)
+    await f.host.setEnabled(false)
+    expect(JSON.parse(await readFile(join(f.directory, MCP_SETTINGS_FILE), 'utf8'))).toEqual({ enabled: false, ownMode: true })
+    const again = createLocustMcpHost({ directory: f.directory, node: '/Locust.exe', bridge: '/bridge.mjs', call: f.call, protectFile: async () => undefined })
+    hosts.push(again)
+    expect((await again.load()).ownMode).toBe(true)
+    expect((await again.setOwnMode(false)).ownMode).toBe(false)
+    expect(again.ownMode()).toBe(false)
+  })
   it('is off by default, with no connection file or listening socket', async () => {
     const f = await fixture()
-    expect(await f.host.load()).toEqual({ enabled: false })
+    expect(await f.host.load()).toEqual({ enabled: false, ownMode: false })
     expect(await stat(join(f.directory, MCP_CONNECTION_FILE)).catch(() => undefined)).toBeUndefined()
     expect(f.call).not.toHaveBeenCalled()
   })
@@ -57,7 +73,7 @@ describe('other apps need a current local token', () => {
     expect(await headersOnly(first.url)).toBe(401)
     expect(await headersOnly(first.url, 'f'.repeat(64))).toBe(401)
     expect(f.call).not.toHaveBeenCalled()
-    expect(await f.host.setEnabled(false)).toEqual({ enabled: false })
+    expect(await f.host.setEnabled(false)).toEqual({ enabled: false, ownMode: false })
     await expect(fetch(first.url)).rejects.toThrow()
     expect(await stat(join(f.directory, MCP_CONNECTION_FILE)).catch(() => undefined)).toBeUndefined()
     await f.host.setEnabled(true)

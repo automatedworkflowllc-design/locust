@@ -9,10 +9,10 @@ const schema = (properties = {}, required = []) => ({ type: 'object', properties
 const string = { type: 'string', minLength: 1, maxLength: 200 }
 const message = { type: 'string', minLength: 1, maxLength: 8000 }
 const TOOLS = [
-  { name: 'list_teammates', description: 'List Locust teammates: id, name, role, runtime, model and whether busy. Read only.', inputSchema: schema() },
-  { name: 'start_conversation', description: 'Ask a Locust teammate by name or id. Always Ask mode (read only), regardless of its usual mode, with no automatic teammate handoffs. Shares remain visible in Locust. API/account usage and Locust monthly limits apply. Returns a conversation id; use read_reply to poll.', inputSchema: schema({ teammate: string, message }, ['teammate', 'message']) },
-  { name: 'send_message', description: 'Continue a conversation started by this server. Always Ask mode (read only), with no automatic teammate handoffs. No message is queued while it is working; poll read_reply before sending.', inputSchema: schema({ conversation_id: string, message }, ['conversation_id', 'message']) },
-  { name: 'read_reply', description: 'Read the newest finished answer, current activity while still working, or Locust\'s own failure words. Read only.', inputSchema: schema({ conversation_id: string }, ['conversation_id']) },
+  { name: 'list_teammates', description: 'List Locust teammates: id, name, role, runtime, model, whether busy, and runs_in: the mode a turn started from here would use. Read only.', inputSchema: schema() },
+  { name: 'start_conversation', description: 'Ask a Locust teammate by name or id. Ask mode (read only), unless the person has turned on "Use each teammate\'s own mode" in Locust; then the mode the teammate is set to there, and any approval is answered by the person in Locust\'s window, never from here. The reply says the mode used. No automatic teammate handoffs. Shares remain visible in Locust. API/account usage and Locust monthly limits apply. Returns a conversation id; use read_reply to poll.', inputSchema: schema({ teammate: string, message }, ['teammate', 'message']) },
+  { name: 'send_message', description: 'Continue a conversation started by this server, in the same kind of mode as start_conversation, with no automatic teammate handoffs. No message is queued while it is working; poll read_reply before sending.', inputSchema: schema({ conversation_id: string, message }, ['conversation_id', 'message']) },
+  { name: 'read_reply', description: 'Read the newest finished answer, current activity while still working (including a wait for the person to approve an action in Locust), or Locust\'s own failure words. Read only.', inputSchema: schema({ conversation_id: string }, ['conversation_id']) },
   { name: 'list_background_runs', description: 'List Claude turns running in the background. Read only; never starts or stops them.', inputSchema: schema() }
 ]
 
