@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.701.0 - 2026-10-07
+
+### Fixed
+
+- **Reading a Claude cloud task in a folder Claude Code doesn't trust yet tells you what to do.** Newer Claude Code versions won't bring a cloud session into a folder until you have opened Claude Code there once and said you trust it. Locust only said "Claude Code did not bring the session in". It now says to open Claude Code in that folder once, answer its question, and check again.
+
 ## 0.700.0 - 2026-10-07
 
 ### Fixed
