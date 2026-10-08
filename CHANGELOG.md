@@ -16,6 +16,7 @@ heading: the home screen then shows it once, as a splash.
 ### Fixed
 
 - **A Claude teammate whose Claude Code isn't signed in says how to fix it, once.** It showed Claude Code's own "Not logged in · Please run /login" twice, naming a command Locust has no place for. It now says to open a terminal, run claude and sign in (with your Claude account, or an Anthropic Console account to pay with an API key), or to add a Claude API key in Settings, Your own models. An API key in your environment is never handed to an agent, so it does not count as signing in.
+- **Report a problem opens on Locust's own GitHub page** (github.com/automatedworkflowllc-design/locust), beside its bug and idea forms, instead of the downloads page. Reports by email still go to support@locust.lol.
 
 ## 0.701.0 - 2026-10-07
 
