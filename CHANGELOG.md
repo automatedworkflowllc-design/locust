@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.707.0 - 2026-10-08
+
+### Improved
+
+- **The other-apps setting reads more clearly.** It says other apps can run your routines too, not only ask teammates, and "Use each teammate's own mode" now sits indented under it as part of that setting, instead of looking like more of the sentence above.
+
 ## 0.706.0 - 2026-10-08
 
 ### New
