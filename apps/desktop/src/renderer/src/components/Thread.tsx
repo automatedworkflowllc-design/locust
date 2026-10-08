@@ -1832,7 +1832,7 @@ onResume,
           />
         )}
       </div>
-      <JumpToBottom shown={follow.away} onClick={follow.toBottom} />
+      <JumpToBottom shown={follow.away} onClick={follow.toBottom} working={running} />
     </div>
   )
 }

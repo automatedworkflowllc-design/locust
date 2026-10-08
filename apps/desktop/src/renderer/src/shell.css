@@ -16193,6 +16193,12 @@ textarea {
   justify-content: center;
   width: 30px;
   height: 30px;
+  /*
+   * The thread is a column flexbox: once a conversation overflows, a
+   * shrinkable pill was squeezed to its icon's height, about 14px of a 30px
+   * circle (seen in the 0.703 drive's frames). It keeps its size.
+   */
+  flex-shrink: 0;
   padding: 0;
   border: 1px solid var(--lc-border-button);
   border-radius: 999px;
@@ -16205,6 +16211,22 @@ textarea {
 .lc-jumpdown:hover {
   border-color: var(--lc-border-hover);
   color: var(--lc-text-primary);
+}
+
+.lc-jumpdown__chevron {
+  display: flex;
+}
+
+/* Still working (0.703): the thinking dots, until the pill is about to be pressed. */
+.lc-jumpdown--working .lc-jumpdown__chevron,
+.lc-jumpdown--working:hover .lc-jumpdown__dots,
+.lc-jumpdown--working:focus-visible .lc-jumpdown__dots {
+  display: none;
+}
+
+.lc-jumpdown--working:hover .lc-jumpdown__chevron,
+.lc-jumpdown--working:focus-visible .lc-jumpdown__chevron {
+  display: flex;
 }
 
 /*
