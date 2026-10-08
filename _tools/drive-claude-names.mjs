@@ -63,7 +63,8 @@ try {
   for (const row of rows) say(`   ${row.label.padEnd(18)} ${row.detail}`)
   await shoot('01-picker-claude.png')
   const labels = rows.map((row) => row.label)
-  for (const expected of ['Fable 5.1', 'Opus 5.5', 'Sonnet 5', 'Haiku 4.5']) check(`the picker names ${expected}`, labels.includes(expected), labels.join(', '))
+  // Haiku 4.5 is an older version: since 0.697 it sits in the fold, in Claude Code's own order (checked below).
+  for (const expected of ['Fable 5.1', 'Opus 5.5', 'Sonnet 5']) check(`the picker names ${expected}`, labels.includes(expected), labels.join(', '))
   check('no row is a bare family name', !labels.some((label) => /^(Fable|Opus|Sonnet|Haiku)$/.test(label)), labels.join(', '))
 
   await drive.evaluate(`(document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })), 'closed')`)
@@ -94,6 +95,7 @@ try {
   const olderCount = Number(/Older versions\s*(\d+)/.exec(fold.before?.text ?? '')?.[1] ?? 0)
   check('older versions are folded, and the fold says how many', fold.toggle && fold.before.expanded === 'false' && fold.before.older === 0 && olderCount > 0, JSON.stringify(fold.before))
   check('opening it shows them in place', fold.after?.expanded === 'true' && ['Opus 5', 'Opus 4.8', 'Opus 4.7', 'Opus 4.6', 'Opus 4.5', 'Fable 5', 'Sonnet 4.6', 'Sonnet 4.5'].every((name) => fold.after.labels.includes(name)))
+  check('the fold offers Haiku 4.5', fold.after?.labels?.includes('Haiku 4.5') === true, JSON.stringify(fold.after?.labels))
   await shoot('03-fold-open.png')
   const picked = await drive.evaluate(`(async () => {
     const row = [...document.querySelectorAll('.lc-picker__row')].find((r) => r.querySelector('.lc-picker__label')?.textContent === 'Opus 4.8')
@@ -106,7 +108,9 @@ try {
   await shoot('04-chip-opus-4-8.png')
   say(failures === 0 ? '\nCLAUDE NAMES PASSED' : `\nCLAUDE NAMES: ${String(failures)} FAILED`)
 } catch (error) {
+  failures += 1
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
   await drive.finish({ intro: 'Claude routes name their version.' })
 }
+process.exit(failures === 0 ? 0 : 1)

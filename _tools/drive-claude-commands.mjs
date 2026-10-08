@@ -115,13 +115,14 @@ try {
   await drive.evaluate(openTeammateScript('Ada'))
   await sleep(800)
 
-  // Before any run, nothing is known of Claude Code's commands.
+  // Before any run, Claude Code's own commands are already listed (since 0.694, read from its handshake; this drive
+  // predates that and expected none -- drive-claude-commands-before-a-turn checks the list itself).
   const before = JSON.parse(String(await drive.capture('A bare slash before Claude Code has run', async () => {
     await drive.evaluate(type('/'))
     return drive.evaluate(menu)
   })))
   say(`  before: ${JSON.stringify(before)}`)
-  check("before a run, the menu is Locust's own", before.open && before.groups.length === 0, JSON.stringify(before))
+  check("before a run, the menu already offers Claude Code's own commands", before.open && before.groups.includes('Claude Code') && before.count > 0, JSON.stringify(before))
   await drive.evaluate(press('Escape'))
 
   await drive.evaluate(type('Remember this word for later: PELICAN. Reply only OK.'))
