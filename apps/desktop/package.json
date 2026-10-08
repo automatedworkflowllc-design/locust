@@ -31,7 +31,7 @@
     "@vitejs/plugin-react": "5.2.0",
     "border-beam": "1.3.0",
     "bot-avatars": "0.2.2",
-    "electron": "^44.6.0",
+    "electron": "^44.7.0",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
     "katex": "~0.16.47",
