@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.704.0 - 2026-10-08
+
+### New
+
+- **Your other AI apps can run your routines.** With "Let your other AI apps use Locust" on, an app such as Claude Code or Codex can list your routines (each step's teammate and mode, and what each asks for), run one with its answers filled in, and follow it step by step to its last answer. It runs exactly as Run on the routine's card does. A routine that changes files runs from another app only if "Use each teammate's own mode" is on, and its approval cards still appear only in Locust's window. A routine that asks for a folder runs only from Locust, where you pick the folder.
+
 ## 0.703.0 - 2026-10-08
 
 ### New
