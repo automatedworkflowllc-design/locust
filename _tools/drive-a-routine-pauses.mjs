@@ -44,8 +44,14 @@ const ROWS = `(async () => {
     pressed: [...row.querySelectorAll('button')].find((b) => /^(Pause|Resume) /.test(b.getAttribute('aria-label') ?? ''))?.getAttribute('aria-pressed') ?? null
   })))
 })()`
-const press = (label) => `(async () => {
-  document.querySelector('button[aria-label="${label}"]')?.click()
+// Literal selectors, so the harness-selector guard can check them against the app's labels.
+const PRESS_PAUSE = `(async () => {
+  document.querySelector('button[aria-label^="Pause "]')?.click()
+  await new Promise((r) => setTimeout(r, 1200))
+  return 1
+})()`
+const PRESS_RESUME = `(async () => {
+  document.querySelector('button[aria-label^="Resume "]')?.click()
   await new Promise((r) => setTimeout(r, 1200))
   return 1
 })()`
@@ -66,7 +72,7 @@ try {
   const hand = before.find((r) => r.name === 'By hand')
   check('only the scheduled routine offers Pause', digest?.pause === 'Pause Morning digest' && digest.pressed === 'false' && hand?.pause === null, JSON.stringify(before))
   check('the scheduled one says its next time', /next/.test(digest?.chip ?? ''), digest?.chip)
-  await drive.evaluate(press('Pause Morning digest'))
+  await drive.evaluate(PRESS_PAUSE)
   const paused = JSON.parse(await drive.capture('Morning digest paused', () => drive.evaluate(ROWS))).find((r) => r.name === 'Morning digest')
   check('paused: the chip says so and the button is Resume', /· paused$/.test(paused?.chip ?? '') && paused?.pause === 'Resume Morning digest' && paused.pressed === 'true', JSON.stringify(paused))
   check('the routine file says paused', (await saved()).rt_digest?.paused === true)
@@ -85,7 +91,7 @@ try {
   await drive.resize(1215, 800)
   const after = JSON.parse(await drive.capture('after a restart', () => drive.evaluate(ROWS))).find((r) => r.name === 'Morning digest')
   check('after a restart it is still paused', /· paused$/.test(after?.chip ?? '') && after?.pause === 'Resume Morning digest', JSON.stringify(after))
-  await drive.evaluate(press('Resume Morning digest'))
+  await drive.evaluate(PRESS_RESUME)
   const resumed = JSON.parse(await drive.capture('Morning digest resumed', () => drive.evaluate(ROWS))).find((r) => r.name === 'Morning digest')
   check('resumed: the next time is back and the button is Pause again', /next/.test(resumed?.chip ?? '') && !/paused/.test(resumed?.chip ?? '') && resumed?.pause === 'Pause Morning digest', JSON.stringify(resumed))
   const file = (await saved()).rt_digest

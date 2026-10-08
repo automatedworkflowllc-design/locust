@@ -101,11 +101,19 @@ const appLabels = new Set<string>()
 const appLabelPrefixes: string[] = []
 for (const text of appSource) {
   for (const [, literal] of text.matchAll(/aria-label="([^"{}]+)"/g)) appLabels.add(literal)
-  for (const [, expression] of text.matchAll(/aria-label=\{([^}]*)\}/g)) {
+  // One level of `${...}` inside the braces, so a ternary of two templates is read whole (0.705).
+  for (const [, expression] of text.matchAll(/aria-label=\{((?:[^{}]|\{[^{}]*\})*)\}/g)) {
     // A ternary of two literals is two literal labels. Missing this is what
     // made the first run of this check report five false positives.
-    for (const [, quoted] of expression.matchAll(/'([^']+)'/g)) appLabels.add(quoted)
-    for (const [, quoted] of expression.matchAll(/"([^"]+)"/g)) appLabels.add(quoted)
+    const outsideTemplates = expression.replace(/`[^`]*`/g, '')
+    for (const [, quoted] of outsideTemplates.matchAll(/'([^']+)'/g)) appLabels.add(quoted)
+    for (const [, quoted] of outsideTemplates.matchAll(/"([^"]+)"/g)) appLabels.add(quoted)
+    // And a ternary of two templates is two prefixes: `Resume ${name}` : `Pause ${name}` (0.705).
+    for (const [, template] of expression.matchAll(/`([^`]*)`/g)) {
+      const fixed = template.split('$')[0] ?? ''
+      if (fixed.length > 0 && fixed !== template) appLabelPrefixes.push(fixed)
+      else if (fixed.length > 0) appLabels.add(fixed)
+    }
   }
   for (const [, template] of text.matchAll(/aria-label=\{`([^`]*)`\}/g)) {
     const fixed = template.split('$')[0] ?? ''
