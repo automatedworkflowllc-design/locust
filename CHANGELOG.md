@@ -11,6 +11,13 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.709.0 - 2026-10-08
+
+### Fixed
+
+- **Free models show up as soon as Locust is ready.** With Antigravity installed, every agent's model list waited for Antigravity's usage reading, which can take several seconds. OpenCode's free models reached the model picker about 14 seconds after start, and Home's "Use a free model" was missing until then. The list no longer waits; Antigravity's usage appears when its reading arrives.
+- **Locust runs on Electron 44.7**, with the latest security fixes from Chromium.
+
 ## 0.708.0 - 2026-10-08
 
 ### Fixed
