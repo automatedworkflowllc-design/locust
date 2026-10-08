@@ -3,7 +3,7 @@ import type { RecoveredMissionPhase } from '@teammate/mission-store'
 
 import type { CodexMissionStartResponse, CodexMissionUpdate, MissionMode, PublicRoutine, RoutineHandOff, RoutineRunResponse, RoutineStaged, TeammateRoute } from '../shared/ipc.js'
 import { handOffPrompt, verdictOf } from '../shared/hand-off.js'
-import { isDue, missedSlot } from '../shared/routine-schedule.js'
+import { isDue, missedSlot, scheduleBase } from '../shared/routine-schedule.js'
 import { arrivalNote } from './routine-file-watch.js'
 import type { FileArrivals } from './routine-file-watch.js'
 import type { MissionPeerContext } from './workroom-briefing.js'
@@ -882,12 +882,14 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
       for (const routine of all) {
         if (routine.execution !== undefined && routine.execution.status !== 'abandoned') continue
         if (routine.schedule === undefined) continue
+        // Paused (0.705): not started, and not missed either -- a pause is the person's choice.
+        if (routine.paused === true) continue
         // Its last run's changes still wait for Keep or Discard (0.533): it does not run on
         // its own until they are settled. A watched folder's new files stay ready meanwhile.
         if (routine.staged !== undefined) continue
         // On a new file (0.522): due when the watcher has settled files for it and its hour is not full.
         const arrivedFiles = routine.schedule.kind === 'files' ? options.arrivals?.ready(routine.routineId, now.getTime()) ?? [] : []
-        if (routine.schedule.kind === 'files' ? arrivedFiles.length === 0 : !isDue(routine.schedule, routine.lastRunAt ?? routine.createdAt, now)) continue
+        if (routine.schedule.kind === 'files' ? arrivedFiles.length === 0 : !isDue(routine.schedule, scheduleBase(routine), now)) continue
         // M15: on its own, only in the folder it was made in. A routine made
         // for project A replayed its steps, in its write mode, in project B.
         const home = await (options.homeOf ?? (async (entry: PublicRoutine) => entry.workspaceId))(routine).catch(() => undefined)
@@ -895,7 +897,7 @@ export function createRoutineRunner(options: RoutineRunnerOptions): RoutineRunne
         // No catch-up. A time that passed while Locust was closed is missed,
         // recorded, and not started. A time that passes while it is open still starts.
         if (routine.schedule.kind !== 'files') {
-          const slot = missedSlot(routine.schedule, routine.lastRunAt ?? routine.createdAt, options.openedAt ?? new Date(0), now)
+          const slot = missedSlot(routine.schedule, scheduleBase(routine), options.openedAt ?? new Date(0), now)
           if (slot !== undefined) {
             await options.routines.recordMiss?.(routine.routineId, slot.toISOString(), now.toISOString())
             continue

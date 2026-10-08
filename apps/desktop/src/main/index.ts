@@ -277,6 +277,7 @@ import {
   ROUTINE_CREATE_CHANNEL,
   ROUTINE_UPDATE_CHANNEL,
   ROUTINE_REMOVE_CHANNEL,
+  ROUTINE_PAUSE_CHANNEL,
   ROUTINE_RUN_CHANNEL,
   ROUTINE_FOLDER_CHANNEL,
   ROUTINE_EXPORT_CHANNEL,
@@ -6328,6 +6329,20 @@ if (!ownsSingleInstanceLock) {
         return { ok: true, data: {} } as const
       } catch {
         return routineRejected('That routine could not be removed.')
+      }
+    })
+
+    // Pause or resume a routine's schedule (0.705). Run still runs a paused one.
+    ipcMain.handle(ROUTINE_PAUSE_CHANNEL, async (event, routineId: unknown, paused: unknown) => {
+      if (!fromOwnWindow(event)) return routineRejected('The routine could not be changed.')
+      try {
+        const routine = await routines.setPaused(routineId, paused, new Date().toISOString())
+        if (routine === undefined) return routineRejected('That routine no longer exists.')
+        // The tray's "next routine" line counts paused routines out.
+        sendToWindow({ kind: 'routine-recovery-changed' })
+        return { ok: true, data: { routine } } as const
+      } catch {
+        return routineRejected('That routine could not be changed.')
       }
     })
 

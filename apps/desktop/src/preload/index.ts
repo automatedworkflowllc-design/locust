@@ -156,6 +156,7 @@ import {
   ROUTINE_CREATE_CHANNEL,
   ROUTINE_UPDATE_CHANNEL,
   ROUTINE_REMOVE_CHANNEL,
+  ROUTINE_PAUSE_CHANNEL,
   ROUTINE_RUN_CHANNEL,
   ROUTINE_FOLDER_CHANNEL,
   ROUTINE_EXPORT_CHANNEL,
@@ -500,6 +501,8 @@ const desktopApi: DesktopApi = {
     ipcRenderer.invoke(ROUTINE_UPDATE_CHANNEL, request) as Promise<RoutineMutationResponse>,
   removeRoutine: (routineId: string) =>
     ipcRenderer.invoke(ROUTINE_REMOVE_CHANNEL, routineId) as Promise<RoutineMutationResponse>,
+  pauseRoutine: (routineId: string, paused: boolean) =>
+    ipcRenderer.invoke(ROUTINE_PAUSE_CHANNEL, routineId, paused) as Promise<RoutineMutationResponse>,
   runRoutine: (routineId: string, values?: Readonly<Record<string, string>>) => ipcRenderer.invoke(ROUTINE_RUN_CHANNEL, routineId, values) as Promise<RoutineRunResponse>,
   chooseRoutineFolder: () => ipcRenderer.invoke(ROUTINE_FOLDER_CHANNEL) as Promise<RoutineFolderResponse>,
   exportRoutine: (request: RoutineExportRequest) => ipcRenderer.invoke(ROUTINE_EXPORT_CHANNEL, request) as Promise<RoutineExportResponse>,

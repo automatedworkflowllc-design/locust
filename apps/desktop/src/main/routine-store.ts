@@ -97,6 +97,11 @@ export interface RoutineStore {
    * stays, and the clock moves to that slot so the next tick does not start it.
    */
   recordMiss(routineId: string, dueAt: string, recordedAt: string): Promise<void>
+  /**
+   * Pause or resume its schedule (0.705). Resuming records when, so the clock
+   * counts from then. Answers the routine as saved, or undefined if it is gone.
+   */
+  setPaused(routineId: unknown, paused: unknown, at: string): Promise<PublicRoutine | undefined>
   /** Drop every routine of a teammate who is gone; their steps had nobody to run them. */
   removeForTeammate(teammateId: unknown): Promise<void>
 }
@@ -216,6 +221,7 @@ export function parsedRoutine(value: unknown): PublicRoutine | undefined {
   // are the person's words and outrank a malformed timer.
   const schedule = validSchedule(record.schedule) ? record.schedule : undefined
   const missedAt = parsedInstant(record.missedAt)
+  const resumedAt = parsedInstant(record.resumedAt)
   const history = parsedHistory(record.history)
   const route: TeammateRoute = {
     runtime: record.route.runtime,
@@ -250,6 +256,9 @@ export function parsedRoutine(value: unknown): PublicRoutine | undefined {
     ...(validStaged(record.staged) ? { staged: { ...record.staged, changed: [...record.staged.changed], deleted: [...record.staged.deleted] } } : {}),
     ...(validFailed(record.lastFailed) ? { lastFailed: record.lastFailed } : {}),
     ...(missedAt === undefined ? {} : { missedAt }),
+    // Paused only by a literal true (0.705): anything else goes on its own, as before.
+    ...(record.paused === true ? { paused: true as const } : {}),
+    ...(resumedAt === undefined ? {} : { resumedAt }),
     ...(history === undefined ? {} : { history }),
     // Validated above: a corrupt declaration must never become a run without inputs.
     ...(validInputs(record.inputs) && record.inputs.length > 0 ? { inputs: keptInputs(record.inputs) } : {})
@@ -613,6 +622,19 @@ export function createRoutineStore(options: { readonly rootDirectory: string }):
           ...file,
           routines: file.routines.map((routine) => (routine.routineId === routineId ? next : routine))
         })
+      })
+    },
+
+    setPaused(routineId, paused, at): Promise<PublicRoutine | undefined> {
+      return serialize(async () => {
+        if (!safeId(routineId) || typeof paused !== 'boolean' || parsedInstant(at) === undefined) return undefined
+        const file = await read()
+        const held = file.routines.find((routine) => routine.routineId === routineId)
+        if (held === undefined) return undefined
+        const { paused: _paused, ...rest } = held
+        const next: PublicRoutine = paused ? { ...rest, paused: true } : { ...rest, resumedAt: at }
+        await write({ ...file, routines: file.routines.map((routine) => (routine.routineId === routineId ? next : routine)) })
+        return next
       })
     },
 

@@ -41,6 +41,7 @@ export function AutomationsScreen({
   onOpenMission,
   onEditRoutine,
   onRemoveRoutine,
+  onPauseRoutine,
   notice,
   onDismissNotice,
   missions,
@@ -84,6 +85,8 @@ export function AutomationsScreen({
   readonly onOpenMission?: (missionId: string) => void
   readonly onEditRoutine: (routine: PublicRoutine) => void
   readonly onRemoveRoutine: (routineId: string) => void
+  /** Pause or resume its schedule (0.705); offered only on a routine that has one. */
+  readonly onPauseRoutine?: (routineId: string, paused: boolean) => void
   /** The last scheduled routine that would not start, and why. */
   readonly notice: string | undefined
   readonly onDismissNotice: () => void
@@ -109,7 +112,9 @@ export function AutomationsScreen({
     if (firstScheduled !== secondScheduled) return firstScheduled - secondScheduled
     return first.name.localeCompare(second.name)
   })
-  const scheduled = ordered.filter((routine) => routine.schedule !== undefined).length
+  // A paused one is not going on its own (0.705): counted apart, so the header does not promise it.
+  const scheduled = ordered.filter((routine) => routine.schedule !== undefined && routine.paused !== true).length
+  const paused = ordered.filter((routine) => routine.schedule !== undefined && routine.paused === true).length
   const ownerOf = (routine: PublicRoutine): PublicTeammate | undefined =>
     teammates.find((teammate) => teammate.teammateId === routine.teammateId)
   const offered = templates.length > 0 && onUseTemplate !== undefined
@@ -160,7 +165,7 @@ export function AutomationsScreen({
             ? 'none saved'
             : `${String(routines.length)} saved · ${
                 scheduled === 0 ? 'none on a schedule' : `${String(scheduled)} on a schedule`
-              }`
+              }${paused === 0 ? '' : ` · ${String(paused)} paused`}`
         }
       />
 
@@ -348,6 +353,19 @@ export function AutomationsScreen({
                     * carry `title` AND `aria-label`, because an icon with
                     * neither is a button nobody can name.
                     */}
+                  {/* Pause (0.705): only where there is a schedule to stop. Run stays a word; this is an icon like Edit. */}
+                  {onPauseRoutine !== undefined && routine.schedule !== undefined && (
+                    <button
+                      type="button"
+                      className="lc-ghostbutton lc-iconbutton"
+                      title={routine.paused === true ? 'Resume: it goes on its own again, counting from now' : 'Pause: it stops going on its own; Run still runs it'}
+                      aria-label={routine.paused === true ? `Resume ${routine.name}` : `Pause ${routine.name}`}
+                      aria-pressed={routine.paused === true}
+                      onClick={() => onPauseRoutine(routine.routineId, routine.paused !== true)}
+                    >
+                      <Icon name={routine.paused === true ? 'play' : 'pause'} size={14} />
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="lc-ghostbutton lc-iconbutton"

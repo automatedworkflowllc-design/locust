@@ -5690,6 +5690,13 @@ export default function App(): ReactElement {
     return response
   }
 
+  const pauseRoutine = (routineId: string, paused: boolean): void => {
+    void window.desktop?.pauseRoutine(routineId, paused)
+      .then((answer) => { if (!answer.ok) setRoutineNotice(answer.error.message) })
+      .then(() => reloadRoutines())
+      .catch(() => setRoutineNotice('That routine could not be changed. Its schedule is as it was.'))
+  }
+
   const removeRoutine = (routineId: string): void => {
     const bridge = window.desktop
     if (!bridge) return
@@ -7616,6 +7623,7 @@ export default function App(): ReactElement {
               onRecoverRoutine={recoverRoutine}
               onEditRoutine={editRoutine}
               onRemoveRoutine={removeRoutine}
+              onPauseRoutine={pauseRoutine}
               notice={routineNotice ?? automationNotice}
               onDismissNotice={() => { setRoutineNotice(undefined); setAutomationNotice(undefined) }}
               // The same rows the sidebar draws. An empty screen offers the

@@ -191,6 +191,13 @@ describe('other apps run routines through the routine card\'s own path (0.704)',
     expect((await f.call('run_routine', { routine: 'nobody' })).isError).toBe(true)
     expect(f.runRoutine).not.toHaveBeenCalled()
   })
+  it('never runs a paused routine, and lists it as paused (0.705)', async () => {
+    const f = routineFixture([routine({ paused: true })], true)
+    const listed = json(await f.call('list_routines', {}))
+    expect(listed[0]).toMatchObject({ paused: true, runs_from_here: false, why_not: 'It is paused in Locust.' })
+    expect(await f.call('run_routine', { routine: 'rt_review', values: { since: 'Monday' } })).toEqual(mcpText('"Weekly review" is paused in Locust. Resume it there, or run it from Locust. Nothing was started.', true))
+    expect(f.runRoutine).not.toHaveBeenCalled()
+  })
   it('passes the runner\'s own refusal through, unchanged', async () => {
     const f = routineFixture([routine()])
     f.runRoutine.mockResolvedValue({ ok: false, error: { code: 'ROUTINE_REJECTED', message: 'This routine is already running or waiting for review. Open its routine card before starting more work.' } })

@@ -134,9 +134,10 @@ export function createLocustMcpTools(options: {
           inputs: (routine.inputs ?? []).map(input => ({ key: input.key, label: input.label, kind: input.kind, required: input.required,
             ...(input.default === undefined ? {} : { default: input.default }), ...(input.choices === undefined ? {} : { choices: input.choices }) })),
           changes_files: writes,
+          ...(routine.paused === true ? { paused: true } : {}),
           // Whether run_routine would start it now, and why not.
-          runs_from_here: !folder && (!writes || own),
-          ...(folder ? { why_not: "It asks for a folder, which is chosen in Locust's own picker." } : writes && !own ? { why_not: "It changes files, and \"Use each teammate's own mode\" is off in Locust." } : {})
+          runs_from_here: routine.paused !== true && !folder && (!writes || own),
+          ...(routine.paused === true ? { why_not: 'It is paused in Locust.' } : folder ? { why_not: "It asks for a folder, which is chosen in Locust's own picker." } : writes && !own ? { why_not: "It changes files, and \"Use each teammate's own mode\" is off in Locust." } : {})
         }
       })))
     }
@@ -144,6 +145,8 @@ export function createLocustMcpTools(options: {
       const routine = await findRoutine(args.routine)
       if (typeof routine === 'string') return mcpText(`${routine} Nothing was started.`, true)
       if (options.runRoutine === undefined) return mcpText('This Locust does not offer routines to other apps. Nothing was started.', true)
+      // Paused (0.705) is the person's word that it should not go on its own; another app's request is not theirs.
+      if (routine.paused === true) return mcpText(`"${routine.name}" is paused in Locust. Resume it there, or run it from Locust. Nothing was started.`, true)
       if ((routine.inputs ?? []).some(input => input.kind === 'folder')) {
         return mcpText(`"${routine.name}" asks for a folder, which is chosen in Locust's own picker. Run it from Locust. Nothing was started.`, true)
       }

@@ -190,16 +190,28 @@ export function slotPassedDuring(schedule: RoutineSchedule, startedAt: string, e
 const pad2 = (value: number): string => String(value).padStart(2, '0')
 
 /**
+ * Where a routine's clock counts from: its last run (or its making), or the
+ * moment it was resumed after a pause, whichever is later (0.705). Without the
+ * second, a routine paused for a week fired the moment it was resumed.
+ */
+export function scheduleBase(routine: { readonly lastRunAt?: string; readonly createdAt: string; readonly resumedAt?: string }): string {
+  const ran = routine.lastRunAt ?? routine.createdAt
+  if (routine.resumedAt === undefined) return ran
+  return Date.parse(routine.resumedAt) > Date.parse(ran) ? routine.resumedAt : ran
+}
+
+/**
  * The tray's "next routine" line: the soonest run still ahead, or that none is.
+ * A paused routine has none (0.705).
  */
 export function nextRoutineDueLine(
-  routines: readonly { readonly name: string; readonly schedule?: RoutineSchedule; readonly lastRunAt?: string; readonly createdAt: string }[],
+  routines: readonly { readonly name: string; readonly schedule?: RoutineSchedule; readonly lastRunAt?: string; readonly createdAt: string; readonly resumedAt?: string; readonly paused?: true }[],
   now: Date
 ): string {
   let best: { readonly name: string; readonly at: Date } | undefined
   for (const routine of routines) {
-    if (routine.schedule === undefined || routine.schedule.kind === 'files') continue
-    const next = nextRunAfter(routine.schedule, routine.lastRunAt ?? routine.createdAt, now)
+    if (routine.schedule === undefined || routine.schedule.kind === 'files' || routine.paused === true) continue
+    const next = nextRunAfter(routine.schedule, scheduleBase(routine), now)
     if (next === undefined || next.getTime() <= now.getTime()) continue
     if (best === undefined || next.getTime() < best.at.getTime()) best = { name: routine.name, at: next }
   }

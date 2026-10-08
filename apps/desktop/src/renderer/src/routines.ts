@@ -3,7 +3,7 @@ import { proposedHandOffs } from '../../shared/chain-proposal.js'
 import type { RoutineInput } from '../../shared/routine-inputs.js'
 import type { MissionRuntimeId } from '@teammate/runtime-adapters'
 import { splitAttachments } from '../../shared/attachments.js'
-import { nextRunAfter, scheduleLabel } from '../../shared/routine-schedule.js'
+import { nextRunAfter, scheduleBase, scheduleLabel } from '../../shared/routine-schedule.js'
 import { conversationTurns, typedPrompt } from './missionView.js'
 import { routeModelName } from './routeName.js'
 import { runtimeDisplayName } from '../../shared/runtimes.js'
@@ -223,16 +223,18 @@ export function missedLine(missedAt: string, now: Date): string | undefined {
 }
 
 export function routineScheduleSummary(
-  routine: Pick<PublicRoutine, 'schedule' | 'lastRunAt' | 'createdAt' | 'execution' | 'missedAt'>,
+  routine: Pick<PublicRoutine, 'schedule' | 'lastRunAt' | 'createdAt' | 'execution' | 'missedAt' | 'paused' | 'resumedAt'>,
   now: Date
 ): string | undefined {
   if (routine.schedule === undefined) return undefined
+  // Paused (0.705): said on the chip itself, the one fact a person scans the row for.
+  if (routine.paused === true && (routine.execution === undefined || routine.execution.status === 'abandoned')) return `${scheduleLabel(routine.schedule)} · paused`
   if (routine.execution !== undefined && routine.execution.status !== 'abandoned') return `${scheduleLabel(routine.schedule)} · ${routine.execution.status === 'running' ? 'in progress' : 'held for review; no automatic retry'}`
   if (routine.missedAt !== undefined) {
     const missed = missedLine(routine.missedAt, now)
     if (missed !== undefined) return missed
   }
-  const next = nextRunAfter(routine.schedule, routine.lastRunAt ?? routine.createdAt, now)
+  const next = nextRunAfter(routine.schedule, scheduleBase(routine), now)
   // A watcher has no next time: it is waiting for a file (0.522).
   if (routine.schedule.kind === 'files') return `${scheduleLabel(routine.schedule)} · watching`
   // A once that has run: said, so the card does not promise a run that will not come.

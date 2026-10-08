@@ -577,6 +577,7 @@ export const ROUTINE_LIST_CHANNEL = 'routines:list'
 export const ROUTINE_CREATE_CHANNEL = 'routines:create'
 export const ROUTINE_UPDATE_CHANNEL = 'routines:update'
 export const ROUTINE_REMOVE_CHANNEL = 'routines:remove'
+export const ROUTINE_PAUSE_CHANNEL = 'routines:pause'
 export const ROUTINE_RUN_CHANNEL = 'routines:run'
 /**
  * A routine that asks for inputs (W7): a folder value only ever comes from this
@@ -1750,6 +1751,17 @@ export interface PublicRoutine {
    * "Missed, 08:00 today" until a real run clears it. Not a completed run.
    */
   readonly missedAt?: string
+  /**
+   * PAUSED (0.705, from Paperclip's routine management): its schedule or
+   * folder watch does not start it, and nothing is recorded as missed; Run
+   * still runs it. Absent means it goes on its own, as every routine did.
+   */
+  readonly paused?: true
+  /**
+   * When it was last resumed. Its clock counts from here or its last run,
+   * whichever is later, so resuming never fires a run that is long overdue.
+   */
+  readonly resumedAt?: string
   /**
    * Misses, oldest first, capped. A real run does not erase them: the miss
    * stays in the history after the card has moved on.
@@ -3489,6 +3501,8 @@ export interface DesktopApi {
   createRoutine(request: RoutineCreateRequest): Promise<RoutineMutationResponse>
   updateRoutine(request: RoutineUpdateRequest): Promise<RoutineMutationResponse>
   removeRoutine(routineId: string): Promise<RoutineMutationResponse>
+  /** Pause or resume a routine's schedule (0.705). Run still runs a paused one. */
+  pauseRoutine(routineId: string, paused: boolean): Promise<RoutineMutationResponse>
   /** Replay a routine: its first step starts now, each later step when the one before completes. */
   runRoutine(routineId: string, values?: Readonly<Record<string, string>>): Promise<RoutineRunResponse>
   /** Pick a folder for a routine input: the only source a folder value is accepted from (W7). */
