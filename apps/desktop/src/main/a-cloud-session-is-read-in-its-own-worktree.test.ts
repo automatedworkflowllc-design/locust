@@ -258,6 +258,18 @@ describe('what a teleport drew', () => {
   it('knows the long-paths failure and offers the fix in words, never setting it', () => {
     expect(readTeleport('error: unable to create file x/y/z: Filename too long').problem).toBe('long-paths')
   })
+  it('knows a folder Claude Code was never told to trust, as 2.1.29x says it, and leaves the answer to the person', () => {
+    // Drawn verbatim by Claude Code 2.1.293 on 2026-10-07 in a checkout it had never been opened in.
+    const drawn = '\u001b[2J\u001b[m\u001b[H\u001b]0;claude\u0007\u001b[31mError creating worktree: Workspace trust not yet accepted. Run `claude` once in this directory and accept the trust dialog, then retry with --worktree.\r\n\u001b[m'
+    const said = readTeleport(drawn)
+    expect(said.problem).toBe('asks')
+    expect(said.gone).toBe(false)
+    expect(said.error).toMatch(/^Workspace trust not yet accepted/)
+  })
+  it('keeps the words of an error it does not know, for the message', () => {
+    expect(readTeleport('Error: Something new went wrong').error).toBe('Something new went wrong')
+    expect(readTeleport('Error creating worktree: Something else').error).toBe('Something else')
+  })
   it('the worktree on the command line is only ever Locust’s own name', () => {
     expect(windowsCommandLine('C:\\c.cmd', [], 'read', { session: 'session_01G8RT9yXr7dbhVM7EUzpvEa', worktree: 'x & del *', stay: false })).toBe('/d /c ""C:\\c.cmd" --teleport session_01G8RT9yXr7dbhVM7EUzpvEa --worktree "')
     expect(readingWorktreeName('cc_0123456789abcdef0123')).toBe('locust-cloud-0123456789ab')

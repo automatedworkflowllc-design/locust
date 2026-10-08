@@ -104,6 +104,14 @@ try {
     check('it says the session is gone, not that its conversation was not saved', !/did not save its conversation/.test(read.text), read.text.slice(-300))
     check('the worktree Claude Code made for the reading is removed', readingWorktrees() === 0)
     check('the folder is untouched', !existsSync(applied))
+  } else if (/asks whether you trust this folder/.test(read.text)) {
+    // Claude Code 2.1.29x refuses `--teleport --worktree` in a folder it was never told to trust, instead of asking
+    // (measured 10/07, 2.1.293; main moved to C:\work\locust on 10/05). Trusting a folder is the person's answer,
+    // never a drive's: check that Locust says so in words they can act on.
+    say(`  [SKIP] reading, Watch and Apply: Claude Code has not been told to trust ${workspace}; run claude there once and accept, or pass --workspace <a trusted checkout>`)
+    check('it says Claude Code wants this folder trusted first, not a vague failure', /Open Claude Code in this folder once/.test(read.text) && !/did not bring the session in/.test(read.text), read.text.slice(-300))
+    check('the worktree Claude Code made for the reading is removed', readingWorktrees() === 0)
+    check('the folder is untouched', !existsSync(applied))
   } else {
     check('the conversation is shown: its task and its answer', read.asks.some((x) => /cloud-read-check\.txt/.test(x)) && read.replies.some((x) => /Created cloud-read-check\.txt|committed/i.test(x)), JSON.stringify({ asks: read.asks, replies: read.replies, text: read.text.slice(0, 400) }))
     check('its change is shown as a diff of the file it made', read.files.includes('cloud-read-check.txt') && read.diffRows > 0, JSON.stringify(read.files))

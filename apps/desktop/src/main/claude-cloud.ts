@@ -102,8 +102,10 @@ export function choiceArgs(choice: CloudChoice | undefined): string[] {
 /** A Claude Code cloud session's id, as it prints one. */
 const SESSION_ID = /^session_[A-Za-z0-9]{8,64}$/
 
-/** Claude Code asking the person something only they may answer: whether the folder is trusted. */
-export const ASKS_THE_PERSON = 'Quick safety check|trust this folder|Do you trust'
+/** Claude Code asking the person something only they may answer: whether the folder is trusted. Since 2.1.29x
+ *  `--teleport --worktree` in a folder never trusted refuses instead of asking: "Workspace trust not yet accepted.
+ *  Run `claude` once in this directory and accept the trust dialog" (measured 2026-10-07, 2.1.293). */
+export const ASKS_THE_PERSON = 'Quick safety check|trust this folder|Do you trust|Workspace trust not yet accepted'
 
 export type CloudStartReading =
   | { readonly kind: 'created'; readonly sessionId: string; readonly url: string; readonly title?: string; readonly note?: string }
@@ -158,7 +160,8 @@ export type CloudReadingProblem = 'asks' | 'long-paths' | undefined
 /** What `claude --teleport <id> --worktree <name>` drew, for what only the person can do about it. */
 export function readTeleport(drawn: string): { readonly problem: CloudReadingProblem; readonly noBranch: boolean; readonly gone: boolean; readonly error?: string } {
   const text = plainTerminalText(drawn)
-  const error = /Error:[ \t]*(.+)/.exec(text)?.[1]?.trim().slice(0, 300)
+  // "Error: ..." and, since 2.1.29x, "Error creating worktree: ...".
+  const error = /\bError(?: [a-z]+){0,4}:[ \t]*(.+)/.exec(text)?.[1]?.trim().slice(0, 300)
   return {
     // Measured 10/03 (0.564): an archived or deleted session -- Claude Code makes the worktree first, then says this.
     gone: /Session not found/i.test(text),
