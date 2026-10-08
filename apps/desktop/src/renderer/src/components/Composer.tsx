@@ -422,8 +422,9 @@ const CHAT_MODES: readonly { readonly id: 'direct' | 'compare' | 'blind' | 'clou
   { id: 'direct', name: 'Direct', desc: 'Chat with one model at a time', icon: 'message' },
   { id: 'compare', name: 'Compare', desc: 'Two or three models of your choice, side by side', icon: 'columns' },
   { id: 'blind', name: 'Blind', desc: 'Compare with the names hidden until you keep one', icon: 'eye-off' },
-  // 0.503: offered only where the window passes `cloud` (main/cloud-tasks.ts).
-  { id: 'cloud', name: 'Cloud', desc: 'Runs in Codex Cloud on this repository; bring the change home when it is done', icon: 'cloud' },
+  // 0.503: offered only where the window passes `cloud` (main/cloud-tasks.ts). Codex Cloud takes no model from
+  // Locust (`codex cloud exec` 0.161.0 has no --model), so the line says whose model it runs on (10/08).
+  { id: 'cloud', name: 'Cloud', desc: 'Runs in Codex Cloud on this repository, on the model Codex Cloud chooses; bring the change home when it is done', icon: 'cloud' },
   // W10: offered only where the window passes `background` (a Claude route).
   { id: 'background', name: 'Background', desc: 'Keeps working on this computer even if you close Locust. Claude Code runs it, and you answer its questions there', icon: 'clock' }
 ]
