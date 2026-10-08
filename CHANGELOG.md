@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.705.0 - 2026-10-08
+
+### New
+
+- **Pause a routine.** A routine on a schedule has a Pause button beside Edit. Paused, it stops going on its own: its schedule chip says paused, the Routines header counts it apart, and nothing is recorded as missed. Run still runs it whenever you want. Resume, and it counts from that moment, so a routine paused for a week does not fire the instant you resume it. Your other AI apps cannot run a paused routine.
+
+### Fixed
+
+- **When OpenCode gives up on a provider, its words are said once.** A free model's provider that was down showed "Endpoint is unavailable" twice, in a note and again on the red card right under it. Now the card says it.
+
 ## 0.704.0 - 2026-10-08
 
 ### New
