@@ -55,7 +55,8 @@ const openEdit = `(async () => {
 const choices = `(() => {
   const box = document.querySelector('.lc-dialog')
   const inner = box.getBoundingClientRect()
-  const radios = [...box.querySelectorAll('[role=radio]')]
+  // The schedule's own group: since 0.530 the dialog also has "Only read / Change files" chips, which are not schedule choices.
+  const radios = [...box.querySelectorAll('[role=radiogroup][aria-labelledby="routine-schedule-label"] [role=radio]')]
   return JSON.stringify({
     labels: radios.map((b) => b.innerText.trim()),
     spill: Math.max(0, ...radios.map((b) => Math.round(b.getBoundingClientRect().right - inner.right))),

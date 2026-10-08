@@ -39,7 +39,7 @@ try {
   const rows = JSON.parse(String(await drive.capture('Routines: the Approve each row says it waits', () => drive.evaluate(`(async () => {
     ;[...document.querySelectorAll('.lc-sidebar__nav button')].find((b) => b.innerText.trim() === 'Routines')?.click()
     await new Promise((r) => setTimeout(r, 1200))
-    const rows = [...document.querySelectorAll('.lc-routinerow')]
+    const rows = [...document.querySelectorAll('.lc-routinerow:not(.lc-routineadd)')]
     return JSON.stringify(rows.map((row) => ({
       name: row.querySelector('.lc-routinerow__name')?.innerText.trim() ?? row.innerText.split('\\n')[0],
       waits: row.querySelector('.lc-routinerow__waits')?.innerText.trim() ?? null

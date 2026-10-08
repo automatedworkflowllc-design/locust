@@ -29,7 +29,10 @@ const there = `ws_${'a'.repeat(32)}`
 const profilePath = await mkdtemp(join(tmpdir(), 'locust-drive-routinehome-profile-'))
 const T0 = '2026-09-05T05:00:00.000Z'
 const ROUTE = { ...FREE_ROUTE, mode: 'accept-edits' }
-const due = new Date(Date.now() - 5 * 3_600_000).toISOString()
+// Due 30 s after seeding, so WHILE the app is open. Five hours back, both were due before launch, and since
+// the no-catch-up rule (10/03, a-routine-due-while-closed-is-missed) a time that passed while Locust was
+// closed is recorded as missed, not started -- the drive then saw nothing run and blamed the routine.
+const due = new Date(Date.now() - 3_600_000 + 30_000).toISOString()
 await writeFile(join(profilePath, 'routines.json'), JSON.stringify({
   schemaVersion: 1,
   routines: [
