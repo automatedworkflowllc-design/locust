@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.706.0 - 2026-10-08
+
+### New
+
+- **Each teammate can have its own instructions.** Open a teammate's Edit (or make a new one) and write them in the Instructions box: "Answer in short bullet points", "Ask before adding a dependency". Every turn that teammate takes is given them, after any group's instructions. Empty the box to remove them.
+
 ## 0.705.0 - 2026-10-08
 
 ### New
