@@ -63,7 +63,7 @@ try {
   })()`))
   await sleep(600)
   const made = await drive.capture('Home: the team it made', () => drive.evaluate(home))
-  verdicts.push(`made: ${/^Your team \|\| 3 cards in 1 row\(s\)/.test(made) && /Wren/.test(made) && /Juno/.test(made) && /Atlas/.test(made) ? 'PASS' : 'FAIL'}`)
+  verdicts.push(`made: ${/^Your team\s*\d* \|\| 3 cards in 1 row\(s\)/.test(made) && /Wren/.test(made) && /Juno/.test(made) && /Atlas/.test(made) ? 'PASS' : 'FAIL'}`)
   say(verdicts.join(' | '))
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)

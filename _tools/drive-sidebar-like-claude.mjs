@@ -54,7 +54,8 @@ try {
   check('project headings are names alone: no count, no icon', wide.heads.includes('Investments') && wide.heads.includes('Locust') && wide.heads.every((h) => !/\d/.test(h)) && wide.headIcons === 0, JSON.stringify({ heads: wide.heads, icons: wide.headIcons }))
   check('the rest are under "Ungrouped"', wide.heads.includes('Ungrouped'), JSON.stringify(wide.heads))
   check('rows carry no ages', wide.ages === 0, String(wide.ages))
-  check('the footer keeps Settings and the status', /Settings/.test(wide.footer) && /connected/.test(wide.footer), wide.footer)
+  // The status reads "N agents ready" since the plain-words pass (was "N connected").
+  check('the footer keeps Settings and the status', /Settings/.test(wide.footer) && /connected|agents? ready/.test(wide.footer), wide.footer)
   await drive.resize(1120, 720)
   await sleep(800)
   await drive.capture('1120: the narrow rail', () => drive.evaluate(read))

@@ -123,6 +123,11 @@ let drive
 try {
   drive = await startDrive({ ...(packaged === undefined ? {} : { packaged }), name: every ? 'start-from-a-template-all' : 'start-from-a-template', port: 9898, workspace, seed, keep: true })
   await drive.ready()
+  // How many templates Locust offers, from its own list: 11 when this drive was written (0.615), 14 since the
+  // three teammate chains (0.643). Sweep 9 failed five checks on the hardcoded eleven.
+  const offered = await drive.evaluate('window.desktop.listRoutineTemplates()')
+  const COUNT = offered?.ok ? offered.data.templates.length : -1
+  check('Locust lists its templates', COUNT >= 11, String(COUNT))
   await drive.send('Page.bringToFront')
   await drive.resize(1200, 720)
   await toRoutines(drive)
@@ -132,8 +137,8 @@ try {
     await drive.resize(width, height)
     await sleep(500)
     const layout = await drive.capture(`empty Routines at ${String(width)}x${String(height)}`, () => drive.evaluate(LAYOUT))
-    check(`${String(width)}x${String(height)}: eleven templates, no sideways scroll, nothing clipped, meta on the name's line`,
-      layout.rows === 11 && layout.sideways === false && layout.clipped === 0 && layout.offLine === 0, JSON.stringify(layout))
+    check(`${String(width)}x${String(height)}: every template, no sideways scroll, nothing clipped, meta on the name's line`,
+      layout.rows === COUNT && layout.sideways === false && layout.clipped === 0 && layout.offLine === 0, JSON.stringify(layout))
   }
   await drive.resize(1200, 720)
   const words = await drive.evaluate(`document.querySelector('.lc-automations')?.innerText ?? ''`)
@@ -157,11 +162,11 @@ try {
 
   // 3. A second from the add row, once the shelf has one.
   const addRow = await drive.evaluate(`[...document.querySelectorAll('.lc-routineadd')].map((b) => b.innerText).join(' | ')`)
-  check('the shelf ends with Start from a template, naming the first few', addRow.includes('Start from a template') && addRow.includes('Explain this project, Find what is unfinished, Review a file and 8 more'), addRow)
+  check('the shelf ends with Start from a template, naming the first few', addRow.includes('Start from a template') && addRow.includes(`Explain this project, Find what is unfinished, Review a file and ${String(COUNT - 3)} more`), addRow)
   await drive.evaluate(`[...document.querySelectorAll('.lc-routineadd')].find((b) => b.innerText.includes('Start from a template'))?.click()`)
   await sleep(600)
   const picker = await drive.capture('the template picker', () => drive.evaluate(`({ open: !!document.querySelector('[role=dialog][aria-label="Start from a template"]'), rows: document.querySelectorAll('[role=dialog] .lc-templates__row').length, body: (() => { const b = document.querySelector('[role=dialog] .lc-dialog__body'); return b ? { scroll: b.scrollHeight, client: b.clientHeight } : null })() })`))
-  check('the picker lists all eleven and scrolls inside itself', picker.open && picker.rows === 11 && picker.body !== null, JSON.stringify(picker))
+  check('the picker lists every template and scrolls inside itself', picker.open && picker.rows === COUNT && picker.body !== null, JSON.stringify(picker))
   await drive.evaluate(`[...document.querySelectorAll('[role=dialog] .lc-templates__row')].find((b) => b.querySelector('.lc-templates__name').innerText === 'Summarize a long text')?.click()`)
   await sleep(700)
   const second = await drive.evaluate(`document.querySelector('[role=dialog][aria-label="Add a starter routine"]')?.innerText ?? 'no dialog'`)
@@ -201,7 +206,7 @@ try {
   if (every) {
     const listed = await drive.evaluate('window.desktop.listRoutineTemplates()')
     const ids = listed.ok ? listed.data.templates.map((entry) => entry.id) : []
-    check('the bridge lists all eleven', ids.length === 11, ids.join(', '))
+    check('the bridge lists every template', ids.length === COUNT, ids.join(', '))
     for (const id of ids.filter((entry) => entry !== 'explain-this-project' && entry !== 'summarize-a-long-text')) {
       const preview = await drive.evaluate(`window.desktop.previewRoutineTemplate(${JSON.stringify(id)})`)
       if (!preview?.ok || preview.data.preview === undefined) { check(`${id}: previews`, false, JSON.stringify(preview)); continue }

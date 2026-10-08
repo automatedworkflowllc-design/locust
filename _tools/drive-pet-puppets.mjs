@@ -210,7 +210,11 @@ const settledStates = async (seconds = 60) => {
 // The eyes each state shows on a screen (TeammateBot's eyeGlyphsFor): at rest the bars, stuck the crossed ones.
 const EYES_OF = { idle: '||', failed: '><' }
 // Every kept pet's teammate a puppet with a screen, saying what it is doing, and painted.
-const isPuppet = (face, id) => face?.face === 'pet' && face.pet === id && face.puppet === 'on' && face.screen === 'on' && face.eyes === EYES_OF[face.state] && face.painted >= 8
+// At rest a face also has its moments (faceLife.ts IDLE_MOMENTS, every 18-36 s beside a name): wide eyes, a happy
+// squint, a doze. Sweep 9 (packaged 0.707) read Astro mid-doze, `cc` while idle -- right, and the check said FAIL.
+const IDLE_MOMENT_EYES = new Set(['oo', '^^', 'cc'])
+const eyesSay = (face) => face.eyes === EYES_OF[face.state] || (face.state === 'idle' && IDLE_MOMENT_EYES.has(face.eyes))
+const isPuppet = (face, id) => face?.face === 'pet' && face.pet === id && face.puppet === 'on' && face.screen === 'on' && eyesSay(face) && face.painted >= 8
 const allPuppets = (seen) => KEPT.every(([id, teammateId]) => isPuppet(seen[teammateId], id))
 
 // A teammate's id, from its card on the Team screen: the sidebar's row has room for only a few faces.

@@ -64,7 +64,8 @@ try {
     })()`))))
     say(`  ${String(size.width)}: ${JSON.stringify(m)}`)
     check(`${String(size.width)} wide: no sideways scroll, the box lines up with the column`, m.overflow === false && m.boxLeft !== null && Math.abs(m.boxLeft) <= 6, JSON.stringify(m))
-    check(`${String(size.width)} wide: margins either side of the column are under 100px, or the column is at its 980px ceiling`, m.column >= 975 || (m.left < 100 && m.right < 100), JSON.stringify(m))
+    // The ceiling came down from 980px to 840px on 10/01 (0c1ad74d, Colin: line chats up with the box, as Claude does).
+    check(`${String(size.width)} wide: margins either side of the column are under 100px, or the column is at its 840px ceiling`, m.column >= 835 || (m.left < 100 && m.right < 100), JSON.stringify(m))
   }
 } catch (error) {
   failures += 1

@@ -41,13 +41,15 @@ const check = (what, ok, detail) => {
   say(`  [${ok ? 'PASS' : 'FAIL'}] ${what}${detail === undefined ? '' : ` -- ${detail}`}`)
 }
 const remember = (text) => drive.evaluate(`(async () => {
-  const field = document.querySelector('.lc-memoryform .lc-input')
+  // By its label: About you, above it, is a .lc-memoryform too, and took the note in sweep 9 (packaged 0.707).
+  const field = document.querySelector('textarea[aria-label="What to remember"]')
   if (!field) return 'NO FIELD'
+  const form = field.closest('.lc-memoryform')
   const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), 'value').set
   setter.call(field, ${JSON.stringify(text)})
   field.dispatchEvent(new Event('input', { bubbles: true }))
   await new Promise((r) => setTimeout(r, 200))
-  document.querySelector('.lc-memoryform .lc-primarybutton')?.click()
+  form?.querySelector('.lc-primarybutton')?.click()
   await new Promise((r) => setTimeout(r, 1200))
   return document.querySelector('main, .lc-screen')?.innerText.replace(/\\s+/g, ' ') ?? ''
 })()`)

@@ -105,7 +105,8 @@ const launch = async (name, port, seen) =>
     // innerText is the text as drawn, and the headings and labels are set in
     // spaced capitals: compare without case.
     const labels = page.labels.map((label) => label.toLowerCase())
-    check('See every version opens Settings on the Changelog', /changelog/i.test(page.current) && page.heading.some((h) => /changelog/i.test(h)) && page.splashGone, page.current)
+    // The page is named "What's new" in the list since 0.393 (settingsPages.ts); its heading says Changelog.
+    check('See every version opens Settings on the Changelog', /changelog|what.s new/i.test(page.current) && page.heading.some((h) => /changelog/i.test(h)) && page.splashGone, page.current)
     check(`newest first (${NEWEST}), twelve builds, grouped New / Improved / Fixed, with the older ones a press away`, page.builds === 12 && page.first === NEWEST && labels.includes('new') && labels.includes('improved') && labels.includes('fixed') && page.more, JSON.stringify({ builds: page.builds, first: page.first, labels: page.labels }))
     await shoot('02-whats-new.png')
     await drive.evaluate(`(document.querySelector('.lc-whatsnew__more').click(), 'more')`)
