@@ -477,6 +477,9 @@ export const REFUSAL_DETAIL_LIMIT = 96;
 /** Said when Claude Code compacts on its own, as its context fills (A2.5). */
 export const CLAUDE_COMPACTED =
   "The conversation outgrew the model's context, so Claude Code summarized it and carried on from the summary.";
+/** Said when Claude Code is not signed in: its own "Please run /login" names a command Locust has no place for. */
+export const CLAUDE_SIGNED_OUT =
+  "Claude Code is not signed in. Open a terminal, run claude, and sign in: with your Claude account, or with an Anthropic Console account to pay with an API key. Then send again. Locust never hands an API key from your environment to an agent; to use a Claude API key directly, add it in Settings, Your own models.";
 /** And when it was asked to, by a `/compact` sent as the prompt. */
 export const CLAUDE_COMPACTED_ON_REQUEST =
   "Claude Code summarized the conversation so far, as asked, and carries on from the summary.";
@@ -558,7 +561,9 @@ export function createClaudeEventNormalizer(
   let finalized = false;
   let sawResult = false;
   let terminalFailure: string | undefined;
+  let terminalFailureKind: "authentication-failed" | undefined;
   let terminalFailureEvidence: CodexEventEvidence | undefined;
+  let syntheticError: string | undefined;
   // What the run cost, as Claude Code itself priced it. Measured 2026-09-03:
   // the `result` record carries `total_cost_usd` and a `usage` block with
   // `input_tokens` / `output_tokens`. Only the numbers travel; the record's
@@ -977,6 +982,13 @@ export function createClaudeEventNormalizer(
       // the buffer exactly this way, so the bug would reach the resume summary.
       const message = isObject(parsed.message) ? parsed.message : {};
       const content = Array.isArray(message.content) ? message.content : [];
+      // Claude Code's own stand-in when the call never reached a model: model "<synthetic>" with an `error` code
+      // (measured 2026-10-07, 2.1.293, signed out: error "authentication_failed", text "Not logged in · Please run
+      // /login"). Its words are not an answer; the result after it carries the failure, and it is said once.
+      if (message.model === "<synthetic>" && typeof parsed.error === "string") {
+        syntheticError = parsed.error;
+        return [];
+      }
       // The complete message states its call's usage too: the same call as
       // the last `message_start` when the run streams, the only word on it
       // when it does not.
@@ -1267,9 +1279,15 @@ export function createClaudeEventNormalizer(
       const reason = stringValue(parsed.terminal_reason) ?? subtype;
       if (isError || (subtype.length > 0 && subtype !== "success")) {
         terminalFailureEvidence = evidence;
-        terminalFailure = boundedMessageText(
-          providerErrorSentence(stringValue(parsed.result) ?? `Claude Code ended with ${reason || "an error"}.`, "claude"),
-        );
+        const said = stringValue(parsed.result) ?? "";
+        if (syntheticError === "authentication_failed" || /^Not logged in\b|Please run \/login|Invalid API key/i.test(said)) {
+          terminalFailureKind = "authentication-failed";
+          terminalFailure = CLAUDE_SIGNED_OUT;
+        } else {
+          terminalFailure = boundedMessageText(
+            providerErrorSentence(said || `Claude Code ended with ${reason || "an error"}.`, "claude"),
+          );
+        }
       }
       // What the run was NOT allowed to do.
       //
@@ -1360,7 +1378,7 @@ export function createClaudeEventNormalizer(
       if (terminalFailure !== undefined) {
         return [
           emit("run.failed", {
-            kind: "unknown",
+            kind: terminalFailureKind ?? "unknown",
             message: terminalFailure,
             ...(terminalFailureEvidence === undefined ? {} : { evidence: terminalFailureEvidence }),
             ...(runtimeThreadId === undefined ? {} : { runtimeThreadId }),

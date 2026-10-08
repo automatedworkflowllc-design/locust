@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   CLAUDE_COMPACTED,
   CLAUDE_COMPACTED_ON_REQUEST,
+  CLAUDE_SIGNED_OUT,
   createClaudeEventNormalizer,
   claudeToolTarget,
   limitKindFor,
@@ -455,6 +456,24 @@ describe("tool pairing and terminal state", () => {
       }),
     );
     expect(failed?.type).toBe("tool.failed");
+  });
+
+  it("says a signed-out Claude Code once, in words a person can act on, as a sign-in failure", () => {
+    // Drawn by Claude Code 2.1.293 on 2026-10-07 with no sign-in (an empty CLAUDE_CONFIG_DIR).
+    const claude = normalizer();
+    const standIn = claude.accept(
+      record({
+        type: "assistant",
+        error: "authentication_failed",
+        message: { id: "m1", model: "<synthetic>", role: "assistant", content: [{ type: "text", text: "Not logged in · Please run /login" }] },
+      }),
+    );
+    expect(standIn).toEqual([]);
+    claude.accept(record({ type: "result", subtype: "success", is_error: true, result: "Not logged in · Please run /login" }));
+    const [terminal] = claude.finish(completion({ exitCode: 1 }));
+    expect(terminal?.type).toBe("run.failed");
+    expect(terminal?.type === "run.failed" && terminal.payload.kind).toBe("authentication-failed");
+    expect(terminal?.type === "run.failed" && terminal.payload.message).toBe(CLAUDE_SIGNED_OUT);
   });
 
   it("completes only when the provider actually said it finished", () => {
