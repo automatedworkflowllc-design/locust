@@ -11,6 +11,20 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.703.0 - 2026-10-08
+
+### New
+
+- **Your other AI apps can start teammates in their own mode, if you turn it on.** Settings, General, "Let your other AI apps use Locust" has a second switch, "Use each teammate's own mode", off by default. Off, a turn another app starts is Ask (read only), as before. On, it runs in the mode the teammate is set to in Locust, so a teammate on Edit can change files. Its approval cards still appear only in Locust's window, and only you can answer them; the other app is told a card is waiting. Auto still runs only if Auto is on in Settings, and there are still no automatic hand-offs. list_teammates says which mode each teammate's turn would use.
+
+### Improved
+
+- **Scrolled up while a teammate works, the way-down button shows the thinking dots.** You can see the run is still going without scrolling down to check. Point at it, or tab to it, and it is the arrow again. It also keeps its round shape in a long conversation, where it had been squeezed to half its height.
+
+### Fixed
+
+- **Cloud on a Codex teammate says it runs on the model Codex Cloud chooses.** Codex Cloud takes no model of its own, so the model in the box did not decide it.
+
 ## 0.702.0 - 2026-10-08
 
 ### Fixed
